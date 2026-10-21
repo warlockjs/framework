@@ -1,4 +1,9 @@
 {
+  "5.36.0": {
+    "publishedAt": "2026-10-21T23:12:50.741Z",
+    "matrix": "none",
+    "summary": "**Smaller, safer page payloads and the Vite 8 / Vitest 5 family.** Breaking: `@warlock.js/web` needs Vite 8 and plugin-react 6 (a clear error names the upgrade on Vite 7), the test kit and AI matchers need Vitest 5, pages embed only the named API routes their client code reaches (`config.apiRoutes`, `clientVisible: false`), and hydration payloads carry only the translation keys a page uses. `npx warlock upgrade --from 5.35 --to 5.36.0` raises Vite, Vitest and plugin-react and rewrites the Vitest 5 runner import. Shared translation groups ship once per locale as cached, content-hashed tables (fixed per process in production, with a latest-table fallback); other keys are pruned per page from literal keys, count variants, static template prefixes and `config.translations`, with `WL9104` for keys built at run time. `build.budgets.payload` (default 64kb) reports oversized inline payloads by section. Fixes: development page edits no longer wait for the sitemap refresh; cascade persists unsetting a stored empty object; browser e2e click and wait errors keep the real reason near the deadline. The docs site moves to Astro 7. Lockstep release across all 33 packages. Generator matrix scope: `none`; before publishing, the blog on the 5.36.0 tarballs passed the release gate; after publishing, every package was confirmed at the npm origin and the blog check passed against npm."
+  },
   "5.35.0": {
     "publishedAt": "2026-10-21T14:58:50.485Z",
     "matrix": "none",

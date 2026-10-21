@@ -136,6 +136,247 @@
   ],
   "releases": [
     {
+      "version": "5.36.0",
+      "id": "v5-36-0",
+      "date": "October 21, 2026",
+      "isUnreleased": false,
+      "summaryHtml": "<strong>Smaller, safer page payloads and the Vite 8 / Vitest 5 family.</strong> Breaking: <code>@warlock.js/web</code> needs Vite 8 and plugin-react 6 (a clear error names the upgrade on Vite 7), the test kit and AI matchers need Vitest 5, pages embed only the named API routes their client code reaches (<code>config.apiRoutes</code>, <code>clientVisible: false</code>), and hydration payloads carry only the translation keys a page uses. <code>npx warlock upgrade --from 5.35 --to 5.36.0</code> raises Vite, Vitest and plugin-react and rewrites the Vitest 5 runner import. Shared translation groups ship once per locale as cached, content-hashed tables (fixed per process in production, with a latest-table fallback); other keys are pruned per page from literal keys, count variants, static template prefixes and <code>config.translations</code>, with <code>WL9104</code> for keys built at run time. <code>build.budgets.payload</code> (default 64kb) reports oversized inline payloads by section. Fixes: development page edits no longer wait for the sitemap refresh; cascade persists unsetting a stored empty object; browser e2e click and wait errors keep the real reason near the deadline. The docs site moves to Astro 7. Lockstep release across all 33 packages. Generator matrix scope: <code>none</code>; before publishing, the blog on the 5.36.0 tarballs passed the release gate; after publishing, every package was confirmed at the npm origin and the blog check passed against npm.",
+      "matrix": "none",
+      "matrixRows": null,
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/web",
+          "slug": "web",
+          "total": 24,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 3
+            },
+            {
+              "type": "Changed",
+              "n": 6
+            },
+            {
+              "type": "Fixed",
+              "n": 14
+            },
+            {
+              "type": "Security",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "Page documents carry only the named API routes their client code can reach. The build finds them from the page's browser code (string literals, template prefixes and the register hooks of setup files) and from <code>config.apiRoutes</code>, which page, layout and root setups accept for names the build cannot see (a <code>prefix.*</code> pattern covers every name under a prefix)."
+            },
+            {
+              "type": "Added",
+              "html": "<code>build.budgets.payload</code> sets the inline payload limit for each rendered document (default <code>64kb</code>, with route globs and a <code>warn</code> or <code>error</code> mode). A runtime measurement of the hydration data and the route table, split by section, reports an over-budget route once per process with its largest keys."
+            },
+            {
+              "type": "Added",
+              "html": "<code>warlock check</code> reports <code>WL9019</code> and <code>WL9020</code> for browser route references (see core)."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>apiHref()</code> and <code>useSubmitForm({ route })</code> resolve names against the current page's route table. Development errors name the route and the declaration that fixes it; production throws a short error with no fallback."
+            },
+            {
+              "type": "Changed",
+              "html": "A client navigation publishes the table of the page it swaps in."
+            },
+            {
+              "type": "Changed",
+              "html": "The document's hydration payload no longer repeats the route table, which its own script already carries."
+            },
+            {
+              "type": "Changed",
+              "html": "The client build, the development server and the Vite plugins run on Vite 8 (Rolldown) and <code>@vitejs/plugin-react</code> 6. The vendor split uses <code>build.rolldownOptions</code> with a <code>codeSplitting</code> group, and the development server configures JSX through <code>oxc</code>, so neither prints a Vite deprecation warning."
+            },
+            {
+              "type": "Changed",
+              "html": "The <code>vite</code> peer range is <code>^8.0.0</code> and the <code>@vitejs/plugin-react</code> peer range is <code>^6.0.0</code>."
+            },
+            {
+              "type": "Changed",
+              "html": "<strong>BREAKING</strong> A page's hydration payload no longer carries every translation group, in either translation mode. It carries the keys the page's client code can reach, and the shared groups arrive in a separate, cached table. Apps that read the hydration payload directly, that read keys their client code builds at run time without declaring them, or that rely on every key being present in the browser's registry, must update. Declare the keys with <code>config.translations</code>, or set <code>build.translations.prune</code> to <code>false</code> in the web connector options to restore the previous payload while migrating. See the upgrade note below."
+            },
+            {
+              "type": "Fixed",
+              "html": "Development page edits reach the browser without waiting for the sitemap subscription refresh, which still runs in order before the next route update. Under heavy machine load a page edit made right after deleting a layout or setup file could take longer than ten seconds to appear."
+            },
+            {
+              "type": "Fixed",
+              "html": "Shared translation groups (default <code>app</code> and <code>common</code>) are shipped once per locale as a table whose URL carries its content hash, and the document preloads it. Hydration waits for the table, so the first client render has every key the server rendered with. Locale switching loads the other locale's table. Route dictionaries (<code>locales.json</code>) emit the table at build time under <code>assets/translations/</code>; the global registry (<code>extend()</code> / <code>register()</code>) computes it from the live registry and serves it at <code>/__warlock/translations/&lt;locale&gt;.&lt;hash&gt;.json</code>."
+            },
+            {
+              "type": "Fixed",
+              "html": "Production serves a table with <code>Cache-Control: public, max-age=31536000, immutable</code>, and each locale's newest table at <code>/__warlock/translations/&lt;locale&gt;.json</code> with <code>no-cache</code>."
+            },
+            {
+              "type": "Fixed",
+              "html": "Global-registry production builds copy the shared groups once, when the web connector boots. That copy and its hash are fixed for the process, so every process of one build publishes the same table under the same name. Keys a page registers later travel inline in its payload."
+            },
+            {
+              "type": "Fixed",
+              "html": "A browser whose hashed table answers 404 fetches the unhashed latest table, then retries the hashed one, and only then reports the failure and renders keys. Development serves it with <code>no-store</code> and carries every group, so the missing-key detector can read it. A name the server no longer holds (the eight most recent tables per locale are kept) answers 404 with <code>no-store</code> and never different bytes under the same name."
+            },
+            {
+              "type": "Fixed",
+              "html": "Per-page pruning of every other group, in both modes: a page inlines only the keys its client module graph can look up. Literal keys, static-prefix template keys (which include their subtree), module-level constants, literal choices, and <code>config.translations</code> declarations in the page's setup file are resolved statically. Any other key-shaped string literal in the graph (a constant, an object mapping names to keys, a prop, an argument to a helper) that equals a key, a group or a subtree is shipped too, and the head of a template literal counts as a prefix. A key used with a <code>count</code> ships all its variants (<code>items_one</code>, <code>items_other</code>, ...) when the page names the base. A key that cannot be resolved (<code>trans(key)</code>, or a translator passed on as a value) makes that page fall back to every non-shared group."
+            },
+            {
+              "type": "Fixed",
+              "html": "The web connector's build option <code>build.translations</code>: <code>sharedGroups</code> (default <code>[\"app\", \"common\"]</code>) and <code>prune</code> (default <code>true</code>). Development reads the same option, so both halves share the settings."
+            },
+            {
+              "type": "Fixed",
+              "html": "The hydration payload's <code>translationAssets</code> reference (URL, hash, groups and a development flag). Client navigation merges each payload's pruned keys into the locale's dictionary (or the global registry)."
+            },
+            {
+              "type": "Fixed",
+              "html": "Development: a translation the page reads but its payload lacks is resolved from the full table, with one warning per key and page that names the <code>config.translations</code> declaration to add. A base key whose count variants were delivered is not reported as missing."
+            },
+            {
+              "type": "Fixed",
+              "html": "Production: a missing key renders its key and is reported once through <code>onClientError</code> with the new <code>kind: \"translations\"</code>. A shared table that cannot be loaded is retried once; the page then renders its keys and the failure is reported the same way."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>warlock check</code> reports <code>WL9104</code> for a translation key computed at runtime in <code>src/web</code>."
+            },
+            {
+              "type": "Fixed",
+              "html": "Gate A's refusal of Node builtins in the bundler's <code>external</code> option works on Vite 8. Rolldown does not pass <code>external</code> to <code>buildStart</code>, so the guard reads the option in the <code>options</code> hook and normalizes a string, a RegExp, an array or a function; without this a build with <code>fs</code> externalized would have shipped it unrefused."
+            },
+            {
+              "type": "Fixed",
+              "html": "Client budget attribution (<code>clientBudgetModules</code>) reads Rolldown's <code>renderedLength</code>, and a spec runs it on a real build."
+            },
+            {
+              "type": "Fixed",
+              "html": "An app that still has Vite 7 installed gets a clear error before the client build or the development server starts, naming the found version and the upgrade command. Before, <code>warlock build</code> failed with <code>Could not resolve entry module</code> because Vite 7 ignores <code>build.rolldownOptions</code>. A Vite version that cannot be parsed is not blocked."
+            },
+            {
+              "type": "Security",
+              "html": "Named API routes are no longer published to every visitor. Admin, auth and internal endpoints are embedded only in pages whose browser code reaches them, and never for a route registered with <code>clientVisible: false</code>. Server-side authorization still decides each request."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 9,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 7
+            },
+            {
+              "type": "Changed",
+              "n": 1
+            },
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>clientVisible</code> route option. Set <code>clientVisible: false</code> on a named API route to keep it out of every page's browser route table and out of client code. The route snapshot carries <code>clientVisible: false</code> only on such routes."
+            },
+            {
+              "type": "Added",
+              "html": "<code>warlock check</code> reports <code>WL9019</code> (warning) for a browser route call (<code>apiHref()</code>, <code>useSubmitForm({ route })</code>) whose name cannot be read statically, and <code>WL9020</code> (error) for a browser reference to a <code>clientVisible: false</code> route."
+            },
+            {
+              "type": "Added",
+              "html": "<code>build.budgets.payload</code> (<code>PayloadBudget</code> type) sets the inline payload budget for each rendered document. Web reads it; <code>warlock build</code> does not measure it."
+            },
+            {
+              "type": "Added",
+              "html": "<code>page.measurePayload({ limit })</code> in the browser end-to-end kit records a document's inline payload under the evidence <code>payloads</code>."
+            },
+            {
+              "type": "Added",
+              "html": "Static translation usage analysis for the client module graph: <code>scanTranslationSource</code>, <code>analyzeTranslationGraph</code>, <code>analyzePageTranslationUsage</code>, <code>readTranslationDeclarations</code>, <code>translationDeclarationUsage</code>, <code>isTranslationKeyUsed</code> and <code>mergeTranslationUsage</code>. A usage lists the exact keys (each with its subtree), the static prefixes of template keys, the key-shaped string literals and template heads found anywhere in the walked modules (<code>literals</code>, <code>literalPrefixes</code>), and whether any lookup is dynamic, with the source position of each dynamic lookup. Literal keys, module-level constants, literal choices, <code>useTrans()</code> bindings under any local name, and <code>config.translations</code> declarations are resolved; a translator passed on as a value, or a key with no static prefix, is dynamic. <code>isTranslationKeyUsed</code> also treats a name as the base of its count variants: <code>\"cart.items\"</code> reaches <code>cart.items_one</code> and <code>cart.items_other</code>, but not <code>cart.itemsTotal</code> or <code>cart.items_one.note</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<code>WL9104</code>: <code>warlock check</code> warns when a translation key in <code>src/web</code> is computed at runtime, because the page that renders it then ships every translation group. The warning points at the <code>config.translations</code> declaration that resolves it."
+            },
+            {
+              "type": "Added",
+              "html": "<code>warlock upgrade</code> codemod <code>vite-8-vitest-5</code> (release 5.36.0): raises <code>vite</code>, <code>vitest</code>, <code>@vitest/*</code> and <code>@vitejs/plugin-react</code> in <code>package.json</code> (dependencies, devDependencies, <code>overrides</code>, <code>resolutions</code>), rewrites a test runner that imports <code>VitestTestRunner</code> from <code>vitest/runners</code> to <code>TestRunner</code> from <code>vitest</code>, and lists removed <code>vitest/*</code> entry points, a Vite config <code>esbuild</code> option and object <code>manualChunks</code> for review. A 5.36.0 note lists the Vitest 5 default changes."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>warlock add test</code> generates a runner that extends <code>TestRunner</code> from <code>vitest</code> (Vitest 5 has no <code>vitest/runners</code>) and declares <code>vitest</code> and <code>@vitest/coverage-v8</code> <code>^5.0.3</code>. <code>warlock add web</code> declares <code>vite</code> <code>^8.3.3</code> and <code>@vitejs/plugin-react</code> <code>^6.1.2</code>."
+            },
+            {
+              "type": "Fixed",
+              "html": "The browser end-to-end kit keeps the reason a target was last observed as blocking when <code>page.click()</code> (and the <code>fill()</code> and <code>type()</code> calls that click first) or a wait runs out of time. A CDP timeout caused by the shrinking deadline no longer replaces that reason, so the error still reads, for example, \"target is covered by DIALOG#modal\" instead of a CDP timeout."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai",
+          "slug": "ai",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "The <code>Matchers</code> augmentation that types <code>toRouteTo</code>, <code>toConverge</code>, <code>toPassStep</code> and <code>toOutputShape</code> follows Vitest 5's <code>Matchers&lt;R, T&gt;</code> signature. With Vitest 5 installed, <code>expect(...)</code> keeps its custom matcher types; the augmentation no longer compiles against Vitest 4."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/cascade",
+          "slug": "cascade",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Unsetting a stored empty object (<code>model.unset(\"field\")</code> on a field holding <code>{}</code>) is persisted: the model reports the change and <code>save()</code> issues the <code>$unset</code>. It was silently skipped, because an empty object has no leaves to diff; a spec only passed by reading a mock call left over from an earlier test."
+            }
+          ]
+        },
+        {
+          "name": "create-warlock",
+          "slug": "create-warlock",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "The template pins Vitest 5.0.3. Selecting the test feature generates the runner against Vitest 5's <code>TestRunner</code>, and a web project declares Vite 8 and <code>@vitejs/plugin-react</code> 6. The generator's own dev dependencies use <code>@types/node</code> 22, the minimum Vitest 5 supports."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "5.35.0",
       "id": "v5-35-0",
       "date": "October 21, 2026",
@@ -8267,15 +8508,7 @@
       "isUnreleased": false,
       "summaryHtml": "<strong>Page actions and sessions in pages.</strong> Pages can export <code>action</code>/<code>actions</code> and post with <code>&lt;Form&gt;</code> (works without JavaScript; <code>useActionData</code>, <code>FieldError</code>, <code>useIsSubmitting</code>), and read the signed-in user with <code>useUser()</code>, guarded server-side by <code>requireUser</code>/<code>requireGuest</code> from <code>@warlock.js/web/session</code>. <strong>Upgrade review required:</strong> a full framework sweep ships ~140 fixes with behaviour changes across core, cascade, web and auth (see each package changelog). Lockstep release across all 30 packages. Generator matrix ran <code>subset</code> scope (<code>baseline</code>, <code>scheduler</code>, <code>postgres</code>, <code>redis</code>, <code>web</code>, <code>sitemap</code>, <code>socket</code> rows); Hasan authorised it on 2026-09-24: \"Don't wait for any other approvals, you have green light to do everything needed to have 5.21 released, don't stop before the release, no complete the push and publish/release\".",
       "matrix": "subset",
-      "matrixRows": [
-        "baseline",
-        "scheduler",
-        "postgres",
-        "redis",
-        "web",
-        "sitemap",
-        "socket"
-      ],
+      "matrixRows": ["baseline", "scheduler", "postgres", "redis", "web", "sitemap", "socket"],
       "mode": "detail",
       "packages": [
         {
@@ -8571,15 +8804,7 @@
       "isUnreleased": false,
       "summaryHtml": "<strong>Cache compatibility changes require an upgrade review:</strong> <code>cached()</code> auto-keys, flat memory keys, finite ownership-safe locks, Redis <code>FLUSHDB</code>, tokenized stored lock values, and numeric TTL normalization all change observable behavior. <code>@warlock.js/web</code> adds generated named-route types and managed sitemap generations; Core, Cache, Cascade, Auth, Scheduler, and Socket.IO add safer multi-instance boundaries. Lockstep release across all 30 packages. Generator matrix ran <code>subset</code> scope (<code>baseline</code>, <code>scheduler</code>, <code>postgres</code>, <code>redis</code>, <code>web</code>, <code>sitemap</code>, <code>socket</code> rows); Hasan authorised it on 2026-09-24: \"Go with rec, and tell me whether we should move the matrix run from my machine to Github instead and I report back with failures or keep it on my machine?\".",
       "matrix": "subset",
-      "matrixRows": [
-        "baseline",
-        "scheduler",
-        "postgres",
-        "redis",
-        "web",
-        "sitemap",
-        "socket"
-      ],
+      "matrixRows": ["baseline", "scheduler", "postgres", "redis", "web", "sitemap", "socket"],
       "mode": "detail",
       "packages": [
         {
@@ -10050,10 +10275,7 @@
       "isUnreleased": false,
       "summaryHtml": "<strong><code>@warlock.js/web</code> moves page, layout, and root server policy into one direct <code>config</code> export (BREAKING)</strong>: <code>PageConfig</code>, <code>LayoutConfig</code>, and <code>RootConfig</code> keep route/cache/prefix/strict-mode policy together while loaders, registration, named error boundaries, and components remain separate. Web adds route-scoped <code>locales.json</code> translations, typed keys, <code>useChangeLocaleCode()</code>, and locale-aware navigation, sitemap, and robots behavior; new scaffolds enable root <code>strictMode</code>. <code>@warlock.js/core</code> and Web require <code>@mongez/localization</code> 3.5.0 for scoped translation lookup. Lockstep release across all 30 packages. Generator matrix ran <code>subset</code> scope (<code>web</code>, <code>sitemap</code> rows); Hasan authorised the release on 2026-09-21: \"Go with your rec\".",
       "matrix": "subset",
-      "matrixRows": [
-        "web",
-        "sitemap"
-      ],
+      "matrixRows": ["web", "sitemap"],
       "mode": "detail",
       "packages": [
         {
@@ -10626,13 +10848,7 @@
       "isUnreleased": false,
       "summaryHtml": "<strong>New package: <code>@warlock.js/sitemap</code></strong> — the thirtieth family member, and the first added since the family settled. Runtime <code>sitemap.xml</code> generation from the page registry, installed with <code>warlock add sitemap</code>, with <strong>zero runtime dependencies</strong>. It is usable three ways: standalone in any Node app, in an API-only Warlock app through <code>sitemapConnector({ entries })</code>, and in a Warlock web app from the page registry. A dynamic route that cannot be enumerated is omitted <strong>and named in a development diagnostic</strong> rather than silently dropped, and an enabled sitemap with no configured origin refuses to boot instead of serving absolute URLs built from a guessed host. Two silent failures are fixed in <code>@warlock.js/web</code> and <code>@warlock.js/core</code>: <code>useTrans()</code> returned the raw key after hydration — server HTML was correct, the post-hydration DOM was not, and the translated value never reached <code>dist/client</code> at all — so the hydration payload gains a seventh required key, <code>translations</code>, carrying only the active locale; and <code>request.cookie()</code> now throws <code>CookieJarUnavailableError</code> when <code>@fastify/cookie</code> is absent instead of returning <code>undefined</code>, which was indistinguishable from \"no such cookie\" and surfaced as a permanent unexplained 401. <code>@warlock.js/core</code> adds <code>app.publicUrl</code> with a <code>PUBLIC_APP_URL</code> fallback. <strong>BREAKING:</strong> <code>@warlock.js/queue/notifications</code> is removed (deprecated in 5.14 — use <code>bullmqQueue()</code> from <code>@warlock.js/notifications</code>), and <code>listRoutablePages</code> moved to the <code>@warlock.js/web/build</code> subpath. <code>@warlock.js/cache</code> finally declares a <code>test</code> script, so its 525 tests run in the release gate for the first time. Lockstep release across all 30 packages. Generator matrix ran <code>subset</code> scope (<code>baseline</code>, <code>web</code>, <code>sitemap</code>, <code>queue</code>, <code>bull-board</code> rows) against the staged candidate, authorised by Hasan on 2026-09-18: \"You could run the matrix if you feel it is important to this release\".",
       "matrix": "subset",
-      "matrixRows": [
-        "baseline",
-        "web",
-        "sitemap",
-        "queue",
-        "bull-board"
-      ],
+      "matrixRows": ["baseline", "web", "sitemap", "queue", "bull-board"],
       "mode": "detail",
       "packages": [
         {
@@ -10803,14 +11019,7 @@
       "isUnreleased": false,
       "summaryHtml": "<code>@warlock.js/web</code> renames the hydration mount from <code>#root</code> to <code>#vessel</code> (BREAKING) — <code>#root</code> collided with embeds and third-party widgets — and hardens the client-build secret scan to refuse EVERY reference to the global <code>process</code>, aliases included (BREAKING for <code>typeof process</code> feature detection). Dev SSR now externalises every installed <code>@warlock.js/*</code> package by rule instead of a hand-maintained list, closing the dual-module-instance class that split framework singletons. A cached page sends one <code>Vary</code> value on both its HTML and data representations. <code>@warlock.js/queue</code> gains a config-driven bull-board dashboard (<code>warlock add bull-board</code>) that refuses to mount unguarded in production, and <code>find(id)</code> no longer returns a finished job with a null result. <code>@warlock.js/notifications</code> takes over the BullMQ integration as <code>bullmqQueue()</code>, a lazy optional-peer driver; <code>@warlock.js/queue/notifications</code> is deprecated for one release. <code>@warlock.js/core</code> adds <code>middleware.cache({ tags })</code> so <code>invalidateTags()</code> clears cached API responses, verifies the esbuild native binary before <code>warlock dev</code> starts, and fixes a <code>devServer.timings</code> watcher phase that always reported 0ms. Lockstep release across all 29 packages. Generator matrix ran <code>subset</code> scope (<code>baseline</code>, <code>web</code>, <code>queue</code>, <code>bull-board</code>, <code>auth-google</code>, <code>auth-passkeys</code> rows) against the staged candidate, authorised by Hasan on 2026-09-17: \"Go ahead plz\".",
       "matrix": "subset",
-      "matrixRows": [
-        "baseline",
-        "web",
-        "queue",
-        "bull-board",
-        "auth-google",
-        "auth-passkeys"
-      ],
+      "matrixRows": ["baseline", "web", "queue", "bull-board", "auth-google", "auth-passkeys"],
       "mode": "detail",
       "packages": [
         {
@@ -10983,14 +11192,7 @@
       "isUnreleased": false,
       "summaryHtml": "<code>@warlock.js/queue</code> ships as a new package (durable BullMQ + Redis background jobs, <code>defineJob</code>, <code>queueConnector()</code>, a bull-board dashboard and a notifications dispatcher). <code>@warlock.js/auth</code> adds email verification, password reset, and login with Google, passkeys and phone OTP, with account linking via a new <code>provider_accounts</code> table. <code>@warlock.js/access</code> makes ABAC <code>strictPolicies</code> deny-by-default (BREAKING) to close a fail-open IDOR path. <code>@warlock.js/web</code> fixes a Host-header cache-poisoning gap in the server page cache key (BREAKING) and a stale-Suspense-fallback replay on cache HIT, and adds <code>linkStylesheetsFor</code> for lazily-imported per-tenant themes. <code>@warlock.js/core</code> adds <code>warlock add queue</code>/<code>warlock add auth-google</code>/<code>warlock add auth-passkeys</code> installers and typed translation-key generation, and drops its dependency on <code>@warlock.js/auth</code>. Lockstep release across all 28 packages. Generator matrix ran <code>subset</code> scope (<code>baseline</code>, <code>web</code>, <code>queue</code>, <code>access</code>, <code>auth-google</code>, <code>auth-passkeys</code> rows) against the staged candidate, authorised by Hasan on 2026-09-16: \"You've my approval for whatever decision you may need to take in this release.\"",
       "matrix": "subset",
-      "matrixRows": [
-        "baseline",
-        "web",
-        "queue",
-        "access",
-        "auth-google",
-        "auth-passkeys"
-      ],
+      "matrixRows": ["baseline", "web", "queue", "access", "auth-google", "auth-passkeys"],
       "mode": "detail",
       "packages": [
         {
@@ -11517,10 +11719,7 @@
       "isUnreleased": false,
       "summaryHtml": "<strong>The authenticated user moves from <code>request.user</code> to <code>request.locals.user</code></strong> (BREAKING, <code>@warlock.js/core</code> / <code>@warlock.js/auth</code> / <code>@warlock.js/access</code>), <code>@warlock.js/auth</code> adds a CSRF Origin check for cookie-authenticated writes plus <code>setAuthCookie()</code> / <code>clearAuthCookie()</code>, and <code>@warlock.js/web</code> ships an opt-in server-side page cache, <code>defer()</code>-ed streaming data with crawler-aware inlining, scroll restoration and locale-direction (RTL) support. <code>@warlock.js/core</code> adds opt-in request tracing and a CSP header; <code>create-warlock</code> scaffolds non-interactively by default and fixes a fresh-scaffold <code>npm run seed</code> failure. Lockstep release across all 28 packages. Generator matrix ran <code>subset</code> scope (<code>baseline</code>, <code>web</code> rows) against the staged candidate, authorised by Hasan on 2026-09-16: \"Yes do it please, don't release before completing all mising points and make sure you have covered everything in the tasks board.\"",
       "matrix": "subset",
-      "matrixRows": [
-        "baseline",
-        "web"
-      ],
+      "matrixRows": ["baseline", "web"],
       "mode": "detail",
       "packages": [
         {
