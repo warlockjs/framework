@@ -116,6 +116,22 @@ describe("router.getNamedApiRoutes responses", () => {
     expect(Object.keys(at(router.getNamedApiRoutes(), 1))).toEqual(["name", "path", "method"]);
   });
 
+  it("marks only a route that opted out of the browser with clientVisible false", () => {
+    router.get("/ping", handler(), { name: "ping" });
+    router.post("/internal/reindex", declared(), {
+      name: "internal.reindex",
+      clientVisible: false,
+    });
+    router.post("/visible", declared(), { name: "visible", clientVisible: true });
+
+    expect(router.getNamedApiRoutes()).toEqual([
+      { name: "ping", path: "/ping", method: "GET" },
+      { name: "internal.reindex", path: "/internal/reindex", method: "POST", clientVisible: false },
+      { name: "visible", path: "/visible", method: "POST" },
+    ]);
+    expect(Object.keys(at(router.getNamedApiRoutes(), 2))).toEqual(["name", "path", "method"]);
+  });
+
   it("adds response only to routes that declare a schema and the resolver describes", () => {
     router.get("/ping", handler(), { name: "ping" });
     router.post("/login", declared(), { name: "login" });

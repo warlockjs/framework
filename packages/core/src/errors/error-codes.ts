@@ -687,6 +687,22 @@ export const ERROR_CODES = {
     fix: "Assign controller.responseSchema with a contract for each response status.",
     skill: "warlock-check",
   },
+  WL9019: {
+    code: "WL9019",
+    area: "convention",
+    category: "code",
+    title: "A browser route call takes a name that cannot be read statically",
+    fix: 'Pass a string literal (or a template with a static prefix), or declare the names the page uses with `config.apiRoutes` in its setup file (`"orders.*"` covers a prefix).',
+    skill: "warlock-check",
+  },
+  WL9020: {
+    code: "WL9020",
+    area: "convention",
+    category: "code",
+    title: "Browser code references a named API route that is clientVisible: false",
+    fix: "Call the endpoint from the server instead, or remove `clientVisible: false` from the route if the browser must reach it.",
+    skill: "warlock-check",
+  },
   WL9101: {
     code: "WL9101",
     area: "convention",

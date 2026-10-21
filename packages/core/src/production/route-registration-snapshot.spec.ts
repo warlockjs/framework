@@ -94,6 +94,38 @@ describe("collectRouteRegistrationSnapshot", () => {
     expect(Object.isFrozen(snapshot.routes[0]?.response)).toBe(true);
   });
 
+  it("accepts clientVisible false as the only extra key, and only on the opted-out route", async () => {
+    const child = new FakeChild();
+    const result = collectRouteRegistrationSnapshot({
+      forkProcess: () => child as unknown as RouteRegistrationChildProcess,
+    });
+
+    child.emit("message", {
+      type: "route-registration:snapshot",
+      snapshot: {
+        version: 1,
+        routes: [
+          {
+            name: "internal.reindex",
+            path: "/internal/reindex",
+            method: "POST",
+            clientVisible: false,
+          },
+          { name: "ping", path: "/ping", method: "GET" },
+        ],
+      },
+    });
+    child.emit("close", 0);
+
+    const snapshot = await result;
+
+    expect(snapshot.routes).toEqual([
+      { name: "internal.reindex", path: "/internal/reindex", method: "POST", clientVisible: false },
+      { name: "ping", path: "/ping", method: "GET" },
+    ]);
+    expect(Object.keys(snapshot.routes[1] ?? {})).toEqual(["name", "path", "method"]);
+  });
+
   it.each([
     ["an unknown fourth key", { handler: "unsafe" }],
     ["response plus another key", { response: { "200": "string" }, handler: "unsafe" }],
@@ -101,6 +133,8 @@ describe("collectRouteRegistrationSnapshot", () => {
     ["an array response", { response: ["string"] }],
     ["a response with a non-string type", { response: { "200": 1 } }],
     ["a null response", { response: null }],
+    ["a clientVisible flag other than false", { clientVisible: true }],
+    ["clientVisible false plus another key", { clientVisible: false, handler: "unsafe" }],
   ])("refuses a route record with %s", async (_label, extra) => {
     const child = new FakeChild();
     const result = collectRouteRegistrationSnapshot({

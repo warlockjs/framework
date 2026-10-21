@@ -9,6 +9,12 @@ import { importFixes } from "./fixes";
 import { codeStyleFindings } from "./code-style-conventions";
 import { securityFindings } from "./security-conventions";
 import { webFindings, responseSchemaFindings, type ConventionOptions } from "./web-conventions";
+import {
+  apiRouteReferenceFindings,
+  collectApiRouteFacts,
+  EMPTY_API_ROUTE_FACTS,
+  type ApiRouteFacts,
+} from "./api-route-references";
 import { positionOf, type SourceFinding } from "./source-ast";
 
 /** Extensions tried when resolving an extension-less import. */
@@ -180,7 +186,9 @@ function findingProblem(
  *   and no `public: true`, a redirect target from request input, sensitive
  *   values in logs, unbounded regexes on request input;
  * - `WL9010`–`WL9012` warnings: `await log.*()`, a second controller in one
- *   file, a `kind` discriminator.
+ *   file, a `kind` discriminator;
+ * - `WL9019` (warning) and `WL9020` (error) the browser route references
+ *   (see `apiRouteReferenceFindings`).
  *
  * A `// warlock-check-ignore WL9006` comment on the problem's line or the line
  * above silences that code there; without codes it silences every one.
@@ -190,6 +198,7 @@ export function checkFileConventions(
   source: string,
   cwd: string,
   options: ConventionOptions = {},
+  apiRouteFacts: ApiRouteFacts = EMPTY_API_ROUTE_FACTS,
 ): ToolingProblem[] {
   const sourceFile = ast.parseSourceFile(relativePath, source);
   const problems = [
@@ -199,6 +208,7 @@ export function checkFileConventions(
       ...codeStyleFindings(sourceFile),
       ...webFindings(sourceFile, options),
       ...responseSchemaFindings(sourceFile),
+      ...apiRouteReferenceFindings(sourceFile, apiRouteFacts),
     ].map((finding) => findingProblem(sourceFile, relativePath, finding)),
   ];
   const lines = source.split(/\r?\n/);
@@ -267,6 +277,7 @@ export function runConventions(
   cwd: string,
   files: readonly string[],
   project?: string,
+  apiRouteFacts: ApiRouteFacts = collectApiRouteFacts(cwd, files),
 ): ToolingProblem[] {
   const options = readConventionOptions(cwd);
   const problems = checkTsconfigConventions(cwd, project)
@@ -285,7 +296,7 @@ export function runConventions(
       continue;
     }
 
-    problems.push(...checkFileConventions(file, source, cwd, options));
+    problems.push(...checkFileConventions(file, source, cwd, options, apiRouteFacts));
   }
 
   return problems;

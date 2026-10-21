@@ -76,11 +76,14 @@ function validateSnapshot(value: unknown): RouteRegistrationSnapshot {
     }
 
     const response = route.response;
-    const allowedKeys = response === undefined ? 3 : 4;
+    const clientVisible = route.clientVisible;
+    const allowedKeys =
+      3 + (response === undefined ? 0 : 1) + (clientVisible === undefined ? 0 : 1);
 
     if (
       Object.keys(route).length !== allowedKeys ||
-      (response !== undefined && !isResponseTypeRecord(response))
+      (response !== undefined && !isResponseTypeRecord(response)) ||
+      (clientVisible !== undefined && clientVisible !== false)
     ) {
       throw new Error("Route registration child sent a route record with non-browser-safe fields.");
     }
@@ -89,6 +92,7 @@ function validateSnapshot(value: unknown): RouteRegistrationSnapshot {
       name: route.name,
       path: route.path,
       method: normalizeRequestMethod(route.method),
+      ...(clientVisible === false ? { clientVisible: false as const } : {}),
     };
 
     return Object.freeze(
