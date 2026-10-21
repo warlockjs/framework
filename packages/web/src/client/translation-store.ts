@@ -30,6 +30,8 @@ type LocaleState = {
   pageLocal: Record<string, unknown>;
   pageName: string;
   dictionary: Readonly<Keywords> | undefined;
+  /** Set once a payload with a shared-table reference arrived: its page was pruned, so a miss means something. */
+  pruned: boolean;
 };
 
 /** Immutable tables, fetched once per URL. A failed load is remembered as `undefined`, so keys render instead of retrying forever. */
@@ -47,6 +49,7 @@ function stateOf(locale: string): LocaleState {
     pageLocal: {},
     pageName: "",
     dictionary: undefined,
+    pruned: false,
   };
   locales.set(locale, created);
 
@@ -133,6 +136,7 @@ export async function loadTranslationAssets(
   const assets = payload.translationAssets;
 
   if (assets !== undefined) {
+    state.pruned = true;
     const table = await loadTable(assets.url);
     state.shared = table === undefined ? undefined : describeShared(table, assets);
     state.dictionary = undefined;
@@ -215,6 +219,8 @@ export function translationsForKeyword(
   if (typeof keyword !== "string" || hasKeyword(dictionary, keyword)) return dictionary;
 
   const state = stateOf(locale);
+  // A payload that was never pruned delivered everything: nothing can be a pruning miss.
+  if (!state.pruned) return dictionary;
   const page = state.pageName;
   const full =
     state.shared?.development === true && hasKeyword(state.shared.table, keyword)
@@ -246,6 +252,25 @@ export function translationsForKeyword(
   );
 
   return dictionary;
+}
+
+/**
+ * A mutable deep copy of a locale's dictionary, for the global registry. The
+ * registry's `groupedTranslations()` writes into nested objects, so it must
+ * never receive the frozen objects this store hands to React.
+ */
+export function registryCopyOf(locale: string): Keywords {
+  return thaw(translationDictionaryFor(locale)) as Keywords;
+}
+
+function thaw(value: unknown): unknown {
+  if (typeof value !== "object" || value === null) return value;
+
+  const copy: Record<string, unknown> = {};
+
+  for (const [key, child] of Object.entries(value)) copy[key] = thaw(child);
+
+  return copy;
 }
 
 /** Test seam: drop every cached table, dictionary and report. */

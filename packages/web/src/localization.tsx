@@ -1,4 +1,5 @@
 import {
+  getKeywordsListOf,
   transFrom,
   transFromKeywords,
   type Converter,
@@ -96,6 +97,25 @@ export function useLocale(): string {
   return value.locale;
 }
 
+/**
+ * Global-registry mode: translate from `@mongez/localization`'s registry, as
+ * before. The registry is checked first, so a key the page did not receive
+ * (a pruning miss) is handled the way the dictionary path handles it.
+ */
+function translateFromRegistry(
+  locale: string,
+  keyword: Translatable,
+  placeholders: unknown,
+  converter: Converter | undefined,
+): unknown {
+  const registry = getKeywordsListOf(locale) ?? {};
+  const resolved = translationsForKeyword(locale, registry, keyword);
+
+  return resolved === registry
+    ? transFrom(locale, keyword, placeholders, converter)
+    : transFromKeywords(locale, resolved, keyword, placeholders, converter);
+}
+
 /** Translate without consulting @mongez/localization's process-global locale. */
 export function useTrans(): Translate {
   const value = useContext(LocaleContext);
@@ -112,7 +132,7 @@ export function useTrans(): Translate {
   return useCallback(
     (keyword: Translatable, placeholders?: unknown, converter?: Converter): unknown =>
       translations === undefined
-        ? transFrom(locale, keyword, placeholders, converter)
+        ? translateFromRegistry(locale, keyword, placeholders, converter)
         : transFromKeywords(
             locale,
             translationsForKeyword(locale, translations, keyword),
