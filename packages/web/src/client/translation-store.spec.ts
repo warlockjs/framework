@@ -377,3 +377,77 @@ describe("global-registry mode", () => {
     expect(getKeywordsListOf(LOCALE)).toEqual({ orders: { title: "Orders" } });
   });
 });
+
+describe("table load order", () => {
+  const latest = "/__warlock/translations/store-test.json";
+  const hashed = "/__warlock/translations/store-test.order.json";
+
+  it("answers from the unhashed latest table when the hashed one is missing (404)", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({}, 404))
+      .mockResolvedValueOnce(jsonResponse({ app: { title: "Latest" } }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await loadTranslationAssets(
+      payload({}, { url: hashed, hash: "order", groups: ["app"], latest }),
+    );
+
+    expect(fetchMock.mock.calls.map((call) => call[0])).toEqual([hashed, latest]);
+    expect(translationDictionaryFor(LOCALE)).toEqual({ app: { title: "Latest" } });
+  });
+
+  it("does not ask for the latest table when the hashed one fails for another reason", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({}, 500))
+      .mockResolvedValueOnce(jsonResponse({ app: { title: "Retried" } }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await loadTranslationAssets(
+      payload({}, { url: hashed, hash: "order2", groups: ["app"], latest }),
+    );
+
+    expect(fetchMock.mock.calls.map((call) => call[0])).toEqual([hashed, hashed]);
+    expect(translationDictionaryFor(LOCALE)).toEqual({ app: { title: "Retried" } });
+  });
+
+  it("retries the hashed table once after the latest one also fails, then recovers", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({}, 404))
+      .mockResolvedValueOnce(jsonResponse({}, 503))
+      .mockResolvedValueOnce(jsonResponse({ app: { title: "Recovered" } }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await loadTranslationAssets(
+      payload({}, { url: hashed, hash: "order3", groups: ["app"], latest }),
+    );
+
+    expect(fetchMock.mock.calls.map((call) => call[0])).toEqual([hashed, latest, hashed]);
+    expect(translationDictionaryFor(LOCALE)).toEqual({ app: { title: "Recovered" } });
+  });
+
+  it("renders its keys and reports once when the hashed and latest tables both stay missing", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => jsonResponse({}, 404)),
+    );
+    const reports: unknown[] = [];
+    onClientError((event) => {
+      reports.push(event);
+    });
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    await loadTranslationAssets(
+      payload(
+        { orders: { title: "Kept" } },
+        { url: hashed, hash: "order4", groups: ["app"], latest },
+      ),
+    );
+
+    expect(translationDictionaryFor(LOCALE)).toEqual({ orders: { title: "Kept" } });
+    expect(reports).toHaveLength(1);
+    expect(reports[0]).toMatchObject({ kind: "translations" });
+  });
+});

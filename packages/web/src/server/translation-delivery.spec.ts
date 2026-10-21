@@ -206,3 +206,33 @@ describe("createRouteTranslationsResolver with delivery", () => {
     expect(snapshot?.delivered?.assets?.groups).toEqual(["app"]);
   });
 });
+
+describe("development options", () => {
+  it("honours prune: false, so every development page reaches every key", () => {
+    const root = tempRoot();
+    const page = path.join(root, "src/web/orders.page.tsx");
+    fs.mkdirSync(path.dirname(page), { recursive: true });
+    fs.writeFileSync(page, `export default () => trans("orders.title");`, "utf8");
+
+    const delivery = developmentTranslationDelivery({
+      sources,
+      appSrcRoot: path.join(root, "src"),
+      pages: [{ pageFile: page, entries: [page], setupFiles: [] }],
+      prune: false,
+    });
+
+    expect(delivery.usageFor(page).dynamic).toBe(true);
+  });
+
+  it("uses the shared groups the options name, in the table it publishes", () => {
+    const delivery = developmentTranslationDelivery({
+      sources,
+      appSrcRoot: tempRoot(),
+      pages: [],
+      sharedGroups: ["members"],
+    });
+
+    expect(delivery.sharedGroups).toEqual(["members"]);
+    expect(delivery.assetFor("en")?.groups).toEqual(["members"]);
+  });
+});

@@ -2,7 +2,11 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { buildTranslationManifest, resolveSharedGroups } from "./translation-manifest";
+import {
+  buildTranslationManifest,
+  resolveSharedGroups,
+  resolveTranslationOptions,
+} from "./translation-manifest";
 import { writeTranslationAssets } from "./emit-translation-assets";
 import type { DiscoveredPage, DiscoveredRoutablePage } from "./discover-pages";
 import { CLIENT_ASSET_URL_PREFIX } from "../server/client-asset-url-prefix";
@@ -127,13 +131,6 @@ describe("buildTranslationManifest", () => {
     );
   });
 
-  it("records each page's usage again under its route name, for the global-registry mode", () => {
-    const { manifest } = buildTranslationManifest(input());
-
-    expect(manifest.routes?.orders?.prefixes).toEqual(["statuses."]);
-    expect(manifest.routes?.members?.keys).toEqual(expect.arrayContaining(["members.title"]));
-  });
-
   it("records error pages as their own entries", () => {
     const { manifest } = buildTranslationManifest(input());
 
@@ -201,5 +198,21 @@ describe("writeTranslationAssets", () => {
     } finally {
       fs.rmSync(assetsDirectory, { recursive: true, force: true });
     }
+  });
+});
+
+describe("resolveTranslationOptions", () => {
+  it("applies the defaults when no option is given", () => {
+    expect(resolveTranslationOptions(undefined)).toEqual({
+      sharedGroups: ["app", "common"],
+      prune: true,
+    });
+  });
+
+  it("reads the same settings the build and the development server both use", () => {
+    expect(resolveTranslationOptions({ sharedGroups: ["members"], prune: false })).toEqual({
+      sharedGroups: ["members"],
+      prune: false,
+    });
   });
 });

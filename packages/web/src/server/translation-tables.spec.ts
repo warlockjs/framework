@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { contentHash } from "../translations/delivery";
 import { registerTranslationTableRoute } from "./translation-route";
 import {
+  latestTranslationTableFor,
+  pinTranslationTable,
   publishTranslationTable,
   RECENT_TRANSLATION_TABLES,
   resetTranslationTablesForTests,
@@ -113,6 +115,47 @@ describe("the translation table route", () => {
     expect(response.status).toBe(404);
     expect(response.body).toBe("");
     expect(response.headers["Cache-Control"]).toBe("no-store");
+  });
+
+  it("never ages out a pinned table, however many tables are published after it", () => {
+    const pinned = pinTranslationTable("en", '{"app":{"title":"Pinned"}}');
+
+    for (let version = 0; version < RECENT_TRANSLATION_TABLES * 2; version += 1) {
+      publishTranslationTable("en", `{"v":${version}}`, true);
+    }
+
+    expect(translationTableFor("en", pinned)?.body).toBe('{"app":{"title":"Pinned"}}');
+    expect(translationTableFor("en", pinned)?.development).toBe(false);
+  });
+
+  it("makes the newest table the latest for its locale, pinned or published", () => {
+    publishTranslationTable("en", '{"v":1}', true);
+    const pinned = pinTranslationTable("en", '{"v":2}');
+
+    expect(latestTranslationTableFor("en")?.body).toBe('{"v":2}');
+    expect(translationTableFor("en", pinned)).toBeDefined();
+  });
+
+  it("answers the unhashed latest name with the newest table, revalidated with no-cache", () => {
+    publishTranslationTable("en", '{"v":1}', false);
+    const newest = pinTranslationTable("en", '{"v":2}');
+
+    const response = serve("en.json");
+
+    expect(response.status).toBeUndefined();
+    expect(response.body).toBe('{"v":2}');
+    expect(response.headers["Cache-Control"]).toBe("no-cache");
+    expect(translationTableFor("en", newest)).toBeDefined();
+  });
+
+  it("answers the latest name of a development table with no-store", () => {
+    publishTranslationTable("en", '{"v":1}', true);
+
+    expect(serve("en.json").headers["Cache-Control"]).toBe("no-store");
+  });
+
+  it("answers 404 for the latest name of a locale with no table", () => {
+    expect(serve("fr.json").status).toBe(404);
   });
 
   it("refuses a name that is not a table file", () => {
