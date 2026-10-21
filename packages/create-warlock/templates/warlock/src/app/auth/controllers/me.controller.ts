@@ -1,5 +1,5 @@
-import { UserResource } from "app/users/resources/user.resource";
 import { type GuardedRequestHandler } from "app/auth/requests/guarded.request";
+import { UserResource } from "app/users/resources/user.resource";
 
 /**
  * Get current user controller

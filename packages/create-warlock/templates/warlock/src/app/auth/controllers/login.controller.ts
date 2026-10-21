@@ -1,5 +1,5 @@
-import { UserResource } from "app/users/resources/user.resource";
 import { type Request, type RequestHandler } from "@warlock.js/core";
+import { UserResource } from "app/users/resources/user.resource";
 import { loginSchema, type LoginSchema } from "../schema/login.schema";
 import { loginService } from "../services/auth.service";
 
