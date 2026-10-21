@@ -454,7 +454,7 @@ and has no Warlock setup or HTTP global setup. `integration` discovers
 It uses the framework setup, HTTP global setup and a generated `src/test-runner.ts`.
 Keep pure service specs beside their source and mock repositories at the boundary.
 Existing config files are preserved; copy the projects layout into them manually.
-Vitest 4.1.10 or newer is required for the generated runner.
+Vitest 5 or newer is required for the generated runner (Vitest 5 removed `vitest/runners`; the runner extends `TestRunner` from `vitest`).
 
 For a unit spec that needs configuration values, use:
 
@@ -502,20 +502,20 @@ Run with `npx vitest run --project integration`. Worker lifetime refuses watch,
 threads, isolated module graphs, or a missing runner with a message explaining
 the required settings. Keep `afterAll(teardownTest)` in the setup file: in worker
 mode it marks the end of the file; Vitest's awaited worker cleanup closes the
-runtime once. The runner uses `VitestTestRunner.onCleanupWorkerContext`, verified
-in Vitest 4.1.10's `runners.d.ts`, runner implementation and worker cleanup source.
+runtime once. The runner uses `TestRunner.onCleanupWorkerContext`, verified
+in Vitest 5.0.3's `TestRunner` declaration, runner implementation and worker cleanup source.
 For an existing project, generate this runner without overwriting your config:
 
 ```ts title="src/test-runner.ts"
 import { configureTestWorker } from "@warlock.js/core/tests";
-import { VitestTestRunner } from "vitest/runners";
+import { TestRunner } from "vitest";
 
-export default class WarlockTestRunner extends VitestTestRunner {
-  public constructor(config: ConstructorParameters<typeof VitestTestRunner>[0]) {
+export default class WarlockTestRunner extends TestRunner {
+  public constructor(config: ConstructorParameters<typeof TestRunner>[0]) {
     super(config);
     configureTestWorker(
       { pool: this.pool, watch: config.watch, isolate: config.isolate },
-      (cleanup) => this.onCleanupWorkerContext(cleanup),
+      (cleanup) => this.onCleanupWorkerContext?.(cleanup),
     );
   }
 }
@@ -534,7 +534,7 @@ This trades module isolation for startup cost: application singletons, config
 mutations, mocks and module side effects can survive between files. Reset your
 own state in `resetBetweenFiles`, restore mocks, and keep connector selection
 consistent. Give each worker a distinct database/schema using
-`process.env.VITEST_POOL_ID` when preparing test connections. Never drop a shared
+`process.env.VITEST_POOL_ID` (1-based since Vitest 5) when preparing test connections. Never drop a shared
 database from this hook while other workers are using it. The framework does not
 create a memory replica set or a cross-worker lock; those belong to the application's
 global setup. A shared HTTP server and a single replica set can contend on I/O,

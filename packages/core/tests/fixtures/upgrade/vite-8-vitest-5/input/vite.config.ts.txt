@@ -1,0 +1,12 @@
+import { defineConfig } from "vitest/config";
+
+export default defineConfig({
+  esbuild: { target: "es2022", jsx: "automatic" },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: { vendor: ["react"] },
+      },
+    },
+  },
+});

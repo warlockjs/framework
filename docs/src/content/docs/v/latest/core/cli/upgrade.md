@@ -52,22 +52,23 @@ stops before touching anything and prints the install command, e.g.
 
 ## What it does for 5.30 and 5.31
 
-| Codemod                | Release | Edits                                                                                                                                        | Lists for review                                                       |
-| ---------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
-| `logger-sync-calls`    | 5.30    | Removes `await` before `log.info/warn/error/debug/success/fatal/log/assert`.                                                                 | `.then()` chained on a log call.                                       |
-| `request-log-snapshot` | 5.30    | In custom log channels: `context.request.baseRequest.url/method/ip` → `.url/.method/.ip`, `.route.path` → `.route`, `.route.name` → `.name`. | Any other read that is not on the snapshot (methods, headers, …).      |
-| `head-viewport`        | 5.30    | Removes a hand-written default viewport `<meta>` next to `<Head />`.                                                                         | A non-default viewport tag (move it to `metadata.viewport`).           |
-| `seal-validate-result` | 5.30    | —                                                                                                                                            | `validate()` results whose `.data` is read without an `isValid` check. |
-| `ai-tool-dispatch`     | 5.30    | —                                                                                                                                            | `ai.agent()`/`spawnSubAgent()` with tools and no `toolDispatch`.       |
-| `ai-anthropic-body`    | 5.30    | —                                                                                                                                            | `providerOptions.anthropic.body` setting a reserved key.               |
-| `ai-finish-reason`     | 5.30    | —                                                                                                                                            | `switch` statements over a `finishReason`.                             |
-| `node-22-15`           | 5.31    | Raises `engines.node`, `.nvmrc` and `.node-version` below 22.15.                                                                             | A Node alias it cannot read.                                           |
-| `rate-limit-defaults`  | 5.31    | —                                                                                                                                            | `src/config/http.ts` without a `rateLimit` (the default now applies).  |
-| `seal-refine-output`   | 5.31    | —                                                                                                                                            | Every `.refine()` (now runs on validated output).                      |
-| `seal-container-catch` | 5.31    | —                                                                                                                                            | `.catch()` on `v.object/array/record/tuple` (now a no-op).             |
-| `seal-union-output`    | 5.31    | —                                                                                                                                            | Every `v.union()` (now returns the branch's output).                   |
-| `ai-compaction-opt-in` | 5.31    | —                                                                                                                                            | Agent `compaction` without `afterTokens` and `summarize`.              |
-| `warlock-versions`     | every   | Sets each `@warlock.js/*` dependency to the target, keeping `^`/`~`/exact.                                                                   | —                                                                      |
+| Codemod                | Release | Edits                                                                                                                                                                                           | Lists for review                                                                        |
+| ---------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| `logger-sync-calls`    | 5.30    | Removes `await` before `log.info/warn/error/debug/success/fatal/log/assert`.                                                                                                                    | `.then()` chained on a log call.                                                        |
+| `request-log-snapshot` | 5.30    | In custom log channels: `context.request.baseRequest.url/method/ip` → `.url/.method/.ip`, `.route.path` → `.route`, `.route.name` → `.name`.                                                    | Any other read that is not on the snapshot (methods, headers, …).                       |
+| `head-viewport`        | 5.30    | Removes a hand-written default viewport `<meta>` next to `<Head />`.                                                                                                                            | A non-default viewport tag (move it to `metadata.viewport`).                            |
+| `seal-validate-result` | 5.30    | —                                                                                                                                                                                               | `validate()` results whose `.data` is read without an `isValid` check.                  |
+| `ai-tool-dispatch`     | 5.30    | —                                                                                                                                                                                               | `ai.agent()`/`spawnSubAgent()` with tools and no `toolDispatch`.                        |
+| `ai-anthropic-body`    | 5.30    | —                                                                                                                                                                                               | `providerOptions.anthropic.body` setting a reserved key.                                |
+| `ai-finish-reason`     | 5.30    | —                                                                                                                                                                                               | `switch` statements over a `finishReason`.                                              |
+| `node-22-15`           | 5.31    | Raises `engines.node`, `.nvmrc` and `.node-version` below 22.15.                                                                                                                                | A Node alias it cannot read.                                                            |
+| `rate-limit-defaults`  | 5.31    | —                                                                                                                                                                                               | `src/config/http.ts` without a `rateLimit` (the default now applies).                   |
+| `seal-refine-output`   | 5.31    | —                                                                                                                                                                                               | Every `.refine()` (now runs on validated output).                                       |
+| `seal-container-catch` | 5.31    | —                                                                                                                                                                                               | `.catch()` on `v.object/array/record/tuple` (now a no-op).                              |
+| `seal-union-output`    | 5.31    | —                                                                                                                                                                                               | Every `v.union()` (now returns the branch's output).                                    |
+| `ai-compaction-opt-in` | 5.31    | —                                                                                                                                                                                               | Agent `compaction` without `afterTokens` and `summarize`.                               |
+| `vite-8-vitest-5`      | 5.36    | Raises `vite`, `vitest`, `@vitest/*` and `@vitejs/plugin-react` in `package.json` (including `overrides`/`resolutions`); rewrites a `vitest/runners` test runner to `TestRunner` from `vitest`. | Removed `vitest/*` entry points, a Vite config `esbuild` option, object `manualChunks`. |
+| `warlock-versions`     | every   | Sets each `@warlock.js/*` dependency to the target, keeping `^`/`~`/exact.                                                                                                                      | —                                                                                       |
 
 Changes with nothing to edit (hashed auth throttle keys, the new image cache
 layout) are printed under "Plan for". Each `**BREAKING**` entry in the package
@@ -90,6 +91,26 @@ warlock upgrade 5.29.0 → 5.31.0 (dry run: nothing written)
 changedFiles, diff, installHint? }`. `applied` and `manual` entries carry
 `codemod`, `file` and `line`; `manual` entries add the `hint` and the `skill`
 to read.
+
+## 5.35 to 5.36: Vite 8 and Vitest 5
+
+`@warlock.js/web` now requires Vite 8 (`^8.0.0`) and `@vitejs/plugin-react` 6, and
+the test kit targets Vitest 5. Move the family together:
+
+```bash
+npm install --save-dev ts-morph
+npx warlock upgrade --from 5.35 --to 5.36.0 --dry-run
+npx warlock upgrade --from 5.35 --to 5.36.0
+npm install
+npx warlock check
+```
+
+The `vite-8-vitest-5` step only touches what Vite 8 and Vitest 5 no longer
+accept: the dependency ranges, a generated `src/test-runner.ts` that imports
+`VitestTestRunner` from `vitest/runners`, and a `vitest/runners` import with other
+names. It lists removed `vitest/*` entry points, a Vite config `esbuild` option and
+object `manualChunks` for review. See the Upgrading note in the `@warlock.js/web`
+changelog.
 
 ## 5.33 to 5.34: toolchain removal
 

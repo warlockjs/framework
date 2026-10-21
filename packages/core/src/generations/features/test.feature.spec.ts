@@ -32,6 +32,36 @@ describe("add test — generated src/test-setup.ts", () => {
   });
 });
 
+describe("add test — generated src/test-runner.ts", () => {
+  beforeEach(() => {
+    written.clear();
+    vi.spyOn(console, "log").mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("extends Vitest 5's TestRunner from the main entry, which no longer ships vitest/runners", async () => {
+    await testFeature.onExecuting?.({} as never);
+
+    const runner = [...written.entries()].find(([path]) => /test-runner\.ts$/.test(path))?.[1];
+
+    expect(runner).toContain('import { TestRunner } from "vitest";');
+    expect(runner).toContain("extends TestRunner");
+    expect(runner).toContain("this.onCleanupWorkerContext?.(cleanup)");
+    expect(runner).not.toContain("vitest/runners");
+  });
+
+  it("declares vite 8 and vitest 5 for the app", () => {
+    expect(testFeature.devDependencies).toMatchObject({
+      vite: "^8.3.3",
+      vitest: "^5.0.3",
+      "@vitest/coverage-v8": "^5.0.3",
+    });
+  });
+});
+
 describe("add test — spec discovery", () => {
   it("includes generated spec files alongside test files", async () => {
     await testFeature.onExecuting?.({} as never);

@@ -83,15 +83,15 @@ afterAll(teardownTest);
     await putFileAsync(
       runnerPath,
       `import { configureTestWorker } from "@warlock.js/core/tests";
-import { VitestTestRunner } from "vitest/runners";
+import { TestRunner } from "vitest";
 
-// Vitest 4.1 awaits onCleanupWorkerContext callbacks before recycling the fork.
-export default class WarlockTestRunner extends VitestTestRunner {
-  public constructor(config: ConstructorParameters<typeof VitestTestRunner>[0]) {
+// Vitest awaits onCleanupWorkerContext callbacks before recycling the fork.
+export default class WarlockTestRunner extends TestRunner {
+  public constructor(config: ConstructorParameters<typeof TestRunner>[0]) {
     super(config);
     configureTestWorker(
       { pool: this.pool, watch: config.watch, isolate: config.isolate },
-      (cleanup) => this.onCleanupWorkerContext(cleanup),
+      (cleanup) => this.onCleanupWorkerContext?.(cleanup),
     );
   }
 }
@@ -164,7 +164,7 @@ export const testFeature: FeatureDefinition = {
   devDependencies: {
     "@mongez/vite": "^2.0.4",
     vite: VITE_RANGE,
-    vitest: "^4.1.10",
-    "@vitest/coverage-v8": "^4.1.10",
+    vitest: "^5.0.3",
+    "@vitest/coverage-v8": "^5.0.3",
   },
 };

@@ -6,6 +6,10 @@ import type { UpgradeNote } from "./types";
  */
 export const UPGRADE_NOTES: readonly UpgradeNote[] = [
   {
+    version: "5.36.0",
+    text: "Vitest 5 changes defaults: `clearMocks` is true, `json`/`junit` reporters write to `.vitest/` instead of stdout, `-t` joins names with ` > `, nested `vi.mock`/`vi.hoisted` calls throw and unawaited `resolves`/`rejects` assertions fail the test. Vite 8 needs Node.js 20.19 or 22.12+ and bundles with Rolldown.",
+  },
+  {
     version: "5.34.0",
     text: "ESLint and Prettier support is gone in 5.34.0. Oxlint/Oxfmt is the only toolchain. The oxc-toolchain-removal step migrates remaining legacy configs/dependencies; review its manual findings. New/migrated templates enable correctness: error, which may report additional defects.",
   },
