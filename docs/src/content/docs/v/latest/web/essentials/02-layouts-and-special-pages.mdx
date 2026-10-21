@@ -47,8 +47,21 @@ Layouts can also provide inherited metadata (including `robots`) and
 `sitemap: false` inside this same `LayoutConfig`. They cannot set a page route,
 cache policy, validation, or a sitemap URL supplier. `root.setup.ts` exports
 `config: RootConfig` for application middleware, `strictMode`, and metadata;
-it owns the flag even though only the tree beneath `#vessel` hydrates in the
-browser.
+the browser hydrates the complete document with the same root, layout and page
+ancestry used by SSR. Client navigation replaces the layout/page tree inside
+`#vessel` and preserves the document root.
+
+## Generated form identifiers
+
+React `useId()` and a Mongez `Form` without an explicit ID work beneath a layout.
+Initial hydration includes the root document and its sibling positions, so IDs
+captured by client handlers match the SSR attributes, labels and ARIA references.
+Repeated instances receive distinct IDs; no global ID replacement or hydration
+warning suppression is needed.
+
+Root components now render in the browser too. Keep server-only reads in root
+setup loaders and pass serializable results through `data`. Keep one `#vessel`
+wrapper around the root's `{children}` for client navigation.
 
 ## Page middleware return values
 

@@ -12,6 +12,7 @@
  */
 import { createElement } from "react";
 import { localeRouting, pages, strictMode } from "virtual:warlock/pages";
+import { buildHydrationDocument } from "../client/build-hydration-document";
 import { buildHydratedTree } from "../client/build-hydrated-tree";
 import { hydratePage } from "../client/hydrate-page";
 import { NavigationRoot } from "../client/navigation/navigation-root";
@@ -68,14 +69,18 @@ publishDocumentNamedApiRoutes();
 */
 hydratePage(
   async (payload) => {
-    const tree = await buildHydratedTree(pages, payload);
-
-    return createElement(NavigationRoot, {
-      pages,
-      initialPayload: payload,
-      initialTree: tree,
-      buildTree: buildHydratedTree,
-    });
+    return buildHydratedTree(pages, payload, (tree, app) =>
+      buildHydrationDocument(
+        app,
+        payload,
+        createElement(NavigationRoot, {
+          pages,
+          initialPayload: payload,
+          initialTree: tree,
+          buildTree: buildHydratedTree,
+        }),
+      ),
+    );
   },
-  { strictMode },
+  { strictMode, documentRoot: true },
 );

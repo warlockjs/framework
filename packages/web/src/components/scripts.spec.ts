@@ -46,6 +46,32 @@ describe("Scripts", () => {
     expect(readPayloadFromHtml(html)).toMatchObject({ name: "account" });
   });
 
+  it("carries document slots without recursively embedding the payload", () => {
+    const value = documentValue({
+      lang: "ar",
+      dir: "rtl",
+      nonce: "request-nonce",
+      stylesheetUrls: ["/app.css"],
+      hydrationClientModuleUrl: "/hydrate.js",
+    });
+    const payload = readPayloadFromHtml(render(value));
+    expect(payload).toMatchObject({
+      name: "account",
+      document: {
+        lang: "ar",
+        dir: "rtl",
+        nonce: "request-nonce",
+        stylesheetUrls: ["/app.css"],
+        hydrationClientModuleUrl: "/hydrate.js",
+      },
+    });
+    if (typeof payload !== "object" || payload === null || !("document" in payload)) {
+      throw new Error("Missing serialized document slots");
+    }
+    expect(payload.document).not.toHaveProperty("payload");
+    expect(payload.document).not.toHaveProperty("metadata");
+  });
+
   it("omits the __WARLOCK_DATA__ payload when the payload is marked non-hydrating (renderPageFailure's pre-triple fallback)", () => {
     const html = render(documentValue({ payload: markNonHydrating(documentValue().payload) }));
 

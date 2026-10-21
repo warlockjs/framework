@@ -215,24 +215,10 @@ function wrap(
  * `{ data, shared }`; the error leaf receives the serialized `{ error, status
  * }` payload shape.
  *
- * ── THE APP LEVEL IS DELIBERATELY ABSENT, AND MUST STAY ABSENT ──────────────
- * `ClientRouteComposition.App` and `payload.appData` still exist and are still
- * carried; they are contracts owned elsewhere. They are simply not part of THIS
- * tree, because App is not part of the markup this tree hydrates against:
- *
- *  - Server-side, `render-page.ts`'s `wrapRootward` wraps the page leaf in
- *    `["layout", "app"]` (`render-page.ts:274`), so the document React renders
- *    is `App( Layout( Page ) )`.
- *  - The app root is the level that owns `<html>`/`<body>` and renders
- *    `<div id="vessel">{children}</div>` inside the body. So App CONTAINS the
- *    mount point — the markup actually inside `#vessel` is `Layout( Page )`.
- *  - `hydrate-page.tsx` mounts at `#vessel` and nowhere else.
- *
- * Composing App here would therefore hydrate a whole `<html>` document inside a
- * `<div>` the server filled with a layout: a guaranteed hydration mismatch. If
- * you arrived here from the optional `App?` on the composition type and are
- * about to "complete" the tree with it — that would be the defect, not the
- * omission.
+ * The app/document is composed separately for initial document hydration.
+ * Navigation continues to replace only this layout/page tree inside #vessel.
+ * `wrapDocument` receives the already-loaded app module so initial hydration
+ * does not load or register the route composition twice.
  *
  * `load()` is awaited exactly ONCE per hydration and its result reused for all
  * levels — the composition arrives whole, so calling it per layout would be
@@ -241,6 +227,7 @@ function wrap(
 export async function buildHydratedTree(
   pages: readonly ClientPageEntry[],
   payload: HydrationDocumentPayloadSource,
+  wrapDocument?: (tree: ReactNode, app: ClientProjectedModule | undefined) => ReactNode,
 ): Promise<ReactNode> {
   const entry = findEntryByName(pages, payload.name);
   const composition = await loadClientRouteComposition(entry);
@@ -324,5 +311,5 @@ export async function buildHydratedTree(
     }
   }
 
-  return element;
+  return wrapDocument === undefined ? element : wrapDocument(element, composition.App);
 }

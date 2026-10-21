@@ -5,7 +5,7 @@ description: 'Author `src/web/root.tsx`, the full-document application root that
 
 # Warlock — write the root
 
-`src/web/root.tsx` is the application document. Its default export renders the complete `<html>` tree and contains the one DOM node the browser hydrates: `#vessel`.
+`src/web/root.tsx` is the application document. Its default export renders the complete `<html>` tree and contains `#vessel`, where client navigation replaces the layout and page. The browser hydrates the complete document so React sees the same ancestor tree as SSR.
 
 Use `root.setup.ts` for root `config` (including `config.metadata`), loader, or universal
 `register()` while `root.tsx` remains the document component. `strictMode` is
@@ -79,20 +79,33 @@ The hydration payload ships a `translations` key holding **only the active local
 
 Either way, a component that calls `useTrans()` under `#vessel` renders the same strings on the server and in the browser. Do not read translations from `navigator.language` or a client-only store during render; that is a hydration mismatch (see the `render-client-only` topic).
 
-## `#vessel` is the hydration boundary
+## Document hydration and `#vessel`
 
-The server renders this document shape:
+SSR and initial hydration both render `App → html/body → #vessel → Layout → Page`.
+React's `useId()` depends on that ancestry, including siblings outside `#vessel`.
+Keep exactly one element with `id="vessel"` around `{children}`. Client navigation
+replaces its layout/page children while preserving the root document.
 
-```text
-App document
-└── #vessel
-    └── Layout
-        └── Page
+Root components and providers execute in the browser as well as on the server.
+Keep server work in `root.setup.ts` loaders and pass browser-safe results through
+`data`. Head, stylesheet, locale and script slots travel with the initial payload
+so the root renders the same document during hydration. No explicit form ID is
+required merely because a form renders below a layout:
+
+```tsx
+import { Form } from "@mongez/react-form";
+
+export default function ContactPage() {
+  return (
+    <Form>
+      <button type="submit">Send</button>
+    </Form>
+  );
+}
 ```
 
-The browser hydrates `#vessel`, not the whole document. The client tree deliberately contains Layout + Page and excludes App because App contains the mount point. Keep exactly one element with `id="vessel"` around `{children}`. It may be nested inside your own body markup, but it must not be renamed or omitted.
-
-Because App is outside the hydrated subtree, put client state that must survive navigation in a layout or component beneath `#vessel`, not in the document root.
+Use explicit IDs when an application needs a named instance; do not rewrite or
+suppress React's generated IDs or hydration warnings.
 
 If `root.tsx` or `root.setup.ts` (or any module they need) fails to load or the setup `register()` throws, there is no trustworthy Layout+Page composition left to hydrate — Warlock falls back to a plain document with no hydration script at all rather than hydrate the browser against markup nothing can vouch for. See the `create-a-page` topic for the app's own `error.page.tsx` boundary, which is tried first.
 

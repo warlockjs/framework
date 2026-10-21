@@ -69,6 +69,8 @@ export type SerializedErrorPageProps = {
 };
 
 export type HydrationDocumentPayloadSource = {
+  /** Document slots needed to reproduce the server root during hydration. */
+  readonly document?: Omit<DocumentContextValue, "payload" | "metadata">;
   readonly live?: import("../live-page-data").LivePageOptions;
   readonly appData: unknown;
   readonly layoutData: unknown;
@@ -123,11 +125,9 @@ export type HydrationDocumentPayloadSource = {
    * The page metadata the server resolved at stage 8, carried WHOLE — the same
    * `MetadataOutput` `<Head/>` rendered into the document on the first request.
    *
-   * Why it has to be on the wire at all: `<Head/>` renders inside the App
-   * level, and the App level is not part of the hydrated tree (the client
-   * mounts at `#vessel`, which App contains). So on a client navigation there is
-   * no React render that can reach `<head>` — without this key the browser
-   * never learns the new page's title and the tab keeps the old one.
+   * Client navigation resolves new metadata without re-rendering the document
+   * root. Carry it so the navigation runtime can update the head and readers
+   * beneath #vessel see the active page's metadata.
    *
    * OPTIONAL, deliberately: `bundle.metadata` is itself optional
    * (`server/execute-page-request.ts:296`) — a page that exports no `metadata`
@@ -264,7 +264,7 @@ export type DocumentContextValue = {
    * present).
    */
   hydrationClientModuleUrl?: string;
-  /** Multi-site bootstrap marker, deliberately outside the hydration payload. */
+  /** Multi-site bootstrap marker carried with the initial document slots. */
   siteKey?: string;
   /**
    * `modulepreload` URLs for the hydration entry's own STATICALLY imported

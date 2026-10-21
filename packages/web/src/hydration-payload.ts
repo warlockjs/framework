@@ -53,6 +53,7 @@ function malformedPayload(): never {
  * is `"object"`, and an array of params is not params.
  */
 export const OPTIONAL_OBJECT_PAYLOAD_KEYS = [
+  "document",
   "metadata",
   "params",
   "errorPage",

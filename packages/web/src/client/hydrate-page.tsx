@@ -1,4 +1,6 @@
 import { createElement, StrictMode, startTransition, type ReactNode } from "react";
+import { LocaleProvider } from "../localization";
+import { scopedPayloadTranslations } from "./install-payload-translations";
 import { hydrateRoot, type RootOptions } from "react-dom/client";
 import {
   DocumentContext,
@@ -111,6 +113,8 @@ export type BuildHydratedTree = (
 export type HydratePageOptions = {
   /** Apply React's development checks to the complete hydrated tree. */
   strictMode?: boolean;
+  /** The entry composes the complete server document, preserving useId ancestry. */
+  documentRoot?: boolean;
 };
 
 function isPromise(value: ReactNode | Promise<ReactNode>): value is Promise<ReactNode> {
@@ -161,10 +165,9 @@ function reportHydrationFailure(error: unknown): void {
 }
 
 /**
- * The one hydration entry point. Mounts at `#vessel` only — the page subtree —
- * never `document`/`html`/`head`/`body`: `metadata`, `dir`, and `nonce` are
- * not used to rebuild the mounted tree; the declared `locale` key is
- * consumed by `NavigationRoot`'s provider.
+ * The entry supplies a complete document tree and sets `documentRoot`, keeping
+ * React's useId ancestry identical to SSR. The vessel is still required as the
+ * stable navigation container. Subtree callers may omit the option.
  * `readHydrationPayload` (web/src/hydration-payload.ts)
  * is the one place ABSENT/MALFORMED are decided, so this
  * function does not re-implement that check — reusing it is what keeps the
@@ -217,7 +220,11 @@ export function hydratePage(buildTree: BuildHydratedTree, options: HydratePageOp
     );
   }
 
-  const value: DocumentContextValue = { metadata: undefined, payload };
+  const value: DocumentContextValue = {
+    ...payload.document,
+    metadata: payload.metadata,
+    payload,
+  };
 
   // Hydrated as a transition: at default priority React hydrates the whole
   // tree in one task that never yields (a ~470ms long task on a throttled
@@ -225,17 +232,25 @@ export function hydratePage(buildTree: BuildHydratedTree, options: HydratePageOp
   // between units of work, and a click during hydration still hydrates its
   // target first.
   const mount = (tree: ReactNode): void => {
+    const content =
+      options.documentRoot === true ? (
+        <LocaleProvider locale={payload.locale} translations={scopedPayloadTranslations(payload)}>
+          {tree}
+        </LocaleProvider>
+      ) : (
+        tree
+      );
     startTransition(() => {
       hydrateRoot(
-        mountElement,
+        options.documentRoot === true ? document : mountElement,
         options.strictMode === true ? (
           createElement(
             StrictMode,
             undefined,
-            <DocumentContext.Provider value={value}>{tree}</DocumentContext.Provider>,
+            <DocumentContext.Provider value={value}>{content}</DocumentContext.Provider>,
           )
         ) : (
-          <DocumentContext.Provider value={value}>{tree}</DocumentContext.Provider>
+          <DocumentContext.Provider value={value}>{content}</DocumentContext.Provider>
         ),
         hydrationErrorHooks,
       );
