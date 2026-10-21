@@ -233,15 +233,25 @@ export function translationDictionaryFor(locale: string): Readonly<Keywords> {
   return state.dictionary;
 }
 
+/**
+ * Whether the dictionary can answer `keyword`: the key is there, or it is the
+ * base of count variants (`items` for `items_one` and `items_other`), which the
+ * localization runtime resolves when a `count` is passed.
+ */
 function hasKeyword(keywords: Readonly<Record<string, unknown>>, keyword: string): boolean {
   let value: unknown = keywords;
+  const segments = keyword.split(".");
+  const last = segments.pop() ?? "";
 
-  for (const segment of keyword.split(".")) {
+  for (const segment of segments) {
     if (!isRecord(value) || !Object.hasOwn(value, segment)) return false;
     value = value[segment];
   }
 
-  return true;
+  if (!isRecord(value) || last === "") return false;
+  if (Object.hasOwn(value, last)) return true;
+
+  return Object.keys(value).some((name) => name.startsWith(`${last}_`));
 }
 
 /**

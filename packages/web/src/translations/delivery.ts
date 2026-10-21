@@ -198,13 +198,21 @@ export function serializeUsage(usage: TranslationUsage): SerializedTranslationUs
   return {
     keys: [...usage.keys],
     prefixes: [...usage.prefixes],
+    literals: [...usage.literals],
+    literalPrefixes: [...usage.literalPrefixes],
     dynamic: usage.dynamic,
   };
 }
 
 /** The inverse of {@link serializeUsage}. */
 export function usageFromRecord(record: SerializedTranslationUsage): TranslationUsage {
-  return usageOf({ keys: record.keys, prefixes: record.prefixes, dynamic: record.dynamic });
+  return usageOf({
+    keys: record.keys,
+    prefixes: record.prefixes,
+    literals: record.literals,
+    literalPrefixes: record.literalPrefixes,
+    dynamic: record.dynamic,
+  });
 }
 
 /**
