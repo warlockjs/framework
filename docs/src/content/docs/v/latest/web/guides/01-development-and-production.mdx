@@ -111,15 +111,27 @@ of that failure.
 
 ### Translation tables
 
-`warlock build` writes each locale's shared translation groups (default `app`
-and `common`) to `dist/client/assets/translations/<locale>.<hash>.json`. The file
-name carries the content hash, so the server serves it with the bundle's
-one-year immutable cache headers, and a changed table is a new URL. Every
-other group is pruned per page to the keys the page's client code can reach,
-and the build records that usage in the production page barrel. Tune the groups
-and pruning with the connector's `translations` option. The
+Each locale's shared translation groups (default `app` and `common`) are served
+under a content-hashed name, and every other group is pruned per page to the
+keys that page's client code can reach. The two translation modes differ only
+in where the shared table comes from:
+
+- **Route dictionaries** (`locales.json`): `warlock build` writes each locale's
+  table to `dist/client/assets/translations/<locale>.<hash>.json`, served from
+  the bundle's assets directory with the one-year immutable cache headers. The
+  build also records each page's usage in the production page barrel.
+- **Global registry** (`extend()` and `register()`): the server computes the
+  table from the live registry and serves it at
+  `/__warlock/translations/<locale>.<hash>.json`, with the same immutable
+  headers. A table the server no longer holds answers 404, because the server
+  keeps only the eight most recent tables per locale. Run a single process, or
+  make every process register the same modules at boot, so each one publishes
+  the same tables.
+
+Tune the groups and pruning with the connector's `translations` option. The
 [localization guide](/v/latest/web/essentials/localization/) explains the keys
-the analysis resolves and how to declare the rest.
+the analysis resolves, the defaults for both modes, and how to declare the
+rest.
 
 ## Run `warlock start` from the app root
 

@@ -556,7 +556,8 @@ only when the application does not otherwise depend on those names.
 ## 5.35 to 5.36 translation payloads
 
 A page's hydration payload now carries only the translations its client code
-can reach. The groups every page uses (default `app` and `common`) arrive once
+can reach, in route-dictionary (`locales.json`) and global-registry (`extend()`)
+apps alike. The groups every page uses (default `app` and `common`) arrive once
 per locale in a hashed, cached file that the page preloads. Nothing in a page's
 render changes: server output is the full dictionary, as before.
 
@@ -572,3 +573,8 @@ key renders as its own text and the miss is reported once through
 `onClientError` with `kind: "translations"`. Declare the key, or set
 `translations: { prune: false }` in the web connector options while migrating to
 restore the previous per-page payload.
+
+Global-registry apps are covered too. Their shared table is served at
+`/__warlock/translations/<locale>.<hash>.json`, which is cached immutable in
+production. A direct `trans()` call from `@mongez/localization` is not checked
+for a pruning miss; the calls through `useTrans()` are.

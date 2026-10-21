@@ -52,6 +52,12 @@ export const config = {
 };
 ```
 
+The same applies to the global registry (`extend()` / `register()`, the
+starter's default): the server computes the shared table from the live
+registry and serves it at `/__warlock/translations/<locale>.<hash>.json`, and
+each page receives only its own keys. A registration never goes missing,
+because the table is recomputed per payload.
+
 Use `useTrans()` under any local name. Do not pass the translator as a prop or
 store it: a translator passed on as a value is treated as computed, so the page
 falls back to every group. Pass the key instead, or declare it.
@@ -60,7 +66,8 @@ When a key is missing from a page's payload, development warns once with the
 declaration to add and resolves the key from the full table. Production renders
 the key and reports it once through `onClientError` (`kind: "translations"`).
 Tune the groups and pruning with the web connector's `translations` option:
-`{ sharedGroups: ["app", "common"], prune: true }`.
+`{ sharedGroups: ["app", "common"], prune: true }`. Set `prune: false` to ship
+every key while you declare the rest. Development always uses the defaults.
 
 ## Scope, errors, and legacy lookups
 
