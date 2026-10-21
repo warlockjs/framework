@@ -8527,7 +8527,7 @@ and has no Warlock setup or HTTP global setup. `integration` discovers
 It uses the framework setup, HTTP global setup and a generated `src/test-runner.ts`.
 Keep pure service specs beside their source and mock repositories at the boundary.
 Existing config files are preserved; copy the projects layout into them manually.
-Vitest 4.1.10 or newer is required for the generated runner.
+Vitest 5 or newer is required for the generated runner (Vitest 5 removed `vitest/runners`; the runner extends `TestRunner` from `vitest`).
 
 For a unit spec that needs configuration values, use:
 
@@ -8575,20 +8575,20 @@ Run with `npx vitest run --project integration`. Worker lifetime refuses watch,
 threads, isolated module graphs, or a missing runner with a message explaining
 the required settings. Keep `afterAll(teardownTest)` in the setup file: in worker
 mode it marks the end of the file; Vitest's awaited worker cleanup closes the
-runtime once. The runner uses `VitestTestRunner.onCleanupWorkerContext`, verified
-in Vitest 4.1.10's `runners.d.ts`, runner implementation and worker cleanup source.
+runtime once. The runner uses `TestRunner.onCleanupWorkerContext`, verified
+in Vitest 5.0.3's `TestRunner` declaration, runner implementation and worker cleanup source.
 For an existing project, generate this runner without overwriting your config:
 
 ```ts title="src/test-runner.ts"
 import { configureTestWorker } from "@warlock.js/core/tests";
-import { VitestTestRunner } from "vitest/runners";
+import { TestRunner } from "vitest";
 
-export default class WarlockTestRunner extends VitestTestRunner {
-  public constructor(config: ConstructorParameters<typeof VitestTestRunner>[0]) {
+export default class WarlockTestRunner extends TestRunner {
+  public constructor(config: ConstructorParameters<typeof TestRunner>[0]) {
     super(config);
     configureTestWorker(
       { pool: this.pool, watch: config.watch, isolate: config.isolate },
-      (cleanup) => this.onCleanupWorkerContext(cleanup),
+      (cleanup) => this.onCleanupWorkerContext?.(cleanup),
     );
   }
 }
@@ -8607,7 +8607,7 @@ This trades module isolation for startup cost: application singletons, config
 mutations, mocks and module side effects can survive between files. Reset your
 own state in `resetBetweenFiles`, restore mocks, and keep connector selection
 consistent. Give each worker a distinct database/schema using
-`process.env.VITEST_POOL_ID` when preparing test connections. Never drop a shared
+`process.env.VITEST_POOL_ID` (1-based since Vitest 5) when preparing test connections. Never drop a shared
 database from this hook while other workers are using it. The framework does not
 create a memory replica set or a cross-worker lock; those belong to the application's
 global setup. A shared HTTP server and a single replica set can contend on I/O,
@@ -9393,6 +9393,7 @@ A page document now carries only the named API routes its client code can reach.
 Routes registered with `clientVisible: false` are never embedded, and a browser call to one is an error (`WL9020`). Keep endpoints the browser must not reach on that option. Authorization is unchanged: the server still decides each request.
 
 To measure a page's inline payload, set `build.budgets.payload` (default `64kb`). An over-budget route logs one line per process and never fails a request.
+
 ## 5.35 to 5.36 translation payloads
 
 A page's hydration payload now carries only the translations its client code
@@ -9418,6 +9419,59 @@ Global-registry apps are covered too. Their shared table is served at
 `/__warlock/translations/<locale>.<hash>.json`, which is cached immutable in
 production. A direct `trans()` call from `@mongez/localization` is not checked
 for a pruning miss; the calls through `useTrans()` are.
+
+## 5.35 to 5.36 Vite 8 and Vitest 5
+
+`@warlock.js/web` requires Vite 8 (`^8.0.0`) and `@vitejs/plugin-react` 6, and the
+test kit requires Vitest 5. Vite 8 bundles with Rolldown and transforms
+TypeScript with Oxc. Vite 7 is not supported; plugin-react 6 needs Vite 8, so the
+family moves together. Vite 8 needs Node.js 20.19 or 22.12 and newer, Vitest 5
+needs 22.12 or newer; Warlock already requires 22.15.
+
+```bash
+npx warlock upgrade --from 5.35 --to 5.36.0 --dry-run
+npx warlock upgrade --from 5.35 --to 5.36.0
+npm install
+npx warlock check
+```
+
+The `vite-8-vitest-5` codemod:
+
+- raises `vite` (8.3.3), `vitest` and `@vitest/*` (5.0.3) and `@vitejs/plugin-react`
+  (6.1.2) in `dependencies`, `devDependencies`, `overrides` and `resolutions`,
+  keeping `^`, `~` or exact style;
+- rewrites a generated `src/test-runner.ts` from `VitestTestRunner` in
+  `vitest/runners` to `TestRunner` from `vitest`, and calls
+  `this.onCleanupWorkerContext?.(cleanup)` (the hook is absent in vm pools);
+- lists, without editing, imports of the removed `vitest/coverage`,
+  `vitest/reporters`, `vitest/environments`, `vitest/snapshot`, `vitest/suite`,
+  `vitest/mocker` and `vitest/internal/module-runner` entry points, other names
+  imported from `vitest/runners`, a top-level `esbuild` option in a Vite or
+  Vitest config, and object-form `output.manualChunks`.
+
+Do these by hand when the codemod lists them:
+
+- Move a config's `esbuild: { jsx: "automatic" }` to
+  `oxc: { jsx: { runtime: "automatic" } }`. `esbuild.target` is not converted, and
+  Oxc does not lower native decorators: keep `lowerStage3Decorators()` from
+  `@warlock.js/core/vite` first in `plugins` for decorated modules, as in the
+  generated test config.
+- Replace object `manualChunks` with
+  `build.rolldownOptions.output.codeSplitting.groups`; `build.rollupOptions` still
+  works but is deprecated in favour of `build.rolldownOptions`.
+- A custom bundler `external` list that names Node builtins is still refused by the
+  client build.
+
+Vitest 5 changes defaults that can alter a green suite: `clearMocks` is true,
+`json` and `junit` reporters write to `.vitest/` instead of stdout, `-t` joins a
+test's names with `>`, `VITEST_POOL_ID` and `VITEST_WORKER_ID` start at 1, nested
+`vi.mock`/`vi.hoisted` calls throw, and an unawaited `resolves` or `rejects`
+assertion fails the test. Vitest also no longer searches parent directories for a
+config file; run it from the package that owns the config. Official guides:
+https://vite.dev/guide/migration and https://vitest.dev/guide/migration.
+
+A project that uses `@warlock.js/ai`'s custom matchers needs Vitest 5 for their
+TypeScript types.
 
 
 ## upload-file  `@warlock.js/core/skills/upload-file/SKILL.md`
@@ -36543,6 +36597,8 @@ rules with the browser; keep those server-side or split the schema.
 `useSubmitForm({ route })` resolves its name against the route table of the page being shown. Each page document carries the named routes its client code reaches: a string literal, a constant or a template prefix naming the route, plus anything declared with `config.apiRoutes` in the page's setup file. Declare a name the build cannot see:
 
 ```ts title="orders.setup.ts"
+import type { PageConfig } from "@warlock.js/web";
+
 export const config: PageConfig = { apiRoutes: ["orders.*"] };
 ```
 
@@ -50554,7 +50610,7 @@ features. A database-free scaffold needs no external database.
 `npx create-warlock my-project --yes --features=test` delegates to `warlock add test`:
 unit `*.spec.ts` outside `tests/` runs without Warlock setup, integration `*.test.ts`
 and specs under `tests/` use framework setup and the generated cleanup runner.
-The template pins Vitest 4.1.10. See the generated `testing-strategy` skill for
+The template pins Vitest 5.0.3. See the generated `testing-strategy` skill for
 `setupTest({ mode: "unit", importModule })`, opt-in `tests.lifetime: "worker"`,
 `tests.resetBetweenFiles`, profiling and the changed-tests release gate.
 
