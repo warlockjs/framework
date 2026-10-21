@@ -1,4 +1,9 @@
 {
+  "5.34.3": {
+    "publishedAt": "2026-10-20T16:47:49.924Z",
+    "matrix": "none",
+    "summary": "**One concise agent skill per package, stronger starter standards, and one JSON error shape.** Every package exports exactly one skill named after it, with package-level descriptions of at most 450 characters (about 13,300 characters in total, down from 22,900). New apps get revised project skills: single-responsibility components, Mongez React Form validation only, custom accessible controls on the project's UI kit, camelCase response fields, `{ error: { code, message } }` errors, `responseSchema` and `Idempotency-Key` guidance, and Oxlint rules that enforce them. Core adds the opt-in `http.errorResponse` formatter for every JSON error, `ResponseStatus` gains 413 and 422, and `warlock e2e` gains `browser.startupTimeoutMs` (default 30 seconds). Lockstep release across all 33 packages. Generator matrix scope: `none`; before publishing, the blog on the 5.34.3 tarballs passed the release gate; after publishing, every package was confirmed at the npm origin and the blog check passed against npm."
+  },
   "5.34.2": {
     "publishedAt": "2026-10-19T20:47:10.981Z",
     "matrix": "none",

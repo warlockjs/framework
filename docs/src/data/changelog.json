@@ -136,6 +136,635 @@
   ],
   "releases": [
     {
+      "version": "5.34.3",
+      "id": "v5-34-3",
+      "date": "October 20, 2026",
+      "isUnreleased": false,
+      "summaryHtml": "<strong>One concise agent skill per package, stronger starter standards, and one JSON error shape.</strong> Every package exports exactly one skill named after it, with package-level descriptions of at most 450 characters (about 13,300 characters in total, down from 22,900). New apps get revised project skills: single-responsibility components, Mongez React Form validation only, custom accessible controls on the project's UI kit, camelCase response fields, <code>{ error: { code, message } }</code> errors, <code>responseSchema</code> and <code>Idempotency-Key</code> guidance, and Oxlint rules that enforce them. Core adds the opt-in <code>http.errorResponse</code> formatter for every JSON error, <code>ResponseStatus</code> gains 413 and 422, and <code>warlock e2e</code> gains <code>browser.startupTimeoutMs</code> (default 30 seconds). Lockstep release across all 33 packages. Generator matrix scope: <code>none</code>; before publishing, the blog on the 5.34.3 tarballs passed the release gate; after publishing, every package was confirmed at the npm origin and the blog check passed against npm.",
+      "matrix": "none",
+      "matrixRows": null,
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "create-warlock",
+          "slug": "create-warlock",
+          "total": 7,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 4
+            },
+            {
+              "type": "Fixed",
+              "n": 3
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "New app models expose a separate public UUID; sample post updates and user filters resolve public IDs, and user lists return the documented pagination envelope."
+            },
+            {
+              "type": "Changed",
+              "html": "Enable non-type-aware Oxlint rules for explicit any, braces, member accessibility, and console usage in both scaffold toolchain copies."
+            },
+            {
+              "type": "Changed",
+              "html": "Strengthen the web code standards skill with single-responsibility components, Mongez React Form validation, accessible custom controls, and explicit UI kit selection; consolidate setup-file guidance and correct typed-route advice."
+            },
+            {
+              "type": "Changed",
+              "html": "The agent skill now exports as <code>create-warlock</code>; package discovery descriptions stay within 450 characters."
+            },
+            {
+              "type": "Fixed",
+              "html": "Keep the public UUID integrity assertion independent of formatter line breaks while checking the complete schema default callback."
+            },
+            {
+              "type": "Fixed",
+              "html": "Align project skills with real handler signatures, resource source-key tuples, public UUIDs, response schemas, idempotency headers, and the canonical JSON error envelope. Keep discovery descriptions within 450 characters and resolve cross-skill references by name."
+            },
+            {
+              "type": "Fixed",
+              "html": "Extract contact locale and form-control behavior into feature hooks and separate components with dedicated props types; preserve form interactions and consume normalized validation details."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 6,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            },
+            {
+              "type": "Changed",
+              "n": 2
+            },
+            {
+              "type": "Fixed",
+              "n": 3
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "Opt-in <code>http.errorResponse</code> formats JSON error bodies at the transport boundary, including framework validation, unmatched routes, early parsing errors, rate limits and server errors, with a correlated request ID. Existing bodies remain unchanged unless configured."
+            },
+            {
+              "type": "Changed",
+              "html": "Keep the upgrade toolchain's enabled explicit-any, brace and console rules in sync with the new-app scaffold."
+            },
+            {
+              "type": "Changed",
+              "html": "Condensed the package agent skill description to at most 450 characters, with API names and package routing guidance."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>warlock e2e</code> waits up to <code>browser.startupTimeoutMs</code> (new option, default 30 seconds instead of a fixed 15) for the browser's DevTools endpoint, so a slow first launch on a busy machine no longer fails the run."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>ResponseStatus</code> includes 413 (<code>CONTENT_TOO_LARGE</code>) and 422 (<code>UNPROCESSABLE_ENTITY</code>), the statuses <code>response.contentTooLarge()</code> and <code>response.unprocessableEntity()</code> send, so <code>responseSchema</code> can declare them."
+            },
+            {
+              "type": "Fixed",
+              "html": "Type Fastify error-response hook and test handler parameters explicitly, and align upgrade fixture expectations with the enabled explicit-any, brace and console rules."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/access",
+          "slug": "access",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Condensed the package agent skill description to at most 450 characters, with API names and package routing guidance."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai",
+          "slug": "ai",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Condensed the package agent skill description to at most 450 characters, with API names and package routing guidance."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-anthropic",
+          "slug": "ai-anthropic",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "The agent skill now exports as <code>warlock-js-ai-anthropic</code>; package discovery descriptions stay within 450 characters."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-bedrock",
+          "slug": "ai-bedrock",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "The agent skill now exports as <code>warlock-js-ai-bedrock</code>; package discovery descriptions stay within 450 characters."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-cli",
+          "slug": "ai-cli",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Condensed the package agent skill description to at most 450 characters, with API names and package routing guidance."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-deepseek",
+          "slug": "ai-deepseek",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "The agent skill now exports as <code>warlock-js-ai-deepseek</code>; package discovery descriptions stay within 450 characters."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-google",
+          "slug": "ai-google",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "The agent skill now exports as <code>warlock-js-ai-google</code>; package discovery descriptions stay within 450 characters."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-groq",
+          "slug": "ai-groq",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "The agent skill now exports as <code>warlock-js-ai-groq</code>; package discovery descriptions stay within 450 characters."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-live",
+          "slug": "ai-live",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "The agent skill now exports as <code>warlock-js-ai-live</code>; package discovery descriptions stay within 450 characters."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-mistral",
+          "slug": "ai-mistral",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "The agent skill now exports as <code>warlock-js-ai-mistral</code>; package discovery descriptions stay within 450 characters."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-ollama",
+          "slug": "ai-ollama",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "The agent skill now exports as <code>warlock-js-ai-ollama</code>; package discovery descriptions stay within 450 characters."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-openai",
+          "slug": "ai-openai",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "The agent skill now exports as <code>warlock-js-ai-openai</code>; package discovery descriptions stay within 450 characters."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-panoptic",
+          "slug": "ai-panoptic",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Condensed the package agent skill description to at most 450 characters, with API names and package routing guidance."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-tools",
+          "slug": "ai-tools",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Condensed the package agent skill description to at most 450 characters, with API names and package routing guidance."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-workspace",
+          "slug": "ai-workspace",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Condensed the package agent skill description to at most 450 characters, with API names and package routing guidance."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-xai",
+          "slug": "ai-xai",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "The agent skill now exports as <code>warlock-js-ai-xai</code>; package discovery descriptions stay within 450 characters."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/auth",
+          "slug": "auth",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Condensed the package agent skill description to at most 450 characters, with API names and package routing guidance."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/cache",
+          "slug": "cache",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Condensed the package agent skill description to at most 450 characters, with API names and package routing guidance."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/cascade",
+          "slug": "cascade",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Condensed the package agent skill description to at most 450 characters, with API names and package routing guidance."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/context",
+          "slug": "context",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Condensed the package agent skill description to at most 450 characters, with API names and package routing guidance."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/devtools",
+          "slug": "devtools",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "The agent skill now exports as <code>warlock-js-devtools</code>; package discovery descriptions stay within 450 characters."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/fs",
+          "slug": "fs",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Condensed the package agent skill description to at most 450 characters, with API names and package routing guidance."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/herald",
+          "slug": "herald",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Condensed the package agent skill description to at most 450 characters, with API names and package routing guidance."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/logger",
+          "slug": "logger",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Condensed the package agent skill description to at most 450 characters, with API names and package routing guidance."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/notifications",
+          "slug": "notifications",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Condensed the package agent skill description to at most 450 characters, with API names and package routing guidance."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/process",
+          "slug": "process",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "The agent skill now exports as <code>warlock-js-process</code>; package discovery descriptions stay within 450 characters."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/queue",
+          "slug": "queue",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Condensed the package agent skill description to at most 450 characters, with API names and package routing guidance."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/scheduler",
+          "slug": "scheduler",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Condensed the package agent skill description to at most 450 characters, with API names and package routing guidance."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/seal",
+          "slug": "seal",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Condensed the package agent skill description to at most 450 characters, with API names and package routing guidance."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/sitemap",
+          "slug": "sitemap",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "The agent skill now exports as <code>warlock-js-sitemap</code>; package discovery descriptions stay within 450 characters."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/web",
+          "slug": "web",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Condensed the package agent skill description to at most 450 characters, with API names and package routing guidance."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "5.34.2",
       "id": "v5-34-2",
       "date": "October 19, 2026",
