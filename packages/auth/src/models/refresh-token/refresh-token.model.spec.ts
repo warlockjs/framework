@@ -234,10 +234,14 @@ describe("RefreshToken statics", () => {
 
   it("enforceMax revokes only the oldest surplus tokens", async () => {
     const rows = [{ revoke: vi.fn() }, { revoke: vi.fn() }, { revoke: vi.fn() }];
-    modelQuery.mockReturnValue(buildQueryStub(rows));
+    const query = buildQueryStub(rows);
+    modelQuery.mockReturnValue(query);
 
     // 3 active, max 2 → slice(0, 3 - 2 + 1) = oldest 2 revoked, newest kept
     await RefreshToken.enforceMax(user, 2);
+    expect(query.where).toHaveBeenCalledWith("expires_at", ">", expect.any(Date));
+    expect(query.where).toHaveBeenCalledWith({ user_id: 7, user_type: "user", revoked_at: null });
+    expect(query.orderBy).toHaveBeenCalledWith("created_at", "asc");
 
     expect(rows[0].revoke).toHaveBeenCalledOnce();
     expect(rows[1].revoke).toHaveBeenCalledOnce();

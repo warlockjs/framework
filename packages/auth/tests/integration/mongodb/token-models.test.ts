@@ -137,6 +137,25 @@ describe("MongoDB integration — RefreshToken", () => {
     expect(outcomes.filter(Boolean)).toHaveLength(1);
   });
 
+  it("expired unrevoked rows cannot consume cap slots or evict a live session", async () => {
+    await RefreshToken.issue(USER_A, "live-session", {
+      familyId: "live-family",
+      expiresAt: future().toISOString(),
+    });
+    for (const token of ["expired-one", "expired-two"]) {
+      await RefreshToken.issue(USER_A, token, { familyId: token, expiresAt: past().toISOString() });
+    }
+    await RefreshToken.enforceMax(USER_A, 2);
+    const live = await RefreshToken.findByToken("live-session");
+    expect(live?.isRevoked).toBe(false);
+    expect((await RefreshToken.activeFor(USER_A)).map((token) => token.get("token"))).toEqual([
+      "live-session",
+    ]);
+    for (const token of ["expired-one", "expired-two"]) {
+      expect((await RefreshToken.findByToken(token))?.isRevoked).toBe(false);
+    }
+  });
+
   it("enforceMax revokes the oldest tokens so room is left for one more", async () => {
     for (const token of ["t1", "t2", "t3"]) {
       await RefreshToken.issue(USER_A, token, {

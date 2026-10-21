@@ -132,3 +132,21 @@ const valid = new Ajv2020({ strict: false }).validate(INSPECT_REPORT_JSON_SCHEMA
 - The `warlock-agents-md` topic — the app summary `warlock dev` keeps in AGENTS.md.
 - The `warlock-routes` topic — the human route table.
 - The `generate-openapi` topic — the same route schemas as an OpenAPI document.
+
+## Session middleware in groups
+
+`sessionMiddleware({ userTypes: "user" })` publishes the same `warlock.auth`
+descriptor as `authMiddleware()`. Group middleware is inherited by nested
+routes, so `inspect` and the generated `agents-md` summary recognize these guards.
+`{ optional: true }` reports `auth.required: false`, with sources and user types
+retained. Such routes remain in the unguarded-write list. Legacy descriptors
+without `required` still mean required authentication.
+
+```ts
+import { router } from "@warlock.js/core";
+import { sessionMiddleware } from "@warlock.js/auth";
+
+router.group({ middleware: [sessionMiddleware({ userTypes: "user" })] }, () => {
+  router.post("/settings", async ({ response }) => response.success({ saved: true }));
+});
+```

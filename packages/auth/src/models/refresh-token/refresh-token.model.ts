@@ -202,11 +202,13 @@ export class RefreshToken extends Model {
    * Active, unexpired sessions for the user, newest first.
    */
   public static activeFor(user: Auth): Promise<RefreshToken[]> {
+    return this.activeQuery(user).orderBy("created_at", "desc").get();
+  }
+
+  private static activeQuery(user: Auth) {
     return this.query()
       .where({ user_id: user.id, user_type: user.userType, revoked_at: null })
-      .where("expires_at", ">", new Date())
-      .orderBy("created_at", "desc")
-      .get();
+      .where("expires_at", ">", new Date());
   }
 
   /**
@@ -249,10 +251,7 @@ export class RefreshToken extends Model {
    * small.
    */
   public static async enforceMax(user: Auth, max: number): Promise<void> {
-    const activeTokens = await this.query()
-      .where({ user_id: user.id, user_type: user.userType, revoked_at: null })
-      .orderBy("created_at", "asc")
-      .get();
+    const activeTokens = await this.activeQuery(user).orderBy("created_at", "asc").get();
 
     if (activeTokens.length < max) return;
 

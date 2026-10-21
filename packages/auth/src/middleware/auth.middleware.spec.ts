@@ -1385,6 +1385,14 @@ describe('authMiddleware — descriptor tag (Symbol.for("warlock.auth"))', () =>
     expect(read(authMiddleware([]))).toEqual({ sources: ["header"], userTypes: [] });
   });
 
+  it("describes optional auth without claiming that credentials are required", () => {
+    expect(read(authMiddleware("user", { optional: true }))).toEqual({
+      sources: ["header"],
+      userTypes: ["user"],
+      required: false,
+    });
+  });
+
   it("is frozen and never enumerable, so it stays out of keys, spreads and JSON", () => {
     const middleware = authMiddleware(["admin"], "cookie:token");
     const descriptor = read(middleware) as { sources: unknown[]; userTypes: unknown[] };

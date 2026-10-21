@@ -33,7 +33,12 @@ export function parseAuthDescriptor(value: unknown): AuthDescriptor | undefined 
     return undefined;
   }
 
-  const { sources, userTypes } = value as { sources?: unknown; userTypes?: unknown };
+  const { sources, userTypes, required } = value as {
+    sources?: unknown;
+    userTypes?: unknown;
+    required?: unknown;
+  };
+  if (required !== undefined && typeof required !== "boolean") return undefined;
 
   if (!Array.isArray(sources) || sources.length === 0 || !sources.every(isAuthSource)) {
     return undefined;
@@ -46,7 +51,11 @@ export function parseAuthDescriptor(value: unknown): AuthDescriptor | undefined 
     return undefined;
   }
 
-  return { sources: [...sources], userTypes: Array.isArray(userTypes) ? [...userTypes] : [] };
+  return {
+    sources: [...sources],
+    userTypes: Array.isArray(userTypes) ? [...userTypes] : [],
+    ...(required === undefined ? {} : { required }),
+  };
 }
 
 /**
@@ -66,6 +75,8 @@ export function readRouteAuth(middleware: unknown, warn: WarningSink): AuthDescr
   const sources: AuthDescriptor["sources"] = [];
   const userTypes: string[] = [];
   let found = false;
+  let required = false;
+  let hasRequiredFlag = false;
 
   for (const fn of middleware) {
     if (typeof fn !== "function") {
@@ -89,6 +100,8 @@ export function readRouteAuth(middleware: unknown, warn: WarningSink): AuthDescr
     }
 
     found = true;
+    required ||= descriptor.required !== false;
+    hasRequiredFlag ||= descriptor.required !== undefined;
 
     for (const source of descriptor.sources) {
       const duplicate = sources.some((existing) =>
@@ -109,7 +122,7 @@ export function readRouteAuth(middleware: unknown, warn: WarningSink): AuthDescr
     }
   }
 
-  return found ? { sources, userTypes } : undefined;
+  return found ? { sources, userTypes, ...(hasRequiredFlag ? { required } : {}) } : undefined;
 }
 
 /**
@@ -122,7 +135,7 @@ export class SecuritySchemes {
   private readonly cookieSchemeNames = new Map<string, string>();
 
   public requirementsFor(descriptor: AuthDescriptor): OpenApiSecurityRequirement[] {
-    return descriptor.sources.map((source) => {
+    const requirements: OpenApiSecurityRequirement[] = descriptor.sources.map((source) => {
       if (source === "header") {
         this.schemes.bearerAuth = { type: "http", scheme: "bearer", bearerFormat: "JWT" };
 
@@ -133,6 +146,7 @@ export class SecuritySchemes {
 
       return { [name]: [] };
     });
+    return descriptor.required === false ? [...requirements, {}] : requirements;
   }
 
   private cookieScheme(cookie: string): string {

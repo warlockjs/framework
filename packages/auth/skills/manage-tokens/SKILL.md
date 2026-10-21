@@ -194,3 +194,20 @@ The package signs access and refresh tokens with independent secrets — `config
 - The `handle-login-and-logout` topic — full login/logout flow that uses these primitives
 - The `run-auth-commands` topic — the bundled cleanup command
 - The `scheduler-basics` topic of the `warlock-js-scheduler` skill — scheduling cleanup
+
+## Active session caps and rejected refreshes
+
+`RefreshToken.enforceMax(user, max)` uses the same active predicate as
+`RefreshToken.activeFor(user)`: `revoked_at` is null and `expires_at` is strictly
+after now. It revokes the oldest active rows until there is room for one new
+session; expired rows need no cleanup before issuance.
+
+```ts
+const sessions = await RefreshToken.activeFor(user); // newest first
+const next = await authService.refreshTokens(refreshToken); // pair or null
+```
+
+A missing or revoked token family rejects outside the family transaction's
+callback, after a read-only transaction completes. Expected refresh rejections
+do not produce database rollback errors. Replay containment still revokes the
+family, and actual query, commit and rollback failures remain visible.

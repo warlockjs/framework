@@ -20,16 +20,17 @@ export const GOOGLE_AUTH_FEATURE = "auth-google";
 
 /** The slice of `jose` the Google provider uses — declared locally because `jose` is an optional peer. */
 export type JoseModule = {
-  createRemoteJWKSet: (url: URL) => unknown;
+  customFetch: symbol;
+  createRemoteJWKSet: (
+    url: URL,
+    options?: { timeoutDuration: number; [key: symbol]: unknown },
+  ) => unknown;
   jwtVerify: (
     token: string,
     key: unknown,
     options: { issuer: string[]; audience: string },
   ) => Promise<{ payload: Record<string, unknown> }>;
 };
-
-/** Google's key set, created once per process; `jose` caches the fetched JWKS inside it. */
-let googleKeySet: unknown;
 
 /** PKCE S256 code challenge for a verifier. */
 export function pkceChallenge(codeVerifier: string): string {
@@ -45,10 +46,24 @@ export function pkceChallenge(codeVerifier: string): string {
 export class GoogleProvider implements AuthProvider {
   public readonly name = "google";
 
-  public constructor(private readonly settings: GoogleProviderConfig) {}
+  private keySet: unknown;
+  private readonly timeoutMs: number;
+
+  public constructor(private readonly settings: GoogleProviderConfig) {
+    this.timeoutMs = settings.timeoutMs ?? 5000;
+    if (
+      !Number.isSafeInteger(this.timeoutMs) ||
+      this.timeoutMs <= 0 ||
+      this.timeoutMs > 2_147_483_647
+    ) {
+      throw new Error(
+        "Google provider timeoutMs must be a positive integer no greater than 2147483647",
+      );
+    }
+  }
 
   public authorizationUrl(state: ProviderAuthorizationState): string {
-    const url = new URL(AUTHORIZATION_ENDPOINT);
+    const url = new URL(this.settings.endpoints?.authorization ?? AUTHORIZATION_ENDPOINT);
 
     url.searchParams.set("client_id", this.settings.clientId);
     url.searchParams.set("redirect_uri", this.settings.redirectUri);
@@ -103,18 +118,22 @@ export class GoogleProvider implements AuthProvider {
     let body: { id_token?: unknown };
 
     try {
-      const response = await fetch(TOKEN_ENDPOINT, {
-        method: "POST",
-        headers: { "content-type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({
-          code,
-          client_id: this.settings.clientId,
-          client_secret: this.settings.clientSecret,
-          redirect_uri: this.settings.redirectUri,
-          grant_type: "authorization_code",
-          code_verifier: codeVerifier,
-        }),
-      });
+      const response = await (this.settings.fetch ?? globalThis.fetch)(
+        this.settings.endpoints?.token ?? TOKEN_ENDPOINT,
+        {
+          signal: AbortSignal.timeout(this.timeoutMs),
+          method: "POST",
+          headers: { "content-type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({
+            code,
+            client_id: this.settings.clientId,
+            client_secret: this.settings.clientSecret,
+            redirect_uri: this.settings.redirectUri,
+            grant_type: "authorization_code",
+            code_verifier: codeVerifier,
+          }),
+        },
+      );
 
       if (!response.ok) {
         throw new Error(`Google token endpoint answered ${response.status}`);
@@ -134,10 +153,14 @@ export class GoogleProvider implements AuthProvider {
 
   /** Verify signature, issuer, audience and expiry; resolve the claims. */
   private async verifyIdToken(jose: JoseModule, idToken: string): Promise<Record<string, unknown>> {
-    googleKeySet ??= jose.createRemoteJWKSet(new URL(JWKS_URI));
-
     try {
-      const { payload } = await jose.jwtVerify(idToken, googleKeySet, {
+      // Keep caches isolated when providers use different transports or endpoints.
+      this.keySet ??= jose.createRemoteJWKSet(new URL(this.settings.endpoints?.jwks ?? JWKS_URI), {
+        timeoutDuration: this.timeoutMs,
+        [jose.customFetch]: (url: string, options: RequestInit) =>
+          (this.settings.fetch ?? globalThis.fetch)(url, options),
+      });
+      const { payload } = await jose.jwtVerify(idToken, this.keySet, {
         issuer: ISSUERS,
         audience: this.settings.clientId,
       });

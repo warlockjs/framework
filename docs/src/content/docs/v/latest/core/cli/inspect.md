@@ -176,3 +176,21 @@ const report = await inspectApp({
 ## For coding agents
 
 [`warlock mcp`](./mcp.md) serves this report as MCP tools — `inspect_app`, then one `inspect_<section>` tool per section with a `filter`, plus `db_schema` built from the `models` section — and `warlock dev --mcp` serves them from the running dev server. [`warlock agents-md`](./agents-md.md) writes a summary of the report into the project's `AGENTS.md`.
+
+## Session middleware in groups
+
+`sessionMiddleware({ userTypes: "user" })` publishes the same `warlock.auth`
+descriptor as `authMiddleware()`. Group middleware is inherited by nested
+routes, so `inspect` and the generated `agents-md` summary recognize these guards.
+`{ optional: true }` reports `auth.required: false`, with sources and user types
+retained. Such routes remain in the unguarded-write list. Legacy descriptors
+without `required` still mean required authentication.
+
+```ts
+import { router } from "@warlock.js/core";
+import { sessionMiddleware } from "@warlock.js/auth";
+
+router.group({ middleware: [sessionMiddleware({ userTypes: "user" })] }, () => {
+  router.post("/settings", async ({ response }) => response.success({ saved: true }));
+});
+```

@@ -89,6 +89,38 @@ The button is a plain link — it must be a top-level navigation, not a
   (`authorizationUrl(state)`, `handleCallback({ query, expected })`) and
   register it under `auth.providers.custom.<name>`.
 
+### Google request deadlines and controlled providers
+
+`GoogleProviderConfig.timeoutMs` sets a positive integer deadline per token or
+JWKS request (default `5000`, maximum `2147483647`). Both requests receive an
+abort signal, including response-body reads. Timeout failures become
+`InvalidProviderCallbackError` with `code-exchange-failed` or `invalid-id-token`.
+
+For controlled tests, supply trusted endpoints and a fetch-compatible transport:
+
+```ts
+import { GoogleProvider } from "@warlock.js/auth";
+
+const provider = new GoogleProvider({
+  clientId: "test-client",
+  clientSecret: "test-secret",
+  redirectUri: "https://example.test/callback",
+  timeoutMs: 1000,
+  fetch: (url, options) => fetch(url, options),
+  endpoints: {
+    authorization: "https://provider.test/authorize",
+    token: "https://provider.test/token",
+    jwks: "https://provider.test/keys",
+  },
+});
+```
+
+The transport must honor `options.signal`. Endpoint overrides are trusted
+configuration, never request input. They do not change the accepted Google
+issuers, client audience, signature, expiry, nonce or PKCE checks. Each provider
+instance owns its JWKS cache so test keys cannot enter another instance's cache.
+The implementation uses the `jose` 6 `customFetch` and `timeoutDuration` options.
+
 ## GitHub, Discord, LinkedIn, Facebook, X
 
 These providers work the same way as Google. Add a config block under

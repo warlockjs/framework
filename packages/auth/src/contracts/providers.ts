@@ -65,6 +65,12 @@ export type GoogleProviderConfig = {
   redirectUri: string;
   /** @default ["openid", "email", "profile"] */
   scopes?: string[];
+  /** Positive integer deadline per token/JWKS request in milliseconds. @default 5000 */
+  timeoutMs?: number;
+  /** Trusted transport override, also used for JWKS retrieval. Must honor the abort signal. */
+  fetch?: typeof globalThis.fetch;
+  /** Trusted endpoint overrides for controlled provider tests; Google issuers remain enforced. */
+  endpoints?: { authorization?: string; token?: string; jwks?: string };
 };
 
 /** `auth.providers.github`. */

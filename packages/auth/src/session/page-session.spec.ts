@@ -4,7 +4,9 @@ const configKey = vi.fn();
 const resolveRequestUser = vi.fn();
 const verdict = vi.fn();
 
-vi.mock("@warlock.js/core", () => ({
+vi.mock("@warlock.js/core", async () => ({
+  markAuthGuard: (await import("@warlock.js/core/src/router/unguarded-route-diagnostics"))
+    .markAuthGuard,
   config: { key: (...args: unknown[]) => configKey(...args) },
   t: (key: string) => key,
   resolveCsrfOriginVerdict: (...args: unknown[]) => verdict(...args),
@@ -106,7 +108,17 @@ describe("pageSession", () => {
 });
 
 describe("sessionMiddleware", () => {
-  const response = () => ({ unauthorized: vi.fn(() => "401"), forbidden: vi.fn(() => "403") });
+  it("publishes required and optional guard metadata for core tooling", () => {
+    for (const optional of [false, true]) {
+      const middleware = sessionMiddleware({ userTypes: "user", optional });
+      expect(Reflect.get(middleware, Symbol.for("warlock.auth"))).toEqual({
+        required: !optional,
+        sources: [{ cookie: "access_token" }, "header"],
+        userTypes: ["user"],
+      });
+      expect(Reflect.get(middleware, Symbol.for("warlock.js.authGuard"))).toBe(!optional);
+    }
+  });
 
   it("sets the user for a signed-in cookie request", async () => {
     resolveRequestUser.mockResolvedValue(model);

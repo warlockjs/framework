@@ -209,20 +209,23 @@ It reuses the exact same same-origin / `auth.csrf.allowedOrigins` comparison and
 router.post("/oauth/callback", oauthCallbackController, { csrf: false });
 ```
 
-## No optional / fallthrough auth
+## Optional authentication and session guards
 
-There is no "hydrate `request.locals.user` if a token is present, otherwise continue" mode. `authMiddleware` always requires a valid token. Public routes leave the middleware off entirely; protected groups apply it once:
+`authMiddleware({ optional: true })` and `sessionMiddleware({ optional: true })`
+allow guests through. Required session guards also work on route groups:
 
 ```ts
-// Public — no middleware
-router.get("/feed", feedController);
+import { sessionMiddleware } from "@warlock.js/auth";
 
-// Protected
-router.get("/account", accountController, { middleware: [authMiddleware([])] });
-router.get("/admin", adminController, { middleware: [authMiddleware("admin")] });
+router.group({ prefix: "/account", middleware: [sessionMiddleware({ userTypes: "user" })] }, () => {
+  router.post("/settings", saveSettingsController);
+});
 ```
 
-If a public route needs soft personalization, read `request.authorizationValue` yourself in the controller (see [Reading the user in a controller](#reading-the-user-in-a-controller)).
+`warlock inspect` and `warlock agents-md` recognize the guard through nested
+groups. Optional middleware reports `auth.required: false`, retaining its
+credential sources and user types; it does not count as protection for writes.
+OpenAPI represents optional authentication with an anonymous security alternative.
 
 ## Custom error responses
 

@@ -189,3 +189,20 @@ The separation of secrets — one for access, one for refresh — is deliberate.
 - [Tokens](../essentials/03-tokens.md) — the conceptual model under these methods.
 - [Handle login and logout](./handle-login-and-logout.md) — `login` / `logout` use everything here.
 - [Run auth commands](./run-auth-commands.mdx) — the bundled cleanup CLI.
+
+## Active session caps and rejected refreshes
+
+`RefreshToken.enforceMax(user, max)` uses the same active predicate as
+`RefreshToken.activeFor(user)`: `revoked_at` is null and `expires_at` is strictly
+after now. It revokes the oldest active rows until there is room for one new
+session; expired rows need no cleanup before issuance.
+
+```ts
+const sessions = await RefreshToken.activeFor(user); // newest first
+const next = await authService.refreshTokens(refreshToken); // pair or null
+```
+
+A missing or revoked token family rejects outside the family transaction's
+callback, after a read-only transaction completes. Expected refresh rejections
+do not produce database rollback errors. Replay containment still revokes the
+family, and actual query, commit and rollback failures remain visible.
