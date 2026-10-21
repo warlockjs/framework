@@ -1,11 +1,10 @@
-import { changeLocaleCode, useLocale, useTextDirection, useTrans } from "@warlock.js/web";
+import { changeLocaleCode, useLocale, useTextDirection } from "@warlock.js/web";
 import { useState } from "react";
 
 /** Own the contact section's locale switch and recoverable error state. */
 export function useContactLocale() {
   const locale = useLocale();
   const direction = useTextDirection();
-  const translate = useTrans();
   const [isSwitchingLocale, setIsSwitchingLocale] = useState(false);
   const [localeError, setLocaleError] = useState("");
 
@@ -30,5 +29,5 @@ export function useContactLocale() {
     }
   }
 
-  return { direction, translate, isSwitchingLocale, localeError, toggleLocale };
+  return { direction, isSwitchingLocale, localeError, toggleLocale };
 }

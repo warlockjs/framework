@@ -480,7 +480,10 @@ describe("App template emission", () => {
     );
     expect(contact).toContain("useContactLocale()");
     expect(contact).not.toContain("useState");
-    expect(contactLocale).toContain("useTrans()");
+    // The translator is called where the keys are written, so the page's
+    // translation usage is readable from the source.
+    expect(contact).toContain("useTrans()");
+    expect(contactLocale).not.toContain("useTrans");
     expect(contactLocale).toContain("await changeLocaleCode(nextLocale)");
     expect(
       existsSync(path.join(appPath, "src/web/home/components/contact-form-controls.tsx")),

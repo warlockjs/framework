@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { hydrateRoot } from "react-dom/client";
 import { DocumentContext } from "../components/document-context";
 import { HYDRATION_ROOT_ID, PAYLOAD_SCRIPT_ID } from "../components/document-context";
+import { publishNamedApiRoutes } from "../routing/named-api-routes";
 import { hydratePage, type BuildHydratedTree } from "./hydrate-page";
 import { installStreamClosedRejection, prepareDeferredPageData } from "./runtime/defer-registry";
 
@@ -187,6 +188,31 @@ describe("hydratePage", () => {
     vi.mocked(hydrateRoot).mockClear();
     hydratePage(() => "tree", { strictMode: false });
     expect(mountedRootTree()).toEqual(expect.objectContaining({ type: DocumentContext.Provider }));
+  });
+
+  it("rebuilds the document's route table from its own script, which the payload's document slot omits", () => {
+    installFakeDocument();
+    const routes = { "orders.show": { path: "/api/orders/:id", method: "GET" } };
+    publishNamedApiRoutes(routes);
+
+    try {
+      hydratePage(() => "tree");
+
+      const provider = mountedRootTree() as ReactElement<{ value: { namedApiRoutes?: unknown } }>;
+      expect(provider.props.value.namedApiRoutes).toBe(routes);
+    } finally {
+      publishNamedApiRoutes(undefined);
+    }
+  });
+
+  it("leaves the route table out of the context when the document published none", () => {
+    installFakeDocument();
+    publishNamedApiRoutes(undefined);
+
+    hydratePage(() => "tree");
+
+    const provider = mountedRootTree() as ReactElement<{ value: object }>;
+    expect(provider.props.value).not.toHaveProperty("namedApiRoutes");
   });
 
   it("awaits a buildTree that returns a Promise, then mounts it", async () => {

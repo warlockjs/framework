@@ -19,6 +19,7 @@ import {
 import { installPageRoutesFromManifest } from "../../src/server/install-page-routes-from-manifest";
 import { createNotFoundRouteHandler, NOT_FOUND_ROUTE_PATH } from "../../src/server/not-found-page";
 import { connectSharedStore, type SharedStoreResolver } from "../../src/shared";
+import { TRANSLATION_TABLE_ROUTE_PREFIX } from "../../src/translations/types";
 import { createCoreHttp, requestContext } from "../../src/server/__fixtures__/core-http";
 import * as App from "./fixtures/root";
 
@@ -292,6 +293,8 @@ function recordingRouter() {
 
   const router = {
     get(path: string, handler: PageRouteHandler) {
+      // The translation table route is every install's, and no page.
+      if (path.startsWith(TRANSLATION_TABLE_ROUTE_PREFIX)) return router;
       (path === NOT_FOUND_ROUTE_PATH ? notFound : pages).push({ path, handler });
 
       return router;
@@ -300,6 +303,8 @@ function recordingRouter() {
       return callback();
     },
     list: () => [],
+    // Read per request by development's per-page route table.
+    getNamedApiRoutes: () => [],
   };
 
   return { router: router as unknown as Router, pages, notFound };

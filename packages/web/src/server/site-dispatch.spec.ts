@@ -22,6 +22,7 @@ import {
   SITE_DISPATCH_ROUTE_PATH,
   type SiteDispatchInstall,
 } from "./site-dispatch";
+import { TRANSLATION_TABLE_ROUTE_PREFIX } from "../translations/types";
 
 /**
  * Multi-site catch-all dispatch. The SAME fixtures run through the dev
@@ -88,6 +89,8 @@ function recordingRouter() {
   const routes: RecordedRoutes = [];
   const router = {
     get: (routePath: string, handler: PageRouteHandler) => {
+      // The translation table route is every install's, and no page dispatch.
+      if (routePath.startsWith(TRANSLATION_TABLE_ROUTE_PREFIX)) return;
       routes.push({ path: routePath, method: "GET", handler });
     },
     post: (routePath: string, handler: PageRouteHandler) => {

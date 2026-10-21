@@ -267,7 +267,9 @@ describe("WebConnector live page routing", () => {
     vi.spyOn(router, "list").mockReturnValue([
       { isPage: true, sourceFile: "src/web/settings.page.tsx" },
     ] as ReturnType<typeof router.list>);
-    sitemapMocks.refresh.mockImplementationOnce(async () => refreshGate);
+    sitemapMocks.refresh.mockImplementationOnce(async () => {
+      await refreshGate;
+    });
 
     // The browser update is decided while the sitemap refresh is still pending.
     await expect(connector.hotUpdate(files.pageFile)).resolves.toBe(false);

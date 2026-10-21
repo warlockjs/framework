@@ -9,6 +9,7 @@ import {
 } from "../components/document-context";
 import { readHydrationPayload, type HydrationDocumentPayloadSource } from "../hydration-payload";
 import { hydrateShared } from "../shared";
+import { readNamedApiRoutes } from "../routing/named-api-routes";
 import { installSession } from "../session/use-user";
 import { LevelErrorBoundary } from "./build-hydrated-tree";
 import { DefaultErrorBoundary } from "./default-error-boundary";
@@ -220,8 +221,16 @@ export function hydratePage(buildTree: BuildHydratedTree, options: HydratePageOp
     );
   }
 
+  // The document's route table travels in its own script, not in the payload's
+  // `document` slot (`<Scripts/>` leaves the copy out so the table ships once).
+  // The entry has already published it, so the server's context is rebuilt from
+  // that: without it `<Scripts/>` would render no table script here and the
+  // hydrated tree would not match the server's markup.
+  const namedApiRoutes = payload.document?.namedApiRoutes ?? readNamedApiRoutes();
+
   const value: DocumentContextValue = {
     ...payload.document,
+    ...(namedApiRoutes === undefined ? {} : { namedApiRoutes }),
     metadata: payload.metadata,
     payload,
   };

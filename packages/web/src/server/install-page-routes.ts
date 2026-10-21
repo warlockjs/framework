@@ -612,17 +612,23 @@ export async function installPageRoutes(
         usageFor: developmentRouteUsageFor,
       }),
     );
-    await options.router.withSourceFile(TRANSLATION_ROUTE_SOURCE_FILE, () =>
-      registerTranslationTableRoute(options.router),
-    );
+    // Registered once the pages are in, never before: a page that fails
+    // validation must be refused without this route having touched the router.
+    const registerTranslationRoute = () =>
+      options.router.withSourceFile(TRANSLATION_ROUTE_SOURCE_FILE, () =>
+        registerTranslationTableRoute(options.router),
+      );
 
     if (options.siteDispatch === undefined) {
-      return await installDiscoveredPageRoutes(
+      const installed = await installDiscoveredPageRoutes(
         options,
         discoveredGraph,
         routeLocaleManifest,
         artifact?.commit,
       );
+      await registerTranslationRoute();
+
+      return installed;
     }
 
     // MULTI-SITE: the single-site installer below runs once per site, against
@@ -657,6 +663,8 @@ export async function installPageRoutes(
       installedPages.push(...installed);
       registerSiteRoutes(site, installed, sites, "installPageRoutes (development)");
     }
+
+    await registerTranslationRoute();
 
     // Owned like every page route, so a dev page reload replaces the
     // catch-alls instead of registering their names a second time.

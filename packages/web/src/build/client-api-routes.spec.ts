@@ -47,7 +47,7 @@ function orderFixture() {
       "export default function Page() {",
       '  const href = apiHref("orders.show", { params: { id: 1 } });',
       '  const submit = useSubmitForm({ route: "orders.create" });',
-      "  const extra = helper;",
+      "  const extra = [helper, OrderRow];",
       "  return null;",
       "}",
       "",

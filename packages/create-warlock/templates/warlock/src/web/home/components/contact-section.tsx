@@ -1,4 +1,5 @@
 import { Form } from "@mongez/react-form";
+import { useTrans } from "@warlock.js/web";
 import { contactSchema } from "../../../shared/contact.schema";
 import { useContactForm } from "../hooks/use-contact-form";
 import { useContactLocale } from "../hooks/use-contact-locale";
@@ -7,7 +8,9 @@ import ContactSubmitButton from "./contact-submit-button";
 
 export default function ContactSection() {
   const { status: contactStatus, submitContact } = useContactForm();
-  const { direction, translate, isSwitchingLocale, localeError, toggleLocale } = useContactLocale();
+  const { direction, isSwitchingLocale, localeError, toggleLocale } = useContactLocale();
+  // Called here, with literal keys, so the page ships exactly the keys it renders.
+  const translate = useTrans();
 
   return (
     <section className="warlock-section warlock-contact" id="contact" dir={direction}>

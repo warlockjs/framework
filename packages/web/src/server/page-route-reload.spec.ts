@@ -149,6 +149,7 @@ describe("page route ownership helpers", () => {
     { isPage: false, sourceFile: "src/app/main/routes.ts" },
     { isPage: true, sourceFile: "src/web/home.page.tsx" },
     { isPage: true, sourceFile: "\0warlock:framework-default-404" },
+    { isPage: false, sourceFile: "\0warlock:translations" },
   ] as ReturnType<Router["list"]>;
 
   it("maps only real page owners back to absolute page files", () => {
@@ -157,10 +158,11 @@ describe("page route ownership helpers", () => {
     ]);
   });
 
-  it("keeps both real and synthetic page owners for atomic replacement", () => {
+  it("keeps real and synthetic page owners and the translation route owner for atomic replacement", () => {
     expect(pageRouteSourceFiles(routes)).toEqual([
       "src/web/home.page.tsx",
       "\0warlock:framework-default-404",
+      "\0warlock:translations",
     ]);
   });
 });

@@ -46,6 +46,7 @@ describe("production translation delivery", () => {
       url: `${CLIENT_ASSET_URL_PREFIX}/${english?.fileName}`,
       hash: english?.hash,
       groups: ["app", "common"],
+      latest: "/__warlock/translations/en.json",
     });
   });
 
@@ -171,17 +172,21 @@ describe("createRouteTranslationsResolver with delivery", () => {
     const manifest = buildRouteLocaleManifest(
       {
         pages: [{ pageFile: "src/web/orders.page.tsx", webRoot: "src/web" }],
-        localeFiles: [{ sourceFile: "src/web/locales.json", webRoot: "src/web" }],
+        localeFiles: [
+          { sourceFile: "src/web/app.locales.json", webRoot: "src/web" },
+          { sourceFile: "src/web/orders.locales.json", webRoot: "src/web" },
+        ],
       },
       {
         localeCodes: ["en", "ar"],
         localeCode: "en",
-        readSource: () =>
-          JSON.stringify({
-            $group: "app",
-            title: { en: "Orders app", ar: "تطبيق" },
-            orders: { title: { en: "Orders", ar: "الطلبات" } },
-          }),
+        // One group per file: `app` is shared, `orders` is the page's own.
+        readSource: (sourceFile) =>
+          JSON.stringify(
+            sourceFile.endsWith("app.locales.json")
+              ? { $group: "app", title: { en: "Orders app", ar: "تطبيق" } }
+              : { $group: "orders", title: { en: "Orders", ar: "الطلبات" } },
+          ),
       },
     );
     const resolver = createRouteTranslationsResolver(
