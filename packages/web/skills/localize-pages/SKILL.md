@@ -237,3 +237,4 @@ export default function AccountLayout({ children }: { children: React.ReactNode 
 - The `navigate-on-the-client` topic: navigation, refresh, and `<Link>`'s `locale` prop.
 - The `use-localization` topic of the `warlock-js-core` skill: global/module dictionaries and localized data columns.
 - The `multi-site` topic: per-site `localeRouting`.
+- The `build-rtl-and-mixed-direction-ui` topic: document `lang`/`dir`, logical CSS, and locale-correct dates for RTL pages.

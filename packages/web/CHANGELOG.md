@@ -2,6 +2,12 @@
 
 All notable changes to `@warlock.js/web` are documented here.
 
+## 5.35.0
+
+### Added
+
+- Add the `build-rtl-and-mixed-direction-ui` and `preserve-feedback-and-motion` agent skill topics, covering RTL layouts and mixed-direction content, and accessible feedback, failure handling and motion patterns.
+
 ## 5.34.3 - 2026-10-20
 
 ### Changed
