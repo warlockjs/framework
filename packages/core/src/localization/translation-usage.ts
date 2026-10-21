@@ -17,6 +17,16 @@ import * as ast from "../tooling/syntax/ast";
 export type TranslationUsage = {
   readonly keys: readonly string[];
   readonly prefixes: readonly string[];
+  /**
+   * Key-shaped string literals written anywhere in the walked modules, outside
+   * a recognized lookup (a helper's argument, a constant, an object that maps to
+   * keys, a prop). A literal counts as used when it equals an existing key,
+   * names a group or subtree, or is the base of plural variants
+   * (`"cart.items"` reaches `"cart.items_one"` and `"cart.items_other"`).
+   */
+  readonly literals: readonly string[];
+  /** The static heads of template literals with substitutions, which reach every key that starts with one. */
+  readonly literalPrefixes: readonly string[];
   readonly dynamic: boolean;
   /** Where each unresolvable lookup was written, for diagnostics. */
   readonly dynamicSites: readonly TranslationDynamicSite[];
@@ -68,12 +78,16 @@ const VALUE_POSITIONS = new Set([
 export function usageOf(parts: {
   readonly keys?: readonly string[];
   readonly prefixes?: readonly string[];
+  readonly literals?: readonly string[];
+  readonly literalPrefixes?: readonly string[];
   readonly dynamic?: boolean;
   readonly dynamicSites?: readonly TranslationDynamicSite[];
 }): TranslationUsage {
   return Object.freeze({
     keys: Object.freeze([...new Set(parts.keys ?? [])]),
     prefixes: Object.freeze([...new Set(parts.prefixes ?? [])]),
+    literals: Object.freeze([...new Set(parts.literals ?? [])]),
+    literalPrefixes: Object.freeze([...new Set(parts.literalPrefixes ?? [])]),
     dynamic: parts.dynamic === true,
     dynamicSites: Object.freeze([...(parts.dynamicSites ?? [])]),
   });
@@ -114,19 +128,48 @@ export function mergeTranslationUsage(usages: readonly TranslationUsage[]): Tran
   return usageOf({
     keys: usages.flatMap((usage) => usage.keys),
     prefixes: usages.flatMap((usage) => usage.prefixes),
+    literals: usages.flatMap((usage) => usage.literals),
+    literalPrefixes: usages.flatMap((usage) => usage.literalPrefixes),
     dynamic: usages.some((usage) => usage.dynamic),
     dynamicSites: usages.flatMap((usage) => usage.dynamicSites),
   });
 }
 
+/**
+ * Whether `key` is `declared`, lives under it, or is one of its plural
+ * variants. The localization runtime resolves `trans("cart.items", { count })`
+ * to `cart.items_one`, `cart.items_other` and the other count suffixes, so a
+ * name that is only a base of such keys reaches them. A suffix is one segment:
+ * `"cart.items_one"` matches `"cart.items"`, `"cart.items_one.note"` does not.
+ */
+function reaches(declared: string, key: string): boolean {
+  if (declared.endsWith(".")) return key.startsWith(declared);
+  if (key === declared || key.startsWith(`${declared}.`)) return true;
+  if (!key.startsWith(`${declared}_`)) return false;
+
+  return !key.includes(".", declared.length);
+}
+
 /** Whether a usage can reach `key`. A dynamic usage reaches every key. */
 export function isTranslationKeyUsed(usage: TranslationUsage, key: string): boolean {
   if (usage.dynamic) return true;
-  if (usage.keys.some((declared) => key === declared || key.startsWith(`${declared}.`))) {
-    return true;
-  }
+  if (usage.keys.some((declared) => reaches(declared, key))) return true;
+  if (usage.literals.some((literal) => reaches(literal, key))) return true;
 
-  return usage.prefixes.some((prefix) => key.startsWith(prefix));
+  return (
+    usage.prefixes.some((prefix) => key.startsWith(prefix)) ||
+    usage.literalPrefixes.some((prefix) => key.startsWith(prefix))
+  );
+}
+
+/** Whether a string could be a translation key, a group or a key prefix: dotted word segments, no spaces. */
+const KEY_SHAPE = /^[A-Za-z_$][\w$-]*(?:\.[\w$-]+)*\.?$/;
+
+/** Longest literal considered; a real key is far shorter, and anything longer is prose or data. */
+const MAX_LITERAL_LENGTH = 160;
+
+function isKeyShaped(text: string): boolean {
+  return text.length <= MAX_LITERAL_LENGTH && KEY_SHAPE.test(text);
 }
 
 type KeyCandidate = { readonly kind: "key" | "prefix"; readonly value: string };
@@ -280,6 +323,8 @@ export function scanTranslationSource(fileName: string, text: string): Translati
   const bindings = translatorBindings(source);
   const keys: string[] = [];
   const prefixes: string[] = [];
+  const literals: string[] = [];
+  const literalPrefixes: string[] = [];
   const dynamicSites: TranslationDynamicSite[] = [];
   const imports: string[] = [];
 
@@ -333,6 +378,13 @@ export function scanTranslationSource(fileName: string, text: string): Translati
     } else if (node.type === "Identifier" && isTranslatorName(node.name, bindings)) {
       const parent = ast.parentOf(node);
       if (parent !== undefined && escapesAsValue(parent, node)) markDynamic(node, node.name);
+    } else if (node.type === "Literal" && typeof node.value === "string") {
+      if (!isModuleSpecifier(node) && isKeyShaped(node.value)) literals.push(node.value);
+    } else if (node.type === "TemplateLiteral") {
+      const head = node.quasis[0]?.value.cooked ?? "";
+      if (isKeyShaped(head)) {
+        (node.expressions.length === 0 ? literals : literalPrefixes).push(head);
+      }
     }
 
     ast.forEachChild(node, visit);
@@ -341,9 +393,34 @@ export function scanTranslationSource(fileName: string, text: string): Translati
   ast.forEachChild(source, visit);
 
   return {
-    usage: usageOf({ keys, prefixes, dynamic: dynamicSites.length > 0, dynamicSites }),
+    usage: usageOf({
+      keys,
+      prefixes,
+      // A literal already read as a lookup key is not repeated.
+      literals: literals.filter((literal) => !keys.includes(literal)),
+      literalPrefixes: literalPrefixes.filter((literal) => !prefixes.includes(literal)),
+      dynamic: dynamicSites.length > 0,
+      dynamicSites,
+    }),
     imports: [...new Set(imports)],
   };
+}
+
+/** The specifier of an import, re-export or dynamic import: a module path, never a translation key. */
+function isModuleSpecifier(node: ast.Node): boolean {
+  const parent = ast.parentOf(node);
+
+  if (parent === undefined) return false;
+
+  switch (parent.type) {
+    case "ImportDeclaration":
+    case "ExportNamedDeclaration":
+    case "ExportAllDeclaration":
+    case "ImportExpression":
+      return parent.source === node;
+    default:
+      return false;
+  }
 }
 
 /** A translator identifier handed on as a value, rather than called or declared. */
