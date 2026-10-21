@@ -542,3 +542,13 @@ to support derivations such as `has_secret: Boolean(data.secret)`. Model
 serialization removes `hidden` top-level keys from the final resource result.
 Review resources that copy input under renamed or nested keys and return explicit
 public projections. Direct resource construction does not invoke model filtering.
+
+## 5.34 to 5.35 document hydration
+
+Initial Web hydration now includes `root.tsx`, matching the document ancestry
+used by SSR so `useId()` and generated Mongez form IDs agree beneath layouts.
+Root components and providers execute in both realms. Move server-only work into
+`root.setup.ts` loaders and pass browser-safe results as `data`; retain exactly
+one `#vessel` around `{children}`. Client navigation still swaps layout/page
+children while preserving the document root. Remove temporary explicit form IDs
+only when the application does not otherwise depend on those names.

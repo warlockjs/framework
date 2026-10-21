@@ -160,6 +160,12 @@ describe("hydratePage", () => {
     expect(mountedTree()).toBe("tree");
   });
 
+  it("mounts the entry's complete document tree at document", () => {
+    installFakeDocument();
+    hydratePage(() => "document tree", { documentRoot: true });
+    expect(vi.mocked(hydrateRoot).mock.calls[0]?.[0]).toBe(document);
+  });
+
   it("wraps the complete hydration tree including DocumentContext in strict mode", () => {
     installFakeDocument();
 

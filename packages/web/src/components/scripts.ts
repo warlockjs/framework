@@ -21,8 +21,10 @@ export type ScriptsProps = {
  * and both disappear together on a non-hydrating document.
  */
 export function Scripts(props: ScriptsProps): ReactElement {
-  const { payload, nonce, hydrationClientModuleUrl, namedApiRoutes, siteKey } =
-    useDocumentContext("Scripts");
+  const context = useDocumentContext("Scripts");
+  const { payload, nonce, hydrationClientModuleUrl, namedApiRoutes, siteKey } = context;
+  const { payload: _payload, metadata: _metadata, ...document } = context;
+  const documentPayload = { ...payload, document: payload.document ?? document };
 
   // `renderPageFailure` marks its payload non-hydrating (page-render-bundle.ts):
   // a module-load/registration throw happens before any triple exists, so
@@ -52,7 +54,7 @@ export function Scripts(props: ScriptsProps): ReactElement {
       // cannot represent.
       type: "application/json",
       nonce: resolvedNonce,
-      dangerouslySetInnerHTML: { __html: escapePayload(stringify(payload)) },
+      dangerouslySetInnerHTML: { __html: escapePayload(stringify(documentPayload)) },
     }),
     namedApiRoutes === undefined
       ? null

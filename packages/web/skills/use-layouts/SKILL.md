@@ -210,6 +210,13 @@ authoritative. Static metadata defaults still merge with child metadata, and
 the nearest template applies once. Layouts still do not accept page routes,
 cache policy, validation, or a sitemap supplier.
 
+## Generated identifiers
+
+Initial hydration includes the document root, matching SSR ancestry. React
+`useId()` and Mongez forms without explicit IDs remain consistent beneath a
+layout, including repeated instances. Keep labels and ARIA references derived
+from the same hook value; client navigation preserves mounted layout state.
+
 ## Gotchas
 
 - **`layout.tsx` is positional.** It applies by directory ancestry; moving a page can change its layout and URL prefix together.

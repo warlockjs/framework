@@ -1,8 +1,9 @@
 import { AsyncLocalStorage } from "node:async_hooks";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { setTimeout as delay } from "node:timers/promises";
 import { createServer, type ViteDevServer } from "vite";
 import { describe, expect, it } from "vitest";
 import type * as SharedModule from "../shared";
@@ -20,14 +21,15 @@ describe("shared runtime across watched server edits", () => {
     const source = await readFile(join(webRoot, "src/shared.ts"), "utf8");
     try {
       await writeFile(join(root, "shared.ts"), source);
+      await symlink(join(webRoot, "node_modules"), join(root, "node_modules"), "dir");
       server = await createServer({
         root,
         configFile: false,
         appType: "custom",
         logLevel: "silent",
-        resolve: { alias: { react: fileURLToPath(import.meta.resolve("react")) } },
         server: {
           middlewareMode: true,
+          hmr: false,
           watch: { usePolling: true, interval: 20 },
           fs: { allow: [root, webRoot] },
         },
@@ -39,10 +41,13 @@ describe("shared runtime across watched server edits", () => {
       const retained = initial;
       for (let revision = 0; revision < 5; revision++) {
         if (revision > 0) {
+          // Separate saves beyond the watcher coalescing window. The observed
+          // event and exported revision below still prove each actual reload.
+          await delay(150);
           const changed = new Promise<void>((done, reject) => {
             const timer = setTimeout(() => {
               vite.watcher.off("change", onChange);
-              reject(new Error("shared edit was not observed"));
+              reject(new Error(`shared edit ${revision} was not observed`));
             }, 8000);
             function onChange(file: string) {
               if (file !== join(root, "shared.ts")) return;
@@ -54,9 +59,14 @@ describe("shared runtime across watched server edits", () => {
           });
           await writeFile(
             join(root, "shared.ts"),
-            source + `\nexport const revision = ${revision};\n`,
+            source + `\nexport const revision = ${revision};\n${"\n".repeat(revision)}`,
           );
           await changed;
+        }
+        if (revision > 0) {
+          await expect
+            .poll(async () => Reflect.get(await vite.ssrLoadModule("/shared.ts"), "revision"))
+            .toBe(revision);
         }
         const reloaded = (await vite.ssrLoadModule("/shared.ts")) as Runtime;
         await Promise.all(

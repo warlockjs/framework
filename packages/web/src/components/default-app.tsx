@@ -27,14 +27,7 @@ export default function DefaultApp({ children }: DefaultAppProps): ReactElement 
         <Head />
       </head>
       <body>
-        {/*
-          The hydration mount point (documented previously as
-          `render-page.ts`'s own hardcoded shell, now moved here since the
-          root supplies the whole document itself). An app writing its own
-          custom `root.tsx` is responsible for its own equivalent if it wants
-          a stable hydration target — this default only covers the
-          no-custom-root case.
-        */}
+        {/* The stable navigation container within the hydrated document. */}
         <div id={HYDRATION_ROOT_ID}>{children}</div>
         {/* Prop-less: inherits the nonce slot via Scripts' own fallback
             (scripts.ts) rather than reading document-context twice here. */}
