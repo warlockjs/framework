@@ -15,23 +15,26 @@ export default defineConfig({
       // bare specifier, which forces the whole real barrel — including
       // `core/src/database/utils.ts`, which imports `@warlock.js/auth`
       // back (a genuine core→auth cycle) — to evaluate mid-mock.
-      "@warlock.js/core/src/http/request": resolve(__dirname, "../core/src/http/request.ts"),
+      "@warlock.js/core/src/http/request": resolve(
+        import.meta.dirname,
+        "../core/src/http/request.ts",
+      ),
       "@warlock.js/core/src/http/context/request-context": resolve(
-        __dirname,
+        import.meta.dirname,
         "../core/src/http/context/request-context.ts",
       ),
       // The auth-guard marker `authMiddleware()` sets, read back by the specs
       // without loading the core barrel.
       "@warlock.js/core/src/router/unguarded-route-diagnostics": resolve(
-        __dirname,
+        import.meta.dirname,
         "../core/src/router/unguarded-route-diagnostics.ts",
       ),
-      "@warlock.js/core": resolve(__dirname, "../core/src/index.ts"),
-      "@warlock.js/cascade": resolve(__dirname, "../cascade/src/index.ts"),
-      "@warlock.js/logger": resolve(__dirname, "../logger/src/index.ts"),
-      "@warlock.js/seal": resolve(__dirname, "../seal/src/index.ts"),
-      "@warlock.js/fs": resolve(__dirname, "../fs/src/index.ts"),
-      "@warlock.js/cache": resolve(__dirname, "../cache/src/index.ts"),
+      "@warlock.js/core": resolve(import.meta.dirname, "../core/src/index.ts"),
+      "@warlock.js/cascade": resolve(import.meta.dirname, "../cascade/src/index.ts"),
+      "@warlock.js/logger": resolve(import.meta.dirname, "../logger/src/index.ts"),
+      "@warlock.js/seal": resolve(import.meta.dirname, "../seal/src/index.ts"),
+      "@warlock.js/fs": resolve(import.meta.dirname, "../fs/src/index.ts"),
+      "@warlock.js/cache": resolve(import.meta.dirname, "../cache/src/index.ts"),
     },
   },
   test: {

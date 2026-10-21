@@ -54,13 +54,13 @@ export default defineConfig({
   plugins: [lowerStage3Decorators()],
   resolve: {
     alias: {
-      "@warlock.js/context": path.resolve(__dirname, "../context/src"),
-      "@warlock.js/seal": path.resolve(__dirname, "../seal/src"),
-      "@warlock.js/logger": path.resolve(__dirname, "../logger/src"),
-      "@warlock.js/core": path.resolve(__dirname, "../core/src"),
-      "@warlock.js/auth": path.resolve(__dirname, "../auth/src"),
-      "@warlock.js/cache": path.resolve(__dirname, "../cache/src"),
-      "@warlock.js/scheduler": path.resolve(__dirname, "../scheduler/src"),
+      "@warlock.js/context": path.resolve(import.meta.dirname, "../context/src"),
+      "@warlock.js/seal": path.resolve(import.meta.dirname, "../seal/src"),
+      "@warlock.js/logger": path.resolve(import.meta.dirname, "../logger/src"),
+      "@warlock.js/core": path.resolve(import.meta.dirname, "../core/src"),
+      "@warlock.js/auth": path.resolve(import.meta.dirname, "../auth/src"),
+      "@warlock.js/cache": path.resolve(import.meta.dirname, "../cache/src"),
+      "@warlock.js/scheduler": path.resolve(import.meta.dirname, "../scheduler/src"),
     },
   },
   test: {

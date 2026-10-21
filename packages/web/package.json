@@ -78,14 +78,14 @@
   "peerDependencies": {
     "@mongez/http": "^3.5.1",
     "@mongez/react-form": "^4.0.0",
-    "@vitejs/plugin-react": "^5.2.0",
+    "@vitejs/plugin-react": "^6.0.0",
     "@warlock.js/cache": "5.35.0",
     "@warlock.js/cascade": "5.35.0",
     "@warlock.js/core": "5.35.0",
     "@warlock.js/seal": "5.35.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "vite": ">=7.3.5 <8"
+    "vite": "^8.0.0"
   },
   "peerDependenciesMeta": {
     "vite": {
@@ -124,8 +124,8 @@
     "@playwright/test": "^1.62.1",
     "@types/babel__traverse": "^7.28.0",
     "@types/jsdom": "^30.0.0",
-    "@types/node": "^20.19.43",
-    "@vitejs/plugin-react": "^5.2.0",
+    "@types/node": "^22.10.5",
+    "@vitejs/plugin-react": "^6.1.2",
     "@warlock.js/cache": "workspace:^",
     "@warlock.js/cascade": "workspace:^",
     "@warlock.js/context": "workspace:^",
@@ -137,8 +137,8 @@
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "typescript": "7.0.2",
-    "vite": "^7.3.5",
-    "vitest": "4.1.10",
+    "vite": "8.3.3",
+    "vitest": "5.0.3",
     "web-vitals": "6.2.3"
   },
   "packageManager": "pnpm@11.24.0"

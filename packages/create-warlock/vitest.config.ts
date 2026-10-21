@@ -5,7 +5,7 @@ export default defineConfig({
   resolve: {
     alias: { web: fileURLToPath(new URL("./templates/design-system/src/web", import.meta.url)) },
   },
-  esbuild: { jsx: "automatic" },
+  oxc: { jsx: { runtime: "automatic" } },
   test: {
     environment: "node",
     globals: false,

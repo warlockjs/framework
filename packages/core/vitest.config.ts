@@ -11,7 +11,7 @@ import { defineConfig } from "vitest/config";
  * without a build step.
  */
 const workspaceSource = (packageName: string) => {
-  return path.resolve(__dirname, `../${packageName}/src/index.ts`);
+  return path.resolve(import.meta.dirname, `../${packageName}/src/index.ts`);
 };
 
 export default defineConfig({

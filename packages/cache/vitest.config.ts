@@ -4,8 +4,8 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   resolve: {
     alias: {
-      "@warlock.js/logger": resolve(__dirname, "../logger/src/index.ts"),
-      "@warlock.js/fs": resolve(__dirname, "../fs/src/index.ts"),
+      "@warlock.js/logger": resolve(import.meta.dirname, "../logger/src/index.ts"),
+      "@warlock.js/fs": resolve(import.meta.dirname, "../fs/src/index.ts"),
     },
   },
   test: {

@@ -18,6 +18,9 @@ const peerPackages = [
   "react",
   "react-dom",
   "vite",
+  // A native-binding package: its WASM fallback imports a package that is not
+  // installed, which Vite 8 (Rolldown) reports as an error when bundled.
+  "oxc-parser",
 ] as const;
 
 function isExternalDependency(id: string): boolean {
@@ -37,7 +40,7 @@ export default defineConfig({
       formats: ["es"],
     },
     outDir: "esm",
-    rollupOptions: {
+    rolldownOptions: {
       // Peers stay external so consumers share React and the single core ALS identity.
       external: isExternalDependency,
     },

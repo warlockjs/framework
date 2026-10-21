@@ -42,11 +42,11 @@
   },
   "devDependencies": {
     "@types/node": "^22.10.5",
-    "@vitest/coverage-v8": "4.1.10",
+    "@vitest/coverage-v8": "5.0.3",
     "@warlock.js/herald": "workspace:^",
     "@warlock.js/queue": "workspace:^",
     "typescript": "7.0.2",
-    "vitest": "4.1.10"
+    "vitest": "5.0.3"
   },
   "keywords": [
     "notifications",

@@ -30,8 +30,11 @@
     "test:skills": "node --test scripts/generate-skills.test.mjs"
   },
   "dependencies": {
-    "@astrojs/starlight": "^0.39.2",
-    "astro": "^6.3.1",
+    "@astrojs/markdown-remark": "7.3.2",
+    "@astrojs/markdown-satteri": "0.4.3",
+    "@astrojs/mdx": "8.0.3",
+    "@astrojs/starlight": "0.42.5",
+    "astro": "7.3.6",
     "astro-mermaid": "^2.0.1",
     "mermaid": "^11.15.0",
     "sharp": "^0.34.5",

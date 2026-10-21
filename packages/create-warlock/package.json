@@ -39,10 +39,10 @@
     "which-pm-runs": "^1.1.0"
   },
   "devDependencies": {
-    "@types/node": "^20.12.7",
+    "@types/node": "^22.10.5",
     "tsx": "^4.21.0",
     "typescript": "7.0.2",
-    "vitest": "4.1.10",
+    "vitest": "5.0.3",
     "oxfmt": "0.73.0",
     "oxlint": "1.88.0",
     "@mongez/react-form": "4.0.0",

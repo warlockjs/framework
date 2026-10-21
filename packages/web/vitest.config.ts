@@ -21,7 +21,7 @@ import { defineConfig } from "vitest/config";
  * prefix alias would corrupt any such specifier that ever hits the resolver.
  */
 const workspaceSource = (packageName: string) => {
-  return path.resolve(__dirname, `../${packageName}/src/index.ts`);
+  return path.resolve(import.meta.dirname, `../${packageName}/src/index.ts`);
 };
 
 const exactAlias = (packageName: string) => ({

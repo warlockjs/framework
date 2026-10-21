@@ -104,3 +104,6 @@ linkWorkspacePackages: true
 # https://github.com/advisories/GHSA-g7r4-m6w7-qqqr (fixed in 0.28.1)
 overrides:
   esbuild: ^0.28.2
+  # Starlight depends on @astrojs/mdx ^8.0.0; keep one copy, at the newest release that
+  # is at least two weeks old (the docs pin it directly too).
+  "@astrojs/mdx": 8.0.3
