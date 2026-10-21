@@ -61,6 +61,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 
 - `warlock add design-system` scaffolds app-owned accessible shadcn controls connected to Mongez React Form, with pinned dependencies, a Tailwind preflight before mutations, preservation of existing files, and dry-run support.
+### Added
+
+- `warlock generate page <path>` scaffolds a UI-only page and setup companion with route, loader and metadata; `--interactive` adds a feature hook.
+- `warlock generate form <name> [--module <name>] [--endpoint]` scaffolds design-system controls, a shared Seal schema, a `useSubmitForm` hook and an optional guarded controller/route with validation and response schema.
+- `warlock generate crud-ui <module>` scaffolds guarded list/create/edit pages, schema-backed forms, endpoint-derived filters, pagination and a delete action for conventional CRUD modules. All web generators support dry-run JSON reports and preserve existing files unless forced.
 
 ## 5.34.3 - 2026-10-20
 

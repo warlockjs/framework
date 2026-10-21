@@ -42,7 +42,7 @@ export type SchemaModuleLoader = (absolutePath: string) => Promise<Record<string
  * Import an app TypeScript file from the CLI: register the framework's
  * loader (path aliases, TypeScript) first, as `warlock dev` does.
  */
-const loadSchemaModuleWithAppLoader: SchemaModuleLoader = async (absolutePath) => {
+export const loadSchemaModuleWithAppLoader: SchemaModuleLoader = async (absolutePath) => {
   const { filesOrchestrator } = await import("../../../../dev-server/files-orchestrator");
   const { warlockConfigManager } =
     await import("../../../../warlock-config/warlock-config.manager");

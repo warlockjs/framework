@@ -11,8 +11,12 @@ import { generateRepository } from "./generators/repository.generator";
 import { generateResource } from "./generators/resource.generator";
 import { generateService } from "./generators/service.generator";
 import { generateUseCase } from "./generators/use-case.generator";
+import { generatePage, generateForm, generateCrudUi } from "./generators/web.generator";
 
 const generators: Record<string, (data: CommandActionData) => Promise<void>> = {
+  page: generatePage,
+  form: generateForm,
+  "crud-ui": generateCrudUi,
   module: generateModule,
   endpoint: generateEndpoint,
   controller: generateController,
@@ -126,6 +130,9 @@ const generatorOptionsForDispatch = [
     type: "boolean" as const,
   },
   ...endpointOptions,
+  { text: "--module <name>", description: "Module owning the generated form" },
+  { text: "--endpoint", description: "Generate a guarded form endpoint", type: "boolean" as const },
+  { text: "--interactive", description: "Generate a page feature hook", type: "boolean" as const },
 ];
 
 // Master generate command
