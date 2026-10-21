@@ -6,6 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 > ⚠ **Versioning: `@warlock.js/*` does not follow SemVer strictly — breaking changes may ship in a minor.** This is a deliberate decision, not an oversight: the framework is pre-adoption and the cost of a major per behaviour fix currently outweighs the benefit. **Pin an exact version or a tilde range (`~4.13.0`) if you need to opt into changes rather than receive them.** Every breaking change is marked **BREAKING** in its entry and summarised in an _Upgrading_ section at the top of the release. **This policy will change once the framework has consumers beyond its author.**
 
+## 5.35.0
+
+### Fixed
+
+- Generate notification locale strings for every configured locale with an explicit English fallback.
+- Exclude co-located tests and test-only directories from configuration discovery and reload.
+- Register module JSON dictionaries in each test worker and remove them during teardown.
+- Dispose HTTP test-server file runtime resources and pending loader acknowledgements on shutdown and failed startup.
+
+### Changed
+
+- Document the development devtools captured-mail preview without logging message bodies.
+
 ## 5.34.3 - 2026-10-20
 
 ### Fixed

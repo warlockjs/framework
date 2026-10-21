@@ -1,7 +1,14 @@
 const normalize = (path: string) => path.replace(/\\/g, "/");
 
 /** `src/config/**` — any depth, the config key is the raw path */
-export const isConfigFile = (path: string) => /^src\/config\/.*\.(ts|tsx)$/.test(normalize(path));
+export const isConfigFile = (path: string) => {
+  const normalized = normalize(path);
+  return (
+    /^src\/config\/.*\.(ts|tsx)$/.test(normalized) &&
+    !/\.(spec|test)\.[^/]+$/.test(normalized) &&
+    !/\/(?:__tests__|__mocks__|__fixtures__|tests?|fixtures)\//.test(normalized)
+  );
+};
 
 /** `src/app/main.ts` or `src/app/<module>/main.ts` */
 export const isMainFile = (path: string) =>

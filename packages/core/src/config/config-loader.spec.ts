@@ -40,6 +40,19 @@ describe("ConfigLoader with config schemas", () => {
     executed.length = 0;
   });
 
+  it("never imports test config files, including direct reloads", async () => {
+    const file = configFile("example.spec", {});
+    modules.set(pathToFileURL(file.absolutePath).href, {
+      get default() {
+        throw new Error("test module imported");
+      },
+    });
+    const loader = new ConfigLoader();
+    await loader.loadAll([file]);
+    await loader.reloadConfig(file);
+    expect(executed).toEqual([]);
+  });
+
   it("loads files without a schema exactly as before", async () => {
     await new ConfigLoader().loadAll([configFile("app", { default: { name: "demo" } })]);
 

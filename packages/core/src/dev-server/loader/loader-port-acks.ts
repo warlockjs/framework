@@ -6,6 +6,7 @@ export type LoaderPortAcks = {
    * `sync-ack`. Every message posted before it has been processed by then.
    */
   sync(): Promise<void>;
+  dispose(): void;
 };
 
 /**
@@ -24,18 +25,28 @@ export type LoaderPortAcks = {
 export function trackLoaderPortAcks(port: MessagePort): LoaderPortAcks {
   const waiters: Array<() => void> = [];
 
-  port.on("message", (message: { type?: string }) => {
+  let disposed = false;
+  const onMessage = (message: { type?: string }) => {
     if (message?.type !== "sync-ack") return;
 
     waiters.shift()?.();
 
     if (waiters.length === 0) port.unref();
-  });
+  };
+  port.on("message", onMessage);
 
   port.unref();
 
   return {
+    dispose() {
+      if (disposed) return;
+      disposed = true;
+      port.off("message", onMessage);
+      for (const resolve of waiters.splice(0)) resolve();
+      port.close();
+    },
     sync() {
+      if (disposed) return Promise.resolve();
       return new Promise<void>((resolve) => {
         waiters.push(resolve);
         port.ref();

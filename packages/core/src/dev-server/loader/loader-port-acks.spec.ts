@@ -94,7 +94,20 @@ describe("trackLoaderPortAcks", () => {
     expect(settled).toBe(true);
   });
 
-  it("lets a process with an open, idle loader channel exit on its own", () => {
+  it("releases pending sync references and listeners on dispose", async () => {
+    const { port1 } = channel();
+    const acks = trackLoaderPortAcks(port1);
+    const pending = acks.sync();
+    expect(port1.hasRef()).toBe(true);
+    acks.dispose();
+    await pending;
+    expect(port1.hasRef()).toBe(false);
+    expect(port1.listenerCount("message")).toBe(0);
+    await acks.sync();
+    acks.dispose();
+  });
+
+  it("lets a process exit after disposing a loader channel with a pending sync", () => {
     // The real failure: nothing else is pending, yet the process never exits.
     // Resolved from the package root (vitest's cwd); core's tsconfig module
     // setting does not allow `import.meta` here.
@@ -103,7 +116,9 @@ describe("trackLoaderPortAcks", () => {
       'import { MessageChannel } from "node:worker_threads";',
       `const { trackLoaderPortAcks } = await import(${JSON.stringify(moduleUrl)});`,
       "const { port1, port2 } = new MessageChannel();",
-      "trackLoaderPortAcks(port1);",
+      "const acks = trackLoaderPortAcks(port1);",
+      "void acks.sync();",
+      "acks.dispose();",
       "port2.unref();",
       'console.log("ready");',
     ].join("\n");

@@ -292,3 +292,12 @@ const message = trans("auth.otpExpired");
 - **[Validation](./validation.md)** — `v.localized()` in context, plus how rule/attribute messages localize through this same registry.
 - **[Resources deep dive](./resources-deep.md)** — the full cast surface, including `"localized"` and the `.localized()` builder.
 - **[HTTP request](./http-request.md)** — `request.locale`, `request.getLocaleCode()`, `request.setLocaleCode()`, and `request.transFrom()`.
+
+## Notification translation defaults
+
+After configuring `app.localeCodes`, run `npx warlock add notifications`.
+New notification dictionaries include `notFound` as a string in every configured
+locale. English ("Notification not found") is the explicit fallback for each
+locale without a bundled translation, including locale sets without English.
+Replace fallback text with your translations before publishing. Existing module
+files and existing translation keys are preserved.

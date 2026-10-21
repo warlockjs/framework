@@ -98,7 +98,7 @@ describe("Model serialization — hidden fields", () => {
     expect(user.toJSON()).toEqual({ id: 1, name: "Carol" });
   });
 
-  it("strips hidden fields from the data handed to a resource class", () => {
+  it("strips hidden fields from resource output", () => {
     const user = new HiddenWithResourceUser({
       id: 1,
       name: "Dave",
@@ -106,6 +106,22 @@ describe("Model serialization — hidden fields", () => {
     });
 
     expect(user.toJSON()).toEqual({ id: 1, name: "Dave" });
+  });
+  it("derives public flags from hidden input while filtering passthrough output", () => {
+    class SecretResource extends PassthroughResource {
+      public toJSON() {
+        return { ...this.resourceData, has_secret: Boolean(this.resourceData.password) };
+      }
+    }
+    class SecretModel extends HiddenWithResourceUser {
+      static resource = SecretResource;
+    }
+    const model = new SecretModel({ id: 1, password: "private" });
+    expect(model.toJSON()).toEqual({ id: 1, has_secret: true });
+    expect(JSON.parse(JSON.stringify({ pageData: { model } }))).toEqual({
+      pageData: { model: { id: 1, has_secret: true } },
+    });
+    expect(model.get("password")).toBe("private");
   });
 });
 

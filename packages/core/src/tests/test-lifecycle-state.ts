@@ -68,6 +68,7 @@ export type TestLifecycleRegistry = {
   activeSelection?: TestConnectorsSelection;
   setupAttempt?: TestSetupAttempt;
   teardownAttempt?: Promise<void>;
+  cleanupLocales?: () => void;
 
   /**
    * How the setup bound is scheduled. Specs replace it to prove the guard in

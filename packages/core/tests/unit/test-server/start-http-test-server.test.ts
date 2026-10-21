@@ -34,6 +34,7 @@ vi.mock("../../../src/warlock-config/warlock-config.manager", () => ({
 
 vi.mock("../../../src/dev-server/files-orchestrator", () => ({
   filesOrchestrator: {
+    dispose: vi.fn(async () => undefined),
     init: vi.fn(async () => undefined),
     initializeAll: vi.fn(async () => undefined),
     moduleLoader: { loadAll: vi.fn(async () => undefined) },

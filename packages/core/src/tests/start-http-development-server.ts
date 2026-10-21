@@ -294,7 +294,11 @@ async function unwindPartialStartup(): Promise<void> {
   }
 
   try {
-    await connectorsManager.shutdown();
+    try {
+      await connectorsManager.shutdown();
+    } finally {
+      await filesOrchestrator.dispose();
+    }
   } catch (shutdownError) {
     // Reported, not thrown — it is secondary to the startup error being
     // rethrown, and losing that one to this would be the worse outcome.
@@ -322,7 +326,11 @@ export async function stopHttpTestServer(): Promise<void> {
       console.error("[test-server] Restoring the test fakes did not complete:", fakesError);
     }
 
-    await connectorsManager.shutdown();
+    try {
+      await connectorsManager.shutdown();
+    } finally {
+      await filesOrchestrator.dispose();
+    }
 
     console.log("[test-server] HTTP test server stopped");
   } catch (error) {

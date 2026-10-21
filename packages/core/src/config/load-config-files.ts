@@ -1,3 +1,4 @@
+import { isConfigFile } from "../dev-server/special-file-patterns";
 import { filesOrchestrator } from "../dev-server/files-orchestrator";
 import { Path } from "../utils/normalized-path";
 import { getCertainFilesFromDirectory, getFilesFromDirectory } from "../dev-server/utils";
@@ -22,7 +23,7 @@ export async function loadConfigFiles(config: string[] | true) {
   }
 
   const configFiles = await Promise.all(
-    relativePaths.map((relativePath) => filesOrchestrator.add(relativePath)),
+    relativePaths.filter(isConfigFile).map((relativePath) => filesOrchestrator.add(relativePath)),
   );
 
   filesOrchestrator.specialFilesCollector.collect(filesOrchestrator.files);

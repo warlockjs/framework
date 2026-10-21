@@ -2,6 +2,12 @@
 
 All notable changes to `@warlock.js/web` are documented here.
 
+## 5.35.0
+
+### Fixed
+
+- Install fetched sessions on refresh, locale changes, and central page swaps, including guest sessions; superseded responses cannot publish identity.
+
 ## 5.34.3 - 2026-10-20
 
 ### Changed

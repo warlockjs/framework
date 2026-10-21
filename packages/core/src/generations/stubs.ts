@@ -1,3 +1,5 @@
+import config from "@mongez/config";
+
 export const accessConfigStub = `import { type AccessConfigurations } from "@warlock.js/access";
 import { DatabaseAccessResolver } from "app/access/services/access-resolver";
 
@@ -677,11 +679,23 @@ router.group({ middleware: [authMiddleware([])] }, () => {
 });
 `;
 
-/** `src/app/notifications/utils/locales.json` — the module's translations. */
-export const notificationLocalesStub = `{
-  "notFound": { "en": "Notification not found" }
+/** Build module locale JSON, with English as the explicit translation fallback. */
+export function createNotificationLocalesStub(): string {
+  const configured: unknown = config.get("app.localeCodes");
+  const codes: string[] =
+    Array.isArray(configured) && configured.length > 0
+      ? configured.filter((code): code is string => typeof code === "string")
+      : ["en"];
+  return (
+    JSON.stringify(
+      { notFound: Object.fromEntries(codes.map((code) => [code, "Notification not found"])) },
+      null,
+      2,
+    ) + "\n"
+  );
 }
-`;
+
+export const notificationLocalesStub = createNotificationLocalesStub();
 
 /** Shared fixtures for the generated signed-in notification controller specs. */
 export const notificationTestFixtureStub = `import type { Auth } from "@warlock.js/auth";

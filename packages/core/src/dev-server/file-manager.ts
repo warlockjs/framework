@@ -7,7 +7,7 @@ import { isTypeOnlyFile, parseImports } from "./parse-imports";
 import { Path } from "../utils/normalized-path";
 import type { FileManifest, FileState, FileType } from "./types";
 
-export type CleanupFunction = () => void;
+export type CleanupFunction = () => void | Promise<void>;
 
 /**
  * Whether `error` is a Node `ENOENT` (path does not exist) error. Used to

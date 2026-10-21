@@ -214,6 +214,23 @@ export class ModuleLoader {
     file.resetCleanup();
   }
 
+  /** Await module-owned handles during test runtime shutdown, attempting every cleanup. */
+  public async dispose(files: Iterable<FileManager>): Promise<void> {
+    const failures: unknown[] = [];
+    for (const file of files) {
+      for (const hook of file.cleanup) {
+        try {
+          if (typeof hook === "function") await hook();
+        } catch (error) {
+          failures.push(error);
+        }
+      }
+      file.resetCleanup();
+      this.cleanupDeletedModule(file);
+    }
+    if (failures.length) throw new AggregateError(failures, "Module cleanup failed");
+  }
+
   /**
    * Clean up after a file whose source was deleted from disk.
    */

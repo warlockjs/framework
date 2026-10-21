@@ -1,3 +1,4 @@
+import appConfig from "@mongez/config";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 let existing = new Set<string>();
@@ -53,10 +54,31 @@ describe("warlock add notifications", () => {
     directories = new Set();
     contents = new Map();
     written = new Map();
+    appConfig.set("app.localeCodes", ["en"]);
   });
 
   afterEach(() => {
     logSpy.mockRestore();
+  });
+
+  it("fills missing configured locales while preserving existing notification translations", async () => {
+    appConfig.set("app.localeCodes", ["en", "ar"]);
+    givenFile("app/notifications/utils/locales.json", JSON.stringify({ notFound: { en: "Gone" } }));
+    await notificationsFeature.onExecuting?.({} as never);
+    const source = written.get(normalize(srcPath("app/notifications/utils/locales.json"))) ?? "{}";
+    expect(JSON.parse(source)).toEqual({ notFound: { en: "Gone", ar: "Notification not found" } });
+  });
+
+  it.each([
+    ["en", "ar"],
+    ["fr", "de"],
+  ])("generates all configured locale strings: %s %s", async (...codes) => {
+    appConfig.set("app.localeCodes", codes);
+    await notificationsFeature.onExecuting?.({} as never);
+    const source = written.get(normalize(srcPath("app/notifications/utils/locales.json"))) ?? "{}";
+    expect(JSON.parse(source)).toEqual({
+      notFound: Object.fromEntries(codes.map((code) => [code, "Notification not found"])),
+    });
   });
 
   it("writes a module laid out one responsibility per file, without specs when tests are not set up", async () => {
@@ -188,6 +210,7 @@ describe("warlock add notifications", () => {
         JSON.stringify({ digest: { en: "Daily digest" } }),
       );
       written = new Map();
+      appConfig.set("app.localeCodes", ["en"]);
 
       await notificationsFeature.onExecuting?.({} as never);
 

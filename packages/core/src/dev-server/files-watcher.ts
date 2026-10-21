@@ -129,6 +129,19 @@ const ENV_FILES = [
 ];
 
 export class FilesWatcher {
+  private watcher?: ReturnType<typeof chokidar.watch>;
+  private readonly onInterrupt = () => {
+    void this.close();
+  };
+
+  public async close(): Promise<void> {
+    process.off("SIGINT", this.onInterrupt);
+    const watcher = this.watcher;
+    this.watcher = undefined;
+    await watcher?.close();
+    this.rawEventTimestamps.clear();
+  }
+
   /**
    * File watcher id
    */
@@ -180,7 +193,8 @@ export class FilesWatcher {
 
     const timingsEnabled = devServerConfig?.timings === true;
 
-    const watcher = chokidar.watch(paths, {
+    await this.close();
+    const watcher = (this.watcher = chokidar.watch(paths, {
       ignoreInitial: true,
       ignored,
       persistent: true,
@@ -193,7 +207,7 @@ export class FilesWatcher {
       },
       // On Windows, explicitly enable recursive watching
       depth: 99,
-    });
+    }));
 
     if (timingsEnabled) {
       watcher.on("raw", (_event, evPath, details) => {
@@ -224,9 +238,7 @@ export class FilesWatcher {
     // );
 
     // Cleanup on process exit
-    process.on("SIGINT", async () => {
-      await watcher.close();
-    });
+    process.on("SIGINT", this.onInterrupt);
   }
 
   /**

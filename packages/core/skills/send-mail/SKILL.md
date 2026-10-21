@@ -400,3 +400,28 @@ await Mail.to(user.email)
 
 - The `configure-app` topic — `src/config/mail.ts` shape and `env()` patterns.
 - The `warlock-conventions` topic — where mail-sending services live.
+
+## Preview development mail in devtools
+
+Run `npx warlock add devtools`, start development, and open `/__warlock` (or your
+configured devtools path). In the mail panel, select a captured message to read
+its recipients, subject, text, and sandboxed HTML preview. Send while the panel's
+collector is attached; captures are held in memory and disappear on restart.
+
+Use development mail mode so previews do not deliver real email:
+
+```ts
+import { setMailMode, sendMail } from "@warlock.js/core";
+
+setMailMode("development");
+await sendMail({
+  to: "reader@example.com",
+  subject: "Preview",
+  html: "<p>Your code is 123456</p>",
+});
+```
+
+Development sends emit `mailEvents.onCaptured`, which devtools consumes; console
+logs show metadata rather than sensitive bodies. Devtools is mounted only for
+the development runtime and is not mounted in production. Keep production mail
+mode configured for actual delivery. Test-mode assertions use the test mailbox.

@@ -205,3 +205,26 @@ export class User extends Model<UserSchema> {
 - The `define-relations` topic — relations and eager loading
 - The `track-changes` topic — dirty tracking
 - The `subscribe-to-model-events` topic — lifecycle hooks
+
+## Resource derivations from hidden columns
+
+A model resource receives data before `hidden` filtering. `resourceColumns`, when
+configured, still limits that input. This allows a resource to derive a public
+flag from a hidden column:
+
+```ts
+class AccountResource {
+  constructor(private readonly data: Record<string, unknown>) {}
+  toJSON() {
+    return { ...this.data, has_secret: Boolean(this.data.secret) };
+  }
+}
+```
+
+With `static hidden = ["secret"]` and `static resource = AccountResource`,
+`model.toJSON()` returns `has_secret` but removes the top-level `secret` even
+when the resource returns it. The model's stored data is unchanged. The same
+boundary applies when models are serialized in page payloads. Resources are
+trusted shaping code: never copy a secret into another key or a nested object.
+Directly constructing a resource bypasses the model's final filter; return an
+explicit public projection in that case.

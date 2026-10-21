@@ -195,3 +195,12 @@ Generated web starter files match the scaffold’s Oxfmt configuration and its
 built-in import sorting.
 After editing generated code, run `npm run format` and `npm run lint:check`.
 Formatting retains unused imports; the linter reports them.
+
+## Notification translation defaults
+
+After configuring `app.localeCodes`, run `npx warlock add notifications`.
+New notification dictionaries include `notFound` as a string in every configured
+locale. English ("Notification not found") is the explicit fallback for each
+locale without a bundled translation, including locale sets without English.
+Replace fallback text with your translations before publishing. Existing module
+files and existing translation keys are preserved.

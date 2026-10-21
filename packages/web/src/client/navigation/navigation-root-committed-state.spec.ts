@@ -1,3 +1,4 @@
+import { getSessionIdentity, resetSession } from "../../session/use-user";
 // @vitest-environment jsdom
 import { act, createElement, startTransition, Suspense, useLayoutEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
@@ -81,7 +82,7 @@ it("exposes only the committed page to navigation callbacks while a transition s
     expect(container.textContent).toBe("committed");
     expect(runtime.readCurrent().payload).toBe(initial);
 
-    const replacement = payload("replacement");
+    const replacement = { ...payload("replacement"), session: { user: { id: "replacement" } } };
     await act(async () =>
       runtime.writeCurrent({
         payload: replacement,
@@ -91,8 +92,10 @@ it("exposes only the committed page to navigation callbacks while a transition s
     );
     expect(container.textContent).toBe("replacement");
     expect(runtime.readCurrent().payload).toBe(replacement);
+    expect(getSessionIdentity()).toBe("replacement");
   } finally {
     act(() => root.unmount());
+    resetSession();
     container.remove();
     captured.runtime = undefined;
     vi.unstubAllGlobals();
@@ -158,7 +161,7 @@ it("keeps the boundary fallback until a replacement swap commits after an abando
     expect(container.querySelector("[style*='display: none']")).toBeNull();
     expect(reportClientError).toHaveBeenCalledTimes(1);
 
-    const replacement = payload("replacement");
+    const replacement = { ...payload("replacement"), session: { user: { id: "replacement" } } };
     await act(async () => {
       setBlocked(false);
       runtime.writeCurrent({
@@ -180,6 +183,7 @@ it("keeps the boundary fallback until a replacement swap commits after an abando
     expect(reportClientError).toHaveBeenCalledTimes(2);
   } finally {
     act(() => root.unmount());
+    resetSession();
     container.remove();
     captured.runtime = undefined;
     consoleError.mockRestore();

@@ -80,7 +80,7 @@ export function modelToJSON(model: Model): Record<string, unknown> {
   }
 
   const resourceColumns = ModelClass.resourceColumns;
-  let data: GenericObject =
+  const data: GenericObject =
     resourceColumns !== undefined && resourceColumns.length > 0
       ? model.only(resourceColumns)
       : { ...model.data };
@@ -97,5 +97,5 @@ export function modelToJSON(model: Model): Record<string, unknown> {
     }
   }
 
-  return new resource(stripHiddenFields(data, hidden)).toJSON();
+  return stripHiddenFields(new resource(data).toJSON(), hidden);
 }
