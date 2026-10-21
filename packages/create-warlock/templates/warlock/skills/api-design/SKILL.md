@@ -20,17 +20,26 @@ The project uses **three envelope shapes**, one per response kind. Each success 
 
 ### 1.1 List endpoints — `{ <pluralResourceName>, pagination }`
 
-The list lands under the **plural name of the module's resource** — `users`, `aiModels`, `orders` — paired with `pagination`. The repository returns the framework's `{ data, pagination }`; the controller re-keys `data` to the plural name so the response is self-describing.
+The list lands under the **plural name of the module's resource** — `users`, `aiModels`, `orders` — paired with `pagination`. The repository returns the framework's `{ data, pagination }`; `listEndpoint` re-keys `data` to the plural name and enforces bounded page controls.
 
 ```typescript
 // ✅ list-users.controller.ts
-export const listUsersController: RequestHandler = async ({ request, response }) => {
-  const { data, pagination } = await listUsersService(request.validated());
+import { listEndpoint, type Request, type RequestHandler } from "@warlock.js/core";
+import type { ListUsersQuery } from "../schema/list-users.schema";
+import { usersRepository } from "../repositories/users.repository";
 
-  return response.success({
-    users: data,
-    pagination,
-  });
+export const listUsersController: RequestHandler<Request<ListUsersQuery>> = async ({
+  request,
+  response,
+}) => {
+  return response.success(
+    await listEndpoint(request, (options) => usersRepository.list(options), {
+      pluralKey: "users",
+      maxLimit: 100,
+      orderBy: ["createdAt"],
+      filters: ["status"],
+    }),
+  );
 };
 ```
 
@@ -113,7 +122,7 @@ Every JSON error response has this shape, with optional `details` for safe field
 }
 ```
 
-Use the matching status helper or throw a framework error from the service. The starter's `http.errorResponse` formatter normalizes helper bodies and framework-generated JSON errors, including unmatched-route 404, validation 422, rate-limit 429, and 500. It removes stacks and masks all 5xx messages. `requestId` is the real Warlock `request.id`, read from the framework's correlation header at the transport boundary; a rejection before Warlock creates a Request uses Fastify's request ID and echoes that same value in the header. Do not generate a new ID inside a controller or use a user ID. See the `observability-and-resilience` skill for trace propagation.
+Use the matching status helper or throw a framework error from the service. The starter's `http.errorResponse` formatter normalizes helper bodies and framework-generated JSON errors, including unmatched-route 404, validation 422, rate-limit 429, and 500. It removes stacks and masks ordinary 5xx messages. Typed `AppError` messages and details are explicitly public and are preserved, including for 5xx responses. `requestId` is the real Warlock `request.id`, read from the framework's correlation header at the transport boundary; a rejection before Warlock creates a Request uses Fastify's request ID and echoes that same value in the header. Do not generate a new ID inside a controller or use a user ID. See the `observability-and-resilience` skill for trace propagation.
 
 ```typescript
 return response.notFound(); // formatter supplies { error: { code, message }, requestId }
@@ -123,7 +132,7 @@ return response.conflict({
 return response.badRequest({ error: { code: "invalidRequest", message: "Invalid request." } });
 ```
 
-`http.errorMapper` translates thrown non-`HttpError` domain errors to `{ status, message?, payload? }`; it does **not** format response bodies. It skips `HttpError` subclasses, returned validation/helper responses, and Fastify's unmatched-route and global rate-limit responses. The starter config uses it to keep unknown thrown errors opaque; `http.errorResponse` handles the final JSON shape for all these paths. HTML error pages, files, and already-started streams retain their own contracts; neither hook rewrites their bodies.
+`http.errorMapper` translates thrown non-`HttpError` domain errors to `{ status, message?, payload? }`; it does **not** format response bodies. It skips `AppError` and `HttpError` subclasses, returned validation/helper responses, and Fastify's unmatched-route and global rate-limit responses. The starter config uses it to keep unknown thrown errors opaque; `http.errorResponse` handles the final JSON shape for all these paths. HTML error pages, files, and already-started streams retain their own contracts; neither hook rewrites their bodies.
 
 Never send a `200 OK` with an `error` field. Never put secrets, stack traces, raw request bodies, or internal database IDs in `details`.
 
@@ -519,3 +528,57 @@ Before merging any controller / route / resource change:
 - [ ] `Cache-Control` set explicitly on `GET` endpoints
 - [ ] Versioning: additive-only by default; explicit `/vN` prefix only when a real breaking change forces it
 - [ ] Deprecated fields announced via `Deprecation` / `Sunset` headers, not silently changed
+
+## Framework helpers for API contracts
+
+Throw `AppError` for new coded domain failures. Its positional constructor is
+`(code, status, publicMessage, details?)`; status must be 400–599. Details are
+typed and must be safe to disclose. Existing `HttpError` subclasses remain
+separate and retain their constructors and payload behavior. Neither needs
+`http.errorMapper`. The starter formatter reads `context.appError` natively and
+keeps this project's `{ error: { code, message }, details?, requestId }` contract.
+Core's unformatted default places details inside `error`; declare the actual
+formatted shape in controller response schemas.
+
+```ts
+import { AppError } from "@warlock.js/core/errors";
+
+throw new AppError("quotaExceeded", 429, "Try again later.", { retryAfter: 30 });
+```
+
+For lists, use the `listEndpoint` example in § 1.1. Type the controller as
+`RequestHandler<Request<ListUsersQuery>>`, attach the query schema with
+`validating: ["query"]`, and configure repository `filterBy`. The helper reads
+only `request.validated()`, defaults to page 1 / limit 20, clamps limits to
+`maxLimit` (100 by default), rejects unlisted sort columns, and forwards only
+named filters as flat repository options. Both `(options) => repo.list(options)`
+and `(options) => repo.listCached(options)` preserve the repository receiver.
+Page pagination is forced; cursor endpoints use a separate controller.
+
+Test the declared response contract through actual HTTP, not just generated
+types. Keep the existing `startHttpTestServer({ port: 0 })` / `setupTest` setup
+and import routes in the worker so its registry contains handler schemas:
+
+```ts
+import { it } from "vitest";
+import { router } from "@warlock.js/core";
+import { assertResponseContracts } from "@warlock.js/core/tests";
+import "../routes";
+
+it("matches user response declarations", async () => {
+  await assertResponseContracts({
+    routes: router.list().filter((route) => route.path === "/users"),
+    cases: () => [{ path: "/users?page=1&limit=10", status: 200 }],
+    requireAllStatuses: true,
+  });
+});
+```
+
+Omit `routes` to discover all registered routes with schemas. Supply fixtures
+for every declared status when using `requireAllStatuses`; parameterized routes
+and methods other than GET always require fixtures. Cases support a concrete
+`path`, `init` (headers/serialized body), and expected `status`. Use isolated
+seed data and cleanup for mutations. Pass `client` for an authenticated client
+or `createTestHttpServer()` instance. Checks reject undeclared statuses, missing
+fields and type mismatches; unsupported computed/builder shapes fail explicitly.
+See core's `test-http` topic for lifecycle, fixture and schema limitations.

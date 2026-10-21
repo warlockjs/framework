@@ -20,6 +20,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Changed
 
 - Document the development devtools captured-mail preview without logging message bodies.
+### Added
+
+- Typed `AppError` domain failures with native HTTP handling and `http.errorResponse` context, preserving legacy HTTP error behavior.
+- `listEndpoint` builds typed plural-key page responses from validated query controls and repository list callbacks, with bounded limits and explicit sort/filter whitelists.
+- `assertResponseContracts` checks real HTTP responses against declared status schemas, with fixtures, resource support and optional complete status coverage.
 
 ## 5.34.3 - 2026-10-20
 

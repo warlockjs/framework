@@ -14,8 +14,9 @@ import { environment } from "../../utils";
 import { requestContext as requestContextInstance } from "../context/request-context";
 import { applyCspHeader } from "../csp";
 import { runDefaultCsrfGuard } from "../csrf-default-guard";
+import { setResponseAppError } from "../error-response";
 import { mapRequestError } from "../error-mapper";
-import { HttpError } from "../errors";
+import { AppError, HttpError } from "../errors";
 import { type Request } from "../request";
 import { type Response } from "../response";
 import { buildTracingContext, dispatchPhase, isTracingEnabled } from "../tracing";
@@ -132,7 +133,7 @@ export function createRequestStore(
  * @internal
  */
 function resolveRequestErrorStatus(error: unknown): number | undefined {
-  if (error instanceof HttpError) {
+  if (error instanceof HttpError || error instanceof AppError) {
     return error.status;
   }
 
@@ -201,6 +202,20 @@ function handleRequestError(
   // per branch — one rule meeting one form while others reach the same output.
   // Applying it once, unconditionally, is both simpler and safer.
   response.header("Cache-Control", "private, no-store");
+
+  if (error instanceof AppError) {
+    if (error.status >= 500) {
+      log.error("http", "request-error", error, { requestId: request.id });
+    }
+    setResponseAppError(response.baseResponse, error);
+    return response.setStatusCode(error.status).send({
+      error: {
+        code: error.code,
+        message: error.publicMessage,
+        ...(error.details === undefined ? {} : { details: error.details }),
+      },
+    });
+  }
 
   if (error instanceof HttpError) {
     // 5xx HttpErrors (e.g. `ServerError`) are server faults: send them to the

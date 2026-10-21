@@ -497,3 +497,53 @@ export async function cleanup(): Promise<void> {
 HTTP test teardown awaits these cleanup functions and reports failures after
 attempting every module's cleanup. Avoid leaving module-owned handles running
 outside this lifecycle.
+
+## Response contracts from declared schemas
+
+`assertResponseContracts` from `@warlock.js/core/tests` sends HTTP requests and
+asserts the serialized JSON body against the handler's `responseSchema` for the
+actual status. It reuses Core's OpenAPI schema translation, including resource
+classes, nested objects, arrays, nullable casts and resource self references.
+It checks required fields and primitive types without coercion; extra fields
+are allowed. URL/date format annotations are not checked beyond their declared
+JSON shape. Builders, computed resolvers and resources without a static shape
+fail with a diagnostic rather than silently passing.
+
+```ts
+import { it } from "vitest";
+import { router } from "@warlock.js/core";
+import { assertResponseContracts } from "@warlock.js/core/tests";
+
+it("matches product response declarations", async () => {
+  await assertResponseContracts({
+    routes: router.list().filter((route) => route.path === "/products"),
+    cases: () => [{ path: "/products?page=1&limit=10", status: 200 }],
+    requireAllStatuses: true,
+  });
+});
+```
+
+With the shared test server, retain `startHttpTestServer({ port: 0 })` in global
+setup and `setupTest` in the worker. The routes and their handler schemas must
+also be loaded in the worker running this assertion (import their routes module
+there); global setup runs in a different process. Omit `routes` to discover all
+registered routes with `responseSchema` in that worker. Empty discovery fails.
+Explicit routes lacking a schema also fail.
+
+Static GET routes default to one request without headers. Parameterized routes
+and non-GET methods require explicit `cases(route)` fixtures; an empty case
+list fails. Each case can supply a concrete `path`, `init` (headers, serialized
+body, etc.) and expected `status`. Supply fixtures with valid IDs, seeded data,
+authentication and invalid inputs to exercise the desired outcomes. An `all` route also needs a concrete fixture `method`. Redirects
+are not followed. POST/PUT/PATCH/DELETE fixtures execute real side effects;
+use isolated test data and clean it up.
+
+Undeclared response statuses fail. Only statuses actually returned are checked
+by default; `requireAllStatuses: true` additionally fails if any declared status
+has no exercised fixture. HEAD, 204 and 304 responses must have an empty body; declare it with
+`{ body: {} }`. Other statuses must carry matching JSON.
+
+For an in-process server, pass `client: app` from `createTestHttpServer()` and
+close it in teardown. For signed-in requests, pass `client: await actingAs(user)`
+and dispose that client afterward. These clients use the same assertion and
+run the real HTTP middleware and serialization paths.

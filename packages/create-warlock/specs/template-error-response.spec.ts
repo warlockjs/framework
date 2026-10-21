@@ -1,7 +1,25 @@
+import { AppError } from "@warlock.js/core/errors";
 import { describe, expect, it } from "vitest";
 import { formatHttpErrorResponse } from "../templates/warlock/src/app/shared/utils/format-http-error-response";
 
 describe("starter error response contract", () => {
+  it("preserves explicitly safe typed domain failures, including server failures", () => {
+    for (const details of [false, 0, null, { retryAfter: 30 }]) {
+      expect(
+        formatHttpErrorResponse({
+          status: 503,
+          body: { stack: "private" },
+          requestId: "domain-request",
+          appError: new AppError("unavailable", 503, "Try again later.", details),
+        }),
+      ).toEqual({
+        error: { code: "unavailable", message: "Try again later." },
+        details,
+        requestId: "domain-request",
+      });
+    }
+  });
+
   it("maps the framework's validation body into details without losing field errors", () => {
     const errors = [{ input: "email", error: "A valid email is required." }];
 

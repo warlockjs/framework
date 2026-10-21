@@ -1,6 +1,6 @@
 import config from "@mongez/config";
 import { log } from "@warlock.js/logger";
-import { HttpError } from "./errors";
+import { AppError, HttpError } from "./errors";
 import type { Request } from "./request";
 
 /**
@@ -29,7 +29,7 @@ export type HttpErrorMapping = {
  * (a worker, a CLI, a standalone helper) carry a status without extending
  * Core's `HttpError`.
  *
- * Called only for errors that are not already an `HttpError`. Return a
+ * Called only for errors that are not already an `HttpError` or `AppError`. Return a
  * mapping (or an `HttpError`) to answer with it, or `undefined` to keep the
  * default handling (a model validation error keeps its configured status,
  * anything else is an opaque 500).
@@ -54,7 +54,7 @@ const OPAQUE_SERVER_ERROR = "Internal server error.";
 /**
  * Run the configured `http.errorMapper` and normalise its answer to an
  * `HttpError`, or return the error unchanged when there is no mapper, the
- * error already is an `HttpError`, or the mapper declines it.
+ * error already is an `HttpError` or `AppError`, or the mapper declines it.
  *
  * The mapped `HttpError` keeps the original error's name and stack (for the
  * request log) and carries it as `cause`. A mapper that throws is a bug in the
@@ -63,7 +63,7 @@ const OPAQUE_SERVER_ERROR = "Internal server error.";
  * @internal
  */
 export function mapRequestError(error: unknown, request: Request<any>): unknown {
-  if (error instanceof HttpError) {
+  if (error instanceof HttpError || error instanceof AppError) {
     return error;
   }
 
