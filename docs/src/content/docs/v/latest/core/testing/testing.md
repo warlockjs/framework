@@ -492,3 +492,42 @@ child process exit status with its captured stderr before checking stdout.
 ### Verify shared rate limits against Redis
 
 Framework contributors can run the cache-backed rate-limit store checks from `packages/core` with `WARLOCK_REDIS_INTEGRATION=1 npx vitest run src/http/rate-limit-cache-store.redis.spec.ts`. The suite connects to `QUEUE_REDIS_HOST` / `QUEUE_REDIS_PORT` (defaults `127.0.0.1:6390`), uses isolated UUID-prefixed keys, and fails if the requested Redis service is unavailable. It exercises separate Redis clients, concurrent counts, preserved window deadlines, aligned window resets, and a seed that actually expires before its atomic increment. Without the opt-in flag it reports a local skip; CI enables it against its Redis service.
+
+## Worker dictionaries and owned runtime resources
+
+The generated `src/test-setup.ts` calls:
+
+```ts
+await setupTest({ importModule: (file) => import(file) });
+```
+
+`setupTest()` reads `src/app/*/utils/locales.json` after configuration in each
+Vitest worker. Server translation helpers therefore see all configured locales
+without manual registration. Invalid dictionaries fail setup. `teardownTest()`
+unregisters those dictionaries; legacy executable locale files still require
+explicit imports in worker setup.
+
+Global HTTP fixtures should use `await startHttpTestServer({ port: 0, web: false })`
+for API-only suites and `await stopHttpTestServer()` in teardown. Stop releases
+connectors and the file runtime's loader channel, queued work, watchers, health
+workers, and registered module cleanup hooks, including after partial startup.
+A Node loader registration is process-scoped; its message channel is closed at
+teardown. Module-owned timers/listeners must register their cleanup hooks.
+
+A module that owns a long-running handle can export an awaited cleanup:
+
+```ts
+// src/app/messages/main.ts
+import { createServer } from "node:net";
+const listener = createServer();
+listener.listen(0, "127.0.0.1");
+export async function cleanup(): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    listener.close((error) => (error ? reject(error) : resolve()));
+  });
+}
+```
+
+HTTP test teardown awaits these cleanup functions and reports failures after
+attempting every module's cleanup. Avoid leaving module-owned handles running
+outside this lifecycle.

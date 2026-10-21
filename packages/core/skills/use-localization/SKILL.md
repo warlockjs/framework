@@ -336,3 +336,24 @@ GET /products/42?locale=ar
 This produces `account.title` and `account.actions.save`. Keep every leaf complete for the configured locale list. The page pipeline selects an immutable snapshot for its route source and locale. `useTrans()` and `t()` use that snapshot; a missing scoped key returns the key itself. With no route-locales manifest, the existing global `@mongez/localization` registry remains the legacy fallback path.
 
 When a route-locales snapshot applies, `t()` (through the request binding) and `request.transFrom(locale, key, placeholders?)` resolve through it; without one, they retain the existing global-registry behavior. The underlying `transFromKeywords(locale, keywords, key, placeholders?, converter?)` is supplied by `@mongez/localization` 3.5.0. Error pages rebind to their own snapshot, while framework fallback uses the app/root snapshot. Development HMR add/edit/delete publishes a new snapshot, and the snapshot revision keeps page-cache entries from reusing old JSON. Generated `.warlock` typings contain the flattened route keys; do not maintain a second handwritten key union.
+
+## Worker dictionaries and owned runtime resources
+
+The generated `src/test-setup.ts` calls:
+
+```ts
+await setupTest({ importModule: (file) => import(file) });
+```
+
+`setupTest()` reads `src/app/*/utils/locales.json` after configuration in each
+Vitest worker. Server translation helpers therefore see all configured locales
+without manual registration. Invalid dictionaries fail setup. `teardownTest()`
+unregisters those dictionaries; legacy executable locale files still require
+explicit imports in worker setup.
+
+Global HTTP fixtures should use `await startHttpTestServer({ port: 0, web: false })`
+for API-only suites and `await stopHttpTestServer()` in teardown. Stop releases
+connectors and the file runtime's loader channel, queued work, watchers, health
+workers, and registered module cleanup hooks, including after partial startup.
+A Node loader registration is process-scoped; its message channel is closed at
+teardown. Module-owned timers/listeners must register their cleanup hooks.

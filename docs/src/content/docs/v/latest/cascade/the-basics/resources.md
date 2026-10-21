@@ -199,7 +199,7 @@ export class User extends Model<UserSchema> {
 }
 ```
 
-**What it does:** every field named in `hidden` is stripped from `toJSON()` output, unconditionally — with the raw-`data` default (no `toJsonColumns`/`resource` set), with `toJsonColumns` (hidden wins even if the field is in the allow-list), and from the data object handed to a `resource` class's constructor (so the resource never even sees it, let alone can accidentally return it).
+**What it does:** every field named in `hidden` is stripped from `toJSON()` output, unconditionally — with the raw-`data` default (no `toJsonColumns`/`resource` set), with `toJsonColumns` (hidden wins even if the field is in the allow-list), and from the final output returned by a `resource` class. Resources can read hidden input for derivations; the model filters their output afterward.
 
 **Default is `[]`.** Declaring `hidden` is opt-in — nothing changes on an existing model until you add fields to the array. But because that default fails open (a model with no `hidden`, no `resource`, no `toJsonColumns` still serializes everything), Cascade logs a **one-time `console.warn` per model** whose schema declares a credential-shaped column — `password`, `passwordHash`, `secret`, `token`, `apiKey`/`api_key`, matched case-insensitively — that isn't covered by `hidden`, `resource`, or `toJsonColumns`. That warning is meant to be acted on: add the field to `hidden` (or confirm your `resource`/`toJsonColumns` already excludes it, which the warning doesn't currently detect for resource-shaped output beyond the raw schema check).
 
@@ -257,3 +257,26 @@ A few things to notice:
 - **Loaded relations and eager loading** — [Relationships essentials](../the-basics/03-relationships.md)
 - **Conditional inclusion based on viewer role** — recipe territory. The mechanic is plain TS in `toJSON()`; where you store the policy is your call.
 - **Versioned API shapes** (`UserResourceV1`, `UserResourceV2`) — out of scope for the framework; the multi-shape pattern above is enough to build it on top.
+
+## Resource derivations from hidden columns
+
+A model resource receives data before `hidden` filtering. `resourceColumns`, when
+configured, still limits that input. This allows a resource to derive a public
+flag from a hidden column:
+
+```ts
+class AccountResource {
+  constructor(private readonly data: Record<string, unknown>) {}
+  toJSON() {
+    return { ...this.data, has_secret: Boolean(this.data.secret) };
+  }
+}
+```
+
+With `static hidden = ["secret"]` and `static resource = AccountResource`,
+`model.toJSON()` returns `has_secret` but removes the top-level `secret` even
+when the resource returns it. The model's stored data is unchanged. The same
+boundary applies when models are serialized in page payloads. Resources are
+trusted shaping code: never copy a secret into another key or a nested object.
+Directly constructing a resource bypasses the model's final filter; return an
+explicit public projection in that case.

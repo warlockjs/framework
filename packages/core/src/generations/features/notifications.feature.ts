@@ -18,7 +18,7 @@ import {
   markNotificationReadServiceStub,
   notificationControllerSpecStub,
   notificationTestFixtureStub,
-  notificationLocalesStub,
+  createNotificationLocalesStub,
   notificationMigrationStub,
   notificationModelStub,
   notificationResourceStub,
@@ -89,6 +89,7 @@ async function writeModuleFile(relativePath: string, content: string, skipped: s
  * that renames its group, is left for the app to update by hand.
  */
 async function registerNotificationLocales(skipped: string[]) {
+  const notificationLocalesStub = createNotificationLocalesStub();
   const localesPath = srcPath("app/notifications/utils/locales.json");
 
   if (!(await fileExistsAsync(localesPath))) {
@@ -122,10 +123,29 @@ async function registerNotificationLocales(skipped: string[]) {
   }
 
   const missing = Object.keys(defaults).filter((key) => dictionary[key] === undefined);
+  const existing = dictionary.notFound;
+  const translations = defaults.notFound;
+  if (
+    existing &&
+    typeof existing === "object" &&
+    !Array.isArray(existing) &&
+    translations &&
+    typeof translations === "object" &&
+    !Array.isArray(translations)
+  ) {
+    const current = existing as Record<string, unknown>;
+    for (const [code, fallback] of Object.entries(translations)) {
+      if (current[code] !== undefined) continue;
+      current[code] = fallback;
+      missing.push(`notFound.${code}`);
+    }
+  }
 
   if (missing.length === 0) return;
 
-  for (const key of missing) dictionary[key] = defaults[key];
+  for (const key of Object.keys(defaults)) {
+    if (dictionary[key] === undefined) dictionary[key] = defaults[key];
+  }
 
   await putFileAsync(localesPath, `${JSON.stringify(dictionary, null, 2)}\n`);
   console.log(

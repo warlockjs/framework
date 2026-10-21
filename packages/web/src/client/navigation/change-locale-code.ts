@@ -1,3 +1,4 @@
+import { installSession } from "../../session/use-user";
 import type { ReactNode } from "react";
 import { hasLeadingLocaleParam } from "../../routing/locale-param-route";
 import { withLocalePrefix } from "../../routing/locale-prefixed-paths";
@@ -290,6 +291,7 @@ export function createLocaleChanger(runtime: RefreshRuntime): LocaleChanger {
 
       // Shared state BEFORE the render that consumes it, exactly as a
       // navigation and a refresh do it.
+      installSession(result.payload.session);
       hydrateShared(result.payload.shared);
       clearPrefetchCache();
 

@@ -171,3 +171,12 @@ Log out with a POST action: `authService.logout(user, accessToken, refreshToken)
 Each prefetch entry is tagged with the identity current when it was fetched (`user?.id ?? null`) and refused for a different one. When the identity in a payload changes, the client clears the prefetch cache automatically.
 
 See [Sessions for pages](/v/latest/auth/guides/sessions-for-pages/) for the auth side.
+
+## Session updates after swaps
+
+`await refresh()` and `await changeLocaleCode("ar")` install the fetched session
+projection before rendering, including a guest (`user: null` or an omitted
+session). Central page/action swaps do the same. Failed or superseded requests
+leave the current identity intact; a response superseded while building its tree
+cannot publish its identity. Persistent components using `useUser()` observe
+profile updates and sign-out without remounting.

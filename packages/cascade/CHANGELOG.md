@@ -4,6 +4,16 @@ All notable changes to `@warlock.js/cascade` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.35.0
+
+### Fixed
+
+- **BREAKING** Model resources receive hidden columns for public field derivations; `hidden` is enforced on final resource output instead of its input.
+
+### Upgrading
+
+- Resources may now read hidden input. Keep resource output deliberate: hidden top-level names are removed by model serialization, but renamed or nested copies must be excluded by resource code. `resourceColumns` still limits input.
+
 ## 5.34.3 - 2026-10-20
 
 ### Changed

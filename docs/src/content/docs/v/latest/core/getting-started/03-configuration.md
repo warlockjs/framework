@@ -201,3 +201,10 @@ Continue to **[First route](./04-first-route.md)** — the page where Warlock ac
 ## TypeScript 7 compiler
 
 Warlock 5.32 pins the native `typescript@7.0.2` compiler. Follow the [TypeScript 7 guide](./typescript-7.mdx) to remove legacy tsconfig options, rebase aliases, and declare Node types explicitly.
+
+## Co-located configuration tests
+
+`src/config/mail.spec.ts` and `src/config/mail.test.tsx` are never imported as
+configuration. Discovery and reload also exclude `test`, `tests`, `__tests__`,
+`__mocks__`, `__fixtures__`, and `fixtures` directories at any depth. A real
+`src/config/tests.ts` remains ordinary configuration.

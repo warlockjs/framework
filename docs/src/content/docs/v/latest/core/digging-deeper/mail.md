@@ -666,3 +666,28 @@ When `config` is `undefined` the call uses the global default. When it's set, it
 - **[File uploads](./file-uploads.md)** — attaching uploaded files to outgoing mail.
 - **[Logging](./logging.md)** — the `log` API the mail pipeline uses for `[DEV MODE]` and `[TEST MODE]` traces.
 - **[Recipe: Transactional email](../recipes/transactional-email.md)** — end-to-end welcome → reset → confirmation flow.
+
+## Preview development mail in devtools
+
+Run `npx warlock add devtools`, start development, and open `/__warlock` (or your
+configured devtools path). In the mail panel, select a captured message to read
+its recipients, subject, text, and sandboxed HTML preview. Send while the panel's
+collector is attached; captures are held in memory and disappear on restart.
+
+Use development mail mode so previews do not deliver real email:
+
+```ts
+import { setMailMode, sendMail } from "@warlock.js/core";
+
+setMailMode("development");
+await sendMail({
+  to: "reader@example.com",
+  subject: "Preview",
+  html: "<p>Your code is 123456</p>",
+});
+```
+
+Development sends emit `mailEvents.onCaptured`, which devtools consumes; console
+logs show metadata rather than sensitive bodies. Devtools is mounted only for
+the development runtime and is not mounted in production. Keep production mail
+mode configured for actual delivery. Test-mode assertions use the test mailbox.

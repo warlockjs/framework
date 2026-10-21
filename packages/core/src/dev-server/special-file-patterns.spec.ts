@@ -35,6 +35,13 @@ describe("special file patterns", () => {
     [isLocaleFile, "src/app/blog/utils/locales.json", true],
     [isLocaleFile, "src/app/modules/blog/utils/locales.ts", false],
     [isConfigFile, "src/config/rate-limit.ts", true],
+    [isConfigFile, "src/config/example.spec.ts", false],
+    [isConfigFile, "src/config/example.test.tsx", false],
+    [isConfigFile, "src/config/__tests__/example.ts", false],
+    [isConfigFile, "src/config/mail/tests/example.ts", false],
+    [isConfigFile, "src/config/fixtures/example.ts", false],
+    [isConfigFile, "src\\config\\__mocks__\\mail.ts", false],
+    [isConfigFile, "src/config/tests.ts", true],
     [isConfigFile, "src/config/mail/smtp.ts", true],
   ])("%p %s -> %s", (predicate, path, expected) => {
     expect(predicate(path)).toBe(expected);

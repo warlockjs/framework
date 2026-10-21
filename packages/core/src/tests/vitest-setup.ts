@@ -1,3 +1,5 @@
+import { loadTestLocales } from "./test-locales";
+
 /**
  * Worker test lifecycle — `setupTest` / `teardownTest`.
  *
@@ -449,6 +451,7 @@ async function runTestRuntimeStartup(
 
     await filesOrchestrator.init();
     await loadConfigFiles(true);
+    registry.cleanupLocales = await loadTestLocales();
 
     // The first point at which `tests.setupTimeout` is readable at all. An
     // invalid value throws from here and takes the normal failure path — falling
@@ -526,6 +529,8 @@ async function startSelectedConnectors(selection: TestConnectorsSelection): Prom
  * step is attempted independently.
  */
 async function unwindPartialStartup(): Promise<void> {
+  getTestLifecycleRegistry().cleanupLocales?.();
+  getTestLifecycleRegistry().cleanupLocales = undefined;
   // Two steps rather than one: `connectorsManager.shutdown()` runs the
   // application hooks itself, but it runs them FIRST and does not isolate their
   // rejection — so a hook that rejects would take the connector teardown down
@@ -581,6 +586,8 @@ async function runTestRuntimeShutdown(): Promise<void> {
     // the lifecycle claiming a runtime it no longer owns. Poisoned rather than
     // idle, because a cleared flag does not prove that ports, sockets, pools or
     // timers closed.
+    getTestLifecycleRegistry().cleanupLocales?.();
+    getTestLifecycleRegistry().cleanupLocales = undefined;
     registry.activeSelection = undefined;
     registry.setupAttempt = undefined;
     registry.teardownAttempt = undefined;

@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   load: vi.fn(async () => undefined),
   bootstrap: vi.fn(async () => undefined),
   init: vi.fn(async () => undefined),
+  dispose: vi.fn(async () => undefined),
   initializeAll: vi.fn(async () => undefined),
   loadAll: vi.fn(async () => undefined),
   loadConfigFiles: vi.fn(async () => undefined),
@@ -54,6 +55,7 @@ vi.mock("../connectors/connectors-manager", () => ({
 }));
 vi.mock("../dev-server/files-orchestrator", () => ({
   filesOrchestrator: {
+    dispose: mocks.dispose,
     init: mocks.init,
     initializeAll: mocks.initializeAll,
     moduleLoader: { loadAll: mocks.loadAll },
@@ -104,6 +106,16 @@ afterEach(async () => {
 });
 
 describe("startHttpTestServer", () => {
+  it("disposes owned runtime resources after connector shutdown, also on failure", async () => {
+    await startHttpTestServer({ web: false });
+    mocks.shutdown.mockRejectedValueOnce(new Error("shutdown failed"));
+    await expect(stopHttpTestServer()).rejects.toThrow("shutdown failed");
+    expect(mocks.dispose).toHaveBeenCalledOnce();
+    expect(mocks.shutdown.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.dispose.mock.invocationCallOrder[0] ?? 0,
+    );
+  });
+
   it("loads .env.test when NODE_ENV is unset before starting the server", async () => {
     await startHttpTestServer();
 

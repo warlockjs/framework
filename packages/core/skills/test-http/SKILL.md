@@ -458,3 +458,42 @@ This is fine for normal test flow. It bites when you're inside a transaction the
 - The `create-controller` topic — the controller shape your HTTP tests are exercising.
 - The `warlock-conventions` topic — module layout, where `tests/*.test.ts` files live.
 - The `write-cli-command` topic — `warlock add test` scaffolds both global + worker setup files.
+
+## Worker dictionaries and owned runtime resources
+
+The generated `src/test-setup.ts` calls:
+
+```ts
+await setupTest({ importModule: (file) => import(file) });
+```
+
+`setupTest()` reads `src/app/*/utils/locales.json` after configuration in each
+Vitest worker. Server translation helpers therefore see all configured locales
+without manual registration. Invalid dictionaries fail setup. `teardownTest()`
+unregisters those dictionaries; legacy executable locale files still require
+explicit imports in worker setup.
+
+Global HTTP fixtures should use `await startHttpTestServer({ port: 0, web: false })`
+for API-only suites and `await stopHttpTestServer()` in teardown. Stop releases
+connectors and the file runtime's loader channel, queued work, watchers, health
+workers, and registered module cleanup hooks, including after partial startup.
+A Node loader registration is process-scoped; its message channel is closed at
+teardown. Module-owned timers/listeners must register their cleanup hooks.
+
+A module that owns a long-running handle can export an awaited cleanup:
+
+```ts
+// src/app/messages/main.ts
+import { createServer } from "node:net";
+const listener = createServer();
+listener.listen(0, "127.0.0.1");
+export async function cleanup(): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    listener.close((error) => (error ? reject(error) : resolve()));
+  });
+}
+```
+
+HTTP test teardown awaits these cleanup functions and reports failures after
+attempting every module's cleanup. Avoid leaving module-owned handles running
+outside this lifecycle.

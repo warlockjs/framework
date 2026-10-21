@@ -22,6 +22,10 @@ import type { TestTimeoutScheduler } from "../../../src/tests/test-setup-timeout
  * the defect being fixed, not an inconvenience to work around.
  */
 
+const localeCleanup = vi.fn();
+const loadLocales = vi.fn(async () => localeCleanup);
+vi.mock("../../../src/tests/test-locales", () => ({ loadTestLocales: () => loadLocales() }));
+
 const startMock = vi.fn(async () => undefined);
 const startWithoutMock = vi.fn(async () => undefined);
 const runShutdownHooksMock = vi.fn(async () => undefined);
@@ -279,6 +283,8 @@ async function settleWithinOneTurn(promise: Promise<unknown>): Promise<PromiseSe
 
 beforeEach(() => {
   resetLifecycleRegistry();
+  localeCleanup.mockClear();
+  loadLocales.mockClear();
 
   startMock.mockReset().mockResolvedValue(undefined);
   startWithoutMock.mockReset().mockResolvedValue(undefined);
@@ -301,6 +307,15 @@ beforeEach(() => {
 afterEach(() => {
   resetLifecycleRegistry();
   vi.restoreAllMocks();
+});
+
+it("loads worker dictionaries once and cleans them across module registry rebuilds", async () => {
+  const first = await importFreshLifecycle();
+  await first.setupTest({ connectors: false });
+  expect(loadLocales).toHaveBeenCalledOnce();
+  const second = await importFreshLifecycle();
+  await second.teardownTest();
+  expect(localeCleanup).toHaveBeenCalledOnce();
 });
 
 describe("proof 1 — effective connector selection precedence", () => {

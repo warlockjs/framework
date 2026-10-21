@@ -512,3 +512,12 @@ payload's `shared` snapshot before rendering. Retained components using
 `useShared()` subscribe to the new snapshot, including across consecutive shell
 switches. Write shared values in server middleware on each request; client
 writes remain refused.
+
+## Session updates after swaps
+
+`await refresh()` and `await changeLocaleCode("ar")` install the fetched session
+projection before rendering, including a guest (`user: null` or an omitted
+session). Central page/action swaps do the same. Failed or superseded requests
+leave the current identity intact; a response superseded while building its tree
+cannot publish its identity. Persistent components using `useUser()` observe
+profile updates and sign-out without remounting.

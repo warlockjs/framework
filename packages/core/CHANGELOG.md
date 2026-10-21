@@ -12,6 +12,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - Recognize required and optional auth descriptors in route inspection and generated agent summaries, including inherited session guards.
 - Describe optional authentication as an anonymous security alternative in OpenAPI while keeping legacy guards required.
+- Generate notification locale strings for every configured locale with an explicit English fallback.
+- Exclude co-located tests and test-only directories from configuration discovery and reload.
+- Register module JSON dictionaries in each test worker and remove them during teardown.
+- Dispose HTTP test-server file runtime resources and pending loader acknowledgements on shutdown and failed startup.
+
+### Changed
+
+- Document the development devtools captured-mail preview without logging message bodies.
 
 ## 5.34.3 - 2026-10-20
 

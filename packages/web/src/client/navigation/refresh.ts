@@ -1,3 +1,4 @@
+import { installSession } from "../../session/use-user";
 import type { ReactNode } from "react";
 import type { HydrationDocumentPayloadSource } from "../../hydration-payload";
 import { routerEvents, type RefreshReason } from "../../routing/router-events";
@@ -208,6 +209,7 @@ export function createRefresher(runtime: RefreshRuntime, liveGuard?: () => boole
 
       // Shared state BEFORE the render that consumes it, exactly as a navigation
       // does it — a refresh can carry a changed locale or a changed user too.
+      installSession(result.payload.session);
       hydrateShared(result.payload.shared);
       clearPrefetchCache();
 

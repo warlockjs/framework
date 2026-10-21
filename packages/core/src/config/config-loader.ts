@@ -1,3 +1,4 @@
+import { isConfigFile } from "../dev-server/special-file-patterns";
 import config from "@mongez/config";
 import { colors } from "@mongez/copper";
 import { pathToFileURL } from "node:url";
@@ -60,6 +61,8 @@ export class ConfigLoader {
     file: FileManager,
     whenInvalid: "register-invalid" | "keep-previous",
   ): Promise<ConfigIssue[]> {
+    if (!isConfigFile(file.relativePath)) return [];
+
     const configName = this.getConfigName(file.relativePath);
 
     const fileUrl = pathToFileURL(file.absolutePath).href;

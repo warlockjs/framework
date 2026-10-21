@@ -208,6 +208,7 @@ export function NavigationRoot({
   const applySwap = (next: Current, complete?: () => void): void => {
     // Every shell/page swap seals and publishes its own shared payload before
     // rendering, including swaps made by an action or another runtime seam.
+    installSession(next.payload.session);
     hydrateShared(next.payload.shared);
     setResetToken((previous) => previous + 1);
 

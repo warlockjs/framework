@@ -44,6 +44,17 @@ export class FileEventHandler {
     private readonly files: Map<string, FileManager>,
   ) {}
 
+  public async dispose(): Promise<void> {
+    clearTimeout(this.debounceTimer);
+    clearTimeout(this.maxWaitTimer);
+    this.debounceTimer = undefined;
+    this.maxWaitTimer = undefined;
+    this.pendingAdds.clear();
+    this.pendingChanges.clear();
+    this.pendingDeletes.clear();
+    await this.batchQueue;
+  }
+
   /** Matches paths the user listed in `devServer.watch.include`. */
   private includeMatcher: (path: string) => boolean = () => false;
 

@@ -10,6 +10,9 @@ All notable changes to `@warlock.js/web` are documented here.
 ### Added
 
 - Add the `build-rtl-and-mixed-direction-ui` and `preserve-feedback-and-motion` agent skill topics, covering RTL layouts and mixed-direction content, and accessible feedback, failure handling and motion patterns.
+### Fixed
+
+- Install fetched sessions on refresh, locale changes, and central page swaps, including guest sessions; superseded responses cannot publish identity.
 
 ## 5.34.3 - 2026-10-20
 

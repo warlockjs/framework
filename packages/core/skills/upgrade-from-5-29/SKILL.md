@@ -534,3 +534,11 @@ editor settings and nonstandard scripts can also require review.
 existing Oxc configs retain their categories. A real lockfile beside a workspace
 marker determines the installer: `package-lock.json` plus `pnpm-workspace.yaml`
 without `pnpm-lock.yaml` now produces `npm install`.
+
+## 5.34 to 5.35 resource hidden input
+
+Model resources now receive hidden input columns (subject to `resourceColumns`)
+to support derivations such as `has_secret: Boolean(data.secret)`. Model
+serialization removes `hidden` top-level keys from the final resource result.
+Review resources that copy input under renamed or nested keys and return explicit
+public projections. Direct resource construction does not invoke model filtering.

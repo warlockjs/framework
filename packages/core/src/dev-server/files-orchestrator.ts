@@ -111,6 +111,32 @@ export class FilesOrchestrator {
     );
   }
 
+  /** Release resources owned by a test-server boot, including module timers/listeners. */
+  public async dispose(): Promise<void> {
+    const results = await Promise.allSettled([this.filesWatcher.close()]);
+    results.push(...(await Promise.allSettled([this.eventHandler.dispose()])));
+    results.push(
+      ...(await Promise.allSettled([
+        this.healthCheckerManager.shutdown(),
+        this.moduleLoader.dispose(this.files.values()),
+      ])),
+    );
+    this.files.clear();
+    this.specialFilesCollector.collect(this.files);
+    this.loaderAcks?.dispose();
+    this.loaderAcks = null;
+    this.loaderPort = null;
+    this.pendingBumpedPaths = [];
+    const failures = results.filter((result) => result.status === "rejected");
+    if (failures.length)
+      throw new AggregateError(
+        failures.map((result) => result.reason),
+        "Test runtime disposal failed",
+      );
+    // Node's registered loader hook is process-scoped and cannot be unregistered.
+    // Keep isInitialized true so another boot does not stack another hook.
+  }
+
   public async add(relativePath: string): Promise<FileManager> {
     return this.fileOperations.addFile(relativePath);
   }
