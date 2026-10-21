@@ -19,3 +19,9 @@ export const logoutController: GuardedRequestHandler = async ({ request, respons
 };
 
 logoutController.description = "User Logout";
+
+logoutController.responseSchema = {
+  200: { body: { message: "string" } },
+  401: { body: { error: { code: "string", message: "string" }, requestId: "string" } },
+  500: { body: { error: { code: "string", message: "string" }, requestId: "string" } },
+};

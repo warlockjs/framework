@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
-import ts from "typescript";
+import { parseSync } from "oxc-parser";
+import * as ast from "../../../../tooling/syntax/ast";
 import type { CommandActionData } from "../../../../commands/types";
 import { getFileAsync, putFileAsync as editFile } from "../../../../generations/generation-fs";
 import { srcPath } from "../../../../utils";
@@ -191,31 +192,39 @@ ${name.camel}Controller.responseSchema = { 200: { body: { data: { name: "string"
 
 /** Read inline query fields from the conventional generated list controller. */
 export function listFilters(source: string, schemaName: string): string[] {
-  const file = ts.createSourceFile("controller.ts", source, ts.ScriptTarget.Latest, true);
+  const parsed = parseSync("controller.ts", source);
+  if (parsed.errors.length) throw new Error("Cannot parse list controller.");
   let fields: string[] | undefined;
-  const visit = (node: ts.Node): void => {
+  const visit = (node: ast.Node): void => {
     if (
-      ts.isVariableDeclaration(node) &&
-      ts.isIdentifier(node.name) &&
-      node.name.text === schemaName &&
-      node.initializer &&
-      ts.isCallExpression(node.initializer)
+      node.type === "VariableDeclarator" &&
+      node.id.type === "Identifier" &&
+      node.id.name === schemaName &&
+      node.init?.type === "CallExpression"
     ) {
-      const object = node.initializer.arguments[0];
-      if (object && ts.isObjectLiteralExpression(object)) {
+      const object = node.init.arguments[0];
+      if (object?.type === "ObjectExpression") {
         fields = object.properties.map((property) => {
           if (
-            !ts.isPropertyAssignment(property) ||
-            !(ts.isIdentifier(property.name) || ts.isStringLiteral(property.name))
+            property.type !== "Property" ||
+            property.computed ||
+            property.method ||
+            property.shorthand ||
+            !(
+              property.key.type === "Identifier" ||
+              (property.key.type === "Literal" && typeof property.key.value === "string")
+            )
           )
             throw new Error("List filters require literal field names.");
-          return property.name.text;
+          return property.key.type === "Identifier"
+            ? property.key.name
+            : String(property.key.value);
         });
       }
     }
-    ts.forEachChild(node, visit);
+    ast.forEachChild(node, visit);
   };
-  visit(file);
+  visit(parsed.program);
   if (!fields)
     throw new Error(
       `Export or declare ${schemaName} as an inline Seal object schema in the list controller.`,
@@ -237,9 +246,15 @@ export function createCrudUiGenerator(
       throw new Error("Generate a full CRUD module before generating its UI.");
     const routes = readFileSync(routesPath, "utf8");
     // Custom authorization cannot safely be inferred. Refuse rather than silently weaken it.
-    const printer = ts.createPrinter({ removeComments: true });
-    const normalized = (source: string) =>
-      printer.printFile(ts.createSourceFile("routes.ts", source, ts.ScriptTarget.Latest, true));
+    const normalized = (source: string) => {
+      const parsed = parseSync("routes.ts", source);
+      if (parsed.errors.length)
+        throw new Error("CRUD UI requires the standard guarded module routes.");
+      // Compare syntax, ignoring source positions, comments and literal spelling.
+      return JSON.stringify(parsed.program, (key, value: unknown) =>
+        ["start", "end", "loc", "range", "raw", "comments"].includes(key) ? undefined : value,
+      );
+    };
     if (normalized(routes) !== normalized(crudRoutesStub(module))) {
       throw new Error(
         "CRUD UI requires the standard guarded module routes. Custom routes and guards need a hand-written UI.",

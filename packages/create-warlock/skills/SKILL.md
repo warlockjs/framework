@@ -298,3 +298,5 @@ import TextInput from "web/design-system/components/text-input";
 All fourteen controls, props and hooks are documented by the Web
 `build-accessible-controls` topic and the generated `web-code-standards` skill.
 Existing apps use `npx warlock add tailwind`, then `npx warlock add design-system`.
+
+Starter controllers include `responseSchema`. Keep these contracts aligned when changing returned bodies, for example `homePageController.responseSchema = { 200: { body: { message: "string", version: "string", docs: "string" } } };`.

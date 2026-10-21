@@ -285,3 +285,5 @@ dependency versions are copied into the app; existing source is preserved.
 See [Shared form controls](/v/latest/web/getting-started/tailwind-and-shadcn/#shared-form-controls)
 for the component list, props, value shapes, keyboard and date semantics.
 Existing Tailwind apps can use `npx warlock add design-system`.
+
+Starter controllers declare `responseSchema` for their success and explicit error statuses. Keep those contracts aligned when changing controller responses, including the token payloads in authentication controllers.

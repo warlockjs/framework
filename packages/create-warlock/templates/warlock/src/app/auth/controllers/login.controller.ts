@@ -1,3 +1,4 @@
+import { UserResource } from "app/users/resources/user.resource";
 import { type Request, type RequestHandler } from "@warlock.js/core";
 import { loginSchema, type LoginSchema } from "../schema/login.schema";
 import { loginService } from "../services/auth.service";
@@ -22,4 +23,20 @@ loginController.description = "User Login";
 
 loginController.validation = {
   schema: loginSchema,
+};
+
+// The starter disables refresh tokens; add tokens.refreshToken when enabling them.
+loginController.responseSchema = {
+  200: {
+    body: {
+      user: UserResource,
+      tokens: {
+        accessToken: { token: "string", expiresAt: "string" },
+      },
+    },
+  },
+  401: { body: { error: { code: "string", message: "string" }, requestId: "string" } },
+  403: { body: { error: { code: "string", message: "string" }, requestId: "string" } },
+  422: { body: { error: { code: "string", message: "string" }, requestId: "string" } },
+  500: { body: { error: { code: "string", message: "string" }, requestId: "string" } },
 };

@@ -23,3 +23,9 @@ forgotPasswordController.validation = {
     email: v.email(),
   }),
 };
+
+forgotPasswordController.responseSchema = {
+  200: { body: { message: "string" } },
+  422: { body: { error: { code: "string", message: "string" }, requestId: "string" } },
+  500: { body: { error: { code: "string", message: "string" }, requestId: "string" } },
+};

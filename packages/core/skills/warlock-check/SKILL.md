@@ -198,3 +198,11 @@ Programmatic usage: `await runCheck({ changed: true, fix: true })` from
 ## Explain a source file
 
 `npx warlock explain src/app/posts/services/list.service.ts --json` reports the file's module, convention role, exports, imports, importers and reaching routes/pages. It boots the app for route/page registrations; error-code explanations remain static. See the `warlock-inspect` topic for graph semantics and the boot-free `npx warlock inspect --section files --json` command.
+
+Starter controllers declare a response contract for each returned status. For example:
+
+```ts
+contactController.responseSchema = { 200: { body: { message: "string" } } };
+```
+
+Use `npx warlock inspect --section files --json` for static inspection without booting the app; `npx warlock explain src/app/contact/controllers/contact.controller.ts` explains its entry points.

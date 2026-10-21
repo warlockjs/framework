@@ -10,3 +10,7 @@ export const homePageController: RequestHandler = async ({ response }) => {
 };
 
 homePageController.description = "Welcome Home Page";
+
+homePageController.responseSchema = {
+  200: { body: { message: "string", version: "string", docs: "string" } },
+};

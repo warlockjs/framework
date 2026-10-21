@@ -37,6 +37,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Fix CRUD UI generation with the Oxc parser, ES2022-compatible tooling arrays, nullable component bodies, and app-free feature scaffolding. Align inspection CLI tests and convention error-code headings.
+
 - Recognize required and optional auth descriptors in route inspection and generated agent summaries, including inherited session guards.
 - Describe optional authentication as an anonymous security alternative in OpenAPI while keeping legacy guards required.
 - Generate notification locale strings for every configured locale with an explicit English fallback.

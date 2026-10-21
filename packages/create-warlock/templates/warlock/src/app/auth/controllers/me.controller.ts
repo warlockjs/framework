@@ -1,3 +1,4 @@
+import { UserResource } from "app/users/resources/user.resource";
 import { type GuardedRequestHandler } from "app/auth/requests/guarded.request";
 
 /**
@@ -16,3 +17,9 @@ export const meController: GuardedRequestHandler = async ({ request, response })
 };
 
 meController.description = "Get Current User";
+
+meController.responseSchema = {
+  200: { body: { user: UserResource } },
+  401: { body: { error: { code: "string", message: "string" }, requestId: "string" } },
+  500: { body: { error: { code: "string", message: "string" }, requestId: "string" } },
+};

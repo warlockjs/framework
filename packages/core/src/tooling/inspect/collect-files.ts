@@ -180,8 +180,8 @@ export function collectFiles(cwd: string, warnings: InspectWarning[] = []): Insp
         forEachChild(node, visit);
       };
       visit(parsed.program);
-      record.exports = [...exports].toSorted();
-      record.imports = [...imports].toSorted().map((specifier) => {
+      record.exports = [...exports].sort();
+      record.imports = [...imports].sort().map((specifier) => {
         const bases = specifier.startsWith(".")
           ? [path.resolve(path.dirname(absolute), specifier)]
           : tsconfig
@@ -200,6 +200,6 @@ export function collectFiles(cwd: string, warnings: InspectWarning[] = []): Insp
     for (const imported of file.imports) {
       if (imported.file) byFile.get(imported.file)?.importedBy.push(file.file);
     }
-  for (const file of files) file.importedBy = [...new Set(file.importedBy)].toSorted();
+  for (const file of files) file.importedBy = [...new Set(file.importedBy)].sort();
   return files;
 }

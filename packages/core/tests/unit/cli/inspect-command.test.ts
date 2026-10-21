@@ -40,6 +40,7 @@ describe("warlock inspect", () => {
     const { frameworkCommands } = await import("../../../src/cli/framework-cli-commands");
 
     expect(frameworkCommands).toContain(inspectCommand);
+    await inspectCommand.commandPreAction?.({ args: [], options: {} });
     expect(inspectCommand.commandPreload).toEqual({
       runtimeStrategy: "development",
       config: true,
