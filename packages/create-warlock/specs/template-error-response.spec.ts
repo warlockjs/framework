@@ -1,6 +1,27 @@
-import { AppError } from "@warlock.js/core/errors";
 import { describe, expect, it } from "vitest";
 import { formatHttpErrorResponse } from "../templates/warlock/src/app/shared/utils/format-http-error-response";
+
+type DomainFailure = NonNullable<Parameters<typeof formatHttpErrorResponse>[0]["appError"]>;
+
+/**
+ * Builds the shape of the framework's typed domain failure without importing
+ * the framework at runtime: this package does not depend on it, and standalone
+ * runs must not resolve it from the monorepo.
+ */
+function domainFailure(
+  code: string,
+  status: number,
+  publicMessage: string,
+  details?: unknown,
+): DomainFailure {
+  return Object.assign(new Error(publicMessage), {
+    name: "AppError",
+    code,
+    status,
+    publicMessage,
+    details,
+  });
+}
 
 describe("starter error response contract", () => {
   it("preserves explicitly safe typed domain failures, including server failures", () => {
@@ -10,7 +31,7 @@ describe("starter error response contract", () => {
           status: 503,
           body: { stack: "private" },
           requestId: "domain-request",
-          appError: new AppError("unavailable", 503, "Try again later.", details),
+          appError: domainFailure("unavailable", 503, "Try again later.", details),
         }),
       ).toEqual({
         error: { code: "unavailable", message: "Try again later." },
