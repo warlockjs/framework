@@ -103,10 +103,10 @@ export function productionGlobalTranslationDelivery(
     sharedGroups: translations?.sharedGroups ?? DEFAULT_SHARED_TRANSLATION_GROUPS,
     prune: translations?.prune ?? true,
     development: false,
-    usageFor: (routeName) =>
-      Object.hasOwn(routes, routeName) && routes[routeName] !== undefined
-        ? usageFromRecord(routes[routeName])
-        : undefined,
+    usageFor: (routeName) => {
+      const record = Object.hasOwn(routes, routeName) ? routes[routeName] : undefined;
+      return record === undefined ? undefined : usageFromRecord(record);
+    },
   });
 }
 
