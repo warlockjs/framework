@@ -34,3 +34,5 @@ export { assertPortIsAvailable, isPortAvailable } from "../http/port-preflight";
 // `WARLOCK_TEST_STORAGE_ROOT` is the same kind of channel.
 
 export * from "./response-contract";
+export { configureTestWorker, getTestRuntimeStats } from "./test-runtime-scope";
+export type { TestWorkerConfiguration } from "./test-runtime-scope";

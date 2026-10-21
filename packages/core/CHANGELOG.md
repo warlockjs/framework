@@ -43,6 +43,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 
 - Browser `page.assertAccessible(options?)` using a pinned local axe-core injection over CDP, exact rule/selector allowances, violation diagnostics and accessibility evidence.
+### Added
+
+- Opt-in `tests.lifetime: "worker"` for Vitest forks in a single run with a shared module graph (`isolate: false`) and the generated cleanup runner. Connectors boot once per worker, file boundaries reset fakes/clock/IDs/private storage and await `tests.resetBetweenFiles`, and worker cleanup awaits shutdown. `getTestRuntimeStats()` exposes bootstrap/file counts. Unsafe pools, watch, isolation and missing runner configurations are refused.
+- `setupTest({ mode: "unit", importModule })` loads configuration values once per module graph without bootstrap hooks, config special handlers, connectors, fake installation or native loader hooks.
+- `tests.profileSetup` / `WARLOCK_TEST_PROFILE=1` report setup steps and teardown per file, with summaries per worker including final shutdown; the generated `TestSetupReporter` aggregates a run summary across workers. `setupTest({ file })` labels profiles.
+- `recommendedTestWorkers()` from `@warlock.js/core/vite` respects CPU affinity and visible cgroup v2 CPU quotas. Testing docs/skills cover shared HTTP/database contention and affected-tests plus integration release gates, with a full suite nightly.
+
+### Changed
+
+- New `warlock add test` configs split pure `*.spec.ts` files from integration `*.test.ts` and specs under `tests/`; only integration loads framework/HTTP setup. Existing configs are preserved. The generated runner requires Vitest 4.1.10 or newer.
+- Reference workload before this change: 1,335 files, 3,532.79 seconds summed setup, 4,465.55 seconds wall time (reported on 5.33.0). No after measurement was run under the implementation check-once rule. The startup cost model changes from one bootstrap per file to one per active worker plus reset cost; this is not a measured wall-time speedup. Use the new profiling switch to compare the same suite and worker count.
+
+### Fixed
+
+- Native ESM loader registration shares a process-global promise across repeated initialization and module reloads; test startup skips the hook when an importer runs application modules through Vitest.
 
 ## 5.34.3 - 2026-10-20
 

@@ -59,14 +59,14 @@ function listFiles(directory: string, base: string): string[] {
  */
 export const storageFake = {
   /** Re-register every driver as a local one under the temp root. */
-  async install(): Promise<void> {
+  async install(options?: { isolated?: boolean }): Promise<void> {
     if (!installed) {
       wasInitialized = storage.isInitialized;
       installed = true;
     }
 
     if (!root) {
-      const shared = process.env[TEST_STORAGE_ROOT_ENV_KEY];
+      const shared = options?.isolated ? undefined : process.env[TEST_STORAGE_ROOT_ENV_KEY];
 
       if (shared) {
         root = shared;
@@ -74,7 +74,7 @@ export const storageFake = {
       } else {
         root = mkdtempSync(path.join(os.tmpdir(), "warlock-test-storage-"));
         ownsRoot = true;
-        process.env[TEST_STORAGE_ROOT_ENV_KEY] = root;
+        if (!options?.isolated) process.env[TEST_STORAGE_ROOT_ENV_KEY] = root;
       }
     }
 

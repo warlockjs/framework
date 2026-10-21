@@ -66,9 +66,9 @@ export async function teardown() {
  * setupTest() owns closing it in the same runtime context.
  */
 import { setupTest, teardownTest } from "@warlock.js/core/tests";
-import { afterAll } from "vitest";
+import { afterAll, expect } from "vitest";
 
-await setupTest({ importModule: (file) => import(file) });
+await setupTest({ importModule: (file) => import(file), file: expect.getState().testPath });
 
 afterAll(teardownTest);
 `,
@@ -78,6 +78,29 @@ afterAll(teardownTest);
     recordSkippedFile(testSetupPath, "exists");
   }
 
+  const runnerPath = srcPath("test-runner.ts");
+  if (!(await fileExistsAsync(runnerPath))) {
+    await putFileAsync(
+      runnerPath,
+      `import { configureTestWorker } from "@warlock.js/core/tests";
+import { VitestTestRunner } from "vitest/runners";
+
+// Vitest 4.1 awaits onCleanupWorkerContext callbacks before recycling the fork.
+export default class WarlockTestRunner extends VitestTestRunner {
+  public constructor(config: ConstructorParameters<typeof VitestTestRunner>[0]) {
+    super(config);
+    configureTestWorker(
+      { pool: this.pool, watch: config.watch, isolate: config.isolate },
+      (cleanup) => this.onCleanupWorkerContext(cleanup),
+    );
+  }
+}
+`,
+    );
+  } else {
+    recordSkippedFile(runnerPath, "exists");
+  }
+
   // Create vite.config.ts
   const viteConfigPath = rootPath("vite.config.ts");
   const viteConfigExists = await fileExistsAsync(viteConfigPath);
@@ -85,21 +108,40 @@ afterAll(teardownTest);
   if (!viteConfigExists) {
     await putFileAsync(
       viteConfigPath,
-      `import { lowerStage3Decorators } from "@warlock.js/core/vite";
+      `import { lowerStage3Decorators, recommendedTestWorkers, TestSetupReporter } from "@warlock.js/core/vite";
 import mongezVite from "@mongez/vite";
 import { defineConfig } from "vitest/config";
 
 export default defineConfig({
-  // lowerStage3Decorators MUST come first: it lowers native (@RegisterModel, …)
-  // decorators with esbuild before oxc / the SSR rewrite can mangle them, so
-  // decorated Cascade models load under Vitest.
   plugins: [lowerStage3Decorators(), mongezVite()],
   test: {
-    globalSetup: "./src/test-global-setup.ts", // HTTP server - runs once
-    setupFiles: ["./src/test-setup.ts"],       // DB/cache - runs per test file
-    environment: "node",
-    globals: false,
-    include: ["src/app/**/*.{test,spec}.ts"],
+    maxWorkers: recommendedTestWorkers(),
+    reporters: ["default", new TestSetupReporter()],
+    projects: [
+      {
+        extends: true,
+        test: {
+          name: "unit",
+          environment: "node",
+          include: ["src/**/*.spec.ts"],
+          exclude: ["src/**/tests/**"],
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: "integration",
+          environment: "node",
+          pool: "forks",
+          // Required only when opting into tests.lifetime: "worker".
+          isolate: true,
+          runner: "./src/test-runner.ts",
+          globalSetup: "./src/test-global-setup.ts",
+          setupFiles: ["./src/test-setup.ts"],
+          include: ["src/**/*.test.ts", "src/**/tests/**/*.{test,spec}.ts", "tests/**/*.{test,spec}.ts"],
+        },
+      },
+    ],
   },
 });
 `,
@@ -122,7 +164,7 @@ export const testFeature: FeatureDefinition = {
   devDependencies: {
     "@mongez/vite": "^2.0.4",
     vite: VITE_RANGE,
-    vitest: "^4.1.8",
-    "@vitest/coverage-v8": "^4.1.8",
+    vitest: "^4.1.10",
+    "@vitest/coverage-v8": "^4.1.10",
   },
 };

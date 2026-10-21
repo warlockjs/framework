@@ -106,11 +106,15 @@ export function resolveTestFakes(explicit?: TestFakesSelection): TestFakeName[] 
  *
  * @returns the fakes that are now installed.
  */
-export async function installTestFakes(explicit?: TestFakesSelection): Promise<TestFakeName[]> {
+export async function installTestFakes(
+  explicit?: TestFakesSelection,
+  options?: { isolatedStorage?: boolean },
+): Promise<TestFakeName[]> {
   const selected = resolveTestFakes(explicit);
 
   for (const name of selected) {
-    await fakes[name].install();
+    if (name === "storage") await storageFake.install({ isolated: options?.isolatedStorage });
+    else await fakes[name].install();
   }
 
   active = [...new Set([...active, ...selected])];

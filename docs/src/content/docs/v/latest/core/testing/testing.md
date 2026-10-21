@@ -1,12 +1,12 @@
 ---
 title: "Testing"
-description: How Warlock tests work — the two-worlds model (per-worker bootstrap + one global HTTP server), `setupTest` for unit tests, `startHttpTestServer` for integration tests, fakes that are on by default, model factories, an in-process server with the production plugins, and `warlock test --changed`.
+description: How Warlock tests work — the two-worlds model (per-file or opt-in worker bootstrap + one global HTTP server), `setupTest` for unit tests, `startHttpTestServer` for integration tests, fakes that are on by default, model factories, an in-process server with the production plugins, and `warlock test --changed`.
 sidebar:
   order: 1
   label: "Testing"
 ---
 
-Warlock tests run on Vitest, and the framework ships a small layer on top that gives you two distinct testing modes: **unit tests** that call services / repositories / models directly, and **integration tests** that hit a real HTTP server over fetch. Each mode has its own bootstrap.
+Warlock tests run on Vitest. Pure **unit specs** mock collaborators and need no framework bootstrap. **Integration tests** call services/models with real connectors or hit an HTTP server. The generated projects keep unit specs separate from integration setup.
 
 This guide explains the architecture, then walks both modes end-to-end.
 
@@ -14,16 +14,16 @@ This guide explains the architecture, then walks both modes end-to-end.
 
 ```bash
 # One command from a fresh project — drops vite.config.ts, test-global-setup.ts, test-setup.ts
-pnpm warlock add test
+npx warlock add test
 
 # Run the suite
-pnpm test
+npm run test
 
 # Watch mode while you work
-pnpm test:watch
+npm run test:watch
 ```
 
-A unit test looks like this:
+A service integration test looks like this:
 
 ```ts title="src/app/products/tests/create-product.service.test.ts"
 import { describe, expect, it } from "vitest";
@@ -41,7 +41,7 @@ An HTTP integration test looks like this:
 
 ```ts title="src/app/products/tests/products.controller.test.ts"
 import { describe, expect, it } from "vitest";
-import { expectJson, testPost } from "@warlock.js/core";
+import { expectJson, testPost } from "@warlock.js/core/tests";
 
 describe("POST /products", () => {
   it("creates a product over HTTP", async () => {
@@ -52,7 +52,7 @@ describe("POST /products", () => {
 });
 ```
 
-Both run against your real code. No mocks of the framework, no in-memory replacements for the DB. The bootstraps below explain how that works without each test paying a multi-second setup cost.
+Both run against your real code. No mocks of the framework, no in-memory replacements for the DB. The bootstraps below explain ownership; opt-in worker lifetime later in this guide amortizes setup across files.
 
 ## Keep Vitest setup out of development
 
@@ -66,7 +66,7 @@ if (process.env.VITEST) {
 
 ## The two-worlds architecture
 
-Vitest runs test files in **worker threads** — one worker per file by default, parallelized. The HTTP server needs to live somewhere that all those workers can reach. So the framework splits the bootstrap into two layers:
+The generated integration project uses Vitest **fork workers**. File setup runs before each file; the pool can execute files in parallel. The HTTP server needs to live somewhere that all those workers can reach. So the framework splits the bootstrap into two layers:
 
 ```
 ┌─── Main vitest process (one) ────────────────────────────┐
@@ -74,13 +74,13 @@ Vitest runs test files in **worker threads** — one worker per file by default,
 │   globalSetup: ./src/test-global-setup.ts                │
 │     └─ startHttpTestServer()                             │
 │         • boots ALL connectors (db, http, socket, …)     │
-│         • listens on http://localhost:2031               │
+│         • listens on an OS-assigned ephemeral port               │
 │         • owns its own DB connection                     │
 │                                                          │
 └──────────────────────────────────────────────────────────┘
             │ HTTP fetch requests
             ▼
-┌─── Worker thread N (one per test file) ──────────────────┐
+┌─── Fork worker N (setup before each file) ──────────────────┐
 │                                                          │
 │   setupFiles: ./src/test-setup.ts                        │
 │     └─ setupTest({ connectors: true })                   │
@@ -104,15 +104,15 @@ Anything you can import and call without going through HTTP. Services, repositor
 
 ### `setupTest({ connectors })`
 
-Each Vitest worker runs `src/test-setup.ts` once before any test in that worker executes. The file calls `setupTest`:
+Each Vitest worker runs `src/test-setup.ts` before each integration test file executes. The file calls `setupTest`:
 
 ```ts title="src/test-setup.ts"
-import { setupTest } from "@warlock.js/core";
+import { setupTest } from "@warlock.js/core/tests";
 
 await setupTest({ connectors: true });
 ```
 
-`setupTest` runs the framework's bootstrap (env, config, modules, files orchestrator) and starts the connectors you ask for. It's idempotent per worker — re-calling early-returns.
+`setupTest` runs the framework's bootstrap (env, config, modules, files orchestrator) and starts the connectors you ask for. By default, pair setup with `afterAll(teardownTest)` in every file; worker lifetime is opt-in below.
 
 ### The `connectors` knob
 
@@ -122,7 +122,7 @@ await setupTest({ connectors: true });
 | `false`                 | Nothing                                                             | Pure logic with no framework subsystem touches.    |
 | `["database", "cache"]` | Only those, in that order                                           | A narrow test that needs DB but not, say, storage. |
 
-You can also set `tests.connectors` in `src/config/tests.ts` for a project-wide default that overrides the `setupTest` parameter:
+You can also set `tests.connectors` in `src/config/tests.ts` for a project-wide default that applies unless the `setupTest` parameter is explicit:
 
 ```ts title="src/config/tests.ts"
 const testsConfigurations = {
@@ -177,7 +177,7 @@ When you want to assert the full stack: route resolution, middleware chain, vali
 ### `startHttpTestServer()` in `globalSetup`
 
 ```ts title="src/test-global-setup.ts"
-import { startHttpTestServer, stopHttpTestServer } from "@warlock.js/core";
+import { startHttpTestServer, stopHttpTestServer } from "@warlock.js/core/tests";
 
 export async function setup() {
   await startHttpTestServer();
@@ -205,7 +205,7 @@ import {
   expectJson,
   parseJsonResponse,
   getTestServerUrl,
-} from "@warlock.js/core";
+} from "@warlock.js/core/tests";
 ```
 
 Everything is built on native `fetch`:
@@ -227,7 +227,7 @@ console.log(body.product.id);
 ```ts title="src/app/products/tests/products.controller.test.ts"
 import { describe, expect, it } from "vitest";
 import { authService } from "@warlock.js/auth";
-import { expectJson, testGet, testPost } from "@warlock.js/core";
+import { expectJson, testGet, testPost } from "@warlock.js/core/tests";
 import { User } from "../../users/models/user";
 
 describe("Products API", () => {
@@ -422,11 +422,11 @@ Default to unit tests — they're faster and easier to reason about. Promote to 
 
 ## Project layout
 
-`warlock add test` drops three files:
+`warlock add test` generates the files below plus `src/test-runner.ts` for awaited worker cleanup:
 
 - **`src/test-global-setup.ts`** — vitest `globalSetup`, starts/stops the HTTP server.
-- **`src/test-setup.ts`** — vitest `setupFiles`, runs `setupTest` per worker.
-- **`vite.config.ts`** — wires both above, sets `include: ["src/app/**/*.test.ts"]`.
+- **`src/test-setup.ts`** — vitest `setupFiles`, calls `setupTest` before each integration file.
+- **`vite.config.ts`** — separates unit and integration projects; see the runtime guide below.
 
 It also installs `vitest`, `@vitest/coverage-v8`, `vite`, and `@mongez/vite` (which is what makes TypeScript imports + the framework's module layout work under vitest).
 
@@ -445,17 +445,17 @@ src/app/products/
 ## Running tests
 
 ```bash
-pnpm test                  # one-shot run
-pnpm test:watch            # watch mode
-pnpm test:coverage         # with v8 coverage
-pnpm test:ui               # vitest UI
+npm run test                  # one-shot run
+npm run test:watch            # watch mode
+npm run test:coverage         # with v8 coverage
+npm run test:ui               # vitest UI
 ```
 
 You can scope down with vitest's filename or test-name filters:
 
 ```bash
-pnpm test create-product           # files matching "create-product"
-pnpm test -t "creates a product"   # test name pattern
+npm run test -- create-product           # files matching "create-product"
+npm run test -- -t "creates a product"   # test name pattern
 ```
 
 `warlock test` runs the project's own Vitest and can run only what a change affects — the fast loop while you work:
@@ -531,3 +531,161 @@ export async function cleanup(): Promise<void> {
 HTTP test teardown awaits these cleanup functions and reports failures after
 attempting every module's cleanup. Avoid leaving module-owned handles running
 outside this lifecycle.
+
+## Runtime lifetime, unit projects and setup profiling
+
+`warlock add test` (also used by `create-warlock --features=test`) generates two
+Vitest projects. `unit` discovers `src/**/*.spec.ts` outside `tests/` directories
+and has no Warlock setup or HTTP global setup. `integration` discovers
+`src/**/*.test.ts`, specs inside `src/**/tests/`, and `tests/**/*.{test,spec}.ts`.
+It uses the framework setup, HTTP global setup and a generated `src/test-runner.ts`.
+Keep pure service specs beside their source and mock repositories at the boundary.
+Existing config files are preserved; copy the projects layout into them manually.
+Vitest 4.1.10 or newer is required for the generated runner.
+
+For a unit spec that needs configuration values, use:
+
+```ts
+import { afterAll, expect } from "vitest";
+import { setupTest, teardownTest } from "@warlock.js/core/tests";
+
+await setupTest({
+  mode: "unit",
+  importModule: (file) => import(file),
+  file: expect.getState().testPath,
+});
+afterAll(teardownTest);
+```
+
+Unit mode loads `warlock.config.ts` and configuration values once per module graph.
+It skips bootstrap/env/prestart hooks, connectors, config special handlers,
+`filesOrchestrator.init()`, the native ESM loader, and fake installation. Keep
+configuration imports free of side effects; arbitrary code imported by a config
+file can still perform I/O. A plain unit spec usually needs no `setupTest()` at all.
+`connectors: false` still bootstraps; it is not the cheap unit mode. Use separate
+projects for unit and integration runtimes.
+
+### Opt into one runtime per fork
+
+The default remains `tests.lifetime: "file"`. To reuse a runtime, change the
+integration project's `isolate` to `false`, keep `pool: "forks"` and
+`runner: "./src/test-runner.ts"`, then configure:
+
+```ts title="src/config/tests.ts"
+import { resetWorkerDatabase } from "../test-database";
+
+export default {
+  lifetime: "worker",
+  // Application-owned callback: truncate only this worker's test database.
+  // Called before every file's fixtures, including the first file.
+  resetBetweenFiles: async () => {
+    await resetWorkerDatabase();
+  },
+  profileSetup: true,
+};
+```
+
+Run with `npx vitest run --project integration`. Worker lifetime refuses watch,
+threads, isolated module graphs, or a missing runner with a message explaining
+the required settings. Keep `afterAll(teardownTest)` in the setup file: in worker
+mode it marks the end of the file; Vitest's awaited worker cleanup closes the
+runtime once. The runner uses `VitestTestRunner.onCleanupWorkerContext`, verified
+in Vitest 4.1.10's `runners.d.ts`, runner implementation and worker cleanup source.
+For an existing project, generate this runner without overwriting your config:
+
+```ts title="src/test-runner.ts"
+import { configureTestWorker } from "@warlock.js/core/tests";
+import { VitestTestRunner } from "vitest/runners";
+
+export default class WarlockTestRunner extends VitestTestRunner {
+  public constructor(config: ConstructorParameters<typeof VitestTestRunner>[0]) {
+    super(config);
+    configureTestWorker(
+      { pool: this.pool, watch: config.watch, isolate: config.isolate },
+      (cleanup) => this.onCleanupWorkerContext(cleanup),
+    );
+  }
+}
+```
+
+The first file bootstraps; subsequent files reuse connectors and config. Between
+files, selected fakes are restored and reinstalled, resetting mail/queue records,
+cache, secrets, clock, IDs and a private storage directory. Worker storage is
+separate from the global HTTP server's storage: use an in-process test HTTP server
+when assertions need to see request-side fake state. The hook runs after fake
+reset and before fixtures. It must finish before returning. Within a file,
+repeated `setupTest()` calls remain idempotent; use `beforeEach`/`afterEach` for
+per-test cleanup.
+
+This trades module isolation for startup cost: application singletons, config
+mutations, mocks and module side effects can survive between files. Reset your
+own state in `resetBetweenFiles`, restore mocks, and keep connector selection
+consistent. Give each worker a distinct database/schema using
+`process.env.VITEST_POOL_ID` when preparing test connections. Never drop a shared
+database from this hook while other workers are using it. The framework does not
+create a memory replica set or a cross-worker lock; those belong to the application's
+global setup. A shared HTTP server and a single replica set can contend on I/O,
+locks and shared fixtures even though workers run concurrently. Scope rows and
+HTTP fixtures per worker, or run tests that require global mutation separately
+with `maxWorkers: 1`. No test-server teardown ownership changes are needed here.
+
+`getTestRuntimeStats()` from `@warlock.js/core/tests` returns process-local
+`{ bootstraps, files }`. For example, after setup in worker mode:
+
+```ts
+import { expect, it } from "vitest";
+import { getTestRuntimeStats } from "@warlock.js/core/tests";
+
+it("reuses this worker's runtime", () => {
+  expect(getTestRuntimeStats().bootstraps).toBe(1);
+});
+```
+
+Across one integration project, a successful run with no worker recycling needs
+at most `maxWorkers` bootstraps. Multiple projects, worker crashes and memory-limit
+recycling can create additional processes; count distinct PIDs in profiles.
+
+### Measure and size CI workers
+
+Set `tests.profileSetup: true` or run
+`WARLOCK_TEST_PROFILE=1 npx vitest run --project integration`. Pass
+`file: expect.getState().testPath` to `setupTest()` for file labels (the generated
+setup does this). Each file emits one line with milliseconds for environment, config,
+bootstrap, orchestrator, app config, connectors, fakes, reset and teardown as
+applicable. Reused files report reset instead of startup steps. A summary per
+worker reports file/bootstrap counts, summed step timings and final shutdown.
+The generated config also installs `TestSetupReporter` from `@warlock.js/core/vite`
+(`reporters: ["default", new TestSetupReporter()]`), which aggregates file counts,
+bootstrap counts and timings across PIDs into a run summary. Summed timings are
+not wall time. Worker shutdown is included when its summary reaches the reporter
+before the run-end callback; individual worker summaries always report it.
+
+The generated config sets `maxWorkers: recommendedTestWorkers()` from
+`@warlock.js/core/vite`. It takes the smaller of CPU affinity and the tightest
+visible cgroup v2 quota, rounding fractional CPUs down with a minimum of one.
+For example `cpu.max = 1200000 100000` recommends 12 workers on a 48-CPU host.
+The format follows the [kernel cgroup v2 CPU interface](https://www.kernel.org/doc/html/latest/admin-guide/cgroup-v2.html#cpu-interface-files).
+It reads `/proc/self/cgroup` and visible ancestors under `/sys/fs/cgroup`; hosts
+without readable v2 quotas use affinity. Set `maxWorkers` explicitly on cgroup v1,
+custom cgroup mounts, or when database/memory limits require fewer workers.
+
+### Release gate
+
+```bash
+npx warlock test --changed --since "$LAST_RELEASE_REF"
+npx vitest run --project integration
+# Nightly (all projects):
+npx vitest run
+```
+
+The first command includes affected tests, using the existing changed-test CLI;
+the second always covers integration wiring. Keep the full suite nightly and
+compare cold and reused setup profiles on the same revision, worker count and
+database fixture before claiming a speedup.
+
+For a manual fake harness outside `setupTest`, the same private storage behavior
+is available with `await installTestFakes(true, { isolatedStorage: true })`, paired
+with `await restoreTestFakes()`. Both are exported from `@warlock.js/core/tests`.
+`await storageFake.install({ isolated: true })` / `await storageFake.restore()`
+provides it for a storage-only harness. Existing installs share the HTTP root by
+default; the isolated option never replaces or deletes that shared root.

@@ -21,7 +21,7 @@ This skill governs projects that have **opted into testing**. Testing is **enabl
 - `package.json` has a `test` (or `test:*`) script, **or**
 - a `vitest.config.*` / `vite.config.*` file exists at the project root.
 
-When the `test` feature is selected at scaffold time, both land automatically (Vitest, `@vitest/coverage-v8`, testcontainers, and a per-worker DB/cache test setup).
+When the `test` feature is selected at scaffold time, both land automatically (Vitest, `@vitest/coverage-v8`, and separate unit/integration projects with a per-file runtime by default).
 
 ### 0.1 If testing is enabled, tests are mandatory — not optional
 
@@ -119,7 +119,7 @@ Each test sets up and tears down its own world. No `let users = []` at the top o
 
 Use transactions that roll back, or use testcontainers with a fresh container per file. Never share rows across tests.
 
-The project's testcontainers setup makes "fresh DB per test file" cheap — use it.
+Provide the database fixture in global setup; the framework does not create testcontainers automatically. Give each worker its own database/schema before resetting rows.
 
 ### 3.4 Time and randomness
 
@@ -309,12 +309,12 @@ Co-located with the integration: `src/app/payments/clients/stripe-client.contrac
 src/app/orders/services/
   place-order.service.ts
   place-order.service.spec.ts       ← unit test, mocks repository
-  place-order.service.integration.spec.ts  ← integration, real DB
+  place-order.service.test.ts  ← integration, real DB
 ```
 
 - `.spec.ts` — default suffix; covers unit tests
-- `.integration.spec.ts` — when the test needs real I/O (DB, queue)
-- `.e2e.spec.ts` — full-system journey tests (sparse; one per critical flow)
+- `.test.ts` or a spec inside `tests/` — integration, real I/O (DB, queue)
+- Full-system journeys also use `.test.ts` in the integration project.
 
 Tests live next to the file under test, always. Never in a separate `__tests__/` or `test/` folder — colocation makes the link obvious and survives refactors.
 
@@ -338,3 +338,44 @@ Before merging a change that should include tests (testing enabled — see § 0)
 - [ ] No `.only`, no `.skip` without a tracking ticket
 - [ ] Snapshots reviewed line-by-line if updated
 - [ ] `npm run test --run` passes; `npm run test:coverage` doesn't drop the floor
+
+## Runtime cost and release gates
+
+With `--features=test`, create-warlock delegates to `warlock add test` to generate
+`vite.config.ts`: the `unit` project runs `src/**/*.spec.ts` outside `tests/`
+without framework or HTTP setup; `integration` runs `*.test.ts` and specs under
+`tests/` with `src/test-setup.ts`, global HTTP setup and `src/test-runner.ts`.
+Prefer `npx vitest run --project unit` during the pure service loop.
+
+When a unit needs config values, call
+`setupTest({ mode: "unit", importModule: (file) => import(file) })` from
+`@warlock.js/core/tests` and pair it with `afterAll(teardownTest)`. Config loads
+once per module graph, without hooks, connectors, native loader or fakes.
+Most unit specs need no setup call.
+
+Integration setup defaults to `tests.lifetime: "file"`. For reuse, set
+`lifetime: "worker"` in `src/config/tests.ts`, change the integration project to
+`pool: "forks", isolate: false`, keep the generated runner, and use `vitest run`.
+Watch, threads and isolated graphs are refused. Keep `afterAll(teardownTest)`:
+it marks file boundaries while the runner closes connectors at worker exit.
+Set `tests.resetBetweenFiles` to an async application-owned cleanup callback;
+it runs before every file, including the first, after selected fakes, clock and
+IDs reset. Each worker needs a separate database/schema. Module singletons and
+mocks survive; reset application state and restore mocks explicitly. Worker
+storage is private and does not mirror the shared HTTP server's fake files.
+
+Use `tests.profileSetup: true` or
+`WARLOCK_TEST_PROFILE=1 npx vitest run --project integration` for file timings and
+summaries per worker. Pass `file: expect.getState().testPath` in the setup call.
+`getTestRuntimeStats()` exposes bootstrap and file counts. Generated configs use
+`recommendedTestWorkers()` from `@warlock.js/core/vite` to respect visible cgroup
+v2 CPU quotas; reduce `maxWorkers` further for database or memory contention.
+
+Release gate:
+
+```bash
+npx warlock test --changed --since "$LAST_RELEASE_REF"
+npx vitest run --project integration
+# Nightly:
+npx vitest run
+```
