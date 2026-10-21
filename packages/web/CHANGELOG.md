@@ -17,6 +17,7 @@ All notable changes to `@warlock.js/web` are documented here.
 
 ### Fixed
 
+- Production builds no longer fail the client budget report when a setup file has no browser `register` hook; its empty projection adds no bytes.
 - Carry resolved document slots through the shared hydration payload so navigation data and document-embedded payloads stay identical.
 
 - Include generated guarded-route output in the page protection skill so its session and useUser examples compile independently.

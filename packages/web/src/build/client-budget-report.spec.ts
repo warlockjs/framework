@@ -71,6 +71,43 @@ describe("client budget manifest traversal", () => {
     ).rejects.toThrow("locate module");
   });
 
+  it("counts setup register projections when bundled and skips empty ones the bundler dropped", async () => {
+    const setup = "page.setup.ts?warlock-setup-register";
+    const withRegister = await measureClientBudgets({
+      manifest: await fixture(),
+      chunks: {
+        ...chunks,
+        "assets/page.js": [...(chunks["assets/page.js"] ?? []), { id: setup, bytes: 50 }],
+      },
+      pages: [
+        {
+          page: "/",
+          source: "page.tsx",
+          entry: "hydration",
+          modules: ["page.tsx", "layout.tsx"],
+          optionalModules: [setup],
+        },
+      ],
+      readAsset: async (file) => asset(file),
+    });
+    expect(withRegister.pages[0]?.modules).toContainEqual({ id: setup, bytes: 50 });
+    const dropped = await measureClientBudgets({
+      manifest: await fixture(),
+      chunks,
+      pages: [
+        {
+          page: "/",
+          source: "page.tsx",
+          entry: "hydration",
+          modules: ["page.tsx", "layout.tsx"],
+          optionalModules: [setup],
+        },
+      ],
+      readAsset: async (file) => asset(file),
+    });
+    expect(dropped.pages[0]?.js).toBe(withRegister.pages[0]?.js);
+  });
+
   it("uses only the selected site's hydration entry", async () => {
     const manifest = await fixture();
     manifest["site.ts"] = { name: "hydration-shop", isEntry: true, file: "assets/site.js" };

@@ -32,6 +32,12 @@ export type ClientBudgetPageInput = {
   page: string;
   source: string;
   modules: string[];
+  /**
+   * Modules that may legitimately be absent from the bundle. A setup file's
+   * browser projection holds only its `register` hook; when there is none the
+   * projection is empty and the bundler drops it, so it adds no bytes.
+   */
+  optionalModules?: string[];
   entry: string;
 };
 
@@ -109,6 +115,7 @@ export async function measureClientBudgets(options: {
         throw new Error(`Client budget cannot locate module ${id} for ${page.page}.`);
       roots.push(...keys);
     }
+    for (const id of page.optionalModules ?? []) roots.push(...(keysByModule.get(id) ?? []));
     const first = closure(roots);
     const deferred = new Set<string>();
     const pending = [...first];
@@ -180,18 +187,15 @@ export async function writeClientBudgetReport(options: {
           ...page.layouts,
           ...(page.appFile ? [page.appFile] : []),
           ...(errorPage ? [errorPage.pageFile] : []),
+        ].map(relative),
+        optionalModules: [
+          page.setupFile,
+          ...(page.layoutSetupFiles ?? []),
+          page.appSetupFile,
+          errorPage?.setupFile,
         ]
-          .map(relative)
-          .concat(
-            [
-              page.setupFile,
-              ...(page.layoutSetupFiles ?? []),
-              page.appSetupFile,
-              errorPage?.setupFile,
-            ]
-              .filter((file): file is string => file !== undefined)
-              .map((file) => `${relative(file)}?warlock-setup-register`),
-          ),
+          .filter((file): file is string => file !== undefined)
+          .map((file) => `${relative(file)}?warlock-setup-register`),
       };
     });
   const report = await measureClientBudgets({
