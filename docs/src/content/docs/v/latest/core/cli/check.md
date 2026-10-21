@@ -165,7 +165,7 @@ warlock typecheck --base main --json
 warlock typecheck --project tsconfig.app.json
 ```
 
-It runs the TypeScript compiler API with `incremental` and `noEmit`, keeping its state in `.warlock/cache/typecheck.tsbuildinfo`, so the second run only re-checks what changed. With `--changed` it collects diagnostics only for the changed files and their direct importers; the checker is lazy, so files nobody asks about are parsed but not checked — most of the memory a full check costs.
+It runs the TypeScript compiler API with `incremental` and `noEmit`, keeping its state in `.warlock/cache/typecheck.tsbuildinfo`, so the second run only re-checks what changed. With `--changed` it collects diagnostics for changed files and their transitive importers. Compilation still runs incrementally across the program.
 
 Problems are `WL7101` (a type error; the TypeScript code is in `rule`) and `WL7102` (a missing or invalid tsconfig). Exit codes match `check`: 0, 1 for type errors, 2 when git is unavailable for `--changed`.
 
@@ -251,3 +251,62 @@ editor settings and nonstandard scripts can also require review.
 existing Oxc configs retain their categories. A real lockfile beside a workspace
 marker determines the installer: `package-lock.json` plus `pnpm-workspace.yaml`
 without `pnpm-lock.yaml` now produces `npm install`.
+
+## Web and response contract conventions
+
+The following codes default to **warnings**, so upgrading does not fail existing projects.
+They parse real TypeScript/JSX syntax with the same oxc-parser adapter as the existing conventions.
+
+| Code     | Convention                                                                   | Remedy                                                                                                                                                             |
+| -------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `WL9013` | A component file exceeds 150 lines                                           | Split components and extract hooks; configure `componentLineLimit`.                                                                                                |
+| `WL9014` | More than one component in a file                                            | Move each component into its own TSX file.                                                                                                                         |
+| `WL9015` | State/effects or event-handler functions inside a component                  | Move `useState`, `useReducer`, `useEffect`, `useLayoutEffect` and handlers into `use-*.ts` hooks.                                                                  |
+| `WL9016` | Native select, checkbox, radio, date, time or datetime-local input           | Use the design-system control. Native controls are allowed in `src/web/design-system/**`.                                                                          |
+| `WL9017` | DOM input/textarea/select native validation                                  | Use shared schema validation instead of `required`, `pattern`, `min`, `max`, `minLength`, `maxLength` or input `type="email"`. Custom component props are allowed. |
+| `WL9018` | Exported `RequestHandler` in `src/app/**/controllers` lacks `responseSchema` | Assign `handler.responseSchema` to document each response status.                                                                                                  |
+
+Web rules apply to `src/web/**/*.tsx`. Components are top-level JSX-returning functions
+with a capitalized name (or an anonymous default export). Hook files and ordinary helpers
+are excluded. Handler checks recognize inline JSX callbacks, `handle*`/`on*` functions,
+and local function values referenced by event props. They do not execute code or infer
+runtime spreads, factory contracts or values imported from other files.
+
+Create `.warlock-check.json` in the project root:
+
+```json
+{
+  "componentLineLimit": 180,
+  "rules": {
+    "WL9013": "warning",
+    "WL9015": "error",
+    "WL9016": "off"
+  }
+}
+```
+
+`rules` accepts `"off"`, `"warning"`, or `"error"` for convention codes, including
+existing codes. Per-line `// warlock-check-ignore WL9015 -- reason` works as before.
+Use `npx warlock explain WL9015` for the registry explanation.
+
+```bash
+npx warlock check --changed --fix --json
+```
+
+`--changed` selects tracked changes against HEAD plus untracked source files and their
+transitive import dependents (including re-exports, type imports and related tests).
+Resolution uses the project's compiler configuration, with relative/app imports as a
+fallback for files outside that configuration. Lint and conventions receive that selection;
+Vitest uses related mode. TypeScript still compiles incrementally as a program, then filters
+diagnostics to the selection and its importers; this is not a partial compilation.
+
+`--fix` applies safe convention edits before the pipeline. Currently it removes `.js`
+suffixes from relative imports (`WL9002`). Ignored/disabled findings are not fixed.
+Component extraction, control replacement and response schemas require human decisions.
+Problems that have a safe edit include optional `fix: { start, end, text }` in JSON;
+`start` and `end` are zero-based source string offsets with an exclusive end.
+The report otherwise keeps schema version 1 and its existing shape. Applied fixes disappear
+from the final report; unresolved findings remain. Review the resulting source diff.
+
+Programmatic usage: `await runCheck({ changed: true, fix: true })` from
+`@warlock.js/core/tooling`.

@@ -509,3 +509,51 @@ Category: your code · skill: `warlock-doctor`
 **CHANGELOG.md is missing or has no version heading.** Add a CHANGELOG.md with a `## x.y.z` heading for the current version.
 
 Category: your code · skill: `warlock-doctor`
+
+## WL9013
+
+Component file exceeds the line limit. Split the component file or configure `componentLineLimit` (default 150). Defaults to a warning; configure severity in `.warlock-check.json`.
+
+```bash
+npx warlock explain WL9013
+```
+
+## WL9014
+
+More than one component per file. Move extra components to their own TSX files. Defaults to a warning; configure severity in `.warlock-check.json`.
+
+```bash
+npx warlock explain WL9014
+```
+
+## WL9015
+
+State, effects or handlers inside components. Move state, effects and event-handler functions into a `use-*.ts` hook. Defaults to a warning; configure severity in `.warlock-check.json`.
+
+```bash
+npx warlock explain WL9015
+```
+
+## WL9016
+
+Native app form control. Use a design-system control; native controls are permitted inside `src/web/design-system/**`. Defaults to a warning; configure severity in `.warlock-check.json`.
+
+```bash
+npx warlock explain WL9016
+```
+
+## WL9017
+
+Native DOM validation. Use shared schema validation and design-system field errors. Defaults to a warning; configure severity in `.warlock-check.json`.
+
+```bash
+npx warlock explain WL9017
+```
+
+## WL9018
+
+Controller has no response schema. Assign `handler.responseSchema` to an exported `RequestHandler` in `src/app/**/controllers`. Defaults to a warning; configure severity in `.warlock-check.json`.
+
+```bash
+npx warlock explain WL9018
+```

@@ -22,6 +22,8 @@ export type ProblemSource =
  * `file`, `line` and `column` are `null` when the problem has no position.
  */
 export type ToolingProblem = {
+  /** Optional safe edit, using zero-based UTF-16 source offsets. */
+  fix?: import("./check/fixes").ProblemFix;
   /** Stable Warlock error code; `warlock explain <code>` prints the fix. */
   code: WarlockErrorCode;
   /** `code` = fix the project; `environment` = fix this machine. */
@@ -50,6 +52,7 @@ export type ToolingProblem = {
 
 /** The fields a reporter supplies; the rest come from the registry. */
 export type ProblemInput = {
+  fix?: import("./check/fixes").ProblemFix;
   code: WarlockErrorCode;
   source: ProblemSource;
   message: string;
@@ -68,6 +71,7 @@ export function createProblem(input: ProblemInput): ToolingProblem {
   const definition = ERROR_CODES[input.code];
 
   return {
+    ...(input.fix ? { fix: input.fix } : {}),
     code: input.code,
     category: definition.category,
     severity: input.severity ?? "error",

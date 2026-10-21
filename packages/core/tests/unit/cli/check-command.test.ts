@@ -69,6 +69,7 @@ describe("warlock check", () => {
     expect(checkCommand.commandPreload).toBeUndefined();
     expect(typecheckCommand.commandPreload).toBeUndefined();
     expect(checkCommand.commandOptions.map((option) => option.name)).toEqual([
+      "fix",
       "lint",
       "changed",
       "base",
@@ -83,6 +84,14 @@ describe("warlock check", () => {
       "json",
     ]);
   }, 60_000);
+
+  it("forwards --fix to the check engine", async () => {
+    hoisted.runCheck.mockResolvedValue({ ...report, exitCode: 0 });
+    captureStdout();
+    const { checkCommand } = await import("../../../src/cli/commands/check.command");
+    await checkCommand.execute({ args: [], options: { fix: true, json: true } });
+    expect(hoisted.runCheck).toHaveBeenCalledWith(expect.objectContaining({ fix: true }));
+  });
 
   it("prints exactly the report under --json and exits with its code", async () => {
     hoisted.runCheck.mockResolvedValue(report);

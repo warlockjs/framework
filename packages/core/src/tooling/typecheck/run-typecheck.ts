@@ -111,7 +111,11 @@ export function runTypecheck(options: TypecheckOptions = {}): TypecheckResult {
   if (wanted) {
     const session = new CompilerSession(cwd, configPath);
     try {
-      for (const file of directImporters(session, wanted, cwd)) wanted.add(file);
+      for (;;) {
+        const importers = directImporters(session, wanted, cwd);
+        if (!importers.size) break;
+        for (const file of importers) wanted.add(file);
+      }
     } finally {
       session.close();
     }

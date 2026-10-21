@@ -17,6 +17,7 @@ export const checkCommand = command({
     "Typecheck, lint, run the affected tests and check conventions; one problem list, exit 1 for your code and 2 for this machine",
   action: checkCommandAction,
   options: [
+    { text: "--fix", description: "Apply safe convention fixes before checking", type: "boolean" },
     {
       text: "--lint",
       description: "Lint tool: oxlint (default)",

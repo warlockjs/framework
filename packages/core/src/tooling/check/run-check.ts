@@ -1,3 +1,5 @@
+import { affectedFiles } from "./affected-files";
+import { applyConventionFixes } from "./fixes";
 import path from "node:path";
 import { createProblem, type ToolingProblem } from "../problem";
 import {
@@ -40,6 +42,8 @@ export type CheckOptions = {
   lint?: "oxlint";
   /** Limit every step to the files changed against `base` (default HEAD) plus untracked files. */
   changed?: boolean;
+  /** Apply safe convention fixes before checking. */
+  fix?: boolean;
   /** Compare with `git merge-base <base> HEAD` instead of HEAD. Implies `changed`. */
   base?: string;
   /** Steps not to run. */
@@ -145,13 +149,20 @@ export async function runCheck(options: CheckOptions = {}): Promise<CheckReport>
     const found = checkNodeVersion(cwd, options.nodeVersion);
 
     if (changed) {
-      const listed = await listChangedFiles({ cwd, base: options.base, git: options.git });
+      const listed = await listChangedFiles({
+        cwd,
+        base: options.base,
+        git: options.git,
+        includeDeleted: true,
+      });
 
       if ("problem" in listed) {
         filesBlocked = true;
         found.push(listed.problem);
       } else {
-        files = listed.files;
+        filesBlocked = true;
+        files = await affectedFiles(cwd, listed.files, options.project);
+        filesBlocked = false;
       }
     }
 
@@ -162,6 +173,20 @@ export async function runCheck(options: CheckOptions = {}): Promise<CheckReport>
   });
 
   const targets = async (): Promise<string[]> => files ?? (await listSourceFiles(cwd));
+
+  if (options.fix && !filesBlocked && !skip.has("conventions")) {
+    try {
+      applyConventionFixes(cwd, runConventions(cwd, await targets(), options.project));
+    } catch (error) {
+      problems.push(
+        createProblem({
+          code: "WL8007",
+          source: "environment",
+          message: `Could not apply fixes: ${errorMessage(error)}`,
+        }),
+      );
+    }
+  }
 
   await run("typecheck", async () => {
     if (files !== null && files.length === 0) {
