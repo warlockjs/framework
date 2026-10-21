@@ -264,7 +264,10 @@ describe("hydration parity", () => {
     const usage = usageOf({ keys: ["orders.title"], prefixes: ["orders.statuses."] });
     const shared = sharedTableFor(sources, LOCALE, ["app"]);
 
-    vi.stubGlobal("fetch", vi.fn(async () => jsonResponse(shared)));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => jsonResponse(shared)),
+    );
     await loadTranslationAssets(
       payload(
         pruneKeywords(serverKeywords, usage, ["app"]),

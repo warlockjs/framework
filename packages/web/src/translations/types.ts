@@ -9,7 +9,10 @@
  * hashed, immutable asset instead of inside each page's payload. A group is the
  * first segment of a key (`app.title` belongs to `app`).
  */
-export const DEFAULT_SHARED_TRANSLATION_GROUPS: readonly string[] = Object.freeze(["app", "common"]);
+export const DEFAULT_SHARED_TRANSLATION_GROUPS: readonly string[] = Object.freeze([
+  "app",
+  "common",
+]);
 
 /** The public path segment under `/assets/` that hashed translation tables live in. */
 export const TRANSLATION_ASSET_DIRECTORY = "translations";

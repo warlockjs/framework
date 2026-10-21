@@ -11,10 +11,7 @@ import { createHash } from "node:crypto";
 import type { Keywords } from "@mongez/localization";
 import { isTranslationKeyUsed, usageOf, type TranslationUsage } from "@warlock.js/core";
 import { CLIENT_ASSET_URL_PREFIX } from "../server/client-asset-url-prefix";
-import {
-  TRANSLATION_ASSET_DIRECTORY,
-  type SerializedTranslationUsage,
-} from "./types";
+import { TRANSLATION_ASSET_DIRECTORY, type SerializedTranslationUsage } from "./types";
 
 /** One parsed route-locale file, reduced to what delivery needs: flattened key → locale → text. */
 export type TranslationSourceEntries = {
