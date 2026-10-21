@@ -23,6 +23,7 @@ import { registerModules } from "../register-modules";
 import { renderBuiltInFallback } from "./built-in-error-fallback";
 import { statusOf } from "./client-error-status";
 import { ErrorPageRenderGuard } from "./error-page-render-guard";
+import { installPayloadApiRoutes } from "./install-payload-api-routes";
 import { installPayloadTranslations } from "./install-payload-translations";
 import { reportClientError } from "./report-client-error";
 import { loadClientRouteComposition } from "./runtime";
@@ -244,6 +245,8 @@ export async function buildHydratedTree(
   // Both modes already carry the server's required copy, so register() is
   // not required to reproduce it and cannot prove its provenance afterward.
   installPayloadTranslations(payload);
+  // The page's own browser route table, before its tree can call `apiHref()`.
+  installPayloadApiRoutes(payload);
 
   // Registration is the first lifecycle action after the real namespaces have
   // loaded. Keep server order: root/App, layouts outermost-to-innermost, page.

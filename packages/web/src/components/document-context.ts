@@ -316,7 +316,13 @@ export type DocumentContextValue = {
    * gate, so `undefined` here means the page is not locale-routed at all.
    */
   localeRouting?: LocaleRouting;
-  /** Optional, browser-safe snapshot of Core's currently registered named API routes. */
+  /**
+   * The browser route table for THIS page document: the named API routes its
+   * client code can reach (`build/client-api-routes.ts`), never Core's whole
+   * registry. A client navigation carries the same field for the new page, and
+   * `client/install-payload-api-routes.ts` publishes it. Absent when the
+   * document has none to offer; `<Scripts/>` then emits no table.
+   */
   namedApiRoutes?: NamedApiRouteMetadata;
 };
 

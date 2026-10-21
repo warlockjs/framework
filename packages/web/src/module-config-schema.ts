@@ -23,7 +23,8 @@ export const MODULE_CONFIG_KEYS = {
     "sitemap",
     "action",
     "actions",
+    "apiRoutes",
   ],
-  layout: ["prefix", "middleware", "metadata", "fontPreload", "sitemap"],
-  root: ["middleware", "strictMode", "metadata", "fontPreload"],
+  layout: ["prefix", "middleware", "metadata", "fontPreload", "sitemap", "apiRoutes"],
+  root: ["middleware", "strictMode", "metadata", "fontPreload", "apiRoutes"],
 } as const satisfies Record<PageModuleKind, readonly string[]>;

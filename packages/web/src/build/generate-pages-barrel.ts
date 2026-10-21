@@ -39,7 +39,15 @@ import {
   isFile,
   walkFiles,
 } from "./discover-pages";
-import type { DiscoveredPage, DiscoveredRoutablePage } from "./discover-pages";
+import type { DiscoveredErrorPage, DiscoveredPage, DiscoveredRoutablePage } from "./discover-pages";
+import {
+  analyzeClientApiRoutes,
+  resolveClientApiRouteNames,
+  type ClientApiRouteModule,
+} from "./client-api-routes";
+import { appConventionAliases } from "../vite/app-convention-aliases";
+import { resolvePayloadBudget } from "../server/payload-budget";
+import type { PagePayloadBudget } from "../server/page-manifest";
 import type { SitesConfig } from "../sites/site-config.types";
 import { serializeRouteLocales } from "./serialize-route-locales";
 import {
@@ -194,6 +202,19 @@ export type GeneratePagesBarrelOptions = {
    * `__mocks__` folders are always skipped.
    */
   testOnly?: readonly string[];
+  /**
+   * The named API routes a page document may embed: every registered route
+   * except the ones that opted out with `clientVisible: false`, from Core's
+   * fresh snapshot. Each page gets the subset its client code can reach
+   * (`client-api-routes.ts`); omitted means no page embeds any route.
+   */
+  clientApiRouteNames?: readonly string[];
+  /**
+   * The inline payload budget (`build.budgets.payload`) already resolved to
+   * bytes, baked into the manifest so production enforces it without reading
+   * the config. Omitted means the default.
+   */
+  payloadBudget?: PagePayloadBudget;
 };
 
 export type GeneratePagesBarrelResult = {
@@ -487,6 +508,8 @@ type BarrelPage = {
   setupFile?: string;
   site?: string;
   layouts: { identifier: string; sourceFile: string; setupFile?: string }[];
+  /** The named API routes this page's document embeds, sorted. */
+  apiRouteNames: readonly string[];
 };
 
 /** Header of every generated barrel — the banner plus the one runtime import. */
@@ -678,6 +701,41 @@ export async function generatePagesBarrel(
 
   const layoutIdentifiers = new Map<string, { identifier: string; setupFile?: string }>();
   const pages: BarrelPage[] = [];
+  const clientApiRouteNames = options.clientApiRouteNames ?? [];
+  const errorPageOf = (site: string | undefined): DiscoveredErrorPage | undefined =>
+    discovered.find(
+      (candidate): candidate is DiscoveredErrorPage =>
+        candidate.type === "error" && candidate.site === site,
+    );
+  /**
+   * The browser route names one page's document embeds: the names its client
+   * modules reach (root, layouts, page, and the error page it may render), out
+   * of the names the build may embed at all.
+   */
+  const apiRouteNamesOf = (
+    page: DiscoveredRoutablePage,
+    pageErrorPage: DiscoveredErrorPage | undefined,
+  ): string[] => {
+    if (clientApiRouteNames.length === 0) return [];
+
+    const modules: ClientApiRouteModule[] = [
+      ...(page.appFile === undefined ? [] : [{ file: page.appFile, setupFile: page.appSetupFile }]),
+      ...page.layouts.map((file, layoutIndex) => ({
+        file,
+        setupFile: page.layoutSetupFiles?.[layoutIndex],
+      })),
+      { file: page.pageFile, setupFile: page.setupFile },
+      ...(pageErrorPage === undefined
+        ? []
+        : [{ file: pageErrorPage.pageFile, setupFile: pageErrorPage.setupFile }]),
+    ];
+
+    return resolveClientApiRouteNames(
+      analyzeClientApiRoutes({ modules, aliases: appConventionAliases(srcRoot) }),
+      clientApiRouteNames,
+    );
+  };
+
   // Persisted paths run through the ROUTER's own `normalizeRoutePath`, the
   // single definition of a route path's canonical form. Discovery derives these
   // from the filesystem and never registers anything, so without this the
@@ -707,6 +765,7 @@ export async function generatePagesBarrel(
       setupFile: page.setupFile,
       site: page.site,
       layouts,
+      apiRouteNames: apiRouteNamesOf(page, errorPageOf(page.site)),
     });
   }
 
@@ -799,6 +858,7 @@ export async function generatePagesBarrel(
           ]),
       ...(page.site === undefined ? [] : [`    site: ${quote(page.site)},`]),
       `    layouts: [${layouts}],`,
+      `    apiRouteNames: ${JSON.stringify(page.apiRouteNames)},`,
       "  },",
     ].join("\n");
   });
@@ -812,6 +872,7 @@ export async function generatePagesBarrel(
       ? []
       : [`  clientDir: ${quote(clientDir)},`]),
     ...(publicFiles.length === 0 ? [] : [`  publicFiles: ${JSON.stringify([...publicFiles])},`]),
+    `  payloadBudget: ${JSON.stringify(options.payloadBudget ?? resolvePayloadBudget(undefined))},`,
     ...(localeFiles.length === 0 ? [] : [`  localeFiles: ${JSON.stringify(localeFiles)},`]),
     ...(options.sites === undefined && routablePages.length === 0
       ? []

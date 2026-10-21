@@ -95,6 +95,23 @@ export type AccessibilityEvidence = {
   violations: AccessibilityViolation[];
   incomplete: AccessibilityViolation[];
 };
+/**
+ * The inline payload of one loaded document, in bytes as the HTML carries it:
+ * the hydration data script and the browser route table. `limit` and
+ * `overBudget` are present when the caller passed a limit to `measurePayload`.
+ */
+export type PayloadEvidence = {
+  at: string;
+  url: string;
+  viewport: Viewport;
+  /** The `__WARLOCK_DATA__` script: page, layout and app data, translations, session. */
+  data: number;
+  /** The `__WARLOCK_NAMED_API_ROUTES__` script: the page's browser route table. */
+  routes: number;
+  total: number;
+  limit?: number;
+  overBudget?: boolean;
+};
 export type E2EEvidence = {
   schemaVersion: 1;
   startedAt: string;
@@ -106,6 +123,7 @@ export type E2EEvidence = {
   networkFailures: NetworkFailure[];
   screenshots: { name: string; file: string; viewport: Viewport }[];
   accessibility?: AccessibilityEvidence[];
+  payloads?: PayloadEvidence[];
   processes: ProcessEvidence[];
   errors: string[];
 };

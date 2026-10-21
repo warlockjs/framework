@@ -22,6 +22,8 @@ import type {
 } from "@warlock.js/core";
 import type { PluginOption } from "vite";
 import type { SitesConfig } from "../sites/site-config.types";
+import { clientVisibleRouteNames } from "../routing/named-api-routes";
+import { resolvePayloadBudget } from "../server/payload-budget";
 
 export type WebBuildOptions = {
   /** Source directory name under the app root. Default: `"src"`. */
@@ -258,6 +260,11 @@ export function createWebBuildContribution(
         publicFiles,
         sites,
         testOnly: options.testOnly,
+        // Core's snapshot is checked just below; until then no names means no page
+        // embeds a route, and the check refuses the build before anything is written.
+        clientApiRouteNames: clientVisibleRouteNames(context.namedApiRoutes ?? []),
+        // `build.budgets.payload`, validated and resolved here so a bad size fails the build.
+        payloadBudget: resolvePayloadBudget(context.options.budgets?.payload),
       });
 
       pageCount = result.pageCount;

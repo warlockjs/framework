@@ -11,6 +11,7 @@ import {
   matches,
   type E2EEvidence,
   type E2ESpec,
+  type PayloadEvidence,
   type Viewport,
 } from "./types";
 
@@ -430,6 +431,38 @@ export class BrowserPage {
    * API: https://github.com/dequelabs/axe-core/blob/develop/doc/API.md#api-name-axerun
    * No CDN, DOM script element, or application dependency is required.
    */
+  /**
+   * Measures the inline payload of the document the page currently shows and
+   * records it under `evidence.payloads`. Measure after a full load: a client
+   * navigation replaces the data it reads. Pass `limit` to mark an overage.
+   */
+  async measurePayload(options: { limit?: number } = {}): Promise<PayloadEvidence> {
+    return this.step(`measurePayload ${this.viewport.name}`, async () => {
+      const measured = await this.evaluate<Pick<PayloadEvidence, "url" | "data" | "routes">>(
+        `(() => {
+          const bytes = (id) => {
+            const node = document.getElementById(id);
+            return node === null ? 0 : new TextEncoder().encode(node.textContent || "").length;
+          };
+          return { url: location.href, data: bytes("__WARLOCK_DATA__"), routes: bytes("__WARLOCK_NAMED_API_ROUTES__") };
+        })()`,
+        10_000,
+      );
+      const total = measured.data + measured.routes;
+      const report: PayloadEvidence = {
+        at: new Date().toISOString(),
+        viewport: { ...this.viewport },
+        ...measured,
+        total,
+        ...(options.limit === undefined
+          ? {}
+          : { limit: options.limit, overBudget: total > options.limit }),
+      };
+      (this.evidence.payloads ??= []).push(report);
+      return report;
+    });
+  }
+
   async assertAccessible(options: AccessibilityOptions = {}): Promise<AccessibilityEvidence> {
     return this.step(`assertAccessible ${this.viewport.name}`, async () => {
       const source = await readFile(

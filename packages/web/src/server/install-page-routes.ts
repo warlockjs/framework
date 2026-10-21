@@ -76,6 +76,8 @@ import {
 import type { ErrorPageModule } from "./error-page";
 import { layoutPrefixesByDirectory } from "./layout-prefixes";
 import { notFoundPageHandlerOptions } from "./not-found-handler-options";
+import { devClientApiRouteNames } from "./dev-client-api-route-names";
+import { resolvePayloadBudget, type PayloadBudgetConfig } from "./payload-budget";
 import { normalizePageModule } from "./normalize-page-module";
 import { composePageModule } from "./compose-page-module";
 import { devDeclaredStylesheetUrls, devHandlerStylesheetUrls } from "./stylesheet-urls";
@@ -660,6 +662,11 @@ async function installDiscoveredPageRoutes(
   // catch-all's absence of them) are decided against this one value, and
   // publishing it once after the loop keeps it in step with `publishRouteTable`.
   const localeRouting = resolveLocaleRouting(siteScope?.localeRouting);
+  // Read from the live config, which `warlock dev` loads; a build reads the same
+  // value through the generated manifest (see `PageManifest.payloadBudget`).
+  const payloadBudget = resolvePayloadBudget(
+    config.key<PayloadBudgetConfig | undefined>("build.budgets.payload"),
+  );
 
   const discovered = [...discoveredGraph.pages].sort((left, right) =>
     left.pageFile < right.pageFile ? -1 : left.pageFile > right.pageFile ? 1 : 0,
@@ -827,6 +834,15 @@ async function installDiscoveredPageRoutes(
       resolveRequestStylesheetUrls,
       cache,
       renderNotFound,
+      clientApiRouteNames: devClientApiRouteNames({
+        router,
+        appSrcRoot,
+        appFile,
+        layoutFiles: layoutLevel.chain,
+        pageFile,
+        errorPageFile,
+      }),
+      payloadBudget,
       ...httpServerOption,
     };
     const pageHandler = createPageRouteHandler(handlerOptions);
@@ -940,6 +956,14 @@ async function installDiscoveredPageRoutes(
                 vite.moduleGraph,
               ),
               resolveRequestStylesheetUrls,
+              clientApiRouteNames: devClientApiRouteNames({
+                router,
+                appSrcRoot,
+                appFile,
+                pageFile: notFoundPageFile,
+                errorPageFile,
+              }),
+              payloadBudget,
             }),
             ...httpServerOption,
           });

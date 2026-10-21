@@ -79,6 +79,7 @@ declare module "@warlock.js/core" {
 import type { ErrorPageModuleLoader } from "./error-page";
 import type { RouteTranslationsResolver } from "./route-translations";
 import { bindRequestRouteTranslations } from "./request-route-translations";
+import type { PagePayloadBudget } from "./page-manifest";
 
 /**
  * Raised when a page route handler is constructed WITHOUT an `httpServer`
@@ -181,6 +182,14 @@ export type PageRouteHandlerOptions = {
    */
   resolveRequestStylesheetUrls?: RequestStylesheetUrlResolver;
   /** Same helper `dev-error-transport.ts` exports — passed in, never imported. */
+  /**
+   * The named API route names this page's document may embed (see
+   * `RenderPageRequestOptions.clientApiRouteNames`). Production passes the
+   * build-time list; development passes a thunk that re-reads its sources.
+   */
+  clientApiRouteNames?: () => readonly string[];
+  /** The inline payload budget every document of this route is checked against (see `RenderPageRequestOptions.payloadBudget`). */
+  payloadBudget?: PagePayloadBudget;
   /**
    * The pattern stage 1 matches `request.path` against, when it differs from
    * the REGISTERED path. Defaults to `path`, which is right for every route
@@ -401,6 +410,8 @@ export function createPageRouteHandler(options: PageRouteHandlerOptions): PageRo
     applyBufferedCookie = defaultApplyBufferedCookie,
     cache: routeCache,
     mode,
+    clientApiRouteNames,
+    payloadBudget,
   } = options;
 
   const actionMode = mode === "action";
@@ -673,6 +684,8 @@ export function createPageRouteHandler(options: PageRouteHandlerOptions): PageRo
         // chunks a HIT would have no live stream to append to.
         crawler: attemptStorageAfterRender && !wantsData ? true : crawler,
         noindex,
+        clientApiRouteNames,
+        payloadBudget,
       });
 
       if (rendered instanceof Response) return rendered;

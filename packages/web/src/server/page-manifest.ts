@@ -49,6 +49,12 @@ export type PageManifestPageEntry = {
   layouts: readonly PageManifestLayoutEntry[];
   /** Key of the site this page belongs to; absent in single-site manifests. */
   site?: string;
+  /**
+   * The named API routes this page's document embeds, computed at build time
+   * from the browser code the page can reach (`build/client-api-routes.ts`).
+   * Absent or empty means the document carries no route table at all.
+   */
+  apiRouteNames?: readonly string[];
 };
 
 /** One site's application root (multi-site manifests only). */
@@ -80,6 +86,19 @@ export type PageManifestLocaleFile = {
   source: string;
 };
 
+/**
+ * The inline payload budget (`build.budgets.payload`), resolved to bytes at
+ * build time so production never reads the config. Patterns are route-path
+ * globs; the last matching one sets the limit.
+ */
+export type PagePayloadBudget = {
+  /** The limit a document gets when no pattern matches it, in bytes. */
+  readonly page: number;
+  readonly pages: readonly { readonly pattern: string; readonly bytes: number }[];
+  /** `"warn"` logs a warning; `"error"` logs at error level. Neither fails a request. */
+  readonly mode: "warn" | "error";
+};
+
 export type PageManifest = {
   /**
    * Where the client bundle was written, as an APP-ROOT-RELATIVE POSIX path
@@ -107,6 +126,8 @@ export type PageManifest = {
    * root and therefore never exposes `.vite/manifest.json`.
    */
   publicFiles?: readonly string[];
+  /** The inline payload budget every rendered document is checked against. Absent means the default. */
+  payloadBudget?: PagePayloadBudget;
   /** Validated route-locales JSON sources, emitted by the production barrel without client imports. */
   localeFiles?: readonly PageManifestLocaleFile[];
   /**

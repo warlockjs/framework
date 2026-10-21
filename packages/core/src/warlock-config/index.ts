@@ -4,6 +4,7 @@ export * from "./warlock-config.manager";
 export type {
   BuildBudgets,
   PageBudget,
+  PayloadBudget,
   BuildBudgetReport,
   BudgetPage,
   BudgetViolation,
