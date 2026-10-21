@@ -87,6 +87,37 @@ describe("browser page over a fake CDP endpoint", () => {
     expect(evidence.steps[0].status).toBe("failed");
   });
 
+  it("keeps the covered reason when a later probe runs out of the deadline", async () => {
+    let probes = 0;
+    const endpoint = await fakeCdp((command: FakeCommand) => {
+      if (command.method !== "Runtime.evaluate") return { result: {} };
+      probes++;
+      // The first probe answers with the covered target. Later probes get no reply,
+      // so each fails with a CDP timeout once the shrinking deadline runs out.
+      if (probes === 1)
+        return {
+          result: { result: { value: { ...stable, reason: "target is covered by DIALOG#modal" } } },
+        };
+      return undefined;
+    });
+    cleanups.push(endpoint.close);
+    const cdp = await CdpConnection.connect(endpoint.url);
+    cleanups.push(() => cdp.close());
+    const directory = await mkdtemp(join(tmpdir(), "warlock-page-spec-"));
+    cleanups.push(() => rm(directory, { recursive: true, force: true }));
+    const page = new BrowserPage(cdp, "http://127.0.0.1:12345", directory, makeEvidence(), {
+      app: {},
+      run: async () => {},
+    });
+    await expect(page.click("#save", 100)).rejects.toThrow(
+      /^Cannot click "#save" within 100ms: target is covered by DIALOG#modal$/,
+    );
+    expect(probes).toBeGreaterThan(1);
+    expect(endpoint.commands.some(({ method }) => method === "Input.dispatchMouseEvent")).toBe(
+      false,
+    );
+  });
+
   it("compares dimensions as well as centers for layout stability", () => {
     expect(boxesStable(stable, { ...stable, width: 101 })).toBe(false);
     expect(boxesStable(stable, { ...stable, x: 50.1 })).toBe(true);

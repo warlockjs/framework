@@ -2,7 +2,7 @@ import { createRequire } from "node:module";
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
-import { CdpConnection } from "./cdp";
+import { CdpConnection, CdpTimeoutError } from "./cdp";
 import {
   type AccessibilityOptions,
   type AccessibilityEvidence,
@@ -82,6 +82,15 @@ export function boxesStable(first: ClickBox, second: ClickBox): boolean {
       (key) => Math.abs(first[key] - second[key]) < 0.25,
     )
   );
+}
+
+/** Reason to report after a failed probe in a retry loop. A CDP timeout comes from
+ * the deadline shrinking under the probe, not from the target, so it must not
+ * replace a reason already observed on the target. Any other error is reported.
+ */
+function probeReason(error: unknown, observed: string | undefined): string {
+  if (error instanceof CdpTimeoutError && observed !== undefined) return observed;
+  return errorMessage(error);
 }
 
 export class BrowserPage {
@@ -198,16 +207,18 @@ export class BrowserPage {
     timeoutMs: number,
   ): Promise<void> {
     const deadline = Date.now() + timeoutMs;
-    let reason = "condition stayed false";
+    let reason: string | undefined;
     while (Date.now() < deadline) {
       try {
         if (await check(Math.max(1, deadline - Date.now()))) return;
       } catch (error) {
-        reason = errorMessage(error);
+        reason = probeReason(error, reason);
       }
       await delay(Math.min(50, Math.max(0, deadline - Date.now())));
     }
-    throw new Error(`${description} timed out after ${timeoutMs}ms: ${reason}`);
+    throw new Error(
+      `${description} timed out after ${timeoutMs}ms: ${reason ?? "condition stayed false"}`,
+    );
   }
 
   async goto(path: string, timeoutMs = 10_000): Promise<void> {
@@ -279,7 +290,7 @@ export class BrowserPage {
     await this.step(`click ${selector}`, async () => {
       const deadline = Date.now() + timeoutMs;
       let previous: ClickBox | undefined;
-      let reason = "layout has not settled";
+      let reason: string | undefined;
       while (Date.now() < deadline) {
         const remaining = () => Math.max(1, deadline - Date.now());
         let box: ClickBox;
@@ -289,7 +300,7 @@ export class BrowserPage {
             remaining(),
           );
         } catch (error) {
-          reason = errorMessage(error);
+          reason = probeReason(error, reason);
           previous = undefined;
           await delay(25);
           continue;
@@ -309,7 +320,7 @@ export class BrowserPage {
               remaining(),
             );
           } catch (error) {
-            reason = errorMessage(error);
+            reason = probeReason(error, reason);
             previous = undefined;
             await delay(Math.min(25, remaining()));
             continue;
@@ -346,7 +357,9 @@ export class BrowserPage {
         } else previous = box;
         await delay(Math.min(50, remaining()));
       }
-      throw new Error(`Cannot click ${JSON.stringify(selector)} within ${timeoutMs}ms: ${reason}`);
+      throw new Error(
+        `Cannot click ${JSON.stringify(selector)} within ${timeoutMs}ms: ${reason ?? "layout has not settled"}`,
+      );
     });
   }
 

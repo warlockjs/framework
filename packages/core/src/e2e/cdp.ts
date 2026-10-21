@@ -75,6 +75,14 @@ type Pending = {
   timer: ReturnType<typeof setTimeout>;
 };
 
+/** A command got no reply within its budget. Retry loops that shrink their budget use this type to tell a timeout apart from a reply that failed. */
+export class CdpTimeoutError extends Error {
+  constructor(timeoutMs: number, method: string) {
+    super(`CDP timeout after ${timeoutMs}ms: ${method}`);
+    this.name = "CdpTimeoutError";
+  }
+}
+
 export class CdpConnection {
   private sequence = 0;
   private pending = new Map<number, Pending>();
@@ -153,7 +161,7 @@ export class CdpConnection {
       const timer = setTimeout(
         () => {
           this.pending.delete(id);
-          reject(new Error(`CDP timeout after ${timeoutMs}ms: ${method}`));
+          reject(new CdpTimeoutError(timeoutMs, method));
         },
         Math.max(1, timeoutMs),
       );
