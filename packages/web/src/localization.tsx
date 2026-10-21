@@ -9,6 +9,7 @@ import { useCallback, useContext, type ReactNode } from "react";
 import { sharedContext } from "./shared/shared-context";
 import type { TranslationKey } from "./index";
 import { recordCurrentLocale } from "./routing/current-locale";
+import { translationsForKeyword } from "./client/translation-store";
 
 export type LocaleProviderProps = {
   readonly locale: string;
@@ -112,7 +113,13 @@ export function useTrans(): Translate {
     (keyword: Translatable, placeholders?: unknown, converter?: Converter): unknown =>
       translations === undefined
         ? transFrom(locale, keyword, placeholders, converter)
-        : transFromKeywords(locale, translations, keyword, placeholders, converter),
+        : transFromKeywords(
+            locale,
+            translationsForKeyword(locale, translations, keyword),
+            keyword,
+            placeholders,
+            converter,
+          ),
     [locale, translations],
   ) as Translate;
 }

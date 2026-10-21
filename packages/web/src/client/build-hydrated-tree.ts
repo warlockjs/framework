@@ -24,6 +24,7 @@ import { renderBuiltInFallback } from "./built-in-error-fallback";
 import { statusOf } from "./client-error-status";
 import { ErrorPageRenderGuard } from "./error-page-render-guard";
 import { installPayloadTranslations } from "./install-payload-translations";
+import { loadTranslationAssets } from "./translation-store";
 import { reportClientError } from "./report-client-error";
 import { loadClientRouteComposition } from "./runtime";
 import { sanitizeClientError } from "./sanitize-client-error";
@@ -243,6 +244,9 @@ export async function buildHydratedTree(
   // payloads stay in their route provider and never extend the registry.
   // Both modes already carry the server's required copy, so register() is
   // not required to reproduce it and cannot prove its provenance afterward.
+  // The shared table is awaited here, before anything renders, so the first
+  // client render reads the same keys the server rendered with.
+  await loadTranslationAssets(payload);
   installPayloadTranslations(payload);
 
   // Registration is the first lifecycle action after the real namespaces have
