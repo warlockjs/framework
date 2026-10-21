@@ -48,6 +48,10 @@ export type HydrationTranslationAssets = {
 export type SerializedTranslationUsage = {
   readonly keys: readonly string[];
   readonly prefixes: readonly string[];
+  /** Key-shaped string literals found in the page's client modules, matched against the existing keys at delivery. */
+  readonly literals?: readonly string[];
+  /** Static heads of template literals found in the page's client modules. */
+  readonly literalPrefixes?: readonly string[];
   readonly dynamic: boolean;
 };
 

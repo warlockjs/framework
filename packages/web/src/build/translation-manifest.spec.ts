@@ -11,7 +11,8 @@ import { writeTranslationAssets } from "./emit-translation-assets";
 import type { DiscoveredPage, DiscoveredRoutablePage } from "./discover-pages";
 import { CLIENT_ASSET_URL_PREFIX } from "../server/client-asset-url-prefix";
 import { productionAssetsDirectoryOptions } from "../server/web-connector";
-import { assetUrlFor } from "../translations/delivery";
+import { isTranslationKeyUsed } from "@warlock.js/core";
+import { assetUrlFor, usageFromRecord } from "../translations/delivery";
 
 let root: string;
 let srcRoot: string;
@@ -51,6 +52,32 @@ beforeAll(() => {
   write(
     "src/web/members/index.page.tsx",
     `export default function M() { return <p>{trans("members.title")}</p>; }`,
+  );
+  write(
+    "src/web/archive/locales.json",
+    JSON.stringify({
+      total_one: { en: "1 post", ar: "مقال" },
+      total_other: { en: ":count posts", ar: ":count مقالات" },
+      reading_other: { en: ":count min", ar: ":count د" },
+      unrelated: { en: "Unrelated", ar: "غير مرتبط" },
+    }),
+  );
+  write(
+    "src/web/archive/index.page.tsx",
+    `import { Summary } from "web/archive/summary";\nexport default function Archive() { return <Summary count={2} />; }`,
+  );
+  write("src/web/archive/summary/index.ts", `export { Summary } from "./summary";`);
+  write(
+    "src/web/archive/summary/summary.tsx",
+    `import { useTrans } from "@warlock.js/web";
+const KEYS = { total: "archive.total", reading: "archive.reading" };
+function label(translate: (key: string, options: { count: number }) => string, key: string, count: number) {
+  return translate(key, { count });
+}
+export function Summary({ count }: { count: number }) {
+  const t = useTrans();
+  return <p>{label(t, KEYS.total, count)}</p>;
+}`,
   );
   write(
     "src/web/error.page.tsx",
@@ -165,6 +192,44 @@ describe("buildTranslationManifest", () => {
 
   it("refuses a shared group that is not a plain group name", () => {
     expect(() => resolveSharedGroups(["bad group"])).toThrow(/must be one translation group name/);
+  });
+});
+
+describe("count variants reached through helpers", () => {
+  const archivePage = () =>
+    routable(path.join(srcRoot, "web/archive/index.page.tsx"), { routeName: "archive" });
+  const archiveInput = () => ({
+    srcRoot,
+    pages: [archivePage()],
+    localeFiles: [
+      {
+        sourceFile: path.join(srcRoot, "web/archive/locales.json"),
+        webRoot: path.join(srcRoot, "web"),
+      },
+    ],
+    relativeTo: (file: string) => path.relative(root, file).split(path.sep).join("/"),
+  });
+
+  it("records the key literals a helper receives, found through an alias and a barrel", () => {
+    const { manifest } = buildTranslationManifest(archiveInput());
+    const record = manifest.usage["src/web/archive/index.page.tsx"];
+
+    expect(record?.literals).toEqual(expect.arrayContaining(["archive.total", "archive.reading"]));
+  });
+
+  it("delivers the count variants of those keys and nothing else of the group", () => {
+    const { manifest } = buildTranslationManifest(archiveInput());
+    const record = manifest.usage["src/web/archive/index.page.tsx"];
+    const usage = usageFromRecord({ ...record, dynamic: false });
+
+    expect(
+      [
+        "archive.total_one",
+        "archive.total_other",
+        "archive.reading_other",
+        "archive.unrelated",
+      ].map((key) => isTranslationKeyUsed(usage, key)),
+    ).toEqual([true, true, true, false]);
   });
 });
 

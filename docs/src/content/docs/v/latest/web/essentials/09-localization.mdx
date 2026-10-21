@@ -260,10 +260,33 @@ Keys are found statically:
 A translator is any binding of `trans`, `t`, `transX`, `transFrom`'s key
 argument, or the result of `useTrans()`, under any local name.
 
+On top of the lookups it understands, the analysis counts every string literal
+in the page's client module graph. A literal that equals an existing key, names
+a group or a subtree, or is the base of count variants is shipped, wherever it
+is written: a constant, an object that maps names to keys, a prop
+(`<Stat labelKey="cart.title" />`), an argument to your own helper, an array of
+keys, or a component in another folder reached through a relative, `web/` or
+`app/` import or an index barrel. The head of a template literal
+(`` `cart.${section}` ``) counts as a prefix. Only literals that are shaped like
+a key are considered: dotted words with no spaces, so prose, class lists and
+import paths are ignored. A literal that matches no key ships nothing. So keys
+you pass around as strings need no declaration; only keys built at run time do.
+
+### Count variants
+
+A key used with a `count` is stored as suffixed variants
+(`items_zero`, `items_one`, `items_two`, `items_few`, `items_many`, `items_other`,
+`items_negative` or `items_range_1_5`), and the call names the base:
+`t("cart.items", { count })`. Naming the base ships every variant of it, in both
+translation modes, and the browser's missing-key detector treats the base as
+present when any variant arrived. A suffix is one segment, so `cart.items`
+ships `cart.items_one` and not `cart.itemsTotal` or `cart.items_one.note`.
+
 ### Declare what static analysis cannot see
 
-A key computed at run time has no static prefix, so the page falls back to
-every group. Declare the keys in the page's setup file instead:
+A key computed at run time, with no static prefix and no literal anywhere in
+the graph to name it, makes the page fall back to every group. Declare the keys
+in the page's setup file instead:
 
 ```ts title="src/web/orders/index.setup.ts"
 export const config = {

@@ -1,5 +1,7 @@
 import { getKeywordsListOf, setTranslationsList } from "@mongez/localization";
+import { usageOf } from "@warlock.js/core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { pruneKeywords, sharedTableFor } from "../translations/delivery";
 import { installPayloadTranslations } from "./install-payload-translations";
 import type { HydrationDocumentPayloadSource } from "../hydration-payload";
 import {
@@ -235,6 +237,33 @@ describe("pruning misses", () => {
     expect(reports[0]).toMatchObject({ kind: "translations", routeName: "orders.index" });
   });
 
+  it("treats the base of delivered count variants as present, and reports a base nothing backs", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => jsonResponse({ app: {} })),
+    );
+    const reports: unknown[] = [];
+    onClientError((event) => {
+      reports.push(event);
+    });
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    await loadTranslationAssets(
+      payload(
+        { cart: { items_one: "1 item", items_other: ":count items" } },
+        { url: "/assets/translations/store-test.plural.json", hash: "plural", groups: ["app"] },
+        "cart.index",
+      ),
+    );
+    const dictionary = translationDictionaryFor(LOCALE);
+
+    expect(translationsForKeyword(LOCALE, dictionary, "cart.items")).toBe(dictionary);
+    expect(reports).toHaveLength(0);
+
+    translationsForKeyword(LOCALE, dictionary, "cart.total");
+    translationsForKeyword(LOCALE, dictionary, "cart.item");
+    expect(reports).toHaveLength(2);
+  });
+
   it("returns inline translation objects and present keys untouched", () => {
     const dictionary = translationDictionaryFor(LOCALE);
     const inline = { en: "Save", ar: "حفظ" };
@@ -245,8 +274,6 @@ describe("pruning misses", () => {
 
 describe("hydration parity", () => {
   it("renders the same text the server rendered for every key the page reads", async () => {
-    const { pruneKeywords, sharedTableFor } = await import("../translations/delivery");
-    const { usageOf } = await import("@warlock.js/core");
     const serverKeywords = {
       app: { title: "Orders app" },
       orders: { title: "Orders", statuses: { paid: "Paid", open: "Open" } },

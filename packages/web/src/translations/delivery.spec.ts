@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { usageOf, translationDeclarationUsage } from "@warlock.js/core";
+import { usageOf, translationDeclarationUsage, scanTranslationSource } from "@warlock.js/core";
 import {
   canonicalJson,
   contentHash,
@@ -7,6 +7,7 @@ import {
   groupOf,
   localeCodesOf,
   pruneKeywords,
+  pruneKeywordsAgainst,
   serializeUsage,
   sharedAssetFileName,
   sharedTableFor,
@@ -131,6 +132,37 @@ describe("pruneKeywords", () => {
   });
 });
 
+describe("count variants", () => {
+  const keywords = {
+    cart: {
+      items_one: "1 item",
+      items_other: ":count items",
+      itemsTotal: "Total",
+      title: "Cart",
+    },
+    app: { title: "Shop" },
+  };
+
+  /** A key that is only passed on to a helper and then used with a count. */
+  const { usage } = scanTranslationSource(
+    "src/web/cart.tsx",
+    `const LABELS = { items: "cart.items" };
+     export const Items = ({ count }) => render(LABELS.items, { count });`,
+  );
+
+  it("delivers every count variant of a base key a page names", () => {
+    expect(pruneKeywords(keywords, usage, ["app"])).toEqual({
+      cart: { items_one: "1 item", items_other: ":count items" },
+    });
+  });
+
+  it("delivers them in the global-registry mode too, leaving unrelated keys out", () => {
+    expect(pruneKeywordsAgainst(keywords, usage, { app: { title: "Shop" } })).toEqual({
+      cart: { items_one: "1 item", items_other: ":count items" },
+    });
+  });
+});
+
 describe("usage records", () => {
   it("round-trips through the serialized manifest form", () => {
     const usage = usageOf({ keys: ["members"], prefixes: ["statuses."] });
@@ -139,6 +171,22 @@ describe("usage records", () => {
       keys: ["members"],
       prefixes: ["statuses."],
       dynamic: false,
+    });
+  });
+
+  it("keeps the key literals and template heads found in the page's modules", () => {
+    const usage = usageOf({ literals: ["cart.items"], literalPrefixes: ["status."] });
+
+    expect(usageFromRecord(serializeUsage(usage))).toMatchObject({
+      literals: ["cart.items"],
+      literalPrefixes: ["status."],
+    });
+  });
+
+  it("reads a record from a manifest built before literals were recorded", () => {
+    expect(usageFromRecord({ keys: ["members"], prefixes: [], dynamic: false })).toMatchObject({
+      literals: [],
+      literalPrefixes: [],
     });
   });
 });

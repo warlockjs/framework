@@ -126,6 +126,101 @@ describe("scanTranslationSource", () => {
   });
 });
 
+describe("plural variants and key-shaped literals", () => {
+  const keysOf = [
+    "cart.items_one",
+    "cart.items_other",
+    "cart.items_one.note",
+    "cart.itemsTotal",
+    "cart.title",
+    "labels.save",
+    "labels.cancel",
+    "status.paid",
+    "other.title",
+  ];
+
+  const reached = (usage: ReturnType<typeof scanTranslationSource>["usage"]): string[] =>
+    keysOf.filter((key) => isTranslationKeyUsed(usage, key));
+
+  it("reaches the count variants of a base key written in a lookup", () => {
+    const { usage } = scanTranslationSource(
+      "src/web/a.tsx",
+      `const label = trans("cart.items", { count: 3 });`,
+    );
+
+    expect(usage.dynamic).toBe(false);
+    expect(reached(usage)).toEqual(["cart.items_one", "cart.items_other"]);
+  });
+
+  it("reaches count variants through a bound useTrans translator", () => {
+    const { usage } = scanTranslationSource(
+      "src/web/a.tsx",
+      `export function Total({ count }: { count: number }) {
+         const t = useTrans();
+         return <span>{t("cart.items", { count })}</span>;
+       }`,
+    );
+
+    expect(reached(usage)).toEqual(["cart.items_one", "cart.items_other"]);
+  });
+
+  it("counts a key literal handed to a helper, a constant or an object as used", () => {
+    const { usage } = scanTranslationSource(
+      "src/web/a.tsx",
+      `const LABELS = { save: "labels.save" };
+       const CANCEL = "labels.cancel";
+       show(LABELS.save, CANCEL);
+       <Field labelKey="cart.title" />;`,
+    );
+
+    expect(usage.dynamic).toBe(false);
+    expect(usage.keys).toEqual([]);
+    expect(reached(usage)).toEqual(["cart.title", "labels.save", "labels.cancel"]);
+  });
+
+  it("reaches count variants of a base key that is only a literal", () => {
+    const { usage } = scanTranslationSource(
+      "src/web/a.tsx",
+      `const COUNT_KEYS = { items: "cart.items" };`,
+    );
+
+    expect(reached(usage)).toEqual(["cart.items_one", "cart.items_other"]);
+  });
+
+  it("counts the static head of a template as a subtree outside a lookup", () => {
+    const { usage } = scanTranslationSource(
+      "src/web/a.tsx",
+      "const key = `status.${state}`; pick(key);",
+    );
+
+    expect(usage.dynamic).toBe(false);
+    expect(usage.literalPrefixes).toEqual(["status."]);
+    expect(reached(usage)).toEqual(["status.paid"]);
+  });
+
+  it("does not count a count suffix that is not a single segment, or a longer name", () => {
+    const { usage } = scanTranslationSource("src/web/a.tsx", `use("cart.items");`);
+
+    expect(isTranslationKeyUsed(usage, "cart.items_one.note")).toBe(false);
+    expect(isTranslationKeyUsed(usage, "cart.itemsTotal")).toBe(false);
+  });
+
+  it("ignores prose, class lists, module specifiers and lookups it already read", () => {
+    const { usage } = scanTranslationSource(
+      "src/web/a.tsx",
+      `import { Card } from "web/components/card";
+       export * from "app/shared/barrel";
+       const lazy = import("web/components/lazy");
+       const text = "Save the file";
+       const classes = "flex items-center";
+       const key = trans("labels.save");`,
+    );
+
+    expect(usage.literals).toEqual([]);
+    expect(usage.keys).toEqual(["labels.save"]);
+  });
+});
+
 describe("config.translations declarations", () => {
   it("reads string entries from the setup file's config object", () => {
     const entries = readTranslationDeclarations(
@@ -201,6 +296,20 @@ describe("analyzePageTranslationUsage", () => {
     );
     write("src/web/dynamic/lookup.ts", `export function lookup() { return trans(key); }`);
     write("src/web/broken/page.tsx", `import "./missing";\nexport default function B() {}`);
+    write(
+      "src/web/counts/page.tsx",
+      `import { Summary } from "web/counts/summary";\nimport { sharedLabelKeys } from "app/shared";\nexport default function C() { return Summary(sharedLabelKeys); }`,
+    );
+    write("src/web/counts/summary/index.ts", `export * from "./summary-view";`);
+    write(
+      "src/web/counts/summary/summary-view.tsx",
+      `const KEYS = { total: "counts.total" };\nexport function Summary(labels: unknown) { return render(KEYS.total, labels); }`,
+    );
+    write("src/app/shared/index.ts", `export { sharedLabelKeys } from "./label-keys";`);
+    write(
+      "src/app/shared/label-keys.ts",
+      `export const sharedLabelKeys = { reading: "counts.readingTime", scope: \`counts.scope.\${kind}\` };`,
+    );
   });
 
   afterAll(() => {
@@ -242,6 +351,28 @@ describe("analyzePageTranslationUsage", () => {
         path.join(root, "src"),
       ),
     ).toBeUndefined();
+  });
+
+  it("reaches a key literal in a module imported through an alias, a barrel and a re-export", () => {
+    const { usage } = analyzePageTranslationUsage({
+      appSrcRoot: path.join(root, "src"),
+      entries: [path.join(root, "src/web/counts/page.tsx")],
+    });
+    const keys = [
+      "counts.total_one",
+      "counts.total_other",
+      "counts.readingTime_one",
+      "counts.scope.a",
+      "counts.other",
+    ];
+
+    expect(usage.dynamic).toBe(false);
+    expect(keys.filter((key) => isTranslationKeyUsed(usage, key))).toEqual([
+      "counts.total_one",
+      "counts.total_other",
+      "counts.readingTime_one",
+      "counts.scope.a",
+    ]);
   });
 
   it("does not walk non-code imports such as JSON", () => {

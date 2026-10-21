@@ -2078,9 +2078,14 @@ key.
 The build finds each page's keys by reading its client module graph: the page,
 its layouts, the root, error pages and the components they import. Literal
 keys, static-prefix templates (``trans(`statuses.${s}`)`` ships `statuses.*`)
-and module constants are resolved. A key it cannot resolve falls back to every
-group, and `warlock check` reports it as `WL9104`. Declare such keys in the
-page's setup file:
+and module constants are resolved. Any other key-shaped string literal in those
+modules (dotted words, no spaces) that equals a key, a group or a subtree also
+ships, wherever it is written: a constant, an object mapping names to keys, a
+prop or an argument to a helper. A key used with `count` is stored as variants
+(`items_one`, `items_other`, ...) and the call names the base, `t("cart.items",
+{ count })`; naming the base ships every variant. A key built at run time that
+no literal names falls back to every group, and `warlock check` reports it as
+`WL9104`. Declare such keys in the page's setup file:
 
 ```ts title="src/web/orders/index.setup.ts"
 export const config = {
