@@ -16,6 +16,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `page.measurePayload({ limit })` in the browser end-to-end kit records a document's inline payload under the evidence `payloads`.
 - Static translation usage analysis for the client module graph: `scanTranslationSource`, `analyzeTranslationGraph`, `analyzePageTranslationUsage`, `readTranslationDeclarations`, `translationDeclarationUsage`, `isTranslationKeyUsed` and `mergeTranslationUsage`. A usage lists the exact keys (each with its subtree), the static prefixes of template keys, and whether any lookup is dynamic, with the source position of each dynamic lookup. Literal keys, module-level constants, literal choices, `useTrans()` bindings under any local name, and `config.translations` declarations are resolved; a translator passed on as a value, or a key with no static prefix, is dynamic.
 - `WL9104`: `warlock check` warns when a translation key in `src/web` is computed at runtime, because the page that renders it then ships every translation group. The warning points at the `config.translations` declaration that resolves it.
+- `warlock upgrade` codemod `vite-8-vitest-5` (release 5.36.0): raises `vite`, `vitest`, `@vitest/*` and `@vitejs/plugin-react` in `package.json` (dependencies, devDependencies, `overrides`, `resolutions`), rewrites a test runner that imports `VitestTestRunner` from `vitest/runners` to `TestRunner` from `vitest`, and lists removed `vitest/*` entry points, a Vite config `esbuild` option and object `manualChunks` for review. A 5.36.0 note lists the Vitest 5 default changes.
+
+### Changed
+
+- `warlock add test` generates a runner that extends `TestRunner` from `vitest` (Vitest 5 has no `vitest/runners`) and declares `vitest` and `@vitest/coverage-v8` `^5.0.3`. `warlock add web` declares `vite` `^8.3.3` and `@vitejs/plugin-react` `^6.1.2`.
+
+### Upgrading
+
+- **BREAKING** The test kit needs Vitest 5. A runner that imports `VitestTestRunner` from `vitest/runners` fails on Vitest 5; run `warlock upgrade --from 5.35 --to 5.36.0` (codemod `vite-8-vitest-5`) or import `TestRunner` from `vitest` and call `this.onCleanupWorkerContext?.(cleanup)`. See the upgrade skill section "5.35 to 5.36 Vite 8 and Vitest 5".
+- Vitest 5 sets `clearMocks` to true, writes `json` and `junit` reports to `.vitest/` and makes `VITEST_POOL_ID` 1-based. Review specs that rely on mock state surviving between tests.
 
 ## 5.35.0 - 2026-10-21
 

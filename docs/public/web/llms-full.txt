@@ -5097,6 +5097,8 @@ rules with the browser; keep those server-side or split the schema.
 `useSubmitForm({ route })` resolves its name against the route table of the page being shown. Each page document carries the named routes its client code reaches: a string literal, a constant or a template prefix naming the route, plus anything declared with `config.apiRoutes` in the page's setup file. Declare a name the build cannot see:
 
 ```ts title="orders.setup.ts"
+import type { PageConfig } from "@warlock.js/web";
+
 export const config: PageConfig = { apiRoutes: ["orders.*"] };
 ```
 

@@ -1,5 +1,6 @@
 // @ts-check
 import { defineConfig } from "astro/config";
+import { unified } from "@astrojs/markdown-remark";
 import starlight from "@astrojs/starlight";
 import mermaid from "astro-mermaid";
 import starlightSidebarTopics from "starlight-sidebar-topics";
@@ -561,12 +562,12 @@ export default defineConfig({
   site: "https://warlock.js.org",
   redirects: docsRedirects,
   markdown: {
-    // Astro 6.4 leaves the deprecated `markdown.gfm` undefined, and @astrojs/mdx 5
-    // copies it as-is, so MDX pages silently lost GFM (tables, strikethrough, task
-    // lists). Keep it explicit until the docs move to Astro 7 / @astrojs/mdx 8.
+    // Astro 7 renders Markdown and MDX with Sätteri by default; the docs keep the
+    // unified (remark) processor because the validation plugin below is a remark
+    // plugin. GFM (tables, strikethrough, task lists) is on by default there, so the
+    // explicit `markdown.gfm` of Astro 6 is gone.
     // scripts/check-mdx-gfm.mjs fails the build if MDX tables stop rendering.
-    gfm: true,
-    remarkPlugins: [remarkValidateMdxComponents],
+    processor: unified({ remarkPlugins: [remarkValidateMdxComponents] }),
   },
   integrations: [
     // mermaid must run BEFORE starlight per astro-mermaid's docs.

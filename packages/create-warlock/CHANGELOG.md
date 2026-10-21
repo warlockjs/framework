@@ -4,6 +4,12 @@ All notable changes to `create-warlock` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.36.0
+
+### Changed
+
+- The template pins Vitest 5.0.3. Selecting the test feature generates the runner against Vitest 5's `TestRunner`, and a web project declares Vite 8 and `@vitejs/plugin-react` 6. The generator's own dev dependencies use `@types/node` 22, the minimum Vitest 5 supports.
+
 ## 5.35.0 - 2026-10-21
 
 ### Fixed

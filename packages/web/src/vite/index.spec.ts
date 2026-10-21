@@ -145,7 +145,9 @@ describe("warlockClientBoundary — composed projection + Gate A pipeline (real 
 
   it("case 1 (positive): loader-only @warlock.js/core import is stripped by projection before Gate A sees it, build succeeds", async () => {
     const result = await buildPage("case1-loader-only-core-import.page.tsx");
-    const code = firstChunkCode(result);
+    // Rolldown labels each module with a `//#region <source path>` marker, and
+    // this fixture's file name contains "loader"; only the code is asserted on.
+    const code = firstChunkCode(result).replace(/^\/\/#(?:end)?region.*$/gm, "");
 
     expect(code).not.toContain("@warlock.js/core");
     expect(code).not.toContain("loader");

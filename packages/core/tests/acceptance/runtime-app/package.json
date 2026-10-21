@@ -9,13 +9,13 @@
     "start": "warlock start"
   },
   "dependencies": {
-    "@vitejs/plugin-react": "5.2.0",
+    "@vitejs/plugin-react": "6.1.2",
     "@warlock.js/cache": "file:./vendor/cache.tgz",
     "@warlock.js/core": "file:./vendor/core.tgz",
     "@warlock.js/logger": "file:./vendor/logger.tgz",
     "@warlock.js/web": "file:./vendor/web.tgz",
     "react": "19.2.3",
     "react-dom": "19.2.3",
-    "vite": "7.3.5"
+    "vite": "8.3.3"
   }
 }

@@ -84,8 +84,8 @@ export const VENDOR_REACT_CHUNK_NAME = "vendor-react";
  * vendor code into its own chunk gives it a stable hash across deploys that
  * only touch app code, so returning visitors serve it from cache.
  *
- * WHY A PATTERN ON THE MODULE ID, NOT AN EXPLICIT PACKAGE LIST. Rollup's
- * `manualChunks` receives the fully resolved absolute module id, so matching
+ * WHY A PATTERN ON THE MODULE ID, NOT AN EXPLICIT PACKAGE LIST. The
+ * bundler's chunk-name callback receives the fully resolved absolute module id, so matching
  * `node_modules/<pkg>/` segments is the same technique Vite's own vendor
  * splitting recipes use, and it is resilient to nested/hoisted installs
  * (pnpm's `.pnpm/react@.../node_modules/react/...` still contains a bare
@@ -107,6 +107,16 @@ export function warlockHydrationManualChunks(id: string): string | undefined {
 
   return undefined;
 }
+
+/**
+ * The vendor split as Rolldown's `codeSplitting` option (see
+ * {@link warlockHydrationManualChunks}): one group whose `name` callback is the
+ * module-id rule, so a returned name pulls the module into that chunk and
+ * `undefined` leaves it to the default chunking.
+ */
+export const HYDRATION_CODE_SPLITTING = {
+  groups: [{ name: (id: string) => warlockHydrationManualChunks(id) }],
+};
 
 export interface BuildHydrationClientResult {
   entry: HydrationClientEntry;
@@ -236,7 +246,7 @@ export async function buildHydrationClient(
       manifest: true,
       outDir,
       target: "es2022",
-      rollupOptions: {
+      rolldownOptions: {
         external: options.external,
         input:
           siteNames === undefined
@@ -247,15 +257,19 @@ export async function buildHydrationClient(
           chunkFileNames: "assets/[name]-[hash].js",
           entryFileNames: "assets/[name]-[hash].js",
           format: "es",
-          // No app-supplied `manualChunks` exists to compose with today: the
+          // No app-supplied chunking exists to compose with today: the
           // caller-configurable surface here is `options.plugins`
           // (`BuildHydrationClientOptions.plugins`) and Vite's own plugin
-          // `config`/`config.build.rollupOptions` merge hooks — a plugin
+          // `config`/`config.build.rolldownOptions` merge hooks — a plugin
           // wanting its own vendor split can still hook `config` before this
-          // one runs. There is no separate `rollupOptions`/`manualChunks`
+          // one runs. There is no separate `rolldownOptions`/`codeSplitting`
           // input threaded onto `BuildHydrationClientOptions` for this
           // function to overwrite, so nothing to compose with yet.
-          manualChunks: warlockHydrationManualChunks,
+          //
+          // Vite 8 bundles with Rolldown, where the function form of Rollup's
+          // `manualChunks` is deprecated in favour of `codeSplitting` groups
+          // (https://vite.dev/guide/migration, "Removed" / "Deprecated").
+          codeSplitting: HYDRATION_CODE_SPLITTING,
         },
       },
       watch: null,

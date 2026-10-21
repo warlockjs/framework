@@ -4,6 +4,12 @@ All notable changes to `@warlock.js/cascade` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.36.0
+
+### Fixed
+
+- Unsetting a stored empty object (`model.unset("field")` on a field holding `{}`) is persisted: the model reports the change and `save()` issues the `$unset`. It was silently skipped, because an empty object has no leaves to diff; a spec only passed by reading a mock call left over from an earlier test.
+
 ## 5.35.0 - 2026-10-21
 
 ### Fixed

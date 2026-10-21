@@ -4,11 +4,11 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   resolve: {
     alias: {
-      "@warlock.js/ai": resolve(__dirname, "../ai/src/index.ts"),
-      "@warlock.js/ai-openai": resolve(__dirname, "../ai-openai/src/index.ts"),
-      "@warlock.js/cache": resolve(__dirname, "../cache/src/index.ts"),
-      "@warlock.js/logger": resolve(__dirname, "../logger/src/index.ts"),
-      "@warlock.js/fs": resolve(__dirname, "../fs/src/index.ts"),
+      "@warlock.js/ai": resolve(import.meta.dirname, "../ai/src/index.ts"),
+      "@warlock.js/ai-openai": resolve(import.meta.dirname, "../ai-openai/src/index.ts"),
+      "@warlock.js/cache": resolve(import.meta.dirname, "../cache/src/index.ts"),
+      "@warlock.js/logger": resolve(import.meta.dirname, "../logger/src/index.ts"),
+      "@warlock.js/fs": resolve(import.meta.dirname, "../fs/src/index.ts"),
     },
   },
   test: {

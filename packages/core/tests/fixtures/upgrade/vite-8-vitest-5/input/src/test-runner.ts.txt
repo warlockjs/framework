@@ -1,0 +1,12 @@
+import { configureTestWorker } from "@warlock.js/core/tests";
+import { VitestTestRunner } from "vitest/runners";
+
+export default class WarlockTestRunner extends VitestTestRunner {
+  public constructor(config: ConstructorParameters<typeof VitestTestRunner>[0]) {
+    super(config);
+    configureTestWorker(
+      { pool: this.pool, watch: config.watch, isolate: config.isolate },
+      (cleanup) => this.onCleanupWorkerContext(cleanup),
+    );
+  }
+}

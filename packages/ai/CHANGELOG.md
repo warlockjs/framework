@@ -4,6 +4,16 @@ All notable changes to `@warlock.js/ai` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.36.0
+
+### Changed
+
+- The `Matchers` augmentation that types `toRouteTo`, `toConverge`, `toPassStep` and `toOutputShape` follows Vitest 5's `Matchers<R, T>` signature. With Vitest 5 installed, `expect(...)` keeps its custom matcher types; the augmentation no longer compiles against Vitest 4.
+
+### Upgrading
+
+- **BREAKING** Using the custom matchers in TypeScript requires Vitest 5 (`vitest@^5`; `warlock upgrade --from 5.35 --to 5.36.0` raises it, codemod `vite-8-vitest-5`). Runtime behavior is unchanged.
+
 ## 5.34.3 - 2026-10-20
 
 ### Changed

@@ -590,3 +590,56 @@ Global-registry apps are covered too. Their shared table is served at
 `/__warlock/translations/<locale>.<hash>.json`, which is cached immutable in
 production. A direct `trans()` call from `@mongez/localization` is not checked
 for a pruning miss; the calls through `useTrans()` are.
+
+## 5.35 to 5.36 Vite 8 and Vitest 5
+
+`@warlock.js/web` requires Vite 8 (`^8.0.0`) and `@vitejs/plugin-react` 6, and the
+test kit requires Vitest 5. Vite 8 bundles with Rolldown and transforms
+TypeScript with Oxc. Vite 7 is not supported; plugin-react 6 needs Vite 8, so the
+family moves together. Vite 8 needs Node.js 20.19 or 22.12 and newer, Vitest 5
+needs 22.12 or newer; Warlock already requires 22.15.
+
+```bash
+npx warlock upgrade --from 5.35 --to 5.36.0 --dry-run
+npx warlock upgrade --from 5.35 --to 5.36.0
+npm install
+npx warlock check
+```
+
+The `vite-8-vitest-5` codemod:
+
+- raises `vite` (8.3.3), `vitest` and `@vitest/*` (5.0.3) and `@vitejs/plugin-react`
+  (6.1.2) in `dependencies`, `devDependencies`, `overrides` and `resolutions`,
+  keeping `^`, `~` or exact style;
+- rewrites a generated `src/test-runner.ts` from `VitestTestRunner` in
+  `vitest/runners` to `TestRunner` from `vitest`, and calls
+  `this.onCleanupWorkerContext?.(cleanup)` (the hook is absent in vm pools);
+- lists, without editing, imports of the removed `vitest/coverage`,
+  `vitest/reporters`, `vitest/environments`, `vitest/snapshot`, `vitest/suite`,
+  `vitest/mocker` and `vitest/internal/module-runner` entry points, other names
+  imported from `vitest/runners`, a top-level `esbuild` option in a Vite or
+  Vitest config, and object-form `output.manualChunks`.
+
+Do these by hand when the codemod lists them:
+
+- Move a config's `esbuild: { jsx: "automatic" }` to
+  `oxc: { jsx: { runtime: "automatic" } }`. `esbuild.target` is not converted, and
+  Oxc does not lower native decorators: keep `lowerStage3Decorators()` from
+  `@warlock.js/core/vite` first in `plugins` for decorated modules, as in the
+  generated test config.
+- Replace object `manualChunks` with
+  `build.rolldownOptions.output.codeSplitting.groups`; `build.rollupOptions` still
+  works but is deprecated in favour of `build.rolldownOptions`.
+- A custom bundler `external` list that names Node builtins is still refused by the
+  client build.
+
+Vitest 5 changes defaults that can alter a green suite: `clearMocks` is true,
+`json` and `junit` reporters write to `.vitest/` instead of stdout, `-t` joins a
+test's names with `>`, `VITEST_POOL_ID` and `VITEST_WORKER_ID` start at 1, nested
+`vi.mock`/`vi.hoisted` calls throw, and an unawaited `resolves` or `rejects`
+assertion fails the test. Vitest also no longer searches parent directories for a
+config file; run it from the package that owns the config. Official guides:
+https://vite.dev/guide/migration and https://vitest.dev/guide/migration.
+
+A project that uses `@warlock.js/ai`'s custom matchers needs Vitest 5 for their
+TypeScript types.

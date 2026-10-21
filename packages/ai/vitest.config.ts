@@ -6,7 +6,7 @@ import { defineConfig } from "vitest/config";
 // not `process.cwd()`. Running the suite from the monorepo root with
 // `vitest run --root ai` leaves cwd at the root, so a cwd-relative
 // `./../logger` would resolve one level too high and fail to find the
-// package. Resolving against `__dirname` keeps the targets correct
+// package. Resolving against `import.meta.dirname` keeps the targets correct
 // regardless of where the command is invoked.
 const here = path.dirname(fileURLToPath(import.meta.url));
 

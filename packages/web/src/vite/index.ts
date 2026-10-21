@@ -125,7 +125,7 @@ export type BuildWarlockHydrationClientOptions = Readonly<{
  * Vite/Rollup upgrade could invert it. Pinned by a
  * regression test (`index.spec.ts`, "D.3 hook ordering pin") that fails
  * loudly if the ordering ever inverts, and by the `vite` peer floor in
- * `web/package.json` (`>=7.3.5`, the version this was verified against). If
+ * `web/package.json` (`^8.0.0`; verified against 8.3.3, where Rolldown keeps the same ordering). If
  * that test ever fails after a Vite bump: the failure mode of the ordering
  * assumption breaking is SAFE — projection would stop removing an import
  * statement Gate A still sees, so Gate A would refuse an import it used to

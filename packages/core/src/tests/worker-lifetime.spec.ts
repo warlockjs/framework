@@ -38,13 +38,13 @@ describe("worker runtime across Vitest files", () => {
       await writeFile(
         path.join(root, "runner.ts"),
         `
-        import { VitestTestRunner } from "vitest/runners";
+        import { TestRunner } from "vitest";
         import { configureTestWorker } from ${specifier("tests/test-runtime-scope.ts")};
-        export default class extends VitestTestRunner {
+        export default class extends TestRunner {
           constructor(config) {
             super(config);
             configureTestWorker({ pool: this.pool, watch: config.watch, isolate: config.isolate },
-              (cleanup) => this.onCleanupWorkerContext(cleanup));
+              (cleanup) => this.onCleanupWorkerContext?.(cleanup));
           }
         }
       `,

@@ -20,3 +20,8 @@ minimumReleaseAgeExclude:
   # exactly like @warlock.js/* did (5.20.0: @mongez/reinforcements@4.0.2).
   - "@mongez/*"
   - lucide-react@1.61.0
+
+# Every dependency, transitive ones included, is at least 14 days old: vitest 5.0.3 accepts
+# tinybench ^6.1.4, and the newest such release is 6.2.1.
+overrides:
+  tinybench: 6.2.1

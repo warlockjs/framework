@@ -1,0 +1,6 @@
+[
+  { "file": "src/reporter.ts", "line": 1 },
+  { "file": "src/reporter.ts", "line": 2 },
+  { "file": "vite.config.ts", "line": 4 },
+  { "file": "vite.config.ts", "line": 8 }
+]

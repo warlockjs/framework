@@ -284,7 +284,7 @@ inside it are server code.
 
 - `@warlock.js/core`
 - `react` and `react-dom` 19+
-- `vite` and `@vitejs/plugin-react` — dev-only, loaded lazily, optional peers
+- `vite` (`^8.0.0`) and `@vitejs/plugin-react` (`^6.0.0`) — dev-only, loaded lazily, optional peers
 
 ## Documentation
 

@@ -40,7 +40,7 @@
     "@warlock.js/logger": "workspace:^",
     "oxc-parser": "0.154.0",
     "typescript": "7.0.2",
-    "vitest": "4.1.10"
+    "vitest": "5.0.3"
   },
   "peerDependencies": {
     "@warlock.js/ai-openai": "*",

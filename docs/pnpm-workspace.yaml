@@ -12,3 +12,17 @@ allowBuilds:
 # https://github.com/advisories/GHSA-g7r4-m6w7-qqqr (fixed in 0.28.1)
 overrides:
   esbuild: ^0.28.2
+  # Starlight depends on @astrojs/mdx ^8.0.0; keep one copy, at the newest release that
+  # is at least two weeks old (the docs pin it directly too).
+  "@astrojs/mdx": 8.0.3
+  # Every dependency, transitive ones included, is at least 14 days old. These pin the
+  # transitive releases the Vite 8 / Vitest 5 / Astro 7 install resolved younger than that to
+  # the newest release inside their dependents' ranges (checked 2026-10-21).
+  rolldown: 1.2.12
+  "@astrojs/compiler-rs": 0.5.1
+  smol-toml: 1.9.0
+  tinybench: 6.2.1
+  zod: 4.6.5
+  "es-module-lexer@^3": 3.0.3
+  postcss: 8.5.29
+  vite: 8.3.3

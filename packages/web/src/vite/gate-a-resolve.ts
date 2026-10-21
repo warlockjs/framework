@@ -783,9 +783,9 @@ type ExternalPredicate = (id: string, importer: string | undefined, isResolved: 
  *
  * Asked as a QUESTION of the normalized predicate rather than by reading an
  * array, because `external` may legitimately be a string, a RegExp, an array of
- * either, or a function — Rollup normalizes all of them into the function
- * handed to `buildStart`, and asking it about each builtin spelling is the only
- * form of the check that covers every shape. A predicate that throws on an
+ * either, or a function — `externalPredicateOf` normalizes all of them into one
+ * function, and asking it about each builtin spelling is the only form of the
+ * check that covers every shape. A predicate that throws on an
  * unexpected shape of argument is read as "not external": this guard exists to
  * catch a config that says yes, and inventing a refusal out of someone else's
  * exception would be a false positive with no evidence behind it.
@@ -795,9 +795,9 @@ type ExternalPredicate = (id: string, importer: string | undefined, isResolved: 
  * fence does not apply, and a build that would silently pass today only because
  * no import happens to exist yet is not a build anyone should trust tomorrow.
  */
-function externalizedBuiltins(isExternal: unknown): string[] {
-  if (typeof isExternal !== "function") return [];
-  const asks = isExternal as ExternalPredicate;
+function externalizedBuiltins(external: unknown): string[] {
+  const asks = externalPredicateOf(external);
+  if (!asks) return [];
   return NODE_BUILTIN_SPELLINGS.filter((specifier) => {
     try {
       return asks(specifier, undefined, false) === true;
@@ -805,6 +805,32 @@ function externalizedBuiltins(isExternal: unknown): string[] {
       return false;
     }
   });
+}
+
+/**
+ * The predicate form of a raw bundler `external` option: a function, a string
+ * (exact id), a RegExp, or an array of those. Rolldown, unlike Rollup, does not
+ * hand a normalized predicate to `buildStart` (its `NormalizedInputOptions` has
+ * no `external`), so the raw option is read from the `options` hook and
+ * normalized here. `undefined` for an absent or unrecognized value.
+ */
+function externalPredicateOf(external: unknown): ExternalPredicate | undefined {
+  if (typeof external === "function") return external as ExternalPredicate;
+  if (typeof external === "string") return (id) => id === external;
+  if (external instanceof RegExp) {
+    return (id) => {
+      external.lastIndex = 0;
+      return external.test(id);
+    };
+  }
+  if (Array.isArray(external)) {
+    const predicates = external
+      .map((entry: unknown) => externalPredicateOf(entry))
+      .filter((entry): entry is ExternalPredicate => entry !== undefined);
+    return (id, importer, isResolved) =>
+      predicates.some((asks) => asks(id, importer, isResolved) === true);
+  }
+  return undefined;
 }
 
 export interface EnvironmentClassifierOptions {
@@ -1047,6 +1073,9 @@ export function gateAResolve(options: GateAOptions = {}): Plugin {
    */
   let declaredAliasCount: number | undefined;
 
+  /** The bundler's raw `external` option, captured by the `options` hook. */
+  let rawExternal: unknown;
+
   function buildChain(importer: string | undefined): string[] {
     const chain: string[] = [];
     let current = importer;
@@ -1067,6 +1096,15 @@ export function gateAResolve(options: GateAOptions = {}): Plugin {
     // if either ran first. The cheapest security mechanism wins: this fence
     // goes first, not last.
     enforce: "pre",
+    /**
+     * Captures the raw `external` option for `buildStart`. Rolldown's
+     * normalized input options carry no `external`, so this hook is the only
+     * place the configured value is visible. Never changes the options.
+     */
+    options(inputOptions) {
+      rawExternal = inputOptions.external;
+      return null;
+    },
     /** Records the alias-table size; see `declaredAliasCount`. Judges nothing. */
     configResolved(config) {
       const alias: unknown = config.resolve?.alias;
@@ -1084,8 +1122,8 @@ export function gateAResolve(options: GateAOptions = {}): Plugin {
      * the first module is loaded, so the refusal lands before anything has been
      * bundled.
      */
-    buildStart(inputOptions) {
-      const externalized = externalizedBuiltins(inputOptions.external);
+    buildStart() {
+      const externalized = externalizedBuiltins(rawExternal);
       if (externalized.length === 0) return;
       const shown = externalized.slice(0, 5).join(", ");
       const rest = externalized.length > 5 ? `, and ${externalized.length - 5} more` : "";

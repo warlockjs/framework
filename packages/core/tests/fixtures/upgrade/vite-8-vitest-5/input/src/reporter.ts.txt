@@ -1,0 +1,5 @@
+import { DefaultReporter } from "vitest/reporters";
+import { NodeBenchmarkRunner, VitestTestRunner } from "vitest/runners";
+
+export class Reporter extends DefaultReporter {}
+export const runners = [NodeBenchmarkRunner, VitestTestRunner];

@@ -33,11 +33,15 @@ export interface AiMatchers<R = unknown> {
 }
 
 declare module "vitest" {
-  // Vitest 4's augmentable `Matchers` interface is `Matchers<T = any>`
-  // — the type parameter must match exactly (TS2428) or the
-  // declaration is rejected. `T` is the assertion-chain return type.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  interface Matchers<T = any> extends AiMatchers<T> {}
+  // Vitest 5's augmentable `Matchers` interface is `Matchers<R, T>`: `R` is the
+  // assertion-chain return type (void, or a promise for `resolves`/`rejects`)
+  // and `T` the asserted value. The type parameters, bounds and defaults must
+  // match exactly (TS2428) or the declaration is rejected.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  interface Matchers<
+    R extends void | Promise<void> = void | Promise<void>,
+    T = unknown,
+  > extends AiMatchers<R> {}
 }
 
 let registered = false;
