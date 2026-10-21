@@ -1,0 +1,33 @@
+{
+  "entry.ts": {
+    "file": "assets/entry.js",
+    "name": "hydration",
+    "isEntry": true,
+    "imports": ["_vendor.js"],
+    "dynamicImports": ["page.tsx", "other.tsx"]
+  },
+  "page.tsx": {
+    "file": "assets/page.js",
+    "src": "page.tsx",
+    "imports": ["_vendor.js", "_shared.js"],
+    "css": ["assets/page.css", "assets/shared.css"],
+    "dynamicImports": ["chart.ts"]
+  },
+  "layout.tsx": {
+    "file": "assets/layout.js",
+    "imports": ["_shared.js"],
+    "css": ["assets/shared.css"]
+  },
+  "_vendor.js": { "file": "assets/vendor.js", "imports": ["_shared.js"] },
+  "_shared.js": {
+    "file": "assets/shared.js",
+    "imports": ["_vendor.js"],
+    "css": ["assets/shared.css"]
+  },
+  "other.tsx": {
+    "file": "assets/other.js",
+    "imports": ["_shared.js"],
+    "css": ["assets/other.css"]
+  },
+  "chart.ts": { "file": "assets/chart.js", "imports": ["_shared.js"], "css": ["assets/chart.css"] }
+}

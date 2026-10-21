@@ -193,3 +193,13 @@ empty.
 See [`warlock routes:diff`](/v/latest/core/cli/routes/#warlock-routesdiff) and
 [connector lifecycle](/v/latest/core/architecture-concepts/connectors/) for
 the surrounding Core APIs.
+
+## Client asset budgets
+
+After the client build, `npx warlock build` measures first-visit gzip JS and CSS
+for every discovered page, including hydration, layouts, roots and static
+imports. Deferred assets are reported separately. A small Rollup plugin records
+the largest module contributors in private build metadata. Configure
+`build.budgets` in `warlock.config.ts` to warn or fail;
+[client performance budgets](/v/latest/core/digging-deeper/build-budgets/)
+describes route overrides, deltas and `npx warlock build --json`.

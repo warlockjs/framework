@@ -229,3 +229,10 @@ The contact, locale, user create/list and post create/update examples declare `r
 Oxlint enables `typescript/no-explicit-any`, explicit member accessibility, `curly`, and `no-console`. The hybrid interface-for-contracts/type-for-data convention stays a review rule because `consistent-type-definitions` only supports one global preference. App sub-folder barrels remain permitted; web imports target individual component and hook files to keep client bundles lean and server-only code out of barrels. Run `npm run lint:check` and `npm run format:check` in the generated app.
 
 These model/resource conventions apply to newly generated apps. Existing apps adopting public UUIDs must add and backfill a unique column before changing their resource output or route lookups; updating a skill alone does not migrate stored data.
+
+## Client asset limits
+
+The generated `warlock.config.ts` configures `build.budgets.page` with gzip
+limits of `150kb` JavaScript and `50kb` CSS in `mode: "error"`. API-only
+builds have no client pages to check. Adjust the limits or choose `"warn"`
+as needed; see [client performance budgets](/v/latest/core/digging-deeper/build-budgets/).

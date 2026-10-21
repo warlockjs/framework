@@ -13,6 +13,9 @@ All notable changes to `@warlock.js/web` are documented here.
 ### Fixed
 
 - Install fetched sessions on refresh, locale changes, and central page swaps, including guest sessions; superseded responses cannot publish identity.
+### Added
+
+- Client manifest traversal for first-visit and deferred asset sizes, including hydration, page layouts, setup registrations and error boundaries; Rollup module attribution identifies the largest contributors.
 
 ## 5.34.3 - 2026-10-20
 

@@ -332,6 +332,9 @@ export function createWebBuildContribution(
           replacement,
         }));
 
+        const { clientBudgetModules, writeClientBudgetReport } =
+          await import("./client-budget-report");
+
         await buildWarlockHydrationClient({
           appRoot: context.appRoot,
           webRoot: await resolveWebPackageRoot(options.webRoot),
@@ -344,7 +347,14 @@ export function createWebBuildContribution(
           external: options.external,
           sites,
           fonts,
-          plugins: connectorPlugins,
+          plugins: [...connectorPlugins, clientBudgetModules(context.appRoot)],
+        });
+
+        await writeClientBudgetReport({
+          appRoot: context.appRoot,
+          outdir: path.resolve(context.appRoot, context.options.outdir),
+          srcDir: options.srcDir,
+          sites,
         });
 
         // Precompressed siblings for the hashed client bundle (card `011315ae`)

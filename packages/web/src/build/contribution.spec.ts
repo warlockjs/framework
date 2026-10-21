@@ -80,6 +80,11 @@ describe("assertWebPackageRoot", () => {
 });
 
 const buildHydrationClient = vi.hoisted(() => vi.fn(async () => undefined));
+const budgetReportWriter = vi.hoisted(() => vi.fn(async () => undefined));
+vi.mock("./client-budget-report", () => ({
+  clientBudgetModules: () => ({ name: "warlock-client-budget-modules" }),
+  writeClientBudgetReport: budgetReportWriter,
+}));
 
 vi.mock("../vite", () => ({
   buildWarlockHydrationClient: buildHydrationClient,
@@ -378,7 +383,12 @@ describe("web build contribution — connector plugins", () => {
 
     expect(generatePagesBarrelSpy).toHaveBeenCalledTimes(1);
     expect(buildHydrationClient).toHaveBeenCalledWith(
-      expect.objectContaining({ plugins: [tailwindStylePlugin] }),
+      expect.objectContaining({
+        plugins: [
+          tailwindStylePlugin,
+          expect.objectContaining({ name: "warlock-client-budget-modules" }),
+        ],
+      }),
     );
 
     log.mockRestore();
@@ -403,7 +413,14 @@ describe("web build contribution — connector plugins", () => {
 
     expect(generatePagesBarrelSpy).toHaveBeenCalledTimes(1);
     expect(buildHydrationClient).toHaveBeenCalledTimes(1);
-    expect(buildHydrationClient).toHaveBeenCalledWith(expect.objectContaining({ plugins: [] }));
+    expect(budgetReportWriter).toHaveBeenCalledWith(
+      expect.objectContaining({ appRoot, outdir: path.join(appRoot, "dist") }),
+    );
+    expect(buildHydrationClient).toHaveBeenCalledWith(
+      expect.objectContaining({
+        plugins: [expect.objectContaining({ name: "warlock-client-budget-modules" })],
+      }),
+    );
 
     log.mockRestore();
   });

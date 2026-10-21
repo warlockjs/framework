@@ -92,10 +92,19 @@ vi.mock("../../../src/warlock-config/warlock-config.manager", () => ({
 }));
 
 const FINAL_OUT_DIR = vi.hoisted(() => "/app/dist");
+const budgetState = vi.hoisted(() => ({ mode: undefined as "error" | "warn" | undefined }));
+const readBudgetReport = vi.hoisted(() => vi.fn());
+const writeBudgetReport = vi.hoisted(() => vi.fn(async () => undefined));
+vi.mock("../../../src/production/build-budgets", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../../src/production/build-budgets")>()),
+  readBuildBudgetReport: readBudgetReport,
+  writeBuildBudgetReport: writeBudgetReport,
+}));
 
 vi.mock("../../../src/production/resolve-build-config", () => ({
   resolveBuildConfig: vi.fn(() => ({
     outdir: FINAL_OUT_DIR,
+    budgets: budgetState.mode ? { page: { js: "1kb" }, mode: budgetState.mode } : undefined,
     outFile: "app.js",
     minify: false,
     sourcemap: false,
@@ -120,6 +129,9 @@ function buildConnector(name: string, build: NonNullable<Connector["build"]>): C
 
 describe("ProductionBuilder.build() — temp write target, final outdir", () => {
   beforeEach(() => {
+    budgetState.mode = undefined;
+    readBudgetReport.mockReset();
+    writeBudgetReport.mockClear();
     esbuildShouldFail.value = false;
     configuredConnectors.value = [];
     esbuildBuild.mockClear();
@@ -306,4 +318,58 @@ describe("ProductionBuilder.build() — temp write target, final outdir", () => 
     expect(putJsonFileAsync).not.toHaveBeenCalled();
     expect(removeDirectoryAsync).toHaveBeenCalledWith(FINAL_OUT_DIR);
   });
+});
+
+describe("production budget enforcement and baseline rollback", () => {
+  it.each(["error", "warn"] as const)(
+    "handles %s budgets before writing the success marker",
+    async (mode) => {
+      const report = {
+        version: 1,
+        compression: "gzip",
+        pages: [
+          {
+            page: "/",
+            source: "home.page.tsx",
+            js: 2048,
+            css: 0,
+            dynamic: { js: 0, css: 0 },
+            files: [],
+            modules: [{ id: "large.ts", bytes: 5000 }],
+          },
+        ],
+        violations: [],
+      };
+      budgetState.mode = mode;
+      configuredConnectors.value = [];
+      esbuildShouldFail.value = false;
+      readBudgetReport.mockReset();
+      readBudgetReport.mockResolvedValueOnce(undefined).mockResolvedValueOnce(report);
+      writeBudgetReport.mockClear();
+      renameFileAsync.mockClear();
+      putJsonFileAsync.mockClear();
+      removeDirectoryAsync.mockClear();
+      directoryExistsAsync.mockResolvedValue(true);
+      const warning = vi.spyOn(console, "warn").mockImplementation(() => {});
+      try {
+        const builder = new ProductionBuilder();
+        if (mode === "error") {
+          await expect(builder.build()).rejects.toThrow("JS budget 1.00kb, actual 2.00kb");
+          expect(putJsonFileAsync).not.toHaveBeenCalled();
+          expect(renameFileAsync).toHaveBeenCalledTimes(4);
+          expect(removeDirectoryAsync).not.toHaveBeenCalledWith(renameFileAsync.mock.calls[0]?.[1]);
+        } else {
+          await builder.build();
+          expect(warning).toHaveBeenCalledWith(expect.stringContaining("large.ts"));
+          expect(putJsonFileAsync).toHaveBeenCalledTimes(1);
+        }
+        expect(esbuildBuild.mock.calls.at(-1)?.[0]).not.toHaveProperty("budgets");
+        expect(builder.budgetReport?.violations).toHaveLength(1);
+        expect(writeBudgetReport).toHaveBeenCalledTimes(1);
+      } finally {
+        warning.mockRestore();
+        budgetState.mode = undefined;
+      }
+    },
+  );
 });

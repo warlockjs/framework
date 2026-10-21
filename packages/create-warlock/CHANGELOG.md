@@ -10,6 +10,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - Add a state ownership rule to the web code standards skill: loader data is server truth, and shared client state lives in named store modules.
 - Teach the project API design skill to use typed domain errors, bounded list endpoints and response-schema contract assertions. The starter formatter preserves explicitly safe `AppError` messages and details through its native typed context.
+### Added
+
+- New projects configure gzip client budgets of 150kb JavaScript and 50kb CSS, enforced by `warlock build`.
 
 ## 5.34.3 - 2026-10-20
 

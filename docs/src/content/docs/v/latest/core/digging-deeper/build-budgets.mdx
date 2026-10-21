@@ -1,0 +1,82 @@
+---
+title: Client performance budgets
+description: Measure and enforce first-visit gzip JavaScript and CSS limits per page during warlock build.
+sidebar:
+  order: 12
+---
+
+`npx warlock build` reports each page's first-visit JavaScript and CSS after
+the Vite client build. Existing apps only receive a report until you configure
+limits. New projects start with 150kb JavaScript and 50kb CSS limits.
+
+```ts title="warlock.config.ts"
+import { defineConfig } from "@warlock.js/core";
+
+export default defineConfig({
+  build: {
+    budgets: {
+      page: { js: "150kb", css: "50kb" },
+      pages: {
+        "/admin/**": { js: "220kb" },
+        "/admin/reports": { js: "300kb", css: "75kb" },
+      },
+      mode: "error",
+    },
+  },
+});
+```
+
+Sizes accept `b`, `kb`, and `mb` (case insensitive), with 1024 bytes per kb.
+Unspecified fields are unlimited; equality passes. `page` sets defaults.
+`pages` keys match route paths: `*` stays within a segment, `**` spans segments,
+and `?` matches one non-slash character. Later matching rules override earlier
+fields while preserving other defaults. Other glob syntax is rejected.
+
+Configured budgets default to `mode: "error"`, which fails the build and
+restores the previous dist. `"warn"` prints violations and completes normally.
+Each violation names the page, JS or CSS budget, actual compressed size and
+the largest contributing modules. API-only builds have an empty page report.
+
+## What is measured
+
+The first visit includes hydration, the requested page, its layouts and root,
+setup registration modules, and the error boundary. From those roots the report
+walks the static imports and CSS references in Vite's `.vite/manifest.json`.
+Each emitted file is gzipped individually and counted once per page. Shared
+chunks count toward every page that needs them. The report excludes HTML,
+fonts, images, HTTP headers and cache reuse.
+
+Dynamic imports beyond the required page roots and their static dependencies
+are reported in separate JS/CSS columns, including their transitive imports.
+They do not count against first-visit limits. This includes other pages exposed
+by the same hydration registry, so deferred totals describe reachable assets,
+not a prediction of what a user will download.
+
+The ten largest modules use Rollup's `chunk.modules[].renderedLength`, recorded
+by a small build plugin. These are uncompressed rendered-byte estimates for JS
+chunk contributors, including zero-length stylesheet wrapper modules. They are
+diagnostic rankings rather than compressed per-module costs.
+
+## Deltas and machine-readable output
+
+The table sorts by combined JS and CSS size, descending, with route names
+breaking ties. Deltas compare the same route and source path with the previous
+successful build's `build-budgets.json` in `build.outdir` (normally `dist`).
+Keep that output directory between builds to retain the baseline. First builds
+and new pages display no delta. Failed builds preserve the earlier baseline.
+
+```bash
+npx warlock build --json > build-report.json
+```
+
+Stdout contains one JSON object: `{ success, budgets, error? }`; progress is
+sent to stderr. `budgets` contains `version: 1`, `compression: "gzip"`, `pages`
+and `violations`. Each page records its route (`page`), `source`, byte totals
+(`js`, `css`), `dynamic` totals, `files`, `modules` and optional `delta`.
+Violations contain `page`, `type`, numeric `budget` and `actual`, and `modules`.
+A budget failure returns a nonzero exit status while still printing the attempted
+report; an earlier build failure may have no `budgets` value.
+
+The full module attribution is private build metadata in
+`client/.vite/budget-modules.json`. Production asset routes do not expose that
+folder. No extra dependency is required.

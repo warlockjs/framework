@@ -404,3 +404,10 @@ Warlock produces a standard Node ESM bundle plus your `node_modules` — anywher
 - [warlock.config.ts](../architecture-concepts/warlock-config.md) — the project-level config, including the `build` block.
 - [Application](../architecture-concepts/application.md) — the static gateway to `environment`, runtime mode, and the well-known paths.
 - [Configuration](../getting-started/03-configuration.md) — the two config layers and how `.env` values feed `src/config/*`.
+
+## Client asset budgets
+
+`npx warlock build` reports per-page gzip JavaScript and CSS, including deltas
+from the previous successful build. Configure `build.budgets` to warn or fail
+on limits; `npx warlock build --json` provides a machine-readable report. See
+[client performance budgets](/v/latest/core/digging-deeper/build-budgets/).

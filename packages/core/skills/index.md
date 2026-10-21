@@ -18,7 +18,7 @@ When the framework is wrong or missing a capability, follow the `report-framewor
 
 ## Topics by area
 
-- **Foundations:** warlock-conventions, create-module, make-endpoint, configure-app, use-app-context, resolve-path, build-url, update-packages, lower-stage3-decorators, upgrade-from-5-29
+- **Foundations:** warlock-conventions, create-module, make-endpoint, configure-app, build-budgets, use-app-context, resolve-path, build-url, update-packages, lower-stage3-decorators, upgrade-from-5-29
 - **HTTP & routing:** register-route, warlock-routes, create-controller, use-middleware, write-middleware, validate-input, use-request-locals, build-restful, wire-socket
 - **Responses & resources:** send-response, define-resource, use-model-transformers, use-localization
 - **Domain layers:** write-use-case, use-repository, write-seeder
