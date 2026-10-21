@@ -120,18 +120,44 @@ in where the shared table comes from:
   table to `dist/client/assets/translations/<locale>.<hash>.json`, served from
   the bundle's assets directory with the one-year immutable cache headers. The
   build also records each page's usage in the production page barrel.
-- **Global registry** (`extend()` and `register()`): the server computes the
-  table from the live registry and serves it at
-  `/__warlock/translations/<locale>.<hash>.json`, with the same immutable
-  headers. A table the server no longer holds answers 404, because the server
-  keeps only the eight most recent tables per locale. Run a single process, or
-  make every process register the same modules at boot, so each one publishes
-  the same tables.
+- **Global registry** (`extend()` and `register()`): when the web connector
+  installs its routes at boot, it copies each locale's shared groups once. That
+  copy and its hash are fixed for the life of the process, and the server
+  serves it at `/__warlock/translations/<locale>.<hash>.json`.
 
-Tune the groups and pruning with the connector's `translations` option. The
-[localization guide](/v/latest/web/essentials/localization/) explains the keys
-the analysis resolves, the defaults for both modes, and how to declare the
-rest.
+Both modes also serve `/__warlock/translations/<locale>.json`, the newest table
+for the locale, with `no-cache`. A browser that receives a page whose hashed
+table this process does not hold (a 404) fetches that unhashed table, and only
+then retries the hashed one. The [localization guide](/v/latest/web/essentials/localization/)
+explains the order in full.
+
+### Running more than one process
+
+A deployment can run several processes, for example with pm2 cluster mode or a
+rolling restart. Each process copies the shared groups at boot, so processes
+started from the same build and the same registrations publish the same table
+under the same hash. A document from one process then names a table another
+process also serves.
+
+During a rolling deploy, a document rendered by the old build names the old
+table. A new process does not hold it, answers 404, and the browser fetches the
+new process's latest table instead. The keys then come from the new build, which
+can differ from the markup the old build rendered. Keep the shared groups stable
+across a release, or deploy the processes together.
+
+Tune the groups and pruning with the connector's build option, which development
+also honours:
+
+```ts title="warlock.config.ts"
+web({
+  build: {
+    translations: { sharedGroups: ["app", "common"], prune: true },
+  },
+});
+```
+
+The [localization guide](/v/latest/web/essentials/localization/) explains the
+keys the analysis resolves and how to declare the rest.
 
 ## Run `warlock start` from the app root
 

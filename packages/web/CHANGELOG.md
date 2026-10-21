@@ -7,9 +7,11 @@ All notable changes to `@warlock.js/web` are documented here.
 ### Added
 
 - Shared translation groups (default `app` and `common`) are shipped once per locale as a table whose URL carries its content hash, and the document preloads it. Hydration waits for the table, so the first client render has every key the server rendered with. Locale switching loads the other locale's table. Route dictionaries (`locales.json`) emit the table at build time under `assets/translations/`; the global registry (`extend()` / `register()`) computes it from the live registry and serves it at `/__warlock/translations/<locale>.<hash>.json`.
-- Production serves a table with `Cache-Control: public, max-age=31536000, immutable`. Development serves it with `no-store` and carries every group, so the missing-key detector can read it. A name the server no longer holds (the eight most recent tables per locale are kept) answers 404 with `no-store` and never different bytes under the same name.
+- Production serves a table with `Cache-Control: public, max-age=31536000, immutable`, and each locale's newest table at `/__warlock/translations/<locale>.json` with `no-cache`.
+- Global-registry production builds copy the shared groups once, when the web connector boots. That copy and its hash are fixed for the process, so every process of one build publishes the same table under the same name. Keys a page registers later travel inline in its payload.
+- A browser whose hashed table answers 404 fetches the unhashed latest table, then retries the hashed one, and only then reports the failure and renders keys. Development serves it with `no-store` and carries every group, so the missing-key detector can read it. A name the server no longer holds (the eight most recent tables per locale are kept) answers 404 with `no-store` and never different bytes under the same name.
 - Per-page pruning of every other group, in both modes: a page inlines only the keys its client module graph can look up. Literal keys, static-prefix template keys (which include their subtree), module-level constants, literal choices, and `config.translations` declarations in the page's setup file are resolved statically. A key that cannot be resolved (`trans(key)`, or a translator passed on as a value) makes that page fall back to every non-shared group.
-- The web connector's build option `translations`: `sharedGroups` (default `["app", "common"]`) and `prune` (default `true`).
+- The web connector's build option `build.translations`: `sharedGroups` (default `["app", "common"]`) and `prune` (default `true`). Development reads the same option, so both halves share the settings.
 - The hydration payload's `translationAssets` reference (URL, hash, groups and a development flag). Client navigation merges each payload's pruned keys into the locale's dictionary (or the global registry).
 - Development: a translation the page reads but its payload lacks is resolved from the full table, with one warning per key and page that names the `config.translations` declaration to add.
 - Production: a missing key renders its key and is reported once through `onClientError` with the new `kind: "translations"`. A shared table that cannot be loaded is retried once; the page then renders its keys and the failure is reported the same way.
@@ -17,7 +19,7 @@ All notable changes to `@warlock.js/web` are documented here.
 
 ### Changed
 
-- **BREAKING** A page's hydration payload no longer carries every translation group, in either translation mode. It carries the keys the page's client code can reach, and the shared groups arrive in a separate, cached table. Apps that read the hydration payload directly, that read keys their client code builds at run time without declaring them, or that rely on every key being present in the browser's registry, must update. Declare the keys with `config.translations`, or set `translations: { prune: false }` in the web connector options to restore the previous payload while migrating. See the upgrade note below.
+- **BREAKING** A page's hydration payload no longer carries every translation group, in either translation mode. It carries the keys the page's client code can reach, and the shared groups arrive in a separate, cached table. Apps that read the hydration payload directly, that read keys their client code builds at run time without declaring them, or that rely on every key being present in the browser's registry, must update. Declare the keys with `config.translations`, or set `build.translations.prune` to `false` in the web connector options to restore the previous payload while migrating. See the upgrade note below.
 
 ### Upgrading
 
@@ -25,8 +27,8 @@ All notable changes to `@warlock.js/web` are documented here.
 - Run `warlock check`. A `WL9104` warning marks a page that renders a key computed at runtime. Declare the keys it renders with `config.translations` in the page's setup file, for example `export const config = { translations: ["statuses.*"] }`.
 - In development, a warning names any key the page reads but its payload lacks. Add the declaration it suggests.
 - If a production page shows keys where translations used to appear, check the `kind: "translations"` reports from `onClientError`: the key is missing from the page's payload. Declare it, or set `prune: false` while you do. In global mode, a direct call to `trans()` from `@mongez/localization` is not checked; declare the keys it reads too.
-- Run one process, or make every process register the same modules at boot. The global registry fills as pages render, and a table one process published can be missing from another.
-- Development always uses the default `sharedGroups` and pruning. Only the production build reads the `translations` option; the missing-key detector covers the difference in development.
+- Global-registry apps: the shared table is fixed at boot. A rolling deploy can briefly serve a page built by the old release; its hashed table is missing from the new process, so the browser loads the new release's latest table. Keep shared groups stable across a release, or deploy the processes together.
+- The option now sits under the build settings: `web({ build: { translations: { ... } } })`. Development honours it too.
 
 ## 5.35.0 - 2026-10-21
 

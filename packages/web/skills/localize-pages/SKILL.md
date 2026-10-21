@@ -53,10 +53,15 @@ export const config = {
 ```
 
 The same applies to the global registry (`extend()` / `register()`, the
-starter's default): the server computes the shared table from the live
-registry and serves it at `/__warlock/translations/<locale>.<hash>.json`, and
-each page receives only its own keys. A registration never goes missing,
-because the table is recomputed per payload.
+starter's default). The shared groups are copied once, when the web connector
+boots, and that copy and its hash are fixed for the process. Every process of
+one build serves the same table under the same name, so a rolling deploy or a
+cluster never names a table another process lacks. A key a page registers later
+(its `register()` runs on the first request) is not in the shared table; it
+travels inline in that page's payload when the page uses it.
+
+A browser asks for the hashed table first. On a 404 it fetches the unhashed
+`/__warlock/translations/<locale>.json`, and only then retries the hashed one.
 
 Use `useTrans()` under any local name. Do not pass the translator as a prop or
 store it: a translator passed on as a value is treated as computed, so the page
@@ -65,9 +70,10 @@ falls back to every group. Pass the key instead, or declare it.
 When a key is missing from a page's payload, development warns once with the
 declaration to add and resolves the key from the full table. Production renders
 the key and reports it once through `onClientError` (`kind: "translations"`).
-Tune the groups and pruning with the web connector's `translations` option:
-`{ sharedGroups: ["app", "common"], prune: true }`. Set `prune: false` to ship
-every key while you declare the rest. Development always uses the defaults.
+Tune the groups and pruning with the build setting
+`web({ build: { translations: { sharedGroups: ["app", "common"], prune: true } } })`.
+Development reads the same setting. Set `prune: false` to ship every key while
+you declare the rest.
 
 ## Scope, errors, and legacy lookups
 

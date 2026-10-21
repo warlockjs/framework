@@ -571,7 +571,7 @@ In development, a warning names a key the page reads but its payload lacks, and
 resolves it from the full table so the page keeps working. In production the
 key renders as its own text and the miss is reported once through
 `onClientError` with `kind: "translations"`. Declare the key, or set
-`translations: { prune: false }` in the web connector options while migrating to
+`build: { translations: { prune: false } }` in the web connector options while migrating to
 restore the previous per-page payload.
 
 Global-registry apps are covered too. Their shared table is served at
