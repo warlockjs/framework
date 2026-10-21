@@ -45,6 +45,8 @@ export const config = { route: "/login", middleware: [requireGuest({ to: "/accou
 - After login or logout call `clearPrefetchCache()` before `navigateTo`/`refresh()`.
 - Log in with `authService.loginWithSessionCookies`, which requires an Origin/Referer.
 
+`requireUser()` answers "is someone signed in?" only. It is authentication, not authorization: a page named `admin` is not restricted to staff just because it uses `requireUser()`. Check roles, permissions and domain rules with `@warlock.js/access` inside the page loader or the action, and secure every mutation API route on its own, since a page guard does not protect a route that the page calls.
+
 ## Type a guarded page as signed-in
 
 A page guarded by `requireUser()` can never be reached by a guest, so its types say so. The route-types generator reads the guard statically and writes `guard: "user"` on that page's `PageRouteRegistry` entry; `GuardedPageRouteName` (exported from `@warlock.js/web`) is the union of those names.
@@ -106,9 +108,11 @@ In dev, a file the generator cannot parse reads as unguarded rather than breakin
 ## Generated typing prerequisites
 
 The guarded example assumes your generated route declaration and session
-projection declaration are included in the TypeScript project. The relevant
-shape is below; let Warlock generate the route entry, and maintain the session
-projection type alongside your app's resolver.
+projection declaration are included in the TypeScript project. The app owns only the
+session projection type, kept alongside your app's resolver. `PageRouteRegistry`
+is generated from the page graph into `.warlock/typings/web-routes.d.ts`
+(including `guard: "user"` for guarded pages); do not hand-write or copy its
+entries.
 
 ```ts title="src/types/page-session.d.ts"
 import type { Auth } from "@warlock.js/auth";
@@ -118,9 +122,6 @@ declare module "@warlock.js/web" {
   interface SessionRegistry {
     user: { id: string | number; name: string };
     model: Auth;
-  }
-  interface PageRouteRegistry {
-    "account.show": { path: "/account"; params: {}; guard: "user" };
   }
 }
 ```

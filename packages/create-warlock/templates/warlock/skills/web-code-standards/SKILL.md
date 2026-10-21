@@ -229,6 +229,11 @@ Avoid copying props into hook state without a plan for refresh and client
 navigation. Avoid setting another state variable inside a state-updater
 callback. Prefer deriving display values from one authoritative state.
 
+**State ownership.** Loader data is server truth. UI interaction state (open,
+selection, draft input) lives in the component's own hook. Shared client state
+goes only through a named store module, never a global variable or a copy
+spread across components. Never copy props into state without a refresh plan.
+
 Effects own their subscriptions and timers: unsubscribe, cancel, or ignore
 stale async work on unmount or entity change. A failed script/socket load
 must not leave a permanently rejected shared promise or silently disable a
