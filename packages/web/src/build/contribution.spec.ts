@@ -153,6 +153,35 @@ describe("web build contribution — zero pages", () => {
     log.mockRestore();
   });
 
+  it("forwards only the route names a page may embed, and the resolved payload budget", async () => {
+    const appRoot = makeTree({ "src/web/root.tsx": APP, "src/web/home.page.tsx": PAGE });
+    const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    stubGeneratedPages(1);
+    const base = buildContext(appRoot);
+
+    await createWebBuildContribution().generate?.({
+      ...base,
+      namedApiRoutes: [
+        { name: "orders.show", path: "/api/orders/:id", method: "GET" },
+        {
+          name: "internal.reindex",
+          path: "/internal/reindex",
+          method: "POST",
+          clientVisible: false,
+        },
+      ],
+      options: { ...base.options, budgets: { payload: { page: "32kb" } } },
+    } as ConnectorBuildContext);
+
+    expect(generatePagesBarrelSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        clientApiRouteNames: ["orders.show"],
+        payloadBudget: expect.objectContaining({ page: 32 * 1024, mode: "warn" }),
+      }),
+    );
+    log.mockRestore();
+  });
+
   it("forwards build.testOnly into the barrel generator", async () => {
     const appRoot = makeTree({ "src/web/root.tsx": APP, "src/web/home.page.tsx": PAGE });
     const log = vi.spyOn(console, "log").mockImplementation(() => undefined);

@@ -117,6 +117,24 @@ describe("Scripts", () => {
     expect(html).toBe("");
   });
 
+  it("embeds the route table once: the payload's document slot does not repeat it", () => {
+    const routes = { "orders.get": { path: "/api/orders/:id", method: "GET" } };
+    const value = documentValue({
+      namedApiRoutes: routes,
+      payload: {
+        ...documentValue().payload,
+        document: { namedApiRoutes: routes, lang: "en" } as never,
+      },
+    });
+
+    const html = render(value);
+    const payload = readPayloadFromHtml(html) as { document?: Record<string, unknown> };
+
+    expect(payload.document).toMatchObject({ lang: "en" });
+    expect(payload.document).not.toHaveProperty("namedApiRoutes");
+    expect(html.split("/api/orders/:id").length - 1).toBe(1);
+  });
+
   it("emits only browser-safe named API metadata in its dedicated escaped channel", () => {
     const html = render(
       documentValue({ namedApiRoutes: { "orders.get": { path: "/orders/<id>", method: "GET" } } }),
