@@ -32,4 +32,5 @@ updatePostController.responseSchema = {
   200: { body: { post: PostResource } },
   422: { body: { error: { code: "string", message: "string" }, requestId: "string" } },
   500: { body: { error: { code: "string", message: "string" }, requestId: "string" } },
+  404: { body: { error: { code: "string", message: "string" }, requestId: "string" } },
 };

@@ -17,3 +17,9 @@ export const logoutAllController: GuardedRequestHandler = async ({ request, resp
 };
 
 logoutAllController.description = "Logout from all devices";
+
+logoutAllController.responseSchema = {
+  200: { body: { message: "string" } },
+  401: { body: { error: { code: "string", message: "string" }, requestId: "string" } },
+  500: { body: { error: { code: "string", message: "string" }, requestId: "string" } },
+};

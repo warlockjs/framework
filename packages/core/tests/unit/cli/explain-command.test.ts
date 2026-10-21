@@ -24,7 +24,7 @@ afterEach(() => {
 describe("warlock explain", () => {
   it("is a framework command taking an optional code and --json, with no preload", () => {
     expect(frameworkCommands).toContain(explainCommand);
-    expect(explainCommand.name).toBe("explain [code]");
+    expect(explainCommand.name).toBe("explain [code-or-file]");
     expect(explainCommand.commandPreload).toBeUndefined();
     expect(explainCommand.commandOptions.map((option) => option.name)).toEqual(["json"]);
   });

@@ -24,6 +24,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Declare response schemas for every starter controller, including authentication and the API home page.
+
 - Keep the public UUID integrity assertion independent of formatter line breaks while checking the complete schema default callback.
 - Align project skills with real handler signatures, resource source-key tuples, public UUIDs, response schemas, idempotency headers, and the canonical JSON error envelope. Keep discovery descriptions within 450 characters and resolve cross-skill references by name.
 - Extract contact locale and form-control behavior into feature hooks and separate components with dedicated props types; preserve form interactions and consume normalized validation details.

@@ -42,7 +42,7 @@ const read = (file: string) => readFile(path.join(directory, "src", file), "utf8
 async function moduleFixture() {
   const module = pluralName("posts");
   await mkdir("src/app/posts/controllers", { recursive: true });
-  await writeFile("src/app/posts/routes.ts", crudRoutesStub(module));
+  await writeFile("src/app/posts/routes.ts", "// Generated routes\n" + crudRoutesStub(module));
   await writeFile(
     "src/app/posts/controllers/list-posts.controller.ts",
     crudListControllerStub(module),
@@ -192,7 +192,10 @@ describe("web generators", () => {
 
   it("fails closed for custom route authorization before loading or writing schemas", async () => {
     await moduleFixture();
-    await writeFile("src/app/posts/routes.ts", "customRoutes();");
+    await writeFile(
+      "src/app/posts/routes.ts",
+      crudRoutesStub(pluralName("posts")).replace("guarded(", "customGuard("),
+    );
     const load = vi.fn(async () => ({}));
     await expect(createCrudUiGenerator(load)({ args: ["posts"], options: {} })).rejects.toThrow(
       "standard guarded",
@@ -206,6 +209,18 @@ describe("web generators", () => {
       listFilters(crudListControllerStub(pluralName("posts")), "listPostsQuerySchema"),
     ).toEqual([]);
     expect(() => listFilters("const other = {};", "listPostsQuerySchema")).toThrow();
+    expect(
+      listFilters(
+        `// ignored: v.string()
+      const example = { ignored: true };
+      const listPostsQuerySchema = v.object({ "search": v.string(), page: v.numeric(), limit: v.numeric() });
+    `,
+        "listPostsQuerySchema",
+      ),
+    ).toEqual(["search"]);
+    expect(() =>
+      listFilters("const listPostsQuerySchema = v.object({ ...other });", "listPostsQuerySchema"),
+    ).toThrow("literal field names");
   });
 
   it("keeps a single default component in each generated UI file", () => {

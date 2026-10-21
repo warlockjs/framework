@@ -578,3 +578,16 @@ describe("project skill contracts", () => {
     expect(read("src/web/home/hooks/use-contact-form.ts")).toContain("errors: body.details");
   });
 });
+
+describe("starter controller response contracts", () => {
+  it("declares a response schema on every exported controller", () => {
+    const controllers = templateSourceFiles().filter((file) => file.includes("/controllers/"));
+    expect(controllers.length).toBeGreaterThan(0);
+    for (const file of controllers) {
+      const source = stripComments(read(file));
+      const name = /export const (\w+)/.exec(source)?.[1];
+      expect(name, file).toBeDefined();
+      expect(source, file).toContain(`${name}.responseSchema =`);
+    }
+  });
+});

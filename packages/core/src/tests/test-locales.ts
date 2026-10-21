@@ -7,11 +7,11 @@ import { registerLocaleDictionary } from "../localization/register-locale-dictio
 export async function loadTestLocales(root = process.cwd()): Promise<() => void> {
   const cleanups: Array<() => void> = [];
   const cleanup = () => {
-    for (const undo of cleanups.splice(0).toReversed()) undo();
+    for (const undo of [...cleanups.splice(0)].reverse()) undo();
   };
   try {
     const files = await glob("src/app/*/utils/locales.json", { cwd: root });
-    for (const sourceFile of files.toSorted()) {
+    for (const sourceFile of [...files].sort()) {
       const namespace = sourceFile.split("/")[2];
       if (!namespace) continue;
       cleanups.push(

@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -84,14 +84,19 @@ let fixtureDir: string;
 beforeEach(async () => {
   fixtureDir = await mkdtemp(path.join(os.tmpdir(), "warlock-add-exit-"));
 
-  // The minimum `add --no-install` needs: a readable/writable package.json.
-  // `image` (`src/generations/features/image.feature.ts`) has no
-  // `ejectConfig` and no `onExecuting` — it only records a dependency — so
-  // this fixture does not need a `src/` tree at all.
+  await mkdir(path.join(fixtureDir, "src/web"), { recursive: true });
+  await writeFile(path.join(fixtureDir, "src/web/app.css"), '@import "tailwindcss";\n');
+
+  // The design-system case needs an existing Tailwind setup; no app config is required.
   await writeFile(
     path.join(fixtureDir, "package.json"),
     JSON.stringify(
-      { name: "add-exit-fixture", version: "1.0.0", dependencies: {}, devDependencies: {} },
+      {
+        name: "add-exit-fixture",
+        version: "1.0.0",
+        dependencies: { tailwindcss: "^4.0.0" },
+        devDependencies: {},
+      },
       null,
       2,
     ),
@@ -103,16 +108,16 @@ afterEach(async () => {
 });
 
 describe("warlock add <feature> --no-install completes and the CLI exits 0 on its own (boot/exit smoke test; NOT the stdin-handle guard — see shortcuts-lazy-stdin.test.ts)", () => {
-  it(
-    "completes the add and the child process terminates 0 without being killed, within the timeout bound",
-    async () => {
+  it.each(["image", "test", "design-system"])(
+    "adds %s and terminates 0 without being killed, within the timeout bound",
+    async (feature) => {
       const exitInfo = await new Promise<{
         code: number | null;
         signal: NodeJS.Signals | null;
         timedOut: boolean;
         stdout: string;
       }>((resolve) => {
-        const child = spawn(process.execPath, [WARLOCK_BIN, "add", "image", "--no-install"], {
+        const child = spawn(process.execPath, [WARLOCK_BIN, "add", feature, "--no-install"], {
           cwd: fixtureDir,
           // Exactly the shape the release gate spawns with — `stdin` ignored,
           // so nothing is ever waiting on input, and the defect was that

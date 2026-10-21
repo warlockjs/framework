@@ -36,7 +36,7 @@ export function webFindings(
   walk(
     source,
     (node) => {
-      if (!isFunctionLike(node) || ancestors(node).some(isFunctionLike)) return;
+      if (!isFunctionLike(node) || !node.body || ancestors(node).some(isFunctionLike)) return;
       const parent = ast.parentOf(node);
       const name =
         node.id?.name ?? (parent?.type === "VariableDeclarator" ? keyName(parent.id) : undefined);
@@ -65,7 +65,7 @@ export function webFindings(
       "More than one component in this file. Move each component to its own file.",
     );
   for (const component of components) {
-    if (!isFunctionLike(component)) continue;
+    if (!isFunctionLike(component) || !component.body) continue;
     const eventNames = new Set<string>();
     walk(component.body, (node) => {
       if (

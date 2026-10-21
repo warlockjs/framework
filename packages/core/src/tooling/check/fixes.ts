@@ -28,7 +28,7 @@ export function applyConventionFixes(cwd: string, problems: readonly ToolingProb
   for (const [file, fixes] of files) {
     const target = path.join(cwd, file);
     let source = readFileSync(target, "utf8");
-    for (const fix of fixes.toSorted((a, b) => b.start - a.start))
+    for (const fix of [...fixes].sort((a, b) => b.start - a.start))
       source = source.slice(0, fix.start) + fix.text + source.slice(fix.end);
     writeFileSync(target, source);
   }

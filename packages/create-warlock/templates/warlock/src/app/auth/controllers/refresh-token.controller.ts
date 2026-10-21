@@ -24,3 +24,15 @@ refreshTokenController.validation = {
     refreshToken: v.string(),
   }),
 };
+
+refreshTokenController.responseSchema = {
+  200: {
+    body: {
+      accessToken: { token: "string", expiresAt: "string" },
+      refreshToken: { token: "string", expiresAt: "string" },
+    },
+  },
+  401: { body: { error: { code: "string", message: "string" }, requestId: "string" } },
+  422: { body: { error: { code: "string", message: "string" }, requestId: "string" } },
+  500: { body: { error: { code: "string", message: "string" }, requestId: "string" } },
+};
