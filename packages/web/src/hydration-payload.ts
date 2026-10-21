@@ -187,6 +187,13 @@ function isTranslationAssets(value: unknown): boolean {
     return false;
   }
 
+  if (
+    record.latest !== undefined &&
+    (typeof record.latest !== "string" || record.latest.length === 0)
+  ) {
+    return false;
+  }
+
   return record.development === undefined || typeof record.development === "boolean";
 }
 

@@ -88,10 +88,21 @@ function deepFreeze<T>(value: T): T {
   return Object.freeze(value);
 }
 
+/** A table response that was not OK, keeping its status so the fallback order can read it. */
+class TableResponseError extends Error {
+  public readonly status: number;
+
+  public constructor(status: number) {
+    super(`The translation table answered HTTP ${status}.`);
+    this.name = "TableResponseError";
+    this.status = status;
+  }
+}
+
 async function fetchTable(url: string): Promise<Table> {
   const response = await fetch(url, { credentials: "same-origin" });
 
-  if (!response.ok) throw new Error(`The translation table answered HTTP ${response.status}.`);
+  if (!response.ok) throw new TableResponseError(response.status);
 
   const parsed: unknown = await response.json();
 
@@ -100,21 +111,52 @@ async function fetchTable(url: string): Promise<Table> {
   return parsed;
 }
 
-/** Fetch once, retry once, then give up loudly: the page keeps rendering its keys. */
-function loadTable(url: string): Promise<Table | undefined> {
-  const existing = tables.get(url);
+/**
+ * The order a table is loaded in, and why:
+ *
+ * 1. The hashed URL the payload names. This is the table the document was
+ *    rendered against, when it is still held.
+ * 2. On a 404 only, the unhashed `latest` URL. A 404 means the name is not in
+ *    this process: another process of the same deployment, or a table that aged
+ *    out. The newest table of the process serves the keys, and it is
+ *    revalidated (`no-cache`).
+ * 3. Otherwise, or when `latest` also fails, the hashed URL once more.
+ * 4. When that fails too, the failure is reported once and the page renders its
+ *    keys. It never renders a blank string.
+ */
+async function loadTableInOrder(assets: HydrationTranslationAssets): Promise<Table> {
+  try {
+    return await fetchTable(assets.url);
+  } catch (error) {
+    if (assets.latest !== undefined && isNotFound(error)) {
+      try {
+        return await fetchTable(assets.latest);
+      } catch {
+        // Falls through to the retry of the hashed URL below.
+      }
+    }
+  }
+
+  return fetchTable(assets.url);
+}
+
+function isNotFound(error: unknown): boolean {
+  return error instanceof TableResponseError && error.status === 404;
+}
+
+/** Load a payload's table in the documented order, once per hashed URL. */
+function loadTable(assets: HydrationTranslationAssets): Promise<Table | undefined> {
+  const existing = tables.get(assets.url);
   if (existing !== undefined) return existing;
 
-  const loaded = fetchTable(url)
-    .catch(() => fetchTable(url))
-    .catch((error: unknown) => {
-      reportClientError("Warlock could not load its translation table", error, {
-        kind: "translations",
-      });
-      return undefined;
+  const loaded = loadTableInOrder(assets).catch((error: unknown) => {
+    reportClientError("Warlock could not load its translation table", error, {
+      kind: "translations",
     });
+    return undefined;
+  });
 
-  tables.set(url, loaded);
+  tables.set(assets.url, loaded);
 
   return loaded;
 }
@@ -137,7 +179,7 @@ export async function loadTranslationAssets(
 
   if (assets !== undefined) {
     state.pruned = true;
-    const table = await loadTable(assets.url);
+    const table = await loadTable(assets);
     state.shared = table === undefined ? undefined : describeShared(table, assets);
     state.dictionary = undefined;
   }
