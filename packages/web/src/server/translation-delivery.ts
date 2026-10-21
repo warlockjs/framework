@@ -24,6 +24,7 @@ import {
   localeCodesOf,
   pruneKeywords,
   sharedTranslationAssets,
+  translationLatestUrl,
   usageFromRecord,
   type TranslationSourceEntries,
 } from "../translations/delivery";
@@ -32,7 +33,11 @@ import {
   type HydrationTranslationAssets,
   type PageManifestTranslations,
 } from "../translations/types";
-import { publishTranslationTable, translationTableUrl } from "./translation-tables";
+import {
+  pinTranslationTable,
+  publishTranslationTable,
+  translationTableUrl,
+} from "./translation-tables";
 
 /** What a page's payload gets for translations: its own pruned dictionary and the shared-table reference. */
 export type DeliveredTranslations = {
@@ -50,6 +55,23 @@ export type TranslationDelivery = {
   assetFor(locale: string): HydrationTranslationAssets | undefined;
 };
 
+/**
+ * Production: pin each locale's shared table in the table store, under the same
+ * content hash the build emitted for it. The build file serves the hashed name;
+ * the pinned copy answers the unhashed `<locale>.json` fallback in every process.
+ */
+export function pinSharedTranslationTables(
+  sources: readonly TranslationSourceEntries[],
+  sharedGroups: readonly string[] | undefined,
+): void {
+  for (const asset of sharedTranslationAssets(
+    sources,
+    sharedGroups ?? DEFAULT_SHARED_TRANSLATION_GROUPS,
+  )) {
+    pinTranslationTable(asset.locale, asset.body);
+  }
+}
+
 /** Production: the usage the build computed, and the shared tables the build emitted. */
 export function productionTranslationDelivery(input: {
   readonly sources: readonly TranslationSourceEntries[];
@@ -60,7 +82,12 @@ export function productionTranslationDelivery(input: {
   const assets = new Map(
     sharedTranslationAssets(input.sources, sharedGroups).map((asset) => [
       asset.locale,
-      { url: assetUrlFor(asset.fileName), hash: asset.hash, groups: sharedGroups },
+      {
+        url: assetUrlFor(asset.fileName),
+        hash: asset.hash,
+        groups: sharedGroups,
+        latest: translationLatestUrl(asset.locale),
+      },
     ]),
   );
 
@@ -126,8 +153,11 @@ export function developmentTranslationDelivery(input: {
   readonly sources: readonly TranslationSourceEntries[];
   readonly appSrcRoot: string;
   readonly pages: readonly DevelopmentPageEntries[];
+  readonly sharedGroups?: readonly string[];
+  /** `false` makes every development page reach every key. */
+  readonly prune?: boolean;
 }): TranslationDelivery {
-  const sharedGroups = DEFAULT_SHARED_TRANSLATION_GROUPS;
+  const sharedGroups = input.sharedGroups ?? DEFAULT_SHARED_TRANSLATION_GROUPS;
   const pages = new Map(input.pages.map((page) => [page.pageFile, page]));
   const analyze = createDevelopmentUsageAnalyzer(input.appSrcRoot);
   const assets = new Map<string, HydrationTranslationAssets>();
@@ -143,6 +173,7 @@ export function developmentTranslationDelivery(input: {
       hash,
       groups: sharedGroups,
       development: true,
+      latest: translationLatestUrl(locale),
     });
   }
 
@@ -150,7 +181,8 @@ export function developmentTranslationDelivery(input: {
     sharedGroups,
     usageFor(sourceFile) {
       const page = pages.get(sourceFile);
-      return page === undefined ? EVERYTHING_USAGE : analyze(page);
+      if (page === undefined || input.prune === false) return EVERYTHING_USAGE;
+      return analyze(page);
     },
     assetFor: (locale) => assets.get(locale),
   };

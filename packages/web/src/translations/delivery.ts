@@ -11,7 +11,11 @@ import { createHash } from "node:crypto";
 import type { Keywords } from "@mongez/localization";
 import { isTranslationKeyUsed, usageOf, type TranslationUsage } from "@warlock.js/core";
 import { CLIENT_ASSET_URL_PREFIX } from "../server/client-asset-url-prefix";
-import { TRANSLATION_ASSET_DIRECTORY, type SerializedTranslationUsage } from "./types";
+import {
+  TRANSLATION_ASSET_DIRECTORY,
+  TRANSLATION_TABLE_ROUTE_PREFIX,
+  type SerializedTranslationUsage,
+} from "./types";
 
 /** One parsed route-locale file, reduced to what delivery needs: flattened key → locale → text. */
 export type TranslationSourceEntries = {
@@ -201,4 +205,62 @@ export function serializeUsage(usage: TranslationUsage): SerializedTranslationUs
 /** The inverse of {@link serializeUsage}. */
 export function usageFromRecord(record: SerializedTranslationUsage): TranslationUsage {
   return usageOf({ keys: record.keys, prefixes: record.prefixes, dynamic: record.dynamic });
+}
+
+/**
+ * The unhashed URL of a locale's newest table. A client asks for it when the
+ * hashed table a payload named is missing (another process, or an older
+ * deployment), and the server answers with `no-cache`.
+ */
+export function translationLatestUrl(locale: string): string {
+  return `${TRANSLATION_TABLE_ROUTE_PREFIX}/${locale}.json`;
+}
+
+/**
+ * The part of a page's dictionary it must carry itself: every leaf the table
+ * does not already hold with the same value, restricted to what the usage can
+ * reach. A leaf the table holds is in the client's table, so it is never
+ * inlined. A registration that changed a table value is not equal, so it
+ * ships inline, like any other used key.
+ */
+export function pruneKeywordsAgainst(
+  keywords: Readonly<Keywords>,
+  usage: TranslationUsage,
+  table: Readonly<Record<string, unknown>>,
+): Keywords {
+  const pruned: Record<string, unknown> = {};
+
+  for (const [name, value] of Object.entries(keywords)) {
+    const kept = pruneBranchAgainst(value, name, usage, table[name]);
+    if (kept !== undefined) pruned[name] = kept;
+  }
+
+  return pruned as Keywords;
+}
+
+function pruneBranchAgainst(
+  value: unknown,
+  key: string,
+  usage: TranslationUsage,
+  tableNode: unknown,
+): unknown {
+  if (typeof value === "string") {
+    if (tableNode === value) return undefined;
+    return isTranslationKeyUsed(usage, key) ? value : undefined;
+  }
+
+  if (typeof value !== "object" || value === null) return undefined;
+
+  const branch: Record<string, unknown> = {};
+  const tableRecord =
+    typeof tableNode === "object" && tableNode !== null
+      ? (tableNode as Record<string, unknown>)
+      : undefined;
+
+  for (const [name, child] of Object.entries(value as Record<string, unknown>)) {
+    const kept = pruneBranchAgainst(child, `${key}.${name}`, usage, tableRecord?.[name]);
+    if (kept !== undefined) branch[name] = kept;
+  }
+
+  return Object.keys(branch).length === 0 ? undefined : branch;
 }

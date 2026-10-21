@@ -37,6 +37,17 @@ export type TranslationBuildOptions = {
   readonly prune?: boolean;
 };
 
+/** The effective translation settings, with every default applied. Development and production both use this. */
+export function resolveTranslationOptions(options: TranslationBuildOptions | undefined): {
+  readonly sharedGroups: readonly string[];
+  readonly prune: boolean;
+} {
+  return {
+    sharedGroups: resolveSharedGroups(options?.sharedGroups),
+    prune: options?.prune !== false,
+  };
+}
+
 export type TranslationBuildResult = {
   readonly manifest: PageManifestTranslations;
   readonly assets: readonly SharedTranslationAsset[];
@@ -96,7 +107,6 @@ export function buildTranslationManifest(input: TranslationBuildInput): Translat
   const prune = input.options?.prune !== false;
   const sources = localeSources(input.localeFiles);
   const usage: Record<string, SerializedTranslationUsage> = {};
-  const routes: Record<string, SerializedTranslationUsage> = {};
 
   const routable = input.pages.filter(isDiscoveredRoutablePage);
   const errorPages = input.pages.filter((page) => page.type === "error");
@@ -128,7 +138,6 @@ export function buildTranslationManifest(input: TranslationBuildInput): Translat
       : EVERYTHING_USAGE;
 
     record(page.pageFile, analyzed);
-    routes[page.routeName] = serializeUsage(analyzed);
   }
 
   for (const page of errorPages) {
@@ -145,7 +154,7 @@ export function buildTranslationManifest(input: TranslationBuildInput): Translat
   }
 
   return {
-    manifest: { sharedGroups, prune, usage, routes },
+    manifest: { sharedGroups, prune, usage },
     assets: sharedTranslationAssets(sources, sharedGroups),
   };
 }

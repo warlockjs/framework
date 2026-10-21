@@ -25,6 +25,15 @@ export type StoredTranslationTable = {
 
 const tablesByLocale = new Map<string, Map<string, StoredTranslationTable>>();
 
+/**
+ * Production tables fixed for the process lifetime. They never age out, so a
+ * hash that a document names stays servable for as long as the process runs.
+ */
+const pinnedByLocale = new Map<string, Map<string, StoredTranslationTable>>();
+
+/** The hash `<locale>.json` answers with: the newest table published or pinned for the locale. */
+const latestByLocale = new Map<string, string>();
+
 /** The table file name a payload references, relative to the route prefix. */
 export function translationTableFileName(locale: string, hash: string): string {
   return `${locale}.${hash}.json`;
@@ -51,8 +60,36 @@ export function parseTranslationTableFile(
 }
 
 /**
+ * Pin a table for the life of the process and return its hash. Production uses
+ * this for the tables that must be identical in every process (the snapshot of
+ * shared groups taken at boot), so two processes answer the same name with the
+ * same bytes.
+ */
+export function pinTranslationTable(locale: string, body: string): string {
+  const hash = contentHash(body);
+  let pinned = pinnedByLocale.get(locale);
+
+  if (pinned === undefined) {
+    pinned = new Map<string, StoredTranslationTable>();
+    pinnedByLocale.set(locale, pinned);
+  }
+
+  pinned.set(hash, { body, development: false });
+  latestByLocale.set(locale, hash);
+
+  return hash;
+}
+
+const LATEST_TABLE_FILE = /^([A-Za-z][A-Za-z0-9-]*)\.json$/;
+
+/** The locale of an unhashed `<locale>.json` name, the fallback a client asks for when a hashed name is missing. */
+export function parseLatestTableFile(file: string): string | undefined {
+  return LATEST_TABLE_FILE.exec(file)?.[1];
+}
+
+/**
  * Store a table body under its content hash and return that hash. Publishing
- * an existing body moves it to the newest position.
+ * an existing body moves it to the newest position, and makes it the latest.
  */
 export function publishTranslationTable(
   locale: string,
@@ -69,6 +106,7 @@ export function publishTranslationTable(
 
   recent.delete(hash);
   recent.set(hash, { body, development });
+  latestByLocale.set(locale, hash);
 
   for (const oldest of recent.keys()) {
     if (recent.size <= RECENT_TRANSLATION_TABLES) break;
@@ -83,10 +121,18 @@ export function translationTableFor(
   locale: string,
   hash: string,
 ): StoredTranslationTable | undefined {
-  return tablesByLocale.get(locale)?.get(hash);
+  return pinnedByLocale.get(locale)?.get(hash) ?? tablesByLocale.get(locale)?.get(hash);
+}
+
+/** The newest table for a locale, whatever its hash. Serves the unhashed `<locale>.json` name. */
+export function latestTranslationTableFor(locale: string): StoredTranslationTable | undefined {
+  const hash = latestByLocale.get(locale);
+  return hash === undefined ? undefined : translationTableFor(locale, hash);
 }
 
 /** Test seam: forget every stored table. */
 export function resetTranslationTablesForTests(): void {
   tablesByLocale.clear();
+  pinnedByLocale.clear();
+  latestByLocale.clear();
 }

@@ -97,10 +97,13 @@ import {
 } from "./translation-dev-pages";
 import { registerTranslationTableRoute, TRANSLATION_ROUTE_SOURCE_FILE } from "./translation-route";
 import {
-  createGlobalTranslationDelivery,
+  createLiveGlobalTranslationDelivery,
   installGlobalTranslationDelivery,
 } from "./global-translations";
-import { DEFAULT_SHARED_TRANSLATION_GROUPS } from "../translations/types";
+import {
+  resolveTranslationOptions,
+  type TranslationBuildOptions,
+} from "../build/translation-manifest";
 import {
   filterActiveSites,
   siteRegistrationRouter,
@@ -425,6 +428,8 @@ async function composeLayoutLevel(
 
 export type InstallPageRoutesOptions = {
   router: Router;
+  /** The web connector's translation settings, shared with the production build. */
+  translations?: TranslationBuildOptions;
   vite: ViteDevServer;
   /** v5/app/src — pages live under "<appSrcRoot>/web/**". */
   appSrcRoot: string;
@@ -596,12 +601,12 @@ export async function installPageRoutes(
     // Development payloads of both modes name their tables under this route.
     // The global mode's usage is keyed by route name, recorded as each page's
     // name resolves during the install below.
+    const translationOptions = resolveTranslationOptions(options.translations);
     beginDevelopmentRouteUsage(options.appSrcRoot);
     installGlobalTranslationDelivery(
-      createGlobalTranslationDelivery({
-        sharedGroups: DEFAULT_SHARED_TRANSLATION_GROUPS,
-        prune: true,
-        development: true,
+      createLiveGlobalTranslationDelivery({
+        sharedGroups: translationOptions.sharedGroups,
+        prune: translationOptions.prune,
         usageFor: developmentRouteUsageFor,
       }),
     );
@@ -700,6 +705,7 @@ async function installDiscoveredPageRoutes(
     appFile: options.appFile,
   });
   const developmentPageByFile = new Map(developmentPages.map((page) => [page.pageFile, page]));
+  const translationOptions = resolveTranslationOptions(options.translations);
   const getRouteTranslations = createRouteTranslationsResolver(
     routeLocaleManifest,
     routeLocaleManifest === undefined
@@ -708,6 +714,8 @@ async function installDiscoveredPageRoutes(
           sources: routeLocaleManifest.sources,
           appSrcRoot,
           pages: developmentPages,
+          sharedGroups: translationOptions.sharedGroups,
+          prune: translationOptions.prune,
         }),
   );
 

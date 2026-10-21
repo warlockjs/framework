@@ -36,6 +36,12 @@ export type HydrationTranslationAssets = {
   readonly hash: string;
   readonly groups: readonly string[];
   readonly development?: boolean;
+  /**
+   * The newest table for the locale, unhashed (`/__warlock/translations/<locale>.json`).
+   * A client falls back to it when the hashed `url` answers 404. Absent in a
+   * payload from a server that predates the fallback.
+   */
+  readonly latest?: string;
 };
 
 /** A translation usage in the form the production manifest stores it. */
@@ -54,10 +60,4 @@ export type PageManifestTranslations = {
   readonly sharedGroups: readonly string[];
   readonly prune: boolean;
   readonly usage: Readonly<Record<string, SerializedTranslationUsage>>;
-  /**
-   * Each routable page's usage keyed by its route name: what the global-registry
-   * mode prunes by, since its payload is built from the matched route. Absent in
-   * a manifest written before 5.36 patch 2; every route then ships everything.
-   */
-  readonly routes?: Readonly<Record<string, SerializedTranslationUsage>>;
 };

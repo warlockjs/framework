@@ -37,10 +37,14 @@ import { publishLocaleRouting } from "../routing/locale-routing";
 import { config, type Router } from "@warlock.js/core";
 import path from "node:path";
 import { buildRouteLocaleManifest } from "../build/build-route-locale-manifest";
-import { productionTranslationDelivery } from "./translation-delivery";
+import { pinSharedTranslationTables, productionTranslationDelivery } from "./translation-delivery";
 import {
+  createSnapshotGlobalTranslationDelivery,
   installGlobalTranslationDelivery,
-  productionGlobalTranslationDelivery,
+  productionGlobalTranslationDeliveryInput,
+  registeredLocales,
+  registerRouteSourceFile,
+  resetRouteSourceFiles,
 } from "./global-translations";
 import { registerTranslationTableRoute } from "./translation-route";
 import { composeLayoutModules } from "./compose-layout-modules";
@@ -382,9 +386,15 @@ export function installPageRoutesFromManifest(
 ): InstalledManifestPageRoute[] {
   // Once per process, before any site slice: the global-registry delivery and
   // the table route serve every page, whatever its site.
+  // The global-registry snapshot is taken here, once per process, so every
+  // process of one deployment publishes the same table under the same hash.
   if (siteSlice === undefined) {
+    resetRouteSourceFiles();
     installGlobalTranslationDelivery(
-      productionGlobalTranslationDelivery(options.manifest.translations),
+      createSnapshotGlobalTranslationDelivery(
+        productionGlobalTranslationDeliveryInput(options.manifest.translations),
+        registeredLocales(),
+      ),
     );
     registerTranslationTableRoute(options.router);
   }
@@ -441,6 +451,12 @@ export function installPageRoutesFromManifest(
       },
     },
   );
+  // Route-dictionary apps: the build emitted these tables under the same hashes,
+  // so pinning them here keeps `<locale>.json` answerable in every process.
+  if (localeManifest !== undefined) {
+    pinSharedTranslationTables(localeManifest.sources, options.manifest.translations?.sharedGroups);
+  }
+
   const getRouteTranslations = createRouteTranslationsResolver(
     localeManifest,
     localeManifest === undefined
@@ -572,6 +588,8 @@ export function installPageRoutesFromManifest(
     const routeExport = pageModule.route;
 
     const { path: routePath, name } = resolveRoute(routeExport, page.sourceFile, siteSlice?.site);
+    // The name a payload carries is `name` itself; the usage is looked up by source file.
+    registerRouteSourceFile(name, page.sourceFile);
 
     // Validated at INSTALL time — the same boot-time gate dev applies in its
     // own installer — so a malformed `cache` opt-in fails a production boot
