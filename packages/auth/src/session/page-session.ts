@@ -1,4 +1,11 @@
-import { config, t, type Middleware, type Request, type Response } from "@warlock.js/core";
+import {
+  config,
+  markAuthGuard,
+  t,
+  type Middleware,
+  type Request,
+  type Response,
+} from "@warlock.js/core";
 import type { CookieDomainResolver } from "../contracts/types";
 import { log } from "@warlock.js/logger";
 import ms from "ms";
@@ -173,7 +180,7 @@ export function sessionMiddleware(options: SessionMiddlewareOptions = {}): Middl
   const resolveModel = createModelResolver(options);
   const sources = options.sources?.length ? options.sources : ["cookie", "header"];
 
-  return async ({ request, response }) => {
+  const middleware: Middleware = async ({ request, response }) => {
     const headerWins = sources.includes("header") && Boolean(request.authorizationValue);
 
     if (!headerWins && requiresCsrfOriginCheck("cookie:x", request.method)) {
@@ -205,4 +212,19 @@ export function sessionMiddleware(options: SessionMiddlewareOptions = {}): Middl
       errorCode: AuthErrorCodes.Unauthorized,
     });
   };
+  Object.defineProperty(middleware, Symbol.for("warlock.auth"), {
+    value: Object.freeze({
+      sources: Object.freeze(
+        sources.map((source) =>
+          source === "header"
+            ? "header"
+            : Object.freeze({ cookie: options.cookie ?? authConfig.cookie.name() }),
+        ),
+      ),
+      userTypes: Object.freeze([...resolveUserTypes(options.userTypes)]),
+      required: options.optional !== true,
+    }),
+    enumerable: false,
+  });
+  return markAuthGuard(middleware, options.optional !== true);
 }

@@ -109,6 +109,8 @@ export type OpenApiRouteInput = Pick<Route, "method" | "path" | "handler"> &
  * Read structurally and validated; core never imports the auth package.
  */
 export type AuthDescriptor = {
+  /** Absent on legacy descriptors, which require authentication. */
+  required?: boolean;
   sources: ("header" | { cookie: string })[];
   userTypes: string[];
 };

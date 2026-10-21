@@ -310,3 +310,21 @@ This is an Origin check, not a double-submit CSRF token — cheaper, and closes 
 - The `handle-login-and-logout` topic — where the access token gets issued in the first place
 - The `throttle-login-attempts` topic — brute-force throttle to stack in front of the login route
 - The `warlock-js-access` skill index — permissions, roles, and who-may-act-on-whom policies, when user-type gating isn't enough
+
+## Session middleware in groups
+
+`sessionMiddleware({ userTypes: "user" })` publishes the same `warlock.auth`
+descriptor as `authMiddleware()`. Group middleware is inherited by nested
+routes, so `inspect` and the generated `agents-md` summary recognize these guards.
+`{ optional: true }` reports `auth.required: false`, with sources and user types
+retained. Such routes remain in the unguarded-write list. Legacy descriptors
+without `required` still mean required authentication.
+
+```ts
+import { router } from "@warlock.js/core";
+import { sessionMiddleware } from "@warlock.js/auth";
+
+router.group({ middleware: [sessionMiddleware({ userTypes: "user" })] }, () => {
+  router.post("/settings", async ({ response }) => response.success({ saved: true }));
+});
+```

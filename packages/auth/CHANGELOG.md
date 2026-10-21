@@ -4,6 +4,15 @@ All notable changes to `@warlock.js/auth` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.35.0
+
+### Fixed
+
+- Exclude expired refresh rows from session caps while preserving oldest-first eviction.
+- Bound Google token and JWKS requests with configurable `timeoutMs`, `fetch` and `endpoints` options; retain all identity checks and isolate JWKS caches.
+- Reject unavailable refresh families outside the transaction callback so expected credential rejection is not logged as a database failure.
+- Publish required/optional session guard descriptors and markers for grouped route inspection.
+
 ## 5.34.3 - 2026-10-20
 
 ### Changed

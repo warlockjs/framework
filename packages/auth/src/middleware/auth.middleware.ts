@@ -32,6 +32,7 @@ export type AuthMiddlewareDescriptorSource = "header" | { cookie: string };
 export type AuthMiddlewareDescriptor = {
   /** Resolved credential sources; with dual sources the header comes first. */
   sources: AuthMiddlewareDescriptorSource[];
+  required?: boolean;
   /** Resolved allowed user types; an empty array means any authenticated user. */
   userTypes: string[];
 };
@@ -273,6 +274,7 @@ export function authMiddleware(
     ? [...(dualHeader ? (["header"] as const) : []), ...dualCookies.map(descriptorSource)]
     : [descriptorSource(tokenFrom)];
   const descriptor: AuthMiddlewareDescriptor = Object.freeze({
+    ...(optional ? { required: false } : {}),
     sources: Object.freeze(
       descriptorSources.map((source) =>
         typeof source === "string" ? source : Object.freeze({ ...source }),

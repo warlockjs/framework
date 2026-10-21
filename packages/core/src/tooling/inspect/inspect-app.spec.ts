@@ -8,6 +8,9 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { defineResource } from "../../resource/define-resource";
+import { router } from "../../router/router";
+import { isUnguardedMutatingRoute, markAuthGuard } from "../../router/unguarded-route-diagnostics";
+import { renderAgentsMdSection } from "../agents-md/render-agents-md";
 import type { RequestHandler, Route } from "../../router/types";
 import { EventRecorder } from "./event-recorder";
 import { inspectApp, parseInspectSections } from "./inspect-app";
@@ -332,5 +335,55 @@ describe("parseInspectSections", () => {
     expect(() => parseInspectSections("routes,controllers")).toThrow(
       "Unknown inspect section(s): controllers. Valid sections: routes, models,",
     );
+  });
+});
+
+const sessionGuard = (optional: boolean) => {
+  const middleware = markAuthGuard(async () => undefined, !optional);
+  Object.defineProperty(middleware, AUTH, {
+    value: {
+      required: !optional,
+      sources: [{ cookie: "access_token" }, "header"],
+      userTypes: ["user"],
+    },
+  });
+  return middleware;
+};
+
+describe("grouped session guard inspection", () => {
+  it("keeps required groups out of unguarded writes and includes optional groups", async () => {
+    const previous = router.list();
+    Reflect.set(router, "routes", []);
+    try {
+      router.group({ prefix: "/account", middleware: [sessionGuard(false)] }, () => {
+        router.group({ prefix: "/settings" }, () => router.post("/save", listPosts));
+      });
+      router.group({ middleware: [sessionGuard(true)] }, () =>
+        router.post("/personalize", listPosts),
+      );
+      const registered = router.list();
+      const report = await inspectApp({ sections: ["routes"], routes: registered });
+      expect(report.routes?.find((entry) => entry.path === "/account/settings/save")?.auth).toEqual(
+        {
+          required: true,
+          sources: [{ cookie: "access_token" }, "header"],
+          userTypes: ["user"],
+        },
+      );
+      expect(report.routes?.find((entry) => entry.path === "/personalize")?.auth.required).toBe(
+        false,
+      );
+      expect(registered.filter(isUnguardedMutatingRoute).map((entry) => entry.path)).toEqual([
+        "/personalize",
+      ]);
+      const summary = renderAgentsMdSection(report);
+      const warning = summary
+        .split("\n")
+        .find((line) => line.startsWith("Mutating routes without"));
+      expect(warning).toContain("POST /personalize");
+      expect(warning).not.toContain("/account/settings/save");
+    } finally {
+      Reflect.set(router, "routes", previous);
+    }
   });
 });

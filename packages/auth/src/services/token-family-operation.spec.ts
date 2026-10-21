@@ -45,6 +45,43 @@ describe("runTokenFamilyOperation", () => {
     expect(operation).not.toHaveBeenCalled();
   });
 
+  it.each([null, { ...family, isRevoked: true }])(
+    "keeps an unavailable family out of the transaction failure path: %s",
+    async (row) => {
+      findByFamilyId.mockResolvedValue(row);
+      const databaseFailure = vi.fn();
+      transaction.mockImplementation(async (operation: () => Promise<unknown>) => {
+        try {
+          return await operation();
+        } catch (error) {
+          databaseFailure(error);
+          throw error;
+        }
+      });
+      await expect(runTokenFamilyOperation("family-1", vi.fn())).rejects.toThrow(
+        "Token family is unavailable",
+      );
+      expect(databaseFailure).not.toHaveBeenCalled();
+      expect(advanceRevision).not.toHaveBeenCalled();
+    },
+  );
+
+  it("leaves genuine database failures visible to the transaction owner", async () => {
+    const failure = new Error("database unavailable");
+    const databaseFailure = vi.fn();
+    findByFamilyId.mockRejectedValue(failure);
+    transaction.mockImplementation(async (operation: () => Promise<unknown>) => {
+      try {
+        return await operation();
+      } catch (error) {
+        databaseFailure(error);
+        throw error;
+      }
+    });
+    await expect(runTokenFamilyOperation("family-1", vi.fn())).rejects.toBe(failure);
+    expect(databaseFailure).toHaveBeenCalledWith(failure);
+  });
+
   it("uses a serializable transaction and advances the durable revision before work", async () => {
     const operation = vi.fn().mockResolvedValue("done");
 

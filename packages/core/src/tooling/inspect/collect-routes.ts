@@ -154,7 +154,7 @@ export function collectRoutes(
       isPage: route.isPage === true,
       middleware: (route.middleware ?? []).map(functionName),
       auth: auth
-        ? { required: true, sources: auth.sources, userTypes: auth.userTypes }
+        ? { required: auth.required !== false, sources: auth.sources, userTypes: auth.userTypes }
         : { required: false, sources: [], userTypes: [] },
       csrf: route.csrf !== false,
       rateLimit: readRateLimit(route, rateLimit),

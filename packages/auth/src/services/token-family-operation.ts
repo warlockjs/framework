@@ -66,7 +66,7 @@ export async function runTokenFamilyOperation<T>(
   for (let attempt = 0; attempt < attempts; attempt++) {
     const parentEffects = operationEffects.getStore();
     const effects: Array<() => void> = [];
-    let result: T;
+    let result: { type: "unavailable" } | { type: "available"; value: T };
     try {
       result = await operationEffects.run(effects, () =>
         transaction(
@@ -74,7 +74,7 @@ export async function runTokenFamilyOperation<T>(
             const family = await AuthTokenFamily.findByFamilyId(familyId);
 
             if (!family || family.isRevoked) {
-              throw new TokenFamilyUnavailableError();
+              return { type: "unavailable" as const };
             }
 
             const revision = family.get<number>("revision");
@@ -84,7 +84,7 @@ export async function runTokenFamilyOperation<T>(
               throw new TokenFamilyConflictError();
             }
 
-            return operation(family);
+            return { type: "available" as const, value: await operation(family) };
           },
           { isolationLevel: "SERIALIZABLE" },
         ),
@@ -101,13 +101,17 @@ export async function runTokenFamilyOperation<T>(
       continue;
     }
 
+    // No writes were made for an unavailable family. Reject outside the
+    // transaction callback so normal credential rejection is not a DB failure.
+    if (result.type === "unavailable") throw new TokenFamilyUnavailableError();
+
     // Listener failures must never retry a transaction that already committed.
     // Nested family operations join their parent's queue. An app-owned outer
     // transaction has no Cascade commit hook, so its existing event timing is
     // retained; its owner remains responsible for external side effects.
     if (parentEffects) parentEffects.push(...effects);
     else for (const effect of effects) effect();
-    return result;
+    return result.value;
   }
 
   throw lastError;
