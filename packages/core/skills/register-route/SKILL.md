@@ -279,3 +279,16 @@ router.get("/webhooks/status", webhookStatusController, { rateLimit: false });
 - The `create-controller` topic — the handler shape, validation, request/response surface.
 - The `send-response` topic — picking the right `response.<helper>()`.
 - The `warlock-conventions` topic — module layout, the `guarded` convention, path aliases.
+
+## A named route the browser must never call — `clientVisible: false`
+
+A named API route is embedded in a page's browser route table only when that page's client code reaches its name. Mark an endpoint that browser code must never reach with `clientVisible: false`:
+
+```ts
+router.post("/internal/reindex", reindexController, {
+  name: "internal.reindex",
+  clientVisible: false,
+});
+```
+
+It is then never embedded in a page, and `warlock check` reports a browser reference to its name as `WL9020` (an error). The server still authorizes the call as for any route.

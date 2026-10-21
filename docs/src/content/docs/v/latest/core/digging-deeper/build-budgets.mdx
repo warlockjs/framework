@@ -37,6 +37,44 @@ restores the previous dist. `"warn"` prints violations and completes normally.
 Each violation names the page, JS or CSS budget, actual compressed size and
 the largest contributing modules. API-only builds have an empty page report.
 
+## Inline payload budget
+
+`build.budgets.payload` limits the hydration data a single rendered document
+embeds in its HTML: the page, layout and app data, translations, session, the
+other hydration slots and the page's browser route table.
+
+```ts title="warlock.config.ts"
+export default defineConfig({
+  build: {
+    budgets: {
+      payload: {
+        page: "64kb",
+        pages: { "/admin/**": "128kb" },
+        mode: "warn",
+      },
+    },
+  },
+});
+```
+
+`page` is the limit for every document, and it defaults to `64kb`. `pages` uses
+the same route-path globs as the client budgets, and the later matching entry
+sets the limit. `mode` is `"warn"` (the default) or `"error"`. `"warn"` logs a
+warning and `"error"` logs at error level; neither fails a request.
+
+The measurement is a runtime one. A page's payload depends on its loaders, which
+only a request runs, so `warlock build --json` does not report it. Documents are
+measured until their route is reported, once per process. When a route is over
+budget, Warlock logs one line for that route with the size of
+each section (page, layout, app, translations, routes, session, other) and the
+three largest data keys. The check adds one serialization of the payload to
+each document. Set `page` above what a healthy page embeds, or raise it for one
+route, rather than turning the warning off.
+
+The end-to-end kit records the same measurement for a loaded document with
+`page.measurePayload({ limit })` (see [Browser end-to-end tests](/v/latest/core/testing/browser-e2e/)),
+which adds it to the run's evidence under `payloads`.
+
 ## What is measured
 
 The first visit includes hydration, the requested page, its layouts and root,

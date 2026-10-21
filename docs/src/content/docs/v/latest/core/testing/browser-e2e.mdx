@@ -257,6 +257,16 @@ replace keyboard, screen-reader, focus-order or contrast review. See the
 [axe API](https://github.com/dequelabs/axe-core/blob/develop/doc/API.md) for scan
 semantics. Run at both 390 and 1280 pixels with `assertViewport()` as well.
 
+## Payload checks
+
+Call `await page.measurePayload({ limit })` on a loaded document to measure the
+bytes of its hydration data script (`__WARLOCK_DATA__`) and its browser route table
+(`__WARLOCK_NAMED_API_ROUTES__`), as the HTML carries them. The measurement is
+recorded under the run's evidence `payloads` with `total`, the two script sizes and,
+when `limit` is passed, `overBudget`. Measure after a full load: a client navigation
+replaces the data the script held. The same limit as `build.budgets.payload` is
+the natural value (see [Client performance budgets](/v/latest/core/digging-deeper/build-budgets/#inline-payload-budget)).
+
 ## Watched development checks
 
 Use an owned app copy with `app.env: { NODE_ENV: "development" }` and

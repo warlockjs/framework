@@ -40,6 +40,20 @@ Validation field mapping is enabled by default. Matching fields receive server e
 
 Named route metadata deliberately contains only name, path, and method (plus the type-only `response` map described below). A route registered with `all` has no safe browser verb; use a direct path with an explicit method.
 
+## Which named routes a page can use
+
+`route` and `apiHref()` resolve a name against the route table of the page being
+shown. Each page document carries the named routes its client code reaches (see
+[Page setup files](/v/latest/web/essentials/02-page-setup-files/#browser-reachable-api-routes)).
+A name the page does not carry throws. In development the error names the route
+and the declaration that fixes it, and in production it is a short error with no
+fallback to the full table. Use a path and method for a call the build cannot see,
+or declare the name with `config.apiRoutes`.
+
+The table is replaced on every client navigation, so the new page's routes are
+available as soon as its tree renders. Authorization is not decided by the table:
+a route the page can see still answers `401` or `403` from the server.
+
 ## Typed API responses
 
 Since 5.27, a route whose handler declares `responseSchema` (see core's [Declare response types](/v/latest/core/the-basics/03-controllers/#declare-response-types-with-responseschema)) gets a `response` map in its generated `ApiRouteRegistry` entry, and `useSubmitForm({ route })` types `data`, `response` and `onSuccess` from the route's declared 2xx body. There is no generic argument and no cast.

@@ -2,6 +2,30 @@
 
 All notable changes to `@warlock.js/web` are documented here.
 
+## 5.36.0
+
+### Added
+
+- Page documents carry only the named API routes their client code can reach. The build finds them from the page's browser code (string literals, template prefixes and the register hooks of setup files) and from `config.apiRoutes`, which page, layout and root setups accept for names the build cannot see (a `prefix.*` pattern covers every name under a prefix).
+- `build.budgets.payload` sets the inline payload limit for each rendered document (default `64kb`, with route globs and a `warn` or `error` mode). A runtime measurement of the hydration data and the route table, split by section, reports an over-budget route once per process with its largest keys.
+- `warlock check` reports `WL9019` and `WL9020` for browser route references (see core).
+
+### Changed
+
+- `apiHref()` and `useSubmitForm({ route })` resolve names against the current page's route table. Development errors name the route and the declaration that fixes it; production throws a short error with no fallback.
+- A client navigation publishes the table of the page it swaps in.
+- The document's hydration payload no longer repeats the route table, which its own script already carries.
+
+### Security
+
+- Named API routes are no longer published to every visitor. Admin, auth and internal endpoints are embedded only in pages whose browser code reaches them, and never for a route registered with `clientVisible: false`. Server-side authorization still decides each request.
+
+### Upgrading
+
+- **BREAKING** A browser call to a named route is valid only when the page's client code reaches the name. A name built at run time, or read from a module the build cannot follow, throws on that page. Declare it in the page setup's `config.apiRoutes` (for example `["orders.*"]`), or call the endpoint with an explicit `path` and `method`. `warlock check` reports the call sites as `WL9019`.
+- Server seam `resolveNamedApiRoutes(names)` takes the names a page may embed; called without them it returns an empty table, where it used to return every route.
+- Authorization is not affected: a route in a page's table still answers `401` or `403` from its own guards.
+
 ## 5.35.0 - 2026-10-21
 
 ### Added

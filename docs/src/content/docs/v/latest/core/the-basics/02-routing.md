@@ -346,3 +346,22 @@ handlers, middleware, schemas, and source paths, so adapters can publish route
 metadata to a browser without exposing server implementation details. A route
 registered with `router.any()` retains method `"all"`; a browser caller must
 choose an explicit request method rather than guessing one.
+
+### Keep a route out of the browser
+
+A named API route is embedded in the browser route table of a page only when that
+page's client code can reach its name (see
+[Form submission](/v/latest/web/essentials/14-form-submission/#which-named-routes-a-page-can-use)).
+Some endpoints must never be reachable from browser code, such as an internal
+webhook or a job trigger. Opt them out with `clientVisible: false`:
+
+```ts
+router.post("/internal/reindex", reindexController, {
+  name: "internal.reindex",
+  clientVisible: false,
+});
+```
+
+Such a route is never written into a page document, and `warlock check` reports a
+browser reference to its name as `WL9020`. Its snapshot carries `clientVisible: false`
+and nothing else extra. Server-side authorization still decides who may call the endpoint.

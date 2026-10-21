@@ -327,6 +327,10 @@ export function NavigationProgress() {
 }
 ```
 
+## Named API routes in the page's table
+
+`apiHref(name)` takes only names in the current page's route table, the routes its client code reaches (see the `submit-a-form` topic, "Which named routes a page can use"). It throws for any other name, and a client navigation swaps in the new page's table. Pass an explicit `path` and `method` to a `fetch` call the build cannot see, or declare the name with `config.apiRoutes`.
+
 ## Generated named-route types
 
 Warlock writes `.warlock/typings/web-routes.d.ts` atomically after successful

@@ -35,3 +35,7 @@ registerTracingHooks({
 Every phase has `name`, `durationMs`, and `startedAt` (epoch milliseconds).
 Use `key` only to identify a deferred value; do not put sensitive loader data
 in tracing attributes.
+
+## Inline payload budget
+
+Each rendered document is checked against `build.budgets.payload` (default `64kb`). An over-budget route logs one line per process with the size of each section (page, layout, app, translations, routes, session, other) and its largest data keys. The check is advisory: it never fails a request. Raise the limit for a route with a `pages` glob, or reduce the data the page loads. The e2e kit records the same measurement with `page.measurePayload({ limit })`.

@@ -57,6 +57,16 @@ the schema in `config.action.validation` and submit with `useSubmitAction`, not
 `useSubmitForm`. Do not share database uniqueness checks or other server-only
 rules with the browser; keep those server-side or split the schema.
 
+## Which named routes a page can use
+
+`useSubmitForm({ route })` resolves its name against the route table of the page being shown. Each page document carries the named routes its client code reaches: a string literal, a constant or a template prefix naming the route, plus anything declared with `config.apiRoutes` in the page's setup file. Declare a name the build cannot see:
+
+```ts title="orders.setup.ts"
+export const config: PageConfig = { apiRoutes: ["orders.*"] };
+```
+
+A name the page does not carry throws. Development names the route and the declaration that fixes it; production throws a short error with no fallback. A route registered with `clientVisible: false` is never in the table. `warlock check` reports a name it cannot read as `WL9019`. Use an explicit `path` and `method` for such a call when declaring is not practical.
+
 ## Typed responses from `responseSchema`
 
 When the API handler declares `responseSchema` (see core's `create-controller`), the generated `ApiRouteRegistry` entry carries a `response` map and `useSubmitForm({ route })` types `data`, `response` and `onSuccess` from the route's declared 2xx body. No generic argument and no cast.

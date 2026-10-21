@@ -12,6 +12,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - `clientVisible` route option. Set `clientVisible: false` on a named API route to keep it out of every page's browser route table and out of client code. The route snapshot carries `clientVisible: false` only on such routes.
 - `warlock check` reports `WL9019` (warning) for a browser route call (`apiHref()`, `useSubmitForm({ route })`) whose name cannot be read statically, and `WL9020` (error) for a browser reference to a `clientVisible: false` route.
+- `build.budgets.payload` (`PayloadBudget` type) sets the inline payload budget for each rendered document. Web reads it; `warlock build` does not measure it.
+- `page.measurePayload({ limit })` in the browser end-to-end kit records a document's inline payload under the evidence `payloads`.
 
 ## 5.35.0 - 2026-10-21
 

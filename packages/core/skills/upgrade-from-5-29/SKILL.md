@@ -552,3 +552,15 @@ Root components and providers execute in both realms. Move server-only work into
 one `#vessel` around `{children}`. Client navigation still swaps layout/page
 children while preserving the document root. Remove temporary explicit form IDs
 only when the application does not otherwise depend on those names.
+
+## 5.35 to 5.36 per-page API routes
+
+A page document now carries only the named API routes its client code can reach. Before 5.36 every page carried every named route, so a browser call to a name the build cannot see worked on every page by accident. Check each `apiHref()` and `useSubmitForm({ route })` call:
+
+- A name written as a string literal, a constant or a template with a static prefix is found automatically.
+- A name computed at run time, or taken from a module the build cannot follow, now throws on the page that calls it. Declare the names in that page's setup file, for example `export const config = { apiRoutes: ["orders.*"] };`, a layout or root `config` covers every page that renders it. Or call the endpoint with an explicit `path` and `method`.
+- `npx warlock check` reports the call sites that need a declaration as `WL9019`.
+
+Routes registered with `clientVisible: false` are never embedded, and a browser call to one is an error (`WL9020`). Keep endpoints the browser must not reach on that option. Authorization is unchanged: the server still decides each request.
+
+To measure a page's inline payload, set `build.budgets.payload` (default `64kb`). An over-budget route logs one line per process and never fails a request.
