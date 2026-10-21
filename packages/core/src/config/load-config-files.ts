@@ -22,8 +22,14 @@ export async function loadConfigFiles(config: string[] | true) {
     relativePaths = configFilesAbsulatePaths.map((path) => Path.toRelative(path));
   }
 
+  relativePaths = relativePaths.filter(isConfigFile);
+  if (relativePaths.length === 0) return;
+
+  // Config-only commands need no loader when the requested files are absent.
+  await filesOrchestrator.init();
+
   const configFiles = await Promise.all(
-    relativePaths.filter(isConfigFile).map((relativePath) => filesOrchestrator.add(relativePath)),
+    relativePaths.map((relativePath) => filesOrchestrator.add(relativePath)),
   );
 
   filesOrchestrator.specialFilesCollector.collect(filesOrchestrator.files);

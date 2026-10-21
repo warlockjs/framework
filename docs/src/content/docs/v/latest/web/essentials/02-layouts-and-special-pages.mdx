@@ -305,3 +305,5 @@ export default function HomePage() {
   return <main>{trans("welcome")}</main>;
 }
 ```
+
+Document and navigation data responses carry the same hydration payload, including the resolved `document` slots (stylesheets, fonts, locale routing and hydration module URLs). These slots let the browser reproduce the server root during initial hydration.

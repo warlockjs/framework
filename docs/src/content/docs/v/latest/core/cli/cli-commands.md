@@ -883,3 +883,5 @@ console.log(colors.red("[!]") + " something went wrong");
 - [`guides/generators.md`](./generators.md) — the `generate.*` family in depth.
 - [`guides/warlock-config.md`](../architecture-concepts/warlock-config.md) — wiring package-exported commands via `cli.commands: [...]`.
 - [`guides/bootstrap-and-connectors.md`](../architecture-concepts/bootstrap-and-connectors.md) — what `preload.bootstrap` and `preload.connectors` actually do.
+
+`npx warlock add notifications` loads only application configuration before generators run, so notification locale stubs follow `app.localeCodes`. It starts no connectors or application bootstrap hooks. If application configuration is absent, scaffolding continues without initializing the development loader.

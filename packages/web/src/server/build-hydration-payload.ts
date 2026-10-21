@@ -122,6 +122,7 @@ export function buildHydrationPayload(
   assertSessionUserSerializable(session, bundle.route.name);
 
   return {
+    ...(bundle.document === undefined ? {} : { document: bundle.document }),
     appData,
     ...(bundle.live === undefined ? {} : { live: bundle.live }),
     layoutData,

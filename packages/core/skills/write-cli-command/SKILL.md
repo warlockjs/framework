@@ -355,3 +355,5 @@ files and dependencies without writing. For example, a generated control is
 `import TextInput from "web/design-system/components/text-input";` with
 `<TextInput id="profile-name" name="name" label="Name" />`.
 See Web's `build-accessible-controls` topic for the complete control contract.
+
+Built-in `npx warlock add notifications` preloads `config: ["app"]` so generated locale stubs respect `app.localeCodes`, without bootstrap hooks or connectors.

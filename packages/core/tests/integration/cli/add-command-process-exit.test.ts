@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -108,9 +108,18 @@ afterEach(async () => {
 });
 
 describe("warlock add <feature> --no-install completes and the CLI exits 0 on its own (boot/exit smoke test; NOT the stdin-handle guard — see shortcuts-lazy-stdin.test.ts)", () => {
-  it.each(["image", "test", "design-system"])(
+  it.each(["image", "test", "design-system", "notifications"])(
     "adds %s and terminates 0 without being killed, within the timeout bound",
     async (feature) => {
+      if (feature === "notifications") {
+        await mkdir(path.join(fixtureDir, "src/config"), { recursive: true });
+        await writeFile(path.join(fixtureDir, "warlock.config.ts"), "export default {};\n");
+        await writeFile(
+          path.join(fixtureDir, "src/config/app.ts"),
+          'export default { localeCode: "fr", localeCodes: ["fr", "de"] };\n',
+        );
+      }
+
       const exitInfo = await new Promise<{
         code: number | null;
         signal: NodeJS.Signals | null;
@@ -152,6 +161,16 @@ describe("warlock add <feature> --no-install completes and the CLI exits 0 on it
       expect(exitInfo.timedOut).toBe(false);
       expect(exitInfo.signal).toBeNull();
       expect(exitInfo.code).toBe(0);
+
+      if (feature === "notifications") {
+        const locales = await readFile(
+          path.join(fixtureDir, "src/app/notifications/utils/locales.json"),
+          "utf8",
+        );
+        expect(JSON.parse(locales)).toEqual({
+          notFound: { fr: "Notification not found", de: "Notification not found" },
+        });
+      }
     },
     CHILD_TIMEOUT_MS + 5_000,
   );

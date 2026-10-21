@@ -59,8 +59,15 @@ describe("ModuleLoader.runCleanup", () => {
   it("invokes every registered function hook", () => {
     const calls: string[] = [];
     const file = fakeFile({
-      cleanup: [() => calls.push("a"), () => calls.push("b")],
-    } as Partial<FileManager>);
+      cleanup: [
+        () => {
+          calls.push("a");
+        },
+        () => {
+          calls.push("b");
+        },
+      ],
+    });
 
     loader().runCleanup(file);
 
