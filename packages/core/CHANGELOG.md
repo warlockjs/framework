@@ -22,6 +22,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - `warlock add test` generates a runner that extends `TestRunner` from `vitest` (Vitest 5 has no `vitest/runners`) and declares `vitest` and `@vitest/coverage-v8` `^5.0.3`. `warlock add web` declares `vite` `^8.3.3` and `@vitejs/plugin-react` `^6.1.2`.
 
+### Fixed
+
+- The browser end-to-end kit keeps the reason a target was last observed as blocking when `page.click()` (and the `fill()` and `type()` calls that click first) or a wait runs out of time. A CDP timeout caused by the shrinking deadline no longer replaces that reason, so the error still reads, for example, "target is covered by DIALOG#modal" instead of a CDP timeout.
+
 ### Upgrading
 
 - **BREAKING** The test kit needs Vitest 5. A runner that imports `VitestTestRunner` from `vitest/runners` fails on Vitest 5; run `warlock upgrade --from 5.35 --to 5.36.0` (codemod `vite-8-vitest-5`) or import `TestRunner` from `vitest` and call `this.onCleanupWorkerContext?.(cleanup)`. See the upgrade skill section "5.35 to 5.36 Vite 8 and Vitest 5".
