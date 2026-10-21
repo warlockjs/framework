@@ -89,11 +89,18 @@ import {
 import type { LayoutModuleShape } from "./page-module-shapes";
 import { createRouteTranslationsResolver } from "./route-translations";
 import { developmentTranslationDelivery } from "./translation-delivery";
-import { developmentTranslationPages } from "./translation-dev-pages";
 import {
-  registerDevelopmentTranslationRoutes,
-  TRANSLATION_ROUTE_SOURCE_FILE,
-} from "./translation-route";
+  beginDevelopmentRouteUsage,
+  developmentRouteUsageFor,
+  developmentTranslationPages,
+  registerDevelopmentRouteUsage,
+} from "./translation-dev-pages";
+import { registerTranslationTableRoute, TRANSLATION_ROUTE_SOURCE_FILE } from "./translation-route";
+import {
+  createGlobalTranslationDelivery,
+  installGlobalTranslationDelivery,
+} from "./global-translations";
+import { DEFAULT_SHARED_TRANSLATION_GROUPS } from "../translations/types";
 import {
   filterActiveSites,
   siteRegistrationRouter,
@@ -586,11 +593,21 @@ export async function installPageRoutes(
 
     // Development serves each locale's full table here, the payload's pointer
     // to it. Owned like the page routes, so a reload replaces them.
-    if (routeLocaleManifest !== undefined) {
-      await options.router.withSourceFile(TRANSLATION_ROUTE_SOURCE_FILE, () =>
-        registerDevelopmentTranslationRoutes(options.router, routeLocaleManifest.sources),
-      );
-    }
+    // Development payloads of both modes name their tables under this route.
+    // The global mode's usage is keyed by route name, recorded as each page's
+    // name resolves during the install below.
+    beginDevelopmentRouteUsage(options.appSrcRoot);
+    installGlobalTranslationDelivery(
+      createGlobalTranslationDelivery({
+        sharedGroups: DEFAULT_SHARED_TRANSLATION_GROUPS,
+        prune: true,
+        development: true,
+        usageFor: developmentRouteUsageFor,
+      }),
+    );
+    await options.router.withSourceFile(TRANSLATION_ROUTE_SOURCE_FILE, () =>
+      registerTranslationTableRoute(options.router),
+    );
 
     if (options.siteDispatch === undefined) {
       return await installDiscoveredPageRoutes(
@@ -678,6 +695,11 @@ async function installDiscoveredPageRoutes(
   const discovered = [...discoveredGraph.pages].sort((left, right) =>
     left.pageFile < right.pageFile ? -1 : left.pageFile > right.pageFile ? 1 : 0,
   );
+  const developmentPages = developmentTranslationPages({
+    pages: discoveredGraph.pages,
+    appFile: options.appFile,
+  });
+  const developmentPageByFile = new Map(developmentPages.map((page) => [page.pageFile, page]));
   const getRouteTranslations = createRouteTranslationsResolver(
     routeLocaleManifest,
     routeLocaleManifest === undefined
@@ -685,10 +707,7 @@ async function installDiscoveredPageRoutes(
       : developmentTranslationDelivery({
           sources: routeLocaleManifest.sources,
           appSrcRoot,
-          pages: developmentTranslationPages({
-            pages: discoveredGraph.pages,
-            appFile: options.appFile,
-          }),
+          pages: developmentPages,
         }),
   );
 
@@ -772,6 +791,9 @@ async function installDiscoveredPageRoutes(
       pageFile,
       siteScope?.site,
     );
+
+    const developmentPage = developmentPageByFile.get(pageFile);
+    if (developmentPage !== undefined) registerDevelopmentRouteUsage(name, developmentPage);
 
     // Validated at INSTALL time, with everything else — a malformed `cache`
     // opt-in fails boot, not the first request that would have served it.

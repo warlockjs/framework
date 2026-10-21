@@ -1,20 +1,24 @@
 /**
  * The server's half of translation delivery: which keys a page's payload
- * carries, and which hashed shared table the browser fetches.
+ * carries, and which content-addressed table the browser fetches.
  *
  * Production and development differ only in where the page usage comes from.
  * Production reads the usage the build computed and carried in the barrel.
  * Development analyzes the page's client graph itself and re-analyzes a page
- * when any file it read has changed, so a new import or a new key is picked up
- * on the next request without a restart.
+ * when any file it read has changed, so a new import or key is picked up on
+ * the next request without a restart.
+ *
+ * A scoped (route dictionary) payload's shared table is emitted at build time
+ * in production; in development it is published to the runtime table store.
+ * A global-registry payload always uses the runtime store (see
+ * `global-translations.ts`).
  */
 import fs from "node:fs";
-import { analyzePageTranslationUsage, type TranslationUsage } from "@warlock.js/core";
 import type { Keywords } from "@mongez/localization";
+import { analyzePageTranslationUsage, type TranslationUsage } from "@warlock.js/core";
 import {
   assetUrlFor,
   canonicalJson,
-  contentHash,
   EVERYTHING_USAGE,
   fullTableFor,
   localeCodesOf,
@@ -28,21 +32,19 @@ import {
   type HydrationTranslationAssets,
   type PageManifestTranslations,
 } from "../translations/types";
+import { publishTranslationTable, translationTableUrl } from "./translation-tables";
 
-/** The development route that serves a locale's full table, fresh on every load. */
-export const DEVELOPMENT_TRANSLATION_ROUTE_PREFIX = "/__warlock/translations";
-
-/** What a page's payload gets for translations: its own pruned dictionary and the shared table reference. */
+/** What a page's payload gets for translations: its own pruned dictionary and the shared-table reference. */
 export type DeliveredTranslations = {
   readonly keywords: Keywords;
   readonly assets: HydrationTranslationAssets | undefined;
 };
 
-/** How a render decides what a page ships. Built once per route table. */
+/** How a scoped render decides what a page ships. Built once per route table. */
 export type TranslationDelivery = {
   /** The groups shipped as shared tables. */
   readonly sharedGroups: readonly string[];
-  /** What a page can reach, by the page identity the route resolver is called with. */
+  /** What a page can reach, by the page identity the route resolver is called with. Unknown pages get everything. */
   usageFor(sourceFile: string): TranslationUsage;
   /** The shared table of one locale, or `undefined` for a locale with no sources. */
   assetFor(locale: string): HydrationTranslationAssets | undefined;
@@ -79,7 +81,7 @@ export type DevelopmentPageEntries = {
   readonly setupFiles: readonly string[];
 };
 
-/** A cached development analysis, valid while every file it read keeps its modification time. */
+/** A cached analysis, valid while every file it read keeps its modification time. */
 type CachedUsage = {
   readonly usage: TranslationUsage;
   readonly files: readonly string[];
@@ -91,10 +93,34 @@ function fileStamp(files: readonly string[]): string {
 }
 
 /**
- * Development: analyze each page's client graph on demand, re-analyzing it
- * when any file it read has changed. The shared table is the FULL table for
- * the development build (`development: true`), so the browser's missing-key
- * detector can tell a pruned key from one that does not exist.
+ * A development usage analyzer. Each page is analyzed on demand and again when
+ * any file it read has changed; the cache is keyed by the page's file.
+ */
+export function createDevelopmentUsageAnalyzer(
+  appSrcRoot: string,
+): (page: DevelopmentPageEntries) => TranslationUsage {
+  const cache = new Map<string, CachedUsage>();
+
+  return (page) => {
+    const cached = cache.get(page.pageFile);
+    if (cached !== undefined && cached.stamp === fileStamp(cached.files)) return cached.usage;
+
+    const { usage, files } = analyzePageTranslationUsage({
+      appSrcRoot,
+      entries: page.entries,
+      setupFiles: page.setupFiles,
+    });
+    cache.set(page.pageFile, { usage, files, stamp: fileStamp(files) });
+
+    return usage;
+  };
+}
+
+/**
+ * Development: analyze each page's client graph on demand. The shared table is
+ * the FULL table for the development build, published to the runtime store, so
+ * the browser's missing-key detector can tell a pruned key from one that does
+ * not exist.
  */
 export function developmentTranslationDelivery(input: {
   readonly sources: readonly TranslationSourceEntries[];
@@ -103,14 +129,18 @@ export function developmentTranslationDelivery(input: {
 }): TranslationDelivery {
   const sharedGroups = DEFAULT_SHARED_TRANSLATION_GROUPS;
   const pages = new Map(input.pages.map((page) => [page.pageFile, page]));
-  const cache = new Map<string, CachedUsage>();
+  const analyze = createDevelopmentUsageAnalyzer(input.appSrcRoot);
   const assets = new Map<string, HydrationTranslationAssets>();
 
   for (const locale of localeCodesOf(input.sources)) {
-    const revision = contentHash(canonicalJson(fullTableFor(input.sources, locale)));
+    const hash = publishTranslationTable(
+      locale,
+      canonicalJson(fullTableFor(input.sources, locale)),
+      true,
+    );
     assets.set(locale, {
-      url: `${DEVELOPMENT_TRANSLATION_ROUTE_PREFIX}/${encodeURIComponent(locale)}?v=${revision}`,
-      hash: revision,
+      url: translationTableUrl(locale, hash),
+      hash,
       groups: sharedGroups,
       development: true,
     });
@@ -120,19 +150,7 @@ export function developmentTranslationDelivery(input: {
     sharedGroups,
     usageFor(sourceFile) {
       const page = pages.get(sourceFile);
-      if (page === undefined) return EVERYTHING_USAGE;
-
-      const cached = cache.get(sourceFile);
-      if (cached !== undefined && cached.stamp === fileStamp(cached.files)) return cached.usage;
-
-      const { usage, files } = analyzePageTranslationUsage({
-        appSrcRoot: input.appSrcRoot,
-        entries: page.entries,
-        setupFiles: page.setupFiles,
-      });
-      cache.set(sourceFile, { usage, files, stamp: fileStamp(files) });
-
-      return usage;
+      return page === undefined ? EVERYTHING_USAGE : analyze(page);
     },
     assetFor: (locale) => assets.get(locale),
   };
@@ -152,12 +170,4 @@ export function deliverTranslations(
     keywords: pruneKeywords(keywords, delivery.usageFor(sourceFile), delivery.sharedGroups),
     assets: delivery.assetFor(locale),
   };
-}
-
-/** The full table of one locale, the body the development route serves. */
-export function developmentTableBody(
-  sources: readonly TranslationSourceEntries[],
-  locale: string,
-): string {
-  return canonicalJson(fullTableFor(sources, locale));
 }

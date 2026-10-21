@@ -96,6 +96,7 @@ export function buildTranslationManifest(input: TranslationBuildInput): Translat
   const prune = input.options?.prune !== false;
   const sources = localeSources(input.localeFiles);
   const usage: Record<string, SerializedTranslationUsage> = {};
+  const routes: Record<string, SerializedTranslationUsage> = {};
 
   const routable = input.pages.filter(isDiscoveredRoutablePage);
   const errorPages = input.pages.filter((page) => page.type === "error");
@@ -122,12 +123,12 @@ export function buildTranslationManifest(input: TranslationBuildInput): Translat
       ...errorSetups,
     ];
 
-    record(
-      page.pageFile,
-      prune
-        ? analyzePageTranslationUsage({ appSrcRoot: input.srcRoot, entries, setupFiles }).usage
-        : EVERYTHING_USAGE,
-    );
+    const analyzed = prune
+      ? analyzePageTranslationUsage({ appSrcRoot: input.srcRoot, entries, setupFiles }).usage
+      : EVERYTHING_USAGE;
+
+    record(page.pageFile, analyzed);
+    routes[page.routeName] = serializeUsage(analyzed);
   }
 
   for (const page of errorPages) {
@@ -144,7 +145,7 @@ export function buildTranslationManifest(input: TranslationBuildInput): Translat
   }
 
   return {
-    manifest: { sharedGroups, prune, usage },
+    manifest: { sharedGroups, prune, usage, routes },
     assets: sharedTranslationAssets(sources, sharedGroups),
   };
 }

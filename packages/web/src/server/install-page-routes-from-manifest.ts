@@ -38,6 +38,11 @@ import { config, type Router } from "@warlock.js/core";
 import path from "node:path";
 import { buildRouteLocaleManifest } from "../build/build-route-locale-manifest";
 import { productionTranslationDelivery } from "./translation-delivery";
+import {
+  installGlobalTranslationDelivery,
+  productionGlobalTranslationDelivery,
+} from "./global-translations";
+import { registerTranslationTableRoute } from "./translation-route";
 import { composeLayoutModules } from "./compose-layout-modules";
 import { composePageModule } from "./compose-page-module";
 import { createPageModuleLoader } from "./create-page-module-loader";
@@ -375,6 +380,15 @@ export function installPageRoutesFromManifest(
   /** Internal: this call is one site's slice of a multi-site install. */
   siteSlice?: SiteSlice,
 ): InstalledManifestPageRoute[] {
+  // Once per process, before any site slice: the global-registry delivery and
+  // the table route serve every page, whatever its site.
+  if (siteSlice === undefined) {
+    installGlobalTranslationDelivery(
+      productionGlobalTranslationDelivery(options.manifest.translations),
+    );
+    registerTranslationTableRoute(options.router);
+  }
+
   if (options.siteDispatch !== undefined) {
     return installSitePagesFromManifest(options, options.siteDispatch);
   }

@@ -831,9 +831,7 @@ export async function generatePagesBarrel(
       : [`  clientDir: ${quote(clientDir)},`]),
     ...(publicFiles.length === 0 ? [] : [`  publicFiles: ${JSON.stringify([...publicFiles])},`]),
     ...(localeFiles.length === 0 ? [] : [`  localeFiles: ${JSON.stringify(localeFiles)},`]),
-    ...(localeFiles.length === 0
-      ? []
-      : [`  translations: ${JSON.stringify(translations.manifest)},`]),
+    `  translations: ${JSON.stringify(translations.manifest)},`,
     ...(options.sites === undefined && routablePages.length === 0
       ? []
       : options.sites === undefined

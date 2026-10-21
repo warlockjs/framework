@@ -14,7 +14,10 @@ export const DEFAULT_SHARED_TRANSLATION_GROUPS: readonly string[] = Object.freez
   "common",
 ]);
 
-/** The public path segment under `/assets/` that hashed translation tables live in. */
+/** The route prefix the runtime serves content-addressed translation tables under. */
+export const TRANSLATION_TABLE_ROUTE_PREFIX = "/__warlock/translations";
+
+/** The public path segment under `/assets/` that build-emitted translation tables live in. */
 export const TRANSLATION_ASSET_DIRECTORY = "translations";
 
 /**
@@ -51,4 +54,10 @@ export type PageManifestTranslations = {
   readonly sharedGroups: readonly string[];
   readonly prune: boolean;
   readonly usage: Readonly<Record<string, SerializedTranslationUsage>>;
+  /**
+   * Each routable page's usage keyed by its route name: what the global-registry
+   * mode prunes by, since its payload is built from the matched route. Absent in
+   * a manifest written before 5.36 patch 2; every route then ships everything.
+   */
+  readonly routes?: Readonly<Record<string, SerializedTranslationUsage>>;
 };

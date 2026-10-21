@@ -1,6 +1,10 @@
 import { isFile, isErrorPageFile, layoutChainFor } from "../build/discover-pages";
 import { pageSetupFileFor } from "../build/page-setup-file";
-import type { DevelopmentPageEntries } from "./translation-delivery";
+import type { TranslationUsage } from "@warlock.js/core";
+import {
+  createDevelopmentUsageAnalyzer,
+  type DevelopmentPageEntries,
+} from "./translation-delivery";
 
 /** The setup companion of a module, when it exists on disk. */
 function existingSetup(file: string | undefined): string[] {
@@ -51,4 +55,28 @@ export function developmentTranslationPages(input: {
       ],
     };
   });
+}
+
+/** Development usage by route name, for the global-registry mode, whose payloads are built from the matched route. */
+let routeEntries: Map<string, DevelopmentPageEntries> | undefined;
+let analyzeRoute: ((page: DevelopmentPageEntries) => TranslationUsage) | undefined;
+
+/** Start a fresh route-usage table for one development install. */
+export function beginDevelopmentRouteUsage(appSrcRoot: string): void {
+  routeEntries = new Map<string, DevelopmentPageEntries>();
+  analyzeRoute = createDevelopmentUsageAnalyzer(appSrcRoot);
+}
+
+/** Record the analysis inputs of the page a route name resolved to. */
+export function registerDevelopmentRouteUsage(
+  routeName: string,
+  page: DevelopmentPageEntries,
+): void {
+  routeEntries?.set(routeName, page);
+}
+
+/** The usage of the page a route name resolved to, or `undefined` when no page was recorded for it. */
+export function developmentRouteUsageFor(routeName: string): TranslationUsage | undefined {
+  const page = routeEntries?.get(routeName);
+  return page === undefined || analyzeRoute === undefined ? undefined : analyzeRoute(page);
 }
