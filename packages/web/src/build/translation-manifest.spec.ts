@@ -78,9 +78,10 @@ function routable(
 function input(options?: Parameters<typeof buildTranslationManifest>[0]["options"]) {
   const pages: DiscoveredPage[] = [
     routable(path.join(srcRoot, "web/orders/index.page.tsx"), {
+      routeName: "orders",
       setupFile: path.join(srcRoot, "web/orders/index.setup.ts"),
     }),
-    routable(path.join(srcRoot, "web/members/index.page.tsx")),
+    routable(path.join(srcRoot, "web/members/index.page.tsx"), { routeName: "members" }),
     {
       type: "error" as const,
       pageFile: path.join(srcRoot, "web/error.page.tsx"),
@@ -124,6 +125,13 @@ describe("buildTranslationManifest", () => {
     expect(manifest.usage["src/web/members/index.page.tsx"]?.keys).toEqual(
       expect.arrayContaining(["members.title"]),
     );
+  });
+
+  it("records each page's usage again under its route name, for the global-registry mode", () => {
+    const { manifest } = buildTranslationManifest(input());
+
+    expect(manifest.routes?.orders?.prefixes).toEqual(["statuses."]);
+    expect(manifest.routes?.members?.keys).toEqual(expect.arrayContaining(["members.title"]));
   });
 
   it("records error pages as their own entries", () => {

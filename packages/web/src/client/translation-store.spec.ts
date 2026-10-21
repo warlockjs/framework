@@ -1,4 +1,6 @@
+import { getKeywordsListOf, setTranslationsList } from "@mongez/localization";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { installPayloadTranslations } from "./install-payload-translations";
 import type { HydrationDocumentPayloadSource } from "../hydration-payload";
 import {
   loadTranslationAssets,
@@ -291,5 +293,87 @@ describe("hydration parity", () => {
 
       expect(clientValue).toBe(serverValue);
     }
+  });
+});
+
+describe("global-registry mode", () => {
+  afterEach(() => setTranslationsList({}));
+
+  it("completes the registry with the shared table and the page's pruned keys", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => jsonResponse({ app: { title: "Orders app" }, common: { save: "Save" } })),
+    );
+    const source = payload(
+      { orders: { title: "Orders" } },
+      { url: "/__warlock/translations/store-test.g1.json", hash: "g1", groups: ["app", "common"] },
+      "orders.index",
+    );
+    delete (source as { translationMode?: string }).translationMode;
+
+    await loadTranslationAssets(source);
+    installPayloadTranslations(source);
+
+    expect(getKeywordsListOf(LOCALE)).toEqual({
+      app: { title: "Orders app" },
+      common: { save: "Save" },
+      orders: { title: "Orders" },
+    });
+  });
+
+  it("merges the next page's keys into the registry on navigation, keeping the earlier page's", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => jsonResponse({ app: { title: "Orders app" } })),
+    );
+    const first = payload(
+      { orders: { title: "Orders" } },
+      { url: "/__warlock/translations/store-test.g2.json", hash: "g2", groups: ["app"] },
+      "orders.index",
+    );
+    const second = payload(
+      { members: { title: "Members" } },
+      { url: "/__warlock/translations/store-test.g2.json", hash: "g2", groups: ["app"] },
+      "members.index",
+    );
+
+    await loadTranslationAssets(first);
+    installPayloadTranslations(first);
+    await loadTranslationAssets(second);
+    installPayloadTranslations(second);
+
+    expect(getKeywordsListOf(LOCALE)).toMatchObject({
+      orders: { title: "Orders" },
+      members: { title: "Members" },
+    });
+  });
+
+  it("keeps the registry writable: a registration into a shared group does not throw on the frozen table", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => jsonResponse({ app: { title: "Orders app" } })),
+    );
+    const source = payload(
+      {},
+      { url: "/__warlock/translations/store-test.g3.json", hash: "g3", groups: ["app"] },
+    );
+
+    await loadTranslationAssets(source);
+    installPayloadTranslations(source);
+
+    expect(() => {
+      const registryList = getKeywordsListOf(LOCALE);
+      if (registryList === null) throw new Error("registry missing");
+      (registryList.app as Record<string, unknown>).title = "Changed by a registration";
+    }).not.toThrow();
+  });
+
+  it("keeps a legacy payload (no shared table) on the plain registry path, with no pruning reports", () => {
+    const legacy = payload({ orders: { title: "Orders" } });
+    delete (legacy as { translationMode?: string }).translationMode;
+
+    installPayloadTranslations(legacy);
+
+    expect(getKeywordsListOf(LOCALE)).toEqual({ orders: { title: "Orders" } });
   });
 });

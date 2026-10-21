@@ -7,12 +7,10 @@ import { sharedTranslationAssets, type TranslationSourceEntries } from "../trans
 import { CLIENT_ASSET_URL_PREFIX } from "./client-asset-url-prefix";
 import { createRouteTranslationsResolver } from "./route-translations";
 import {
-  DEVELOPMENT_TRANSLATION_ROUTE_PREFIX,
   deliverTranslations,
   developmentTranslationDelivery,
   productionTranslationDelivery,
 } from "./translation-delivery";
-import { registerDevelopmentTranslationRoutes } from "./translation-route";
 import { developmentTranslationPages } from "./translation-dev-pages";
 
 const temporary: string[] = [];
@@ -122,7 +120,7 @@ describe("development translation delivery", () => {
     expect(delivery.usageFor(page).keys).toEqual(["members.title"]);
   });
 
-  it("serves every locale through a revisioned, uncached development URL with the full table", () => {
+  it("names the development full table by its content hash, under the table route", () => {
     const delivery = developmentTranslationDelivery({
       sources,
       appSrcRoot: tempRoot(),
@@ -130,7 +128,8 @@ describe("development translation delivery", () => {
     });
     const asset = delivery.assetFor("en");
 
-    expect(asset?.url.startsWith(`${DEVELOPMENT_TRANSLATION_ROUTE_PREFIX}/en?v=`)).toBe(true);
+    expect(asset?.url).toMatch(/^\/__warlock\/translations\/en\.[0-9a-f]{16}\.json$/);
+    expect(asset?.url.endsWith(`.${asset?.hash ?? ""}.json`)).toBe(true);
     expect(asset?.development).toBe(true);
   });
 
@@ -164,45 +163,6 @@ describe("development page entries", () => {
     });
 
     expect(entry?.entries).toEqual(expect.arrayContaining([page, layout, app, errorPage]));
-  });
-});
-
-describe("registerDevelopmentTranslationRoutes", () => {
-  it("registers one no-store route per locale that answers with the full table", async () => {
-    const registered = new Map<string, (context: unknown) => unknown>();
-    const response = {
-      headers: new Map<string, string>(),
-      header(name: string, value: string) {
-        this.headers.set(name, value);
-      },
-      send(body: string) {
-        return body;
-      },
-    };
-
-    registerDevelopmentTranslationRoutes(
-      {
-        get(route: string, handler: (context: unknown) => unknown) {
-          registered.set(route, handler);
-        },
-      },
-      sources,
-    );
-
-    expect([...registered.keys()].sort()).toEqual([
-      `${DEVELOPMENT_TRANSLATION_ROUTE_PREFIX}/ar`,
-      `${DEVELOPMENT_TRANSLATION_ROUTE_PREFIX}/en`,
-    ]);
-
-    const handler = registered.get(`${DEVELOPMENT_TRANSLATION_ROUTE_PREFIX}/en`);
-    const body = handler?.({ response });
-
-    expect(response.headers.get("Cache-Control")).toBe("no-store");
-    expect(JSON.parse(String(body))).toEqual({
-      app: { title: "Orders app" },
-      members: { title: "Members" },
-      orders: { title: "Orders" },
-    });
   });
 });
 
