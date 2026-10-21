@@ -1,35 +1,24 @@
 import { extend, type Keywords } from "@mongez/localization";
 import type { HydrationDocumentPayloadSource } from "../hydration-payload";
-
-const scopedSnapshots = new WeakMap<object, Readonly<Keywords>>();
-
-function copyKeywords(keywords: Readonly<Keywords>): Keywords {
-  const copy = Object.create(null) as Keywords;
-
-  for (const [key, value] of Object.entries(keywords)) {
-    copy[key] = typeof value === "string" ? value : copyKeywords(value as Readonly<Keywords>);
-  }
-
-  return Object.freeze(copy);
-}
+import {
+  mergePayloadTranslations,
+  registryCopyOf,
+  translationDictionaryFor,
+} from "./translation-store";
 
 /**
- * Return one immutable, payload-owned copy of a scoped JSON snapshot. The
- * WeakMap keeps rerenders from cloning it while allowing superseded payloads
- * to be collected.
+ * The immutable dictionary a scoped payload's locale renders with: its shared
+ * table and every page merged so far (see `translation-store.ts`). Stable across
+ * rerenders until a navigation merges something new.
  */
 export function scopedPayloadTranslations(
   payload: HydrationDocumentPayloadSource,
 ): Readonly<Keywords> | undefined {
   if (payload.translationMode !== "scoped") return undefined;
 
-  const cached = scopedSnapshots.get(payload);
-  if (cached !== undefined) return cached;
+  mergePayloadTranslations(payload);
 
-  const snapshot = copyKeywords(payload.translations);
-  scopedSnapshots.set(payload, snapshot);
-
-  return snapshot;
+  return translationDictionaryFor(payload.locale);
 }
 
 /**
@@ -48,6 +37,15 @@ export function scopedPayloadTranslations(
  */
 export function installPayloadTranslations(payload: HydrationDocumentPayloadSource): void {
   if (payload.translationMode === "scoped") return;
+
+  // A pruned global payload completes the registry with its shared table and
+  // every page merged so far (see `translation-store.ts`), so `trans()` from
+  // `@mongez/localization` sees the same keys `useTrans()` does.
+  if (payload.translationAssets !== undefined) {
+    mergePayloadTranslations(payload);
+    extend(payload.locale, registryCopyOf(payload.locale));
+    return;
+  }
 
   extend(payload.locale, payload.translations);
 }

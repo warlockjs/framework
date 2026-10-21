@@ -23,6 +23,7 @@ import { DevalueError, stringify } from "devalue";
 import type { HydrationDocumentPayloadSource } from "../components/document-context";
 import type { PageDataBundle } from "./execute-page-request";
 import { assertPageDataSerializable } from "./page-data-serialization-error";
+import { globalTranslationDelivery } from "./global-translations";
 
 /**
  * Levels without a loader resolve to `undefined`, but the hydration contract
@@ -96,6 +97,16 @@ export function buildHydrationPayload(
       `Route translation snapshot locale ${JSON.stringify(bundle.routeTranslations.locale)} does not match payload locale ${JSON.stringify(locale)}.`,
     );
   }
+  // Global-registry mode: the installed delivery prunes this route's keys and
+  // publishes the shared table. Scoped payloads carry their own (see above).
+  const globalDelivered =
+    bundle.routeTranslations === undefined
+      ? globalTranslationDelivery()?.deliver(bundle.route.name, locale)
+      : undefined;
+  const translationAssets =
+    bundle.routeTranslations === undefined
+      ? globalDelivered?.assets
+      : bundle.routeTranslations.delivered?.assets;
   const appData = serializableData(bundle.appData);
   const layoutData = serializableData(bundle.layoutData);
   const pageData = wirePageData(bundle.pageData, bundle.deferredKeys);
@@ -158,9 +169,13 @@ export function buildHydrationPayload(
     // object).
     translations:
       bundle.routeTranslations !== undefined
-        ? bundle.routeTranslations.keywords
-        : (getKeywordsListOf(locale) ?? {}),
+        ? (bundle.routeTranslations.delivered?.keywords ?? bundle.routeTranslations.keywords)
+        : (globalDelivered?.keywords ?? getKeywordsListOf(locale) ?? {}),
     ...(bundle.routeTranslations !== undefined ? { translationMode: "scoped" as const } : {}),
+    // The shared table this page's translations are completed by. Scoped and
+    // global payloads both carry one when delivery is installed; see
+    // `translations/types.ts`.
+    ...(translationAssets === undefined ? {} : { translationAssets }),
     // Same optional/never-empty rule as `metadata`/`errorPage` above — see
     // `HydrationDocumentPayloadSource.deferred`'s own doc comment.
     ...(deferredMarkerKeys.length === 0 ? {} : { deferred: deferredMarkerKeys }),

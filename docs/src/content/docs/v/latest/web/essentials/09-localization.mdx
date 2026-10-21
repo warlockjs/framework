@@ -225,6 +225,163 @@ On failure (network error, or the fresh page could not be built), the
 promise rejects and the active locale and any cookie are left exactly as
 they were.
 
+## Translation delivery: shared tables and page pruning — new in 5.36
+
+A page's hydration payload carries the translations its client code can reach,
+not every dictionary in the app. This works in both translation modes, and the
+two modes differ only in where the dictionary comes from:
+
+- **Route dictionaries** (`locales.json` under `src/web`), the scoped mode.
+- **Global registry** (`extend()`, `groupedTranslations()` and the `register()`
+  hooks), the default for a starter app.
+
+The same two mechanisms apply to both:
+
+- **Shared groups** (default `app` and `common`, the first segment of a key) are
+  shipped once per locale as a table whose URL carries its content hash, such
+  as `/__warlock/translations/en.3f9a1c0d2b7e4a51.json`. The document preloads
+  it, and hydration waits for it, so the first client render has every key.
+  A table's bytes never change under its URL, so a cached copy is never stale.
+- **Every other group** is pruned per page. The build (route dictionaries) or
+  the server (global registry) reads the page's client module graph, the
+  page, its layouts, the root, every error page and the components they
+  import, and inlines only the keys that graph can look up.
+
+Keys are found statically:
+
+| The client code does                               | The page ships                                   |
+| -------------------------------------------------- | ------------------------------------------------ |
+| `trans("members.title")`, `t(...)`, `transX(...)`  | that key and its subtree                         |
+| ``trans(`statuses.${order.status}`)``              | every key under the static prefix `statuses.`    |
+| `trans(KEY)` where `const KEY = "x.y"` (same file) | `x.y`                                            |
+| `trans(flag ? "a" : "b")`                          | both literal keys                                |
+| `trans(key)`, a translator passed on as a value    | every non-shared key (the full fallback, larger) |
+
+A translator is any binding of `trans`, `t`, `transX`, `transFrom`'s key
+argument, or the result of `useTrans()`, under any local name.
+
+### Declare what static analysis cannot see
+
+A key computed at run time has no static prefix, so the page falls back to
+every group. Declare the keys in the page's setup file instead:
+
+```ts title="src/web/orders/index.setup.ts"
+export const config = {
+  route: "/orders",
+  translations: ["statuses.*", "members.title", "members"],
+};
+```
+
+`"statuses.*"` declares every key under `statuses.`, `"members.title"` declares
+one key, and a plain group name declares the group with its subtree. A
+declaration may name a key the page reads only through a helper. `warlock check`
+reports each computed lookup in `src/web` as `WL9104` and points at this
+declaration.
+
+### Global-registry apps
+
+In global mode the shared groups are copied once, when the web connector installs
+its routes at boot. That runs after the server bundle has evaluated the app's
+module-level registrations, and before the server listens. The copy, its hash
+and the table that carries it are fixed for the life of the process:
+
+- Every process started from one deployment copies the same groups, so each
+  computes the same hash and serves the same bytes under it. A document from
+  one process names a table every other process also holds.
+- A registration that runs later, such as a page's `register()` hook on its
+  first request, does not change the shared table. A key of a shared group that
+  the page uses but the table lacks travels in that page's payload like any
+  other used key. A shared key the table already holds is never repeated in a
+  payload.
+- A locale the registry did not hold at boot gets an empty shared table. Its
+  keys travel inline, the same way.
+
+In development the table is recomputed from the registry for every payload and
+republished when it changes (`no-store`), so an edit shows at once.
+
+The client merges the shared table and each page's pruned keys into the
+registry. A later navigation adds its page's keys and keeps the earlier ones.
+`trans()` imported from `@mongez/localization` sees the keys the page received.
+
+### Serving the tables and the fallback order
+
+The server answers under `/__warlock/translations/`:
+
+- `<locale>.<hash>.json` answers that exact table. In production it is marked
+  `Cache-Control: public, max-age=31536000, immutable`, since the same name
+  always means the same bytes. In development it is `no-store`, and it carries
+  every group, so the missing-key detector can read it.
+- `<locale>.json` answers the newest table the process holds for the locale,
+  marked `no-cache`, because it changes when the table does.
+- A name the server does not hold answers **404** with `no-store`. It never
+  answers different bytes under the same name.
+
+A payload names the hashed table and the unhashed latest one. The browser loads
+the first table that answers, in this order:
+
+1. The hashed table the payload names.
+2. Only when step 1 answered **404** (the name is not in this process, because
+   another process of the deployment or an older deployment served the page):
+   the unhashed latest table.
+3. Otherwise, or when step 2 also fails: the hashed table once more.
+4. When that also fails: the failure is reported once through `onClientError`
+   with `kind: "translations"`, and the page renders its keys. It never renders
+   a blank string.
+
+Route-dictionary apps follow the same order. Their hashed table is the build's
+file under `/assets/translations/`. A process pins the same table under the same
+hash at boot, so the unhashed latest table answers in every process as well.
+
+Production tables are fixed for the process. A process therefore answers every
+hashed name it published, and the latest table, which covers a name from another
+process. A deployment should run every process from the same build, so that the
+tables match.
+
+### Development and production behave differently on a miss
+
+A key the page reads but its payload lacks is a pruning miss:
+
+- **Development** resolves it from the full table, so the page keeps working,
+  and logs one warning per key and page that names the declaration to add.
+- **Production** renders the key and reports the miss once through the client
+  error reporter that `onClientError` registers, the same one hydration and
+  navigation failures use. The report has `kind: "translations"`.
+
+If the shared table cannot be loaded even by the order above, the failure is
+reported once through `onClientError` with `kind: "translations"`, and the page
+renders its keys.
+
+In global mode a direct call to `trans()` from `@mongez/localization` is not
+hooked, so a pruning miss there is not reported. Calls through `useTrans()`
+and the framework's own translator are checked.
+
+### Options and defaults
+
+The `translations` option is set on the web connector's build settings, and the
+same object reaches the production build and the development server:
+
+```ts title="warlock.config.ts"
+web({
+  build: {
+    translations: {
+      sharedGroups: ["app", "common", "members"], // shipped once per locale
+      prune: true, // false ships every non-shared key on every page
+    },
+  },
+});
+```
+
+| Option         | Default             | Route dictionaries (scoped)        | Global registry                                      |
+| -------------- | ------------------- | ---------------------------------- | ---------------------------------------------------- |
+| `sharedGroups` | `["app", "common"]` | shared table emitted at build time | shared table copied at boot, fixed for the process   |
+| `prune`        | `true`              | keys pruned to the page's usage    | keys pruned to the page's usage, and to the snapshot |
+
+`prune: false` ships every non-shared key on every page, as payloads did before
+5.36. Use it to check a page whose keys you have not declared yet. Development
+honours both options, so a page behaves the same way in `warlock dev` and in
+production. The missing-key detector still makes a pruning miss visible in
+development.
+
 ## Gotchas
 
 - **`useLocale()` requires the page pipeline.** It throws outside

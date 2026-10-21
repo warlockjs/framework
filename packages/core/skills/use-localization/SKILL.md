@@ -357,3 +357,7 @@ connectors and the file runtime's loader channel, queued work, watchers, health
 workers, and registered module cleanup hooks, including after partial startup.
 A Node loader registration is process-scoped; its message channel is closed at
 teardown. Module-owned timers/listeners must register their cleanup hooks.
+
+## Translation keys in pages (5.36)
+
+`warlock check` reports `WL9104` when a page renders a translation key computed at runtime (`trans(key)` with no static prefix, or a translator passed on as a value). Such a page ships every translation group. Declare its keys in the page's setup file, `export const config = { translations: ["statuses.*", "members.title"] }`, to ship only what it uses. The `web` skill `localize-pages` covers the browser side.

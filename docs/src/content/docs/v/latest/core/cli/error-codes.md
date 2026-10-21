@@ -1,6 +1,6 @@
 ---
 title: "Error codes"
-description: Every stable Warlock error code (WL1001…WL9103) — what it means, what to do, and the skill that explains it. Thrown framework errors, `warlock doctor --json` findings and `warlock check --json` problems all carry these codes; `warlock explain <CODE>` prints one.
+description: Every stable Warlock error code (WL1001…WL9104) — what it means, what to do, and the skill that explains it. Thrown framework errors, `warlock doctor --json` findings and `warlock check --json` problems all carry these codes; `warlock explain <CODE>` prints one.
 sidebar:
   order: 10
   label: "Error codes"
@@ -509,6 +509,12 @@ Category: your code · skill: `warlock-doctor`
 **CHANGELOG.md is missing or has no version heading.** Add a CHANGELOG.md with a `## x.y.z` heading for the current version.
 
 Category: your code · skill: `warlock-doctor`
+
+### WL9104
+
+**Translation key is computed at runtime, so the page cannot ship only the keys it uses.** Declare the keys or prefixes the page renders in its setup file, for example `export const config = { translations: ["statuses.*", "members.title"] }`. Until then the page ships every translation group. Reported as a warning on `src/web` files; the page falls back to the full groups.
+
+Category: your code · skill: `use-localization`
 
 ### WL9013
 

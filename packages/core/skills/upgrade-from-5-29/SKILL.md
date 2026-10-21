@@ -564,3 +564,28 @@ A page document now carries only the named API routes its client code can reach.
 Routes registered with `clientVisible: false` are never embedded, and a browser call to one is an error (`WL9020`). Keep endpoints the browser must not reach on that option. Authorization is unchanged: the server still decides each request.
 
 To measure a page's inline payload, set `build.budgets.payload` (default `64kb`). An over-budget route logs one line per process and never fails a request.
+## 5.35 to 5.36 translation payloads
+
+A page's hydration payload now carries only the translations its client code
+can reach, in route-dictionary (`locales.json`) and global-registry (`extend()`)
+apps alike. The groups every page uses (default `app` and `common`) arrive once
+per locale in a hashed, cached file that the page preloads. Nothing in a page's
+render changes: server output is the full dictionary, as before.
+
+Run `warlock build`, then `warlock check`. A `WL9104` warning marks a page that
+renders a translation key computed at runtime. Declare the keys it renders in
+the page's setup file, for example
+`export const config = { translations: ["statuses.*", "members.title"] }`, so the
+page ships only what it uses.
+
+In development, a warning names a key the page reads but its payload lacks, and
+resolves it from the full table so the page keeps working. In production the
+key renders as its own text and the miss is reported once through
+`onClientError` with `kind: "translations"`. Declare the key, or set
+`build: { translations: { prune: false } }` in the web connector options while migrating to
+restore the previous per-page payload.
+
+Global-registry apps are covered too. Their shared table is served at
+`/__warlock/translations/<locale>.<hash>.json`, which is cached immutable in
+production. A direct `trans()` call from `@mongez/localization` is not checked
+for a pruning miss; the calls through `useTrans()` are.

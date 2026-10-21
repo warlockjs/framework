@@ -727,6 +727,14 @@ export const ERROR_CODES = {
     fix: "Add a CHANGELOG.md with a `## x.y.z` heading for the current version.",
     skill: "warlock-doctor",
   },
+  WL9104: {
+    code: "WL9104",
+    area: "convention",
+    category: "code",
+    title: "Translation key is computed at runtime, so the page cannot ship only the keys it uses",
+    fix: 'Declare the keys or prefixes the page renders in its setup file, for example `export const config = { translations: ["statuses.*", "members.title"] }`. Until then the page ships every translation group.',
+    skill: "use-localization",
+  },
 } as const satisfies Record<string, ErrorCodeDefinition>;
 
 /** Every registered code, as a union. */

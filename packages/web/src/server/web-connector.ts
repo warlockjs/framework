@@ -273,6 +273,7 @@ export function resolveWebServerBarrelPath(selfPath: string): string {
   return path.join(path.dirname(selfPath), `index${path.extname(selfPath)}`);
 }
 
+import type { TranslationBuildOptions } from "../build/translation-manifest";
 export type WebConnectorOptions = {
   /**
    * Vite's `root` Ã¢â‚¬â€ the application directory that owns `src/`, `package.json`
@@ -305,6 +306,13 @@ export type WebConnectorOptions = {
   plugins?: PluginOption[];
   /** Milliseconds Vite's development SSR module fetch may take before failing. */
   ssrFetchTimeoutMs?: number;
+
+  /**
+   * Translation delivery, the same object `web({ build: { translations } })`
+   * hands to the production build. Development reads it too, so both halves
+   * share `sharedGroups` and `prune`. See `TranslationBuildOptions`.
+   */
+  translations?: TranslationBuildOptions;
 };
 
 /**
@@ -571,6 +579,7 @@ export class WebConnector extends BaseConnector {
     this.installDevPageRoutes = () =>
       webServerSsr.installPageRoutes({
         router,
+        translations: this.options.translations,
         vite: this.vite,
         appSrcRoot: paths.appSrcRoot,
         appFile: paths.appFile,

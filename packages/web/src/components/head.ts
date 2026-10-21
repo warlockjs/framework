@@ -6,6 +6,7 @@ import {
   type MetadataDescriptor,
 } from "../metadata/metadata-descriptors";
 import { useDocumentContext } from "./document-context";
+import { translationPreloadLinks } from "./translation-preload";
 import { LOCALE_ROUTING_META_NAME } from "../routing/locale-routing-meta-name";
 
 function renderDescriptor(descriptor: MetadataDescriptor): ReactElement {
@@ -54,6 +55,7 @@ export function Head(): ReactElement {
     localeAlternates,
     localeRouting,
     hydrationClientModulePreloadUrls,
+    payload,
   } = useDocumentContext("Head");
 
   const viewport = resolveViewport(metadata);
@@ -76,6 +78,8 @@ export function Head(): ReactElement {
     ...(hydrationClientModulePreloadUrls ?? []).map((url) =>
       createElement("link", { key: `modulepreload-${url}`, rel: "modulepreload", href: url }),
     ),
+    // The shared translation table the client fetches before hydrating.
+    ...translationPreloadLinks(payload?.translationAssets),
     ...[...new Map((fontPreloads ?? []).map((face) => [face.href, face])).values()].map((face) =>
       createElement("link", {
         key: `font-${face.href}`,

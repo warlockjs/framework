@@ -267,6 +267,7 @@ They parse real TypeScript/JSX syntax with the same oxc-parser adapter as the ex
 | `WL9018` | Exported `RequestHandler` in `src/app/**/controllers` lacks `responseSchema`                             | Assign `handler.responseSchema` to document each response status.                                                                                                  |
 | `WL9019` | A browser route call (`apiHref`, `useSubmitForm({ route })`) takes a name that is only known at run time | Pass a string literal or a template with a static prefix, or declare the names with `config.apiRoutes` in a page setup file.                                       |
 | `WL9020` | Browser code references a route registered with `clientVisible: false` (an error, not a warning)         | Call the endpoint from the server, or drop `clientVisible: false` from the route.                                                                                  |
+| `WL9104` | Translation key computed at runtime in `src/web` (a page then ships every group)                         | Declare the keys with `config.translations` in the page's setup file.                                                                                              |
 
 Web rules apply to `src/web/**/*.tsx`. Components are top-level JSX-returning functions
 with a capitalized name (or an anonymous default export). Hook files and ordinary helpers

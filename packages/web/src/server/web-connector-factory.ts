@@ -116,6 +116,8 @@ export function webConnector(options: WebConnectorFactoryOptions = {}): Connecto
         ...connectorOptions,
         plugins: connectorPlugins,
         webRoot,
+        // One setting for both halves: development reads the same options the build does.
+        translations: buildOptions?.translations,
       });
     }
 

@@ -29,7 +29,8 @@ export type ClientErrorKind =
   | "unhandled-rejection"
   | "hydration"
   | "boundary"
-  | "navigation";
+  | "navigation"
+  | "translations";
 
 /** What a registered {@link ClientErrorReporter} receives. */
 export type ClientErrorEvent = {

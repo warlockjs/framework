@@ -90,6 +90,22 @@ import {
 } from "./not-found-page";
 import type { LayoutModuleShape } from "./page-module-shapes";
 import { createRouteTranslationsResolver } from "./route-translations";
+import { developmentTranslationDelivery } from "./translation-delivery";
+import {
+  beginDevelopmentRouteUsage,
+  developmentRouteUsageFor,
+  developmentTranslationPages,
+  registerDevelopmentRouteUsage,
+} from "./translation-dev-pages";
+import { registerTranslationTableRoute, TRANSLATION_ROUTE_SOURCE_FILE } from "./translation-route";
+import {
+  createLiveGlobalTranslationDelivery,
+  installGlobalTranslationDelivery,
+} from "./global-translations";
+import {
+  resolveTranslationOptions,
+  type TranslationBuildOptions,
+} from "../build/translation-manifest";
 import {
   filterActiveSites,
   siteRegistrationRouter,
@@ -414,6 +430,8 @@ async function composeLayoutLevel(
 
 export type InstallPageRoutesOptions = {
   router: Router;
+  /** The web connector's translation settings, shared with the production build. */
+  translations?: TranslationBuildOptions;
   vite: ViteDevServer;
   /** v5/app/src — pages live under "<appSrcRoot>/web/**". */
   appSrcRoot: string;
@@ -580,6 +598,24 @@ export async function installPageRoutes(
     const routeLocaleManifest =
       artifact === undefined ? buildRouteLocaleManifest(graph, localeOptions) : artifact.manifest;
 
+    // Development serves each locale's full table here, the payload's pointer
+    // to it. Owned like the page routes, so a reload replaces them.
+    // Development payloads of both modes name their tables under this route.
+    // The global mode's usage is keyed by route name, recorded as each page's
+    // name resolves during the install below.
+    const translationOptions = resolveTranslationOptions(options.translations);
+    beginDevelopmentRouteUsage(options.appSrcRoot);
+    installGlobalTranslationDelivery(
+      createLiveGlobalTranslationDelivery({
+        sharedGroups: translationOptions.sharedGroups,
+        prune: translationOptions.prune,
+        usageFor: developmentRouteUsageFor,
+      }),
+    );
+    await options.router.withSourceFile(TRANSLATION_ROUTE_SOURCE_FILE, () =>
+      registerTranslationTableRoute(options.router),
+    );
+
     if (options.siteDispatch === undefined) {
       return await installDiscoveredPageRoutes(
         options,
@@ -671,7 +707,24 @@ async function installDiscoveredPageRoutes(
   const discovered = [...discoveredGraph.pages].sort((left, right) =>
     left.pageFile < right.pageFile ? -1 : left.pageFile > right.pageFile ? 1 : 0,
   );
-  const getRouteTranslations = createRouteTranslationsResolver(routeLocaleManifest);
+  const developmentPages = developmentTranslationPages({
+    pages: discoveredGraph.pages,
+    appFile: options.appFile,
+  });
+  const developmentPageByFile = new Map(developmentPages.map((page) => [page.pageFile, page]));
+  const translationOptions = resolveTranslationOptions(options.translations);
+  const getRouteTranslations = createRouteTranslationsResolver(
+    routeLocaleManifest,
+    routeLocaleManifest === undefined
+      ? undefined
+      : developmentTranslationDelivery({
+          sources: routeLocaleManifest.sources,
+          appSrcRoot,
+          pages: developmentPages,
+          sharedGroups: translationOptions.sharedGroups,
+          prune: translationOptions.prune,
+        }),
+  );
 
   // THE NOT-FOUND PAGE IS TAKEN OUT OF THE ORDINARY LOOP, not filtered inside
   // it. It has no `route` export to read, no path to compose and no collision
@@ -753,6 +806,9 @@ async function installDiscoveredPageRoutes(
       pageFile,
       siteScope?.site,
     );
+
+    const developmentPage = developmentPageByFile.get(pageFile);
+    if (developmentPage !== undefined) registerDevelopmentRouteUsage(name, developmentPage);
 
     // Validated at INSTALL time, with everything else — a malformed `cache`
     // opt-in fails boot, not the first request that would have served it.

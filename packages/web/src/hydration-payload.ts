@@ -173,6 +173,31 @@ function requireValidationIssues(value: unknown): void {
 }
 
 /**
+ * The shared-table reference a scoped payload may carry: a non-empty URL and
+ * hash, the groups it provides, and an optional development flag.
+ */
+function isTranslationAssets(value: unknown): boolean {
+  if (!isPlainObject(value)) return false;
+
+  const record = value as Record<string, unknown>;
+
+  if (typeof record.url !== "string" || record.url.length === 0) return false;
+  if (typeof record.hash !== "string" || record.hash.length === 0) return false;
+  if (!Array.isArray(record.groups) || !record.groups.every((group) => typeof group === "string")) {
+    return false;
+  }
+
+  if (
+    record.latest !== undefined &&
+    (typeof record.latest !== "string" || record.latest.length === 0)
+  ) {
+    return false;
+  }
+
+  return record.development === undefined || typeof record.development === "boolean";
+}
+
+/**
  * The single runtime gate for hydration payloads, regardless of whether they
  * arrived in the document or through a navigation data response.
  */
@@ -199,6 +224,9 @@ export function isHydrationPayload(value: unknown): value is HydrationDocumentPa
   ) {
     return false;
   }
+
+  const translationAssets = (value as Record<string, unknown>).translationAssets;
+  if (translationAssets !== undefined && !isTranslationAssets(translationAssets)) return false;
 
   for (const key of OPTIONAL_OBJECT_PAYLOAD_KEYS) {
     const optional = (value as Record<string, unknown>)[key];

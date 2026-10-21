@@ -2,6 +2,11 @@ import type { Keywords } from "@mongez/localization";
 import { createHash } from "node:crypto";
 
 import type { RouteLocaleManifest } from "../build/build-route-locale-manifest";
+import {
+  deliverTranslations,
+  type DeliveredTranslations,
+  type TranslationDelivery,
+} from "./translation-delivery";
 
 /**
  * The immutable locale table selected for one server render. It is deliberately
@@ -12,6 +17,12 @@ export type RouteTranslations = {
   readonly keywords: Readonly<Keywords>;
   /** Selected copy identity used to keep cached responses current after JSON edits. */
   readonly revision: string;
+  /**
+   * What the hydration payload carries for this page: the pruned dictionary and
+   * the shared-table reference. Absent when no delivery was configured, in which
+   * case the payload carries {@link keywords} as it always did.
+   */
+  readonly delivered?: DeliveredTranslations;
 };
 
 export type RouteTranslationsResolver = (sourceFile: string, locale: string) => RouteTranslations;
@@ -33,6 +44,7 @@ function copyAndFreeze(value: unknown): unknown {
  */
 export function createRouteTranslationsResolver(
   manifest: RouteLocaleManifest | undefined,
+  delivery?: TranslationDelivery,
 ): RouteTranslationsResolver | undefined {
   if (manifest === undefined) return undefined;
 
@@ -57,10 +69,14 @@ export function createRouteTranslationsResolver(
     const existing = snapshots.get(key);
     if (existing !== undefined) return existing;
 
+    const frozen = copyAndFreeze(keywords) as Readonly<Keywords>;
     const snapshot: RouteTranslations = Object.freeze({
       locale,
-      keywords: copyAndFreeze(keywords) as Readonly<Keywords>,
+      keywords: frozen,
       revision: createHash("sha256").update(JSON.stringify(keywords)).digest("hex"),
+      ...(delivery === undefined
+        ? {}
+        : { delivered: deliverTranslations(delivery, sourceFile, locale, frozen) }),
     });
     snapshots.set(key, snapshot);
 

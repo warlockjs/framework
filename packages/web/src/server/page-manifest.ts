@@ -20,6 +20,9 @@
  * does at build — so explicit-wins semantics live in one place for all three.
  */
 
+// Type-only: erased at run time, so this module stays dependency-free.
+import type { PageManifestTranslations } from "../translations/types";
+
 export type PageManifestLayoutEntry = {
   /** The imported layout module namespace object (default export = component, optional `prefix`). */
   module: Record<string, unknown>;
@@ -130,6 +133,12 @@ export type PageManifest = {
   payloadBudget?: PagePayloadBudget;
   /** Validated route-locales JSON sources, emitted by the production barrel without client imports. */
   localeFiles?: readonly PageManifestLocaleFile[];
+  /**
+   * Build-time translation delivery: the shared groups, the pruning switch and
+   * each page's client usage. Present whenever `localeFiles` is; see
+   * `PageManifestTranslations`.
+   */
+  translations?: PageManifestTranslations;
   /**
    * The application root component every page renders inside.
    *

@@ -15,6 +15,7 @@ import {
   EMPTY_API_ROUTE_FACTS,
   type ApiRouteFacts,
 } from "./api-route-references";
+import { translationProblems } from "./translation-conventions";
 import { positionOf, type SourceFinding } from "./source-ast";
 
 /** Extensions tried when resolving an extension-less import. */
@@ -203,6 +204,7 @@ export function checkFileConventions(
   const sourceFile = ast.parseSourceFile(relativePath, source);
   const problems = [
     ...importProblems(sourceFile, relativePath, cwd),
+    ...translationProblems(relativePath, source),
     ...[
       ...securityFindings(sourceFile),
       ...codeStyleFindings(sourceFile),
