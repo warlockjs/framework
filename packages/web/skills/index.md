@@ -11,9 +11,9 @@ Web adds an SSR React page layer to a Warlock app. Pages live under `src/web/**`
 1. Install the layer with `warlock add web` (`add-web-to-an-app.md`), then edit the document in `src/web/root.tsx` (`write-the-root.md`).
 2. Separate UI and logic with `use-page-setup-files`, then create pages with `config` and a loader (`create-a-page.md`, `load-page-data.md`, which also covers how loader data is typed on the page); wrap them with `use-layouts.md`; set titles, descriptions, Open Graph and per-locale metadata (`set-page-metadata.md`).
 3. Link and navigate with `<Link>`, `href()`, `navigateTo` (`navigate-on-the-client.md`).
-4. Post forms to a Core API route (`submit-a-form.md`), then `refresh()` to revalidate (a route whose handler declares `responseSchema` types `data` and `onSuccess`); or handle a form on the page itself with an `action` export and `<Form>` (`handle-a-form-action.md`).
+4. Post forms to a Core API route (`submit-a-form.md`), then `refresh()` to revalidate (a route whose handler declares `responseSchema` types `data` and `onSuccess`); or handle a form on the page itself with an `action` export and `<Form>` (`handle-a-form-action.md`). Keep feedback, pending states and motion correct with `preserve-feedback-and-motion.md`.
 5. Guard pages and read the user (`protect-a-page.md`); a `requireUser()`-guarded page is typed as signed-in (`useUser("route.name")` is non-null).
-6. Translate pages (`localize-pages.md`); stream slow data (`stream-deferred-data.md`).
+6. Translate pages (`localize-pages.md`), then build RTL and mixed-direction layouts (`build-rtl-and-mixed-direction-ui.md`); stream slow data (`stream-deferred-data.md`).
 7. Polish: styles (`serve-styles.md`), self-hosted fonts (`use-web-fonts.md`), sitemap and robots (`generate-sitemap.md`), themes (`multi-theme.md`), multi-site apps (`multi-site.md`), client-only UI and hydration debugging (`render-client-only.md`), images (`render-images.md`), vitals (`measure-web-vitals.md`).
 8. Test page loaders, actions and rendering (`test-a-page.md`).
 9. Observe SSR phases and deferred values with `TracingHooks` (`observe-page-requests.md`).
