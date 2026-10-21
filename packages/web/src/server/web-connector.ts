@@ -46,6 +46,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { FastifyReply, FastifyRequest, HookHandlerDoneFunction } from "fastify";
 import type { Alias, PluginOption, ViteDevServer } from "vite";
+import { assertViteVersion } from "../vite/assert-vite-version";
 import {
   Application,
   BaseConnector,
@@ -1027,7 +1028,9 @@ export class WebConnector extends BaseConnector {
     fastify: FastifyInstance,
     paths: Awaited<ReturnType<WebConnector["resolvePaths"]>>,
   ): Promise<ViteDevServer> {
-    const { createServer, buildErrorMessage, searchForWorkspaceRoot } = await import("vite");
+    const { createServer, buildErrorMessage, searchForWorkspaceRoot, version } =
+      await import("vite");
+    assertViteVersion(version);
     const { createWebConnectorViteConfig } = await import("../vite/dev-server-config");
 
     // Vite's own default for `server.fs.allow`, reproduced rather than dropped:

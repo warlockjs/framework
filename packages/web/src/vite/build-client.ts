@@ -1,6 +1,7 @@
 import { statSync } from "node:fs";
 import path from "node:path";
 import type { AliasOptions, PluginOption, Rollup } from "vite";
+import { assertViteVersion } from "./assert-vite-version";
 import { cssModulesConfig } from "./css-modules-config";
 import {
   createHydrationClientEntry,
@@ -203,9 +204,9 @@ export async function buildHydrationClient(
 
   const outDir = path.resolve(options.outDir);
   const manifestPath = path.join(outDir, ".vite/manifest.json");
-  const { build } = await import("vite");
+  const { build, createLogger, version } = await import("vite");
+  assertViteVersion(version);
   const viteRoot = options.webRoot;
-  const { createLogger } = await import("vite");
   const logger = createLogger();
   const logRoot = options.logRoot;
   const customLogger = {
