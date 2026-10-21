@@ -1,10 +1,19 @@
 import config from "@mongez/config";
 import { log } from "@warlock.js/logger";
 import type { FastifyReply, FastifyRequest } from "fastify";
+import type { AppError } from "./errors";
 import type { FastifyInstance } from "./server";
+
+const appErrors = new WeakMap<FastifyReply, AppError>();
+
+/** @internal Preserve the typed domain failure until the JSON formatter runs. */
+export function setResponseAppError(reply: FastifyReply, error: AppError): void {
+  appErrors.set(reply, error);
+}
 
 /** JSON error body and correlation data available at the transport boundary. */
 export type HttpErrorResponseContext = {
+  appError?: AppError;
   status: number;
   body: unknown;
   requestId: string;
@@ -49,7 +58,12 @@ export function registerErrorResponseFormatter(server: FastifyInstance): void {
 
       try {
         const body: unknown = JSON.parse(payload.toString());
-        const formatted = formatter({ status: reply.statusCode, body, requestId });
+        const formatted = formatter({
+          status: reply.statusCode,
+          body,
+          requestId,
+          appError: appErrors.get(reply),
+        });
 
         if (formatted === undefined) {
           return payload;

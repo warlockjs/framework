@@ -425,3 +425,59 @@ The controller doesn't know there's a cache. The service doesn't know how the ca
 - **Repository caching depth — keys, invalidation, custom drivers:** [Repositories (deep) guide](../the-basics/repositories-deep.md)
 - **Latency benchmarking patterns:** [Benchmark guide](../digging-deeper/benchmark.md)
 - **Building one-shot remember/forget calls:** ``@warlock.js/cache` — cache-basics skill`
+
+## Bounded list endpoints
+
+Use `listEndpoint(request, listCallback, options)` from `@warlock.js/core` to
+produce `{ <pluralKey>: data, pagination }` from a page-based repository list.
+The callback receives repository options, with sorting translated into the
+repository's `[column, direction]` tuple. Wrap repository methods in an arrow
+to preserve their receiver. Both `list` and `listCached` work.
+
+```ts
+import { listEndpoint, type Request, type RequestHandler } from "@warlock.js/core";
+import { v, type Infer } from "@warlock.js/seal";
+import { productsRepository } from "../repositories/products.repository";
+
+const querySchema = v.object({
+  page: v.int().min(1).default(1),
+  limit: v.int().min(1).default(20),
+  orderBy: v.literal("createdAt", "name").optional(),
+  orderDir: v.literal("asc", "desc").optional(),
+  status: v.literal("active", "archived").optional(),
+});
+type Query = Infer<typeof querySchema>;
+
+export const listProducts: RequestHandler<Request<Query>> = async ({ request, response }) =>
+  response.success(
+    await listEndpoint(request, (options) => productsRepository.listCached(options), {
+      pluralKey: "products",
+      maxLimit: 100,
+      orderBy: ["createdAt", "name"],
+      filters: ["status"],
+    }),
+  );
+
+listProducts.validation = { schema: querySchema, validating: ["query"] };
+// Attach responseSchema with your ProductResource and pagination fields too.
+```
+
+`request.validated()` must already contain schema-validated query values. Seal
+handles coercion and filter validation; the helper does not read raw query or
+body values. Configure the repository's `filterBy` for the chosen filter fields.
+Only explicitly listed `filters` are forwarded; pagination and sort controls
+cannot be declared as filters in the typed API. Filters remain flat repository
+options, rather than a nested `filters` object.
+
+Defaults are page 1, limit 20, maxLimit 100. The helper clamps a positive integer
+limit to maxLimit (use `.max(100)` in the query schema instead if you prefer a
+422 for excessive requests). Invalid page/limit or unlisted sort columns throw
+`AppError("invalidListQuery", 422, ...)`. Sort directions are restricted to
+`asc`/`desc`, defaulting to `asc` when a column is provided. With no column,
+repository default ordering applies. Invalid helper configuration throws a
+`TypeError`. The plural key must be nonempty and cannot be `pagination`.
+
+The helper forces page pagination and preserves the repository's pagination
+metadata without recalculating it. Cursor and unpaginated endpoints need their
+own controller. Add authorization constraints inside the callback using trusted
+server values; never accept them as client filters.

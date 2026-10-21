@@ -11,7 +11,19 @@ const statusCodes: Record<number, string> = {
 };
 
 /** Convert framework JSON errors to the project's public error contract. */
-export function formatHttpErrorResponse({ status, body, requestId }: HttpErrorResponseContext) {
+export function formatHttpErrorResponse({
+  status,
+  body,
+  requestId,
+  appError,
+}: HttpErrorResponseContext) {
+  if (appError) {
+    return {
+      error: { code: appError.code, message: appError.publicMessage },
+      ...(appError.details === undefined ? {} : { details: appError.details }),
+      requestId,
+    };
+  }
   const source = isRecord(body) ? body : {};
   const error = isRecord(source.error) ? source.error : {};
   const serverFault = status >= 500;

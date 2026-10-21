@@ -53,3 +53,5 @@ export * from "./context/request-memo";
 
 // the client-side type of a serialized value, and the model to resource registry behind it
 export * from "./serialized";
+
+export * from "./list-endpoint";

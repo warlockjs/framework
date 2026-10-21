@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 > ⚠ **Versioning: `@warlock.js/*` does not follow SemVer strictly — breaking changes may ship in a minor.** This is a deliberate decision, not an oversight: the framework is pre-adoption and the cost of a major per behaviour fix currently outweighs the benefit. **Pin an exact version or a tilde range (`~4.13.0`) if you need to opt into changes rather than receive them.** Every breaking change is marked **BREAKING** in its entry and summarised in an _Upgrading_ section at the top of the release. **This policy will change once the framework has consumers beyond its author.**
 
+## 5.35.0
+
+### Added
+
+- Typed `AppError` domain failures with native HTTP handling and `http.errorResponse` context, preserving legacy HTTP error behavior.
+- `listEndpoint` builds typed plural-key page responses from validated query controls and repository list callbacks, with bounded limits and explicit sort/filter whitelists.
+- `assertResponseContracts` checks real HTTP responses against declared status schemas, with fixtures, resource support and optional complete status coverage.
+
 ## 5.34.3 - 2026-10-20
 
 ### Fixed

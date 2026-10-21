@@ -1,3 +1,19 @@
+/** A domain failure whose message and details are explicitly safe for clients. */
+export class AppError<Details = unknown, Code extends string = string> extends Error {
+  public constructor(
+    public readonly code: Code,
+    public readonly status: number,
+    public readonly publicMessage: string,
+    public readonly details?: Details,
+  ) {
+    super(publicMessage);
+    if (!Number.isInteger(status) || status < 400 || status > 599) {
+      throw new RangeError("AppError status must be an integer between 400 and 599.");
+    }
+    this.name = "AppError";
+  }
+}
+
 export class HttpError extends Error {
   public constructor(
     public status: number,

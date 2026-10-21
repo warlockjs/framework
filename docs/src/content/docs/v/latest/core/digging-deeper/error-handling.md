@@ -357,3 +357,53 @@ The `response` object ships matching helpers for the common statuses — `respon
 - [Use-cases](../the-basics/04-use-cases.md) — where `BadSchemaUseCaseError` is thrown, and the pipeline that catches your throws.
 - [Validation](../the-basics/validation.md) — the schema layer that feeds the `failedSchema` envelope.
 - [Logging](./logging.md) — the `log` API the pipeline uses when it records a failed request.
+
+## Typed domain failures
+
+`AppError<Details, Code>` is available from `@warlock.js/core` and the lightweight
+`@warlock.js/core/errors` entry. Its constructor is
+`new AppError(code, status, publicMessage, details?)`. Status must be an integer
+from 400 to 599. The message and details are explicitly public, including for
+5xx errors: never put diagnostics, credentials or private records there.
+
+```ts
+import { AppError } from "@warlock.js/core/errors";
+
+throw new AppError("quotaExceeded", 429, "Try again later.", { retryAfter: 30 });
+```
+
+The default response is
+`{ error: { code: "quotaExceeded", message: "Try again later.", details: { retryAfter: 30 } } }`.
+Absent details are omitted; `false`, `0` and `null` details are preserved. Errors
+retain the private, no-store cache policy, and server failures are logged.
+
+`AppError` and `HttpError` are separate `Error` subclasses. Existing `HttpError`
+constructors, inheritance, `payload` and legacy `{ error: message, payload? }`
+bodies remain unchanged. Both bypass `http.errorMapper`; ordinary errors retain
+the existing opaque 500 fallback. Choose `AppError` for new domain failures
+that need stable codes, and keep existing HTTP error subclasses as they are.
+
+`http.errorResponse` receives an optional typed `appError` alongside `body`,
+`status` and `requestId`. No per-error mapper is needed:
+
+```ts
+import type { HttpErrorResponseFormatter } from "@warlock.js/core";
+
+const errorResponse: HttpErrorResponseFormatter = ({ appError, requestId }) => {
+  if (!appError) return undefined; // keep other JSON errors unchanged
+  return {
+    error: {
+      code: appError.code,
+      message: appError.publicMessage,
+      ...(appError.details === undefined ? {} : { details: appError.details }),
+    },
+    requestId,
+  };
+};
+// Set this function as http.errorResponse in your HTTP configuration.
+```
+
+The formatter sees the original instance only for thrown `AppError`s handled
+by the request lifecycle. Early Fastify rejections and returned helper responses
+have no `appError`; use `body` and `status` for those cases. Do not spread an
+error instance into the response.
