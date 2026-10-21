@@ -28,7 +28,7 @@ Measured on a real admin page: 56.7 KB HTML, of which translations 22 KB and the
   fully dynamic keys, and a development detector for used-but-missing keys.
 - Page data stays inline (required for hydration).
 
-## Development watch race (found in the 5.35.0 validation)
+## Development watch race (found in the 5.35.0 validation) — addressed: page edits no longer wait for the sitemap refresh
 
 `packages/core/tests/integration/e2e/web-development.test.ts` ("development regression: shared") timed out once under
 full-suite load: after `src/web/layout.setup.ts` was deleted (revision 3) the browser reloaded, then the page edit

@@ -249,6 +249,40 @@ describe("WebConnector live page routing", () => {
     expect(sitemapMocks.refresh).toHaveBeenCalledWith({ appRoot: files.appRoot });
   });
 
+  it("answers a hot update before the sitemap refresh while keeping queue order", async () => {
+    const files = fixture();
+    const vite = fakeVite({ config: { route: { path: "/settings" } }, default: (): null => null });
+    const connector = new LiveRoutingConnector();
+    let releaseRefresh = (): void => undefined;
+    const refreshGate = new Promise<void>((resolve) => {
+      releaseRefresh = resolve;
+    });
+
+    connector.seed({
+      ...files,
+      vite: vite.vite,
+      installedPages: [page(files.pageFile)],
+      install: vi.fn(async () => [page(files.pageFile)]),
+    });
+    vi.spyOn(router, "list").mockReturnValue([
+      { isPage: true, sourceFile: "src/web/settings.page.tsx" },
+    ] as ReturnType<typeof router.list>);
+    sitemapMocks.refresh.mockImplementationOnce(async () => refreshGate);
+
+    // The browser update is decided while the sitemap refresh is still pending.
+    await expect(connector.hotUpdate(files.pageFile)).resolves.toBe(false);
+    expect(sitemapMocks.refresh).toHaveBeenCalledTimes(1);
+
+    // The next edit still waits for that refresh before it inspects the page.
+    const next = connector.hotUpdate(files.pageFile);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(vite.ssrLoadModule).toHaveBeenCalledTimes(1);
+
+    releaseRefresh();
+    await expect(next).resolves.toBe(false);
+    expect(vite.ssrLoadModule).toHaveBeenCalledTimes(2);
+  });
+
   it("atomically replaces routes, then invalidates the client registry for a route edit", async () => {
     const files = fixture();
     const vite = fakeVite({

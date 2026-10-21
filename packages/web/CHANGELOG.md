@@ -26,6 +26,10 @@ All notable changes to `@warlock.js/web` are documented here.
 - Server seam `resolveNamedApiRoutes(names)` takes the names a page may embed; called without them it returns an empty table, where it used to return every route.
 - Authorization is not affected: a route in a page's table still answers `401` or `403` from its own guards.
 
+### Fixed
+
+- Development page edits reach the browser without waiting for the sitemap subscription refresh, which still runs in order before the next route update. Under heavy machine load a page edit made right after deleting a layout or setup file could take longer than ten seconds to appear.
+
 ## 5.35.0 - 2026-10-21
 
 ### Added

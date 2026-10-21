@@ -823,15 +823,30 @@ export class WebConnector extends BaseConnector {
   }
 
   protected enqueuePageRouteReload(changes: PageFileChanges): Promise<boolean> {
+    return this.schedulePageRouteReload(changes).decision;
+  }
+
+  /**
+   * Queues one route reconciliation. `decision` resolves as soon as the route
+   * graph is settled, so the browser update is not held behind the sitemap
+   * subscription refresh; `settled` also covers that refresh, which stays in
+   * the queue so the next job still runs after it.
+   */
+  protected schedulePageRouteReload(changes: PageFileChanges): {
+    decision: Promise<boolean>;
+    settled: Promise<void>;
+  } {
     const eventVersions = pageChangeVersions(changes);
-    const run = this.pageRouteReloadQueue
+    const job = this.pageRouteReloadQueue
       .catch(() => undefined)
-      .then(async () => {
+      .then(async (): Promise<{ handled: boolean; sitemapRoot?: string }> => {
         const vite = this.vite;
         const install = this.installDevPageRoutes;
         const paths = this.resolvedPaths;
 
-        if (vite === undefined || install === undefined || paths === undefined) return false;
+        if (vite === undefined || install === undefined || paths === undefined) {
+          return { handled: false };
+        }
 
         const matchingCommittedFiles = new Set<string>();
 
@@ -850,8 +865,7 @@ export class WebConnector extends BaseConnector {
         }
 
         if (eventVersions.size > 0 && matchingCommittedFiles.size === eventVersions.size) {
-          await this.refreshSitemapModelSubscriptions(paths.appRoot);
-          return true;
+          return { handled: true, sitemapRoot: paths.appRoot };
         }
 
         const replace = await pageRoutesNeedReplacement(changes, {
@@ -860,10 +874,7 @@ export class WebConnector extends BaseConnector {
           installedPages: this.installedPages,
         });
 
-        if (!replace) {
-          await this.refreshSitemapModelSubscriptions(paths.appRoot);
-          return false;
-        }
+        if (!replace) return { handled: false, sitemapRoot: paths.appRoot };
 
         const nextInstalledPages = await router.replaceRoutesBySourceFiles(
           pageRouteSourceFiles(router.list()),
@@ -880,20 +891,25 @@ export class WebConnector extends BaseConnector {
           invalidateClientPageRegistry(vite, site);
         }
 
-        // Routes are committed; now atomically replace sitemap invalidation subscriptions.
-        await this.refreshSitemapModelSubscriptions(paths.appRoot);
-
         for (const [file, eventVersion] of eventVersions) {
           if (!matchingCommittedFiles.has(file)) {
             this.pendingHotUpdateSuppressions.set(file, eventVersion);
           }
         }
 
-        return true;
+        // Routes are committed; the sitemap subscriptions are replaced next, in the queue.
+        return { handled: true, sitemapRoot: paths.appRoot };
       });
 
-    this.pageRouteReloadQueue = run;
-    return run;
+    const settled = job.then(
+      async ({ sitemapRoot }) => {
+        if (sitemapRoot !== undefined) await this.refreshSitemapModelSubscriptions(sitemapRoot);
+      },
+      () => undefined,
+    );
+
+    this.pageRouteReloadQueue = settled;
+    return { decision: job.then(({ handled }) => handled), settled };
   }
 
   /**
@@ -944,7 +960,9 @@ export class WebConnector extends BaseConnector {
       return;
     }
 
-    await this.enqueuePageRouteReload(changes);
+    const { decision, settled } = this.schedulePageRouteReload(changes);
+    await decision;
+    await settled;
   }
 
   /** The pages this connector registered on the router, in registration order. */
