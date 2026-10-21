@@ -284,6 +284,10 @@ A key the page reads but its payload lacks is a pruning miss:
   one hydration and navigation failures use.
   It never throws during render.
 
+If the shared table itself cannot be loaded, the browser retries it once. When
+the retry fails too, the page renders its keys (never a blank string) and the
+failure is reported once through `onClientError` with `kind: "translations"`.
+
 Client navigation merges each page's pruned keys into the locale's dictionary,
 so a page visited earlier keeps its keys. Locale switching loads the other
 locale's shared table.
