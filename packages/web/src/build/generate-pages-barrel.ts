@@ -42,6 +42,7 @@ import {
 import type { DiscoveredPage, DiscoveredRoutablePage } from "./discover-pages";
 import type { SitesConfig } from "../sites/site-config.types";
 import { serializeRouteLocales } from "./serialize-route-locales";
+import { buildTranslationManifest, type TranslationBuildOptions } from "./translation-manifest";
 import {
   isNotFoundPageFile,
   NOT_FOUND_ROUTE_NAME,
@@ -194,6 +195,12 @@ export type GeneratePagesBarrelOptions = {
    * `__mocks__` folders are always skipped.
    */
   testOnly?: readonly string[];
+  /**
+   * Translation delivery: the shared groups emitted as hashed per-locale assets,
+   * and whether each page inlines only the keys it can reach. See
+   * `TranslationBuildOptions`.
+   */
+  translations?: TranslationBuildOptions;
 };
 
 export type GeneratePagesBarrelResult = {
@@ -205,6 +212,8 @@ export type GeneratePagesBarrelResult = {
   contents: string;
   /** The build-time route surface persisted beside the production output. */
   pageRoutes: PageRoutesManifest;
+  /** Hashed shared translation tables, relative to the client `assets` directory, for the emit step to write. */
+  translationAssets: readonly { readonly fileName: string; readonly body: string }[];
 };
 
 export type PageRouteManifestEntry = {
@@ -636,6 +645,7 @@ export async function generatePagesBarrel(
       barrelFile: await writeBarrel(productionDir, contents),
       contents,
       pageRoutes: { version: 1, routes: [] },
+      translationAssets: [],
     };
   }
 
@@ -803,6 +813,14 @@ export async function generatePagesBarrel(
     ].join("\n");
   });
 
+  const translations = buildTranslationManifest({
+    srcRoot,
+    pages: discovered,
+    localeFiles: graph.localeFiles,
+    relativeTo: (file) => toPosix(path.relative(appRoot, file)),
+    options: options.translations,
+  });
+
   const contents = [
     ...BARREL_HEADER,
     ...importLines,
@@ -813,6 +831,9 @@ export async function generatePagesBarrel(
       : [`  clientDir: ${quote(clientDir)},`]),
     ...(publicFiles.length === 0 ? [] : [`  publicFiles: ${JSON.stringify([...publicFiles])},`]),
     ...(localeFiles.length === 0 ? [] : [`  localeFiles: ${JSON.stringify(localeFiles)},`]),
+    ...(localeFiles.length === 0
+      ? []
+      : [`  translations: ${JSON.stringify(translations.manifest)},`]),
     ...(options.sites === undefined && routablePages.length === 0
       ? []
       : options.sites === undefined
@@ -869,5 +890,9 @@ export async function generatePagesBarrel(
     barrelFile: await writeBarrel(productionDir, contents),
     contents,
     pageRoutes,
+    translationAssets: translations.assets.map((asset) => ({
+      fileName: asset.fileName,
+      body: asset.body,
+    })),
   };
 }

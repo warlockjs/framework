@@ -22,6 +22,7 @@ import type {
 } from "@warlock.js/core";
 import type { PluginOption } from "vite";
 import type { SitesConfig } from "../sites/site-config.types";
+import type { TranslationBuildOptions } from "./translation-manifest";
 
 export type WebBuildOptions = {
   /** Source directory name under the app root. Default: `"src"`. */
@@ -61,6 +62,13 @@ export type WebBuildOptions = {
    * `__mocks__` folders are always skipped. Example: `["src/web/shared/testing"]`.
    */
   testOnly?: string[];
+  /**
+   * Translation delivery. `sharedGroups` (default `["app", "common"]`) are
+   * shipped once per locale as hashed, immutable assets; `prune` (default
+   * `true`) inlines only the keys each page can reach. See the web translations
+   * guide.
+   */
+  translations?: TranslationBuildOptions;
 };
 
 function resolveClientOutDir(context: ConnectorBuildContext): string {
@@ -203,6 +211,7 @@ export function createWebBuildContribution(
     routes: [],
   };
   let publicFiles: string[] = [];
+  let translationAssets: readonly { readonly fileName: string; readonly body: string }[] = [];
   let sites: SitesConfig | undefined;
   let fonts: readonly import("../fonts/types").WebFont[] | undefined;
 
@@ -258,8 +267,10 @@ export function createWebBuildContribution(
         publicFiles,
         sites,
         testOnly: options.testOnly,
+        translations: options.translations,
       });
 
+      translationAssets = result.translationAssets;
       pageCount = result.pageCount;
       pageRoutes = result.pageRoutes;
 
@@ -362,6 +373,14 @@ export function createWebBuildContribution(
         // (`../server/web-connector.ts`, `productionAssetsDirectoryOptions`)
         // reads exactly this `<file>.br` / `<file>.gz` layout. Must run AFTER
         // the client build writes `assets/`, and only when it did.
+        // Hashed shared translation tables (`translations/<locale>.<hash>.json`),
+        // written before precompression so they get `.br`/`.gz` siblings too.
+        const { writeTranslationAssets } = await import("./emit-translation-assets");
+        await writeTranslationAssets(
+          path.join(resolveClientOutDir(context), "assets"),
+          translationAssets,
+        );
+
         const { precompressAssets } = await import("./precompress-assets");
         await precompressAssets(path.join(resolveClientOutDir(context), "assets"));
       }
