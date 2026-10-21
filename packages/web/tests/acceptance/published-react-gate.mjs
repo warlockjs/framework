@@ -741,10 +741,10 @@ async function writeFixture(appRoot, baseUrl, tarballs, { registryPeerVersion, r
   const dependencies = {
     "@types/react": "19.2.7",
     "@types/react-dom": "19.2.3",
-    "@vitejs/plugin-react": "5.2.0",
+    "@vitejs/plugin-react": "6.1.2",
     react: "19.2.3",
     "react-dom": "19.2.3",
-    vite: "7.3.5",
+    vite: "8.3.3",
   };
   for (const [name, tarball] of tarballs) dependencies[name] = `file:${toPosix(tarball)}`;
   if (registryVersion) {

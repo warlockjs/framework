@@ -337,16 +337,18 @@ export async function createWebConnectorViteConfig(
         ],
       },
     },
-    // Without an explicit target, esbuild assumes native (TC39) decorator
-    // support and leaves `@RegisterModel()`-style syntax untouched — but Vite's
-    // SSR module runner evaluates transformed code via `new AsyncFunction(...)`,
-    // which node has no native decorator support for. `es2022` downlevels them
-    // into helper calls. `jsx` is named explicitly rather than left to tsconfig
-    // discovery, because Vite matches a file against a tsconfig's `include` and
+    // `jsx` is named explicitly rather than left to tsconfig discovery, because
+    // Vite matches a file against a tsconfig's `include` and
     // `web/tsconfig.json`'s is narrow enough that most of `web/src` matched no
     // config at all and fell back to the CLASSIC transform — emitting
     // `React.createElement` into modules that import no `React` binding.
-    esbuild: { target: "es2022", jsx: "automatic" },
+    // Vite 8 transforms TypeScript with Oxc, so this is the `oxc` option; the
+    // old `esbuild` option is deprecated there and its `target` is not
+    // converted. Oxc does not lower native decorators, so a decorated module
+    // reaching this transform is left as written; `src/app` modules (models
+    // included) never do, because Core loads them and `coreAppModules` /
+    // `coreModelModules` bridge them into this graph.
+    oxc: { target: "es2022", jsx: { runtime: "automatic" } },
     /**
      * REACT MUST BE PRE-BUNDLED, and naming it here is the only thing that
      * makes that happen for the framework's own client graph.

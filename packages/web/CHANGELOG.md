@@ -15,6 +15,8 @@ All notable changes to `@warlock.js/web` are documented here.
 - `apiHref()` and `useSubmitForm({ route })` resolve names against the current page's route table. Development errors name the route and the declaration that fixes it; production throws a short error with no fallback.
 - A client navigation publishes the table of the page it swaps in.
 - The document's hydration payload no longer repeats the route table, which its own script already carries.
+- The client build, the development server and the Vite plugins run on Vite 8 (Rolldown) and `@vitejs/plugin-react` 6. The vendor split uses `build.rolldownOptions` with a `codeSplitting` group, and the development server configures JSX through `oxc`, so neither prints a Vite deprecation warning.
+- The `vite` peer range is `^8.0.0` and the `@vitejs/plugin-react` peer range is `^6.0.0`.
 
 ### Security
 
@@ -39,6 +41,8 @@ All notable changes to `@warlock.js/web` are documented here.
 - Development: a translation the page reads but its payload lacks is resolved from the full table, with one warning per key and page that names the `config.translations` declaration to add.
 - Production: a missing key renders its key and is reported once through `onClientError` with the new `kind: "translations"`. A shared table that cannot be loaded is retried once; the page then renders its keys and the failure is reported the same way.
 - `warlock check` reports `WL9104` for a translation key computed at runtime in `src/web`.
+- Gate A's refusal of Node builtins in the bundler's `external` option works on Vite 8. Rolldown does not pass `external` to `buildStart`, so the guard reads the option in the `options` hook and normalizes a string, a RegExp, an array or a function; without this a build with `fs` externalized would have shipped it unrefused.
+- Client budget attribution (`clientBudgetModules`) reads Rolldown's `renderedLength`, and a spec runs it on a real build.
 
 ### Changed
 
@@ -52,6 +56,8 @@ All notable changes to `@warlock.js/web` are documented here.
 - If a production page shows keys where translations used to appear, check the `kind: "translations"` reports from `onClientError`: the key is missing from the page's payload. Declare it, or set `prune: false` while you do. In global mode, a direct call to `trans()` from `@mongez/localization` is not checked; declare the keys it reads too.
 - Global-registry apps: the shared table is fixed at boot. A rolling deploy can briefly serve a page built by the old release; its hashed table is missing from the new process, so the browser loads the new release's latest table. Keep shared groups stable across a release, or deploy the processes together.
 - The option now sits under the build settings: `web({ build: { translations: { ... } } })`. Development honours it too.
+- **BREAKING** Vite 7 is no longer supported. Install `vite@^8.0.0` and `@vitejs/plugin-react@^6.0.0` (plugin-react 6 requires Vite 8) together, or run `warlock upgrade --from 5.35 --to 5.36.0` (codemod `vite-8-vitest-5`), which raises both in `package.json`. Vite 8 needs Node.js 20.19 or 22.12 and newer.
+- Vite 8 does not lower native decorators in modules it transforms (the `esbuild` option is now `oxc`). Modules under `src/app` still load through Core; add `lowerStage3Decorators()` from `@warlock.js/core/vite` for a decorated module under `src/web`.
 
 ## 5.35.0 - 2026-10-21
 

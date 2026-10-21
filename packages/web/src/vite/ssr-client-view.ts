@@ -284,6 +284,9 @@ export function clientEnvironmentOnly(plugin: Plugin, ssrState: SsrBoundaryState
 
           const transformed = await originalTransform.call(this, clientCode, id, {
             ...options,
+            // Rolldown always supplies the module type; the wrapped hook type
+            // marks it optional, and its own type requires it.
+            moduleType: options?.moduleType ?? "js",
             ssr: false,
           });
 

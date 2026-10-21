@@ -122,14 +122,20 @@ describe("coreModelModules", () => {
           {} as never,
           "export const untouched = true",
           path.join(root, "other.mjs"),
-          { ssr: true },
+          { moduleType: "ts", ssr: true },
         ),
       ).toBeNull();
       expect(
-        await transform.call({} as never, "export default 1", `${modelFile}?raw`, { ssr: true }),
+        await transform.call({} as never, "export default 1", `${modelFile}?raw`, {
+          moduleType: "ts",
+          ssr: true,
+        }),
       ).toBeNull();
       expect(
-        await transform.call({} as never, "export default 1", modelFile, { ssr: false }),
+        await transform.call({} as never, "export default 1", modelFile, {
+          moduleType: "ts",
+          ssr: false,
+        }),
       ).toBeNull();
       expect(plugin.applyToEnvironment?.({ config: { consumer: "client" } } as never)).toBe(false);
       expect(plugin.applyToEnvironment?.({ config: { consumer: "server" } } as never)).toBe(true);

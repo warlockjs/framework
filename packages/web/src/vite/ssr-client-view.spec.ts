@@ -81,7 +81,7 @@ describe("clientEnvironmentOnly setup-register projection", () => {
           `export default function Layout(_: typeof loader) { return null; }`,
         ].join("\n"),
         layoutFile,
-        {},
+        { moduleType: "ts" },
       ),
     ).resolves.toBeDefined();
     expect(resolved).toEqual([]);
@@ -130,7 +130,7 @@ describe("clientEnvironmentOnly setup-register projection", () => {
         `export function register() { registerLayout(); }`,
       ].join("\n"),
       SETUP_REGISTER_ID,
-      {},
+      { moduleType: "ts" },
     );
 
     expect([...boundaryState.clientImportsByModule.entries()]).toEqual([
@@ -151,11 +151,13 @@ describe("clientEnvironmentOnly setup-register projection", () => {
     ].join("\n");
 
     await expect(
-      transform.call(serverContext as any, code, SETUP_REGISTER_ID, {}),
+      transform.call(serverContext as any, code, SETUP_REGISTER_ID, { moduleType: "ts" }),
     ).resolves.toBeDefined();
     expect(resolved).toEqual(["./register-layout"]);
 
-    await expect(transform.call(serverContext as any, code, SETUP_FILE, {})).resolves.toBeNull();
+    await expect(
+      transform.call(serverContext as any, code, SETUP_FILE, { moduleType: "ts" }),
+    ).resolves.toBeNull();
     expect(resolved).toEqual(["./register-layout"]);
   });
 
@@ -173,7 +175,7 @@ describe("clientEnvironmentOnly setup-register projection", () => {
           `export function register() {}`,
         ].join("\n"),
         SETUP_FILE,
-        {},
+        { moduleType: "ts" },
       ),
     ).rejects.toThrow(/ProjectionAmbiguityError|refused to guess/);
   });
@@ -188,7 +190,9 @@ describe("clientEnvironmentOnly setup-register projection", () => {
       `export function register() { registerLayout(); }`,
     ].join("\n");
 
-    await expect(transform.call(serverContext as any, code, SETUP_FILE, {})).resolves.toBeNull();
+    await expect(
+      transform.call(serverContext as any, code, SETUP_FILE, { moduleType: "ts" }),
+    ).resolves.toBeNull();
     expect(resolved).toEqual([]);
   });
 
@@ -205,7 +209,7 @@ describe("clientEnvironmentOnly setup-register projection", () => {
           `export function register() { return authService; }`,
         ].join("\n"),
         SETUP_REGISTER_ID,
-        {},
+        { moduleType: "ts" },
       ),
     ).rejects.toThrow("server-only edge: @warlock.js/auth");
   });
@@ -222,7 +226,7 @@ describe("clientEnvironmentOnly setup-register projection", () => {
           `export function register() { registerLayout(); }`,
         ].join("\n"),
         SETUP_REGISTER_ID,
-        {},
+        { moduleType: "ts" },
       ),
     ).rejects.toThrow("Gate A refused an import");
   });

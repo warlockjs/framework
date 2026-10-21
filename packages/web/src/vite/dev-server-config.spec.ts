@@ -39,6 +39,7 @@ describe("dev SSR config: stateful framework packages stay external", () => {
   beforeAll(async () => {
     appRoot = fs.mkdtempSync(path.join(os.tmpdir(), "warlock-dev-ssr-"));
     fs.mkdirSync(path.join(appRoot, "src"));
+    fs.writeFileSync(path.join(appRoot, "view.tsx"), "export const View = () => <div>hi</div>;\n");
     fs.writeFileSync(
       path.join(appRoot, "probe.ts"),
       [
@@ -89,6 +90,24 @@ describe("dev SSR config: stateful framework packages stay external", () => {
       expect(result?.code).not.toContain(`/${name}/src/index.ts`);
     },
   );
+
+  it("transforms JSX with the automatic runtime through Oxc, with no deprecated esbuild option", async () => {
+    const config = await createWebConnectorViteConfig({
+      appRoot,
+      appSrcRoot: path.join(appRoot, "src"),
+      webRoot: WEB_ROOT,
+      workspaceRoot: WORKSPACE_ROOT,
+      hmrServer,
+      handlePageHotUpdate: async () => false,
+      leadingPlugins: [],
+    });
+    const result = await vite.environments.ssr.transformRequest(path.join(appRoot, "view.tsx"));
+
+    expect("esbuild" in config).toBe(false);
+    expect(config.oxc).toMatchObject({ jsx: { runtime: "automatic" } });
+    expect(result?.code).toContain("react/jsx-");
+    expect(result?.code).not.toContain("React.createElement");
+  });
 
   it("keeps the app's alias for @warlock.js/web, which dev SSR deliberately inlines", async () => {
     const result = await vite.environments.ssr.transformRequest(path.join(appRoot, "probe.ts"));

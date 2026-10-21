@@ -652,7 +652,10 @@ describe("gateAResolve — rule 1 is generic and scope-free", () => {
    * opened with `import { readFileSync } from "node:fs"`. `buildStart` is the
    * only place left to catch it.
    */
-  async function buildWithExternal(fileName: string, external: string[]) {
+  async function buildWithExternal(
+    fileName: string,
+    external: string | RegExp | (string | RegExp)[] | ((id: string) => boolean),
+  ) {
     return build({
       root: FIXTURE_ROOT,
       logLevel: "silent",
@@ -677,6 +680,17 @@ describe("gateAResolve — rule 1 is generic and scope-free", () => {
       expect(message).toContain("node:fs");
       expect(message).toContain("Fix:");
     }
+  });
+
+  it.each([
+    ["a string", "node:fs"],
+    ["a RegExp", /^node:/],
+    ["a mixed array", ["vendor-browser-lib", /^fs$/]],
+    ["a predicate function", (id: string) => id === "fs" || id === "node:fs"],
+  ])("case 23b: %s in the external config is refused too", async (_shape, external) => {
+    await expect(buildWithExternal("case16-prefixed-builtin.page.tsx", external)).rejects.toThrow(
+      "Gate A refused this build",
+    );
   });
 
   it("case 24 (NEGATIVE CONTROL): externalizing an ORDINARY package is untouched by that guard", async () => {
