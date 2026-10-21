@@ -358,3 +358,30 @@ describe("DatabaseDirtyTracker", () => {
     });
   });
 });
+
+describe("DatabaseDirtyTracker — stored empty objects", () => {
+  it("counts unsetting a stored {} as a change", () => {
+    const stored = new DatabaseDirtyTracker({ id: 1, nested: {} });
+
+    stored.unset("nested");
+
+    expect(stored.hasChanges()).toBe(true);
+    expect(stored.getReplacedColumns()).toEqual(["nested"]);
+  });
+
+  it("counts replacing a stored {} with an object as a change", () => {
+    const stored = new DatabaseDirtyTracker({ id: 1, nested: {} });
+
+    stored.setAtPath("nested", { a: 1 });
+
+    expect(stored.hasChanges()).toBe(true);
+  });
+
+  it("does not count a stored {} that was left alone", () => {
+    const stored = new DatabaseDirtyTracker({ id: 1, nested: {} });
+
+    stored.unset("nested.x");
+
+    expect(stored.hasChanges()).toBe(false);
+  });
+});

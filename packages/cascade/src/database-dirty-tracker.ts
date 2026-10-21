@@ -234,7 +234,13 @@ export class DatabaseDirtyTracker {
    * ```
    */
   public hasChanges(): boolean {
-    return this.dirtyColumns.size > 0 || this.removedColumns.size > 0;
+    return (
+      this.dirtyColumns.size > 0 ||
+      this.removedColumns.size > 0 ||
+      // A stored `{}` that was unset or replaced has no leaves, so it shows in
+      // neither set above; it is still a change the writer must persist.
+      this.getReplacedColumns().length > 0
+    );
   }
 
   /**
