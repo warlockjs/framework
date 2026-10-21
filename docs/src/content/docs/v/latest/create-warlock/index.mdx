@@ -40,22 +40,22 @@ npm create warlock@latest -- --interactive
 
 The first positional argument (or `--name`) is the project name. Value flags accept either `--db=postgres` or `--db postgres`. Unknown `--db`, `--features`, `--ai`, `--pm`, `--agents`, or `--lint` values fail fast — before anything is written to disk — so a typo (or a hostile value) never leaves you with a half-scaffolded project.
 
-| Flag                           | Takes value | Default                                                             | Purpose                                                                                                                                                                     |
-| ------------------------------ | ----------- | ------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `<positional>` / `--name`      | yes         | — (required)                                                        | Project name + target directory                                                                                                                                             |
-| `--stack`                      | yes         | `api`                                                               | `api` or `web` — the structural choice; `web` seeds the `web` feature by default                                                                                            |
-| `--db` / `--no-db`             | yes / no    | `mongodb`                                                           | Database driver — `mongodb`, `postgres`, or `none` (`--no-db` is shorthand for `--db=none`)                                                                                 |
-| `--pm`                         | yes         | inferred (`npm_config_user_agent` or the system)                    | Package manager — must be `npm` / `yarn` / `pnpm` / `bun`; any other value is rejected before scaffolding starts                                                            |
-| `--features`                   | yes (CSV)   | none, or `["web"]` when `--stack=web` and `--features` is not given | Comma-separated optional feature keys                                                                                                                                       |
-| `--lint`                       | yes         | `oxc`                                                               | `oxc` (Oxlint/Oxfmt); removed or invalid values fail before writes                                                                                                          |
-| `--ai`                         | yes (CSV)   | none                                                                | Comma-separated AI provider keys (auto-pulls `@warlock.js/ai`)                                                                                                              |
-| `--agents`                     | yes (CSV)   | `claude`                                                            | Comma-separated [agent-kit](https://mongez.js.org/agent-kit) targets to derive docs/skills for — validated against the published target list, cached after the first lookup |
-| `--git` / `--no-git`           | no          | off                                                                 | Force-enable or force-disable git initialization                                                                                                                            |
-| `--jwt` / `--no-jwt`           | no          | off                                                                 | Force-enable or force-disable JWT secret generation                                                                                                                         |
-| `-y`, `--yes`                  | no          | off                                                                 | Skip every prompt and accept defaults for anything unset                                                                                                                    |
-| `--interactive`, `--customize` | no          | off                                                                 | Restore the full long-form interactive wizard                                                                                                                               |
-| `-h`, `--help`                 | no          | —                                                                   | Print usage (every flag + its default) and exit                                                                                                                             |
-| `-v`, `--version`              | no          | —                                                                   | Print the installed `create-warlock` version and exit                                                                                                                       |
+| Flag                           | Takes value | Default                                                                                        | Purpose                                                                                                                                                                     |
+| ------------------------------ | ----------- | ---------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `<positional>` / `--name`      | yes         | — (required)                                                                                   | Project name + target directory                                                                                                                                             |
+| `--stack`                      | yes         | `api`                                                                                          | `api` or `web` — the structural choice; `web` seeds `web`, `shadcn`, and `design-system` by default                                                                         |
+| `--db` / `--no-db`             | yes / no    | `mongodb`                                                                                      | Database driver — `mongodb`, `postgres`, or `none` (`--no-db` is shorthand for `--db=none`)                                                                                 |
+| `--pm`                         | yes         | inferred (`npm_config_user_agent` or the system)                                               | Package manager — must be `npm` / `yarn` / `pnpm` / `bun`; any other value is rejected before scaffolding starts                                                            |
+| `--features`                   | yes (CSV)   | none, or `["web", "shadcn", "design-system"]` when `--stack=web` and `--features` is not given | Comma-separated optional feature keys                                                                                                                                       |
+| `--lint`                       | yes         | `oxc`                                                                                          | `oxc` (Oxlint/Oxfmt); removed or invalid values fail before writes                                                                                                          |
+| `--ai`                         | yes (CSV)   | none                                                                                           | Comma-separated AI provider keys (auto-pulls `@warlock.js/ai`)                                                                                                              |
+| `--agents`                     | yes (CSV)   | `claude`                                                                                       | Comma-separated [agent-kit](https://mongez.js.org/agent-kit) targets to derive docs/skills for — validated against the published target list, cached after the first lookup |
+| `--git` / `--no-git`           | no          | off                                                                                            | Force-enable or force-disable git initialization                                                                                                                            |
+| `--jwt` / `--no-jwt`           | no          | off                                                                                            | Force-enable or force-disable JWT secret generation                                                                                                                         |
+| `-y`, `--yes`                  | no          | off                                                                                            | Skip every prompt and accept defaults for anything unset                                                                                                                    |
+| `--interactive`, `--customize` | no          | off                                                                                            | Restore the full long-form interactive wizard                                                                                                                               |
+| `-h`, `--help`                 | no          | —                                                                                              | Print usage (every flag + its default) and exit                                                                                                                             |
+| `-v`, `--version`              | no          | —                                                                                              | Print the installed `create-warlock` version and exit                                                                                                                       |
 
 `-h`/`--help` and `-v`/`--version` short-circuit before anything else runs — no prompt, filesystem write, or network call, and `--help` wins even over a positional project name.
 
@@ -267,3 +267,21 @@ The default runtime lifetime is per file. For reuse, profiling and the
 quota-aware `recommendedTestWorkers()` helper, see the
 [testing guide](/v/latest/core/testing/testing/#runtime-lifetime-unit-projects-and-setup-profiling).
 The generated `testing-strategy` project skill covers the same trade-offs.
+
+## App-owned form controls
+
+The full-stack preset (`--stack=web`) now seeds `web`, `shadcn`, and
+`design-system`. Selecting `shadcn` in Customize or passing
+`--features=tailwind,shadcn` also adds the design system. An explicit
+`--features` replaces the stack's default selection.
+
+The generated app receives fourteen accessible Mongez controls under
+`src/web/design-system/components`, with separate hooks and props types. Each
+component is a default export imported through the web alias, for example
+`import EmailInput from "web/design-system/components/email-input";`. Forms use
+`Form` directly from `@mongez/react-form`. shadcn primitives and exact runtime
+dependency versions are copied into the app; existing source is preserved.
+
+See [Shared form controls](/v/latest/web/getting-started/tailwind-and-shadcn/#shared-form-controls)
+for the component list, props, value shapes, keyboard and date semantics.
+Existing Tailwind apps can use `npx warlock add design-system`.

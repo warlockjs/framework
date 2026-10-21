@@ -11,6 +11,7 @@ import { aiFeature } from "./ai.feature";
 import { authGoogleFeature } from "./auth-google.feature";
 import { authPasskeysFeature } from "./auth-passkeys.feature";
 import { bullBoardFeature } from "./bull-board.feature";
+import { designSystemFeature } from "./design-system.feature";
 import { devtoolsFeature } from "./devtools.feature";
 import { heraldFeature } from "./herald.feature";
 import { imageFeature } from "./image.feature";
@@ -69,6 +70,7 @@ export const featuresMap: Record<string, FeatureDefinition> = {
   // it `requires` it, it appends to the stylesheet that feature creates, and the
   // three of them are one stack a reader should meet in build order.
   shadcn: shadcnFeature,
+  "design-system": designSystemFeature,
   // Directly after the web/tailwind/shadcn stack, for the same reason: it
   // `requires` web (it reads the page registry `listRoutablePages()`
   // exposes) and a reader scanning `--list` for the page stack should meet it

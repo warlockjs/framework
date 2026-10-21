@@ -18,6 +18,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Web starter home-page browser spec with accessibility, overflow and screenshot checks at phone and desktop widths; omitted from API-only projects.
 - Pin the template's Vitest to 4.1.10 for awaited worker cleanup support. Selecting the test feature uses core's unit/integration projects generator, including quota-aware worker sizing and the cleanup runner, while preserving existing configs.
 - Update the testing-strategy project skill and scaffolding docs with matching file conventions, cheap unit configuration, opt-in worker lifetime/reset hooks, setup profiling and an affected-tests plus integration release gate with full suites nightly.
+### Added
+
+- Full-stack and Tailwind + shadcn selections include fourteen accessible app-owned form controls, separate behavior hooks and props types, and exact UI dependency pins. The optional template and add-command payload share an integrity contract.
+- Template web standards name the shared controls and their direct web-alias imports; template verification includes the optional sources.
 
 ## 5.34.3 - 2026-10-20
 

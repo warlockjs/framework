@@ -15,8 +15,9 @@ Web adds an SSR React page layer to a Warlock app. Pages live under `src/web/**`
 5. Guard pages and read the user (`protect-a-page.md`); a `requireUser()`-guarded page is typed as signed-in (`useUser("route.name")` is non-null).
 6. Translate pages (`localize-pages.md`), then build RTL and mixed-direction layouts (`build-rtl-and-mixed-direction-ui.md`); stream slow data (`stream-deferred-data.md`).
 7. Polish: styles (`serve-styles.md`), self-hosted fonts (`use-web-fonts.md`), sitemap and robots (`generate-sitemap.md`), themes (`multi-theme.md`), multi-site apps (`multi-site.md`), client-only UI and hydration debugging (`render-client-only.md`), images (`render-images.md`), vitals (`measure-web-vitals.md`).
-8. Test page loaders, actions and rendering (`test-a-page.md`).
-9. Observe SSR phases and deferred values with `TracingHooks` (`observe-page-requests.md`).
+8. Build form controls with `build-accessible-controls` (the app design-system, keyboard/focus, RTL and date semantics).
+9. Test page loaders, actions and rendering (`test-a-page.md`).
+10. Observe SSR phases and deferred values with `TracingHooks` (`observe-page-requests.md`).
 
 ## Conventions and pitfalls
 

@@ -19,6 +19,7 @@ import {
 import { rootPath, srcPath } from "../utils";
 import { getWarlockVersion } from "../utils/framework-vesion";
 import { featuresMap } from "./features";
+import { assertDesignSystemTailwind } from "./features/design-system.feature";
 import {
   getPnpmVersion,
   isInsideParentPnpmWorkspace,
@@ -120,6 +121,10 @@ export async function addCommandAction(options: CommandActionData) {
   validateFeatures(features);
 
   const resolvedFeatures = resolveFeatures(features);
+
+  if (resolvedFeatures.includes("design-system") && !resolvedFeatures.includes("tailwind")) {
+    await assertDesignSystemTailwind();
+  }
 
   const dependencies: Record<string, string> = {};
   const devDependencies: Record<string, string> = {};

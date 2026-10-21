@@ -136,3 +136,103 @@ ending in `?direct`. In production, CSS is emitted from Vite's manifest for the
 matched root, layout, and page chain.
 
 [Learn how development and production CSS delivery differ →](/v/latest/web/guides/development-and-production/)
+
+## Shared form controls
+
+The full-stack `create-warlock --stack=web` preset and the Tailwind + shadcn
+selection include an app-owned design system. An explicit `--features` replaces
+the preset; `--features=tailwind,shadcn` includes the controls. For an existing
+Tailwind app:
+
+```bash
+npx warlock add design-system
+```
+
+The command refuses before changing files or installing dependencies if
+`package.json` does not declare Tailwind or `src/web/app.css` does not import it.
+Run `npx warlock add tailwind` first. It prepares shadcn's aliases and tokens,
+adds pinned dependencies, and copies the same source as the scaffolder.
+Existing files are preserved. `--no-install` records dependencies without
+installing; `--dry-run --json` previews the operation without writing.
+
+```tsx
+import { Form } from "@mongez/react-form";
+import EmailInput from "web/design-system/components/email-input";
+import SelectInput from "web/design-system/components/select-input";
+import SubmitButton from "web/design-system/components/submit-button";
+
+export default function PreferencesForm() {
+  return (
+    <Form>
+      <EmailInput id="preferences-email" name="email" label="Email" hint="For receipts" />
+      <SelectInput
+        id="preferences-language"
+        name="language"
+        label="Language"
+        options={[
+          { value: "en", label: "English" },
+          { value: "ar", label: "Arabic" },
+        ]}
+      />
+      <SubmitButton id="preferences-save" name="save" label="Save" />
+    </Form>
+  );
+}
+```
+
+Use `Form` directly from Mongez React Form, which supplies `noValidate`. Each
+control registers with `useFormControl`; SubmitButton reads submission state
+and is excluded from collected values. Props live in
+`src/web/design-system/types/`, behavior in `src/web/design-system/hooks/`, and
+each component has its own default-export file. Import by the `web` alias,
+without barrels. The shadcn primitives remain editable in `src/web/components/ui`.
+
+| Default export      | Component file           | Value                                  |
+| ------------------- | ------------------------ | -------------------------------------- |
+| TextInput           | `text-input`             | string                                 |
+| EmailInput          | `email-input`            | string                                 |
+| PasswordInput       | `password-input`         | string                                 |
+| TextareaInput       | `textarea-input`         | string                                 |
+| SelectInput         | `select-input`           | string; empty `""`                     |
+| MultiSelectInput    | `multi-select-input`     | string array; empty `[]`               |
+| DatePickerInput     | `date-picker-input`      | `YYYY-MM-DD`; empty `""`               |
+| TimePickerInput     | `time-picker-input`      | `HH:mm`; empty `""`                    |
+| DateTimePickerInput | `date-time-picker-input` | `YYYY-MM-DDTHH:mm`; empty `""`         |
+| CheckboxInput       | `checkbox-input`         | checked value or false                 |
+| RadioInput          | `radio-input`            | one selected string per group          |
+| SwitchInput         | `switch-input`           | checked value or false                 |
+| FileInput           | `file-input`             | File or File[]; reset clears selection |
+| SubmitButton        | `submit-button`          | excluded from collected values         |
+
+Every control requires an explicit stable `id`, `name`, and `label`. Optional
+`hint` and `error` are linked with `aria-describedby`; errors are announced.
+Use `schema`, `rules`, and `validateOn` for Mongez validation. Pass `checked` or
+`defaultChecked` to boolean controls, and `value`/`defaultValue` to scalar and
+array controls. Options use unique stable string `value`s, string `label`s,
+and optional `disabled`. RadioInput takes the same options shape. FileInput
+accepts `accept` and `multiple`; browsers cannot restore an initial file, so
+its reset baseline is empty. File uploads still require the appropriate server
+transport and validation. TextareaInput accepts `rows`.
+
+Searchable selections keep search separate from the selected form value. Enter
+or Space opens the popup, arrows/Home/End navigate options, Enter selects,
+Escape dismisses, and focus returns to the trigger. MultiSelectInput toggles
+with Enter or Space when the search is empty. Clear writes the empty value.
+The listbox exposes each committed selection independently from keyboard focus.
+Date dialogs trap focus and use DayPicker's calendar grid keyboard navigation.
+Checkboxes, radios, and switches preserve Radix keyboard behavior and visible
+checked/selected and focus states. Pass `dir="rtl"` to preserve direction in
+portals and radio navigation. Override search, empty, clear, close, and time
+labels with `searchLabel`, `emptyLabel`, `clearLabel`, `closeLabel`, and
+`timeLabel` as applicable; translate placeholders and visible labels too.
+
+Dates and local date-times are calendar/wall-clock strings, **not UTC instants**.
+Resolve the timezone explicitly in your service before converting to an instant.
+Choosing a date-time without a time uses midnight; clearing its time clears the
+value. Never derive a calendar date through `toISOString()`.
+
+See the Web `build-accessible-controls` skill for the keyboard, focus, stable-id,
+RTL, clear/reset and date-versus-instant contract. Primitive names and dependencies
+follow the official [shadcn registry](https://ui.shadcn.com/docs/registry) and
+[Calendar](https://ui.shadcn.com/docs/components/radix/calendar) source; Radix,
+DayPicker, cmdk and styling dependencies are pinned in the optional template.

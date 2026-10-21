@@ -339,3 +339,19 @@ args, labels })`. Consume output and await `handle.exited`. Use handle stops or
 label filters; never stop processes by command or name. `spawnPty()` lazily
 loads separately installed optional peer `node-pty`. The `warlock-js-process`
 skill contains complete working examples.
+
+## Add the shared design system
+
+```bash
+npx warlock add tailwind
+npx warlock add design-system
+```
+
+`design-system` refuses before dependency installation when Tailwind is absent
+from `package.json` or `src/web/app.css`. It adds pinned shadcn primitives and
+Mongez controls to `src/web/design-system`, preserving existing source files.
+Use `--no-install` to record dependencies only, or `--dry-run --json` to preview
+files and dependencies without writing. For example, a generated control is
+`import TextInput from "web/design-system/components/text-input";` with
+`<TextInput id="profile-name" name="name" label="Name" />`.
+See Web's `build-accessible-controls` topic for the complete control contract.

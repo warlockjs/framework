@@ -50,6 +50,8 @@
     "paths": {
       // The template's own aliases (templates/warlock/tsconfig.json), rebased
       // from that file's location to this one's.
+      "web/design-system/*": ["./templates/design-system/src/web/design-system/*"],
+      "web/components/ui/*": ["./templates/design-system/src/web/components/ui/*"],
       "web/*": ["./templates/warlock/src/web/*"],
       "app/*": ["./templates/warlock/src/app/*"],
       "@shared/*": ["./templates/warlock/src/shared/*"],
@@ -71,6 +73,8 @@
     }
   },
   "include": [
+    "templates/design-system/src/**/*.ts",
+    "templates/design-system/src/**/*.tsx",
     "templates/warlock/src/**/*.ts",
     "templates/warlock/src/**/*.tsx",
     "templates/warlock/warlock.config.ts"

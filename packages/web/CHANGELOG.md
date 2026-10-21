@@ -23,6 +23,9 @@ All notable changes to `@warlock.js/web` are documented here.
 ### Added
 
 - Watched development regression coverage for shared-store connectivity and a characterization of layout form identifier hydration parity.
+### Added
+
+- `build-accessible-controls` skill and design-system documentation cover shared Mongez controls, keyboard and focus behavior, stable ids, RTL, visual checked states, empty/reset semantics, and calendar dates versus instants.
 
 ## 5.34.3 - 2026-10-20
 

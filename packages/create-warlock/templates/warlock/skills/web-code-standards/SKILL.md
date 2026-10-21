@@ -331,6 +331,39 @@ feature hook. With generated route declarations and a handler's `responseSchema`
 `@warlock.js/web` reads a declared status body. Do not replace this inference
 with casts. Server endpoints must still validate input independently.
 
+### Use the shared design-system controls
+
+For Tailwind + shadcn projects, use the controls in `src/web/design-system/`:
+TextInput, EmailInput, PasswordInput, TextareaInput, SelectInput (search),
+MultiSelectInput, DatePickerInput, TimePickerInput, DateTimePickerInput,
+CheckboxInput, RadioInput, SwitchInput, FileInput, and SubmitButton.
+Import each component directly, for example
+`import TextInput from "web/design-system/components/text-input";` — no barrels.
+Use `Form` from `@mongez/react-form` directly. Every control requires a stable
+explicit `id`, `name`, and visible `label`, and accepts `hint`, `error`,
+Mongez `schema`/`rules`, and `validateOn`. Put behavior in design-system hooks
+and props in design-system types. See the Web `build-accessible-controls`
+topic for keyboard/focus, RTL, reset and calendar-date semantics.
+
+```tsx
+import { Form } from "@mongez/react-form";
+import TextInput from "web/design-system/components/text-input";
+import SubmitButton from "web/design-system/components/submit-button";
+
+export default function ProfileForm() {
+  return (
+    <Form>
+      <TextInput id="profile-name" name="name" label="Name" hint="Display name" />
+      <SubmitButton id="profile-save" name="save" label="Save" />
+    </Form>
+  );
+}
+```
+
+The full-stack preset and shadcn selection scaffold these controls. Existing
+Tailwind apps can run `npx warlock add design-system`; install Tailwind first
+with `npx warlock add tailwind` when missing. Existing files are preserved.
+
 ### Build custom controls with the project's UI kit
 
 Do not render native `<select>`, `<input type="checkbox">`,

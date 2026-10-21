@@ -58,6 +58,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Fixed
 
 - Native ESM loader registration shares a process-global promise across repeated initialization and module reloads; test startup skips the hook when an importer runs application modules through Vitest.
+### Added
+
+- `warlock add design-system` scaffolds app-owned accessible shadcn controls connected to Mongez React Form, with pinned dependencies, a Tailwind preflight before mutations, preservation of existing files, and dry-run support.
 
 ## 5.34.3 - 2026-10-20
 
