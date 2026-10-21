@@ -136,6 +136,335 @@
   ],
   "releases": [
     {
+      "version": "5.35.0",
+      "id": "v5-35-0",
+      "date": "October 21, 2026",
+      "isUnreleased": false,
+      "summaryHtml": "<strong>Design system, web generators, new check rules, API helpers, budgets, accessibility tests and faster test runs.</strong> Breaking: root components now run in the browser so hydration covers the full document ancestry (move server-only root work to the root setup loader), and model resources receive hidden columns with <code>hidden</code> enforced on final output. <code>warlock add design-system</code> scaffolds fourteen accessible shadcn controls wired to Mongez React Form, included by default in full-stack and Tailwind + shadcn starters; <code>warlock generate page</code>, <code>form</code> and <code>crud-ui</code> scaffold pages, forms and guarded CRUD screens. <code>warlock check</code> adds WL9013–WL9018 (component size, component-owned state, native controls and validation, controllers without a response schema) and <code>--fix</code>; <code>warlock inspect --section files</code> and <code>warlock explain &lt;file&gt;</code> map files, imports and the routes that reach them. Core adds <code>AppError</code>, <code>listEndpoint</code>, <code>assertResponseContracts</code>, per-page gzip build budgets and <code>page.assertAccessible()</code> with axe-core; tests gain opt-in worker lifetime, <code>setupTest({ mode: \"unit\" })</code> and setup profiling. Auth bounds Google and JWKS requests; web keeps sessions in sync after refresh, locale changes and page swaps. Lockstep release across all 33 packages. Generator matrix scope: <code>none</code>; before publishing, the blog on the 5.35.0 tarballs passed the release gate; after publishing, every package was confirmed at the npm origin and the blog check passed against npm.",
+      "matrix": "none",
+      "matrixRows": null,
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 31,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 17
+            },
+            {
+              "type": "Changed",
+              "n": 4
+            },
+            {
+              "type": "Fixed",
+              "n": 10
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "Typed <code>AppError</code> domain failures with native HTTP handling and <code>http.errorResponse</code> context, preserving legacy HTTP error behavior."
+            },
+            {
+              "type": "Added",
+              "html": "<code>listEndpoint</code> builds typed plural-key page responses from validated query controls and repository list callbacks, with bounded limits and explicit sort/filter whitelists."
+            },
+            {
+              "type": "Added",
+              "html": "<code>assertResponseContracts</code> checks real HTTP responses against declared status schemas, with fixtures, resource support and optional complete status coverage."
+            },
+            {
+              "type": "Added",
+              "html": "Web convention warnings for component size, multiple components, component-owned state/effects and handlers, native form controls and native validation; exported controller response schema warnings (<code>WL9013</code>–<code>WL9018</code>). Configure severity and component line limits through <code>.warlock-check.json</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<code>warlock check --fix</code> applies safe relative import extension fixes and exposes available edits through the optional JSON <code>fix</code> field."
+            },
+            {
+              "type": "Added",
+              "html": "<code>warlock inspect --section files</code> lists every file under <code>src/</code> with its module, convention role, exports and resolved import graph without booting the app. The versioned report schema and MCP <code>inspect_files</code> tool expose the same section."
+            },
+            {
+              "type": "Added",
+              "html": "<code>warlock explain &lt;file&gt;</code> prints exports, importers and transitively reaching routes/pages, with <code>--json</code> support. Error-code explanations continue to work."
+            },
+            {
+              "type": "Added",
+              "html": "Per-page gzip JS/CSS build budgets with route overrides, warn/error enforcement, previous-build deltas, and <code>warlock build --json</code> reports. Existing apps remain report-only unless limits are configured."
+            },
+            {
+              "type": "Added",
+              "html": "Browser <code>page.assertAccessible(options?)</code> using a pinned local axe-core injection over CDP, exact rule/selector allowances, violation diagnostics and accessibility evidence."
+            },
+            {
+              "type": "Added",
+              "html": "Opt-in <code>tests.lifetime: \"worker\"</code> for Vitest forks in a single run with a shared module graph (<code>isolate: false</code>) and the generated cleanup runner. Connectors boot once per worker, file boundaries reset fakes/clock/IDs/private storage and await <code>tests.resetBetweenFiles</code>, and worker cleanup awaits shutdown. <code>getTestRuntimeStats()</code> exposes bootstrap/file counts. Unsafe pools, watch, isolation and missing runner configurations are refused."
+            },
+            {
+              "type": "Added",
+              "html": "<code>setupTest({ mode: \"unit\", importModule })</code> loads configuration values once per module graph without bootstrap hooks, config special handlers, connectors, fake installation or native loader hooks."
+            },
+            {
+              "type": "Added",
+              "html": "<code>tests.profileSetup</code> / <code>WARLOCK_TEST_PROFILE=1</code> report setup steps and teardown per file, with summaries per worker including final shutdown; the generated <code>TestSetupReporter</code> aggregates a run summary across workers. <code>setupTest({ file })</code> labels profiles."
+            },
+            {
+              "type": "Added",
+              "html": "<code>recommendedTestWorkers()</code> from <code>@warlock.js/core/vite</code> respects CPU affinity and visible cgroup v2 CPU quotas. Testing docs/skills cover shared HTTP/database contention and affected-tests plus integration release gates, with a full suite nightly."
+            },
+            {
+              "type": "Added",
+              "html": "<code>warlock add design-system</code> scaffolds app-owned accessible shadcn controls connected to Mongez React Form, with pinned dependencies, a Tailwind preflight before mutations, preservation of existing files, and dry-run support."
+            },
+            {
+              "type": "Added",
+              "html": "<code>warlock generate page &lt;path&gt;</code> scaffolds a UI-only page and setup companion with route, loader and metadata; <code>--interactive</code> adds a feature hook."
+            },
+            {
+              "type": "Added",
+              "html": "<code>warlock generate form &lt;name&gt; [--module &lt;name&gt;] [--endpoint]</code> scaffolds design-system controls, a shared Seal schema, a <code>useSubmitForm</code> hook and an optional guarded controller/route with validation and response schema."
+            },
+            {
+              "type": "Added",
+              "html": "<code>warlock generate crud-ui &lt;module&gt;</code> scaffolds guarded list/create/edit pages, schema-backed forms, endpoint-derived filters, pagination and a delete action for conventional CRUD modules. All web generators support dry-run JSON reports and preserve existing files unless forced."
+            },
+            {
+              "type": "Changed",
+              "html": "Document the development devtools captured-mail preview without logging message bodies."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>warlock check --changed</code> includes transitive import dependents for scoped lint, conventions and related tests. Changed typecheck diagnostics now include transitive importers."
+            },
+            {
+              "type": "Changed",
+              "html": "New <code>warlock add test</code> configs split pure <code>*.spec.ts</code> files from integration <code>*.test.ts</code> and specs under <code>tests/</code>; only integration loads framework/HTTP setup. Existing configs are preserved. The generated runner requires Vitest 4.1.10 or newer."
+            },
+            {
+              "type": "Changed",
+              "html": "Reference workload before this change: 1,335 files, 3,532.79 seconds summed setup, 4,465.55 seconds wall time (reported on 5.33.0). No after measurement was run under the implementation check-once rule. The startup cost model changes from one bootstrap per file to one per active worker plus reset cost; this is not a measured wall-time speedup. Use the new profiling switch to compare the same suite and worker count."
+            },
+            {
+              "type": "Fixed",
+              "html": "Restore application-config-only preload for feature generators, preserving configured notification locales and one-shot CLI exit. Correct cleanup test hooks to return void."
+            },
+            {
+              "type": "Fixed",
+              "html": "Fix CRUD UI generation with the Oxc parser, ES2022-compatible tooling arrays, nullable component bodies, and app-free feature scaffolding. Align inspection CLI tests and convention error-code headings."
+            },
+            {
+              "type": "Fixed",
+              "html": "Wait for owned MessagePort close events in the test-server disposal regression so referenced handles are actually released."
+            },
+            {
+              "type": "Fixed",
+              "html": "Recognize required and optional auth descriptors in route inspection and generated agent summaries, including inherited session guards."
+            },
+            {
+              "type": "Fixed",
+              "html": "Describe optional authentication as an anonymous security alternative in OpenAPI while keeping legacy guards required."
+            },
+            {
+              "type": "Fixed",
+              "html": "Generate notification locale strings for every configured locale with an explicit English fallback."
+            },
+            {
+              "type": "Fixed",
+              "html": "Exclude co-located tests and test-only directories from configuration discovery and reload."
+            },
+            {
+              "type": "Fixed",
+              "html": "Register module JSON dictionaries in each test worker and remove them during teardown."
+            },
+            {
+              "type": "Fixed",
+              "html": "Dispose HTTP test-server file runtime resources and pending loader acknowledgements on shutdown and failed startup."
+            },
+            {
+              "type": "Fixed",
+              "html": "Native ESM loader registration shares a process-global promise across repeated initialization and module reloads; test startup skips the hook when an importer runs application modules through Vitest."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/web",
+          "slug": "web",
+          "total": 11,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 4
+            },
+            {
+              "type": "Changed",
+              "n": 1
+            },
+            {
+              "type": "Fixed",
+              "n": 6
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "Add the <code>build-rtl-and-mixed-direction-ui</code> and <code>preserve-feedback-and-motion</code> agent skill topics, covering RTL layouts and mixed-direction content, and accessible feedback, failure handling and motion patterns."
+            },
+            {
+              "type": "Added",
+              "html": "Client manifest traversal for first-visit and deferred asset sizes, including hydration, page layouts, setup registrations and error boundaries; Rollup module attribution identifies the largest contributors."
+            },
+            {
+              "type": "Added",
+              "html": "Watched development regression coverage for shared-store connectivity and a characterization of layout form identifier hydration parity."
+            },
+            {
+              "type": "Added",
+              "html": "<code>build-accessible-controls</code> skill and design-system documentation cover shared Mongez controls, keyboard and focus behavior, stable ids, RTL, visual checked states, empty/reset semantics, and calendar dates versus instants."
+            },
+            {
+              "type": "Changed",
+              "html": "Correct the <code>ClientOnly</code> opening example to defer browser reads through a function child, and update the navigation and page-guard skill examples to match the real API."
+            },
+            {
+              "type": "Fixed",
+              "html": "Production builds no longer fail the client budget report when a setup file has no browser <code>register</code> hook; its empty projection adds no bytes."
+            },
+            {
+              "type": "Fixed",
+              "html": "Carry resolved document slots through the shared hydration payload so navigation data and document-embedded payloads stay identical."
+            },
+            {
+              "type": "Fixed",
+              "html": "Include generated guarded-route output in the page protection skill so its session and useUser examples compile independently."
+            },
+            {
+              "type": "Fixed",
+              "html": "<strong>BREAKING</strong> Hydrate the same full-document root ancestry as SSR, preserving React <code>useId()</code> and generated form IDs beneath layouts. Root components now execute in the browser; move server-only work to root setup loaders. Client navigation continues to replace the layout/page subtree inside <code>#vessel</code>."
+            },
+            {
+              "type": "Fixed",
+              "html": "Install fetched sessions on refresh, locale changes, and central page swaps, including guest sessions; superseded responses cannot publish identity."
+            },
+            {
+              "type": "Fixed",
+              "html": "Preserve the shared request-store resolver and request-keyed scopes across server module re-evaluation during development."
+            }
+          ]
+        },
+        {
+          "name": "create-warlock",
+          "slug": "create-warlock",
+          "total": 9,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 6
+            },
+            {
+              "type": "Changed",
+              "n": 2
+            },
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "New projects configure gzip client budgets of 150kb JavaScript and 50kb CSS, enforced by <code>warlock build</code>."
+            },
+            {
+              "type": "Added",
+              "html": "Web starter home-page browser spec with accessibility, overflow and screenshot checks at phone and desktop widths; omitted from API-only projects."
+            },
+            {
+              "type": "Added",
+              "html": "Pin the template's Vitest to 4.1.10 for awaited worker cleanup support. Selecting the test feature uses core's unit/integration projects generator, including quota-aware worker sizing and the cleanup runner, while preserving existing configs."
+            },
+            {
+              "type": "Added",
+              "html": "Update the testing-strategy project skill and scaffolding docs with matching file conventions, cheap unit configuration, opt-in worker lifetime/reset hooks, setup profiling and an affected-tests plus integration release gate with full suites nightly."
+            },
+            {
+              "type": "Added",
+              "html": "Full-stack and Tailwind + shadcn selections include fourteen accessible app-owned form controls, separate behavior hooks and props types, and exact UI dependency pins. The optional template and add-command payload share an integrity contract."
+            },
+            {
+              "type": "Added",
+              "html": "Template web standards name the shared controls and their direct web-alias imports; template verification includes the optional sources."
+            },
+            {
+              "type": "Changed",
+              "html": "Add a state ownership rule to the web code standards skill: loader data is server truth, and shared client state lives in named store modules."
+            },
+            {
+              "type": "Changed",
+              "html": "Teach the project API design skill to use typed domain errors, bounded list endpoints and response-schema contract assertions. The starter formatter preserves explicitly safe <code>AppError</code> messages and details through its native typed context."
+            },
+            {
+              "type": "Fixed",
+              "html": "Keep the existing-Tailwind design controls label within narrow terminal rows and supply the ResizeObserver test adapter needed by Radix form inputs in jsdom, and complete async submission fixtures before resubmitting. Pin matching React and React DOM test dependencies for standalone runs."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/auth",
+          "slug": "auth",
+          "total": 5,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 5
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Restore session middleware response fixtures, keep session projection defaults typed as unknown, and skip renewal without an explicit user type."
+            },
+            {
+              "type": "Fixed",
+              "html": "Exclude expired refresh rows from session caps while preserving oldest-first eviction."
+            },
+            {
+              "type": "Fixed",
+              "html": "Bound Google token and JWKS requests with configurable <code>timeoutMs</code>, <code>fetch</code> and <code>endpoints</code> options; retain all identity checks and isolate JWKS caches."
+            },
+            {
+              "type": "Fixed",
+              "html": "Reject unavailable refresh families outside the transaction callback so expected credential rejection is not logged as a database failure."
+            },
+            {
+              "type": "Fixed",
+              "html": "Publish required/optional session guard descriptors and markers for grouped route inspection."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/cascade",
+          "slug": "cascade",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "<strong>BREAKING</strong> Model resources receive hidden columns for public field derivations; <code>hidden</code> is enforced on final resource output instead of its input."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "5.34.3",
       "id": "v5-34-3",
       "date": "October 20, 2026",
@@ -148,7 +477,7 @@
         {
           "name": "create-warlock",
           "slug": "create-warlock",
-          "total": 7,
+          "total": 8,
           "counts": [
             {
               "type": "Changed",
@@ -156,7 +485,7 @@
             },
             {
               "type": "Fixed",
-              "n": 3
+              "n": 4
             }
           ],
           "items": [
@@ -175,6 +504,10 @@
             {
               "type": "Changed",
               "html": "The agent skill now exports as <code>create-warlock</code>; package discovery descriptions stay within 450 characters."
+            },
+            {
+              "type": "Fixed",
+              "html": "Declare response schemas for every starter controller, including authentication and the API home page."
             },
             {
               "type": "Fixed",

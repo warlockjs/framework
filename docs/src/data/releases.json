@@ -1,4 +1,9 @@
 {
+  "5.35.0": {
+    "publishedAt": "2026-10-21T14:58:50.485Z",
+    "matrix": "none",
+    "summary": "**Design system, web generators, new check rules, API helpers, budgets, accessibility tests and faster test runs.** Breaking: root components now run in the browser so hydration covers the full document ancestry (move server-only root work to the root setup loader), and model resources receive hidden columns with `hidden` enforced on final output. `warlock add design-system` scaffolds fourteen accessible shadcn controls wired to Mongez React Form, included by default in full-stack and Tailwind + shadcn starters; `warlock generate page`, `form` and `crud-ui` scaffold pages, forms and guarded CRUD screens. `warlock check` adds WL9013–WL9018 (component size, component-owned state, native controls and validation, controllers without a response schema) and `--fix`; `warlock inspect --section files` and `warlock explain <file>` map files, imports and the routes that reach them. Core adds `AppError`, `listEndpoint`, `assertResponseContracts`, per-page gzip build budgets and `page.assertAccessible()` with axe-core; tests gain opt-in worker lifetime, `setupTest({ mode: \"unit\" })` and setup profiling. Auth bounds Google and JWKS requests; web keeps sessions in sync after refresh, locale changes and page swaps. Lockstep release across all 33 packages. Generator matrix scope: `none`; before publishing, the blog on the 5.35.0 tarballs passed the release gate; after publishing, every package was confirmed at the npm origin and the blog check passed against npm."
+  },
   "5.34.3": {
     "publishedAt": "2026-10-20T16:47:49.924Z",
     "matrix": "none",
