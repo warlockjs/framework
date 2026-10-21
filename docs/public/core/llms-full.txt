@@ -8044,6 +8044,8 @@ close it in teardown. For signed-in requests, pass `client: await actingAs(user)
 and dispose that client afterward. These clients use the same assertion and
 run the real HTTP middleware and serialization paths.
 
+Cleanup hooks that own asynchronous handles should return a promise for completed closure. For MessagePorts, subscribe to `close` before calling `close()` and await the event before checking reference state.
+
 
 ## test-service  `@warlock.js/core/skills/test-service/SKILL.md`
 
@@ -9347,6 +9349,16 @@ to support derivations such as `has_secret: Boolean(data.secret)`. Model
 serialization removes `hidden` top-level keys from the final resource result.
 Review resources that copy input under renamed or nested keys and return explicit
 public projections. Direct resource construction does not invoke model filtering.
+
+## 5.34 to 5.35 document hydration
+
+Initial Web hydration now includes `root.tsx`, matching the document ancestry
+used by SSR so `useId()` and generated Mongez form IDs agree beneath layouts.
+Root components and providers execute in both realms. Move server-only work into
+`root.setup.ts` loaders and pass browser-safe results as `data`; retain exactly
+one `#vessel` around `{children}`. Client navigation still swaps layout/page
+children while preserving the document root. Remove temporary explicit form IDs
+only when the application does not otherwise depend on those names.
 
 
 ## upload-file  `@warlock.js/core/skills/upload-file/SKILL.md`
@@ -12259,6 +12271,14 @@ Programmatic usage: `await runCheck({ changed: true, fix: true })` from
 ## Explain a source file
 
 `npx warlock explain src/app/posts/services/list.service.ts --json` reports the file's module, convention role, exports, imports, importers and reaching routes/pages. It boots the app for route/page registrations; error-code explanations remain static. See the `warlock-inspect` topic for graph semantics and the boot-free `npx warlock inspect --section files --json` command.
+
+Starter controllers declare a response contract for each returned status. For example:
+
+```ts
+contactController.responseSchema = { 200: { body: { message: "string" } } };
+```
+
+Use `npx warlock inspect --section files --json` for static inspection without booting the app; `npx warlock explain src/app/contact/controllers/contact.controller.ts` explains its entry points.
 
 
 ## warlock-conventions  `@warlock.js/core/skills/warlock-conventions/SKILL.md`

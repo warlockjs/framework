@@ -8053,6 +8053,8 @@ close it in teardown. For signed-in requests, pass `client: await actingAs(user)
 and dispose that client afterward. These clients use the same assertion and
 run the real HTTP middleware and serialization paths.
 
+Cleanup hooks that own asynchronous handles should return a promise for completed closure. For MessagePorts, subscribe to `close` before calling `close()` and await the event before checking reference state.
+
 
 ## test-service  `@warlock.js/core/skills/test-service/SKILL.md`
 
@@ -9356,6 +9358,16 @@ to support derivations such as `has_secret: Boolean(data.secret)`. Model
 serialization removes `hidden` top-level keys from the final resource result.
 Review resources that copy input under renamed or nested keys and return explicit
 public projections. Direct resource construction does not invoke model filtering.
+
+## 5.34 to 5.35 document hydration
+
+Initial Web hydration now includes `root.tsx`, matching the document ancestry
+used by SSR so `useId()` and generated Mongez form IDs agree beneath layouts.
+Root components and providers execute in both realms. Move server-only work into
+`root.setup.ts` loaders and pass browser-safe results as `data`; retain exactly
+one `#vessel` around `{children}`. Client navigation still swaps layout/page
+children while preserving the document root. Remove temporary explicit form IDs
+only when the application does not otherwise depend on those names.
 
 
 ## upload-file  `@warlock.js/core/skills/upload-file/SKILL.md`
@@ -12268,6 +12280,14 @@ Programmatic usage: `await runCheck({ changed: true, fix: true })` from
 ## Explain a source file
 
 `npx warlock explain src/app/posts/services/list.service.ts --json` reports the file's module, convention role, exports, imports, importers and reaching routes/pages. It boots the app for route/page registrations; error-code explanations remain static. See the `warlock-inspect` topic for graph semantics and the boot-free `npx warlock inspect --section files --json` command.
+
+Starter controllers declare a response contract for each returned status. For example:
+
+```ts
+contactController.responseSchema = { 200: { body: { message: "string" } } };
+```
+
+Use `npx warlock inspect --section files --json` for static inspection without booting the app; `npx warlock explain src/app/contact/controllers/contact.controller.ts` explains its entry points.
 
 
 ## warlock-conventions  `@warlock.js/core/skills/warlock-conventions/SKILL.md`
@@ -27997,6 +28017,8 @@ router.group({ middleware: [sessionMiddleware({ userTypes: "user" })] }, () => {
 });
 ```
 
+When wiring `pageSession`, annotate the projection callback model parameter. An unspecified model type defaults to `unknown`. Refresh renewal needs an explicit user type; missing renewal types must not issue cookies.
+
 
 ## register-user  `@warlock.js/auth/skills/register-user/SKILL.md`
 
@@ -34954,6 +34976,20 @@ declare module "@warlock.js/web" {
 }
 ```
 
+The following is **generated output**, shown to make the example's typing
+prerequisite explicit. Let the route generator write this file; apps must never
+hand-write `PageRouteRegistry` entries.
+
+```ts title=".warlock/typings/web-routes.d.ts"
+import "@warlock.js/web";
+
+declare module "@warlock.js/web" {
+  interface PageRouteRegistry {
+    "account.show": { path: "/account"; params: {}; actions: never; guard: "user" };
+  }
+}
+```
+
 ## render-client-only  `@warlock.js/web/skills/render-client-only/SKILL.md`
 
 ---
@@ -37020,6 +37056,13 @@ authoritative. Static metadata defaults still merge with child metadata, and
 the nearest template applies once. Layouts still do not accept page routes,
 cache policy, validation, or a sitemap supplier.
 
+## Generated identifiers
+
+Initial hydration includes the document root, matching SSR ancestry. React
+`useId()` and Mongez forms without explicit IDs remain consistent beneath a
+layout, including repeated instances. Keep labels and ARIA references derived
+from the same hook value; client navigation preserves mounted layout state.
+
 ## Gotchas
 
 - **`layout.tsx` is positional.** It applies by directory ancestry; moving a page can change its layout and URL prefix together.
@@ -37271,7 +37314,7 @@ description: 'Author `src/web/root.tsx`, the full-document application root that
 
 # Warlock — write the root
 
-`src/web/root.tsx` is the application document. Its default export renders the complete `<html>` tree and contains the one DOM node the browser hydrates: `#vessel`.
+`src/web/root.tsx` is the application document. Its default export renders the complete `<html>` tree and contains `#vessel`, where client navigation replaces the layout and page. The browser hydrates the complete document so React sees the same ancestor tree as SSR.
 
 Use `root.setup.ts` for root `config` (including `config.metadata`), loader, or universal
 `register()` while `root.tsx` remains the document component. `strictMode` is
@@ -37345,20 +37388,33 @@ The hydration payload ships a `translations` key holding **only the active local
 
 Either way, a component that calls `useTrans()` under `#vessel` renders the same strings on the server and in the browser. Do not read translations from `navigator.language` or a client-only store during render; that is a hydration mismatch (see the `render-client-only` topic).
 
-## `#vessel` is the hydration boundary
+## Document hydration and `#vessel`
 
-The server renders this document shape:
+SSR and initial hydration both render `App → html/body → #vessel → Layout → Page`.
+React's `useId()` depends on that ancestry, including siblings outside `#vessel`.
+Keep exactly one element with `id="vessel"` around `{children}`. Client navigation
+replaces its layout/page children while preserving the root document.
 
-```text
-App document
-└── #vessel
-    └── Layout
-        └── Page
+Root components and providers execute in the browser as well as on the server.
+Keep server work in `root.setup.ts` loaders and pass browser-safe results through
+`data`. Head, stylesheet, locale and script slots travel with the initial payload
+so the root renders the same document during hydration. No explicit form ID is
+required merely because a form renders below a layout:
+
+```tsx
+import { Form } from "@mongez/react-form";
+
+export default function ContactPage() {
+  return (
+    <Form>
+      <button type="submit">Send</button>
+    </Form>
+  );
+}
 ```
 
-The browser hydrates `#vessel`, not the whole document. The client tree deliberately contains Layout + Page and excludes App because App contains the mount point. Keep exactly one element with `id="vessel"` around `{children}`. It may be nested inside your own body markup, but it must not be renamed or omitted.
-
-Because App is outside the hydrated subtree, put client state that must survive navigation in a layout or component beneath `#vessel`, not in the document root.
+Use explicit IDs when an application needs a named instance; do not rewrite or
+suppress React's generated IDs or hydration warnings.
 
 If `root.tsx` or `root.setup.ts` (or any module they need) fails to load or the setup `register()` throws, there is no trustworthy Layout+Page composition left to hydrate — Warlock falls back to a plain document with no hydration script at all rather than hydrate the browser against markup nothing can vouch for. See the `create-a-page` topic for the app's own `error.page.tsx` boundary, which is tried first.
 
@@ -50391,6 +50447,12 @@ import TextInput from "web/design-system/components/text-input";
 All fourteen controls, props and hooks are documented by the Web
 `build-accessible-controls` topic and the generated `web-code-standards` skill.
 Existing apps use `npx warlock add tailwind`, then `npx warlock add design-system`.
+
+Starter controllers include `responseSchema`. Keep these contracts aligned when changing returned bodies, for example `homePageController.responseSchema = { 200: { body: { message: "string", version: "string", docs: "string" } } };`.
+
+Feature picker labels stay compact enough for a 40-column terminal; hints are shortened or omitted when necessary. The existing-Tailwind design controls choice keeps its feature value when its display label is shortened.
+
+For generated form controls, return the save promise from `onSubmit` to finish the form's submitting lifecycle before a second submission. In jsdom control tests, provide a scoped ResizeObserver adapter because jsdom does not calculate layout.
 
 
 ================================================================================

@@ -1617,6 +1617,8 @@ router.group({ middleware: [sessionMiddleware({ userTypes: "user" })] }, () => {
 });
 ```
 
+When wiring `pageSession`, annotate the projection callback model parameter. An unspecified model type defaults to `unknown`. Refresh renewal needs an explicit user type; missing renewal types must not issue cookies.
+
 
 ## register-user  `@warlock.js/auth/skills/register-user/SKILL.md`
 
