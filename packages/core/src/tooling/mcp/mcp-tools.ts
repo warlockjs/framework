@@ -139,6 +139,7 @@ function sectionEntryMatches(section: InspectSection, entry: unknown, filter: st
     jobs: ["name", "queue"],
     schedules: ["name"],
     packages: ["name"],
+    files: ["file", "module", "role"],
   };
 
   return includesText(
@@ -166,6 +167,8 @@ const SECTION_DESCRIPTIONS: Record<InspectSection, string> = {
   jobs: "Queue jobs defined with defineJob() from @warlock.js/queue: name, queue, attempts, backoff, retention.",
   schedules:
     "Scheduled tasks from @warlock.js/scheduler: name, cron expression, intervals, next run.",
+  files:
+    "Source files, convention roles, exports and resolved imports/importedBy (static analysis, no execution).",
   packages: "Installed @warlock.js/* packages and their versions.",
 };
 
@@ -191,7 +194,7 @@ function inspectSectionTool(context: WarlockMcpContext, section: InspectSection)
 
   return {
     name: `inspect_${section}`,
-    description: `${SECTION_DESCRIPTIONS[section]} Read from the app's registries (the same data as \`warlock inspect --json --section ${section}\`), not from source text. Read-only.`,
+    description: `${SECTION_DESCRIPTIONS[section]} The same data as \`warlock inspect --json --section ${section}\`. Read-only.`,
     input: inputSchema(properties),
     writes: false,
     async run(input) {

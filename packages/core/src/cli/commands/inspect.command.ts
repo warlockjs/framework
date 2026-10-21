@@ -1,3 +1,4 @@
+import { parseInspectSections } from "../../tooling/inspect/inspect-app";
 import { command } from "../../commands/cli-command";
 import { inspectCommandAction } from "./inspect/inspect-command.action";
 
@@ -10,18 +11,21 @@ import { inspectCommandAction } from "./inspect/inspect-command.action";
  *
  * Boots like `warlock doctor`: connectors boot (routes register) but none
  * starts, so no database, cache or socket connection opens and no port binds.
- * `runtimeStrategy: "development"` for the same reason doctor declares it.
+ * Files-only requests skip preload and boot and read source statically.
+ * Other requests use `runtimeStrategy: "development"`, like doctor.
  */
 export const inspectCommand = command({
   name: "inspect",
   description:
-    "Print the app's routes, models, resources, config keys, events, pages, jobs, schedules and package versions (read-only); --json for the versioned report",
+    "Print the app's routes, models, resources, config keys, events, pages, jobs, schedules, files and package versions (read-only); --json for the versioned report",
   action: inspectCommandAction,
-  preload: {
-    runtimeStrategy: "development",
-    config: true,
-    env: true,
-    bootstrap: true,
+  preAction: ({ options }) => {
+    const sections = parseInspectSections(
+      typeof options.section === "string" ? options.section : undefined,
+    );
+    inspectCommand.commandPreload = sections.every((section) => section === "files")
+      ? undefined
+      : { runtimeStrategy: "development", config: true, env: true, bootstrap: true };
   },
   options: [
     {
@@ -32,7 +36,7 @@ export const inspectCommand = command({
     {
       text: "--section, -s",
       description:
-        "Comma-separated sections: routes, models, resources, config, events, pages, jobs, schedules, packages",
+        "Comma-separated sections: routes, models, resources, config, events, pages, jobs, schedules, packages, files",
       type: "string",
     },
   ],

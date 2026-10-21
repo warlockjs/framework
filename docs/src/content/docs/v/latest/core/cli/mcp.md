@@ -146,3 +146,7 @@ await server.close();
 | `WL7005` | A generate tool was asked to write on a read-only server.                                      |
 | `WL8008` | `requests_recent`: no dev server recorded, or it does not answer.                              |
 | `WL8009` | `requests_recent`: the dev server answers but devtools is not mounted.                         |
+
+## Source file graph
+
+Call `inspect_files` with `{ "filter": "service" }` for file paths, modules, convention roles, export names, resolved imports and reverse `importedBy` edges. This section scans `src/` without executing source modules; files-only requests skip the lazy app boot. `inspect_app` includes a `files` count. See `npx warlock explain src/app/posts/services/list.service.ts --json` for reaching routes and pages.

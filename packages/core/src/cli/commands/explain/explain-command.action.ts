@@ -1,3 +1,7 @@
+import { bootForInspect, inspectOptionsFromBoot } from "../../../tooling/inspect/boot-for-inspect";
+import { inspectApp } from "../../../tooling/inspect/inspect-app";
+import { explainFile, formatFileExplanation } from "../../../tooling/inspect/explain-file";
+import { withConsoleOnStderr } from "../routes/with-console-on-stderr";
 import { colors } from "@mongez/copper";
 import type { CommandActionData } from "../../../commands/types";
 import {
@@ -66,6 +70,23 @@ export async function explainCommandAction({ args, options }: CommandActionData)
       console.log(line);
     }
 
+    return;
+  }
+
+  if (!/^WL\d+$/i.test(requested.trim())) {
+    const collect = async () => {
+      const boot = await bootForInspect();
+      return explainFile(
+        requested,
+        await inspectApp({
+          ...inspectOptionsFromBoot(boot),
+          sections: ["files", "routes", "pages"],
+        }),
+      );
+    };
+    const file = await withConsoleOnStderr(collect);
+    if (options.json) console.log(JSON.stringify(file, null, 2));
+    else for (const line of formatFileExplanation(file)) console.log(line);
     return;
   }
 

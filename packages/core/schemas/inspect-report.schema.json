@@ -47,7 +47,8 @@
           "pages",
           "jobs",
           "schedules",
-          "packages"
+          "packages",
+          "files"
         ]
       }
     },
@@ -546,6 +547,51 @@
           },
           "source": {
             "type": ["string", "null"]
+          }
+        }
+      }
+    },
+    "files": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["file", "module", "role", "exports", "imports", "importedBy"],
+        "properties": {
+          "file": {
+            "type": "string"
+          },
+          "module": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          },
+          "exports": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "importedBy": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "imports": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["specifier", "file"],
+              "properties": {
+                "specifier": {
+                  "type": "string"
+                },
+                "file": {
+                  "type": ["string", "null"]
+                }
+              }
+            }
           }
         }
       }

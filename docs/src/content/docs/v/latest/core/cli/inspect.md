@@ -14,7 +14,7 @@ warlock inspect --json                   # the full report, schemaVersion 1
 warlock inspect --json --section routes  # only some sections
 ```
 
-It boots exactly like [`warlock doctor`](./doctor.md): every connector boots (that is where routes register) and **none starts**, so no database, cache or socket connection opens and no port binds. App modules are imported, so whatever they do at import time happens, as in `warlock dev`.
+Except for `--section files`, which reads source without booting, it boots exactly like [`warlock doctor`](./doctor.md): every connector boots (that is where routes register) and **none starts**, so no database, cache or socket connection opens and no port binds. App modules are imported, so whatever they do at import time happens, as in `warlock dev`.
 
 | Flag            | Type    | Description                                                                                     |
 | --------------- | ------- | ----------------------------------------------------------------------------------------------- |
@@ -33,6 +33,7 @@ It boots exactly like [`warlock doctor`](./doctor.md): every connector boots (th
 | `pages`     | Pages `@warlock.js/web` installed: path, name, page file, layout chain (outermost first), which files on the chain export a `loader`, actions, guard. Empty without the web package.       |
 | `jobs`      | Jobs defined with `defineJob()` from `@warlock.js/queue`: name, queue, attempts, backoff, retention. Empty without the queue package.                                                      |
 | `schedules` | Tasks on the `@warlock.js/scheduler` scheduler: name, cron expression, intervals, next run. Empty without the scheduler.                                                                   |
+| `files`     | Source files with module, convention role, exports and resolved imports/importedBy; no app boot for files-only requests.                                                                   |
 | `packages`  | Installed `@warlock.js/*` packages and their versions.                                                                                                                                     |
 
 ### A route
@@ -194,3 +195,28 @@ router.group({ middleware: [sessionMiddleware({ userTypes: "user" })] }, () => {
   router.post("/settings", async ({ response }) => response.success({ saved: true }));
 });
 ```
+
+## Source files and reachability
+
+```bash
+npx warlock inspect --section files --json
+npx warlock explain src/app/posts/services/list.service.ts
+npx warlock explain src/web/components/Post.tsx --json
+npx warlock explain WL3001 --json
+```
+
+The `files` section reads every file under `src/`, without importing app modules or booting connectors. Each entry has `file`, `module`, `role`, `exports`, `imports` and `importedBy`. Paths are relative to the project root. Modules use `src/app/<module>` or the containing top-level `src` directory. Roles follow file names and directories: controller, service, repository, model, migration, schema, resource, routes, page, setup, layout, root, hook, component, util, type, config and spec; unmatched files use `source`. Non-code assets have empty exports and imports.
+
+Each code file is parsed once with OXC per inspection. Export names include types, aliases, destructured bindings, `default` and `*` for star re-exports; star exports are recorded rather than expanded. Imports include type imports, side effects, re-exports and literal dynamic imports. Each import is `{ specifier, file }`: `file` is the resolved local path, or `null` for external/unresolved imports. Resolution follows inherited tsconfig path aliases, fallback targets, baseUrl, extensionless files and directory indexes within `src/`. Computed dynamic imports and CommonJS `require()` calls are not graph edges. Parse/config failures appear in `warnings`.
+
+File explanations accept a project-relative or absolute path. They boot the app to read the existing routes/pages sections, then walk the static graph to find entry points reaching the file, including page layouts and loaders. Type-only edges participate; this is source reachability, not proof that runtime execution calls a function. Every route declared in a reaching route module is listed. Boot warnings remain in the JSON explanation and human output, so missing registrations are visible. `warlock explain <WLxxxx>` keeps its static error-code behavior.
+
+```ts
+import { inspectApp, explainFile } from "@warlock.js/core/tooling";
+
+const report = await inspectApp({ sections: ["files"] });
+const source = explainFile("src/app/posts/services/list.service.ts", report);
+console.log(source.role, source.exports, source.importedBy);
+```
+
+For route/page reachability in code, call `inspectApp({ sections: ["files", "routes", "pages"] })` in an already booted app. `inspect_files` exposes the section through MCP with a case-insensitive `filter` on file, module or role.

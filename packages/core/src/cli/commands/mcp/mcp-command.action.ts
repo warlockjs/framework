@@ -98,7 +98,11 @@ export async function mcpCommandAction({ options }: CommandActionData): Promise<
   const inspectOptions = lazyInspectOptions();
   const context = createMcpContext({
     allowWrites,
-    inspect: async (sections) => inspectApp({ ...(await inspectOptions()), sections }),
+    inspect: async (sections) =>
+      inspectApp({
+        ...(sections.every((section) => section === "files") ? {} : await inspectOptions()),
+        sections,
+      }),
     ...(process.argv[1] ? { cliEntry: process.argv[1] } : {}),
     devtools: {
       ...(stringOption(options.url) ? { url: stringOption(options.url) } : {}),

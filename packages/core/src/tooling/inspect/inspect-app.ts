@@ -2,6 +2,7 @@ import { Application } from "../../application/application";
 import { SchemaRegistry } from "../../openapi/schema-registry";
 import { router } from "../../router/router";
 import type { Route } from "../../router/types";
+import { collectFiles } from "./collect-files";
 import { collectConfig } from "./collect-config";
 import { collectModels, collectResources, type InspectModelModule } from "./collect-models";
 import {
@@ -131,8 +132,15 @@ export async function inspectApp(options: InspectOptions = {}): Promise<InspectR
 
   // Routes and models register the resources they reference, so `resources`
   // (and `components`) are filled from both even when only one is printed.
-  const routes = collectRoutes(options.routes ?? router.list(), registry, warnings);
-  const { models, resourceModels } = collectModels(options.modelModules ?? [], registry, warnings);
+  const filesOnly = sections.every((section) => section === "files");
+  const routes = !filesOnly
+    ? collectRoutes(options.routes ?? router.list(), registry, warnings)
+    : [];
+  const { models, resourceModels } = !filesOnly
+    ? collectModels(options.modelModules ?? [], registry, warnings)
+    : { models: [], resourceModels: new Map<string, string[]>() };
+
+  if (wants.has("files")) report.files = collectFiles(cwd, warnings);
 
   if (wants.has("routes")) report.routes = routes;
   if (wants.has("models")) report.models = models;
@@ -141,7 +149,12 @@ export async function inspectApp(options: InspectOptions = {}): Promise<InspectR
   if (wants.has("events")) report.events = groupListeners(options.events ?? []);
 
   if (wants.has("pages")) {
-    report.pages = collectPages(options.pages ?? installedPagesFromConnectors(), cwd, warnings);
+    report.pages = collectPages(
+      options.pages ?? installedPagesFromConnectors(),
+      cwd,
+      warnings,
+      report.files,
+    );
   }
 
   if (wants.has("jobs")) report.jobs = await collectJobs(importFromApp, warnings);

@@ -306,6 +306,7 @@ export const INSPECT_REPORT_JSON_SCHEMA: Record<string, unknown> = {
           "jobs",
           "schedules",
           "packages",
+          "files",
         ],
       },
     },
@@ -318,6 +319,28 @@ export const INSPECT_REPORT_JSON_SCHEMA: Record<string, unknown> = {
     jobs: { type: "array", items: job },
     schedules: { type: "array", items: schedule },
     packages: { type: "array", items: installedPackage },
+    files: {
+      type: "array",
+      items: {
+        type: "object",
+        required: ["file", "module", "role", "exports", "imports", "importedBy"],
+        properties: {
+          file: { type: "string" },
+          module: { type: "string" },
+          role: { type: "string" },
+          exports: stringArray,
+          importedBy: stringArray,
+          imports: {
+            type: "array",
+            items: {
+              type: "object",
+              required: ["specifier", "file"],
+              properties: { specifier: { type: "string" }, file: nullableString },
+            },
+          },
+        },
+      },
+    },
     components: {
       type: "object",
       required: ["schemas"],

@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import * as ast from "../syntax/ast";
 import { connectorsManager } from "../../connectors/connectors-manager";
-import type { InspectPage, InspectWarning } from "./inspect-report.types";
+import type { InspectFile, InspectPage, InspectWarning } from "./inspect-report.types";
 
 /** The fields of `@warlock.js/web`'s installed page record that inspect reads. */
 type InstalledPageLike = {
@@ -131,10 +131,12 @@ export function collectPages(
   pages: readonly unknown[] | undefined,
   cwd: string,
   warnings: InspectWarning[],
+  files?: readonly InspectFile[],
 ): InspectPage[] {
   if (!pages) return [];
 
   const collected: InspectPage[] = [];
+  const exports = files ? new Map(files.map((file) => [file.file, file.exports])) : undefined;
 
   for (const page of pages) {
     if (!isInstalledPage(page)) {
@@ -144,7 +146,11 @@ export function collectPages(
 
     const pageFile = path.isAbsolute(page.file) ? page.file : path.join(cwd, page.file);
     const layouts = layoutChainOf(pageFile, cwd);
-    const loaders = [...layouts, pageFile].filter((file) => exportsName(file, "loader"));
+    const loaders = [...layouts, pageFile].filter((file) =>
+      exports
+        ? exports.get(relativeTo(cwd, file))?.includes("loader") === true
+        : exportsName(file, "loader"),
+    );
     const actions = Array.isArray(page.actions)
       ? page.actions.filter((action): action is string => typeof action === "string")
       : [];

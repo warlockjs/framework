@@ -194,3 +194,7 @@ from the final report; unresolved findings remain. Review the resulting source d
 
 Programmatic usage: `await runCheck({ changed: true, fix: true })` from
 `@warlock.js/core/tooling`.
+
+## Explain a source file
+
+`npx warlock explain src/app/posts/services/list.service.ts --json` reports the file's module, convention role, exports, imports, importers and reaching routes/pages. It boots the app for route/page registrations; error-code explanations remain static. See the `warlock-inspect` topic for graph semantics and the boot-free `npx warlock inspect --section files --json` command.

@@ -33,6 +33,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Changed
 
 - `warlock check --changed` includes transitive import dependents for scoped lint, conventions and related tests. Changed typecheck diagnostics now include transitive importers.
+### Added
+
+- `warlock inspect --section files` lists every file under `src/` with its module, convention role, exports and resolved import graph without booting the app. The versioned report schema and MCP `inspect_files` tool expose the same section.
+- `warlock explain <file>` prints exports, importers and transitively reaching routes/pages, with `--json` support. Error-code explanations continue to work.
 
 ## 5.34.3 - 2026-10-20
 
