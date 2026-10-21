@@ -40,6 +40,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 
 - Per-page gzip JS/CSS build budgets with route overrides, warn/error enforcement, previous-build deltas, and `warlock build --json` reports. Existing apps remain report-only unless limits are configured.
+### Added
+
+- Browser `page.assertAccessible(options?)` using a pinned local axe-core injection over CDP, exact rule/selector allowances, violation diagnostics and accessibility evidence.
 
 ## 5.34.3 - 2026-10-20
 

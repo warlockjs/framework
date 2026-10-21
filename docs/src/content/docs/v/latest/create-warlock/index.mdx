@@ -236,3 +236,13 @@ The generated `warlock.config.ts` configures `build.budgets.page` with gzip
 limits of `150kb` JavaScript and `50kb` CSS in `mode: "error"`. API-only
 builds have no client pages to check. Adjust the limits or choose `"warn"`
 as needed; see [client performance budgets](/v/latest/core/digging-deeper/build-budgets/).
+
+## Starter browser checks
+
+Full-stack web projects include `e2e/home.e2e.ts`. Run `npx warlock e2e` with
+Chrome or Edge installed. The spec builds and starts an owned app copy, visits
+`/` at 1280×800 and 390×844, then calls `page.assertAccessible()`,
+`page.assertViewport()` and `page.screenshot("home")`. API-only scaffolds omit
+this web spec. The fixture excludes dotenv files and production data directories;
+provide disposable service configuration explicitly if you add database-backed
+features. A database-free scaffold needs no external database.

@@ -16,6 +16,13 @@ All notable changes to `@warlock.js/web` are documented here.
 ### Added
 
 - Client manifest traversal for first-visit and deferred asset sizes, including hydration, page layouts, setup registrations and error boundaries; Rollup module attribution identifies the largest contributors.
+### Fixed
+
+- Preserve the shared request-store resolver and request-keyed scopes across server module re-evaluation during development.
+
+### Added
+
+- Watched development regression coverage for shared-store connectivity and a characterization of layout form identifier hydration parity.
 
 ## 5.34.3 - 2026-10-20
 

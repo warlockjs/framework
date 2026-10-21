@@ -261,3 +261,13 @@ editor settings and nonstandard scripts can also require review.
 existing Oxc configs retain their categories. A real lockfile beside a workspace
 marker determines the installer: `package-lock.json` plus `pnpm-workspace.yaml`
 without `pnpm-lock.yaml` now produces `npm install`.
+
+## Starter browser checks
+
+Full-stack web projects include `e2e/home.e2e.ts`. Run `npx warlock e2e` with
+Chrome or Edge installed. The spec builds and starts an owned app copy, visits
+`/` at 1280×800 and 390×844, then calls `page.assertAccessible()`,
+`page.assertViewport()` and `page.screenshot("home")`. API-only scaffolds omit
+this web spec. The fixture excludes dotenv files and production data directories;
+provide disposable service configuration explicitly if you add database-backed
+features. A database-free scaffold needs no external database.

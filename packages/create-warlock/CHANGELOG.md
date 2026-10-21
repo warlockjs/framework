@@ -13,6 +13,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 
 - New projects configure gzip client budgets of 150kb JavaScript and 50kb CSS, enforced by `warlock build`.
+### Added
+
+- Web starter home-page browser spec with accessibility, overflow and screenshot checks at phone and desktop widths; omitted from API-only projects.
 
 ## 5.34.3 - 2026-10-20
 

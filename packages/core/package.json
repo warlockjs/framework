@@ -53,7 +53,8 @@
     "mime": "^4.1.0",
     "oxc-parser": "0.154.0",
     "pluralize-esm": "^9.0.5",
-    "typescript": "7.0.2"
+    "typescript": "7.0.2",
+    "axe-core": "4.14.0"
   },
   "peerDependencies": {
     "@napi-rs/keyring": "^2.1.1",

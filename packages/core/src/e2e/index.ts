@@ -4,6 +4,9 @@ export { E2ERunError, runE2E } from "./run-e2e";
 export type { E2EResult } from "./run-e2e";
 export { defaultViewports, defineE2E } from "./types";
 export type {
+  AccessibilityOptions,
+  AccessibilityViolation,
+  AccessibilityEvidence,
   AppFixtureOptions,
   BrowserOptions,
   Command,

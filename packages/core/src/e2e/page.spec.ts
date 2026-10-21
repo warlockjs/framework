@@ -221,3 +221,53 @@ describe("browser page over a fake CDP endpoint", () => {
     );
   });
 });
+
+describe("accessibility scans", () => {
+  const violation = {
+    id: "label",
+    impact: "critical",
+    help: "Label inputs",
+    helpUrl: "https://example.test/label",
+    nodes: [{ target: ["#email"] }, { target: ["#name"] }],
+  };
+  it("injects axe through CDP, reports selectors and retains failed results", async () => {
+    const { page, endpoint, evidence } = await setup((expression) =>
+      expression.includes("const results = await axe.run")
+        ? { url: "http://fixture/", violations: [structuredClone(violation)], incomplete: [] }
+        : true,
+    );
+    await expect(page.assertAccessible()).rejects.toThrow('label: ["#email"]');
+    expect(evidence.accessibility?.[0].violations).toHaveLength(1);
+    expect(
+      endpoint.commands.some(
+        (command) =>
+          command.method === "Runtime.evaluate" &&
+          String(command.params.expression).includes("axe"),
+      ),
+    ).toBe(true);
+  });
+  it("allows exact rule/selector pairs without hiding other nodes", async () => {
+    const { page, evidence } = await setup((expression) =>
+      expression.includes("const results = await axe.run")
+        ? { url: "http://fixture/", violations: [structuredClone(violation)], incomplete: [] }
+        : true,
+    );
+    await expect(
+      page.assertAccessible({ allow: [{ id: "label", selector: "#email" }] }),
+    ).rejects.toThrow("#name");
+    expect(evidence.accessibility?.[0].violations[0].nodes.map((node) => node.allowed)).toEqual([
+      true,
+      false,
+    ]);
+    await expect(page.assertAccessible({ allow: [{ id: "label" }] })).resolves.toBeDefined();
+  });
+  it("retains incomplete checks for manual review on a passing scan", async () => {
+    const { page, evidence } = await setup((expression) =>
+      expression.includes("const results = await axe.run")
+        ? { url: "http://fixture/", violations: [], incomplete: [violation] }
+        : true,
+    );
+    await page.assertAccessible({ selector: "main", tags: ["wcag2aa"] });
+    expect(evidence.accessibility?.[0].incomplete).toHaveLength(1);
+  });
+});
