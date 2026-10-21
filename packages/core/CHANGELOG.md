@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 > ⚠ **Versioning: `@warlock.js/*` does not follow SemVer strictly — breaking changes may ship in a minor.** This is a deliberate decision, not an oversight: the framework is pre-adoption and the cost of a major per behaviour fix currently outweighs the benefit. **Pin an exact version or a tilde range (`~4.13.0`) if you need to opt into changes rather than receive them.** Every breaking change is marked **BREAKING** in its entry and summarised in an _Upgrading_ section at the top of the release. **This policy will change once the framework has consumers beyond its author.**
 
+## 5.35.0
+
+### Added
+
+- Web convention warnings for component size, multiple components, component-owned state/effects and handlers, native form controls and native validation; exported controller response schema warnings (`WL9013`–`WL9018`). Configure severity and component line limits through `.warlock-check.json`.
+- `warlock check --fix` applies safe relative import extension fixes and exposes available edits through the optional JSON `fix` field.
+
+### Changed
+
+- `warlock check --changed` includes transitive import dependents for scoped lint, conventions and related tests. Changed typecheck diagnostics now include transitive importers.
+
 ## 5.34.3 - 2026-10-20
 
 ### Fixed

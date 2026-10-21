@@ -1,11 +1,14 @@
+import { isWarlockErrorCode } from "../../errors/error-codes";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { parse } from "jsonc-parser";
 import { importSpecifiers } from "../syntax/imports";
 import * as ast from "../syntax/ast";
 import { createProblem, type ToolingProblem } from "../problem";
+import { importFixes } from "./fixes";
 import { codeStyleFindings } from "./code-style-conventions";
 import { securityFindings } from "./security-conventions";
+import { webFindings, responseSchemaFindings, type ConventionOptions } from "./web-conventions";
 import { positionOf, type SourceFinding } from "./source-ast";
 
 /** Extensions tried when resolving an extension-less import. */
@@ -33,7 +36,11 @@ function toPosix(file: string): string {
 }
 
 /** Resolve a relative or `app/...` specifier to a project-relative file, if it exists. */
-function resolveSpecifier(specifier: string, importer: string, cwd: string): string | undefined {
+export function resolveSpecifier(
+  specifier: string,
+  importer: string,
+  cwd: string,
+): string | undefined {
   let base: string;
 
   if (specifier.startsWith(".")) {
@@ -88,6 +95,7 @@ function importProblems(
   cwd: string,
 ): ToolingProblem[] {
   const problems: ToolingProblem[] = [];
+  const fixes = importFixes(relativePath, sourceFile.text);
   const importerModule = moduleOf(relativePath);
 
   for (const { specifier, node } of importsOf(sourceFile)) {
@@ -97,6 +105,7 @@ function importProblems(
       problems.push(
         createProblem({
           code: "WL9002",
+          fix: fixes.find((fix) => fix.end === node.end - 1),
           source: "convention",
           message: `Import "${specifier}" ends in a .js extension.`,
           ...at,
@@ -180,17 +189,31 @@ export function checkFileConventions(
   relativePath: string,
   source: string,
   cwd: string,
+  options: ConventionOptions = {},
 ): ToolingProblem[] {
   const sourceFile = ast.parseSourceFile(relativePath, source);
   const problems = [
     ...importProblems(sourceFile, relativePath, cwd),
-    ...[...securityFindings(sourceFile), ...codeStyleFindings(sourceFile)].map((finding) =>
-      findingProblem(sourceFile, relativePath, finding),
-    ),
+    ...[
+      ...securityFindings(sourceFile),
+      ...codeStyleFindings(sourceFile),
+      ...webFindings(sourceFile, options),
+      ...responseSchemaFindings(sourceFile),
+    ].map((finding) => findingProblem(sourceFile, relativePath, finding)),
   ];
   const lines = source.split(/\r?\n/);
 
   return problems
+    .filter((problem) => options.rules?.[problem.code] !== "off")
+    .map((problem) => ({
+      ...problem,
+      severity:
+        options.rules?.[problem.code] === "error"
+          ? ("error" as const)
+          : options.rules?.[problem.code] === "warning"
+            ? ("warning" as const)
+            : problem.severity,
+    }))
     .filter((problem) => problem.line === null || !isIgnored(lines, problem.line, problem.code))
     .sort(
       (first, second) =>
@@ -245,7 +268,13 @@ export function runConventions(
   files: readonly string[],
   project?: string,
 ): ToolingProblem[] {
-  const problems = checkTsconfigConventions(cwd, project);
+  const options = readConventionOptions(cwd);
+  const problems = checkTsconfigConventions(cwd, project)
+    .filter((problem) => options.rules?.[problem.code] !== "off")
+    .map((problem) => {
+      const severity = options.rules?.[problem.code];
+      return severity === "error" || severity === "warning" ? { ...problem, severity } : problem;
+    });
 
   for (const file of files) {
     let source: string;
@@ -256,8 +285,38 @@ export function runConventions(
       continue;
     }
 
-    problems.push(...checkFileConventions(file, source, cwd));
+    problems.push(...checkFileConventions(file, source, cwd, options));
   }
 
   return problems;
+}
+
+/** Optional JSON configuration; malformed configuration is reported by the check step. */
+export function readConventionOptions(cwd: string): ConventionOptions {
+  const file = path.join(cwd, ".warlock-check.json");
+  if (!existsSync(file)) return {};
+  const value: unknown = JSON.parse(readFileSync(file, "utf8"));
+  if (!value || typeof value !== "object")
+    throw new Error(".warlock-check.json must be an object.");
+  const limit: unknown = Reflect.get(value, "componentLineLimit");
+  if (limit !== undefined && (typeof limit !== "number" || !Number.isInteger(limit) || limit < 1))
+    throw new Error("componentLineLimit must be a positive integer.");
+  const rules: unknown = Reflect.get(value, "rules");
+  const overrides: NonNullable<ConventionOptions["rules"]> = {};
+  if (rules !== undefined) {
+    if (!rules || typeof rules !== "object" || Array.isArray(rules))
+      throw new Error("rules must be an object.");
+    for (const [code, severity] of Object.entries(rules)) {
+      if (
+        !isWarlockErrorCode(code) ||
+        (severity !== "off" && severity !== "warning" && severity !== "error")
+      )
+        throw new Error("rules must map registered WL codes to off, warning or error.");
+      overrides[code] = severity;
+    }
+  }
+  return {
+    ...(typeof limit === "number" ? { componentLineLimit: limit } : {}),
+    rules: overrides,
+  };
 }

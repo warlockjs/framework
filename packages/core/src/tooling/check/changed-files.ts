@@ -50,6 +50,8 @@ export async function listChangedFiles(options: {
   cwd: string;
   base?: string;
   git?: GitRunner;
+  /** Keep deleted paths as seeds for reverse dependency selection. */
+  includeDeleted?: boolean;
 }): Promise<{ files: string[] } | { problem: ToolingProblem }> {
   const git = options.git ?? runGit;
   let ref = "HEAD";
@@ -70,7 +72,13 @@ export async function listChangedFiles(options: {
 
   // `--relative` makes the paths relative to cwd and limits them to it.
   const diff = await git(
-    ["diff", "--name-only", "--relative", "--diff-filter=ACMR", ref],
+    [
+      "diff",
+      "--name-only",
+      "--relative",
+      options.includeDeleted ? "--diff-filter=ACMRD" : "--diff-filter=ACMR",
+      ref,
+    ],
     options.cwd,
   );
 
@@ -94,7 +102,11 @@ export async function listChangedFiles(options: {
 
   const files = [...new Set([...lines(diff.stdout), ...lines(untracked.stdout)])]
     .map((file) => file.split(path.sep).join("/"))
-    .filter((file) => SOURCE_FILE.test(file) && existsSync(path.join(options.cwd, file)))
+    .filter(
+      (file) =>
+        SOURCE_FILE.test(file) &&
+        (options.includeDeleted || existsSync(path.join(options.cwd, file))),
+    )
     .sort();
 
   return { files };

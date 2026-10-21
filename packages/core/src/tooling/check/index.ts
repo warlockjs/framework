@@ -26,3 +26,7 @@ export {
   type VitestRun,
   type VitestRunner,
 } from "./tests-step";
+
+export { affectedFiles } from "./affected-files";
+export type { ConventionOptions } from "./web-conventions";
+export type { ProblemFix } from "./fixes";

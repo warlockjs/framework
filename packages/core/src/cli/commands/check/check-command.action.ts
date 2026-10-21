@@ -61,6 +61,7 @@ export async function checkCommandAction({ options }: CommandActionData): Promis
 
   const report = await runCheck({
     lint,
+    fix: options.fix === true,
     changed,
     base,
     skip,
