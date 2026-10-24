@@ -137,5 +137,7 @@ export async function confirmRollback(options: ConfirmRollbackOptions = {}): Pro
     );
   }
 
-  return (options.confirm ?? askOnTerminal)("This rollback removes the data listed above. Continue?");
+  return (options.confirm ?? askOnTerminal)(
+    "This rollback removes the data listed above. Continue?",
+  );
 }

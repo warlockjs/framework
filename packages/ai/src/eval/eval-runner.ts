@@ -14,12 +14,7 @@ import { AgentExecutionError } from "../errors";
 import { log } from "@warlock.js/logger";
 import { judge as judgeScorer } from "./judge-scorer";
 import { diff } from "./regression";
-import {
-  caseScoreInterval,
-  computeStats,
-  DEFAULT_CONFIDENCE,
-  wilsonInterval,
-} from "./statistics";
+import { caseScoreInterval, computeStats, DEFAULT_CONFIDENCE, wilsonInterval } from "./statistics";
 
 /**
  * Narrow `EvalOptions.cases` to the underlying `EvalCase[]`. A

@@ -81,7 +81,13 @@ type EvalRegression = {
   removed: string[]; // in baseline, absent now
   added: string[]; // new now, absent in baseline
   passed: boolean; // true when nothing regressed beyond tolerance
-  regressedMetrics?: Array<{ scope: string; metric: "passRate" | "meanScore"; before: number; after: number; interval: { low: number; high: number } }>; // interval gate
+  regressedMetrics?: Array<{
+    scope: string;
+    metric: "passRate" | "meanScore";
+    before: number;
+    after: number;
+    interval: { low: number; high: number };
+  }>; // interval gate
   stableFailures?: string[]; // repeat > 1
   flaky?: string[]; // repeat > 1
 };

@@ -10,31 +10,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- `warlock release <action> [id]`: a deploy pipeline for applications, configured by the new `release` section of `warlock.config.ts` (`ReleaseConfig`, `ReleaseCheck`). `candidate` freezes a clean commit (`--commit`, `--allow-dirty`) into `.warlock/releases/<version>-<shortsha>/` with a manifest (version, commit, creation time, Node version, lockfile hash). `gate` runs an ordered list of named checks (default: typecheck, check, test, build) and stops at the first failure. `migrations --prove [--target]` snapshots the migration ledger, tables and indexes around a real run of the pending migrations and compares them with the expected set. `stage` copies the build and what is needed to run it. `activate [--preflight] [--dry-run] [--allow-same]` checks the staged files, the gate and that the version is strictly greater than the active one, then switches `current` with an atomic symlink, keeps `previous` and runs the restart command you configure in `release.restart.command`; Warlock never calls a process manager itself. `verify` retries a GET on `release.verify.url` and compares the reported version and commit with the active release. `rollback [--dry-run]` switches back and reruns the restart command; it does not roll migrations back. `list`, `status` and `prune --keep <n>` (the only command that deletes releases) complete the family. Every action accepts `--json`, and a manifest per release plus a `release.log` record what happened.
+
 - `sites` route option and `router.group({ sites })` option: the `web.sites` keys a multi-site app offers a named API route to in the browser. Absent means shared by every site; a route's own `sites` replaces its group's. The route snapshot carries `sites` only on routes that declared it.
 - The named route snapshot carries `guarded: true` on a route with an auth guard in its middleware chain (group middleware included), so browser route tables can leave it out for guests.
+
+- In development, the first time a validation translation cannot be filled, a warning names its `validation.*` key.
+
+### Changed
+
+- **BREAKING** `warlock migrate --rollback` and `warlock migrate --fresh` print a destructive-operation summary (collections/tables dropped, fields/columns unset, document/row counts) before running. Outside development they ask for confirmation, and exit with code 1 when there is no terminal. New `--yes, -y` and `--force` flags confirm without a prompt.
 
 ### Fixed
 
 - `warlock inspect` and the generated `AGENTS.md` list of "Mutating routes without an auth guard" counted only routes whose guard attached a `warlock.auth` descriptor. A middleware that declares itself a guard with `markAuthGuard()`, including one registered once on a `router.group`, now marks every route inside the group as guarded.
 - `warlock check` (`WL9006`) treats `markAuthGuard(fn, false)` written inline in a middleware list as not a guard, and recognises a local factory such as `const requireAdmin = () => markAuthGuard(fn)` used as `middleware: [requireAdmin()]` in a route or group.
-- `warlock release <action> [id]`: a deploy pipeline for applications, configured by the new `release` section of `warlock.config.ts` (`ReleaseConfig`, `ReleaseCheck`). `candidate` freezes a clean commit (`--commit`, `--allow-dirty`) into `.warlock/releases/<version>-<shortsha>/` with a manifest (version, commit, creation time, Node version, lockfile hash). `gate` runs an ordered list of named checks (default: typecheck, check, test, build) and stops at the first failure. `migrations --prove [--target]` snapshots the migration ledger, tables and indexes around a real run of the pending migrations and compares them with the expected set. `stage` copies the build and what is needed to run it. `activate [--preflight] [--dry-run] [--allow-same]` checks the staged files, the gate and that the version is strictly greater than the active one, then switches `current` with an atomic symlink, keeps `previous` and runs the restart command you configure in `release.restart.command`; Warlock never calls a process manager itself. `verify` retries a GET on `release.verify.url` and compares the reported version and commit with the active release. `rollback [--dry-run]` switches back and reruns the restart command; it does not roll migrations back. `list`, `status` and `prune --keep <n>` (the only command that deletes releases) complete the family. Every action accepts `--json`, and a manifest per release plus a `release.log` record what happened.
-### Fixed
 
 - The default validation message translation no longer returns a message with an unfilled `:placeholder`. When the browser form library is imported on the server, its English `validation.*` defaults share the translation registry and name the length value `:length`, where seal uses `:minLength` and `:maxLength`, so a `v.string().maxLength(5)` failure read "This input can not be greater than :length characters". The aliases `:length` (for `minLength` and `maxLength`) and `:matchingInput` (for `match`) are now mapped, and a translation that still cannot be filled falls back to seal's own message. App overrides of `validation.*` keep working.
 
-### Added
-
-- In development, the first time a validation translation cannot be filled, a warning names its `validation.*` key.
-### Changed
-
-- **BREAKING** `warlock migrate --rollback` and `warlock migrate --fresh` print a destructive-operation summary (collections/tables dropped, fields/columns unset, document/row counts) before running. Outside development they ask for confirmation, and exit with code 1 when there is no terminal. New `--yes, -y` and `--force` flags confirm without a prompt.
+- The dev loader hook answers stylesheet imports (`.css`, `.scss`, `.sass`, `.less`, `.styl`) with an empty module, so sitemap discovery works for a page whose component imports a stylesheet instead of failing with `ERR_UNKNOWN_FILE_EXTENSION`.
 
 ### Upgrading
 
 - Deploy scripts and CI jobs that run `warlock migrate --rollback` or `--fresh` with `NODE_ENV` set to anything other than `development` must add `--yes` (or `--force`). A rollback that removes no data does not ask. On MongoDB, a plain `dropColumn()` in a migration's `down()` is now skipped (see the Cascade 5.37.0 notes).
-### Fixed
-
-- The dev loader hook answers stylesheet imports (`.css`, `.scss`, `.sass`, `.less`, `.styl`) with an empty module, so sitemap discovery works for a page whose component imports a stylesheet instead of failing with `ERR_UNKNOWN_FILE_EXTENSION`.
 
 ## 5.36.0 - 2026-10-22
 

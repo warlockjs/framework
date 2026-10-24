@@ -24,6 +24,7 @@ Flags:
 - `migrate:rollback` — `-a/--all` (roll back everything), `--batches N`, `-p/--path <glob>`, `-y/--yes` / `--force` (confirm without a prompt)
 
 `migrate:rollback` and `migrate -f` print what they will drop or unset (with document or row counts) first. Outside development they ask for confirmation; in CI pass `--yes`, because without a terminal and without the flag they refuse. Programmatic equivalent: `confirmRollback({ all, batches, yes })` before `rollbackMigrations()`. On MongoDB a plain `dropColumn()` in `down()` is skipped; see the `alter-migration` topic.
+
 - `migrate:export-sql` — `--pending-only`, `-c/--compact`, `-p/--path <glob>`
 
 There is **no** `seed`, `db:create`, or `db:drop-tables` in the standalone binary — those need project context; use the warlock CLI when you have a Warlock app.

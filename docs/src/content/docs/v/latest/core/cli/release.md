@@ -43,22 +43,22 @@ export default defineConfig({
 });
 ```
 
-| Key                              | Default                         | Meaning                                                                                                      |
-| -------------------------------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `directory`                      | `".warlock"`                    | Base directory. Releases live in `<directory>/releases/<id>`; the pointers are `<directory>/current` and `previous`. |
-| `distDir`                        | `"dist"`                        | Build output, relative to the candidate's source.                                                            |
-| `include`                        | `[]`                            | Extra files or directories copied into the staged release. `package.json` and the lockfile are always copied. |
-| `linkNodeModules`                | `true`                          | Link the project's `node_modules` into the frozen source and the staged release.                              |
-| `gate.checks`                    | typecheck, check, test, build   | Ordered `{ name, command, timeoutMs? }` list. Replaces the defaults.                                          |
-| `migrations.targets`             | none                            | Named `{ env }` overrides for `--target`.                                                                    |
-| `migrations.expected`            | the pending set                 | Migration names that must be the ones applied, in order.                                                      |
-| `migrations.expectedTables`      | none                            | Tables or collections that must exist after the proof.                                                        |
-| `restart.command`                | none                            | Shell command run after activation and rollback. `restart.timeoutMs` defaults to 120000.                       |
-| `verify.url`                     | none                            | Health URL for `release verify`.                                                                              |
-| `verify.expectedStatus`          | `200`                           | Required HTTP status.                                                                                         |
-| `verify.retries` / `intervalMs`  | `5` / `2000`                    | Extra attempts and the pause between them. `verify.timeoutMs` (default 5000) bounds each request.             |
-| `verify.versionPath` / `commitPath` | `"version"` / `"commit"`     | Dotted paths into the JSON response.                                                                          |
-| `verify.match`                   | `["version", "commit"]`         | Which reported fields must equal the active release.                                                          |
+| Key                                 | Default                       | Meaning                                                                                                              |
+| ----------------------------------- | ----------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `directory`                         | `".warlock"`                  | Base directory. Releases live in `<directory>/releases/<id>`; the pointers are `<directory>/current` and `previous`. |
+| `distDir`                           | `"dist"`                      | Build output, relative to the candidate's source.                                                                    |
+| `include`                           | `[]`                          | Extra files or directories copied into the staged release. `package.json` and the lockfile are always copied.        |
+| `linkNodeModules`                   | `true`                        | Link the project's `node_modules` into the frozen source and the staged release.                                     |
+| `gate.checks`                       | typecheck, check, test, build | Ordered `{ name, command, timeoutMs? }` list. Replaces the defaults.                                                 |
+| `migrations.targets`                | none                          | Named `{ env }` overrides for `--target`.                                                                            |
+| `migrations.expected`               | the pending set               | Migration names that must be the ones applied, in order.                                                             |
+| `migrations.expectedTables`         | none                          | Tables or collections that must exist after the proof.                                                               |
+| `restart.command`                   | none                          | Shell command run after activation and rollback. `restart.timeoutMs` defaults to 120000.                             |
+| `verify.url`                        | none                          | Health URL for `release verify`.                                                                                     |
+| `verify.expectedStatus`             | `200`                         | Required HTTP status.                                                                                                |
+| `verify.retries` / `intervalMs`     | `5` / `2000`                  | Extra attempts and the pause between them. `verify.timeoutMs` (default 5000) bounds each request.                    |
+| `verify.versionPath` / `commitPath` | `"version"` / `"commit"`      | Dotted paths into the JSON response.                                                                                 |
+| `verify.match`                      | `["version", "commit"]`       | Which reported fields must equal the active release.                                                                 |
 
 The restart command runs through the shell in the project root with these variables set: `WARLOCK_RELEASE_ID`, `WARLOCK_RELEASE_DIR` (the release directory) and `WARLOCK_RELEASE_CURRENT` (the `current` symlink path).
 

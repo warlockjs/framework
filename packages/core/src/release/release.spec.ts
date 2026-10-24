@@ -126,7 +126,12 @@ describe("resolveReleaseConfig", () => {
   it("defaults to the typecheck, check, test and build gate", () => {
     const config = resolveReleaseConfig();
 
-    expect(config.checks.map((check) => check.name)).toEqual(["typecheck", "check", "test", "build"]);
+    expect(config.checks.map((check) => check.name)).toEqual([
+      "typecheck",
+      "check",
+      "test",
+      "build",
+    ]);
     expect(config.directory).toBe(".warlock");
     expect(config.restart.command).toBeUndefined();
   });
@@ -639,7 +644,10 @@ describe("runReleaseAction", () => {
     const context = makeContext();
 
     await expect(
-      runReleaseAction({ args: ["launch"], options: {} }, { context, openMigrations: unusedMigrations }),
+      runReleaseAction(
+        { args: ["launch"], options: {} },
+        { context, openMigrations: unusedMigrations },
+      ),
     ).rejects.toThrow(/Usage: warlock release/);
     await expect(
       runReleaseAction(

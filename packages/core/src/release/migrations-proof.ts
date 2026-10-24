@@ -89,9 +89,7 @@ export async function proveMigrations(
   const ledgerGrowth = difference(after.executed, before.executed);
 
   if (JSON.stringify(applied) !== JSON.stringify(plan.expected)) {
-    problems.push(
-      `Applied [${applied.join(", ")}] but expected [${plan.expected.join(", ")}].`,
-    );
+    problems.push(`Applied [${applied.join(", ")}] but expected [${plan.expected.join(", ")}].`);
   }
 
   if (JSON.stringify(ledgerGrowth) !== JSON.stringify(plan.expected)) {

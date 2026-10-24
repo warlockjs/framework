@@ -103,9 +103,33 @@ describe("tInterval", () => {
 describe("computeStats", () => {
   it("should pool runs overall and per category", () => {
     const stats = computeStats([
-      caseOf("a", [[1, true], [1, true], [0, false]], "math"),
-      caseOf("b", [[1, true], [1, true], [1, true]], "math"),
-      caseOf("c", [[0, false], [0, false], [0, false]], "geo"),
+      caseOf(
+        "a",
+        [
+          [1, true],
+          [1, true],
+          [0, false],
+        ],
+        "math",
+      ),
+      caseOf(
+        "b",
+        [
+          [1, true],
+          [1, true],
+          [1, true],
+        ],
+        "math",
+      ),
+      caseOf(
+        "c",
+        [
+          [0, false],
+          [0, false],
+          [0, false],
+        ],
+        "geo",
+      ),
     ]);
 
     expect(stats.confidence).toBe(0.95);
@@ -118,8 +142,19 @@ describe("computeStats", () => {
   });
 
   it("should give a small category a wider interval than a large one", () => {
-    const small = caseOf("s", [[1, true], [1, true]], "small");
-    const large = caseOf("l", Array.from({ length: 40 }, () => [1, true] as [number, boolean]), "large");
+    const small = caseOf(
+      "s",
+      [
+        [1, true],
+        [1, true],
+      ],
+      "small",
+    );
+    const large = caseOf(
+      "l",
+      Array.from({ length: 40 }, () => [1, true] as [number, boolean]),
+      "large",
+    );
     const stats = computeStats([small, large]);
 
     const width = (key: string) =>

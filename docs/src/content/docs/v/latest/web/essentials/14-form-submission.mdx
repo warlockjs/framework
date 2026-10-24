@@ -60,11 +60,11 @@ Besides `clientVisible: false`, three rules keep routes out of a table, and
 `web.namedApiRoutes` adds your own. The rules only remove routes: a page still
 carries just the routes its client code reaches.
 
-| Rule                                                                    | Applies to                                                               |
-| ----------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| Routes under `privatePrefixes`                                          | every viewer and every site                                              |
+| Rule                                                                                                                                         | Applies to                                                 |
+| -------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| Routes under `privatePrefixes`                                                                                                               | every viewer and every site                                |
 | Routes declared for other sites (`sites` route or group option, [core](/v/latest/core/the-basics/routing/#offer-a-route-to-some-sites-only)) | a page served by a site; a route without `sites` is shared |
-| Routes with an auth guard in their middleware chain, group middleware included | a guest viewer                                                    |
+| Routes with an auth guard in their middleware chain, group middleware included                                                               | a guest viewer                                             |
 
 ```ts title="src/config/web.ts"
 import type { WebConfigurations } from "@warlock.js/web";

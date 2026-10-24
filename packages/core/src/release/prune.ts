@@ -52,7 +52,9 @@ export async function pruneReleases(
   }
 
   return {
-    kept: manifests.filter((manifest) => !removed.includes(manifest.id)).map((manifest) => manifest.id),
+    kept: manifests
+      .filter((manifest) => !removed.includes(manifest.id))
+      .map((manifest) => manifest.id),
     removed,
     dryRun: options.dryRun === true,
   };

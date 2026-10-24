@@ -90,9 +90,9 @@ describe("agent.eval repeat", () => {
   });
 
   it("should reject an invalid repeat or confidence", async () => {
-    await expect(runEval(fakeAgent(answer), { cases, scorers: [exact()], repeat: 0 })).rejects.toThrow(
-      /repeat/,
-    );
+    await expect(
+      runEval(fakeAgent(answer), { cases, scorers: [exact()], repeat: 0 }),
+    ).rejects.toThrow(/repeat/);
     await expect(
       runEval(fakeAgent(answer), { cases, scorers: [exact()], confidence: 1 }),
     ).rejects.toThrow(/confidence/);
@@ -193,10 +193,13 @@ describe("baseline gating with repeats", () => {
   });
 
   it("should gate on stable failures only when asked", async () => {
-    const baseline = await runEval(fakeAgent(() => "ok"), {
-      cases,
-      scorers: [exact()],
-    });
+    const baseline = await runEval(
+      fakeAgent(() => "ok"),
+      {
+        cases,
+        scorers: [exact()],
+      },
+    );
     const options = { cases, scorers: [exact()], repeat: 2, baseline, tolerance: 1 };
 
     const lenient = await runEval(fakeAgent(answer), options);
@@ -230,7 +233,9 @@ describe("baseline files", () => {
     const restored = fromJSON(toJSON(report));
 
     expect(restored.repeat).toBe(3);
-    expect(restored.stats?.overall.passRateInterval).toEqual(report.stats?.overall.passRateInterval);
+    expect(restored.stats?.overall.passRateInterval).toEqual(
+      report.stats?.overall.passRateInterval,
+    );
     expect(restored.cases[1].passes).toBe(2);
     expect(restored.cases[1].scoreInterval).toEqual(report.cases[1].scoreInterval);
     expect(restored.cases[1].passRateInterval).toEqual(report.cases[1].passRateInterval);

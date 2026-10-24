@@ -93,7 +93,11 @@ export async function stageRelease(context: ReleaseContext, id: string): Promise
     }
 
     if (context.config.linkNodeModules && (await exists(path.join(source, "node_modules")))) {
-      await symlink(path.join(context.root, "node_modules"), path.join(temporary, "node_modules"), "dir");
+      await symlink(
+        path.join(context.root, "node_modules"),
+        path.join(temporary, "node_modules"),
+        "dir",
+      );
     }
 
     await writeFile(

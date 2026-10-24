@@ -228,9 +228,10 @@ A middleware you wrote counts as an auth guard when it is wrapped in `markAuthGu
 descriptor. Registering it once on a group marks every route inside:
 
 ```ts
-export const adminGuard = () => markAuthGuard(async ({ request, response }) => {
-  if (!(await isAdmin(request))) return response.forbidden();
-});
+export const adminGuard = () =>
+  markAuthGuard(async ({ request, response }) => {
+    if (!(await isAdmin(request))) return response.forbidden();
+  });
 
 router.group({ prefix: "/api/admin", middleware: [adminGuard()] }, () => {
   router.post("/users", createUserController);

@@ -1,10 +1,4 @@
-import {
-  appendLog,
-  readManifest,
-  readPointer,
-  writeManifest,
-  type ReleaseContext,
-} from "./store";
+import { appendLog, readManifest, readPointer, writeManifest, type ReleaseContext } from "./store";
 
 export type VerifyResult = {
   id: string;

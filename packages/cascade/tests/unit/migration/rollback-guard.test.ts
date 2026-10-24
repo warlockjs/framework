@@ -88,7 +88,13 @@ describe("confirmRollback", () => {
     const confirm = vi.fn();
 
     await expect(
-      confirmRollback({ development: false, yes: true, interactive: false, print: vi.fn(), confirm }),
+      confirmRollback({
+        development: false,
+        yes: true,
+        interactive: false,
+        print: vi.fn(),
+        confirm,
+      }),
     ).resolves.toBe(true);
     expect(confirm).not.toHaveBeenCalled();
   });

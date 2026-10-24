@@ -65,11 +65,17 @@ describe("web.namedApiRoutes", () => {
     { name: "hooks.stripe", path: "/api/webhooks/stripe", method: "POST" as const },
     { name: "admin.stats", path: "/api/stats", method: "GET" as const, sites: ["admin"] },
     { name: "shop.cart", path: "/api/cart", method: "GET" as const, sites: ["shop", "admin"] },
-    { name: "account.update", path: "/api/account", method: "PATCH" as const, guarded: true as const },
+    {
+      name: "account.update",
+      path: "/api/account",
+      method: "PATCH" as const,
+      guarded: true as const,
+    },
   ];
   const ALL = TABLE.map((route) => route.name);
 
-  const names = (table: ReturnType<typeof resolveNamedApiRoutes>) => Object.keys(table ?? {}).sort();
+  const names = (table: ReturnType<typeof resolveNamedApiRoutes>) =>
+    Object.keys(table ?? {}).sort();
 
   it("embeds nothing when it is false", () => {
     vi.spyOn(router, "getNamedApiRoutes").mockReturnValue(TABLE);

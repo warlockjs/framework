@@ -1965,7 +1965,7 @@ A `check()` may be sync or async (async = call an external service); the guard a
 
 ---
 name: eval-datasets-and-ci
-description: 'Datasets + regression-gated eval CI with ai.dataset({...}) feeding agent.eval({cases,baseline,tolerance}). Covers the immutable filterable/shardable dataset (cases / fromFile JSONL), DatasetEntry tags, EvalReport.regression (regressed/added/removed/passed) against a baseline, and the ai.eval reporters toJUnit / toJSON / fromJSON for CI artifacts + committed baselines. Triggers: `ai.dataset`, `DatasetContract`, `DatasetEntry`, `DatasetOptions`, `dataset.filter`, `dataset.shard`, `fromFile`, `agent.eval`, `EvalOptions`, `EvalReport`, `EvalCaseResult`, `EvalRegression`, `baseline`, `tolerance`, `ai.eval.toJUnit`, `ai.eval.toJSON`, `ai.eval.fromJSON`, `diff`, JSONL; ''eval dataset from a JSONL file'', ''shard an eval suite across CI jobs'', ''fail CI on an eval regression'', ''emit a JUnit report'', ''snapshot an eval baseline''; typical import `import { ai } from "@warlock.js/ai"`. Skip: the scorers + LLM-as-judge + Vitest matchers themselves — the `ai-dx-helpers` topic (registerAiMatchers / ai.eval.exact|contains|predicate|judge); record/replay of model calls for deterministic tests — the `record-replay-llm` topic; competing libs `promptfoo`, `braintrust`.'
+description: 'Datasets + regression-gated eval CI with ai.dataset({...}) feeding agent.eval({cases,baseline,tolerance}). Covers the immutable filterable/shardable dataset (cases / fromFile JSONL), DatasetEntry tags, EvalReport.regression (regressed/added/removed/passed) against a baseline, and the ai.eval reporters toJUnit / toJSON / fromJSON for CI artifacts + committed baselines. Also repeat: n runs, Wilson/t confidence intervals, gate: "interval", stable vs flaky failures. Triggers: `ai.dataset`, `repeat`, `gate`, `stableFailures`, `DatasetContract`, `DatasetEntry`, `DatasetOptions`, `dataset.filter`, `dataset.shard`, `fromFile`, `agent.eval`, `EvalOptions`, `EvalReport`, `EvalCaseResult`, `EvalRegression`, `baseline`, `tolerance`, `ai.eval.toJUnit`, `ai.eval.toJSON`, `ai.eval.fromJSON`, `diff`, JSONL; ''eval dataset from a JSONL file'', ''shard an eval suite across CI jobs'', ''fail CI on an eval regression'', ''emit a JUnit report'', ''snapshot an eval baseline''; typical import `import { ai } from "@warlock.js/ai"`. Skip: the scorers + LLM-as-judge + Vitest matchers themselves — the `ai-dx-helpers` topic (registerAiMatchers / ai.eval.exact|contains|predicate|judge); record/replay of model calls for deterministic tests — the `record-replay-llm` topic; competing libs `promptfoo`, `braintrust`.'
 ---
 
 # `ai.dataset()` + `agent.eval()` regression CI
@@ -2046,6 +2046,24 @@ When `baseline` is set the report carries a `regression` block (`EvalRegression`
 - **`passed`** — `true` when `regressed` is empty.
 
 The pure `diff(report, baseline, tolerance)` function (exported as `diff`) is the same logic, decoupled from the runner — depends only on the two reports and the tolerance, mutates neither.
+
+## Repeated runs + variance-aware gating
+
+`agent.eval({ repeat: n })` runs every case `n` times (sequentially, default 1). A case passes only when all runs pass. Case results gain `repeat`, `passes`, `runs`, `scoreInterval`, `passRateInterval`; the report gains `stats` (`overall` + per `EvalCase.category`: `passRate` with Wilson `passRateInterval`, `meanScore` with Student-t `meanScoreInterval`), and with `repeat > 1` `stableFailures` (failed every run) and `flakyCases` (failed some). `confidence` defaults to 0.95.
+
+```ts
+const report = await myAgent.eval({
+  cases: ds,
+  scorers: [ai.eval.exact()],
+  repeat: 5,
+  baseline,
+  gate: "interval", // default "point" = original before - after > tolerance
+  tolerance: 0.02,
+  failOnStableFailures: true, // stable failures fail regression.passed
+});
+```
+
+`gate: "interval"` flags a case, or an overall / `category:<name>` pass rate or mean score (`regression.regressedMetrics`), only when the baseline's lower bound is above the current upper bound by more than `tolerance`. Sides with fewer than two samples use point values, so older baselines still load. `diff(report, baseline, { tolerance, gate, confidence, failOnStableFailures })` is the pure form (a number third argument still means point tolerance). Small categories give wide intervals by design.
 
 ## CI reporters — `ai.eval.toJUnit` / `toJSON` / `fromJSON`
 

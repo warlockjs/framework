@@ -176,7 +176,9 @@ export async function runReleaseAction(
         allowSame: flag(data, "allowSame"),
       });
       const lines = [
-        ...result.checks.map((check) => `${check.ok ? "PASS" : "FAIL"} ${check.name}: ${check.detail}`),
+        ...result.checks.map(
+          (check) => `${check.ok ? "PASS" : "FAIL"} ${check.name}: ${check.detail}`,
+        ),
         result.message,
       ];
 
@@ -207,7 +209,9 @@ export async function runReleaseAction(
 
       if (result.restartOutput) lines.push("", result.restartOutput.trim());
       if (result.ok && !result.dryRun) {
-        lines.push("Migrations were not rolled back. Run `warlock migrate --rollback` yourself if needed.");
+        lines.push(
+          "Migrations were not rolled back. Run `warlock migrate --rollback` yourself if needed.",
+        );
       }
 
       return { ok: result.ok, data: result, lines };
@@ -247,7 +251,9 @@ export async function runReleaseAction(
         : ["No active release."];
 
       for (const entry of report.log) {
-        lines.push(`${entry.at}  ${entry.event}  ${entry.release ?? "-"}  ${entry.ok ? "ok" : "failed"}`);
+        lines.push(
+          `${entry.at}  ${entry.event}  ${entry.release ?? "-"}  ${entry.ok ? "ok" : "failed"}`,
+        );
       }
 
       return { ok: true, data: report, lines };
@@ -277,9 +283,8 @@ export async function runReleaseAction(
 
 /** Start the database the way `warlock migrate` does, then wrap cascade. */
 async function openCascadeMigrations(target: string | null): Promise<MigrationProofProvider> {
-  const { createCascadeMigrationProvider } = await import(
-    "../../../release/cascade-migration-provider"
-  );
+  const { createCascadeMigrationProvider } =
+    await import("../../../release/cascade-migration-provider");
 
   if (target !== null) {
     const targets = warlockConfigManager.get("release")?.migrations?.targets ?? {};

@@ -1,5 +1,15 @@
 import { randomBytes } from "node:crypto";
-import { appendFile, mkdir, readdir, readFile, readlink, rename, rm, symlink, writeFile } from "node:fs/promises";
+import {
+  appendFile,
+  mkdir,
+  readdir,
+  readFile,
+  readlink,
+  rename,
+  rm,
+  symlink,
+  writeFile,
+} from "node:fs/promises";
 import path from "node:path";
 import type {
   CommandRunner,
@@ -66,10 +76,7 @@ export async function writeFileAtomic(file: string, content: string): Promise<vo
   }
 }
 
-export async function readManifest(
-  context: ReleaseContext,
-  id: string,
-): Promise<ReleaseManifest> {
+export async function readManifest(context: ReleaseContext, id: string): Promise<ReleaseManifest> {
   const file = path.join(releaseDir(context, id), "manifest.json");
 
   try {

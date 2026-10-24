@@ -898,6 +898,7 @@ Creating a page, deleting one, or editing `config.route` is route-table churn ra
 - **Components receive data, not HTTP objects.** `request` and `response` belong to loaders; the component also renders in the browser.
 - **A default component is synchronous.** Fetch in the loader, then render its result.
 - **A page can export `action` (or `actions`) to handle its own form POST.** Use `<Form>` and `useActionData`; see the `handle-a-form-action` topic. Mutations through API routes remain ordinary requests; call `refresh()` after them.
+- **`Intl`-derived text can differ between Node and the browser.** `Intl.DisplayNames`, `localeCompare` sorting and similar use each runtime's ICU data, so SSR output may not match hydration. Render such labels from a shared pre-computed table (or a value computed in the loader), or after hydration; see the `localize-pages` topic. In development the client logs the first mismatching node.
 - **Do not import the hydration entry.** `esm/hydration/index.mjs` is a framework build input, not a consumer API. The public low-level runtime subpath is `@warlock.js/web/client/runtime`.
 
 ## See also
@@ -2116,6 +2117,14 @@ Tune the groups and pruning with the build setting
 `web({ build: { translations: { sharedGroups: ["app", "common"], prune: true } } })`.
 Development reads the same setting. Set `prune: false` to ship every key while
 you declare the rest.
+
+## `Intl` labels and hydration
+
+`Intl.DisplayNames`, `Intl.Collator` and `localeCompare` use the ICU data of the runtime that runs them. Node and browsers differ (region names such as Hong Kong, Macao or Palestine, and collation order), so SSR text built from them can differ from the hydrated text and React reports a hydration mismatch.
+
+- Do not render `Intl`-derived labels or sort orders during SSR unless both sides read the same table. Use a checked-in, pre-sorted name table per locale, or compute the list in the loader and return it as page data.
+- If the browser has to compute it, render it after hydration (an effect) or inside `<ClientOnly>`.
+- In development the client logs the first mismatching node: element path, server text and client text.
 
 ## Scope, errors, and legacy lookups
 
@@ -5109,6 +5118,16 @@ export const config: PageConfig = { apiRoutes: ["orders.*"] };
 
 A name the page does not carry throws. Development names the route and the declaration that fixes it; production throws a short error with no fallback. A route registered with `clientVisible: false` is never in the table. `warlock check` reports a name it cannot read as `WL9019`. Use an explicit `path` and `method` for such a call when declaring is not practical.
 
+### Control the route table — `web.namedApiRoutes`
+
+`web.namedApiRoutes` (in `src/config/web.ts`) only removes routes from what a page reaches:
+
+- `false`: embed no table. Named-route calls throw (the development error names the option); an explicit `path` and `method` still work. Use it when the app never calls routes by name.
+- `{ privatePrefixes: ["/api/admin/", "/api/webhooks/"] }`: routes under these path prefixes (whole segments) are never embedded, for any viewer or site.
+- an allowlist of names or `prefix.*` patterns, or a filter `(route, { site, guest }) => boolean`, as shorthand for `{ include }` (`route` has `name`, `path`, `method`, `sites`, `guarded`).
+
+Always applied as well: routes declared for other sites with the core `sites` route or group option (a route without `sites` is shared) are left out of a site's pages, and routes behind an auth guard (group middleware included) are left out for a guest, meaning no `web.session` or no signed-in user. After signing in without a navigation, the page still holds the guest table until the next navigation or reload.
+
 ## Typed responses from `responseSchema`
 
 When the API handler declares `responseSchema` (see core's `create-controller`), the generated `ApiRouteRegistry` entry carries a `response` map and `useSubmitForm({ route })` types `data`, `response` and `onSuccess` from the route's declared 2xx body. No generic argument and no cast.
@@ -5850,7 +5869,7 @@ in loaders or actions.
 
 ## Browser-reachable API routes
 
-A page document embeds only the named API routes its client code can reach. Declare a name the build cannot see, such as one read from data, in the setup file's `config`: `config.apiRoutes: ["orders.show", "reports.*"]`. A layout or root declaration reaches every page that renders it. A route registered with `clientVisible: false` is never embedded.
+A page document embeds only the named API routes its client code can reach. Declare a name the build cannot see, such as one read from data, in the setup file's `config`: `config.apiRoutes: ["orders.show", "reports.*"]`. A layout or root declaration reaches every page that renders it. A route registered with `clientVisible: false` is never embedded. `web.namedApiRoutes` (private path prefixes, an allowlist, a filter, or `false`), routes declared for other sites and, for guests, guarded routes also stay out (see `submit-a-form`).
 
 ## Duplicate declarations and development
 

@@ -1,13 +1,7 @@
 import { createHash } from "node:crypto";
 import { access, mkdir, readFile, rm, symlink } from "node:fs/promises";
 import path from "node:path";
-import {
-  appendLog,
-  releaseDir,
-  releasesDir,
-  writeManifest,
-  type ReleaseContext,
-} from "./store";
+import { appendLog, releaseDir, releasesDir, writeManifest, type ReleaseContext } from "./store";
 import type { ReleaseManifest } from "./types";
 
 const LOCKFILES = ["pnpm-lock.yaml", "package-lock.json", "yarn.lock", "bun.lock", "bun.lockb"];
@@ -122,7 +116,9 @@ export async function createCandidate(
       if (await exists(location)) {
         lockfile = {
           file,
-          sha256: createHash("sha256").update(await readFile(location)).digest("hex"),
+          sha256: createHash("sha256")
+            .update(await readFile(location))
+            .digest("hex"),
         };
         break;
       }

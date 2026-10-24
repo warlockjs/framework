@@ -149,11 +149,15 @@ describe("dropColumn inside a document-store rollback", () => {
   });
 
   it("skips dropColumns() the same way", async () => {
-    const Many = Migration.alter(User, {}, {
-      down() {
-        this.dropColumns("a", "b");
+    const Many = Migration.alter(
+      User,
+      {},
+      {
+        down() {
+          this.dropColumns("a", "b");
+        },
       },
-    });
+    );
     const driver = documentDriver();
     const migration = await rollback(Many, driver);
     vi.spyOn(log, "warn").mockImplementation(() => undefined as any);

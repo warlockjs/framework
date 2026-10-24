@@ -21,7 +21,10 @@ function documentSource(counts: { withField?: number; all?: number }) {
     queryBuilder: () => {
       const qb: any = {
         orderBy: () => qb,
-        get: async () => [{ name: "mirrored", batch: 1 }, { name: "add-only", batch: 1 }],
+        get: async () => [
+          { name: "mirrored", batch: 1 },
+          { name: "add-only", batch: 1 },
+        ],
       };
       return qb;
     },
@@ -40,7 +43,10 @@ const named = (name: string, Class: any) => {
 
 describe("MigrationRunner.planRollback", () => {
   it("reports unset fields with counts and skips ledger-only alters", async () => {
-    const runner = new MigrationRunner({ dataSource: documentSource({ withField: 7 }), verbose: false });
+    const runner = new MigrationRunner({
+      dataSource: documentSource({ withField: 7 }),
+      verbose: false,
+    });
     runner.register(
       named(
         "mirrored",

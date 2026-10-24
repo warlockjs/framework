@@ -334,13 +334,13 @@ The derived `down()` drops the added columns on SQL. On a document store (MongoD
 
 The two kinds of store are not symmetric:
 
-| | SQL | MongoDB |
-| --- | --- | --- |
-| `add` in `up()` | Adds the column | No-op: nothing is written to any document |
-| `dropColumn` in `down()` | Drops the column added by `up()` | Runs `$unset` on every document, erasing all values stored since |
-| Add-only alter, derived `down()` | Drops the added columns | Ledger-only |
-| Plain `dropColumn()` / `dropColumns()` in `down()` | Applied | Skipped, with a warning |
-| `dropColumn(name, { destructive: true })` in `down()` | Applied | Applied: unsets the field on every document |
+|                                                       | SQL                              | MongoDB                                                          |
+| ----------------------------------------------------- | -------------------------------- | ---------------------------------------------------------------- |
+| `add` in `up()`                                       | Adds the column                  | No-op: nothing is written to any document                        |
+| `dropColumn` in `down()`                              | Drops the column added by `up()` | Runs `$unset` on every document, erasing all values stored since |
+| Add-only alter, derived `down()`                      | Drops the added columns          | Ledger-only                                                      |
+| Plain `dropColumn()` / `dropColumns()` in `down()`    | Applied                          | Skipped, with a warning                                          |
+| `dropColumn(name, { destructive: true })` in `down()` | Applied                          | Applied: unsets the field on every document                      |
 
 So the conventional `down()` that mirrors an `add` with `dropColumn` is safe on SQL and destructive on MongoDB. Cascade skips that drop on MongoDB unless you opt in:
 
