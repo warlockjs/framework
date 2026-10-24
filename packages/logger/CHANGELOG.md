@@ -4,6 +4,12 @@ All notable changes to `@warlock.js/logger` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.38.0
+
+### Added
+
+- `LogChannel.passive`: a channel that only observes entries (keeps them in memory, derives data from them) and persists nothing sets it to `true`. Code that falls back to the terminal "when no log channel is configured" ignores passive channels, so adding an observer never silences that fallback.
+
 ## 5.37.0 - 2026-10-24
 
 ### Fixed

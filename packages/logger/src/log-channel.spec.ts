@@ -196,3 +196,17 @@ describe("LogChannel", () => {
     });
   });
 });
+
+describe("LogChannel passive flag", () => {
+  it("is false by default, so a channel counts as a log destination", () => {
+    expect(new TestChannel().passive).toBe(false);
+  });
+
+  it("can be set by a channel that only observes entries", () => {
+    class ObserverChannel extends TestChannel {
+      public override passive = true;
+    }
+
+    expect(new ObserverChannel().passive).toBe(true);
+  });
+});

@@ -27,6 +27,14 @@ export abstract class LogChannel<
   public terminal = false;
 
   /**
+   * A passive channel only observes entries (it keeps them in memory or
+   * derives data from them) and persists nothing. Passive channels do not
+   * count as a place a log entry can end up: code that falls back to the
+   * terminal "when no log channel is configured" ignores them.
+   */
+  public passive = false;
+
+  /**
    * Default Configurations
    */
   protected defaultConfigurations: Options = {} as Options;

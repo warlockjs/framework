@@ -3,6 +3,13 @@
 All notable changes to `@warlock.js/web` are documented here.
 
 ## 5.37.1 - 2026-10-24
+## 5.38.0
+
+### Changed
+
+- The `console.error` fallback for a page failure, used when no log channel is configured, ignores passive channels (for example the collector behind Core's request log), so the failure still reaches the terminal.
+
+## 5.37.1
 
 ### Fixed
 

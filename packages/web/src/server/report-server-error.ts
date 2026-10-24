@@ -249,7 +249,9 @@ export function reportServerError(
 
   // With no log channel configured the record above goes nowhere; the
   // terminal still gets the failure.
-  if (log.channels.length === 0) console.error(`[warlock:web] ${message}:`, thrown);
+  if (log.channels.every((channel) => channel.passive)) {
+    console.error(`[warlock:web] ${message}:`, thrown);
+  }
 
   enqueueAppHookReport(thrown, {
     ...context,
