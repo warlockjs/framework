@@ -24,6 +24,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { isExemptSpecFile } from "./spec-coverage-exemptions.mjs";
+
 const workspaceRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 
 /** Vitest's own default when a package defines no `test.include` at all. */
@@ -167,23 +169,8 @@ function gitTrackedSpecFiles(packageDir) {
     .split("\n")
     .map((line) => line.trim())
     .filter(Boolean)
-    .filter((relative) => !isScaffoldTemplateFile(relative))
+    .filter((relative) => !isExemptSpecFile(relative))
     .map((relative) => path.join(packageDir, relative));
-}
-
-/**
- * A spec under `templates/` belongs to the app the scaffolder GENERATES, not
- * to the package that ships it. It is copied into a new project and runs
- * there, under that project's own vitest config — so it is not an orphan, and
- * `create-warlock`'s own suite is right not to run it.
- *
- * This exemption is narrow on purpose. The guard's whole value is that it
- * fails, and a guard that fails on a file nobody intends to fix is one people
- * learn to skip — which is the defect this script exists to prevent, wearing a
- * different hat.
- */
-function isScaffoldTemplateFile(relativePath) {
-  return relativePath.split(/[\\/]/).includes("templates");
 }
 
 /**
