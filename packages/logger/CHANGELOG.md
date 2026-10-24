@@ -4,6 +4,12 @@ All notable changes to `@warlock.js/logger` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.37.0
+
+### Fixed
+
+- `FileLog`'s background flush interval no longer keeps the process alive. A finished Vitest run or CLI command used to wait on it, and Vitest reported "something prevents the main process from exiting". Buffered entries are still written by `flush()` and `flushSync()`.
+
 ## 5.34.3 - 2026-10-20
 
 ### Changed

@@ -61,6 +61,8 @@ metadata, not a scheduler.
 
 Declare page sitemap policy in `config.sitemap` in the matching `.setup.ts` file.
 
+Sitemap discovery imports page modules in Node, not in the browser. Stylesheet imports (`.css`, `.scss`, `.sass`, `.less`, `.styl`) in a page or in the components it imports resolve to an empty module there, so components can keep their own styles.
+
 Static pages are included unless a page or layout sets `config.sitemap: false`.
 Dynamic routes need concrete entries:
 

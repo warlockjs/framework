@@ -36,6 +36,7 @@
     "node_modules",
     "dist",
     "tests/acceptance/pnpm-production-app",
-    "tests/acceptance/runtime-app"
+    "tests/acceptance/runtime-app",
+    "tests/fixtures/vitest-exit-app"
   ]
 }
