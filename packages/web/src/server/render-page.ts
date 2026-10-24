@@ -676,6 +676,26 @@ function reportRenderError(
   });
 }
 
+/**
+ * The document's browser route table. `web.namedApiRoutes: false` skips the
+ * work entirely (the page's route names are not even computed); a failure
+ * computing the table is tagged with its own phase so the page error log says
+ * where it came from instead of a bare request-handler failure.
+ */
+function resolveDocumentNamedApiRoutes(
+  routeNames: (() => readonly string[]) | undefined,
+  options: Parameters<typeof resolveNamedApiRoutes>[1],
+): ReturnType<typeof resolveNamedApiRoutes> {
+  if (options?.config === false) return undefined;
+
+  try {
+    return resolveNamedApiRoutes(routeNames?.(), options);
+  } catch (thrown) {
+    tagErrorPhase(thrown, "named-api-routes");
+    throw thrown;
+  }
+}
+
 /** One line naming a failure: `Name: message`, whatever was thrown. */
 function describeRootCause(rootCause: unknown): string {
   return rootCause instanceof Error ? `${rootCause.name}: ${rootCause.message}` : String(rootCause);
@@ -1175,6 +1195,8 @@ async function finishRender(
     (module) => module.fontPreload !== false,
   );
 
+  const namedApiRoutesConfig = config.get("web.namedApiRoutes") as NamedApiRoutesOption | undefined;
+
   let documentValue: DocumentContextValue = {
     metadata: bundle.metadata,
     payload: buildHydrationPayload(bundle, documentSlots.locale, sessionExtras(bundle)),
@@ -1196,8 +1218,8 @@ async function finishRender(
     hydrationClientModulePreloadUrls: streamOptions.hydrationClientModulePreloadUrls,
     localeAlternates: hasExplicitAlternates ? undefined : localeAlternates,
     localeRouting,
-    namedApiRoutes: resolveNamedApiRoutes(streamOptions.clientApiRouteNames?.(), {
-      config: config.get("web.namedApiRoutes") as NamedApiRoutesOption | undefined,
+    namedApiRoutes: resolveDocumentNamedApiRoutes(streamOptions.clientApiRouteNames, {
+      config: namedApiRoutesConfig,
       site: request.site?.key,
       // Guest only when a session resolver ran and found no user. Without
       // `web.session` the viewer is unknown, so guarded routes stay.

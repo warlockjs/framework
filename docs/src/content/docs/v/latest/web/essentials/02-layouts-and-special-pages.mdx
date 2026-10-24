@@ -229,6 +229,7 @@ never reduced to the `Completed Request: … 500` line. The record's `module` is
 | `stream`          | React's shell or stream failed (`onShellError`, `onError`)                        |
 | `defer`           | A deferred value rejected                                                         |
 | `error-page`      | `error.page.tsx` itself failed                                                    |
+| `named-api-routes` | Computing the route table the document embeds for named API routes                |
 | `request-handler` | Anything else that escaped the page handler                                       |
 | `unknown`         | The response is `5xx` but no stage reported an error, for example `response.setStatusCode(500)` without a throw |
 

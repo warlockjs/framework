@@ -12,6 +12,7 @@ import { v } from "@warlock.js/seal";
 import { parse } from "devalue";
 import { createElement, isValidElement, StrictMode, type ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { taggedErrorPhase } from "./page-error-scope";
 import { PAYLOAD_SCRIPT_ID } from "../components/document-context";
 import DefaultApp from "../components/default-app";
 import { useLocale, useTrans } from "../localization";
@@ -971,6 +972,40 @@ describe("per-page browser route table", () => {
     } finally {
       config.set("web", {});
     }
+  });
+
+  it("does not compute the page's route names when web.namedApiRoutes is false", async () => {
+    const names = vi.fn(() => ["orders.show"]);
+
+    try {
+      config.set("web", { namedApiRoutes: false });
+      const rendered = await renderPageRequest("/orders/1", {
+        routes: [entry],
+        createHttp: () => createHttp(),
+        clientApiRouteNames: names,
+      });
+
+      if (rendered instanceof Response) throw new Error("unexpected terminal Response");
+      expect(names).not.toHaveBeenCalled();
+      expect(rendered.bundle?.document?.namedApiRoutes).toBeUndefined();
+    } finally {
+      config.set("web", {});
+    }
+  });
+
+  it("tags a failure computing the route names with its own phase", async () => {
+    const failure = new TypeError("registry unavailable");
+
+    await expect(
+      renderPageRequest("/orders/1", {
+        routes: [entry],
+        createHttp: () => createHttp(),
+        clientApiRouteNames: () => {
+          throw failure;
+        },
+      }),
+    ).rejects.toBe(failure);
+    expect(taggedErrorPhase(failure)).toBe("named-api-routes");
   });
 
   it("embeds an empty table when the page is asked for no names", async () => {

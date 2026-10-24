@@ -32,7 +32,7 @@ export type ServerErrorContext = {
   kind: ServerErrorKind;
   /**
    * The pipeline stage this failure happened in: `"middleware"`, `"session"`, `"loader"`,
-   * `"metadata"`, `"translations"`, `"module-load"`, `"render"`, `"stream"`, `"defer"`,
+   * `"metadata"`, `"translations"`, `"named-api-routes"`, `"module-load"`, `"render"`, `"stream"`, `"defer"`,
    * `"error-page"`, `"request-handler"` or `"unknown"` (a 5xx nobody reported).
    */
   phase: string;

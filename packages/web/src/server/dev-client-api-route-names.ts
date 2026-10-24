@@ -20,8 +20,15 @@ import { pageSetupFileFor } from "../build/page-setup-file";
 import { appConventionAliases } from "../vite/app-convention-aliases";
 import { clientVisibleRouteNames } from "../routing/named-api-routes";
 
+/**
+ * Where the browser route table's names come from: Core's REAL router
+ * registry. A multi-site install's per-site registration facade does not
+ * implement it and must never be passed here.
+ */
+export type NamedApiRouteRegistry = Pick<Router, "getNamedApiRoutes">;
+
 export type DevClientApiRouteInput = {
-  router: Router;
+  registry: NamedApiRouteRegistry;
   /** The application's `src` directory: the root of the `web/*` and `app/*` aliases. */
   appSrcRoot: string;
   /** The global application root component file. */
@@ -36,6 +43,14 @@ export type DevClientApiRouteInput = {
 
 /** The per-request route-name function for one page document in development. */
 export function devClientApiRouteNames(input: DevClientApiRouteInput): () => readonly string[] {
+  // A site registration facade slipped in through a cast would otherwise fail
+  // on the first request; fail at install with the cause named.
+  if (typeof input.registry?.getNamedApiRoutes !== "function") {
+    throw new TypeError(
+      "devClientApiRouteNames needs Core's router registry (getNamedApiRoutes); a site registration router cannot supply named API routes.",
+    );
+  }
+
   const moduleOf = (file: string): ClientApiRouteModule => {
     const setupFile = pageSetupFileFor(file);
     return setupFile !== undefined && isFile(setupFile) ? { file, setupFile } : { file };
@@ -49,6 +64,6 @@ export function devClientApiRouteNames(input: DevClientApiRouteInput): () => rea
 
   return createClientApiRouteResolver(
     { modules: files.map(moduleOf), aliases: appConventionAliases(input.appSrcRoot) },
-    () => clientVisibleRouteNames(input.router.getNamedApiRoutes()),
+    () => clientVisibleRouteNames(input.registry.getNamedApiRoutes()),
   );
 }

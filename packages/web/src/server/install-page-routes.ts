@@ -76,7 +76,7 @@ import {
 import type { ErrorPageModule } from "./error-page";
 import { layoutPrefixesByDirectory } from "./layout-prefixes";
 import { notFoundPageHandlerOptions } from "./not-found-handler-options";
-import { devClientApiRouteNames } from "./dev-client-api-route-names";
+import { devClientApiRouteNames, type NamedApiRouteRegistry } from "./dev-client-api-route-names";
 import { resolvePayloadBudget, type PayloadBudgetConfig } from "./payload-budget";
 import { normalizePageModule } from "./normalize-page-module";
 import { composePageModule } from "./compose-page-module";
@@ -430,6 +430,12 @@ async function composeLayoutLevel(
 
 export type InstallPageRoutesOptions = {
   router: Router;
+  /**
+   * Where named API route names are read from. Defaults to `router`; the
+   * multi-site installer sets it to Core's real router while `router` is the
+   * per-site registration facade, which has no route registry.
+   */
+  namedRouteRegistry?: NamedApiRouteRegistry;
   /** The web connector's translation settings, shared with the production build. */
   translations?: TranslationBuildOptions;
   vite: ViteDevServer;
@@ -650,6 +656,7 @@ export async function installPageRoutes(
         {
           ...options,
           router: siteRegistrationRouter(dispatch, site, siteConfig.basePath ?? ""),
+          namedRouteRegistry: options.router,
           appFile: siteAppFile,
         },
         {
@@ -687,6 +694,7 @@ async function installDiscoveredPageRoutes(
   siteScope?: SiteScope,
 ): Promise<InstalledPageRoute[]> {
   const { router, vite, appSrcRoot, appFile, hydrationClientModuleUrl, httpServer } = options;
+  const namedRouteRegistry = options.namedRouteRegistry ?? router;
   // Spread conditionally, never as a bare `httpServer,` property: an explicit
   // `httpServer: undefined` key is its own signal to `createPageRouteHandler`
   // (`"httpServer" in options"`, `create-page-route-handler.ts`) — "no server,
@@ -899,7 +907,7 @@ async function installDiscoveredPageRoutes(
       cache,
       renderNotFound,
       clientApiRouteNames: devClientApiRouteNames({
-        router,
+        registry: namedRouteRegistry,
         appSrcRoot,
         appFile,
         layoutFiles: layoutLevel.chain,
@@ -1021,7 +1029,7 @@ async function installDiscoveredPageRoutes(
               ),
               resolveRequestStylesheetUrls,
               clientApiRouteNames: devClientApiRouteNames({
-                router,
+                registry: namedRouteRegistry,
                 appSrcRoot,
                 appFile,
                 pageFile: notFoundPageFile,
