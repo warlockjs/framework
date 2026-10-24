@@ -11,7 +11,7 @@ import type { Connector, ConnectorLifecyclePhase } from "@warlock.js/core";
 import { loadProcessPanel } from "./process-panel";
 import { createCollector } from "./collector";
 import { resolveDevtoolsOptions } from "./options";
-import type { DevtoolsRouteRow } from "./server";
+import type { DevtoolsRequestLogSource, DevtoolsRouteRow } from "./server";
 import { attachAiSource } from "./sources/ai-source";
 import { attachCacheSource } from "./sources/cache-source";
 import { attachLogSource } from "./sources/log-source";
@@ -84,12 +84,14 @@ export function devtoolsConnector(options: DevtoolsConnectorOptions = {}): Conne
 
       const { mountDevtoolsRoutes } = await import("./server");
       const postmanBuilder = await findPostmanBuilder();
+      const requestLog = await findRequestLogSource();
 
       mountDevtoolsRoutes(getHttpServer(), {
         collector,
         ai,
         processPanel: await loadProcessPanel(),
         options: resolved,
+        requestLog,
         isDevelopment: () => Application.runtimeStrategy === "development",
         explain: (query) => explainQuery(query),
         listRoutes: () => listRoutes(),
@@ -201,6 +203,36 @@ async function findPostmanBuilder(): Promise<PostmanBuilder | undefined> {
     const build = core.getDevelopmentPostmanCollection;
 
     return typeof build === "function" ? (build as PostmanBuilder) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Looks up core's persistent request log reader. Older cores do not export
+ * it; the dashboard then shows the in-memory requests only. Core is imported
+ * lazily, like the builders above.
+ */
+async function findRequestLogSource(): Promise<DevtoolsRequestLogSource | undefined> {
+  try {
+    const core: Record<string, unknown> = await import("@warlock.js/core");
+    const { listRequestLogs, getRequestLog, requestLogToCurl, compileRequestLogFilter } = core;
+
+    if (
+      typeof listRequestLogs !== "function" ||
+      typeof getRequestLog !== "function" ||
+      typeof requestLogToCurl !== "function" ||
+      typeof compileRequestLogFilter !== "function"
+    ) {
+      return undefined;
+    }
+
+    return {
+      list: (filter) => listRequestLogs(filter),
+      get: (id) => getRequestLog(id),
+      curl: (record, baseUrl) => requestLogToCurl(record, baseUrl),
+      compile: (filter) => compileRequestLogFilter(filter),
+    };
   } catch {
     return undefined;
   }

@@ -1,3 +1,4 @@
+import type { RequestLogFilter, RequestLogRecord, RequestLogSummary } from "@warlock.js/core";
 import type { DevtoolsAiSource } from "../sources/ai-source";
 import type { ProcessPanel } from "../process-panel";
 import type { DevtoolsCollector, DevtoolsQuery, ResolvedDevtoolsOptions } from "../types";
@@ -14,6 +15,20 @@ export type DevtoolsRouteRow = {
 };
 
 /**
+ * The persistent request log (core's `http.logging.requests`), injected so
+ * devtools never imports core at load. Reads the JSON-lines files, so
+ * requests survive restarts.
+ */
+export type DevtoolsRequestLogSource = {
+  list(filter: RequestLogFilter): Promise<RequestLogSummary[]>;
+  get(id: string): Promise<RequestLogRecord | undefined>;
+  /** The request as a `curl` command; redacted values stay redacted. */
+  curl(record: RequestLogRecord, baseUrl?: string): string;
+  /** Compile a filter into a predicate over list rows; throws on a bad value. */
+  compile(filter: RequestLogFilter): (row: RequestLogSummary) => boolean;
+};
+
+/**
  * Dependencies the connector injects so the dashboard's routes need no core
  * boot to test: the collector, the resolved options, a development check,
  * and the optional EXPLAIN, route-listing, OpenAPI and Postman hooks.
@@ -24,6 +39,8 @@ export type MountDevtoolsRoutesDeps = {
   /** Optional Panoptic feed, attached only in development. */
   ai?: DevtoolsAiSource;
   options: ResolvedDevtoolsOptions;
+  /** The persisted request log; absent when core is too old to have one. */
+  requestLog?: DevtoolsRequestLogSource;
   isDevelopment: () => boolean;
   explain?: (query: DevtoolsQuery) => Promise<unknown>;
   listRoutes?: () => DevtoolsRouteRow[] | Promise<DevtoolsRouteRow[]>;

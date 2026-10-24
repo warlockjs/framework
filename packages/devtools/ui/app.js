@@ -10,6 +10,7 @@ const state = {
   mails: [],
   logs: [],
   routes: [],
+  requestFilter: { q: "", status: "", method: "" },
 };
 
 async function api(path, init) {
@@ -82,6 +83,9 @@ function requestRow(request, selected) {
       ]),
       el("div", { class: "path", text: request.path }),
       el("div", { class: "meta" }, [
+        request.persisted
+          ? el("span", { class: "badge", text: "saved" })
+          : document.createTextNode(""),
         el("span", { text: `${value(request.durationMs)} ms` }),
         el("span", { text: `${request.queryCount} queries` }),
         request.warningCount
@@ -174,6 +178,88 @@ function queryRow(query, requestId) {
   return details;
 }
 
+function requestTools(request) {
+  const status = el("span", { class: "meta" });
+  const button = el("button", {
+    type: "button",
+    text: "Copy as curl",
+    onclick: async () => {
+      try {
+        const { curl } = await api(`api/requests/${encodeURIComponent(request.id)}/curl`);
+        await navigator.clipboard.writeText(curl);
+        status.textContent = "Copied. Redacted values stay redacted.";
+      } catch (error) {
+        status.textContent = `Could not copy: ${error.message}`;
+      }
+    },
+  });
+  return el("div", { class: "toolbar" }, [button, status]);
+}
+
+/** The parts only the persisted request log keeps: the error, the redacted input and the response. */
+function recordSections(record) {
+  const sections = [];
+  if (record.error) {
+    const where = [record.error.phase, record.error.file, record.error.site]
+      .filter(Boolean)
+      .join(" · ");
+    sections.push(
+      el("h3", { text: "Error" }),
+      el("div", { class: "warning" }, [
+        el("span", { text: `${record.error.name}: ${record.error.message}` }),
+        where ? el("div", { class: "meta", text: where }) : document.createTextNode(""),
+      ]),
+    );
+    if (record.error.stack) sections.push(el("pre", { text: record.error.stack }));
+  }
+  const input = {
+    headers: record.headers,
+    params: record.params,
+    query: record.query,
+    body: record.body,
+    session: record.session,
+    ip: record.ip,
+  };
+  sections.push(
+    el("h3", { text: "Request (redacted)" }),
+    el("pre", { text: JSON.stringify(input, null, 2) }),
+    el("h3", { text: "Response" }),
+    el("pre", { text: JSON.stringify({ status: record.status, ...record.response }, null, 2) }),
+  );
+  if (record.queries?.nPlusOne?.length)
+    sections.push(
+      el("h3", { text: `Queries (${record.queries.count})` }),
+      el("pre", { text: JSON.stringify(record.queries, null, 2) }),
+    );
+  return sections;
+}
+
+function requestFilterQuery() {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(state.requestFilter))
+    if (value.trim()) params.set(key, value.trim());
+  const text = params.toString();
+  return text ? `?${text}` : "";
+}
+
+function requestFilterBar() {
+  const field = (key, placeholder) =>
+    el("input", {
+      type: "search",
+      placeholder,
+      value: state.requestFilter[key],
+      onchange: (event) => {
+        state.requestFilter[key] = event.target.value;
+        render();
+      },
+    });
+  return el("div", { class: "toolbar" }, [
+    field("q", "Search url or id"),
+    field("status", "Status: 404 or 5xx"),
+    field("method", "Method"),
+  ]);
+}
+
 async function requestDetail(request) {
   const section = el("section", { class: "detail" }, [
     el("h2", {
@@ -195,6 +281,8 @@ async function requestDetail(request) {
       section.append(el("div", { class: "warning" }, children));
     });
   }
+  section.append(requestTools(request));
+  if (request.record) section.append(...recordSections(request.record));
   section.append(
     el("h3", { text: "Waterfall" }),
     waterfall(request),
@@ -232,10 +320,11 @@ async function requestDetail(request) {
 async function requestsView() {
   const list = el("div", { class: "panel list" });
   try {
-    state.requests = await api("api/requests");
+    state.requests = await api(`api/requests${requestFilterQuery()}`);
   } catch (error) {
     return errorView(error);
   }
+  list.append(requestFilterBar());
   if (!state.requests.length) list.append(empty("No requests yet — make a request to your app"));
   else
     state.requests.forEach((item) =>

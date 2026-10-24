@@ -200,6 +200,10 @@ export type RequestLogSummary = {
   status: number;
   durationMs: number;
   error?: string;
+  /** Database queries the request ran, when recorded. */
+  queryCount?: number;
+  /** Query shapes reported as N+1, when recorded. */
+  nPlusOneCount?: number;
 };
 
 /** Filters for listing persisted requests. */

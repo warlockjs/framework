@@ -13,7 +13,7 @@ import { registerStreamRoute } from "./stream-route";
 import type { MountDevtoolsRoutesDeps } from "./types";
 import { registerUiAssets } from "./ui-assets";
 
-export type { DevtoolsRouteRow, MountDevtoolsRoutesDeps } from "./types";
+export type { DevtoolsRequestLogSource, DevtoolsRouteRow, MountDevtoolsRoutesDeps } from "./types";
 
 /**
  * Mounts the devtools dashboard and its API under `deps.options.path` on

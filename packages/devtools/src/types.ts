@@ -1,3 +1,4 @@
+import type { RequestLogRecord } from "@warlock.js/core";
 import type { DevtoolsAiEvent } from "./sources/ai-source";
 
 /**
@@ -5,7 +6,8 @@ import type { DevtoolsAiEvent } from "./sources/ai-source";
  *
  * Every timestamp is epoch milliseconds (fractional allowed); every duration
  * is milliseconds. Nothing here is persisted — the collector is an in-memory
- * ring buffer that is lost on restart.
+ * ring buffer that is lost on restart. Request history that must survive a
+ * restart is read from core's persistent request log instead.
  */
 
 /** Options accepted by `devtoolsConnector()`. */
@@ -164,6 +166,18 @@ export type DevtoolsRequestSummary = {
   durationMs?: number;
   queryCount: number;
   warningCount: number;
+  /** Read from the persisted request log only: the request is no longer in memory. */
+  persisted?: true;
+};
+
+/**
+ * `GET <path>/api/requests/:id`: the in-memory record, or one rebuilt from
+ * the persisted request log. `record` is the log's full record (redacted
+ * headers and body, response, error with stack) when one was written.
+ */
+export type DevtoolsRequestDetail = DevtoolsRequest & {
+  persisted?: true;
+  record?: RequestLogRecord;
 };
 
 /** The row the mailbox list shows; `GET <path>/api/mails` returns these. */

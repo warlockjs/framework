@@ -70,6 +70,8 @@ export function summarizeRequestLog(record: RequestLogRecord): RequestLogSummary
     status: record.status,
     durationMs: record.durationMs,
     ...(record.error ? { error: record.error.message } : {}),
+    ...(record.queries ? { queryCount: record.queries.count } : {}),
+    ...(record.queries?.nPlusOne?.length ? { nPlusOneCount: record.queries.nPlusOne.length } : {}),
   };
 }
 
