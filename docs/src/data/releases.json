@@ -1,4 +1,9 @@
 {
+  "5.37.1": {
+    "publishedAt": "2026-10-24T16:07:05.596Z",
+    "matrix": "none",
+    "summary": "**Multi-site development fix, page error logging and npm family upgrades.** Multi-site pages no longer answer 500 in development and under the HTTP test server (the route table is read from Core's router; `web.namedApiRoutes: false` skips it). Every 5xx page failure logs one error record with the message, mapped stack, phase, page file, route, site and request id, and the development error page shows the same details. `warlock update` on npm removes the family's lock entries and re-resolves them in one install (npm 11.6.2 or newer), `WL8010` reports mixed family versions, and `warlock upgrade` no longer downgrades newer packages and names the package manager the project uses. Vitest 5 no longer warns about a repeated `lowerStage3Decorators()`, worker lifetime supports HTTP and database suites (`tests.resetDatabase`, `workerDatabaseName()`), HMR attaches through Vite 8's `server.ws`, and the client-bundle check no longer reports the app's `index.html`. Lockstep release across all 33 packages. Generator matrix scope: `none`; before publishing, the blog on the 5.37.1 tarballs passed the release gate; after publishing, every package was confirmed at the npm origin."
+  },
   "5.37.0": {
     "publishedAt": "2026-10-24T11:10:12.043Z",
     "matrix": "none",

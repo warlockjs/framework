@@ -136,6 +136,149 @@
   ],
   "releases": [
     {
+      "version": "5.37.1",
+      "id": "v5-37-1",
+      "date": "October 24, 2026",
+      "isUnreleased": false,
+      "summaryHtml": "<strong>Multi-site development fix, page error logging and npm family upgrades.</strong> Multi-site pages no longer answer 500 in development and under the HTTP test server (the route table is read from Core's router; <code>web.namedApiRoutes: false</code> skips it). Every 5xx page failure logs one error record with the message, mapped stack, phase, page file, route, site and request id, and the development error page shows the same details. <code>warlock update</code> on npm removes the family's lock entries and re-resolves them in one install (npm 11.6.2 or newer), <code>WL8010</code> reports mixed family versions, and <code>warlock upgrade</code> no longer downgrades newer packages and names the package manager the project uses. Vitest 5 no longer warns about a repeated <code>lowerStage3Decorators()</code>, worker lifetime supports HTTP and database suites (<code>tests.resetDatabase</code>, <code>workerDatabaseName()</code>), HMR attaches through Vite 8's <code>server.ws</code>, and the client-bundle check no longer reports the app's <code>index.html</code>. Lockstep release across all 33 packages. Generator matrix scope: <code>none</code>; before publishing, the blog on the 5.37.1 tarballs passed the release gate; after publishing, every package was confirmed at the npm origin.",
+      "matrix": "none",
+      "matrixRows": null,
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 12,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 5
+            },
+            {
+              "type": "Changed",
+              "n": 2
+            },
+            {
+              "type": "Fixed",
+              "n": 5
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>tests.resetDatabase</code> (<code>true</code> or <code>{ connection, except, only }</code>): with <code>tests.lifetime: \"worker\"</code>, truncates every table or collection of the data source before each file, keeping the migrations ledger and system collections, then runs <code>tests.resetBetweenFiles</code>. <code>resetTestDatabase()</code>, <code>workerDatabaseName(base)</code> and <code>testWorkerId()</code> are exported from <code>@warlock.js/core/tests</code> so each Vitest worker can use a database of its own."
+            },
+            {
+              "type": "Added",
+              "html": "A worker-lifetime runtime closes the <code>createTestHttpServer()</code> servers a file left open before the next file starts, so their routes and ports do not leak across files."
+            },
+            {
+              "type": "Added",
+              "html": "The setup profile reports <code>body</code>, the time between setup finishing and teardown starting. When a file-lifetime run of at least four files spends half or more of its time in setup, the worker summary and <code>TestSetupReporter</code> print a line recommending <code>tests.lifetime: \"worker\"</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<code>warlock add test</code> generates <code>src/config/tests.ts</code>. <code>WARLOCK_TEST_LIFETIME=worker</code> turns on worker lifetime and <code>resetDatabase</code>, and the generated integration project sets <code>isolate: false</code> from the same variable."
+            },
+            {
+              "type": "Added",
+              "html": "Upgrade codemod <code>vitest-inline-project-plugins</code> lists a <code>lowerStage3Decorators()</code> call repeated inside a Vitest config that declares <code>projects</code>."
+            },
+            {
+              "type": "Changed",
+              "html": "The exact, cyclic pins between <code>@warlock.js/*</code> packages stay (the family is released in lockstep). To get past them, <code>warlock update</code> on npm removes the family's (and <code>vite</code>, <code>vitest</code>, <code>@vitest/*</code> and <code>@vitejs/*</code>) entries from <code>package-lock.json</code> and re-resolves them in one <code>npm install</code>; npm 11.6.2 or newer is required for that step, and <code>WL8010</code> reports mixed family versions."
+            },
+            {
+              "type": "Changed",
+              "html": "Package manager detection with several lockfiles side by side (and no <code>packageManager</code> field or <code>pnpm-workspace.yaml</code>) uses the most recently written one, the lockfile the project installs with, and <code>warlock update</code> says which it chose. <code>bun.lock</code> still wins over the <code>yarn.lock</code> Bun also writes."
+            },
+            {
+              "type": "Fixed",
+              "html": "Vitest 5 printed <code>The \"&lt;project&gt;\" project applies the same plugin multiple times: \"warlock:lower-stage3-decorators\"</code> when a config listed <code>lowerStage3Decorators()</code> in the root and again in an inline project. Instances after the first in a process now carry a numbered plugin name and skip modules that no longer contain a decorator, so the warning is gone and a project that does not inherit the root config still lowers decorators. The docs and skills explain <code>extends</code> for inline projects."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>warlock check</code> reports <code>WL8010</code> when the installed <code>@warlock.js/*</code> packages are on different versions, naming the packages that differ from the newest one and pointing to <code>warlock update</code>. The family stays in lockstep: packages pin each other to the exact same version, so a mixed set is not a valid install."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>warlock update</code> for npm projects removes the family's (and Vite's and Vitest's) entries from <code>package-lock.json</code> before the install, so one <code>npm install</code> re-resolves them together, and warns when the npm in use is older than 11.6.2, which <code>npm</code> 10 cannot always do (<code>ERESOLVE</code>, or a crash on the Vitest peer set). It names the install command of the package manager the project uses instead of a generic one."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>warlock upgrade</code> no longer moves a <code>@warlock.js/*</code> dependency down: one already newer than <code>--to</code> stays as it is and is listed in the review list. Its install hint names the package manager the project installs with, not the first lockfile found."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>@warlock.js/core</code> exports the shared <code>log</code> instance from <code>@warlock.js/logger</code>, so framework packages that depend on core write to the channels the app configured with <code>setLogConfigurations</code>."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/web",
+          "slug": "web",
+          "total": 7,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 2
+            },
+            {
+              "type": "Fixed",
+              "n": 5
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "Outside production, the error page, an authored <code>ErrorBoundary</code> and the framework fallback are followed by a development panel (<code>data-warlock-dev-error</code>) showing the message, phase, page file, route, site and stack. <code>error.page.tsx</code> receives the same facts as <code>props.debug</code> (<code>PageErrorDetails</code>, new type export). Production responses stay generic and never carry them."
+            },
+            {
+              "type": "Added",
+              "html": "<code>ServerErrorContext</code> (the context of <code>web.errors.report</code>) gains <code>file</code>, <code>site</code> and <code>level</code>; <code>phase</code> takes the values above."
+            },
+            {
+              "type": "Fixed",
+              "html": "The development server no longer prints <code>server.hmr.protocol/host/port/path/clientPort/timeout/server is deprecated</code> on every boot. The HMR websocket is attached to the app's HTTP server through Vite 8's <code>server.ws.server</code> instead of the deprecated <code>server.hmr.server</code>; hot reload behaves as before."
+            },
+            {
+              "type": "Fixed",
+              "html": "The client-bundle security check (Gate A) no longer warns <code>could not judge this import</code> for the app's own <code>index.html</code> entry, in either the client or the SSR build. HTML entries and Vite's virtual HTML proxy modules are treated as entries, not imports; a genuinely unresolvable import still warns."
+            },
+            {
+              "type": "Fixed",
+              "html": "A page that answered 500 left only the <code>Completed Request: … 500</code> line in the log. Every <code>5xx</code> page response now writes one error-level logger record (<code>module: \"web\"</code>, <code>action: \"page.&lt;phase&gt;\"</code>) with the error message, the stack, the matched page file, the route pattern, the site key, the request id and the phase: <code>translations</code>, <code>module-load</code>, <code>middleware</code>, <code>session</code>, <code>loader</code>, <code>metadata</code>, <code>render</code>, <code>stream</code>, <code>defer</code>, <code>error-page</code>, <code>request-handler</code>, or <code>unknown</code> for a <code>5xx</code> nobody reported (for example <code>response.setStatusCode(500)</code> without a throw). With no log channel configured the failure still goes to <code>console.error</code>. Errors that React swallows into an <code>ErrorBoundary</code> or <code>error.page.tsx</code>, errors from <code>onShellError</code> and <code>onError</code> of the stream, and failures while binding route translations or loading the page module are logged too. The same error is logged once however many stages observe it, and a <code>4xx</code> outcome (not found, redirect, validation, a thrown <code>HttpError</code> below 500) is not logged as an error."
+            },
+            {
+              "type": "Fixed",
+              "html": "Multi-site apps: pages no longer answer 500 in development and under the HTTP test server with <code>input.router.getNamedApiRoutes is not a function</code>, even with <code>web.namedApiRoutes: false</code>. The browser route table now reads Core's real router registry, never the per-site registration router. With <code>web.namedApiRoutes: false</code> the page's route names are no longer computed at all, and a failure computing the table is logged through the page error log with the new phase <code>named-api-routes</code> instead of a bare 500."
+            },
+            {
+              "type": "Fixed",
+              "html": "The development stack is mapped back to source files through the dev server (<code>ssrFixStacktrace</code>); in production, run Node with <code>--enable-source-maps</code>."
+            }
+          ]
+        },
+        {
+          "name": "create-warlock",
+          "slug": "create-warlock",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "The template's <code>testing-strategy</code> skill describes <code>WARLOCK_TEST_LIFETIME=worker</code>, <code>resetDatabase</code> and <code>workerDatabaseName()</code> for the generated test setup."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "5.37.0",
       "id": "v5-37-0",
       "date": "October 24, 2026",
