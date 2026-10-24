@@ -6,8 +6,9 @@
  *   node --import tsx scripts/dispatch-release.ts --version 5.31.0 --publish  # gate + publish
  *   node --import tsx scripts/dispatch-release.ts --watch <runId>             # follow an existing run
  *
- * The GitHub token is read from the file named by `WARLOCK_RELEASE_TOKEN_FILE`
- * (or the `GH_TOKEN` variable). It needs `Actions: Read and write` on
+ * The GitHub token is the first non-empty line of the file named by
+ * `WARLOCK_RELEASE_TOKEN_FILE` (or the `GH_TOKEN` variable); later lines may
+ * hold other tokens. It needs `Actions: Read and write` on
  * `warlockjs/framework`; see "Dispatching a release from automation" in
  * tools/release/README.md. The token is never printed.
  *
@@ -111,7 +112,12 @@ export function failedJobs(jobs: JobSummary[]): Array<{ job: JobSummary; failedS
 
 function readToken(): string {
   const file = process.env.WARLOCK_RELEASE_TOKEN_FILE;
-  const token = file ? readFileSync(file, "utf8").trim() : process.env.GH_TOKEN?.trim();
+  const token = file
+    ? readFileSync(file, "utf8")
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .find((line) => line !== "")
+    : process.env.GH_TOKEN?.trim();
 
   if (!token) {
     throw new Error("Set WARLOCK_RELEASE_TOKEN_FILE (a chmod 600 file) or GH_TOKEN.");
