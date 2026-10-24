@@ -3,6 +3,7 @@ import { log } from "@warlock.js/logger";
 import { router } from "../router";
 import { setBaseUrl } from "../utils/urls";
 import { httpConfig } from "./config";
+import { startRequestLog } from "./request-log";
 import { validateCspConfigAtBoot } from "./csp";
 import { registerHttpPlugins } from "./plugins";
 import { getHttpServer, startHttpServer } from "./server";
@@ -14,6 +15,10 @@ export async function createHttpApplication() {
   validateCspConfigAtBoot();
 
   const server = startHttpServer();
+
+  // Collectors for the persistent request log (log entries, phases, queries);
+  // a no-op unless `http.logging.requests` is enabled.
+  await startRequestLog();
 
   await registerHttpPlugins(server);
 

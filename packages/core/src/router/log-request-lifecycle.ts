@@ -38,6 +38,7 @@
  * pays one boolean check and allocates nothing extra.
  */
 import type { Request } from "../http/request";
+import { isRequestLogEnabled, recordRequestLogError } from "../http/request-log";
 import {
   buildTracingContext,
   dispatchRequestEnd,
@@ -126,6 +127,11 @@ export async function logRequestLifecycle<TResult>(
 
   const finish = (level: Level, outcome: string, error?: unknown): void => {
     const duration = Math.round(ports.now() - startedAt);
+
+    // The persistent request log attaches the error a request threw.
+    if (error !== undefined && isRequestLogEnabled()) {
+      recordRequestLogError(descriptor.requestId, error);
+    }
 
     ports[level]({
       module: descriptor.module,

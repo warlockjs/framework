@@ -171,7 +171,7 @@ function logRequestError(error: unknown, request: Request<any>) {
 function reportUnhandledRequestError(error: unknown, request: Request<any>) {
   log.error("http", "unhandled-request-error", error, { requestId: request.id });
 
-  if (log.channels.length === 0) {
+  if (log.channels.every((channel) => channel.passive)) {
     console.error(`[http] unhandled-request-error (requestId: ${request.id})`, error);
   }
 }

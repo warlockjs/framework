@@ -32,6 +32,8 @@ export * from "./server-rebuilt";
 // request exports
 export * from "./request";
 export * from "./request-log-snapshot";
+// the persistent request log (`http.logging.requests`)
+export * from "./request-log";
 // response exports
 export * from "./response";
 // output escaping and redirect allowlisting for values built from request input

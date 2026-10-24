@@ -10,6 +10,7 @@ import { container } from "../container";
 import { registerLazyStatic } from "../http/lazy-static";
 import { buildCorsOptions } from "../http/build-cors-options";
 import { Request } from "../http/request";
+import { isRequestLogEnabled, trackRequestLog } from "../http/request-log";
 import { buildRequestLogSnapshot } from "../http/request-log-snapshot";
 import { Response } from "../http/response";
 import { type FastifyInstance } from "../http/server";
@@ -1337,6 +1338,10 @@ export class Router {
       const routeMatchStartedAt = tracingEnabled ? performance.now() : 0;
 
       request.setRequest(fastifyRequest).setRoute(route);
+
+      // The persistent request log: one cached boolean check when it is off.
+      // When on, the record is built and written after the response is sent.
+      if (isRequestLogEnabled()) trackRequestLog(request, fastifyResponse);
 
       if (tracingEnabled) {
         dispatchPhase(buildTracingContext(request), {

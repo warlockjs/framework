@@ -1,5 +1,6 @@
 import config from "@mongez/config";
 import { DEFAULT_REDACT_KEY_SET, normalizeRedactKey } from "@warlock.js/logger";
+import type { HttpRequestLogConfig } from "./request-log/request-log.types";
 import { UploadedFile } from "./uploaded-file";
 
 /**
@@ -54,6 +55,11 @@ export type HttpLoggingConfig = RequestLoggingOptions & {
   redactQueryParams?: string[];
   /** URL policies applied before route logging; matching rules cannot be overridden by a route. */
   private?: PrivateRequestLoggingRule[];
+  /**
+   * The persistent request log: one JSON record per request, written when
+   * the response has finished. On by default in development only.
+   */
+  requests?: HttpRequestLogConfig;
 };
 
 /**
