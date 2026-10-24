@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 > ⚠ **Versioning: `@warlock.js/*` does not follow SemVer strictly — breaking changes may ship in a minor.** This is a deliberate decision, not an oversight: the framework is pre-adoption and the cost of a major per behaviour fix currently outweighs the benefit. **Pin an exact version or a tilde range (`~4.13.0`) if you need to opt into changes rather than receive them.** Every breaking change is marked **BREAKING** in its entry and summarised in an _Upgrading_ section at the top of the release. **This policy will change once the framework has consumers beyond its author.**
 
+## 5.37.0
+
+### Added
+
+- `warlock release <action> [id]`: a deploy pipeline for applications, configured by the new `release` section of `warlock.config.ts` (`ReleaseConfig`, `ReleaseCheck`). `candidate` freezes a clean commit (`--commit`, `--allow-dirty`) into `.warlock/releases/<version>-<shortsha>/` with a manifest (version, commit, creation time, Node version, lockfile hash). `gate` runs an ordered list of named checks (default: typecheck, check, test, build) and stops at the first failure. `migrations --prove [--target]` snapshots the migration ledger, tables and indexes around a real run of the pending migrations and compares them with the expected set. `stage` copies the build and what is needed to run it. `activate [--preflight] [--dry-run] [--allow-same]` checks the staged files, the gate and that the version is strictly greater than the active one, then switches `current` with an atomic symlink, keeps `previous` and runs the restart command you configure in `release.restart.command`; Warlock never calls a process manager itself. `verify` retries a GET on `release.verify.url` and compares the reported version and commit with the active release. `rollback [--dry-run]` switches back and reruns the restart command; it does not roll migrations back. `list`, `status` and `prune --keep <n>` (the only command that deletes releases) complete the family. Every action accepts `--json`, and a manifest per release plus a `release.log` record what happened.
+
 ## 5.36.0 - 2026-10-22
 
 ### Added

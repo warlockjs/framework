@@ -9,3 +9,4 @@ export type {
   BudgetPage,
   BudgetViolation,
 } from "../production/build-budgets";
+export type { ReleaseCheck, ReleaseConfig } from "../release/types";

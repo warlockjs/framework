@@ -30,6 +30,7 @@ import { migrateCommand } from "./commands/migrate.command";
 import { openApiGeneratorCommand } from "./commands/openapi-generator.command";
 import { postmanGeneratorCommand } from "./commands/postman-generator.command";
 import { pm2Command } from "./commands/pm2.command";
+import { releaseCommand } from "./commands/release.command";
 import { routesCommand, routesDiffCommand } from "./commands/routes.command";
 import { seedCommand } from "./commands/seed.command";
 import { startProductionCommand } from "./commands/start-production.command";
@@ -73,6 +74,7 @@ export const frameworkCommands = [
   buildCommand,
   startProductionCommand,
   pm2Command,
+  releaseCommand,
 
   // database commands
   migrateCommand,

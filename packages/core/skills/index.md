@@ -22,7 +22,7 @@ When the framework is wrong or missing a capability, follow the `report-framewor
 - **HTTP & routing:** register-route, warlock-routes, create-controller, use-middleware, write-middleware, validate-input, use-request-locals, build-restful, wire-socket
 - **Responses & resources:** send-response, define-resource, use-model-transformers, use-localization
 - **Domain layers:** write-use-case, use-repository, write-seeder
-- **CLI & running the app:** generate-web-ui, run-app, write-cli-command, add-connector, health-checks, warlock-doctor, warlock-inspect, warlock-check, generate-openapi
+- **CLI & running the app:** generate-web-ui, run-app, deploy-release, write-cli-command, add-connector, health-checks, warlock-doctor, warlock-inspect, warlock-check, generate-openapi
 - **Agent tooling:** warlock-mcp, warlock-trace, warlock-agents-md, warlock-board
 - **Storage, files & mail:** store-file, upload-file, process-image, send-mail
 - **Security & utilities:** hash-password, encrypt-data, store-secrets, retry-operation, benchmark-code, request-memo, request-tracing

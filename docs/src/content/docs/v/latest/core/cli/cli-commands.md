@@ -592,6 +592,18 @@ Auto-detects file vs. directory. Files are streamed (no full-buffer-in-memory), 
 
 ---
 
+## Releasing
+
+### `release`
+
+```bash
+warlock release candidate | gate | migrations --prove | stage | activate | verify | rollback | list | status | prune --keep <n>
+```
+
+Freeze a clean commit, run the gate, prove the migrations, stage the build, switch to it with one atomic symlink and verify the health URL, with a manifest and a log per release. Warlock only runs the restart command you configure. The full guide is [Deploying with `warlock release`](./release.md).
+
+---
+
 ## Diagnostics
 
 ### `doctor`
