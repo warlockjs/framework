@@ -1152,8 +1152,9 @@ async function finishRender(
     namedApiRoutes: resolveNamedApiRoutes(streamOptions.clientApiRouteNames?.(), {
       config: config.get("web.namedApiRoutes") as NamedApiRoutesOption | undefined,
       site: request.site?.key,
-      // No session resolver means no viewer is ever known to be signed in.
-      guest: (bundle as Bundle).session?.user == null,
+      // Guest only when a session resolver ran and found no user. Without
+      // `web.session` the viewer is unknown, so guarded routes stay.
+      guest: (bundle as Bundle).session !== undefined && (bundle as Bundle).session?.user == null,
     }),
   };
 

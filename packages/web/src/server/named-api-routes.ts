@@ -14,7 +14,11 @@ export type ResolveNamedApiRoutesOptions = {
   config?: NamedApiRoutesOption;
   /** Key of the site serving the document; absent in single-site mode. */
   site?: string;
-  /** Whether the viewer is signed out. Without a session resolver every viewer is a guest. */
+  /**
+   * Whether the viewer is KNOWN to be signed out. Defaults to `false`: without a
+   * session resolver the viewer is unknown (the app may sign in with tokens in
+   * the browser), so routes behind an auth guard stay in the table.
+   */
   guest?: boolean;
 };
 
@@ -90,7 +94,7 @@ export function resolveNamedApiRoutes(
   const { include, privatePrefixes } = readConfig(options.config);
   const context: NamedApiRouteContext = Object.freeze({
     site: options.site,
-    guest: options.guest ?? true,
+    guest: options.guest ?? false,
   });
   const wanted = new Set(names);
   const result: Record<string, { path: string; method: string }> = Object.create(null);

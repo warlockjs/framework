@@ -77,7 +77,7 @@ A name the page does not carry throws. Development names the route and the decla
 - `{ privatePrefixes: ["/api/admin/", "/api/webhooks/"] }`: routes under these path prefixes (whole segments) are never embedded, for any viewer or site.
 - an allowlist of names or `prefix.*` patterns, or a filter `(route, { site, guest }) => boolean`, as shorthand for `{ include }` (`route` has `name`, `path`, `method`, `sites`, `guarded`).
 
-Always applied as well: routes declared for other sites with the core `sites` route or group option (a route without `sites` is shared) are left out of a site's pages, and routes behind an auth guard (group middleware included) are left out for a guest, meaning no `web.session` or no signed-in user. After signing in without a navigation, the page still holds the guest table until the next navigation or reload.
+Always applied as well: routes declared for other sites with the core `sites` route or group option (a route without `sites` is shared) are left out of a site's pages, and routes behind an auth guard (group middleware included) are left out for a guest, meaning `web.session` is configured and resolves no user (without `web.session` the viewer is unknown and guarded routes stay). After signing in without a navigation, the page still holds the guest table until the next navigation or reload.
 
 ## Typed responses from `responseSchema`
 

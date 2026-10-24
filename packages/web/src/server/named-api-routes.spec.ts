@@ -156,6 +156,7 @@ describe("web.namedApiRoutes", () => {
     vi.spyOn(router, "getNamedApiRoutes").mockReturnValue(TABLE);
 
     expect(names(resolveNamedApiRoutes(ALL, { site: "shop" }))).toEqual([
+      "account.update",
       "admin.users.create",
       "hooks.stripe",
       "orders.list",
@@ -166,11 +167,11 @@ describe("web.namedApiRoutes", () => {
     expect(names(resolveNamedApiRoutes(ALL))).toContain("admin.stats");
   });
 
-  it("drops guarded routes for a guest and keeps them for a signed-in viewer", () => {
+  it("drops guarded routes only for a known guest; an unknown viewer keeps them", () => {
     vi.spyOn(router, "getNamedApiRoutes").mockReturnValue(TABLE);
 
     expect(names(resolveNamedApiRoutes(ALL, { guest: true }))).not.toContain("account.update");
     expect(names(resolveNamedApiRoutes(ALL, { guest: false }))).toContain("account.update");
-    expect(names(resolveNamedApiRoutes(ALL))).not.toContain("account.update");
+    expect(names(resolveNamedApiRoutes(ALL))).toContain("account.update");
   });
 });

@@ -98,7 +98,9 @@ namedApiRoutes: (route, { site, guest }) => !(guest && route.name.startsWith("ac
 Private prefixes match whole path segments: `/api/admin` covers `/api/admin/users`, not
 `/api/administrators`.
 
-A viewer is a guest when `web.session` is not configured or resolves no user. A guest's page
+A viewer is a guest only when `web.session` is configured and resolves no user. Without
+`web.session` the viewer is unknown (the app may sign in with tokens in the browser), so
+guarded routes stay in the table. A guest's page
 is cacheable and carries the guest table; a signed-in viewer's render is never cached and
 carries the guarded routes its code reaches. A login does not re-render the page a visitor
 already holds, so after signing in without a navigation the page still has the guest table:
