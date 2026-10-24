@@ -182,7 +182,7 @@ function gatherRequestLogInput(
   const base = attempt(() => request.baseRequest) as
     | { method?: string; url?: string }
     | undefined;
-  const user = attempt(() => (request.locals as Record<string, unknown>).user) as
+  const user = attempt(() => (request.locals as unknown as Record<string, unknown>).user) as
     | Record<string, any>
     | undefined;
   const response = attempt(() => request.response);
