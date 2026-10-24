@@ -10,7 +10,10 @@ function install(name: string, version: string, base = root): void {
   const dir = path.join(base, "node_modules", "@warlock.js", name);
 
   mkdirSync(dir, { recursive: true });
-  writeFileSync(path.join(dir, "package.json"), JSON.stringify({ name: `@warlock.js/${name}`, version }));
+  writeFileSync(
+    path.join(dir, "package.json"),
+    JSON.stringify({ name: `@warlock.js/${name}`, version }),
+  );
 }
 
 beforeEach(() => {

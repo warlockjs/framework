@@ -48,7 +48,7 @@ What it does, in order:
 2. Collects every `@warlock.js/*` package across `dependencies` and `devDependencies`. Only the `@warlock.js/` scope is considered — `create-warlock` and unrelated dependencies are never touched.
 3. Looks up each package's latest version on the npm registry, in parallel.
 4. Rewrites each matching spec, **preserving the range operator**: `^4.2.0` → `^4.3.0`, `~4.2.0` → `~4.3.0`, an exact `4.2.0` → `4.3.0`. Specs that are not a plain semver — `workspace:*`, `*`, `latest`, git/file URLs — are left exactly as written, and any package already at or ahead of latest is skipped.
-5. Runs the project's install to reconcile `node_modules`. The package manager is the `packageManager` field, then a pnpm workspace, then the nearest lockfile; when several lockfiles sit side by side, `bun.lock` wins and otherwise the most recently modified one (the command says which). Skipped with `--no-install`.
+5. Runs the project's install to reconcile `node_modules`. The package manager is the `packageManager` field, then a workspace file, then the nearest lockfile; when several lockfiles sit side by side, `bun.lock` wins and otherwise the most recently modified one (the command says which). Skipped with `--no-install`.
 
 With npm it first removes the `@warlock.js/*`, `vite`, `vitest`, `@vitest/*` and `@vitejs/*` entries from `package-lock.json`, so one `npm install` re-resolves them together (the family's peers name each other). **Use npm 11.6.2 or newer**: npm 10.9, bundled with Node 22.15, can fail with `ERESOLVE` or an arborist `edgesOut` crash; the command warns when npm is older, and `npx npm@11 install` is the way around it.
 

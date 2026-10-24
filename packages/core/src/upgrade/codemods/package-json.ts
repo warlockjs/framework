@@ -128,7 +128,9 @@ export const warlockVersions: Codemod = {
         line: lineOf(source, `"${firstSkipped.name}"`),
         hint: `Left unchanged because it is already newer than ${context.targetVersion}: ${skipped
           .map((item) => `${item.name} ${item.spec}`)
-          .join(", ")}. Packages are never moved down; run \`warlock update\` to bring the rest of the family up to the same version.`,
+          .join(
+            ", ",
+          )}. Packages are never moved down; run \`warlock update\` to bring the rest of the family up to the same version.`,
       });
     }
 

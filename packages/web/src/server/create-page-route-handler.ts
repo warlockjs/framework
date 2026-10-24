@@ -557,15 +557,15 @@ export function createPageRouteHandler(options: PageRouteHandlerOptions): PageRo
         "module-load",
         () =>
           Promise.all([
-        loadModule(appFile),
-        layoutFile
-          ? (loadComposedLayout?.() ??
-            loadModule(layoutFile).then((module) =>
-              normalizePageModule(module, "layout", layoutFile),
-            ))
-          : Promise.resolve({}),
-        loadModule(pageFile),
-        loadRegistrationLayouts?.() ?? Promise.resolve([]),
+            loadModule(appFile),
+            layoutFile
+              ? (loadComposedLayout?.() ??
+                loadModule(layoutFile).then((module) =>
+                  normalizePageModule(module, "layout", layoutFile),
+                ))
+              : Promise.resolve({}),
+            loadModule(pageFile),
+            loadRegistrationLayouts?.() ?? Promise.resolve([]),
           ]),
       );
 

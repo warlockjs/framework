@@ -11,7 +11,8 @@ export const MIN_NPM_VERSION = "11.6.2";
  * re-resolve them together: the framework family and the Vite/Vitest toolchain
  * whose peer set the family constrains.
  */
-const PRUNED_PACKAGE = /^(@warlock\.js\/[^/]+|create-warlock|vite|vitest|@vitest\/[^/]+|@vitejs\/[^/]+)$/;
+const PRUNED_PACKAGE =
+  /^(@warlock\.js\/[^/]+|create-warlock|vite|vitest|@vitest\/[^/]+|@vitejs\/[^/]+)$/;
 
 type LockEntry = Record<string, unknown>;
 
@@ -29,7 +30,10 @@ function packageNameOfKey(key: string): string | undefined {
   return index < 0 ? undefined : key.slice(index + marker.length);
 }
 
-function pruneLegacyDependencies(dependencies: Record<string, LockEntry>, removed: Set<string>): void {
+function pruneLegacyDependencies(
+  dependencies: Record<string, LockEntry>,
+  removed: Set<string>,
+): void {
   for (const name of Object.keys(dependencies)) {
     if (PRUNED_PACKAGE.test(name)) {
       delete dependencies[name];

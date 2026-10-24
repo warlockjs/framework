@@ -3404,6 +3404,32 @@ export default defineConfig({
 
 That's the whole fix. Any file that imports a decorated model now loads.
 
+### With Vitest 5 projects
+
+Declare the plugin **once**, in the root config. Since Vitest 5 an inline project
+extends the config file that declares it (`extends: true` is the default), so it
+inherits the plugin; listing `lowerStage3Decorators()` again inside a project makes
+Vitest warn `The "<project>" project applies the same plugin multiple times`.
+
+```ts title="vite.config.ts"
+export default defineConfig({
+  plugins: [lowerStage3Decorators(), mongezVite()],
+  test: {
+    projects: [
+      // inherits the root plugins; no `plugins` entry here
+      { extends: true, test: { name: "unit", include: ["src/**/*.spec.ts"] } },
+      // a project that must not inherit the root config lists what it needs itself
+      { extends: false, plugins: [lowerStage3Decorators()], test: { name: "isolated" } },
+    ],
+  },
+});
+```
+
+Setting `extends` explicitly also silences the warning. Calling the factory more
+than once in a process is harmless: later instances get a numbered plugin name and
+skip modules that no longer contain a decorator. `warlock upgrade` lists the extra
+calls in a config with `projects` (`vitest-inline-project-plugins`).
+
 ## Why it works
 
 The plugin runs `enforce: "pre"`, so it executes **ahead of** Vite's core transform and the SSR rewrite. For every `.ts`/`.tsx` file that actually contains a decorator it runs esbuild with `target: "es2022"` and `experimentalDecorators: false` — esbuild lowers the Stage-3 decorator into a plain helper call (no `@` left), preserving the `(value, context)` runtime semantics the decorators depend on. By the time oxc and the SSR step see the file, there's no decorator syntax left to mangle — just ordinary import references.
@@ -4437,6 +4463,13 @@ description: 'Vendor-neutral request tracing hooks (`http.tracing`) — observe 
 ---
 
 # Warlock — request tracing hooks
+
+> A request that ends `5xx` is explained by the error log, not by tracing. The
+> `Completed Request: … 500` line carries only status and duration; for a web
+> page the cause (message, stack, page file, site, phase) is a separate
+> `error`-level record from `module: "web"`. See the `observe-page-requests`
+> topic of the `warlock-js-web` skill. The shared `log` instance is exported
+> from `@warlock.js/core` for packages that write to the app's channels.
 
 `http.tracing` gives every request a set of named phase spans and start/end
 events, delivered to plain callbacks you register in config — no
@@ -8309,6 +8342,11 @@ export default defineConfig({
 
 The `mongezVite()` plugin handles TypeScript path resolution and the framework's module shape. Without it, your imports break the moment vitest tries to load a Warlock module. `lowerStage3Decorators()` goes **first** — it lets decorated Cascade models (`@RegisterModel`, …) load under Vitest 4 / Vite 8; see the `lower-stage3-decorators` topic.
 
+With Vitest 5 projects, list the plugin only in the root config: inline projects
+extend the file that declares them by default, and repeating it inside a project
+makes Vitest warn `applies the same plugin multiple times`. Use `extends: true`
+(inherit, the generated layout) or `extends: false` (own plugins) explicitly.
+
 ### Keep Vitest setup out of development
 
 `warlock dev` (and `warlock build`) load your app's `vite.config.ts`. Anything you put there for tests runs in development too. Guard vitest-only setup:
@@ -8714,6 +8752,44 @@ Across one integration project, a successful run with no worker recycling needs
 at most `maxWorkers` bootstraps. Multiple projects, worker crashes and memory-limit
 recycling can create additional processes; count distinct PIDs in profiles.
 
+### Worker lifetime with the HTTP test server and a database
+
+Two things are shared when a worker keeps its runtime: the database and the
+servers a file opened. Both have a built-in reset now.
+
+```ts title="src/config/tests.ts"
+export default {
+  lifetime: "worker",
+  // Truncate every table/collection (the migrations ledger is kept) before each file.
+  resetDatabase: true, // or { except: ["countries"] }
+};
+```
+
+```ts title="src/config/database.ts"
+import { workerDatabaseName } from "@warlock.js/core/tests";
+
+// One database per Vitest worker: the reset above may delete every row in it.
+const name = process.env.VITEST ? workerDatabaseName("app_test") : "app";
+```
+
+- `resetDatabase` runs after the fakes reset and before `resetBetweenFiles`, so
+  the hook can seed reference data. `resetTestDatabase({ except, only, connection })`
+  is exported for tests and custom hooks. On PostgreSQL it truncates with
+  `CASCADE`.
+- `workerDatabaseName(base)` returns `base_<VITEST_POOL_ID>`; `testWorkerId()`
+  returns the 1-based worker id. Create or migrate that database in the
+  application's global setup or in a `bootstrap` step before connectors start.
+- Servers from `createTestHttpServer()` that a file did not `close()` are closed
+  before the next file, so their routes and ports do not leak. App modules
+  (`loadAppModules`) load once per worker and are reused.
+- The global `startHttpTestServer()` server runs in Vitest's main process with its
+  own connections and fakes. Worker lifetime does not touch it, so keep requests
+  through it independent of the worker database, or use `createTestHttpServer()`
+  in the worker for tests that read the same database the assertions use.
+- `isolate: false` shares module state between files of a worker: singletons,
+  `vi.mock()` of app modules and module-level caches survive. Restore mocks in
+  `afterEach`, and clear module state in `resetBetweenFiles`.
+
 ### Measure and size CI workers
 
 Set `tests.profileSetup: true` or run
@@ -8721,7 +8797,10 @@ Set `tests.profileSetup: true` or run
 `file: expect.getState().testPath` to `setupTest()` for file labels (the generated
 setup does this). Each file emits one line with milliseconds for environment, config,
 bootstrap, orchestrator, app config, connectors, fakes, reset and teardown as
-applicable. Reused files report reset instead of startup steps. A summary per
+applicable, plus `body`, the time between setup finishing and teardown starting.
+Reused files report reset instead of startup steps. When a file-lifetime run spends
+half or more of its time in setup over at least four files, the worker summary and
+`TestSetupReporter` print a line recommending worker lifetime. A summary per
 worker reports file/bootstrap counts, summed step timings and final shutdown.
 The generated config also installs `TestSetupReporter` from `@warlock.js/core/vite`
 (`reporters: ["default", new TestSetupReporter()]`), which aggregates file counts,
@@ -8812,7 +8891,7 @@ What it does, in order:
 2. Collects every `@warlock.js/*` package across `dependencies` and `devDependencies`. Only the `@warlock.js/` scope is considered — `create-warlock` and unrelated dependencies are never touched.
 3. Looks up each package's latest version on the npm registry, in parallel.
 4. Rewrites each matching spec, **preserving the range operator**: `^4.2.0` → `^4.3.0`, `~4.2.0` → `~4.3.0`, an exact `4.2.0` → `4.3.0`. Specs that are not a plain semver — `workspace:*`, `*`, `latest`, git/file URLs — are left exactly as written, and any package already at or ahead of latest is skipped.
-5. Runs the project's install to reconcile `node_modules`. The package manager is the `packageManager` field, then a pnpm workspace, then the nearest lockfile; when several lockfiles sit side by side, `bun.lock` wins and otherwise the most recently modified one (the command says which). Skipped with `--no-install`.
+5. Runs the project's install to reconcile `node_modules`. The package manager is the `packageManager` field, then a workspace file, then the nearest lockfile; when several lockfiles sit side by side, `bun.lock` wins and otherwise the most recently modified one (the command says which). Skipped with `--no-install`.
 
 With npm it first removes the `@warlock.js/*`, `vite`, `vitest`, `@vitest/*` and `@vitejs/*` entries from `package-lock.json`, so one `npm install` re-resolves them together (the family's peers name each other). **Use npm 11.6.2 or newer**: npm 10.9, bundled with Node 22.15, can fail with `ERESOLVE` or an arborist `edgesOut` crash; the command warns when npm is older, and `npx npm@11 install` is the way around it.
 
@@ -9537,6 +9616,12 @@ The `vite-8-vitest-5` codemod:
   Vitest config, and object-form `output.manualChunks`.
 
 Do these by hand when the codemod lists them:
+
+- Under Vitest 5 an inline project extends the config file that declares it, so a
+  project that lists `lowerStage3Decorators()` again applies it twice and Vitest
+  warns. Keep the plugin in the root config only, or set `extends: false` on a
+  project that must not inherit. The `vitest-inline-project-plugins` codemod
+  (5.37.1) lists the extra calls.
 
 - Move a config's `esbuild: { jsx: "automatic" }` to
   `oxc: { jsx: { runtime: "automatic" } }`. `esbuild.target` is not converted, and

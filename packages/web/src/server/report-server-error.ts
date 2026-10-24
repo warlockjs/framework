@@ -160,7 +160,10 @@ function mappedStack(thrown: Error): string | undefined {
  */
 export function describeServerError(
   thrown: unknown,
-  context: Pick<ServerErrorContext, "phase" | "level" | "file" | "routePath" | "site" | "requestId">,
+  context: Pick<
+    ServerErrorContext,
+    "phase" | "level" | "file" | "routePath" | "site" | "requestId"
+  >,
 ): PageErrorDetails {
   const scope = currentPageErrorScope();
   const error = thrown instanceof Error ? thrown : undefined;

@@ -4,7 +4,11 @@ import { execSync } from "node:child_process";
 import { rootPath } from "../utils";
 import { fetchLatestVersion } from "../utils/npm-registry";
 import { isNewerVersion } from "../utils/version-compare";
-import { detectPackageManager, detectPackageManagerDetails, getInstallCommand } from "./package-manager";
+import {
+  detectPackageManager,
+  detectPackageManagerDetails,
+  getInstallCommand,
+} from "./package-manager";
 import {
   MIN_NPM_VERSION,
   oldNpmMessage,
@@ -382,6 +386,8 @@ async function pruneNpmLockfile(): Promise<void> {
 
   await putJsonFileAsync(lockfilePath, lockfile);
   console.log(
-    colors.dim(`Removed ${removed.length} package(s) from package-lock.json to re-resolve them together.`),
+    colors.dim(
+      `Removed ${removed.length} package(s) from package-lock.json to re-resolve them together.`,
+    ),
   );
 }

@@ -227,7 +227,13 @@ async function runMiddlewareChain(
           designateBoundary(level, triple),
           pathname,
           resolvedStatus,
-          { phase: "middleware", routeName, routePath, method: request.method, requestId: request.id },
+          {
+            phase: "middleware",
+            routeName,
+            routePath,
+            method: request.method,
+            requestId: request.id,
+          },
           !isClientError,
         );
 

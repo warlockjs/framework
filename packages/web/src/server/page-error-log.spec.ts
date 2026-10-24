@@ -74,7 +74,8 @@ function entryWith(page: PageRouteEntry["triple"]["page"]): PageRouteEntry {
     name: "post",
     triple: {
       app: {
-        default: ({ children }: { children?: ReactNode }) => createElement(DefaultApp, { children }),
+        default: ({ children }: { children?: ReactNode }) =>
+          createElement(DefaultApp, { children }),
       },
       layout: {},
       page,
@@ -242,7 +243,9 @@ describe("5xx page failures log one located error record", () => {
       }),
     );
 
-    expect(onlyRecord().context.stack).toBe("Error: mapped\n    at src/posts/pages/post.page.tsx:3:9");
+    expect(onlyRecord().context.stack).toBe(
+      "Error: mapped\n    at src/posts/pages/post.page.tsx:3:9",
+    );
   });
 });
 

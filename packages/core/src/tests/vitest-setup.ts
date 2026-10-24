@@ -821,7 +821,8 @@ async function resetBetweenFiles(): Promise<void> {
   await closeOpenTestHttpServers();
   const { resetDatabase } = readRuntimeConfiguration();
   if (resetDatabase === true) await resetTestDatabase();
-  else if (resetDatabase && typeof resetDatabase === "object") await resetTestDatabase(resetDatabase);
+  else if (resetDatabase && typeof resetDatabase === "object")
+    await resetTestDatabase(resetDatabase);
   else if (resetDatabase !== undefined && resetDatabase !== null && resetDatabase !== false)
     throw new TestLifecycleError("tests.resetDatabase must be true or an options object.");
   const reset = readRuntimeConfiguration().resetBetweenFiles;

@@ -39,11 +39,15 @@ function runFixture(): Promise<{ code: number | null; output: string }> {
 }
 
 describe("lowerStage3Decorators under Vitest 5 inline projects", () => {
-  it("is not reported as a plugin applied multiple times", async () => {
-    const run = await runFixture();
+  it(
+    "is not reported as a plugin applied multiple times",
+    async () => {
+      const run = await runFixture();
 
-    expect(run.output).toContain("2 passed");
-    expect(run.output).not.toMatch(/applies the same plugin multiple times/);
-    expect(run.code).toBe(0);
-  }, RUN_BOUND_MS + 15_000);
+      expect(run.output).toContain("2 passed");
+      expect(run.output).not.toMatch(/applies the same plugin multiple times/);
+      expect(run.code).toBe(0);
+    },
+    RUN_BOUND_MS + 15_000,
+  );
 });

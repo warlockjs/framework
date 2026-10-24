@@ -207,31 +207,31 @@ configured (and to `console.error` when none is configured), so a failure is
 never reduced to the `Completed Request: … 500` line. The record's `module` is
 `web`, its `action` is `page.<phase>`, and its context carries:
 
-| Field                  | Meaning                                                                          |
-| ---------------------- | -------------------------------------------------------------------------------- |
-| `name`, `message`      | The thrown error                                                                 |
-| `stack`                | The stack, mapped to source files (the dev server maps it; in production run Node with `--enable-source-maps`) |
-| `phase`                | The stage that failed (below)                                                    |
-| `level`                | `app`, `layout` or `page`, for `middleware`, `session` and `loader`              |
-| `file`                 | The matched page file                                                            |
-| `routePath`, `site`    | The route pattern and the `web.sites` key serving the request                    |
-| `method`, `pathname`, `requestId` | The request, without its query string                                 |
+| Field                             | Meaning                                                                                                        |
+| --------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `name`, `message`                 | The thrown error                                                                                               |
+| `stack`                           | The stack, mapped to source files (the dev server maps it; in production run Node with `--enable-source-maps`) |
+| `phase`                           | The stage that failed (below)                                                                                  |
+| `level`                           | `app`, `layout` or `page`, for `middleware`, `session` and `loader`                                            |
+| `file`                            | The matched page file                                                                                          |
+| `routePath`, `site`               | The route pattern and the `web.sites` key serving the request                                                  |
+| `method`, `pathname`, `requestId` | The request, without its query string                                                                          |
 
-| Phase             | Failure                                                                           |
-| ----------------- | --------------------------------------------------------------------------------- |
-| `translations`    | Binding the route's translations (for example a locale the page has no table for) |
-| `module-load`     | Loading the app, layout or page module                                            |
-| `middleware`      | An app, layout or page middleware threw                                           |
-| `session`         | `web.session` threw while resolving the viewer                                    |
-| `loader`          | An app, layout or page loader threw or timed out                                  |
-| `metadata`        | Resolving metadata or document slots                                              |
-| `render`          | A component threw while rendering, including errors React hands to an `ErrorBoundary` |
-| `stream`          | React's shell or stream failed (`onShellError`, `onError`)                        |
-| `defer`           | A deferred value rejected                                                         |
-| `error-page`      | `error.page.tsx` itself failed                                                    |
-| `named-api-routes` | Computing the route table the document embeds for named API routes                |
-| `request-handler` | Anything else that escaped the page handler                                       |
-| `unknown`         | The response is `5xx` but no stage reported an error, for example `response.setStatusCode(500)` without a throw |
+| Phase              | Failure                                                                                                         |
+| ------------------ | --------------------------------------------------------------------------------------------------------------- |
+| `translations`     | Binding the route's translations (for example a locale the page has no table for)                               |
+| `module-load`      | Loading the app, layout or page module                                                                          |
+| `middleware`       | An app, layout or page middleware threw                                                                         |
+| `session`          | `web.session` threw while resolving the viewer                                                                  |
+| `loader`           | An app, layout or page loader threw or timed out                                                                |
+| `metadata`         | Resolving metadata or document slots                                                                            |
+| `render`           | A component threw while rendering, including errors React hands to an `ErrorBoundary`                           |
+| `stream`           | React's shell or stream failed (`onShellError`, `onError`)                                                      |
+| `defer`            | A deferred value rejected                                                                                       |
+| `error-page`       | `error.page.tsx` itself failed                                                                                  |
+| `named-api-routes` | Computing the route table the document embeds for named API routes                                              |
+| `request-handler`  | Anything else that escaped the page handler                                                                     |
+| `unknown`          | The response is `5xx` but no stage reported an error, for example `response.setStatusCode(500)` without a throw |
 
 A failure that ends as a `4xx` (not found, a guard redirect, a failed page
 validation, a thrown `HttpError` below 500) is the visitor's affair and is not

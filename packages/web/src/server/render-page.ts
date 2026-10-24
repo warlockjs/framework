@@ -1291,7 +1291,9 @@ async function finishRender(
       createElement(DefaultApp, {
         children: strictPageTree(
           triple.app,
-          createElement(FrameworkRootBoundary, { details: developmentDetails(currentError?.debug) }),
+          createElement(FrameworkRootBoundary, {
+            details: developmentDetails(currentError?.debug),
+          }),
         ),
       }),
     );
