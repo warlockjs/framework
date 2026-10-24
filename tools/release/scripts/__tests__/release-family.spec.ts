@@ -7,7 +7,10 @@ import { describe, it } from "node:test";
 import type { PublishHandoff } from "../local-registry-gate.ts";
 import {
   NPM_ORIGIN,
+  assertBuiltManifest,
   assertMatrixScopeIsStated,
+  familyRange,
+  relaxFamilyPins,
   assertSinglePhysicalCore,
   checkPackageTreeIsClean,
   confirmSubjectsAtOrigin,
@@ -197,8 +200,8 @@ function fixture(overrides: Partial<ReleaseFamilyDependencies> = {}): {
           },
           dependencies:
             name === "@warlock.js/notifications"
-              ? { "@warlock.js/core": VERSION }
-              : { "@warlock.js/fs": VERSION },
+              ? { "@warlock.js/core": familyRange(VERSION) }
+              : { "@warlock.js/fs": familyRange(VERSION) },
         },
         entries: [
           "package/package.json",
@@ -3222,5 +3225,54 @@ describe("public text release gate", () => {
       /Private references in public text/,
     );
     assert.ok(!control.commands.some((request) => request.args.includes("build")));
+  });
+});
+
+describe("family pins between published members", () => {
+  const manifest = (peer: string) =>
+    JSON.stringify({
+      name: "@warlock.js/web",
+      version: VERSION,
+      peerDependencies: { "@warlock.js/core": peer, react: VERSION },
+    });
+
+  it("rewrites the exact pins pkgist writes to a same-major range", () => {
+    const relaxed = JSON.parse(relaxFamilyPins(manifest(VERSION), VERSION));
+
+    assert.equal(relaxed.peerDependencies["@warlock.js/core"], `^${VERSION}`);
+    assert.equal(relaxed.peerDependencies.react, VERSION, "a non-family package is untouched");
+    assert.equal(familyRange(VERSION), `^${VERSION}`);
+  });
+
+  it("leaves a manifest with nothing to rewrite byte for byte", () => {
+    const text = manifest(`^${VERSION}`);
+
+    assert.equal(relaxFamilyPins(text, VERSION), text);
+  });
+
+  it("accepts the range and refuses an exact pin or a stale range in a built manifest", () => {
+    const built = (peer: string) => JSON.parse(manifest(peer));
+
+    assertBuiltManifest(built(`^${VERSION}`), "@warlock.js/web", VERSION);
+    assert.throws(
+      () => assertBuiltManifest(built(VERSION), "@warlock.js/web", VERSION),
+      /must equal \^5\.3\.0; found 5\.3\.0/,
+    );
+    assert.throws(
+      () => assertBuiltManifest(built("^5.2.0"), "@warlock.js/web", VERSION),
+      /must equal \^5\.3\.0/,
+    );
+  });
+
+  it("still refuses a member built at another version", () => {
+    assert.throws(
+      () =>
+        assertBuiltManifest(
+          { ...JSON.parse(manifest(`^${VERSION}`)), version: "5.2.0" },
+          "@warlock.js/web",
+          VERSION,
+        ),
+      /version mismatch/,
+    );
   });
 });

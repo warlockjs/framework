@@ -6,6 +6,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 > ⚠ **Versioning: `@warlock.js/*` does not follow SemVer strictly — breaking changes may ship in a minor.** This is a deliberate decision, not an oversight: the framework is pre-adoption and the cost of a major per behaviour fix currently outweighs the benefit. **Pin an exact version or a tilde range (`~4.13.0`) if you need to opt into changes rather than receive them.** Every breaking change is marked **BREAKING** in its entry and summarised in an _Upgrading_ section at the top of the release. **This policy will change once the framework has consumers beyond its author.**
 
+## 5.37.1
+
+### Added
+
+- `warlock check` reports `WL8010` when the installed `@warlock.js/*` packages are on different versions, naming the packages that differ from the newest one and pointing to `warlock update`. Peer dependencies between family packages are now same-major ranges, so a package manager no longer refuses a mixed set.
+- `warlock update` for npm projects removes the family's (and Vite's and Vitest's) entries from `package-lock.json` before the install, so one `npm install` re-resolves them together, and warns when the npm in use is older than 11.6.2, which `npm` 10 cannot always do (`ERESOLVE`, or a crash on the Vitest peer set). It names the install command of the package manager the project uses instead of a generic one.
+
+### Changed
+
+- Peer and runtime dependencies on other `@warlock.js/*` packages are published as the same-major range `^5.37.1` instead of the exact version, because npm 10 could not step the family in an existing `package-lock.json` (`ERESOLVE` on the exact, cyclic peer pins).
+- Package manager detection with several lockfiles side by side (and no `packageManager` field or `pnpm-workspace.yaml`) uses the most recently written one, the lockfile the project installs with, and `warlock update` says which it chose. `bun.lock` still wins over the `yarn.lock` Bun also writes.
+
+### Fixed
+
+- `warlock upgrade` no longer moves a `@warlock.js/*` dependency down: one already newer than `--to` stays as it is and is listed in the review list. Its install hint names the package manager the project installs with, not the first lockfile found.
+
 ## 5.37.0 - 2026-10-24
 
 ### Added

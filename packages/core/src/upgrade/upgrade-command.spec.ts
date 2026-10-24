@@ -1,4 +1,11 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  utimesSync,
+  writeFileSync,
+} from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -90,6 +97,50 @@ describe("warlock upgrade", () => {
     });
     expect(result.from).toBe("5.29.0");
     expect(result.changedFiles).toEqual(["package.json", "src/app/jobs/run.service.ts"]);
+    expect(result.installHint).toBe("npm install");
+    vi.unstubAllEnvs();
+  });
+
+  it("never moves a package down to a target older than its declared version", async () => {
+    vi.stubEnv("npm_config_user_agent", "");
+    const root = createApp("^5.37.0");
+    writeFileSync(
+      path.join(root, "package.json"),
+      `${JSON.stringify(
+        {
+          name: "app",
+          dependencies: { "@warlock.js/core": "^5.37.0", "@warlock.js/seal": "^5.35.0" },
+        },
+        null,
+        2,
+      )}\n`,
+    );
+
+    const result = await runUpgrade({ root, from: "5.35", to: "5.36.0" });
+
+    expect(JSON.parse(readFileSync(path.join(root, "package.json"), "utf8")).dependencies).toEqual({
+      "@warlock.js/core": "^5.37.0",
+      "@warlock.js/seal": "^5.36.0",
+    });
+    expect(result.manual).toContainEqual(
+      expect.objectContaining({
+        file: "package.json",
+        hint: expect.stringContaining("@warlock.js/core ^5.37.0"),
+      }),
+    );
+    vi.unstubAllEnvs();
+  });
+
+  it("names the package manager the project installs with, not the first lockfile found", async () => {
+    vi.stubEnv("npm_config_user_agent", "");
+    const root = createApp();
+    writeFileSync(path.join(root, "pnpm-lock.yaml"), "lockfileVersion: '9.0'\n");
+    writeFileSync(path.join(root, "package-lock.json"), "{}");
+    const old = new Date(Date.now() - 60_000);
+    utimesSync(path.join(root, "pnpm-lock.yaml"), old, old);
+
+    const result = await runUpgrade({ root, to: "5.31" });
+
     expect(result.installHint).toBe("npm install");
     vi.unstubAllEnvs();
   });

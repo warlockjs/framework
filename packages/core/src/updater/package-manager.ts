@@ -1,5 +1,5 @@
 import { fileExistsAsync } from "@warlock.js/fs";
-import { readFile } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import { rootPath } from "../utils";
 
@@ -20,12 +20,30 @@ const LOCKFILES: ReadonlyArray<{ file: string; packageManager: PackageManager }>
   { file: "package-lock.json", packageManager: "npm" },
 ];
 
+/** What {@link detectPackageManagerDetails} found. */
+export type PackageManagerDetection = {
+  packageManager: PackageManager;
+  /**
+   * The lockfiles found side by side when the choice had to be made between
+   * them (no `packageManager` field, no workspace marker). Empty otherwise.
+   */
+  ambiguous: string[];
+};
+
 /**
- * Detect the project's package manager from its lockfile, falling back to
- * npm when none is present. Shared by `warlock update` and `warlock add` so
- * both agree on a project that happens to carry more than one lockfile.
+ * Detect the project's package manager. The rule, in order:
+ *
+ * 1. the nearest `packageManager` field in a package.json;
+ * 2. a `pnpm-workspace.yaml` (its `pnpm-lock.yaml` wins over compatibility lockfiles);
+ * 3. the nearest directory holding a lockfile: the only one, `bun.lock` when
+ *    present (Bun also writes a `yarn.lock`), otherwise the most recently
+ *    modified, because the lockfile the project installs with is the one its
+ *    package manager rewrites;
+ * 4. the package manager running the CLI, then npm.
  */
-export async function detectPackageManager(startDir: string = rootPath()): Promise<PackageManager> {
+export async function detectPackageManagerDetails(
+  startDir: string = rootPath(),
+): Promise<PackageManagerDetection> {
   const dirs: string[] = [];
 
   for (let dir = path.resolve(startDir); ; dir = path.dirname(dir)) {
@@ -38,32 +56,80 @@ export async function detectPackageManager(startDir: string = rootPath()): Promi
   for (const dir of dirs) {
     const declared = await readDeclaredPackageManager(dir);
 
-    if (declared) return declared;
+    if (declared) return { packageManager: declared, ambiguous: [] };
   }
 
   // 2. a workspace governs descendants, but its own real lockfile wins over a marker
   for (const dir of dirs) {
     if (await fileExistsAsync(path.join(dir, "pnpm-workspace.yaml"))) {
-      if (await fileExistsAsync(path.join(dir, "pnpm-lock.yaml"))) return "pnpm";
-      for (const { file, packageManager } of LOCKFILES) {
-        if (await fileExistsAsync(path.join(dir, file))) return packageManager;
+      if (await fileExistsAsync(path.join(dir, "pnpm-lock.yaml"))) {
+        return { packageManager: "pnpm", ambiguous: [] };
       }
-      return "pnpm";
+
+      const found = await findLockfiles(dir);
+
+      return found.length > 0 ? chooseLockfile(found) : { packageManager: "pnpm", ambiguous: [] };
     }
   }
 
   // 3. lockfiles, nearest level first
   for (const dir of dirs) {
-    for (const { file, packageManager } of LOCKFILES) {
-      if (await fileExistsAsync(path.join(dir, file))) return packageManager;
-    }
+    const found = await findLockfiles(dir);
+
+    if (found.length > 0) return chooseLockfile(found);
   }
 
   const agent = process.env.npm_config_user_agent?.split("/")[0];
 
-  if (agent === "pnpm" || agent === "yarn" || agent === "bun") return agent;
+  if (agent === "pnpm" || agent === "yarn" || agent === "bun") {
+    return { packageManager: agent, ambiguous: [] };
+  }
 
-  return "npm";
+  return { packageManager: "npm", ambiguous: [] };
+}
+
+/**
+ * Detect the project's package manager, falling back to npm when none is
+ * present. Shared by `warlock update`, `warlock upgrade` and `warlock add` so
+ * they agree on a project that happens to carry more than one lockfile.
+ */
+export async function detectPackageManager(startDir: string = rootPath()): Promise<PackageManager> {
+  return (await detectPackageManagerDetails(startDir)).packageManager;
+}
+
+/** A lockfile found in one directory, with when it was last written. */
+type FoundLockfile = { file: string; packageManager: PackageManager; modifiedAt: number };
+
+async function findLockfiles(dir: string): Promise<FoundLockfile[]> {
+  const found: FoundLockfile[] = [];
+
+  for (const { file, packageManager } of LOCKFILES) {
+    try {
+      found.push({ file, packageManager, modifiedAt: (await stat(path.join(dir, file))).mtimeMs });
+    } catch {
+      // not present
+    }
+  }
+
+  return found;
+}
+
+function chooseLockfile(found: FoundLockfile[]): PackageManagerDetection {
+  const [first] = found;
+
+  if (!first) return { packageManager: "npm", ambiguous: [] };
+
+  if (found.length === 1) return { packageManager: first.packageManager, ambiguous: [] };
+
+  const names = found.map((entry) => entry.file);
+  const bun = found.find((entry) => entry.packageManager === "bun");
+
+  if (bun) return { packageManager: "bun", ambiguous: names };
+
+  // Stable sort: on equal times the LOCKFILES order decides.
+  const newest = [...found].sort((a, b) => b.modifiedAt - a.modifiedAt)[0] ?? first;
+
+  return { packageManager: newest.packageManager, ambiguous: names };
 }
 
 /** The manager named by the app's `packageManager` field, if any. */

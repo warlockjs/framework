@@ -4,7 +4,13 @@ import { execSync } from "node:child_process";
 import { rootPath } from "../utils";
 import { fetchLatestVersion } from "../utils/npm-registry";
 import { isNewerVersion } from "../utils/version-compare";
-import { detectPackageManager, getInstallCommand } from "./package-manager";
+import { detectPackageManager, detectPackageManagerDetails, getInstallCommand } from "./package-manager";
+import {
+  MIN_NPM_VERSION,
+  oldNpmMessage,
+  parseNpmVersion,
+  pruneFamilyLockEntries,
+} from "./prune-npm-lockfile";
 
 /** Scope prefix that identifies a Warlock framework package. */
 const WARLOCK_SCOPE = "@warlock.js/";
@@ -166,9 +172,9 @@ export async function updateWarlockPackages(
   printUpdates(updates);
 
   if (!runInstall) {
-    console.log(
-      colors.dim("Skipped install (--no-install). Run your package manager to apply the changes."),
-    );
+    const command = getInstallCommand(await detectPackageManager());
+
+    console.log(colors.dim(`Skipped install (--no-install). Run ${command} to apply the changes.`));
     return { outcome: "updated", updates };
   }
 
@@ -177,7 +183,7 @@ export async function updateWarlockPackages(
   } catch (error) {
     console.log(
       `${colors.red("✖")} The install failed. package.json is already updated — ` +
-        `re-run your package manager install to finish.`,
+        `re-run ${getInstallCommand(await detectPackageManager())} to finish.`,
     );
     return { outcome: "install-failed", updates, error: error as Error };
   }
@@ -313,10 +319,69 @@ function printUpdates(updates: PackageUpdate[], { pending = false } = {}): void 
 
 /** Reconcile node_modules to the rewritten package.json via the project PM. */
 async function installDependencies(): Promise<void> {
-  const packageManager = await detectPackageManager();
+  const { packageManager, ambiguous } = await detectPackageManagerDetails();
   const installCommand = getInstallCommand(packageManager);
+
+  if (ambiguous.length > 0) {
+    console.log(
+      `${colors.yellow("⚠")} Found ${ambiguous.join(" and ")}; installing with ` +
+        `${colors.bold(packageManager)}, the one written most recently. Set "packageManager" in package.json to choose.`,
+    );
+  }
+
+  let npmVersion: string | undefined;
+
+  if (packageManager === "npm") {
+    npmVersion = readNpmVersion();
+
+    if (npmVersion && isNewerVersion(MIN_NPM_VERSION, npmVersion)) {
+      console.log(`${colors.yellow("⚠")} ${oldNpmMessage(npmVersion)}`);
+    }
+
+    await pruneNpmLockfile();
+  }
 
   console.log(`${colors.cyan("›")} Running ${colors.bold(installCommand)}…`);
 
-  execSync(installCommand, { cwd: process.cwd(), stdio: "inherit" });
+  try {
+    execSync(installCommand, { cwd: process.cwd(), stdio: "inherit" });
+  } catch (error) {
+    if (npmVersion && isNewerVersion(MIN_NPM_VERSION, npmVersion)) {
+      console.log(`${colors.yellow("⚠")} ${oldNpmMessage(npmVersion)}`);
+    }
+
+    throw error;
+  }
+}
+
+/** The version of the `npm` on PATH, or `undefined` when it cannot be run. */
+function readNpmVersion(): string | undefined {
+  try {
+    return parseNpmVersion(execSync("npm --version", { encoding: "utf8", stdio: "pipe" }));
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Drop the family's (and Vite/Vitest's) entries from package-lock.json so the
+ * install that follows re-resolves them together. npm cannot step the family
+ * entry by entry: each member's peer range names the others.
+ */
+async function pruneNpmLockfile(): Promise<void> {
+  const lockfilePath = rootPath("package-lock.json");
+
+  if (!(await fileExistsAsync(lockfilePath))) return;
+
+  const lockfile = (await getJsonFileAsync(lockfilePath)) as Parameters<
+    typeof pruneFamilyLockEntries
+  >[0];
+  const removed = pruneFamilyLockEntries(lockfile);
+
+  if (removed.length === 0) return;
+
+  await putJsonFileAsync(lockfilePath, lockfile);
+  console.log(
+    colors.dim(`Removed ${removed.length} package(s) from package-lock.json to re-resolve them together.`),
+  );
 }

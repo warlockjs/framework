@@ -1,8 +1,8 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { detectPackageManager } from "./package-manager";
+import { detectPackageManager, detectPackageManagerDetails } from "./package-manager";
 
 describe("detectPackageManager", () => {
   let tmp: string;
@@ -68,10 +68,36 @@ describe("detectPackageManager", () => {
     expect(await detectPackageManager(app)).toBe("pnpm");
   });
 
-  it("prefers pnpm-lock.yaml over package-lock.json at the same level", async () => {
+  it("uses the most recently written lockfile when several share a level", async () => {
     writeFileSync(path.join(app, "package-lock.json"), "{}");
     writeFileSync(path.join(app, "pnpm-lock.yaml"), "");
+    const old = new Date(Date.now() - 60_000);
+    utimesSync(path.join(app, "pnpm-lock.yaml"), old, old);
+
+    const npm = await detectPackageManagerDetails(app);
+    expect(npm.packageManager).toBe("npm");
+    expect(npm.ambiguous).toEqual(["pnpm-lock.yaml", "package-lock.json"]);
+
+    utimesSync(path.join(app, "package-lock.json"), old, old);
+    utimesSync(path.join(app, "pnpm-lock.yaml"), new Date(), new Date());
     expect(await detectPackageManager(app)).toBe("pnpm");
+  });
+
+  it("keeps bun when bun.lock sits next to the yarn.lock bun also writes", async () => {
+    writeFileSync(path.join(app, "yarn.lock"), "");
+    writeFileSync(path.join(app, "bun.lock"), "{}");
+    expect(await detectPackageManager(app)).toBe("bun");
+  });
+
+  it("reports no ambiguity for a single lockfile or a packageManager field", async () => {
+    writeFileSync(path.join(app, "package-lock.json"), "{}");
+    expect((await detectPackageManagerDetails(app)).ambiguous).toEqual([]);
+    writeFileSync(path.join(app, "pnpm-lock.yaml"), "");
+    writeFileSync(path.join(app, "package.json"), JSON.stringify({ packageManager: "pnpm@9" }));
+    expect(await detectPackageManagerDetails(app)).toEqual({
+      packageManager: "pnpm",
+      ambiguous: [],
+    });
   });
 
   it("lets the app's packageManager field beat every other signal", async () => {

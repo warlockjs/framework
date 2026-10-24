@@ -32,11 +32,11 @@
     "generate:llms": "node scripts/generate-llms.mjs"
   },
   "peerDependencies": {
-    "@warlock.js/ai-panoptic": "5.37.0",
-    "@warlock.js/cache": "5.37.0",
-    "@warlock.js/cascade": "5.37.0",
-    "@warlock.js/core": "5.37.0",
-    "@warlock.js/logger": "5.37.0"
+    "@warlock.js/ai-panoptic": "^5.37.0",
+    "@warlock.js/cache": "^5.37.0",
+    "@warlock.js/cascade": "^5.37.0",
+    "@warlock.js/core": "^5.37.0",
+    "@warlock.js/logger": "^5.37.0"
   },
   "peerDependenciesMeta": {
     "@warlock.js/ai-panoptic": {

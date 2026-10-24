@@ -544,7 +544,9 @@ warlock update --check          # same, but exit 1 when behind — a CI gate
 
 Scans `dependencies` and `devDependencies` for `@warlock.js/*` packages, looks up each one's latest version on npm, and rewrites the matching specs — **preserving each range operator** (`^`, `~`, or an exact pin). Non-semver specs (`workspace:*`, `*`, git/file URLs) are left untouched, and packages already at or ahead of latest are skipped. It then runs your project's install — `bun` / `npm` / `yarn` / `pnpm`, auto-detected from the lockfile — to reconcile `node_modules`.
 
-Bun is checked first: a Bun project may also carry a `yarn.lock` (Bun writes one for tooling compatibility), and matching yarn there would run the wrong installer. [`add`](#add) shares the same detection.
+The package manager is chosen in this order: the `packageManager` field of `package.json`; a `pnpm-workspace.yaml` with its `pnpm-lock.yaml`; the nearest directory with a lockfile. When that directory holds several lockfiles, `bun.lock` wins (Bun also writes a `yarn.lock`), otherwise the most recently modified one wins, because it is the one the project installs with; the command says which it picked. Set `packageManager` in `package.json` to choose explicitly. [`add`](#add) and [`upgrade`](./upgrade.md) share the same detection.
+
+With npm, `warlock update` removes the `@warlock.js/*`, `vite`, `vitest`, `@vitest/*` and `@vitejs/*` entries from `package-lock.json` first, so a single `npm install` resolves them together. The family's packages name each other as peers, which npm cannot step one entry at a time. **Use npm 11.6.2 or newer**: npm 10.9 (bundled with Node 22.15) can fail with `ERESOLVE` or an internal error on this step. The command warns when your npm is older; `npx npm@11 install` runs the install with a newer one.
 
 Because the whole `@warlock.js/*` family is versioned in lockstep, this keeps every framework package on the same release. The [`dev`](#dev) server surfaces a notice when a newer version is published — and lets you apply it with a single `u` keypress — so you rarely need to run this by hand.
 
@@ -553,7 +555,7 @@ Offline runs are honest about it: if none of the registry lookups answer, the co
 ### `upgrade`
 
 Apply the code changes a release's breaking changes need, and list what needs a
-decision, with `file:line`. See [`warlock upgrade`](./upgrade.md).
+decision, with `file:line`. A `@warlock.js/*` dependency already newer than `--to` is never moved down; it is listed in the review list. See [`warlock upgrade`](./upgrade.md).
 
 ```bash
 warlock upgrade --from 5.30 --to 5.31.0 --dry-run   # diff + review list, nothing written

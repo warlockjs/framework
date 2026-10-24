@@ -2,6 +2,12 @@
 
 All notable changes to `@warlock.js/web` are documented here.
 
+## 5.37.1
+
+### Changed
+
+- Peer and runtime dependencies on other `@warlock.js/*` packages are now published as the same-major range `^5.37.1` instead of the exact version. npm 10 could not step the family in an existing `package-lock.json` (`ERESOLVE` on the exact, cyclic peer pins). Every package still ships at the same version; `warlock check` (`WL8010`) reports an installed set that has drifted apart.
+
 ## 5.37.0 - 2026-10-24
 
 ### Added
