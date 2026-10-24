@@ -19,6 +19,13 @@ vi.mock("node:fs/promises", () => ({
 
     return content;
   },
+  // Lockfiles side by side are ordered by modification time; these tests only
+  // need every mocked lockfile to exist with the same timestamp.
+  stat: async (file: string) => {
+    if (!existingFiles.has(file)) throw new Error("ENOENT");
+
+    return { mtimeMs: 0 };
+  },
 }));
 
 vi.mock("../../../src/utils", () => ({

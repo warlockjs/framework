@@ -1,5 +1,10 @@
 import { describe, expectTypeOf, it } from "vitest";
-import type { ErrorPageProps, SerializedErrorPageProps, SerializedPageError } from "../index";
+import type {
+  ErrorPageProps,
+  PageErrorDetails,
+  SerializedErrorPageProps,
+  SerializedPageError,
+} from "../index";
 
 describe("ErrorPageProps public contract", () => {
   it("keeps the SSR error value public and exposes a distinct hydration shape", () => {
@@ -21,6 +26,7 @@ describe("ErrorPageProps public contract", () => {
     expectTypeOf<SerializedErrorPageProps>().toEqualTypeOf<{
       readonly error: SerializedPageError;
       readonly status: number;
+      readonly debug?: PageErrorDetails;
     }>();
   });
 });
