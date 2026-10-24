@@ -19,7 +19,7 @@ import { createServer as createNodeServer } from "node:http";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { createServer, type ViteDevServer } from "vite";
+import { createLogger, createServer, type ViteDevServer } from "vite";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createWebConnectorViteConfig } from "./dev-server-config";
 import { RESOLVED_CLIENT_PAGE_REGISTRY_ID } from "./page-registry-plugin";
@@ -236,6 +236,51 @@ describe("dev SSR config: the client page registry honours a custom appSrcRoot",
       expect(result?.code).toContain(path.basename(pageFile));
     } finally {
       await vite.close();
+      hmrServer.close();
+      fs.rmSync(appRoot, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("dev server config: HMR websocket attachment", () => {
+  it("attaches the websocket to the app server through server.ws, with no deprecated server.hmr keys", async () => {
+    const appRoot = fs.mkdtempSync(path.join(os.tmpdir(), "warlock-dev-ws-"));
+    const hmrServer = createNodeServer();
+    const config = await createWebConnectorViteConfig({
+      appRoot,
+      appSrcRoot: path.join(appRoot, "src"),
+      webRoot: WEB_ROOT,
+      workspaceRoot: WORKSPACE_ROOT,
+      hmrServer,
+      handlePageHotUpdate: async () => false,
+      leadingPlugins: [],
+    });
+
+    const messages: string[] = [];
+    const logger = createLogger("info");
+    for (const level of ["info", "warn", "warnOnce", "error"] as const) {
+      logger[level] = (message: string) => {
+        messages.push(message);
+      };
+    }
+
+    let vite: ViteDevServer | undefined;
+    try {
+      const hmr = config.server?.hmr;
+      expect(typeof hmr === "object" ? Object.keys(hmr) : []).toEqual([]);
+      expect(config.server?.ws).toMatchObject({ server: hmrServer });
+
+      vite = await createServer({
+        ...config,
+        configFile: false,
+        customLogger: logger,
+        optimizeDeps: { ...config.optimizeDeps, noDiscovery: true, include: [] },
+        server: { ...config.server, watch: null },
+      });
+
+      expect(messages.filter((message) => message.includes("deprecated"))).toEqual([]);
+    } finally {
+      await vite?.close();
       hmrServer.close();
       fs.rmSync(appRoot, { recursive: true, force: true });
     }

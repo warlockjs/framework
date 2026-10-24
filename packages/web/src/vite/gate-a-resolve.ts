@@ -974,6 +974,12 @@ export function createEnvironmentClassifier(
   return { appRoot, environmentOf, packageNameForFilePath };
 }
 
+/** An HTML entry document or one of Vite's virtual `html-proxy` modules. */
+function isHtmlEntrySource(source: string): boolean {
+  const bare = source.startsWith("\0") ? source.slice(1) : source;
+  return /\.html?(?:$|\?)/.test(bare) || bare.includes("html-proxy");
+}
+
 /**
  * The client-build Vite plugin. `vite` is only imported for its types
  * (`import type`), so this module carries no runtime dependency on `vite`
@@ -1172,6 +1178,13 @@ export function gateAResolve(options: GateAOptions = {}): Plugin {
       return id === TYPE_ONLY_ERASED_ID ? "export {};" : null;
     },
     async resolveId(source, importer, resolveOptions) {
+      // An HTML document is the build's ENTRY, never an import: Vite resolves
+      // `index.html` (and its `?html-proxy` inline-script modules) through the
+      // plugin pipeline as the root of the graph, with the document itself as
+      // the importer. There is no file here for any rule to judge and nothing
+      // crosses the fence, so it must not reach the "could not judge" warning.
+      if (isHtmlEntrySource(source)) return null;
+
       // Gate A is a CLIENT-build fence — see the header note and Gate B/Gate
       // C's identical carve-outs (`gate-b-secrets.ts`'s `options?.ssr` guard
       // in `transform`, Gate C's `this.environment?.config?.consumer ===

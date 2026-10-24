@@ -2,6 +2,13 @@
 
 All notable changes to `@warlock.js/web` are documented here.
 
+## 5.37.1
+
+### Fixed
+
+- The development server no longer prints `server.hmr.protocol/host/port/path/clientPort/timeout/server is deprecated` on every boot. The HMR websocket is attached to the app's HTTP server through Vite 8's `server.ws.server` instead of the deprecated `server.hmr.server`; hot reload behaves as before.
+- The client-bundle security check (Gate A) no longer warns `could not judge this import` for the app's own `index.html` entry, in either the client or the SSR build. HTML entries and Vite's virtual HTML proxy modules are treated as entries, not imports; a genuinely unresolvable import still warns.
+
 ## 5.37.0 - 2026-10-24
 
 ### Added

@@ -224,8 +224,8 @@ export type WebConnectorViteConfigOptions = {
  * `appType: "custom"` — Warlock owns the response shape and Vite never fronts
  * the server.
  *
- * `server.hmr.server` is handed the RAW node server (`fastify.server`), so the
- * HMR websocket shares the one port the app already listens on. No `hmr.port`
+ * `server.ws.server` is handed the RAW node server (`fastify.server`), so the
+ * HMR websocket shares the one port the app already listens on. No `ws.port`
  * and no `clientPort`: Vite's HMR path stays the default `"/"`, socket.io
  * stays on `"/socket.io"` (`core/src/connectors/socket-connector.ts:90`), and
  * the two `upgrade` listeners coexist because each is a selective filter that
@@ -307,7 +307,9 @@ export async function createWebConnectorViteConfig(
     ],
     server: {
       middlewareMode: true,
-      hmr: { server: options.hmrServer },
+      // Vite 8 moved the HMR websocket options to `server.ws`; `server.hmr.server`
+      // is deprecated and warns on every boot.
+      ws: { server: options.hmrServer },
       fs: {
         // `<Scripts />` points the browser at the hydration client entry under
         // `<webRoot>`: the published `esm/entry/index.mjs` when installed,
