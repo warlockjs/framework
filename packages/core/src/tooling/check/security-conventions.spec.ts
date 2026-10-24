@@ -74,6 +74,8 @@ describe("WL9006 mutating routes need an auth guard or public: true", () => {
     "router.post('/posts', createPost, { middleware: [markAuthGuard(requireApiKey)] });",
     "const requireApiKey = markAuthGuard(checkKey);\nrouter.post('/imports', importController, { middleware: [requireApiKey] });",
     "guarded(() => { router.post('/posts', createPost); });",
+    "router.group({ prefix: '/api/admin', middleware: [adminGuard()] }, () => { router.post('/users', createUser); });",
+    "const requireAdmin = () => markAuthGuard(checkAdmin);\nrouter.group({ prefix: '/api/admin', middleware: [requireAdmin()] }, () => { router.delete('/users/:id', deleteUser); });",
     "router.group({ middleware: [authMiddleware('user')] }, () => { router.put('/posts/:id', updatePost); });",
     "router.group({ public: true, prefix: '/webhooks' }, () => { router.post('/stripe', stripeWebhook); });",
     "router.prefix('/admin', () => guarded(() => router.patch('/settings', saveSettings)));",
@@ -114,6 +116,14 @@ describe("WL9006 mutating routes need an auth guard or public: true", () => {
       "POST /users",
     ],
     ["router.post(`/users`, createUser, { middleware: [requireStaff()] });", "POST /users"],
+    [
+      "router.group({ middleware: [markAuthGuard(readUser, false)] }, () => { router.post('/users', createUser); });",
+      "POST /users",
+    ],
+    [
+      "const requireStaff = () => markAuthGuard(readUser, false);\nrouter.group({ middleware: [requireStaff()] }, () => { router.post('/users', createUser); });",
+      "POST /users",
+    ],
   ])("reports %s", (source, route) => {
     const found = check(source).filter((item) => item.code === "WL9006");
 

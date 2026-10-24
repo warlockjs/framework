@@ -359,6 +359,17 @@ export interface RouteOptions {
    * router.post("/internal/reindex", reindexController, { name: "internal.reindex", clientVisible: false });
    */
   clientVisible?: boolean;
+  /**
+   * The sites (`web.sites` keys) a multi-site app offers this named API route
+   * to in the browser. Absent means the route is shared: every site may embed
+   * it. A route registered inside a `router.group({ sites })` inherits the
+   * group's list unless it declares its own. This scopes browser route tables
+   * only; the endpoint itself still answers on every host.
+   *
+   * @example
+   * router.post("/api/admin/users", createUser, { name: "admin.users.create", sites: ["admin"] });
+   */
+  sites?: readonly string[];
 }
 
 export type RequestMethod =
@@ -388,6 +399,14 @@ export type NamedApiRoute = Readonly<{
    * `clientVisible: false`. Absent means the route may be embedded in pages.
    */
   clientVisible?: false;
+  /** The route's declared `sites`, present only when it declared some. */
+  sites?: readonly string[];
+  /**
+   * Present only as `true`: a required auth guard (see `markAuthGuard`) is in
+   * the route's middleware chain, group middleware included. Browser tables
+   * leave such a route out for guest viewers.
+   */
+  guarded?: true;
 }>;
 
 /** Options for `router.getNamedApiRoutes()`. */
@@ -472,6 +491,11 @@ export type GroupedRoutesOptions = {
    * opts it back out.
    */
   public?: boolean;
+  /**
+   * Offer every named API route in the group only to these sites (see
+   * `RouteOptions.sites`). A route's own `sites` replaces it.
+   */
+  sites?: readonly string[];
 };
 
 /** Route resource */
@@ -536,6 +560,8 @@ export type RouterStacks = {
    * is open default to `public: true`.
    */
   public?: number;
+  /** Open `router.group({ sites })` scopes, innermost last. */
+  sites?: (readonly string[])[];
   /**
    * Source file path for routes being added (for HMR route tracking)
    */

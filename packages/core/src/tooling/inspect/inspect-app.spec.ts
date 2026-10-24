@@ -387,3 +387,31 @@ describe("grouped session guard inspection", () => {
     }
   });
 });
+
+describe("custom guard inspection", () => {
+  it("counts a group middleware that declared itself a guard, with or without a descriptor", async () => {
+    const previous = router.list();
+    Reflect.set(router, "routes", []);
+    try {
+      // No `warlock.auth` descriptor and a name that says nothing about guards.
+      const staffOnly = markAuthGuard(async () => undefined);
+      router.group({ prefix: "/api/admin", middleware: [staffOnly] }, () => {
+        router.post("/users", listPosts);
+      });
+      router.post("/api/open", listPosts);
+      const registered = router.list();
+      const report = await inspectApp({ sections: ["routes"], routes: registered });
+
+      expect(report.routes?.find((entry) => entry.path === "/api/admin/users")?.auth.required).toBe(
+        true,
+      );
+      const warning = renderAgentsMdSection(report)
+        .split("\n")
+        .find((line) => line.startsWith("Mutating routes without"));
+      expect(warning).toContain("POST /api/open");
+      expect(warning).not.toContain("/api/admin/users");
+    } finally {
+      Reflect.set(router, "routes", previous);
+    }
+  });
+});

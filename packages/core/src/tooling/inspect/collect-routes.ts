@@ -6,6 +6,7 @@ import { buildRequestParts } from "../../openapi/request-schemas";
 import { buildDeclaredResponses } from "../../openapi/response-schemas";
 import type { SchemaRegistry } from "../../openapi/schema-registry";
 import { readRouteAuth } from "../../openapi/security";
+import { isRequiredGuardRoute } from "../../router/unguarded-route-diagnostics";
 import type { Route } from "../../router/types";
 import type {
   InspectRoute,
@@ -153,9 +154,15 @@ export function collectRoutes(
       description: route.description ?? handler?.description ?? null,
       isPage: route.isPage === true,
       middleware: (route.middleware ?? []).map(functionName),
+      // A guard that declared itself (`markAuthGuard`) counts even without a
+      // `warlock.auth` descriptor; `route.middleware` already carries group middleware.
       auth: auth
-        ? { required: auth.required !== false, sources: auth.sources, userTypes: auth.userTypes }
-        : { required: false, sources: [], userTypes: [] },
+        ? {
+            required: auth.required !== false || isRequiredGuardRoute(route),
+            sources: auth.sources,
+            userTypes: auth.userTypes,
+          }
+        : { required: isRequiredGuardRoute(route), sources: [], userTypes: [] },
       csrf: route.csrf !== false,
       rateLimit: readRateLimit(route, rateLimit),
       logging: readLogging(route, logging),

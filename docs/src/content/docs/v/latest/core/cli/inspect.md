@@ -220,3 +220,22 @@ console.log(source.role, source.exports, source.importedBy);
 ```
 
 For route/page reachability in code, call `inspectApp({ sections: ["files", "routes", "pages"] })` in an already booted app. `inspect_files` exposes the section through MCP with a case-insensitive `filter` on file, module or role.
+
+## Custom guards in groups
+
+A middleware you wrote counts as an auth guard when it is wrapped in `markAuthGuard()`
+(or its function name contains `auth` or `guard`), even without a `warlock.auth`
+descriptor. Registering it once on a group marks every route inside:
+
+```ts
+export const adminGuard = () => markAuthGuard(async ({ request, response }) => {
+  if (!(await isAdmin(request))) return response.forbidden();
+});
+
+router.group({ prefix: "/api/admin", middleware: [adminGuard()] }, () => {
+  router.post("/users", createUserController);
+});
+```
+
+`POST /api/admin/users` reports `auth.required: true` and does not appear under
+"Mutating routes without an auth guard". `markAuthGuard(fn, false)` declares the opposite.

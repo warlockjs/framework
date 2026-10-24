@@ -95,6 +95,45 @@ describe("unguarded mutating routes", () => {
     ).toEqual(["/webhooks/internal", "/after"]);
   });
 
+  it("reports a route with a group guard as guarded and one without as not", () => {
+    const guard = markAuthGuard(async () => undefined);
+    const optional = markAuthGuard(async () => undefined, false);
+
+    router.group({ prefix: "/admin", middleware: [guard] }, () => {
+      router.get("/stats", handler(), { name: "admin.stats" });
+    });
+    router.group({ middleware: [optional] }, () => {
+      router.get("/feed", handler(), { name: "feed" });
+    });
+    router.get("/open", handler(), { name: "open" });
+
+    expect(router.getNamedApiRoutes()).toEqual([
+      { name: "admin.stats", path: "/admin/stats", method: "GET", guarded: true },
+      { name: "feed", path: "/feed", method: "GET" },
+      { name: "open", path: "/open", method: "GET" },
+    ]);
+  });
+
+  it("scopes routes to the sites of the group, and a route's own sites win", () => {
+    router.group({ prefix: "/admin", sites: ["admin"] }, () => {
+      router.get("/stats", handler(), { name: "admin.stats" });
+      router.get("/shared", handler(), { name: "admin.shared", sites: ["admin", "shop"] });
+      router.group({ prefix: "/inner", sites: ["ops"] }, () => {
+        router.get("/x", handler(), { name: "admin.x" });
+      });
+      router.get("/after", handler(), { name: "admin.after" });
+    });
+    router.get("/open", handler(), { name: "open" });
+
+    expect(router.getNamedApiRoutes().map((route) => [route.name, route.sites])).toEqual([
+      ["admin.stats", ["admin"]],
+      ["admin.shared", ["admin", "shop"]],
+      ["admin.x", ["ops"]],
+      ["admin.after", ["admin"]],
+      ["open", undefined],
+    ]);
+  });
+
   it("pops the public stack even when the group callback throws", () => {
     expect(() =>
       router.group({ public: true }, () => {

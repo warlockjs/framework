@@ -61,6 +61,15 @@ export function isAuthGuardMiddleware(middleware: unknown): boolean {
   return isAuthGuardName(middleware.name);
 }
 
+/**
+ * Whether an auth guard is in the route's middleware chain. `route.middleware`
+ * already holds the middleware of every enclosing `router.group`, so a guard
+ * declared once on a group counts for each route inside it.
+ */
+export function isRequiredGuardRoute(route: Pick<Route, "middleware">): boolean {
+  return (route.middleware ?? []).some(isAuthGuardMiddleware);
+}
+
 /** Whether a route mutates state, is not a page route, and is neither guarded nor public. */
 export function isUnguardedMutatingRoute(route: Route): boolean {
   if (!isMutatingHttpMethod(String(route.method))) return false;
@@ -68,7 +77,7 @@ export function isUnguardedMutatingRoute(route: Route): boolean {
   if (route.isPage) return false;
   if (route.public === true) return false;
 
-  return !(route.middleware ?? []).some(isAuthGuardMiddleware);
+  return !isRequiredGuardRoute(route);
 }
 
 /** Routes already reported in this process, so an HMR reload does not repeat them. */
