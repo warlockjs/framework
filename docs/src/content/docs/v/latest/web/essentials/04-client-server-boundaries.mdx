@@ -100,6 +100,14 @@ In Web 5.2, `.client.tsx` is only a naming convention. A module statically
 imported by a page, layout, root, or one of their imports is still evaluated by
 the server. Top-level `window` or `document` access therefore breaks SSR.
 
+## `Intl` output can differ between Node and the browser
+
+`Intl.DisplayNames`, `Intl.Collator` and `localeCompare` depend on the ICU data
+of the runtime, which differs between Node and browsers. Text or ordering built
+from them during the server render can disagree with the hydrated render and
+cause a hydration mismatch. Render it from a shared pre-computed table or after
+hydration; see [Localization](/v/latest/web/essentials/localization/#intl-labels-and-hydration).
+
 ## Static assets
 
 Imported non-stylesheet assets are not supported by the production server

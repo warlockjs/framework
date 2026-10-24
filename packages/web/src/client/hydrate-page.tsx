@@ -12,6 +12,7 @@ import { hydrateShared } from "../shared";
 import { readNamedApiRoutes } from "../routing/named-api-routes";
 import { installSession } from "../session/use-user";
 import { LevelErrorBoundary } from "./build-hydrated-tree";
+import { describeHydrationMismatch, formatHydrationMismatch } from "./describe-hydration-mismatch";
 import { DefaultErrorBoundary } from "./default-error-boundary";
 import { replayStashedNavigationFailure } from "./navigation-failure-stash";
 import { reportClientError } from "./report-client-error";
@@ -56,6 +57,19 @@ export function resetWindowErrorReportersForTests(): void {
 }
 
 /**
+ * Development only: names the first mismatching node of a hydration error,
+ * read from the diff React 19 puts in the error message. Logs nothing when
+ * the error carries no diff.
+ */
+export function logHydrationMismatchInDevelopment(error: unknown): void {
+  if (!import.meta.env?.DEV) return;
+
+  const mismatch = describeHydrationMismatch(error instanceof Error ? error.message : "");
+
+  if (mismatch) console.warn(formatHydrationMismatch(mismatch));
+}
+
+/**
  * `hydrateRoot`'s own React 19 error hooks, wired to the SAME reporting seam
  * (card 1db238ca) — `onRecoverableError` fires for a hydration mismatch React
  * recovered from by re-rendering client-side; `onCaughtError`/`onUncaughtError`
@@ -68,6 +82,7 @@ const hydrationErrorHooks: Pick<
   "onRecoverableError" | "onCaughtError" | "onUncaughtError"
 > = {
   onRecoverableError: (error) => {
+    logHydrationMismatchInDevelopment(error);
     reportClientError("React recovered from a hydration mismatch", error, {
       kind: "hydration",
       pathname: typeof window === "undefined" ? undefined : window.location.pathname,
