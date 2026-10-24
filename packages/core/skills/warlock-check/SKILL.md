@@ -66,6 +66,7 @@ jq -r '.problems[] | "\(.file // "-"):\(.line // 0) \(.code) \(.message)\n  → 
 | `WL9009`            | regex with `*` / `+` / `{n,}` run on request input                                                            |
 | `WL9010`–`WL9012`   | warnings: `await log.*()`, a second controller in a file, a `kind` discriminator                              |
 | `WL8001`–`WL8007`   | this machine: Node version, missing tool, unreachable service, busy port, esbuild binary, git, tool crash/OOM |
+| `WL8010`            | installed `@warlock.js/*` packages on different versions — run `warlock update`                               |
 
 ## `warlock typecheck`
 

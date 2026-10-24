@@ -775,6 +775,12 @@ async function buildAndPackAllMembers(
   for (const entry of releaseCommitSha ? built : []) {
     const { member } = entry;
     const buildDirectory = path.join(BUILD_ROOT, ...member.name.split("/"), version);
+    const builtManifestPath = path.join(buildDirectory, "package.json");
+    if (existsSync(builtManifestPath)) {
+      const builtText = readFileSync(builtManifestPath, "utf8");
+      const relaxed = relaxFamilyPins(builtText, version);
+      if (relaxed !== builtText) await writeFile(builtManifestPath, relaxed, "utf8");
+    }
     const packed = await runtime.runCommand({
       command: process.execPath,
       args: [
@@ -1833,6 +1839,41 @@ function binaryEntryFromShim(modulesDirectory: string, binaryName: string): stri
   return existsSync(resolved) ? resolved : undefined;
 }
 
+/**
+ * The range a family member publishes for another member: the release version
+ * as a floor, the major as the ceiling. An exact peer pin between members makes
+ * npm 10 unable to step the family in an existing lockfile (ERESOLVE on the
+ * cyclic peers), so the lockstep guarantee comes from every member's own
+ * `version` field (checked here and in the family gate) and from
+ * `warlock check`, not from the pins.
+ */
+export function familyRange(version: string): string {
+  return `^${version}`;
+}
+
+/**
+ * Rewrite every `@warlock.js/*` dependency, peer and optional dependency in a
+ * built manifest from the exact version pkgist writes to {@link familyRange}.
+ * Returns the manifest text unchanged when there is nothing to rewrite.
+ */
+export function relaxFamilyPins(manifestText: string, version: string): string {
+  const manifest = JSON.parse(manifestText) as Record<string, unknown>;
+  let changed = false;
+
+  for (const field of DEPENDENCY_FIELDS) {
+    const value = manifest[field];
+    if (!isStringRecord(value)) continue;
+    for (const [name, specification] of Object.entries(value)) {
+      if (name.startsWith("@warlock.js/") && specification === version) {
+        value[name] = familyRange(version);
+        changed = true;
+      }
+    }
+  }
+
+  return changed ? `${JSON.stringify(manifest, null, 2)}\n` : manifestText;
+}
+
 /** Parse and enforce the only package metadata that can cross the gate. */
 export function assertBuiltManifest(
   manifest: BuiltManifest,
@@ -1861,9 +1902,9 @@ export function assertBuiltManifest(
       if (specification.startsWith("workspace:")) {
         throw new Error(`${expectedName} ${field}.${name} retained ${specification}.`);
       }
-      if (name.startsWith("@warlock.js/") && specification !== expectedVersion) {
+      if (name.startsWith("@warlock.js/") && specification !== familyRange(expectedVersion)) {
         throw new Error(
-          `${expectedName} ${field}.${name} must equal ${expectedVersion}; found ${specification}.`,
+          `${expectedName} ${field}.${name} must equal ${familyRange(expectedVersion)}; found ${specification}.`,
         );
       }
     }

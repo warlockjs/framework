@@ -99,6 +99,7 @@ export const warlockVersions: Codemod = {
 
     const pkg = JSON.parse(source) as PackageJson;
     const changes: { name: string; from: string; to: string }[] = [];
+    const skipped: { name: string; spec: string }[] = [];
 
     for (const field of ["dependencies", "devDependencies"] as const) {
       const dependencies = pkg[field];
@@ -106,12 +107,29 @@ export const warlockVersions: Codemod = {
       for (const [name, spec] of Object.entries(dependencies)) {
         if (!name.startsWith("@warlock.js/") && name !== "create-warlock") continue;
         if (typeof spec !== "string" || NON_REGISTRY_SPEC.test(spec)) continue;
+        const declared = parseVersion(spec);
+        // Never move a package down: one already past the target stays where it is.
+        if (declared && compareVersions(declared.join("."), context.targetVersion) > 0) {
+          skipped.push({ name, spec });
+          continue;
+        }
         const prefix = /^[\^~]/.exec(spec)?.[0] ?? (/^\d/.test(spec) ? "" : "^");
         const next = `${prefix}${context.targetVersion}`;
         if (next === spec) continue;
         dependencies[name] = next;
         changes.push({ name, from: spec, to: next });
       }
+    }
+
+    const firstSkipped = skipped[0];
+    if (firstSkipped) {
+      output.manual.push({
+        file: "package.json",
+        line: lineOf(source, `"${firstSkipped.name}"`),
+        hint: `Left unchanged because it is already newer than ${context.targetVersion}: ${skipped
+          .map((item) => `${item.name} ${item.spec}`)
+          .join(", ")}. Packages are never moved down; run \`warlock update\` to bring the rest of the family up to the same version.`,
+      });
     }
 
     if (changes.length === 0) return output;

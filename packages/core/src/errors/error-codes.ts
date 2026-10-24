@@ -541,6 +541,14 @@ export const ERROR_CODES = {
     fix: "Install it with `warlock add devtools` and restart `warlock dev`; devtools answers loopback requests in development only.",
     skill: "warlock-trace",
   },
+  WL8010: {
+    code: "WL8010",
+    area: "environment",
+    category: "environment",
+    title: "Installed @warlock.js packages are on different versions",
+    fix: "Run `warlock update` (or install every @warlock.js/* package at the same version) so the whole family shares one version.",
+    skill: "update-packages",
+  },
 
   // ── WL9xxx conventions and hygiene ───────────────────────────────────────
   WL9001: {

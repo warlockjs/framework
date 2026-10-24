@@ -19,6 +19,7 @@ import {
 import { runConventions } from "./conventions-step";
 import { collectApiRouteFacts } from "./api-route-references";
 import { checkNodeVersion } from "./environment-step";
+import { checkFamilyVersions } from "./family-versions-step";
 import { runLint } from "./lint-step";
 import { listSourceFiles, listTestFiles } from "./source-files";
 import {
@@ -147,7 +148,7 @@ export async function runCheck(options: CheckOptions = {}): Promise<CheckReport>
   };
 
   await run("environment", async () => {
-    const found = checkNodeVersion(cwd, options.nodeVersion);
+    const found = [...checkNodeVersion(cwd, options.nodeVersion), ...checkFamilyVersions(cwd)];
 
     if (changed) {
       const listed = await listChangedFiles({

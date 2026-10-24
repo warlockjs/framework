@@ -418,6 +418,12 @@ Category: this machine · skill: `warlock-trace`
 
 Category: this machine · skill: `warlock-trace`
 
+### WL8010
+
+**Installed @warlock.js packages are on different versions.** Run `warlock update` (or install every @warlock.js/* package at the same version) so the whole family shares one version.
+
+Category: this machine · skill: `update-packages`
+
 ## WL9xxx — conventions and hygiene
 
 ### WL9001

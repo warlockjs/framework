@@ -1,5 +1,11 @@
 ﻿# Changelog — release tooling
 
+## 5.37.1
+
+### Changed
+
+- The release rewrites the exact family pins pkgist writes into each built package to the same-major range `^<version>` before packing, and the built-manifest gate requires that range. Lockstep is still enforced through every member's own `version` field. `pnpm release:version` writes the same range form into the package manifests.
+
 ## 5.34.3 - 2026-10-20
 
 ### Changed
