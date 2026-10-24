@@ -578,6 +578,8 @@ describe("finishRender — normal app error page path", () => {
         stack: expect.any(String),
       },
       status: 500,
+      // Outside production the payload also carries where it failed.
+      debug: expect.objectContaining({ phase: "render", message: "page render exploded" }),
     });
   });
 });

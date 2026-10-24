@@ -99,9 +99,9 @@ describe("reportServerError()", () => {
     await Promise.resolve();
     await Promise.resolve();
 
-    // The console floor still logs BOTH distinct messages — dedupe only
-    // scopes the app-hook dispatch, never the unconditional floor.
-    expect(console.error).toHaveBeenCalledTimes(2);
+    // One failed request is one error record: the same Error object seen by
+    // two stages is logged (and dispatched to the app hook) once.
+    expect(console.error).toHaveBeenCalledTimes(1);
     expect(report).toHaveBeenCalledTimes(1);
   });
 

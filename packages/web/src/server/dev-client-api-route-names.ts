@@ -43,14 +43,6 @@ export type DevClientApiRouteInput = {
 
 /** The per-request route-name function for one page document in development. */
 export function devClientApiRouteNames(input: DevClientApiRouteInput): () => readonly string[] {
-  // A site registration facade slipped in through a cast would otherwise fail
-  // on the first request; fail at install with the cause named.
-  if (typeof input.registry?.getNamedApiRoutes !== "function") {
-    throw new TypeError(
-      "devClientApiRouteNames needs Core's router registry (getNamedApiRoutes); a site registration router cannot supply named API routes.",
-    );
-  }
-
   const moduleOf = (file: string): ClientApiRouteModule => {
     const setupFile = pageSetupFileFor(file);
     return setupFile !== undefined && isFile(setupFile) ? { file, setupFile } : { file };
@@ -64,6 +56,17 @@ export function devClientApiRouteNames(input: DevClientApiRouteInput): () => rea
 
   return createClientApiRouteResolver(
     { modules: files.map(moduleOf), aliases: appConventionAliases(input.appSrcRoot) },
-    () => clientVisibleRouteNames(input.registry.getNamedApiRoutes()),
+    () => {
+      // A site registration facade slipped in through a cast cannot answer;
+      // name the cause instead of "getNamedApiRoutes is not a function". Read
+      // per request, so installs that never render a table do not need it.
+      if (typeof input.registry?.getNamedApiRoutes !== "function") {
+        throw new TypeError(
+          "devClientApiRouteNames needs Core's router registry (getNamedApiRoutes); a site registration router cannot supply named API routes.",
+        );
+      }
+
+      return clientVisibleRouteNames(input.registry.getNamedApiRoutes());
+    },
   );
 }

@@ -287,12 +287,14 @@ export async function buildHydratedTree(
     element =
       ErrorPage === undefined
         ? null
-        : createElement(
-            Fragment,
-            null,
-            createElement(ErrorPage, errorPageProps),
-            devErrorPanelElement(errorPageProps.debug),
-          );
+        : errorPageProps.debug === undefined
+          ? createElement(ErrorPage, errorPageProps)
+          : createElement(
+              Fragment,
+              null,
+              createElement(ErrorPage, errorPageProps),
+              devErrorPanelElement(errorPageProps.debug),
+            );
   }
 
   // The page leaf gets its own boundary (its `ErrorBoundary` export, else the

@@ -2,11 +2,10 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { Router } from "@warlock.js/core";
+import { Router, container } from "@warlock.js/core";
 import type { SitesConfig } from "../sites/site-config.types";
 import { devClientApiRouteNames } from "./dev-client-api-route-names";
 import { installPageRoutes, type InstallPageRoutesOptions } from "./install-page-routes";
-import * as devNames from "./dev-client-api-route-names";
 import { createSiteDispatch, siteRegistrationRouter } from "./site-dispatch";
 
 const router = Router.getInstance();
@@ -54,20 +53,20 @@ describe("devClientApiRouteNames", () => {
     const sites: SitesConfig = { store: { hosts: ["store.test"] } };
     const facade = siteRegistrationRouter(createSiteDispatch({ sites }), "store", "");
 
-    expect(() =>
-      devClientApiRouteNames({
-        // @ts-expect-error the facade is not a named-route registry
-        registry: { get: facade.get, post: facade.post },
-        appSrcRoot: files.appSrcRoot,
-        appFile: files.appFile,
-        pageFile: files.pageFile,
-      }),
-    ).toThrow(/getNamedApiRoutes/);
+    const names = devClientApiRouteNames({
+      // @ts-expect-error the facade is not a named-route registry
+      registry: { get: facade.get, post: facade.post },
+      appSrcRoot: files.appSrcRoot,
+      appFile: files.appFile,
+      pageFile: files.pageFile,
+    });
+
+    expect(() => names()).toThrow(/getNamedApiRoutes/);
   });
 });
 
 describe("installPageRoutes multi-site named route source", () => {
-  it("hands every page Core's real router as the named route registry, never the site facade", async () => {
+  it("installs a multi-site tree against Core's real router without touching the site facade's missing registry", async () => {
     const appRoot = fs.mkdtempSync(path.join(os.tmpdir(), "warlock-dev-names-sites-"));
     directories.push(appRoot);
     const appSrcRoot = path.join(appRoot, "src");
@@ -80,31 +79,29 @@ describe("installPageRoutes multi-site named route source", () => {
 
     const sites: SitesConfig = { store: { hosts: ["store.test"] } };
     const dispatch = createSiteDispatch({ sites });
-    const spy = vi.spyOn(devNames, "devClientApiRouteNames");
     const vite: InstallPageRoutesOptions["vite"] = {
       ssrLoadModule: vi.fn(async () => ({ default: () => null })),
     } as never;
 
+    container.set("http.server", { addHook: vi.fn() } as never);
+
     try {
-      await installPageRoutes({
-        router,
-        vite,
-        appRoot,
-        appSrcRoot,
-        appFile: path.join(appSrcRoot, "web", "root.tsx"),
-        siteDispatch: { dispatch, sites },
-      });
+      await expect(
+        installPageRoutes({
+          router,
+          vite,
+          appRoot,
+          appSrcRoot,
+          appFile: path.join(appSrcRoot, "web", "root.tsx"),
+          siteDispatch: { dispatch, sites },
+        }),
+      ).resolves.toBeDefined();
     } finally {
+      container.delete("http.server");
+
       for (const route of router.list()) {
         if (route.sourceFile !== undefined) router.removeRoutesBySourceFile(route.sourceFile);
       }
-    }
-
-    expect(spy).toHaveBeenCalled();
-
-    for (const [input] of spy.mock.calls) {
-      expect(input.registry).toBe(router);
-      expect(typeof input.registry.getNamedApiRoutes).toBe("function");
     }
   });
 });

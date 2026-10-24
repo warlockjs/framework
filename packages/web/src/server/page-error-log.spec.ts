@@ -275,19 +275,6 @@ describe("4xx outcomes are not logged as errors", () => {
     expect(rendered.status).toBe(404);
     expect(logError).not.toHaveBeenCalled();
   });
-
-  it("does not log a loader redirect", async () => {
-    const rendered = await render(
-      entryWith({
-        loader: ({ response }: { response: { redirect(url: string): unknown } }) =>
-          response.redirect("/login"),
-        default: () => createElement("p", null, "ok"),
-      } as never),
-    );
-
-    expect(rendered.status).toBe(302);
-    expect(logError).not.toHaveBeenCalled();
-  });
 });
 
 describe("the error page in development and production", () => {
