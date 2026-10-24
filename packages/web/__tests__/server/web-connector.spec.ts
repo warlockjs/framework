@@ -459,21 +459,23 @@ describe("WebConnector — the Vite config it builds", () => {
 
   it("hands HMR the Fastify raw server itself, and declares no port of its own", async () => {
     const harness = await bootHarness();
-    const hmr = harness.viteConfig.server?.hmr as Record<string, unknown>;
+    const ws = harness.viteConfig.server?.ws as Record<string, unknown>;
 
     // Identity, not shape: HMR must share the ONE port the
     // app listens on, which only holds if this is the very server object
-    // `HttpConnector` will call `listen()` on.
-    expect(hmr.server).toBe(harness.fastify.server);
+    // `HttpConnector` will call `listen()` on. Vite 8 attaches it through
+    // `server.ws`; the deprecated `server.hmr.*` keys stay unset.
+    expect(ws.server).toBe(harness.fastify.server);
+    expect(harness.viteConfig.server?.hmr ?? {}).toEqual({});
 
     // A `port` or `clientPort` here forks HMR onto a second port and the
     // single-port guarantee is gone — silently, since HMR still "works" locally.
-    expect(hmr).not.toHaveProperty("port");
-    expect(hmr).not.toHaveProperty("clientPort");
+    expect(ws).not.toHaveProperty("port");
+    expect(ws).not.toHaveProperty("clientPort");
 
-    // Key-set equality so ANY future addition to `hmr` has to come through
+    // Key-set equality so ANY future addition to `ws` has to come through
     // this test rather than past it.
-    expect(Object.keys(hmr)).toEqual(["server"]);
+    expect(Object.keys(ws)).toEqual(["server"]);
   });
 
   it("mounts Vite's connect stack as an onRequest hook that yields via done()", async () => {
