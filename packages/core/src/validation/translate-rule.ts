@@ -92,7 +92,7 @@ export function translateSealRule({
   key,
   translate,
 }: TranslateSealRuleOptions): string {
-  const own = rule.errorMessage || rule.defaultErrorMessage;
+  const own = rule.errorMessage || rule.defaultErrorMessage || key;
   const aliased = withPlaceholderAliases(rule.name, attributes);
   const translation = translate(key, aliased);
 

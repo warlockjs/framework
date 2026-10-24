@@ -13,18 +13,18 @@ import { databasePlugin, filePlugin, localizedPlugin } from "./plugins";
 
 // Configure Seal to use Warlock's localization
 configureSeal({
-  translateRule({ rule, attributes }) {
+  translateRule({ rule, attributes, context }) {
     const translateRule = config.key("validation.translateRule");
 
     if (translateRule) {
-      return translateRule({ rule, attributes });
+      return translateRule({ rule, attributes, context });
     }
 
     const translationGroup = config.key("validation.translationGroup", "validation");
 
     const translationKey = `${translationGroup}.${rule.name}`;
 
-    return translateSealRule({ rule, attributes, key: translationKey, translate: t });
+    return translateSealRule({ rule, attributes, context, key: translationKey, translate: t });
   },
 
   translateAttribute({ attribute, context, rule }) {

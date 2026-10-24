@@ -100,7 +100,7 @@ describe("unguarded mutating routes", () => {
     const optional = markAuthGuard(async () => undefined, false);
 
     router.group({ prefix: "/admin", middleware: [guard] }, () => {
-      router.get("/stats", handler(), { name: "admin.stats" });
+      router.get("/stats", handler(), { name: "stats" });
     });
     router.group({ middleware: [optional] }, () => {
       router.get("/feed", handler(), { name: "feed" });
@@ -116,19 +116,19 @@ describe("unguarded mutating routes", () => {
 
   it("scopes routes to the sites of the group, and a route's own sites win", () => {
     router.group({ prefix: "/admin", sites: ["admin"] }, () => {
-      router.get("/stats", handler(), { name: "admin.stats" });
-      router.get("/shared", handler(), { name: "admin.shared", sites: ["admin", "shop"] });
+      router.get("/stats", handler(), { name: "stats" });
+      router.get("/shared", handler(), { name: "shared", sites: ["admin", "shop"] });
       router.group({ prefix: "/inner", sites: ["ops"] }, () => {
-        router.get("/x", handler(), { name: "admin.x" });
+        router.get("/x", handler(), { name: "x" });
       });
-      router.get("/after", handler(), { name: "admin.after" });
+      router.get("/after", handler(), { name: "after" });
     });
     router.get("/open", handler(), { name: "open" });
 
     expect(router.getNamedApiRoutes().map((route) => [route.name, route.sites])).toEqual([
       ["admin.stats", ["admin"]],
       ["admin.shared", ["admin", "shop"]],
-      ["admin.x", ["ops"]],
+      ["admin.inner.x", ["ops"]],
       ["admin.after", ["admin"]],
       ["open", undefined],
     ]);

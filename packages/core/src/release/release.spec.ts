@@ -672,13 +672,16 @@ describe("runReleaseAction", () => {
     await commitVersion("1.0.0");
     const context = makeContext();
     let runs = 0;
+    const executed: string[] = [];
     const provider: MigrationProofProvider = {
-      listExecuted: async () => [],
+      listExecuted: async () => [...executed],
       listPending: async () => ["001-users"],
       listTables: async () => [],
       listIndexes: async () => [],
       runPending: async () => {
         runs += 1;
+        executed.push("001-users");
+
         return ["001-users"];
       },
     };

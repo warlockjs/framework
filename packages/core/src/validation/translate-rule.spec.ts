@@ -1,6 +1,7 @@
 import { extend, trans } from "@mongez/localization";
 import { log } from "@warlock.js/logger";
 import { v, validate } from "@warlock.js/seal";
+import type { RuleTranslation } from "@warlock.js/seal";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { setEnvironment } from "../utils/environment";
 import { resetUnfilledPlaceholderWarningsForTests, translateSealRule } from "./translate-rule";
@@ -19,9 +20,10 @@ const formLibraryDefaults = {
   minLength: "This input can not be less than :length characters",
   maxLength: "This input can not be greater than :length characters",
   pattern: "This input is not matching with the :pattern",
+  email: "This input is not an email of :domain",
 };
 
-const translateRule = (ruleTranslation: Parameters<typeof translateSealRule>[0]) =>
+const translateRule = (ruleTranslation: RuleTranslation) =>
   translateSealRule({
     ...ruleTranslation,
     key: `validation.${ruleTranslation.rule.name}`,
@@ -59,9 +61,9 @@ describe("default seal rule translation with the form library defaults registere
   });
 
   it("falls back to seal's message when a placeholder has no matching parameter", async () => {
-    const message = await messageOf(v.string().pattern(/^a+$/), "bbb");
+    const message = await messageOf(v.string().email(), "bbb");
 
-    expect(message).toBe("The name does not match the required pattern");
+    expect(message).toBe("The name must be a valid email address");
     expect(message).not.toMatch(/:[a-zA-Z]/);
   });
 
@@ -81,11 +83,11 @@ describe("default seal rule translation with the form library defaults registere
     setEnvironment("development");
     const warn = vi.spyOn(log, "warn").mockImplementation(() => undefined as never);
 
-    await messageOf(v.string().pattern(/^a+$/), "bbb");
-    await messageOf(v.string().pattern(/^a+$/), "ccc");
+    await messageOf(v.string().email(), "bbb");
+    await messageOf(v.string().email(), "ccc");
 
     expect(warn).toHaveBeenCalledTimes(1);
-    expect(String(warn.mock.calls[0]?.[2])).toContain("validation.pattern");
+    expect(String(warn.mock.calls[0]?.[2])).toContain("validation.email");
   });
 
   it("does not warn outside development", async () => {

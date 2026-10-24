@@ -40,7 +40,7 @@ function readConfig(config: NamedApiRoutesOption | undefined): {
   include: NamedApiRoutesInclude | undefined;
   privatePrefixes: readonly string[];
 } {
-  if (config === undefined || config === false) return { include: undefined, privatePrefixes: [] };
+  if (config == null || config === false) return { include: undefined, privatePrefixes: [] };
 
   if (Array.isArray(config) || typeof config === "function") {
     return { include: config as NamedApiRoutesInclude, privatePrefixes: [] };
