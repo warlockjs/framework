@@ -30,6 +30,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Fixed
 
 - `warlock upgrade` no longer moves a `@warlock.js/*` dependency down: one already newer than `--to` stays as it is and is listed in the review list. Its install hint names the package manager the project installs with, not the first lockfile found.
+- `@warlock.js/core` exports the shared `log` instance from `@warlock.js/logger`, so framework packages that depend on core write to the channels the app configured with `setLogConfigurations`.
 
 ## 5.37.0 - 2026-10-24
 

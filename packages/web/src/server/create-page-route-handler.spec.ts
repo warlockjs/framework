@@ -1,6 +1,6 @@
 import { stringify } from "devalue";
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { Response } from "@warlock.js/core";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { log, Response } from "@warlock.js/core";
 
 const { renderPageRequest, renderPageFailure } = vi.hoisted(() => ({
   renderPageRequest: vi.fn(),
@@ -959,5 +959,105 @@ describe("createPageRouteHandler — the original failure is reported first, the
     expect(secondError).toBe(secondary);
 
     errorSpy.mockRestore();
+  });
+});
+
+describe("createPageRouteHandler — located error records", () => {
+  const pageModules = {
+    "app.tsx": {},
+    "composed-layout.tsx": {},
+    "account.page.tsx": { default: MockPage },
+  };
+
+  const spies: Array<{ mockRestore(): void }> = [];
+
+  afterEach(() => {
+    for (const spy of spies.splice(0)) spy.mockRestore();
+  });
+
+  function spyOnLog() {
+    spies.push(vi.spyOn(console, "error").mockImplementation(() => undefined));
+
+    const logError = vi.spyOn(log, "error").mockImplementation(() => log);
+
+    spies.push(logError);
+
+    return logError;
+  }
+
+  it("logs a module that fails to load as the module-load phase with the page file and route", async () => {
+    const logError = spyOnLog();
+    const handler = createPageRouteHandler(
+      handlerOptions(
+        {},
+        {
+          loadModule: async (moduleId) => {
+            if (moduleId === "account.page.tsx") throw new Error("cannot load the page module");
+
+            return {};
+          },
+        },
+      ),
+    );
+
+    renderPageFailure.mockResolvedValue({ html: "", status: 500, headers: {}, bundle: undefined });
+
+    await handler(context() as never).catch(() => undefined);
+
+    expect(logError).toHaveBeenCalledTimes(1);
+    expect(logError.mock.calls[0]?.[0]).toMatchObject({
+      module: "web",
+      action: "page.module-load",
+      context: {
+        phase: "module-load",
+        message: "cannot load the page module",
+        file: "account.page.tsx",
+        routePath: "/account",
+      },
+    });
+  });
+
+  it("logs a translations failure that happens before the pipeline runs", async () => {
+    const logError = spyOnLog();
+    const handler = createPageRouteHandler(
+      handlerOptions(pageModules, {
+        getRouteTranslations: () => {
+          throw new Error("Route translations have no manifest entry for source");
+        },
+      }),
+    );
+
+    await expect(handler(context() as never)).rejects.toThrow("no manifest entry");
+
+    expect(logError).toHaveBeenCalledTimes(1);
+    expect(logError.mock.calls[0]?.[0]).toMatchObject({
+      action: "page.translations",
+      context: { phase: "translations", file: "account.page.tsx" },
+    });
+  });
+
+  it("logs a 5xx that settled without any stage reporting an error", async () => {
+    const logError = spyOnLog();
+    const handler = createPageRouteHandler(handlerOptions(pageModules));
+
+    renderPageRequest.mockResolvedValue({ ...renderedOk(), status: 503 });
+
+    await handler(context() as never);
+
+    expect(logError).toHaveBeenCalledTimes(1);
+    expect(logError.mock.calls[0]?.[0]).toMatchObject({
+      context: { phase: "unknown", file: "account.page.tsx", routePath: "/account" },
+    });
+  });
+
+  it("does not log a 4xx answer", async () => {
+    const logError = spyOnLog();
+    const handler = createPageRouteHandler(handlerOptions(pageModules));
+
+    renderPageRequest.mockResolvedValue({ ...renderedOk(), status: 404 });
+
+    await handler(context() as never);
+
+    expect(logError).not.toHaveBeenCalled();
   });
 });

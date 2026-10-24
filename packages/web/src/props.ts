@@ -85,4 +85,10 @@ export type AppProps<TLoader extends LoaderFunction | undefined = undefined> = {
 export type ServerErrorPageProps = {
   error: unknown;
   status: number;
+  /**
+   * Where the failure happened (stage, page file, route, site, mapped stack).
+   * Present outside production only; the framework draws it under the error
+   * page already, so an `error.page.tsx` rarely needs to read it.
+   */
+  debug?: import("./components/document-context").PageErrorDetails;
 };

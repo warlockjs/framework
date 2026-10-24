@@ -49,6 +49,13 @@ import { looksAuthenticated } from "./page-cache-eligibility";
 import { hasCookieRequiringPageCacheBypass } from "./page-cache-cookie-bypass";
 import { type PageCacheVariant } from "./page-cache-key";
 import { pageVaryHeader } from "./page-vary-header";
+import {
+  currentPageErrorScope,
+  inErrorPhase,
+  runInPageErrorScope,
+  tagErrorPhase,
+  taggedErrorPhase,
+} from "./page-error-scope";
 import { reportServerError } from "./report-server-error";
 import { pathnameFromRequest } from "./error-reporting-config";
 import { ensureSetCookieCacheFloorHook, markPageResponse } from "./set-cookie-cache-floor-hook";
@@ -447,12 +454,29 @@ export function createPageRouteHandler(options: PageRouteHandlerOptions): PageRo
     ensureSetCookieCacheFloorHook(httpServer);
   }
 
-  return async (context: HttpContext) => {
+  const handlePageRequest = async (context: HttpContext) => {
     const { request, response } = context;
 
     // Bind the normal page source before any middleware or loader can render.
     // The resolver is request-local and never mutates @mongez/localization's registry.
-    const routeTranslations = bindRequestRouteTranslations(request, getRouteTranslations, pageFile);
+    let routeTranslations: ReturnType<typeof bindRequestRouteTranslations>;
+
+    try {
+      routeTranslations = bindRequestRouteTranslations(request, getRouteTranslations, pageFile);
+    } catch (thrown) {
+      tagErrorPhase(thrown, "translations");
+      reportServerError(`page request ${request.method} ${request.path} failed`, thrown, {
+        kind: "request-handler",
+        phase: "translations",
+        routeName: name,
+        routePath: path,
+        pathname: pathnameFromRequest(request),
+        method: request.method,
+        requestId: request.id,
+      });
+
+      throw thrown;
+    }
 
     const wantsData = isDataRequest(request.header(WARLOCK_DATA_REQUEST_HEADER, undefined));
 
@@ -529,7 +553,10 @@ export function createPageRouteHandler(options: PageRouteHandlerOptions): PageRo
     const cacheLookupTranslationsRevision = routeTranslations?.revision;
 
     try {
-      const [rawAppModule, layoutModule, rawPageModule, registrationLayouts] = await Promise.all([
+      const [rawAppModule, layoutModule, rawPageModule, registrationLayouts] = await inErrorPhase(
+        "module-load",
+        () =>
+          Promise.all([
         loadModule(appFile),
         layoutFile
           ? (loadComposedLayout?.() ??
@@ -539,7 +566,8 @@ export function createPageRouteHandler(options: PageRouteHandlerOptions): PageRo
           : Promise.resolve({}),
         loadModule(pageFile),
         loadRegistrationLayouts?.() ?? Promise.resolve([]),
-      ]);
+          ]),
+      );
 
       // Refuse invalid live app/page namespaces before their registration hooks
       // can run. Registration itself still receives the original namespaces so
@@ -714,6 +742,33 @@ export function createPageRouteHandler(options: PageRouteHandlerOptions): PageRo
         settledStatus === 200 && rendered.bundle?.actionData?.ok === false
           ? rendered.bundle.actionData.status
           : settledStatus;
+
+      // Safety net: a 5xx the pipeline settled on without any stage reporting
+      // an error (a middleware or loader that only set the status, for one)
+      // still leaves a located line, so a 500 is never an unexplained one.
+      if (
+        status >= 500 &&
+        currentPageErrorScope()?.reported === false &&
+        rendered.bundle?.actionData?.ok !== false
+      ) {
+        reportServerError(
+          `page request ${request.method} ${request.path} answered ${status}`,
+          new Error(
+            `The page answered ${status} but no stage reported an error. A middleware, loader or ` +
+              "response.setStatusCode() call set that status without throwing.",
+          ),
+          {
+            kind: "request-handler",
+            phase: "unknown",
+            routeName: name,
+            routePath: path,
+            pathname: pathnameFromRequest(request),
+            method: request.method,
+            statusCode: status,
+            requestId: request.id,
+          },
+        );
+      }
 
       // Stage 10a: the stage 7 commit (headers, then cookies), applied ONCE,
       // identically for the document and the data representation — see
@@ -978,7 +1033,7 @@ export function createPageRouteHandler(options: PageRouteHandlerOptions): PageRo
       // `error.page.tsx`, and the server log stays empty.
       reportServerError(`page request ${request.method} ${request.path} failed`, thrown, {
         kind: "request-handler",
-        phase: "request-handler",
+        phase: taggedErrorPhase(thrown) ?? "request-handler",
         routeName: name,
         routePath: path,
         pathname: pathnameFromRequest(request),
@@ -1040,4 +1095,17 @@ export function createPageRouteHandler(options: PageRouteHandlerOptions): PageRo
       }
     }
   };
+
+  // One error scope per request: the page file, route and site every failure
+  // report of this request is located with (`page-error-scope.ts`).
+  return (context: HttpContext) =>
+    runInPageErrorScope(
+      {
+        file: pageFile,
+        routePath: path,
+        routeName: name,
+        site: context.request.site?.key,
+      },
+      () => handlePageRequest(context),
+    );
 }

@@ -8,6 +8,13 @@ All notable changes to `@warlock.js/web` are documented here.
 
 - The development server no longer prints `server.hmr.protocol/host/port/path/clientPort/timeout/server is deprecated` on every boot. The HMR websocket is attached to the app's HTTP server through Vite 8's `server.ws.server` instead of the deprecated `server.hmr.server`; hot reload behaves as before.
 - The client-bundle security check (Gate A) no longer warns `could not judge this import` for the app's own `index.html` entry, in either the client or the SSR build. HTML entries and Vite's virtual HTML proxy modules are treated as entries, not imports; a genuinely unresolvable import still warns.
+- A page that answered 500 left only the `Completed Request: … 500` line in the log. Every `5xx` page response now writes one error-level logger record (`module: "web"`, `action: "page.<phase>"`) with the error message, the stack, the matched page file, the route pattern, the site key, the request id and the phase: `translations`, `module-load`, `middleware`, `session`, `loader`, `metadata`, `render`, `stream`, `defer`, `error-page`, `request-handler`, or `unknown` for a `5xx` nobody reported (for example `response.setStatusCode(500)` without a throw). With no log channel configured the failure still goes to `console.error`. Errors that React swallows into an `ErrorBoundary` or `error.page.tsx`, errors from `onShellError` and `onError` of the stream, and failures while binding route translations or loading the page module are logged too. The same error is logged once however many stages observe it, and a `4xx` outcome (not found, redirect, validation, a thrown `HttpError` below 500) is not logged as an error.
+- The development stack is mapped back to source files through the dev server (`ssrFixStacktrace`); in production, run Node with `--enable-source-maps`.
+
+### Added
+
+- Outside production, the error page, an authored `ErrorBoundary` and the framework fallback are followed by a development panel (`data-warlock-dev-error`) showing the message, phase, page file, route, site and stack. `error.page.tsx` receives the same facts as `props.debug` (`PageErrorDetails`, new type export). Production responses stay generic and never carry them.
+- `ServerErrorContext` (the context of `web.errors.report`) gains `file`, `site` and `level`; `phase` takes the values above.
 
 ## 5.37.0 - 2026-10-24
 

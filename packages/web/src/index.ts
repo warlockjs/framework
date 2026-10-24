@@ -98,6 +98,7 @@ export type { DeferredResult } from "./loaders/defer";
 export type { PageProps, LayoutProps, AppProps } from "./props";
 export type {
   ErrorPageProps,
+  PageErrorDetails,
   SerializedErrorPageProps,
   SerializedPageError,
 } from "./components/document-context";

@@ -102,7 +102,7 @@ import {
 // Type-only: the reporter walks pages with `../build/discover-pages`, which
 // reaches `@babel/parser`; development imports it where it boots.
 import type { UnregisteredPageReporter } from "./unregistered-pages";
-import { flushPendingServerErrorReports } from "./report-server-error";
+import { flushPendingServerErrorReports, setServerStackFixer } from "./report-server-error";
 import { WEB_CONNECTOR_PRIORITY } from "./web-connector-factory";
 
 /**
@@ -531,6 +531,10 @@ export class WebConnector extends BaseConnector {
 
     this.vite = await this.createViteServer(fastify, paths);
 
+    // Page code runs in Vite's SSR graph, so a thrown error's stack names
+    // transformed modules until Vite maps it back to the source files.
+    setServerStackFixer((error) => this.vite?.ssrFixStacktrace(error));
+
     // The pipeline barrel is loaded THROUGH VITE, not imported directly, and
     // that is load-bearing: page modules are evaluated inside Vite's SSR module
     // graph, so `connectSharedStore`/`connectPageContext` must be called on
@@ -787,6 +791,7 @@ export class WebConnector extends BaseConnector {
 
     await this.vite?.close();
     this.vite = undefined;
+    setServerStackFixer(undefined);
     this.installedPages = [];
     this.installDevPageRoutes = undefined;
     this.pendingPageChanges = undefined;

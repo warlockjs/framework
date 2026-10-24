@@ -30,8 +30,18 @@ export type ServerErrorKind = "render" | "loader" | "defer" | "error-page" | "re
  */
 export type ServerErrorContext = {
   kind: ServerErrorKind;
-  /** The pipeline stage this failure happened in, e.g. `"render"`, `"page"`, `"rejected"`, `"timeout"`. */
+  /**
+   * The pipeline stage this failure happened in: `"middleware"`, `"session"`, `"loader"`,
+   * `"metadata"`, `"translations"`, `"module-load"`, `"render"`, `"stream"`, `"defer"`,
+   * `"error-page"`, `"request-handler"` or `"unknown"` (a 5xx nobody reported).
+   */
   phase: string;
+  /** The page level (`"app"`, `"layout"` or `"page"`) that threw, for `middleware`, `session` and `loader`. */
+  level?: string;
+  /** The matched page file, when the request has one in scope. */
+  file?: string;
+  /** The `web.sites` key serving the request, in a multi-site app. */
+  site?: string;
   /** The matched route's name, when one matched. */
   routeName?: string;
   /** The matched route's own TEMPLATE path (e.g. `/posts/:slug`), never the resolved URL. */
