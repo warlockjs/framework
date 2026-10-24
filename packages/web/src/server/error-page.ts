@@ -1,6 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { environment } from "@warlock.js/core";
-import type { SerializedErrorPageProps, SerializedPageError } from "../components/document-context";
+import type {
+  PageErrorDetails,
+  SerializedErrorPageProps,
+  SerializedPageError,
+} from "../components/document-context";
 import { ERROR_PAGE_METADATA } from "./resolve-page-metadata";
 import type { MetadataOutput } from "../metadata";
 import type { ServerErrorPageProps } from "../props";
@@ -150,6 +154,13 @@ export function hydrationErrorPageProps(
   props: ServerErrorPageProps,
   serializableError: unknown = props.error,
   requestId?: string,
+  debug?: PageErrorDetails,
 ): SerializedErrorPageProps {
-  return { error: serializePageError(serializableError, requestId), status: props.status };
+  const error = serializePageError(serializableError, requestId);
+
+  // Where the failure happened is development knowledge: production never
+  // carries it, whatever the caller passes.
+  return environment() === "production" || debug === undefined
+    ? { error, status: props.status }
+    : { error, status: props.status, debug };
 }

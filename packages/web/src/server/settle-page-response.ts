@@ -2,7 +2,8 @@ import { randomUUID } from "node:crypto";
 import { environment, type Response } from "@warlock.js/core";
 import { assertSafeRedirectUrl } from "../routing/safe-redirect-url";
 import { isVisitorSafePageError } from "./is-visitor-safe-page-error";
-import { reportServerError } from "./report-server-error";
+import { taggedErrorPhase } from "./page-error-scope";
+import { describeServerError, reportServerError } from "./report-server-error";
 import type { ServerErrorContext } from "./error-reporting-config";
 import type {
   PageBoundaryDesignation,
@@ -13,6 +14,11 @@ import type {
 
 /** Reporting context `buildErrorRecord`'s caller hands over purely for `web.errors.report()` (card 1db238ca). */
 export type BuildErrorRecordReportContext = {
+  /**
+   * The pipeline stage that threw (`"middleware"`, `"session"`, `"loader"`,
+   * `"metadata"`, `"render"`, `"defer"`). Defaults to the throwing page level.
+   */
+  phase?: string;
   routeName?: string;
   routePath?: string;
   method?: string;
@@ -50,7 +56,8 @@ export function buildErrorRecord(
   const digest = randomUUID();
   const errorContext: ServerErrorContext = {
     kind: "loader",
-    phase: boundary.throwingLevel,
+    phase: reportContext?.phase ?? taggedErrorPhase(thrown) ?? boundary.throwingLevel,
+    level: boundary.throwingLevel,
     routeName: reportContext?.routeName,
     routePath: reportContext?.routePath,
     pathname: requestPath ?? "unknown",
@@ -74,6 +81,11 @@ export function buildErrorRecord(
       thrown,
     );
   }
+
+  // Outside production the record carries where the failure happened, for the
+  // development error panel. Production records never do.
+  const debug =
+    environment() === "production" ? undefined : describeServerError(thrown, errorContext);
 
   // A visitor-safe error (PublicPageError, PageValidationFailedError) keeps
   // its own content even in production — the
@@ -101,7 +113,19 @@ export function buildErrorRecord(
   // keeps the record's `toEqual` shape honest (undefined properties compare as
   // absent) and readers still get the real error via
   // `record.originalError ?? record.error`.
-  return { originalError: undefined, error: thrown, boundary, digest, scrubbed: false, statusCode };
+  const record: PageErrorRecord = {
+    originalError: undefined,
+    error: thrown,
+    boundary,
+    digest,
+    scrubbed: false,
+    statusCode,
+  };
+
+  // Non-enumerable: a diagnostic riding along, not part of the record's shape.
+  if (debug !== undefined) Object.defineProperty(record, "debug", { value: debug });
+
+  return record;
 }
 
 // ---------------------------------------------------------------------------

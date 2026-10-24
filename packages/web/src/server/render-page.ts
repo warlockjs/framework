@@ -1,5 +1,5 @@
 import { documentFonts } from "./document-fonts";
-import { createElement, StrictMode, type ComponentType, type ReactNode } from "react";
+import { createElement, Fragment, StrictMode, type ComponentType, type ReactNode } from "react";
 import type { PipeableStream, RenderToPipeableStreamOptions } from "react-dom/server";
 import {
   buildTracingContext,
@@ -12,11 +12,13 @@ import {
   type Request,
 } from "@warlock.js/core";
 import DefaultApp from "../components/default-app";
+import { devErrorPanelElement } from "../components/dev-error-panel";
 import {
   DocumentContext,
   escapePayload,
   PAYLOAD_SCRIPT_ID,
   type DocumentContextValue,
+  type PageErrorDetails,
   type SerializedErrorPageProps,
 } from "../components/document-context";
 import type { SharedContext } from "../index";
@@ -56,7 +58,8 @@ import {
 import { PageMiddlewareShortCircuitError } from "./page-middleware-short-circuit-error";
 import { ClientDisconnectedError } from "./client-disconnected-error";
 import { wrapPipeableStreamForDeferredEmission } from "./defer-emission";
-import { reportServerError } from "./report-server-error";
+import { taggedErrorPhase, tagErrorPhase } from "./page-error-scope";
+import { describeServerError, reportServerError } from "./report-server-error";
 import { pathnameFromRequest } from "./error-reporting-config";
 import { requestStylesheetSources } from "../request-stylesheets";
 import {
@@ -371,8 +374,34 @@ function requireRegistry(options: RenderPageRequestOptions): RouteRegistry {
  * boundary. Deliberately generic: the error itself is server knowledge and
  * never serialized into the document.
  */
-function FrameworkRootBoundary(): ReactNode {
-  return createElement("main", { role: "alert" }, "Something went wrong.");
+function FrameworkRootBoundary({ details }: { details?: PageErrorDetails }): ReactNode {
+  return createElement(
+    "main",
+    { role: "alert" },
+    "Something went wrong.",
+    // Outside production only: the caller passes `details` solely there.
+    devErrorPanelElement(details),
+  );
+}
+
+/** What the development error panel may show; always `undefined` in production. */
+function developmentDetails(details: PageErrorDetails | undefined): PageErrorDetails | undefined {
+  return environment() === "production" ? undefined : details;
+}
+
+/** Details for a failure that never went through an error record. */
+function describeUnrecordedFailure(
+  thrown: unknown,
+  route: PageDataBundle["route"],
+  request: Request,
+): PageErrorDetails | undefined {
+  if (environment() === "production") return undefined;
+
+  return describeServerError(thrown, {
+    phase: taggedErrorPhase(thrown) ?? "request-handler",
+    routePath: route?.path,
+    requestId: request.id,
+  });
 }
 
 function errorPageElement(module: ErrorPageModule, props: ServerErrorPageProps): ReactNode {
@@ -397,7 +426,9 @@ export function resolveServerErrorPageProps(
   props: ServerErrorPageProps,
   errorPage: SerializedErrorPageProps,
 ): ServerErrorPageProps {
-  if (environment() !== "production") return props;
+  if (environment() !== "production") {
+    return errorPage.debug === undefined ? props : { ...props, debug: errorPage.debug };
+  }
   return { ...props, error: errorPage.error };
 }
 
@@ -457,9 +488,15 @@ function buildBoundaryElement(
     | ((props: PageErrorBoundaryProps) => ReactNode)
     | undefined;
 
+  const details = developmentDetails(record.debug);
   const element = Boundary
-    ? createElement(Boundary, { error, status: record.statusCode ?? 500 })
-    : createElement(FrameworkRootBoundary, {});
+    ? createElement(
+        Fragment,
+        null,
+        createElement(Boundary, { error, status: record.statusCode ?? 500 }),
+        devErrorPanelElement(details),
+      )
+    : createElement(FrameworkRootBoundary, { details });
 
   const wrapped = wrapRootward(triple, bundle, boundary.boundaryLevel, element);
 
@@ -625,11 +662,12 @@ function reportRenderError(
   route: PageDataBundle["route"],
   thrown: unknown,
   request: Request,
+  phase: "render" | "stream" = "render",
 ): void {
   const where = route?.path ?? route?.name ?? "an unknown route";
-  reportServerError(`SSR render error while rendering ${where}`, thrown, {
+  reportServerError(`SSR ${phase} error while rendering ${where}`, thrown, {
     kind: "render",
-    phase: "render",
+    phase,
     routeName: route?.name,
     routePath: route?.path,
     pathname: pathnameFromRequest(request),
@@ -741,7 +779,12 @@ async function renderElementToPipeableStream(
     let stream: PipeableStream;
     const options: RenderToPipeableStreamOptions = {
       nonce,
-      onShellError: (error) => reject(error),
+      onShellError: (error) => {
+        // Nothing is written yet, so the caller's catch answers; tag it so that
+        // catch reports it as a stream failure rather than a bare handler error.
+        tagErrorPhase(error, "stream");
+        reject(error);
+      },
       onError: (error) => {
         // A client disconnect aborts this SAME stream with
         // `ClientDisconnectedError` as its reason (below, and
@@ -763,7 +806,7 @@ async function renderElementToPipeableStream(
         // `reportServerError` — never through here) — report it through the
         // same floor a render-time throw already uses, rather than let it
         // vanish.
-        reportRenderError(route, error, request);
+        reportRenderError(route, error, request, "stream");
       },
     };
 
@@ -1024,11 +1067,15 @@ async function finishRender(
         bundle.route.path,
         failure.error.statusCode,
         {
+          phase: "defer",
           routeName: bundle.route.name,
           routePath: bundle.route.path,
           method: request.method,
           requestId: request.id,
         },
+        // The rejection itself was already logged by its defer settlement; this
+        // record only carries it to the boundary.
+        false,
       );
       bundle.deferredKeys = undefined;
 
@@ -1220,7 +1267,10 @@ async function finishRender(
     };
     return renderWithContext(
       createElement(DefaultApp, {
-        children: strictPageTree(triple.app, createElement(FrameworkRootBoundary, {})),
+        children: strictPageTree(
+          triple.app,
+          createElement(FrameworkRootBoundary, { details: developmentDetails(currentError?.debug) }),
+        ),
       }),
     );
   };
@@ -1262,6 +1312,7 @@ async function finishRender(
       props,
       serializableError,
       currentError?.digest ?? request.id,
+      currentError?.debug,
     );
     bundle.errorPage = errorPage;
     const ssrProps = resolveServerErrorPageProps(props, errorPage);
@@ -1272,7 +1323,17 @@ async function finishRender(
       payload: buildHydrationPayload(bundle, documentSlots.locale, sessionExtras(bundle)),
     };
     return renderWithContext(
-      wrapRootward(triple, bundle, "page", errorPageElement(module, ssrProps)),
+      wrapRootward(
+        triple,
+        bundle,
+        "page",
+        createElement(
+          Fragment,
+          null,
+          errorPageElement(module, ssrProps),
+          devErrorPanelElement(errorPage.debug),
+        ),
+      ),
     );
   };
 
@@ -1345,6 +1406,7 @@ async function finishRender(
         bundle.route.path,
         undefined,
         {
+          phase: "render",
           routeName: bundle.route.name,
           routePath: bundle.route.path,
           method: request.method,
@@ -1553,7 +1615,8 @@ export async function renderPageFailure(options: RenderPageFailureOptions): Prom
       options.errorPageFile ?? options.appFile ?? "",
     );
     registerModules([module as RegisterableModuleNamespace]);
-    const errorPage = hydrationErrorPageProps(props, undefined, request.id);
+    const failureDetails = describeUnrecordedFailure(thrown, bundle.route, request);
+    const errorPage = hydrationErrorPageProps(props, undefined, request.id, failureDetails);
     bundle.errorPage = errorPage;
     // Same chokepoint as `renderErrorPage` above: production SSR must render
     // the sanitized error, matching the hydration payload set below.
@@ -1564,7 +1627,14 @@ export async function renderPageFailure(options: RenderPageFailureOptions): Prom
       payload: markNonHydrating({ ...buildHydrationPayload(bundle, slots.locale), errorPage }),
     };
     body = renderWithContext(
-      createElement(DefaultApp, { children: errorPageElement(module, ssrProps) }),
+      createElement(DefaultApp, {
+        children: createElement(
+          Fragment,
+          null,
+          errorPageElement(module, ssrProps),
+          devErrorPanelElement(errorPage.debug),
+        ),
+      }),
     );
   } catch (errorPageThrown) {
     if (loadErrorPage) reportErrorPageFailure(bundle.route, errorPageThrown, request, thrown);
@@ -1582,7 +1652,9 @@ export async function renderPageFailure(options: RenderPageFailureOptions): Prom
     };
     body = renderWithContext(
       createElement(DefaultApp, {
-        children: createElement(FrameworkRootBoundary, {}),
+        children: createElement(FrameworkRootBoundary, {
+          details: describeUnrecordedFailure(thrown, bundle.route, request),
+        }),
       }),
     );
   }

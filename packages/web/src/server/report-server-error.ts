@@ -15,10 +15,8 @@
  *
  * DEDUPE: the same Error OBJECT reported twice in one request (a render
  * failure whose defer path also observes it, for example) reaches the app
- * hook exactly once — enforced with a marker symbol stamped onto the object
- * itself the first time it is handed to the hook. The stderr floor is
- * UNAFFECTED by this — every call site's own message still logs every time,
- * exactly as it did before this card; only the app hook dispatch is deduped.
+ * hook exactly once, and is logged exactly once: the first observer writes the
+ * log line (with its phase), later observers of the same object write nothing.
  *
  * QUEUE: `./bounded-task-queue.ts`'s `BoundedTaskQueue` bounds this on TWO
  * axes, not one — at most {@link REPORT_CONCURRENCY} calls to the app hook
@@ -44,9 +42,11 @@
  * `shutdown()`) gives in-flight reports a bounded chance to finish instead of
  * the process exiting mid-flight and dropping them silently.
  */
-import { config } from "@warlock.js/core";
+import { config, log } from "@warlock.js/core";
+import type { PageErrorDetails } from "../components/document-context";
 import { BoundedTaskQueue } from "./bounded-task-queue";
 import type { ServerErrorContext } from "./error-reporting-config";
+import { currentPageErrorScope } from "./page-error-scope";
 
 /** Concurrency limit — at most this many app-hook calls are ever ACTIVE at once. */
 const REPORT_CONCURRENCY = 10;
@@ -125,15 +125,86 @@ function enqueueAppHookReport(thrown: unknown, context: ServerErrorContext): voi
   );
 }
 
+/** Registry symbol for the stack mapper; see {@link setServerStackFixer}. */
+const STACK_FIXER = Symbol.for("warlock.web.serverStackFixer");
+
+type StackFixer = (error: Error) => void;
+
 /**
- * Unconditional stderr floor for a server-side failure that must never be
- * silenced by a configurable sink alone — `render-page.ts`'s
- * `reportRenderError` established this convention for a render-time throw.
- * Every other server error path in `web` (loader/middleware throws, deferred
- * rejections/timeouts, the top-level request-handler catch) now calls this
- * SAME function, so there is exactly one console-floor implementation and
- * exactly one dispatch point to the app-owned `web.errors.report()` hook —
- * see the file header.
+ * Register the function that maps a thrown error's stack back to source files
+ * (the dev server's `ssrFixStacktrace`). Held on a registry symbol because the
+ * dev connector and the page pipeline run in two module copies. Production
+ * stacks are mapped by Node itself when it runs with `--enable-source-maps`.
+ */
+export function setServerStackFixer(fixer: StackFixer | undefined): void {
+  (globalThis as Record<symbol, unknown>)[STACK_FIXER] = fixer;
+}
+
+function mappedStack(thrown: Error): string | undefined {
+  const fixer = (globalThis as Record<symbol, unknown>)[STACK_FIXER] as StackFixer | undefined;
+
+  try {
+    fixer?.(thrown);
+  } catch {
+    // Mapping is best effort; the raw stack is still better than none.
+  }
+
+  return typeof thrown.stack === "string" ? thrown.stack : undefined;
+}
+
+/**
+ * The facts about one failure: the error plus the stage, page file, route and
+ * site it belongs to. The file, route and site fall back to the request's
+ * {@link currentPageErrorScope} when the call site did not name them. Used for
+ * the log record and, outside production, for the error page's `debug` prop.
+ */
+export function describeServerError(
+  thrown: unknown,
+  context: Pick<ServerErrorContext, "phase" | "level" | "file" | "routePath" | "site" | "requestId">,
+): PageErrorDetails {
+  const scope = currentPageErrorScope();
+  const error = thrown instanceof Error ? thrown : undefined;
+  let message: string;
+
+  try {
+    message = error?.message ?? (typeof thrown === "string" ? thrown : String(thrown));
+  } catch {
+    message = "An unexpected error occurred.";
+  }
+
+  const stack = error === undefined ? undefined : mappedStack(error);
+  const file = context.file ?? scope?.file;
+  const routePath = context.routePath ?? scope?.routePath;
+  const site = context.site ?? scope?.site;
+
+  return {
+    name: error?.name || "Error",
+    message,
+    ...(stack === undefined ? {} : { stack }),
+    phase: context.phase,
+    ...(context.level === undefined ? {} : { level: context.level }),
+    ...(file === undefined ? {} : { file }),
+    ...(routePath === undefined ? {} : { routePath }),
+    ...(site === undefined ? {} : { site }),
+    ...(context.requestId === undefined ? {} : { requestId: context.requestId }),
+  };
+}
+
+/** Errors already logged, so a failure several stages observe is logged once. */
+const loggedErrors = new WeakSet<object>();
+
+/**
+ * Unconditional log for a server-side failure that must never be silenced by
+ * a configurable sink alone. Every server error path in `web` (loader and
+ * middleware throws, render and stream failures, deferred rejections, the
+ * top-level request-handler catch) calls this SAME function, so there is
+ * exactly one log writer and exactly one dispatch point to the app-owned
+ * `web.errors.report()` hook — see the file header.
+ *
+ * The line goes to the framework logger at `error` level, with the record
+ * from {@link describeServerError} (message, stack, page file, route, site,
+ * phase, request id) as its context. With no log channel configured, the same
+ * failure goes to `console.error`, so it always reaches the terminal.
  *
  * `context` is required, not optional: every call site knows at minimum
  * which failure class it is (`kind`) and which pipeline stage it is in
@@ -144,8 +215,45 @@ export function reportServerError(
   thrown: unknown,
   context: ServerErrorContext,
 ): void {
-  console.error(`[warlock:web] ${message}:`, thrown);
-  enqueueAppHookReport(thrown, context);
+  const scope = currentPageErrorScope();
+
+  if (scope !== undefined) scope.reported = true;
+
+  // One failure, one line: the same error object seen by several stages
+  // (a render throw the escalation loop then wraps in an error record) is
+  // logged and reported to the app hook by its first observer only.
+  if (typeof thrown === "object" && thrown !== null) {
+    if (loggedErrors.has(thrown)) return;
+
+    loggedErrors.add(thrown);
+  }
+
+  const details = describeServerError(thrown, context);
+
+  log.error({
+    module: "web",
+    action: `page.${context.phase}`,
+    message: `${message}: ${details.message}`,
+    context: {
+      ...details,
+      kind: context.kind,
+      method: context.method,
+      pathname: context.pathname,
+      ...(context.routeName === undefined ? {} : { routeName: context.routeName }),
+      ...(context.statusCode === undefined ? {} : { statusCode: context.statusCode }),
+    },
+  });
+
+  // With no log channel configured the record above goes nowhere; the
+  // terminal still gets the failure.
+  if (log.channels.length === 0) console.error(`[warlock:web] ${message}:`, thrown);
+
+  enqueueAppHookReport(thrown, {
+    ...context,
+    ...(details.file === undefined ? {} : { file: details.file }),
+    ...(details.site === undefined ? {} : { site: details.site }),
+    ...(details.routePath === undefined ? {} : { routePath: details.routePath }),
+  });
 }
 
 /**

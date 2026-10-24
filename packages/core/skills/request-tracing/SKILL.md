@@ -5,6 +5,13 @@ description: 'Vendor-neutral request tracing hooks (`http.tracing`) — observe 
 
 # Warlock — request tracing hooks
 
+> A request that ends `5xx` is explained by the error log, not by tracing. The
+> `Completed Request: … 500` line carries only status and duration; for a web
+> page the cause (message, stack, page file, site, phase) is a separate
+> `error`-level record from `module: "web"`. See the `observe-page-requests`
+> topic of the `warlock-js-web` skill. The shared `log` instance is exported
+> from `@warlock.js/core` for packages that write to the app's channels.
+
 `http.tracing` gives every request a set of named phase spans and start/end
 events, delivered to plain callbacks you register in config — no
 `@opentelemetry/api` dependency in `core`, in this release or later (an OTel

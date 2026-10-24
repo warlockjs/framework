@@ -227,7 +227,7 @@ async function runMiddlewareChain(
           designateBoundary(level, triple),
           pathname,
           resolvedStatus,
-          { routeName, routePath, method: request.method, requestId: request.id },
+          { phase: "middleware", routeName, routePath, method: request.method, requestId: request.id },
           !isClientError,
         );
 
@@ -592,6 +592,7 @@ export async function executePageRequest<TResult = PageDataBundle>(
           pathname,
           resolvedStatus,
           {
+            phase: "session",
             routeName: matched.entry.name,
             routePath: matched.entry.path,
             method: request.method,
@@ -999,6 +1000,7 @@ export async function executePageRequest<TResult = PageDataBundle>(
           pathname,
           resolvedStatus,
           {
+            phase: "loader",
             routeName: matched.entry.name,
             routePath: matched.entry.path,
             method: request.method,
@@ -1103,6 +1105,7 @@ export async function executePageRequest<TResult = PageDataBundle>(
     if (Object.hasOwn(resolved, "thrown")) {
       const boundary = designateBoundary(resolved.throwingLevel ?? "page", triple);
       bundle.error = buildErrorRecord(resolved.thrown, boundary, bundle.route.path, undefined, {
+        phase: "metadata",
         routeName: matched.entry.name,
         routePath: matched.entry.path,
         method: request.method,

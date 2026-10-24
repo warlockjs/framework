@@ -13,7 +13,8 @@
  * markup. `matchClientRoute` is for client-side NAVIGATION, where no server
  * answer exists yet.
  */
-import { Component, createElement, type ComponentType, type ReactNode } from "react";
+import { Component, createElement, Fragment, type ComponentType, type ReactNode } from "react";
+import { devErrorPanelElement } from "../components/dev-error-panel";
 import type {
   HydrationDocumentPayloadSource,
   SerializedErrorPageProps,
@@ -281,7 +282,17 @@ export async function buildHydratedTree(
           });
   } else {
     const ErrorPage = componentOf<SerializedErrorPageProps>(selectedPageModule);
-    element = ErrorPage === undefined ? null : createElement(ErrorPage, errorPageProps);
+    // `debug` rides in the payload outside production only; drawing it here
+    // keeps the hydrated tree identical to the server's.
+    element =
+      ErrorPage === undefined
+        ? null
+        : createElement(
+            Fragment,
+            null,
+            createElement(ErrorPage, errorPageProps),
+            devErrorPanelElement(errorPageProps.debug),
+          );
   }
 
   // The page leaf gets its own boundary (its `ErrorBoundary` export, else the

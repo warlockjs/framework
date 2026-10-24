@@ -195,6 +195,8 @@ export type PageErrorRecord = {
   boundary: PageBoundaryDesignation;
   digest: string;
   scrubbed: boolean;
+  /** Where the failure happened; set outside production only, never serialized as-is. */
+  debug?: import("../components/document-context").PageErrorDetails;
   /**
    * Undefined means the pipeline's ordinary answer to any escalated failure:
    * 500. Set only by a failure that OWNS its own status — today, a

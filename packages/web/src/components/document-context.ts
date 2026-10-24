@@ -67,6 +67,34 @@ export type ErrorPageProps = {
 export type SerializedErrorPageProps = {
   readonly error: SerializedPageError;
   readonly status: number;
+  /**
+   * Where the failure happened. Present only outside production, never
+   * alongside a scrubbed error; see `PageErrorDetails`.
+   */
+  readonly debug?: PageErrorDetails;
+};
+
+/**
+ * What a developer needs to find a failed page request: the error, the stage
+ * it came from, the page file and the route. Built on the server for the log
+ * line and, outside production only, handed to the error page as `debug` and
+ * drawn by the development error panel. A production response never carries it.
+ */
+export type PageErrorDetails = {
+  readonly name: string;
+  readonly message: string;
+  readonly stack?: string;
+  /** `"middleware"`, `"loader"`, `"render"`, `"stream"`, `"translations"` and so on. */
+  readonly phase: string;
+  /** The page level (`app`, `layout`, `page`) for middleware, session and loader failures. */
+  readonly level?: string;
+  /** The matched page file. */
+  readonly file?: string;
+  /** The route pattern, e.g. `/posts/:slug`. */
+  readonly routePath?: string;
+  /** The `web.sites` key, in a multi-site app. */
+  readonly site?: string;
+  readonly requestId?: string;
 };
 
 export type HydrationDocumentPayloadSource = {
