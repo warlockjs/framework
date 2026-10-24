@@ -27,6 +27,7 @@ import {
   type TestAuthenticableUser,
   actingAs,
 } from "./authenticated-test-client";
+import { forgetOpenTestServer, trackOpenTestServer } from "./open-test-servers";
 import { type TestRequestClient, createTestRequestClient } from "./test-helpers";
 
 export type CreateTestHttpServerOptions = {
@@ -163,7 +164,7 @@ export async function createTestHttpServer(
   const client = createTestRequestClient(url);
   let closed = false;
 
-  return {
+  const handle: TestHttpServer = {
     ...client,
     url,
     port,
@@ -173,8 +174,13 @@ export async function createTestHttpServer(
       if (closed) return;
 
       closed = true;
+      forgetOpenTestServer(handle);
       router.removeRoutesBySourceFile(sourceFile);
       await server.close();
     },
   };
+
+  trackOpenTestServer(handle);
+
+  return handle;
 }

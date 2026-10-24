@@ -75,3 +75,26 @@ describe("add test — spec discovery", () => {
     expect(viteConfig?.[1]).toContain('runner: "./src/test-runner.ts"');
   });
 });
+
+describe("add test — worker lifetime switch", () => {
+  beforeEach(() => {
+    written.clear();
+    vi.spyOn(console, "log").mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("derives isolate and the tests config from WARLOCK_TEST_LIFETIME", async () => {
+    await testFeature.onExecuting?.({} as never);
+
+    const viteConfig = [...written.entries()].find(([path]) => /vite\.config\.ts$/.test(path))?.[1];
+    const testsConfig = [...written.entries()].find(([path]) => /config\/tests\.ts$/.test(path))?.[1];
+
+    expect(viteConfig).toContain('isolate: process.env.WARLOCK_TEST_LIFETIME !== "worker"');
+    expect(viteConfig).toContain("extends: true");
+    expect(testsConfig).toContain('lifetime: workerLifetime ? "worker" : "file"');
+    expect(testsConfig).toContain("resetDatabase: workerLifetime");
+  });
+});

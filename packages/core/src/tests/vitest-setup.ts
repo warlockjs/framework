@@ -26,8 +26,11 @@ import { loadTestLocales } from "./test-locales";
 import { performance } from "node:perf_hooks";
 import { config } from "../config";
 import { loadUnitConfig } from "./load-unit-config";
+import { resetTestDatabase, type ResetTestDatabaseOptions } from "./reset-test-database";
+import { closeOpenTestHttpServers } from "./open-test-servers";
 import {
   testRuntimeScope,
+  markTestFileOpen,
   selectTestLifetime,
   timeTestStep,
   finishTestProfile,
@@ -67,6 +70,13 @@ export type TestRuntimeConfiguration = {
   profileSetup?: boolean;
   /** Runs before fixtures in every worker-lifetime file, including the first. Use a worker-specific database. */
   resetBetweenFiles?: () => void | Promise<void>;
+  /**
+   * Worker lifetime only. Truncates every table or collection of the default
+   * data source before each file (the migrations ledger is kept), then runs
+   * `resetBetweenFiles`. `true` truncates everything; an object narrows it.
+   * The worker needs its own database, see `workerDatabaseName()`.
+   */
+  resetDatabase?: boolean | ResetTestDatabaseOptions;
 };
 
 export type TestSetupOptions = {
@@ -199,6 +209,7 @@ export async function setupTest(options?: TestSetupOptions): Promise<void> {
     if (!profileEnabled()) scope.profile = undefined;
     scope.files += 1;
     scope.fileOpen = true;
+    markTestFileOpen();
     return;
   }
   warnMissingImportModule(options?.importModule);
@@ -228,6 +239,7 @@ export async function setupTest(options?: TestSetupOptions): Promise<void> {
             await resetBetweenFiles();
           });
           scope.fileOpen = true;
+          markTestFileOpen();
           scope.files += 1;
         } catch (error) {
           registry.state = "poisoned";
@@ -604,6 +616,7 @@ async function runTestRuntimeStartup(
 
     if (!bound.hasExpired()) {
       scope.fileOpen = true;
+      markTestFileOpen();
       scope.files += 1;
       registry.state = "ready";
       registry.setupAttempt = undefined;
@@ -804,6 +817,13 @@ function beginFileProfile(file?: string): void {
 }
 
 async function resetBetweenFiles(): Promise<void> {
+  // Servers a previous file forgot to close still hold routes and a port.
+  await closeOpenTestHttpServers();
+  const { resetDatabase } = readRuntimeConfiguration();
+  if (resetDatabase === true) await resetTestDatabase();
+  else if (resetDatabase && typeof resetDatabase === "object") await resetTestDatabase(resetDatabase);
+  else if (resetDatabase !== undefined && resetDatabase !== null && resetDatabase !== false)
+    throw new TestLifecycleError("tests.resetDatabase must be true or an options object.");
   const reset = readRuntimeConfiguration().resetBetweenFiles;
   if (reset === undefined || reset === null) return;
   if (typeof reset !== "function")
@@ -815,11 +835,14 @@ function readRuntimeConfiguration(): {
   lifetime?: unknown;
   profileSetup?: unknown;
   resetBetweenFiles?: unknown;
+  resetDatabase?: unknown;
 } {
   return (
-    config.get<{ lifetime?: unknown; profileSetup?: unknown; resetBetweenFiles?: unknown }>(
-      "tests",
-      {},
-    ) ?? {}
+    config.get<{
+      lifetime?: unknown;
+      profileSetup?: unknown;
+      resetBetweenFiles?: unknown;
+      resetDatabase?: unknown;
+    }>("tests", {}) ?? {}
   );
 }

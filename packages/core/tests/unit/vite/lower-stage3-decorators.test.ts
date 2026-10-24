@@ -52,3 +52,18 @@ describe("lowerStage3Decorators", () => {
     expect(result).toBeNull();
   });
 });
+
+describe("lowerStage3Decorators called more than once", () => {
+  it("names later instances distinctly so Vitest does not report a duplicated plugin, and keeps them working", async () => {
+    const names = [lowerStage3Decorators(), lowerStage3Decorators()].map((item) => item.name);
+
+    expect(new Set(names).size).toBe(2);
+    expect(names.every((name) => name.startsWith("warlock:lower-stage3-decorators"))).toBe(true);
+
+    const second = lowerStage3Decorators();
+    const lowered = await second.transform("@Register()\nexport class A {}", "/app/a.ts");
+
+    expect(lowered!.code).not.toMatch(/^\s*@Register/m);
+    expect(await second.transform(lowered!.code, "/app/a.ts")).toBeNull();
+  });
+});

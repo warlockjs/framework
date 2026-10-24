@@ -6,6 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 > ⚠ **Versioning: `@warlock.js/*` does not follow SemVer strictly — breaking changes may ship in a minor.** This is a deliberate decision, not an oversight: the framework is pre-adoption and the cost of a major per behaviour fix currently outweighs the benefit. **Pin an exact version or a tilde range (`~4.13.0`) if you need to opt into changes rather than receive them.** Every breaking change is marked **BREAKING** in its entry and summarised in an _Upgrading_ section at the top of the release. **This policy will change once the framework has consumers beyond its author.**
 
+## 5.37.1
+
+### Added
+
+- `tests.resetDatabase` (`true` or `{ connection, except, only }`): with `tests.lifetime: "worker"`, truncates every table or collection of the data source before each file, keeping the migrations ledger and system collections, then runs `tests.resetBetweenFiles`. `resetTestDatabase()`, `workerDatabaseName(base)` and `testWorkerId()` are exported from `@warlock.js/core/tests` so each Vitest worker can use a database of its own.
+- A worker-lifetime runtime closes the `createTestHttpServer()` servers a file left open before the next file starts, so their routes and ports do not leak across files.
+- The setup profile reports `body`, the time between setup finishing and teardown starting. When a file-lifetime run of at least four files spends half or more of its time in setup, the worker summary and `TestSetupReporter` print a line recommending `tests.lifetime: "worker"`.
+- `warlock add test` generates `src/config/tests.ts`. `WARLOCK_TEST_LIFETIME=worker` turns on worker lifetime and `resetDatabase`, and the generated integration project sets `isolate: false` from the same variable.
+- Upgrade codemod `vitest-inline-project-plugins` lists a `lowerStage3Decorators()` call repeated inside a Vitest config that declares `projects`.
+
+### Fixed
+
+- Vitest 5 printed `The "<project>" project applies the same plugin multiple times: "warlock:lower-stage3-decorators"` when a config listed `lowerStage3Decorators()` in the root and again in an inline project. Instances after the first in a process now carry a numbered plugin name and skip modules that no longer contain a decorator, so the warning is gone and a project that does not inherit the root config still lowers decorators. The docs and skills explain `extends` for inline projects.
+
 ## 5.37.0 - 2026-10-24
 
 ### Added

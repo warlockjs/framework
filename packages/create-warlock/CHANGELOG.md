@@ -4,6 +4,12 @@ All notable changes to `create-warlock` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.37.1
+
+### Changed
+
+- The template's `testing-strategy` skill describes `WARLOCK_TEST_LIFETIME=worker`, `resetDatabase` and `workerDatabaseName()` for the generated test setup.
+
 ## 5.36.0 - 2026-10-22
 
 ### Changed

@@ -358,6 +358,13 @@ Integration setup defaults to `tests.lifetime: "file"`. For reuse, set
 `pool: "forks", isolate: false`, keep the generated runner, and use `vitest run`.
 Watch, threads and isolated graphs are refused. Keep `afterAll(teardownTest)`:
 it marks file boundaries while the runner closes connectors at worker exit.
+`warlock add test` generates `src/config/tests.ts` so `WARLOCK_TEST_LIFETIME=worker`
+switches `lifetime` to `"worker"`, turns on `resetDatabase` (truncates every table or
+collection before each file, keeping the migrations ledger) and flips the integration
+project to `isolate: false`. Use `workerDatabaseName(base)` from
+`@warlock.js/core/tests` so each worker has its own database. When setup dominates a
+file-lifetime run, the profiler summary recommends this. Servers from
+`createTestHttpServer()` a file leaves open are closed before the next file.
 Set `tests.resetBetweenFiles` to an async application-owned cleanup callback;
 it runs before every file, including the first, after selected fakes, clock and
 IDs reset. Each worker needs a separate database/schema. Module singletons and

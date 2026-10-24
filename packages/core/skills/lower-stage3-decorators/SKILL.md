@@ -37,6 +37,32 @@ export default defineConfig({
 
 That's the whole fix. Any file that imports a decorated model now loads.
 
+### With Vitest 5 projects
+
+Declare the plugin **once**, in the root config. Since Vitest 5 an inline project
+extends the config file that declares it (`extends: true` is the default), so it
+inherits the plugin; listing `lowerStage3Decorators()` again inside a project makes
+Vitest warn `The "<project>" project applies the same plugin multiple times`.
+
+```ts title="vite.config.ts"
+export default defineConfig({
+  plugins: [lowerStage3Decorators(), mongezVite()],
+  test: {
+    projects: [
+      // inherits the root plugins; no `plugins` entry here
+      { extends: true, test: { name: "unit", include: ["src/**/*.spec.ts"] } },
+      // a project that must not inherit the root config lists what it needs itself
+      { extends: false, plugins: [lowerStage3Decorators()], test: { name: "isolated" } },
+    ],
+  },
+});
+```
+
+Setting `extends` explicitly also silences the warning. Calling the factory more
+than once in a process is harmless: later instances get a numbered plugin name and
+skip modules that no longer contain a decorator. `warlock upgrade` lists the extra
+calls in a config with `projects` (`vitest-inline-project-plugins`).
+
 ## Why it works
 
 The plugin runs `enforce: "pre"`, so it executes **ahead of** Vite's core transform and the SSR rewrite. For every `.ts`/`.tsx` file that actually contains a decorator it runs esbuild with `target: "es2022"` and `experimentalDecorators: false` — esbuild lowers the Stage-3 decorator into a plain helper call (no `@` left), preserving the `(value, context)` runtime semantics the decorators depend on. By the time oxc and the SSR step see the file, there's no decorator syntax left to mangle — just ordinary import references.

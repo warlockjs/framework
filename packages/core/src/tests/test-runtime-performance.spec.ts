@@ -4,6 +4,7 @@ import { idsFake } from "./fakes/ids-fake";
 import { ids } from "../utils/ids";
 import { getTestLifecycleRegistry } from "./test-lifecycle-state";
 import { configureTestWorker, getTestRuntimeStats, testRuntimeScope } from "./test-runtime-scope";
+import { trackOpenTestServer } from "./open-test-servers";
 import { setupTest, teardownTest } from "./vitest-setup";
 
 const mocks = vi.hoisted(() => ({
@@ -15,7 +16,9 @@ const mocks = vi.hoisted(() => ({
   unitConfig: vi.fn(async () => undefined),
   startWithout: vi.fn(async () => undefined),
   shutdown: vi.fn(async () => undefined),
+  resetDatabase: vi.fn(async () => [] as string[]),
 }));
+vi.mock("./reset-test-database", () => ({ resetTestDatabase: mocks.resetDatabase }));
 vi.mock("../application/application", () => ({
   Application: { setEnvironment: vi.fn(), runShutdownHooks: vi.fn() },
 }));
@@ -109,6 +112,43 @@ describe("test runtime performance modes", () => {
     await cleanup();
     await cleanup();
     expect(mocks.shutdown).toHaveBeenCalledTimes(1);
+  });
+
+  it("truncates the database and closes leaked test servers before each worker-lifetime file", async () => {
+    const order: string[] = [];
+    mocks.resetDatabase.mockImplementation(async () => {
+      order.push("database");
+      return [];
+    });
+    mocks.settings = {
+      lifetime: "worker",
+      resetDatabase: { except: ["countries"] },
+      resetBetweenFiles: () => {
+        order.push("hook");
+      },
+    };
+    const leaked = vi.fn(async () => {
+      order.push("server");
+    });
+    await setupTest(options);
+    trackOpenTestServer({ close: leaked });
+    await teardownTest();
+    await setupTest(options);
+    expect(leaked).toHaveBeenCalledTimes(1);
+    expect(order).toEqual(["database", "hook", "server", "database", "hook"]);
+    expect(mocks.resetDatabase).toHaveBeenNthCalledWith(1, { except: ["countries"] });
+  });
+
+  it("rejects an invalid tests.resetDatabase value", async () => {
+    mocks.settings = { lifetime: "worker", resetDatabase: "yes" };
+    await expect(setupTest(options)).rejects.toThrow(/resetDatabase must be true/);
+  });
+
+  it("does not touch the database under file lifetime", async () => {
+    mocks.settings = { resetDatabase: true };
+    await setupTest(options);
+    await teardownTest();
+    expect(mocks.resetDatabase).not.toHaveBeenCalled();
   });
 
   it("shares concurrent file resets and refuses reuse after a reset failure", async () => {

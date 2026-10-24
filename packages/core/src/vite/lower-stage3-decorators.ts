@@ -13,6 +13,28 @@ export interface DecoratorLoweringPlugin {
   transform(code: string, id: string): Promise<{ code: string; map: string } | null>;
 }
 
+const PLUGIN_NAME = "warlock:lower-stage3-decorators";
+
+let instances = 0;
+
+/**
+ * The first instance in a process keeps the plain name. Any later one gets a
+ * numbered name, because Vitest 5 counts plugins by name and warns
+ * `applies the same plugin multiple times` when an inline project lists the
+ * plugin its root config already declares.
+ *
+ * The extra instance is deliberately not switched off: when the project does
+ * not inherit the root config (`extends: false`) it is the only one that
+ * reaches the project, and it must lower decorators there. Running twice is
+ * safe, as a lowered module carries no decorator left for the second pass and
+ * the cheap gate returns before esbuild is called.
+ */
+function nextPluginName(): string {
+  instances += 1;
+
+  return instances === 1 ? PLUGIN_NAME : `${PLUGIN_NAME}#${instances}`;
+}
+
 /**
  * Vite/Vitest plugin that lowers TC39 Stage-3 (native) decorators to plain JS
  * **before** the rest of the transform pipeline runs.
@@ -32,6 +54,11 @@ export interface DecoratorLoweringPlugin {
  * "pre"` hands oxc / the SSR rewrite already-lowered, decorator-free code. Files
  * with no decorator skip esbuild entirely, so the fast path is untouched.
  *
+ * Calling it more than once in one process is safe (a root config plus an
+ * inline project, for example): later instances are named distinctly, so Vitest
+ * does not warn about a duplicated plugin, and they skip modules that carry no
+ * decorator any more.
+ *
  * Keep it **first** in the `plugins` array so it runs ahead of `@mongez/vite`
  * and Vite's core transform.
  *
@@ -48,7 +75,7 @@ export interface DecoratorLoweringPlugin {
  */
 export function lowerStage3Decorators(): DecoratorLoweringPlugin {
   return {
-    name: "warlock:lower-stage3-decorators",
+    name: nextPluginName(),
     enforce: "pre",
     async transform(code, id) {
       const [filepath] = id.split("?");

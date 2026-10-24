@@ -622,6 +622,12 @@ The `vite-8-vitest-5` codemod:
 
 Do these by hand when the codemod lists them:
 
+- Under Vitest 5 an inline project extends the config file that declares it, so a
+  project that lists `lowerStage3Decorators()` again applies it twice and Vitest
+  warns. Keep the plugin in the root config only, or set `extends: false` on a
+  project that must not inherit. The `vitest-inline-project-plugins` codemod
+  (5.37.1) lists the extra calls.
+
 - Move a config's `esbuild: { jsx: "automatic" }` to
   `oxc: { jsx: { runtime: "automatic" } }`. `esbuild.target` is not converted, and
   Oxc does not lower native decorators: keep `lowerStage3Decorators()` from

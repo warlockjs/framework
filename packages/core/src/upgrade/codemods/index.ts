@@ -4,7 +4,7 @@ import { loggerSyncCalls } from "./logger-sync-calls";
 import { node2215, warlockVersions } from "./package-json";
 import { oxcToolchain, oxcToolchainRemoval } from "./oxc-toolchain";
 import { requestLogSnapshot } from "./request-log-snapshot";
-import { viteVitest } from "./vite-vitest";
+import { viteVitest, vitestInlineProjectPlugins } from "./vite-vitest";
 import {
   aiAnthropicBody,
   aiCompactionOptIn,
@@ -40,6 +40,7 @@ export const CODEMODS: readonly Codemod[] = [
   oxcToolchain,
   oxcToolchainRemoval,
   viteVitest,
+  vitestInlineProjectPlugins,
   warlockVersions,
 ];
 
