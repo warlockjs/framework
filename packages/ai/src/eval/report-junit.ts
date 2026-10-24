@@ -66,15 +66,28 @@ export function toJUnit(report: EvalReport): string {
     const caseName = escapeXml(entry.case.name);
     const caseTime = (entry.duration / 1000).toFixed(3);
 
-    if (entry.passed) {
+    const repeated = (entry.repeat ?? 1) > 1;
+    const tally = repeated ? `passed ${entry.passes}/${entry.repeat} runs` : "";
+
+    if (entry.passed && !repeated) {
       lines.push(`  <testcase name="${caseName}" classname="${suiteName}" time="${caseTime}"/>`);
 
       continue;
     }
 
-    const message = failureMessage(entry);
     lines.push(`  <testcase name="${caseName}" classname="${suiteName}" time="${caseTime}">`);
-    lines.push(`    <failure message="${escapeXml(message)}">${escapeXml(message)}</failure>`);
+
+    if (!entry.passed) {
+      const reason = failureMessage(entry);
+      const message = repeated ? `${tally}; ${reason}` : reason;
+
+      lines.push(`    <failure message="${escapeXml(message)}">${escapeXml(message)}</failure>`);
+    }
+
+    if (repeated) {
+      lines.push(`    <system-out>${escapeXml(tally)}</system-out>`);
+    }
+
     lines.push("  </testcase>");
   }
 

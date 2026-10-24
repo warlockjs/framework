@@ -17,6 +17,7 @@ export type { DatasetContract, DatasetEntry, DatasetOptions } from "./dataset.ty
 
 // Regression diff + CI reporters (pure, runner-decoupled).
 export { diff } from "./regression";
+export type { DiffOptions } from "./regression";
 export { toJSON, fromJSON } from "./report-json";
 export { toJUnit } from "./report-junit";
 

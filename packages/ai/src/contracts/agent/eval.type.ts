@@ -66,6 +66,12 @@ export type EvalCase<TOutput = unknown> = {
    * comparison, or omitted when the scorer is purely predicate-based.
    */
   expected?: unknown;
+  /**
+   * Optional grouping label. Reports carry pass-rate and mean-score
+   * statistics per category, so a weak area stays visible next to a
+   * healthy aggregate.
+   */
+  category?: string;
   /** Per-case scorer override. Falls back to the suite `scorers`. */
   scorers?: EvalScorer<TOutput>[];
   /** Per-case execute-options override merged over the suite default. */
@@ -146,6 +152,77 @@ export type EvalOptions<TOutput = unknown> = {
    * (any drop is a regression).
    */
   tolerance?: number;
+  /**
+   * How many times every case runs. Runs execute one after another, in
+   * case order, repeating each case `repeat` times before the next. A case
+   * passes only when all of its runs pass; `passes` / `repeat` on the case
+   * result shows how many did. Defaults to `1` (single run, unchanged
+   * behavior).
+   */
+  repeat?: number;
+  /**
+   * Confidence level of the reported intervals, in `(0, 1)`. Defaults to
+   * `0.95`.
+   */
+  confidence?: number;
+  /**
+   * How a `baseline` is compared. `"point"` (default) flags a case whose
+   * score dropped more than `tolerance` below its baseline score.
+   * `"interval"` flags a case or metric only when the baseline's lower
+   * confidence bound sits above the current upper bound by more than
+   * `tolerance` (the two intervals are separated), so run-to-run noise is
+   * not reported as a regression.
+   * Cases with fewer than two runs have no interval and fall back to the
+   * point rule.
+   */
+  gate?: "point" | "interval";
+  /**
+   * When `true`, any stable failure (a case failing in every one of
+   * `repeat > 1` runs) fails the regression verdict on its own. Requires a
+   * `baseline`; without one, read `report.stableFailures` directly.
+   */
+  failOnStableFailures?: boolean;
+};
+
+/** Closed confidence interval `[low, high]`, both bounds in `[0, 1]`. */
+export type EvalInterval = {
+  low: number;
+  high: number;
+};
+
+/**
+ * Statistics of one group of runs (the whole suite, or one category).
+ * Every run of every case is one sample.
+ */
+export type EvalMetricStats = {
+  /** Number of samples (cases x repeat). */
+  runs: number;
+  /** Samples that passed. */
+  passes: number;
+  /** `passes / runs`. */
+  passRate: number;
+  /** Wilson score interval of the pass rate. */
+  passRateInterval: EvalInterval;
+  /** Mean score across samples. */
+  meanScore: number;
+  /** Student-t interval of the mean score, clamped to `[0, 1]`. */
+  meanScoreInterval: EvalInterval;
+};
+
+/** Overall and per-category statistics attached to an {@link EvalReport}. */
+export type EvalStats = {
+  /** Confidence level the intervals were computed at. */
+  confidence: number;
+  overall: EvalMetricStats;
+  /** Keyed by `EvalCase.category`; cases without a category are not listed. */
+  categories: Record<string, EvalMetricStats>;
+};
+
+/** Lightweight record of one run of a case (kept in serialized reports). */
+export type EvalCaseRun = {
+  score: number;
+  passed: boolean;
+  duration: number;
 };
 
 /**
@@ -158,11 +235,30 @@ export type EvalRegression = {
    * carrying the before/after scores.
    */
   regressed: Array<{ name: string; before: number; after: number }>;
+  /**
+   * Interval gate only: the overall or per-category metrics whose baseline
+   * interval lies above the current interval by more than `tolerance`.
+   * `scope` is `"overall"` or `"category:<name>"`.
+   */
+  regressedMetrics?: Array<{
+    scope: string;
+    metric: "passRate" | "meanScore";
+    before: number;
+    after: number;
+    interval: EvalInterval;
+  }>;
+  /** Cases that failed every run of a repeated eval (`repeat > 1`). */
+  stableFailures?: string[];
+  /** Cases that passed some runs and failed others (`repeat > 1`). */
+  flaky?: string[];
   /** Case names present in the baseline but absent in the new report. */
   removed: string[];
   /** Case names present in the new report but absent in the baseline. */
   added: string[];
-  /** `true` when `regressed` is empty — no case regressed beyond tolerance. */
+  /**
+   * `true` when no case or metric regressed beyond tolerance (and, with
+   * `failOnStableFailures`, no stable failure exists).
+   */
   passed: boolean;
 };
 
@@ -182,8 +278,18 @@ export type EvalCaseResult<TOutput = unknown> = {
   score: number;
   /** `true` only when EVERY scorer passed and the agent did not error. */
   passed: boolean;
-  /** Wall-clock duration of the case run in milliseconds. */
+  /** Wall-clock duration of the case (all runs) in milliseconds. */
   duration: number;
+  /** Number of times the case ran. Absent in reports from before repeats. */
+  repeat?: number;
+  /** Runs that passed, e.g. `2` of `repeat: 3`. */
+  passes?: number;
+  /** Per-run score, verdict and duration, in run order. */
+  runs?: EvalCaseRun[];
+  /** Student-t interval of the case's run scores (`[0, 1]` when under two runs). */
+  scoreInterval?: EvalInterval;
+  /** Wilson interval of the case's per-run pass rate. */
+  passRateInterval?: EvalInterval;
 };
 
 /**
@@ -206,6 +312,14 @@ export type EvalReport<TOutput = unknown> = {
   meanScore: number;
   /** `true` only when every case passed. */
   passed: boolean;
+  /** Runs per case. Absent in reports from before repeats. */
+  repeat?: number;
+  /** Pooled pass-rate / mean-score statistics with confidence intervals. */
+  stats?: EvalStats;
+  /** Cases that failed every run (only when `repeat > 1`). */
+  stableFailures?: string[];
+  /** Cases that passed some runs and failed others (only when `repeat > 1`). */
+  flakyCases?: string[];
   /** Per-case results in suite order. */
   cases: EvalCaseResult<TOutput>[];
   /** Total wall-clock duration of the whole suite in milliseconds. */
