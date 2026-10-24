@@ -94,6 +94,44 @@ describe("collectRouteRegistrationSnapshot", () => {
     expect(Object.isFrozen(snapshot.routes[0]?.response)).toBe(true);
   });
 
+  it("keeps the sites list and the guarded flag a route carries", async () => {
+    const child = new FakeChild();
+    const result = collectRouteRegistrationSnapshot({
+      forkProcess: () => child as unknown as RouteRegistrationChildProcess,
+    });
+
+    child.emit("message", {
+      type: "route-registration:snapshot",
+      snapshot: {
+        version: 1,
+        routes: [
+          {
+            name: "admin.stats",
+            path: "/api/admin/stats",
+            method: "GET",
+            sites: ["admin"],
+            guarded: true,
+          },
+          { name: "ping", path: "/ping", method: "GET" },
+        ],
+      },
+    });
+    child.emit("close", 0);
+
+    const snapshot = await result;
+
+    expect(snapshot.routes).toEqual([
+      {
+        name: "admin.stats",
+        path: "/api/admin/stats",
+        method: "GET",
+        sites: ["admin"],
+        guarded: true,
+      },
+      { name: "ping", path: "/ping", method: "GET" },
+    ]);
+  });
+
   it("accepts clientVisible false as the only extra key, and only on the opted-out route", async () => {
     const child = new FakeChild();
     const result = collectRouteRegistrationSnapshot({
@@ -135,6 +173,10 @@ describe("collectRouteRegistrationSnapshot", () => {
     ["a null response", { response: null }],
     ["a clientVisible flag other than false", { clientVisible: true }],
     ["clientVisible false plus another key", { clientVisible: false, handler: "unsafe" }],
+    ["a guarded flag other than true", { guarded: false }],
+    ["a non-list sites value", { sites: "landing" }],
+    ["a sites list with a non-string entry", { sites: ["landing", 1] }],
+    ["sites and guarded plus another key", { sites: ["admin"], guarded: true, handler: "unsafe" }],
   ])("refuses a route record with %s", async (_label, extra) => {
     const child = new FakeChild();
     const result = collectRouteRegistrationSnapshot({

@@ -77,13 +77,21 @@ function validateSnapshot(value: unknown): RouteRegistrationSnapshot {
 
     const response = route.response;
     const clientVisible = route.clientVisible;
+    const sites = route.sites;
+    const guarded = route.guarded;
     const allowedKeys =
-      3 + (response === undefined ? 0 : 1) + (clientVisible === undefined ? 0 : 1);
+      3 +
+      (response === undefined ? 0 : 1) +
+      (clientVisible === undefined ? 0 : 1) +
+      (sites === undefined ? 0 : 1) +
+      (guarded === undefined ? 0 : 1);
 
     if (
       Object.keys(route).length !== allowedKeys ||
       (response !== undefined && !isResponseTypeRecord(response)) ||
-      (clientVisible !== undefined && clientVisible !== false)
+      (clientVisible !== undefined && clientVisible !== false) ||
+      (sites !== undefined && !isStringList(sites)) ||
+      (guarded !== undefined && guarded !== true)
     ) {
       throw new Error("Route registration child sent a route record with non-browser-safe fields.");
     }
@@ -93,6 +101,8 @@ function validateSnapshot(value: unknown): RouteRegistrationSnapshot {
       path: route.path,
       method: normalizeRequestMethod(route.method),
       ...(clientVisible === false ? { clientVisible: false as const } : {}),
+      ...(sites === undefined ? {} : { sites: Object.freeze([...sites]) }),
+      ...(guarded === true ? { guarded: true as const } : {}),
     };
 
     return Object.freeze(
@@ -101,6 +111,10 @@ function validateSnapshot(value: unknown): RouteRegistrationSnapshot {
   });
 
   return Object.freeze({ version: PROTOCOL_VERSION, routes: Object.freeze(routes) });
+}
+
+function isStringList(value: unknown): value is readonly string[] {
+  return Array.isArray(value) && value.every((entry) => typeof entry === "string");
 }
 
 function isResponseTypeRecord(value: unknown): value is Record<string, string> {
