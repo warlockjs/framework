@@ -136,9 +136,9 @@ describe("computeStats", () => {
     expect(stats.overall.runs).toBe(9);
     expect(stats.overall.passes).toBe(5);
     expect(stats.overall.passRate).toBeCloseTo(5 / 9, 10);
-    expect(stats.categories.math.runs).toBe(6);
-    expect(stats.categories.math.passes).toBe(5);
-    expect(stats.categories.geo.passRate).toBe(0);
+    expect(stats.categories.math?.runs).toBe(6);
+    expect(stats.categories.math?.passes).toBe(5);
+    expect(stats.categories.geo?.passRate).toBe(0);
   });
 
   it("should give a small category a wider interval than a large one", () => {
@@ -157,8 +157,11 @@ describe("computeStats", () => {
     );
     const stats = computeStats([small, large]);
 
-    const width = (key: string) =>
-      stats.categories[key].passRateInterval.high - stats.categories[key].passRateInterval.low;
+    const width = (key: string) => {
+      const interval = stats.categories[key]?.passRateInterval;
+
+      return interval ? interval.high - interval.low : Number.NaN;
+    };
 
     expect(width("small")).toBeGreaterThan(width("large") * 5);
   });

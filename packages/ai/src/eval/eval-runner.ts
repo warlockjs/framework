@@ -152,13 +152,14 @@ async function runCase<TOutput>(
   repeat: number,
   confidence: number,
 ): Promise<EvalCaseResult<TOutput>> {
-  const outcomes: EvalCaseResult<TOutput>[] = [];
+  const first = await runOnce(agent, evalCase, options, passThreshold);
+  const outcomes: EvalCaseResult<TOutput>[] = [first];
 
-  for (let run = 0; run < repeat; run++) {
+  for (let run = 1; run < repeat; run++) {
     outcomes.push(await runOnce(agent, evalCase, options, passThreshold));
   }
 
-  const representative = outcomes.find((outcome) => !outcome.passed) ?? outcomes[0];
+  const representative = outcomes.find((outcome) => !outcome.passed) ?? first;
   const runs = outcomes.map((outcome) => ({
     score: outcome.score,
     passed: outcome.passed,

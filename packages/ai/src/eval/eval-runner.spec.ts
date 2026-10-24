@@ -19,7 +19,7 @@ describe("agent.eval", () => {
     expect(report.passedCount).toBe(1);
     expect(report.failedCount).toBe(0);
     expect(report.passRate).toBe(1);
-    expect(report.cases[0].score).toBe(1);
+    expect(report.cases[0]?.score).toBe(1);
   });
 
   it("should fail a case when the exact scorer does not match", async () => {
@@ -35,7 +35,7 @@ describe("agent.eval", () => {
 
     expect(report.passed).toBe(false);
     expect(report.failedCount).toBe(1);
-    expect(report.cases[0].passed).toBe(false);
+    expect(report.cases[0]?.passed).toBe(false);
   });
 
   it("should normalize case and whitespace for exact matching", async () => {
@@ -92,7 +92,7 @@ describe("agent.eval", () => {
     });
 
     expect(report.passed).toBe(false);
-    expect(report.cases[0].scores).toHaveLength(2);
+    expect(report.cases[0]?.scores).toHaveLength(2);
   });
 
   it("should average scores into a mean across the suite", async () => {
@@ -133,7 +133,7 @@ describe("agent.eval", () => {
     });
 
     expect(onFailure).toHaveBeenCalledTimes(1);
-    expect(onFailure.mock.calls[0][0].case.name).toBe("bad");
+    expect(onFailure.mock.calls[0]?.[0]?.case.name).toBe("bad");
   });
 
   it("should not fire onFailure for passing cases", async () => {
@@ -204,7 +204,7 @@ describe("agent.eval", () => {
     });
 
     expect(report.passed).toBe(false);
-    expect(report.cases[0].result.error).toBeDefined();
+    expect(report.cases[0]?.result.error).toBeDefined();
   });
 
   it("should derive pass from passThreshold when scorer omits passed", async () => {
@@ -220,7 +220,7 @@ describe("agent.eval", () => {
     });
 
     expect(report.passed).toBe(false);
-    expect(report.cases[0].score).toBe(0.4);
+    expect(report.cases[0]?.score).toBe(0.4);
   });
 });
 
@@ -244,7 +244,7 @@ describe("ai.eval.judge (LLM-as-judge)", () => {
     });
 
     expect(report.passed).toBe(true);
-    expect(report.cases[0].scores[0].reason).toBe("warm tone");
+    expect(report.cases[0]?.scores[0]?.reason).toBe("warm tone");
   });
 
   it("should fail when the judge verdict scores below threshold", async () => {
@@ -284,7 +284,7 @@ describe("ai.eval.judge (LLM-as-judge)", () => {
     });
 
     expect(report.passed).toBe(false);
-    expect(report.cases[0].scores[0].reason).toMatch(/parseable/);
+    expect(report.cases[0]?.scores[0]?.reason).toMatch(/parseable/);
   });
 
   it("should use judge() scorer directly with a fenced JSON verdict", async () => {

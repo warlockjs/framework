@@ -48,7 +48,9 @@ function unfilledPlaceholders(message: string, attributes: Record<string, unknow
   const names = new Set<string>();
 
   for (const match of message.matchAll(PLACEHOLDER)) {
-    if (!(match[1] in attributes)) names.add(match[1]);
+    const name = match[1];
+
+    if (name !== undefined && !(name in attributes)) names.add(name);
   }
 
   return [...names];

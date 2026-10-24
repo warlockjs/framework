@@ -45,7 +45,7 @@ describe("agent.eval with a dataset", () => {
     const report = await subject.eval({ cases: ds, scorers: [exact()] });
 
     expect(report.total).toBe(1);
-    expect(report.cases[0].case.name).toBe("egypt");
+    expect(report.cases[0]?.case.name).toBe("egypt");
   });
 });
 

@@ -12,6 +12,11 @@ function mean(values: number[]): number {
   return values.length === 0 ? 0 : values.reduce((sum, value) => sum + value, 0) / values.length;
 }
 
+/** Evaluate a polynomial with Horner's method; coefficients run from highest degree down. */
+function polynomial(coefficients: number[], x: number): number {
+  return coefficients.reduce((accumulator, coefficient) => accumulator * x + coefficient, 0);
+}
+
 /**
  * Inverse of the standard normal CDF (Acklam's rational approximation,
  * relative error below 1.2e-9).
@@ -35,10 +40,7 @@ export function normalQuantile(p: number): number {
   if (p < low) {
     const q = Math.sqrt(-2 * Math.log(p));
 
-    return (
-      (((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) /
-      ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1)
-    );
+    return polynomial(c, q) / polynomial([...d, 1], q);
   }
 
   if (p > 1 - low) {
@@ -48,10 +50,7 @@ export function normalQuantile(p: number): number {
   const q = p - 0.5;
   const r = q * q;
 
-  return (
-    ((((((a[0] * r + a[1]) * r + a[2]) * r + a[3]) * r + a[4]) * r + a[5]) * q) /
-    (((((b[0] * r + b[1]) * r + b[2]) * r + b[3]) * r + b[4]) * r + 1)
-  );
+  return (polynomial(a, r) * q) / polynomial([...b, 1], r);
 }
 
 /** Natural log of the gamma function (Lanczos approximation). */
