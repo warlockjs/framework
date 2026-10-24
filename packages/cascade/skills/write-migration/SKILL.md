@@ -117,12 +117,14 @@ export default class BackfillStatuses extends Migration {
   }
 
   public down(): void {
-    this.dropColumn("status");
+    // SQL only: on MongoDB a plain dropColumn() in down() is skipped, because
+    // it would unset `status` on every document.
+    if (!this.isDocumentStore) this.dropColumn("status");
   }
 }
 ```
 
-Class-form builders include `createTable()` / `createTableIfNotExists()`, `dropTable()` / `dropTableIfExists()`, `dropColumn(name)`, `renameTableTo(name)`, `timestamps()`, `index(...)`, `primaryUuid()`, and `raw(sql)` for a raw statement.
+Class-form builders include `createTable()` / `createTableIfNotExists()`, `dropTable()` / `dropTableIfExists()`, `dropColumn(name, { destructive? })`, `renameTableTo(name)`, `timestamps()`, `index(...)`, `primaryUuid()`, and `raw(sql)` for a raw statement.
 
 ### Foreign-key columns that match the app's PK type — `this.foreignId`
 
@@ -146,7 +148,7 @@ export default class AddUserToPosts extends Migration {
   }
 
   public down(): void {
-    this.dropColumn("user_id");
+    if (!this.isDocumentStore) this.dropColumn("user_id");
   }
 }
 ```
@@ -176,6 +178,16 @@ public down(): void {
   throw new Error("This migration is irreversible — restore from backup if you need to undo it.");
 }
 ```
+
+### Rollback is not symmetric on MongoDB
+
+On SQL, dropping a column you added undoes `up()`. On MongoDB `up()` added nothing to any document, while `dropColumn` unsets the field on every document and erases what the app stored since. Because of that:
+
+- `Migration.alter(Model, { add: {...} })` with no custom `up`/`down` gets a derived `down()`: SQL drops the columns, MongoDB records the rollback in the ledger only. Do not write a `down()` for it.
+- Inside `down()` on MongoDB, a plain `dropColumn()` / `dropColumns()` is skipped with a warning. Pass `this.dropColumn("field", { destructive: true })` to unset it for real.
+- `migrate:rollback` and `migrate --fresh` print the collections and fields they will drop or unset, with document counts, and outside development ask for confirmation (`--yes` / `--force` for scripts; no terminal and no flag means refusal).
+
+See the `alter-migration` topic for the full rules.
 
 ## Data-source-aware migrations
 

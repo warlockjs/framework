@@ -1,4 +1,4 @@
-import type { Migration } from "./migration";
+import type { DestructiveOperation, Migration } from "./migration";
 
 /**
  * Result of a single migration execution.
@@ -188,3 +188,20 @@ export type TaggedSQL = {
   /** Migration name for within-phase tiebreaking */
   migrationName?: string;
 };
+
+/**
+ * What rolling back one migration would remove.
+ */
+export interface RollbackPlanEntry {
+  /** Migration name/identifier */
+  readonly name: string;
+  /** Table/collection the migration targets */
+  readonly table: string;
+  /** Data-removing operations its `down()` queues (empty when ledger-only) */
+  readonly operations: readonly DestructiveOperation[];
+}
+
+/**
+ * Destructive-operation plan for a rollback, newest migration first.
+ */
+export type RollbackPlan = readonly RollbackPlanEntry[];

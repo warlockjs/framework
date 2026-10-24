@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 > ⚠ **Versioning: `@warlock.js/*` does not follow SemVer strictly — breaking changes may ship in a minor.** This is a deliberate decision, not an oversight: the framework is pre-adoption and the cost of a major per behaviour fix currently outweighs the benefit. **Pin an exact version or a tilde range (`~4.13.0`) if you need to opt into changes rather than receive them.** Every breaking change is marked **BREAKING** in its entry and summarised in an _Upgrading_ section at the top of the release. **This policy will change once the framework has consumers beyond its author.**
 
+## 5.37.0
+
+### Changed
+
+- **BREAKING** `warlock migrate --rollback` and `warlock migrate --fresh` print a destructive-operation summary (collections/tables dropped, fields/columns unset, document/row counts) before running. Outside development they ask for confirmation, and exit with code 1 when there is no terminal. New `--yes, -y` and `--force` flags confirm without a prompt.
+
+### Upgrading
+
+- Deploy scripts and CI jobs that run `warlock migrate --rollback` or `--fresh` with `NODE_ENV` set to anything other than `development` must add `--yes` (or `--force`). A rollback that removes no data does not ask. On MongoDB, a plain `dropColumn()` in a migration's `down()` is now skipped (see the Cascade 5.37.0 notes).
+
 ## 5.36.0 - 2026-10-22
 
 ### Added

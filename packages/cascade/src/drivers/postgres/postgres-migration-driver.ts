@@ -158,6 +158,17 @@ export class PostgresMigrationDriver implements MigrationDriverContract {
   }
 
   /**
+   * Count the rows in a table, for the rollback summary.
+   */
+  public async countRows(table: string): Promise<number> {
+    const result = await this.driver.query<{ total: string }>(
+      `SELECT COUNT(*) AS total FROM ${this.driver.dialect.quoteIdentifier(table)}`,
+    );
+
+    return Number(result.rows[0]?.total ?? 0);
+  }
+
+  /**
    * List all columns in a table.
    *
    * @param table - Table name

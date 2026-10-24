@@ -21,7 +21,9 @@ cascade migrate:export-sql      # write .up.sql / .down.sql instead of executing
 Flags:
 
 - `migrate` — `-f/--fresh` (drop everything and re-run), `-s/--sql` (export SQL instead of executing), `--pending-only`, `-c/--compact`, `-p/--path <glob>`
-- `migrate:rollback` — `-a/--all` (roll back everything), `--batches N`, `-p/--path <glob>`
+- `migrate:rollback` — `-a/--all` (roll back everything), `--batches N`, `-p/--path <glob>`, `-y/--yes` / `--force` (confirm without a prompt)
+
+`migrate:rollback` and `migrate -f` print what they will drop or unset (with document or row counts) first. Outside development they ask for confirmation; in CI pass `--yes`, because without a terminal and without the flag they refuse. Programmatic equivalent: `confirmRollback({ all, batches, yes })` before `rollbackMigrations()`. On MongoDB a plain `dropColumn()` in `down()` is skipped; see the `alter-migration` topic.
 - `migrate:export-sql` — `--pending-only`, `-c/--compact`, `-p/--path <glob>`
 
 There is **no** `seed`, `db:create`, or `db:drop-tables` in the standalone binary — those need project context; use the warlock CLI when you have a Warlock app.
@@ -109,6 +111,7 @@ Reach for these when you need migrations inside test setup (`beforeAll(async () 
 | Drop everything and re-run     | `cascade migrate -f`                   |
 | Roll back the last batch       | `cascade migrate:rollback`             |
 | Roll back everything           | `cascade migrate:rollback --all`       |
+| Roll back in CI                | `cascade migrate:rollback --yes`       |
 | Generate SQL without executing | `cascade migrate --sql`                |
 | Generate SQL for pending only  | `cascade migrate --sql --pending-only` |
 | See what's been executed       | `cascade migrate:list`                 |

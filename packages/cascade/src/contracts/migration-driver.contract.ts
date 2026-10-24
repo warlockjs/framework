@@ -263,6 +263,18 @@ export interface MigrationDriverContract {
   tableExists(table: string): Promise<boolean>;
 
   /**
+   * Count the rows/documents in a table, for the rollback summary.
+   * Optional: a driver that cannot count cheaply omits it.
+   */
+  countRows?(table: string): Promise<number>;
+
+  /**
+   * Count the rows/documents that hold a value for at least one of the given
+   * columns, i.e. how many a drop would change. Optional, like `countRows`.
+   */
+  countWithColumns?(table: string, columns: readonly string[]): Promise<number>;
+
+  /**
    * List all columns in a table.
    *
    * @param table - Table name
@@ -307,7 +319,9 @@ export interface MigrationDriverContract {
   /**
    * Drop a column from an existing table.
    *
-   * Note: For MongoDB, this optionally runs $unset on all documents.
+   * Note: For MongoDB, this runs $unset on all documents, erasing stored values.
+   * `Migration` therefore skips it inside `down()` unless the author passed
+   * `{ destructive: true }`.
    *
    * @param table - Table name
    * @param column - Column name to drop

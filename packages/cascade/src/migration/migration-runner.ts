@@ -6,6 +6,7 @@ import type { MigrationDriverContract } from "../contracts/migration-driver.cont
 import type { DataSource } from "../data-source/data-source";
 import { dataSourceRegistry } from "../data-source/data-source-registry";
 import {
+  type DestructiveOperation,
   type Migration,
   type MigrationContract,
   type MigrationOrigin,
@@ -14,7 +15,13 @@ import {
 import { sortMigrations, sortMigrationsForRollback } from "./migration-order";
 import { parseCreatedAt } from "./parse-created-at";
 import { SQLGrammar } from "./sql-grammar";
-import type { MigrationRecord, MigrationResult, TaggedSQL } from "./types";
+import type {
+  MigrationRecord,
+  MigrationResult,
+  RollbackPlan,
+  RollbackPlanEntry,
+  TaggedSQL,
+} from "./types";
 
 /**
  * Migration class type with static name property.
@@ -979,6 +986,70 @@ export class MigrationRunner {
   }
 
   /**
+   * Describe what rolling back N batches would remove, without changing
+   * anything: per migration, the collections/tables and fields/columns the
+   * rollback drops or unsets, with document/row counts where the driver can
+   * count them cheaply.
+   *
+   * It calls each migration's `down()` on a throwaway instance to collect the
+   * queued operations, so a `down()` that talks to the database directly
+   * instead of queueing operations is executed by the plan as well.
+   *
+   * @param batches - Number of batches to roll back (`Infinity` for all)
+   * @param options - `pruneMissing` mirrors the rollback option of the same name
+   */
+  public async planRollback(
+    batches: number,
+    options: { pruneMissing?: boolean } = {},
+  ): Promise<RollbackPlan> {
+    const toRollback = await this.getMigrationsToRollback(batches, {
+      pruneMissing: options.pruneMissing,
+      readOnly: true,
+    });
+    const plan: RollbackPlanEntry[] = [];
+
+    for (const MigrationClass of toRollback) {
+      const migration = this.createMigrationInstance(MigrationClass);
+      migration.setDirection("down");
+      await migration.down();
+
+      const dataSource = this.resolveDataSource(migration.dataSource);
+      const migrationDriver = this.getMigrationDriver(dataSource);
+      const operations: DestructiveOperation[] = [];
+
+      for (const operation of migration.describeDestructiveOperations()) {
+        operations.push({
+          ...operation,
+          count: await this.countAffected(migrationDriver, operation),
+        });
+      }
+
+      plan.push({ name: MigrationClass.migrationName, table: migration.table, operations });
+    }
+
+    return plan;
+  }
+
+  /** Cheap affected-count for the summary; `undefined` when the driver cannot tell. */
+  private async countAffected(
+    migrationDriver: MigrationDriverContract,
+    operation: DestructiveOperation,
+  ): Promise<number | undefined> {
+    try {
+      if (operation.type === "dropFields") {
+        if (!migrationDriver.countWithColumns) return undefined;
+
+        return await migrationDriver.countWithColumns(operation.table, operation.fields ?? []);
+      }
+
+      return await migrationDriver.countRows?.(operation.table);
+    } catch {
+      // The table may not exist (yet); a missing count never blocks the summary.
+      return undefined;
+    }
+  }
+
+  /**
    * Rollback all executed migrations.
    *
    * @param options - Execution options
@@ -1140,6 +1211,8 @@ export class MigrationRunner {
         // ============================================================================
 
         // Collect the requested direction's operations
+        migration.setDirection(direction);
+
         if (direction === "up") {
           await migration.up();
         } else {

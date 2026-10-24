@@ -13,5 +13,7 @@ export type {
   MigrationStatus,
   PendingMigration,
   RollbackOptions,
+  RollbackPlan,
+  RollbackPlanEntry,
   RunMigrationsOptions,
 } from "./types";

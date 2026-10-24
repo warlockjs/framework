@@ -67,6 +67,44 @@ export type MigrationStep = string | { readonly data: () => Promise<unknown> };
 export type PendingOperation = {
   readonly type: OperationType;
   readonly payload: unknown;
+  /**
+   * `dropColumn` only: the author explicitly accepted that this drop removes
+   * stored data from a document store during a rollback.
+   */
+  readonly destructive?: boolean;
+};
+
+/**
+ * Options for {@link Migration.dropColumn}.
+ */
+export type DropColumnOptions = {
+  /**
+   * Document stores (MongoDB) only. Unsetting a field erases every value the
+   * application stored in it, which the forward migration never did. Inside
+   * `down()` a drop therefore only runs when this is `true`; a plain
+   * `dropColumn()` there is skipped (ledger-only) with a warning. Ignored in
+   * `up()` and on SQL, where a dropped column is always applied.
+   */
+  readonly destructive?: boolean;
+};
+
+/**
+ * One data-removing operation a rollback would perform, as reported by
+ * `migrationRunner.planRollback()`.
+ */
+export type DestructiveOperation = {
+  /** What is removed. */
+  readonly type: "dropFields" | "dropTable" | "truncateTable";
+  /** Table or collection. */
+  readonly table: string;
+  /** Store family the operation runs on. */
+  readonly store: "document" | "sql";
+  /** Fields/columns for `dropFields`. */
+  readonly fields?: readonly string[];
+  /** `false` when the rollback skips the operation (document-store drop without `destructive: true`). */
+  readonly applied: boolean;
+  /** Documents (with the field) or rows affected, when the driver can count them cheaply. */
+  readonly count?: number;
 };
 
 /**
@@ -447,7 +485,7 @@ export interface MigrationContract {
   /**
    * Drop a column.
    */
-  dropColumn(column: string): MigrationContract;
+  dropColumn(column: string, options?: DropColumnOptions): MigrationContract;
 
   /**
    * Drop multiple columns.
@@ -763,6 +801,9 @@ export abstract class Migration implements MigrationContract {
    */
   protected driver!: MigrationDriverContract;
 
+  /** Direction the runner is collecting operations for. */
+  private direction: "up" | "down" = "up";
+
   /** Collection-only run (dry run / SQL export): `withConnection` must not touch the database. */
   private dryRunMode = false;
 
@@ -977,6 +1018,74 @@ export abstract class Migration implements MigrationContract {
   // ============================================================================
 
   /**
+   * Tell the migration which direction the runner is collecting operations
+   * for. Document stores skip undeclared field drops while it is `"down"`.
+   *
+   * @internal
+   */
+  public setDirection(direction: "up" | "down"): void {
+    this.direction = direction;
+  }
+
+  /**
+   * Whether the bound driver is a document store (MongoDB: no SQL serialization).
+   * Use it in `down()` to undo an `add` on SQL only.
+   */
+  public get isDocumentStore(): boolean {
+    return this.driver?.driver?.supportsSqlSerialization === false;
+  }
+
+  /**
+   * Whether an operation is a field drop the rollback skips on a document
+   * store because the author did not pass `destructive: true`.
+   */
+  private isSkippedFieldDrop(op: PendingOperation): boolean {
+    return (
+      this.direction === "down" &&
+      this.isDocumentStore &&
+      (op.type === "dropColumn" || op.type === "dropColumns") &&
+      op.destructive !== true
+    );
+  }
+
+  /**
+   * List the data-removing operations queued by the last `up()`/`down()` call
+   * without executing or clearing them.
+   *
+   * @internal
+   */
+  public describeDestructiveOperations(): DestructiveOperation[] {
+    const store = this.isDocumentStore ? "document" : "sql";
+    const operations: DestructiveOperation[] = [];
+
+    for (const op of this.pendingOperations) {
+      if (op.type === "dropColumn" || op.type === "dropColumns") {
+        const fields = op.type === "dropColumn" ? [op.payload as string] : (op.payload as string[]);
+        operations.push({
+          type: "dropFields",
+          table: this.table,
+          store,
+          fields,
+          applied: !this.isSkippedFieldDrop(op),
+        });
+      } else if (
+        op.type === "dropTable" ||
+        op.type === "dropTableIfExists" ||
+        op.type === "truncateTable"
+      ) {
+        operations.push({
+          type: op.type === "truncateTable" ? "truncateTable" : "dropTable",
+          table: this.table,
+          store,
+          applied: true,
+        });
+      }
+    }
+
+    return operations;
+  }
+
+  /**
    * Execute all pending operations directly through the migration driver.
    *
    * SQL-capable drivers go through toSQL() + raw query execution instead
@@ -1060,6 +1169,23 @@ export abstract class Migration implements MigrationContract {
   }
 
   /**
+   * Skip (and report) a field drop that a document-store rollback must not
+   * apply without `destructive: true`. Returns `true` when skipped.
+   */
+  private skipFieldDropWithWarning(op: PendingOperation): boolean {
+    if (!this.isSkippedFieldDrop(op)) return false;
+
+    const fields = [op.payload].flat().join(", ");
+    log.warn(
+      "database",
+      "migration",
+      `Rollback skipped dropping "${fields}" on "${this.table}": unsetting a field erases stored values on a document store. Pass { destructive: true } to dropColumn() to unset it.`,
+    );
+
+    return true;
+  }
+
+  /**
    * Execute a single pending operation.
    */
   private async executeOperation(op: PendingOperation): Promise<void> {
@@ -1079,10 +1205,12 @@ export abstract class Migration implements MigrationContract {
       }
 
       case "dropColumn":
+        if (this.skipFieldDropWithWarning(op)) break;
         await this.driver.dropColumn(this.table, op.payload as string);
         break;
 
       case "dropColumns":
+        if (this.skipFieldDropWithWarning(op)) break;
         await this.driver.dropColumns(this.table, op.payload as string[]);
         break;
 
@@ -2436,16 +2564,32 @@ export abstract class Migration implements MigrationContract {
   /**
    * Drop a column.
    *
+   * On SQL the column is dropped. On a document store (MongoDB) this unsets
+   * the field on every document, erasing stored values. Because a rollback
+   * that mirrors an additive `up()` would silently do exactly that, a plain
+   * drop inside `down()` is skipped on document stores; pass
+   * `{ destructive: true }` to really unset the field. Drops in `up()` always
+   * run.
+   *
    * @param column - Column name to drop
+   * @param options - `destructive: true` opts in to unsetting data on rollback
    * @returns This migration for chaining
    */
-  public dropColumn(column: string): this {
-    this.pendingOperations.push({ type: "dropColumn", payload: column });
+  public dropColumn(column: string, options: DropColumnOptions = {}): this {
+    this.pendingOperations.push({
+      type: "dropColumn",
+      payload: column,
+      destructive: options.destructive === true,
+    });
     return this;
   }
 
   /**
    * Drop multiple columns.
+   *
+   * Has no `destructive` opt-in: on a document store inside `down()` it is
+   * skipped like a plain `dropColumn()`. Call `dropColumn(name, { destructive: true })`
+   * per field to unset them on rollback.
    *
    * @param columns - Column names to drop
    * @returns This migration for chaining
@@ -3249,7 +3393,11 @@ export type MigrationAlterOptions = {
 
   /**
    * Custom rollback logic to execute on rollback.
-   * Unlike `create()`, `alter()` does not auto-infer rollbacks.
+   *
+   * `alter()` infers a rollback only for an add-only alter (just `add`, no
+   * custom `up`/`down`): SQL drops the added columns, document stores do
+   * nothing because `up` changed no documents. Any other alter needs an
+   * explicit `down`.
    */
   down?: (this: Migration) => void | Promise<void>;
 };
@@ -3735,6 +3883,20 @@ Migration.create = function createMigration(
  * });
  * ```
  */
+/**
+ * An alter whose only effect is `add`: `down()` can be derived.
+ */
+function isAddOnlyAlter(schema: AlterSchema, options: MigrationAlterOptions): boolean {
+  if (options.up || options.down) return false;
+
+  const keys = Object.keys(schema).filter((key) => {
+    const value = (schema as Record<string, unknown>)[key];
+    return value !== undefined && !(Array.isArray(value) && value.length === 0);
+  });
+
+  return keys.length === 1 && keys[0] === "add" && Object.keys(schema.add!).length > 0;
+}
+
 Migration.alter = function alterMigration(
   model: ChildModel<Model<any>>,
   schema: AlterSchema,
@@ -3936,6 +4098,17 @@ Migration.alter = function alterMigration(
     public async down(): Promise<void> {
       if (options.down) {
         await options.down.call(this as unknown as Migration);
+        return;
+      }
+
+      if (isAddOnlyAlter(schema, options)) {
+        // Document stores: `up` added no field to any document, so there is
+        // nothing to undo, and unsetting would erase values stored since.
+        if (this.isDocumentStore) return;
+
+        for (const column of Object.keys(schema.add!)) {
+          this.dropColumn(column);
+        }
       }
     }
   }

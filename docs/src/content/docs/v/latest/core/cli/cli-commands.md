@@ -271,6 +271,8 @@ warlock migrate --path src/app/orders/models/order/migrations
 | ---------------- | ------- | --------------------------------------------------------------------------- |
 | `--fresh, -f`    | boolean | Drop all tables and re-run migrations from scratch.                         |
 | `--rollback, -r` | boolean | Roll back migrations, dropping all tables.                                  |
+| `--yes, -y`      | boolean | With `--fresh` or `--rollback`: confirm without asking. See below.          |
+| `--force`        | boolean | Same as `--yes`.                                                            |
 | `--path, -p`     | string  | Path to a specific migration file or folder. Defaults to running all.       |
 | `--list, -l`     | boolean | Migration state: executed migrations, then what will run next.              |
 | `--pending`      | boolean | Only what will run next, in execution order. Sets an exit code — see below. |
@@ -280,6 +282,8 @@ warlock migrate --path src/app/orders/models/order/migrations
 | `--compact, -c`  | boolean | With `--sql`, strips generated comments and blank lines.                    |
 
 The minimal preload — only `database` and `logger` connectors — keeps migrations fast.
+
+`--fresh` and `--rollback` print a summary of what they will remove (collections or tables dropped, fields or columns unset, with document or row counts) before they run. In development they proceed after the summary. In any other environment they ask for confirmation; pass `--yes` or `--force` in scripts. With no terminal and neither flag they refuse and exit with code 1. On MongoDB, a plain `dropColumn()` inside a migration's `down()` is skipped rather than unsetting the field on every document: see [Rolling back on SQL versus MongoDB](../../cascade/the-basics/migrations.md#rolling-back-on-sql-versus-mongodb).
 
 #### Checking what will run next
 
