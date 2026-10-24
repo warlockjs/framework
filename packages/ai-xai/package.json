@@ -1,6 +1,6 @@
 {
   "name": "@warlock.js/ai-xai",
-  "version": "5.36.0",
+  "version": "5.37.0",
   "type": "module",
   "description": "xAI Grok adapter for @warlock.js/ai",
   "main": "./src/index.ts",
