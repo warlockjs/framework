@@ -1,4 +1,5 @@
 import type { BuildBudgets } from "../production/build-budgets";
+import type { ReleaseConfig } from "../release/types";
 import type { MigrationConstructor } from "@warlock.js/cascade";
 import type { CLICommand } from "../commands/cli-command";
 import type { Connector } from "../connectors/types";
@@ -280,6 +281,14 @@ export type WarlockConfig = {
      */
     migrations?: Array<MigrationConstructor>;
   };
+
+  /**
+   * Release pipeline settings for `warlock release`: candidate, gate,
+   * migration proof, stage, activate, verify and rollback.
+   *
+   * @see ReleaseConfig
+   */
+  release?: ReleaseConfig;
 
   /**
    * Testing configuration

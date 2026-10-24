@@ -236,6 +236,18 @@ testing: {
 
 Additional globs for the test runner. Most apps don't need this — the defaults pick up `**/*.spec.ts` and `**/*.test.ts` everywhere. Use this when your project has a non-standard test location (a shared test root, integration tests in a separate folder, etc.).
 
+### `release` — deploy pipeline
+
+```ts
+release: {
+  gate: { checks: [{ name: "test", command: "npx warlock test" }] },
+  restart: { command: "pm2 reload my-app" },
+  verify: { url: "http://127.0.0.1:2030/health" },
+}
+```
+
+Settings for `warlock release`: the gate checks, the migration proof targets, the restart command you own and the health URL to verify. Every field is optional. See [Deploying with `warlock release`](../cli/release.md).
+
 ## The `defineConfig` helper
 
 ```ts
