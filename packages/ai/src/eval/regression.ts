@@ -71,7 +71,7 @@ export function diff<TOutput = unknown>(
   const confidence = resolved.confidence ?? report.stats?.confidence ?? DEFAULT_CONFIDENCE;
   const useInterval = resolved.gate === "interval";
   const baselineScores = new Map<string, number>();
-  const baselineEntries = new Map<string, EvalCaseResult>();
+  const baselineEntries = new Map<string, EvalCaseResult<TOutput>>();
 
   for (const entry of baseline.cases) {
     baselineScores.set(entry.case.name, entry.score);

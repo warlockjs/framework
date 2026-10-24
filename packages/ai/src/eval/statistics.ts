@@ -219,7 +219,7 @@ export function tInterval(values: number[], confidence = DEFAULT_CONFIDENCE): Ev
 type Sample = { score: number; passed: boolean };
 
 /** Samples of a case: its recorded runs, or the case itself for legacy reports. */
-export function samplesOf(entry: EvalCaseResult): Sample[] {
+export function samplesOf<TOutput>(entry: EvalCaseResult<TOutput>): Sample[] {
   if (entry.runs && entry.runs.length > 0) {
     return entry.runs;
   }
@@ -248,7 +248,10 @@ function metricStats(samples: Sample[], confidence: number): EvalMetricStats {
  * `repeat: 3` over 10 cases pools 30 samples. Reports without recorded runs
  * (older baselines) contribute one sample per case.
  */
-export function computeStats(cases: EvalCaseResult[], confidence = DEFAULT_CONFIDENCE): EvalStats {
+export function computeStats<TOutput>(
+  cases: EvalCaseResult<TOutput>[],
+  confidence = DEFAULT_CONFIDENCE,
+): EvalStats {
   const groups = new Map<string, Sample[]>();
   const all: Sample[] = [];
 
@@ -274,8 +277,8 @@ export function computeStats(cases: EvalCaseResult[], confidence = DEFAULT_CONFI
 }
 
 /** Per-case score interval from its runs (`[0, 1]` when under two runs). */
-export function caseScoreInterval(
-  entry: EvalCaseResult,
+export function caseScoreInterval<TOutput>(
+  entry: EvalCaseResult<TOutput>,
   confidence = DEFAULT_CONFIDENCE,
 ): EvalInterval {
   return tInterval(
