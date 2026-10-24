@@ -43,6 +43,15 @@ describe("resolveApiRoute outside the page's table", () => {
   });
 });
 
+describe("resolveApiRoute without a table", () => {
+  it("explains that the document embeds no table and names web.namedApiRoutes", () => {
+    publishNamedApiRoutes(undefined);
+
+    expect(() => resolveApiRoute("orders.show")).toThrow(/embeds no route table/);
+    expect(() => resolveApiRoute("orders.show")).toThrow(/explicit path/);
+  });
+});
+
 describe("clientVisibleRouteNames", () => {
   it("keeps every route except the ones that opted out of the browser", () => {
     const routes = [

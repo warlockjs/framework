@@ -134,6 +134,23 @@ import { Link } from "@warlock.js/web";
 
 `src/config/web.ts` can import your resolver from app code (`app/tenants/...`); `warlock build` resolves those path aliases when it reads `web.sites`.
 
+## Named API routes per site
+
+API routes are registered once on the shared router and answer on every host, so they
+do not belong to a site by themselves. A page embeds a named API route in its browser
+table when its code reaches the name, and a route that declares `sites` is embedded
+only in pages of those sites:
+
+```ts
+router.group({ prefix: "/api/admin", sites: ["admin"] }, () => {
+  router.post("/users", createUserController, { name: "admin.users.create" });
+});
+```
+
+A route without `sites` is shared by every site. Combine this with
+[`web.namedApiRoutes`](/v/latest/web/essentials/14-form-submission/#control-the-route-table)
+to keep path prefixes out of every table.
+
 ## Search and TLS endpoints
 
 With the normal sitemap and robots features enabled, `/sitemap.xml` and `/robots.txt` are selected per site. A site's sitemap contains only that site's pages and uses that request's site origin and `basePath`. A resolver-selected dynamic site is omitted from indexing unless its resolver result has `indexable: true`: its sitemap is a 404 and its robots response disallows all crawling otherwise.

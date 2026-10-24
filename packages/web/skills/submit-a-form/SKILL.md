@@ -69,6 +69,16 @@ export const config: PageConfig = { apiRoutes: ["orders.*"] };
 
 A name the page does not carry throws. Development names the route and the declaration that fixes it; production throws a short error with no fallback. A route registered with `clientVisible: false` is never in the table. `warlock check` reports a name it cannot read as `WL9019`. Use an explicit `path` and `method` for such a call when declaring is not practical.
 
+### Control the route table — `web.namedApiRoutes`
+
+`web.namedApiRoutes` (in `src/config/web.ts`) only removes routes from what a page reaches:
+
+- `false`: embed no table. Named-route calls throw (the development error names the option); an explicit `path` and `method` still work. Use it when the app never calls routes by name.
+- `{ privatePrefixes: ["/api/admin/", "/api/webhooks/"] }`: routes under these path prefixes (whole segments) are never embedded, for any viewer or site.
+- an allowlist of names or `prefix.*` patterns, or a filter `(route, { site, guest }) => boolean`, as shorthand for `{ include }` (`route` has `name`, `path`, `method`, `sites`, `guarded`).
+
+Always applied as well: routes declared for other sites with the core `sites` route or group option (a route without `sites` is shared) are left out of a site's pages, and routes behind an auth guard (group middleware included) are left out for a guest, meaning no `web.session` or no signed-in user. After signing in without a navigation, the page still holds the guest table until the next navigation or reload.
+
 ## Typed responses from `responseSchema`
 
 When the API handler declares `responseSchema` (see core's `create-controller`), the generated `ApiRouteRegistry` entry carries a `response` map and `useSubmitForm({ route })` types `data`, `response` and `onSuccess` from the route's declared 2xx body. No generic argument and no cast.

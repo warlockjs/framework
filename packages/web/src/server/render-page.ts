@@ -3,6 +3,7 @@ import { createElement, StrictMode, type ComponentType, type ReactNode } from "r
 import type { PipeableStream, RenderToPipeableStreamOptions } from "react-dom/server";
 import {
   buildTracingContext,
+  config,
   dispatchPhase,
   environment,
   getPublicUrl,
@@ -65,6 +66,7 @@ import {
 import type { DeferSettlement } from "./defer-settlement";
 import { createSettledThenable } from "../loaders/settled-thenable";
 import { bindRequestRouteTranslations } from "./request-route-translations";
+import type { NamedApiRoutesOption } from "../named-api-routes-config";
 import { resolveNamedApiRoutes } from "./named-api-routes";
 import { siteHydrationUrl } from "./hydration-client-url";
 import { consumePageManifest, type PagePayloadBudget } from "./page-manifest";
@@ -1147,7 +1149,12 @@ async function finishRender(
     hydrationClientModulePreloadUrls: streamOptions.hydrationClientModulePreloadUrls,
     localeAlternates: hasExplicitAlternates ? undefined : localeAlternates,
     localeRouting,
-    namedApiRoutes: resolveNamedApiRoutes(streamOptions.clientApiRouteNames?.()),
+    namedApiRoutes: resolveNamedApiRoutes(streamOptions.clientApiRouteNames?.(), {
+      config: config.get("web.namedApiRoutes") as NamedApiRoutesOption | undefined,
+      site: request.site?.key,
+      // No session resolver means no viewer is ever known to be signed in.
+      guest: (bundle as Bundle).session?.user == null,
+    }),
   };
 
   // Resolve document slots before either wire representation is serialized.

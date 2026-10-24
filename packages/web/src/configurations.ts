@@ -4,6 +4,7 @@ import type { RobotsConfig } from "./sitemap/robots-config-types";
 import type { WebSitemapConfig } from "./sitemap/sitemap-config-types";
 import type { WebErrorReportingConfigurations } from "./server/error-reporting-config";
 import type { SessionResolver } from "./session/session.types";
+import type { NamedApiRoutesOption } from "./named-api-routes-config";
 import type { HostResolver, SitesConfig } from "./sites/site-config.types";
 
 /** Customises crawler detection for the fully resolved-document renderer. */
@@ -42,6 +43,12 @@ export type WebConfigurations = {
   errors?: WebErrorReportingConfigurations;
   /** Resolves the signed-in user for pages, e.g. auth's `pageSession()`. */
   session?: SessionResolver;
+  /**
+   * Controls the browser route table each page embeds for `apiHref()` and
+   * `useSubmitForm({ route })`: `false` embeds nothing, an allowlist or filter
+   * narrows it, `{ privatePrefixes }` keeps path prefixes out for everyone.
+   */
+  namedApiRoutes?: NamedApiRoutesOption;
   /** Opt-in multi-site mode: several sites (fixed hosts or resolver-driven) in one app. */
   sites?: SitesConfig;
   /** Maps a request host to a dynamic site; `null` means unknown host. */

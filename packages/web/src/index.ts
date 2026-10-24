@@ -51,6 +51,14 @@ export type {
   PageActionContext,
 } from "./loaders";
 export type {
+  NamedApiRouteCandidate,
+  NamedApiRouteContext,
+  NamedApiRoutesConfig,
+  NamedApiRoutesFilter,
+  NamedApiRoutesInclude,
+  NamedApiRoutesOption,
+} from "./named-api-routes-config";
+export type {
   CrawlerDetectionOptions,
   WebStreamingConfigurations,
   WebConfigurations,
