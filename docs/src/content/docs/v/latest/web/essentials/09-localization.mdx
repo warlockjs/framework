@@ -405,6 +405,23 @@ honours both options, so a page behaves the same way in `warlock dev` and in
 production. The missing-key detector still makes a pruning miss visible in
 development.
 
+## `Intl` labels and hydration
+
+Labels from `Intl.DisplayNames`, `Intl.Collator` or `localeCompare` sorting are
+computed from the ICU data of the runtime that evaluates them. Node and each
+browser ship different data, so a region name (Hong Kong, Macao, Palestine and
+others) or a sort order can differ between the server render and the browser,
+and React reports a hydration mismatch (error 418 in production).
+
+Render such text from a table both sides share: a checked-in, pre-sorted list
+of names per locale, or a value computed in the loader and returned as page
+data. If the browser must compute it, render it after hydration, for example in
+an effect, or inside `<ClientOnly>`.
+
+In development, when React reports a hydration mismatch, the client logs the
+first mismatching node with the element path above it, the server text and the
+client text. Production builds log nothing extra.
+
 ## Gotchas
 
 - **`useLocale()` requires the page pipeline.** It throws outside

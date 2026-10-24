@@ -15,6 +15,11 @@ All notable changes to `@warlock.js/web` are documented here.
 ### Changed
 
 - Server seam `resolveNamedApiRoutes(names, options)` takes `{ config, site, guest }`; without options it applies site scoping and guard rules for a guest in single-site mode.
+- In development, when React reports a hydration mismatch, the client logs the first mismatching node: the element path, the server text and the client text. Production builds are unchanged.
+
+### Changed
+
+- The `create-a-page` and `localize-pages` skills and the localization and client/server boundary docs warn that `Intl.DisplayNames`, `localeCompare` sorting and similar `Intl` output can differ between Node and browsers and cause hydration mismatches, and recommend a shared pre-computed table or rendering after hydration.
 
 ## 5.36.0 - 2026-10-22
 

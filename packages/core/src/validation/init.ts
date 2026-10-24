@@ -8,6 +8,7 @@
 import { configureSeal, getSealConfig, registerPlugin } from "@warlock.js/seal";
 import { config } from "../config";
 import { t } from "../http/middleware/inject-request-context";
+import { translateSealRule } from "./translate-rule";
 import { databasePlugin, filePlugin, localizedPlugin } from "./plugins";
 
 // Configure Seal to use Warlock's localization
@@ -22,11 +23,8 @@ configureSeal({
     const translationGroup = config.key("validation.translationGroup", "validation");
 
     const translationKey = `${translationGroup}.${rule.name}`;
-    const translation = t(translationKey, attributes);
 
-    return translation === translationKey
-      ? rule.errorMessage || rule.defaultErrorMessage
-      : translation;
+    return translateSealRule({ rule, attributes, key: translationKey, translate: t });
   },
 
   translateAttribute({ attribute, context, rule }) {

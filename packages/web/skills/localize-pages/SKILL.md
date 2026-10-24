@@ -80,6 +80,14 @@ Tune the groups and pruning with the build setting
 Development reads the same setting. Set `prune: false` to ship every key while
 you declare the rest.
 
+## `Intl` labels and hydration
+
+`Intl.DisplayNames`, `Intl.Collator` and `localeCompare` use the ICU data of the runtime that runs them. Node and browsers differ (region names such as Hong Kong, Macao or Palestine, and collation order), so SSR text built from them can differ from the hydrated text and React reports a hydration mismatch.
+
+- Do not render `Intl`-derived labels or sort orders during SSR unless both sides read the same table. Use a checked-in, pre-sorted name table per locale, or compute the list in the loader and return it as page data.
+- If the browser has to compute it, render it after hydration (an effect) or inside `<ClientOnly>`.
+- In development the client logs the first mismatching node: element path, server text and client text.
+
 ## Scope, errors, and legacy lookups
 
 A page receives only `locales.json` files on its physical ancestor chain. A child file can contribute additional keys for that page. A sibling cannot contribute. Current ownership validation rejects duplicate flattened keys globally, including matching ancestor/child keys; any key that conflicts with a namespace prefix also fails the build.

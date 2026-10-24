@@ -557,6 +557,7 @@ Creating a page, deleting one, or editing `config.route` is route-table churn ra
 - **Components receive data, not HTTP objects.** `request` and `response` belong to loaders; the component also renders in the browser.
 - **A default component is synchronous.** Fetch in the loader, then render its result.
 - **A page can export `action` (or `actions`) to handle its own form POST.** Use `<Form>` and `useActionData`; see the `handle-a-form-action` topic. Mutations through API routes remain ordinary requests; call `refresh()` after them.
+- **`Intl`-derived text can differ between Node and the browser.** `Intl.DisplayNames`, `localeCompare` sorting and similar use each runtime's ICU data, so SSR output may not match hydration. Render such labels from a shared pre-computed table (or a value computed in the loader), or after hydration; see the `localize-pages` topic. In development the client logs the first mismatching node.
 - **Do not import the hydration entry.** `esm/hydration/index.mjs` is a framework build input, not a consumer API. The public low-level runtime subpath is `@warlock.js/web/client/runtime`.
 
 ## See also

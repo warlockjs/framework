@@ -277,6 +277,14 @@ const message = trans("auth.otpExpired");
 
 `setCurrentLocaleCode` is process-global. In a worker that handles jobs for different tenants/locales, set it at the **start of each job handler** so one job's locale never leaks into the next. For a single off-locale translation without changing global state, prefer `transFrom(localeCode, key)` directly.
 
+## Validation messages
+
+The default seal rule translation looks up `validation.<rule>` (or the group set in `validation.translationGroup`) in the translation registry. A translation is used only when every `:placeholder` in it can be filled from the rule's parameters; otherwise the schema falls back to seal's own message, so a raw `:placeholder` never reaches an API response. Placeholder aliases are mapped for you: `:length` reads `:minLength` / `:maxLength` for the `minLength` and `maxLength` rules, and `:matchingInput` reads `:field` for `match`.
+
+This matters when a browser library such as `@mongez/react-form` is imported on the server: it registers English `validation.*` defaults in the same process-wide registry. Your own `validation.*` translations still override them. To take full control, set `validation.translationGroup` to a group only your app fills, or provide `validation.translateRule`.
+
+In development, the first time a key's translation cannot be filled, a warning names the key.
+
 ## Gotchas
 
 - **`translation-locale-code` beats the `locale` header and `?locale` query.** If a request sets both `translation-locale-code: en` and `locale: ar`, you get English. The recipe's three-source list omits this header — this page's [precedence table](#locale-resolution-precedence) is the authoritative order.
