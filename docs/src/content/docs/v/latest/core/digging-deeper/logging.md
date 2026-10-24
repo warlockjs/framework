@@ -297,6 +297,8 @@ logging: {
 },
 ```
 
+To keep a record of every request (or only the failing and slow ones) after the process restarts, with the same redaction and `logging` rules applied, use the [request log](./request-log.md) (`http.logging.requests`).
+
 Log a request yourself the same way: `log.warn("billing", "charge", "declined", { request: request.toLogSnapshot() })` instead of passing `request`.
 
 ## Per-channel filtering

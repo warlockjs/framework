@@ -50,6 +50,26 @@ of it would fail to resolve there.
 Work outside a request (boot, scheduler ticks, queue jobs) goes to a separate
 background list, so it never clutters a request's timeline.
 
+## Request history survives restarts
+
+With core's request log on (the default in development, `http.logging.requests`),
+the **Requests** panel also reads `storage/logs/requests/*.jsonl`: history past
+a restart and past the 200-request ring buffer, merged with live requests
+without duplicates by id (saved-only rows are marked **saved**).
+
+- Filter: `GET /__warlock/api/requests?status=5xx&route=posts&method=POST&since=1h&until=…&q=text&limit=50`
+  (`status` is `404` or a class like `5xx`; `since` is a duration or ISO date).
+  A bad value answers 400.
+- Detail: `GET /__warlock/api/requests/:id` returns the in-memory request, or a
+  saved one rebuilt from the log; either carries `record` (the full
+  `RequestLogRecord`: redacted headers/body, response, error with stack, logs,
+  query summary) when one was written. Per-query detail and Explain exist only
+  for requests still in memory.
+- Copy as curl: `GET /__warlock/api/requests/:id/curl` returns `{ curl }`;
+  redacted values stay `[REDACTED]`.
+
+An older core without the request log leaves the panel in-memory only.
+
 ## AI runs alongside HTTP requests
 
 The **AI** tab and each request's **AI runs** section display completed traces

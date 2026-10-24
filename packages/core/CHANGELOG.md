@@ -7,6 +7,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 > ⚠ **Versioning: `@warlock.js/*` does not follow SemVer strictly — breaking changes may ship in a minor.** This is a deliberate decision, not an oversight: the framework is pre-adoption and the cost of a major per behaviour fix currently outweighs the benefit. **Pin an exact version or a tilde range (`~4.13.0`) if you need to opt into changes rather than receive them.** Every breaking change is marked **BREAKING** in its entry and summarised in an _Upgrading_ section at the top of the release. **This policy will change once the framework has consumers beyond its author.**
 
 ## 5.37.1 - 2026-10-24
+## 5.38.0
+
+### Added
+
+- Persistent request log, `http.logging.requests`: one redacted JSON record per request, written after the response is sent through buffered logger channels. A record holds the id and trace id, time, method, URL (credential query values masked), route name and pattern, params, query, headers, body, `session: { userId, userType }`, IP, status, duration, response size (and headers and body when `include.response` is on), phases, the log entries emitted during the request, a query summary (count, slowest query, N+1 findings) and, for a `5xx` or a request that threw, the error with its stack, phase, page file and site. `RequestLogRecord`, `listRequestLogs()`, `getRequestLog()`, `requestLogToCurl()` and `compileRequestLogFilter()` are exported.
+- `http.logging.requests` options: `enabled` (default on in development, off elsewhere), `channels` (logger channel names or instances; default a daily JSON-lines file `storage/logs/requests/YYYY-MM-DD.jsonl`), `only` (`"all"`, `"errors"`, `"slow"`; default `"all"` in development and `"errors"` elsewhere), `slowMs`, `sampleRate` (errors are always kept when `only` includes them), `include` (`headers`, `body`, `query`, `params`, `session`, `response`, `stack`, `logs`, `queries`, `phases`), `maxBodyBytes` (default 16 KB, a larger body ends with a truncation marker) and `retention: { maxDays, maxSizeMb }` for the default file channel, which prunes on boot and when a new day's file starts.
+- Outside development the request log records request headers through an allowlist, and leaves the request and response bodies out unless `include.body` / `include.response` is set. The logger's redaction, `http.logging.private` URL rules and a route's `logging: { body: false, query: false }` apply to every record, and uploaded files are recorded as `{ file, mimeType }` only.
+- `warlock logs requests [--status 5xx|404] [--route name] [--since 1h] [--limit n] [--json]` lists persisted requests and `warlock logs request <id> [--json]` prints one in full. Neither boots the app.
+- MCP tool `request_log` (read-only): lists persisted requests with `status`, `route`, `method`, `since`, `q` and `limit` filters, or returns one full record by `id`.
+- Skill `request-log`.
+
+### Changed
+
+- The `console.error` fallback for an unhandled request error, used when no log channel is configured, ignores passive channels (see `LogChannel.passive` in `@warlock.js/logger`), so the request log's log collector never silences it.
+
+## 5.37.1
 
 ### Added
 

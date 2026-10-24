@@ -4,6 +4,15 @@ All notable changes to `@warlock.js/devtools` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.38.0
+
+### Added
+
+- The Requests panel and `GET /__warlock/api/requests` also read core's persistent request log (`storage/logs/requests/*.jsonl`), so request history survives a restart and the 200-request ring buffer. Live and persisted requests are merged without duplicates by request id; requests read only from disk are marked `persisted`.
+- Request filters: the list API takes `status` (`404` or a class such as `5xx`), `route`, `method`, `since`, `until`, `q` (text in the URL or id) and `limit`, answering 400 for a bad value; the dashboard has search, status and method filters.
+- A saved request opens with its error (message, stack, phase, page file, site), the redacted request and response, the log entries and the query summary with N+1 findings. `GET /__warlock/api/requests/:id` carries the full record as `record`.
+- Copy as curl: `GET /__warlock/api/requests/:id/curl` and a button in the request detail. Values the log redacted stay `[REDACTED]`.
+
 ## 5.34.3 - 2026-10-20
 
 ### Changed

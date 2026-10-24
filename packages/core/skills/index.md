@@ -12,7 +12,7 @@ Core is the application runtime: it boots the app, auto-loads each module's spec
 2. Write a thin controller (`create-controller.md`); validate input with a schema attached to the handler (`validate-input.md`).
 3. Put logic in a service or use case (`write-use-case.md`), and data access in a repository (`use-repository.md`).
 4. Return via `response.*` (`send-response.md`) and shape output with a resource (`define-resource.md`); declare `responseSchema` for typed clients and docs (`create-controller.md`, `generate-openapi.md`).
-5. Configure and run (`configure-app.md`, `run-app.md`); check setup with `warlock-doctor.md`, read the app with `warlock-inspect.md` (or serve it to an agent with `warlock-mcp.md`), verify a change with `warlock-check.md`, and a request's runtime behaviour with `warlock-trace.md`.
+5. Configure and run (`configure-app.md`, `run-app.md`); check setup with `warlock-doctor.md`, read the app with `warlock-inspect.md` (or serve it to an agent with `warlock-mcp.md`), verify a change with `warlock-check.md`, a request's runtime behaviour with `warlock-trace.md`, and what happened to a past request with `request-log.md`.
 
 When the framework is wrong or missing a capability, follow the `report-framework-issue` topic to prepare a public report and ask the user before filing.
 
@@ -25,7 +25,7 @@ When the framework is wrong or missing a capability, follow the `report-framewor
 - **CLI & running the app:** generate-web-ui, run-app, deploy-release, write-cli-command, add-connector, health-checks, warlock-doctor, warlock-inspect, warlock-check, generate-openapi
 - **Agent tooling:** warlock-mcp, warlock-trace, warlock-agents-md, warlock-board
 - **Storage, files & mail:** store-file, upload-file, process-image, send-mail
-- **Security & utilities:** hash-password, encrypt-data, store-secrets, retry-operation, benchmark-code, request-memo, request-tracing
+- **Security & utilities:** hash-password, encrypt-data, store-secrets, retry-operation, benchmark-code, request-memo, request-tracing, request-log
 - **Testing:** test-browser, test-http, test-service, test-fakes, model-factories
 
 ## Conventions and pitfalls

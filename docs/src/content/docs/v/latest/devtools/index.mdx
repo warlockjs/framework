@@ -41,6 +41,30 @@ The default dashboard retains the latest 200 requests at `/__warlock`.
 Work that is not part of a request, such as boot work or a scheduler tick,
 appears separately so it does not distort a request timeline.
 
+## Request history
+
+The dashboard keeps the latest 200 requests in memory. With core's
+[request log](/v/latest/core/digging-deeper/request-log/) on (the default in
+development), the **Requests** panel also reads the persisted JSON-lines files
+in `storage/logs/requests`, so history survives a restart and the 200-request
+limit. A request in both places is shown once, from memory. Requests read only
+from disk are marked **saved**.
+
+- **Filter** the list by text (URL or id), status (`404` or `5xx`) and method.
+  The API takes `status`, `route`, `method`, `since`, `until`, `q` and `limit`:
+  `GET /__warlock/api/requests?status=5xx&since=1h`.
+- **Open a saved request** to see its error with stack, page file and site,
+  the redacted request (headers, params, query, body, user), the response, the
+  log entries and the query summary with N+1 findings. Per-query detail and
+  Explain exist only for requests still in memory.
+- **Copy as curl** builds a `curl` command from the record
+  (`GET /__warlock/api/requests/:id/curl`). Values the log redacted stay
+  `[REDACTED]`, so the command is safe to paste; replace them before running it.
+
+**Clear** empties the in-memory list only; the files are not touched. Without
+the request log, or with a core older than 5.38, the panel shows only the
+in-memory requests.
+
 ## Processes
 
 `npx warlock add process` registers a read-only **Processes** panel through
@@ -75,7 +99,8 @@ The document is built in-process, on every request to `GET /__warlock/api/openap
 - Dashboard and API routes answer only loopback clients (`127.0.0.1` and
   `::1`). The check uses the socket address; `X-Forwarded-For` cannot unlock
   it.
-- Data is held in memory and disappears when the process restarts.
+- Live data is held in memory and disappears when the process restarts. Only
+  what core's request log wrote (already redacted) is read back from disk.
 
 ## Build your own tooling
 
