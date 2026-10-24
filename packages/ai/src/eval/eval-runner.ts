@@ -14,6 +14,12 @@ import { AgentExecutionError } from "../errors";
 import { log } from "@warlock.js/logger";
 import { judge as judgeScorer } from "./judge-scorer";
 import { diff } from "./regression";
+import {
+  caseScoreInterval,
+  computeStats,
+  DEFAULT_CONFIDENCE,
+  wilsonInterval,
+} from "./statistics";
 
 /**
  * Narrow `EvalOptions.cases` to the underlying `EvalCase[]`. A
@@ -94,7 +100,7 @@ function mergeOptions<TOutput>(
  * scorer, aggregate into an {@link EvalCaseResult}. A case passes only
  * when the agent did not error AND every scorer passed.
  */
-async function runCase<TOutput>(
+async function runOnce<TOutput>(
   agent: AgentContract<TOutput>,
   evalCase: EvalCase<TOutput>,
   options: EvalOptions<TOutput>,
@@ -137,7 +143,53 @@ async function runCase<TOutput>(
 }
 
 /**
- * Core implementation of `agent.eval`. Runs every case sequentially
+ * Run one case `repeat` times and fold the runs into a single
+ * {@link EvalCaseResult}: `score` is the mean of the run scores, `passed`
+ * requires every run to pass, and `result` / `scores` come from the first
+ * failing run (or the first run when all passed) so a report shows the
+ * evidence for a failure.
+ */
+async function runCase<TOutput>(
+  agent: AgentContract<TOutput>,
+  evalCase: EvalCase<TOutput>,
+  options: EvalOptions<TOutput>,
+  passThreshold: number,
+  repeat: number,
+  confidence: number,
+): Promise<EvalCaseResult<TOutput>> {
+  const outcomes: EvalCaseResult<TOutput>[] = [];
+
+  for (let run = 0; run < repeat; run++) {
+    outcomes.push(await runOnce(agent, evalCase, options, passThreshold));
+  }
+
+  const representative = outcomes.find((outcome) => !outcome.passed) ?? outcomes[0];
+  const runs = outcomes.map((outcome) => ({
+    score: outcome.score,
+    passed: outcome.passed,
+    duration: outcome.duration,
+  }));
+  const passes = runs.filter((run) => run.passed).length;
+
+  const folded: EvalCaseResult<TOutput> = {
+    ...representative,
+    score: runs.reduce((sum, run) => sum + run.score, 0) / runs.length,
+    passed: passes === repeat,
+    duration: runs.reduce((sum, run) => sum + run.duration, 0),
+    repeat,
+    passes,
+    runs,
+    passRateInterval: wilsonInterval(passes, repeat, confidence),
+  };
+
+  folded.scoreInterval = caseScoreInterval(folded, confidence);
+
+  return folded;
+}
+
+/**
+ * Core implementation of `agent.eval`. Runs every case (and each of its
+ * `repeat` runs) sequentially
  * (cases share the agent and may carry side effects — ordering must be
  * deterministic), scores each, fires `onFailure` for failed cases, and
  * assembles the aggregate {@link EvalReport}.
@@ -150,13 +202,29 @@ export async function runEval<TOutput>(
   options: EvalOptions<TOutput>,
 ): Promise<EvalReport<TOutput>> {
   const passThreshold = options.passThreshold ?? DEFAULT_PASS_THRESHOLD;
+  const repeat = options.repeat ?? 1;
+  const confidence = options.confidence ?? DEFAULT_CONFIDENCE;
+
+  if (!Number.isInteger(repeat) || repeat < 1) {
+    throw new AgentExecutionError(`eval "repeat" must be a positive integer, received ${repeat}`, {
+      context: { authoring: true, repeat },
+    });
+  }
+
+  if (!(confidence > 0 && confidence < 1)) {
+    throw new AgentExecutionError(
+      `eval "confidence" must be between 0 and 1 (exclusive), received ${confidence}`,
+      { context: { authoring: true, confidence } },
+    );
+  }
+
   const start = performance.now();
 
   const suiteCases = resolveCases(options.cases);
   const cases: EvalCaseResult<TOutput>[] = [];
 
   for (const evalCase of suiteCases) {
-    const caseResult = await runCase(agent, evalCase, options, passThreshold);
+    const caseResult = await runCase(agent, evalCase, options, passThreshold, repeat, confidence);
 
     cases.push(caseResult);
 
@@ -187,10 +255,26 @@ export async function runEval<TOutput>(
     passed: total > 0 && passedCount === total,
     cases,
     duration: performance.now() - start,
+    repeat,
+    stats: computeStats(cases, confidence),
   };
 
+  if (repeat > 1) {
+    report.stableFailures = cases
+      .filter((entry) => entry.passes === 0)
+      .map((entry) => entry.case.name);
+    report.flakyCases = cases
+      .filter((entry) => (entry.passes ?? 0) > 0 && !entry.passed)
+      .map((entry) => entry.case.name);
+  }
+
   if (options.baseline) {
-    report.regression = diff(report, options.baseline, options.tolerance);
+    report.regression = diff(report, options.baseline, {
+      tolerance: options.tolerance,
+      gate: options.gate,
+      confidence,
+      failOnStableFailures: options.failOnStableFailures,
+    });
   }
 
   return report;

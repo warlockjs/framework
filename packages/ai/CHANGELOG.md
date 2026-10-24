@@ -4,6 +4,15 @@ All notable changes to `@warlock.js/ai` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.37.0
+
+### Added
+
+- `agent.eval({ repeat })` runs every case several times (default `1`, unchanged). Case results carry `passes` / `repeat`, per-run `runs`, and score and pass-rate intervals; reports carry `stats` (overall and per `EvalCase.category`, Wilson intervals for pass rates and Student-t intervals for mean scores), plus `stableFailures` and `flakyCases` when `repeat > 1`. `toJUnit` shows `passed 2/3 runs` for repeated cases.
+- `gate: "interval"` for baseline comparison flags a case, or an overall or per-category pass rate or mean score, only when the baseline interval lies above the current interval by more than `tolerance`, so run-to-run noise no longer reads as a regression. The default `gate: "point"` keeps the existing rule. `failOnStableFailures` fails the regression verdict when a case failed every run. `diff` accepts `{ tolerance, gate, confidence, failOnStableFailures }` as its third argument (a plain tolerance number still works), and `EvalRegression` gains `regressedMetrics`, `stableFailures` and `flaky`.
+- `EvalCase.category` groups cases for per-category statistics.
+- Serialized baselines store the repeat count, per-case counts and intervals; baselines saved earlier still load and count each case as one sample.
+
 ## 5.36.0 - 2026-10-22
 
 ### Changed

@@ -80,11 +80,14 @@ type EvalRegression = {
   regressed: Array<{ name: string; before: number; after: number }>;
   removed: string[]; // in baseline, absent now
   added: string[]; // new now, absent in baseline
-  passed: boolean; // true when `regressed` is empty
+  passed: boolean; // true when nothing regressed beyond tolerance
+  regressedMetrics?: Array<{ scope: string; metric: "passRate" | "meanScore"; before: number; after: number; interval: { low: number; high: number } }>; // interval gate
+  stableFailures?: string[]; // repeat > 1
+  flaky?: string[]; // repeat > 1
 };
 ```
 
-Cases present in only one report surface under `added` / `removed` rather than as regressions — **adding or dropping a case never fails the gate by itself.** `passed` flips false only when a real case got worse beyond tolerance. The diff is a pure function of the two reports and the tolerance; you can also call it directly as `ai.eval`'s underlying `diff(report, baseline, tolerance)` if you have both reports in hand.
+Cases present in only one report surface under `added` / `removed` rather than as regressions — **adding or dropping a case never fails the gate by itself.** `passed` flips false only when a real case got worse beyond tolerance. The diff is a pure function of the two reports and the tolerance; you can also call it directly as `ai.eval`'s underlying `diff(report, baseline, tolerance)` if you have both reports in hand. The third argument also accepts `{ tolerance, gate, confidence, failOnStableFailures }`; see [Repeated runs and variance-aware gating](#repeated-runs-and-variance-aware-gating).
 
 ### The baseline loop
 
@@ -95,6 +98,51 @@ await writeFile("./eval/baseline.json", ai.eval.toJSON(report));
 ```
 
 `toJSON` emits the whole report verbatim (results, per-case scores, timings, any attached `regression`); `fromJSON` parses it back. Scorers were never part of the serialized report, so the round-trip is over plain data — exactly what regression diffing needs.
+
+## Repeated runs and variance-aware gating
+
+A language model scores a few points differently every run, so one run compared with one baseline flags regressions that are only noise. Set `repeat` to run every case several times and let the gate account for the spread:
+
+```ts
+const report = await agent.eval({
+  cases: ds, // entries may carry a `category`
+  scorers: [ai.eval.contains()],
+  repeat: 5, // default 1: a single run, behavior unchanged
+  confidence: 0.95, // interval level, default 0.95
+  baseline,
+  gate: "interval", // default "point"
+  tolerance: 0.02,
+  failOnStableFailures: true,
+});
+```
+
+Runs execute one after another (the eval runner has no parallelism, so the concurrency you already have is unchanged); each case runs `repeat` times before the next case starts. A case passes only when **all** its runs pass.
+
+### What the report adds
+
+- Per case: `repeat`, `passes` (e.g. `2` of `3`), `runs` (score, verdict and duration of each run), `score` (mean of the runs), `scoreInterval` and `passRateInterval`. `result` and `scores` are those of the first failing run, or of the first run when all passed. `onFailure` fires once per failing case.
+- `report.stats`: pooled `overall` statistics plus one entry per `EvalCase.category`. Every run of every case is a sample, so `repeat: 3` over 10 cases gives 30. Each entry holds `runs`, `passes`, `passRate` with a Wilson `passRateInterval`, and `meanScore` with a Student-t `meanScoreInterval`.
+- With `repeat > 1`: `report.stableFailures` (cases that failed every run) and `report.flakyCases` (failed some runs, passed others). A stable failure is a defect; a flaky case is variance. Treat them differently.
+- `toJUnit` adds `passed 2/3 runs` to repeated cases.
+
+### The statistics
+
+- **Pass rates** use the Wilson score interval. It stays inside `[0, 1]`, is not degenerate at 0% or 100%, and is wide for small samples (2 of 2 passing gives a lower bound near 0.34, not "100%").
+- **Mean scores** use a Student-t interval on the run scores, clamped to `[0, 1]`. With fewer than two samples there is no variance estimate, so the interval is the whole `[0, 1]` range.
+- Runs are treated as independent samples. Pooling the runs of different cases also folds case-to-case difficulty into the spread, which makes the interval conservative (wider), never falsely tight.
+- A small category therefore shows a wide interval instead of false precision.
+
+### The interval gate
+
+`gate: "point"` (default) is the original rule: a case regresses when `before - after > tolerance`.
+
+`gate: "interval"` flags a regression only when the baseline and current intervals are **separated**: the baseline's lower bound is above the current upper bound by more than `tolerance`. Both sides' uncertainty counts, so noise inside the intervals does not fail the gate, while a drop clearly outside them does. The rule is applied to each case (needs two or more runs) and to the overall and per-category pass rate and mean score, reported as `regression.regressedMetrics` (`{ scope: "overall" | "category:<name>", metric, before, after, interval }`). A baseline side with fewer than two samples contributes its point value; a current case with fewer than two runs uses the point rule.
+
+`regression.stableFailures` and `regression.flaky` mirror the report lists. `failOnStableFailures: true` also fails `regression.passed` when any case failed every run, independent of the baseline comparison.
+
+### Baseline files
+
+`toJSON` stores `repeat`, per-case `passes`, `runs` and intervals, and `stats`. Baselines written before repeats exist (no `runs`, no `stats`) keep working: each case counts as one sample, so use `gate: "point"` or re-record the baseline with `repeat` to get meaningful intervals.
 
 ## CI reporters
 
