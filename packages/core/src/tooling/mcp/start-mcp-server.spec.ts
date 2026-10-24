@@ -103,6 +103,7 @@ describe("warlock mcp over Streamable HTTP", () => {
         "check_run",
         "test_run",
         "requests_recent",
+        "request_log",
         "generate_make",
         "generate_add",
       ]),

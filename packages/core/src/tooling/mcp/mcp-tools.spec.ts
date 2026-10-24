@@ -291,3 +291,75 @@ describe("db schema", () => {
     expect(buildDbSchema([], "x").tables).toEqual([]);
   });
 });
+
+describe("request_log tool", () => {
+  /** A project whose storage/logs/requests holds three persisted requests. */
+  function logProject(): string {
+    const root = mkdtempSync(path.join(os.tmpdir(), "warlock-mcp-requests-"));
+    const directory = path.join(root, "storage", "logs", "requests");
+    const base = {
+      type: "request",
+      time: new Date().toISOString(),
+      method: "GET",
+      route: { pattern: "/posts", name: "posts.list" },
+      response: {},
+    };
+    const records = [
+      { ...base, id: "ok", traceId: "ok", url: "/posts", status: 200, durationMs: 4 },
+      { ...base, id: "gone", traceId: "gone", url: "/nope", status: 404, durationMs: 2, route: {} },
+      {
+        ...base,
+        id: "boom",
+        traceId: "boom",
+        url: "/posts/1",
+        status: 500,
+        durationMs: 30,
+        error: { message: "db down", name: "Error", stack: "Error: db down" },
+        logs: [{ level: "error", module: "http", action: "request-error", message: "db down", at: 1 }],
+        queries: { count: 2 },
+      },
+    ];
+
+    roots.push(root);
+    mkdirSync(directory, { recursive: true });
+    writeFileSync(
+      path.join(directory, `${new Date().toISOString().slice(0, 10)}.jsonl`),
+      records.map((record) => JSON.stringify(record)).join("\n") + "\n",
+    );
+
+    return root;
+  }
+
+  it("is read-only and does not need a dev server", () => {
+    const found = tool(createWarlockMcpTools(fakeMcpContext().context), "request_log");
+
+    expect(found.writes).toBe(false);
+  });
+
+  it("lists persisted requests newest first, with filters", async () => {
+    const tools = createWarlockMcpTools(fakeMcpContext({ cwd: logProject() }).context);
+    const run = (input: Record<string, unknown>) => tool(tools, "request_log").run(input);
+
+    expect(await run({})).toMatchObject({
+      requests: [{ id: "boom", error: "db down" }, { id: "gone" }, { id: "ok" }],
+    });
+    expect(await run({ status: "5xx" })).toMatchObject({ requests: [{ id: "boom" }] });
+    expect(await run({ status: "404" })).toMatchObject({ requests: [{ id: "gone" }] });
+    expect(await run({ route: "posts.list", limit: 1 })).toMatchObject({ requests: [{ id: "boom" }] });
+  });
+
+  it("returns one request in full by id", async () => {
+    const tools = createWarlockMcpTools(fakeMcpContext({ cwd: logProject() }).context);
+
+    expect(await tool(tools, "request_log").run({ id: "boom" })).toMatchObject({
+      request: { id: "boom", error: { stack: "Error: db down" }, queries: { count: 2 }, logs: [{ message: "db down" }] },
+    });
+    await expect(tool(tools, "request_log").run({ id: "missing" })).rejects.toThrow(/No request with id/);
+  });
+
+  it("lists nothing when the app has no request log", async () => {
+    const tools = createWarlockMcpTools(fakeMcpContext({ cwd: "/definitely/not/a/project" }).context);
+
+    expect(await tool(tools, "request_log").run({})).toEqual({ requests: [] });
+  });
+});

@@ -1,3 +1,4 @@
+import path from "node:path";
 import {
   ERROR_CODES,
   errorCodeDocsUrl,
@@ -19,6 +20,7 @@ import {
   type InspectRoute,
   type InspectSection,
 } from "../inspect/inspect-report.types";
+import { getRequestLog, listRequestLogs } from "../../http/request-log/request-log-store";
 import { buildDbSchema } from "./db-schema";
 import { type DocsCorpus, readDocsFile, searchDocs } from "./docs-search";
 import { inputSchema, type McpInputSchema, type McpInputProperty } from "./tool-input";
@@ -591,6 +593,61 @@ export function createWarlockMcpTools(context: WarlockMcpContext): WarlockMcpToo
         }
 
         return { devtools: { url: devtools.url, path: devtools.devtoolsPath }, requests };
+      },
+    },
+    {
+      name: "request_log",
+      description:
+        "The persistent request log (`http.logging.requests`, JSON lines in storage/logs/requests), which survives restarts and, unlike requests_recent, needs no running dev server. Without `id`, lists persisted requests newest first (id, time, method, url, route, status, duration, error message), filtered by `status` (404 or 5xx), `route`, `method`, `since` (30m, 1h, 2d or an ISO date), `q` (text in the url or id) and `limit`. With `id`, returns the full record: params, query, redacted headers and body, session, response, phases, the log entries emitted during the request, query count with the slowest query and N+1 findings, and the error with its stack, phase, file and site. Read-only.",
+      input: inputSchema({
+        id: {
+          type: "string",
+          description: "Return this request in full instead of listing.",
+        },
+        status: {
+          type: "string",
+          description: "Only this status (404) or class (5xx).",
+        },
+        route: { type: "string", description: "Only routes whose name or pattern contains this text." },
+        method: { type: "string", description: "Only this HTTP method." },
+        since: {
+          type: "string",
+          description: "Only requests since a duration back (30m, 1h, 2d) or an ISO date.",
+        },
+        q: { type: "string", description: "Only urls or ids containing this text." },
+        limit: {
+          type: "integer",
+          description: "How many requests to list (default 10, newest first).",
+          minimum: 1,
+          maximum: 100,
+        },
+      }),
+      writes: false,
+      async run(input) {
+        const read = { directory: path.join(context.cwd, "storage", "logs", "requests") };
+        const id = stringArg(input, "id");
+
+        if (id) {
+          const request = await getRequestLog(id, read);
+
+          if (!request) throw new Error(`No request with id "${id}" in the request log.`);
+
+          return { request };
+        }
+
+        return {
+          requests: await listRequestLogs(
+            {
+              status: stringArg(input, "status"),
+              route: stringArg(input, "route"),
+              method: stringArg(input, "method"),
+              since: stringArg(input, "since"),
+              q: stringArg(input, "q"),
+              limit: integerArg(input, "limit", 10),
+            },
+            read,
+          ),
+        };
       },
     },
     {
