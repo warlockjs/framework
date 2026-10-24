@@ -6,12 +6,10 @@
  *   pnpm release:version 5.30.0 --no-lockfile
  *
  * The family is released in lockstep, so every member must already share one
- * version; this sets all of them to the next one. It also moves the family
- * pins (`"@warlock.js/core": "5.29.0"` or `"^5.29.0"` in a peer or optional
- * dependency) along with them, and writes each as the same-major range
- * `^5.30.0`: the floor moves with every release and the major bounds it, so npm
- * can step the family in an existing lockfile (exact pins cannot be stepped).
- * `*` and `workspace:` specs are left alone: they never name a version.
+ * version; this sets all of them to the next one. It also moves the exact
+ * family pins (`"@warlock.js/core": "5.29.0"` in a peer or optional
+ * dependency) along with them, keeping any `^`/`~` prefix. `*` and
+ * `workspace:` specs are left alone: they never name a version.
  *
  * The create-warlock app template is moved too. Its framework dependencies
  * normally hold the placeholder `0.0.0-set-by-scaffolder`, which the
@@ -27,7 +25,8 @@
  *
  * Refuses, naming what was wrong, when the version is not exact semver, is not
  * newer than the current one, or when the members disagree on the current one.
- */import { spawnSync } from "node:child_process";
+ */
+import { spawnSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -64,22 +63,14 @@ function escapeVersion(version) {
   return version.replaceAll(".", "\\.");
 }
 
-/**
- * Move only the family pins at `current`; the manifest's own version is
- * untouched. By default a pin keeps its `^`/`~` prefix. With `{ range: true }`
- * every such pin is written as the same-major range `^next`, the form the
- * published packages carry between family members (an exact peer pin makes
- * npm unable to step the family in an existing lockfile).
- */
-export function bumpFamilyPins(text, current, next, { range = false } = {}) {
+/** Move only the family pins at `current`; the manifest's own version is untouched. */
+export function bumpFamilyPins(text, current, next) {
   const familyPin = new RegExp(
     `("(?:@warlock\\.js/[a-z0-9-]+|create-warlock)"\\s*:\\s*")([~^]?)${escapeVersion(current)}(")`,
     "g",
   );
 
-  return text.replace(familyPin, (_match, head, prefix, tail) =>
-    range ? `${head}^${next}${tail}` : `${head}${prefix}${next}${tail}`,
-  );
+  return text.replace(familyPin, `$1$2${next}$3`);
 }
 
 /**
@@ -94,9 +85,7 @@ export function bumpManifest(text, current, next) {
   }
 
   const versionLine = new RegExp(`("version"\\s*:\\s*")${escapeVersion(current)}(")`);
-  const updated = bumpFamilyPins(text.replace(versionLine, `$1${next}$2`), current, next, {
-    range: true,
-  });
+  const updated = bumpFamilyPins(text.replace(versionLine, `$1${next}$2`), current, next);
 
   if (JSON.parse(updated).version !== next) {
     throw new Error(`${manifest.name}: could not rewrite its version line`);

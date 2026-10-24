@@ -69,8 +69,8 @@ function compare(left: string, right: string): number {
 
 /**
  * The `@warlock.js/*` packages are released in lockstep. Their peer
- * dependencies on each other are same-major ranges, so a package manager
- * installs a mixed set without complaint. A `WL8010` problem names the
+ * dependencies on each other are exact pins, so a mixed install means a
+ * package was moved on its own. A `WL8010` problem names the
  * packages whose installed version differs from the newest one installed.
  */
 export function checkFamilyVersions(cwd: string): ToolingProblem[] {

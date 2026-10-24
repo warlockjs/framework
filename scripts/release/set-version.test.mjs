@@ -5,7 +5,7 @@ import { bumpFamilyPins, bumpManifest, compareVersions, readMemberDirs } from ".
 const manifest = (body) =>
   `{\r\n  "name": "@warlock.js/web",\r\n  "version": "5.29.0"${body ? `,\r\n${body}` : "\r\n"}}\r\n`;
 
-test("moves the version and writes every family pin as a same-major range", () => {
+test("moves the version and exact family pins, keeping range prefixes", () => {
   const input = manifest(
     [
       '  "peerDependencies": {',
@@ -24,7 +24,7 @@ test("moves the version and writes every family pin as a same-major range", () =
   const output = JSON.parse(bumpManifest(input, "5.29.0", "5.30.0"));
 
   assert.equal(output.version, "5.30.0");
-  assert.equal(output.peerDependencies["@warlock.js/core"], "^5.30.0");
+  assert.equal(output.peerDependencies["@warlock.js/core"], "5.30.0");
   assert.equal(output.peerDependencies["@warlock.js/seal"], "^5.30.0");
   assert.equal(output.peerDependencies["@warlock.js/cache"], "*");
   assert.equal(output.peerDependencies.react, "5.29.0", "a non-family package keeps its pin");
@@ -62,15 +62,6 @@ test("moves real framework pins in a template and leaves the scaffolder placehol
   assert.equal(output.version, "5.29.0", "a template app's own version is not the framework's");
   assert.equal(output.dependencies["@warlock.js/core"], "0.0.0-set-by-scaffolder");
   assert.equal(output.dependencies["@warlock.js/web"], "^5.30.0");
-});
-
-test("a template's exact pin stays exact: only package manifests get the range form", () => {
-  const template = '{ "dependencies": { "@warlock.js/core": "5.29.0" } }';
-
-  assert.equal(
-    JSON.parse(bumpFamilyPins(template, "5.29.0", "5.30.0")).dependencies["@warlock.js/core"],
-    "5.30.0",
-  );
 });
 
 test("compares versions numerically, not as text", () => {

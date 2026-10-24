@@ -16,8 +16,8 @@
     "@warlock.js/logger": "workspace:^"
   },
   "peerDependencies": {
-    "@warlock.js/herald": "^5.37.0",
-    "@warlock.js/queue": "^5.37.0"
+    "@warlock.js/herald": "5.37.0",
+    "@warlock.js/queue": "5.37.0"
   },
   "peerDependenciesMeta": {
     "@warlock.js/herald": {

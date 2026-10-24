@@ -4,12 +4,6 @@ All notable changes to `@warlock.js/ai-xai` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
-## 5.37.1
-
-### Changed
-
-- Peer and runtime dependencies on other `@warlock.js/*` packages are now published as the same-major range `^5.37.1` instead of the exact version. npm 10 could not step the family in an existing `package-lock.json` (`ERESOLVE` on the exact, cyclic peer pins). Every package still ships at the same version; `warlock check` (`WL8010`) reports an installed set that has drifted apart.
-
 ## 5.34.3 - 2026-10-20
 
 ### Changed

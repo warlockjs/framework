@@ -28,8 +28,8 @@
   "peerDependencies": {
     "@bull-board/api": "^9.0.0",
     "@bull-board/fastify": "^9.0.0",
-    "@warlock.js/core": "^5.37.0",
-    "@warlock.js/logger": "^5.37.0"
+    "@warlock.js/core": "5.37.0",
+    "@warlock.js/logger": "5.37.0"
   },
   "peerDependenciesMeta": {
     "@bull-board/api": {

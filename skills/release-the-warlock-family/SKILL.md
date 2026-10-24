@@ -31,7 +31,7 @@ monorepo".
 
 **Move the family first.** `pnpm release:version <version>` (from the repo
 root) sets every member's `package.json` to the version, moves the exact family
-pins (peer/optional `@warlock.js/*` specs at the old version, rewritten as `^<new version>`),
+pins (peer/optional `@warlock.js/*` specs at the old version, `^`/`~` kept),
 moves any real pin in the create-warlock template (its framework deps are
 normally the `0.0.0-set-by-scaffolder` placeholder, filled from create-warlock's
 own version at scaffold time), and refreshes the lockfile. It refuses unless
@@ -186,32 +186,24 @@ allowed to create packages in the `@warlock.js` scope.
 
 ## Read this first: the five things that will catch you
 
-### 0. The family pins itself to a same-major range, lockstep lives in the version field
+### 0. The family pins itself EXACTLY, so a partial release CANNOT install
 
-Family packages peer-depend on their siblings by a **same-major range whose
-floor is the release version**: `@warlock.js/auth@5.37.1` declares
-`"@warlock.js/core": "^5.37.1"`. pkgist writes the exact version when it builds
-a tarball; the release runner (`relaxFamilyPins`) rewrites each family spec to
-`^<version>` before packing, and `assertBuiltManifest` requires that exact
-string.
+Family packages peer-depend on their siblings by **exact version**, not by
+range: `@warlock.js/auth@5.1.0` declares `"@warlock.js/core": "5.1.0"`.
 
-Why not exact: npm 10 cannot step the family inside an existing
-`package-lock.json` when every member names the others by exact version
-(`ERESOLVE` on the cyclic peers access, auth, core and others, then an arborist
-`edgesOut` crash on Vitest's peer set). A range lets one member move without
-dragging the cycle. `^x.y.z` and `>=x.y.z <6` are the same set; the caret is
-the idiom.
+So publishing a subset is not "a smaller release" — it is an **uninstallable**
+one. Ship core at 5.2.1 and auth@5.1.0 still demands core 5.1.0; npm refuses
+the tree with `ERESOLVE`. It does not matter that 5.2.1 would satisfy a caret;
+there is no caret.
 
-**Lockstep is still the rule.** Every release publishes the whole family, at one
-shared version; a package that did not change still gets a no-op bump. It is no
-longer enforced by the install, so it is enforced by the version field: every
-member's `version` must equal the release (the family gate and
-`assertBuiltManifest` check it), and `warlock check` reports an installed set
-that differs (`WL8010`). Publishing a subset leaves the old members satisfying
-the new floor only if they are at least that version, so still release them all.
+**Lockstep is not a convention here. It is the only satisfiable configuration.**
+Every release publishes the whole family, at one shared version. A package that
+did not change still gets a no-op bump — that is intended, and it is what makes
+the tree resolvable.
 
-**Never loosen a family spec to `*` or an open `>=`.** The floor is what
-makes a new `web` refuse an old `core`.
+**Never "fix" this by loosening a family pin to a caret.** A caret in an
+intra-family spec is the defect, not the repair. Carets are correct for
+third-party dependencies only. Canon `85d63e52`.
 
 ### Bumping the version does NOT bump every family spec
 
@@ -230,13 +222,13 @@ Do not trust that table — **derive the list**, because a new literal pin added
 between releases will not be in it:
 
 ```sh
-node -e "for (const d of require('fs').readdirSync('.',{withFileTypes:true})) { if(!d.isDirectory())continue; const p='./'+d.name+'/package.json'; if(!require('fs').existsSync(p))continue; const j=require(p); if(j.private||!/^(@warlock\.js\/|create-warlock$)/.test(j.name||''))continue; for (const f of ['dependencies','devDependencies','peerDependencies','optionalDependencies']) for (const [k,v] of Object.entries(j[f]||{})) if (/^@warlock\.js\//.test(k) && /^[\^~]?[0-9]+\.[0-9]+\.[0-9]+$/.test(v)) console.log(j.name,f,k,v); }"
+node -e "for (const d of require('fs').readdirSync('.',{withFileTypes:true})) { if(!d.isDirectory())continue; const p='./'+d.name+'/package.json'; if(!require('fs').existsSync(p))continue; const j=require(p); if(j.private||!/^(@warlock\.js\/|create-warlock$)/.test(j.name||''))continue; for (const f of ['dependencies','devDependencies','peerDependencies','optionalDependencies']) for (const [k,v] of Object.entries(j[f]||{})) if (/^@warlock\.js\//.test(k) && /^[0-9]+\.[0-9]+\.[0-9]+$/.test(v)) console.log(j.name,f,k,v); }"
 ```
 
 Left behind, `web@<new>` peer-depends on `core@<old>` and npm refuses the tree
 with `ERESOLVE` — an uninstallable release, from a green build. The release gate
 does catch it (`assertBuiltManifest` requires every `@warlock.js/*` spec to
-equal `^<release version>`), but it catches it at `web`, which is **last**, after
+equal the release version), but it catches it at `web`, which is **last**, after
 every other package has been built and packed.
 
 ### 1. A release PUSHES GIT BRANCHES by default
@@ -563,8 +555,8 @@ The runner must perform these steps in order:
    installed binary directly, never through `npx` or `pnpm exec`.
 3. Unpack each candidate and parse its manifest. Require the expected name and
    exact version, and inspect `dependencies`, `peerDependencies`, and
-   `optionalDependencies` as objects: every `@warlock.js/*` value must be
-   `^` plus the shared version and no `workspace:` value may survive.
+   `optionalDependencies` as objects: every `@warlock.js/*` value must be the
+   exact shared version and no `workspace:` value may survive.
 4. Pack each build once, record its SHA-256, and make those tarballs immutable
    inputs to the remaining stages. **Do not `grep` the archive for
    `workspace:`.** The literal legitimately appears in sourcemaps and doc

@@ -8816,7 +8816,7 @@ What it does, in order:
 
 With npm it first removes the `@warlock.js/*`, `vite`, `vitest`, `@vitest/*` and `@vitejs/*` entries from `package-lock.json`, so one `npm install` re-resolves them together (the family's peers name each other). **Use npm 11.6.2 or newer**: npm 10.9, bundled with Node 22.15, can fail with `ERESOLVE` or an arborist `edgesOut` crash; the command warns when npm is older, and `npx npm@11 install` is the way around it.
 
-The family's peers on each other are same-major ranges (`^5.37.1`), so a package manager accepts a mixed set. `warlock check` reports it as `WL8010`; fix it with `warlock update`. `warlock upgrade` never moves a package down: one already newer than `--to` is left and listed.
+The family's packages pin each other to the exact same version (lockstep), so a mixed set is not a valid install. `warlock check` reports it as `WL8010`; fix it with `warlock update`. `warlock upgrade` never moves a package down: one already newer than `--to` is left and listed.
 
 | Lockfile                 | Install        | Add (`warlock add`) |
 | ------------------------ | -------------- | ------------------- |
