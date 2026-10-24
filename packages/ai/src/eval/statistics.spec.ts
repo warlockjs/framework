@@ -88,7 +88,10 @@ describe("tInterval", () => {
   });
 
   it("should collapse to a point when all scores are equal", () => {
-    expect(tInterval([0.7, 0.7, 0.7])).toEqual({ low: 0.7, high: 0.7 });
+    const interval = tInterval([0.7, 0.7, 0.7]);
+
+    expect(interval.low).toBeCloseTo(0.7, 10);
+    expect(interval.high).toBeCloseTo(0.7, 10);
   });
 
   it("should be uninformative under two samples", () => {
