@@ -1,4 +1,9 @@
 {
+  "5.37.0": {
+    "publishedAt": "2026-10-24T11:10:12.043Z",
+    "matrix": "none",
+    "summary": "**Field-report fixes: route table controls, safe document-store rollbacks, `warlock release` and eval variance.** Breaking: on MongoDB a plain `dropColumn()` inside `down()` is skipped with a warning (pass `{ destructive: true }` to unset; add-only `Migration.alter` derives a ledger-only rollback), and `warlock migrate --rollback`/`--fresh` and the cascade rollback commands print a destructive-operation summary and need confirmation or `--yes` outside development. `web.namedApiRoutes` turns the page route table off, limits it with an allowlist or filter, and keeps `privatePrefixes` out; routes take a `sites` option for multi-site apps, and guarded routes are left out for known guests. Route inspection, the generated `AGENTS.md` facts and `WL9006` count group guards and `markAuthGuard()` middleware. `warlock release` adds candidate, gate, migrations --prove, stage, activate, verify, rollback and prune for application deploys. `agent.eval({ repeat })` reports pass counts, Wilson and t intervals, an interval-based regression gate and stable versus flaky failures. Fixes: validation messages never keep an unfilled `:placeholder`, finished Vitest runs exit on their own (the file logger's flush timer no longer holds the process), pages whose components import CSS work in Node page discovery, and development logs the first hydration mismatch. Lockstep release across all 33 packages. Generator matrix scope: `none`; before publishing, the blog on the 5.37.0 tarballs passed the release gate; after publishing, every package was confirmed at the npm origin."
+  },
   "5.36.0": {
     "publishedAt": "2026-10-21T23:12:50.741Z",
     "matrix": "none",

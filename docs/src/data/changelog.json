@@ -136,6 +136,215 @@
   ],
   "releases": [
     {
+      "version": "5.37.0",
+      "id": "v5-37-0",
+      "date": "October 24, 2026",
+      "isUnreleased": false,
+      "summaryHtml": "<strong>Field-report fixes: route table controls, safe document-store rollbacks, <code>warlock release</code> and eval variance.</strong> Breaking: on MongoDB a plain <code>dropColumn()</code> inside <code>down()</code> is skipped with a warning (pass <code>{ destructive: true }</code> to unset; add-only <code>Migration.alter</code> derives a ledger-only rollback), and <code>warlock migrate --rollback</code>/<code>--fresh</code> and the cascade rollback commands print a destructive-operation summary and need confirmation or <code>--yes</code> outside development. <code>web.namedApiRoutes</code> turns the page route table off, limits it with an allowlist or filter, and keeps <code>privatePrefixes</code> out; routes take a <code>sites</code> option for multi-site apps, and guarded routes are left out for known guests. Route inspection, the generated <code>AGENTS.md</code> facts and <code>WL9006</code> count group guards and <code>markAuthGuard()</code> middleware. <code>warlock release</code> adds candidate, gate, migrations --prove, stage, activate, verify, rollback and prune for application deploys. <code>agent.eval({ repeat })</code> reports pass counts, Wilson and t intervals, an interval-based regression gate and stable versus flaky failures. Fixes: validation messages never keep an unfilled <code>:placeholder</code>, finished Vitest runs exit on their own (the file logger's flush timer no longer holds the process), pages whose components import CSS work in Node page discovery, and development logs the first hydration mismatch. Lockstep release across all 33 packages. Generator matrix scope: <code>none</code>; before publishing, the blog on the 5.37.0 tarballs passed the release gate; after publishing, every package was confirmed at the npm origin.",
+      "matrix": "none",
+      "matrixRows": null,
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 9,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 4
+            },
+            {
+              "type": "Changed",
+              "n": 1
+            },
+            {
+              "type": "Fixed",
+              "n": 4
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>warlock release &lt;action&gt; [id]</code>: a deploy pipeline for applications, configured by the new <code>release</code> section of <code>warlock.config.ts</code> (<code>ReleaseConfig</code>, <code>ReleaseCheck</code>). <code>candidate</code> freezes a clean commit (<code>--commit</code>, <code>--allow-dirty</code>) into <code>.warlock/releases/&lt;version&gt;-&lt;shortsha&gt;/</code> with a manifest (version, commit, creation time, Node version, lockfile hash). <code>gate</code> runs an ordered list of named checks (default: typecheck, check, test, build) and stops at the first failure. <code>migrations --prove [--target]</code> snapshots the migration ledger, tables and indexes around a real run of the pending migrations and compares them with the expected set. <code>stage</code> copies the build and what is needed to run it. <code>activate [--preflight] [--dry-run] [--allow-same]</code> checks the staged files, the gate and that the version is strictly greater than the active one, then switches <code>current</code> with an atomic symlink, keeps <code>previous</code> and runs the restart command you configure in <code>release.restart.command</code>; Warlock never calls a process manager itself. <code>verify</code> retries a GET on <code>release.verify.url</code> and compares the reported version and commit with the active release. <code>rollback [--dry-run]</code> switches back and reruns the restart command; it does not roll migrations back. <code>list</code>, <code>status</code> and <code>prune --keep &lt;n&gt;</code> (the only command that deletes releases) complete the family. Every action accepts <code>--json</code>, and a manifest per release plus a <code>release.log</code> record what happened."
+            },
+            {
+              "type": "Added",
+              "html": "<code>sites</code> route option and <code>router.group({ sites })</code> option: the <code>web.sites</code> keys a multi-site app offers a named API route to in the browser. Absent means shared by every site; a route's own <code>sites</code> replaces its group's. The route snapshot carries <code>sites</code> only on routes that declared it."
+            },
+            {
+              "type": "Added",
+              "html": "The named route snapshot carries <code>guarded: true</code> on a route with an auth guard in its middleware chain (group middleware included), so browser route tables can leave it out for guests."
+            },
+            {
+              "type": "Added",
+              "html": "In development, the first time a validation translation cannot be filled, a warning names its <code>validation.*</code> key."
+            },
+            {
+              "type": "Changed",
+              "html": "<strong>BREAKING</strong> <code>warlock migrate --rollback</code> and <code>warlock migrate --fresh</code> print a destructive-operation summary (collections/tables dropped, fields/columns unset, document/row counts) before running. Outside development they ask for confirmation, and exit with code 1 when there is no terminal. New <code>--yes, -y</code> and <code>--force</code> flags confirm without a prompt."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>warlock inspect</code> and the generated <code>AGENTS.md</code> list of \"Mutating routes without an auth guard\" counted only routes whose guard attached a <code>warlock.auth</code> descriptor. A middleware that declares itself a guard with <code>markAuthGuard()</code>, including one registered once on a <code>router.group</code>, now marks every route inside the group as guarded."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>warlock check</code> (<code>WL9006</code>) treats <code>markAuthGuard(fn, false)</code> written inline in a middleware list as not a guard, and recognises a local factory such as <code>const requireAdmin = () =&gt; markAuthGuard(fn)</code> used as <code>middleware: [requireAdmin()]</code> in a route or group."
+            },
+            {
+              "type": "Fixed",
+              "html": "The default validation message translation no longer returns a message with an unfilled <code>:placeholder</code>. When the browser form library is imported on the server, its English <code>validation.*</code> defaults share the translation registry and name the length value <code>:length</code>, where seal uses <code>:minLength</code> and <code>:maxLength</code>, so a <code>v.string().maxLength(5)</code> failure read \"This input can not be greater than :length characters\". The aliases <code>:length</code> (for <code>minLength</code> and <code>maxLength</code>) and <code>:matchingInput</code> (for <code>match</code>) are now mapped, and a translation that still cannot be filled falls back to seal's own message. App overrides of <code>validation.*</code> keep working."
+            },
+            {
+              "type": "Fixed",
+              "html": "The dev loader hook answers stylesheet imports (<code>.css</code>, <code>.scss</code>, <code>.sass</code>, <code>.less</code>, <code>.styl</code>) with an empty module, so sitemap discovery works for a page whose component imports a stylesheet instead of failing with <code>ERR_UNKNOWN_FILE_EXTENSION</code>."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/web",
+          "slug": "web",
+          "total": 8,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 5
+            },
+            {
+              "type": "Changed",
+              "n": 3
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>web.namedApiRoutes</code> controls the route table each page embeds for <code>apiHref()</code> and <code>useSubmitForm({ route })</code>. <code>false</code> embeds nothing: a named-route call then throws, and in development the error names the option (explicit <code>path</code> and <code>method</code> still work). An allowlist of route names (with <code>prefix.*</code> patterns) or a filter function <code>(route, { site, guest }) =&gt; boolean</code> narrows the table, and <code>{ include, privatePrefixes }</code> combines both. Every form can only remove routes from what the page's client code reaches."
+            },
+            {
+              "type": "Added",
+              "html": "<code>web.namedApiRoutes.privatePrefixes</code> (for example <code>[\"/api/admin/\", \"/api/webhooks/\"]</code>) keeps every route under those path prefixes out of every table, for any viewer and any site. Prefixes match whole path segments."
+            },
+            {
+              "type": "Added",
+              "html": "Site scoping: in a multi-site app a page never embeds a route declared for other sites. A route declares its sites with the <code>sites</code> option (see core); a route that declares none is shared by every site."
+            },
+            {
+              "type": "Added",
+              "html": "A route with an auth guard in its middleware chain (group middleware included) is left out of the table for a guest viewer. A viewer is a guest only when <code>web.session</code> is configured and resolves no user; without <code>web.session</code> the viewer is unknown (the app may sign in with tokens in the browser) and guarded routes stay."
+            },
+            {
+              "type": "Added",
+              "html": "Types <code>NamedApiRoutesOption</code>, <code>NamedApiRoutesConfig</code>, <code>NamedApiRoutesInclude</code>, <code>NamedApiRoutesFilter</code>, <code>NamedApiRouteCandidate</code> and <code>NamedApiRouteContext</code>."
+            },
+            {
+              "type": "Changed",
+              "html": "Server seam <code>resolveNamedApiRoutes(names, options)</code> takes <code>{ config, site, guest }</code>; without options it applies site scoping and guard rules for a guest in single-site mode."
+            },
+            {
+              "type": "Changed",
+              "html": "In development, when React reports a hydration mismatch, the client logs the first mismatching node: the element path, the server text and the client text. Production builds are unchanged."
+            },
+            {
+              "type": "Changed",
+              "html": "The <code>create-a-page</code> and <code>localize-pages</code> skills and the localization and client/server boundary docs warn that <code>Intl.DisplayNames</code>, <code>localeCompare</code> sorting and similar <code>Intl</code> output can differ between Node and browsers and cause hydration mismatches, and recommend a shared pre-computed table or rendering after hydration."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/cascade",
+          "slug": "cascade",
+          "total": 7,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 5
+            },
+            {
+              "type": "Changed",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>Migration.alter</code> with only <code>add</code> (no custom <code>up</code>/<code>down</code>) derives its <code>down()</code>: on SQL it drops the added columns, on document stores it is ledger-only because <code>up()</code> changed no documents. The \"up without down\" warning does not fire for it."
+            },
+            {
+              "type": "Added",
+              "html": "<code>dropColumn(column, { destructive: true })</code> (<code>DropColumnOptions</code>), the explicit opt-in to unset a field on a document store during a rollback."
+            },
+            {
+              "type": "Added",
+              "html": "Rollback plan: <code>migrationRunner.planRollback(batches)</code> returns, per migration, the tables/collections dropped or truncated and the fields/columns dropped or unset (<code>RollbackPlan</code>, <code>DestructiveOperation</code>), with document/row counts from the new optional <code>countRows</code> / <code>countWithColumns</code> driver methods (implemented for MongoDB, <code>countRows</code> for Postgres)."
+            },
+            {
+              "type": "Added",
+              "html": "<code>confirmRollback({ all, batches, yes, development })</code> prints that plan and asks for confirmation outside development. <code>cascade migrate:rollback</code> and <code>cascade migrate --fresh</code> use it and accept <code>--yes</code> / <code>-y</code> and <code>--force</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<code>Migration#isDocumentStore</code>, to guard a SQL-only drop in a hand-written <code>down()</code>."
+            },
+            {
+              "type": "Changed",
+              "html": "<strong>BREAKING</strong> On document stores (MongoDB), a plain <code>dropColumn()</code> / <code>dropColumns()</code> inside <code>down()</code> is skipped with a warning instead of running <code>$unset</code> on every document. Forward drops (<code>up()</code>, <code>drop: [...]</code>) are unchanged."
+            },
+            {
+              "type": "Changed",
+              "html": "<strong>BREAKING</strong> <code>cascade migrate:rollback</code> and <code>cascade migrate --fresh</code> print a destructive-operation summary first. Outside development (<code>NODE_ENV</code> other than <code>development</code>, including unset) a rollback that removes data (table or collection drops, applied field drops) asks for confirmation, and refuses without a terminal."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai",
+          "slug": "ai",
+          "total": 4,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 4
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>agent.eval({ repeat })</code> runs every case several times (default <code>1</code>, unchanged). Case results carry <code>passes</code> / <code>repeat</code>, per-run <code>runs</code>, and score and pass-rate intervals; reports carry <code>stats</code> (overall and per <code>EvalCase.category</code>, Wilson intervals for pass rates and Student-t intervals for mean scores), plus <code>stableFailures</code> and <code>flakyCases</code> when <code>repeat &gt; 1</code>. <code>toJUnit</code> shows <code>passed 2/3 runs</code> for repeated cases."
+            },
+            {
+              "type": "Added",
+              "html": "<code>gate: \"interval\"</code> for baseline comparison flags a case, or an overall or per-category pass rate or mean score, only when the baseline interval lies above the current interval by more than <code>tolerance</code>, so run-to-run noise no longer reads as a regression. The default <code>gate: \"point\"</code> keeps the existing rule. <code>failOnStableFailures</code> fails the regression verdict when a case failed every run. <code>diff</code> accepts <code>{ tolerance, gate, confidence, failOnStableFailures }</code> as its third argument (a plain tolerance number still works), and <code>EvalRegression</code> gains <code>regressedMetrics</code>, <code>stableFailures</code> and <code>flaky</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<code>EvalCase.category</code> groups cases for per-category statistics."
+            },
+            {
+              "type": "Added",
+              "html": "Serialized baselines store the repeat count, per-case counts and intervals; baselines saved earlier still load and count each case as one sample."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/logger",
+          "slug": "logger",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "<code>FileLog</code>'s background flush interval no longer keeps the process alive. A finished Vitest run or CLI command used to wait on it, and Vitest reported \"something prevents the main process from exiting\". Buffered entries are still written by <code>flush()</code> and <code>flushSync()</code>."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "5.36.0",
       "id": "v5-36-0",
       "date": "October 21, 2026",
@@ -8508,7 +8717,15 @@
       "isUnreleased": false,
       "summaryHtml": "<strong>Page actions and sessions in pages.</strong> Pages can export <code>action</code>/<code>actions</code> and post with <code>&lt;Form&gt;</code> (works without JavaScript; <code>useActionData</code>, <code>FieldError</code>, <code>useIsSubmitting</code>), and read the signed-in user with <code>useUser()</code>, guarded server-side by <code>requireUser</code>/<code>requireGuest</code> from <code>@warlock.js/web/session</code>. <strong>Upgrade review required:</strong> a full framework sweep ships ~140 fixes with behaviour changes across core, cascade, web and auth (see each package changelog). Lockstep release across all 30 packages. Generator matrix ran <code>subset</code> scope (<code>baseline</code>, <code>scheduler</code>, <code>postgres</code>, <code>redis</code>, <code>web</code>, <code>sitemap</code>, <code>socket</code> rows); Hasan authorised it on 2026-09-24: \"Don't wait for any other approvals, you have green light to do everything needed to have 5.21 released, don't stop before the release, no complete the push and publish/release\".",
       "matrix": "subset",
-      "matrixRows": ["baseline", "scheduler", "postgres", "redis", "web", "sitemap", "socket"],
+      "matrixRows": [
+        "baseline",
+        "scheduler",
+        "postgres",
+        "redis",
+        "web",
+        "sitemap",
+        "socket"
+      ],
       "mode": "detail",
       "packages": [
         {
@@ -8804,7 +9021,15 @@
       "isUnreleased": false,
       "summaryHtml": "<strong>Cache compatibility changes require an upgrade review:</strong> <code>cached()</code> auto-keys, flat memory keys, finite ownership-safe locks, Redis <code>FLUSHDB</code>, tokenized stored lock values, and numeric TTL normalization all change observable behavior. <code>@warlock.js/web</code> adds generated named-route types and managed sitemap generations; Core, Cache, Cascade, Auth, Scheduler, and Socket.IO add safer multi-instance boundaries. Lockstep release across all 30 packages. Generator matrix ran <code>subset</code> scope (<code>baseline</code>, <code>scheduler</code>, <code>postgres</code>, <code>redis</code>, <code>web</code>, <code>sitemap</code>, <code>socket</code> rows); Hasan authorised it on 2026-09-24: \"Go with rec, and tell me whether we should move the matrix run from my machine to Github instead and I report back with failures or keep it on my machine?\".",
       "matrix": "subset",
-      "matrixRows": ["baseline", "scheduler", "postgres", "redis", "web", "sitemap", "socket"],
+      "matrixRows": [
+        "baseline",
+        "scheduler",
+        "postgres",
+        "redis",
+        "web",
+        "sitemap",
+        "socket"
+      ],
       "mode": "detail",
       "packages": [
         {
@@ -10275,7 +10500,10 @@
       "isUnreleased": false,
       "summaryHtml": "<strong><code>@warlock.js/web</code> moves page, layout, and root server policy into one direct <code>config</code> export (BREAKING)</strong>: <code>PageConfig</code>, <code>LayoutConfig</code>, and <code>RootConfig</code> keep route/cache/prefix/strict-mode policy together while loaders, registration, named error boundaries, and components remain separate. Web adds route-scoped <code>locales.json</code> translations, typed keys, <code>useChangeLocaleCode()</code>, and locale-aware navigation, sitemap, and robots behavior; new scaffolds enable root <code>strictMode</code>. <code>@warlock.js/core</code> and Web require <code>@mongez/localization</code> 3.5.0 for scoped translation lookup. Lockstep release across all 30 packages. Generator matrix ran <code>subset</code> scope (<code>web</code>, <code>sitemap</code> rows); Hasan authorised the release on 2026-09-21: \"Go with your rec\".",
       "matrix": "subset",
-      "matrixRows": ["web", "sitemap"],
+      "matrixRows": [
+        "web",
+        "sitemap"
+      ],
       "mode": "detail",
       "packages": [
         {
@@ -10848,7 +11076,13 @@
       "isUnreleased": false,
       "summaryHtml": "<strong>New package: <code>@warlock.js/sitemap</code></strong> — the thirtieth family member, and the first added since the family settled. Runtime <code>sitemap.xml</code> generation from the page registry, installed with <code>warlock add sitemap</code>, with <strong>zero runtime dependencies</strong>. It is usable three ways: standalone in any Node app, in an API-only Warlock app through <code>sitemapConnector({ entries })</code>, and in a Warlock web app from the page registry. A dynamic route that cannot be enumerated is omitted <strong>and named in a development diagnostic</strong> rather than silently dropped, and an enabled sitemap with no configured origin refuses to boot instead of serving absolute URLs built from a guessed host. Two silent failures are fixed in <code>@warlock.js/web</code> and <code>@warlock.js/core</code>: <code>useTrans()</code> returned the raw key after hydration — server HTML was correct, the post-hydration DOM was not, and the translated value never reached <code>dist/client</code> at all — so the hydration payload gains a seventh required key, <code>translations</code>, carrying only the active locale; and <code>request.cookie()</code> now throws <code>CookieJarUnavailableError</code> when <code>@fastify/cookie</code> is absent instead of returning <code>undefined</code>, which was indistinguishable from \"no such cookie\" and surfaced as a permanent unexplained 401. <code>@warlock.js/core</code> adds <code>app.publicUrl</code> with a <code>PUBLIC_APP_URL</code> fallback. <strong>BREAKING:</strong> <code>@warlock.js/queue/notifications</code> is removed (deprecated in 5.14 — use <code>bullmqQueue()</code> from <code>@warlock.js/notifications</code>), and <code>listRoutablePages</code> moved to the <code>@warlock.js/web/build</code> subpath. <code>@warlock.js/cache</code> finally declares a <code>test</code> script, so its 525 tests run in the release gate for the first time. Lockstep release across all 30 packages. Generator matrix ran <code>subset</code> scope (<code>baseline</code>, <code>web</code>, <code>sitemap</code>, <code>queue</code>, <code>bull-board</code> rows) against the staged candidate, authorised by Hasan on 2026-09-18: \"You could run the matrix if you feel it is important to this release\".",
       "matrix": "subset",
-      "matrixRows": ["baseline", "web", "sitemap", "queue", "bull-board"],
+      "matrixRows": [
+        "baseline",
+        "web",
+        "sitemap",
+        "queue",
+        "bull-board"
+      ],
       "mode": "detail",
       "packages": [
         {
@@ -11019,7 +11253,14 @@
       "isUnreleased": false,
       "summaryHtml": "<code>@warlock.js/web</code> renames the hydration mount from <code>#root</code> to <code>#vessel</code> (BREAKING) — <code>#root</code> collided with embeds and third-party widgets — and hardens the client-build secret scan to refuse EVERY reference to the global <code>process</code>, aliases included (BREAKING for <code>typeof process</code> feature detection). Dev SSR now externalises every installed <code>@warlock.js/*</code> package by rule instead of a hand-maintained list, closing the dual-module-instance class that split framework singletons. A cached page sends one <code>Vary</code> value on both its HTML and data representations. <code>@warlock.js/queue</code> gains a config-driven bull-board dashboard (<code>warlock add bull-board</code>) that refuses to mount unguarded in production, and <code>find(id)</code> no longer returns a finished job with a null result. <code>@warlock.js/notifications</code> takes over the BullMQ integration as <code>bullmqQueue()</code>, a lazy optional-peer driver; <code>@warlock.js/queue/notifications</code> is deprecated for one release. <code>@warlock.js/core</code> adds <code>middleware.cache({ tags })</code> so <code>invalidateTags()</code> clears cached API responses, verifies the esbuild native binary before <code>warlock dev</code> starts, and fixes a <code>devServer.timings</code> watcher phase that always reported 0ms. Lockstep release across all 29 packages. Generator matrix ran <code>subset</code> scope (<code>baseline</code>, <code>web</code>, <code>queue</code>, <code>bull-board</code>, <code>auth-google</code>, <code>auth-passkeys</code> rows) against the staged candidate, authorised by Hasan on 2026-09-17: \"Go ahead plz\".",
       "matrix": "subset",
-      "matrixRows": ["baseline", "web", "queue", "bull-board", "auth-google", "auth-passkeys"],
+      "matrixRows": [
+        "baseline",
+        "web",
+        "queue",
+        "bull-board",
+        "auth-google",
+        "auth-passkeys"
+      ],
       "mode": "detail",
       "packages": [
         {
@@ -11192,7 +11433,14 @@
       "isUnreleased": false,
       "summaryHtml": "<code>@warlock.js/queue</code> ships as a new package (durable BullMQ + Redis background jobs, <code>defineJob</code>, <code>queueConnector()</code>, a bull-board dashboard and a notifications dispatcher). <code>@warlock.js/auth</code> adds email verification, password reset, and login with Google, passkeys and phone OTP, with account linking via a new <code>provider_accounts</code> table. <code>@warlock.js/access</code> makes ABAC <code>strictPolicies</code> deny-by-default (BREAKING) to close a fail-open IDOR path. <code>@warlock.js/web</code> fixes a Host-header cache-poisoning gap in the server page cache key (BREAKING) and a stale-Suspense-fallback replay on cache HIT, and adds <code>linkStylesheetsFor</code> for lazily-imported per-tenant themes. <code>@warlock.js/core</code> adds <code>warlock add queue</code>/<code>warlock add auth-google</code>/<code>warlock add auth-passkeys</code> installers and typed translation-key generation, and drops its dependency on <code>@warlock.js/auth</code>. Lockstep release across all 28 packages. Generator matrix ran <code>subset</code> scope (<code>baseline</code>, <code>web</code>, <code>queue</code>, <code>access</code>, <code>auth-google</code>, <code>auth-passkeys</code> rows) against the staged candidate, authorised by Hasan on 2026-09-16: \"You've my approval for whatever decision you may need to take in this release.\"",
       "matrix": "subset",
-      "matrixRows": ["baseline", "web", "queue", "access", "auth-google", "auth-passkeys"],
+      "matrixRows": [
+        "baseline",
+        "web",
+        "queue",
+        "access",
+        "auth-google",
+        "auth-passkeys"
+      ],
       "mode": "detail",
       "packages": [
         {
@@ -11719,7 +11967,10 @@
       "isUnreleased": false,
       "summaryHtml": "<strong>The authenticated user moves from <code>request.user</code> to <code>request.locals.user</code></strong> (BREAKING, <code>@warlock.js/core</code> / <code>@warlock.js/auth</code> / <code>@warlock.js/access</code>), <code>@warlock.js/auth</code> adds a CSRF Origin check for cookie-authenticated writes plus <code>setAuthCookie()</code> / <code>clearAuthCookie()</code>, and <code>@warlock.js/web</code> ships an opt-in server-side page cache, <code>defer()</code>-ed streaming data with crawler-aware inlining, scroll restoration and locale-direction (RTL) support. <code>@warlock.js/core</code> adds opt-in request tracing and a CSP header; <code>create-warlock</code> scaffolds non-interactively by default and fixes a fresh-scaffold <code>npm run seed</code> failure. Lockstep release across all 28 packages. Generator matrix ran <code>subset</code> scope (<code>baseline</code>, <code>web</code> rows) against the staged candidate, authorised by Hasan on 2026-09-16: \"Yes do it please, don't release before completing all mising points and make sure you have covered everything in the tasks board.\"",
       "matrix": "subset",
-      "matrixRows": ["baseline", "web"],
+      "matrixRows": [
+        "baseline",
+        "web"
+      ],
       "mode": "detail",
       "packages": [
         {
