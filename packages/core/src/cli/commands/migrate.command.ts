@@ -21,6 +21,17 @@ export const migrateCommand = command({
       type: "boolean",
     },
     {
+      text: "--yes, -y",
+      description:
+        "With --fresh or --rollback: confirm a rollback that removes data without asking (required outside development when there is no terminal)",
+      type: "boolean",
+    },
+    {
+      text: "--force",
+      description: "Same as --yes",
+      type: "boolean",
+    },
+    {
       text: "--path, -p",
       description: "Migration file path, if not provided, all migrations will be wroking",
       type: "string",

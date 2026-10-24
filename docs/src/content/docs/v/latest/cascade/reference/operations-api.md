@@ -60,6 +60,37 @@ await rollbackMigrations({ batches: 3 }); // last three batches
 await rollbackMigrations({ all: true }); // everything
 ```
 
+### `confirmRollback(options?)`
+
+```ts
+confirmRollback(options?: {
+  all?: boolean;
+  batches?: number;
+  development?: boolean;
+  yes?: boolean;
+  interactive?: boolean;
+  confirm?: (question: string) => Promise<boolean>;
+  print?: (line: string) => void;
+}): Promise<boolean>
+```
+
+**What it does.** Plans the rollback (`migrationRunner.planRollback()`), prints the destructive-operation summary (collections or tables dropped, fields or columns unset, document or row counts), and decides whether it may proceed. `all` and `batches` select the same migrations as `rollbackMigrations`. It runs nothing itself.
+
+- A plan that removes no data returns `true` without asking.
+- With `development: true` (default: `NODE_ENV === "development"`) it returns `true` after printing.
+- Otherwise it asks via `confirm` (default: a terminal prompt), or returns `true` when `yes` is set.
+- Without a terminal (`interactive` defaults to both stdin and stdout being a TTY) and without `yes` it throws instead of guessing.
+
+**Returns.** `true` to proceed, `false` when the person declined.
+
+```ts
+if (await confirmRollback({ all: true, yes: process.argv.includes("--yes") })) {
+  await rollbackMigrations({ all: true });
+}
+```
+
+`migrationRunner.planRollback(batches)` returns the plan itself: one entry per migration with its `operations` (`type`, `table`, `fields`, `applied`, `count`). `applied: false` marks a document-store field drop that the rollback skips because it lacks `destructive: true`.
+
 ### `freshMigrate()`
 
 ```ts

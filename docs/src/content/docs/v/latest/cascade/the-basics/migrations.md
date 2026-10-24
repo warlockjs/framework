@@ -319,23 +319,68 @@ Every key is optional — include only what the migration changes. The `AlterSch
 
 ### Rollback for `alter`
 
-`Migration.create` auto-infers its rollback (drop the table). **`Migration.alter` does not** — it can't always know the inverse of a `modify`. Provide a `down` in the options when the rollback matters:
+`Migration.create` auto-infers its rollback (drop the table). **`Migration.alter` infers one only when it is add-only** — just `add`, with no custom `up` or `down`. Any other alter can't always know the inverse (a `modify`, say), so provide a `down` in the options when the rollback matters.
+
+```ts
+// Add-only: no down() needed.
+export default Migration.alter(User, {
+  add: { phone: text().nullable() },
+});
+```
+
+The derived `down()` drops the added columns on SQL. On a document store (MongoDB) it only removes the `_migrations` ledger row, because `up()` changed no documents.
+
+### Rolling back on SQL versus MongoDB
+
+The two kinds of store are not symmetric:
+
+| | SQL | MongoDB |
+| --- | --- | --- |
+| `add` in `up()` | Adds the column | No-op: nothing is written to any document |
+| `dropColumn` in `down()` | Drops the column added by `up()` | Runs `$unset` on every document, erasing all values stored since |
+| Add-only alter, derived `down()` | Drops the added columns | Ledger-only |
+| Plain `dropColumn()` / `dropColumns()` in `down()` | Applied | Skipped, with a warning |
+| `dropColumn(name, { destructive: true })` in `down()` | Applied | Applied: unsets the field on every document |
+
+So the conventional `down()` that mirrors an `add` with `dropColumn` is safe on SQL and destructive on MongoDB. Cascade skips that drop on MongoDB unless you opt in:
 
 ```ts
 export default Migration.alter(
   User,
-  {
-    add: { phone: text().nullable() },
-  },
+  { add: { legacy_flag: bool().nullable() } },
   {
     down() {
-      this.dropColumn("phone");
+      // The flag is disposable, so erasing it from every document is intended.
+      this.dropColumn("legacy_flag", { destructive: true });
     },
   },
 );
 ```
 
-For purely additive alters in environments where you never roll back, omitting `down` is fine — but be explicit about that choice rather than discovering it during an incident.
+Forward drops are unaffected: `drop: [...]` and `dropColumn()` in `up()` still run on every store. `dropTable()` and `truncateTable()` in `down()` still run too, which is why `migrate:rollback` shows them in its summary (see [Rolling back safely](#rolling-back-safely)). In a hand-written `down()` that must also run on SQL, guard the drop with `this.isDocumentStore`:
+
+```ts
+down() {
+  if (!this.isDocumentStore) this.dropColumn("full_name");
+}
+```
+
+### Rolling back safely
+
+`migrate:rollback`, `migrate --fresh` and `warlock migrate --rollback` print a destructive-operation summary before they run: per migration, the collections or tables dropped, the fields or columns unset, and how many documents or rows are affected (counted for MongoDB, and for table drops on both stores).
+
+```text
+Rollback plan:
+  2026-10-01_add-phone
+    - unset field(s) legacy_flag on collection "users" [1204 document(s)]
+  1 migration(s) only update the migrations ledger (no data removed).
+```
+
+- In **development** (`NODE_ENV=development`; `warlock migrate` also treats an unset `NODE_ENV` as development, the standalone `cascade` binary does not) the rollback runs right after the summary.
+- Everywhere else it asks for confirmation. Pass `--yes` (or `--force`) to confirm in a script. With no terminal and no flag it refuses and exits with an error.
+- A rollback that removes no data (ledger-only, or only skipped drops) runs without a question.
+
+The counts come from `countDocuments` on the affected collection, so a very large collection pays one count per listed operation. The plan calls each migration's `down()` on a throwaway instance to see what it queues; a `down()` that talks to the database directly, rather than through the migration methods, runs during planning.
 
 ## The `up` / `raw` / `down` option hooks
 
@@ -353,6 +398,7 @@ export default Migration.alter(
   {
     raw: "UPDATE users SET full_name = first_name || ' ' || last_name",
     down() {
+      // Skipped on MongoDB, where it would unset full_name on every document.
       this.dropColumn("full_name");
     },
   },
@@ -471,6 +517,7 @@ Every CLI command maps to one Operations API function:
 | `npx cascade migrate:rollback`             | `rollbackMigrations()`               | Roll back the last batch                          |
 | `npx cascade migrate:rollback --batches 3` | `rollbackMigrations({ batches: 3 })` | Roll back the last `n` batches                    |
 | `npx cascade migrate:rollback --all`       | `rollbackMigrations({ all: true })`  | Roll back everything                              |
+| `npx cascade migrate:rollback --yes`       | `confirmRollback({ yes: true })`     | Confirm a data-removing rollback without a prompt |
 | `npx cascade migrate -f`                   | `freshMigrate()`                     | Roll back everything, then re-run                 |
 | `npx cascade migrate:list`                 | `listExecutedMigrations()`           | Read the `_migrations` tracking table             |
 | `npx cascade migrate --sql`                | `exportMigrationsSQL()`              | Write `.up.sql` / `.down.sql` files; no DB writes |

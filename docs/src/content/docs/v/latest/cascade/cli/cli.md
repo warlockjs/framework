@@ -120,6 +120,8 @@ npx cascade migrate:rollback --all        # nuclear
 npx cascade migrate:rollback --batches 3  # last three batches
 ```
 
+Before it runs, `migrate:rollback` (and `migrate -f`) prints a summary of every collection or table it will drop and every field or column it will unset, with document or row counts where the driver can count them. In development it then proceeds. Elsewhere it asks `Continue? (y/N)`; pass `--yes` (alias `-y`) or `--force` to confirm in a script. With no terminal and neither flag it refuses with an error and a non-zero exit. A rollback that removes no data does not ask. On MongoDB a plain `dropColumn()` in `down()` is skipped; see [Rolling back on SQL versus MongoDB](../the-basics/migrations.md#rolling-back-on-sql-versus-mongodb).
+
 Rollbacks run **newest-first** — the exact inverse of the order the migrations were applied — so a `down()` never meets schema that a later migration's `down()` has already removed.
 
 :::caution[Upgrade to 4.9.2 if you roll back multi-migration batches]

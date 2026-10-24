@@ -1,5 +1,6 @@
 import { defineCommand } from "citty";
 import { rollbackMigrations } from "../../operations/migrations";
+import { confirmRollback } from "../../operations/rollback-guard";
 import { loadMigrations } from "../load-migrations";
 import { printRunSummary } from "../printers";
 import { withCliConnection } from "../with-cli-connection";
@@ -25,6 +26,18 @@ export const migrateRollbackCommand = defineCommand({
       type: "string",
       description: "Roll back the last N batches (ignored when --all is set). Default: 1.",
     },
+    yes: {
+      type: "boolean",
+      alias: "y",
+      description:
+        "Confirm a rollback that removes data without asking. Required outside development when there is no terminal.",
+      default: false,
+    },
+    force: {
+      type: "boolean",
+      description: "Same as --yes.",
+      default: false,
+    },
     path: {
       type: "string",
       alias: "p",
@@ -43,10 +56,16 @@ export const migrateRollbackCommand = defineCommand({
         );
       }
 
-      const results = await rollbackMigrations({
-        all: Boolean(args.all),
-        batches,
-      });
+      const options = { all: Boolean(args.all), batches };
+
+      const proceed = await confirmRollback({ ...options, yes: Boolean(args.yes || args.force) });
+
+      if (!proceed) {
+        console.log("Rollback cancelled.");
+        return;
+      }
+
+      const results = await rollbackMigrations(options);
 
       printRunSummary(results);
     });

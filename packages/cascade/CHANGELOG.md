@@ -4,6 +4,26 @@ All notable changes to `@warlock.js/cascade` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.37.0
+
+### Added
+
+- `Migration.alter` with only `add` (no custom `up`/`down`) derives its `down()`: on SQL it drops the added columns, on document stores it is ledger-only because `up()` changed no documents. The "up without down" warning does not fire for it.
+- `dropColumn(column, { destructive: true })` (`DropColumnOptions`), the explicit opt-in to unset a field on a document store during a rollback.
+- Rollback plan: `migrationRunner.planRollback(batches)` returns, per migration, the tables/collections dropped or truncated and the fields/columns dropped or unset (`RollbackPlan`, `DestructiveOperation`), with document/row counts from the new optional `countRows` / `countWithColumns` driver methods (implemented for MongoDB, `countRows` for Postgres).
+- `confirmRollback({ all, batches, yes, development })` prints that plan and asks for confirmation outside development. `cascade migrate:rollback` and `cascade migrate --fresh` use it and accept `--yes` / `-y` and `--force`.
+- `Migration#isDocumentStore`, to guard a SQL-only drop in a hand-written `down()`.
+
+### Changed
+
+- **BREAKING** On document stores (MongoDB), a plain `dropColumn()` / `dropColumns()` inside `down()` is skipped with a warning instead of running `$unset` on every document. Forward drops (`up()`, `drop: [...]`) are unchanged.
+- **BREAKING** `cascade migrate:rollback` and `cascade migrate --fresh` print a destructive-operation summary first. Outside development (`NODE_ENV` other than `development`, including unset) a rollback that removes data (table or collection drops, applied field drops) asks for confirmation, and refuses without a terminal.
+
+### Upgrading
+
+- Rollbacks that mirrored an additive alter with `dropColumn()` now leave the field in place on MongoDB. Delete that `down()` for add-only alters (it is derived), or pass `{ destructive: true }` where erasing the data is intended.
+- Scripts and CI jobs that run `cascade migrate:rollback` or `cascade migrate --fresh` outside development must pass `--yes` (or `--force`); without a terminal and without the flag they now fail instead of running. Programmatic calls to `rollbackMigrations()` / `freshMigrate()` are unchanged and do not prompt; call `confirmRollback()` first to get the same guard.
+
 ## 5.36.0 - 2026-10-22
 
 ### Fixed

@@ -7,7 +7,9 @@ description: 'Evolve an existing table with `Migration.alter(Model, schema, opti
 
 Use `Migration.alter` to evolve an existing table — adding or dropping columns, renaming them, changing their type, and managing every variety of index or constraint. It's the declarative counterpart to `Migration.create` and inherits the table name and data source straight from the model.
 
-> **Key difference from `Migration.create`:** `alter` does **not** auto-infer rollbacks. You must supply a `down()` function in options whenever you need to be able to roll back.
+> **Key difference from `Migration.create`:** `alter` does **not** auto-infer rollbacks, with one exception: an alter that only has `add` (and no custom `up`/`down`) gets a derived `down()`. Anything else needs a `down()` in options when you want to roll back.
+>
+> **SQL and document stores are not symmetric.** On SQL an added column exists only because of `up()`, so dropping it on rollback is safe. On MongoDB `add` changes no documents, but dropping a field unsets it on **every** document and erases what the app stored since. See [Rolling back on MongoDB](#rolling-back-on-mongodb).
 
 ---
 
@@ -24,11 +26,8 @@ export default Migration.alter(
       phone: text().nullable(),
     },
   },
-  {
-    down() {
-      this.dropColumn("phone");
-    },
-  },
+  // No down(): an add-only alter derives one. SQL drops `phone`; MongoDB only
+  // removes the ledger row, because `up()` changed no documents.
 );
 ```
 
@@ -69,14 +68,7 @@ export default Migration.alter(
       organization_id: uuid().references(Organization.table).onDelete("cascade").notNullable(),
     },
   },
-  {
-    down() {
-      this.dropColumn("phone");
-      this.dropColumn("login_attempts");
-      this.dropColumn("is_verified");
-      this.dropColumn("organization_id");
-    },
-  },
+  // Add-only: down() is derived (drops the four columns on SQL, ledger-only on MongoDB).
 );
 ```
 
@@ -430,7 +422,8 @@ export default Migration.alter(
   },
   {
     down() {
-      this.dropColumn("full_name");
+      // SQL only: on MongoDB this would erase full_name everywhere.
+      if (!this.isDocumentStore) this.dropColumn("full_name");
     },
   },
 );
@@ -449,11 +442,12 @@ raw: [
 
 ## Writing `down()` — the rollback function
 
-`Migration.alter` **never** auto-infers rollback. Supply `down()` in options whenever you want `cascade migrate:rollback` to work. Inside `down()`, `this` is a full `Migration` instance — every class-form builder is available:
+`Migration.alter` infers a rollback only for an add-only alter. For every other alter, supply `down()` in options whenever you want `cascade migrate:rollback` to work. Inside `down()`, `this` is a full `Migration` instance — every class-form builder is available:
 
 | Operation                       | Class-form call in `down()`                                 |
 | ------------------------------- | ----------------------------------------------------------- |
-| Drop an added column            | `this.dropColumn("name")`                                   |
+| Drop an added column (SQL)      | `if (!this.isDocumentStore) this.dropColumn("name")`        |
+| Unset a field on MongoDB        | `this.dropColumn("name", { destructive: true })`            |
 | Re-add a dropped column         | `this.text("name").nullable()`                              |
 | Undo a rename                   | `this.renameColumn("new", "old")`                           |
 | Undo a column modify            | `this.text("col").notNullable()`                            |
@@ -469,6 +463,31 @@ raw: [
 | Drop vector index               | `this.dropVectorIndex("column")`                            |
 | Drop TTL index                  | `this.dropTTLIndex("column")`                               |
 | Raw SQL                         | `this.raw("SQL statement")`                                 |
+
+### Rolling back on MongoDB
+
+`addColumn` is a no-op on MongoDB: an `add` writes nothing to any document. `dropColumn` is not a no-op, it runs `$unset` on every document. So the conventional `down()` that mirrors `add` with `dropColumn` erases every value stored in that field since the migration shipped.
+
+Cascade handles this in three ways:
+
+- **Add-only alters need no `down()`.** The derived rollback is ledger-only on MongoDB and drops the columns on SQL.
+- **A plain `dropColumn()` / `dropColumns()` inside `down()` is skipped on MongoDB** with a warning; the rollback only updates the ledger. Forward drops (in `up()` or `drop: [...]`) still run.
+- **To really unset a field, say so:** `this.dropColumn("name", { destructive: true })`. Use it when the field was cleaned up by hand or the data is disposable.
+
+`migrate:rollback`, `migrate --fresh` and `warlock migrate --rollback` print a summary of every collection or table dropped and field or column unset (with document counts on MongoDB) before running. Outside development they ask for confirmation; pass `--yes` (or `--force`) in scripts. Without a terminal and without the flag they refuse.
+
+```ts
+export default Migration.alter(
+  User,
+  { add: { legacy_flag: bool().nullable() } },
+  {
+    down() {
+      // Only because the data is disposable. Runs `$unset` on every document.
+      this.dropColumn("legacy_flag", { destructive: true });
+    },
+  },
+);
+```
 
 If a migration is genuinely irreversible, throw inside `down()` so accidental rollbacks fail loudly:
 
@@ -506,7 +525,9 @@ export default Migration.alter(
       this.raw(`UPDATE users SET verified_at = updated_at WHERE status = 'confirmed'`);
     },
     down() {
-      this.dropColumn("verified_at");
+      // A custom up() disables the derived down(). SQL only: on MongoDB this
+      // would erase verified_at everywhere.
+      if (!this.isDocumentStore) this.dropColumn("verified_at");
     },
   },
 );
@@ -536,7 +557,7 @@ export default Migration.alter(
     down() {
       this.dropForeign("team_id", Team.table);
       this.dropIndex("team_id");
-      this.dropColumn("team_id");
+      if (!this.isDocumentStore) this.dropColumn("team_id");
     },
   },
 );
@@ -598,7 +619,7 @@ export default Migration.alter(
       this.dropIndex("idx_cat_status");
       this.renameColumn("price_cents", "price");
       this.text("old_code").nullable();
-      this.dropColumn("sku");
+      if (!this.isDocumentStore) this.dropColumn("sku");
     },
   },
 );
@@ -609,7 +630,8 @@ export default Migration.alter(
 ## Things NOT to do
 
 - **Don't edit a shipped migration.** If it's already run in any environment, add a new migration on top.
-- **Don't skip `down()` for reversible changes.** Without it, `cascade migrate:rollback` is a no-op on your migration.
+- **Don't skip `down()` for reversible changes** other than an add-only alter. Without it, `cascade migrate:rollback` is a no-op on your migration.
+- **Don't mirror `add` with `dropColumn` on MongoDB.** It unsets the field on every document. Omit `down()` for add-only alters, or opt in with `{ destructive: true }`.
 - **Don't put large backfills and schema changes together.** Schema change first (nullable column or default), backfill second — in its own migration or a background job. This keeps rollback safe.
 - **Don't use `raw` for something the declarative API already covers.** Use `addIndex`, `addUnique`, etc. — raw SQL bypasses Cascade's driver abstraction and breaks on non-Postgres sources.
 - **Don't declare `id`, `createdAt`, or `updatedAt`** — they're managed by the framework.

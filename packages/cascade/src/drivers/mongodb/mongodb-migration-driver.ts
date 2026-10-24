@@ -142,6 +142,25 @@ export class MongoMigrationDriver implements MigrationDriverContract {
   }
 
   /**
+   * Count the documents in a collection, for the rollback summary.
+   */
+  public async countRows(table: string): Promise<number> {
+    return this.db.collection(table).countDocuments({});
+  }
+
+  /**
+   * Count the documents that have at least one of the given fields, i.e. how
+   * many documents an `$unset` of those fields would change.
+   */
+  public async countWithColumns(table: string, columns: readonly string[]): Promise<number> {
+    if (columns.length === 0) return 0;
+
+    return this.db
+      .collection(table)
+      .countDocuments({ $or: columns.map((column) => ({ [column]: { $exists: true } })) });
+  }
+
+  /**
    * List all columns in a collection.
    *
    * MongoDB is schema-less, so this returns an empty array.

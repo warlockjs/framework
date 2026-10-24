@@ -1,5 +1,6 @@
 import { defineCommand } from "citty";
 import { exportMigrationsSQL, freshMigrate, runMigrations } from "../../operations/migrations";
+import { confirmRollback } from "../../operations/rollback-guard";
 import { loadMigrations } from "../load-migrations";
 import { printRunSummary } from "../printers";
 import { withCliConnection } from "../with-cli-connection";
@@ -19,6 +20,18 @@ export const migrateCommand = defineCommand({
       type: "boolean",
       alias: "f",
       description: "Roll back every executed migration first, then run them again.",
+      default: false,
+    },
+    yes: {
+      type: "boolean",
+      alias: "y",
+      description:
+        "With --fresh: confirm the rollback without asking. Required outside development when there is no terminal.",
+      default: false,
+    },
+    force: {
+      type: "boolean",
+      description: "Same as --yes.",
       default: false,
     },
     sql: {
@@ -55,6 +68,18 @@ export const migrateCommand = defineCommand({
         });
 
         return;
+      }
+
+      if (args.fresh) {
+        const proceed = await confirmRollback({
+          all: true,
+          yes: Boolean(args.yes || args.force),
+        });
+
+        if (!proceed) {
+          console.log("Fresh migration cancelled.");
+          return;
+        }
       }
 
       const results = args.fresh ? await freshMigrate() : await runMigrations();
