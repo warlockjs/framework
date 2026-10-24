@@ -21,7 +21,7 @@ import {
   inspectHandlerSignature,
   reportPositionalHandlerSuspects,
 } from "./positional-handler-diagnostics";
-import { reportUnguardedMutatingRoutes } from "./unguarded-route-diagnostics";
+import { isRequiredGuardRoute, reportUnguardedMutatingRoutes } from "./unguarded-route-diagnostics";
 import { config as configAccessor } from "../config/config-getter";
 import { normalizeRoutePath } from "./normalize-route-path";
 import { RouteBuilder } from "./route-builder";
@@ -455,6 +455,14 @@ export class Router {
       options.public = true;
     }
 
+    // An enclosing `router.group({ sites })` scopes the route's browser table
+    // entry unless the route names its own sites.
+    const groupSites = this.stacks.sites?.at(-1);
+
+    if (options.sites === undefined && groupSites !== undefined) {
+      options.sites = groupSites;
+    }
+
     if (Array.isArray(handler)) {
       const [controller, action] = handler;
 
@@ -731,7 +739,12 @@ export class Router {
       name = prefix ? trim(prefix.replace(/\//g, "."), ".") : undefined,
       middleware,
       public: isPublic,
+      sites,
     } = options;
+
+    if (sites) {
+      (this.stacks.sites ??= []).push(sites);
+    }
 
     if (isPublic) {
       this.stacks.public = (this.stacks.public ?? 0) + 1;
@@ -770,6 +783,10 @@ export class Router {
       }
       if (isPublic) {
         this.stacks.public = (this.stacks.public ?? 1) - 1;
+      }
+
+      if (sites) {
+        this.stacks.sites?.pop();
       }
     }
 
@@ -1007,8 +1024,10 @@ export class Router {
    *
    * Names are the registered names, including method suffixes. `all` stays
    * intact as route metadata; consumers decide whether their use supports it.
-   * A route that opted out with `clientVisible: false` carries that flag, and
-   * only that flag, so browser-facing consumers can leave it out.
+   * A route that opted out with `clientVisible: false` carries that flag so
+   * browser-facing consumers can leave it out. `sites` is present only on a
+   * route that declared some, and `guarded: true` only on a route with an auth
+   * guard in its middleware chain (group middleware included).
    */
   public getNamedApiRoutes(options: NamedApiRoutesOptions = {}): readonly NamedApiRoute[] {
     return Object.freeze(
@@ -1022,6 +1041,8 @@ export class Router {
             path: route.path,
             method: route.method,
             ...(route.clientVisible === false ? { clientVisible: false as const } : {}),
+            ...(route.sites === undefined ? {} : { sites: Object.freeze([...route.sites]) }),
+            ...(isRequiredGuardRoute(route) ? { guarded: true as const } : {}),
           };
           const schema = route.handler?.responseSchema;
           const response = schema ? options.resolveResponse?.(schema, route) : undefined;

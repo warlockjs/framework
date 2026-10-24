@@ -21,13 +21,22 @@ export function readNamedApiRoutes(): NamedApiRouteMetadata | undefined {
  */
 function missingRouteMessage(name: string): string {
   const quoted = JSON.stringify(name);
+  if (published === undefined) {
+    return import.meta.env?.DEV
+      ? `Named API route ${quoted} cannot be resolved: this document embeds no route table. Either ` +
+          "web.namedApiRoutes is false in the application's web configuration (named routes are " +
+          "switched off), or Core's route registry could not be read. Use an explicit path and " +
+          "method, or remove web.namedApiRoutes: false."
+      : `Named API route ${quoted} is not available: this document embeds no route table. Use an explicit path and method.`;
+  }
   if (import.meta.env?.DEV) {
     return (
       `Named API route ${quoted} is not in this page's browser route table. Each page embeds only the ` +
       "named routes its client code can reach. Fix: name the route with a string literal in code the " +
       `page imports, or declare it with config.apiRoutes in the page's setup file (${quoted} or a ` +
-      '"prefix.*" pattern). A route marked clientVisible: false is never in the table; call its endpoint ' +
-      "from the server. An explicit path and method always work."
+      '"prefix.*" pattern). A route marked clientVisible: false, a route under web.namedApiRoutes.privatePrefixes, a ' +
+      "route declared for another site, and (for a signed-out viewer) a route behind an auth guard are " +
+      "never in the table; call such an endpoint from the server or with an explicit path. An explicit path and method always work."
     );
   }
   return (

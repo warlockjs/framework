@@ -186,7 +186,7 @@ router.post("/posts", createPostController, { middleware: [authMiddleware("user"
 router.post("/contact", contactController, { public: true });
 ```
 
-A route inside `guarded(() => …)` or `router.group({ middleware: [authMiddleware()] }, …)` is guarded. A middleware counts as a guard when its name contains `auth` or `guard`, or when it is a constant initialised with `markAuthGuard()` in the same file. `warlock dev` warns about the same routes at runtime.
+A route inside `guarded(() => …)` or `router.group({ middleware: [authMiddleware()] }, …)` is guarded. A middleware counts as a guard when its name contains `auth` or `guard`, or when it is a constant initialised with `markAuthGuard()` in the same file, or a local factory that returns `markAuthGuard(fn)` and is called in the `middleware` list. `warlock dev` warns about the same routes at runtime.
 
 ### `WL9007` — safe redirects
 

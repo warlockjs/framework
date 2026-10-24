@@ -945,6 +945,34 @@ describe("per-page browser route table", () => {
     });
   });
 
+  it("reads web.namedApiRoutes: false embeds no table, privatePrefixes drop a reached route", async () => {
+    vi.spyOn(router, "getNamedApiRoutes").mockReturnValue(registered);
+    const options = {
+      routes: [entry],
+      createHttp: () => createHttp(),
+      clientApiRouteNames: () => ["orders.show", "admin.purge"],
+    };
+
+    try {
+      config.set("web", { namedApiRoutes: false });
+      const off = await renderPageRequest("/orders/1", options);
+
+      if (off instanceof Response) throw new Error("unexpected terminal Response");
+      expect(off.bundle?.document?.namedApiRoutes).toBeUndefined();
+      expect(off.html).not.toContain("/api/orders/:id");
+
+      config.set("web", { namedApiRoutes: { privatePrefixes: ["/api/admin/"] } });
+      const scoped = await renderPageRequest("/orders/1", options);
+
+      if (scoped instanceof Response) throw new Error("unexpected terminal Response");
+      expect(scoped.bundle?.document?.namedApiRoutes).toEqual({
+        "orders.show": { path: "/api/orders/:id", method: "GET" },
+      });
+    } finally {
+      config.set("web", {});
+    }
+  });
+
   it("embeds an empty table when the page is asked for no names", async () => {
     vi.spyOn(router, "getNamedApiRoutes").mockReturnValue(registered);
 

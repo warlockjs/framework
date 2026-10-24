@@ -214,6 +214,42 @@ function isMarkedGuard(identifier: ast.Identifier): boolean {
   );
 }
 
+/**
+ * Whether a call such as `requireAdmin()` invokes a local factory
+ * (`const requireAdmin = () => markAuthGuard(fn)`) whose body declares the
+ * middleware it returns an auth guard. A name that says nothing about guards
+ * (`requireAdmin`) still counts once the factory marks itself.
+ */
+function isMarkedGuardFactory(call: ast.CallExpression): boolean {
+  const callee = unwrap(ast.expressionOf(call));
+
+  if (!ast.isIdentifier(callee)) return false;
+
+  const initializer = resolveInitializer(callee);
+
+  if (!initializer || !isFunctionLike(unwrap(initializer))) return false;
+
+  let marked = false;
+
+  walk(
+    initializer,
+    (node) => {
+      if (
+        ast.isCallExpression(node) &&
+        calleeName(node) === "markAuthGuard" &&
+        !(node.arguments[1]?.type === "Literal" && node.arguments[1].value === false)
+      ) {
+        marked = true;
+      }
+
+      return marked ? false : undefined;
+    },
+    true,
+  );
+
+  return marked;
+}
+
 function middlewareHasGuard(node: ast.Node): boolean {
   const value = unwrap(node);
 
@@ -227,7 +263,15 @@ function middlewareHasGuard(node: ast.Node): boolean {
     const item = unwrap(element);
 
     if (ast.isIdentifier(item)) return isGuardName(ast.valueText(item)) || isMarkedGuard(item);
-    if (ast.isCallExpression(item)) return isGuardName(calleeName(item));
+    if (ast.isCallExpression(item)) {
+      // `markAuthGuard(fn, false)` declares the opposite: not a guard.
+      const optedOut =
+        calleeName(item) === "markAuthGuard" &&
+        item.arguments[1]?.type === "Literal" &&
+        item.arguments[1].value === false;
+
+      return !optedOut && (isGuardName(calleeName(item)) || isMarkedGuardFactory(item));
+    }
     if (isMemberAccess(item)) return isGuardName(memberName(item));
 
     return false;

@@ -292,3 +292,15 @@ router.post("/internal/reindex", reindexController, {
 ```
 
 It is then never embedded in a page, and `warlock check` reports a browser reference to its name as `WL9020` (an error). The server still authorizes the call as for any route.
+
+### Offer a route to some sites only — `sites`
+
+In a multi-site app a route answers on every host, and a page of any site may embed it in its browser table. Declare the sites that may embed it on the route or on a group; a route's own `sites` replaces its group's, and a route with none is shared:
+
+```ts
+router.group({ prefix: "/api/admin", sites: ["admin"] }, () => {
+  router.post("/users", createUser, { name: "admin.users.create" });
+});
+```
+
+This limits the browser table only; keep the route's guard. A guard in the route's middleware chain (group middleware included) also keeps it out of a guest's table, and a custom guard must say so with `markAuthGuard(fn)` unless its name contains `auth` or `guard`. `warlock inspect`, `warlock agents-md` and `WL9006` read the same chain, so a guard declared once on a group guards every route inside it.

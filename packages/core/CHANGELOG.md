@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 > ⚠ **Versioning: `@warlock.js/*` does not follow SemVer strictly — breaking changes may ship in a minor.** This is a deliberate decision, not an oversight: the framework is pre-adoption and the cost of a major per behaviour fix currently outweighs the benefit. **Pin an exact version or a tilde range (`~4.13.0`) if you need to opt into changes rather than receive them.** Every breaking change is marked **BREAKING** in its entry and summarised in an _Upgrading_ section at the top of the release. **This policy will change once the framework has consumers beyond its author.**
 
+## 5.37.0
+
+### Added
+
+- `sites` route option and `router.group({ sites })` option: the `web.sites` keys a multi-site app offers a named API route to in the browser. Absent means shared by every site; a route's own `sites` replaces its group's. The route snapshot carries `sites` only on routes that declared it.
+- The named route snapshot carries `guarded: true` on a route with an auth guard in its middleware chain (group middleware included), so browser route tables can leave it out for guests.
+
+### Fixed
+
+- `warlock inspect` and the generated `AGENTS.md` list of "Mutating routes without an auth guard" counted only routes whose guard attached a `warlock.auth` descriptor. A middleware that declares itself a guard with `markAuthGuard()`, including one registered once on a `router.group`, now marks every route inside the group as guarded.
+- `warlock check` (`WL9006`) treats `markAuthGuard(fn, false)` written inline in a middleware list as not a guard, and recognises a local factory such as `const requireAdmin = () => markAuthGuard(fn)` used as `middleware: [requireAdmin()]` in a route or group.
+
 ## 5.36.0 - 2026-10-22
 
 ### Added

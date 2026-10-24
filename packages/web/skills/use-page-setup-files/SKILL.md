@@ -83,7 +83,7 @@ in loaders or actions.
 
 ## Browser-reachable API routes
 
-A page document embeds only the named API routes its client code can reach. Declare a name the build cannot see, such as one read from data, in the setup file's `config`: `config.apiRoutes: ["orders.show", "reports.*"]`. A layout or root declaration reaches every page that renders it. A route registered with `clientVisible: false` is never embedded.
+A page document embeds only the named API routes its client code can reach. Declare a name the build cannot see, such as one read from data, in the setup file's `config`: `config.apiRoutes: ["orders.show", "reports.*"]`. A layout or root declaration reaches every page that renders it. A route registered with `clientVisible: false` is never embedded. `web.namedApiRoutes` (private path prefixes, an allowlist, a filter, or `false`), routes declared for other sites and, for guests, guarded routes also stay out (see `submit-a-form`).
 
 ## Duplicate declarations and development
 

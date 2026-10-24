@@ -292,10 +292,19 @@ export const requireApiKey: Middleware = markAuthGuard(async ({ request, respons
 });
 ```
 
+A guard declared once on a group counts for every route inside it, at any depth,
+and `warlock inspect`, the generated `AGENTS.md` ("Mutating routes without an auth
+guard") and the MCP `inspect_routes` tool read the same chain, so a route inside
+`router.group({ prefix: "/api/admin", middleware: [adminGuard()] }, …)` is not
+listed as unguarded. A guard counts there when it carries the `markAuthGuard()`
+marker or its function name contains `auth` or `guard`; an anonymous function
+returned by a factory needs the marker.
+
 Turn the warning off with `http.warnUnguardedRoutes: false`. The same check runs
 over the source, before the app boots, as [`warlock check`](/v/latest/core/cli/check/#convention-checks)
 code `WL9006`. It reads source: a guard counts when its name contains `auth` or `guard`, or when it is a
-constant initialised with `markAuthGuard()` in the same file. A differently-named guard imported from
+constant initialised with `markAuthGuard()` in the same file, or when a local factory
+(`const requireAdmin = () => markAuthGuard(fn)`) is called in a `middleware` list. A differently-named guard imported from
 another file needs a `// warlock-check-ignore WL9006` comment on its route.
 
 ## API versioning
@@ -365,3 +374,29 @@ router.post("/internal/reindex", reindexController, {
 Such a route is never written into a page document, and `warlock check` reports a
 browser reference to its name as `WL9020`. Its snapshot carries `clientVisible: false`
 and nothing else extra. Server-side authorization still decides who may call the endpoint.
+
+### Offer a route to some sites only
+
+In a multi-site app (`web.sites`), the router is shared: a route registered once
+answers on every host. Every route is therefore shared by default, and a page of
+any site may embed it in its browser route table. Declare the sites a route is
+offered to with `sites`, on the route or on a group (a route's own `sites`
+replaces its group's):
+
+```ts
+router.group({ prefix: "/api/admin", sites: ["admin"] }, () => {
+  router.post("/users", createUserController, { name: "admin.users.create" });
+});
+```
+
+A page of the `shop` site never embeds `admin.users.create`; a page of the `admin`
+site can. This scopes the browser table only: the endpoint still answers on every
+host, so keep its guard. The snapshot carries `sites` only on routes that declare it.
+
+### Guarded routes and the route table
+
+The snapshot carries `guarded: true` on a route with an auth guard in its
+middleware chain (group middleware included, see
+[public mutating routes](#public-mutating-routes)). Web leaves such a route out of the table for a guest
+viewer. The Web option `web.namedApiRoutes` adds private path prefixes, allowlists and filters
+(see [Form submission](/v/latest/web/essentials/14-form-submission/#control-the-route-table)).

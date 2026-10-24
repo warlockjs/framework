@@ -2,6 +2,20 @@
 
 All notable changes to `@warlock.js/web` are documented here.
 
+## 5.37.0
+
+### Added
+
+- `web.namedApiRoutes` controls the route table each page embeds for `apiHref()` and `useSubmitForm({ route })`. `false` embeds nothing: a named-route call then throws, and in development the error names the option (explicit `path` and `method` still work). An allowlist of route names (with `prefix.*` patterns) or a filter function `(route, { site, guest }) => boolean` narrows the table, and `{ include, privatePrefixes }` combines both. Every form can only remove routes from what the page's client code reaches.
+- `web.namedApiRoutes.privatePrefixes` (for example `["/api/admin/", "/api/webhooks/"]`) keeps every route under those path prefixes out of every table, for any viewer and any site. Prefixes match whole path segments.
+- Site scoping: in a multi-site app a page never embeds a route declared for other sites. A route declares its sites with the `sites` option (see core); a route that declares none is shared by every site.
+- A route with an auth guard in its middleware chain (group middleware included) is left out of the table for a guest viewer. A viewer is a guest when `web.session` is not configured or resolves no user.
+- Types `NamedApiRoutesOption`, `NamedApiRoutesConfig`, `NamedApiRoutesInclude`, `NamedApiRoutesFilter`, `NamedApiRouteCandidate` and `NamedApiRouteContext`.
+
+### Changed
+
+- Server seam `resolveNamedApiRoutes(names, options)` takes `{ config, site, guest }`; without options it applies site scoping and guard rules for a guest in single-site mode.
+
 ## 5.36.0 - 2026-10-22
 
 ### Added
