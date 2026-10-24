@@ -10,6 +10,7 @@ export * from "./vitest-setup";
 export * from "./fakes";
 export * from "./factories";
 export * from "./test-http-server";
+export * from "./reset-test-database";
 export * from "./snapshot-response";
 export { assertPortIsAvailable, isPortAvailable } from "../http/port-preflight";
 

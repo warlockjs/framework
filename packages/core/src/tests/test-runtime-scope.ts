@@ -1,4 +1,5 @@
 import { performance } from "node:perf_hooks";
+import { recommendWorkerLifetime } from "./setup-recommendation";
 
 export type TestWorkerConfiguration = { pool: string; watch: boolean; isolate: boolean };
 export type TestSetupProfile = { file: string; steps: Record<string, number> };
@@ -8,6 +9,8 @@ type RuntimeScope = {
   cleanupRegistered?: boolean;
   lifetime: "file" | "worker";
   fileOpen: boolean;
+  /** When the open file's tests could start, for the `body` profile step. */
+  bodyStartedAt?: number;
   boundary?: Promise<void>;
   bootstraps: number;
   files: number;
@@ -90,9 +93,18 @@ function formatSteps(steps: Record<string, number>): string {
     .join(" ");
 }
 
+/** Called when a file's fixtures are ready; the time until teardown is the file's own test time. */
+export function markTestFileOpen(): void {
+  testRuntimeScope().bodyStartedAt = performance.now();
+}
+
 export function finishTestProfile(): void {
   const scope = testRuntimeScope();
   if (!scope.profile) return;
+  if (scope.bodyStartedAt !== undefined) {
+    scope.profile.steps.body = performance.now() - scope.bodyStartedAt;
+    scope.bodyStartedAt = undefined;
+  }
   console.info(
     `[warlock:test] file=${JSON.stringify(scope.profile.file)} pid=${process.pid} ${formatSteps(scope.profile.steps)}`,
   );
@@ -111,4 +123,12 @@ function printTestSummary(scope: RuntimeScope): void {
   console.info(
     `[warlock:test] summary pid=${process.pid} files=${scope.files} bootstraps=${scope.bootstraps} ${formatSteps(totals)}`,
   );
+  const { body = 0, ...setup } = totals;
+  const advice = recommendWorkerLifetime({
+    files: scope.files,
+    bootstraps: scope.bootstraps,
+    setupMs: Object.values(setup).reduce((sum, ms) => sum + ms, 0),
+    bodyMs: body,
+  });
+  if (advice) console.info(advice);
 }

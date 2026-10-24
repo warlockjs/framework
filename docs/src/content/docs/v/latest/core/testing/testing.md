@@ -567,6 +567,12 @@ projects for unit and integration runtimes.
 
 ### Opt into one runtime per fork
 
+The fastest way in: `warlock add test` generates `src/config/tests.ts` and an
+integration project whose `isolate` follows `WARLOCK_TEST_LIFETIME`. Run
+`WARLOCK_TEST_LIFETIME=worker npx vitest run --project integration` to switch
+`lifetime`, `resetDatabase` and `isolate: false` together. The steps below do the
+same by hand for an existing config.
+
 The default remains `tests.lifetime: "file"`. To reuse a runtime, change the
 integration project's `isolate` to `false`, keep `pool: "forks"` and
 `runner: "./src/test-runner.ts"`, then configure:
@@ -645,6 +651,44 @@ Across one integration project, a successful run with no worker recycling needs
 at most `maxWorkers` bootstraps. Multiple projects, worker crashes and memory-limit
 recycling can create additional processes; count distinct PIDs in profiles.
 
+### Worker lifetime with the HTTP test server and a database
+
+Two things are shared when a worker keeps its runtime: the database and the
+servers a file opened. Both have a built-in reset now.
+
+```ts title="src/config/tests.ts"
+export default {
+  lifetime: "worker",
+  // Truncate every table/collection (the migrations ledger is kept) before each file.
+  resetDatabase: true, // or { except: ["countries"] }
+};
+```
+
+```ts title="src/config/database.ts"
+import { workerDatabaseName } from "@warlock.js/core/tests";
+
+// One database per Vitest worker: the reset above may delete every row in it.
+const name = process.env.VITEST ? workerDatabaseName("app_test") : "app";
+```
+
+- `resetDatabase` runs after the fakes reset and before `resetBetweenFiles`, so
+  the hook can seed reference data. `resetTestDatabase({ except, only, connection })`
+  is exported for tests and custom hooks. On PostgreSQL it truncates with
+  `CASCADE`.
+- `workerDatabaseName(base)` returns `base_<VITEST_POOL_ID>`; `testWorkerId()`
+  returns the 1-based worker id. Create or migrate that database in the
+  application's global setup or in a `bootstrap` step before connectors start.
+- Servers from `createTestHttpServer()` that a file did not `close()` are closed
+  before the next file, so their routes and ports do not leak. App modules
+  (`loadAppModules`) load once per worker and are reused.
+- The global `startHttpTestServer()` server runs in Vitest's main process with its
+  own connections and fakes. Worker lifetime does not touch it, so keep requests
+  through it independent of the worker database, or use `createTestHttpServer()`
+  in the worker for tests that read the same database the assertions use.
+- `isolate: false` shares module state between files of a worker: singletons,
+  `vi.mock()` of app modules and module-level caches survive. Restore mocks in
+  `afterEach`, and clear module state in `resetBetweenFiles`.
+
 ### Measure and size CI workers
 
 Set `tests.profileSetup: true` or run
@@ -652,7 +696,10 @@ Set `tests.profileSetup: true` or run
 `file: expect.getState().testPath` to `setupTest()` for file labels (the generated
 setup does this). Each file emits one line with milliseconds for environment, config,
 bootstrap, orchestrator, app config, connectors, fakes, reset and teardown as
-applicable. Reused files report reset instead of startup steps. A summary per
+applicable, plus `body`, the time between setup finishing and teardown starting.
+Reused files report reset instead of startup steps. When a file-lifetime run spends
+half or more of its time in setup over at least four files, the worker summary and
+`TestSetupReporter` print a line recommending worker lifetime. A summary per
 worker reports file/bootstrap counts, summed step timings and final shutdown.
 The generated config also installs `TestSetupReporter` from `@warlock.js/core/vite`
 (`reporters: ["default", new TestSetupReporter()]`), which aggregates file counts,

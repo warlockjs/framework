@@ -1,3 +1,5 @@
+import { recommendWorkerLifetime } from "../tests/setup-recommendation";
+
 /** Vitest reporter shape, with no runtime dependency on Vitest in the config helper. */
 export class TestSetupReporter {
   private files = 0;
@@ -52,5 +54,13 @@ export class TestSetupReporter {
     console.info(
       `[warlock:test] run summary files=${this.files} workers=${this.workers.size} bootstraps=${this.bootstraps} ${steps}`,
     );
+    const { body = 0, ...setup } = { ...this.totals, shutdown };
+    const advice = recommendWorkerLifetime({
+      files: this.files,
+      bootstraps: this.bootstraps,
+      setupMs: Object.values(setup).reduce((sum, ms) => sum + ms, 0),
+      bodyMs: body,
+    });
+    if (advice) console.info(advice);
   }
 }

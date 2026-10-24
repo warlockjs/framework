@@ -76,6 +76,11 @@ export default defineConfig({
 
 `lowerStage3Decorators()` **must** be the first entry in `plugins` — it lowers the native stage-3 decorators (`@RegisterModel`, `@BelongsTo`, …) with esbuild before the rest of the transform pipeline can mangle them, so decorated Cascade models load under Vitest. Drop it or reorder it and every model load throws a `SyntaxError`.
 
+With Vitest 5 projects, list the plugin only in the root config: inline projects
+extend the file that declares them by default, and repeating it inside a project
+makes Vitest warn `applies the same plugin multiple times`. Use `extends: true`
+(inherit, the generated layout) or `extends: false` (own plugins) explicitly.
+
 The split matters: `globalSetup` runs ONCE in the main vitest process (boots the HTTP server); `setupFiles` runs in each worker thread (gives each worker its own DB connection for direct calls).
 
 ### Keep Vitest setup out of development

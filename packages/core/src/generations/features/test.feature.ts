@@ -78,6 +78,33 @@ afterAll(teardownTest);
     recordSkippedFile(testSetupPath, "exists");
   }
 
+  const testsConfigPath = srcPath("config/tests.ts");
+  if (!(await fileExistsAsync(testsConfigPath))) {
+    await putFileAsync(
+      testsConfigPath,
+      `/**
+ * Test runtime settings.
+ *
+ * WARLOCK_TEST_LIFETIME=worker boots the framework once per Vitest worker instead of once
+ * per test file. It needs the integration project's isolate: false (vite.config.ts derives
+ * that from the same variable) and a database of its own per worker, because resetDatabase
+ * truncates every table before each file. Point your database config at
+ * workerDatabaseName("app_test") from "@warlock.js/core/tests" when VITEST is set.
+ */
+const workerLifetime = process.env.WARLOCK_TEST_LIFETIME === "worker";
+
+export default {
+  lifetime: workerLifetime ? "worker" : "file",
+  resetDatabase: workerLifetime,
+  profileSetup: process.env.WARLOCK_TEST_PROFILE === "1",
+};
+`,
+    );
+    console.log(`${colors.green("✓")} Created src/config/tests.ts`);
+  } else {
+    recordSkippedFile(testsConfigPath, "exists");
+  }
+
   const runnerPath = srcPath("test-runner.ts");
   if (!(await fileExistsAsync(runnerPath))) {
     await putFileAsync(
@@ -133,8 +160,9 @@ export default defineConfig({
           name: "integration",
           environment: "node",
           pool: "forks",
-          // Required only when opting into tests.lifetime: "worker".
-          isolate: true,
+          // Worker lifetime shares one module graph per fork, so it needs isolate: false.
+          // Switch both with WARLOCK_TEST_LIFETIME=worker (see src/config/tests.ts).
+          isolate: process.env.WARLOCK_TEST_LIFETIME !== "worker",
           runner: "./src/test-runner.ts",
           globalSetup: "./src/test-global-setup.ts",
           setupFiles: ["./src/test-setup.ts"],

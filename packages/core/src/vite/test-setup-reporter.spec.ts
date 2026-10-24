@@ -40,4 +40,33 @@ describe("setup profiling run summary", () => {
     reporter.onTestRunEnd();
     expect(output).not.toHaveBeenCalled();
   });
+  it("recommends worker lifetime when setup dominates a file-lifetime run", () => {
+    const output = vi.spyOn(console, "info").mockImplementation(() => undefined);
+    const reporter = new TestSetupReporter();
+    reporter.onTestRunStart();
+    for (let file = 0; file < 4; file += 1) {
+      reporter.onUserConsoleLog({
+        content: `[warlock:test] file="f${file}.test.ts" pid=100 bootstrap=900.00ms teardown=50.00ms body=50.00ms`,
+      });
+    }
+    reporter.onTestRunEnd();
+    expect(output).toHaveBeenCalledTimes(2);
+    expect(String(output.mock.calls[1]?.[0])).toContain('tests.lifetime: "worker"');
+  });
+
+  it("does not recommend it when files share a runtime or tests dominate", () => {
+    const output = vi.spyOn(console, "info").mockImplementation(() => undefined);
+    const reporter = new TestSetupReporter();
+    reporter.onTestRunStart();
+    reporter.onUserConsoleLog({
+      content: '[warlock:test] file="a.test.ts" pid=100 bootstrap=900.00ms body=10.00ms',
+    });
+    for (const name of ["b", "c", "d"]) {
+      reporter.onUserConsoleLog({
+        content: `[warlock:test] file="${name}.test.ts" pid=100 reset=1.00ms body=10.00ms`,
+      });
+    }
+    reporter.onTestRunEnd();
+    expect(output).toHaveBeenCalledTimes(1);
+  });
 });

@@ -1,0 +1,15 @@
+import { lowerStage3Decorators } from "@warlock.js/core/vite";
+import { defineConfig } from "vitest/config";
+
+export default defineConfig({
+  plugins: [lowerStage3Decorators()],
+  test: {
+    projects: [
+      {
+        plugins: [lowerStage3Decorators()],
+        test: { name: "http", include: ["src/**/*.test.ts"] },
+      },
+      { test: { name: "unit", include: ["src/**/*.spec.ts"] } },
+    ],
+  },
+});

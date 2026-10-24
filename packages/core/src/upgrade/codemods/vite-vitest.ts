@@ -226,3 +226,47 @@ export const viteVitest: Codemod = {
     return output;
   },
 };
+
+/**
+ * 5.37.1: since Vitest 5 an inline project extends the config file that
+ * declares it. A plugin listed again inside a project (the Vitest 4 layout,
+ * where projects did not inherit) is then applied twice and Vitest warns
+ * `The "<project>" project applies the same plugin multiple times`.
+ *
+ * Lists every extra `lowerStage3Decorators()` call in a config that declares
+ * `projects`, so it can be removed from the project (it is inherited) or the
+ * project can opt out of inheriting with `extends: false`.
+ */
+export const vitestInlineProjectPlugins: Codemod = {
+  id: "vitest-inline-project-plugins",
+  version: "5.37.1",
+  package: "@warlock.js/core",
+  title: "Remove plugins repeated inside inline Vitest projects",
+  skill: "lower-stage3-decorators",
+  run(context) {
+    const output: CodemodOutput = { edits: [], manual: [] };
+
+    for (const file of context.text.list()) {
+      if (!VITE_CONFIG_FILE.test(file)) continue;
+      const config = context.text.read(file);
+      if (config === undefined || !/\bprojects\s*:/.test(config)) continue;
+
+      const calls: number[] = [];
+      config.split("\n").forEach((text, index) => {
+        if (/\blowerStage3Decorators\s*\(/.test(text) && !/^\s*(import\b|\/\/|\*)/.test(text)) {
+          calls.push(index + 1);
+        }
+      });
+
+      for (const line of calls.slice(1)) {
+        output.manual.push({
+          file,
+          line,
+          hint: "`lowerStage3Decorators()` appears more than once in a config with `projects`. Since Vitest 5 an inline project extends the config that declares it, so a project that lists the plugin again applies it twice and Vitest warns. Remove it from the project (the root plugin is inherited), or set `extends: false` on a project that must not inherit the root config.",
+        });
+      }
+    }
+
+    return output;
+  },
+};
