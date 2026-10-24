@@ -41,6 +41,7 @@ export type TranspileInit = {
 
 const VERSION_QUERY = /\?v=\d+$/;
 const TS_FILE = /\.(ts|tsx|mts|cts)$/;
+const STYLESHEET_FILE = /\.(css|scss|sass|less|styl)$/;
 
 let transpile: TranspileInit;
 let cache: TranspileCache;
@@ -95,6 +96,14 @@ export async function load(
   nextLoad: NextLoad,
 ): Promise<LoadResult> {
   const cleanUrl = url.replace(VERSION_QUERY, "");
+
+  // A stylesheet imported by a component. Node cannot load one, and in Node the
+  // styles have no meaning: a module graph imported for its exports (sitemap
+  // discovery, page listing) only needs the import to resolve. CSS modules get
+  // an empty class map.
+  if (STYLESHEET_FILE.test(cleanUrl)) {
+    return { format: "module", source: "export default {};\n", shortCircuit: true };
+  }
 
   // Not TypeScript → not ours. npm packages, node: builtins, JSON, etc.
   if (!TS_FILE.test(cleanUrl)) {

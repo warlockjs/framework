@@ -535,6 +535,18 @@ describe("FileLog", () => {
       expect(fs.readFileSync(channel.filePath, "utf-8")).toContain("drained-on-dispose");
     });
 
+    it("never keeps the process alive through its background flush interval", async () => {
+      const channel = track(new FileLog({ storagePath }));
+
+      await waitForInit(channel);
+
+      const handle = (channel as unknown as { flushIntervalHandle?: NodeJS.Timeout })
+        .flushIntervalHandle;
+
+      expect(handle).toBeDefined();
+      expect(handle?.hasRef()).toBe(false);
+    });
+
     it("is safe to call more than once", async () => {
       const channel = track(new FileLog({ storagePath }));
 

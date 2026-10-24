@@ -292,6 +292,11 @@ export class FileLog extends LogChannel<FileLogConfig> implements LogContract {
         this.writeMessagesToFile();
       }
     }, 5000);
+
+    // A periodic re-check must never be the reason a process stays alive: a
+    // finished test run or CLI command would otherwise wait for it forever.
+    // Buffered entries are still written by `flush()` / `flushSync()` on shutdown.
+    this.flushIntervalHandle.unref?.();
   }
 
   /**

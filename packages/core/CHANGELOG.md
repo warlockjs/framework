@@ -32,6 +32,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Upgrading
 
 - Deploy scripts and CI jobs that run `warlock migrate --rollback` or `--fresh` with `NODE_ENV` set to anything other than `development` must add `--yes` (or `--force`). A rollback that removes no data does not ask. On MongoDB, a plain `dropColumn()` in a migration's `down()` is now skipped (see the Cascade 5.37.0 notes).
+### Fixed
+
+- The dev loader hook answers stylesheet imports (`.css`, `.scss`, `.sass`, `.less`, `.styl`) with an empty module, so sitemap discovery works for a page whose component imports a stylesheet instead of failing with `ERR_UNKNOWN_FILE_EXTENSION`.
 
 ## 5.36.0 - 2026-10-22
 
