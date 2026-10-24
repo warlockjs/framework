@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 > ⚠ **Versioning: `@warlock.js/*` does not follow SemVer strictly — breaking changes may ship in a minor.** This is a deliberate decision, not an oversight: the framework is pre-adoption and the cost of a major per behaviour fix currently outweighs the benefit. **Pin an exact version or a tilde range (`~4.13.0`) if you need to opt into changes rather than receive them.** Every breaking change is marked **BREAKING** in its entry and summarised in an _Upgrading_ section at the top of the release. **This policy will change once the framework has consumers beyond its author.**
 
+## 5.37.0
+
+### Fixed
+
+- The default validation message translation no longer returns a message with an unfilled `:placeholder`. When the browser form library is imported on the server, its English `validation.*` defaults share the translation registry and name the length value `:length`, where seal uses `:minLength` and `:maxLength`, so a `v.string().maxLength(5)` failure read "This input can not be greater than :length characters". The aliases `:length` (for `minLength` and `maxLength`) and `:matchingInput` (for `match`) are now mapped, and a translation that still cannot be filled falls back to seal's own message. App overrides of `validation.*` keep working.
+
+### Added
+
+- In development, the first time a validation translation cannot be filled, a warning names its `validation.*` key.
+
 ## 5.36.0 - 2026-10-22
 
 ### Added
