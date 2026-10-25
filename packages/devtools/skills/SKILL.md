@@ -44,6 +44,7 @@ of it would fail to resolve there.
 | **Mail**     | Every mail sent in development: headers, HTML (sandboxed) and text, attachment names                                                                                                                                                              | core `mailEvents.onCaptured()`            |
 | **Logs**     | Log entries per request, filterable by level and module                                                                                                                                                                                           | a logger channel                          |
 | **Cache**    | hit / miss / set / removed / `invalidated` (tags, keys removed)                                                                                                                                                                                   | cache `cache.on(...)`                     |
+| **Agents**   | Per-turn traces of `@warlock.js/ai` agents: system prompt, tools offered with schema hashes, tool calls, results and refusals, retries, usage and cost, plus a comparison with the previous run of the agent | `@warlock.js/ai` `agentTraces` store      |
 | **Routes**   | Every HTTP route with its method, path, name and middleware                                                                                                                                                                                       | core router                               |
 | **API**      | The app's API reference: every route with its parameters, request body, responses and auth                                                                                                                                                        | core `getDevelopmentOpenApiDocument()`    |
 
@@ -112,6 +113,19 @@ feed the panel. An installed but unobserved flow produces no trace.
 - Compaction metadata includes applied/skipped agent decisions and provider
   compaction-block counts; summary content is omitted. Orchestrator result-only
   compaction cannot be reconstructed from a report-only trace.
+
+### Agent traces
+
+The **Agents** tab needs no Panoptic: `@warlock.js/ai` 5.38+ records a trace per
+agent run in development and devtools reads its shared store. Endpoints:
+`GET /__warlock/api/ai/agent-runs[?requestId=<id>]` (list, newest first; `available:
+false` with guidance until the AI package has created its store),
+`GET /__warlock/api/ai/agent-runs/<run-id>` (full trace, 404 when evicted), and
+`agent-trace` events `{ runId, status, requestId? }` on the stream. Unlike the
+Panoptic view these carry prompt and tool content (secret keys are redacted
+before storage), so they stay behind the same development and loopback guard.
+`warlock ai trace [runId] [--diff other]` prints the same data. Public types:
+`DevtoolsAgentRun`, `DevtoolsAgentTraceEvent`.
 
 A same-origin browser tool can consume the public types directly:
 

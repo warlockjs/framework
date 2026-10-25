@@ -91,6 +91,10 @@ A misbehaving listener's throw is swallowed (same swallow-on-throw discipline as
 
 `@warlock.js/ai-panoptic` is the shipped, full-featured `Observer` — install it, configure it via `ai.config({ panoptic })`, and it registers its collector + (optionally) flips observe-all for you. Core stays dependency-free; this skill documents the seam panoptic plugs into.
 
+## Agent traces (development)
+
+Separate from observers: agents record a bounded in-memory per-turn trace (`agentTraces`, latest 100 runs) in development with no setup, holding prompt and tool content, redacted. Read it with `agentTraces.get(runId)`, `formatAgentTrace`, `diffAgentTraces`, the devtools Agents tab, or `warlock ai trace`. Set `trace: false` / `true` / `{ text, redact, store }` per agent.
+
 ## See also
 
 - The `run-ai-agent` topic — the `AgentReport` / `ExecutionReport` tree (`trips`, `children`) an observer receives

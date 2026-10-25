@@ -18,3 +18,25 @@ export {
   type CompactionSummarizer,
   type CompactionSummarizerOptions,
 } from "./compaction-summarizer";
+
+export {
+  defaultActHint,
+  defaultRefusalHint,
+  matchesIntent,
+  refusalReason,
+  requiredToolsCalled,
+} from "./tool-use-contract";
+export type {
+  ActWhenAskedConfig,
+  ActWhenAskedHintContext,
+  AgentBackstop,
+  BackstopContext,
+  BackstopOutcome,
+  BackstopPhase,
+  BackstopTurn,
+  IntentMatcher,
+  ToolRefusalConfig,
+  ToolRefusalHintContext,
+  ToolRefusalOption,
+  ToolUseContractEvent,
+} from "./tool-use-contract";

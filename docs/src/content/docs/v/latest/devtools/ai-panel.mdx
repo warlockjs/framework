@@ -108,3 +108,25 @@ socket-loopback guard. Nothing is mounted in production. The view omits span
 input/output, prompts, tool arguments/results and compaction summaries, even if
 Panoptic's other exporters capture content. Names, usage, diagnostic metadata
 and normalized error type/message remain development data.
+
+## Agents tab
+
+The **Agents** tab is separate from the Panoptic-backed AI tab and does not need
+Panoptic. It shows the per-turn traces `@warlock.js/ai` 5.38 or newer records for
+its own agents in development: the system prompt, the tools offered with schema
+hashes and token estimates, tool calls with results and refusals, retries and
+re-prompts, usage and cost, and a comparison with the previous run of the same
+agent. See [agent traces](/v/latest/ai/observability/agent-trace/).
+
+Unlike the Panoptic view, an agent trace holds prompt and tool content, so it
+exists for development only: the same guard applies, secret keys are redacted
+before a trace is stored, and nothing is mounted in production.
+
+- `GET /__warlock/api/ai/agent-runs[?requestId=<id>]` — recent runs, newest
+  first, or `available: false` with guidance until `@warlock.js/ai` has created
+  its trace store.
+- `GET /__warlock/api/ai/agent-runs/<run-id>` — the full trace, or `404`.
+- `GET /__warlock/api/stream` adds `agent-trace` events carrying
+  `{ runId, status, requestId? }`.
+
+`warlock ai trace` reads the same endpoints from the terminal.

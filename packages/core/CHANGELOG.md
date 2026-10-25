@@ -53,6 +53,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Per-feature locale files: `src/app/<module>/utils/locales/<feature>.json` is merged with the module's `utils/locales.json` in development, in the production build and in test workers, under the module's namespace unless the file names its own `$group`. A key may live in one file only. Web's per-page translation tables are built from the same registry, so they see the merged dictionary.
 - `generate: { barrels: false }` in `warlock.config.ts` makes `warlock generate`, `warlock make` and `warlock add access` write no `index.ts` barrel (for models) and import the model file itself in the files they generate. The default stays `true`.
 - `warlock doctor --fix` converts a legacy `utils/locales.ts` into `utils/locales/legacy.json` when the module already has a `locales.json`, as long as no key appears in both; it still writes `locales.json` when there is none.
+- `warlock ai tools --tools <module>` lists each tool's estimated tokens per call and its per-provider schema findings (OpenAI strict, Anthropic, Google); `--targets`, `--warn-above`, `--fail` (exit 1 on an error-level finding) and `--json`.
+- `warlock ai trace [runId]` reads the agent traces held by the running dev server: a run list, or one run turn by turn (system prompt hash, tools offered, calls, refusals, retries, usage, cost); `--diff <otherRunId>` compares the prompt and tool definitions of two runs; `--url`, `--devtools-path` and `--json`. Both need `@warlock.js/ai` 5.38.0 or newer.
+
+### Changed
+
+- `warlock ai` no longer marks `--model` as required in its option list; `warlock ai measure` still requires it and reports a missing value.
 
 ## 5.37.1 - 2026-10-24
 

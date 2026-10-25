@@ -238,6 +238,8 @@ import { ai /* types, errors */ } from "@warlock.js/ai";
 | `DatasetContract<TOutput>`                                                                                 | Returned by `ai.dataset`. Immutable, `.filter()` / `.shard()`-able cases that feed `agent.eval({ cases })`. `.name`, `.cases`.                           |
 | `DatasetEntry<TOutput>` / `DatasetOptions<TOutput>`                                                        | A dataset row (a superset of `EvalCase` plus `tags?`); factory options (`name`, `cases?`, `fromFile?` JSONL).                                            |
 | `EvalRegression`                                                                                           | Regression verdict attached when `agent.eval` gets a `baseline` — `{ regressed[], removed, added, passed, regressedMetrics?, stableFailures?, flaky? }`. |
+| `ai.eval.requiredToolCalled({ tools, intents?, require? })` | Scorer: an action request was answered by a successful call to a required tool. See [tool-use contract](/v/latest/ai/agents/tool-use-contract/). |
+| `ai.eval.changeClaimedWithoutToolCall({ tools?, claims? })` | Scorer: the reply claims a change that no completed tool call made.                                                                              |
 | `ai.eval.toJUnit(report)`                                                                                  | JUnit-XML artifact for CI ingestion.                                                                                                                     |
 | `ai.eval.toJSON(report)` / `ai.eval.fromJSON(serialized)`                                                  | Round-trippable `EvalReport` snapshot — today's report becomes tomorrow's `baseline`.                                                                    |
 | `registerAiMatchers()`                                                                                     | Vitest matchers `toRouteTo` / `toConverge` / `toPassStep` / `toOutputShape`.                                                                             |
@@ -277,6 +279,9 @@ import { ai /* types, errors */ } from "@warlock.js/ai";
 | `compactToolSchemas(tools, options?)`                 | Copies of `tools` whose schemas serialize compact for every adapter; validation still uses the originals.                                                                                                     |
 | `measureTools(tools, options?)`                       | Input tokens a tool list adds to every call — `{ tokens, perTool, overhead, source: "native" \| "estimate", mode }`. Also `ai.tools.measure` with `@warlock.js/ai-tools`.                                     |
 | `compactJsonSchema(schema, options?)`                 | Strip annotation keywords (`description`, `title`, `examples`, `default`, …) and collapse const unions to `enum`; `keepDescriptions` keeps descriptions. `extractJsonSchema(schema, { compact })` applies it. |
+| `describeToolSchema(tool, options?)`                  | Per-provider schema check of one tool (`openai-strict`, `anthropic`, `google`) — `{ name, tokens, descriptionChars, schemaHash, targets, issues[], ok }`. Also `ai.tools.describe`. See [lint tool schemas](/v/latest/ai/tools/lint-tool-schemas/). |
+| `describeToolSchemas(tools, options?)`                | The same for a list — `{ tools[], tokens, issueCount }`. Also `ai.tools.describeAll`.                                                                                                                       |
+| `ToolConfig.lint` / `AIConfig.toolLint`               | `false` or `DescribeToolSchemaOptions` — silence or tune the development-time schema warning.                                                                                                                |
 | `ToolCall`                                            | One recorded tool call — `{ name, input, output, error?, tripIndex, duration, startedAt, endedAt }`.                                                                                                          |
 | `ToolMode`                                            | `"feedback"                                                                                                                                                                                                   | "silent"`. |
 
@@ -452,6 +457,18 @@ A generic, panoptic-agnostic observability seam. Observability tools (panoptic, 
 | `onConfigApplied(listener)`               | Subscribe to `ai.config(...)` application so a tool can pick up its opaque config slot. |
 | `Observer`                                | The structural observer contract a tool implements.                                     |
 | `FlowObserveOption`                       | A flow's `observe` value — `true` / `false` / a flow-local `Observer`.                  |
+
+### Agent traces and the tool-use contract
+
+| Export                                                         | What it is                                                                                                                                                      |
+| -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `AgentConfig.actWhenAsked`                                     | `{ intents, requiredTools, require?, hint?, maxReprompts? }` — re-prompt once when an action request is answered without a required tool.                       |
+| `AgentConfig.onToolRefusal`                                    | `"off"`, `"retry-once-with-hint"` or `{ retries?, hint?, isRefusal? }` — one retry prompt quoting a tool's refusal.                                              |
+| `AgentConfig.backstops`                                        | `AgentBackstop[]` — `{ name?, phase?: "before" \| "after", detect(turn), run(context) }` deterministic checks around the model turn.                            |
+| `AgentConfig.trace`                                            | `boolean` or `AgentTraceOptions` — record a per-turn trace; default on in development only.                                                                    |
+| `agentTraces` / `createAgentTraceStore({ capacity? })`         | The shared in-memory `AgentTraceStore` (`publish`, `get`, `list`, `subscribe`, `clear`) and a factory for another.                                              |
+| `AgentTrace` / `AgentTraceTurn` / `AgentTraceToolCall`         | The recorded run, its turns and tool calls.                                                                                                                      |
+| `diffAgentTraces(before, after)` / `formatAgentTrace(trace)`   | Compare the prompt and tool definitions two runs sent; render a trace as plain text.                                                                            |
 
 ## Serve over SSE
 

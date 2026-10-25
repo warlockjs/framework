@@ -69,6 +69,7 @@ import { providerTool } from "./tool/provider-tool";
 import { tool } from "./tool/tool";
 import { catalogue } from "./tool/catalogue";
 import { measureTools } from "./tool/tool-schemas";
+import { describeToolSchema, describeToolSchemas } from "./tool/tool-schema-lint";
 import { step } from "./workflow/step";
 import { workflow } from "./workflow/workflow";
 
@@ -76,6 +77,8 @@ import { workflow } from "./workflow/workflow";
 export interface AiToolsNamespace {
   catalogue: typeof catalogue;
   measure: typeof measureTools;
+  describe: typeof describeToolSchema;
+  describeAll: typeof describeToolSchemas;
 }
 
 /**
@@ -260,7 +263,12 @@ export const ai = {
   measure,
   config: setAIConfig,
   tool,
-  tools: { catalogue, measure: measureTools },
+  tools: {
+    catalogue,
+    measure: measureTools,
+    describe: describeToolSchema,
+    describeAll: describeToolSchemas,
+  },
   providerTool,
   agent,
   systemPrompt,

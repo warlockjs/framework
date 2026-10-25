@@ -240,6 +240,10 @@ Fast Refresh boundary.
 
 `warlock ai measure --model <id> [--tools <module>] [--system <file>] [--skills <dir>] [--json]` loads `@warlock.js/ai` lazily without app bootstrap. Model IDs default to OpenAI Responses or use `openai:`, `anthropic:`, `google:` prefixes and the corresponding installed adapter/environment API key. `--model-module <module>` accepts `model`, `default`, or `resolveModel(id)` for custom providers/prices. Tools modules export a `tools` or default array; paths resolve from cwd. The report breaks down messages, system, skills catalogue, and tools, labels native counts versus estimates, and includes uncached input USD only when priced. CLI reports include an explicit `.` user probe and do not preload skill bodies or add skill tools. JSON stdout contains one report. No CLI config registration is required.
 
+### AI tool lint and agent traces
+
+`warlock ai tools --tools <module> [--targets openai-strict,anthropic,google] [--warn-above <tokens>] [--fail] [--json]` lists each tool with its estimated tokens per call and the per-provider schema findings (optional fields sent as required, unsupported keywords, oversized descriptions); `--fail` exits 1 on an error-level finding. `warlock ai trace [runId] [--diff <otherRunId>] [--url <origin>] [--json]` reads the per-turn agent traces held by the running dev server's devtools (`/__warlock/api/ai/agent-runs`): without an id it lists runs, with one it prints the turns, tools offered, calls, refusals, retries, usage and cost; `--diff` compares two runs' prompt and tool definitions. Both live under the same built-in `ai <action> [runId]` command and need `@warlock.js/ai` 5.38.0 or newer.
+
 ### Misc
 
 | Command                                         | Purpose                                                   |

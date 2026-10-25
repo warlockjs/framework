@@ -6,9 +6,9 @@ import type { Measurement, ModelContract, ToolConfig } from "@warlock.js/ai";
 import type { CommandActionData } from "../../../commands/types";
 import { withConsoleOnStderr } from "../routes/with-console-on-stderr";
 
-type ModuleExports = Record<string, unknown>;
+export type ModuleExports = Record<string, unknown>;
 type MeasureModule = Pick<typeof import("@warlock.js/ai"), "measure" | "skills">;
-type ModuleLoader = (specifier: string) => Promise<ModuleExports>;
+export type ModuleLoader = (specifier: string) => Promise<ModuleExports>;
 type SDKConstructor = new (config: { apiKey: string }) => {
   model(config: { name: string; api?: "responses" }): ModelContract;
 };
@@ -49,7 +49,7 @@ function isModel(value: unknown): value is ModelContract {
   );
 }
 
-function isTool(value: unknown): value is ToolConfig<unknown, unknown> {
+export function isTool(value: unknown): value is ToolConfig<unknown, unknown> {
   return (
     object(value) &&
     typeof value.name === "string" &&
@@ -137,14 +137,47 @@ export function formatMeasurement(report: Measurement): string {
   return lines.join("\n");
 }
 
+/** What the `ai` actions can be given; each is a seam for tests. */
+export type AiCommandDependencies = {
+  load?: ModuleLoader;
+  cwd?: string;
+  /** The `fetch` `warlock ai trace` calls against the dev server. */
+  fetch?: (input: string, init?: RequestInit) => Promise<Response>;
+};
+
+export const AI_COMMAND_USAGE = [
+  "Usage:",
+  "  warlock ai measure --model <id> [--tools <module>] [--system <file>] [--skills <dir>] [--json]",
+  "  warlock ai tools --tools <module> [--targets openai-strict,anthropic,google] [--warn-above <tokens>] [--fail] [--json]",
+  "  warlock ai trace [runId] [--diff <otherRunId>] [--url <origin>] [--json]",
+].join("\n");
+
+/** Action behind `warlock ai <action>`: `measure`, `tools` or `trace`. */
 export async function aiCommandAction(
-  { args, options }: CommandActionData,
-  dependencies: { load?: ModuleLoader; cwd?: string } = {},
+  data: CommandActionData,
+  dependencies: AiCommandDependencies = {},
 ): Promise<void> {
-  if (args.length !== 1 || args[0] !== "measure")
-    throw new Error(
-      "Usage: warlock ai measure --model <id> [--tools <module>] [--system <file>] [--skills <dir>] [--json]",
-    );
+  const action = data.args[0];
+
+  if (action === "tools") {
+    const { aiToolsAction } = await import("./ai-tools.action");
+    return aiToolsAction(data, dependencies);
+  }
+
+  if (action === "trace") {
+    const { aiTraceAction } = await import("./ai-trace.action");
+    return aiTraceAction(data, dependencies);
+  }
+
+  if (action !== "measure" || data.args.length !== 1) throw new Error(AI_COMMAND_USAGE);
+
+  return aiMeasureAction(data, dependencies);
+}
+
+async function aiMeasureAction(
+  { options }: CommandActionData,
+  dependencies: AiCommandDependencies,
+): Promise<void> {
   const stringOption = (name: string, required = false): string | undefined => {
     const value = options[name];
     if (value === undefined && !required) return undefined;

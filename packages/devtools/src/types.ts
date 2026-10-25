@@ -1,4 +1,5 @@
 import type { RequestLogRecord } from "@warlock.js/core";
+import type { DevtoolsAgentTraceEvent } from "./sources/agent-trace-source";
 import type { DevtoolsAiEvent } from "./sources/ai-source";
 
 /**
@@ -204,7 +205,8 @@ export type DevtoolsStreamEvent =
   | { type: "request"; data: DevtoolsRequestSummary }
   | { type: "mail"; data: DevtoolsMailSummary }
   | { type: "log"; data: DevtoolsLogEntry }
-  | { type: "ai"; data: DevtoolsAiEvent };
+  | { type: "ai"; data: DevtoolsAiEvent }
+  | { type: "agent-trace"; data: DevtoolsAgentTraceEvent };
 
 /** Unsubscribes a listener or detaches a source. */
 export type DevtoolsDisposer = () => void;

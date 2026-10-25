@@ -287,6 +287,20 @@ compactJsonSchema({ type: "string", description: "Order id", examples: ["A-1"] }
 
 Compact mode drops `description` / `title` / `examples` / `example` / `default` / `$comment` / `deprecated` / `readOnly` / `writeOnly` / `$schema` at every level and collapses `anyOf` / `oneOf` of bare `const` branches into `enum` (`{ keepDescriptions: true }` keeps descriptions). Validation and property names are untouched; the tool's own `description` is always sent. Trade-off: no per-field guidance for the model — name fields clearly and keep must-know rules in the tool `description`. `compactToolSchemas(tools)` returns compact copies for direct `model.complete(messages, { tools })` calls.
 
+## Schema lint — per-provider checks at definition time
+
+`ai.tool()` checks its JSON Schema against `openai-strict`, `anthropic` and `google` and, in development only, logs one warning per tool definition (`ai.tool` / `schema.lint`). Findings: `optional-forced-required` (an optional field is sent required and nullable), `optional-not-required` and `missing-additional-properties-false` (OpenAI strict rejects), `unsupported-keyword` (`allOf`, `oneOf`, `not`, conditionals, `patternProperties`, ...), `root-not-object` (adapters send no parameters), `invalid-name`, `oversized-description` (over 1024 characters on a tool, 512 on a property), `heavy-definition` (over 500 estimated tokens).
+
+```ts
+const report = ai.tools.describe(tool);            // { name, tokens, descriptionChars, schemaHash, targets, issues, ok }
+const { tools, tokens } = ai.tools.describeAll(tools);
+ai.tool({ ..., lint: false });                      // silence one tool
+ai.tool({ ..., lint: { targets: ["anthropic"], warnAboveTokens: 300 } });
+ai.config({ toolLint: false });                     // silence the app
+```
+
+`tokens` is an estimate (4 characters per token, `charsPerToken` to tune); use `ai.tools.measure(tools, { model })` for an exact native count. CLI: `warlock ai tools --tools ./tools.ts [--targets ...] [--fail] [--json]`.
+
 ## See also
 
 - The `run-ai-agent` topic — how tools plug into the trip loop

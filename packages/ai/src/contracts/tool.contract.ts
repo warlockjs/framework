@@ -1,4 +1,5 @@
 import type { StandardSchemaV1 } from "@standard-schema/spec";
+import type { DescribeToolSchemaOptions } from "../tool/tool-schema-lint";
 
 /**
  * Optional metadata attached to a tool for documentation and tooling.
@@ -227,6 +228,14 @@ export interface ToolConfig<TInput = unknown, TOutput = unknown> {
    * mixed-mode rule.
    */
   mode?: ToolMode;
+  /**
+   * Development-time schema check of this definition (see
+   * `describeToolSchema`). `ai.tool()` logs one warning per definition when
+   * a provider would reject, ignore or over-charge for the schema. `false`
+   * silences it for this tool; an object tunes the check (targets,
+   * description limits, token budget). Defaults to `ai.config({ toolLint })`.
+   */
+  lint?: false | DescribeToolSchemaOptions;
   /**
    * Standard Schema-compatible input schema.
    * Any schema library implementing @standard-schema/spec works here

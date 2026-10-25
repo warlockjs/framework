@@ -114,6 +114,7 @@ export { team } from "./team";
 export type { TeamConfig, TeamGate, TeamGateFn, TeamMemberValue } from "./contracts/team";
 export * from "./system-prompt";
 export * from "./tool";
+export * from "./trace";
 export * from "./utils";
 export * from "./vcr";
 export * from "./workflow";

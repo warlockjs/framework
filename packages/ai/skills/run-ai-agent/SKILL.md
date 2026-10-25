@@ -580,6 +580,38 @@ ambiguous, compaction records `no-safe-range` and leaves the conversation intact
 the threshold or `keep` triggers durable drift detection; bump the agent's
 `version` when changing summary callback semantics.
 
+## Tool-use contract — act when asked, refusal retry, backstops
+
+All opt-in; an agent without them behaves as before.
+
+```ts
+ai.agent({
+  model,
+  tools: [updatePlan],
+  actWhenAsked: { intents: [/\b(swap|replace|add|remove)\b/i], requiredTools: ["update_plan"], maxReprompts: 1 },
+  onToolRefusal: "retry-once-with-hint", // or { retries, hint, isRefusal }
+  backstops: [{ name: "injury", phase: "before", detect: (t) => /\bpain\b/i.test(t.input), run: async (c) => ({ prompt: "Acknowledge the injury." }) }],
+});
+```
+
+- `actWhenAsked`: input matches an `intents` entry (substring, `RegExp` or predicate) and the answer called no `requiredTools` tool, so one hint is sent as a user message (`hint` string or builder).
+- `onToolRefusal`: a schema validation error, or a result with `refused: true` / `ok: false` and a `reason`, `error` or `message`. If the model then answers without a tool call, one retry prompt quotes the reason.
+- `backstops`: `detect(turn)` / `run(context)` run `"before"` the first call or `"after"` a final answer; a returned `{ prompt }` is added as a user message (re-prompt in `"after"`). Each runs once per run; throws are logged and skipped. Order on one answer: backstops, refusal retry, act-when-asked.
+- Re-prompts use `maxTrips`; none left, none sent.
+- Eval: `ai.eval.requiredToolCalled({ tools, intents? })` and `ai.eval.changeClaimedWithoutToolCall({ tools? })`.
+
+## Agent trace — `trace`
+
+Development default: each run records a per-turn trace (system prompt hash and text, tools offered with schema hashes, tool calls, results, refusals, contract actions, usage, cost) into the shared `agentTraces` store, redacted with the logger's rules. `trace: true` records everywhere (text only in development), `false` never, an object sets `{ text, redact, maxStringLength, store }`.
+
+```ts
+import { agentTraces, diffAgentTraces, formatAgentTrace } from "@warlock.js/ai";
+const trace = agentTraces.get(result.report.runId);
+diffAgentTraces(a, b); // { identical, systemPrompt, tools: { added, removed, changed } }
+```
+
+Devtools shows it in the Agents tab; CLI: `warlock ai trace [runId] [--diff other]`.
+
 ## When NOT to use this primitive
 
 - Multi-step pipeline with a fixed shape → the `run-ai-workflow` topic

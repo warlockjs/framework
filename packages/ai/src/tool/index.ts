@@ -24,3 +24,19 @@ export type {
   CatalogueSearchResult,
   CatalogueCallInput,
 } from "./catalogue";
+
+export {
+  describeToolSchema,
+  describeToolSchemas,
+  formatToolSchemaReports,
+  TOOL_SCHEMA_TARGETS,
+} from "./tool-schema-lint";
+export type {
+  DescribeToolSchemaOptions,
+  ToolSchemaIssue,
+  ToolSchemaIssueCode,
+  ToolSchemaReport,
+  ToolSchemaSeverity,
+  ToolSchemaSummary,
+  ToolSchemaTarget,
+} from "./tool-schema-lint";

@@ -12,6 +12,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Request filters: the list API takes `status` (`404` or a class such as `5xx`), `route`, `method`, `since`, `until`, `q` (text in the URL or id) and `limit`, answering 400 for a bad value; the dashboard has search, status and method filters.
 - A saved request opens with its error (message, stack, phase, page file, site), the redacted request and response, the log entries and the query summary with N+1 findings. `GET /__warlock/api/requests/:id` carries the full record as `record`.
 - Copy as curl: `GET /__warlock/api/requests/:id/curl` and a button in the request detail. Values the log redacted stay `[REDACTED]`.
+- Agents tab at `/__warlock` for the per-turn agent traces `@warlock.js/ai` records in development: system prompt, tools offered with schema hashes and token estimates, tool calls with results and refusals, retries and re-prompts, usage and cost, and a comparison with the previous run of the same agent. It needs no Panoptic.
+- `GET /__warlock/api/ai/agent-runs` (optionally `?requestId=`) and `GET /__warlock/api/ai/agent-runs/:id`, plus `agent-trace` events on the stream, behind the existing development and loopback guard. Runs started during an HTTP request link to it. Types `DevtoolsAgentRun` and `DevtoolsAgentTraceEvent`.
 
 ## 5.34.3 - 2026-10-20
 
