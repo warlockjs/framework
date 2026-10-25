@@ -16,6 +16,7 @@ import {
   type ApiRouteFacts,
 } from "./api-route-references";
 import { translationProblems } from "./translation-conventions";
+import { integrationSpecProblems } from "./integration-spec-conventions";
 import { positionOf, type SourceFinding } from "./source-ast";
 
 /** Extensions tried when resolving an extension-less import. */
@@ -190,6 +191,8 @@ function findingProblem(
  *   file, a `kind` discriminator;
  * - `WL9019` (warning) and `WL9020` (error) the browser route references
  *   (see `apiRouteReferenceFindings`).
+ * - `WL9021` (warning) an integration spec that imports nothing needing the app
+ *   (see `integrationSpecProblems`).
  *
  * A `// warlock-check-ignore WL9006` comment on the problem's line or the line
  * above silences that code there; without codes it silences every one.
@@ -205,6 +208,9 @@ export function checkFileConventions(
   const problems = [
     ...importProblems(sourceFile, relativePath, cwd),
     ...translationProblems(relativePath, source),
+    ...integrationSpecProblems(relativePath, source, cwd, (specifier, importer) =>
+      resolveSpecifier(specifier, importer, cwd),
+    ),
     ...[
       ...securityFindings(sourceFile),
       ...codeStyleFindings(sourceFile),

@@ -711,6 +711,14 @@ export const ERROR_CODES = {
     fix: "Call the endpoint from the server instead, or remove `clientVisible: false` from the route if the browser must reach it.",
     skill: "warlock-check",
   },
+  WL9021: {
+    code: "WL9021",
+    area: "convention",
+    category: "code",
+    title: "An integration spec never touches the app",
+    fix: "Move it to the unit project: rename the *.test.ts file to *.spec.ts (outside tests/), so it skips the booted framework.",
+    skill: "test-service",
+  },
   WL9101: {
     code: "WL9101",
     area: "convention",

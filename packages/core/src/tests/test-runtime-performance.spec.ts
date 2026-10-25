@@ -271,6 +271,17 @@ describe("test runtime performance modes", () => {
     expect(mocks.shutdown).not.toHaveBeenCalled();
   });
 
+  it("refuses to boot the framework from the unit project, but still allows unit mode", async () => {
+    vi.stubEnv("WARLOCK_TEST_PROJECT", "unit");
+
+    await expect(setupTest(options)).rejects.toThrow(/unit project/);
+    expect(mocks.bootstrap).not.toHaveBeenCalled();
+
+    await setupTest({ mode: "unit", importModule: options.importModule });
+    await teardownTest();
+    expect(mocks.unitConfig).toHaveBeenCalledTimes(1);
+  });
+
   it("requires the Vitest importer in unit mode", async () => {
     await expect(setupTest({ mode: "unit" })).rejects.toThrow(/requires importModule/);
   });

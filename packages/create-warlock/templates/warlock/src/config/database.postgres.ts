@@ -1,10 +1,18 @@
 import type { ConnectionOptions, PostgresPoolConfig } from "@warlock.js/cascade";
 import { env } from "@warlock.js/core";
 
+// Each Vitest worker keeps its own database and truncates it between test files
+// (src/config/tests.ts), so tests run against "<DB_NAME>_test_<worker id>". Create one
+// database per worker first (for example <DB_NAME>_test_1 to _4, one per `maxWorkers`) and
+// run the migrations on each.
+const databaseName = process.env.VITEST
+  ? `${env("DB_NAME", "app")}_test_${process.env.VITEST_POOL_ID ?? 1}`
+  : env("DB_NAME");
+
 const databaseConfigurations: ConnectionOptions<never, PostgresPoolConfig> = {
   driver: env("DB_DRIVER", "postgres"),
   name: "default",
-  database: env("DB_NAME"),
+  database: databaseName,
   host: env("DB_HOST", "localhost"),
   port: env("DB_PORT", 5432),
   username: env("DB_USERNAME"),
@@ -16,7 +24,7 @@ const databaseConfigurations: ConnectionOptions<never, PostgresPoolConfig> = {
   clientOptions: {
     // `PostgresPoolConfig` extends the connection config, so `database` is
     // required here too even though it duplicates the top-level value above.
-    database: env("DB_NAME"),
+    database: databaseName,
 
     // Native `pg` pool options — tune these for your workload.
     // max: 10,

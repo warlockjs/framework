@@ -225,6 +225,12 @@ export async function setupTest(options?: TestSetupOptions): Promise<void> {
     markTestFileOpen();
     return;
   }
+  if (process.env.WARLOCK_TEST_PROJECT === "unit") {
+    throw new TestLifecycleError(
+      'setupTest() boots the whole framework, and this file runs in the unit project. Call setupTest({ mode: "unit", importModule }) for config values only, or move the spec to the integration project (name it *.test.ts).',
+    );
+  }
+
   warnMissingImportModule(options?.importModule);
 
   const registry = getTestLifecycleRegistry();
