@@ -8,6 +8,7 @@ import { localesTsDeprecatedCheck } from "./locales-ts-deprecated.check";
 import { optionalPeersCheck } from "./optional-peers.check";
 import { releaseHygieneCheck } from "./release-hygiene.check";
 import { routesCheck } from "./routes.check";
+import { validationLabelsCheck } from "./validation-labels.check";
 
 /**
  * The default, ordered set of checks `warlock doctor` runs. Ordering controls
@@ -27,6 +28,7 @@ export const defaultDoctorChecks: DoctorCheck[] = [
   optionalPeersCheck,
   jwtSecretCheck,
   healthCheck,
+  validationLabelsCheck,
   localesTsDeprecatedCheck,
   releaseHygieneCheck,
 ];

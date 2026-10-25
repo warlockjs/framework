@@ -30,12 +30,23 @@ export type JsonSchemaResult = Record<string, unknown>;
 export function applyNullable(schema: JsonSchemaResult, target: JsonSchemaTarget): void {
   if (target === "openapi-3.0") {
     schema.nullable = true;
+
+    // `nullable: true` alone does not admit null when an enum is present
+    if (Array.isArray(schema.enum) && !schema.enum.includes(null)) {
+      schema.enum = [...schema.enum, null];
+    }
+
     return;
   }
 
   if (target === "draft-2020-12" || target === "openai-strict") {
-    const baseType = schema.type as string | string[] | undefined;
-    schema.type = Array.isArray(baseType) ? [...baseType, "null"] : [baseType as string, "null"];
+    const wrapped = wrapNullableStrict(schema);
+
+    for (const key of Object.keys(schema)) {
+      delete schema[key];
+    }
+
+    Object.assign(schema, wrapped);
     return;
   }
 
@@ -47,12 +58,26 @@ export function applyNullable(schema: JsonSchemaResult, target: JsonSchemaTarget
   schema.oneOf = [copy, { type: "null" }];
 }
 
+const NULL_BRANCH = { type: "null" } as const;
+
+function hasNullBranch(branches: unknown[]): boolean {
+  return branches.some(
+    (branch) => typeof branch === "object" && branch !== null && (branch as any).type === "null",
+  );
+}
+
 /**
  * Wrap a field schema as nullable for OpenAI strict mode.
  *
  * OpenAI strict requires optional fields to be expressed as a nullable type
  * rather than being omitted from the `required` array. This helper wraps a
- * given schema into its nullable equivalent using the type-array form.
+ * given schema into its nullable equivalent, whatever its shape:
+ *
+ * - `type`            : the type becomes an array with `"null"`
+ * - `enum`            : `null` is added to the enum (and to `type` when present)
+ * - `const`           : becomes `anyOf: [{ const }, { type: "null" }]`
+ * - `anyOf` / `oneOf` : a `{ type: "null" }` branch is appended once
+ * - `allOf` / `$ref`  : wrapped in `anyOf` with a null branch
  *
  * Unlike `applyNullable()` (which mutates in-place), this returns a new
  * schema object to avoid side effects when wrapping child schemas.
@@ -62,33 +87,76 @@ export function applyNullable(schema: JsonSchemaResult, target: JsonSchemaTarget
  * wrapNullableStrict({ type: "string", minLength: 3 })
  * // → { type: ["string", "null"], minLength: 3 }
  *
- * wrapNullableStrict({ type: "object", properties: {...} })
- * // → { type: ["object", "null"], properties: {...} }
+ * wrapNullableStrict({ enum: ["left", "right"] })
+ * // → { enum: ["left", "right", null] }
+ *
+ * wrapNullableStrict({ const: "items" })
+ * // → { anyOf: [{ const: "items" }, { type: "null" }] }
  *
  * wrapNullableStrict({ oneOf: [...] })
  * // → { oneOf: [..., { type: "null" }] }
  * ```
  */
 export function wrapNullableStrict(schema: JsonSchemaResult): JsonSchemaResult {
-  // If the schema uses oneOf/anyOf (e.g. union), append null to the list
-  if (schema.oneOf) {
-    return { ...schema, oneOf: [...(schema.oneOf as unknown[]), { type: "null" }] };
+  // Union shapes: append the null branch, once
+  for (const key of ["oneOf", "anyOf"] as const) {
+    const branches = schema[key];
+
+    if (Array.isArray(branches)) {
+      if (hasNullBranch(branches)) return schema;
+
+      return { ...schema, [key]: [...branches, { ...NULL_BRANCH }] };
+    }
   }
 
-  if (schema.anyOf) {
-    return { ...schema, anyOf: [...(schema.anyOf as unknown[]), { type: "null" }] };
-  }
-
-  // If there's no type at all (permissive `{}`), stay permissive
-  if (schema.type === undefined) {
+  // Permissive `{}` already accepts null
+  if (Object.keys(schema).length === 0) {
     return schema;
+  }
+
+  if (Array.isArray(schema.enum)) {
+    const output: JsonSchemaResult = {
+      ...schema,
+      enum: schema.enum.includes(null) ? schema.enum : [...schema.enum, null],
+    };
+
+    if (schema.type !== undefined) {
+      const baseType = schema.type as string | string[];
+      const types = Array.isArray(baseType) ? baseType : [baseType];
+      output.type = types.includes("null") ? types : [...types, "null"];
+    }
+
+    return output;
+  }
+
+  if (schema.const !== undefined) {
+    if (schema.const === null) return schema;
+
+    const { const: constant, type, ...rest } = schema;
+    const branch: JsonSchemaResult = type === undefined ? { const: constant } : { const: constant, type };
+
+    return { ...rest, anyOf: [branch, { ...NULL_BRANCH }] };
+  }
+
+  if (schema.type === undefined) {
+    // `$ref`, `allOf`, `not` and any other typeless shape: wrap as a whole
+    const { description, title, default: defaultValue, ...inner } = schema;
+    const output: JsonSchemaResult = { anyOf: [inner, { ...NULL_BRANCH }] };
+
+    if (description !== undefined) output.description = description;
+    if (title !== undefined) output.title = title;
+    if (defaultValue !== undefined) output.default = defaultValue;
+
+    return output;
   }
 
   // Standard case: wrap type into array with null
   const baseType = schema.type as string | string[];
+  const types = Array.isArray(baseType) ? baseType : [baseType];
+
   return {
     ...schema,
-    type: Array.isArray(baseType) ? [...baseType, "null"] : [baseType, "null"],
+    type: types.includes("null") ? types : [...types, "null"],
   };
 }
 

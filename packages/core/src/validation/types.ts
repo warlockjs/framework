@@ -206,6 +206,19 @@ export type ValidationConfiguration = {
    */
   attributeGroup?: string;
   /**
+   * Turn a field key without a translated label into readable words in
+   * validation messages (`max_dumbbell_kg` becomes "Max dumbbell kg").
+   * Set to `false` to keep the raw key.
+   * @default true
+   */
+  humanizeAttributes?: boolean;
+  /**
+   * Make `warlock doctor` list request-schema fields that have no translated
+   * label in a configured locale.
+   * @default false
+   */
+  warnMissingLabels?: boolean;
+  /**
    * Whether to show only the first error or all errors
    * @default true
    */

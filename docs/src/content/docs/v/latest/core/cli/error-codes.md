@@ -224,6 +224,12 @@ Category: your code · skill: `create-controller`
 
 Category: your code · skill: `validate-input`
 
+### WL4002
+
+**A request-schema field has no translated label in a configured locale.** Add the field under `attributes` (or the configured validation.attributeGroup) in each locale file, or turn the check off with validation.warnMissingLabels: false.
+
+Category: your code · skill: `validate-input`
+
 ## WL5xxx — http
 
 ### WL5001

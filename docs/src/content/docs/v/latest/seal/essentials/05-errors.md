@@ -131,7 +131,7 @@ The `translateRule` callback receives a `RuleTranslation` object with the rule (
 
 ## Field display names — `.label()`
 
-By default, the error message uses the field key (`email_address` → "The email_address is required"). Override the `:input` placeholder with `.label()` on the field:
+Without a label, seal uses the field key as written (`email_address` → "The email_address is required"). In a Warlock app the key is first looked up as a translated label and otherwise turned into words (`email_address` → "Email address", `maxDumbbellKg` → "Max dumbbell kg"); see [Validation](../../core/the-basics/validation.md#locale-aware-error-messages). `humanizeAttribute(key)` is exported when you want the same wording in your own `translateAttribute`. Override the `:input` placeholder with `.label()` on the field:
 
 ```ts
 v.object({

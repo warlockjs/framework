@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 > ⚠ **Versioning: `@warlock.js/*` does not follow SemVer strictly — breaking changes may ship in a minor.** This is a deliberate decision, not an oversight: the framework is pre-adoption and the cost of a major per behaviour fix currently outweighs the benefit. **Pin an exact version or a tilde range (`~4.13.0`) if you need to opt into changes rather than receive them.** Every breaking change is marked **BREAKING** in its entry and summarised in an _Upgrading_ section at the top of the release. **This policy will change once the framework has consumers beyond its author.**
 
+## 5.38.0
+
+### Added
+
+- Validation messages name a field without a translated label in words: `max_dumbbell_kg` reads "Max dumbbell kg" and `firstName` reads "First name" instead of the raw key. Labels under `attributes.<field>` still win, and `validation.attributes.<field>` is read too when `validation.attributeGroup` is not set. Only the validated field and sibling fields a rule refers to are turned into words. `validation.humanizeAttributes: false` keeps the raw key.
+- `warlock doctor` check `validation-labels` (`WL4002`), off by default: with `validation.warnMissingLabels: true` it lists request-schema fields that have no label in a locale of `app.localeCodes`.
+
 ## 5.37.1 - 2026-10-24
 ## 5.38.0
 

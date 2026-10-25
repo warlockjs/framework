@@ -278,6 +278,14 @@ export const ERROR_CODES = {
     fix: "Use Seal validators with a static shape for validation.schema/params; custom validate middleware is not described.",
     skill: "validate-input",
   },
+  WL4002: {
+    code: "WL4002",
+    area: "validation",
+    category: "code",
+    title: "A request-schema field has no translated label in a configured locale",
+    fix: "Add the field under `attributes` (or the configured validation.attributeGroup) in each locale file, or turn the check off with validation.warnMissingLabels: false.",
+    skill: "validate-input",
+  },
 
   // ── WL5xxx http ──────────────────────────────────────────────────────────
   WL5001: {

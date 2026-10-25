@@ -8,6 +8,7 @@
 import { configureSeal, getSealConfig, registerPlugin } from "@warlock.js/seal";
 import { config } from "../config";
 import { t } from "../http/middleware/inject-request-context";
+import { translateSealAttribute } from "./translate-attribute";
 import { translateSealRule } from "./translate-rule";
 import { databasePlugin, filePlugin, localizedPlugin } from "./plugins";
 
@@ -34,12 +35,14 @@ configureSeal({
       return translateAttribute({ attribute, context, rule });
     }
 
-    const attributeGroup = config.key("validation.attributeGroup") ?? "attributes";
-
-    const translationKey = `${attributeGroup ? attributeGroup + "." : ""}${attribute}`;
-
-    const output = t(translationKey, context.allValues);
-    return output === translationKey ? attribute : output;
+    return translateSealAttribute({
+      attribute,
+      key: context.key,
+      allValues: context.allValues,
+      attributeGroup: config.key<string | undefined>("validation.attributeGroup"),
+      humanize: config.key("validation.humanizeAttributes", true),
+      translate: t,
+    });
   },
 });
 

@@ -49,6 +49,7 @@ Pick by consumer:
 This target encodes the quirks of OpenAI's strict mode:
 
 - **Every field listed in `required`** — strict mode forbids leaving fields out.
+- **Optional enums, literals and unions stay nullable** — `null` is added to an `enum`, a single literal becomes `anyOf: [{ const }, { type: "null" }]`, and a union gets one `{ type: "null" }` branch.
 - **Optional fields encoded as `type: ["T", "null"]`** instead of being omitted from `required`.
 - **`additionalProperties: false` on every object.**
 
