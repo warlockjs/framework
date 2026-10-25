@@ -72,10 +72,10 @@ describe("warlock inspect --section wiring", () => {
     expect(text).toContain("posts.cache  not provided (optional)");
   });
 
-  it("is a valid --section value and needs the booted app", () => {
+  it("is a valid --section value, documented in the option help", () => {
     expect(INSPECT_SECTIONS).toContain("wiring");
-    expect(inspectCommand.options?.some((option) => option.description?.includes("wiring"))).toBe(
-      true,
-    );
+    expect(
+      inspectCommand.commandOptions.some((option) => option.description?.includes("wiring")),
+    ).toBe(true);
   });
 });

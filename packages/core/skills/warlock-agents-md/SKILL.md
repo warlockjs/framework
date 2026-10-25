@@ -39,7 +39,7 @@ Mutating routes without an auth guard (confirm each is meant to be public): `POS
 <!-- warlock:generated:end -->
 ```
 
-Sections: app + `@warlock.js/*` versions, modules (`src/app/*`, routes/models per module), routes (counts, unguarded writes, a list capped at 60), models (table, module), conventions in force (`WL9001`–`WL9004` and the layout rules), installed skills (`node_modules/@warlock.js/*/skills/*/SKILL.md`, first sentence each), verify commands. No timestamps: an unchanged app regenerates the same bytes and nothing is written.
+Sections: app + `@warlock.js/*` versions, modules (`src/app/*`, routes/models per module), routes (counts, unguarded writes, a list capped at 60), models (table, module), conventions in force (`WL9001`–`WL9004` and the layout rules), installed skills (`node_modules/@warlock.js/*/skills/*/SKILL.md`, plus a package's single `skills/SKILL.md` under its front-matter `name`, first sentence each), verify commands. No timestamps: an unchanged app regenerates the same bytes and nothing is written.
 
 ## Rules
 

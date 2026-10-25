@@ -34,6 +34,7 @@ Except for `--section files`, which reads source without booting, it boots exact
 | `jobs`      | Jobs defined with `defineJob()` from `@warlock.js/queue`: name, queue, attempts, backoff, retention. Empty without the queue package.                                                      |
 | `schedules` | Tasks on the `@warlock.js/scheduler` scheduler: name, cron expression, intervals, next run. Empty without the scheduler.                                                                   |
 | `files`     | Source files with module, convention role, exports and resolved imports/importedBy; no app boot for files-only requests.                                                                   |
+| `wiring`    | Every auto-loaded file (config, locales, events, `main.ts`, `routes.ts`, workers) with its module and boot load order, then every [capability](../digging-deeper/capabilities.md) slot with its provider and consumers. |
 | `packages`  | Installed `@warlock.js/*` packages and their versions.                                                                                                                                     |
 
 ### A route
@@ -195,6 +196,37 @@ router.group({ middleware: [sessionMiddleware({ userTypes: "user" })] }, () => {
   router.post("/settings", async ({ response }) => response.success({ saved: true }));
 });
 ```
+
+## Wiring: what loads on its own
+
+`main.ts`, `routes.ts`, event files, locales and workers are imported by the framework, not by your code, so no import graph shows them. `--section wiring` lists them in the order the boot loads them:
+
+```bash
+warlock inspect --section wiring
+warlock inspect --json --section wiring
+```
+
+```json
+{
+  "wiring": [
+    { "type": "file", "role": "config", "file": "src/config/http.ts", "module": "src/config", "order": 1 },
+    { "type": "file", "role": "main", "file": "src/app/billing/main.ts", "module": "src/app/billing", "order": 4 },
+    { "type": "file", "role": "route", "file": "src/app/billing/routes.ts", "module": "src/app/billing", "order": 5 },
+    {
+      "type": "capability",
+      "name": "billing.invoiceMailer",
+      "description": "Sends an invoice by email",
+      "required": true,
+      "provided": true,
+      "definedIn": "src/app/billing/capabilities.ts",
+      "providedBy": "src/app/billing/main.ts",
+      "consumers": ["src/app/billing/services/send-invoice.service.ts"]
+    }
+  ]
+}
+```
+
+Files come first, numbered from 1 in boot order: config, then locales, events, `main` files, routes (alphabetical) and workers. Capability entries follow. `required` and `provided` tell you what `warlock doctor` will warn about; `consumers` are the files that read the capability while the app booted, so a capability read only inside a request handler shows none until the handler runs. In the MCP server the section is the tool `inspect_wiring` (filter by file, name, module, role or type). Because the capabilities are filled by code that runs at boot, the section needs the booted app; it never starts a connector.
 
 ## Source files and reachability
 

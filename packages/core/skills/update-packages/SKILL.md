@@ -18,6 +18,17 @@ AND applies the code edits its breaking changes need, listing the rest with
 is installed the detected `@warlock.js/core` is already the target. See the
 `upgrade-from-5-29` topic.
 
+To learn what an upgrade will break before touching the project, run
+`warlock upgrade --check --from <current> --to <version>`. It copies the app
+(without `node_modules`, `.git` and `storage`) to a temporary directory, applies
+the upgrade there, installs there with the detected package manager, then runs
+typings, typecheck, `warlock doctor` and the `unit` Vitest project, and reports
+the breaking changes that hit the app and each step's result. The real project
+is never written. It runs one command at a time at low priority with a heap cap
+(`--memory-mb`, default 4096) and a time limit (`--timeout-minutes`, default 20);
+`--skip-install` stops after applying the upgrade to the copy, `--keep` leaves
+the copy on disk. Exit code 1 when a step failed.
+
 ## `warlock update`
 
 ```bash
