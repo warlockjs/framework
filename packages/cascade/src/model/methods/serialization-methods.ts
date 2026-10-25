@@ -64,6 +64,13 @@ function stripHiddenFields(
   return output;
 }
 
+/**
+ * A shallow copy of the model's data without its `hidden` fields.
+ */
+export function modelToSnapshot(model: Model): Record<string, unknown> {
+  return { ...stripHiddenFields(model.data, model.self().hidden ?? []) };
+}
+
 export function modelToJSON(model: Model): Record<string, unknown> {
   const ModelClass = model.self();
   const resource = ModelClass.resource;

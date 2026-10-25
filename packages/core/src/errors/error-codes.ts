@@ -711,6 +711,14 @@ export const ERROR_CODES = {
     fix: "Call the endpoint from the server instead, or remove `clientVisible: false` from the route if the browser must reach it.",
     skill: "warlock-check",
   },
+  WL9021: {
+    code: "WL9021",
+    area: "convention",
+    category: "code",
+    title: "A Cascade column is read or written as a model property",
+    fix: 'Read it with `model.get("column")` and write it with `model.set("column", value)`; `warlock check --fix` rewrites it.',
+    skill: "warlock-check",
+  },
   WL9101: {
     code: "WL9101",
     area: "convention",

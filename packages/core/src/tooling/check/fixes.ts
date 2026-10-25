@@ -17,6 +17,22 @@ export function importFixes(file: string, source: string): ProblemFix[] {
     .map(({ node }) => ({ start: node.end - 4, end: node.end - 1, text: "" }));
 }
 
+/** Apply `fixes` to `source`, last offset first so earlier offsets stay valid. */
+export function applyFixes(source: string, fixes: readonly ProblemFix[]): string {
+  let result = source;
+  let appliedFrom = Infinity;
+
+  for (const fix of [...fixes].sort((a, b) => b.start - a.start || b.end - a.end)) {
+    // An overlapping fix would corrupt the text; the next run picks it up.
+    if (fix.end > appliedFrom) continue;
+
+    result = result.slice(0, fix.start) + fix.text + result.slice(fix.end);
+    appliedFrom = fix.start;
+  }
+
+  return result;
+}
+
 export function applyConventionFixes(cwd: string, problems: readonly ToolingProblem[]): void {
   const files = new Map<string, ProblemFix[]>();
   for (const problem of problems)
@@ -27,9 +43,6 @@ export function applyConventionFixes(cwd: string, problems: readonly ToolingProb
     }
   for (const [file, fixes] of files) {
     const target = path.join(cwd, file);
-    let source = readFileSync(target, "utf8");
-    for (const fix of [...fixes].sort((a, b) => b.start - a.start))
-      source = source.slice(0, fix.start) + fix.text + source.slice(fix.end);
-    writeFileSync(target, source);
+    writeFileSync(target, applyFixes(readFileSync(target, "utf8"), fixes));
   }
 }

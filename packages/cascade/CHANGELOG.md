@@ -4,6 +4,20 @@ All notable changes to `@warlock.js/cascade` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.38.0
+
+### Added
+
+- `Model.get()` and `Model.set()` are typed from the model's schema type. `get("publishedAt")` is `Date | null`, a column with a `.default()` is never `undefined`, `get(key, default)` drops `null` and `undefined`, and `set(key, value)` rejects a value of the wrong type. Dot paths (`"profile.city"`) stay loosely typed (`any`, or the type argument you pass) so large schemas do not slow the compiler. A model declared without a schema type keeps loose access.
+- `ModelData<typeof schema>` (the schema's output type, casts applied), `ModelDataSnapshot<T>`, `ModelKey`, `ModelValue` and `ModelPath` types.
+- `model.toSnapshot()`: a typed, read-only copy of the model's data without its `hidden` columns, for resources and presenters that want exact types.
+- `Model.requestSchema()` returns the model schema without the fields marked `.internal()`, so a server-set field is declared once and request schemas derived from the model omit it. `Model.create()` still accepts those fields.
+- In development, reading a schema column as a property (`model.title`) logs one warning per model and column that names `model.get("title")`. Nothing is installed when `NODE_ENV` is `production`.
+
+### Changed
+
+- **BREAKING** For a model declared with a schema type, `get()` and `set()` with a top-level column name that is not in the schema are now type errors. Add the column to the schema, use a dot path, or declare the model without a schema type to keep loose access.
+
 ## 5.37.0 - 2026-10-24
 
 ### Added

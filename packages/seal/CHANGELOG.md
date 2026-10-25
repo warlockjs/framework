@@ -4,6 +4,16 @@ All notable changes to `@warlock.js/seal` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.38.0
+
+### Added
+
+- `.internal()` marks a field as set by the server. It validates and infers like any other field; `ObjectValidator#withoutInternal()` returns the schema without those fields (type included) for request validation, and `internalKeys()` lists them. `BaseValidator#isServerSet()` reads the mark.
+
+### Changed
+
+- `ObjectValidator#partial()` keeps its types: the named keys (all keys when none are named) become optional in the inferred shape.
+
 ## 5.34.3 - 2026-10-20
 
 ### Changed

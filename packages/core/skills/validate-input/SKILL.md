@@ -240,6 +240,10 @@ const validationConfig: ValidationConfiguration = {
 export default validationConfig;
 ```
 
+## Request schemas from a Cascade model
+
+Do not redeclare the fields a model already has. Mark the ones only the server sets `.internal()` on the model schema, then derive the request schema: `Post.requestSchema().pick("title", "body")` (or `.partial()` for an update). Set the internal values in the controller: `Post.create({ ...request.validated(), authorId: request.locals.user.id })`.
+
 ## Scoping what's validated
 
 By default the validator merges `request.body + request.query` (everything but route params) and validates the merged object. To narrow:

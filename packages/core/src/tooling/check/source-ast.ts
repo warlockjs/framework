@@ -1,11 +1,14 @@
 import * as ast from "../syntax/ast";
 import type { WarlockErrorCode } from "../../errors/error-codes";
+import type { ProblemFix } from "./fixes";
 
 export type SourceFinding = {
   code: WarlockErrorCode;
   node: ast.Node;
   message: string;
   severity?: "error" | "warning";
+  /** Optional safe edit, applied by `warlock check --fix`. */
+  fix?: ProblemFix;
 };
 export type MemberAccess = ast.MemberExpression;
 export const isMemberAccess = (node: ast.Node): node is MemberAccess =>

@@ -115,6 +115,21 @@ export type IsInputOptionalKey<V> = V extends
   : false;
 
 /**
+ * The keys of a schema whose validator was marked with `.internal()`.
+ */
+export type InternalKeys<S extends Schema> = {
+  [K in keyof S]: S[K] extends { isInternal: true } ? K : never;
+}[keyof S];
+
+/**
+ * A schema where the given keys are optional. Mapped once over the keys, so
+ * the cost grows with the key count, not with the nesting depth.
+ */
+export type PartialSchema<S extends Schema, K extends keyof S> = {
+  [P in keyof S]: P extends K ? S[P] & { isOptional: true } : S[P];
+};
+
+/**
  * Merge the optional-key and required-key halves of an object shape into one
  * object type, so `Infer<>` reads (and compares) as a single literal instead
  * of an intersection of two mapped types.

@@ -20,7 +20,7 @@ v.object({
 - **Plain objects only.** Arrays and non-plain objects fail even with `.allowUnknown()` or `.stripUnknown()`. Null-prototype dictionaries work. Convert class instances to explicit DTOs; no permissive opt-in is provided.
 - **Required by default.** `.optional()` to opt out — the `{ isOptional: true }` brand makes the key optional in `Infer<>`.
 - **Unknown keys policy.** By default extra keys fail validation. Toggle with `.allowUnknown()` (forward as-is), `.stripUnknown()` (explicit drop), or `.allow(...keys)` (whitelist specific extras). See [`object-methods.md`](./object-methods.md).
-- **Schema composition.** `.extend(schema)`, `.merge(other)`, `.pick(...keys)`, `.without(...keys)`, `.partial(...keys)`, `.requiredFields(...keys)` — all in [`object-methods.md`](./object-methods.md).
+- **Schema composition.** `.extend(schema)`, `.merge(other)`, `.pick(...keys)`, `.without(...keys)`, `.partial(...keys)`, `.requiredFields(...keys)` — `.partial()` keeps the inferred type; mark a server-set field `.internal()` and `schema.withoutInternal()` / `schema.internalKeys()` derive the request-facing schema. All in [`object-methods.md`](./object-methods.md).
 - **Cross-field rules** (`sameAs`, `requiredIf`, `requiredWith`) attach to fields _inside_ a `v.object`. Without a parent, sibling resolution silently passes.
 
 ## `v.array` — homogeneous lists

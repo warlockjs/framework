@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 > ⚠ **Versioning: `@warlock.js/*` does not follow SemVer strictly — breaking changes may ship in a minor.** This is a deliberate decision, not an oversight: the framework is pre-adoption and the cost of a major per behaviour fix currently outweighs the benefit. **Pin an exact version or a tilde range (`~4.13.0`) if you need to opt into changes rather than receive them.** Every breaking change is marked **BREAKING** in its entry and summarised in an _Upgrading_ section at the top of the release. **This policy will change once the framework has consumers beyond its author.**
 
+## 5.38.0
+
+### Added
+
+- `warlock check` rule `WL9021` (warning): a Cascade column read or written as a model property (`user.email`). It recognises instances from `new User()`, the single-record finders (`find`, `first`, `create`, ...), a `User` annotation and `this` inside a model class, and compares the name with the keys of the model's `static schema` when they can be read statically. `warlock check --fix` rewrites reads to `model.get("column")` and plain `model.column = value;` statements to `model.set("column", value)`.
+
 ## 5.37.1 - 2026-10-24
 
 ### Added
