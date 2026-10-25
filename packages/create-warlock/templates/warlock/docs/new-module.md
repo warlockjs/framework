@@ -42,7 +42,8 @@ src/app/[module-name]/
 ├── types/                       # TypeScript type definitions
 │   └── *.ts
 └── utils/                       # Module-specific utilities
-    ├── locales.ts              # Translations (auto-imported by Warlock.js)
+    ├── locales.json            # Translations (auto-loaded by Warlock.js)
+    ├── locales/                # Optional per-feature translation files (<feature>.json)
     └── flags.ts                # Constants/flags
 ```
 
@@ -352,7 +353,7 @@ export const cleanup = [event];
 export const cleanup = () => event.unsbcribe();
 ```
 
-**Note:** Files in the `events/` folder are auto-imported, similar to `routes.ts`, `main.ts`, and `utils/locales.ts`. Just create the file and it will be loaded automatically.
+**Note:** Files in the `events/` folder are auto-imported, similar to `routes.ts`, `main.ts`, and `utils/locales.json`. Just create the file and it will be loaded automatically.
 
 ### 11. services/mail/ (or separate mail/ folder)
 
@@ -443,24 +444,26 @@ export type UserRole = "admin" | "user" | "guest";
 
 ### 14. utils/
 
-Module-specific utility functions. **Must include `locales.ts`** which is automatically imported by Warlock.js.
+Module-specific utility functions. Translations live in `locales.json`, which Warlock.js loads automatically.
 
-**utils/locales.ts (Auto-imported):**
+**utils/locales.json (Auto-loaded):**
 
-```typescript
-import { groupedTranslations } from "@mongez/localization";
-
-groupedTranslations("moduleName", {
-  key1: {
-    en: "English translation",
-    ar: "Arabic translation",
+```json
+{
+  "key1": {
+    "en": "English translation",
+    "ar": "Arabic translation"
   },
-  invalidCredentials: {
-    en: "Invalid credentials",
-    ar: "بيانات الدخول غير صحيحة",
-  },
-});
+  "invalidCredentials": {
+    "en": "Invalid credentials",
+    "ar": "بيانات الدخول غير صحيحة"
+  }
+}
 ```
+
+Keys are registered under the module name (`moduleName.key1`); add `"$group": "name"` at the top to pick another group. Every key needs every locale in `app.localeCodes`; `npx warlock check` reports a missing one.
+
+When several people work in one module, put each feature's translations in `utils/locales/<feature>.json` instead of growing one file. All of the module's files are merged at load time, and a key may live in only one of them.
 
 **utils/flags.ts (Constants):**
 
@@ -488,7 +491,7 @@ export function formatUserName(user: User): string {
 }
 ```
 
-**Note:** The `utils/locales.ts` file is automatically imported by Warlock.js, similar to `routes.ts`, `main.ts`, and files in the `events/` folder.
+**Note:** `utils/locales.json` and `utils/locales/*.json` are loaded automatically by Warlock.js, similar to `routes.ts`, `main.ts`, and files in the `events/` folder. The older `utils/locales.ts` is deprecated; `npx warlock doctor --fix` converts it.
 
 ## Best Practices
 
@@ -540,7 +543,7 @@ export function formatUserName(user: User): string {
 
    - `main.ts` - Module entry point
    - `routes.ts` - Route definitions
-   - `utils/locales.ts` - Translations
+   - `utils/locales.json` and `utils/locales/*.json` - Translations
    - All files in `events/` folder - Event handlers
    - No need to manually import these files elsewhere
 

@@ -116,4 +116,22 @@ describe("ProductionBuilder generated entry order", () => {
     expect(generated["locales.ts"]).toContain("registerLocaleDictionary");
     expect(generated["locales.ts"]).toContain('defaultNamespace: "posts"');
   }, 60_000);
+
+  it("embeds per-feature locale files under the module's namespace", async () => {
+    await fs.mkdir(path.join(tempRoot, "src/app/posts/utils/locales"), { recursive: true });
+    await fs.writeFile(
+      path.join(tempRoot, "src/app/posts/utils/locales/comments.json"),
+      JSON.stringify({ added: { en: "Comment added" } }),
+    );
+
+    await new ProductionBuilder().build();
+
+    const locales = generated["locales.ts"]!;
+    const feature = locales
+      .split("\n")
+      .find((line) => line.includes("posts/utils/locales/comments.json") && line.startsWith("registerLocaleDictionary"));
+
+    expect(locales).toContain("../../src/app/posts/utils/locales/comments.json");
+    expect(feature).toContain('defaultNamespace: "posts"');
+  }, 60_000);
 });

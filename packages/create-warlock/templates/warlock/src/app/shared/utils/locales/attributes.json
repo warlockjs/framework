@@ -1,0 +1,31 @@
+{
+  "$group": "attributes",
+  "email": {
+    "en": "Email",
+    "ar": "البريد الإلكتروني"
+  },
+  "phoneNumber": {
+    "en": "Phone Number",
+    "ar": "رقم الهاتف"
+  },
+  "firstName": {
+    "en": "First Name",
+    "ar": "الاسم الأول"
+  },
+  "lastName": {
+    "en": "Last Name",
+    "ar": "الاسم الأخير"
+  },
+  "password": {
+    "en": "Password",
+    "ar": "كلمة المرور"
+  },
+  "name": {
+    "en": "Name",
+    "ar": "الاسم"
+  },
+  "image": {
+    "en": "Image",
+    "ar": "الصورة"
+  }
+}

@@ -30,7 +30,9 @@ import {
   isRouteFile,
   isWorkerFile,
 } from "../dev-server/special-file-patterns";
+import { warnForLegacyLocales } from "../dev-server/legacy-locales-warning";
 import { tsconfigManager } from "../dev-server/tsconfig-manager";
+import { moduleOfLocaleJson } from "../localization/module-locale-paths";
 import { appPath, rootPath, warlockPath } from "../utils";
 import { warlockConfigManager } from "../warlock-config/warlock-config.manager";
 import { assertGeneratedImportsAreDeclared } from "./assert-generated-imports";
@@ -562,10 +564,15 @@ bootstrap();
   private async generateLocales(): Promise<boolean> {
     const files = await this.globModule(isLocaleFile);
     if (files.length === 0) return false;
+    warnForLegacyLocales(
+      files
+        .filter((file) => !file.endsWith(".json"))
+        .map((file) => `${file.replace(/^(?:\.\.\/)+/, "")}.ts`),
+    );
     const content = files
       .map((file, index) => {
         if (!file.endsWith(".json")) return `import "${file}";`;
-        const moduleFolder = file.split("/").at(-3)!;
+        const moduleFolder = moduleOfLocaleJson(file.replace(/^(?:\.\.\/)+/, "")) ?? file.split("/").at(-3)!;
         return [
           `import dictionary${index} from "${file}";`,
           'import { registerLocaleDictionary } from "@warlock.js/core";',

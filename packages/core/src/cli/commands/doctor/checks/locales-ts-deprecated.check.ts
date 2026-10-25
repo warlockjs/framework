@@ -1,4 +1,12 @@
-import { existsSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  rmdirSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs";
 import path from "node:path";
 import { parseSync } from "oxc-parser";
 import * as ast from "../../../../tooling/syntax/ast";
@@ -16,6 +24,11 @@ type LocaleSource = {
 };
 
 export type LocaleInspection = LocaleSource & {
+  /**
+   * The JSON file the conversion writes: the module's `locales.json`, or
+   * `locales/legacy.json` when `locales.json` already exists.
+   */
+  target?: string;
   convertible: boolean;
   reason: string;
   group?: string;
@@ -77,10 +90,40 @@ function flattenLiteral(
   );
 }
 
+/** Where a legacy file's translations go: `locales.json`, or a feature file beside an existing one. */
+function targetOf(source: LocaleSource): { file: string; mergedWith?: string } | undefined {
+  const directory = path.dirname(source.file);
+  const jsonFile = path.join(directory, "locales.json");
+  if (!existsSync(jsonFile)) return { file: jsonFile };
+  const featureFile = path.join(directory, "locales", "legacy.json");
+  return existsSync(featureFile) ? undefined : { file: featureFile, mergedWith: jsonFile };
+}
+
+function overlappingKeys(
+  mergedWith: string,
+  module: string,
+  entries: LocaleDictionaryEntries,
+): string[] {
+  try {
+    const existing = parseLocaleDictionary({
+      sourceFile: rootPath(path.relative(process.cwd(), mergedWith)),
+      source: readFileSync(mergedWith, "utf8"),
+      defaultNamespace: module,
+    });
+    return Object.keys(entries).filter((key) => key in existing.entries);
+  } catch {
+    return Object.keys(entries);
+  }
+}
+
 function inspect(source: LocaleSource): LocaleInspection {
-  const jsonFile = path.join(path.dirname(source.file), "locales.json");
-  if (existsSync(jsonFile))
-    return { ...source, convertible: false, reason: "locales.json already exists" };
+  const target = targetOf(source);
+  if (!target)
+    return {
+      ...source,
+      convertible: false,
+      reason: "locales.json and locales/legacy.json already exist",
+    };
 
   const text = readFileSync(source.file, "utf8");
   const program = ast.parseSourceFile(source.file, text);
@@ -150,10 +193,22 @@ function inspect(source: LocaleSource): LocaleInspection {
       convertible: false,
       reason: "translation object has no valid literal locale entries",
     };
+  if (target.mergedWith) {
+    const overlap = overlappingKeys(target.mergedWith, source.module, entries);
+    if (overlap.length > 0)
+      return {
+        ...source,
+        convertible: false,
+        reason: `keys already defined in locales.json: ${overlap.slice(0, 3).join(", ")}${overlap.length > 3 ? ", ..." : ""}`,
+      };
+  }
   return {
     ...source,
+    target: target.file,
     convertible: true,
-    reason: "pure groupedTranslations literal",
+    reason: target.mergedWith
+      ? "pure groupedTranslations literal (goes to locales/legacy.json because locales.json exists)"
+      : "pure groupedTranslations literal",
     group,
     dictionary,
     entries,
@@ -178,9 +233,17 @@ function sameEntries(left: LocaleDictionaryEntries, right: LocaleDictionaryEntri
 /** Convert safe legacy locale sources, retaining a TS file whenever verification cannot prove equivalence. */
 export function fixLocaleSources(): LocaleInspection[] {
   return inspectLocaleSources().map((result) => {
-    if (!result.convertible || !result.group || !result.dictionary || !result.entries)
+    if (
+      !result.convertible ||
+      !result.group ||
+      !result.dictionary ||
+      !result.entries ||
+      !result.target
+    )
       return result;
-    const jsonFile = path.join(path.dirname(result.file), "locales.json");
+    const jsonFile = result.target;
+    const directoryExisted = existsSync(path.dirname(jsonFile));
+    mkdirSync(path.dirname(jsonFile), { recursive: true });
     const document: Record<string, unknown> =
       result.group === result.module
         ? result.dictionary
@@ -197,6 +260,7 @@ export function fixLocaleSources(): LocaleInspection[] {
       if (!sameEntries(result.entries, parsed.entries)) throw new Error("flattened entries differ");
     } catch (error) {
       unlinkSync(jsonFile);
+      if (!directoryExisted) rmdirSync(path.dirname(jsonFile));
       return {
         ...result,
         convertible: false,
