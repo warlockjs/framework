@@ -83,13 +83,17 @@ describe("Model get() and set() are typed from the schema", () => {
     post.set("publishedAt", new Date());
     post.set("meta.seoTitle", "anything");
 
-    // @ts-expect-error a string is not a number
-    post.set("views", "10");
-    // @ts-expect-error a string is not a Date
-    post.set("createdOn", "2026-01-01");
-    // @ts-expect-error not a column of Post
-    post.set("tilte", "x");
+    // Rejected at compile time only: the calls are never run, set() does not coerce.
+    const rejected = (): void => {
+      // @ts-expect-error a string is not a number
+      post.set("views", "10");
+      // @ts-expect-error a string is not a Date
+      post.set("createdOn", "2026-01-01");
+      // @ts-expect-error not a column of Post
+      post.set("tilte", "x");
+    };
 
+    expect(rejected).toBeTypeOf("function");
     expect(post.get("views")).toBe(10);
   });
 

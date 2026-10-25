@@ -62,6 +62,7 @@ describe("default doctor check set", () => {
       "optional-peers",
       "jwt-secret",
       "health",
+      "validation-labels",
       "sites",
       "capabilities",
       "locales-ts-deprecated",

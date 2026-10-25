@@ -89,7 +89,11 @@ describe("locales-ts-deprecated doctor migration", () => {
         convertible: false,
         reason: expect.stringContaining("must contain only"),
       },
-      { module: "occupied", convertible: false, reason: "locales.json already exists" },
+      {
+        module: "occupied",
+        convertible: false,
+        reason: "keys already defined in locales.json: occupied.title",
+      },
       { module: "orders", convertible: true, reason: expect.stringContaining("converted") },
     ]);
 
@@ -143,7 +147,7 @@ describe("locales-ts-deprecated doctor migration", () => {
       "must contain only the groupedTranslations import and one call",
     );
     expect(report?.detail).toContain(
-      "occupied/utils/locales.ts: manual (locales.json already exists)",
+      "occupied/utils/locales.ts: manual (keys already defined in locales.json: occupied.title)",
     );
     expect(report?.detail).toContain("goes away in v6");
   });

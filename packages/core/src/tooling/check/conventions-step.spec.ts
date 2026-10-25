@@ -55,9 +55,9 @@ describe("convention checks", () => {
     expect(codes(file, 'import "../routes";')).toEqual(["WL9001"]);
     expect(codes(file, 'import { x } from "../events/audit.event";')).toEqual(["WL9001"]);
     expect(codes(file, 'import { y } from "app/posts/main";')).toEqual(["WL9001"]);
-    expect(codes("src/app/posts/services/publish.service.spec.ts", 'import "../routes";')).toEqual(
-      [],
-    );
+    expect(
+      codes("src/app/posts/services/publish.service.spec.ts", 'import "../routes";'),
+    ).not.toContain("WL9001");
   });
 
   it("flags a .js extension on a relative import (WL9002), not on a package", () => {

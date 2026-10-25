@@ -88,10 +88,11 @@ describe("proof 2 — the generated test setup preserves project config and pair
     expect(setupFile).toMatch(/teardownTest[^\n]*from "@warlock\.js\/core\/tests"/);
   });
 
-  it("does not tell the reader the setup runs once per worker", async () => {
+  it("explains the worker lifetime without claiming the setup file runs once per worker", async () => {
     const setupFile = emittedFile(await runTestScaffold(), "src/test-setup.ts");
 
-    expect(setupFile).not.toMatch(/worker/i);
+    expect(setupFile).not.toMatch(/runs? once per worker/i);
+    expect(setupFile).toContain('lifetime: "worker"');
     expect(setupFile).toMatch(/EVERY test file/);
   });
 

@@ -241,8 +241,11 @@ export async function startHttpTestServer(options: StartHttpTestServerOptions = 
 
     // The connectors `warlock.config.ts` declares (the web connector among them)
     // register here, as `warlock dev` does; without this the test server serves
-    // HTTP only and every page answers 404.
-    registerConfiguredConnectors();
+    // HTTP only and every page answers 404. An app without a warlock config has
+    // none to register.
+    if (warlockConfigManager.isLoaded) {
+      registerConfiguredConnectors();
+    }
 
     // Initialize file orchestrator (but don't watch)
     await timed("orchestrator", async () => {

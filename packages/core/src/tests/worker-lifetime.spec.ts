@@ -64,7 +64,7 @@ describe("worker runtime across Vitest files", () => {
         vi.mock(${specifier("tests/load-unit-config.ts")}, () => ({ async loadUnitConfig() {} }));
         vi.mock(${specifier("dev-server/files-orchestrator.ts")}, () => ({ filesOrchestrator: { async init() {} } }));
         vi.mock(${specifier("tests/fakes/test-fakes.ts")}, () => ({ async installTestFakes() {}, async restoreTestFakes() {} }));
-        vi.mock(${specifier("connectors/index.ts")}, () => ({ connectorsManager: { async shutdown() {
+        vi.mock(${specifier("connectors/index.ts")}, () => ({ connectorsManager: { observeTimings() {}, async shutdown() {
           const { appendFile } = await import("node:fs/promises");
           await appendFile(process.env.TEST_BOOTSTRAP_LEDGER, JSON.stringify({ type: "close", pid: process.pid }) + "\\n");
         } } }));

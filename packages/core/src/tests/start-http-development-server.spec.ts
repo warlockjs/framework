@@ -67,7 +67,7 @@ vi.mock("../dev-server/files-orchestrator", () => ({
   },
 }));
 vi.mock("../warlock-config/warlock-config.manager", () => ({
-  warlockConfigManager: { load: mocks.load },
+  warlockConfigManager: { load: mocks.load, isLoaded: true },
 }));
 
 import { resetLoadedEnvironment } from "../utils/load-environment";

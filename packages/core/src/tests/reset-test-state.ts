@@ -13,10 +13,12 @@
  * - the request context a file entered and never left;
  * - a real in-memory cache store, when the cache fake is switched off.
  *
- * Imports are lazy: a worker that never touches the router or the cache does not
+ * The router and the cache are imported lazily: a worker that never touches the router or the cache does not
  * pay for loading them just to reset them, and unit-mode runtimes never reach
  * this module.
  */
+
+import { requestContext } from "../http/context/request-context";
 
 /** What one reset did, for the setup profile and for tests. */
 export type TestStateResetReport = {
@@ -40,10 +42,11 @@ export async function captureTestRouterSnapshot(): Promise<void> {
  * Reset the in-memory state a file may have changed.
  */
 export async function resetTestRuntimeState(): Promise<TestStateResetReport> {
-  const { router } = await import("../router/router");
-  const { requestContext } = await import("../http/context/request-context");
-
+  // Cleared before the first await: AsyncLocalStorage.enterWith only reaches the
+  // caller while it runs synchronously, so after an await the caller keeps its store.
   requestContext.clear();
+
+  const { router } = await import("../router/router");
 
   return {
     routesRestored: router.restoreBootSnapshot(),

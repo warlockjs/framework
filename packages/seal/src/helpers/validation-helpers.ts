@@ -31,7 +31,16 @@ export const resolveTranslation = ({
   rule: ContextualSchemaRule;
   context: SchemaContext;
 }): string => {
-  const translator = getSealConfig().translateAttribute;
+  const globalTranslator = getSealConfig().translateAttribute;
+  // The translator handed to this validation call wins over the global one, the
+  // same way `translateRule` resolves. A call without one returns "".
+  const translator: typeof globalTranslator =
+    globalTranslator || context.translateAttribute
+      ? (translation) =>
+          context.translateAttribute?.(translation) ||
+          globalTranslator?.(translation) ||
+          translation.attribute
+      : undefined;
 
   // 1. Direct text override wins
   const direct = rule.context.attributesList?.[key];

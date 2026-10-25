@@ -1,4 +1,4 @@
-import { transFrom } from "@mongez/localization";
+import { getKeywordsListOf, transFromKeywords } from "@mongez/localization";
 import { config } from "../../../../config/config-getter";
 import { router } from "../../../../router/router";
 import type { DoctorCheck } from "../check.types";
@@ -53,17 +53,22 @@ function configuredLocales(): string[] {
   return [typeof code === "string" && code.length > 0 ? code : "en"];
 }
 
+/** Whether `locale` itself defines `key`, without the fallback locale standing in for it. */
+function definesKey(locale: string, key: string): boolean {
+  return transFromKeywords(locale, getKeywordsListOf(locale) ?? {}, key) !== key;
+}
+
 function hasLabel(locale: string, field: string, attributeGroup: string | undefined): boolean {
   const group = attributeGroup ?? "attributes";
   const key = `${group ? group + "." : ""}${field}`;
 
-  if (transFrom(locale, key) !== key) return true;
+  if (definesKey(locale, key)) return true;
 
-  if (attributeGroup !== undefined) return false;
+  if (attributeGroup != null) return false;
 
   const nestedKey = `validation.attributes.${field}`;
 
-  return transFrom(locale, nestedKey) !== nestedKey;
+  return definesKey(locale, nestedKey);
 }
 
 /**
