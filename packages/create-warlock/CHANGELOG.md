@@ -9,14 +9,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 
 - The web template ships `src/web/forbidden.page.tsx` and `forbidden.setup.ts` (styled by `forbidden.css`, imported from `app.css`): the page a 401/403 on a page route renders instead of raw JSON. The template README and the `web-code-standards` skill describe it.
+
 ### Changed
 
 - The starter boots the test framework once per Vitest worker: `src/config/tests.ts` sets `lifetime: "worker"` and `resetDatabase: true` (`WARLOCK_TEST_LIFETIME=file` switches back), and `src/config/database.ts` (and the PostgreSQL variant) uses one database per Vitest worker, `<DB_NAME>_test_<worker id>`. With `--features=test` the generated unit project fails a spec that imports a connector or boots the app, and the integration project runs with `isolate: false`. The PostgreSQL variant needs those databases created and migrated first.
 - The template's `testing-strategy` skill describes the per-file reset, the `setupTest({ lifetime: "file" })` opt-out, the unit-project guard, `WL9024`, the boot profile and Vitest 5's `clearMocks` default.
-### Changed
-
 - The starter app keeps translations in JSON: `app/auth/utils/locales.json` and `app/shared/utils/locales/{validation,http,attributes}.json` replace the two `utils/locales.ts` files, and `docs/new-module.md` describes `locales.json` and `locales/<feature>.json`.
-- The template's `module-boundaries`, `code-standards` and `web-code-standards` skills describe small exported types co-located in `*.service.ts`, optional barrels (and the opt-in `WL9022` lint), the browser-safe surface of an app module and the `*.client.ts(x)` boundary.
+- The template's `module-boundaries`, `code-standards` and `web-code-standards` skills describe small exported types co-located in `*.service.ts`, optional barrels (and the opt-in `WL9023` lint), the browser-safe surface of an app module and the `*.client.ts(x)` boundary.
 
 ## 5.37.1 - 2026-10-24
 

@@ -15,6 +15,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `warlock check` rule `WL9021` (warning): a Cascade column read or written as a model property (`user.email`). It recognises instances from `new User()`, the single-record finders (`find`, `first`, `create`, ...), a `User` annotation and `this` inside a model class, and compares the name with the keys of the model's `static schema` when they can be read statically. `warlock check --fix` rewrites reads to `model.get("column")` and plain `model.column = value;` statements to `model.set("column", value)`.
 - Every 5xx the HTTP layer answers writes one error-level log record (`module: "http"`, `action: "request.<phase>"`), once per request, in the same shape as the page-failure record of `@warlock.js/web`: `name`, `message`, `stack`, `phase` (`csrf`, `middleware`, `validation` or `handler`), `file` (the routes file), `routeName`, `routePath`, `handler`, `middleware` (the middleware that threw), `method`, `pathname` (no query string), `requestId` and `statusCode`. It covers throws from route middleware, request validation and controllers, and a 5xx a handler returned without throwing; a returned `503` is treated as an intentional answer and not logged. A 4xx is never logged as an error. With no log channel configured the failure still goes to `console.error`.
 - In `development` the JSON error body of a thrown error and of the opaque 500 includes `requestId`. Production bodies are unchanged.
+- Persistent request log, `http.logging.requests`: one redacted JSON record per request, written after the response is sent through buffered logger channels. A record holds the id and trace id, time, method, URL (credential query values masked), route name and pattern, params, query, headers, body, `session: { userId, userType }`, IP, status, duration, response size (and headers and body when `include.response` is on), phases, the log entries emitted during the request, a query summary (count, slowest query, N+1 findings) and, for a `5xx` or a request that threw, the error with its stack, phase, page file and site. `RequestLogRecord`, `listRequestLogs()`, `getRequestLog()`, `requestLogToCurl()` and `compileRequestLogFilter()` are exported.
+- `http.logging.requests` options: `enabled` (default on in development, off elsewhere), `channels` (logger channel names or instances; default a daily JSON-lines file `storage/logs/requests/YYYY-MM-DD.jsonl`), `only` (`"all"`, `"errors"`, `"slow"`; default `"all"` in development and `"errors"` elsewhere), `slowMs`, `sampleRate` (errors are always kept when `only` includes them), `include` (`headers`, `body`, `query`, `params`, `session`, `response`, `stack`, `logs`, `queries`, `phases`), `maxBodyBytes` (default 16 KB, a larger body ends with a truncation marker) and `retention: { maxDays, maxSizeMb }` for the default file channel, which prunes on boot and when a new day's file starts.
+- Outside development the request log records request headers through an allowlist, and leaves the request and response bodies out unless `include.body` / `include.response` is set. The logger's redaction, `http.logging.private` URL rules and a route's `logging: { body: false, query: false }` apply to every record, and uploaded files are recorded as `{ file, mimeType }` only.
+- `warlock logs requests [--status 5xx|404] [--route name] [--since 1h] [--limit n] [--json]` lists persisted requests and `warlock logs request <id> [--json]` prints one in full. Neither boots the app.
+- MCP tool `request_log` (read-only): lists persisted requests with `status`, `route`, `method`, `since`, `q` and `limit` filters, or returns one full record by `id`.
+- Skill `request-log`.
 
 ### Changed
 
@@ -25,10 +31,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `guardUnitProject()` in `@warlock.js/core/vite`: a plugin for the Vitest `unit` project that fails a spec importing a connector, `connectorsManager`, `bootstrap` or a test-server helper, or calling `setupTest()` without `{ mode: "unit" }`, with a message naming the import and pointing to the integration project. `setupTest()` outside unit mode also throws when `WARLOCK_TEST_PROJECT=unit`.
 - `warlock check` reports `WL9024` (a warning) for an integration spec (`*.test.ts`, or a spec under `tests/`) that imports nothing needing the app, with the hint to move it to the unit project.
 - Upgrade codemod `test-runtime-worker-lifetime` lists where an existing app can opt in to the worker lifetime (`src/config/tests.ts` without a `lifetime`) and a `unit` project without `guardUnitProject()`. It edits nothing; existing apps keep their test configuration. The 5.38 upgrade note says the same.
-
-### Changed
-
 - `warlock add test` generates the worker lifetime as the default: `src/config/tests.ts` sets `lifetime: "worker"` and `resetDatabase: true` unless `WARLOCK_TEST_LIFETIME=file`, the integration project has `isolate: false` from the same variable, and the `unit` project runs in threads with `guardUnitProject()`. Existing files are never overwritten.
+- Auto-loaded `utils/locales.ts` is deprecated. The development and production-build warning now names every legacy file, and `WL9101` already lists them in `warlock doctor`. Removal is planned for v6, not this release; move to `utils/locales.json` with `warlock doctor --fix`.
+- The starter template (`create-warlock`) ships JSON dictionaries (`app/auth/utils/locales.json`, `app/shared/utils/locales/*.json`) instead of `utils/locales.ts`.
+- The `console.error` fallback for an unhandled request error, used when no log channel is configured, ignores passive channels (see `LogChannel.passive` in `@warlock.js/logger`), so the request log's log collector never silences it.
 
 ### Fixed
 
@@ -39,43 +45,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Capabilities: `defineCapability<T>(name, { description, required })`, `provideCapability(capability, implementation)`, `useCapability(capability)`, `hasCapability(capability)` and `listCapabilities()` give a module-cycle-breaking slot a typed, discoverable home. `useCapability` throws `WL2008` when nothing provided it. `warlock doctor` warns (`WL2008`) when a required capability has no provider after boot (check `capabilities`).
 - `warlock inspect --section wiring` and the MCP tool `inspect_wiring`: every auto-loaded file (config, locales, events, `main.ts`, `routes.ts`, workers) with its module and boot load order, followed by every capability slot with its provider and consumers. The section is part of the inspect report JSON Schema.
 - New skill `use-capabilities`.
-
-### Fixed
-
 - `warlock agents-md` lists the skill of a package that ships a single `skills/SKILL.md` (for example the AI provider packages and `@warlock.js/sitemap`). Its slug is the front-matter `name`, else the package name.
 - Package manager detection no longer lets a stale `pnpm-workspace.yaml` and `pnpm-lock.yaml` win over the lockfile actually in use. The order is now the `packageManager` field; then the manager that installed `node_modules` (`.package-lock.json` for npm, `.pnpm` or `.modules.yaml` for pnpm, `.yarn-state.yml` or `.yarn-integrity` for yarn, `.bun` for Bun); then the lockfile that lists every dependency of `package.json`, else `bun.lock`, else the most recently written one; a `pnpm-workspace.yaml` counts only when there is no lockfile at all. `warlock update` always prints which manager it chose and why.
-- `warlock check` reports `WL9021` when server-only code (controllers, services, repositories, models, connectors, `routes.ts`, `main.ts`, `worker.ts`, `events/` and `*.server.*` files) imports a `*.client.ts(x)` module, directly or through other files. The message names the import chain, and a type-only import is not reported.
+- `warlock check` reports `WL9022` when server-only code (controllers, services, repositories, models, connectors, `routes.ts`, `main.ts`, `worker.ts`, `events/` and `*.server.*` files) imports a `*.client.ts(x)` module, directly or through other files. The message names the import chain, and a type-only import is not reported.
 - `warlock check` reports `WL9105` when a translation key of a module dictionary is missing a configured locale. The configured locales are `localeCodes` in `src/config/app.ts`, or `localeCodes` in `.warlock-check.json`, which wins; the rule is skipped when neither names any.
-- Opt-in `WL9022` finds hand-maintained `index.ts` barrels in app modules (an `index.ts` that only re-exports). It is off until `.warlock-check.json` sets `rules.WL9022` to `"warning"` or `"error"`.
+- Opt-in `WL9023` finds hand-maintained `index.ts` barrels in app modules (an `index.ts` that only re-exports). It is off until `.warlock-check.json` sets `rules.WL9023` to `"warning"` or `"error"`.
 - Per-feature locale files: `src/app/<module>/utils/locales/<feature>.json` is merged with the module's `utils/locales.json` in development, in the production build and in test workers, under the module's namespace unless the file names its own `$group`. A key may live in one file only. Web's per-page translation tables are built from the same registry, so they see the merged dictionary.
 - `generate: { barrels: false }` in `warlock.config.ts` makes `warlock generate` and `warlock make` write no `index.ts` barrel (for models) and import the model file itself in the files they generate. The default stays `true`.
 - `warlock doctor --fix` converts a legacy `utils/locales.ts` into `utils/locales/legacy.json` when the module already has a `locales.json`, as long as no key appears in both; it still writes `locales.json` when there is none.
 
-### Deprecated
-
-- Auto-loaded `utils/locales.ts` is deprecated. The development and production-build warning now names every legacy file, and `WL9101` already lists them in `warlock doctor`. Removal is planned for v6, not this release; move to `utils/locales.json` with `warlock doctor --fix`.
-
-### Changed
-
-- The starter template (`create-warlock`) ships JSON dictionaries (`app/auth/utils/locales.json`, `app/shared/utils/locales/*.json`) instead of `utils/locales.ts`.
-
 ## 5.37.1 - 2026-10-24
-## 5.38.0
-
-### Added
-
-- Persistent request log, `http.logging.requests`: one redacted JSON record per request, written after the response is sent through buffered logger channels. A record holds the id and trace id, time, method, URL (credential query values masked), route name and pattern, params, query, headers, body, `session: { userId, userType }`, IP, status, duration, response size (and headers and body when `include.response` is on), phases, the log entries emitted during the request, a query summary (count, slowest query, N+1 findings) and, for a `5xx` or a request that threw, the error with its stack, phase, page file and site. `RequestLogRecord`, `listRequestLogs()`, `getRequestLog()`, `requestLogToCurl()` and `compileRequestLogFilter()` are exported.
-- `http.logging.requests` options: `enabled` (default on in development, off elsewhere), `channels` (logger channel names or instances; default a daily JSON-lines file `storage/logs/requests/YYYY-MM-DD.jsonl`), `only` (`"all"`, `"errors"`, `"slow"`; default `"all"` in development and `"errors"` elsewhere), `slowMs`, `sampleRate` (errors are always kept when `only` includes them), `include` (`headers`, `body`, `query`, `params`, `session`, `response`, `stack`, `logs`, `queries`, `phases`), `maxBodyBytes` (default 16 KB, a larger body ends with a truncation marker) and `retention: { maxDays, maxSizeMb }` for the default file channel, which prunes on boot and when a new day's file starts.
-- Outside development the request log records request headers through an allowlist, and leaves the request and response bodies out unless `include.body` / `include.response` is set. The logger's redaction, `http.logging.private` URL rules and a route's `logging: { body: false, query: false }` apply to every record, and uploaded files are recorded as `{ file, mimeType }` only.
-- `warlock logs requests [--status 5xx|404] [--route name] [--since 1h] [--limit n] [--json]` lists persisted requests and `warlock logs request <id> [--json]` prints one in full. Neither boots the app.
-- MCP tool `request_log` (read-only): lists persisted requests with `status`, `route`, `method`, `since`, `q` and `limit` filters, or returns one full record by `id`.
-- Skill `request-log`.
-
-### Changed
-
-- The `console.error` fallback for an unhandled request error, used when no log channel is configured, ignores passive channels (see `LogChannel.passive` in `@warlock.js/logger`), so the request log's log collector never silences it.
-
-## 5.37.1
 
 ### Added
 

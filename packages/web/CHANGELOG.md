@@ -10,6 +10,11 @@ All notable changes to `@warlock.js/web` are documented here.
 - Client build integrity: every build writes `client/.vite/warlock-integrity.json` (a digest per file in `client/assets`). The next `warlock build` reads the previous record before it starts and fails, naming each file, when a file name now maps to different bytes. The new web build option `previousBuild` points the comparison at another build's record or output directory (for example the deployed release). New exports from `@warlock.js/web/vite`: `ChunkIntegrityError`, `CHUNK_INTEGRITY_FILE`, `readChunkIntegrity` and the `ChunkIntegrityRecord` and `ChunkIntegrityConflict` types; `buildHydrationClient` takes `previousIntegrity`.
 - Two request tracing phases through core's `TracingHooks.onPhase`: `translations` (`route`, `locale`, `mode`) around binding the page's translation snapshot, and `named-api-routes` (`route`) around resolving the document's route table.
 
+### Changed
+
+- `*.client.ts(x)` is now an enforced client-only boundary. Pages, layouts and components may import it, and it renders on the server unless the component is wrapped in `<ClientOnly>`; server-only code (loaders in setup files, controllers, services, repositories, models, routes, connectors and `*.server.ts` files) may not import it. In development SSR such an import is an error naming the import chain instead of a warning. `warlock check` reports the same import as `WL9022`.
+- The `console.error` fallback for a page failure, used when no log channel is configured, ignores passive channels (for example the collector behind Core's request log), so the failure still reaches the terminal.
+
 ### Fixed
 
 - Production client chunks are named after their final bytes. The bundler hashed a chunk before the import specifiers inside it were rewritten, so two builds that differed only in the name of an imported chunk emitted the same file name for different bytes, and two byte-identical chunks could keep different names. After the bundle is written, chunks are renamed in dependency order from the hash of their final code (chunks that import each other are named together), byte-identical non-entry chunks are merged into one file, and the client manifest, the module preload lists, the budget report and the precompressed `.br` and `.gz` files all use the final names.
@@ -17,30 +22,14 @@ All notable changes to `@warlock.js/web` are documented here.
 - A render that built its hydration payload more than once (the document context, the final payload, a data request) pruned the global translation registry each time; it is now pruned once per request.
 - `forbidden.page.tsx` (with an optional `forbidden.setup.ts`): the application's page for a refused request. A 401 or 403 on a page route renders it with that status. It declares no `config.route`, a second copy fails the build (one per site in multi-site mode, at `$sites/<name>/forbidden.page.tsx`), and it receives the same `{ error, status }` props as `error.page.tsx`, plus `debug` outside production. A request renders the site's (or the app's) forbidden page, then its `error.page.tsx` with the 401/403 status, then the framework default. The page manifest gains `forbiddenPage` (and a `forbiddenPage` entry per site), the client registry projects it as `ForbiddenPage`, and hydration picks it by the same rule, so the browser hydrates the page the server rendered. Discovery exports `DiscoveredForbiddenPage`, `isForbiddenPageFile` and `DuplicateForbiddenPageError`.
 - The framework's own fallback page now shows the request id and a "Back to home" link, and a 401/403 gets its own plain, accessible "You don't have access to this page." message. Outside production the development details panel still follows it.
-
-### Fixed
-
 - `requireUser({ userType })` and `requireUser({ when })` answered a failed check with a raw JSON body (`{"error":"Forbidden"}`) on a page route. The middleware form now throws `ForbiddenError` (and `UnAuthorizedError` for a guest with no sign-in page or a bearer client), so a page route renders the forbidden page instead. A guest with `auth.pageAuth.loginPath` is still redirected to sign in. To refuse a page request from your own middleware, throw a Core `ForbiddenError`; `response.forbidden()` still writes its own JSON reply.
 - In development, hydrating an error page failed with a malformed-payload error because the payload check rejected the `debug` details the server sends outside production. The check now accepts `debug`.
 - A route-translations lookup for a failure rendered by the error or forbidden page now covers both pages' keys.
-### Fixed
-
 - `WebConnector.shutdown()` closes the Vite dev server, its HMR websocket and its file watchers whenever Vite was created, not only after `start()` completed. A boot that failed after creating Vite, or a shutdown between `boot()` and `start()`, used to leave Vite running and keep a test or dev process from exiting. A failure to close one part no longer skips the others, and the first failure is reported afterwards.
 - The client build enforces a module boundary: browser code may import from `app/<module>/...` only browser-safe files, which are `*.client.ts(x)`, schema files (`*.schema.ts` or a `schema/` folder), type files (`*.types.ts`, `*.d.ts` or a `types/` folder), the module's `web/` folder and non-code files. Any other file (a controller, service, repository, model, route file or plain helper) fails the build with the import chain. A type-only import is erased and always allowed. `web.moduleBoundary` sets `"error"` (default), `"warn"` (report and continue, for migration) or `"off"`, in development and in `warlock build`.
 - Development SSR warns once per `*.client.*` module that reads `window`, `document`, `navigator`, `localStorage` or another browser global while it is being imported (outside a function or a `typeof` guard), naming the file and line.
 
-### Changed
-
-- `*.client.ts(x)` is now an enforced client-only boundary. Pages, layouts and components may import it, and it renders on the server unless the component is wrapped in `<ClientOnly>`; server-only code (loaders in setup files, controllers, services, repositories, models, routes, connectors and `*.server.ts` files) may not import it. In development SSR such an import is an error naming the import chain instead of a warning. `warlock check` reports the same import as `WL9021`.
-
 ## 5.37.1 - 2026-10-24
-## 5.38.0
-
-### Changed
-
-- The `console.error` fallback for a page failure, used when no log channel is configured, ignores passive channels (for example the collector behind Core's request log), so the failure still reaches the terminal.
-
-## 5.37.1
 
 ### Fixed
 
