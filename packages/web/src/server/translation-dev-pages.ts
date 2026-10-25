@@ -1,4 +1,4 @@
-import { isFile, isErrorPageFile, layoutChainFor } from "../build/discover-pages";
+import { isFile, isErrorPageFile, isForbiddenPageFile, layoutChainFor } from "../build/discover-pages";
 import { pageSetupFileFor } from "../build/page-setup-file";
 import type { TranslationUsage } from "@warlock.js/core";
 import {
@@ -29,16 +29,18 @@ export function developmentTranslationPages(input: {
   const { appFile } = input;
   const rootEntries = appFile === undefined ? [] : [appFile];
   const rootSetups = existingSetup(appFile);
-  const errorPages = input.pages.filter((page) => isErrorPageFile(page.pageFile));
+  const isSpecialPage = (file: string) => isErrorPageFile(file) || isForbiddenPageFile(file);
+  const errorPages = input.pages.filter((page) => isSpecialPage(page.pageFile));
   const errorEntries = errorPages.flatMap((page) => [page.pageFile, ...rootEntries]);
   const errorSetups = errorPages.flatMap((page) => existingSetup(page.pageFile));
 
   return input.pages.map((page) => {
-    if (isErrorPageFile(page.pageFile)) {
+    if (isSpecialPage(page.pageFile)) {
       return {
         pageFile: page.pageFile,
-        entries: [page.pageFile, ...rootEntries],
-        setupFiles: [...existingSetup(page.pageFile), ...rootSetups],
+        // Error and forbidden pages share one analysis, like the build.
+        entries: errorEntries,
+        setupFiles: [...errorSetups, ...rootSetups],
       };
     }
 

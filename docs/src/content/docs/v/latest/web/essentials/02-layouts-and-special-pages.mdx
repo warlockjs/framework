@@ -136,6 +136,58 @@ or fail through the fallback. Its page middleware and `register()` still run,
 and the root application loader still runs; keep root work cheap and tolerant
 of an unmatched request.
 
+## The forbidden page
+
+`forbidden.page.tsx` is the application-owned page for a refused request. A page
+route never answers a raw JSON error: a 401 or a 403 renders this page, with
+that status. That covers a failed `requireUser({ userType })` or
+`requireUser({ when })` check, and any loader or middleware that throws a Core
+`ForbiddenError` or `UnAuthorizedError`. A guest who has a sign-in page
+configured (`auth.pageAuth.loginPath`) is still redirected to it; only a
+refusal with nowhere to redirect reaches the forbidden page. API routes keep
+their JSON answers.
+
+```ts title="src/web/forbidden.setup.ts"
+import type { PageConfig } from "@warlock.js/web";
+
+export const config: PageConfig = {
+  metadata: { title: "Access denied", robots: "noindex" },
+};
+```
+
+```tsx title="src/web/forbidden.page.tsx"
+import type { ErrorPageProps } from "@warlock.js/web";
+
+export default function ForbiddenPage({ status }: ErrorPageProps) {
+  return (
+    <main>
+      <h1>{status === 401 ? "Please sign in" : "You don't have access to this page"}</h1>
+      <a href="/">Back to home</a>
+    </main>
+  );
+}
+```
+
+It follows the same rules as `error.page.tsx`: it declares no `config.route`,
+a second copy fails the build (one per site in multi-site mode, at
+`$sites/<name>/forbidden.page.tsx`), `robots: "noindex"` stays on, and it
+receives the same `{ error, status }` props, plus `debug` outside production.
+The request renders the first of these that exists:
+
+1. the site's (or the app's) `forbidden.page.tsx`;
+2. its `error.page.tsx`, with the 401 or 403 status;
+3. the framework default: a plain, accessible page with the request id, the
+   development details outside production, and a "Back to home" link.
+
+Hydration makes the same choice, so the page the server rendered is the page the
+browser hydrates. The framework's own fallback for any other failure also shows
+the request id and a "Back to home" link.
+
+To refuse a page request from your own middleware, throw
+(`throw new ForbiddenError("Forbidden")`) instead of calling
+`response.forbidden()`. A thrown 401/403 renders this page; `response.forbidden()`
+writes its JSON body straight to the wire, as the previous section describes.
+
 ## The error boundary
 
 `error.page.tsx` is the one application-wide error boundary. A second copy
@@ -192,7 +244,7 @@ application boundary and then falls back to a minimal framework document when
 application code is no longer trustworthy. That fallback omits hydration so
 the browser never hydrates a tree the server could not establish.
 
-There is no `500.page.tsx`; all non-404 failures use `error.page.tsx`.
+There is no `500.page.tsx`; all failures except 404 and 401/403 use `error.page.tsx`.
 
 Every unhandled error response is forced to
 `Cache-Control: private, no-store` at the framework's shared error funnel.
@@ -236,6 +288,10 @@ never reduced to the `Completed Request: … 500` line. The record's `module` is
 A failure that ends as a `4xx` (not found, a guard redirect, a failed page
 validation, a thrown `HttpError` below 500) is the visitor's affair and is not
 logged as an error.
+
+The same record is written for a 5xx from an API route, a controller or a route
+middleware, with `module: "http"`; see
+[the 5xx error record](/v/latest/core/digging-deeper/error-handling/#the-5xx-error-record).
 
 Outside production, the error page also shows the same facts. Every error
 page, authored `ErrorBoundary` and the framework's fallback is followed by a

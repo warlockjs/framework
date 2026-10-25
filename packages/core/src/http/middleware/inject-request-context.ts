@@ -18,6 +18,11 @@ import { setResponseAppError } from "../error-response";
 import { mapRequestError } from "../error-mapper";
 import { AppError, HttpError } from "../errors";
 import { type Request } from "../request";
+import {
+  reportRequestServerError,
+  tagRequestError,
+  type RequestErrorPhase,
+} from "../report-request-error";
 import { type Response } from "../response";
 import { buildTracingContext, dispatchPhase, isTracingEnabled } from "../tracing";
 import { type ReturnedResponse } from "./../types";
@@ -65,6 +70,10 @@ export function createRequestStore(
 
   // Run all contexts together!
   return contextManager.runAll(httpContextStore, async () => {
+    // The lifecycle step in flight, so a 5xx record can name where it failed
+    // when the throw site did not tag the error itself.
+    let phase: RequestErrorPhase = "csrf";
+
     try {
       // Default CSRF-Origin guard (SECURITY, card 8a752ab2) — the earliest
       // seam common to every request, BEFORE the route's own middleware
@@ -85,11 +94,17 @@ export function createRequestStore(
       }
 
       // Run middleware chain
+      phase = "middleware";
+
       const result = await request.runMiddleware();
 
       if (result) {
+        reportReturnedServerError(request, response, "middleware");
+
         return result as ReturnedResponse;
       }
+
+      phase = "handler";
 
       // Execute route handler
       request.trigger("executingAction", request.route);
@@ -112,6 +127,8 @@ export function createRequestStore(
 
       request.log("Handler Executed Successfully", "success");
 
+      reportReturnedServerError(request, response, "handler");
+
       request.trigger("executedAction", request.route);
 
       return output as ReturnedResponse;
@@ -119,6 +136,14 @@ export function createRequestStore(
       const error = mapRequestError(thrown, request);
 
       logRequestError(error, request);
+      reportRequestServerError({
+        error,
+        thrown,
+        request,
+        status: resolveRequestErrorStatus(error) ?? 500,
+        phase,
+      });
+
       return handleRequestError(error, response, request);
     }
   });
@@ -163,17 +188,38 @@ function logRequestError(error: unknown, request: Request<any>) {
 }
 
 /**
- * Unconditional floor for an unhandled request error (canon 8d3c13a8): route it
- * through the logger, and when no logger channel is configured (nothing would
- * record it) fall back to `console.error` so the only copy is never lost.
+ * A handler or middleware can answer a 5xx without throwing
+ * (`return response.serverError(...)`). Leave the same single record a thrown
+ * 5xx leaves. A returned 503 is the conventional "unavailable on purpose"
+ * answer (maintenance, a failing readiness probe), so it is not an error.
  * @internal
  */
-function reportUnhandledRequestError(error: unknown, request: Request<any>) {
-  log.error("http", "unhandled-request-error", error, { requestId: request.id });
+function reportReturnedServerError(
+  request: Request<any>,
+  response: Response,
+  phase: RequestErrorPhase,
+) {
+  let status: number | undefined;
 
-  if (log.channels.every((channel) => channel.passive)) {
-    console.error(`[http] unhandled-request-error (requestId: ${request.id})`, error);
+  try {
+    status = response.statusCode;
+  } catch {
+    return;
   }
+
+  if (typeof status !== "number" || status < 500 || status === 503) return;
+
+  reportRequestServerError({ error: undefined, request, status, phase });
+}
+
+/**
+ * The request id, added to a JSON error body in development so a failing
+ * response can be matched to its log record without opening the headers.
+ * Production bodies stay generic.
+ * @internal
+ */
+function developmentRequestId(request: Request<any>): { requestId?: string } {
+  return environment() === "development" && request.id ? { requestId: request.id } : {};
 }
 
 /**
@@ -204,9 +250,6 @@ function handleRequestError(
   response.header("Cache-Control", "private, no-store");
 
   if (error instanceof AppError) {
-    if (error.status >= 500) {
-      log.error("http", "request-error", error, { requestId: request.id });
-    }
     setResponseAppError(response.baseResponse, error);
     return response.setStatusCode(error.status).send({
       error: {
@@ -218,14 +261,11 @@ function handleRequestError(
   }
 
   if (error instanceof HttpError) {
-    // 5xx HttpErrors (e.g. `ServerError`) are server faults: send them to the
-    // logger channels too, tagged with the request id.
-    if (error.status >= 500) {
-      log.error("http", "request-error", error, { requestId: request.id });
-    }
-
+    // 5xx HttpErrors (e.g. `ServerError`) are server faults; the caller already
+    // left their single log record (`reportRequestServerError`).
     const payload: GenericObject = {
       error: error.message,
+      ...developmentRequestId(request),
     };
     if (error.payload) {
       payload.payload = error.payload;
@@ -242,13 +282,7 @@ function handleRequestError(
     const status = resolveRequestErrorStatus(error) as number;
 
     // A 4xx is an expected client error, already logged as a one-line warn by
-    // `logRequestError`; only a 5xx gets the error-level entry with its stack.
-    if (status >= 500) {
-      log.error("http", "model-write-validation-error", error, {
-        requestId: request.id,
-        errors: error.errors,
-      });
-    }
+    // `logRequestError`; a 5xx already left its error record with the stack.
 
     // A 4xx status means the app treats this as the client's fault, so the
     // field errors are useful to it; a 5xx stays opaque.
@@ -260,18 +294,18 @@ function handleRequestError(
 
     return response.setStatusCode(status).send({
       error: "Internal server error.",
+      ...developmentRequestId(request),
     });
   }
 
   // Last resort: the error matched none of the known shapes above, so the
-  // client gets a deliberately opaque message. Without this line the error
-  // itself is discarded here — no stack, no message, nothing in any log — and
-  // an unrecognised failure becomes indistinguishable from a working server
-  // returning 500. Never swallow the only copy of an error (`65e476ee`).
-  reportUnhandledRequestError(error, request);
-
+  // client gets a deliberately opaque message. The caller already left the
+  // only copy of the error (stack included) in the log, so an unrecognised
+  // failure is never indistinguishable from a working server returning 500
+  // (`65e476ee`).
   return response.serverError({
     error: "Internal server error.",
+    ...developmentRequestId(request),
   });
 }
 

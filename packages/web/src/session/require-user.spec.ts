@@ -17,6 +17,7 @@ function ctx(
 
 afterEach(() => {
   config.set("auth.pageAuth.loginPath", undefined);
+  config.set("web.session", undefined);
 });
 
 describe("requireUser loader form", () => {
@@ -63,5 +64,52 @@ describe("requireUser middleware form", () => {
   it("still returns a middleware function", () => {
     expect(typeof requireUser({ loginPath: "/login" })).toBe("function");
     expect(typeof requireUser()).toBe("function");
+  });
+
+  const run = (middleware: ReturnType<typeof requireUser>, request: Record<string, unknown> = {}) =>
+    (middleware as (input: unknown) => Promise<unknown>)({
+      request: { url: "/staff", locale: "en", authorizationValue: undefined, ...request },
+      response: {
+        redirect: (url: string) => ({ redirectedTo: url }),
+        forbidden: () => {
+          throw new Error("a page route must never answer raw JSON");
+        },
+        unauthorized: () => {
+          throw new Error("a page route must never answer raw JSON");
+        },
+      },
+    });
+
+  it("throws a 403 instead of answering JSON when `when` fails", async () => {
+    config.set("web.session", { resolve: async () => ({ model: { userType: "member" } }) });
+
+    await expect(run(requireUser({ when: () => false }))).rejects.toMatchObject({
+      status: 403,
+    });
+  });
+
+  it("throws a 403 instead of answering JSON when the user type differs", async () => {
+    config.set("web.session", { resolve: async () => ({ model: { userType: "member" } }) });
+
+    await expect(run(requireUser({ userType: "admin" }))).rejects.toMatchObject({
+      status: 403,
+    });
+  });
+
+  it("lets a passing user through", async () => {
+    config.set("web.session", { resolve: async () => ({ model: { userType: "admin" } }) });
+
+    await expect(
+      run(requireUser({ userType: "admin", when: async () => true })),
+    ).resolves.toBeUndefined();
+  });
+
+  it("redirects a guest to the sign-in page and throws a 401 without one", async () => {
+    config.set("web.session", { resolve: async () => undefined });
+
+    await expect(run(requireUser({ loginPath: "/login" }))).resolves.toEqual({
+      redirectedTo: `/login?redirect=${encodeURIComponent("/staff")}`,
+    });
+    await expect(run(requireUser())).rejects.toMatchObject({ status: 401 });
   });
 });

@@ -493,6 +493,7 @@ describe("web template UI and setup contracts", () => {
     ["src/web/home/index.page.tsx", "src/web/home/index.setup.ts"],
     ["src/web/root.tsx", "src/web/root.setup.ts"],
     ["src/web/404.page.tsx", "src/web/404.setup.ts"],
+    ["src/web/forbidden.page.tsx", "src/web/forbidden.setup.ts"],
   ])("keeps %s as UI with policy in %s", (uiFile, setupFile) => {
     const ui = stripComments(read(uiFile));
     const setup = stripComments(read(setupFile));

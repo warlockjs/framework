@@ -21,6 +21,7 @@ import type {
 } from "../hydration-payload";
 import type { PageErrorBoundaryProps } from "../page-config";
 import { registerModules } from "../register-modules";
+import { isForbiddenPageStatus } from "../shared/is-forbidden-page-status";
 import { renderBuiltInFallback } from "./built-in-error-fallback";
 import { statusOf } from "./client-error-status";
 import { ErrorPageRenderGuard } from "./error-page-render-guard";
@@ -235,8 +236,14 @@ export async function buildHydratedTree(
   const entry = findEntryByName(pages, payload.name);
   const composition = await loadClientRouteComposition(entry);
   const errorPageProps = payload.errorPage;
+  // The same rule the server renders by: a 401/403 failure uses the app's
+  // forbidden page when it has one, every other failure the error page.
   const selectedPageModule =
-    errorPageProps === undefined ? composition.Page : composition.ErrorPage;
+    errorPageProps === undefined
+      ? composition.Page
+      : isForbiddenPageStatus(errorPageProps.status) && composition.ForbiddenPage !== undefined
+        ? composition.ForbiddenPage
+        : composition.ErrorPage;
 
   if (selectedPageModule === undefined) {
     throw new MissingHydrationErrorPageError(payload.name);

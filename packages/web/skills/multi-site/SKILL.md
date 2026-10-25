@@ -20,7 +20,7 @@ src/web/
   components/
 ```
 
-The folder name is the site key, and neither `$sites` nor the site folder appears in URLs. Each configured site folder needs its own `root.tsx`; it also holds that site's 404/error pages and routes. Shared components can live outside `$sites`, but pages cannot. Do not leave a top-level `src/web/root.tsx` in multi-site mode.
+The folder name is the site key, and neither `$sites` nor the site folder appears in URLs. Each configured site folder needs its own `root.tsx`; it also holds that site's 404, forbidden and error pages and routes. Shared components can live outside `$sites`, but pages cannot. Do not leave a top-level `src/web/root.tsx` in multi-site mode.
 
 ## 2. Declare fixed and dynamic sites
 

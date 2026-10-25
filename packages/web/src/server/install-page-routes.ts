@@ -40,6 +40,7 @@ import {
   type DiscoveredPageGraph,
   ErrorPageDeclaresRouteError,
   isErrorPageFile,
+  isForbiddenPageFile,
   isFile,
   layoutChainFor,
 } from "../build/discover-pages";
@@ -73,7 +74,7 @@ import {
   localeActionRegistrations,
   localePageRegistrations,
 } from "./locale-routing/locale-page-registrations";
-import type { ErrorPageModule } from "./error-page";
+import { composeErrorPageLoader, type ErrorPageModule } from "./error-page";
 import { layoutPrefixesByDirectory } from "./layout-prefixes";
 import { notFoundPageHandlerOptions } from "./not-found-handler-options";
 import { devClientApiRouteNames, type NamedApiRouteRegistry } from "./dev-client-api-route-names";
@@ -748,10 +749,38 @@ async function installDiscoveredPageRoutes(
   // does not have one. Registering it here would put it at `/404`, which is not
   // a page anybody asked to be able to visit.
   const errorPageFiles = discovered.filter((page) => isErrorPageFile(page.pageFile));
+  const forbiddenPageFiles = discovered.filter((page) => isForbiddenPageFile(page.pageFile));
   const notFoundPageFiles = discovered.filter((page) => isNotFoundPageFile(page.pageFile));
   const pageFiles = discovered.filter(
-    (page) => !isNotFoundPageFile(page.pageFile) && !isErrorPageFile(page.pageFile),
+    (page) =>
+      !isNotFoundPageFile(page.pageFile) &&
+      !isErrorPageFile(page.pageFile) &&
+      !isForbiddenPageFile(page.pageFile),
   );
+
+  if (forbiddenPageFiles.length > 1) {
+    throw new Error(
+      `Two forbidden pages were found: ${forbiddenPageFiles.map((page) => page.pageFile).join(", ")}.`,
+    );
+  }
+
+  const forbiddenPageFile = forbiddenPageFiles[0]?.pageFile;
+
+  // Parse only, like the error page: the module stays lazy until a 401/403.
+  if (forbiddenPageFile !== undefined) {
+    const setupCandidate = pageSetupFileFor(forbiddenPageFile);
+    const declarationFile =
+      setupCandidate !== undefined && isFile(setupCandidate) ? setupCandidate : forbiddenPageFile;
+    const declarations = readModuleConfig(
+      declarationFile,
+      readFileSync(declarationFile, "utf-8"),
+      "page",
+      { allowMissingDefault: declarationFile !== forbiddenPageFile },
+    );
+    if (declarations.route !== undefined) {
+      throw new ErrorPageDeclaresRouteError(forbiddenPageFile, "forbidden");
+    }
+  }
 
   if (errorPageFiles.length > 1) {
     throw new Error(
@@ -775,10 +804,16 @@ async function installDiscoveredPageRoutes(
     );
     if (declarations.route !== undefined) throw new ErrorPageDeclaresRouteError(errorPageFile);
   }
-  const loadErrorPage =
-    errorPageFile === undefined
-      ? undefined
-      : () => loadComposedModule(vite, errorPageFile) as Promise<ErrorPageModule>;
+  const loadErrorPage = composeErrorPageLoader({
+    error:
+      errorPageFile === undefined
+        ? undefined
+        : () => loadComposedModule(vite, errorPageFile) as Promise<ErrorPageModule>,
+    forbidden:
+      forbiddenPageFile === undefined
+        ? undefined
+        : () => loadComposedModule(vite, forbiddenPageFile) as Promise<ErrorPageModule>,
+  });
 
   if (notFoundPageFiles.length > 1) {
     throw new DuplicateNotFoundPageError(notFoundPageFiles.map((page) => page.pageFile));
@@ -913,6 +948,7 @@ async function installDiscoveredPageRoutes(
         layoutFiles: layoutLevel.chain,
         pageFile,
         errorPageFile,
+        forbiddenPageFile,
       }),
       payloadBudget,
       ...httpServerOption,
@@ -1034,6 +1070,7 @@ async function installDiscoveredPageRoutes(
                 appFile,
                 pageFile: notFoundPageFile,
                 errorPageFile,
+                forbiddenPageFile,
               }),
               payloadBudget,
             }),

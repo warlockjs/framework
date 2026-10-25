@@ -78,6 +78,18 @@ export function createPageModuleLoader(manifest: PageManifest): PageModuleLoader
     );
   }
 
+  if (manifest.forbiddenPage) {
+    modulesById.set(
+      manifest.forbiddenPage.sourceFile,
+      composePageModule(
+        manifest.forbiddenPage.module,
+        manifest.forbiddenPage.setupModule,
+        manifest.forbiddenPage.sourceFile,
+        manifest.forbiddenPage.setupSourceFile,
+      ),
+    );
+  }
+
   for (const page of manifest.pages) {
     modulesById.set(
       page.sourceFile,

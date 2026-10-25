@@ -13,6 +13,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Validation messages name a field without a translated label in words: `max_dumbbell_kg` reads "Max dumbbell kg" and `firstName` reads "First name" instead of the raw key. Labels under `attributes.<field>` still win, and `validation.attributes.<field>` is read too when `validation.attributeGroup` is not set. Only the validated field and sibling fields a rule refers to are turned into words. `validation.humanizeAttributes: false` keeps the raw key.
 - `warlock doctor` check `validation-labels` (`WL4002`), off by default: with `validation.warnMissingLabels: true` it lists request-schema fields that have no label in a locale of `app.localeCodes`.
 - `warlock check` rule `WL9021` (warning): a Cascade column read or written as a model property (`user.email`). It recognises instances from `new User()`, the single-record finders (`find`, `first`, `create`, ...), a `User` annotation and `this` inside a model class, and compares the name with the keys of the model's `static schema` when they can be read statically. `warlock check --fix` rewrites reads to `model.get("column")` and plain `model.column = value;` statements to `model.set("column", value)`.
+- Every 5xx the HTTP layer answers writes one error-level log record (`module: "http"`, `action: "request.<phase>"`), once per request, in the same shape as the page-failure record of `@warlock.js/web`: `name`, `message`, `stack`, `phase` (`csrf`, `middleware`, `validation` or `handler`), `file` (the routes file), `routeName`, `routePath`, `handler`, `middleware` (the middleware that threw), `method`, `pathname` (no query string), `requestId` and `statusCode`. It covers throws from route middleware, request validation and controllers, and a 5xx a handler returned without throwing; a returned `503` is treated as an intentional answer and not logged. A 4xx is never logged as an error. With no log channel configured the failure still goes to `console.error`.
+- In `development` the JSON error body of a thrown error and of the opaque 500 includes `requestId`. Production bodies are unchanged.
+
+### Changed
+
+- The three separate error-level entries for a 5xx (`request-error`, `model-write-validation-error` and `unhandled-request-error`) are replaced by the single record above. The per-request `http.log` line is unchanged.
 
 ## 5.37.1 - 2026-10-24
 ## 5.38.0

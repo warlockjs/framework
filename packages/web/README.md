@@ -216,8 +216,10 @@ Incoming URLs may carry one trailing slash: `/about` and `/about/` match the
 same page in development and production. Route declarations remain canonical
 and slash-free, `/` stays the root path, and case handling is unchanged.
 
-Exactly two page filenames are special: `404.page.tsx` (the not-found page,
-reached by not matching, never declares `config.route`, renders with no layout) and
+Exactly three page filenames are special: `404.page.tsx` (the not-found page,
+reached by not matching, never declares `config.route`, renders with no layout),
+`forbidden.page.tsx` (the page for a 401/403 on a page route, so a refused
+request never answers raw JSON; it also declares no `config.route`) and
 `error.page.tsx` (the application's one error boundary, also declares no
 `config.route`). There is no `500.page.tsx`; an unmatched URL is not an error.
 

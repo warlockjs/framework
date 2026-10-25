@@ -215,7 +215,9 @@ Returning anything other than `undefined` from a middleware short-circuits the r
 - **A full page load**, when the middleware already wrote the real reply itself — `response.redirect()`, `response.permanentRedirect()`, or a call that reaches `response.send()` (`.forbidden()`, `.unauthorized()`, `.notFound()`, `.send()` directly) — answers with exactly that reply. The pipeline renders nothing further; there is no document to add.
 - **A full page load**, when the middleware returns a value WITHOUT writing the reply itself (the `{ error: "Unauthorized" }` example above, after only `setStatusCode`) — a status `>= 400` renders the application's `error.page.tsx` boundary with that status, the returned value attached to the error; a status `< 200`–`399` (2xx) sends the returned value as the response body unchanged (JSON-stringified if it's an object) — **a page middleware returning 2xx content replaces the page.**
 
-Prefer calling a `response` method (`.forbidden()`, `.redirect()`, `.unauthorized()`, …) over returning a bare object when you want full control over the wire reply; a bare returned object is still safe on a full page load — it now always reaches the visitor, never silently dropped — but it renders through the error boundary for `>= 400`, and as raw content for `2xx`.
+To refuse a page request, prefer THROWING a Core `HttpError` (`throw new ForbiddenError("Forbidden")`, `UnAuthorizedError`) over `response.forbidden()`: a thrown 401/403 renders your `forbidden.page.tsx` (or the framework default), while `response.forbidden()` writes its JSON body straight to the wire. The `requireUser()` middleware throws, so a failed `userType` or `when` check never answers raw JSON on a page route.
+
+Prefer calling a `response` method (`.redirect()`, …) over returning a bare object when you want full control over the wire reply; a bare returned object is still safe on a full page load — it now always reaches the visitor, never silently dropped — but it renders through the error boundary for `>= 400`, and as raw content for `2xx`.
 
 ## Page caching
 
@@ -464,7 +466,7 @@ Throwing a Core `HttpError` that resolves to 404, such as `ResourceNotFoundError
 
 ## The error boundary — `error.page.tsx`
 
-`error.page.tsx` anywhere beneath `src/web` is the application's one error boundary — exactly two page filenames are special in Warlock, this and `404.page.tsx`. A second `error.page.tsx` is a build error naming both files. Like `404.page.tsx`, it declares no `route` — it has no URL of its own and is reached only when something throws.
+`error.page.tsx` anywhere beneath `src/web` is the application's one error boundary — three page filenames are special in Warlock: this, `404.page.tsx` and `forbidden.page.tsx`. A second `error.page.tsx` is a build error naming both files. Like `404.page.tsx`, it declares no `route` — it has no URL of its own and is reached only when something throws.
 
 ```tsx title="src/web/error.page.tsx"
 import type { ErrorPageProps } from "@warlock.js/web";
@@ -486,6 +488,25 @@ Every unhandled error response is also forced to
 This includes page and API-route failures.
 
 If the failure happens before any page module could even load — a module-load or `register()` throw — there is no trustworthy server composition left to hydrate against, so Warlock renders a plain framework fallback (your `error.page.tsx` if it can still be loaded, otherwise a minimal built-in boundary) with no hydration script at all rather than risk hydrating client code against markup nothing can vouch for.
+
+## The forbidden page — `forbidden.page.tsx`
+
+`forbidden.page.tsx` anywhere beneath `src/web` is the application's one page for a refused request. A page route never answers a raw JSON error: a 401 or 403 (a failed `requireUser({ userType })` / `requireUser({ when })` check, a thrown `ForbiddenError` or `UnAuthorizedError`) renders this page with that status. A guest who has a sign-in page configured (`auth.pageAuth.loginPath`) is still redirected there, as before; only the refusals that have nowhere to redirect to reach the forbidden page. API routes keep their JSON answers.
+
+```tsx title="src/web/forbidden.page.tsx"
+import type { ErrorPageProps } from "@warlock.js/web";
+
+export default function ForbiddenPage({ status }: ErrorPageProps) {
+  return (
+    <main>
+      <h1>{status === 401 ? "Please sign in" : "You don't have access to this page"}</h1>
+      <a href="/">Back to home</a>
+    </main>
+  );
+}
+```
+
+Pair it with `forbidden.setup.ts` for `config.metadata`. It follows the same rules as `error.page.tsx`: no `config.route`, a second `forbidden.page.tsx` is a build error naming both files, `robots: noindex` by default, and it receives the same `{ error, status }` props (plus `debug` outside production). In multi-site mode each site folder (`$sites/<name>/forbidden.page.tsx`) owns its own. The page that renders for a refusal is picked in this order: the site's (or the app's) `forbidden.page.tsx`, then its `error.page.tsx` with the 401/403 status, then the framework default. The framework default is a plain accessible page with the request id, the development details outside production and a "Back to home" link. Hydration uses the same pick, so the page the server rendered is the page the browser hydrates.
 
 ## The `register()` hook
 

@@ -179,8 +179,14 @@ detail nested under `payload`:
 Every unhandled error response also carries
 `Cache-Control: private, no-store`, regardless of status. The floor is
 applied once at the shared error funnel, so API-route errors cannot be stored
-and replayed across users. In development mode, the stack trace is included
-too.
+and replayed across users. In development mode, the stack trace and the
+`requestId` are included too; production bodies stay generic.
+
+Every 5xx also writes exactly one `error`-level log record (`module: "http"`,
+`action: "request.<phase>"`) with the method, pathname, route name and pattern,
+handler, the middleware that threw (when it was one), phase, error, stack and
+request id. A 4xx is never logged as an error, and a returned `503` is treated
+as an intentional "unavailable" answer rather than a failure.
 
 Pick the class, throw from the service or use-case, and forget about response shaping at the call site. The controller stays focused on the success path:
 

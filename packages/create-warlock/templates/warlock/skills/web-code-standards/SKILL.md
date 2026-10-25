@@ -53,7 +53,8 @@ Page logic lives in the matching `.setup.ts` file: `config`, `loader`,
 `register`, and `action`/`actions`. The UI file owns its named default
 component; re-export a framework-required named component such as `ErrorBoundary`
 from that component's own file. Pair `layout.tsx` with
-`layout.setup.ts`, `root.tsx` with `root.setup.ts`, and `error.page.tsx` with
+`layout.setup.ts`, `root.tsx` with `root.setup.ts`, `forbidden.page.tsx` with
+`forbidden.setup.ts`, and `error.page.tsx` with
 `error.setup.ts`. Use type-only imports from setup for loader/action inference.
 The framework projects browser-safe `register()` code to the client. Put route,
 cache, validation, middleware, metadata, and sitemap policy inside `config`;

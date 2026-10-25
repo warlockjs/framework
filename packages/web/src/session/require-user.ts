@@ -97,7 +97,9 @@ export function requireUser(options?: RequireUserOptions): Middleware;
 /**
  * Page middleware: guests are redirected to the login page (302, followed by
  * data navigations too); bearer clients and apps without a `loginPath` get a
- * 401; a failed `userType`/`when` check gets a 403.
+ * 401; a failed `userType`/`when` check gets a 403. The 401/403 are thrown, so
+ * a page route answers with the app's `forbidden.page.tsx` (or its error page,
+ * or the framework default) and never with raw JSON.
  */
 export function requireUser(
   first?: RequireUserContext | RequireUserOptions,
@@ -114,9 +116,10 @@ export function requireUser(
       const loginPath =
         options.loginPath ?? config.key<string | undefined>("auth.pageAuth.loginPath");
 
-      if (!loginPath || request.authorizationValue) {
-        return response.unauthorized({ error: "Unauthorized" });
-      }
+      // Thrown, not answered: a page route never replies with a raw JSON
+      // error. The page pipeline renders the forbidden page (or the app's
+      // error page) with this status instead.
+      if (!loginPath || request.authorizationValue) throw new UnAuthorizedError("Unauthorized");
 
       const destination = localizeLoginPath(loginPath, request.locale);
       const separator = destination.includes("?") ? "&" : "?";
@@ -132,12 +135,10 @@ export function requireUser(
       options.userType &&
       (model as { userType?: string } | null)?.userType !== options.userType
     ) {
-      return response.forbidden({ error: "Forbidden" });
+      throw new ForbiddenError("Forbidden");
     }
 
-    if (options.when && !(await options.when(model))) {
-      return response.forbidden({ error: "Forbidden" });
-    }
+    if (options.when && !(await options.when(model))) throw new ForbiddenError("Forbidden");
   };
 
   return middleware;

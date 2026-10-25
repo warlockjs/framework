@@ -64,6 +64,14 @@ fallback show the same facts in a panel (`data-warlock-dev-error`), and
 `error.page.tsx` receives them as `props.debug`; production responses stay
 generic, so use the log and the `errorCode` to find the record.
 
+A 5xx from an API route, a controller or a route middleware writes the same
+kind of record from `@warlock.js/core` (`module: "http"`,
+`action: "request.<phase>"`, phases `csrf`, `middleware`, `validation`,
+`handler`), once per request, with the same `method`, `pathname`, `routeName`,
+`routePath`, `requestId` and `stack`, plus the `handler` and the `middleware`
+that threw. A 401 or 403 on a page route is not an error record: it renders the
+app's `forbidden.page.tsx` (see the `create-a-page` topic).
+
 ## Inline payload budget
 
 Each rendered document is checked against `build.budgets.payload` (default `64kb`). An over-budget route logs one line per process with the size of each section (page, layout, app, translations, routes, session, other) and its largest data keys. The runtime check is advisory: it never fails a request. `warlock build` measures the two sections the build knows (translations and the route table, both upper bounds) and, with `mode: "error"`, fails the build when a page is over its limit before any page data is added; page, layout, app and session data are measured only at runtime. Raise the limit for a route with a `pages` glob, or reduce the data the page loads. The e2e kit records the same measurement with `page.measurePayload({ limit })`.

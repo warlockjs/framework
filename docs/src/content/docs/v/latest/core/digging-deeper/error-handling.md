@@ -161,6 +161,28 @@ The payload lands under a `payload` key, not spread at the top level. In `develo
 
 A thrown error that resolves to a 4xx is logged once at `warn` (`Name: message (status)`, no stack); 5xx and unknown errors are logged at `error` with the stack.
 
+### The 5xx error record
+
+Every 5xx the HTTP layer answers writes **one** `error`-level logger record, however many stages saw the error. It covers a throw from a route middleware, from request validation, from a controller or handler, and a 5xx a handler returned without throwing (a returned `503` is the usual "unavailable on purpose" answer, such as maintenance mode or a failing readiness probe, so it is not logged as an error). A 4xx is never logged as an error.
+
+The record's `module` is `http` and its `action` is `request.<phase>`. It has the same shape as the page-failure record `@warlock.js/web` writes, with these context fields:
+
+| Field                      | Meaning                                                                                          |
+| -------------------------- | ------------------------------------------------------------------------------------------------ |
+| `name`, `message`, `stack` | The thrown error                                                                                 |
+| `phase`                    | `csrf`, `middleware`, `validation` or `handler`                                                  |
+| `middleware`               | The name of the middleware that threw, when `phase` is `middleware`                              |
+| `handler`                  | The route handler's function name (`(anonymous)` when it has none)                               |
+| `file`                     | The routes file that declares the route                                                          |
+| `routeName`, `routePath`   | The route's name and its pattern (`/posts/:id`)                                                  |
+| `method`, `pathname`       | The request, without its query string                                                            |
+| `requestId`                | The same id as the `X-Request-Id` header                                                         |
+| `statusCode`               | The status the response carries                                                                  |
+
+With no log channel configured, the failure still reaches the terminal through `console.error`.
+
+In `development` the JSON error body also carries `requestId`, so a failing response can be matched to its record without opening the headers. Production bodies stay generic.
+
 ## Mapping your own errors: `http.errorMapper`
 
 Domain errors often have to exist outside an HTTP process too — in a worker, a CLI, a standalone helper — where extending Core's `HttpError` would drag the framework in. Give them a status at the HTTP edge instead, with `http.errorMapper` in `src/config/http.ts`:

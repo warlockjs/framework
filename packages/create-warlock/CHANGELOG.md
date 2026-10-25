@@ -4,6 +4,12 @@ All notable changes to `create-warlock` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.38.0
+
+### Added
+
+- The web template ships `src/web/forbidden.page.tsx` and `forbidden.setup.ts` (styled by `forbidden.css`, imported from `app.css`): the page a 401/403 on a page route renders instead of raw JSON. The template README and the `web-code-standards` skill describe it.
+
 ## 5.37.1 - 2026-10-24
 
 ### Changed
