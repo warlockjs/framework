@@ -78,7 +78,7 @@ export type ModelPath = `${string}.${string}`;
 export type ModelData<TValidator extends ObjectValidator> = Infer.Output<TValidator>;
 
 /**
- * A read-only snapshot of a model's data (`model.toSnapshot()`), also the
+ * A read-only snapshot of a model's data (`model.toDataSnapshot()`), also the
  * natural input type of a resource built from the model.
  */
 export type ModelDataSnapshot<TSchema> = Readonly<TSchema>;

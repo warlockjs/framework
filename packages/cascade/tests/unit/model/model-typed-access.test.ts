@@ -105,10 +105,10 @@ describe("Model get() and set() are typed from the schema", () => {
 });
 
 describe("Model snapshots and request schemas", () => {
-  it("toSnapshot() is typed, read-only and drops hidden columns", () => {
+  it("toDataSnapshot() is typed, read-only and drops hidden columns", () => {
     const createdOn = new Date("2026-01-01T00:00:00Z");
     const post = new Post({ title: "Hello", rating: 4.5, createdOn });
-    const snapshot = post.toSnapshot();
+    const snapshot = post.toDataSnapshot();
 
     expectTypeOf(snapshot).toEqualTypeOf<ModelDataSnapshot<PostSchema>>();
     expectTypeOf(snapshot.createdOn).toEqualTypeOf<Date>();

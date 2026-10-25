@@ -66,10 +66,10 @@ Only top-level columns are typed. A dot path (`"profile.address.city"`) is accep
 
 ### Read-only snapshots
 
-`toSnapshot()` returns a typed, read-only copy of the model's data, without the `hidden` columns. Unlike `toJSON()` it ignores `resource`, `resourceColumns` and `toJsonColumns`, so its type is exactly the schema:
+`toDataSnapshot()` returns a typed, read-only copy of the model's data, without the `hidden` columns. Unlike `toJSON()` it ignores `resource`, `resourceColumns` and `toJsonColumns`, so its type is exactly the schema:
 
 ```ts
-const snapshot = post.toSnapshot(); // ModelDataSnapshot<PostSchema>
+const snapshot = post.toDataSnapshot(); // ModelDataSnapshot<PostSchema>
 snapshot.publishedAt; // Date | null
 ```
 

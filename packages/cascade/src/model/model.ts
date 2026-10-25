@@ -107,7 +107,7 @@ import {
   removeLocalModelScope,
 } from "./methods/scope-methods";
 import { guardColumnPropertyReads } from "./methods/column-read-guard";
-import { modelToJSON, modelToSnapshot } from "./methods/serialization-methods";
+import { modelToDataSnapshot, modelToJSON } from "./methods/serialization-methods";
 import {
   cleanupModelEvents,
   getGlobalEvents,
@@ -2716,12 +2716,12 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
    *
    * @example
    * ```typescript
-   * const snapshot = user.toSnapshot();
+   * const snapshot = user.toDataSnapshot();
    * snapshot.createdAt; // Date
    * ```
    */
-  public toSnapshot(): ModelDataSnapshot<TSchema> {
-    return modelToSnapshot(this) as ModelDataSnapshot<TSchema>;
+  public toDataSnapshot(): ModelDataSnapshot<TSchema> {
+    return modelToDataSnapshot(this) as ModelDataSnapshot<TSchema>;
   }
 
   /**
