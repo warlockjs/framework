@@ -57,6 +57,7 @@ vi.mock("../../../src/tests/fakes/test-fakes", () => ({
 
 vi.mock("../../../src/connectors", () => ({
   connectorsManager: {
+    observeTimings: vi.fn(),
     start: (...args: unknown[]) => startMock(...(args as [])),
     startWithout: (...args: unknown[]) => startWithoutMock(...(args as [])),
     shutdown: (...args: unknown[]) => shutdownMock(...(args as [])),

@@ -19,7 +19,7 @@ type Run = { code: number | null; output: string; elapsed: number; killed: boole
  * integration project with the global-setup HTTP server, the Warlock runner and
  * `setupTest()`), exactly as an app's `vitest run` does.
  */
-function runFixture(lifetime: "file" | "worker"): Promise<Run> {
+function runFixture(lifetime: "file" | "worker", web = false): Promise<Run> {
   const vitest = path.join(path.dirname(require.resolve("vitest/package.json")), "vitest.mjs");
   const environment = Object.fromEntries(
     Object.entries(process.env).filter(([key]) => !key.startsWith("VITEST")),
@@ -29,7 +29,12 @@ function runFixture(lifetime: "file" | "worker"): Promise<Run> {
     const started = Date.now();
     const child = spawn(process.execPath, [vitest, "run", "--reporter=default"], {
       cwd: fixture,
-      env: { ...environment, NODE_ENV: "test", EXIT_APP_LIFETIME: lifetime },
+      env: {
+        ...environment,
+        NODE_ENV: "test",
+        EXIT_APP_LIFETIME: lifetime,
+        EXIT_APP_WEB: web ? "1" : "0",
+      },
       stdio: ["ignore", "pipe", "pipe"],
     });
     let output = "";
@@ -60,6 +65,25 @@ describe("vitest process exit", () => {
       // Vitest prints these only when something still holds the process open
       // and its own close timeout had to give up.
       expect(run.output).not.toMatch(/prevents|close timed out/);
+      expect(run.killed).toBe(false);
+      expect(run.code).toBe(0);
+      expect(run.elapsed).toBeLessThan(EXIT_BOUND_MS);
+    },
+    EXIT_BOUND_MS + 15_000,
+  );
+
+  // The global-setup server boots the web connector, which owns a Vite dev
+  // server with an HMR websocket and file watchers. `stopHttpTestServer()` has
+  // to close all three, or Vitest ends the run with "something prevents N Vite
+  // servers from exiting".
+  it.each(["file", "worker"] as const)(
+    "closes the web connector's Vite dev server so the run exits with %s lifetime",
+    async (lifetime) => {
+      const run = await runFixture(lifetime, true);
+
+      expect(run.output).toContain("3 passed");
+      expect(run.output).toContain("[test-server] HTTP test server stopped");
+      expect(run.output).not.toMatch(/prevents|close timed out|still active after shutdown/);
       expect(run.killed).toBe(false);
       expect(run.code).toBe(0);
       expect(run.elapsed).toBeLessThan(EXIT_BOUND_MS);

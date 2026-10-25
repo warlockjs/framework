@@ -87,7 +87,39 @@ export async function timeTestStep<T>(step: string, run: () => T | Promise<T>): 
   }
 }
 
-function formatSteps(steps: Record<string, number>): string {
+/**
+ * Add one connector's `boot()` or `start()` time to the open file's profile as
+ * `connector.<name>`, so the profile names the connector that is slow.
+ */
+export function recordConnectorTiming(timing: { connector: string; ms: number }): void {
+  const profile = testRuntimeScope().profile;
+  if (!profile) return;
+  const step = `connector.${timing.connector}`;
+  profile.steps[step] = (profile.steps[step] ?? 0) + timing.ms;
+}
+
+const SERVER_PROFILE_KEY = Symbol.for("warlock.core.testServerBootProfile");
+
+/** Boot phases of the global-setup HTTP test server, in milliseconds. */
+export type TestServerBootProfile = { pid: number; steps: Record<string, number> };
+
+/**
+ * Publish the HTTP test server's boot phases. The server boots in Vitest's main
+ * process, the same process the reporter runs in, so a global key is the whole
+ * channel.
+ */
+export function publishTestServerBootProfile(profile: TestServerBootProfile): void {
+  (globalThis as Record<symbol, unknown>)[SERVER_PROFILE_KEY] = profile;
+}
+
+/** The profile {@link publishTestServerBootProfile} stored, if the server booted with profiling on. */
+export function readTestServerBootProfile(): TestServerBootProfile | undefined {
+  return (globalThis as Record<symbol, unknown>)[SERVER_PROFILE_KEY] as
+    | TestServerBootProfile
+    | undefined;
+}
+
+export function formatSteps(steps: Record<string, number>): string {
   return Object.entries(steps)
     .map(([step, ms]) => `${step}=${ms.toFixed(2)}ms`)
     .join(" ");

@@ -83,6 +83,9 @@ async function loadAppModulesOnce(importModule: AppModuleImporter | undefined): 
       await filesOrchestrator.init();
       await filesOrchestrator.initializeAll();
       await filesOrchestrator.moduleLoader.loadAll();
+      // The application's own routes are now part of the state a worker-scoped
+      // runtime returns to between files.
+      router.captureBootSnapshot();
     } finally {
       setAppModuleImporter(undefined);
     }
