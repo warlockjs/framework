@@ -106,12 +106,14 @@ describe("warlock logs requests", () => {
   });
 
   it("rejects a bad limit, status or since with exit code 1", async () => {
-    for (const options of [
+    const badOptions: Record<string, string>[] = [
       { limit: "0" },
       { limit: "x" },
       { status: "teapot" },
       { since: "soon" },
-    ]) {
+    ];
+
+    for (const options of badOptions) {
       const result = await runLogsCommand(["requests"], options, { directory });
 
       expect(result.exitCode).toBe(1);

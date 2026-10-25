@@ -48,11 +48,7 @@ export type ModelKey<TSchema> = string extends keyof TSchema ? string : keyof TS
  * The value type of one column: the schema type for a typed model, `any`
  * for a loose one.
  */
-export type ModelValue<TSchema, TKey> = string extends keyof TSchema
-  ? any
-  : TKey extends keyof TSchema
-    ? TSchema[TKey]
-    : never;
+export type ModelValue<TSchema, TKey> = TKey extends keyof TSchema ? TSchema[TKey] : never;
 
 /**
  * A dot-notation path into a nested column (`"address.city"`). Nested paths

@@ -18,6 +18,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - **BREAKING** For a model declared with a schema type, `get()` and `set()` with a top-level column name that is not in the schema are now type errors. Add the column to the schema, use a dot path, or declare the model without a schema type to keep loose access.
 
+### Fixed
+
+- A model declared with a schema type is assignable to the loose `Model` and `ChildModel` again, so helpers, migrations and `this`-typed statics accept typed models unchanged.
+
 ## 5.37.0 - 2026-10-24
 
 ### Added

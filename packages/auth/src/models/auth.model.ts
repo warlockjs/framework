@@ -4,7 +4,9 @@ import type { AccessTokenOutput, DeviceInfo, TokenPair } from "../contracts/type
 import { authService } from "../services";
 import type { RefreshToken } from "./refresh-token/refresh-token.model";
 
-export abstract class Auth<Schema extends ModelSchema = ModelSchema>
+// `out` keeps a typed auth model assignable to the loose `Auth`, like `Model` itself.
+// @ts-expect-error TS2636: variance cannot be verified through Model's typed get()/set()
+export abstract class Auth<out Schema extends ModelSchema = ModelSchema>
   extends Model<Schema>
   implements Authenticable
 {

@@ -309,7 +309,8 @@ export async function startHttpTestServer(options: StartHttpTestServerOptions = 
  * its JSON, so the web connector and Vite show up next to the worker phases.
  */
 function reportServerBootProfile(steps: Record<string, number>): void {
-  const settings = config.get<{ profileSetup?: unknown }>("tests", {}) ?? {};
+  const settings =
+    (config.get("tests", {} as never) as unknown as { profileSetup?: unknown } | undefined) ?? {};
 
   if (process.env.WARLOCK_TEST_PROFILE !== "1" && settings.profileSetup !== true) return;
 

@@ -18,7 +18,7 @@ const looseSchema = fixed({
   properties: { a: { type: "string" } },
 });
 
-function define(name = "save_facts", extra: Partial<ToolConfig<unknown, unknown>> = {}) {
+function define(name = "save_facts", extra: Partial<ToolConfig<unknown, string>> = {}) {
   return tool<unknown, string>({
     name,
     description: "Save facts",

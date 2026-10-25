@@ -119,7 +119,7 @@ export class ConnectorsManager {
   private async timed(
     connector: Connector,
     step: ConnectorTiming["step"],
-    run: () => Promise<void>,
+    run: () => void | Promise<void>,
   ): Promise<void> {
     const observer = this.timingObserver;
 

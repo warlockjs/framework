@@ -180,7 +180,11 @@ export type {
  * console.log(user.hasChanges()); // true
  * ```
  */
-export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
+// `out` makes a typed model assignable to the loose `Model` (the constraint every helper
+// and `ChildModel` uses). The checker cannot prove it through the conditional `get()`/`set()`
+// types, but the schema is only read through them, so it holds.
+// @ts-expect-error TS2636: variance cannot be verified through ModelValue
+export abstract class Model<out TSchema extends ModelSchema = ModelSchema> {
   /**
    * The database table or collection name associated with this model.
    *
@@ -313,7 +317,7 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
    * }
    * ```
    */
-  public static schema?: ObjectValidator;
+  public static schema?: ObjectValidator<any>;
 
   /**
    * Strict mode behavior for unknown fields.

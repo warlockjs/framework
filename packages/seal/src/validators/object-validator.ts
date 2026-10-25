@@ -32,7 +32,11 @@ import { ComputedValidator } from "./computed-validator";
  * recursive class-base evaluation that would otherwise occur when the
  * brand-aware widening tries to inspect the class type.
  */
-export class ObjectValidator<TSchema extends Schema = Schema> extends BaseValidator<
+// `out` keeps `ObjectValidator<{ id: ... }>` assignable to the loose `ObjectValidator<Schema>`.
+// The checker cannot prove it through the self-referencing `partial()`/`withoutInternal()`
+// return types, but the schema is only read through them, so it holds.
+// @ts-expect-error TS2636: variance cannot be verified through the mapped return types
+export class ObjectValidator<out TSchema extends Schema = Schema> extends BaseValidator<
   InferInputObjectShape<TSchema>,
   InferOutputObjectShape<TSchema>
 > {

@@ -50,14 +50,14 @@ export class DatabaseLogModel extends Model<LogSchema> {
    * {@inheritdoc}
    */
   public get(field: string, defaultValue?: any): any {
-    const value = super.get(field, undefined as any);
+    const value = super.get(field as never, undefined as any);
 
     if (value !== undefined && value !== null) return value;
 
     const legacy = DatabaseLogModel.legacyFields[field];
 
     if (legacy) {
-      const legacyValue = super.get(legacy, undefined as any);
+      const legacyValue = super.get(legacy as never, undefined as any);
 
       if (legacyValue !== undefined && legacyValue !== null) return legacyValue;
     }

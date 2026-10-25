@@ -12,7 +12,7 @@ export type TranslateSealAttributeOptions = {
   /** Whether a field without a label is turned into readable words. */
   humanize?: boolean;
   /** Translates the key with the given placeholders (the request-aware `t`). */
-  translate: (key: string, placeholders: unknown) => string;
+  translate: (key: string, placeholders?: Record<string, unknown>) => string;
 };
 
 /**
@@ -45,13 +45,13 @@ export function translateSealAttribute({
 }: TranslateSealAttributeOptions): string {
   const group = attributeGroup ?? "attributes";
   const translationKey = `${group ? group + "." : ""}${attribute}`;
-  const output = translate(translationKey, allValues);
+  const output = translate(translationKey, allValues as Record<string, unknown> | undefined);
 
   if (output !== translationKey) return output;
 
   if (attributeGroup === undefined) {
     const nestedKey = `validation.attributes.${attribute}`;
-    const nested = translate(nestedKey, allValues);
+    const nested = translate(nestedKey, allValues as Record<string, unknown> | undefined);
 
     if (nested !== nestedKey) return nested;
   }
