@@ -136,9 +136,7 @@ describe("LiteralValidator", () => {
 
   it("nullable literal gains the null branch", () => {
     const schema = v.literal("x").nullable().toJsonSchema("draft-2020-12");
-    // const form stays a const; nullable wraps via type array only when type exists,
-    // for draft-2020-12 with no `type` key applyNullable sets type: [undefined, "null"]
-    expect(schema).toHaveProperty("const", "x");
+    expect(schema).toEqual({ anyOf: [{ const: "x" }, { type: "null" }] });
   });
 });
 

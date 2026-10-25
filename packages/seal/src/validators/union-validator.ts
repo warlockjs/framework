@@ -1,6 +1,6 @@
 import { unionRule } from "../rules";
 import { BaseValidator } from "./base-validator";
-import { getRuleOptions } from "../standard-schema/json-schema";
+import { applyNullable, getRuleOptions } from "../standard-schema/json-schema";
 import type { JsonSchemaResult, JsonSchemaTarget } from "../standard-schema/json-schema";
 
 /**
@@ -62,8 +62,12 @@ export class UnionValidator extends BaseValidator {
     const opts = getRuleOptions(this.rules, "union");
     const validators = (opts?.validators ?? []) as BaseValidator[];
 
-    return {
+    const schema: JsonSchemaResult = {
       oneOf: validators.map((v) => v.toJsonSchema(target)),
     };
+
+    if (this.isNullable) applyNullable(schema, target);
+
+    return schema;
   }
 }

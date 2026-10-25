@@ -52,7 +52,7 @@ Pick by consumer:
 The `openai-strict` target encodes the quirks of OpenAI's strict mode:
 
 - **Every field listed in `required`** — strict mode forbids leaving fields out.
-- **Optional fields encoded as `type: ["T", "null"]`** instead of being omitted from `required`.
+- **Optional fields encoded as nullable** instead of being omitted from `required`: `type: ["T", "null"]` for typed schemas, `null` added to the `enum` of an enum, `anyOf: [{ const }, { type: "null" }]` for a single literal, and a `{ type: "null" }` branch (added once) for unions.
 - **`additionalProperties: false` on every object.**
 
 ```ts
@@ -122,7 +122,7 @@ Same field, different wire format — pick the target your consumer reads.
 - `v.union([...])` — `{ anyOf: [...] }`.
 - `v.discriminatedUnion(key, [...])` — `{ oneOf: [...] }` with literal `const` on the discriminator field.
 - `v.tuple([...])` — `{ type: "array", prefixItems: [...] }` (draft-2020-12) or `{ type: "array", items: [...] }` (draft-07).
-- `.nullable()` — type union or `nullable: true` per target.
+- `.nullable()` — type union or `nullable: true` per target. Schemas without a `type` follow the same rule: an `enum` gains `null`, a `const` becomes `anyOf: [{ const }, { type: "null" }]`, and a union gains a `{ type: "null" }` branch.
 
 ## What's silently dropped
 

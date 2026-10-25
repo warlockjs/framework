@@ -15,7 +15,7 @@ import {
   declinedWithoutRule,
 } from "../rules/scalar";
 import { PrimitiveValidator } from "./primitive-validator";
-import { getRuleOptions } from "../standard-schema/json-schema";
+import { applyNullable, getRuleOptions } from "../standard-schema/json-schema";
 import type { JsonSchemaResult, JsonSchemaTarget } from "../standard-schema/json-schema";
 
 /**
@@ -168,20 +168,25 @@ export class ScalarValidator extends PrimitiveValidator {
    * // → { enum: ["active", "inactive"] }
    * ```
    */
-  public override toJsonSchema(_target: JsonSchemaTarget = "draft-2020-12"): JsonSchemaResult {
+  public override toJsonSchema(target: JsonSchemaTarget = "draft-2020-12"): JsonSchemaResult {
+    let schema: JsonSchemaResult;
+
     // If a value set is constrained, collapse to enum
     const inOpts = getRuleOptions(this.rules, "in");
-    if (inOpts?.values && Array.isArray(inOpts.values)) {
-      return { enum: inOpts.values };
-    }
-
     const enumOpts = getRuleOptions(this.rules, "enum");
-    if (enumOpts?.enum && Array.isArray(enumOpts.enum)) {
-      return { enum: enumOpts.enum };
+
+    if (inOpts?.values && Array.isArray(inOpts.values)) {
+      schema = { enum: [...inOpts.values] };
+    } else if (enumOpts?.enum && Array.isArray(enumOpts.enum)) {
+      schema = { enum: [...enumOpts.enum] };
+    } else {
+      schema = {
+        oneOf: [{ type: "string" }, { type: "number" }, { type: "boolean" }],
+      };
     }
 
-    return {
-      oneOf: [{ type: "string" }, { type: "number" }, { type: "boolean" }],
-    };
+    if (this.isNullable) applyNullable(schema, target);
+
+    return schema;
   }
 }
