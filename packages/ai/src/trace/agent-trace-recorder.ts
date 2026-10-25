@@ -5,6 +5,7 @@ import type { ModelCallOptions } from "../contracts/model.contract";
 import type { LLMTrip } from "../contracts/result/llm-trip.type";
 import type { ToolCall } from "../contracts/result/tool-call.type";
 import type { Usage } from "../contracts/result/usage.type";
+import { totalCost } from "../utils/compute-cost";
 import { isDevRuntime } from "../utils/dev-runtime";
 import { estimateInputTokens } from "../utils/estimate-input-tokens";
 import { hashText, stableJson } from "../utils/hash-text";
@@ -228,7 +229,8 @@ export class AgentTraceRecorder {
       this.turn.durationMs = trip.duration;
       this.turn.finishReason = trip.finishReason;
       this.turn.usage = { ...trip.usage };
-      if (trip.usage.cost !== undefined) this.turn.cost = trip.usage.cost;
+      const turnCost = totalCost(trip.usage.cost);
+      if (turnCost !== undefined) this.turn.cost = turnCost;
       if (this.init.options.text) {
         this.turn.text = String(safeValue(trip.output, this.init.options.maxStringLength));
       }
@@ -248,7 +250,8 @@ export class AgentTraceRecorder {
       this.trace.endedAt = new Date().toISOString();
       this.trace.durationMs = Date.parse(this.trace.endedAt) - Date.parse(this.trace.startedAt);
       this.trace.usage = { ...outcome.usage };
-      if (outcome.usage.cost !== undefined) this.trace.cost = outcome.usage.cost;
+      const runCost = totalCost(outcome.usage.cost);
+      if (runCost !== undefined) this.trace.cost = runCost;
       if (outcome.error) this.trace.error = errorSummary(outcome.error);
       this.publish();
     });
