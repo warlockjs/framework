@@ -151,8 +151,25 @@ function rewriteJson(value: unknown, replace: (text: string) => string, key?: st
 
     for (const [name, child] of Object.entries(value)) {
       const renamed = replace(name);
-      if (Object.hasOwn(result, renamed)) continue;
-      result[renamed] = rewriteJson(child, replace, name);
+      const rewritten = rewriteJson(child, replace, name);
+
+      if (Object.hasOwn(result, renamed)) {
+        // Deduplicated chunks collapse onto one key. Their lists (the modules
+        // each held) are merged so no module is lost from the report.
+        const existing = result[renamed];
+
+        if (Array.isArray(existing) && Array.isArray(rewritten)) {
+          const seen = new Set(existing.map((item) => JSON.stringify(item)));
+          result[renamed] = [
+            ...existing,
+            ...rewritten.filter((item) => !seen.has(JSON.stringify(item))),
+          ];
+        }
+
+        continue;
+      }
+
+      result[renamed] = rewritten;
     }
 
     return result;

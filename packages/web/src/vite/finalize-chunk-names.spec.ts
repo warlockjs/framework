@@ -149,6 +149,40 @@ describe("finalizeChunkNames", () => {
     expect(Object.keys(modules).sort()).toEqual(files.map((file) => `assets/${file}`));
   });
 
+  it("keeps the modules of every merged chunk in the budget module report", async () => {
+    // Two layouts that compile to the same bytes are merged into one file; the
+    // report must still list both modules under that file.
+    const code = "export default function L(){return null}";
+    const { directory } = build({
+      "layout-AAAAAAAA.js": { code },
+      "layout-BBBBBBBB.js": { code },
+    });
+    fs.writeFileSync(
+      path.join(directory, ".vite/budget-modules.json"),
+      JSON.stringify({
+        "assets/layout-AAAAAAAA.js": [{ id: "src/web/account/layout.tsx", bytes: 40 }],
+        "assets/layout-BBBBBBBB.js": [{ id: "src/web/shop/layout.tsx", bytes: 40 }],
+      }),
+    );
+    await finalizeChunkNames({
+      outDir: directory,
+      chunks: ["layout-AAAAAAAA.js", "layout-BBBBBBBB.js"].map((name) => ({
+        fileName: `assets/${name}`,
+        isEntry: false,
+      })),
+    });
+    const modules = JSON.parse(
+      fs.readFileSync(path.join(directory, ".vite/budget-modules.json"), "utf8"),
+    ) as Record<string, { id: string }[]>;
+
+    expect(Object.keys(modules)).toHaveLength(1);
+    expect(
+      Object.values(modules)[0]
+        ?.map((module) => module.id)
+        .sort(),
+    ).toEqual(["src/web/account/layout.tsx", "src/web/shop/layout.tsx"]);
+  });
+
   it("rewrites preload dependency lists, which name chunks with their directory", async () => {
     const { directory } = await finalize({
       "main-MMMMMMMM.js": {
