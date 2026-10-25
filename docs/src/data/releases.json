@@ -1,4 +1,9 @@
 {
+  "5.38.0": {
+    "publishedAt": "2026-10-25T21:20:38.523Z",
+    "matrix": "none",
+    "summary": "**Persistent request log, faster test runtimes, stable chunk names and typed models.** `http.logging.requests` writes one redacted record per request, read by devtools (history, copy as curl), `warlock logs` and the MCP `request_log` tool, and every 5xx is logged once as `request.<phase>`. New apps run tests with worker lifetime and per-file resets, `*.unit.spec.ts` files run without booting the app, the HTTP test server closes the web connector's Vite servers, and `tests.profileSetup` prints a per-phase boot profile. Production chunks are named after their final bytes, identical chunks are merged, builds check integrity against the previous build and enforce payload budgets. Seal keeps optional enums and literals nullable in `openai-strict` and names unlabelled fields in words; AI tools get per-provider schema lint, a tool-use contract, eval scorers and agent traces in devtools. Page routes render a per-site `forbidden.page.tsx` instead of JSON for 401/403, `warlock upgrade --check` rehearses upgrades, `warlock doctor` renders each site, typed capabilities and `inspect --section wiring` show auto-loaded wiring, and `*.client.ts(x)` is an enforced client-only boundary. **Breaking:** typed models type `get()` and `set()` from their schema. Lockstep release across all 33 packages. Generator matrix scope: `none`; before publishing, the blog on the 5.38.0 tarballs passed the release gate; after publishing, every package was confirmed at the npm origin."
+  },
   "5.37.1": {
     "publishedAt": "2026-10-24T16:07:05.596Z",
     "matrix": "none",

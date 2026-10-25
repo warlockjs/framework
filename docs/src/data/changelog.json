@@ -136,6 +136,538 @@
   ],
   "releases": [
     {
+      "version": "5.38.0",
+      "id": "v5-38-0",
+      "date": "October 25, 2026",
+      "isUnreleased": false,
+      "summaryHtml": "<strong>Persistent request log, faster test runtimes, stable chunk names and typed models.</strong> <code>http.logging.requests</code> writes one redacted record per request, read by devtools (history, copy as curl), <code>warlock logs</code> and the MCP <code>request_log</code> tool, and every 5xx is logged once as <code>request.&lt;phase&gt;</code>. New apps run tests with worker lifetime and per-file resets, <code>*.unit.spec.ts</code> files run without booting the app, the HTTP test server closes the web connector's Vite servers, and <code>tests.profileSetup</code> prints a per-phase boot profile. Production chunks are named after their final bytes, identical chunks are merged, builds check integrity against the previous build and enforce payload budgets. Seal keeps optional enums and literals nullable in <code>openai-strict</code> and names unlabelled fields in words; AI tools get per-provider schema lint, a tool-use contract, eval scorers and agent traces in devtools. Page routes render a per-site <code>forbidden.page.tsx</code> instead of JSON for 401/403, <code>warlock upgrade --check</code> rehearses upgrades, <code>warlock doctor</code> renders each site, typed capabilities and <code>inspect --section wiring</code> show auto-loaded wiring, and <code>*.client.ts(x)</code> is an enforced client-only boundary. <strong>Breaking:</strong> typed models type <code>get()</code> and <code>set()</code> from their schema. Lockstep release across all 33 packages. Generator matrix scope: <code>none</code>; before publishing, the blog on the 5.38.0 tarballs passed the release gate; after publishing, every package was confirmed at the npm origin.",
+      "matrix": "none",
+      "matrixRows": null,
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 44,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 12
+            },
+            {
+              "type": "Changed",
+              "n": 13
+            },
+            {
+              "type": "Fixed",
+              "n": 19
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "Test file convention: <code>*.unit.spec.ts</code> and <code>*.unit.test.ts</code> run in the Vitest <code>unit</code> project (no setup files, no app boot, threads pool); every other <code>*.spec.ts</code> and <code>*.test.ts</code>, and anything under <code>tests/</code>, runs in the <code>integration</code> project. <code>guardUnitProject()</code> checks the <code>.unit.</code> files, and <code>WL9024</code> now flags any integration spec that never touches the app and suggests renaming it to <code>&lt;name&gt;.unit.spec.ts</code>. Existing apps keep their own globs; the 5.38 upgrade note and the <code>test-runtime-worker-lifetime</code> step list how to adopt the convention."
+            },
+            {
+              "type": "Added",
+              "html": "Validation messages name a field without a translated label in words: <code>max_dumbbell_kg</code> reads \"Max dumbbell kg\" and <code>firstName</code> reads \"First name\" instead of the raw key. Labels under <code>attributes.&lt;field&gt;</code> still win, and <code>validation.attributes.&lt;field&gt;</code> is read too when <code>validation.attributeGroup</code> is not set. Only the validated field and sibling fields a rule refers to are turned into words. <code>validation.humanizeAttributes: false</code> keeps the raw key."
+            },
+            {
+              "type": "Added",
+              "html": "<code>warlock doctor</code> check <code>validation-labels</code> (<code>WL4002</code>), off by default: with <code>validation.warnMissingLabels: true</code> it lists request-schema fields that have no label in a locale of <code>app.localeCodes</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<code>warlock check</code> rule <code>WL9021</code> (warning): a Cascade column read or written as a model property (<code>user.email</code>). It recognises instances from <code>new User()</code>, the single-record finders (<code>find</code>, <code>first</code>, <code>create</code>, ...), a <code>User</code> annotation and <code>this</code> inside a model class, and compares the name with the keys of the model's <code>static schema</code> when they can be read statically. <code>warlock check --fix</code> rewrites reads to <code>model.get(\"column\")</code> and plain <code>model.column = value;</code> statements to <code>model.set(\"column\", value)</code>."
+            },
+            {
+              "type": "Added",
+              "html": "Every 5xx the HTTP layer answers writes one error-level log record (<code>module: \"http\"</code>, <code>action: \"request.&lt;phase&gt;\"</code>), once per request, in the same shape as the page-failure record of <code>@warlock.js/web</code>: <code>name</code>, <code>message</code>, <code>stack</code>, <code>phase</code> (<code>csrf</code>, <code>middleware</code>, <code>validation</code> or <code>handler</code>), <code>file</code> (the routes file), <code>routeName</code>, <code>routePath</code>, <code>handler</code>, <code>middleware</code> (the middleware that threw), <code>method</code>, <code>pathname</code> (no query string), <code>requestId</code> and <code>statusCode</code>. It covers throws from route middleware, request validation and controllers, and a 5xx a handler returned without throwing; a returned <code>503</code> is treated as an intentional answer and not logged. A 4xx is never logged as an error. With no log channel configured the failure still goes to <code>console.error</code>."
+            },
+            {
+              "type": "Added",
+              "html": "In <code>development</code> the JSON error body of a thrown error and of the opaque 500 includes <code>requestId</code>. Production bodies are unchanged."
+            },
+            {
+              "type": "Added",
+              "html": "Persistent request log, <code>http.logging.requests</code>: one redacted JSON record per request, written after the response is sent through buffered logger channels. A record holds the id and trace id, time, method, URL (credential query values masked), route name and pattern, params, query, headers, body, <code>session: { userId, userType }</code>, IP, status, duration, response size (and headers and body when <code>include.response</code> is on), phases, the log entries emitted during the request, a query summary (count, slowest query, N+1 findings) and, for a <code>5xx</code> or a request that threw, the error with its stack, phase, page file and site. <code>RequestLogRecord</code>, <code>listRequestLogs()</code>, <code>getRequestLog()</code>, <code>requestLogToCurl()</code> and <code>compileRequestLogFilter()</code> are exported."
+            },
+            {
+              "type": "Added",
+              "html": "<code>http.logging.requests</code> options: <code>enabled</code> (default on in development, off elsewhere), <code>channels</code> (logger channel names or instances; default a daily JSON-lines file <code>storage/logs/requests/YYYY-MM-DD.jsonl</code>), <code>only</code> (<code>\"all\"</code>, <code>\"errors\"</code>, <code>\"slow\"</code>; default <code>\"all\"</code> in development and <code>\"errors\"</code> elsewhere), <code>slowMs</code>, <code>sampleRate</code> (errors are always kept when <code>only</code> includes them), <code>include</code> (<code>headers</code>, <code>body</code>, <code>query</code>, <code>params</code>, <code>session</code>, <code>response</code>, <code>stack</code>, <code>logs</code>, <code>queries</code>, <code>phases</code>), <code>maxBodyBytes</code> (default 16 KB, a larger body ends with a truncation marker) and <code>retention: { maxDays, maxSizeMb }</code> for the default file channel, which prunes on boot and when a new day's file starts."
+            },
+            {
+              "type": "Added",
+              "html": "Outside development the request log records request headers through an allowlist, and leaves the request and response bodies out unless <code>include.body</code> / <code>include.response</code> is set. The logger's redaction, <code>http.logging.private</code> URL rules and a route's <code>logging: { body: false, query: false }</code> apply to every record, and uploaded files are recorded as <code>{ file, mimeType }</code> only."
+            },
+            {
+              "type": "Added",
+              "html": "<code>warlock logs requests [--status 5xx|404] [--route name] [--since 1h] [--limit n] [--json]</code> lists persisted requests and <code>warlock logs request &lt;id&gt; [--json]</code> prints one in full. Neither boots the app."
+            },
+            {
+              "type": "Added",
+              "html": "MCP tool <code>request_log</code> (read-only): lists persisted requests with <code>status</code>, <code>route</code>, <code>method</code>, <code>since</code>, <code>q</code> and <code>limit</code> filters, or returns one full record by <code>id</code>."
+            },
+            {
+              "type": "Added",
+              "html": "Skill <code>request-log</code>."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>warlock add test</code> generates the new layout: the <code>unit</code> project includes <code>src/**/*.unit.{spec,test}.ts</code>, and <code>integration</code> includes <code>src/**/*.{spec,test}.ts</code>, <code>src/<strong>/tests/</strong>/*.{test,spec}.ts</code> and <code>tests/**/*.{test,spec}.ts</code>, excluding <code>*.unit.*</code>. An existing <code>vite.config.ts</code> is never overwritten."
+            },
+            {
+              "type": "Changed",
+              "html": "The three separate error-level entries for a 5xx (<code>request-error</code>, <code>model-write-validation-error</code> and <code>unhandled-request-error</code>) are replaced by the single record above. The per-request <code>http.log</code> line is unchanged."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>setupTest({ lifetime: \"file\" })</code> opts one file out of a worker-scoped runtime (<code>tests.lifetime: \"worker\"</code>). The worker's shared runtime is shut down, the file boots a fresh one that its own <code>teardownTest()</code> closes, and the next file returns to the worker lifetime. Use it for a spec that changes global configuration the per-file reset does not undo."
+            },
+            {
+              "type": "Changed",
+              "html": "A worker-scoped runtime now resets more between files, in addition to the database and the fakes: test HTTP servers left open are closed, the request context is cleared, the route table returns to the snapshot taken after the app booted (routes a file registered by hand are removed, the app's own stay), and a real in-memory cache driver is flushed. <code>router.captureBootSnapshot()</code> and <code>router.restoreBootSnapshot()</code> are the router side of it."
+            },
+            {
+              "type": "Changed",
+              "html": "Per-phase boot profile. With <code>tests.profileSetup: true</code> or <code>WARLOCK_TEST_PROFILE=1</code>, each file's profile also carries one <code>connector.&lt;name&gt;</code> entry per connector (<code>boot()</code> plus <code>start()</code>) and <code>appModules</code>, <code>startHttpTestServer()</code> prints and publishes its own phases, and <code>TestSetupReporter</code> prints the phases (config, translations, connectors, fakes, routes, reset, teardown), each connector, the HTTP test server's boot and the slowest files in the run summary. <code>WARLOCK_TEST_PROFILE_JSON=&lt;path&gt;</code> or <code>new TestSetupReporter({ json, slowest })</code> also writes the profile as JSON. <code>connectorsManager.observeTimings()</code> exposes the connector timings."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>guardUnitProject()</code> in <code>@warlock.js/core/vite</code>: a plugin for the Vitest <code>unit</code> project that fails a spec importing a connector, <code>connectorsManager</code>, <code>bootstrap</code> or a test-server helper, or calling <code>setupTest()</code> without <code>{ mode: \"unit\" }</code>, with a message naming the import and pointing to the integration project. <code>setupTest()</code> outside unit mode also throws when <code>WARLOCK_TEST_PROJECT=unit</code>."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>warlock check</code> reports <code>WL9024</code> (a warning) for an integration spec (<code>*.test.ts</code>, or a spec under <code>tests/</code>) that imports nothing needing the app, with the hint to move it to the unit project."
+            },
+            {
+              "type": "Changed",
+              "html": "Upgrade codemod <code>test-runtime-worker-lifetime</code> lists where an existing app can opt in to the worker lifetime (<code>src/config/tests.ts</code> without a <code>lifetime</code>) and a <code>unit</code> project without <code>guardUnitProject()</code>. It edits nothing; existing apps keep their test configuration. The 5.38 upgrade note says the same."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>warlock add test</code> generates the worker lifetime as the default: <code>src/config/tests.ts</code> sets <code>lifetime: \"worker\"</code> and <code>resetDatabase: true</code> unless <code>WARLOCK_TEST_LIFETIME=file</code>, the integration project has <code>isolate: false</code> from the same variable, and the <code>unit</code> project runs in threads with <code>guardUnitProject()</code>. Existing files are never overwritten."
+            },
+            {
+              "type": "Changed",
+              "html": "Auto-loaded <code>utils/locales.ts</code> is deprecated. The development and production-build warning now names every legacy file, and <code>WL9101</code> already lists them in <code>warlock doctor</code>. Removal is planned for v6, not this release; move to <code>utils/locales.json</code> with <code>warlock doctor --fix</code>."
+            },
+            {
+              "type": "Changed",
+              "html": "The starter template (<code>create-warlock</code>) ships JSON dictionaries (<code>app/auth/utils/locales.json</code>, <code>app/shared/utils/locales/*.json</code>) instead of <code>utils/locales.ts</code>."
+            },
+            {
+              "type": "Changed",
+              "html": "The <code>console.error</code> fallback for an unhandled request error, used when no log channel is configured, ignores passive channels (see <code>LogChannel.passive</code> in <code>@warlock.js/logger</code>), so the request log's log collector never silences it."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>warlock ai</code> no longer marks <code>--model</code> as required in its option list; <code>warlock ai measure</code> still requires it and reports a missing value."
+            },
+            {
+              "type": "Fixed",
+              "html": "Loading <code>warlock.config.ts</code> keeps <code>@warlock.js/*</code> imports external even when the project's tsconfig <code>paths</code> maps them to local source (a monorepo checkout). The config bundle used to inline a second copy of core and the web connector, whose container never held the application's HTTP server."
+            },
+            {
+              "type": "Fixed",
+              "html": "The HTTP test server (<code>startHttpTestServer()</code>) registers the connectors <code>warlock.config.ts</code> declares, as <code>warlock dev</code> does. The web connector was never started under it, so a page request answered 404."
+            },
+            {
+              "type": "Fixed",
+              "html": "A test run that booted the web connector no longer ends with <code>something prevents 2 Vite servers from exiting</code> and <code>close timed out after 10000ms</code>. <code>stopHttpTestServer()</code> and the worker teardown shut the web connector down even when it had booted but not started, closing Vite, its HMR websocket and its file watchers, and teardown names any connector still active afterwards."
+            },
+            {
+              "type": "Fixed",
+              "html": "The 5.36 upgrade note and the testing docs and skills now say that Vitest 5's <code>clearMocks: true</code> default also clears calls a module made when it was imported (a scheduler registering jobs from a <code>main.ts</code>), before the first test runs. Import the module inside the test, or set <code>clearMocks: false</code>."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>warlock upgrade --check</code>: rehearses an upgrade on a scratch copy of the app and never writes the real project. The project (without <code>node_modules</code>, <code>.git</code> and <code>storage</code>) is copied to a temporary directory, the upgrade (<code>package.json</code> and codemods) is applied there, dependencies are installed there with the app's package manager, and typings, typecheck, <code>warlock doctor</code> and the <code>unit</code> Vitest project run against the result. The report lists the breaking changes that hit the app and the outcome of each step. Every child process runs one at a time, at low priority, with a heap cap (<code>--memory-mb</code>, default 4096) and a time limit (<code>--timeout-minutes</code>, default 20); <code>--skip-install</code> applies the upgrade to the copy and stops there, and <code>--keep</code> leaves the copy on disk. Exit code 1 when a step failed."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>warlock doctor</code> check <code>sites</code>: in an app with <code>web.sites</code>, renders the root page of every site with fixed hostnames through the development page pipeline, in this process with no port, and fails (<code>WL5005</code>) with the status, the phase and the page file of any 5xx."
+            },
+            {
+              "type": "Fixed",
+              "html": "Capabilities: <code>defineCapability&lt;T&gt;(name, { description, required })</code>, <code>provideCapability(capability, implementation)</code>, <code>useCapability(capability)</code>, <code>hasCapability(capability)</code> and <code>listCapabilities()</code> give a module-cycle-breaking slot a typed, discoverable home. <code>useCapability</code> throws <code>WL2008</code> when nothing provided it. <code>warlock doctor</code> warns (<code>WL2008</code>) when a required capability has no provider after boot (check <code>capabilities</code>)."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>warlock inspect --section wiring</code> and the MCP tool <code>inspect_wiring</code>: every auto-loaded file (config, locales, events, <code>main.ts</code>, <code>routes.ts</code>, workers) with its module and boot load order, followed by every capability slot with its provider and consumers. The section is part of the inspect report JSON Schema."
+            },
+            {
+              "type": "Fixed",
+              "html": "New skill <code>use-capabilities</code>."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>warlock agents-md</code> lists the skill of a package that ships a single <code>skills/SKILL.md</code> (for example the AI provider packages and <code>@warlock.js/sitemap</code>). Its slug is the front-matter <code>name</code>, else the package name."
+            },
+            {
+              "type": "Fixed",
+              "html": "Package manager detection no longer lets a stale <code>pnpm-workspace.yaml</code> and <code>pnpm-lock.yaml</code> win over the lockfile actually in use. The order is now the <code>packageManager</code> field; then the manager that installed <code>node_modules</code> (<code>.package-lock.json</code> for npm, <code>.pnpm</code> or <code>.modules.yaml</code> for pnpm, <code>.yarn-state.yml</code> or <code>.yarn-integrity</code> for yarn, <code>.bun</code> for Bun); then the lockfile that lists every dependency of <code>package.json</code>, else <code>bun.lock</code>, else the most recently written one; a <code>pnpm-workspace.yaml</code> counts only when there is no lockfile at all. <code>warlock update</code> always prints which manager it chose and why."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>warlock check</code> reports <code>WL9022</code> when server-only code (controllers, services, repositories, models, connectors, <code>routes.ts</code>, <code>main.ts</code>, <code>worker.ts</code>, <code>events/</code> and <code>*.server.*</code> files) imports a <code>*.client.ts(x)</code> module, directly or through other files. The message names the import chain, and a type-only import is not reported."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>warlock check</code> reports <code>WL9105</code> when a translation key of a module dictionary is missing a configured locale. The configured locales are <code>localeCodes</code> in <code>src/config/app.ts</code>, or <code>localeCodes</code> in <code>.warlock-check.json</code>, which wins; the rule is skipped when neither names any."
+            },
+            {
+              "type": "Fixed",
+              "html": "Opt-in <code>WL9023</code> finds hand-maintained <code>index.ts</code> barrels in app modules (an <code>index.ts</code> that only re-exports). It is off until <code>.warlock-check.json</code> sets <code>rules.WL9023</code> to <code>\"warning\"</code> or <code>\"error\"</code>."
+            },
+            {
+              "type": "Fixed",
+              "html": "Per-feature locale files: <code>src/app/&lt;module&gt;/utils/locales/&lt;feature&gt;.json</code> is merged with the module's <code>utils/locales.json</code> in development, in the production build and in test workers, under the module's namespace unless the file names its own <code>$group</code>. A key may live in one file only. Web's per-page translation tables are built from the same registry, so they see the merged dictionary."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>generate: { barrels: false }</code> in <code>warlock.config.ts</code> makes <code>warlock generate</code>, <code>warlock make</code> and <code>warlock add access</code> write no <code>index.ts</code> barrel (for models) and import the model file itself in the files they generate. The default stays <code>true</code>."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>warlock doctor --fix</code> converts a legacy <code>utils/locales.ts</code> into <code>utils/locales/legacy.json</code> when the module already has a <code>locales.json</code>, as long as no key appears in both; it still writes <code>locales.json</code> when there is none."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>warlock ai tools --tools &lt;module&gt;</code> lists each tool's estimated tokens per call and its per-provider schema findings (OpenAI strict, Anthropic, Google); <code>--targets</code>, <code>--warn-above</code>, <code>--fail</code> (exit 1 on an error-level finding) and <code>--json</code>."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>warlock ai trace [runId]</code> reads the agent traces held by the running dev server: a run list, or one run turn by turn (system prompt hash, tools offered, calls, refusals, retries, usage, cost); <code>--diff &lt;otherRunId&gt;</code> compares the prompt and tool definitions of two runs; <code>--url</code>, <code>--devtools-path</code> and <code>--json</code>. Both need <code>@warlock.js/ai</code> 5.38.0 or newer."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/web",
+          "slug": "web",
+          "total": 19,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 3
+            },
+            {
+              "type": "Changed",
+              "n": 2
+            },
+            {
+              "type": "Fixed",
+              "n": 14
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>warlock build</code> measures <code>build.budgets.payload</code> for the sections the build knows: each page's pruned translations and its browser route table, both upper bounds. A page whose measured sections exceed its limit fails the build with <code>mode: \"error\"</code> and prints a warning with <code>mode: \"warn\"</code>; the message gives the per-section breakdown and says which sections (page, layout, app and session data, other) are only measured at runtime. The runtime check is unchanged and still never fails a request."
+            },
+            {
+              "type": "Added",
+              "html": "Client build integrity: every build writes <code>client/.vite/warlock-integrity.json</code> (a digest per file in <code>client/assets</code>). The next <code>warlock build</code> reads the previous record before it starts and fails, naming each file, when a file name now maps to different bytes. The new web build option <code>previousBuild</code> points the comparison at another build's record or output directory (for example the deployed release). New exports from <code>@warlock.js/web/vite</code>: <code>ChunkIntegrityError</code>, <code>CHUNK_INTEGRITY_FILE</code>, <code>readChunkIntegrity</code> and the <code>ChunkIntegrityRecord</code> and <code>ChunkIntegrityConflict</code> types; <code>buildHydrationClient</code> takes <code>previousIntegrity</code>."
+            },
+            {
+              "type": "Added",
+              "html": "Two request tracing phases through core's <code>TracingHooks.onPhase</code>: <code>translations</code> (<code>route</code>, <code>locale</code>, <code>mode</code>) around binding the page's translation snapshot, and <code>named-api-routes</code> (<code>route</code>) around resolving the document's route table."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>*.client.ts(x)</code> is now an enforced client-only boundary. Pages, layouts and components may import it, and it renders on the server unless the component is wrapped in <code>&lt;ClientOnly&gt;</code>; server-only code (loaders in setup files, controllers, services, repositories, models, routes, connectors and <code>*.server.ts</code> files) may not import it. In development SSR such an import is an error naming the import chain instead of a warning. <code>warlock check</code> reports the same import as <code>WL9022</code>."
+            },
+            {
+              "type": "Changed",
+              "html": "The <code>console.error</code> fallback for a page failure, used when no log channel is configured, ignores passive channels (for example the collector behind Core's request log), so the failure still reaches the terminal."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>apiHref()</code> and <code>useSubmitForm({ route })</code> called while a page renders on the server found no route table when the page code and the renderer were separate copies of the framework module (the development SSR graph, with an application alias for <code>@warlock.js/web</code>). The renderer now publishes the document's table where every copy reads it."
+            },
+            {
+              "type": "Fixed",
+              "html": "In development, the document's browser route table was empty when the renderer ran through Vite SSR as a separate copy of <code>@warlock.js/core</code> (an HTTP test server or dev server with an application alias), so <code>apiHref()</code> found no route. The page handlers now carry the real router registry to the renderer, which reads the table from it."
+            },
+            {
+              "type": "Fixed",
+              "html": "A multi-site app in development answered every site hostname with Vite's \"Blocked request. This host is not allowed\" (403). The dev server now allows the hostnames listed in <code>web.sites</code>, and any host when a site is <code>dynamic</code>."
+            },
+            {
+              "type": "Fixed",
+              "html": "Production client chunks are named after their final bytes. The bundler hashed a chunk before the import specifiers inside it were rewritten, so two builds that differed only in the name of an imported chunk emitted the same file name for different bytes, and two byte-identical chunks could keep different names. After the bundle is written, chunks are renamed in dependency order from the hash of their final code (chunks that import each other are named together), byte-identical non-entry chunks are merged into one file (the budget report keeps the modules of every merged chunk), and the client manifest, the module preload lists, the budget report and the precompressed <code>.br</code> and <code>.gz</code> files all use the final names."
+            },
+            {
+              "type": "Fixed",
+              "html": "Production pages no longer walk the whole named route registry on every request. A page's browser route table is resolved once per site and viewer kind and reused; development still resolves it per request, because its registry and files change. A <code>web.namedApiRoutes</code> filter function is therefore called once per route, site and viewer kind in production."
+            },
+            {
+              "type": "Fixed",
+              "html": "A render that built its hydration payload more than once (the document context, the final payload, a data request) pruned the global translation registry each time; it is now pruned once per request."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>forbidden.page.tsx</code> (with an optional <code>forbidden.setup.ts</code>): the application's page for a refused request. A 401 or 403 on a page route renders it with that status. It declares no <code>config.route</code>, a second copy fails the build (one per site in multi-site mode, at <code>$sites/&lt;name&gt;/forbidden.page.tsx</code>), and it receives the same <code>{ error, status }</code> props as <code>error.page.tsx</code>, plus <code>debug</code> outside production. A request renders the site's (or the app's) forbidden page, then its <code>error.page.tsx</code> with the 401/403 status, then the framework default. The page manifest gains <code>forbiddenPage</code> (and a <code>forbiddenPage</code> entry per site), the client registry projects it as <code>ForbiddenPage</code>, and hydration picks it by the same rule, so the browser hydrates the page the server rendered. Discovery exports <code>DiscoveredForbiddenPage</code>, <code>isForbiddenPageFile</code> and <code>DuplicateForbiddenPageError</code>."
+            },
+            {
+              "type": "Fixed",
+              "html": "The framework's own fallback page now shows the request id and a \"Back to home\" link, and a 401/403 gets its own plain, accessible \"You don't have access to this page.\" message. Outside production the development details panel still follows it."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>requireUser({ userType })</code> and <code>requireUser({ when })</code> answered a failed check with a raw JSON body (<code>{\"error\":\"Forbidden\"}</code>) on a page route. The middleware form now throws <code>ForbiddenError</code> (and <code>UnAuthorizedError</code> for a guest with no sign-in page or a bearer client), so a page route renders the forbidden page instead. A guest with <code>auth.pageAuth.loginPath</code> is still redirected to sign in. To refuse a page request from your own middleware, throw a Core <code>ForbiddenError</code>; <code>response.forbidden()</code> still writes its own JSON reply."
+            },
+            {
+              "type": "Fixed",
+              "html": "In development, hydrating an error page failed with a malformed-payload error because the payload check rejected the <code>debug</code> details the server sends outside production. The check now accepts <code>debug</code>."
+            },
+            {
+              "type": "Fixed",
+              "html": "A route-translations lookup for a failure rendered by the error or forbidden page now covers both pages' keys."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>WebConnector.shutdown()</code> closes the Vite dev server, its HMR websocket and its file watchers whenever Vite was created, not only after <code>start()</code> completed. A boot that failed after creating Vite, or a shutdown between <code>boot()</code> and <code>start()</code>, used to leave Vite running and keep a test or dev process from exiting. A failure to close one part no longer skips the others, and the first failure is reported afterwards."
+            },
+            {
+              "type": "Fixed",
+              "html": "The client build enforces a module boundary: browser code may import from <code>app/&lt;module&gt;/...</code> only browser-safe files, which are <code>*.client.ts(x)</code>, schema files (<code>*.schema.ts</code> or a <code>schema/</code> folder), type files (<code>*.types.ts</code>, <code>*.d.ts</code> or a <code>types/</code> folder), the module's <code>web/</code> folder and non-code files. Any other file (a controller, service, repository, model, route file or plain helper) fails the build with the import chain. A type-only import is erased and always allowed. <code>web.moduleBoundary</code> sets <code>\"warn\"</code> (default: report and continue, so an existing app upgrades without a broken build), <code>\"error\"</code> (fail the build) or <code>\"off\"</code>, in development and in <code>warlock build</code>."
+            },
+            {
+              "type": "Fixed",
+              "html": "Development SSR warns once per <code>*.client.*</code> module that reads <code>window</code>, <code>document</code>, <code>navigator</code>, <code>localStorage</code> or another browser global while it is being imported (outside a function or a <code>typeof</code> guard), naming the file and line."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/cascade",
+          "slug": "cascade",
+          "total": 7,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 5
+            },
+            {
+              "type": "Changed",
+              "n": 1
+            },
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>Model.get()</code> and <code>Model.set()</code> are typed from the model's schema type. <code>get(\"publishedAt\")</code> is <code>Date | null</code>, a column with a <code>.default()</code> is never <code>undefined</code>, <code>get(key, default)</code> drops <code>null</code> and <code>undefined</code>, and <code>set(key, value)</code> rejects a value of the wrong type. Dot paths (<code>\"profile.city\"</code>) stay loosely typed (<code>any</code>, or the type argument you pass) so large schemas do not slow the compiler. A model declared without a schema type keeps loose access."
+            },
+            {
+              "type": "Added",
+              "html": "<code>ModelData&lt;typeof schema&gt;</code> (the schema's output type, casts applied), <code>ModelDataSnapshot&lt;T&gt;</code>, <code>ModelKey</code>, <code>ModelValue</code> and <code>ModelPath</code> types."
+            },
+            {
+              "type": "Added",
+              "html": "<code>model.toDataSnapshot()</code>: a typed, read-only copy of the model's data without its <code>hidden</code> columns, for resources and presenters that want exact types."
+            },
+            {
+              "type": "Added",
+              "html": "<code>Model.requestSchema()</code> returns the model schema without the fields marked <code>.internal()</code>, so a server-set field is declared once and request schemas derived from the model omit it. <code>Model.create()</code> still accepts those fields."
+            },
+            {
+              "type": "Added",
+              "html": "In development, reading a schema column as a property (<code>model.title</code>) logs one warning per model and column that names <code>model.get(\"title\")</code>. Nothing is installed when <code>NODE_ENV</code> is <code>production</code>."
+            },
+            {
+              "type": "Changed",
+              "html": "<strong>BREAKING</strong> For a model declared with a schema type, <code>get()</code> and <code>set()</code> with a top-level column name that is not in the schema are now type errors. Add the column to the schema, use a dot path, or declare the model without a schema type to keep loose access."
+            },
+            {
+              "type": "Fixed",
+              "html": "A model declared with a schema type is assignable to the loose <code>Model</code> and <code>ChildModel</code> again, so helpers, migrations and <code>this</code>-typed statics accept typed models unchanged."
+            }
+          ]
+        },
+        {
+          "name": "create-warlock",
+          "slug": "create-warlock",
+          "total": 7,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 2
+            },
+            {
+              "type": "Changed",
+              "n": 5
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "The web template ships <code>src/web/forbidden.page.tsx</code> and <code>forbidden.setup.ts</code> (styled by <code>forbidden.css</code>, imported from <code>app.css</code>): the page a 401/403 on a page route renders instead of raw JSON. The template README and the <code>web-code-standards</code> skill describe it."
+            },
+            {
+              "type": "Added",
+              "html": "The starter ships <code>src/config/web.ts</code> with <code>moduleBoundary: \"error\"</code>, so browser code importing a server-only module file fails the client build in new apps (the framework default for existing apps is <code>\"warn\"</code>)."
+            },
+            {
+              "type": "Changed",
+              "html": "The generated testing guidance and code standards use the <code>*.unit.spec.ts</code> / <code>*.unit.test.ts</code> convention for unit specs (the <code>test</code> feature's <code>unit</code> and <code>integration</code> Vitest projects pick files by that infix)."
+            },
+            {
+              "type": "Changed",
+              "html": "The starter boots the test framework once per Vitest worker: <code>src/config/tests.ts</code> sets <code>lifetime: \"worker\"</code> and <code>resetDatabase: true</code> (<code>WARLOCK_TEST_LIFETIME=file</code> switches back), and <code>src/config/database.ts</code> (and the PostgreSQL variant) uses one database per Vitest worker, <code>&lt;DB_NAME&gt;_test_&lt;worker id&gt;</code>. With <code>--features=test</code> the generated unit project fails a spec that imports a connector or boots the app, and the integration project runs with <code>isolate: false</code>. The PostgreSQL variant needs those databases created and migrated first."
+            },
+            {
+              "type": "Changed",
+              "html": "The template's <code>testing-strategy</code> skill describes the per-file reset, the <code>setupTest({ lifetime: \"file\" })</code> opt-out, the unit-project guard, <code>WL9024</code>, the boot profile and Vitest 5's <code>clearMocks</code> default."
+            },
+            {
+              "type": "Changed",
+              "html": "The starter app keeps translations in JSON: <code>app/auth/utils/locales.json</code> and <code>app/shared/utils/locales/{validation,http,attributes}.json</code> replace the two <code>utils/locales.ts</code> files, and <code>docs/new-module.md</code> describes <code>locales.json</code> and <code>locales/&lt;feature&gt;.json</code>."
+            },
+            {
+              "type": "Changed",
+              "html": "The template's <code>module-boundaries</code>, <code>code-standards</code> and <code>web-code-standards</code> skills describe small exported types co-located in <code>*.service.ts</code>, optional barrels (and the opt-in <code>WL9023</code> lint), the browser-safe surface of an app module and the <code>*.client.ts(x)</code> boundary."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/devtools",
+          "slug": "devtools",
+          "total": 6,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 6
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "The Requests panel and <code>GET /__warlock/api/requests</code> also read core's persistent request log (<code>storage/logs/requests/*.jsonl</code>), so request history survives a restart and the 200-request ring buffer. Live and persisted requests are merged without duplicates by request id; requests read only from disk are marked <code>persisted</code>."
+            },
+            {
+              "type": "Added",
+              "html": "Request filters: the list API takes <code>status</code> (<code>404</code> or a class such as <code>5xx</code>), <code>route</code>, <code>method</code>, <code>since</code>, <code>until</code>, <code>q</code> (text in the URL or id) and <code>limit</code>, answering 400 for a bad value; the dashboard has search, status and method filters."
+            },
+            {
+              "type": "Added",
+              "html": "A saved request opens with its error (message, stack, phase, page file, site), the redacted request and response, the log entries and the query summary with N+1 findings. <code>GET /__warlock/api/requests/:id</code> carries the full record as <code>record</code>."
+            },
+            {
+              "type": "Added",
+              "html": "Copy as curl: <code>GET /__warlock/api/requests/:id/curl</code> and a button in the request detail. Values the log redacted stay <code>[REDACTED]</code>."
+            },
+            {
+              "type": "Added",
+              "html": "Agents tab at <code>/__warlock</code> for the per-turn agent traces <code>@warlock.js/ai</code> records in development: system prompt, tools offered with schema hashes and token estimates, tool calls with results and refusals, retries and re-prompts, usage and cost, and a comparison with the previous run of the same agent. It needs no Panoptic."
+            },
+            {
+              "type": "Added",
+              "html": "<code>GET /__warlock/api/ai/agent-runs</code> (optionally <code>?requestId=</code>) and <code>GET /__warlock/api/ai/agent-runs/:id</code>, plus <code>agent-trace</code> events on the stream, behind the existing development and loopback guard. Runs started during an HTTP request link to it. Types <code>DevtoolsAgentRun</code> and <code>DevtoolsAgentTraceEvent</code>."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/seal",
+          "slug": "seal",
+          "total": 6,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            },
+            {
+              "type": "Changed",
+              "n": 1
+            },
+            {
+              "type": "Fixed",
+              "n": 4
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>humanizeAttribute(key)</code> turns a field key into words (<code>max_dumbbell_kg</code> becomes \"Max dumbbell kg\")."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>ObjectValidator#partial()</code> keeps its types: the named keys (all keys when none are named) become optional in the inferred shape."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>toJsonSchema(\"openai-strict\")</code> keeps an optional <code>v.enum()</code>, <code>v.literal()</code>, <code>in()</code> list or union nullable: <code>null</code> is added to an <code>enum</code>, a <code>const</code> becomes <code>anyOf: [{ const }, { type: \"null\" }]</code>, <code>anyOf</code>/<code>oneOf</code> gain one <code>{ type: \"null\" }</code> branch, and <code>allOf</code>/<code>$ref</code> schemas are wrapped in <code>anyOf</code>. Before, such fields were listed in <code>required</code> with no way to send <code>null</code>."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>.nullable()</code> on an enum, a literal, a scalar or a union no longer produces a <code>type</code> of <code>[undefined, \"null\"]</code> for <code>draft-2020-12</code>; the same shapes as above are used, and <code>openapi-3.0</code> adds <code>null</code> to the <code>enum</code> next to <code>nullable: true</code>. A nullable single literal now emits <code>anyOf: [{ const }, { type: \"null\" }]</code> instead of a bare <code>const</code>."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>.internal()</code> marks a field as set by the server. It validates and infers like any other field; <code>ObjectValidator#withoutInternal()</code> returns the schema without those fields (type included) for request validation, and <code>internalKeys()</code> lists them. <code>BaseValidator#isServerSet()</code> reads the mark."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>translateAttribute</code> passed to <code>v.validate(schema, data, options)</code> now translates the <code>:input</code> placeholder too; before, only the global config's translator was used for attribute labels."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai",
+          "slug": "ai",
+          "total": 5,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 5
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>ai.tool()</code> checks its JSON Schema against OpenAI strict, Anthropic and Google when the tool is defined and, in development only, logs one warning per tool definition: optional fields sent as required and nullable, properties missing from <code>required</code>, objects without <code>additionalProperties: false</code>, unsupported keywords (<code>allOf</code>, <code>oneOf</code>, <code>not</code>, conditionals, <code>patternProperties</code>, ...), non-object roots, invalid names, oversized descriptions and heavy definitions. <code>lint: false</code> or <code>lint: { targets, warnAboveTokens, ... }</code> on a tool and <code>ai.config({ toolLint })</code> tune or silence it."
+            },
+            {
+              "type": "Added",
+              "html": "<code>describeToolSchema(tool, options?)</code> and <code>describeToolSchemas(tools, options?)</code> (also <code>ai.tools.describe</code> / <code>ai.tools.describeAll</code>) return the findings, a schema hash and an estimated token cost per definition; <code>formatToolSchemaReports()</code> prints them. The token figure is an estimate (<code>charsPerToken</code>, default 4); <code>ai.tools.measure</code> stays the exact native count."
+            },
+            {
+              "type": "Added",
+              "html": "Opt-in tool-use contract on agents. <code>actWhenAsked: { intents, requiredTools }</code> re-prompts once when an action request is answered without a required tool call. <code>onToolRefusal: \"retry-once-with-hint\"</code> (or <code>{ retries, hint, isRefusal }</code>) sends one retry prompt with the refusal reason when the model gives up after a tool refused a call. <code>backstops: [{ phase, detect(turn), run(context) }]</code> run deterministic checks before the first model call or after a final answer, and may return a <code>prompt</code> to send the model. Agents without these options behave exactly as before."
+            },
+            {
+              "type": "Added",
+              "html": "Eval scorers <code>ai.eval.requiredToolCalled({ tools, intents?, require? })</code> (\"required tool not called\") and <code>ai.eval.changeClaimedWithoutToolCall({ tools?, claims? })</code> (\"change claimed without a tool call\")."
+            },
+            {
+              "type": "Added",
+              "html": "Agent traces. Each agent run records a per-turn trace: system prompt (hash, and text in development), tools offered with schema hashes and token estimates, tool calls, results, refusals, tool-use contract actions, token usage and cost. On in development, off under test and in production; <code>trace: true | false | { enabled, text, redact, maxStringLength, store }</code> per agent (an options object records in development only unless <code>enabled: true</code>). Traces are redacted with the logger's secret-key rules and registered credentials, and kept in the shared in-memory <code>agentTraces</code> store (<code>get</code>, <code>list</code>, <code>subscribe</code>, <code>clear</code>; <code>createAgentTraceStore()</code> for another). <code>diffAgentTraces(a, b)</code> reports whether two runs sent the same system prompt and tool definitions; <code>formatAgentTrace(trace)</code> renders one as text."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/logger",
+          "slug": "logger",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>LogChannel.passive</code>: a channel that only observes entries (keeps them in memory, derives data from them) and persists nothing sets it to <code>true</code>. Code that falls back to the terminal \"when no log channel is configured\" ignores passive channels, so adding an observer never silences that fallback."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "5.37.1",
       "id": "v5-37-1",
       "date": "October 24, 2026",
@@ -8860,15 +9392,7 @@
       "isUnreleased": false,
       "summaryHtml": "<strong>Page actions and sessions in pages.</strong> Pages can export <code>action</code>/<code>actions</code> and post with <code>&lt;Form&gt;</code> (works without JavaScript; <code>useActionData</code>, <code>FieldError</code>, <code>useIsSubmitting</code>), and read the signed-in user with <code>useUser()</code>, guarded server-side by <code>requireUser</code>/<code>requireGuest</code> from <code>@warlock.js/web/session</code>. <strong>Upgrade review required:</strong> a full framework sweep ships ~140 fixes with behaviour changes across core, cascade, web and auth (see each package changelog). Lockstep release across all 30 packages. Generator matrix ran <code>subset</code> scope (<code>baseline</code>, <code>scheduler</code>, <code>postgres</code>, <code>redis</code>, <code>web</code>, <code>sitemap</code>, <code>socket</code> rows); Hasan authorised it on 2026-09-24: \"Don't wait for any other approvals, you have green light to do everything needed to have 5.21 released, don't stop before the release, no complete the push and publish/release\".",
       "matrix": "subset",
-      "matrixRows": [
-        "baseline",
-        "scheduler",
-        "postgres",
-        "redis",
-        "web",
-        "sitemap",
-        "socket"
-      ],
+      "matrixRows": ["baseline", "scheduler", "postgres", "redis", "web", "sitemap", "socket"],
       "mode": "detail",
       "packages": [
         {
@@ -9164,15 +9688,7 @@
       "isUnreleased": false,
       "summaryHtml": "<strong>Cache compatibility changes require an upgrade review:</strong> <code>cached()</code> auto-keys, flat memory keys, finite ownership-safe locks, Redis <code>FLUSHDB</code>, tokenized stored lock values, and numeric TTL normalization all change observable behavior. <code>@warlock.js/web</code> adds generated named-route types and managed sitemap generations; Core, Cache, Cascade, Auth, Scheduler, and Socket.IO add safer multi-instance boundaries. Lockstep release across all 30 packages. Generator matrix ran <code>subset</code> scope (<code>baseline</code>, <code>scheduler</code>, <code>postgres</code>, <code>redis</code>, <code>web</code>, <code>sitemap</code>, <code>socket</code> rows); Hasan authorised it on 2026-09-24: \"Go with rec, and tell me whether we should move the matrix run from my machine to Github instead and I report back with failures or keep it on my machine?\".",
       "matrix": "subset",
-      "matrixRows": [
-        "baseline",
-        "scheduler",
-        "postgres",
-        "redis",
-        "web",
-        "sitemap",
-        "socket"
-      ],
+      "matrixRows": ["baseline", "scheduler", "postgres", "redis", "web", "sitemap", "socket"],
       "mode": "detail",
       "packages": [
         {
@@ -10643,10 +11159,7 @@
       "isUnreleased": false,
       "summaryHtml": "<strong><code>@warlock.js/web</code> moves page, layout, and root server policy into one direct <code>config</code> export (BREAKING)</strong>: <code>PageConfig</code>, <code>LayoutConfig</code>, and <code>RootConfig</code> keep route/cache/prefix/strict-mode policy together while loaders, registration, named error boundaries, and components remain separate. Web adds route-scoped <code>locales.json</code> translations, typed keys, <code>useChangeLocaleCode()</code>, and locale-aware navigation, sitemap, and robots behavior; new scaffolds enable root <code>strictMode</code>. <code>@warlock.js/core</code> and Web require <code>@mongez/localization</code> 3.5.0 for scoped translation lookup. Lockstep release across all 30 packages. Generator matrix ran <code>subset</code> scope (<code>web</code>, <code>sitemap</code> rows); Hasan authorised the release on 2026-09-21: \"Go with your rec\".",
       "matrix": "subset",
-      "matrixRows": [
-        "web",
-        "sitemap"
-      ],
+      "matrixRows": ["web", "sitemap"],
       "mode": "detail",
       "packages": [
         {
@@ -11219,13 +11732,7 @@
       "isUnreleased": false,
       "summaryHtml": "<strong>New package: <code>@warlock.js/sitemap</code></strong> — the thirtieth family member, and the first added since the family settled. Runtime <code>sitemap.xml</code> generation from the page registry, installed with <code>warlock add sitemap</code>, with <strong>zero runtime dependencies</strong>. It is usable three ways: standalone in any Node app, in an API-only Warlock app through <code>sitemapConnector({ entries })</code>, and in a Warlock web app from the page registry. A dynamic route that cannot be enumerated is omitted <strong>and named in a development diagnostic</strong> rather than silently dropped, and an enabled sitemap with no configured origin refuses to boot instead of serving absolute URLs built from a guessed host. Two silent failures are fixed in <code>@warlock.js/web</code> and <code>@warlock.js/core</code>: <code>useTrans()</code> returned the raw key after hydration — server HTML was correct, the post-hydration DOM was not, and the translated value never reached <code>dist/client</code> at all — so the hydration payload gains a seventh required key, <code>translations</code>, carrying only the active locale; and <code>request.cookie()</code> now throws <code>CookieJarUnavailableError</code> when <code>@fastify/cookie</code> is absent instead of returning <code>undefined</code>, which was indistinguishable from \"no such cookie\" and surfaced as a permanent unexplained 401. <code>@warlock.js/core</code> adds <code>app.publicUrl</code> with a <code>PUBLIC_APP_URL</code> fallback. <strong>BREAKING:</strong> <code>@warlock.js/queue/notifications</code> is removed (deprecated in 5.14 — use <code>bullmqQueue()</code> from <code>@warlock.js/notifications</code>), and <code>listRoutablePages</code> moved to the <code>@warlock.js/web/build</code> subpath. <code>@warlock.js/cache</code> finally declares a <code>test</code> script, so its 525 tests run in the release gate for the first time. Lockstep release across all 30 packages. Generator matrix ran <code>subset</code> scope (<code>baseline</code>, <code>web</code>, <code>sitemap</code>, <code>queue</code>, <code>bull-board</code> rows) against the staged candidate, authorised by Hasan on 2026-09-18: \"You could run the matrix if you feel it is important to this release\".",
       "matrix": "subset",
-      "matrixRows": [
-        "baseline",
-        "web",
-        "sitemap",
-        "queue",
-        "bull-board"
-      ],
+      "matrixRows": ["baseline", "web", "sitemap", "queue", "bull-board"],
       "mode": "detail",
       "packages": [
         {
@@ -11396,14 +11903,7 @@
       "isUnreleased": false,
       "summaryHtml": "<code>@warlock.js/web</code> renames the hydration mount from <code>#root</code> to <code>#vessel</code> (BREAKING) — <code>#root</code> collided with embeds and third-party widgets — and hardens the client-build secret scan to refuse EVERY reference to the global <code>process</code>, aliases included (BREAKING for <code>typeof process</code> feature detection). Dev SSR now externalises every installed <code>@warlock.js/*</code> package by rule instead of a hand-maintained list, closing the dual-module-instance class that split framework singletons. A cached page sends one <code>Vary</code> value on both its HTML and data representations. <code>@warlock.js/queue</code> gains a config-driven bull-board dashboard (<code>warlock add bull-board</code>) that refuses to mount unguarded in production, and <code>find(id)</code> no longer returns a finished job with a null result. <code>@warlock.js/notifications</code> takes over the BullMQ integration as <code>bullmqQueue()</code>, a lazy optional-peer driver; <code>@warlock.js/queue/notifications</code> is deprecated for one release. <code>@warlock.js/core</code> adds <code>middleware.cache({ tags })</code> so <code>invalidateTags()</code> clears cached API responses, verifies the esbuild native binary before <code>warlock dev</code> starts, and fixes a <code>devServer.timings</code> watcher phase that always reported 0ms. Lockstep release across all 29 packages. Generator matrix ran <code>subset</code> scope (<code>baseline</code>, <code>web</code>, <code>queue</code>, <code>bull-board</code>, <code>auth-google</code>, <code>auth-passkeys</code> rows) against the staged candidate, authorised by Hasan on 2026-09-17: \"Go ahead plz\".",
       "matrix": "subset",
-      "matrixRows": [
-        "baseline",
-        "web",
-        "queue",
-        "bull-board",
-        "auth-google",
-        "auth-passkeys"
-      ],
+      "matrixRows": ["baseline", "web", "queue", "bull-board", "auth-google", "auth-passkeys"],
       "mode": "detail",
       "packages": [
         {
@@ -11576,14 +12076,7 @@
       "isUnreleased": false,
       "summaryHtml": "<code>@warlock.js/queue</code> ships as a new package (durable BullMQ + Redis background jobs, <code>defineJob</code>, <code>queueConnector()</code>, a bull-board dashboard and a notifications dispatcher). <code>@warlock.js/auth</code> adds email verification, password reset, and login with Google, passkeys and phone OTP, with account linking via a new <code>provider_accounts</code> table. <code>@warlock.js/access</code> makes ABAC <code>strictPolicies</code> deny-by-default (BREAKING) to close a fail-open IDOR path. <code>@warlock.js/web</code> fixes a Host-header cache-poisoning gap in the server page cache key (BREAKING) and a stale-Suspense-fallback replay on cache HIT, and adds <code>linkStylesheetsFor</code> for lazily-imported per-tenant themes. <code>@warlock.js/core</code> adds <code>warlock add queue</code>/<code>warlock add auth-google</code>/<code>warlock add auth-passkeys</code> installers and typed translation-key generation, and drops its dependency on <code>@warlock.js/auth</code>. Lockstep release across all 28 packages. Generator matrix ran <code>subset</code> scope (<code>baseline</code>, <code>web</code>, <code>queue</code>, <code>access</code>, <code>auth-google</code>, <code>auth-passkeys</code> rows) against the staged candidate, authorised by Hasan on 2026-09-16: \"You've my approval for whatever decision you may need to take in this release.\"",
       "matrix": "subset",
-      "matrixRows": [
-        "baseline",
-        "web",
-        "queue",
-        "access",
-        "auth-google",
-        "auth-passkeys"
-      ],
+      "matrixRows": ["baseline", "web", "queue", "access", "auth-google", "auth-passkeys"],
       "mode": "detail",
       "packages": [
         {
@@ -12110,10 +12603,7 @@
       "isUnreleased": false,
       "summaryHtml": "<strong>The authenticated user moves from <code>request.user</code> to <code>request.locals.user</code></strong> (BREAKING, <code>@warlock.js/core</code> / <code>@warlock.js/auth</code> / <code>@warlock.js/access</code>), <code>@warlock.js/auth</code> adds a CSRF Origin check for cookie-authenticated writes plus <code>setAuthCookie()</code> / <code>clearAuthCookie()</code>, and <code>@warlock.js/web</code> ships an opt-in server-side page cache, <code>defer()</code>-ed streaming data with crawler-aware inlining, scroll restoration and locale-direction (RTL) support. <code>@warlock.js/core</code> adds opt-in request tracing and a CSP header; <code>create-warlock</code> scaffolds non-interactively by default and fixes a fresh-scaffold <code>npm run seed</code> failure. Lockstep release across all 28 packages. Generator matrix ran <code>subset</code> scope (<code>baseline</code>, <code>web</code> rows) against the staged candidate, authorised by Hasan on 2026-09-16: \"Yes do it please, don't release before completing all mising points and make sure you have covered everything in the tasks board.\"",
       "matrix": "subset",
-      "matrixRows": [
-        "baseline",
-        "web"
-      ],
+      "matrixRows": ["baseline", "web"],
       "mode": "detail",
       "packages": [
         {
