@@ -83,7 +83,10 @@ describe("guardUnitProject", () => {
 
   it("throws for a spec that imports a connector", () => {
     expect(() =>
-      plugin.transform('import { connectorsManager } from "@warlock.js/core";', "/app/a.unit.spec.ts"),
+      plugin.transform(
+        'import { connectorsManager } from "@warlock.js/core";',
+        "/app/a.unit.spec.ts",
+      ),
     ).toThrow(/connectorsManager/);
   });
 

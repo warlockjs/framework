@@ -37,11 +37,13 @@ async function linkWorkspaceDependencies(directory: string): Promise<void> {
   for (const name of await readdir(join(workspace, "packages"))) {
     if (name === "create-warlock") continue;
 
-    await symlink(join(workspace, "packages", name), join(target, "@warlock.js", name), "dir").catch(
-      (error: NodeJS.ErrnoException) => {
-        if (error.code !== "EEXIST") throw error;
-      },
-    );
+    await symlink(
+      join(workspace, "packages", name),
+      join(target, "@warlock.js", name),
+      "dir",
+    ).catch((error: NodeJS.ErrnoException) => {
+      if (error.code !== "EEXIST") throw error;
+    });
   }
 
   const link = async (from: string, to: string) => {
