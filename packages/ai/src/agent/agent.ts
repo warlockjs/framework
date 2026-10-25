@@ -75,6 +75,20 @@ import { createAgentStream, type StreamController } from "./agent-stream";
 import { agentEventToStreamEvent } from "./agent-to-stream-event";
 import { JsonStreamGuard } from "./json-stream-guard";
 import { computeAgentSignature } from "./signature";
+import { AgentTraceRecorder, resolveTraceOptions } from "../trace/agent-trace-recorder";
+import {
+  defaultActHint,
+  defaultRefusalHint,
+  matchesIntent,
+  refusalReason,
+  requiredToolsCalled,
+  resolveRefusalConfig,
+  type AgentBackstop,
+  type BackstopOutcome,
+  type BackstopPhase,
+  type BackstopTurn,
+  type ToolUseContractEvent,
+} from "./tool-use-contract";
 import { deleteAgentSnapshot, loadAgentSnapshotForResume, persistAgentSnapshot } from "./snapshot";
 
 const LOG_MODULE = "ai.agent";
@@ -613,6 +627,21 @@ class Execution<TOutput> {
   /** Lazily built compact-schema copies of `effectiveTools` — see `toolsForModel`. */
   private compactTools?: ToolContract<unknown, unknown>[];
 
+  /** Per-turn trace of this run; absent when tracing is off. */
+  private readonly recorder?: AgentTraceRecorder;
+  /** Re-prompts sent for `actWhenAsked` this run. */
+  private actReprompts = 0;
+  /** Retry prompts sent after tool refusals this run. */
+  private refusalRetries = 0;
+  /** Refusals not yet answered by a retry or a later success of the same tool. */
+  private pendingRefusals: Array<{ tool: string; reason: string; input: unknown }> = [];
+  /** Backstops that already ran this run. */
+  private readonly backstopsRun = new Set<AgentBackstop>();
+  /** Scratch state shared by this run's backstops. */
+  private readonly backstopState: Record<string, unknown> = {};
+  /** Label for the next trip's input when the contract queued a re-prompt. */
+  private nextTripInput?: string;
+
   private error?: AIError;
   /**
    * Continue turns this run has sent after an output-cap cut-off, bounded
@@ -687,6 +716,20 @@ class Execution<TOutput> {
       : [];
 
     this.effectiveTools = [...(config.tools ?? []), ...skillTools];
+
+    const traceOptions = resumeFrom ? undefined : resolveTraceOptions(config.trace);
+
+    if (traceOptions) {
+      this.recorder = new AgentTraceRecorder({
+        runId: this.runId,
+        agent: config.name ?? config.model.name,
+        version: config.version,
+        model: { name: config.model.name, provider: config.model.provider },
+        sessionId: options?.sessionId,
+        input,
+        options: traceOptions,
+      });
+    }
   }
 
   /**
@@ -741,6 +784,19 @@ class Execution<TOutput> {
     } catch (thrown) {
       this.error = this.toAIError(thrown);
       result = this.buildResult();
+    }
+
+    if (this.recorder) {
+      const status = result.report.status;
+
+      this.recorder.finish({
+        status:
+          status === "failed" || status === "cancelled" || status === "incomplete"
+            ? status
+            : "completed",
+        usage: result.usage,
+        error: result.error,
+      });
     }
 
     if (result.error) {
@@ -806,6 +862,8 @@ class Execution<TOutput> {
         await this.buildInitialMessages();
 
         this.emit("agent.starting", { input: this.input });
+
+        await this.runBackstops("before", undefined, 0);
       }
 
       await this.runTripLoop();
@@ -949,9 +1007,12 @@ class Execution<TOutput> {
       const tripInput =
         tripIndex === 0
           ? this.input
-          : isContinuedFinish(this.trips[tripIndex - 1]?.finishReason)
-            ? "[continue]"
-            : "[tool results]";
+          : (this.nextTripInput ??
+            (isContinuedFinish(this.trips[tripIndex - 1]?.finishReason)
+              ? "[continue]"
+              : "[tool results]"));
+
+      this.nextTripInput = undefined;
       const outcome = await this.runTrip(tripIndex, tripInput);
 
       if (outcome === "error" || outcome === "stop") {
@@ -981,6 +1042,8 @@ class Execution<TOutput> {
   ): Promise<"continue" | "stop" | "error"> {
     this.emit("agent.trip.started", { tripIndex, input: tripInput });
 
+    this.traceTurnStart(tripIndex, tripInput);
+
     const tripStartedAt = new Date();
     const tripStart = performance.now();
 
@@ -1004,6 +1067,8 @@ class Execution<TOutput> {
       };
 
       this.trips.push(failedTrip);
+
+      this.recorder?.endTurn(failedTrip);
 
       this.emit("agent.trip.completed", { trip: failedTrip });
       this.emit("agent.error", { error: this.error });
@@ -1119,6 +1184,8 @@ class Execution<TOutput> {
 
     this.trips.push(trip);
 
+    this.recorder?.endTurn(trip);
+
     this.emit("agent.trip.completed", { trip });
 
     // Per-trip durable checkpoint. Sits AFTER the trip push + the
@@ -1139,6 +1206,12 @@ class Execution<TOutput> {
     }
 
     if (!isToolCallTrip) {
+      // Opt-in tool-use contract: backstops, refusal retry and
+      // act-when-asked may queue one more trip instead of ending the run.
+      if (await this.queueContractReprompt(response, tripIndex)) {
+        return "continue";
+      }
+
       return "stop";
     }
 
@@ -1214,6 +1287,203 @@ class Execution<TOutput> {
     });
 
     return true;
+  }
+
+  /** Record the start of a turn in the agent trace. No-op when tracing is off. */
+  private traceTurnStart(tripIndex: number, tripInput: string): void {
+    if (!this.recorder) return;
+
+    try {
+      this.recorder.startTurn(tripIndex, tripInput, this.messages, this.buildModelCallOptions());
+    } catch {
+      // Tracing never fails a run.
+    }
+  }
+
+  /**
+   * Record a settled tool call in the trace and, when `onToolRefusal` is
+   * on, track refusals the model has not yet answered with a valid call.
+   */
+  private noteToolCall(record: ToolCall): void {
+    const refusalConfig = resolveRefusalConfig(this.config.onToolRefusal);
+    const reason = refusalReason(record, refusalConfig?.isRefusal);
+
+    this.recorder?.toolCall(record, reason);
+
+    if (!refusalConfig) return;
+
+    if (reason) {
+      this.pendingRefusals.push({ tool: record.name, reason, input: record.input });
+    } else if (record.status !== "failed") {
+      this.pendingRefusals = this.pendingRefusals.filter((refusal) => refusal.tool !== record.name);
+    }
+  }
+
+  /** Log a tool-use contract action and put it in the trace. */
+  private recordContractEvent(event: ToolUseContractEvent): void {
+    this.recorder?.contractEvent(event);
+
+    this.logger.info(LOG_MODULE, `contract.${event.type}`, "tool-use contract acted", {
+      runId: this.runId,
+      ...event,
+    });
+  }
+
+  /**
+   * After a model answer that would end the run, decide whether the
+   * tool-use contract wants one more trip. Order: backstops (always run,
+   * for their side effects), then a retry after an unanswered tool
+   * refusal, then `actWhenAsked`. Queues the hint as a user message and
+   * returns true when a trip should follow. Does nothing, and returns
+   * false, when none of the options is configured.
+   */
+  private async queueContractReprompt(
+    response: ModelResponse,
+    tripIndex: number,
+  ): Promise<boolean> {
+    const { actWhenAsked, backstops } = this.config;
+    const refusalConfig = resolveRefusalConfig(this.config.onToolRefusal);
+
+    if (!actWhenAsked && !refusalConfig && !backstops?.length) return false;
+
+    const backstopPrompt = await this.runBackstops("after", response.content, tripIndex);
+
+    // `tripIndex + 1` trips will exist once this one is recorded.
+    if (tripIndex + 1 >= this.maxTrips) return false;
+
+    let hint: string | undefined;
+
+    if (backstopPrompt) {
+      hint = backstopPrompt;
+    } else if (
+      refusalConfig &&
+      this.refusalRetries < refusalConfig.retries &&
+      this.pendingRefusals.length > 0
+    ) {
+      const refusal = this.pendingRefusals[this.pendingRefusals.length - 1];
+
+      if (refusal) {
+        hint =
+          resolveHint(refusalConfig.hint, { ...refusal, tripIndex }) ??
+          defaultRefusalHint(refusal.tool, refusal.reason);
+
+        this.refusalRetries++;
+        this.pendingRefusals = [];
+        this.recordContractEvent({
+          type: "refusal-retry",
+          tripIndex,
+          tool: refusal.tool,
+          reason: refusal.reason,
+          hint,
+        });
+      }
+    } else if (
+      actWhenAsked &&
+      this.actReprompts < (actWhenAsked.maxReprompts ?? 1) &&
+      matchesIntent(this.input, actWhenAsked.intents) &&
+      !requiredToolsCalled(this.toolCalls, actWhenAsked.requiredTools, actWhenAsked.require)
+    ) {
+      hint =
+        resolveHint(actWhenAsked.hint, {
+          input: this.input,
+          reply: response.content,
+          requiredTools: actWhenAsked.requiredTools,
+          tripIndex,
+        }) ?? defaultActHint(actWhenAsked.requiredTools);
+
+      this.actReprompts++;
+      this.recordContractEvent({
+        type: "act-reprompt",
+        tripIndex,
+        requiredTools: [...actWhenAsked.requiredTools],
+        hint,
+      });
+    }
+
+    if (!hint) return false;
+
+    if (response.content.length > 0) {
+      this.messages.push({ role: "assistant", content: response.content });
+    }
+
+    this.messages.push({ role: "user", content: hint });
+    this.nextTripInput = "[contract hint]";
+
+    return true;
+  }
+
+  /**
+   * Run the backstops of one phase whose `detect` fires. Each backstop runs
+   * at most once per run, so a re-prompted answer does not repeat its side
+   * effect. A `prompt` returned from a `"before"` backstop is added to the
+   * conversation here; from an `"after"` backstop it is returned for the
+   * caller to send as a re-prompt. A throwing backstop is logged and skipped.
+   */
+  private async runBackstops(
+    phase: BackstopPhase,
+    reply: string | undefined,
+    tripIndex: number,
+  ): Promise<string | undefined> {
+    const prompts: string[] = [];
+
+    for (const backstop of this.config.backstops ?? []) {
+      if ((backstop.phase ?? "after") !== phase || this.backstopsRun.has(backstop)) continue;
+
+      const name = backstop.name ?? "backstop";
+      const turn: BackstopTurn = {
+        phase,
+        runId: this.runId,
+        input: this.input,
+        ...(reply !== undefined ? { reply } : {}),
+        tripIndex,
+        toolCalls: this.toolCalls,
+        messages: this.messages,
+      };
+
+      try {
+        if (!(await backstop.detect(turn))) continue;
+
+        this.backstopsRun.add(backstop);
+
+        const outcome = (await backstop.run({
+          ...turn,
+          agent: this.config.name ?? this.config.model.name,
+          state: this.backstopState,
+        })) as BackstopOutcome | undefined;
+        const prompt =
+          outcome && typeof outcome.prompt === "string" && outcome.prompt.length > 0
+            ? outcome.prompt
+            : undefined;
+
+        this.recordContractEvent({
+          type: "backstop",
+          tripIndex,
+          name,
+          phase,
+          prompted: prompt !== undefined,
+        });
+
+        if (prompt) prompts.push(prompt);
+      } catch (thrown) {
+        this.logger.warn(LOG_MODULE, "backstop.error", "a backstop threw and was skipped", {
+          runId: this.runId,
+          backstop: name,
+          error: thrown instanceof Error ? thrown.message : String(thrown),
+        });
+      }
+    }
+
+    if (prompts.length === 0) return undefined;
+
+    const joined = prompts.join("\n\n");
+
+    if (phase === "before") {
+      this.messages.push({ role: "user", content: joined });
+
+      return undefined;
+    }
+
+    return joined;
   }
 
   /**
@@ -1522,6 +1792,7 @@ class Execution<TOutput> {
 
         this.toolCalls.push(record);
         this.messages.push(message);
+        this.noteToolCall(record);
         records.push(record);
       }
 
@@ -1537,6 +1808,7 @@ class Execution<TOutput> {
     for (const { record, message } of dispatched) {
       this.toolCalls.push(record);
       this.messages.push(message);
+      this.noteToolCall(record);
     }
 
     return dispatched.map(({ record }) => record);
@@ -2460,6 +2732,24 @@ function stableStringify(value: unknown): string {
 
     return val;
   });
+}
+
+/**
+ * Resolve a re-prompt hint (a string or a builder) to text. A builder
+ * that throws, or an empty result, yields `undefined` so the caller
+ * falls back to the default hint.
+ */
+function resolveHint<TContext>(
+  hint: string | ((context: TContext) => string) | undefined,
+  context: TContext,
+): string | undefined {
+  try {
+    const text = typeof hint === "function" ? hint(context) : hint;
+
+    return text ? text : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 /**

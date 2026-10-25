@@ -18,6 +18,8 @@ import type { SkillsContract } from "../skills/contracts/skills.contract";
 import type { AgentToolEntry } from "../tool/executable-as-tool";
 import type { AgentCompactionConfig } from "./compaction.type";
 import type { JudgeConfig } from "./judge-config.type";
+import type { AgentTraceOptions } from "../trace/agent-trace.type";
+import type { ActWhenAskedConfig, AgentBackstop, ToolRefusalOption } from "./tool-use-contract";
 
 /**
  * Map of factory-level event handlers. Every key is optional; handlers
@@ -316,6 +318,50 @@ export type AgentConfig<TOutput = unknown> = {
    * Observer errors are swallowed — they never break the run.
    */
   observe?: FlowObserveOption;
+  /**
+   * Tool-use contract: when the user's turn matches one of the `intents`
+   * and the model answers without calling a required tool, the agent
+   * re-prompts once with a hint (configurable) instead of accepting an
+   * offer where an action was asked for.
+   *
+   * Omitted ⇒ no re-prompt; the agent runs byte-for-byte as before.
+   *
+   * @example
+   * actWhenAsked: {
+   *   intents: [/\b(swap|replace|add|remove)\b/i],
+   *   requiredTools: ["update_plan"],
+   * }
+   */
+  actWhenAsked?: ActWhenAskedConfig;
+  /**
+   * What to do when a tool refuses a call (a schema validation error, or a
+   * result with `refused: true` / `ok: false` and a reason). With
+   * `"retry-once-with-hint"`, if the model then answers without calling a
+   * tool again, the agent sends one retry prompt quoting the refusal
+   * reason. An object sets the retry count, the hint and the refusal rule.
+   *
+   * Omitted or `"off"` ⇒ the refusal is fed back to the model as before and
+   * nothing more happens.
+   */
+  onToolRefusal?: ToolRefusalOption;
+  /**
+   * Deterministic checks around the model turn. Each backstop's `detect`
+   * runs before the first call (`phase: "before"`) or after the model's
+   * final answer (`phase: "after"`, the default); when it returns true,
+   * `run` acts, and may return a `prompt` to send the model as an extra
+   * user message (an after-phase prompt re-prompts, once per backstop).
+   * Errors are logged and skipped.
+   */
+  backstops?: AgentBackstop[];
+  /**
+   * Record a per-turn trace of this agent's runs (system prompt, tools
+   * offered, tool calls, results, refusals, re-prompts, usage and cost) in
+   * the shared `agentTraces` store, which devtools and `warlock ai trace`
+   * read. Default: on in development, off under test and in production.
+   * `true` records everywhere; `false` never; an object tunes text,
+   * redaction and the store.
+   */
+  trace?: boolean | AgentTraceOptions;
   /**
    * Opt-in durable mid-run crash-resume. When set, the agent checkpoints
    * its state to a {@link SnapshotStore} after every settled trip, so a

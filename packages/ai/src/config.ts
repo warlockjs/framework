@@ -2,6 +2,7 @@ import type { CacheDriver } from "@warlock.js/cache";
 import { log } from "@warlock.js/logger";
 import type { CheckpointStore } from "./contracts/orchestrator/checkpoint-store.contract";
 import type { SnapshotStore } from "./contracts/orchestrator/snapshot-store.contract";
+import type { DescribeToolSchemaOptions } from "./tool/tool-schema-lint";
 
 /**
  * Process-wide `@warlock.js/ai` configuration. **Intentionally tiny.**
@@ -94,6 +95,18 @@ export interface AIConfig {
    * ai.config({ defaultSnapshotStore: ai.snapshot.memory() });
    */
   defaultSnapshotStore?: SnapshotStore;
+
+  /**
+   * Development-time check of every `ai.tool()` definition against the
+   * provider schema rules (OpenAI strict, Anthropic, Google): one logged
+   * warning per tool with what would be rejected, ignored or over-charged,
+   * plus its estimated token cost. On in development only. `false` turns it
+   * off for the app; an object tunes the check. A tool's own `lint` wins.
+   *
+   * @example
+   * ai.config({ toolLint: { targets: ["anthropic"], warnAboveTokens: 300 } });
+   */
+  toolLint?: false | DescribeToolSchemaOptions;
 }
 
 const aiConfig: AIConfig = {};

@@ -2,6 +2,7 @@ import { judge } from "./judge-scorer";
 import { fromJSON, toJSON } from "./report-json";
 import { toJUnit } from "./report-junit";
 import { contains, exact, predicate } from "./scorers";
+import { changeClaimedWithoutToolCall, requiredToolCalled } from "./tool-use-scorers";
 
 // Runner — wired into AgentContract.eval() by the agent factory.
 export { runEval } from "./eval-runner";
@@ -10,6 +11,11 @@ export { runEval } from "./eval-runner";
 export { contains, exact, predicate } from "./scorers";
 export type { EvalPredicate } from "./scorers";
 export { judge } from "./judge-scorer";
+export { changeClaimedWithoutToolCall, requiredToolCalled } from "./tool-use-scorers";
+export type {
+  ChangeClaimedWithoutToolCallOptions,
+  RequiredToolCalledOptions,
+} from "./tool-use-scorers";
 
 // Dataset primitive — feeds `agent.eval({ cases })`.
 export { dataset } from "./dataset";
@@ -31,6 +37,8 @@ export { toJUnit } from "./report-junit";
  * - `contains()` — pass when `expected` appears as a substring.
  * - `predicate(fn)` — wrap an arbitrary boolean assertion.
  * - `judge(config)` — LLM-as-judge scoring against a rubric.
+ * - `requiredToolCalled({ tools })` — an action request was answered by a required tool call.
+ * - `changeClaimedWithoutToolCall()` — the reply claims a change that no tool call made.
  *
  * Reporters / serialization (pure functions over a finished `EvalReport`):
  * - `toJUnit(report)` — JUnit-XML artifact for CI ingestion.
@@ -52,6 +60,8 @@ export const evalScorers = {
   contains,
   predicate,
   judge,
+  requiredToolCalled,
+  changeClaimedWithoutToolCall,
   toJUnit,
   toJSON,
   fromJSON,

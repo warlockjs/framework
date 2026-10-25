@@ -4,6 +4,7 @@ import type { Usage } from "../contracts/result/usage.type";
 import type { ToolConfig, ToolContext } from "../contracts/tool.contract";
 import { AIError, SchemaValidationError, ToolExecutionError } from "../errors";
 import { generateRunId } from "../utils/generate-run-id";
+import { warnOnToolSchema } from "./tool-lint-warning";
 
 /**
  * Degraded `ToolContext` supplied when no caller threads one through
@@ -240,6 +241,8 @@ export function compositeAsTool<TInput, TOutput>(contract: {
 export function tool<TInput, TOutput>(
   contract: ToolConfig<TInput, TOutput>,
 ): ToolContract<TInput, TOutput> {
+  warnOnToolSchema(contract as ToolConfig<unknown, unknown>);
+
   return {
     ...contract,
 
