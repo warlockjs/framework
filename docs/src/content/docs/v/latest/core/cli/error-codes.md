@@ -250,6 +250,12 @@ Category: your code · skill: `health-checks`
 
 Category: your code · skill: `warlock-trace`
 
+### WL5005
+
+**A site's root page answered 5xx in the doctor render.** Read the phase and page file doctor prints, fix that stage, then run warlock doctor again.
+
+Category: your code · skill: `warlock-doctor`
+
 ## WL6xxx — database
 
 ### WL6001

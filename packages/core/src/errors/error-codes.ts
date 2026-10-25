@@ -313,6 +313,14 @@ export const ERROR_CODES = {
     fix: "Keep http.requestId enabled (its echoed header is how the request is found) and retry; a path under the devtools prefix is never recorded.",
     skill: "warlock-trace",
   },
+  WL5005: {
+    code: "WL5005",
+    area: "http",
+    category: "code",
+    title: "A site's root page answered 5xx in the doctor render",
+    fix: "Read the phase and page file doctor prints, fix that stage, then run warlock doctor again.",
+    skill: "warlock-doctor",
+  },
 
   // ── WL6xxx database ──────────────────────────────────────────────────────
   WL6001: {

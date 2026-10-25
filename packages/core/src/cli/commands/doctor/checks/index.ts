@@ -8,11 +8,12 @@ import { localesTsDeprecatedCheck } from "./locales-ts-deprecated.check";
 import { optionalPeersCheck } from "./optional-peers.check";
 import { releaseHygieneCheck } from "./release-hygiene.check";
 import { routesCheck } from "./routes.check";
+import { sitesCheck } from "./sites.check";
 
 /**
  * The default, ordered set of checks `warlock doctor` runs. Ordering controls
  * the report layout: runtime-surface checks first (routes, handler signatures,
- * config, connectors, peers, health), release hygiene last.
+ * config, connectors, peers, health, site renders), release hygiene last.
  *
  * Every check is handed the same boot context, and any of them may return
  * `undefined` to opt out of a project it does not apply to — so this list is
@@ -27,6 +28,7 @@ export const defaultDoctorChecks: DoctorCheck[] = [
   optionalPeersCheck,
   jwtSecretCheck,
   healthCheck,
+  sitesCheck,
   localesTsDeprecatedCheck,
   releaseHygieneCheck,
 ];
