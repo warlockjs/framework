@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 > ⚠ **Versioning: `@warlock.js/*` does not follow SemVer strictly — breaking changes may ship in a minor.** This is a deliberate decision, not an oversight: the framework is pre-adoption and the cost of a major per behaviour fix currently outweighs the benefit. **Pin an exact version or a tilde range (`~4.13.0`) if you need to opt into changes rather than receive them.** Every breaking change is marked **BREAKING** in its entry and summarised in an _Upgrading_ section at the top of the release. **This policy will change once the framework has consumers beyond its author.**
 
+## 5.38.0
+
+### Added
+
+- Every 5xx the HTTP layer answers writes one error-level log record (`module: "http"`, `action: "request.<phase>"`), once per request, in the same shape as the page-failure record of `@warlock.js/web`: `name`, `message`, `stack`, `phase` (`csrf`, `middleware`, `validation` or `handler`), `file` (the routes file), `routeName`, `routePath`, `handler`, `middleware` (the middleware that threw), `method`, `pathname` (no query string), `requestId` and `statusCode`. It covers throws from route middleware, request validation and controllers, and a 5xx a handler returned without throwing; a returned `503` is treated as an intentional answer and not logged. A 4xx is never logged as an error. With no log channel configured the failure still goes to `console.error`.
+- In `development` the JSON error body of a thrown error and of the opaque 500 includes `requestId`. Production bodies are unchanged.
+
+### Changed
+
+- The three separate error-level entries for a 5xx (`request-error`, `model-write-validation-error` and `unhandled-request-error`) are replaced by the single record above. The per-request `http.log` line is unchanged.
+
 ## 5.37.1 - 2026-10-24
 
 ### Added

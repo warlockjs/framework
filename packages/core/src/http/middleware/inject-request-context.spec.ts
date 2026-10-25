@@ -3,7 +3,14 @@ import config from "@mongez/config";
 import { contextManager } from "@warlock.js/context";
 import { log } from "@warlock.js/logger";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ConflictError, HttpError, ResourceNotFoundError, ServerError } from "../errors";
+import {
+  ConflictError,
+  ForbiddenError,
+  HttpError,
+  ResourceNotFoundError,
+  ServerError,
+} from "../errors";
+import { tagRequestError } from "../report-request-error";
 import type { Request } from "../request";
 import type { Response } from "../response";
 
@@ -243,5 +250,158 @@ describe("http.errorMapper", () => {
     const { response } = await run(new Error("unexpected"));
 
     expect(response.serverError).toHaveBeenCalled();
+  });
+});
+
+describe("createRequestStore 5xx record", () => {
+  function createRequest(overrides: Record<string, unknown> = {}, handler?: unknown) {
+    function showPost() {
+      return undefined;
+    }
+
+    const route = {
+      name: "posts.show",
+      path: "/posts/:id",
+      sourceFile: "src/app/posts/routes.ts",
+      handler: handler ?? showPost,
+    };
+
+    return {
+      id: "req-7",
+      method: "GET",
+      path: "/posts/1?debug=1",
+      route,
+      log: vi.fn(),
+      runMiddleware: vi.fn(async () => undefined),
+      getHandler: () => route.handler,
+      trigger: vi.fn(),
+      ...overrides,
+    } as unknown as Request;
+  }
+
+  function createResponse(statusCode = 200) {
+    return {
+      statusCode,
+      header: vi.fn(),
+      setStatusCode: vi.fn().mockReturnThis(),
+      send: vi.fn((payload: unknown) => payload),
+      serverError: vi.fn((payload: unknown) => payload),
+    } as unknown as Response;
+  }
+
+  const records = () =>
+    loggerError.mock.calls
+      .map(([entry]: [unknown]) => entry)
+      .filter((entry: unknown) => typeof entry === "object" && entry !== null) as Array<{
+      action: string;
+      context: Record<string, unknown>;
+    }>;
+
+  it("leaves one record with the route and the handler for a controller throw", async () => {
+    const request = createRequest(
+      {},
+      async function showPost() {
+        throw new Error("controller exploded");
+      },
+    );
+
+    await createRequestStore(request, createResponse());
+
+    expect(records()).toHaveLength(1);
+    expect(records()[0]).toMatchObject({
+      action: "request.handler",
+      context: {
+        phase: "handler",
+        method: "GET",
+        pathname: "/posts/1",
+        routeName: "posts.show",
+        routePath: "/posts/:id",
+        handler: "showPost",
+        requestId: "req-7",
+        statusCode: 500,
+      },
+    });
+  });
+
+  it("names the middleware that threw", async () => {
+    const request = createRequest({
+      runMiddleware: vi.fn(async () => {
+        const failure = new Error("token store down");
+
+        tagRequestError(failure, { phase: "middleware", middleware: "authMiddleware" });
+
+        throw failure;
+      }),
+    });
+
+    await createRequestStore(request, createResponse());
+
+    expect(records()).toHaveLength(1);
+    expect(records()[0]).toMatchObject({
+      action: "request.middleware",
+      context: { phase: "middleware", middleware: "authMiddleware" },
+    });
+  });
+
+  it("does not log a thrown 4xx as an error record", async () => {
+    const request = createRequest({
+      runMiddleware: vi.fn(async () => {
+        throw new ForbiddenError("Forbidden");
+      }),
+    });
+
+    await createRequestStore(request, createResponse());
+
+    expect(records()).toHaveLength(0);
+  });
+
+  it("logs a 5xx the handler returned without throwing", async () => {
+    const request = createRequest({}, async () => undefined);
+
+    await createRequestStore(request, createResponse(502));
+
+    expect(records()).toHaveLength(1);
+    expect(records()[0]).toMatchObject({
+      action: "request.handler",
+      context: { phase: "handler", statusCode: 502 },
+    });
+  });
+
+  it("does not log a returned 503 (maintenance, readiness)", async () => {
+    const request = createRequest({}, async () => undefined);
+
+    await createRequestStore(request, createResponse(503));
+
+    expect(records()).toHaveLength(0);
+  });
+
+  it("adds the request id to the JSON error body in development only", async () => {
+    const original = process.env.NODE_ENV;
+    const failing = () => ({
+      runMiddleware: vi.fn(async () => {
+        throw new ServerError("boom");
+      }),
+    });
+
+    try {
+      process.env.NODE_ENV = "development";
+
+      const development = createResponse();
+      await createRequestStore(createRequest(failing()), development);
+
+      expect(development.setStatusCode).toHaveBeenCalledWith(500);
+      expect(development.send).toHaveBeenCalledWith(
+        expect.objectContaining({ error: "boom", requestId: "req-7" }),
+      );
+
+      process.env.NODE_ENV = "production";
+
+      const production = createResponse();
+      await createRequestStore(createRequest(failing()), production);
+
+      expect(production.send).toHaveBeenCalledWith({ error: "boom" });
+    } finally {
+      process.env.NODE_ENV = original;
+    }
   });
 });

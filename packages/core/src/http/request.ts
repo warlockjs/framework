@@ -23,6 +23,7 @@ import { createRequestStore } from "./middleware/inject-request-context";
 import { buildRequestLogSnapshot, type RequestLogSnapshot } from "./request-log-snapshot";
 import { Response } from "./response";
 import { buildTracingContext, deriveTraceId, dispatchPhase, isTracingEnabled } from "./tracing";
+import { tagRequestError } from "./report-request-error";
 import type {
   DecodedAccessToken,
   HttpConfigurations,
@@ -996,7 +997,15 @@ export class Request<RequestValidation = any> {
     const tracingEnabled = isTracingEnabled();
     const validationStartedAt = tracingEnabled ? performance.now() : 0;
 
-    const validationOutput = await validateAll(validation, this, this.response);
+    let validationOutput: Awaited<ReturnType<typeof validateAll>>;
+
+    try {
+      validationOutput = await validateAll(validation, this, this.response);
+    } catch (thrown) {
+      tagRequestError(thrown, { phase: "validation" });
+
+      throw thrown;
+    }
 
     if (tracingEnabled) {
       dispatchPhase(buildTracingContext(this), {
@@ -1091,10 +1100,22 @@ export class Request<RequestValidation = any> {
 
       const middlewareStartedAt = tracingEnabled ? performance.now() : 0;
 
-      const output = await middleware({
-        request: this,
-        response: this.response,
-      });
+      let output: Awaited<ReturnType<typeof middleware>>;
+
+      try {
+        output = await middleware({
+          request: this,
+          response: this.response,
+        });
+      } catch (thrown) {
+        // So the 5xx record names the middleware that threw.
+        tagRequestError(thrown, {
+          phase: "middleware",
+          middleware: middleware.name || `middleware #${index}`,
+        });
+
+        throw thrown;
+      }
 
       if (tracingEnabled) {
         dispatchPhase(buildTracingContext(this), {
