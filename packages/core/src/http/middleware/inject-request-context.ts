@@ -18,10 +18,7 @@ import { setResponseAppError } from "../error-response";
 import { mapRequestError } from "../error-mapper";
 import { AppError, HttpError } from "../errors";
 import { type Request } from "../request";
-import {
-  reportRequestServerError,
-  type RequestErrorPhase,
-} from "../report-request-error";
+import { reportRequestServerError, type RequestErrorPhase } from "../report-request-error";
 import { type Response } from "../response";
 import { buildTracingContext, dispatchPhase, isTracingEnabled } from "../tracing";
 import { type ReturnedResponse } from "./../types";
