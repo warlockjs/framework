@@ -151,6 +151,20 @@ export type WarlockConfig = {
   connectors?: Connector[];
 
   /**
+   * Code generator settings for `warlock generate` and `warlock make`.
+   */
+  generate?: {
+    /**
+     * Write `index.ts` barrels (for example `models/<name>/index.ts`) and
+     * import through them. Barrels are optional: set `false` and generators
+     * write none and import the model file directly.
+     *
+     * @default true
+     */
+    barrels?: boolean;
+  };
+
+  /**
    * CLI configuration
    */
   cli?: {
