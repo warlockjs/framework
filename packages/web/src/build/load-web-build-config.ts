@@ -9,6 +9,7 @@ import type { SitesConfig } from "../sites/site-config.types";
 export type WebBuildConfig = {
   sites?: SitesConfig;
   fonts?: readonly import("../fonts/types").WebFont[];
+  moduleBoundary?: "error" | "warn" | "off";
 };
 
 type Esbuild = typeof import("esbuild");
@@ -106,7 +107,15 @@ export async function loadWebBuildConfig(appRoot: string): Promise<WebBuildConfi
       default?: WebBuildConfig;
     };
 
-    return { sites: staticSites(module.default?.sites), fonts: module.default?.fonts };
+    const moduleBoundary = module.default?.moduleBoundary;
+
+    return {
+      sites: staticSites(module.default?.sites),
+      fonts: module.default?.fonts,
+      ...(moduleBoundary === "error" || moduleBoundary === "warn" || moduleBoundary === "off"
+        ? { moduleBoundary }
+        : {}),
+    };
   } finally {
     await unlink(bundleFile).catch(() => {});
   }

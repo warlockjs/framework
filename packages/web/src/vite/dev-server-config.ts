@@ -8,6 +8,7 @@ import { appConventionAliases } from "./app-convention-aliases";
 import { cssModulesConfig } from "./css-modules-config";
 import { coreAppModules } from "./core-app-modules";
 import { coreModelModules } from "./core-model-modules";
+import { clientModuleSsrWarningPlugin } from "./client-module-ssr-warning";
 import { warlockClientBoundary } from "./index";
 import { resolveReactFastRefreshPlugins } from "./react-refresh-preamble";
 import { createSsrBoundaryState, isClientBoundModule } from "./ssr-client-view";
@@ -206,6 +207,8 @@ export type WebConnectorViteConfigOptions = {
   hmrServer: HttpServer;
   /** `web.sites`: each per-site hydration entry then imports only its own site's page registry. */
   sites?: SitesConfig;
+  /** `web.moduleBoundary`: what browser code importing a non-browser-safe module file does. */
+  moduleBoundary?: "error" | "warn" | "off";
   fonts?: readonly import("../fonts/types").WebFont[];
   handlePageHotUpdate: (file: string) => Promise<boolean>;
   /** Plugins that must run ahead of the client-boundary gates, e.g. `devErrorTransportPlugin`. */
@@ -282,9 +285,13 @@ export async function createWebConnectorViteConfig(
         appRoot: options.appRoot,
         srcDir: path.relative(options.appRoot, options.appSrcRoot),
         sites: options.sites,
+        moduleBoundary: options.moduleBoundary,
         beforePageHotUpdate: ({ file }) => options.handlePageHotUpdate(file),
         ssrState: ssrBoundaryState,
       }),
+      // Dev SSR only: names a top-level browser-global read in a `.client.*`
+      // module that the server render evaluates.
+      clientModuleSsrWarningPlugin(),
       // Dev SSR only; see the plugin header. `enforce: "pre"` and a `load` hook,
       // so it is ordered by enforce bucket and not by this position.
       coreAppModules({

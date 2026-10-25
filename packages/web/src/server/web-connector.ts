@@ -1051,6 +1051,7 @@ export class WebConnector extends BaseConnector {
         workspaceRoot,
         hmrServer: fastify.server,
         sites: config.get("web", {}).sites,
+        moduleBoundary: config.get("web", {}).moduleBoundary,
         fonts: config.get("web", {}).fonts,
         handlePageHotUpdate: (file) => this.handlePageHotUpdate(file),
         leadingPlugins: [devErrorTransportPlugin({ isProductionRuntime, buildErrorMessage })],

@@ -478,8 +478,12 @@ type ImportKind = "value" | "type";
 /** Files whose source Gate A will parse for import kinds. */
 const PARSEABLE_MODULE_EXTENSIONS = /\.([cm]?[jt]sx?)$/;
 
-/** Cheap pre-filter: no governed scope in the text, nothing to classify. */
-const GOVERNED_SCOPE_MENTION = /@warlock\.js\/|@mongez\//;
+/**
+ * Cheap pre-filter: no governed scope, `app/` alias or relative specifier in
+ * the text, nothing to classify. The last two serve the module-boundary rule,
+ * which must tell a type-only import from a value import.
+ */
+const GOVERNED_SCOPE_MENTION = /@warlock\.js\/|@mongez\/|["'`](?:app\/|\.{1,2}\/)/;
 
 /**
  * The id Gate A resolves a type-only edge into a server-only package to. `\0`
@@ -620,6 +624,66 @@ function classifyImportKinds(code: string, id: string): Map<string, ImportKind> 
   for (const source of runtimeSpecifiers) kinds.set(source, "value");
 
   return kinds;
+}
+
+/**
+ * The module-boundary rule: browser code may import from `app/<module>/...`
+ * only files that are browser-safe.
+ *
+ * A module (`<srcDir>/app/<module>/`) is server code by default: controllers,
+ * services, repositories, models and routes load Node-only dependencies and
+ * secrets. The files a module offers to the browser are named for it:
+ *
+ *   - `*.client.ts` / `*.client.tsx`, or anything under a `.client/` directory;
+ *   - schema files: `*.schema.ts`, or anything under a `schema/` directory;
+ *   - type files: `*.types.ts`, `*.type.ts`, `*.d.ts`, or a `types/` directory;
+ *   - the module's own `web/` folder;
+ *   - non-code files (JSON, CSS, images), which carry no behaviour.
+ *
+ * `*.server.ts` files are refused earlier by rule 3, whatever folder they sit
+ * in. A type-only import never reaches here as a refusal: it is erased.
+ */
+const BROWSER_SAFE_MODULE_FILE = /\.(?:schema|types?)\.[cm]?[jt]sx?$/;
+const BROWSER_SAFE_MODULE_DIRECTORIES = new Set(["schema", "types", "web"]);
+
+export function moduleSurfaceOf(
+  resolvedPath: string,
+  appRoot: string,
+  srcDir = "src",
+): { module: string; inner: string } | undefined {
+  const [bare = resolvedPath] = resolvedPath.split("?", 1);
+  if (!isAppSourcePath(bare, appRoot)) return undefined;
+  const relative = toPosix(path.relative(path.join(appRoot, srcDir, "app"), bare));
+  if (!relative || relative.startsWith("..") || path.isAbsolute(relative)) return undefined;
+  const [moduleName, ...rest] = relative.split("/");
+  if (!moduleName || rest.length === 0) return undefined;
+  return { module: moduleName, inner: rest.join("/") };
+}
+
+export function isBrowserSafeModuleFile(inner: string): boolean {
+  // A path that carries no code extension is data (JSON, CSS, images) or a
+  // specifier completion could not finish; it carries no behaviour to refuse.
+  if (!LOCAL_MODULE_EXTENSIONS.test(inner)) return true;
+  if (/\.d\.[cm]?ts$/.test(inner)) return true;
+  if (isClientFile(inner)) return true;
+  if (BROWSER_SAFE_MODULE_FILE.test(path.posix.basename(inner))) return true;
+  const directories = inner.split("/").slice(0, -1);
+  return directories.some((segment) => BROWSER_SAFE_MODULE_DIRECTORIES.has(segment));
+}
+
+function moduleBoundaryViolation(
+  resolvedPath: string,
+  importer: string | undefined,
+  appRoot: string,
+  srcDir: string | undefined,
+): FenceViolation | undefined {
+  if (!importer || !isAppSourcePath(moduleKey(importer), appRoot)) return undefined;
+  const surface = moduleSurfaceOf(resolvedPath, appRoot, srcDir);
+  if (!surface || isBrowserSafeModuleFile(surface.inner)) return undefined;
+  return {
+    cause: `"app/${surface.module}/${surface.inner}" is a server file of module "${surface.module}" — browser code may import only a module's browser-safe files: *.client.ts(x), schema files (*.schema.ts or schema/), type files (*.types.ts or types/) and its web/ folder.`,
+    fix: `Use "import type" when only a type is needed, move the shared logic into ${surface.module}/schema/ or a *.client.ts file, or read the data through a page loader. Set web.moduleBoundary to "warn" to migrate gradually.`,
+  };
 }
 
 interface FenceViolation {
@@ -835,6 +899,18 @@ function externalPredicateOf(external: unknown): ExternalPredicate | undefined {
 
 export interface EnvironmentClassifierOptions {
   /**
+   * Source directory under `appRoot` that holds `app/<module>/`. Defaults to
+   * `"src"`. Only the module-boundary rule reads it.
+   */
+  srcDir?: string;
+  /**
+   * What the module-boundary rule does when browser code imports a module file
+   * that is not browser-safe: `"error"` (default) refuses the build, `"warn"`
+   * reports the same message and lets the build continue (a migration aid),
+   * `"off"` skips the rule.
+   */
+  moduleBoundary?: "error" | "warn" | "off";
+  /**
    * Force these governed-scope package names (e.g. `@warlock.js/core`) to
    * classify as `"server"` regardless of what `warlock.environment` their
    * `package.json` declares. Defaults to the live marker resolution (workspace
@@ -987,6 +1063,7 @@ function isHtmlEntrySource(source: string): boolean {
  */
 export function gateAResolve(options: GateAOptions = {}): Plugin {
   const { appRoot, environmentOf } = createEnvironmentClassifier(options);
+  const moduleBoundary = options.moduleBoundary ?? "error";
 
   // Maps a resolved module id to the id that imported it, rebuilt per plugin
   // instance (i.e. per build) via our own `this.resolve` calls below — this
@@ -1092,6 +1169,27 @@ export function gateAResolve(options: GateAOptions = {}): Plugin {
       current = importerOf.get(current);
     }
     return chain;
+  }
+
+  function reportModuleBoundary(
+    context: { error(message: string): never; warn(message: string): void },
+    mode: "error" | "warn",
+    violation: FenceViolation,
+    source: string,
+    importer: string | undefined,
+  ): void {
+    const message = [
+      mode === "error"
+        ? `Gate A refused an import: browser code reaches a server file of an app module.`
+        : `Gate A WOULD refuse this import (web.moduleBoundary is "warn"): browser code reaches a server file of an app module.`,
+      ``,
+      `Import chain: ${[...buildChain(importer), source].join(" → ")}`,
+      `File: ${importer ?? source}`,
+      `Cause: ${violation.cause}`,
+      `Fix: ${violation.fix}`,
+    ].join("\n");
+    if (mode === "error") context.error(message);
+    else context.warn(message);
   }
 
   return {
@@ -1236,6 +1334,21 @@ export function gateAResolve(options: GateAOptions = {}): Plugin {
         );
       }
 
+      // Rule 5, the module boundary, judged on the path as written (relative or
+      // absolute). The alias spelling is judged below, on the resolved file.
+      if (moduleBoundary !== "off" && isRelativeOrAbsolute) {
+        const boundaryViolation = moduleBoundaryViolation(
+          judgedPath,
+          importer,
+          appRoot,
+          options.srcDir,
+        );
+        if (boundaryViolation) {
+          if (typeOnly) return TYPE_ONLY_ERASED_ID;
+          reportModuleBoundary(this, moduleBoundary, boundaryViolation, source, importer);
+        }
+      }
+
       // Not refused, but not an ordinary import either: rule 2's predicate
       // holds and only the missing value binding spared it. Asked here, AFTER
       // `ruleViolation` has run to completion, so rules 3 and 4 keep the last
@@ -1319,6 +1432,24 @@ export function gateAResolve(options: GateAOptions = {}): Plugin {
               id: importer,
             });
           }
+        }
+      }
+
+      // Rule 5 for the alias spelling (`app/users/...`). Unlike the rule 3 alias
+      // pass above, this one is enforced: alias form is how nearly every app
+      // writes a cross-module import, so a warning here would leave the rule
+      // off for the imports it exists to judge.
+      if (moduleBoundary !== "off" && isBareSpecifier && resolved && !resolved.external) {
+        const aliasPath = completeLocalModulePath(moduleKey(resolved.id));
+        const boundaryViolation = moduleBoundaryViolation(
+          aliasPath,
+          importer,
+          appRoot,
+          options.srcDir,
+        );
+        if (boundaryViolation) {
+          if (typeOnly) return TYPE_ONLY_ERASED_ID;
+          reportModuleBoundary(this, moduleBoundary, boundaryViolation, source, importer);
         }
       }
 

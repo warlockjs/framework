@@ -57,6 +57,8 @@ export type WebBuildOptions = {
   external?: string[];
   /** Build-safe snapshot of `src/config/web.ts`'s static `sites` shape. */
   sites?: SitesConfig;
+  /** `web.moduleBoundary`: `"error"` (default), `"warn"` or `"off"` for browser imports of non-browser-safe module files. */
+  moduleBoundary?: "error" | "warn" | "off";
   /**
    * App-root-relative folders or files that hold test-only code (helpers
    * imported only by specs). The production build's page-graph scan skips
@@ -216,6 +218,7 @@ export function createWebBuildContribution(
   let translationAssets: readonly { readonly fileName: string; readonly body: string }[] = [];
   let sites: SitesConfig | undefined;
   let fonts: readonly import("../fonts/types").WebFont[] | undefined;
+  let moduleBoundary: "error" | "warn" | "off" | undefined;
 
   return {
     async generate(context: ConnectorBuildContext): Promise<ConnectorBuildGenerateResult | void> {
@@ -250,6 +253,7 @@ export function createWebBuildContribution(
       const webConfig = await loadWebBuildConfig(context.appRoot);
       sites = options.sites ?? webConfig.sites;
       fonts = webConfig.fonts;
+      moduleBoundary = options.moduleBoundary ?? webConfig.moduleBoundary;
 
       const result = await generatePagesBarrel({
         appRoot: context.appRoot,
@@ -357,6 +361,7 @@ export function createWebBuildContribution(
           appRoot: context.appRoot,
           webRoot: await resolveWebPackageRoot(options.webRoot),
           srcDir: options.srcDir,
+          moduleBoundary,
           outDir: resolveClientOutDir(context),
           resolveAliases: [
             ...callerAliases,
