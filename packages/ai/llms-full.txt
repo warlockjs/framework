@@ -1226,6 +1226,20 @@ compactJsonSchema({ type: "string", description: "Order id", examples: ["A-1"] }
 
 Compact mode drops `description` / `title` / `examples` / `example` / `default` / `$comment` / `deprecated` / `readOnly` / `writeOnly` / `$schema` at every level and collapses `anyOf` / `oneOf` of bare `const` branches into `enum` (`{ keepDescriptions: true }` keeps descriptions). Validation and property names are untouched; the tool's own `description` is always sent. Trade-off: no per-field guidance for the model — name fields clearly and keep must-know rules in the tool `description`. `compactToolSchemas(tools)` returns compact copies for direct `model.complete(messages, { tools })` calls.
 
+## Schema lint — per-provider checks at definition time
+
+`ai.tool()` checks its JSON Schema against `openai-strict`, `anthropic` and `google` and, in development only, logs one warning per tool definition (`ai.tool` / `schema.lint`). Findings: `optional-forced-required` (an optional field is sent required and nullable), `optional-not-required` and `missing-additional-properties-false` (OpenAI strict rejects), `unsupported-keyword` (`allOf`, `oneOf`, `not`, conditionals, `patternProperties`, ...), `root-not-object` (adapters send no parameters), `invalid-name`, `oversized-description` (over 1024 characters on a tool, 512 on a property), `heavy-definition` (over 500 estimated tokens).
+
+```ts
+const report = ai.tools.describe(tool);            // { name, tokens, descriptionChars, schemaHash, targets, issues, ok }
+const { tools, tokens } = ai.tools.describeAll(tools);
+ai.tool({ ..., lint: false });                      // silence one tool
+ai.tool({ ..., lint: { targets: ["anthropic"], warnAboveTokens: 300 } });
+ai.config({ toolLint: false });                     // silence the app
+```
+
+`tokens` is an estimate (4 characters per token, `charsPerToken` to tune); use `ai.tools.measure(tools, { model })` for an exact native count. CLI: `warlock ai tools --tools ./tools.ts [--targets ...] [--fail] [--json]`.
+
 ## See also
 
 - The `run-ai-agent` topic — how tools plug into the trip loop
@@ -2080,6 +2094,10 @@ const restored = ai.eval.fromJSON(await readFile("./eval/baseline.json", "utf8")
 ```
 
 `toJSON`/`fromJSON` preserve `result` payloads, per-case `scores`, timings, and any attached `regression` block, so a parsed report drives regression diffing exactly as the in-memory one. `toJUnit` hand-emits XML (no `xml` dependency) and entity-escapes every dynamic value.
+
+## Tool-use scorers
+
+`ai.eval.requiredToolCalled({ tools, intents?, require? })` fails with "required tool not called" for an action request answered without a successful required call; `ai.eval.changeClaimedWithoutToolCall({ tools?, claims? })` fails with "change claimed without a tool call" when the reply says it changed something and no change tool completed.
 
 ## Typical CI shard job
 
@@ -3545,6 +3563,10 @@ A misbehaving listener's throw is swallowed (same swallow-on-throw discipline as
 ## The batteries-included Observer
 
 `@warlock.js/ai-panoptic` is the shipped, full-featured `Observer` — install it, configure it via `ai.config({ panoptic })`, and it registers its collector + (optionally) flips observe-all for you. Core stays dependency-free; this skill documents the seam panoptic plugs into.
+
+## Agent traces (development)
+
+Separate from observers: agents record a bounded in-memory per-turn trace (`agentTraces`, latest 100 runs) in development with no setup, holding prompt and tool content, redacted. Read it with `agentTraces.get(runId)`, `formatAgentTrace`, `diffAgentTraces`, the devtools Agents tab, or `warlock ai trace`. Set `trace: false` / `true` / `{ text, redact, store }` per agent.
 
 ## See also
 
@@ -5038,6 +5060,38 @@ derived from an unambiguous matching user input. If the input is missing or
 ambiguous, compaction records `no-safe-range` and leaves the conversation intact. Changing
 the threshold or `keep` triggers durable drift detection; bump the agent's
 `version` when changing summary callback semantics.
+
+## Tool-use contract — act when asked, refusal retry, backstops
+
+All opt-in; an agent without them behaves as before.
+
+```ts
+ai.agent({
+  model,
+  tools: [updatePlan],
+  actWhenAsked: { intents: [/\b(swap|replace|add|remove)\b/i], requiredTools: ["update_plan"], maxReprompts: 1 },
+  onToolRefusal: "retry-once-with-hint", // or { retries, hint, isRefusal }
+  backstops: [{ name: "injury", phase: "before", detect: (t) => /\bpain\b/i.test(t.input), run: async (c) => ({ prompt: "Acknowledge the injury." }) }],
+});
+```
+
+- `actWhenAsked`: input matches an `intents` entry (substring, `RegExp` or predicate) and the answer called no `requiredTools` tool, so one hint is sent as a user message (`hint` string or builder).
+- `onToolRefusal`: a schema validation error, or a result with `refused: true` / `ok: false` and a `reason`, `error` or `message`. If the model then answers without a tool call, one retry prompt quotes the reason.
+- `backstops`: `detect(turn)` / `run(context)` run `"before"` the first call or `"after"` a final answer; a returned `{ prompt }` is added as a user message (re-prompt in `"after"`). Each runs once per run; throws are logged and skipped. Order on one answer: backstops, refusal retry, act-when-asked.
+- Re-prompts use `maxTrips`; none left, none sent.
+- Eval: `ai.eval.requiredToolCalled({ tools, intents? })` and `ai.eval.changeClaimedWithoutToolCall({ tools? })`.
+
+## Agent trace — `trace`
+
+Development default: each run records a per-turn trace (system prompt hash and text, tools offered with schema hashes, tool calls, results, refusals, contract actions, usage, cost) into the shared `agentTraces` store, redacted with the logger's rules. `trace: true` records everywhere (text only in development), `false` never, an object sets `{ text, redact, maxStringLength, store }`.
+
+```ts
+import { agentTraces, diffAgentTraces, formatAgentTrace } from "@warlock.js/ai";
+const trace = agentTraces.get(result.report.runId);
+diffAgentTraces(a, b); // { identical, systemPrompt, tools: { added, removed, changed } }
+```
+
+Devtools shows it in the Agents tab; CLI: `warlock ai trace [runId] [--diff other]`.
 
 ## When NOT to use this primitive
 

@@ -20,7 +20,7 @@ Core is the application runtime: it boots the app, auto-loads each module's spec
 2. Write a thin controller (`create-controller.md`); validate input with a schema attached to the handler (`validate-input.md`).
 3. Put logic in a service or use case (`write-use-case.md`), and data access in a repository (`use-repository.md`).
 4. Return via `response.*` (`send-response.md`) and shape output with a resource (`define-resource.md`); declare `responseSchema` for typed clients and docs (`create-controller.md`, `generate-openapi.md`).
-5. Configure and run (`configure-app.md`, `run-app.md`); check setup with `warlock-doctor.md`, read the app with `warlock-inspect.md` (or serve it to an agent with `warlock-mcp.md`), verify a change with `warlock-check.md`, and a request's runtime behaviour with `warlock-trace.md`.
+5. Configure and run (`configure-app.md`, `run-app.md`); check setup with `warlock-doctor.md`, read the app with `warlock-inspect.md` (or serve it to an agent with `warlock-mcp.md`), verify a change with `warlock-check.md`, a request's runtime behaviour with `warlock-trace.md`, and what happened to a past request with `request-log.md`.
 
 When the framework is wrong or missing a capability, follow the `report-framework-issue` topic to prepare a public report and ask the user before filing.
 
@@ -30,10 +30,10 @@ When the framework is wrong or missing a capability, follow the `report-framewor
 - **HTTP & routing:** register-route, warlock-routes, create-controller, use-middleware, write-middleware, validate-input, use-request-locals, build-restful, wire-socket
 - **Responses & resources:** send-response, define-resource, use-model-transformers, use-localization
 - **Domain layers:** write-use-case, use-repository, write-seeder
-- **CLI & running the app:** generate-web-ui, run-app, deploy-release, write-cli-command, add-connector, health-checks, warlock-doctor, warlock-inspect, warlock-check, generate-openapi
+- **CLI & running the app:** generate-web-ui, run-app, deploy-release, write-cli-command, add-connector, health-checks, warlock-doctor, warlock-inspect, use-capabilities, warlock-check, generate-openapi
 - **Agent tooling:** warlock-mcp, warlock-trace, warlock-agents-md, warlock-board
 - **Storage, files & mail:** store-file, upload-file, process-image, send-mail
-- **Security & utilities:** hash-password, encrypt-data, store-secrets, retry-operation, benchmark-code, request-memo, request-tracing
+- **Security & utilities:** hash-password, encrypt-data, store-secrets, retry-operation, benchmark-code, request-memo, request-tracing, request-log
 - **Testing:** test-browser, test-http, test-service, test-fakes, model-factories
 
 ## Conventions and pitfalls
@@ -1879,13 +1879,13 @@ description: 'Scaffold a new feature module under `src/app/<name>/` via `warlock
 
 # Warlock — create a module
 
-A module is a self-contained feature folder under `src/app/<name>/`. The CLI scaffolds the standard subfolders; the framework auto-loads `routes.ts`, `main.ts`, every `.ts(x)` file inside `events/`, and `utils/locales.ts`. You never `import` those files. (`src/app/main.ts` at the project root is also auto-loaded for global one-time application setup; connector instances belong in `warlock.config.ts > connectors`.)
+A module is a self-contained feature folder under `src/app/<name>/`. The CLI scaffolds the standard subfolders; the framework auto-loads `routes.ts`, `main.ts`, every `.ts(x)` file inside `events/`, and `utils/locales.json` (plus `utils/locales/<feature>.json`). You never `import` those files. (`src/app/main.ts` at the project root is also auto-loaded for global one-time application setup; connector instances belong in `warlock.config.ts > connectors`.)
 
 ## The shape
 
 ```bash
 npx warlock generate.module products            # full CRUD bootstrap (default — controllers, model, services, repository, resource, schemas, routes, seed)
-npx warlock generate.module products --minimal  # bare bones (routes.ts + main.ts + utils/locales.ts + empty subfolders)
+npx warlock generate.module products --minimal  # bare bones (routes.ts + main.ts + utils/locales.json + empty subfolders)
 ```
 
 Full CRUD is the default — opt down to a bare skeleton with `--minimal` (`-m`) when you want to build the module piece by piece. `--force` (`-f`) overwrites existing files. Every generator takes `--dry-run` (write nothing, list the plan) and `--json` (one machine-readable report on stdout). To add one endpoint from its request schema — controller, service, resource, route, locale key and an HTTP test — use `warlock make endpoint` (the `make-endpoint` topic). The plural form is auto-derived: `generate.module product` and `generate.module products` produce the same `src/app/products/` folder.
@@ -1911,7 +1911,7 @@ src/app/products/
   models/
     product/
       product.model.ts
-      index.ts
+      index.ts                 ← optional barrel; omitted when `generate.barrels` is false
       migrations/              ← migration file is created here by the default CRUD scaffold
   repositories/
     products.repository.ts
@@ -1923,14 +1923,14 @@ src/app/products/
   events/                       ← auto-loaded by the framework
   types/
   utils/
-    locales.ts                  ← `groupedTranslations("products", { ... })`
+    locales.json                ← `{ "notFound": { "en": "...", "ar": "..." } }`; add `locales/<feature>.json` to split by feature
   seeds/
     products.seed.ts
   routes.ts                     ← auto-loaded; RESTful chain pre-wired with `guarded(...)`
   main.ts                       ← auto-loaded once on boot
 ```
 
-With `--minimal`, only `routes.ts`, `main.ts`, `utils/locales.ts`, and the empty subfolders are created — fill them in manually with the per-component generators below.
+With `--minimal`, only `routes.ts`, `main.ts`, `utils/locales.json`, and the empty subfolders are created — fill them in manually with the per-component generators below.
 
 ## Auto-loaded files
 
@@ -1939,7 +1939,7 @@ The framework discovers these by convention — do not import them anywhere:
 - `routes.ts` — runs `router.<verb>(...)` calls on boot
 - `main.ts` — one-time setup (event listeners, custom registrations, boot-time hooks)
 - `events/*.ts(x)` — **any** `.ts(x)` file inside this folder is auto-loaded (convention is `*.event.ts`; the framework doesn't enforce the suffix)
-- `utils/locales.ts` — auto-loaded; holds `groupedTranslations(...)`
+- `utils/locales.json` and `utils/locales/<feature>.json` — auto-loaded translation dictionaries (the old `utils/locales.ts` is deprecated)
 
 Branching at registration time breaks HMR. Conditional behavior belongs inside controllers/services, not around `router.get(...)`.
 
@@ -2049,7 +2049,7 @@ await warmupProductCache();
 - **`generate.module` does not run the migration.** It only creates the migration file. Run `npx warlock migrate` separately to apply it.
 - **`models/<entity>/` is its own folder, not a flat file.** The generator puts `product.model.ts` inside `models/product/` so migrations can sit beside the model in `models/product/migrations/`.
 - **Don't import `routes.ts`, `main.ts`, or anything in `events/`.** They're auto-loaded; double-loading errors out at boot.
-- **`utils/locales.ts` is mandatory for translation keys.** Skip it and `t("products.notFound")` silently falls back to the key itself.
+- **`utils/locales.json` is where translation keys live.** Skip it and `t("products.notFound")` silently falls back to the key itself.
 - **The CRUD list service uses `listCached`, not `list`.** Switch to `list(...)` if your data churns faster than the cache invalidates.
 
 ## See also
@@ -2061,7 +2061,7 @@ await warmupProductCache();
 - The `define-resource` topic — the output mapper for the model.
 - The `validate-input` topic — wiring `schema/*.schema.ts` to controllers.
 - The `write-seeder` topic — populating the generated `seeds/` folder.
-- The `use-localization` topic — populating the generated `utils/locales.ts`.
+- The `use-localization` topic — populating the generated `utils/locales.json`.
 
 ## Verify generated imports
 
@@ -4309,6 +4309,95 @@ GitHub CLI flags: [list](https://cli.github.com/manual/gh_issue_list),
 [authentication](https://cli.github.com/manual/gh_auth_status).
 
 
+## request-log  `@warlock.js/core/skills/request-log/SKILL.md`
+
+---
+name: request-log
+description: 'Persistent, redacted request log (`http.logging.requests`) — one JSON record per request in `storage/logs/requests/YYYY-MM-DD.jsonl`, kept after restarts: URL, route, status, timing, redacted headers/body/response, log entries, query count with N+1, and the 5xx error with stack, phase, page file and site. Covers `enabled`/`only`/`slowMs`/`sampleRate`/`include`/`maxBodyBytes`/`retention`/`channels`, production defaults, reading it with `warlock logs requests` / `warlock logs request <id>`, the `request_log` MCP tool and devtools, and `listRequestLogs`/`getRequestLog`/`RequestLogRecord`. Triggers: "why did this request 500 in production", "request history", "find the failing request", "http.logging.requests", "warlock logs". Skip: lifecycle log lines and hiding a route''s body (`http.logging`, `logging: { body: false }`) — the logging docs; timing spans/OTel — the `request-tracing` topic; a live timeline of a dev request — `warlock-trace`.'
+---
+
+# Warlock — request log
+
+Use it to answer "what happened to that request?" after the fact, in production
+or after a dev-server restart. One JSON record per request is written **after
+the response is sent**, so it never slows a request and never breaks one (a
+failing channel is reported once on stderr).
+
+## Turn it on
+
+```ts
+// src/config/http.ts
+export default {
+  logging: {
+    requests: {
+      enabled: true, // default: true in development, false elsewhere
+      only: "errors", // "all" | "errors" | "slow"   (default: "all" in dev, "errors" otherwise)
+      slowMs: 1000,
+      sampleRate: 1, // 0..1; 5xx are always kept when `only` is "all" or "errors"
+      include: { body: false, response: false }, // production defaults; headers are allowlisted
+      maxBodyBytes: 16384,
+      retention: { maxDays: 14, maxSizeMb: 256 }, // default file channel
+      // channels: ["sentry", myChannel] // default: daily JSON-lines file
+    },
+  },
+};
+```
+
+Resolved once and cached for the process. Disabled means one boolean check per
+request, nothing else.
+
+## What a record has
+
+`type`, `id`, `traceId`, `time` (ISO), `method`, `url` (credential query values
+masked), `route: { name, pattern }`, `params`, `query`, `headers`, `body`,
+`session: { userId, userType }`, `ip`, `status`, `durationMs`,
+`response: { size, headers?, body? }`, `phases`, `logs` (entries emitted during
+the request, by request id, max 200), `queries: { count, slowest?, nPlusOne? }`,
+and `error: { message, name, stack, phase, file, site }` for a 5xx or a request
+that threw. The type is `RequestLogRecord`, exported from `@warlock.js/core`.
+
+## Privacy rules you can rely on
+
+- The logger's redaction (default key denylist plus `log.setRedact`) runs over
+  the whole record. `authorization`, `cookie`, tokens and passwords are
+  `[REDACTED]`.
+- Outside development request headers pass an allowlist (no cookies or
+  credentials at all), and `body` / `response` are off unless set to `true`.
+- `http.logging.private` URL rules and a route's `logging: { body: false, query: false }`
+  apply; a route that hides its request body also hides its response body.
+- Uploaded files are `{ file, mimeType }` only. Bodies over `maxBodyBytes` end
+  with `…[truncated, N bytes]`.
+
+Keep `include.body` off on apps that accept secrets in free-form fields: the
+body is recorded as received, before validation.
+
+## Read it
+
+```bash
+warlock logs requests --status 5xx --since 1h          # list, newest first
+warlock logs requests --route posts --limit 20 --json
+warlock logs request <id> --json                       # one record in full
+```
+
+- MCP: the read-only `request_log` tool (`id` for one record, else filters
+  `status`, `route`, `method`, `since`, `q`, `limit`).
+- Devtools merges the files with its live ring buffer (no duplicates by id),
+  filters, opens a saved request and copies it as curl.
+- Code: `listRequestLogs(filter?)`, `getRequestLog(id)`, `requestLogToCurl(record)`.
+
+These read the **default file channel** (`storage/logs/requests`). Custom
+`channels` are write-only from the framework's point of view.
+
+## Gotchas
+
+- A 4xx is not an error for `only: "errors"`; use `only: "all"` with a
+  `sampleRate` to keep a share of them.
+- Turning it on registers an internal tracing hook (for `phases`) and a passive
+  log collector; neither changes where your logs go.
+- Do not copy a record into tickets without checking `body`: redaction is by key
+  name, so a secret under an unlisted key (`providerId`) is not masked.
+
+
 ## request-memo  `@warlock.js/core/skills/request-memo/SKILL.md`
 
 ---
@@ -6331,8 +6420,14 @@ detail nested under `payload`:
 Every unhandled error response also carries
 `Cache-Control: private, no-store`, regardless of status. The floor is
 applied once at the shared error funnel, so API-route errors cannot be stored
-and replayed across users. In development mode, the stack trace is included
-too.
+and replayed across users. In development mode, the stack trace and the
+`requestId` are included too; production bodies stay generic.
+
+Every 5xx also writes exactly one `error`-level log record (`module: "http"`,
+`action: "request.<phase>"`) with the method, pathname, route name and pattern,
+handler, the middleware that threw (when it was one), phase, error, stack and
+request id. A 4xx is never logged as an error, and a returned `503` is treated
+as an intentional "unavailable" answer rather than a failure.
 
 Pick the class, throw from the service or use-case, and forget about response shaping at the call site. The controller stays focused on the success path:
 
@@ -7619,7 +7714,8 @@ An unknown fake name or a non-boolean value fails setup with the list of known f
 
 ## Gotchas
 
-- **Recorded state lives for the test file.** Call `clear()` in `beforeEach` when tests in one file must not see each other's mails or jobs.
+- **Recorded state lives for the test file.** Call `clear()` in `beforeEach` when tests in one file must not see each other's mails or jobs. With `tests.lifetime: "worker"` the fakes are reinstalled before every file, so a file always starts empty.
+- **Vitest 5 defaults `clearMocks` to true, and that also clears calls a module made when it was imported.** A scheduler that registers jobs, or an event bus that subscribes, from a `main.ts` imported at the top of the spec has its recorded calls cleared before the first test, so asserting them fails although the code ran. Import the module inside the test (`await import("./main")`) after the mocks are set up, or set `clearMocks: false` for the project. The Warlock fakes (`mailFake`, `queueFake`, ...) record on their own and are not affected by `clearMocks`, which only touches `vi.fn()` mocks and spies.
 - **Real deliveries in tests need an opt-out.** A test that relied on a real SMTP sink, a Redis cache shared between the HTTP server and the workers, or a real bucket now gets the fake — set that fake to `false`.
 - **The queue seam is public.** `setDispatchInterceptor({ dispatch, find? })` from `@warlock.js/queue` replaces the broker for every job in the process; `queueFake` is built on it.
 
@@ -8611,7 +8707,8 @@ Node process, preserve the source package's module mode. ESM fixtures need a
 CommonJS and named exports fail before the behavior under test runs. Assert the
 child process exit status with its captured stderr before checking stdout.
 
-- **By default `setupTest` boots per test file** — every version of this skill through 4.13.0 said otherwise. **You pay one framework bootstrap per test file**, which is what 4.13.0 already cost; the difference is that it is now a chosen lifetime rather than a side effect of a module flag resetting.
+- **Vitest 5's `clearMocks: true` clears calls made at import time.** A module that calls a mocked function when it is imported (a scheduler registering jobs from a `main.ts`, an event bus subscribing) records those calls before the first test, and Vitest clears them before the first test runs, so `expect(mock).toHaveBeenCalled()` fails although the code ran. Import the module inside the test (`await import("./main")`) after the mocks are set up, or set `clearMocks: false` for that project.
+- **Apps created before 5.38 boot per test file; apps generated by 5.38 or newer boot per worker** — every version of this skill through 4.13.0 said otherwise. **You pay one framework bootstrap per test file**, which is what 4.13.0 already cost; the difference is that it is now a chosen lifetime rather than a side effect of a module flag resetting.
 - ⛔ **Never delete the `afterAll(teardownTest)` from your setup file.** Without it nothing closes what `setupTest` opened, and the connectors outlive the file that started them.
 - ⛔ **You can't swap the connector set by calling `setupTest` again — it rejects now.** Through 4.13.0 the second call was silently ignored. Tear down first, or don't call it.
 - **These connections are separate from the HTTP test server's.** A row inserted by a service-level test is on this connection; the HTTP test server has its own. They only see each other if both point at the same physical DB **and** the inserting test has committed.
@@ -8648,6 +8745,13 @@ and has no Warlock setup or HTTP global setup. `integration` discovers
 It uses the framework setup, HTTP global setup and a generated `src/test-runner.ts`.
 Keep pure service specs beside their source and mock repositories at the boundary.
 Existing config files are preserved; copy the projects layout into them manually.
+The generated `unit` project lists `plugins: [guardUnitProject()]` (from
+`@warlock.js/core/vite`) and `env: { WARLOCK_TEST_PROJECT: "unit" }`: a unit spec that
+imports a connector, `connectorsManager`, `bootstrap`, a test-server helper, or calls
+`setupTest()` without `{ mode: "unit" }` fails with a message naming the import and
+saying to move the spec to the integration project. `warlock check` reports `WL9024`
+(a warning) for the opposite mistake, an integration spec that imports nothing needing
+the app: rename it to `*.spec.ts`.
 Vitest 5 or newer is required for the generated runner (Vitest 5 removed `vitest/runners`; the runner extends `TestRunner` from `vitest`).
 
 For a unit spec that needs configuration values, use:
@@ -8672,11 +8776,14 @@ file can still perform I/O. A plain unit spec usually needs no `setupTest()` at 
 `connectors: false` still bootstraps; it is not the cheap unit mode. Use separate
 projects for unit and integration runtimes.
 
-### Opt into one runtime per fork
+### One runtime per fork (the default for new apps)
 
-The default remains `tests.lifetime: "file"`. To reuse a runtime, change the
-integration project's `isolate` to `false`, keep `pool: "forks"` and
-`runner: "./src/test-runner.ts"`, then configure:
+Apps generated by 5.38 or newer use `tests.lifetime: "worker"` with `resetDatabase: true`,
+`isolate: false` on the integration project and one database per worker. An app created
+earlier keeps `tests.lifetime: "file"` until it opts in; `warlock upgrade` lists the places
+(`test-runtime-worker-lifetime`). `WARLOCK_TEST_LIFETIME=file` switches a generated app back
+to one runtime per file. To opt an existing app in, change the integration project's
+`isolate` to `false`, keep `pool: "forks"` and `runner: "./src/test-runner.ts"`, then configure:
 
 ```ts title="src/config/tests.ts"
 import { resetWorkerDatabase } from "../test-database";
@@ -8715,9 +8822,15 @@ export default class WarlockTestRunner extends TestRunner {
 }
 ```
 
-The first file bootstraps; subsequent files reuse connectors and config. Between
-files, selected fakes are restored and reinstalled, resetting mail/queue records,
-cache, secrets, clock, IDs and a private storage directory. Worker storage is
+The first file bootstraps; subsequent files reuse connectors and config. Before each
+file the runtime resets, in this order: test HTTP servers the previous file left open are
+closed; the request context is cleared; the route table returns to the snapshot taken after
+the app booted (routes a file registered by hand are removed, the app's routes stay); a real
+in-memory cache driver is flushed; the database is truncated (`resetDatabase`); then
+`resetBetweenFiles` runs. Selected fakes are restored and reinstalled first, resetting
+mail/queue records, the cache fake, secrets, the fake clock, IDs and a private storage
+directory. Notification and other connector state outside those fakes is yours to reset in
+`resetBetweenFiles`. Worker storage is
 separate from the global HTTP server's storage: use an in-process test HTTP server
 when assertions need to see request-side fake state. The hook runs after fake
 reset and before fixtures. It must finish before returning. Within a file,
@@ -8735,6 +8848,18 @@ global setup. A shared HTTP server and a single replica set can contend on I/O,
 locks and shared fixtures even though workers run concurrently. Scope rows and
 HTTP fixtures per worker, or run tests that require global mutation separately
 with `maxWorkers: 1`. No test-server teardown ownership changes are needed here.
+
+A spec that changes global configuration the reset does not undo (`config.set`, process
+environment, a driver option) opts its own file out:
+
+```ts title="src/app/billing/tests/gateway-config.test.ts"
+await setupTest({ importModule: (file) => import(file), lifetime: "file" });
+```
+
+The worker's shared runtime is shut down, the file gets a fresh runtime that its own
+`teardownTest()` closes, and the next file goes back to the worker lifetime. The cost is one
+extra boot for that file. `lifetime: "file"` is the only accepted value; it has no effect
+under the default file lifetime.
 
 `getTestRuntimeStats()` from `@warlock.js/core/tests` returns process-local
 `{ bootstraps, files }`. For example, after setup in worker mode:
@@ -8798,13 +8923,23 @@ Set `tests.profileSetup: true` or run
 setup does this). Each file emits one line with milliseconds for environment, config,
 bootstrap, orchestrator, app config, connectors, fakes, reset and teardown as
 applicable, plus `body`, the time between setup finishing and teardown starting.
-Reused files report reset instead of startup steps. When a file-lifetime run spends
+Reused files report reset instead of startup steps. A file that booted also reports one
+`connector.<name>` entry per connector (its `boot()` plus `start()`), which names the slow one:
+the database connector includes opening the connection and registering models, the web
+connector includes creating the Vite dev server. App module loading (routes, `main.ts`,
+events, models) is `appModules`. When a file-lifetime run spends
 half or more of its time in setup over at least four files, the worker summary and
 `TestSetupReporter` print a line recommending worker lifetime. A summary per
 worker reports file/bootstrap counts, summed step timings and final shutdown.
 The generated config also installs `TestSetupReporter` from `@warlock.js/core/vite`
 (`reporters: ["default", new TestSetupReporter()]`), which aggregates file counts,
-bootstrap counts and timings across PIDs into a run summary. Summed timings are
+bootstrap counts and timings across PIDs into a run summary. With profiling on, the same
+block lists the boot phases (config, translations, connectors, fakes, routes, reset,
+teardown), each connector, the HTTP test server's own boot phases (`startHttpTestServer()`
+prints a `[warlock:test] server` line, and its web connector and Vite show up as
+`connector.web`) and the five slowest files. Set `WARLOCK_TEST_PROFILE_JSON=profile.json` (or
+`new TestSetupReporter({ json: "profile.json", slowest: 10 })`) to also write the profile as
+JSON: `phases`, `connectors`, `server`, `slowestFiles` and `perFile`. Summed timings are
 not wall time. Worker shutdown is included when its summary reaches the reporter
 before the run-end callback; individual worker summaries always report it.
 
@@ -8861,6 +8996,17 @@ AND applies the code edits its breaking changes need, listing the rest with
 is installed the detected `@warlock.js/core` is already the target. See the
 `upgrade-from-5-29` topic.
 
+To learn what an upgrade will break before touching the project, run
+`warlock upgrade --check --from <current> --to <version>`. It copies the app
+(without `node_modules`, `.git` and `storage`) to a temporary directory, applies
+the upgrade there, installs there with the detected package manager, then runs
+typings, typecheck, `warlock doctor` and the `unit` Vitest project, and reports
+the breaking changes that hit the app and each step's result. The real project
+is never written. It runs one command at a time at low priority with a heap cap
+(`--memory-mb`, default 4096) and a time limit (`--timeout-minutes`, default 20);
+`--skip-install` stops after applying the upgrade to the copy, `--keep` leaves
+the copy on disk. Exit code 1 when a step failed.
+
 ## `warlock update`
 
 ```bash
@@ -8891,21 +9037,29 @@ What it does, in order:
 2. Collects every `@warlock.js/*` package across `dependencies` and `devDependencies`. Only the `@warlock.js/` scope is considered — `create-warlock` and unrelated dependencies are never touched.
 3. Looks up each package's latest version on the npm registry, in parallel.
 4. Rewrites each matching spec, **preserving the range operator**: `^4.2.0` → `^4.3.0`, `~4.2.0` → `~4.3.0`, an exact `4.2.0` → `4.3.0`. Specs that are not a plain semver — `workspace:*`, `*`, `latest`, git/file URLs — are left exactly as written, and any package already at or ahead of latest is skipped.
-5. Runs the project's install to reconcile `node_modules`. The package manager is the `packageManager` field, then a workspace file, then the nearest lockfile; when several lockfiles sit side by side, `bun.lock` wins and otherwise the most recently modified one (the command says which). Skipped with `--no-install`.
+5. Runs the project's install to reconcile `node_modules`. The package manager is chosen in this order, and the command always prints which one it picked and why:
+   1. the `packageManager` field in `package.json`;
+   2. the manager that installed `node_modules` (the marker it left there: npm's `node_modules/.package-lock.json`, the pnpm `.pnpm` folder or `.modules.yaml`, yarn's `.yarn-state.yml` or `.yarn-integrity`, bun's `.bun`);
+   3. the nearest lockfile that lists every dependency in `package.json`; when several remain, `bun.lock` wins and otherwise the most recently modified one;
+   4. a workspace file, only when no lockfile exists at all.
+
+   A stale workspace file next to an old lockfile never outranks the lockfile your installs actually use. Skipped with `--no-install`.
 
 With npm it first removes the `@warlock.js/*`, `vite`, `vitest`, `@vitest/*` and `@vitejs/*` entries from `package-lock.json`, so one `npm install` re-resolves them together (the family's peers name each other). **Use npm 11.6.2 or newer**: npm 10.9, bundled with Node 22.15, can fail with `ERESOLVE` or an arborist `edgesOut` crash; the command warns when npm is older, and `npx npm@11 install` is the way around it.
 
 The family's packages pin each other to the exact same version (lockstep), so a mixed set is not a valid install. `warlock check` reports it as `WL8010`; fix it with `warlock update`. `warlock upgrade` never moves a package down: one already newer than `--to` is left and listed.
 
-| Lockfile                 | Install        | Add (`warlock add`) |
-| ------------------------ | -------------- | ------------------- |
-| `bun.lock` / `bun.lockb` | `bun install`  | `bun add`           |
-| `package-lock.json`      | `npm install`  | `npm install`       |
-| `yarn.lock`              | `yarn install` | `yarn add`          |
-| `pnpm-lock.yaml`         | `pnpm install` | `pnpm add`          |
-| _none_                   | `npm install`  | `npm install`       |
+| Lockfile                 | Manager |
+| ------------------------ | ------- |
+| `bun.lock` / `bun.lockb` | bun     |
+| `package-lock.json`      | npm     |
+| `yarn.lock`              | yarn    |
+| `pnpm-lock.yaml`         | pnpm    |
+| _none_                   | npm     |
 
-Bun is checked **first**: a Bun project may also carry a `yarn.lock` (Bun writes one for tooling compatibility), and matching yarn there would run the wrong installer against the wrong lockfile. `warlock update` and `warlock add` share this detection, so they can never disagree.
+Each manager runs its own install command (`warlock add` uses the matching add command). Set `"packageManager"` in `package.json` to pin the choice.
+
+Among lockfiles of equal standing, Bun is checked **first**: a Bun project may also carry a `yarn.lock` (Bun writes one for tooling compatibility), and matching yarn there would run the wrong installer against the wrong lockfile. `warlock update` and `warlock add` share this detection, so they can never disagree.
 
 Re-running on an already-current project is a no-op: nothing resolves as newer, so it prints "All @warlock.js packages are already up to date" and exits without writing or installing.
 
@@ -9642,8 +9796,28 @@ assertion fails the test. Vitest also no longer searches parent directories for 
 config file; run it from the package that owns the config. Official guides:
 https://vite.dev/guide/migration and https://vitest.dev/guide/migration.
 
+`clearMocks: true` also clears calls a module made when it was imported, before the
+first test runs. A scheduler that registers jobs, or an event bus that subscribes, from a
+`main.ts` imported at the top of a spec has those recorded calls cleared, so asserting them
+fails after the upgrade although the code ran. Import the module inside the test
+(`await import("./main")`) once the mocks are set up, or set `clearMocks: false` for the
+project.
+
 A project that uses `@warlock.js/ai`'s custom matchers needs Vitest 5 for their
 TypeScript types.
+
+## 5.37 to 5.38 test runtime defaults
+
+Apps generated by 5.38 boot the test framework once per Vitest worker
+(`lifetime: "worker"`, `resetDatabase: true`, `isolate: false`, one database per worker via
+`workerDatabaseName()`), and the generated `unit` project fails a spec that imports a
+connector or boots the app. An existing app keeps its configuration; nothing changes until
+you edit it. The `test-runtime-worker-lifetime` codemod edits nothing and lists the two
+places: `src/config/tests.ts` without a `lifetime`, and a `unit` project without
+`plugins: [guardUnitProject()]`. A spec that changes global configuration opts out of a
+worker runtime with `setupTest({ importModule, lifetime: "file" })`. `warlock check` reports
+`WL9024` (a warning) for an integration spec that imports nothing needing the app; rename
+it to `*.spec.ts`.
 
 
 ## upload-file  `@warlock.js/core/skills/upload-file/SKILL.md`
@@ -10270,6 +10444,80 @@ cors: {
 - The `warlock-conventions` topic — module layout, where paths point to.
 
 
+## use-capabilities  `@warlock.js/core/skills/use-capabilities/SKILL.md`
+
+---
+name: use-capabilities
+description: 'Break an import cycle or let one module plug into another with a typed, discoverable slot: `defineCapability<T>(name, { description, required })` declares it, `provideCapability(capability, implementation)` fills it from a module that loads at boot, `useCapability(capability)` reads it (throws `WL2008` when nothing provided it), `hasCapability` and `listCapabilities` inspect it. `warlock inspect --section wiring` lists each slot with its provider and consumers, and `warlock doctor` warns when a required one has no provider. Triggers: `defineCapability`, `provideCapability`, `useCapability`, `hasCapability`, `listCapabilities`, `Capability`, `CapabilityNotProvidedError`, `WL2008`, `inspect_wiring`, `--section wiring`; "circular import between modules", "module A needs module B but B imports A", "late-bound dependency", "register an implementation at boot", "plug-in point", "which file provides this", "what loads automatically". Skip: a service shared across the process by key — the `use-app-context` topic (`container`); events between modules — the `events` docs page; config values — the `configure-app` topic.'
+---
+
+# Warlock — capabilities
+
+A capability is a named, typed slot. One module declares it, another fills it at boot, and any module reads it. Use it where a direct import would create a cycle (billing needs to send mail through a notifier that imports billing) or where a feature must plug into one that loads earlier. It replaces a module-level `let` that nobody can find: the framework knows every capability, who provides it and who reads it.
+
+```ts
+// src/app/billing/capabilities.ts: declare the slot, with the shape of what fills it
+import { defineCapability } from "@warlock.js/core";
+
+export type InvoiceMailer = { send(invoiceId: string): Promise<void> };
+
+export const invoiceMailer = defineCapability<InvoiceMailer>("billing.invoiceMailer", {
+  description: "Sends an invoice by email",
+});
+```
+
+```ts
+// src/app/notifications/main.ts: fill it at boot (main.ts, routes.ts and event files load automatically)
+import { provideCapability } from "@warlock.js/core";
+import { invoiceMailer } from "app/billing/capabilities";
+import { sendInvoiceEmail } from "./services/send-invoice-email.service";
+
+provideCapability(invoiceMailer, { send: sendInvoiceEmail });
+```
+
+```ts
+// src/app/billing/services/send-invoice.service.ts: read it where it is needed
+import { useCapability } from "@warlock.js/core";
+import { invoiceMailer } from "../capabilities";
+
+export async function sendInvoice(invoiceId: string) {
+  await useCapability(invoiceMailer).send(invoiceId);
+}
+```
+
+## The API
+
+| Call                                          | Does                                                                                                                      |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `defineCapability<T>(name, options?)`         | Declares the slot. `options.description` is shown by `inspect`; `options.required` (default `true`) drives the doctor warning. Defining a name again updates it and keeps the provider. |
+| `provideCapability(capability, implementation)` | Fills the slot. A second call replaces the first.                                                                       |
+| `useCapability(capability)`                   | Returns the implementation. Throws `CapabilityNotProvidedError` (`WL2008`) when nothing provided it.                       |
+| `hasCapability(capability)`                   | `true` when something provided it. Use it for an optional capability (`required: false`).                                  |
+| `listCapabilities()`                          | Every defined capability with `provided`, `definedIn`, `providedBy` and `consumers` (absolute files, best effort).         |
+
+Names are global strings: prefix them with the module (`billing.invoiceMailer`). The type parameter of `defineCapability` is checked at `provideCapability` and returned by `useCapability`; the name is not, so export the capability from the declaring module and import it, never re-declare the name.
+
+## Providing at the right time
+
+Provide from a file the framework loads on its own, so the slot is full before the first request: `main.ts`, `routes.ts`, an event file or a worker (`warlock inspect --section wiring` shows them in boot order). Do not provide inside a request handler. Do not read a capability at module scope in a file that loads before its provider; read it inside the function that needs it.
+
+## Seeing and checking the wiring
+
+```bash
+warlock inspect --section wiring        # auto-loaded files in boot order, then the capability slots
+warlock inspect --json --section wiring # the same as JSON (MCP tool: inspect_wiring)
+warlock doctor                          # `capabilities` warns (WL2008) about a required slot with no provider
+```
+
+In tests, call `resetCapabilities()` between cases that define their own, and `provideCapability` a fake before the code under test runs.
+
+## Gotchas
+
+- `consumers` lists the files that read the capability while the app booted. A capability read only inside a request handler shows none until that handler runs.
+- Mark an optional integration `required: false`, or `warlock doctor` warns about it on every run.
+- A capability is a process-wide singleton, like the container. It is not per request; for per-request data use `request.locals` (the `use-request-locals` topic).
+
+
 ## use-localization  `@warlock.js/core/skills/use-localization/SKILL.md`
 
 ---
@@ -10326,12 +10574,50 @@ file yourself.
 }
 ```
 
-`utils/locales.ts` with `groupedTranslations` remains supported but is
-deprecated and will be removed in v6. Migrate it with `warlock doctor --fix`.
+### Split a busy module into per-feature files
+
+A module's dictionary grows with every feature, and one shared JSON file is where
+parallel work collides. Put each feature's keys in
+`src/app/<module>/utils/locales/<feature>.json` instead (or beside
+`locales.json`). Every file of the module is merged into the one translation
+registry when it loads, in `warlock dev`, `warlock build` and test workers, and
+the per-page translation tables of `@warlock.js/web` are built from that merged
+registry.
+
+```json title="src/app/products/utils/locales/reviews.json"
+{
+  "reviewAdded": { "en": "Review added", "ar": "تمت إضافة التقييم" }
+}
+```
+
+- The module name is the default group, so this registers `products.reviewAdded`;
+  a root `$group` string picks another group.
+- A key may live in one file only. Two files that define the same key fail at
+  load and name both files.
+- Only `utils/locales.json` and `utils/locales/<feature>.json` (one level deep)
+  are loaded.
+
+### Every key needs every configured locale
+
+`npx warlock check` reports `WL9105` for each key that lacks one of the
+configured locales, naming the file and the key. The configured locales are
+`localeCodes` in `src/config/app.ts`; set `"localeCodes": ["en", "ar"]` in
+`.warlock-check.json` to override them. The rule is skipped when neither names
+any. Boot fails on the same gap, so this moves the error into the pull request.
+
+### `utils/locales.ts` is deprecated
+
+`utils/locales.ts` with `groupedTranslations` still loads but is deprecated and
+will be removed in v6, not before. The dev server and `warlock build` warn and
+name every such file, and `warlock doctor` lists them under `WL9101`. Run
+`warlock doctor --fix` to move a file that only holds one literal
+`groupedTranslations` call into the module's `locales.json`, or into
+`locales/legacy.json` when `locales.json` already exists and shares no key with
+it. A file with computed keys or other code stays and is reported as manual.
 
 ### Legacy `groupedTranslations`
 
-Every module owns its translation namespace under `src/app/<module>/utils/locales.ts`. The file is auto-loaded at boot — you don't import it from anywhere; the framework picks it up via the module loader.
+Only for an app that has not migrated. Every module owns its translation namespace under `src/app/<module>/utils/locales.ts`. The file is auto-loaded at boot — you don't import it from anywhere; the framework picks it up via the module loader.
 
 ```ts title="src/app/products/utils/locales.ts"
 import { groupedTranslations } from "@mongez/localization";
@@ -11876,6 +12162,10 @@ type UpdateProductOutput = Infer.Output<typeof updateProductSchema>;
 
 The bare `Infer<T>` is the input shape (what the client sends). `Infer.Output<T>` is what's available after validation and transformation. For most service signatures, `Infer<typeof schema>` is what you want.
 
+## Field names in messages
+
+`:input` in a message is the field's label: `.label("...")`, else `attributes.<field>` (or `validation.attributes.<field>`) in the request's locale, else the key in words (`max_dumbbell_kg` becomes "Max dumbbell kg"). Set `validation.humanizeAttributes: false` for the raw key. `validation.warnMissingLabels: true` makes `warlock doctor` list schema fields with no label per locale (`WL4002`).
+
 ## Database-aware rules
 
 The DB validators come from two plugins: base `unique`/`exists` (registered by `@warlock.js/cascade`) and request-aware `…ExceptCurrentId`/`…ExceptCurrentUser` (registered by `@warlock.js/core`). All four chain onto scalar validators:
@@ -12016,6 +12306,10 @@ const validationConfig: ValidationConfiguration = {
 
 export default validationConfig;
 ```
+
+## Request schemas from a Cascade model
+
+Do not redeclare the fields a model already has. Mark the ones only the server sets `.internal()` on the model schema, then derive the request schema: `Post.requestSchema().pick("title", "body")` (or `.partial()` for an update). Set the internal values in the controller: `Post.create({ ...request.validated(), authorId: request.locals.user.id })`.
 
 ## Scoping what's validated
 
@@ -12174,7 +12468,7 @@ Mutating routes without an auth guard (confirm each is meant to be public): `POS
 <!-- warlock:generated:end -->
 ```
 
-Sections: app + `@warlock.js/*` versions, modules (`src/app/*`, routes/models per module), routes (counts, unguarded writes, a list capped at 60), models (table, module), conventions in force (`WL9001`–`WL9004` and the layout rules), installed skills (`node_modules/@warlock.js/*/skills/*/SKILL.md`, first sentence each), verify commands. No timestamps: an unchanged app regenerates the same bytes and nothing is written.
+Sections: app + `@warlock.js/*` versions, modules (`src/app/*`, routes/models per module), routes (counts, unguarded writes, a list capped at 60), models (table, module), conventions in force (`WL9001`–`WL9004` and the layout rules), installed skills (`node_modules/@warlock.js/*/skills/*/SKILL.md`, plus a package's single `skills/SKILL.md` under its front-matter `name`, first sentence each), verify commands. No timestamps: an unchanged app regenerates the same bytes and nothing is written.
 
 ## Rules
 
@@ -12427,6 +12721,9 @@ jq -r '.problems[] | "\(.file // "-"):\(.line // 0) \(.code) \(.message)\n  → 
 | `WL9008`            | raw email, credential or request body in a log call                                                           |
 | `WL9009`            | regex with `*` / `+` / `{n,}` run on request input                                                            |
 | `WL9010`–`WL9012`   | warnings: `await log.*()`, a second controller in a file, a `kind` discriminator                              |
+| `WL9022`            | server-only code (controller, service, repository, model, route, connector, `*.server.*`) imports a `*.client.*` module — the message names the chain |
+| `WL9023`            | an app-module `index.ts` that only re-exports; **off by default** (`rules.WL9023` in `.warlock-check.json`)   |
+| `WL9105`            | a key of `utils/locales.json` or `utils/locales/<feature>.json` lacks a configured locale (`app.localeCodes`) |
 | `WL8001`–`WL8007`   | this machine: Node version, missing tool, unreachable service, busy port, esbuild binary, git, tool crash/OOM |
 | `WL8010`            | installed `@warlock.js/*` packages on different versions — run `warlock update`                               |
 
@@ -12514,6 +12811,8 @@ They parse real TypeScript/JSX syntax with the same oxc-parser adapter as the ex
 | `WL9018` | Exported `RequestHandler` in `src/app/**/controllers` lacks `responseSchema`     | Assign `handler.responseSchema` to document each response status.                                                                                                  |
 | `WL9019` | Browser route call (`apiHref`, `useSubmitForm({ route })`) takes a run-time name | Pass a string literal or a template with a static prefix, or declare the names with `config.apiRoutes` in a page setup file.                                       |
 | `WL9020` | Browser code names a route registered with `clientVisible: false` (error)        | Call the endpoint from the server, or remove `clientVisible: false` from the route.                                                                                |
+| `WL9021` | A Cascade column is read or written as a model property (warning)               | Use `model.get("column")` / `model.set("column", value)`; `--fix` rewrites it.                                                                                     |
+| `WL9024` | Integration spec imports nothing that needs the app (warning)                    | Move it to the unit project: rename `*.test.ts` to `*.spec.ts` outside `tests/`.                                                                                   |
 | `WL9104` | Translation key computed at runtime in `src/web` (the page ships every group)    | Declare the keys with `config.translations` in the page's setup file, for example `["statuses.*"]`.                                                                |
 
 Web rules apply to `src/web/**/*.tsx`. Components are top-level JSX-returning functions
@@ -12551,7 +12850,7 @@ Vitest uses related mode. TypeScript still compiles incrementally as a program, 
 diagnostics to the selection and its importers; this is not a partial compilation.
 
 `--fix` applies safe convention edits before the pipeline. Currently it removes `.js`
-suffixes from relative imports (`WL9002`). Ignored/disabled findings are not fixed.
+suffixes from relative imports (`WL9002`) and rewrites `model.column` reads on Cascade models to `model.get("column")` (`WL9021`). Ignored/disabled findings are not fixed.
 Component extraction, control replacement and response schemas require human decisions.
 Problems that have a safe edit include optional `fix: { start, end, text }` in JSON;
 `start` and `end` are zero-based source string offsets with an exclusive end.
@@ -12596,7 +12895,7 @@ This skill is the foundation. Every other warlock skill (`register-route`, `crea
      `worker` role, and always loaded by `warlock dev`
    - `src/app/main.ts` — **project-level** one-time application setup (global hooks and other app initialization; connector instances belong in `warlock.config.ts > connectors`)
    - `src/app/<module>/events/*.ts(x)` — **any** `.ts(x)` file inside the `events/` folder (the `*.event.ts` suffix is convention, not a framework requirement)
-   - `src/app/<module>/utils/locales.ts` — module translations via `groupedTranslations(...)`
+   - `src/app/<module>/utils/locales.json` and `utils/locales/<feature>.json` — module translations (the old `utils/locales.ts` is deprecated; `warlock doctor --fix` converts it)
    - `src/config/*.ts(x)` — subsystem config files
 3. **Canonical imports — each package owns its surface.** `@warlock.js/core` does **NOT** re-export `v`/`Infer` or Cascade types. Import from the home package:
    - `v`, `Infer` → `@warlock.js/seal`
@@ -12648,12 +12947,28 @@ src/app/<module>/
   schema/                   seal schemas (`<action>.schema.ts`) — value + type from one file
   events/                   any `*.ts(x)` file here is auto-loaded
   types/                    `.type.ts` files for module-internal types
-  utils/                    module-private helpers (`utils/locales.ts` is auto-loaded)
+  utils/                    module-private helpers (`utils/locales.json` and `utils/locales/*.json` are auto-loaded)
   seeds/                    seed data for `warlock seed`
   routes.ts                 ← auto-loaded
   main.ts                   ← auto-loaded once, one-time setup
   worker.ts                 ← auto-loaded for the worker role only
 ```
+
+### Small files or fewer files
+
+One export per file is the default for controllers, services and components, not a ban on small companions. A service, repository or controller file may export the small input and output types it is written around next to the function that uses them (`export type CreatePostInput`, `export type CreatePostResult`); `warlock check` raises nothing for that. Move a type to `types/` or `schema/` once another module or the browser needs it, or when the file grows past what reads in one screen. Web UI is unchanged: one component per file, logic in `*.setup.ts` and `use-*.ts`.
+
+### Barrels are optional
+
+`index.ts` barrels in `src/app/**` are not required, and a hand-maintained one is a file every feature edits. Import from the file that defines the export. To make that a rule, set `rules: { "WL9023": "warning" }` in `.warlock-check.json` (off by default). To stop generators writing them, set `generate: { barrels: false }` in `warlock.config.ts`; `warlock generate` and `warlock make` then write no model `index.ts` and import the model file directly.
+
+### What the browser may import from a module
+
+`src/app/<module>/` is server code. Browser code (anything the client build reaches from a page) may import from it only `*.client.ts(x)` files, schema files (`*.schema.ts`, `schema/`), type files (`*.types.ts`, `types/`) and the module's `web/` folder; anything else fails the build with the import chain. Type-only imports (`import type`) are erased and always allowed, which is how a page shares a service's input and output types. `web.moduleBoundary` (`"warn"` default, `"error"`, `"off"`) controls it.
+
+### `.client.*` is a client-only boundary
+
+A `*.client.ts(x)` module may be imported by pages, layouts and components, where it renders on the server too unless wrapped in `<ClientOnly>`. Server-only code (controllers, services, repositories, models, routes, connectors, `main.ts`, `events/`, `*.server.*`) must never import it: `warlock check` reports `WL9022` with the import chain, and development SSR refuses it.
 
 Some older modules still have a `validation/` folder instead of `schema/` — historical drift. The framework treats them as plain folders either way; the generator emits to `schema/`.
 
@@ -12834,7 +13149,7 @@ The comment covers the codes it names on its own line and the next; with no code
 
 ---
 name: warlock-doctor
-description: 'Run `warlock doctor` — a read-only diagnostics command that checks routes / config / connectors / optional-peers / health endpoints / release hygiene and prints a pass/warn/fail report, exiting non-zero on any failure. Add your own probe with the `DoctorCheck` contract and `runChecks` / `formatReportLines`. Triggers: `warlock doctor`, `warlock doctor --json`, `toDoctorJson`, `WL1001`, `doctorCommand`, `DoctorCheck`, `CheckResult`, `CheckStatus`, `DoctorReport`, `runChecks`, `formatReportLines`, `printReport`, `defaultDoctorChecks`; "diagnose my app", "preflight / preflight check", "is the app healthy", "why are there 0 routes", "pre-release sanity check", "CI smoke check"; run as `npx warlock doctor`. Skip: the live `/health` + `/ready` HTTP probes — the `health-checks` topic; authoring a general CLI command — the `write-cli-command` topic; releasing the package — `releasing-warlock-monorepo`; competing tools `npm doctor`, `nest info`, hand-rolled preflight scripts.'
+description: 'Run `warlock doctor` — a read-only diagnostics command that checks routes / config / connectors / optional-peers / health endpoints / multi-site renders / capabilities / release hygiene and prints a pass/warn/fail report, exiting non-zero on any failure. Add your own probe with the `DoctorCheck` contract and `runChecks` / `formatReportLines`. Triggers: `warlock doctor`, `warlock doctor --json`, `toDoctorJson`, `WL1001`, `doctorCommand`, `DoctorCheck`, `CheckResult`, `CheckStatus`, `DoctorReport`, `runChecks`, `formatReportLines`, `printReport`, `defaultDoctorChecks`; "diagnose my app", "preflight / preflight check", "is the app healthy", "why are there 0 routes", "pre-release sanity check", "CI smoke check"; run as `npx warlock doctor`. Skip: the live `/health` + `/ready` HTTP probes — the `health-checks` topic; authoring a general CLI command — the `write-cli-command` topic; releasing the package — `releasing-warlock-monorepo`; competing tools `npm doctor`, `nest info`, hand-rolled preflight scripts.'
 ---
 
 # Warlock — `warlock doctor`
@@ -12897,8 +13212,17 @@ The default set is `defaultDoctorChecks` (in registration order — runtime-surf
 | `connectors`      | manager enumerable; reports registered + active set                 | —                                               | (only if the probe itself throws)                                                                          |
 | `optional-peers`  | every known optional peer installed                                 | a peer is missing → its feature is unavailable  | —                                                                                                          |
 | `jwt-secret`      | `auth.userType` configured and a JWT signing secret set             | —                                               | `auth.userType` is configured but no signing secret (`auth.accessToken.secret` / `auth.jwt.secret`) is set |
+| `validation-labels` | every request-schema field has a label in each configured locale | a field has no label in a locale (WL4002) | — |
 | `health`          | `/health` + `/ready` will be exposed                                | `http.health.enabled = false` (probes off)      | —                                                                                                          |
+| `sites`           | each fixed-host site in `web.sites` renders its root page in development without a 5xx | —                         | a site answers 5xx (`WL5005`), with the status, phase and page file                                        |
+| `capabilities`    | every required capability has a provider after boot                 | a required capability has none (`WL2008`)       | —                                                                                                          |
 | `release-hygiene` | `package.json` version matches the top `## x.y.z` CHANGELOG heading | no `CHANGELOG.md`, or no parseable heading      | version ≠ top heading                                                                                      |
+
+`validation-labels` is opt-in: it emits no line unless `validation.warnMissingLabels` is `true`, and it stays silent when the app sets its own `validation.translateAttribute`. It lists fields of registered request schemas (`validation.schema`, nested objects included) that have no label under `attributes.<field>` (or `validation.attributes.<field>`, or the configured `validation.attributeGroup`) in each locale of `app.localeCodes`.
+
+`sites` renders the root page of every site in an app with `web.sites` through the development page pipeline, inside the doctor process (the request is injected into the booted HTTP server; no port is opened). A multi-site app can answer 500 on every page in development and under the test server while production is healthy; this is the check that sees it. It requests `/` (or the site's `basePath`) with the site's first hostname as the `Host` header, one site at a time; a redirect or a 404 is fine, only a 5xx or no answer fails. Sites whose hosts are resolved at runtime (`dynamic: true`) are not rendered.
+
+`capabilities` reads the registry that `defineCapability()` fills (the `use-capabilities` topic): a required capability that no `provideCapability()` call filled while the app booted is a slot the first caller will trip over.
 
 `jwt-secret` is the pre-flight form of the silent first-login 500: when `auth.userType` is set but no signing secret is, every login and token operation fails with a generic 500 at runtime — `doctor` turns that into a `fail` before you ship. It resolves the secret from both the current key (`auth.accessToken.secret`) and the legacy `auth.jwt.secret`, so a project on the older-but-supported shape doesn't trip it. When `auth.userType` isn't configured at all (no auth), the check emits **no line** — it's skipped, not a pass — so it never nags a project that isn't doing auth.
 
@@ -13017,7 +13341,7 @@ Migrate with `npx warlock upgrade --from 5.32 --to 5.33.0` (preview with `--dry-
 
 ---
 name: warlock-inspect
-description: 'Ask the app instead of grepping it: `warlock inspect --json` prints the facts of the booted app — routes (middleware chain, auth guard, CSRF, rate limit, logging, request/response JSON Schema), models (table, columns, relations, resource), resources, config keys and types, event listeners, pages (layouts, loaders, actions), queue jobs, scheduled tasks and installed @warlock.js versions — as a versioned report (`schemaVersion: 1`) with a published JSON Schema; `inspectApp()` returns the same object. Triggers: `warlock inspect`, `--section`, `inspect_routes`, `inspectApp`, `bootForInspect`, `InspectReport`, `INSPECT_REPORT_JSON_SCHEMA`, `inspect-report.schema.json`, `@warlock.js/core/tooling`; "which routes are unguarded", "what does this app expose", "what models and columns exist", "which config keys are set", "list event listeners", "app facts as JSON for an agent". Skip: a route table for humans — the `warlock-routes` topic; health diagnostics — the `warlock-doctor` topic; verifying a change — the `warlock-check` topic; an OpenAPI file — the `generate-openapi` topic.'
+description: 'Ask the app instead of grepping it: `warlock inspect --json` prints the facts of the booted app — routes (middleware chain, auth guard, CSRF, rate limit, logging, request/response JSON Schema), models (table, columns, relations, resource), resources, config keys and types, event listeners, pages (layouts, loaders, actions), queue jobs, scheduled tasks, installed @warlock.js versions and the wiring (auto-loaded files in boot order, capability slots) — as a versioned report (`schemaVersion: 1`) with a published JSON Schema; `inspectApp()` returns the same object. Triggers: `warlock inspect`, `--section`, `inspect_routes`, `inspectApp`, `bootForInspect`, `InspectReport`, `INSPECT_REPORT_JSON_SCHEMA`, `inspect-report.schema.json`, `@warlock.js/core/tooling`; "which routes are unguarded", "what does this app expose", "what models and columns exist", "which config keys are set", "list event listeners", "app facts as JSON for an agent". Skip: a route table for humans — the `warlock-routes` topic; health diagnostics — the `warlock-doctor` topic; verifying a change — the `warlock-check` topic; an OpenAPI file — the `generate-openapi` topic.'
 ---
 
 # Warlock — `warlock inspect`
@@ -13032,7 +13356,7 @@ npx warlock inspect --json --section routes,models   # only some sections
 
 Except for `--section files` (static source inspection without app boot), it boots like `warlock doctor`: connectors boot (routes register) but none starts — no database, cache or socket connection, no port. With `--json`, stdout is only the JSON.
 
-Sections: `routes`, `models`, `resources`, `config`, `events`, `pages`, `jobs`, `schedules`, `packages`, `files`. An unknown section fails before the app boots.
+Sections: `routes`, `models`, `resources`, `config`, `events`, `pages`, `jobs`, `schedules`, `packages`, `files`, `wiring`. An unknown section fails before the app boots.
 
 ## Answer questions with jq
 
@@ -13167,6 +13491,18 @@ router.group({ middleware: [sessionMiddleware({ userTypes: "user" })] }, () => {
   router.post("/settings", async ({ response }) => response.success({ saved: true }));
 });
 ```
+
+## Wiring: what loads on its own
+
+`main.ts`, `routes.ts`, event files, locales and workers are imported by the framework, so no import graph shows them. `warlock inspect --json --section wiring` (MCP: `inspect_wiring`, `filter` on file, name, module, role or type) lists them in boot order, then the capability slots:
+
+```json
+{ "type": "file", "role": "main", "file": "src/app/billing/main.ts", "module": "src/app/billing", "order": 4 }
+{ "type": "capability", "name": "billing.invoiceMailer", "required": true, "provided": true,
+  "definedIn": "src/app/billing/capabilities.ts", "providedBy": "src/app/billing/main.ts", "consumers": [] }
+```
+
+Files are numbered from 1: config, locales, events, `main` files, routes (alphabetical), workers. A capability with `"required": true, "provided": false` is what `warlock doctor` warns about; see the `use-capabilities` topic. The section needs the booted app (the capabilities are filled by code that runs at boot).
 
 ## Source files and reachability
 
@@ -14101,6 +14437,10 @@ Fast Refresh boundary.
 ### AI input measurement
 
 `warlock ai measure --model <id> [--tools <module>] [--system <file>] [--skills <dir>] [--json]` loads `@warlock.js/ai` lazily without app bootstrap. Model IDs default to OpenAI Responses or use `openai:`, `anthropic:`, `google:` prefixes and the corresponding installed adapter/environment API key. `--model-module <module>` accepts `model`, `default`, or `resolveModel(id)` for custom providers/prices. Tools modules export a `tools` or default array; paths resolve from cwd. The report breaks down messages, system, skills catalogue, and tools, labels native counts versus estimates, and includes uncached input USD only when priced. CLI reports include an explicit `.` user probe and do not preload skill bodies or add skill tools. JSON stdout contains one report. No CLI config registration is required.
+
+### AI tool lint and agent traces
+
+`warlock ai tools --tools <module> [--targets openai-strict,anthropic,google] [--warn-above <tokens>] [--fail] [--json]` lists each tool with its estimated tokens per call and the per-provider schema findings (optional fields sent as required, unsupported keywords, oversized descriptions); `--fail` exits 1 on an error-level finding. `warlock ai trace [runId] [--diff <otherRunId>] [--url <origin>] [--json]` reads the per-turn agent traces held by the running dev server's devtools (`/__warlock/api/ai/agent-runs`): without an id it lists runs, with one it prints the turns, tools offered, calls, refusals, retries, usage and cost; `--diff` compares two runs' prompt and tool definitions. Both live under the same built-in `ai <action> [runId]` command and need `@warlock.js/ai` 5.38.0 or newer.
 
 ### Misc
 

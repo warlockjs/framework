@@ -556,7 +556,9 @@ Returning anything other than `undefined` from a middleware short-circuits the r
 - **A full page load**, when the middleware already wrote the real reply itself — `response.redirect()`, `response.permanentRedirect()`, or a call that reaches `response.send()` (`.forbidden()`, `.unauthorized()`, `.notFound()`, `.send()` directly) — answers with exactly that reply. The pipeline renders nothing further; there is no document to add.
 - **A full page load**, when the middleware returns a value WITHOUT writing the reply itself (the `{ error: "Unauthorized" }` example above, after only `setStatusCode`) — a status `>= 400` renders the application's `error.page.tsx` boundary with that status, the returned value attached to the error; a status `< 200`–`399` (2xx) sends the returned value as the response body unchanged (JSON-stringified if it's an object) — **a page middleware returning 2xx content replaces the page.**
 
-Prefer calling a `response` method (`.forbidden()`, `.redirect()`, `.unauthorized()`, …) over returning a bare object when you want full control over the wire reply; a bare returned object is still safe on a full page load — it now always reaches the visitor, never silently dropped — but it renders through the error boundary for `>= 400`, and as raw content for `2xx`.
+To refuse a page request, prefer THROWING a Core `HttpError` (`throw new ForbiddenError("Forbidden")`, `UnAuthorizedError`) over `response.forbidden()`: a thrown 401/403 renders your `forbidden.page.tsx` (or the framework default), while `response.forbidden()` writes its JSON body straight to the wire. The `requireUser()` middleware throws, so a failed `userType` or `when` check never answers raw JSON on a page route.
+
+Prefer calling a `response` method (`.redirect()`, …) over returning a bare object when you want full control over the wire reply; a bare returned object is still safe on a full page load — it now always reaches the visitor, never silently dropped — but it renders through the error boundary for `>= 400`, and as raw content for `2xx`.
 
 ## Page caching
 
@@ -805,7 +807,7 @@ Throwing a Core `HttpError` that resolves to 404, such as `ResourceNotFoundError
 
 ## The error boundary — `error.page.tsx`
 
-`error.page.tsx` anywhere beneath `src/web` is the application's one error boundary — exactly two page filenames are special in Warlock, this and `404.page.tsx`. A second `error.page.tsx` is a build error naming both files. Like `404.page.tsx`, it declares no `route` — it has no URL of its own and is reached only when something throws.
+`error.page.tsx` anywhere beneath `src/web` is the application's one error boundary — three page filenames are special in Warlock: this, `404.page.tsx` and `forbidden.page.tsx`. A second `error.page.tsx` is a build error naming both files. Like `404.page.tsx`, it declares no `route` — it has no URL of its own and is reached only when something throws.
 
 ```tsx title="src/web/error.page.tsx"
 import type { ErrorPageProps } from "@warlock.js/web";
@@ -828,6 +830,25 @@ This includes page and API-route failures.
 
 If the failure happens before any page module could even load — a module-load or `register()` throw — there is no trustworthy server composition left to hydrate against, so Warlock renders a plain framework fallback (your `error.page.tsx` if it can still be loaded, otherwise a minimal built-in boundary) with no hydration script at all rather than risk hydrating client code against markup nothing can vouch for.
 
+## The forbidden page — `forbidden.page.tsx`
+
+`forbidden.page.tsx` anywhere beneath `src/web` is the application's one page for a refused request. A page route never answers a raw JSON error: a 401 or 403 (a failed `requireUser({ userType })` / `requireUser({ when })` check, a thrown `ForbiddenError` or `UnAuthorizedError`) renders this page with that status. A guest who has a sign-in page configured (`auth.pageAuth.loginPath`) is still redirected there, as before; only the refusals that have nowhere to redirect to reach the forbidden page. API routes keep their JSON answers.
+
+```tsx title="src/web/forbidden.page.tsx"
+import type { ErrorPageProps } from "@warlock.js/web";
+
+export default function ForbiddenPage({ status }: ErrorPageProps) {
+  return (
+    <main>
+      <h1>{status === 401 ? "Please sign in" : "You don't have access to this page"}</h1>
+      <a href="/">Back to home</a>
+    </main>
+  );
+}
+```
+
+Pair it with `forbidden.setup.ts` for `config.metadata`. It follows the same rules as `error.page.tsx`: no `config.route`, a second `forbidden.page.tsx` is a build error naming both files, `robots: noindex` by default, and it receives the same `{ error, status }` props (plus `debug` outside production). In multi-site mode each site folder (`$sites/<name>/forbidden.page.tsx`) owns its own. The page that renders for a refusal is picked in this order: the site's (or the app's) `forbidden.page.tsx`, then its `error.page.tsx` with the 401/403 status, then the framework default. The framework default is a plain accessible page with the request id, the development details outside production and a "Back to home" link. Hydration uses the same pick, so the page the server rendered is the page the browser hydrates.
+
 ## The `register()` hook
 
 `root.setup.ts`, `layout.setup.ts`, and page setup files export `register`: a synchronous, no-argument, side-effect hook that runs once per raw module namespace instance. It is separate from `config` and runs before middleware or loader work.
@@ -848,16 +869,27 @@ imports must be browser-safe. Use type-only imports from setup.
 
 Keep server-only repository and service reads inside `loader`. Do not read them from module-scope initializers or the default component.
 
-### `.client` does not isolate SSR
+### `.client` is a client-only boundary
 
-A `.client.tsx` suffix is a naming convention, not an SSR-isolation boundary. A
-module statically imported by a page, layout, root, or any of their imports is
-still evaluated by the server. Top-level browser globals such as `window`
-therefore crash SSR boot. To keep browser-only UI out of the server render, use
-`<ClientOnly>` / `useIsClient()` from `@warlock.js/web` (see the `render-client-only`
-topic). They defer rendering only; for a module that touches `window` at import
-time, also load it with `React.lazy` inside `<ClientOnly>`, since an ordinary
-`import` still runs on the server.
+A `*.client.ts(x)` module is browser code. Pages, layouts and components may
+import it; server-only code (loaders and actions in setup files, controllers,
+services, repositories, models, routes, connectors, `*.server.ts`) may not, and
+`warlock check` reports `WL9022` for it. A static import from a page is still
+evaluated by the server render, so top-level browser globals such as `window`
+crash SSR boot (development logs a warning naming the file and line). To keep
+browser-only UI out of the server render, use `<ClientOnly>` / `useIsClient()`
+from `@warlock.js/web` (see the `render-client-only` topic). They defer
+rendering only; for a module that touches `window` at import time, also load it
+with `React.lazy` inside `<ClientOnly>`, since an ordinary `import` still runs
+on the server.
+
+### Importing from an app module
+
+Browser code may import from `app/<module>/...` only `*.client.ts(x)`, schema
+(`*.schema.ts`, `schema/`), types (`*.types.ts`, `types/`), the module's `web/`
+folder and non-code files; anything else fails the client build with the import
+chain. Use `import type` to share types that sit next to a service.
+`web.moduleBoundary` controls it: `"warn"` (default) reports and continues, `"error"` fails the build (new apps set it), `"off"` skips the rule.
 
 ### Static assets use `public/`
 
@@ -886,7 +918,7 @@ Creating a page, deleting one, or editing `config.route` is route-table churn ra
 
 - **A page with no `config.route` is not unreachable.** It derives a real URL from its file location — see [Filesystem routing](#filesystem-routing).
 - **A page with no default export IS refused.** Named exports alone fail the build naming the file, instead of serving a blank 200.
-- **`.client.tsx` does not prevent SSR evaluation.** It is a naming convention, not an isolation boundary. Use `<ClientOnly>` (the `render-client-only` topic).
+- **`.client.tsx` does not skip SSR.** It keeps server-only code from importing the module, but a page that imports it still evaluates it on the server. Use `<ClientOnly>` (the `render-client-only` topic).
 - **Imported static assets do not build.** Put them in `public/` and reference their root URL; CSS imports remain supported.
 - **`import.meta.url` fails the build in page-graph code.** Spec/test files, `__tests__` / `__mocks__` folders and the paths in `webConnector({ build: { testOnly } })` are skipped by that scan.
 - **`[...slug]` is not a catch-all.** It fails boot with
@@ -1837,7 +1869,7 @@ Loaders run **sequentially, root to leaf, each one awaited before the next start
 
 **The first core `Response` a loader returns is terminal.** Returning a `Response` object stops the pipeline immediately: no lower loader starts, `metadata` is not resolved, and that response is sent as-is. It is more terminal than a short-circuit — because the response is returned whole, the buffered header/cookie writes made at that same level are discarded along with everything below it. Use `response.redirect()` / `response.notFound()` (which produce a `LoaderShortCircuit`, committing that level's buffer inclusively) when you want your buffered writes to survive; return a raw `Response` only when you mean "this exact response, nothing else."
 
-A loader that **throws** is also terminal: it stops lower loaders, discards its own level's buffer, and commits only the levels above it. A thrown `@warlock.js/core` `HttpError` (`ResourceNotFoundError`, `ForbiddenError`, `BadRequestError`, `ConflictError`, …) keeps its own status: a 404 renders your `404.page.tsx` exactly like `response.notFound()`, and any other 4xx renders `error.page.tsx` with that status and its own message, without reaching `web.errors.report()`; a plain throw (or a resolved 5xx) still renders `error.page.tsx` with the generic 500.
+A loader that **throws** is also terminal: it stops lower loaders, discards its own level's buffer, and commits only the levels above it. A thrown `@warlock.js/core` `HttpError` (`ResourceNotFoundError`, `ForbiddenError`, `BadRequestError`, `ConflictError`, …) keeps its own status: a 404 renders your `404.page.tsx` exactly like `response.notFound()`, a 401 or 403 renders your `forbidden.page.tsx` (falling back to `error.page.tsx`, then the framework default), and any other 4xx renders `error.page.tsx` with that status and its own message, without reaching `web.errors.report()`; a plain throw (or a resolved 5xx) still renders `error.page.tsx` with the generic 500.
 
 ## Loader response surface
 
@@ -2075,6 +2107,11 @@ every page uses (default `app` and `common`, the first segment of a key) are
 emitted once per locale as a content-hashed, immutable JSON file and preloaded
 by the document. Hydration waits for that file, so the first render has every
 key.
+
+Module dictionaries from core count too: `src/app/<module>/utils/locales.json`
+and every `utils/locales/<feature>.json` are merged into the registry before
+the tables are built, so a key in a per-feature file is shared, pruned and typed
+exactly like one in `locales.json`.
 
 The build finds each page's keys by reading its client module graph: the page,
 its layouts, the root, error pages and the components they import. Literal
@@ -2647,7 +2684,7 @@ src/web/
   components/
 ```
 
-The folder name is the site key, and neither `$sites` nor the site folder appears in URLs. Each configured site folder needs its own `root.tsx`; it also holds that site's 404/error pages and routes. Shared components can live outside `$sites`, but pages cannot. Do not leave a top-level `src/web/root.tsx` in multi-site mode.
+The folder name is the site key, and neither `$sites` nor the site folder appears in URLs. Each configured site folder needs its own `root.tsx`; it also holds that site's 404, forbidden and error pages and routes. Shared components can live outside `$sites`, but pages cannot. Do not leave a top-level `src/web/root.tsx` in multi-site mode.
 
 ## 2. Declare fixed and dynamic sites
 
@@ -3438,6 +3475,8 @@ registerTracingHooks({
 | `page.middleware` | `count`, `outcome` (`next`   | `response`                                         | `error`)                           | All page middleware settling |
 | `page.cache`      | `status` (`hit`              | `miss`                                             | `bypass`)                          | Page-cache lookup settling   |
 | `loader`          | `level`, `layoutPath?`       | An app, layout, or page loader                     |
+| `translations`    | `route`, `locale`, `mode`    | Binding the page's translation snapshot (built once per page source and locale, so warm requests are near zero) |
+| `named-api-routes` | `route`                     | Resolving the document's browser route table (once per site and viewer kind in production) |
 | `render.shell`    | —                            | Rendering until React's shell is ready to stream   |
 | `stream.end`      | —                            | Whole streamed response, including deferred values |
 | `defer.settle`    | `key`, `status` (`fulfilled` | `rejected`)                                        | One deferred loader value settling |
@@ -3472,9 +3511,17 @@ fallback show the same facts in a panel (`data-warlock-dev-error`), and
 `error.page.tsx` receives them as `props.debug`; production responses stay
 generic, so use the log and the `errorCode` to find the record.
 
+A 5xx from an API route, a controller or a route middleware writes the same
+kind of record from `@warlock.js/core` (`module: "http"`,
+`action: "request.<phase>"`, phases `csrf`, `middleware`, `validation`,
+`handler`), once per request, with the same `method`, `pathname`, `routeName`,
+`routePath`, `requestId` and `stack`, plus the `handler` and the `middleware`
+that threw. A 401 or 403 on a page route is not an error record: it renders the
+app's `forbidden.page.tsx` (see the `create-a-page` topic).
+
 ## Inline payload budget
 
-Each rendered document is checked against `build.budgets.payload` (default `64kb`). An over-budget route logs one line per process with the size of each section (page, layout, app, translations, routes, session, other) and its largest data keys. The check is advisory: it never fails a request. Raise the limit for a route with a `pages` glob, or reduce the data the page loads. The e2e kit records the same measurement with `page.measurePayload({ limit })`.
+Each rendered document is checked against `build.budgets.payload` (default `64kb`). An over-budget route logs one line per process with the size of each section (page, layout, app, translations, routes, session, other) and its largest data keys. The runtime check is advisory: it never fails a request. `warlock build` measures the two sections the build knows (translations and the route table, both upper bounds) and, with `mode: "error"`, fails the build when a page is over its limit before any page data is added; page, layout, app and session data are measured only at runtime. Raise the limit for a route with a `pages` glob, or reduce the data the page loads. The e2e kit records the same measurement with `page.measurePayload({ limit })`.
 
 ## preserve-feedback-and-motion  `@warlock.js/web/skills/preserve-feedback-and-motion/SKILL.md`
 
@@ -3757,6 +3804,8 @@ function ThemeToggle() {
 ## This defers RENDERING, not MODULE LOADING
 
 **The trap:** `<ClientOnly>` decides what gets RENDERED. It has no say over what gets IMPORTED. A normal `import` statement runs at module-load time, wherever that module is reached from in the import graph — including the server, if the file that imports it is part of the page's server bundle.
+
+Naming the file `*.client.tsx` does not change this. `.client` keeps server-only code (controllers, services, loaders, `*.server.ts`) from importing the module, and `warlock check` reports `WL9022` if one does; a page that imports it still evaluates it on the server. In development a warning names a `.client` module that reads `window`, `document` or another browser global at the top level.
 
 The widget and its fallback, shared by every example below:
 
@@ -5737,7 +5786,7 @@ A `404.page.tsx` renders with no layouts, even when it sits in a directory with 
 
 This is scoped to the not-found page: an ordinary page in the same directory still gets its full layout chain, and nested-layout refusal on the 404's own path is still enforced exactly as it is for any other page.
 
-`error.page.tsx` — the application's other special page, its one error boundary (the `create-a-page` topic) — is excluded from discovery's layout-chain analysis the same way: neither special page has a layout chain of its own.
+`error.page.tsx` (its one error boundary) and `forbidden.page.tsx` (the page for a refused request) — the application's other special pages (the `create-a-page` topic) — are excluded from discovery's layout-chain analysis the same way: no special page has a layout chain of its own.
 
 ## Why layout state persists
 
@@ -5829,6 +5878,7 @@ setup file.
 | `root.tsx`               | `root.setup.ts`          |
 | `error.page.tsx`         | `error.setup.ts`         |
 | `404.page.tsx`           | `404.setup.ts`           |
+| `forbidden.page.tsx`     | `forbidden.setup.ts`     |
 
 The UI file owns the default component and any named component such as
 `ErrorBoundary`. Setup files own `config`, `loader`, `register`, and page

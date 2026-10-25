@@ -1292,12 +1292,27 @@ export class User extends Model<UserSchema> {
 
 `static hidden: string[]` names top-level fields `toJSON()` (and therefore `JSON.stringify(user)` / `res.json(user)`) can **never** emit — stripped whether the model falls back to the raw-document default, uses `toJsonColumns`, or goes through `resource` (hidden wins over all three). Defaults to `[]`, so declaring it is opt-in and nothing changes on an existing model until you add fields — but because that default fails open, cascade logs a one-time `console.warn` per model whose schema declares a credential-shaped column (`password`, `passwordHash`, `secret`, `token`, `apiKey`/`api_key`, case-insensitive) that isn't covered by `hidden`, `resource`, or `toJsonColumns`. Treat that warning as "add this field to `hidden`," not noise to suppress. Prefer `hidden` over remembering to exclude the field from every `toJsonColumns` list by hand — it's enforced regardless of which shaping strategy a given model (or a future refactor) picks.
 
+## Typed reads, snapshots and server-set fields
+
+Type the model with `ModelData<typeof schema>` (the schema's output type) and `get()` / `set()` are checked against it: `get("publishedAt")` is `Date | null`, `get("views")` is `number` when the column has a `.default()`, `get("tilte")` and `set("views", "10")` are type errors. A model without a schema type stays loose. Dot paths (`"profile.city"`) are accepted for any column and return `any`; pass a type argument for a precise type.
+
+```ts
+export type PostSchema = ModelData<typeof postSchema>;
+post.toSnapshot(); // ModelDataSnapshot<PostSchema>: typed, read-only, `hidden` columns removed
+```
+
+`post.title` is `undefined`: read columns with `get()`. `warlock check` flags it as `WL9021` (`--fix` rewrites it) and, outside production, Cascade warns once per model and column.
+
+Mark a column the server alone sets with `.internal()` (`authorId: v.int().required().internal()`). `Model.create()` and `get()` / `set()` treat it as any column; `Post.requestSchema()` returns the schema without internal fields, and `.pick()`, `.without()` and `.partial()` on it keep their types. The controller passes the value itself: `Post.create({ ...request.validated(), authorId: request.locals.user.id })`.
+
 ## Things NOT to do
 
 - Don't `new User()` to create a record — `User.create({...})` validates, persists, fires events.
 - Don't `.set("relation_name", instance)` for a relation slot. Use `setRelation("name", instance)`.
 - Don't return the raw model from an HTTP route without shaping output. Add `toJsonColumns` or `resource`.
 - Don't rely on `toJsonColumns`/`resource` alone to keep a password or token out of responses — declare it in `static hidden` too; that's the one path enforced no matter which shaping strategy is used, and the only one that survives someone adding a second `resource` later.
+- Don't read a column as a property (`post.title`); use `post.get("title")`.
+- Don't redeclare server-set fields on a request schema; mark them `.internal()` on the model schema and use `Model.requestSchema()`.
 - Don't `await user.save()` and forget the `await` — your changes live only on the instance and never reach the DB.
 - Don't expect schema defaults to apply on `.merge()` — defaults fire on `.create()` only.
 

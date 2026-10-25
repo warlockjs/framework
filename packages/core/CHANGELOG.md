@@ -35,6 +35,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Auto-loaded `utils/locales.ts` is deprecated. The development and production-build warning now names every legacy file, and `WL9101` already lists them in `warlock doctor`. Removal is planned for v6, not this release; move to `utils/locales.json` with `warlock doctor --fix`.
 - The starter template (`create-warlock`) ships JSON dictionaries (`app/auth/utils/locales.json`, `app/shared/utils/locales/*.json`) instead of `utils/locales.ts`.
 - The `console.error` fallback for an unhandled request error, used when no log channel is configured, ignores passive channels (see `LogChannel.passive` in `@warlock.js/logger`), so the request log's log collector never silences it.
+- `warlock ai` no longer marks `--model` as required in its option list; `warlock ai measure` still requires it and reports a missing value.
 
 ### Fixed
 
@@ -55,10 +56,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `warlock doctor --fix` converts a legacy `utils/locales.ts` into `utils/locales/legacy.json` when the module already has a `locales.json`, as long as no key appears in both; it still writes `locales.json` when there is none.
 - `warlock ai tools --tools <module>` lists each tool's estimated tokens per call and its per-provider schema findings (OpenAI strict, Anthropic, Google); `--targets`, `--warn-above`, `--fail` (exit 1 on an error-level finding) and `--json`.
 - `warlock ai trace [runId]` reads the agent traces held by the running dev server: a run list, or one run turn by turn (system prompt hash, tools offered, calls, refusals, retries, usage, cost); `--diff <otherRunId>` compares the prompt and tool definitions of two runs; `--url`, `--devtools-path` and `--json`. Both need `@warlock.js/ai` 5.38.0 or newer.
-
-### Changed
-
-- `warlock ai` no longer marks `--model` as required in its option list; `warlock ai measure` still requires it and reports a missing value.
 
 ## 5.37.1 - 2026-10-24
 
