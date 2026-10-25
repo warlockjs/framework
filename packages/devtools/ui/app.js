@@ -423,6 +423,177 @@ async function aiView() {
   return section;
 }
 
+function agentRunSummary(run) {
+  const cost = run.cost == null ? "unpriced" : `$${run.cost.toFixed(6)} USD`;
+  return el("div", {}, [
+    el("div", {
+      class: "row-top",
+      text: `${run.agent} · ${run.status} · ${value(run.durationMs)} ms`,
+    }),
+    el("div", { class: "meta", text: run.model }),
+    el("p", {
+      text: `${run.turns} turns · ${run.toolCalls} tool calls · ${run.refusals} refused · ${run.usage.input} input · ${run.usage.output} output · ${cost}`,
+    }),
+    el("div", {
+      class: "meta",
+      text: `${run.runId}${run.requestId ? ` · Request ${run.requestId}` : ""}`,
+    }),
+  ]);
+}
+
+function agentToolCall(call) {
+  const lines = [
+    `${call.name} · ${call.status} · ${call.durationMs} ms`,
+    ...(call.refusal ? [`refused: ${call.refusal}`] : []),
+    ...(call.error ? [`error: ${call.error.message}`] : []),
+  ];
+  return el("details", { class: "ai-span", open: call.refusal || call.error ? "" : null }, [
+    el("summary", { text: lines.join(" · ") }),
+    el("pre", {
+      text: JSON.stringify({ input: call.input, output: call.output }, null, 2),
+    }),
+  ]);
+}
+
+function agentTurn(turn, trace) {
+  const tokens = turn.toolsOffered.reduce((sum, tool) => sum + tool.tokens, 0);
+  const cost = turn.cost == null ? "" : ` · $${turn.cost.toFixed(6)} USD`;
+  const section = el("details", { class: "ai-span", open: "" }, [
+    el("summary", {
+      text: `turn ${turn.index} · ${value(turn.finishReason)} · ${Math.round(turn.durationMs)} ms · ${turn.usage.input} input · ${turn.usage.output} output${cost}`,
+    }),
+    el("p", {
+      class: "meta",
+      text: `starts from ${turn.input} · system prompt ${value(turn.systemPromptHash)} · tools ${turn.toolsHash}`,
+    }),
+    el("p", {
+      class: "meta",
+      text: `Tools offered (~${tokens} tokens): ${turn.toolsOffered.map((tool) => `${tool.name}@${tool.schemaHash.slice(0, 8)}`).join(", ") || "none"}`,
+    }),
+  ]);
+  if (turn.text) section.append(el("pre", { text: turn.text }));
+  turn.toolCalls.forEach((call) => section.append(agentToolCall(call)));
+  turn.contract.forEach((event) =>
+    section.append(
+      el("p", {
+        class: "meta",
+        text: `contract: ${event.type}${event.tool ? ` ${event.tool}` : ""}${event.name ? ` ${event.name}` : ""}${event.reason ? ` (${event.reason})` : ""}`,
+      }),
+    ),
+  );
+  if (turn.error) section.append(el("p", { class: "error", text: turn.error.message }));
+  return section;
+}
+
+function agentRequestDiff(trace, previous) {
+  if (!previous) return empty("No earlier run of this agent to compare with.");
+  const tools = (item) =>
+    new Map(item.turns.flatMap((turn) => turn.toolsOffered).map((tool) => [tool.name, tool.schemaHash]));
+  const now = tools(trace);
+  const before = tools(previous);
+  const changed = [...now].filter(([name, hash]) => before.has(name) && before.get(name) !== hash);
+  const added = [...now.keys()].filter((name) => !before.has(name));
+  const removed = [...before.keys()].filter((name) => !now.has(name));
+  const prompt =
+    trace.systemPrompt?.hash === previous.systemPrompt?.hash ? "same" : "changed";
+  const identical =
+    prompt === "same" && !changed.length && !added.length && !removed.length;
+  return el("p", {
+    class: "meta",
+    text: identical
+      ? `Same system prompt and tool definitions as ${previous.runId}.`
+      : `Against ${previous.runId}: system prompt ${prompt}; tools changed: ${changed.map(([name]) => name).join(", ") || "none"}; added: ${added.join(", ") || "none"}; removed: ${removed.join(", ") || "none"}.`,
+  });
+}
+
+async function agentsView() {
+  const section = el("section", { class: "detail" }, el("h2", { text: "Agent runs" }));
+  const input = el("input", {
+    type: "text",
+    placeholder: "HTTP request id (empty for all runs)",
+    "aria-label": "Filter agent runs by HTTP request id",
+    value: state.agentRequestId || "",
+  });
+  section.append(
+    el(
+      "form",
+      {
+        class: "toolbar",
+        onsubmit: (event) => {
+          event.preventDefault();
+          state.agentRequestId = input.value;
+          state.selectedAgentRun = undefined;
+          render();
+        },
+      },
+      [input, el("button", { type: "submit", text: "Filter / refresh" })],
+    ),
+  );
+  const data = await api(
+    `api/ai/agent-runs${state.agentRequestId ? `?requestId=${encodeURIComponent(state.agentRequestId)}` : ""}`,
+  );
+  if (!data.available) {
+    section.append(empty(data.message || "No agent traces yet."));
+    return section;
+  }
+  if (!data.runs.length) {
+    section.append(empty("No agent runs yet. Execute an agent in development; runs appear as turns finish."));
+    return section;
+  }
+  const list = el("div", { class: "panel list" });
+  for (const run of data.runs)
+    list.append(
+      el(
+        "button",
+        {
+          class: `row${run.runId === state.selectedAgentRun ? " is-selected" : ""}`,
+          type: "button",
+          onclick: () => {
+            state.selectedAgentRun = run.runId;
+            render();
+          },
+        },
+        agentRunSummary(run),
+      ),
+    );
+  const detail = el("div", { class: "panel detail" });
+  const selected = data.runs.find((run) => run.runId === state.selectedAgentRun);
+  if (selected) {
+    detail.append(agentRunSummary(selected));
+    try {
+      const trace = await api(`api/ai/agent-runs/${encodeURIComponent(selected.runId)}`);
+      const index = data.runs.indexOf(selected);
+      const earlier = data.runs.slice(index + 1).find((run) => run.agent === selected.agent);
+      const previous = earlier
+        ? await api(`api/ai/agent-runs/${encodeURIComponent(earlier.runId)}`).catch(() => undefined)
+        : undefined;
+      detail.append(el("p", { class: "meta", text: `Input: ${trace.input}` }));
+      if (trace.systemPrompt) {
+        detail.append(
+          el("details", { class: "ai-span" }, [
+            el("summary", { text: `System prompt ${trace.systemPrompt.hash}` }),
+            el("pre", { text: trace.systemPrompt.text ?? "Text not kept (only the hash is recorded)." }),
+          ]),
+        );
+      }
+      detail.append(agentRequestDiff(trace, previous));
+      for (const [hash, schema] of Object.entries(trace.toolSchemas))
+        detail.append(
+          el("details", { class: "ai-span" }, [
+            el("summary", { text: `Tool ${schema.name}@${hash.slice(0, 8)}` }),
+            el("pre", { text: `${schema.description}\n\n${schema.schema ?? "Schema not kept."}` }),
+          ]),
+        );
+      trace.turns.forEach((turn) => detail.append(agentTurn(turn, trace)));
+      if (trace.error) detail.append(el("p", { class: "error", text: trace.error.message }));
+    } catch (error) {
+      detail.append(errorView(error));
+    }
+  } else detail.append(empty("Select a run to inspect its prompt, tools, calls and refusals."));
+  section.append(el("div", { class: "layout" }, [list, detail]));
+  return section;
+}
+
 function queriesView() {
   const requests = [...state.details.values()].sort((a, b) => b.startedAt - a.startedAt);
   // This session-only tab intentionally lists queries from request details fetched so far.
@@ -731,7 +902,9 @@ async function render() {
     const view =
       state.tab === "ai"
         ? await aiView()
-        : state.tab === "requests"
+        : state.tab === "agents"
+          ? await agentsView()
+          : state.tab === "requests"
           ? await requestsView()
           : state.tab === "queries"
             ? queriesView()
@@ -764,11 +937,12 @@ document.querySelector("#clear").addEventListener("click", async () => {
   }
 });
 const events = new EventSource("api/stream");
-for (const type of ["request", "mail", "log", "ai"])
+for (const type of ["request", "mail", "log", "ai", "agent-trace"])
   events.addEventListener(type, (event) => {
     try {
       const data = JSON.parse(event.data);
       if (type === "ai" && (state.tab === "ai" || state.tab === "requests")) render();
+      if (type === "agent-trace" && state.tab === "agents") render();
       if (type === "request") {
         state.requests = [data, ...state.requests.filter((item) => item.id !== data.id)].slice(
           0,

@@ -1,3 +1,4 @@
+import type { DevtoolsAgentTraceSource } from "../sources/agent-trace-source";
 import type { DevtoolsAiSource } from "../sources/ai-source";
 import type { ProcessPanel } from "../process-panel";
 import type { DevtoolsCollector, DevtoolsQuery, ResolvedDevtoolsOptions } from "../types";
@@ -23,6 +24,8 @@ export type MountDevtoolsRoutesDeps = {
   collector: DevtoolsCollector;
   /** Optional Panoptic feed, attached only in development. */
   ai?: DevtoolsAiSource;
+  /** Per-turn agent traces from `@warlock.js/ai`, attached only in development. */
+  agentTraces?: DevtoolsAgentTraceSource;
   options: ResolvedDevtoolsOptions;
   isDevelopment: () => boolean;
   explain?: (query: DevtoolsQuery) => Promise<unknown>;

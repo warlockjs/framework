@@ -12,6 +12,7 @@ import { loadProcessPanel } from "./process-panel";
 import { createCollector } from "./collector";
 import { resolveDevtoolsOptions } from "./options";
 import type { DevtoolsRouteRow } from "./server";
+import { attachAgentTraceSource } from "./sources/agent-trace-source";
 import { attachAiSource } from "./sources/ai-source";
 import { attachCacheSource } from "./sources/cache-source";
 import { attachLogSource } from "./sources/log-source";
@@ -82,12 +83,16 @@ export function devtoolsConnector(options: DevtoolsConnectorOptions = {}): Conne
       const ai = await attachAiSource(resolved.maxRequests);
       disposers.push(ai.dispose);
 
+      const agentTraces = await attachAgentTraceSource();
+      disposers.push(agentTraces.dispose);
+
       const { mountDevtoolsRoutes } = await import("./server");
       const postmanBuilder = await findPostmanBuilder();
 
       mountDevtoolsRoutes(getHttpServer(), {
         collector,
         ai,
+        agentTraces,
         processPanel: await loadProcessPanel(),
         options: resolved,
         isDevelopment: () => Application.runtimeStrategy === "development",

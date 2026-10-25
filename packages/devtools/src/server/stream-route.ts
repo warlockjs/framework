@@ -30,6 +30,10 @@ export function registerStreamRoute(server: FastifyInstance, deps: MountDevtools
         })
       : undefined;
 
+    const disposeAgentTraces = deps.agentTraces?.subscribe((event) => {
+      res.write(`event: agent-trace\ndata: ${JSON.stringify(event)}\n\n`);
+    });
+
     const pingTimer = setInterval(() => res.write(": ping\n\n"), PING_INTERVAL_MS);
     pingTimer.unref();
 
@@ -37,6 +41,7 @@ export function registerStreamRoute(server: FastifyInstance, deps: MountDevtools
       clearInterval(pingTimer);
       dispose();
       disposeAi?.();
+      disposeAgentTraces?.();
     });
   });
 }
