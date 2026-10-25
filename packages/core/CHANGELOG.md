@@ -51,7 +51,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `warlock check` reports `WL9105` when a translation key of a module dictionary is missing a configured locale. The configured locales are `localeCodes` in `src/config/app.ts`, or `localeCodes` in `.warlock-check.json`, which wins; the rule is skipped when neither names any.
 - Opt-in `WL9023` finds hand-maintained `index.ts` barrels in app modules (an `index.ts` that only re-exports). It is off until `.warlock-check.json` sets `rules.WL9023` to `"warning"` or `"error"`.
 - Per-feature locale files: `src/app/<module>/utils/locales/<feature>.json` is merged with the module's `utils/locales.json` in development, in the production build and in test workers, under the module's namespace unless the file names its own `$group`. A key may live in one file only. Web's per-page translation tables are built from the same registry, so they see the merged dictionary.
-- `generate: { barrels: false }` in `warlock.config.ts` makes `warlock generate` and `warlock make` write no `index.ts` barrel (for models) and import the model file itself in the files they generate. The default stays `true`.
+- `generate: { barrels: false }` in `warlock.config.ts` makes `warlock generate`, `warlock make` and `warlock add access` write no `index.ts` barrel (for models) and import the model file itself in the files they generate. The default stays `true`.
 - `warlock doctor --fix` converts a legacy `utils/locales.ts` into `utils/locales/legacy.json` when the module already has a `locales.json`, as long as no key appears in both; it still writes `locales.json` when there is none.
 
 ## 5.37.1 - 2026-10-24

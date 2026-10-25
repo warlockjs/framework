@@ -130,7 +130,7 @@ For pages, shared-schema forms and module CRUD interfaces, see [Web UI generator
 The model generator writes `models/<name>/index.ts`, and the files it generates
 import the model through that folder. Barrels are optional: set
 `generate: { barrels: false }` in `warlock.config.ts` and `generate.module`,
-`generate.model` and `generate.repository` write no `index.ts` and import the
+`generate.model`, `generate.repository` and `warlock add access` write no `index.ts` and import the
 model file (`../models/product/product.model`) instead. The default is `true`.
 
 ```ts title="warlock.config.ts"

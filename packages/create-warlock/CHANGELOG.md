@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 
 - The web template ships `src/web/forbidden.page.tsx` and `forbidden.setup.ts` (styled by `forbidden.css`, imported from `app.css`): the page a 401/403 on a page route renders instead of raw JSON. The template README and the `web-code-standards` skill describe it.
+- The starter ships `src/config/web.ts` with `moduleBoundary: "error"`, so browser code importing a server-only module file fails the client build in new apps (the framework default for existing apps is `"warn"`).
 
 ### Changed
 

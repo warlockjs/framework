@@ -905,9 +905,9 @@ export interface EnvironmentClassifierOptions {
   srcDir?: string;
   /**
    * What the module-boundary rule does when browser code imports a module file
-   * that is not browser-safe: `"error"` (default) refuses the build, `"warn"`
-   * reports the same message and lets the build continue (a migration aid),
-   * `"off"` skips the rule.
+   * that is not browser-safe: `"warn"` (default) reports the same message
+   * and lets the build continue, `"error"` refuses the build, `"off"` skips
+   * the rule.
    */
   moduleBoundary?: "error" | "warn" | "off";
   /**
@@ -1063,7 +1063,7 @@ function isHtmlEntrySource(source: string): boolean {
  */
 export function gateAResolve(options: GateAOptions = {}): Plugin {
   const { appRoot, environmentOf } = createEnvironmentClassifier(options);
-  const moduleBoundary = options.moduleBoundary ?? "error";
+  const moduleBoundary = options.moduleBoundary ?? "warn";
 
   // Maps a resolved module id to the id that imported it, rebuilt per plugin
   // instance (i.e. per build) via our own `this.resolve` calls below — this

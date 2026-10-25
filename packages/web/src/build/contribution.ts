@@ -57,7 +57,7 @@ export type WebBuildOptions = {
   external?: string[];
   /** Build-safe snapshot of `src/config/web.ts`'s static `sites` shape. */
   sites?: SitesConfig;
-  /** `web.moduleBoundary`: `"error"` (default), `"warn"` or `"off"` for browser imports of non-browser-safe module files. */
+  /** `web.moduleBoundary`: `"warn"` (default), `"error"` or `"off"` for browser imports of non-browser-safe module files. */
   moduleBoundary?: "error" | "warn" | "off";
   /**
    * App-root-relative folders or files that hold test-only code (helpers

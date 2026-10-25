@@ -26,8 +26,12 @@ All notable changes to `@warlock.js/web` are documented here.
 - In development, hydrating an error page failed with a malformed-payload error because the payload check rejected the `debug` details the server sends outside production. The check now accepts `debug`.
 - A route-translations lookup for a failure rendered by the error or forbidden page now covers both pages' keys.
 - `WebConnector.shutdown()` closes the Vite dev server, its HMR websocket and its file watchers whenever Vite was created, not only after `start()` completed. A boot that failed after creating Vite, or a shutdown between `boot()` and `start()`, used to leave Vite running and keep a test or dev process from exiting. A failure to close one part no longer skips the others, and the first failure is reported afterwards.
-- The client build enforces a module boundary: browser code may import from `app/<module>/...` only browser-safe files, which are `*.client.ts(x)`, schema files (`*.schema.ts` or a `schema/` folder), type files (`*.types.ts`, `*.d.ts` or a `types/` folder), the module's `web/` folder and non-code files. Any other file (a controller, service, repository, model, route file or plain helper) fails the build with the import chain. A type-only import is erased and always allowed. `web.moduleBoundary` sets `"error"` (default), `"warn"` (report and continue, for migration) or `"off"`, in development and in `warlock build`.
+- The client build enforces a module boundary: browser code may import from `app/<module>/...` only browser-safe files, which are `*.client.ts(x)`, schema files (`*.schema.ts` or a `schema/` folder), type files (`*.types.ts`, `*.d.ts` or a `types/` folder), the module's `web/` folder and non-code files. Any other file (a controller, service, repository, model, route file or plain helper) fails the build with the import chain. A type-only import is erased and always allowed. `web.moduleBoundary` sets `"warn"` (default: report and continue, so an existing app upgrades without a broken build), `"error"` (fail the build) or `"off"`, in development and in `warlock build`.
 - Development SSR warns once per `*.client.*` module that reads `window`, `document`, `navigator`, `localStorage` or another browser global while it is being imported (outside a function or a `typeof` guard), naming the file and line.
+
+### Upgrading
+
+- `web.moduleBoundary` defaults to `"warn"`: browser imports of server-only module files are reported and the build continues. Set `web.moduleBoundary: "error"` once your client code only imports browser-safe module files; the default becomes `error` in a later release.
 
 ## 5.37.1 - 2026-10-24
 

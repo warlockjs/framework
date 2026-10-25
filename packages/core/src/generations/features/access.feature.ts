@@ -7,6 +7,7 @@ import {
 } from "../generation-fs";
 import type { CommandActionData } from "../../commands/types";
 import { srcPath } from "../../utils";
+import { generatedBarrels, loadGeneratedBarrels } from "../../cli/commands/generate/utils/barrels";
 import {
   accessConfigStub,
   accessResolverStub,
@@ -103,11 +104,18 @@ async function scaffoldAccessFiles() {
     return;
   }
 
+  // Barrels are optional: `generate.barrels: false` skips the model `index.ts`
+  // files and points the resolver at the model files instead.
+  await loadGeneratedBarrels();
+  const barrels = generatedBarrels();
+
   // 1. Role catalog model folder (model + barrel + migration). The catalog row
   //    is role name → granted permissions; managed at runtime in the DB.
   await ensureDirectoryAsync(srcPath("app/access/models/role"));
   await putFileAsync(srcPath("app/access/models/role/role.model.ts"), accessRoleModelStub);
-  await putFileAsync(srcPath("app/access/models/role/index.ts"), accessRoleModelIndexStub);
+  if (barrels) {
+    await putFileAsync(srcPath("app/access/models/role/index.ts"), accessRoleModelIndexStub);
+  }
   console.log(`${colors.green("✓")} Created src/app/access/models/role`);
 
   await ensureDirectoryAsync(srcPath("app/access/models/role/migrations"));
@@ -134,7 +142,12 @@ async function scaffoldAccessFiles() {
     srcPath("app/access/models/user-role/user-role.model.ts"),
     accessUserRoleModelStub,
   );
-  await putFileAsync(srcPath("app/access/models/user-role/index.ts"), accessUserRoleModelIndexStub);
+  if (barrels) {
+    await putFileAsync(
+      srcPath("app/access/models/user-role/index.ts"),
+      accessUserRoleModelIndexStub,
+    );
+  }
   console.log(`${colors.green("✓")} Created src/app/access/models/user-role`);
 
   await ensureDirectoryAsync(srcPath("app/access/models/user-role/migrations"));
@@ -151,7 +164,14 @@ async function scaffoldAccessFiles() {
   // 3. The DatabaseAccessResolver — the one required config seam, wired into
   //    config/access.ts by the ejected stub.
   await ensureDirectoryAsync(srcPath("app/access/services"));
-  await putFileAsync(resolverPath, accessResolverStub);
+  await putFileAsync(
+    resolverPath,
+    barrels
+      ? accessResolverStub
+      : accessResolverStub
+          .replace('"app/access/models/role"', '"app/access/models/role/role.model"')
+          .replace('"app/access/models/user-role"', '"app/access/models/user-role/user-role.model"'),
+  );
   console.log(`${colors.green("✓")} Created src/app/access/services/access-resolver.ts`);
 }
 

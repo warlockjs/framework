@@ -125,13 +125,16 @@ input and output types that sit next to a service:
 import type { CreateOrderInput } from "app/orders/services/create-order.service";
 ```
 
-Both the relative and the `app/...` spelling are checked. While an existing app
-migrates, set `moduleBoundary: "warn"` in `src/config/web.ts` to report each
-import without failing the build, then switch it back to the default:
+Both the relative and the `app/...` spelling are checked. By default
+(`"warn"`) each offending import is reported and the build continues, so an
+existing app upgrades without a broken build. Once your client code only imports
+browser-safe module files, set `moduleBoundary: "error"` in `src/config/web.ts`
+to fail the build instead. New apps from `create-warlock` start with `"error"`,
+and the default becomes `"error"` in a later release.
 
 ```ts title="src/config/web.ts"
 const webConfigurations: WebConfigurations = {
-  moduleBoundary: "warn", // "error" (default) | "warn" | "off"
+  moduleBoundary: "error", // "warn" (default) | "error" | "off"
 };
 ```
 

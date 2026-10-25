@@ -52,9 +52,9 @@ export type WebConfigurations = {
   /**
    * What the client build does when browser code imports a file of an
    * `app/<module>/` that is not browser-safe (`.client.*`, schema, types, or the
-   * module's `web/` folder). `"error"` (default) fails the build, `"warn"`
-   * reports the import and continues while an app migrates, `"off"` disables
-   * the rule.
+   * module's `web/` folder). `"warn"` (default) reports the import and
+   * continues, `"error"` fails the build, `"off"` disables the rule. The default
+   * becomes `"error"` in a later release.
    */
   moduleBoundary?: "error" | "warn" | "off";
   /** Opt-in multi-site mode: several sites (fixed hosts or resolver-driven) in one app. */

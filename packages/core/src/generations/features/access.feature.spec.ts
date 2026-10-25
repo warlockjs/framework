@@ -14,6 +14,13 @@ vi.mock("@warlock.js/fs", () => ({
   putFileAsync: vi.fn(async (path: string, content: string) => files.set(path, content)),
 }));
 
+let barrelsOn = true;
+
+vi.mock("../../cli/commands/generate/utils/barrels", () => ({
+  loadGeneratedBarrels: vi.fn(async () => undefined),
+  generatedBarrels: () => barrelsOn,
+}));
+
 import { accessFeature } from "./access.feature";
 
 const accessJson = /src[\\/]app[\\/]access[\\/]utils[\\/]locales\.json$/;
@@ -103,5 +110,45 @@ describe("add access locale dictionary", () => {
 
     expect(jsonFile()?.[1]).toBe(renamed);
     expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("$group"));
+  });
+});
+
+describe("add access model barrels", () => {
+  let logSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    files.clear();
+    barrelsOn = true;
+    logSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    barrelsOn = true;
+    logSpy.mockRestore();
+  });
+
+  const written = (suffix: string) =>
+    [...files.entries()].find(([path]) => path.replace(/\\/g, "/").endsWith(suffix));
+
+  it("writes the model index.ts barrels and imports the model folders by default", async () => {
+    await accessFeature.onExecuting?.({} as never);
+
+    expect(written("app/access/models/role/index.ts")).toBeDefined();
+    expect(written("app/access/models/user-role/index.ts")).toBeDefined();
+    const resolver = written("app/access/services/access-resolver.ts")?.[1] ?? "";
+    expect(resolver).toContain('from "app/access/models/role"');
+  });
+
+  it("writes no barrel and imports the model files when generate.barrels is false", async () => {
+    barrelsOn = false;
+
+    await accessFeature.onExecuting?.({} as never);
+
+    expect(written("app/access/models/role/role.model.ts")).toBeDefined();
+    expect(written("app/access/models/role/index.ts")).toBeUndefined();
+    expect(written("app/access/models/user-role/index.ts")).toBeUndefined();
+    const resolver = written("app/access/services/access-resolver.ts")?.[1] ?? "";
+    expect(resolver).toContain('from "app/access/models/role/role.model"');
+    expect(resolver).toContain('from "app/access/models/user-role/user-role.model"');
   });
 });

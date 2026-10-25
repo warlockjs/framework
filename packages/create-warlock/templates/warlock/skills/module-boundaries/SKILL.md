@@ -121,7 +121,7 @@ See the `code-standards` skill § 2.2 for the reasoning.
 - the module's `web/` folder
 - non-code files (JSON, CSS)
 
-Anything else (a service, repository, controller, model, route file, a plain helper) fails the client build with the import chain. `import type { CreateOrderInput } from "app/orders/services/create-order.service"` is always fine because a type-only import is erased. `web.moduleBoundary` in `src/config/web.ts` is `"error"` by default, `"warn"` while migrating, `"off"` to disable.
+Anything else (a service, repository, controller, model, route file, a plain helper) fails the client build with the import chain (this app sets `web.moduleBoundary: "error"` in `src/config/web.ts`; the framework default is `"warn"`, which only reports). `import type { CreateOrderInput } from "app/orders/services/create-order.service"` is always fine because a type-only import is erased. `web.moduleBoundary` in `src/config/web.ts` is `"error"` by default, `"warn"` while migrating, `"off"` to disable.
 
 ### 3.1.2 `*.client.*` is browser code
 

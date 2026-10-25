@@ -49,6 +49,8 @@ function code(result: Awaited<ReturnType<typeof buildPage>>): string {
   return chunk.code;
 }
 
+const ERROR = { moduleBoundary: "error" } as const;
+
 const SERVICE_IMPORT = `import { createUser } from "app/users/services/create-user.service";\nexport default createUser();\n`;
 
 beforeAll(() => {
@@ -127,14 +129,14 @@ describe("moduleSurfaceOf / isBrowserSafeModuleFile", () => {
 
 describe("gateAResolve — module boundary (real Vite builds)", () => {
   it("refuses an alias-form value import of a service, naming the chain", async () => {
-    await expect(buildPage(SERVICE_IMPORT)).rejects.toThrow(
+    await expect(buildPage(SERVICE_IMPORT, ERROR)).rejects.toThrow(
       /Import chain: entry\.page\.tsx → app\/users\/services\/create-user\.service/,
     );
   });
 
   it("explains the cause and the fix", async () => {
     try {
-      await buildPage(SERVICE_IMPORT);
+      await buildPage(SERVICE_IMPORT, ERROR);
       expect.unreachable("expected the build to fail");
     } catch (error) {
       const message = (error as Error).message;
@@ -146,7 +148,7 @@ describe("gateAResolve — module boundary (real Vite builds)", () => {
 
   it("refuses a relative import of a module file that is not browser-safe", async () => {
     await expect(
-      buildPage(`import { enumValue } from "../app/users/enums";\nexport default enumValue;\n`),
+      buildPage(`import { enumValue } from "../app/users/enums";\nexport default enumValue;\n`, ERROR),
     ).rejects.toThrow(/server file of module "users"/);
   });
 
@@ -189,6 +191,13 @@ describe("gateAResolve — module boundary (real Vite builds)", () => {
   it('reports instead of refusing when moduleBoundary is "warn"', async () => {
     const warnings: string[] = [];
     const result = await buildPage(SERVICE_IMPORT, { moduleBoundary: "warn" }, warnings);
+    expect(code(result)).toContain("server-value");
+    expect(warnings.join("\n")).toContain("web.moduleBoundary");
+  });
+
+  it("reports instead of refusing by default", async () => {
+    const warnings: string[] = [];
+    const result = await buildPage(SERVICE_IMPORT, {}, warnings);
     expect(code(result)).toContain("server-value");
     expect(warnings.join("\n")).toContain("web.moduleBoundary");
   });

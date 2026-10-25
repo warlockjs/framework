@@ -87,7 +87,7 @@ One export per file is the default for controllers, services and components, not
 
 ### What the browser may import from a module
 
-`src/app/<module>/` is server code. Browser code (anything the client build reaches from a page) may import from it only `*.client.ts(x)` files, schema files (`*.schema.ts`, `schema/`), type files (`*.types.ts`, `types/`) and the module's `web/` folder; anything else fails the build with the import chain. Type-only imports (`import type`) are erased and always allowed, which is how a page shares a service's input and output types. `web.moduleBoundary` (`"error"` default, `"warn"`, `"off"`) controls it.
+`src/app/<module>/` is server code. Browser code (anything the client build reaches from a page) may import from it only `*.client.ts(x)` files, schema files (`*.schema.ts`, `schema/`), type files (`*.types.ts`, `types/`) and the module's `web/` folder; anything else fails the build with the import chain. Type-only imports (`import type`) are erased and always allowed, which is how a page shares a service's input and output types. `web.moduleBoundary` (`"warn"` default, `"error"`, `"off"`) controls it.
 
 ### `.client.*` is a client-only boundary
 
