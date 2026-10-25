@@ -1298,7 +1298,7 @@ Type the model with `ModelData<typeof schema>` (the schema's output type) and `g
 
 ```ts
 export type PostSchema = ModelData<typeof postSchema>;
-post.toSnapshot(); // ModelDataSnapshot<PostSchema>: typed, read-only, `hidden` columns removed
+post.toDataSnapshot(); // ModelDataSnapshot<PostSchema>: typed, read-only, `hidden` columns removed
 ```
 
 `post.title` is `undefined`: read columns with `get()`. `warlock check` flags it as `WL9021` (`--fix` rewrites it) and, outside production, Cascade warns once per model and column.

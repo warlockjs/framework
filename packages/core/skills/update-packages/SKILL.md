@@ -81,7 +81,7 @@ The family's packages pin each other to the exact same version (lockstep), so a 
 
 Each manager runs its own install command (`warlock add` uses the matching add command). Set `"packageManager"` in `package.json` to pin the choice.
 
-Among lockfiles of equal standing, Bun is checked **first**: a Bun project may also carry a `yarn.lock` (Bun writes one for tooling compatibility), and matching yarn there would run the wrong installer against the wrong lockfile. `warlock update` and `warlock add` share this detection, so they can never disagree.
+Among lockfiles of equal standing, Bun is checked **first**: a Bun project may also carry a `yarn.lock` (Bun writes one for tooling compatibility), and matching the `yarn.lock` there would run the wrong installer against the wrong lockfile. `warlock update` and `warlock add` share this detection, so they can never disagree.
 
 Re-running on an already-current project is a no-op: nothing resolves as newer, so it prints "All @warlock.js packages are already up to date" and exits without writing or installing.
 

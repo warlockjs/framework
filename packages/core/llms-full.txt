@@ -9059,7 +9059,7 @@ The family's packages pin each other to the exact same version (lockstep), so a 
 
 Each manager runs its own install command (`warlock add` uses the matching add command). Set `"packageManager"` in `package.json` to pin the choice.
 
-Among lockfiles of equal standing, Bun is checked **first**: a Bun project may also carry a `yarn.lock` (Bun writes one for tooling compatibility), and matching yarn there would run the wrong installer against the wrong lockfile. `warlock update` and `warlock add` share this detection, so they can never disagree.
+Among lockfiles of equal standing, Bun is checked **first**: a Bun project may also carry a `yarn.lock` (Bun writes one for tooling compatibility), and matching the `yarn.lock` there would run the wrong installer against the wrong lockfile. `warlock update` and `warlock add` share this detection, so they can never disagree.
 
 Re-running on an already-current project is a no-op: nothing resolves as newer, so it prints "All @warlock.js packages are already up to date" and exits without writing or installing.
 
@@ -12468,7 +12468,7 @@ Mutating routes without an auth guard (confirm each is meant to be public): `POS
 <!-- warlock:generated:end -->
 ```
 
-Sections: app + `@warlock.js/*` versions, modules (`src/app/*`, routes/models per module), routes (counts, unguarded writes, a list capped at 60), models (table, module), conventions in force (`WL9001`–`WL9004` and the layout rules), installed skills (`node_modules/@warlock.js/*/skills/*/SKILL.md`, plus a package's single `skills/SKILL.md` under its front-matter `name`, first sentence each), verify commands. No timestamps: an unchanged app regenerates the same bytes and nothing is written.
+Sections: app + `@warlock.js/*` versions, modules (`src/app/*`, routes/models per module), routes (counts, unguarded writes, a list capped at 60), models (table, module), conventions in force (`WL9001`–`WL9004` and the layout rules), installed skills (`node_modules/@warlock.js/*/skills/*/SKILL.md`, plus a package that ships a single top-level skill file, listed under its front-matter `name`, first sentence each), verify commands. No timestamps: an unchanged app regenerates the same bytes and nothing is written.
 
 ## Rules
 

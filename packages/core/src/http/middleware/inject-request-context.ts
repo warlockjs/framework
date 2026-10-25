@@ -20,7 +20,6 @@ import { AppError, HttpError } from "../errors";
 import { type Request } from "../request";
 import {
   reportRequestServerError,
-  tagRequestError,
   type RequestErrorPhase,
 } from "../report-request-error";
 import { type Response } from "../response";
