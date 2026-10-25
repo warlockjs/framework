@@ -314,6 +314,10 @@ export async function createWebConnectorViteConfig(
     ],
     server: {
       middlewareMode: true,
+      // Vite answers 403 to any Host it does not know. A multi-site app is
+      // reached on its configured hostnames (or, with dynamic sites, on hosts
+      // only `web.resolveHost` knows), so those must pass Vite's host check.
+      ...siteAllowedHosts(options.sites),
       // Vite 8 moved the HMR websocket options to `server.ws`; `server.hmr.server`
       // is deprecated and warns on every boot.
       ws: { server: options.hmrServer },
@@ -509,4 +513,25 @@ export async function createWebConnectorViteConfig(
       ],
     },
   };
+}
+
+/**
+ * `server.allowedHosts` for a multi-site app: every fixed site's hostnames, or
+ * `true` when a dynamic site claims hosts at runtime. Nothing for a single-site
+ * app, which keeps Vite's default.
+ */
+export function siteAllowedHosts(sites: SitesConfig | undefined): {
+  allowedHosts?: true | string[];
+} {
+  if (!sites) return {};
+
+  const hosts: string[] = [];
+
+  for (const site of Object.values(sites)) {
+    if ("dynamic" in site) return { allowedHosts: true };
+
+    hosts.push(...site.hosts);
+  }
+
+  return hosts.length > 0 ? { allowedHosts: hosts } : {};
 }

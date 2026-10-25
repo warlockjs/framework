@@ -21,7 +21,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createLogger, createServer, type ViteDevServer } from "vite";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createWebConnectorViteConfig } from "./dev-server-config";
+import { createWebConnectorViteConfig, siteAllowedHosts } from "./dev-server-config";
 import { RESOLVED_CLIENT_PAGE_REGISTRY_ID } from "./page-registry-plugin";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -284,5 +284,24 @@ describe("dev server config: HMR websocket attachment", () => {
       hmrServer.close();
       fs.rmSync(appRoot, { recursive: true, force: true });
     }
+  });
+});
+
+describe("siteAllowedHosts", () => {
+  it("allows nothing extra for a single-site app", () => {
+    expect(siteAllowedHosts(undefined)).toEqual({});
+  });
+
+  it("allows every fixed site hostname", () => {
+    expect(
+      siteAllowedHosts({
+        landing: { hosts: ["landing.test"] },
+        client: { hosts: ["client.test"] },
+      }),
+    ).toEqual({ allowedHosts: ["landing.test", "client.test"] });
+  });
+
+  it("allows any host when a site is dynamic", () => {
+    expect(siteAllowedHosts({ tenants: { dynamic: true } })).toEqual({ allowedHosts: true });
   });
 });

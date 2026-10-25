@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   clientVisibleRouteNames,
   parseNamedApiRoutes,
@@ -66,5 +66,17 @@ describe("clientVisibleRouteNames", () => {
     ];
 
     expect(clientVisibleRouteNames(routes)).toEqual(["orders.show", "orders.create"]);
+  });
+});
+
+describe("published route table across module copies", () => {
+  it("is visible to a second copy of the module, as when the SSR graph inlines the framework", async () => {
+    publishNamedApiRoutes({ "ping.show": { path: "/api/ping", method: "GET" } });
+    vi.resetModules();
+
+    const copy = await import("./named-api-routes");
+
+    expect(copy.resolveApiRoute("ping.show")).toEqual({ path: "/api/ping", method: "GET" });
+    publishNamedApiRoutes(undefined);
   });
 });

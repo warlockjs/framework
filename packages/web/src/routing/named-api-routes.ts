@@ -3,14 +3,28 @@ export type NamedApiRouteMetadata = Readonly<
   Record<string, Readonly<{ path: string; method: string }>>
 >;
 
-let published: NamedApiRouteMetadata | undefined;
+/**
+ * The published table lives on `globalThis`, not in module state: on the server
+ * the renderer that knows the page's table and the page code that calls
+ * `apiHref()` can be separate copies of this module (the dev SSR graph inlines
+ * the framework when the application aliases it).
+ */
+const PUBLISHED_KEY = Symbol.for("warlock.web.published-named-api-routes");
+
+type PublishedSlot = { routes?: NamedApiRouteMetadata };
+
+function slot(): PublishedSlot {
+  const host = globalThis as unknown as Record<symbol, PublishedSlot | undefined>;
+
+  return (host[PUBLISHED_KEY] ??= {});
+}
 
 export function publishNamedApiRoutes(routes: NamedApiRouteMetadata | undefined): void {
-  published = routes;
+  slot().routes = routes;
 }
 
 export function readNamedApiRoutes(): NamedApiRouteMetadata | undefined {
-  return published;
+  return slot().routes;
 }
 
 /**
@@ -21,6 +35,7 @@ export function readNamedApiRoutes(): NamedApiRouteMetadata | undefined {
  */
 function missingRouteMessage(name: string): string {
   const quoted = JSON.stringify(name);
+  const published = readNamedApiRoutes();
   if (published === undefined) {
     return import.meta.env?.DEV
       ? `Named API route ${quoted} cannot be resolved: this document embeds no route table. Either ` +
@@ -47,6 +62,7 @@ function missingRouteMessage(name: string): string {
 
 /** Resolves one named API route for browser consumers. `all` has no safe request verb. */
 export function resolveApiRoute(name: string): Readonly<{ path: string; method: string }> {
+  const published = readNamedApiRoutes();
   const route = published && Object.hasOwn(published, name) ? published[name] : undefined;
   if (route === undefined) throw new Error(missingRouteMessage(name));
   if (route.method === "all") {

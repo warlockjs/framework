@@ -71,6 +71,7 @@ import type { DeferSettlement } from "./defer-settlement";
 import { createSettledThenable } from "../loaders/settled-thenable";
 import { bindRequestRouteTranslations } from "./request-route-translations";
 import type { NamedApiRoutesOption } from "../named-api-routes-config";
+import { publishNamedApiRoutes } from "../routing/named-api-routes";
 import { resolveCachedNamedApiRoutes, type ResolveNamedApiRoutesOptions } from "./named-api-routes";
 import { siteHydrationUrl } from "./hydration-client-url";
 import { consumePageManifest, type PagePayloadBudget } from "./page-manifest";
@@ -1292,8 +1293,11 @@ async function finishRender(
     });
   }
 
-  const wrapWithContext = (element: ReactNode): ReactNode =>
-    createElement(DocumentContext.Provider, {
+  const wrapWithContext = (element: ReactNode): ReactNode => {
+    // The page's own `apiHref()` calls read the published table while it renders.
+    publishNamedApiRoutes(documentValue.namedApiRoutes);
+
+    return createElement(DocumentContext.Provider, {
       value: documentValue,
       children: createElement(LocaleProvider, {
         locale: documentValue.payload.locale,
@@ -1301,6 +1305,7 @@ async function finishRender(
         children: withSessionProvider(documentValue.payload.session, element),
       }),
     });
+  };
 
   // Records the LAST wrapped element every `renderWithContext` call rendered
   // — read after the escalation loop below settles, to feed the second,
@@ -1668,8 +1673,11 @@ export async function renderPageFailure(options: RenderPageFailureOptions): Prom
     // guess, or `<Link>`/`changeLocaleCode` go dead on this document too.
     localeRouting: resolveDocumentLocaleRouting(path, readLocaleRouting()),
   };
-  const renderWithContext = (element: ReactNode): string =>
-    renderToString(
+  const renderWithContext = (element: ReactNode): string => {
+    // This document carries no route table; drop the previous request's.
+    publishNamedApiRoutes(undefined);
+
+    return renderToString(
       createElement(DocumentContext.Provider, {
         value,
         children: createElement(LocaleProvider, {
@@ -1679,6 +1687,7 @@ export async function renderPageFailure(options: RenderPageFailureOptions): Prom
         }),
       }),
     );
+  };
   let body: string;
   let errorPageMissing = loadErrorPage === undefined;
 
