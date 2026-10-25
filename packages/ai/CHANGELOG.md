@@ -4,6 +4,16 @@ All notable changes to `@warlock.js/ai` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.38.0
+
+### Added
+
+- `ai.tool()` checks its JSON Schema against OpenAI strict, Anthropic and Google when the tool is defined and, in development only, logs one warning per tool definition: optional fields sent as required and nullable, properties missing from `required`, objects without `additionalProperties: false`, unsupported keywords (`allOf`, `oneOf`, `not`, conditionals, `patternProperties`, ...), non-object roots, invalid names, oversized descriptions and heavy definitions. `lint: false` or `lint: { targets, warnAboveTokens, ... }` on a tool and `ai.config({ toolLint })` tune or silence it.
+- `describeToolSchema(tool, options?)` and `describeToolSchemas(tools, options?)` (also `ai.tools.describe` / `ai.tools.describeAll`) return the findings, a schema hash and an estimated token cost per definition; `formatToolSchemaReports()` prints them. The token figure is an estimate (`charsPerToken`, default 4); `ai.tools.measure` stays the exact native count.
+- Opt-in tool-use contract on agents. `actWhenAsked: { intents, requiredTools }` re-prompts once when an action request is answered without a required tool call. `onToolRefusal: "retry-once-with-hint"` (or `{ retries, hint, isRefusal }`) sends one retry prompt with the refusal reason when the model gives up after a tool refused a call. `backstops: [{ phase, detect(turn), run(context) }]` run deterministic checks before the first model call or after a final answer, and may return a `prompt` to send the model. Agents without these options behave exactly as before.
+- Eval scorers `ai.eval.requiredToolCalled({ tools, intents?, require? })` ("required tool not called") and `ai.eval.changeClaimedWithoutToolCall({ tools?, claims? })` ("change claimed without a tool call").
+- Agent traces. Each agent run records a per-turn trace: system prompt (hash, and text in development), tools offered with schema hashes and token estimates, tool calls, results, refusals, tool-use contract actions, token usage and cost. On in development, off under test and in production; `trace: true | false | { text, redact, maxStringLength, store }` per agent. Traces are redacted with the logger's secret-key rules and registered credentials, and kept in the shared in-memory `agentTraces` store (`get`, `list`, `subscribe`, `clear`; `createAgentTraceStore()` for another). `diffAgentTraces(a, b)` reports whether two runs sent the same system prompt and tool definitions; `formatAgentTrace(trace)` renders one as text.
+
 ## 5.37.0 - 2026-10-24
 
 ### Added

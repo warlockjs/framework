@@ -116,6 +116,10 @@ const restored = ai.eval.fromJSON(await readFile("./eval/baseline.json", "utf8")
 
 `toJSON`/`fromJSON` preserve `result` payloads, per-case `scores`, timings, and any attached `regression` block, so a parsed report drives regression diffing exactly as the in-memory one. `toJUnit` hand-emits XML (no `xml` dependency) and entity-escapes every dynamic value.
 
+## Tool-use scorers
+
+`ai.eval.requiredToolCalled({ tools, intents?, require? })` fails with "required tool not called" for an action request answered without a successful required call; `ai.eval.changeClaimedWithoutToolCall({ tools?, claims? })` fails with "change claimed without a tool call" when the reply says it changed something and no change tool completed.
+
 ## Typical CI shard job
 
 ```ts

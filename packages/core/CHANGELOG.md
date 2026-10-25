@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 > ⚠ **Versioning: `@warlock.js/*` does not follow SemVer strictly — breaking changes may ship in a minor.** This is a deliberate decision, not an oversight: the framework is pre-adoption and the cost of a major per behaviour fix currently outweighs the benefit. **Pin an exact version or a tilde range (`~4.13.0`) if you need to opt into changes rather than receive them.** Every breaking change is marked **BREAKING** in its entry and summarised in an _Upgrading_ section at the top of the release. **This policy will change once the framework has consumers beyond its author.**
 
+## 5.38.0
+
+### Added
+
+- `warlock ai tools --tools <module>` lists each tool's estimated tokens per call and its per-provider schema findings (OpenAI strict, Anthropic, Google); `--targets`, `--warn-above`, `--fail` (exit 1 on an error-level finding) and `--json`.
+- `warlock ai trace [runId]` reads the agent traces held by the running dev server: a run list, or one run turn by turn (system prompt hash, tools offered, calls, refusals, retries, usage, cost); `--diff <otherRunId>` compares the prompt and tool definitions of two runs; `--url`, `--devtools-path` and `--json`. Both need `@warlock.js/ai` 5.38.0 or newer.
+
+### Changed
+
+- `warlock ai` no longer marks `--model` as required in its option list; `warlock ai measure` still requires it and reports a missing value.
+
 ## 5.37.1 - 2026-10-24
 
 ### Added

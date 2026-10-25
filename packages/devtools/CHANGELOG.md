@@ -4,6 +4,13 @@ All notable changes to `@warlock.js/devtools` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.38.0
+
+### Added
+
+- Agents tab at `/__warlock` for the per-turn agent traces `@warlock.js/ai` records in development: system prompt, tools offered with schema hashes and token estimates, tool calls with results and refusals, retries and re-prompts, usage and cost, and a comparison with the previous run of the same agent. It needs no Panoptic.
+- `GET /__warlock/api/ai/agent-runs` (optionally `?requestId=`) and `GET /__warlock/api/ai/agent-runs/:id`, plus `agent-trace` events on the stream, behind the existing development and loopback guard. Runs started during an HTTP request link to it. Types `DevtoolsAgentRun` and `DevtoolsAgentTraceEvent`.
+
 ## 5.34.3 - 2026-10-20
 
 ### Changed

@@ -360,3 +360,4 @@ A provider's own tools (Anthropic `web_search` / `bash`, OpenAI Responses `web_s
 - [Run supervisor](/v/latest/ai/orchestration/run-supervisor/) — artifacts under a supervisor.
 - [Handle errors](/v/latest/ai/reliability/handle-errors/) — `ToolExecutionError` and `cause` chain.
 - [Silent tools recipe](/v/latest/ai/recipes/silent-tools/) — `mode: "silent"` patterns.
+- [Lint tool schemas](/v/latest/ai/tools/lint-tool-schemas/) — per-provider schema checks and token cost.

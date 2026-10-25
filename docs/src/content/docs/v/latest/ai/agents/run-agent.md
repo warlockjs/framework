@@ -687,3 +687,5 @@ the threshold or `keep` triggers durable drift detection; bump the agent's
 - [Write system prompts](/v/latest/ai/prompts/write-system-prompts/) — composable prompts.
 - [Handle errors](/v/latest/ai/reliability/handle-errors/) — the typed error hierarchy.
 - [Streaming tool guard recipe](/v/latest/ai/recipes/streaming-tool-guard/) — recovering leaked tool calls.
+- [Tool-use contract](/v/latest/ai/agents/tool-use-contract/) — act when asked, retry after refusals, backstops.
+- [Agent traces](/v/latest/ai/observability/agent-trace/) — what an agent sent and did, turn by turn.
