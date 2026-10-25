@@ -353,18 +353,31 @@ When a unit needs config values, call
 once per module graph, without hooks, connectors, native loader or fakes.
 Most unit specs need no setup call.
 
-Integration setup defaults to `tests.lifetime: "file"`. For reuse, set
-`lifetime: "worker"` in `src/config/tests.ts`, change the integration project to
-`pool: "forks", isolate: false`, keep the generated runner, and use `vitest run`.
-Watch, threads and isolated graphs are refused. Keep `afterAll(teardownTest)`:
-it marks file boundaries while the runner closes connectors at worker exit.
-`warlock add test` generates `src/config/tests.ts` so `WARLOCK_TEST_LIFETIME=worker`
-switches `lifetime` to `"worker"`, turns on `resetDatabase` (truncates every table or
-collection before each file, keeping the migrations ledger) and flips the integration
-project to `isolate: false`. Use `workerDatabaseName(base)` from
-`@warlock.js/core/tests` so each worker has its own database. When setup dominates a
-file-lifetime run, the profiler summary recommends this. Servers from
-`createTestHttpServer()` a file leaves open are closed before the next file.
+Integration setup boots the framework once per Vitest worker (`tests.lifetime:
+"worker"`): the generated `src/config/tests.ts` also turns on `resetDatabase` (truncates
+every table or collection before each file, keeping the migrations ledger), the
+integration project has `pool: "forks", isolate: false` with the generated runner, and
+`src/config/database.ts` gives each worker its own database
+(`<DB_NAME>_test_<worker id>`). Use `vitest run`; watch, threads and isolated graphs are
+refused. Keep `afterAll(teardownTest)`: it marks file boundaries while the runner closes
+connectors at worker exit. `WARLOCK_TEST_LIFETIME=file` boots once per file instead
+(slower, with isolated module state).
+
+Before each file the runtime closes `createTestHttpServer()` servers the previous file
+left open, clears the request context, restores the route table to the booted app's,
+flushes a real in-memory cache, reinstalls the fakes (mail, queue, cache, storage, fake
+clock, ids) and truncates the database. A spec that changes global configuration these
+resets do not undo opts its file out with
+`setupTest({ importModule: (file) => import(file), lifetime: "file" })`.
+
+The `unit` project fails a spec that imports a connector, `connectorsManager`,
+`bootstrap`, a test-server helper, or calls `setupTest()` without `{ mode: "unit" }`.
+`warlock check` reports `WL9021` (a warning) for an integration spec that imports nothing
+needing the app: rename it to `*.spec.ts`.
+
+Vitest 5 defaults `clearMocks` to true, which also clears the calls a module made when it
+was imported (a scheduler registering jobs from `main.ts`). To assert those calls, import
+the module inside the test after the mocks are set up, or set `clearMocks: false`.
 Set `tests.resetBetweenFiles` to an async application-owned cleanup callback;
 it runs before every file, including the first, after selected fakes, clock and
 IDs reset. Each worker needs a separate database/schema. Module singletons and
@@ -373,7 +386,9 @@ storage is private and does not mirror the shared HTTP server's fake files.
 
 Use `tests.profileSetup: true` or
 `WARLOCK_TEST_PROFILE=1 npx vitest run --project integration` for file timings and
-summaries per worker. Pass `file: expect.getState().testPath` in the setup call.
+summaries per worker; the run summary lists the boot phases (config, translations,
+connectors one by one, fakes, routes, reset, teardown), the HTTP test server's boot and
+the slowest files, and `WARLOCK_TEST_PROFILE_JSON=profile.json` writes them as JSON. Pass `file: expect.getState().testPath` in the setup call.
 `getTestRuntimeStats()` exposes bootstrap and file counts. Generated configs use
 `recommendedTestWorkers()` from `@warlock.js/core/vite` to respect visible cgroup
 v2 CPU quotas; reduce `maxWorkers` further for database or memory contention.

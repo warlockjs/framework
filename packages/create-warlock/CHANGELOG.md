@@ -4,6 +4,13 @@ All notable changes to `create-warlock` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.38.0
+
+### Changed
+
+- The starter boots the test framework once per Vitest worker: `src/config/tests.ts` sets `lifetime: "worker"` and `resetDatabase: true` (`WARLOCK_TEST_LIFETIME=file` switches back), and `src/config/database.ts` (and the PostgreSQL variant) uses one database per Vitest worker, `<DB_NAME>_test_<worker id>`. With `--features=test` the generated unit project fails a spec that imports a connector or boots the app, and the integration project runs with `isolate: false`. The PostgreSQL variant needs those databases created and migrated first.
+- The template's `testing-strategy` skill describes the per-file reset, the `setupTest({ lifetime: "file" })` opt-out, the unit-project guard, `WL9021`, the boot profile and Vitest 5's `clearMocks` default.
+
 ## 5.37.1 - 2026-10-24
 
 ### Changed

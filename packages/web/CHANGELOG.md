@@ -2,6 +2,12 @@
 
 All notable changes to `@warlock.js/web` are documented here.
 
+## 5.38.0
+
+### Fixed
+
+- `WebConnector.shutdown()` closes the Vite dev server, its HMR websocket and its file watchers whenever Vite was created, not only after `start()` completed. A boot that failed after creating Vite, or a shutdown between `boot()` and `start()`, used to leave Vite running and keep a test or dev process from exiting. A failure to close one part no longer skips the others, and the first failure is reported afterwards.
+
 ## 5.37.1 - 2026-10-24
 
 ### Fixed
