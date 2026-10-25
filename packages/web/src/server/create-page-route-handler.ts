@@ -87,6 +87,7 @@ import type { ErrorPageModuleLoader } from "./error-page";
 import type { RouteTranslationsResolver } from "./route-translations";
 import { bindRequestRouteTranslations } from "./request-route-translations";
 import type { PagePayloadBudget } from "./page-manifest";
+import type { NamedApiRouteRegistry } from "./dev-client-api-route-names";
 
 /**
  * Raised when a page route handler is constructed WITHOUT an `httpServer`
@@ -195,6 +196,8 @@ export type PageRouteHandlerOptions = {
    * build-time list; development passes a thunk that re-reads its sources.
    */
   clientApiRouteNames?: () => readonly string[];
+  /** Core's real router registry the route table is read from (see `RenderPageRequestOptions.namedRouteRegistry`). */
+  namedRouteRegistry?: NamedApiRouteRegistry;
   /** The inline payload budget every document of this route is checked against (see `RenderPageRequestOptions.payloadBudget`). */
   payloadBudget?: PagePayloadBudget;
   /**
@@ -418,6 +421,7 @@ export function createPageRouteHandler(options: PageRouteHandlerOptions): PageRo
     cache: routeCache,
     mode,
     clientApiRouteNames,
+    namedRouteRegistry,
     payloadBudget,
   } = options;
 
@@ -732,6 +736,7 @@ export function createPageRouteHandler(options: PageRouteHandlerOptions): PageRo
         crawler: attemptStorageAfterRender && !wantsData ? true : crawler,
         noindex,
         clientApiRouteNames,
+        namedRouteRegistry,
         payloadBudget,
       });
 

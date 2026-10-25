@@ -931,6 +931,22 @@ describe("per-page browser route table", () => {
     });
   });
 
+  it("reads the route table from the registry the handler passes, not the imported router", async () => {
+    vi.spyOn(router, "getNamedApiRoutes").mockReturnValue([]);
+
+    const rendered = await renderPageRequest("/orders/1", {
+      routes: [entry],
+      createHttp: () => createHttp(),
+      clientApiRouteNames: () => ["orders.show"],
+      namedRouteRegistry: { getNamedApiRoutes: () => registered },
+    });
+
+    if (rendered instanceof Response) throw new Error("unexpected terminal Response");
+    expect(rendered.bundle?.document?.namedApiRoutes).toEqual({
+      "orders.show": { path: "/api/orders/:id", method: "GET" },
+    });
+  });
+
   it("gives a client navigation the same page table in its payload", async () => {
     vi.spyOn(router, "getNamedApiRoutes").mockReturnValue(registered);
 

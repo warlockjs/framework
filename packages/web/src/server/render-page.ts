@@ -73,6 +73,7 @@ import { bindRequestRouteTranslations } from "./request-route-translations";
 import type { NamedApiRoutesOption } from "../named-api-routes-config";
 import { publishNamedApiRoutes } from "../routing/named-api-routes";
 import { resolveCachedNamedApiRoutes, type ResolveNamedApiRoutesOptions } from "./named-api-routes";
+import type { NamedApiRouteRegistry } from "./dev-client-api-route-names";
 import { siteHydrationUrl } from "./hydration-client-url";
 import { consumePageManifest, type PagePayloadBudget } from "./page-manifest";
 import { reportPayloadBudget } from "./payload-budget";
@@ -206,6 +207,12 @@ export type RenderPageRequestOptions = {
    * `clientVisible: false`, reach the browser table. Absent means an empty table.
    */
   clientApiRouteNames?: () => readonly string[];
+  /**
+   * Core's real router registry, read for the document's route table instead of
+   * this module's own `router` import (a separate, empty copy when the renderer
+   * runs through Vite SSR). Absent reads the imported router.
+   */
+  namedRouteRegistry?: NamedApiRouteRegistry;
   /**
    * The inline payload budget this document is checked against, once it is
    * rendered (`server/payload-budget.ts`). Advisory: an overage is reported, never
@@ -924,6 +931,8 @@ async function finishRender(
     awaitDeferredForDataRequest?: boolean;
     /** See `RenderPageRequestOptions.clientApiRouteNames`. */
     clientApiRouteNames?: () => readonly string[];
+    /** See `RenderPageRequestOptions.namedRouteRegistry`. */
+    namedRouteRegistry?: NamedApiRouteRegistry;
     /** See `RenderPageRequestOptions.payloadBudget`. */
     payloadBudget?: PagePayloadBudget;
     /** See `RenderPageRequestOptions.crawler`. */
@@ -1268,6 +1277,7 @@ async function finishRender(
       resolveDocumentNamedApiRoutes(streamOptions.clientApiRouteNames, {
         config: namedApiRoutesConfig,
         site: request.site?.key,
+        registry: streamOptions.namedRouteRegistry,
         // Guest only when a session resolver ran and found no user. Without
         // `web.session` the viewer is unknown, so guarded routes stay.
         guest: (bundle as Bundle).session !== undefined && (bundle as Bundle).session?.user == null,
@@ -1824,6 +1834,7 @@ export async function renderPageRequest(
           waitForAll: options.waitForAll ?? false,
           awaitDeferredForDataRequest: options.awaitDeferredForDataRequest,
           clientApiRouteNames: options.clientApiRouteNames,
+          namedRouteRegistry: options.namedRouteRegistry,
           payloadBudget: options.payloadBudget,
           crawler: options.crawler,
           noindex: options.noindex,

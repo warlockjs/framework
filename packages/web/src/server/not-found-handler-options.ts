@@ -34,6 +34,7 @@ import type { PageModuleLoader, PageRouteHandlerOptions } from "./create-page-ro
 import type { ErrorPageModuleLoader } from "./error-page";
 import type { RequestStylesheetUrlResolver } from "./document-stylesheet-urls";
 import type { PagePayloadBudget } from "./page-manifest";
+import type { NamedApiRouteRegistry } from "./dev-client-api-route-names";
 import type { RouteTranslationsResolver } from "./route-translations";
 import { NOT_FOUND_ROUTE_NAME, NOT_FOUND_ROUTE_PATH } from "./not-found-page";
 
@@ -57,6 +58,8 @@ export type NotFoundPageHandlerInput = {
   resolveRequestStylesheetUrls?: RequestStylesheetUrlResolver;
   /** The named API route names this page's document may embed; see `PageRouteHandlerOptions`. */
   clientApiRouteNames?: () => readonly string[];
+  /** Core's real router registry the route table is read from; see `PageRouteHandlerOptions`. */
+  namedRouteRegistry?: NamedApiRouteRegistry;
   /** The inline payload budget the not-found document is checked against, same as every other page. */
   payloadBudget?: PagePayloadBudget;
 };
@@ -84,6 +87,7 @@ export function notFoundPageHandlerOptions(
     errorPageFile: input.errorPageFile,
     getRouteTranslations: input.getRouteTranslations,
     clientApiRouteNames: input.clientApiRouteNames,
+    namedRouteRegistry: input.namedRouteRegistry,
     payloadBudget: input.payloadBudget,
     // NO LAYOUT means no layout CSS either — just root and the not-found
     // page's own stylesheets.

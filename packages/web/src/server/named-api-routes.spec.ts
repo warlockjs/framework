@@ -23,6 +23,14 @@ afterEach(() => {
 });
 
 describe("resolveNamedApiRoutes", () => {
+  it("reads the registry it is given instead of this module's own router", () => {
+    vi.spyOn(router, "getNamedApiRoutes").mockReturnValue([]);
+
+    expect(
+      resolveNamedApiRoutes(["orders.show"], { registry: { getNamedApiRoutes: () => REGISTERED } }),
+    ).toEqual({ "orders.show": { path: "/api/orders/:id", method: "GET" } });
+  });
+
   it("embeds only the requested names", () => {
     vi.spyOn(router, "getNamedApiRoutes").mockReturnValue(REGISTERED);
 

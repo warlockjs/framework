@@ -950,6 +950,7 @@ async function installDiscoveredPageRoutes(
         errorPageFile,
         forbiddenPageFile,
       }),
+      namedRouteRegistry,
       payloadBudget,
       ...httpServerOption,
     };
@@ -1072,6 +1073,7 @@ async function installDiscoveredPageRoutes(
                 errorPageFile,
                 forbiddenPageFile,
               }),
+              namedRouteRegistry,
               payloadBudget,
             }),
             ...httpServerOption,

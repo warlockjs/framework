@@ -6,6 +6,7 @@ import type {
   NamedApiRoutesInclude,
   NamedApiRoutesOption,
 } from "../named-api-routes-config";
+import type { NamedApiRouteRegistry } from "./dev-client-api-route-names";
 import type { NamedApiRouteMetadata } from "../routing/named-api-routes";
 
 /** What decides the table besides the page's own names: the viewer, the site and `web.namedApiRoutes`. */
@@ -20,6 +21,12 @@ export type ResolveNamedApiRoutesOptions = {
    * the browser), so routes behind an auth guard stay in the table.
    */
   guest?: boolean;
+  /**
+   * The router registry to read. Absent reads this module's own `router`, which
+   * is empty when the renderer is a separate copy of Core (the development SSR
+   * graph); the side that owns the real router passes it.
+   */
+  registry?: NamedApiRouteRegistry;
 };
 
 /** An allowlist entry: an exact route name or a `prefix.*` pattern. */
@@ -55,9 +62,9 @@ function readConfig(config: NamedApiRoutesOption | undefined): {
   return { include: options.include, privatePrefixes: options.privatePrefixes ?? [] };
 }
 
-function readRegistry(): readonly NamedApiRoute[] | undefined {
+function readRegistry(source?: NamedApiRouteRegistry): readonly NamedApiRoute[] | undefined {
   try {
-    return router.getNamedApiRoutes();
+    return (source ?? router).getNamedApiRoutes();
   } catch {
     return undefined;
   }
@@ -87,7 +94,7 @@ export function resolveNamedApiRoutes(
 ): NamedApiRouteMetadata | undefined {
   if (options.config === false) return undefined;
 
-  const registry = readRegistry();
+  const registry = readRegistry(options.registry);
 
   if (registry === undefined) return undefined;
 
