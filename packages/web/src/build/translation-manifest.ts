@@ -51,6 +51,8 @@ export function resolveTranslationOptions(options: TranslationBuildOptions | und
 export type TranslationBuildResult = {
   readonly manifest: PageManifestTranslations;
   readonly assets: readonly SharedTranslationAsset[];
+  /** The parsed route-locale sources the tables derive from, for build-time payload estimates. */
+  readonly sources: readonly TranslationSourceEntries[];
 };
 
 export type TranslationBuildInput = {
@@ -156,6 +158,7 @@ export function buildTranslationManifest(input: TranslationBuildInput): Translat
   return {
     manifest: { sharedGroups, prune, usage },
     assets: sharedTranslationAssets(sources, sharedGroups),
+    sources,
   };
 }
 

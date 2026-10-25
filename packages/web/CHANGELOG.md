@@ -2,6 +2,20 @@
 
 All notable changes to `@warlock.js/web` are documented here.
 
+## 5.38.0
+
+### Added
+
+- `warlock build` measures `build.budgets.payload` for the sections the build knows: each page's pruned translations and its browser route table, both upper bounds. A page whose measured sections exceed its limit fails the build with `mode: "error"` and prints a warning with `mode: "warn"`; the message gives the per-section breakdown and says which sections (page, layout, app and session data, other) are only measured at runtime. The runtime check is unchanged and still never fails a request.
+- Client build integrity: every build writes `client/.vite/warlock-integrity.json` (a digest per file in `client/assets`). The next `warlock build` reads the previous record before it starts and fails, naming each file, when a file name now maps to different bytes. The new web build option `previousBuild` points the comparison at another build's record or output directory (for example the deployed release). New exports from `@warlock.js/web/vite`: `ChunkIntegrityError`, `CHUNK_INTEGRITY_FILE`, `readChunkIntegrity` and the `ChunkIntegrityRecord` and `ChunkIntegrityConflict` types; `buildHydrationClient` takes `previousIntegrity`.
+- Two request tracing phases through core's `TracingHooks.onPhase`: `translations` (`route`, `locale`, `mode`) around binding the page's translation snapshot, and `named-api-routes` (`route`) around resolving the document's route table.
+
+### Fixed
+
+- Production client chunks are named after their final bytes. The bundler hashed a chunk before the import specifiers inside it were rewritten, so two builds that differed only in the name of an imported chunk emitted the same file name for different bytes, and two byte-identical chunks could keep different names. After the bundle is written, chunks are renamed in dependency order from the hash of their final code (chunks that import each other are named together), byte-identical non-entry chunks are merged into one file, and the client manifest, the module preload lists, the budget report and the precompressed `.br` and `.gz` files all use the final names.
+- Production pages no longer walk the whole named route registry on every request. A page's browser route table is resolved once per site and viewer kind and reused; development still resolves it per request, because its registry and files change. A `web.namedApiRoutes` filter function is therefore called once per route, site and viewer kind in production.
+- A render that built its hydration payload more than once (the document context, the final payload, a data request) pruned the global translation registry each time; it is now pruned once per request.
+
 ## 5.37.1 - 2026-10-24
 ## 5.38.0
 

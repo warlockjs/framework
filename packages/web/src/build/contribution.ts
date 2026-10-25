@@ -71,6 +71,13 @@ export type WebBuildOptions = {
    * guide.
    */
   translations?: TranslationBuildOptions;
+  /**
+   * The previous build to compare the client bundle's file names with: the path of its
+   * `client/.vite/warlock-integrity.json`, or of the build output directory that holds it.
+   * Default: the record the current `build.outdir` already holds. A file name the previous
+   * build used for different bytes fails the build.
+   */
+  previousBuild?: string;
 };
 
 function resolveClientOutDir(context: ConnectorBuildContext): string {
@@ -214,6 +221,7 @@ export function createWebBuildContribution(
   };
   let publicFiles: string[] = [];
   let translationAssets: readonly { readonly fileName: string; readonly body: string }[] = [];
+  let previousIntegrity: import("../vite/chunk-integrity").ChunkIntegrityRecord | undefined;
   let sites: SitesConfig | undefined;
   let fonts: readonly import("../fonts/types").WebFont[] | undefined;
 
@@ -224,6 +232,15 @@ export function createWebBuildContribution(
       const { collectPublicFiles } = await import("./public-files");
       const { cssModulesServerPlugin } = await import("./css-module-esbuild-plugin");
       const { loadWebBuildConfig } = await import("./load-web-build-config");
+
+      // The previous build's name-to-bytes record, read now: `outdir` still holds that build
+      // here, and the client bundle replaces it when `emit` runs.
+      const { readChunkIntegrity } = await import("../vite/chunk-integrity");
+      previousIntegrity = await readChunkIntegrity(
+        options.previousBuild === undefined
+          ? path.resolve(context.appRoot, context.options.outdir, "client")
+          : path.resolve(context.appRoot, options.previousBuild),
+      );
 
       // Sitemap (v5.16 contract Part 6 rule 1, revised): `warlock build` does
       // NOT generate the sitemap. It cannot: the application's config is not
@@ -251,6 +268,8 @@ export function createWebBuildContribution(
       sites = options.sites ?? webConfig.sites;
       fonts = webConfig.fonts;
 
+      const payloadBudget = resolvePayloadBudget(context.options.budgets?.payload);
+
       const result = await generatePagesBarrel({
         appRoot: context.appRoot,
         productionDir: context.productionDir,
@@ -273,7 +292,7 @@ export function createWebBuildContribution(
         // embeds a route, and the check refuses the build before anything is written.
         clientApiRouteNames: clientVisibleRouteNames(context.namedApiRoutes ?? []),
         // `build.budgets.payload`, validated and resolved here so a bad size fails the build.
-        payloadBudget: resolvePayloadBudget(context.options.budgets?.payload),
+        payloadBudget,
         translations: options.translations,
       });
 
@@ -293,6 +312,23 @@ export function createWebBuildContribution(
         pages: pageRoutes.routes,
         apis: context.namedApiRoutes,
       });
+
+      // `build.budgets.payload`, the part the build can measure: translations and the route
+      // table of every page. Page data is loaded per request and is measured at runtime.
+      const { formatPayloadBudgetOverages, payloadBudgetOverages } =
+        await import("./payload-budget-estimate");
+      const overages = payloadBudgetOverages(
+        result.estimatePayloads(context.namedApiRoutes),
+        payloadBudget,
+      );
+
+      if (overages.length > 0) {
+        const message = formatPayloadBudgetOverages(overages);
+
+        if (payloadBudget.mode === "error") throw new Error(message);
+
+        console.warn(`[warlock:web] ${message}`);
+      }
 
       // Contributed unconditionally, zero pages included: the barrel is always
       // written, and the entry has to IMPORT it for the empty table to reach
@@ -365,6 +401,7 @@ export function createWebBuildContribution(
           external: options.external,
           sites,
           fonts,
+          previousIntegrity,
           plugins: [...connectorPlugins, clientBudgetModules(context.appRoot)],
         });
 

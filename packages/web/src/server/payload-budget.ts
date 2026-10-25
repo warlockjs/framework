@@ -15,11 +15,13 @@
  *   `pages`  route-path globs (`*`, `**`, `?`) overriding `page`, the later
  *            matching entry winning, the same rule as the client budgets;
  *   `mode`   `"warn"` (default) logs a warning, `"error"` logs at error level.
- *            Neither ever fails a request.
+ *            Neither ever fails a request. `warlock build` also checks the
+ *            sections it can measure (`../build/payload-budget-estimate`), and
+ *            with `"error"` fails the build.
  *
  * The limits are resolved at BUILD time for production (`PageManifest.payloadBudget`)
  * and read from the live config in development, so the same numbers apply in
- * both. The measurement itself is a runtime one: a page's payload depends on
+ * both. The full measurement is a runtime one: a page's payload depends on
  * its loaders, which only a request can run, so `warlock build --json` does not
  * report it.
  *
@@ -231,6 +233,9 @@ export function resetPayloadBudgetReports(): void {
 }
 
 const kb = (bytes: number): string => `${(bytes / 1024).toFixed(1)}kb`;
+
+/** Bytes as the budget report prints them: `12.3kb`. */
+export const formatBytes = kb;
 
 /** The one diagnostic line for an over-budget route, with its breakdown. */
 export function formatPayloadBudgetReport(input: {

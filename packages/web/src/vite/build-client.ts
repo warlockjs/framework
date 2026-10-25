@@ -2,7 +2,15 @@ import { statSync } from "node:fs";
 import path from "node:path";
 import type { AliasOptions, PluginOption, Rollup } from "vite";
 import { assertViteVersion } from "./assert-vite-version";
+import {
+  assertChunkIntegrity,
+  readChunkIntegrity,
+  recordChunkIntegrity,
+  writeChunkIntegrity,
+  type ChunkIntegrityRecord,
+} from "./chunk-integrity";
 import { cssModulesConfig } from "./css-modules-config";
+import { finalizeChunkNames } from "./finalize-chunk-names";
 import {
   createHydrationClientEntry,
   createHydrationSiteInputs,
@@ -36,6 +44,12 @@ export interface BuildHydrationClientOptions {
   sites?: readonly string[];
   /** Application root the build's log paths are shown relative to. Logging only; never used to read or write files. */
   logRoot?: string;
+  /**
+   * The previous build's name-to-bytes record. Absent: the record the output
+   * directory already holds from its last build is used. After the build, a
+   * file name that maps to different bytes than the record fails the build.
+   */
+  previousIntegrity?: ChunkIntegrityRecord;
 }
 
 /**
@@ -203,6 +217,9 @@ export async function buildHydrationClient(
   assertEntryFile(entry);
 
   const outDir = path.resolve(options.outDir);
+  // Read before the build: `emptyOutDir` removes the previous record with the rest.
+  const previousIntegrity =
+    options.previousIntegrity ?? (await readChunkIntegrity(outDir));
   const manifestPath = path.join(outDir, ".vite/manifest.json");
   const { build, createLogger, version } = await import("vite");
   assertViteVersion(version);
@@ -280,6 +297,23 @@ export async function buildHydrationClient(
   if (!Array.isArray(viteResult) && !("output" in viteResult)) {
     await viteResult.close();
     throw new Error("Cannot build the hydration client: Vite unexpectedly returned a watcher.");
+  }
+
+  // Every chunk is renamed after its final bytes and byte-identical chunks are
+  // merged, before the manifest is read by anything else.
+  const emitted = (Array.isArray(viteResult) ? viteResult : [viteResult]).flatMap(
+    (result) => result.output,
+  );
+  const chunks = emitted
+    .filter((item): item is Rollup.OutputChunk => item.type === "chunk")
+    .map((item) => ({ fileName: item.fileName, isEntry: item.isEntry }));
+
+  if (chunks.length > 0) {
+    await finalizeChunkNames({ outDir, chunks });
+
+    const record = await recordChunkIntegrity(outDir);
+    assertChunkIntegrity(previousIntegrity, record);
+    await writeChunkIntegrity(outDir, record);
   }
 
   return { entry, outDir, manifestPath, output: viteResult };

@@ -87,6 +87,37 @@ export type BuildHydrationPayloadExtras = {
   readonly session?: HydrationDocumentPayloadSource["session"];
 };
 
+type GlobalDelivery = NonNullable<ReturnType<typeof globalTranslationDelivery>>;
+
+/** The global delivery a bundle already asked for, so one request prunes its table once. */
+const globalDeliveries = new WeakMap<
+  PageDataBundle,
+  { delivery: GlobalDelivery; locale: string; delivered: ReturnType<GlobalDelivery["deliver"]> }
+>();
+
+/**
+ * A render builds the payload twice (the document context, then the final
+ * payload) and a data request builds it again. Pruning the registry's table is
+ * a walk over every key, so the result is kept on the request's bundle: one
+ * walk per request instead of one per payload.
+ */
+function deliverGlobalOnce(bundle: PageDataBundle, locale: string) {
+  const delivery = globalTranslationDelivery();
+
+  if (delivery === undefined) return undefined;
+
+  const known = globalDeliveries.get(bundle);
+
+  if (known !== undefined && known.delivery === delivery && known.locale === locale) {
+    return known.delivered;
+  }
+
+  const delivered = delivery.deliver(bundle.route.name, locale);
+  globalDeliveries.set(bundle, { delivery, locale, delivered });
+
+  return delivered;
+}
+
 export function buildHydrationPayload(
   bundle: PageDataBundle,
   locale: string,
@@ -100,9 +131,7 @@ export function buildHydrationPayload(
   // Global-registry mode: the installed delivery prunes this route's keys and
   // publishes the shared table. Scoped payloads carry their own (see above).
   const globalDelivered =
-    bundle.routeTranslations === undefined
-      ? globalTranslationDelivery()?.deliver(bundle.route.name, locale)
-      : undefined;
+    bundle.routeTranslations === undefined ? deliverGlobalOnce(bundle, locale) : undefined;
   const translationAssets =
     bundle.routeTranslations === undefined
       ? globalDelivered?.assets

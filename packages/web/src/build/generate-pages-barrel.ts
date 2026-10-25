@@ -49,6 +49,11 @@ import { appConventionAliases } from "../vite/app-convention-aliases";
 import { resolvePayloadBudget } from "../server/payload-budget";
 import type { PagePayloadBudget } from "../server/page-manifest";
 import type { SitesConfig } from "../sites/site-config.types";
+import {
+  estimatePagePayloads,
+  type EstimateApiRoute,
+  type PagePayloadEstimate,
+} from "./payload-budget-estimate";
 import { serializeRouteLocales } from "./serialize-route-locales";
 import { buildTranslationManifest, type TranslationBuildOptions } from "./translation-manifest";
 import {
@@ -235,6 +240,12 @@ export type GeneratePagesBarrelResult = {
   pageRoutes: PageRoutesManifest;
   /** Hashed shared translation tables, relative to the client `assets` directory, for the emit step to write. */
   translationAssets: readonly { readonly fileName: string; readonly body: string }[];
+  /**
+   * The build-measurable sections of every page's inline payload (translations
+   * and the route table), given the registered named API routes. See
+   * `./payload-budget-estimate`.
+   */
+  estimatePayloads: (apiRoutes: readonly EstimateApiRoute[]) => PagePayloadEstimate[];
 };
 
 export type PageRouteManifestEntry = {
@@ -669,6 +680,7 @@ export async function generatePagesBarrel(
       contents,
       pageRoutes: { version: 1, routes: [] },
       translationAssets: [],
+      estimatePayloads: () => [],
     };
   }
 
@@ -953,5 +965,28 @@ export async function generatePagesBarrel(
       fileName: asset.fileName,
       body: asset.body,
     })),
+    estimatePayloads: (apiRoutes) =>
+      estimatePagePayloads({
+        pages: pages.flatMap((page, index) => {
+          const routable = routablePages[index];
+          if (routable === undefined || isNotFoundPageFile(routable.pageFile)) return [];
+
+          return [
+            {
+              route: routable.routeName,
+              path: normalizeRoutePath(routable.routePath),
+              source: toPosix(path.relative(appRoot, page.sourceFile)),
+              apiRouteNames: page.apiRouteNames,
+            },
+          ];
+        }),
+        translations: {
+          sources: translations.sources,
+          usage: translations.manifest.usage,
+          sharedGroups: translations.manifest.sharedGroups,
+          prune: translations.manifest.prune,
+        },
+        apiRoutes,
+      }),
   };
 }

@@ -33,6 +33,12 @@ export type {
   BuildHydrationClientResult,
   HydrationClientBuildOutput,
 } from "./build-client";
+export {
+  ChunkIntegrityError,
+  CHUNK_INTEGRITY_FILE,
+  readChunkIntegrity,
+} from "./chunk-integrity";
+export type { ChunkIntegrityConflict, ChunkIntegrityRecord } from "./chunk-integrity";
 export { gateAResolve } from "./gate-a-resolve";
 export type {
   EnvironmentClassifier,
@@ -93,6 +99,8 @@ export type BuildWarlockHydrationClientOptions = Readonly<{
   plugins?: BuildHydrationClientOptions["plugins"];
   /** Static `web.sites` shape; host resolution never enters the client build. */
   sites?: SitesConfig;
+  /** The previous build's name-to-bytes record; see {@link BuildHydrationClientOptions.previousIntegrity}. */
+  previousIntegrity?: BuildHydrationClientOptions["previousIntegrity"];
 }>;
 
 /**
@@ -225,6 +233,7 @@ export async function buildWarlockHydrationClient(
     resolveAliases: options.resolveAliases,
     external: options.external,
     cssModulesRoot: options.appRoot,
+    previousIntegrity: options.previousIntegrity,
     // Build logs list output paths relative to the app, not to the installed
     // `@warlock.js/web` package Vite runs from.
     logRoot: options.appRoot,

@@ -28,6 +28,8 @@ registerTracingHooks({
 | `page.middleware` | `count`, `outcome` (`next`   | `response`                                         | `error`)                           | All page middleware settling |
 | `page.cache`      | `status` (`hit`              | `miss`                                             | `bypass`)                          | Page-cache lookup settling   |
 | `loader`          | `level`, `layoutPath?`       | An app, layout, or page loader                     |
+| `translations`    | `route`, `locale`, `mode`    | Binding the page's translation snapshot (built once per page source and locale, so warm requests are near zero) |
+| `named-api-routes` | `route`                     | Resolving the document's browser route table (once per site and viewer kind in production) |
 | `render.shell`    | —                            | Rendering until React's shell is ready to stream   |
 | `stream.end`      | —                            | Whole streamed response, including deferred values |
 | `defer.settle`    | `key`, `status` (`fulfilled` | `rejected`)                                        | One deferred loader value settling |
@@ -64,4 +66,4 @@ generic, so use the log and the `errorCode` to find the record.
 
 ## Inline payload budget
 
-Each rendered document is checked against `build.budgets.payload` (default `64kb`). An over-budget route logs one line per process with the size of each section (page, layout, app, translations, routes, session, other) and its largest data keys. The check is advisory: it never fails a request. Raise the limit for a route with a `pages` glob, or reduce the data the page loads. The e2e kit records the same measurement with `page.measurePayload({ limit })`.
+Each rendered document is checked against `build.budgets.payload` (default `64kb`). An over-budget route logs one line per process with the size of each section (page, layout, app, translations, routes, session, other) and its largest data keys. The runtime check is advisory: it never fails a request. `warlock build` measures the two sections the build knows (translations and the route table, both upper bounds) and, with `mode: "error"`, fails the build when a page is over its limit before any page data is added; page, layout, app and session data are measured only at runtime. Raise the limit for a route with a `pages` glob, or reduce the data the page loads. The e2e kit records the same measurement with `page.measurePayload({ limit })`.

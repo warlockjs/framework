@@ -131,6 +131,7 @@ function stubGeneratedPages(pageCount: number): void {
     contents: "",
     pageRoutes: { version: 1, routes: [] },
     translationAssets: [],
+    estimatePayloads: () => [],
   });
 }
 
@@ -181,6 +182,78 @@ describe("web build contribution — zero pages", () => {
       }),
     );
     log.mockRestore();
+  });
+
+  describe("build.budgets.payload", () => {
+    const overPage = {
+      route: "products",
+      path: "/products",
+      source: "src/web/products.page.tsx",
+      locale: "en",
+      sections: { translations: 40 * 1024, routes: 1024 },
+      total: 41 * 1024,
+    };
+
+    function stubOverBudgetPage(): void {
+      generatePagesBarrelSpy.mockResolvedValueOnce({
+        pageCount: 1,
+        barrelFile: "virtual-pages.ts",
+        contents: "",
+        pageRoutes: { version: 1, routes: [] },
+        translationAssets: [],
+        estimatePayloads: () => [overPage],
+      });
+    }
+
+    function contextWithPayload(appRoot: string, payload: object): ConnectorBuildContext {
+      const base = buildContext(appRoot);
+
+      return {
+        ...base,
+        options: { ...base.options, budgets: { payload } },
+      } as ConnectorBuildContext;
+    }
+
+    it("fails the build with the per-section breakdown when mode is error", async () => {
+      const appRoot = makeTree({ "src/web/root.tsx": APP, "src/web/home.page.tsx": PAGE });
+      const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
+      stubOverBudgetPage();
+
+      await expect(
+        createWebBuildContribution().generate?.(
+          contextWithPayload(appRoot, { page: "16kb", mode: "error" }),
+        ),
+      ).rejects.toThrow(/\/products.*translations 40\.0kb.*routes 1\.0kb/s);
+      log.mockRestore();
+    });
+
+    it("only warns when mode is warn", async () => {
+      const appRoot = makeTree({ "src/web/root.tsx": APP, "src/web/home.page.tsx": PAGE });
+      const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+      stubOverBudgetPage();
+
+      await createWebBuildContribution().generate?.(
+        contextWithPayload(appRoot, { page: "16kb", mode: "warn" }),
+      );
+
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining("/products"));
+      log.mockRestore();
+      warn.mockRestore();
+    });
+
+    it("passes when every page fits its limit", async () => {
+      const appRoot = makeTree({ "src/web/root.tsx": APP, "src/web/home.page.tsx": PAGE });
+      const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
+      stubOverBudgetPage();
+
+      await expect(
+        createWebBuildContribution().generate?.(
+          contextWithPayload(appRoot, { page: "64kb", mode: "error" }),
+        ),
+      ).resolves.toBeTruthy();
+      log.mockRestore();
+    });
   });
 
   it("forwards build.testOnly into the barrel generator", async () => {
