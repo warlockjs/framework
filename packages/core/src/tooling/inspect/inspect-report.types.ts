@@ -30,6 +30,7 @@ export const INSPECT_SECTIONS = [
   "schedules",
   "packages",
   "files",
+  "wiring",
 ] as const;
 
 /** One section name. */
@@ -215,6 +216,44 @@ export type InspectWarning = {
   source: string | null;
 };
 
+/** The kinds of file the framework loads on its own, in the order it loads them. */
+export const INSPECT_WIRING_ROLES = ["config", "locale", "event", "main", "route", "worker"] as const;
+
+/** One auto-loaded file role. */
+export type InspectWiringRole = (typeof INSPECT_WIRING_ROLES)[number];
+
+/** A file the framework imports at boot without anything importing it. */
+export type InspectWiringFile = {
+  type: "file";
+  role: InspectWiringRole;
+  /** Project-relative path. */
+  file: string;
+  /** `src/app/<module>`, or the containing top-level `src` directory. */
+  module: string;
+  /** 1-based position in the boot load order. */
+  order: number;
+};
+
+/** A capability slot (`defineCapability`) with its provider and consumers. */
+export type InspectWiringCapability = {
+  type: "capability";
+  name: string;
+  description: string | null;
+  /** `false` when defined with `{ required: false }`. */
+  required: boolean;
+  /** Whether a provider was registered while the app booted. */
+  provided: boolean;
+  /** Project-relative file that defined it; `null` when unknown. */
+  definedIn: string | null;
+  /** Project-relative file that provided it; `null` when nothing did. */
+  providedBy: string | null;
+  /** Project-relative files that read it while the app booted. */
+  consumers: string[];
+};
+
+/** One entry of the `wiring` section: an auto-loaded file or a capability slot. */
+export type InspectWiringEntry = InspectWiringFile | InspectWiringCapability;
+
 /** The whole report. Sections not requested are absent. */
 export type InspectReport = {
   schemaVersion: typeof INSPECT_SCHEMA_VERSION;
@@ -240,6 +279,11 @@ export type InspectReport = {
   schedules?: InspectSchedule[];
   packages?: InspectPackage[];
   files?: InspectFile[];
+  /**
+   * Every auto-loaded file in boot load order (`type: "file"`), then every
+   * capability slot (`type: "capability"`).
+   */
+  wiring?: InspectWiringEntry[];
   /** Shared schemas that `$ref`s point at (`#/components/schemas/<name>`). */
   components: { schemas: Record<string, JsonSchema> };
   warnings: InspectWarning[];

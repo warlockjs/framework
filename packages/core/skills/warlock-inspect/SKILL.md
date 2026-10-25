@@ -1,6 +1,6 @@
 ---
 name: warlock-inspect
-description: 'Ask the app instead of grepping it: `warlock inspect --json` prints the facts of the booted app — routes (middleware chain, auth guard, CSRF, rate limit, logging, request/response JSON Schema), models (table, columns, relations, resource), resources, config keys and types, event listeners, pages (layouts, loaders, actions), queue jobs, scheduled tasks and installed @warlock.js versions — as a versioned report (`schemaVersion: 1`) with a published JSON Schema; `inspectApp()` returns the same object. Triggers: `warlock inspect`, `--section`, `inspect_routes`, `inspectApp`, `bootForInspect`, `InspectReport`, `INSPECT_REPORT_JSON_SCHEMA`, `inspect-report.schema.json`, `@warlock.js/core/tooling`; "which routes are unguarded", "what does this app expose", "what models and columns exist", "which config keys are set", "list event listeners", "app facts as JSON for an agent". Skip: a route table for humans — the `warlock-routes` topic; health diagnostics — the `warlock-doctor` topic; verifying a change — the `warlock-check` topic; an OpenAPI file — the `generate-openapi` topic.'
+description: 'Ask the app instead of grepping it: `warlock inspect --json` prints the facts of the booted app — routes (middleware chain, auth guard, CSRF, rate limit, logging, request/response JSON Schema), models (table, columns, relations, resource), resources, config keys and types, event listeners, pages (layouts, loaders, actions), queue jobs, scheduled tasks, installed @warlock.js versions and the wiring (auto-loaded files in boot order, capability slots) — as a versioned report (`schemaVersion: 1`) with a published JSON Schema; `inspectApp()` returns the same object. Triggers: `warlock inspect`, `--section`, `inspect_routes`, `inspectApp`, `bootForInspect`, `InspectReport`, `INSPECT_REPORT_JSON_SCHEMA`, `inspect-report.schema.json`, `@warlock.js/core/tooling`; "which routes are unguarded", "what does this app expose", "what models and columns exist", "which config keys are set", "list event listeners", "app facts as JSON for an agent". Skip: a route table for humans — the `warlock-routes` topic; health diagnostics — the `warlock-doctor` topic; verifying a change — the `warlock-check` topic; an OpenAPI file — the `generate-openapi` topic.'
 ---
 
 # Warlock — `warlock inspect`
@@ -15,7 +15,7 @@ npx warlock inspect --json --section routes,models   # only some sections
 
 Except for `--section files` (static source inspection without app boot), it boots like `warlock doctor`: connectors boot (routes register) but none starts — no database, cache or socket connection, no port. With `--json`, stdout is only the JSON.
 
-Sections: `routes`, `models`, `resources`, `config`, `events`, `pages`, `jobs`, `schedules`, `packages`, `files`. An unknown section fails before the app boots.
+Sections: `routes`, `models`, `resources`, `config`, `events`, `pages`, `jobs`, `schedules`, `packages`, `files`, `wiring`. An unknown section fails before the app boots.
 
 ## Answer questions with jq
 
@@ -150,6 +150,18 @@ router.group({ middleware: [sessionMiddleware({ userTypes: "user" })] }, () => {
   router.post("/settings", async ({ response }) => response.success({ saved: true }));
 });
 ```
+
+## Wiring: what loads on its own
+
+`main.ts`, `routes.ts`, event files, locales and workers are imported by the framework, so no import graph shows them. `warlock inspect --json --section wiring` (MCP: `inspect_wiring`, `filter` on file, name, module, role or type) lists them in boot order, then the capability slots:
+
+```json
+{ "type": "file", "role": "main", "file": "src/app/billing/main.ts", "module": "src/app/billing", "order": 4 }
+{ "type": "capability", "name": "billing.invoiceMailer", "required": true, "provided": true,
+  "definedIn": "src/app/billing/capabilities.ts", "providedBy": "src/app/billing/main.ts", "consumers": [] }
+```
+
+Files are numbered from 1: config, locales, events, `main` files, routes (alphabetical), workers. A capability with `"required": true, "provided": false` is what `warlock doctor` warns about; see the `use-capabilities` topic. The section needs the booted app (the capabilities are filled by code that runs at boot).
 
 ## Source files and reachability
 

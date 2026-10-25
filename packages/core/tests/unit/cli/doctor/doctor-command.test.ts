@@ -62,6 +62,8 @@ describe("default doctor check set", () => {
       "optional-peers",
       "jwt-secret",
       "health",
+      "sites",
+      "capabilities",
       "locales-ts-deprecated",
       "release-hygiene",
     ]);

@@ -35,6 +35,11 @@ manager), run the type check and the tests, and work through the review list.
 | `--to`         | string  | Version to upgrade to: `5.31` or `5.31.0`. Required.                                                                                                            |
 | `--from`       | string  | Version to upgrade from. Default: the installed `@warlock.js/core` (then its range), which is already the target once the new release is installed, so pass it. |
 | `--dry-run`    | boolean | Print the unified diff and the review list without writing any file.                                                                                            |
+| `--check`      | boolean | Rehearse the whole upgrade on a scratch copy and report what breaks; the project is never written. See [Rehearse it with `--check`](#rehearse-it-with---check).    |
+| `--skip-install` | boolean | With `--check`: apply the upgrade to the copy, install nothing and run no project command.                                                                     |
+| `--keep`       | boolean | With `--check`: keep the scratch copy on disk and print where it is.                                                                                            |
+| `--timeout-minutes` | number | With `--check`: time limit for each command (default 20).                                                                                                  |
+| `--memory-mb`  | number  | With `--check`: heap cap for each Node process it starts (default 4096).                                                                                        |
 | `--json`, `-j` | boolean | Print the result as JSON (see below).                                                                                                                           |
 
 A codemod runs when the upgrade crosses its release (`from < release <= to`),
@@ -42,6 +47,30 @@ so `--from 5.30 --to 5.31.0` skips the 5.30 changes. The command reads
 `src/**/*.{ts,tsx}`, `package.json`, `.nvmrc` and `.node-version`; it does not
 boot the app. Exit code `0` means it ran (review items included), `1` means
 bad arguments or a missing `ts-morph`.
+
+## Rehearse it with `--check`
+
+`--dry-run` shows what the codemods would edit. It cannot tell you whether the app still installs, typechecks and boots on the new release. `--check` answers that without touching the project:
+
+```bash
+warlock upgrade --check --from 5.37 --to 5.38.0
+```
+
+1. Copies the project to a scratch directory under the OS temp directory, leaving out `node_modules`, `.git` and `storage`.
+2. Applies the upgrade there: `package.json` versions and every codemod, exactly as `warlock upgrade` would.
+3. Installs there with the package manager detected on the real project, and prints which one it chose and why. With npm it first removes the framework family's lock entries, as [`warlock update`](./cli-commands.md#update) does.
+4. Runs, in the copy and one after the other: `warlock generate.typings`, `warlock typecheck`, `warlock doctor` (which renders the root page of every site) and the app's `unit` Vitest project.
+5. Reports the breaking changes that hit the app (each codemod that rewrote or flagged code, with the files) and the outcome and duration of every step, with the tail of the output of a failed one. Exit code `1` when a step failed.
+
+The real project is never written: every command runs with the copy as its working directory, and the command refuses to run if the scratch directory would be inside the project. The copy is deleted afterwards unless you pass `--keep`.
+
+### Resource use on a shared server
+
+The check installs dependencies and runs a typecheck and a test project, so it is as heavy as those commands are. It runs one child process at a time, at low priority (`nice` 10), caps each Node process's heap with `--max-old-space-size` (`--memory-mb`, default 4096) and kills a command, including its child processes, after `--timeout-minutes` (default 20). The copy needs disk space for the source tree plus a full `node_modules`; point `TMPDIR` at a volume with room. On a machine other people share, run it under whatever memory and CPU limit you use for builds.
+
+- `--skip-install` applies the upgrade to the copy and stops: you get the breaking changes that hit the app and the diff-level result, with the install, typings, typecheck, doctor and test steps reported as skipped. Use it when you only need to know what the codemods touch.
+- `--keep` leaves the copy (with its `node_modules`) so you can open it, rerun a step or compare files. Delete it when you are done.
+- The copy includes `.env`, so the app boots with its real configuration. `warlock doctor` does not open connections, but the unit project runs your code: give it a test environment.
 
 ## ts-morph
 

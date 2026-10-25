@@ -32,8 +32,13 @@ vi.mock("../../../src/utils", () => ({
   rootPath: (file = "") => path.join(path.resolve("/project"), file),
 }));
 
-const { detectPackageManager, getAddCommand, getExactAddCommand, getInstallCommand } =
-  await import("../../../src/updater/package-manager");
+const {
+  detectPackageManager,
+  detectPackageManagerDetails,
+  getAddCommand,
+  getExactAddCommand,
+  getInstallCommand,
+} = await import("../../../src/updater/package-manager");
 
 /** Pretend the project root carries exactly these lockfiles. */
 function withLockfiles(...files: string[]) {
@@ -99,6 +104,57 @@ describe("detectPackageManager", () => {
     packageJsons.set(path.join(projectRoot, "package.json"), '{"packageManager":"pnpm@9.0.0"}');
 
     await expect(detectPackageManager(projectRoot)).resolves.toBe("pnpm");
+  });
+
+  it("trusts what installed node_modules over a stale pnpm workspace and lockfile", async () => {
+    withLockfiles("pnpm-workspace.yaml", "pnpm-lock.yaml", "package-lock.json");
+    existingFiles.add(path.join(projectRoot, "node_modules", ".package-lock.json"));
+
+    const detection = await detectPackageManagerDetails(projectRoot);
+
+    expect(detection.packageManager).toBe("npm");
+    expect(detection.reason).toContain("node_modules");
+  });
+
+  it.each([
+    [".pnpm", "pnpm"],
+    [".modules.yaml", "pnpm"],
+    [".yarn-state.yml", "yarn"],
+    [".yarn-integrity", "yarn"],
+    [".bun", "bun"],
+  ])("reads the node_modules/%s marker as %s", async (marker, expected) => {
+    withLockfiles("package-lock.json");
+    existingFiles.add(path.join(projectRoot, "node_modules", marker));
+
+    await expect(detectPackageManager(projectRoot)).resolves.toBe(expected);
+  });
+
+  it("does not let a pnpm-workspace.yaml outrank a lockfile", async () => {
+    withLockfiles("pnpm-workspace.yaml", "package-lock.json");
+
+    await expect(detectPackageManager(projectRoot)).resolves.toBe("npm");
+  });
+
+  it("uses a pnpm-workspace.yaml only when there is no lockfile or marker", async () => {
+    withLockfiles("pnpm-workspace.yaml");
+
+    await expect(detectPackageManager(projectRoot)).resolves.toBe("pnpm");
+  });
+
+  it("prefers the packageManager field over the node_modules marker", async () => {
+    withLockfiles();
+    existingFiles.add(path.join(projectRoot, "node_modules", ".package-lock.json"));
+    packageJsons.set(path.join(projectRoot, "package.json"), '{"packageManager":"yarn@4.1.0"}');
+
+    await expect(detectPackageManager(projectRoot)).resolves.toBe("yarn");
+  });
+
+  it("explains which signal decided", async () => {
+    withLockfiles("yarn.lock");
+
+    const detection = await detectPackageManagerDetails(projectRoot);
+
+    expect(detection.reason).toContain("yarn.lock");
   });
 
   it("falls back to the invoking user agent when nothing else identifies it", async () => {

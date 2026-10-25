@@ -7,6 +7,12 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import {
+  defineCapability,
+  provideCapability,
+  resetCapabilities,
+  useCapability,
+} from "../../capabilities/capability";
 import { defineResource } from "../../resource/define-resource";
 import { router } from "../../router/router";
 import { isUnguardedMutatingRoute, markAuthGuard } from "../../router/unguarded-route-diagnostics";
@@ -413,5 +419,91 @@ describe("custom guard inspection", () => {
     } finally {
       Reflect.set(router, "routes", previous);
     }
+  });
+});
+
+describe("wiring section", () => {
+  afterEach(() => {
+    resetCapabilities();
+  });
+
+  it("lists the auto-loaded files in boot order from a static scan", async () => {
+    for (const file of [
+      "src/app/posts/main.ts",
+      "src/app/posts/routes.ts",
+      "src/app/posts/events/audit.ts",
+      "src/app/posts/services/publish.service.ts",
+    ]) {
+      mkdirSync(path.dirname(path.join(root, file)), { recursive: true });
+      writeFileSync(path.join(root, file), "export {};\n");
+    }
+
+    const report = await inspectApp({ cwd: root, sections: ["wiring"] });
+
+    expect(report.sections).toEqual(["wiring"]);
+    expect(
+      report.wiring?.flatMap((entry) =>
+        entry.type === "file" ? [`${entry.order} ${entry.role} ${entry.file} ${entry.module}`] : [],
+      ),
+    ).toEqual([
+      "1 config src/config/http.ts src/config",
+      "2 event src/app/posts/events/audit.ts src/app/posts",
+      "3 main src/app/posts/main.ts src/app/posts",
+      "4 route src/app/posts/routes.ts src/app/posts",
+    ]);
+  });
+
+  it("uses the load order a boot pass reports instead of scanning", async () => {
+    const report = await inspectApp({
+      cwd: root,
+      sections: ["wiring"],
+      wiringFiles: [
+        { role: "route", file: "src/app/b/routes.ts" },
+        { role: "main", file: "src/app/a/main.ts" },
+      ],
+    });
+
+    expect(report.wiring).toEqual([
+      { type: "file", role: "route", file: "src/app/b/routes.ts", module: "src/app/b", order: 1 },
+      { type: "file", role: "main", file: "src/app/a/main.ts", module: "src/app/a", order: 2 },
+    ]);
+  });
+
+  it("lists capability slots with their provider and consumers", async () => {
+    const mailer = defineCapability<{ send(): void }>("billing.mailer", {
+      description: "Sends invoices",
+    });
+    defineCapability<string>("billing.audit", { required: false });
+    provideCapability(mailer, { send: () => undefined });
+    useCapability(mailer);
+
+    const report = await inspectApp({ cwd: root, sections: ["wiring"], wiringFiles: [] });
+    const slots = report.wiring?.filter((entry) => entry.type === "capability");
+
+    expect(slots?.map((entry) => entry.type === "capability" && entry.name)).toEqual([
+      "billing.audit",
+      "billing.mailer",
+    ]);
+    expect(slots?.[1]).toMatchObject({
+      required: true,
+      provided: true,
+      description: "Sends invoices",
+    });
+    expect(slots?.[0]).toMatchObject({ required: false, provided: false, providedBy: null });
+  });
+
+  it("validates against the published JSON Schema", async () => {
+    provideCapability(defineCapability<string>("billing.mailer"), "impl");
+
+    const report = await inspectApp({ cwd: root, sections: ["wiring"] });
+    const validate = new Ajv2020({ strict: false, allErrors: true }).compile(
+      INSPECT_REPORT_JSON_SCHEMA,
+    );
+
+    expect(validate(report), JSON.stringify(validate.errors, null, 2)).toBe(true);
+  });
+
+  it("parses wiring as a section name", () => {
+    expect(parseInspectSections("wiring,routes")).toEqual(["routes", "wiring"]);
   });
 });

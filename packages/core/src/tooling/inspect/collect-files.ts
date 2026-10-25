@@ -20,6 +20,15 @@ export function projectFile(cwd: string, file: string): string {
   return path.relative(cwd, path.resolve(cwd, file)).split(path.sep).join("/");
 }
 
+/** `src/app/<module>`, or the containing top-level `src` directory, of a project-relative file. */
+export function fileModule(file: string): string {
+  const parts = file.split("/");
+
+  return parts[1] === "app" && parts.length > 3
+    ? parts.slice(0, 3).join("/")
+    : path.posix.dirname(file).split("/").slice(0, 2).join("/");
+}
+
 /** Infer a role from file names and the framework's directory conventions. */
 export function fileRole(file: string): string {
   const stem = path.posix.basename(file).replace(CODE, "");
@@ -113,13 +122,9 @@ export function collectFiles(cwd: string, warnings: InspectWarning[] = []): Insp
   };
   const files = paths.map((absolute): InspectFile => {
     const file = projectFile(cwd, absolute);
-    const parts = file.split("/");
     const record: InspectFile = {
       file,
-      module:
-        parts[1] === "app" && parts.length > 3
-          ? parts.slice(0, 3).join("/")
-          : path.posix.dirname(file).split("/").slice(0, 2).join("/"),
+      module: fileModule(file),
       role: fileRole(file),
       exports: [],
       imports: [],

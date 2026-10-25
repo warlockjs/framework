@@ -544,7 +544,15 @@ warlock update --check          # same, but exit 1 when behind — a CI gate
 
 Scans `dependencies` and `devDependencies` for `@warlock.js/*` packages, looks up each one's latest version on npm, and rewrites the matching specs — **preserving each range operator** (`^`, `~`, or an exact pin). Non-semver specs (`workspace:*`, `*`, git/file URLs) are left untouched, and packages already at or ahead of latest are skipped. It then runs your project's install — `bun` / `npm` / `yarn` / `pnpm`, auto-detected from the lockfile — to reconcile `node_modules`.
 
-The package manager is chosen in this order: the `packageManager` field of `package.json`; a `pnpm-workspace.yaml` with its `pnpm-lock.yaml`; the nearest directory with a lockfile. When that directory holds several lockfiles, `bun.lock` wins (Bun also writes a `yarn.lock`), otherwise the most recently modified one wins, because it is the one the project installs with; the command says which it picked. Set `packageManager` in `package.json` to choose explicitly. [`add`](#add) and [`upgrade`](./upgrade.md) share the same detection.
+The package manager is chosen in this order, and the command always prints which one it picked and why:
+
+1. the `packageManager` field of `package.json`;
+2. the manager that installed `node_modules`, from the marker it leaves there: npm's `node_modules/.package-lock.json`, pnpm's `node_modules/.pnpm` or `.modules.yaml`, yarn's `.yarn-state.yml` or `.yarn-integrity`, Bun's `.bun`;
+3. the nearest directory with a lockfile. When it holds several, the one that lists every dependency of `package.json` wins; if more than one does, `bun.lock` wins (Bun also writes a `yarn.lock`), otherwise the most recently modified one, because it is the one the project installs with;
+4. a `pnpm-workspace.yaml`, only when there is no lockfile at all;
+5. the package manager that started the CLI, then npm.
+
+A stale `pnpm-workspace.yaml` and `pnpm-lock.yaml` left behind after a project moved to another manager therefore never win over the install the project actually uses. Set `packageManager` in `package.json` to choose explicitly. [`add`](#add) and [`upgrade`](./upgrade.md) share the same detection.
 
 With npm, `warlock update` removes the `@warlock.js/*`, `vite`, `vitest`, `@vitest/*` and `@vitejs/*` entries from `package-lock.json` first, so a single `npm install` resolves them together. The family's packages name each other as peers, which npm cannot step one entry at a time. **Use npm 11.6.2 or newer**: npm 10.9 (bundled with Node 22.15) can fail with `ERESOLVE` or an internal error on this step. The command warns when your npm is older; `npx npm@11 install` runs the install with a newer one.
 

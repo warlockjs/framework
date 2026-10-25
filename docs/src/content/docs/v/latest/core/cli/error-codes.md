@@ -178,6 +178,12 @@ Category: your code · skill: `store-file` · thrown as `StorageNotInitializedEr
 
 Category: your code · skill: `update-packages`
 
+### WL2008
+
+**A capability was used, or required at boot, without a provider.** Call provideCapability(capability, implementation) from a module that loads at boot (main.ts, routes.ts or an event file), or define the capability with { required: false } if it is optional.
+
+Category: your code · skill: `use-capabilities` · thrown as `CapabilityNotProvidedError`
+
 ## WL3xxx — routing
 
 ### WL3001
@@ -255,6 +261,12 @@ Category: your code · skill: `health-checks`
 **Devtools recorded no timeline for the traced request.** Keep http.requestId enabled (its echoed header is how the request is found) and retry; a path under the devtools prefix is never recorded.
 
 Category: your code · skill: `warlock-trace`
+
+### WL5005
+
+**A site's root page answered 5xx in the doctor render.** Read the phase and page file doctor prints, fix that stage, then run warlock doctor again.
+
+Category: your code · skill: `warlock-doctor`
 
 ## WL6xxx — database
 

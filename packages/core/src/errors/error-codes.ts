@@ -217,6 +217,15 @@ export const ERROR_CODES = {
     fix: "Install the package named in the message (for example `pnpm add sharp`), or stop configuring the driver.",
     skill: "update-packages",
   },
+  WL2008: {
+    code: "WL2008",
+    area: "boot",
+    category: "code",
+    title: "A capability was used, or required at boot, without a provider",
+    fix: "Call provideCapability(capability, implementation) from a module that loads at boot (main.ts, routes.ts or an event file), or define the capability with { required: false } if it is optional.",
+    skill: "use-capabilities",
+    errorNames: ["CapabilityNotProvidedError"],
+  },
 
   // ── WL3xxx routing ───────────────────────────────────────────────────────
   WL3001: {
@@ -320,6 +329,14 @@ export const ERROR_CODES = {
     title: "Devtools recorded no timeline for the traced request",
     fix: "Keep http.requestId enabled (its echoed header is how the request is found) and retry; a path under the devtools prefix is never recorded.",
     skill: "warlock-trace",
+  },
+  WL5005: {
+    code: "WL5005",
+    area: "http",
+    category: "code",
+    title: "A site's root page answered 5xx in the doctor render",
+    fix: "Read the phase and page file doctor prints, fix that stage, then run warlock doctor again.",
+    skill: "warlock-doctor",
   },
 
   // ── WL6xxx database ──────────────────────────────────────────────────────

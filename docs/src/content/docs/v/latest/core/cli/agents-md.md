@@ -28,7 +28,7 @@ It boots like `warlock inspect`: every connector boots so routes register, none 
 - **Routes** — counts per method, the mutating routes (`POST`, `PUT`, `PATCH`, `DELETE`) that have no auth guard, and a compact `METHOD path [auth] name` list. Past 60 routes the list stops and points at `warlock inspect --json --section routes`.
 - **Models** — model name, table and module.
 - **Conventions in force** — the rules `warlock check` enforces (`WL9001`–`WL9012`) and the layout every skill assumes.
-- **Skills** — every `SKILL.md` the installed packages ship under `node_modules/@warlock.js/<package>/skills/`, with its first sentence.
+- **Skills** — every `SKILL.md` the installed packages ship under `node_modules/@warlock.js/<package>/skills/`, with its first sentence. A package that ships one skill as `skills/SKILL.md` is listed too, under the `name` in its front matter (the package name when it has none).
 - **Verify a change** — `warlock check --changed --json`, `warlock inspect --json`, `warlock explain <code>`, `warlock trace` and `warlock mcp`.
 
 The output is deterministic — no timestamps, stable ordering — so regenerating an app that did not change produces the same bytes and nothing is written.

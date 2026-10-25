@@ -31,6 +31,7 @@ export function formatInspectSummary(report: InspectReport): string[] {
     ["schedules", report.schedules?.length],
     ["packages", report.packages?.length],
     ["files", report.files?.length],
+    ["wiring", report.wiring?.length],
   ];
 
   for (const [label, count] of counts) {
@@ -45,6 +46,28 @@ export function formatInspectSummary(report: InspectReport): string[] {
       const name = route.name ? `  ${route.name}` : "";
 
       lines.push(`  ${route.method.padEnd(7)} ${route.path}${guard}${name}`);
+    }
+  }
+
+  if (report.wiring && report.wiring.length > 0) {
+    lines.push("", "Wiring (boot load order):");
+
+    for (const entry of report.wiring) {
+      if (entry.type === "file") {
+        lines.push(`  ${String(entry.order).padStart(3)}  ${entry.role.padEnd(7)} ${entry.file}`);
+      }
+    }
+
+    const slots = report.wiring.filter((entry) => entry.type === "capability");
+
+    if (slots.length > 0) {
+      lines.push("", "Capabilities:");
+
+      for (const slot of slots) {
+        lines.push(
+          `  ${slot.name}  ${slot.provided ? `provided by ${slot.providedBy ?? "unknown"}` : slot.required ? "NOT PROVIDED" : "not provided (optional)"}`,
+        );
+      }
     }
   }
 

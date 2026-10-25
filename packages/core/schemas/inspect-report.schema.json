@@ -48,7 +48,8 @@
           "jobs",
           "schedules",
           "packages",
-          "files"
+          "files",
+          "wiring"
         ]
       }
     },
@@ -549,6 +550,76 @@
             "type": ["string", "null"]
           }
         }
+      }
+    },
+    "wiring": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": ["type", "role", "file", "module", "order"],
+            "properties": {
+              "type": {
+                "const": "file"
+              },
+              "role": {
+                "enum": ["config", "locale", "event", "main", "route", "worker"]
+              },
+              "file": {
+                "type": "string"
+              },
+              "module": {
+                "type": "string"
+              },
+              "order": {
+                "type": "integer"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "type",
+              "name",
+              "description",
+              "required",
+              "provided",
+              "definedIn",
+              "providedBy",
+              "consumers"
+            ],
+            "properties": {
+              "type": {
+                "const": "capability"
+              },
+              "name": {
+                "type": "string"
+              },
+              "description": {
+                "type": ["string", "null"]
+              },
+              "required": {
+                "type": "boolean"
+              },
+              "provided": {
+                "type": "boolean"
+              },
+              "definedIn": {
+                "type": ["string", "null"]
+              },
+              "providedBy": {
+                "type": ["string", "null"]
+              },
+              "consumers": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ]
       }
     },
     "files": {

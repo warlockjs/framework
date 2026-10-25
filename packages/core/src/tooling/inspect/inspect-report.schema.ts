@@ -191,6 +191,42 @@ const configKey = {
   },
 };
 
+const wiringFile = {
+  type: "object",
+  required: ["type", "role", "file", "module", "order"],
+  properties: {
+    type: { const: "file" },
+    role: { enum: ["config", "locale", "event", "main", "route", "worker"] },
+    file: { type: "string" },
+    module: { type: "string" },
+    order: { type: "integer" },
+  },
+};
+
+const wiringCapability = {
+  type: "object",
+  required: [
+    "type",
+    "name",
+    "description",
+    "required",
+    "provided",
+    "definedIn",
+    "providedBy",
+    "consumers",
+  ],
+  properties: {
+    type: { const: "capability" },
+    name: { type: "string" },
+    description: nullableString,
+    required: { type: "boolean" },
+    provided: { type: "boolean" },
+    definedIn: nullableString,
+    providedBy: nullableString,
+    consumers: stringArray,
+  },
+};
+
 const event = {
   type: "object",
   required: ["event", "listeners"],
@@ -307,6 +343,7 @@ export const INSPECT_REPORT_JSON_SCHEMA: Record<string, unknown> = {
           "schedules",
           "packages",
           "files",
+          "wiring",
         ],
       },
     },
@@ -319,6 +356,7 @@ export const INSPECT_REPORT_JSON_SCHEMA: Record<string, unknown> = {
     jobs: { type: "array", items: job },
     schedules: { type: "array", items: schedule },
     packages: { type: "array", items: installedPackage },
+    wiring: { type: "array", items: { oneOf: [wiringFile, wiringCapability] } },
     files: {
       type: "array",
       items: {

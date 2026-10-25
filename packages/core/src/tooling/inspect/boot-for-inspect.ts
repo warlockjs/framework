@@ -5,8 +5,10 @@ import { resolve as resolveModule } from "import-meta-resolve";
 import { bootForDiagnostics } from "../../cli/commands/doctor/boot-for-diagnostics";
 import type { DoctorBootContext } from "../../cli/commands/doctor/check.types";
 import { filesOrchestrator } from "../../dev-server/files-orchestrator";
+import { SPECIAL_TYPES } from "../../dev-server/module-loader";
 import { collectResourceExportMap } from "../../router/named-api-routes-with-responses";
 import { EventRecorder, type RecordedListener } from "./event-recorder";
+import type { WiringSourceFile } from "./collect-wiring";
 import type { InspectOptions } from "./inspect-app";
 
 /** What the boot pass observed, ready to hand to `inspectApp`. */
@@ -17,7 +19,24 @@ export type InspectBootResult = {
   resolveResourceName: (resource: unknown) => string | undefined;
   /** Resource modules that could not be read while naming resources. */
   warnings: string[];
+  /** The auto-loaded files in the order the boot pass loaded them. */
+  wiringFiles: WiringSourceFile[];
 };
+
+/**
+ * The auto-loaded files as the module loader orders them: config first (loaded
+ * before app modules), then locale, event, main, route and worker files.
+ */
+export function wiringFilesFromBoot(): WiringSourceFile[] {
+  const collector = filesOrchestrator.specialFilesCollector;
+
+  return [
+    ...collector.getFilesByType("config").map((file) => ({ role: "config" as const, file: file.relativePath })),
+    ...SPECIAL_TYPES.flatMap((type) =>
+      collector.getFilesByType(type).map((file) => ({ role: type, file: file.relativePath })),
+    ),
+  ];
+}
 
 /**
  * The app's own `@mongez/events` instance, when it resolves to a different
@@ -59,6 +78,7 @@ export async function bootForInspect(cwd = process.cwd()): Promise<InspectBootRe
       events: recorder.list(),
       resolveResourceName: (resource) => resources.get(resource)?.exportName,
       warnings,
+      wiringFiles: context.booted ? wiringFilesFromBoot() : [],
     };
   } finally {
     recorder.stop();
@@ -71,6 +91,7 @@ export function inspectOptionsFromBoot(result: InspectBootResult): InspectOption
     modelModules: result.context.modelModules,
     moduleFailures: result.context.moduleFailures,
     events: result.events,
+    ...(result.context.booted && { wiringFiles: result.wiringFiles }),
     resolveResourceName: result.resolveResourceName,
     warnings: result.warnings.map((message) => ({ code: null, message, source: "resources" })),
   };

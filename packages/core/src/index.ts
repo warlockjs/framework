@@ -9,6 +9,7 @@ export * from "./benchmark";
 export * from "./bootstrap";
 export * from "./bootstrap/setup";
 export * from "./cache";
+export * from "./capabilities";
 export * from "./config";
 // The command-authoring API only — NOT `./cli`. Applications declare custom
 // commands in `warlock.config.ts`, so `command` and `CLICommand` must stay on

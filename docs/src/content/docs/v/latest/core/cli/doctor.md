@@ -40,6 +40,8 @@ Six checks run in a fixed order — runtime-surface first, release hygiene last:
 | `config`          | The required top-level config sections (`app`, `http`) are present. A missing one is a **`fail`**.                                                                                                                          |
 | `connectors`      | Lists the registered connectors and which are currently active. Informational — passes as long as it can enumerate.                                                                                                         |
 | `optional-peers`  | Probes the optional peer deps core knows how to use (`sharp`, `nodemailer`, `socket.io`, the AWS SDK family, `redis`, the DB drivers). Missing ones are a **`warn`** — that feature is simply unavailable, never a failure. |
+| `sites`           | In an app with `web.sites`, renders the root page of every site that has fixed hostnames through the development page pipeline and **fails** (`WL5005`) on any 5xx, naming the status, the phase and the page file. Dynamic sites (hosts resolved at runtime) are listed as not rendered. See [Multi-site render](#multi-site-render). |
+| `capabilities`    | **`warn`** (`WL2008`) for each required [capability](../digging-deeper/capabilities.md) that nothing provided while the app booted. Silent when the app defines none. |
 | `health`          | The built-in `/health` (liveness) and `/ready` (readiness) endpoints will be exposed. **`warn`** when disabled via `http.health.enabled = false`.                                                                           |
 | `release-hygiene` | The project `package.json` version matches the top `## x.y.z` heading in `CHANGELOG.md`. A mismatch is a **`fail`**; a missing/unparseable changelog is a **`warn`**.                                                       |
 
@@ -100,8 +102,16 @@ Every `warn` or `fail` finding carries a stable [error code](./error-codes.md), 
 | `optional-peers`        | `WL2007` a configured driver's package is not installed                                    |
 | `jwt-secret`            | `WL1002` no JWT signing secret                                                             |
 | `health`                | `WL5002` a route claims a probe path, `WL5003` probes not registered                       |
+| `sites`                 | `WL5005` a site's root page answered 5xx in development                                    |
+| `capabilities`          | `WL2008` a required capability has no provider after boot                                  |
 | `locales-ts-deprecated` | `WL9101` a legacy `utils/locales.ts`                                                       |
 | `release-hygiene`       | `WL9102` version and changelog disagree, `WL9103` changelog missing or unparseable         |
+
+## Multi-site render
+
+A multi-site app can answer 500 on every page in development and under the test server while production, which reads route names from the build manifest, is healthy. Nothing else in `doctor` touches that path, so the `sites` check requests each site's root page (`/`, or the site's `basePath`) with the site's first hostname as the `Host` header.
+
+It runs in the doctor process: the routes are bound to the booted HTTP server instance and the request is injected into it, so no port is opened. Only the root page is requested, one site at a time, with a 30 second limit. A redirect or a 404 is not a failure; only a 5xx or no answer is. The failure names the page error record's phase and file, for example `500 in phase "render" at src/web/$sites/landing/index.page.tsx`. Binding the routes also prints the router's usual development warnings, such as mutating routes without a guard.
 
 ## What it does NOT do
 
