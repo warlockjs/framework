@@ -57,7 +57,8 @@ describe("generatePagesBarrel: forbidden page", () => {
       'setupModule: forbiddenPageSetup, setupSourceFile: "src/web/forbidden.setup.ts"',
     );
     expect(result.pageCount).toBe(1);
-    expect(result.pageRoutes.routes.map((route) => route.path)).toEqual(["/"]);
+    // The framework 404 catch-all is always recorded; the forbidden page is not a route.
+    expect(result.pageRoutes.routes.map((route) => route.path)).toEqual(["/", "/*"]);
   });
 
   it("leaves the barrel without a forbiddenPage entry when the app has none", async () => {

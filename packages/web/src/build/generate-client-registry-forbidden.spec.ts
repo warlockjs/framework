@@ -49,7 +49,8 @@ const forbiddenPage: DiscoveredPage = {
 describe("generateClientRegistry: forbidden page", () => {
   it("projects the forbidden page into every route's composition next to ErrorPage", async () => {
     const contents = generateClientRegistry({
-      pages: [page, errorPage, forbiddenPage],
+      // No setup file: a data: URL stub cannot carry the `?warlock-setup-register` suffix.
+      pages: [page, errorPage, { ...forbiddenPage, setupFile: undefined }],
       toImportSpecifier: stubSpecifier,
     });
     const [entry] = await evaluate(contents);

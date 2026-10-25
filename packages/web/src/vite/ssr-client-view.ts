@@ -347,7 +347,14 @@ export function clientEnvironmentOnly(plugin: Plugin, ssrState: SsrBoundaryState
               resolvedTarget: targetId,
               importer,
             });
-            if (message && targetId && isAppSourcePath(moduleKey(importer), ssrState.appRoot)) {
+            // Vite's entry requests (`transformRequest`, `ssrLoadModule`) carry the
+            // root `index.html` as a stand-in importer; that is no server code.
+            if (
+              message &&
+              targetId &&
+              !/\.html?$/.test(moduleKey(importer)) &&
+              isAppSourcePath(moduleKey(importer), ssrState.appRoot)
+            ) {
               this.error(message);
             }
             return null;

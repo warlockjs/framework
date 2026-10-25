@@ -121,12 +121,15 @@ describe("page tracing — enabled: loader (per level), render.shell, stream.end
     await handler({ request: http.request, response: http.response } as unknown as HttpContext);
     const wallClockMs = Date.now() - startedAt;
 
-    // `page.middleware` opens every traced page request (5.25, devtools).
+    // `page.middleware` opens every traced page request (5.25, devtools); 5.38
+    // also traces the translations and the document's route table.
     expect(phases.map(({ phase }) => phase.name)).toEqual([
+      "translations",
       "page.middleware",
       "loader",
       "loader",
       "loader",
+      "named-api-routes",
       "render.shell",
       "stream.end",
     ]);

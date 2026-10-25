@@ -1171,6 +1171,18 @@ export function gateAResolve(options: GateAOptions = {}): Plugin {
     return chain;
   }
 
+  /**
+   * An alias plugin may hand Gate A the already-rewritten absolute path. Show it
+   * the way the developer wrote it: relative to the source root, no extension.
+   */
+  function displayBoundarySource(source: string): string {
+    if (!path.isAbsolute(source)) return source;
+
+    const relative = toPosix(path.relative(path.join(appRoot, options.srcDir ?? "src"), source));
+
+    return relative.startsWith("..") ? source : relative.replace(/\.[cm]?[jt]sx?$/, "");
+  }
+
   function reportModuleBoundary(
     context: { error(message: string): never; warn(message: string): void },
     mode: "error" | "warn",
@@ -1183,7 +1195,7 @@ export function gateAResolve(options: GateAOptions = {}): Plugin {
         ? `Gate A refused an import: browser code reaches a server file of an app module.`
         : `Gate A WOULD refuse this import (web.moduleBoundary is "warn"): browser code reaches a server file of an app module.`,
       ``,
-      `Import chain: ${[...buildChain(importer), source].join(" → ")}`,
+      `Import chain: ${[...buildChain(importer), displayBoundarySource(source)].join(" → ")}`,
       `File: ${importer ?? source}`,
       `Cause: ${violation.cause}`,
       `Fix: ${violation.fix}`,

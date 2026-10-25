@@ -622,13 +622,14 @@ describe("WebConnector — shutdown", () => {
     expect(harness.connector.getInstalledPages()).toEqual([]);
   });
 
-  it("is a no-op when the connector was never started", async () => {
+  // 5.38 deliberately keys the Vite teardown on the server existing, not on
+  // `start()` having run, so a boot that was never started cannot leak it.
+  it("closes the Vite server of a connector that booted but was never started", async () => {
     const harness = await bootHarness();
 
     await harness.connector.shutdown();
 
-    expect(harness.rawServer.closeAllConnections).not.toHaveBeenCalled();
-    expect(harness.vite.close).not.toHaveBeenCalled();
+    expect(harness.vite.close).toHaveBeenCalledTimes(1);
   });
 });
 
