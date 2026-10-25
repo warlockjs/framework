@@ -1,3 +1,6 @@
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { TestSetupReporter } from "./test-setup-reporter";
 
@@ -68,5 +71,48 @@ describe("setup profiling run summary", () => {
     }
     reporter.onTestRunEnd();
     expect(output).toHaveBeenCalledTimes(1);
+  });
+
+  it("prints the boot phases and slowest files in the same block as the run summary", () => {
+    const output = vi.spyOn(console, "info").mockImplementation(() => undefined);
+    const reporter = new TestSetupReporter({ slowest: 1 });
+    reporter.onTestRunStart();
+    reporter.onUserConsoleLog({
+      content:
+        '[warlock:test] file="/app/slow.test.ts" pid=100 bootstrap=10.00ms connectors=90.00ms connector.database=60.00ms connector.web=25.00ms body=500.00ms',
+    });
+    reporter.onUserConsoleLog({
+      content: '[warlock:test] file="/app/fast.test.ts" pid=100 reset=1.00ms body=2.00ms',
+    });
+    reporter.onTestRunEnd();
+    const text = String(output.mock.calls[0]?.[0]);
+    expect(output).toHaveBeenCalledTimes(1);
+    expect(text).toContain("boot phases config=10.00ms");
+    expect(text).toContain("connectors database=60.00ms web=25.00ms");
+    expect(text).toContain("/app/slow.test.ts");
+    expect(text).not.toContain("/app/fast.test.ts");
+  });
+
+  it("writes the profile as JSON when a path is given", () => {
+    vi.spyOn(console, "info").mockImplementation(() => undefined);
+    const directory = mkdtempSync(path.join(os.tmpdir(), "warlock-profile-"));
+    const target = path.join(directory, "profile.json");
+    try {
+      const reporter = new TestSetupReporter({ json: target });
+      reporter.onTestRunStart();
+      reporter.onUserConsoleLog({
+        content:
+          '[warlock:test] file="/app/a.test.ts" pid=100 bootstrap=10.00ms connector.web=25.00ms body=5.00ms',
+      });
+      reporter.onTestRunEnd();
+      const document = JSON.parse(readFileSync(target, "utf8"));
+      expect(document.files).toBe(1);
+      expect(document.connectors).toEqual({ web: 25 });
+      expect(document.phases.config).toBe(10);
+      expect(document.slowestFiles[0].file).toBe("/app/a.test.ts");
+      expect(document.perFile).toHaveLength(1);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
   });
 });

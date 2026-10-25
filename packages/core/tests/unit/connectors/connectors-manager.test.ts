@@ -201,6 +201,38 @@ describe("ConnectorsManager — startWithout", () => {
   });
 });
 
+describe("ConnectorsManager — observeTimings", () => {
+  let manager: ConnectorsManager;
+  let log: string[];
+
+  beforeEach(() => {
+    manager = new ConnectorsManager();
+    clearBuiltins(manager);
+    log = [];
+  });
+
+  it("reports the duration of every boot and start, and stops when unset", async () => {
+    manager.register(new FakeConnector("timed", 2000, ConnectorLifecyclePhase.Early, log));
+    const seen: Array<[string, string]> = [];
+
+    manager.observeTimings((timing) => {
+      expect(timing.ms).toBeGreaterThanOrEqual(0);
+      seen.push([timing.connector, timing.step]);
+    });
+    await manager.start();
+
+    expect(seen).toEqual([
+      ["timed", "boot"],
+      ["timed", "start"],
+    ]);
+
+    manager.observeTimings(undefined);
+    await manager.startPhase(ConnectorLifecyclePhase.Early);
+
+    expect(seen).toHaveLength(2);
+  });
+});
+
 describe("ConnectorsManager — shutdown", () => {
   let manager: ConnectorsManager;
   let log: string[];
