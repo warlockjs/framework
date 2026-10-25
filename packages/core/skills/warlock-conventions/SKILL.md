@@ -18,7 +18,7 @@ This skill is the foundation. Every other warlock skill (`register-route`, `crea
      `worker` role, and always loaded by `warlock dev`
    - `src/app/main.ts` — **project-level** one-time application setup (global hooks and other app initialization; connector instances belong in `warlock.config.ts > connectors`)
    - `src/app/<module>/events/*.ts(x)` — **any** `.ts(x)` file inside the `events/` folder (the `*.event.ts` suffix is convention, not a framework requirement)
-   - `src/app/<module>/utils/locales.ts` — module translations via `groupedTranslations(...)`
+   - `src/app/<module>/utils/locales.json` and `utils/locales/<feature>.json` — module translations (the old `utils/locales.ts` is deprecated; `warlock doctor --fix` converts it)
    - `src/config/*.ts(x)` — subsystem config files
 3. **Canonical imports — each package owns its surface.** `@warlock.js/core` does **NOT** re-export `v`/`Infer` or Cascade types. Import from the home package:
    - `v`, `Infer` → `@warlock.js/seal`
@@ -70,12 +70,28 @@ src/app/<module>/
   schema/                   seal schemas (`<action>.schema.ts`) — value + type from one file
   events/                   any `*.ts(x)` file here is auto-loaded
   types/                    `.type.ts` files for module-internal types
-  utils/                    module-private helpers (`utils/locales.ts` is auto-loaded)
+  utils/                    module-private helpers (`utils/locales.json` and `utils/locales/*.json` are auto-loaded)
   seeds/                    seed data for `warlock seed`
   routes.ts                 ← auto-loaded
   main.ts                   ← auto-loaded once, one-time setup
   worker.ts                 ← auto-loaded for the worker role only
 ```
+
+### Small files or fewer files
+
+One export per file is the default for controllers, services and components, not a ban on small companions. A service, repository or controller file may export the small input and output types it is written around next to the function that uses them (`export type CreatePostInput`, `export type CreatePostResult`); `warlock check` raises nothing for that. Move a type to `types/` or `schema/` once another module or the browser needs it, or when the file grows past what reads in one screen. Web UI is unchanged: one component per file, logic in `*.setup.ts` and `use-*.ts`.
+
+### Barrels are optional
+
+`index.ts` barrels in `src/app/**` are not required, and a hand-maintained one is a file every feature edits. Import from the file that defines the export. To make that a rule, set `rules: { "WL9022": "warning" }` in `.warlock-check.json` (off by default). To stop generators writing them, set `generate: { barrels: false }` in `warlock.config.ts`; `warlock generate` and `warlock make` then write no model `index.ts` and import the model file directly.
+
+### What the browser may import from a module
+
+`src/app/<module>/` is server code. Browser code (anything the client build reaches from a page) may import from it only `*.client.ts(x)` files, schema files (`*.schema.ts`, `schema/`), type files (`*.types.ts`, `types/`) and the module's `web/` folder; anything else fails the build with the import chain. Type-only imports (`import type`) are erased and always allowed, which is how a page shares a service's input and output types. `web.moduleBoundary` (`"error"` default, `"warn"`, `"off"`) controls it.
+
+### `.client.*` is a client-only boundary
+
+A `*.client.ts(x)` module may be imported by pages, layouts and components, where it renders on the server too unless wrapped in `<ClientOnly>`. Server-only code (controllers, services, repositories, models, routes, connectors, `main.ts`, `events/`, `*.server.*`) must never import it: `warlock check` reports `WL9021` with the import chain, and development SSR refuses it.
 
 Some older modules still have a `validation/` folder instead of `schema/` — historical drift. The framework treats them as plain folders either way; the generator emits to `schema/`.
 

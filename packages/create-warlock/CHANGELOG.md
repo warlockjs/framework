@@ -4,6 +4,13 @@ All notable changes to `create-warlock` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.38.0
+
+### Changed
+
+- The starter app keeps translations in JSON: `app/auth/utils/locales.json` and `app/shared/utils/locales/{validation,http,attributes}.json` replace the two `utils/locales.ts` files, and `docs/new-module.md` describes `locales.json` and `locales/<feature>.json`.
+- The template's `module-boundaries`, `code-standards` and `web-code-standards` skills describe small exported types co-located in `*.service.ts`, optional barrels (and the opt-in `WL9022` lint), the browser-safe surface of an app module and the `*.client.ts(x)` boundary.
+
 ## 5.37.1 - 2026-10-24
 
 ### Changed

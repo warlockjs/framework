@@ -11,13 +11,13 @@ sidebar:
 ```bash
 warlock doctor
 warlock doctor --json   # machine-readable, each finding with its stable error code
-warlock doctor --fix    # also convert auto-convertible legacy utils/locales.ts files
+warlock doctor --fix    # also move legacy utils/locales.ts files into locales.json
 ```
 
 | Flag         | Type    | Description                                                                        |
 | ------------ | ------- | ---------------------------------------------------------------------------------- |
 | `--json, -j` | boolean | Print the report as JSON (below). stdout carries only the JSON.                    |
-| `--fix`      | boolean | Convert safely auto-convertible legacy `utils/locales.ts` files to `locales.json`. |
+| `--fix`      | boolean | Convert safely auto-convertible legacy `utils/locales.ts` files to `locales.json` (or `locales/legacy.json` when `locales.json` exists). |
 
 ```
 ✓ routes: 42 registered
@@ -100,7 +100,7 @@ Every `warn` or `fail` finding carries a stable [error code](./error-codes.md), 
 | `optional-peers`        | `WL2007` a configured driver's package is not installed                                    |
 | `jwt-secret`            | `WL1002` no JWT signing secret                                                             |
 | `health`                | `WL5002` a route claims a probe path, `WL5003` probes not registered                       |
-| `locales-ts-deprecated` | `WL9101` a legacy `utils/locales.ts`                                                       |
+| `locales-ts-deprecated` | `WL9101` a legacy `utils/locales.ts`; the detail names each file and whether `--fix` converts it |
 | `release-hygiene`       | `WL9102` version and changelog disagree, `WL9103` changelog missing or unparseable         |
 
 ## What it does NOT do

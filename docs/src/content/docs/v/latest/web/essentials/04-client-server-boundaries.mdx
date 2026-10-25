@@ -19,15 +19,16 @@ to retain loader and action inference.
 
 ## What the build refuses
 
-The client build enforces the boundary at three points:
+The client build enforces the boundary at four points:
 
 1. **Import resolution** refuses Node built-ins, server-environment Warlock and
-   Mongez packages, `server-only`, `*.server.ts`, `.server/` directories,
-   application `server/` directories, and local modules outside `web/` that are
-   not recognized universal surfaces.
-2. **Module transformation** refuses every client-side `process.env` read and
+   Mongez packages, `server-only`, `*.server.ts`, `.server/` directories and
+   application `server/` directories.
+2. **The module boundary** refuses an import of an `app/<module>/...` file that
+   is not browser-safe (see below).
+3. **Module transformation** refuses every client-side `process.env` read and
    any non-public `import.meta.env` key.
-3. **Emitted-bundle validation** checks that no server export binding or import
+4. **Emitted-bundle validation** checks that no server export binding or import
    edge into a server package survived projection.
 
 The checks apply to development SSR as well as production builds. A violation
@@ -94,11 +95,66 @@ allowed. These values are fixed when the bundle is built; they cannot vary per
 request or deployment. Loader data remains the correct channel for anything
 request-scoped.
 
-## `.client.tsx` is not an SSR boundary
+## What browser code may import from an app module
 
-In Web 5.2, `.client.tsx` is only a naming convention. A module statically
-imported by a page, layout, root, or one of their imports is still evaluated by
-the server. Top-level `window` or `document` access therefore breaks SSR.
+An application module (`src/app/<module>/`) is server code: controllers,
+services, repositories, models, routes. Browser code, meaning everything the
+client build reaches from a page, may import only these files from it:
+
+| File                                                          | Why it is safe                          |
+| ------------------------------------------------------------- | --------------------------------------- |
+| `*.client.ts` / `*.client.tsx`, or a `.client/` folder        | It declares itself browser code         |
+| `*.schema.ts`, or anything in a `schema/` folder              | Shared validation, no server dependency |
+| `*.types.ts`, `*.d.ts`, or anything in a `types/` folder      | Types only                              |
+| The module's `web/` folder                                    | Web code that lives beside the module   |
+| JSON, CSS and other non-code files                            | They carry no behavior                  |
+
+Anything else fails the build with the import chain:
+
+```text
+Gate A refused an import: browser code reaches a server file of an app module.
+
+Import chain: orders.page.tsx → app/orders/services/create-order.service
+Cause: "app/orders/services/create-order.service.ts" is a server file of module "orders" ...
+```
+
+A type-only import is erased, so this is allowed and is the way to share the
+input and output types that sit next to a service:
+
+```tsx
+import type { CreateOrderInput } from "app/orders/services/create-order.service";
+```
+
+Both the relative and the `app/...` spelling are checked. While an existing app
+migrates, set `moduleBoundary: "warn"` in `src/config/web.ts` to report each
+import without failing the build, then switch it back to the default:
+
+```ts title="src/config/web.ts"
+const webConfigurations: WebConfigurations = {
+  moduleBoundary: "warn", // "error" (default) | "warn" | "off"
+};
+```
+
+## `.client` modules are a client-only boundary
+
+A `*.client.ts` or `*.client.tsx` file is browser code. The guarantee is about
+who may import it:
+
+- **Pages, layouts and components may import it.** A static import is evaluated
+  by the server render too, so a `.client` module is not skipped during SSR. To
+  keep a component out of the server render, wrap it in `<ClientOnly>` and load
+  the module with `React.lazy` (see `render-client-only`).
+- **Server-only code must not import it.** Controllers, services, repositories,
+  models, routes, connectors, `main.ts`, event files, `*.server.ts` files and
+  the server side of a setup file (`loader`, `action`, `middleware`) fail with
+  the import chain in development SSR, and `npx warlock check` reports
+  `WL9021` for the same import in CI. A type-only import is not reported.
+
+In development, a `.client` module that reads `window`, `document`,
+`navigator`, `localStorage` or another browser global outside a function while
+the server evaluates it logs one warning naming the file and line. Move the
+access into an effect or event handler, or guard it with
+`typeof window !== "undefined"`.
 
 ## `Intl` output can differ between Node and the browser
 

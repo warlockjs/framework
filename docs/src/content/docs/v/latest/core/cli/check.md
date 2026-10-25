@@ -269,6 +269,30 @@ They parse real TypeScript/JSX syntax with the same oxc-parser adapter as the ex
 | `WL9020` | Browser code references a route registered with `clientVisible: false` (an error, not a warning)         | Call the endpoint from the server, or drop `clientVisible: false` from the route.                                                                                  |
 | `WL9104` | Translation key computed at runtime in `src/web` (a page then ships every group)                         | Declare the keys with `config.translations` in the page's setup file.                                                                                              |
 
+## Boundary, barrel and locale conventions
+
+| Code     | Finding                                                                                                                                  | Fix                                                                                                                                  |
+| -------- | ---------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `WL9021` | Server-only code imports a `*.client.ts(x)` module, directly or through other files; the message names the import chain (an error)      | Remove the import. Pass the data through a loader, or move shared logic to a file that is neither `.client` nor server-only.        |
+| `WL9022` | An `index.ts` in an app module only re-exports other files. **Off by default**; set `rules.WL9022` to `"warning"` or `"error"` to enable | Import from the file that defines each export and delete the barrel.                                                                 |
+| `WL9105` | A key of `utils/locales.json` or `utils/locales/<feature>.json` is missing one of the configured locales (an error)                      | Add the missing locale to the key. The configured locales are `localeCodes` in `src/config/app.ts` or in `.warlock-check.json`. |
+
+Server-only code means controllers, services, repositories, models, connectors, a
+module's `routes.ts`, `main.ts`, `worker.ts` and `events/`, and any `*.server.*` file.
+Pages, layouts, components and other `.client` modules may import a `.client` module. A
+type-only import is erased and never reported. Exported input and output types that sit
+beside the service, repository or controller that uses them are fine and raise nothing.
+
+`WL9105` reads the dictionaries as files, so it needs no boot. It is skipped when no
+locales are configured. To set them for the check only:
+
+```json
+{
+  "localeCodes": ["en", "ar"],
+  "rules": { "WL9022": "warning" }
+}
+```
+
 Web rules apply to `src/web/**/*.tsx`. Components are top-level JSX-returning functions
 with a capitalized name (or an anonymous default export). Hook files and ordinary helpers
 are excluded. Handler checks recognize inline JSX callbacks, `handle*`/`on*` functions,

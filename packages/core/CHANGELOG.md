@@ -6,6 +6,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 > ⚠ **Versioning: `@warlock.js/*` does not follow SemVer strictly — breaking changes may ship in a minor.** This is a deliberate decision, not an oversight: the framework is pre-adoption and the cost of a major per behaviour fix currently outweighs the benefit. **Pin an exact version or a tilde range (`~4.13.0`) if you need to opt into changes rather than receive them.** Every breaking change is marked **BREAKING** in its entry and summarised in an _Upgrading_ section at the top of the release. **This policy will change once the framework has consumers beyond its author.**
 
+## 5.38.0
+
+### Added
+
+- `warlock check` reports `WL9021` when server-only code (controllers, services, repositories, models, connectors, `routes.ts`, `main.ts`, `worker.ts`, `events/` and `*.server.*` files) imports a `*.client.ts(x)` module, directly or through other files. The message names the import chain, and a type-only import is not reported.
+- `warlock check` reports `WL9105` when a translation key of a module dictionary is missing a configured locale. The configured locales are `localeCodes` in `src/config/app.ts`, or `localeCodes` in `.warlock-check.json`, which wins; the rule is skipped when neither names any.
+- Opt-in `WL9022` finds hand-maintained `index.ts` barrels in app modules (an `index.ts` that only re-exports). It is off until `.warlock-check.json` sets `rules.WL9022` to `"warning"` or `"error"`.
+- Per-feature locale files: `src/app/<module>/utils/locales/<feature>.json` is merged with the module's `utils/locales.json` in development, in the production build and in test workers, under the module's namespace unless the file names its own `$group`. A key may live in one file only. Web's per-page translation tables are built from the same registry, so they see the merged dictionary.
+- `generate: { barrels: false }` in `warlock.config.ts` makes `warlock generate` and `warlock make` write no `index.ts` barrel (for models) and import the model file itself in the files they generate. The default stays `true`.
+- `warlock doctor --fix` converts a legacy `utils/locales.ts` into `utils/locales/legacy.json` when the module already has a `locales.json`, as long as no key appears in both; it still writes `locales.json` when there is none.
+
+### Deprecated
+
+- Auto-loaded `utils/locales.ts` is deprecated. The development and production-build warning now names every legacy file, and `WL9101` already lists them in `warlock doctor`. Removal is planned for v6, not this release; move to `utils/locales.json` with `warlock doctor --fix`.
+
+### Changed
+
+- The starter template (`create-warlock`) ships JSON dictionaries (`app/auth/utils/locales.json`, `app/shared/utils/locales/*.json`) instead of `utils/locales.ts`.
+
 ## 5.37.1 - 2026-10-24
 
 ### Added

@@ -1,6 +1,6 @@
 ---
 title: "Error codes"
-description: Every stable Warlock error code (WL1001…WL9104) — what it means, what to do, and the skill that explains it. Thrown framework errors, `warlock doctor --json` findings and `warlock check --json` problems all carry these codes; `warlock explain <CODE>` prints one.
+description: Every stable Warlock error code (WL1001…WL9105) — what it means, what to do, and the skill that explains it. Thrown framework errors, `warlock doctor --json` findings and `warlock check --json` problems all carry these codes; `warlock explain <CODE>` prints one.
 sidebar:
   order: 10
   label: "Error codes"
@@ -584,4 +584,28 @@ Browser code names a route registered with `clientVisible: false`. Such a route 
 
 ```bash
 npx warlock explain WL9020
+```
+
+### WL9021
+
+Server-only code imports a `.client` module. A `*.client.ts` or `*.client.tsx` module is a client-only boundary: pages, layouts and components may import it, but controllers, services, repositories, models, routes, connectors, `main.ts`, event files and `*.server.ts` files may not, directly or through another file. The message names the import chain. Pass the data through a loader, or move the shared logic into a file that is neither `.client` nor server-only. Defaults to an error; configure severity in `.warlock-check.json`.
+
+```bash
+npx warlock explain WL9021
+```
+
+### WL9022
+
+An app module keeps a hand-maintained `index.ts` barrel. Import from the file that defines the export and delete the barrel. The rule is **off by default**; turn it on with `{ "rules": { "WL9022": "warning" } }` in `.warlock-check.json`.
+
+```bash
+npx warlock explain WL9022
+```
+
+### WL9105
+
+A translation key in a module's `locales.json` or `locales/<feature>.json` is missing one of the configured locales. The configured locales are `localeCodes` in `src/config/app.ts` or in `.warlock-check.json`; the rule is skipped when neither is set. Defaults to an error; configure severity in `.warlock-check.json`.
+
+```bash
+npx warlock explain WL9105
 ```

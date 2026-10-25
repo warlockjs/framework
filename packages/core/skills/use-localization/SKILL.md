@@ -52,12 +52,50 @@ file yourself.
 }
 ```
 
-`utils/locales.ts` with `groupedTranslations` remains supported but is
-deprecated and will be removed in v6. Migrate it with `warlock doctor --fix`.
+### Split a busy module into per-feature files
+
+A module's dictionary grows with every feature, and one shared JSON file is where
+parallel work collides. Put each feature's keys in
+`src/app/<module>/utils/locales/<feature>.json` instead (or beside
+`locales.json`). Every file of the module is merged into the one translation
+registry when it loads, in `warlock dev`, `warlock build` and test workers, and
+the per-page translation tables of `@warlock.js/web` are built from that merged
+registry.
+
+```json title="src/app/products/utils/locales/reviews.json"
+{
+  "reviewAdded": { "en": "Review added", "ar": "تمت إضافة التقييم" }
+}
+```
+
+- The module name is the default group, so this registers `products.reviewAdded`;
+  a root `$group` string picks another group.
+- A key may live in one file only. Two files that define the same key fail at
+  load and name both files.
+- Only `utils/locales.json` and `utils/locales/<feature>.json` (one level deep)
+  are loaded.
+
+### Every key needs every configured locale
+
+`npx warlock check` reports `WL9105` for each key that lacks one of the
+configured locales, naming the file and the key. The configured locales are
+`localeCodes` in `src/config/app.ts`; set `"localeCodes": ["en", "ar"]` in
+`.warlock-check.json` to override them. The rule is skipped when neither names
+any. Boot fails on the same gap, so this moves the error into the pull request.
+
+### `utils/locales.ts` is deprecated
+
+`utils/locales.ts` with `groupedTranslations` still loads but is deprecated and
+will be removed in v6, not before. The dev server and `warlock build` warn and
+name every such file, and `warlock doctor` lists them under `WL9101`. Run
+`warlock doctor --fix` to move a file that only holds one literal
+`groupedTranslations` call into the module's `locales.json`, or into
+`locales/legacy.json` when `locales.json` already exists and shares no key with
+it. A file with computed keys or other code stays and is reported as manual.
 
 ### Legacy `groupedTranslations`
 
-Every module owns its translation namespace under `src/app/<module>/utils/locales.ts`. The file is auto-loaded at boot — you don't import it from anywhere; the framework picks it up via the module loader.
+Only for an app that has not migrated. Every module owns its translation namespace under `src/app/<module>/utils/locales.ts`. The file is auto-loaded at boot — you don't import it from anywhere; the framework picks it up via the module loader.
 
 ```ts title="src/app/products/utils/locales.ts"
 import { groupedTranslations } from "@mongez/localization";

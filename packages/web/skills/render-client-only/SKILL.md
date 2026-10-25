@@ -58,6 +58,8 @@ function ThemeToggle() {
 
 **The trap:** `<ClientOnly>` decides what gets RENDERED. It has no say over what gets IMPORTED. A normal `import` statement runs at module-load time, wherever that module is reached from in the import graph — including the server, if the file that imports it is part of the page's server bundle.
 
+Naming the file `*.client.tsx` does not change this. `.client` keeps server-only code (controllers, services, loaders, `*.server.ts`) from importing the module, and `warlock check` reports `WL9021` if one does; a page that imports it still evaluates it on the server. In development a warning names a `.client` module that reads `window`, `document` or another browser global at the top level.
+
 The widget and its fallback, shared by every example below:
 
 ```tsx title="src/web/widgets/browser-only-widget.tsx"

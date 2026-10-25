@@ -65,6 +65,9 @@ jq -r '.problems[] | "\(.file // "-"):\(.line // 0) \(.code) \(.message)\n  → 
 | `WL9008`            | raw email, credential or request body in a log call                                                           |
 | `WL9009`            | regex with `*` / `+` / `{n,}` run on request input                                                            |
 | `WL9010`–`WL9012`   | warnings: `await log.*()`, a second controller in a file, a `kind` discriminator                              |
+| `WL9021`            | server-only code (controller, service, repository, model, route, connector, `*.server.*`) imports a `*.client.*` module — the message names the chain |
+| `WL9022`            | an app-module `index.ts` that only re-exports; **off by default** (`rules.WL9022` in `.warlock-check.json`)   |
+| `WL9105`            | a key of `utils/locales.json` or `utils/locales/<feature>.json` lacks a configured locale (`app.localeCodes`) |
 | `WL8001`–`WL8007`   | this machine: Node version, missing tool, unreachable service, busy port, esbuild binary, git, tool crash/OOM |
 | `WL8010`            | installed `@warlock.js/*` packages on different versions — run `warlock update`                               |
 

@@ -38,6 +38,11 @@ emitted once per locale as a content-hashed, immutable JSON file and preloaded
 by the document. Hydration waits for that file, so the first render has every
 key.
 
+Module dictionaries from core count too: `src/app/<module>/utils/locales.json`
+and every `utils/locales/<feature>.json` are merged into the registry before
+the tables are built, so a key in a per-feature file is shared, pruned and typed
+exactly like one in `locales.json`.
+
 The build finds each page's keys by reading its client module graph: the page,
 its layouts, the root, error pages and the components they import. Literal
 keys, static-prefix templates (``trans(`statuses.${s}`)`` ships `statuses.*`)

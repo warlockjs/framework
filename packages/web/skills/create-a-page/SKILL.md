@@ -507,16 +507,27 @@ imports must be browser-safe. Use type-only imports from setup.
 
 Keep server-only repository and service reads inside `loader`. Do not read them from module-scope initializers or the default component.
 
-### `.client` does not isolate SSR
+### `.client` is a client-only boundary
 
-A `.client.tsx` suffix is a naming convention, not an SSR-isolation boundary. A
-module statically imported by a page, layout, root, or any of their imports is
-still evaluated by the server. Top-level browser globals such as `window`
-therefore crash SSR boot. To keep browser-only UI out of the server render, use
-`<ClientOnly>` / `useIsClient()` from `@warlock.js/web` (see the `render-client-only`
-topic). They defer rendering only; for a module that touches `window` at import
-time, also load it with `React.lazy` inside `<ClientOnly>`, since an ordinary
-`import` still runs on the server.
+A `*.client.ts(x)` module is browser code. Pages, layouts and components may
+import it; server-only code (loaders and actions in setup files, controllers,
+services, repositories, models, routes, connectors, `*.server.ts`) may not, and
+`warlock check` reports `WL9021` for it. A static import from a page is still
+evaluated by the server render, so top-level browser globals such as `window`
+crash SSR boot (development logs a warning naming the file and line). To keep
+browser-only UI out of the server render, use `<ClientOnly>` / `useIsClient()`
+from `@warlock.js/web` (see the `render-client-only` topic). They defer
+rendering only; for a module that touches `window` at import time, also load it
+with `React.lazy` inside `<ClientOnly>`, since an ordinary `import` still runs
+on the server.
+
+### Importing from an app module
+
+Browser code may import from `app/<module>/...` only `*.client.ts(x)`, schema
+(`*.schema.ts`, `schema/`), types (`*.types.ts`, `types/`), the module's `web/`
+folder and non-code files; anything else fails the client build with the import
+chain. Use `import type` to share types that sit next to a service.
+`web.moduleBoundary` (`"error"` default, `"warn"`, `"off"`) controls it.
 
 ### Static assets use `public/`
 
@@ -545,7 +556,7 @@ Creating a page, deleting one, or editing `config.route` is route-table churn ra
 
 - **A page with no `config.route` is not unreachable.** It derives a real URL from its file location — see [Filesystem routing](#filesystem-routing).
 - **A page with no default export IS refused.** Named exports alone fail the build naming the file, instead of serving a blank 200.
-- **`.client.tsx` does not prevent SSR evaluation.** It is a naming convention, not an isolation boundary. Use `<ClientOnly>` (the `render-client-only` topic).
+- **`.client.tsx` does not skip SSR.** It keeps server-only code from importing the module, but a page that imports it still evaluates it on the server. Use `<ClientOnly>` (the `render-client-only` topic).
 - **Imported static assets do not build.** Put them in `public/` and reference their root URL; CSS imports remain supported.
 - **`import.meta.url` fails the build in page-graph code.** Spec/test files, `__tests__` / `__mocks__` folders and the paths in `webConnector({ build: { testOnly } })` are skipped by that scan.
 - **`[...slug]` is not a catch-all.** It fails boot with
