@@ -630,7 +630,7 @@ npx warlock explain WL9023
 
 ### WL9024
 
-An integration spec (`*.test.ts`, or any spec under `tests/`) imports no `@warlock.js` package other than `seal`, no `app/...` module, and no file that does. It runs in the integration project and pays for the booted app without using it. Rename it to `*.spec.ts` outside `tests/` so the unit project runs it. Defaults to a warning; configure severity in `.warlock-check.json`, or silence one file with `// warlock-check-ignore WL9024` on its first line.
+An integration spec (any `*.spec.ts` or `*.test.ts` that is not `*.unit.*`, or any file under `tests/`) imports no `@warlock.js` package other than `seal`, no `app/...` module, and no file that does. It runs in the integration project and pays for the booted app without using it. Rename it to `<name>.unit.spec.ts` outside `tests/` so the unit project runs it. Defaults to a warning; configure severity in `.warlock-check.json`, or silence one file with `// warlock-check-ignore WL9024` on its first line.
 
 ```bash
 npx warlock explain WL9024

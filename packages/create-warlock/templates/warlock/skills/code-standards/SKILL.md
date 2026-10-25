@@ -206,7 +206,8 @@ Always bare: `from "./order.service"`, never `from "./order.service.ts"` or `.js
 | `.setup.ts`               | Page, layout or root policy and server exports | `index.setup.ts`                        |
 | `use-*.ts`                | Named feature hook                             | `use-contact-form.ts`                   |
 | `.resource.ts`            | Output mapper                                  | `user.resource.ts`                      |
-| `.spec.ts` / `.test.ts`   | Co-located test                                | `cart.service.spec.ts`                  |
+| `.unit.spec.ts`           | Co-located unit test (no app boot)             | `cart.service.unit.spec.ts`             |
+| `.spec.ts` / `.test.ts`   | Co-located integration test (booted app)       | `cart.service.test.ts`                  |
 
 **One primary export per file.** If a `.contract.ts` also defines closely-related data types used only by that contract, that's fine — but the primary export is the interface.
 
@@ -585,7 +586,7 @@ A secret with no safe default (a payment key, a signing secret) should fail loud
 
 ## 10. Testing
 
-- **Vitest**, co-located: `cart.service.ts` → `cart.service.spec.ts` in the same folder.
+- **Vitest**, co-located: `cart.service.ts` → `cart.service.unit.spec.ts` in the same folder (the `.unit` infix selects the unit project; a plain `.spec.ts` or `.test.ts` runs in integration).
 - **Test the public surface.** If a private method needs testing, the public method that calls it does — test through it. If you can't reach the behaviour from outside, it shouldn't exist.
 - **Arrange / Act / Assert** structure per test. Blank lines between phases. One assertion target per test where practical.
 - **Mock at the boundary.** Use `MockSDK` from `@warlock.js/ai` for AI calls. Mock HTTP at the HTTP client level, not deep inside services.

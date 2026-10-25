@@ -66,6 +66,7 @@ describe("codemod test-runtime-worker-lifetime", () => {
 
     expect(result.manual).toHaveLength(1);
     expect(result.manual[0]?.hint).toContain("guardUnitProject()");
+    expect(result.manual[0]?.hint).toContain("src/**/*.unit.{spec,test}.ts");
   });
 
   it("does not list a unit project that already has the guard", async () => {
@@ -82,8 +83,15 @@ describe("5.38 upgrade note", () => {
   it("says existing apps keep their test configuration", () => {
     const note = UPGRADE_NOTES.find((entry) => entry.version === "5.38.0");
 
-    expect(note?.text).toContain("existing");
+    expect(note?.text).toContain("Existing apps");
     expect(note?.text).toContain("lifetime");
+  });
+
+  it("explains the .unit file convention and how to adopt it", () => {
+    const note = UPGRADE_NOTES.find((entry) => entry.version === "5.38.0");
+
+    expect(note?.text).toContain("*.unit.spec.ts");
+    expect(note?.text).toContain("nothing changes until you do");
   });
 
   it("explains the clearMocks consequence for module-level calls in the 5.36 note", () => {

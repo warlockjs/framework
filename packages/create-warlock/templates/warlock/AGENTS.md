@@ -70,7 +70,7 @@ automatically on `postinstall`).
   schemas, authentication, and secrets handling.
 - **observability-and-resilience** — structured logging, retries, timeouts, and
   avoiding N+1 work.
-- **testing-strategy** — Vitest test pyramid with co-located `*.spec.ts` files.
+- **testing-strategy** — Vitest test pyramid with co-located `*.unit.spec.ts` unit files and `*.test.ts` integration files.
 - **git-workflow** — conventional commits, branching, PRs, and CI gates.
 
 ## Commands

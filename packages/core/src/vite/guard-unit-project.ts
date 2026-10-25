@@ -8,7 +8,7 @@
  * the code under test. This plugin fails the spec's own module instead, naming
  * the import and where to move the spec.
  *
- * Only spec files are checked (`*.spec.*` by default). Their helpers and the
+ * Only unit spec files are checked (`*.unit.spec.*` and `*.unit.test.*` by default). Their helpers and the
  * code under test are not: a service that happens to import a connector is a
  * finding for `warlock check`, not a reason to break a spec that mocks it.
  */
@@ -21,7 +21,7 @@ export interface UnitProjectGuardPlugin {
 }
 
 export type GuardUnitProjectOptions = {
-  /** Files to check. Defaults to `*.spec.{ts,tsx,js,jsx,mts,cts,mjs,cjs}`. */
+  /** Files to check. Defaults to `*.unit.{spec,test}.{ts,tsx,js,jsx,mts,cts,mjs,cjs}`. */
   include?: RegExp;
   /** Import names or specifiers to allow, e.g. `["connectorsManager"]` for a spec that only mocks it. */
   allow?: string[];
@@ -34,7 +34,7 @@ export type UnitGuardViolation = {
   reason: string;
 };
 
-const DEFAULT_INCLUDE = /\.spec\.[cm]?[jt]sx?$/;
+const DEFAULT_INCLUDE = /\.unit\.(?:spec|test)\.[cm]?[jt]sx?$/;
 
 /** Named exports of `@warlock.js/core` that need a booted app. */
 const APP_EXPORTS = new Set([
@@ -184,7 +184,7 @@ export function describeUnitGuardViolations(
   return [
     `[warlock] The unit spec ${file} cannot run in the unit project, which never boots the app:`,
     ...lines,
-    "Move the spec to the integration project (name it *.test.ts), or take the import out. " +
+    "Move the spec to the integration project (drop `.unit` from its name), or take the import out. " +
       'A spec that only needs config values can call setupTest({ mode: "unit", importModule }).',
   ].join("\n");
 }

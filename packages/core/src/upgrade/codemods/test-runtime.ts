@@ -50,7 +50,7 @@ export const testRuntimeDefaults: Codemod = {
       output.manual.push({
         file,
         line: lineOf(config, /name\s*:\s*["']unit["']/),
-        hint: 'The `unit` project can run a spec that imports a connector or boots the app and then fails with an unrelated error. Add `plugins: [guardUnitProject()]` (from `@warlock.js/core/vite`) and `env: { WARLOCK_TEST_PROJECT: "unit" }` to the project so such a spec fails with a message naming the import. `warlock check` (WL9024) also lists integration specs that never touch the app.',
+        hint: 'The `unit` project can run a spec that imports a connector or boots the app and then fails with an unrelated error. Add `plugins: [guardUnitProject()]` (from `@warlock.js/core/vite`) and `env: { WARLOCK_TEST_PROJECT: "unit" }` to the project so such a spec fails with a message naming the import. `warlock check` (WL9024) also lists integration specs that never touch the app. New apps pick the project by file name: `*.unit.spec.ts` and `*.unit.test.ts` run in `unit`, every other spec runs in `integration`. To adopt it, rename the pure specs to `<name>.unit.spec.ts` and set the `unit` include to `src/**/*.unit.{spec,test}.ts`, the `integration` include to `src/**/*.{spec,test}.ts`, `src/**/tests/**/*.{test,spec}.ts` and `tests/**/*.{test,spec}.ts`, and its exclude to `**/*.unit.{spec,test}.ts`. Nothing changes until you do.',
       });
     }
 

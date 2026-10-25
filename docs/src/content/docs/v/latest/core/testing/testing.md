@@ -538,19 +538,23 @@ outside this lifecycle.
 ## Runtime lifetime, unit projects and setup profiling
 
 `warlock add test` (also used by `create-warlock --features=test`) generates two
-Vitest projects. `unit` discovers `src/**/*.spec.ts` outside `tests/` directories
-and has no Warlock setup or HTTP global setup. `integration` discovers
-`src/**/*.test.ts`, specs inside `src/**/tests/`, and `tests/**/*.{test,spec}.ts`.
-It uses the framework setup, HTTP global setup and a generated `src/test-runner.ts`.
-Keep pure service specs beside their source and mock repositories at the boundary.
+Vitest projects. `unit` discovers `src/**/*.unit.{spec,test}.ts` and has no Warlock
+setup or HTTP global setup. `integration` discovers every other `src/**/*.{spec,test}.ts`,
+specs inside `src/**/tests/`, and `tests/**/*.{test,spec}.ts`, and excludes `*.unit.*`
+files. It uses the framework setup, HTTP global setup and a generated `src/test-runner.ts`.
+Name a pure service spec `<name>.unit.spec.ts`, keep it beside its source and mock
+repositories at the boundary. The `.unit` infix is the only switch: a plain `.spec.ts` or
+`.test.ts` boots the app. Existing config files are never overwritten, so an app created
+before 5.38 keeps `*.spec.ts` as unit and `*.test.ts` as integration until you copy the
+new `include` and `exclude` globs into its `vite.config.ts` and rename the unit specs.
 Existing config files are preserved; copy the projects layout into them manually.
 The generated `unit` project lists `plugins: [guardUnitProject()]` (from
 `@warlock.js/core/vite`) and `env: { WARLOCK_TEST_PROJECT: "unit" }`. A unit spec that
 imports a connector, `connectorsManager`, `bootstrap` or a test-server helper, or calls
 `setupTest()` without `{ mode: "unit" }`, fails with a message that names the import and
-says to move the spec to the integration project. The opposite mistake is reported by
+says to drop `.unit` from its name. The opposite mistake is reported by
 `warlock check` as [`WL9024`](../cli/error-codes.md#wl9021) (a warning): an integration spec
-that imports nothing needing the app should be renamed to `*.spec.ts`.
+that imports nothing needing the app should be renamed to `<name>.unit.spec.ts`.
 Vitest 5 or newer is required for the generated runner (Vitest 5 removed `vitest/runners`; the runner extends `TestRunner` from `vitest`).
 
 For a unit spec that needs configuration values, use:

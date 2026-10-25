@@ -668,4 +668,6 @@ places: `src/config/tests.ts` without a `lifetime`, and a `unit` project without
 `plugins: [guardUnitProject()]`. A spec that changes global configuration opts out of a
 worker runtime with `setupTest({ importModule, lifetime: "file" })`. `warlock check` reports
 `WL9024` (a warning) for an integration spec that imports nothing needing the app; rename
-it to `*.spec.ts`.
+it to `<name>.unit.spec.ts`.
+
+The 5.38 test file convention is `*.unit.spec.ts` / `*.unit.test.ts` for the unit project and every other spec or test for integration. An existing app keeps its own globs. To adopt it: rename the pure specs to `<name>.unit.spec.ts` (`git mv`), then set the `unit` project's `include` to `src/**/*.unit.{spec,test}.ts`, the `integration` project's `include` to `src/**/*.{spec,test}.ts`, `src/**/tests/**/*.{test,spec}.ts` and `tests/**/*.{test,spec}.ts`, and its `exclude` to `**/node_modules/**` and `**/*.unit.{spec,test}.ts`. `guardUnitProject()` then checks the `.unit.` files.

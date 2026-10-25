@@ -83,7 +83,7 @@ describe("guardUnitProject", () => {
 
   it("throws for a spec that imports a connector", () => {
     expect(() =>
-      plugin.transform('import { connectorsManager } from "@warlock.js/core";', "/app/a.spec.ts"),
+      plugin.transform('import { connectorsManager } from "@warlock.js/core";', "/app/a.unit.spec.ts"),
     ).toThrow(/connectorsManager/);
   });
 
@@ -91,10 +91,18 @@ describe("guardUnitProject", () => {
     const code = 'import { connectorsManager } from "@warlock.js/core";';
 
     expect(plugin.transform(code, "/app/src/service.ts")).toBeNull();
-    expect(plugin.transform(code, "/app/node_modules/x/a.spec.ts")).toBeNull();
+    expect(plugin.transform(code, "/app/node_modules/x/a.unit.spec.ts")).toBeNull();
+  });
+
+  it("checks .unit.test files and leaves plain specs to the integration project", () => {
+    const code = 'import { connectorsManager } from "@warlock.js/core";';
+
+    expect(() => plugin.transform(code, "/app/src/a.unit.test.ts")).toThrow(/connectorsManager/);
+    expect(plugin.transform(code, "/app/src/a.spec.ts")).toBeNull();
+    expect(plugin.transform(code, "/app/src/a.test.ts")).toBeNull();
   });
 
   it("passes a clean spec through", () => {
-    expect(plugin.transform('import { it } from "vitest";', "/app/a.spec.ts?v=1")).toBeNull();
+    expect(plugin.transform('import { it } from "vitest";', "/app/a.unit.spec.ts?v=1")).toBeNull();
   });
 });

@@ -45,7 +45,7 @@ describe("WL9024", () => {
       file: "src/app/math/add.test.ts",
       line: 1,
     });
-    expect(problem?.message).toContain("*.spec.ts");
+    expect(problem?.message).toContain("<name>.unit.spec.ts");
   });
 
   it("also covers specs under tests/", () => {
@@ -79,9 +79,17 @@ describe("WL9024", () => {
 
   it("does not look at unit specs", () => {
     const source = `import { it } from "vitest";\n`;
+    const root = project({ "src/a.unit.spec.ts": source, "src/b.unit.test.ts": source });
+
+    expect(problems(root, "src/a.unit.spec.ts", source)).toEqual([]);
+    expect(problems(root, "src/b.unit.test.ts", source)).toEqual([]);
+  });
+
+  it("treats a plain .spec.ts as an integration spec", () => {
+    const source = `import { it } from "vitest";\n`;
     const root = project({ "src/a.spec.ts": source });
 
-    expect(problems(root, "src/a.spec.ts", source)).toEqual([]);
+    expect(problems(root, "src/a.spec.ts", source)).toHaveLength(1);
   });
 
   it("can be silenced with warlock-check-ignore and configured through rules", () => {

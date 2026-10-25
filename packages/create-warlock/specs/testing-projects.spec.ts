@@ -19,4 +19,11 @@ describe("generated testing strategy", () => {
     expect(skill).toContain('npx warlock test --changed --since "$LAST_RELEASE_REF"');
     expect(skill).not.toContain(".integration.spec.ts");
   });
+  it("documents the .unit file convention that picks the unit project", () => {
+    const skill = template("skills/testing-strategy/SKILL.md");
+    expect(skill).toContain("src/**/*.unit.{spec,test}.ts");
+    expect(skill).toContain("place-order.service.unit.spec.ts");
+    expect(skill).toContain("<name>.unit.spec.ts");
+    expect(template("skills/code-standards/SKILL.md")).toContain("cart.service.unit.spec.ts");
+  });
 });

@@ -67,9 +67,12 @@ describe("add test — spec discovery", () => {
     await testFeature.onExecuting?.({} as never);
     const viteConfig = [...written.entries()].find(([path]) => /vite\.config\.ts$/.test(path));
     expect(viteConfig?.[1]).toContain('name: "unit"');
-    expect(viteConfig?.[1]).toContain('include: ["src/**/*.spec.ts"]');
+    expect(viteConfig?.[1]).toContain('include: ["src/**/*.unit.{spec,test}.ts"]');
     expect(viteConfig?.[1]).toContain('name: "integration"');
-    expect(viteConfig?.[1]).toContain('"src/**/*.test.ts"');
+    expect(viteConfig?.[1]).toContain('"src/**/*.{spec,test}.ts"');
+    expect(viteConfig?.[1]).toContain('"src/**/tests/**/*.{test,spec}.ts"');
+    expect(viteConfig?.[1]).toContain('"tests/**/*.{test,spec}.ts"');
+    expect(viteConfig?.[1]).toContain('exclude: ["**/node_modules/**", "**/*.unit.{spec,test}.ts"]');
     expect(viteConfig?.[1]).toContain("recommendedTestWorkers()");
     expect(viteConfig?.[1]).toContain("new TestSetupReporter()");
     expect(viteConfig?.[1]).toContain('runner: "./src/test-runner.ts"');

@@ -25,7 +25,7 @@ When the `test` feature is selected at scaffold time, both land automatically (V
 
 ### 0.1 If testing is enabled, tests are mandatory — not optional
 
-- **Every service** ships a co-located unit spec: `place-order.service.ts` → `place-order.service.spec.ts`. Cover the happy path, every branch, and every error path. Mock the repository — the service's logic is the unit under test.
+- **Every service** ships a co-located unit spec: `place-order.service.ts` → `place-order.service.unit.spec.ts`. Cover the happy path, every branch, and every error path. Mock the repository — the service's logic is the unit under test.
 - **Every HTTP controller / request handler** ships a test: a unit test with mocked services for its branch / validation / authorization logic, **or** an integration test through the route when the wiring is the point. A new endpoint without a test is an incomplete endpoint.
 
 Write the spec in the **same change** that adds the service or controller. A reviewer treats a missing spec as a blocking defect, not a follow-up.
@@ -299,7 +299,7 @@ Run against a recorded fixture in CI (fast, deterministic). Run against the real
 
 ### 9.2 Where they live
 
-Co-located with the integration: `src/app/payments/clients/stripe-client.contract.spec.ts`.
+Co-located with the integration: `src/app/payments/clients/stripe-client.contract.spec.ts` (an integration spec, because it has no `.unit`).
 
 ---
 
@@ -308,13 +308,13 @@ Co-located with the integration: `src/app/payments/clients/stripe-client.contrac
 ```
 src/app/orders/services/
   place-order.service.ts
-  place-order.service.spec.ts       ← unit test, mocks repository
-  place-order.service.test.ts  ← integration, real DB
+  place-order.service.unit.spec.ts  ← unit test, mocks repository
+  place-order.service.test.ts       ← integration, real DB
 ```
 
-- `.spec.ts` — default suffix; covers unit tests
-- `.test.ts` or a spec inside `tests/` — integration, real I/O (DB, queue)
-- Full-system journeys also use `.test.ts` in the integration project.
+- `.unit.spec.ts` / `.unit.test.ts` — the unit project: no app boot, no setup files
+- every other `.spec.ts` / `.test.ts`, and any file inside `tests/` — integration, with the booted app and real I/O (DB, queue)
+- Full-system journeys are plain `.test.ts` files in the integration project.
 
 Tests live next to the file under test, always. Never in a separate `__tests__/` or `test/` folder — colocation makes the link obvious and survives refactors.
 
@@ -324,7 +324,7 @@ Tests live next to the file under test, always. Never in a separate `__tests__/`
 
 Before merging a change that should include tests (testing enabled — see § 0):
 
-- [ ] Every new/changed **service** has a co-located `.service.spec.ts`
+- [ ] Every new/changed **service** has a co-located `.service.unit.spec.ts`
 - [ ] Every new/changed **HTTP controller / request handler** has a test (unit with mocked services, or integration through the route)
 - [ ] New public function has at least one test
 - [ ] Branches / error paths / edge cases covered
@@ -342,16 +342,16 @@ Before merging a change that should include tests (testing enabled — see § 0)
 ## Runtime cost and release gates
 
 With `--features=test`, create-warlock delegates to `warlock add test` to generate
-`vite.config.ts`: the `unit` project runs `src/**/*.spec.ts` outside `tests/`
-without framework or HTTP setup; `integration` runs `*.test.ts` and specs under
-`tests/` with `src/test-setup.ts`, global HTTP setup and `src/test-runner.ts`.
+`vite.config.ts`: the `unit` project runs `src/**/*.unit.{spec,test}.ts`
+without framework or HTTP setup; `integration` runs every other `*.spec.ts` and
+`*.test.ts` and anything under `tests/` with `src/test-setup.ts`, global HTTP setup and `src/test-runner.ts`.
 Prefer `npx vitest run --project unit` during the pure service loop.
 
 When a unit needs config values, call
 `setupTest({ mode: "unit", importModule: (file) => import(file) })` from
 `@warlock.js/core/tests` and pair it with `afterAll(teardownTest)`. Config loads
 once per module graph, without hooks, connectors, native loader or fakes.
-Most unit specs need no setup call.
+Most unit specs need no setup call. The `.unit` infix is the only switch: a plain `.spec.ts` boots the app.
 
 Integration setup boots the framework once per Vitest worker (`lifetime: "worker"`
 in `tests`): the generated `src/config/tests.ts` also turns on `resetDatabase` (truncates
@@ -373,7 +373,7 @@ resets do not undo opts its file out with
 The `unit` project fails a spec that imports a connector, `connectorsManager`,
 `bootstrap`, a test-server helper, or calls `setupTest()` without `{ mode: "unit" }`.
 `warlock check` reports `WL9024` (a warning) for an integration spec that imports nothing
-needing the app: rename it to `*.spec.ts`.
+needing the app: rename it to `<name>.unit.spec.ts`.
 
 Vitest 5 defaults `clearMocks` to true, which also clears the calls a module made when it
 was imported (a scheduler registering jobs from `main.ts`). To assert those calls, import

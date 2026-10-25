@@ -170,8 +170,7 @@ export default defineConfig({
           environment: "node",
           pool: "threads",
           env: { WARLOCK_TEST_PROJECT: "unit" },
-          include: ["src/**/*.spec.ts"],
-          exclude: ["src/**/tests/**"],
+          include: ["src/**/*.unit.{spec,test}.ts"],
         },
       },
       {
@@ -186,7 +185,12 @@ export default defineConfig({
           runner: "./src/test-runner.ts",
           globalSetup: "./src/test-global-setup.ts",
           setupFiles: ["./src/test-setup.ts"],
-          include: ["src/**/*.test.ts", "src/**/tests/**/*.{test,spec}.ts", "tests/**/*.{test,spec}.ts"],
+          include: [
+            "src/**/*.{spec,test}.ts",
+            "src/**/tests/**/*.{test,spec}.ts",
+            "tests/**/*.{test,spec}.ts",
+          ],
+          exclude: ["**/node_modules/**", "**/*.unit.{spec,test}.ts"],
         },
       },
     ],

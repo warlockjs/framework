@@ -13,6 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- The generated testing guidance and code standards use the `*.unit.spec.ts` / `*.unit.test.ts` convention for unit specs (the `test` feature's `unit` and `integration` Vitest projects pick files by that infix).
 - The starter boots the test framework once per Vitest worker: `src/config/tests.ts` sets `lifetime: "worker"` and `resetDatabase: true` (`WARLOCK_TEST_LIFETIME=file` switches back), and `src/config/database.ts` (and the PostgreSQL variant) uses one database per Vitest worker, `<DB_NAME>_test_<worker id>`. With `--features=test` the generated unit project fails a spec that imports a connector or boots the app, and the integration project runs with `isolate: false`. The PostgreSQL variant needs those databases created and migrated first.
 - The template's `testing-strategy` skill describes the per-file reset, the `setupTest({ lifetime: "file" })` opt-out, the unit-project guard, `WL9024`, the boot profile and Vitest 5's `clearMocks` default.
 - The starter app keeps translations in JSON: `app/auth/utils/locales.json` and `app/shared/utils/locales/{validation,http,attributes}.json` replace the two `utils/locales.ts` files, and `docs/new-module.md` describes `locales.json` and `locales/<feature>.json`.

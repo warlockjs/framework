@@ -5,9 +5,11 @@ import { createProblem, type ToolingProblem } from "../problem";
 
 /**
  * Integration specs are the ones the generated Vitest layout runs with the
- * booted app: `*.test.ts(x)` files, and anything under a `tests/` folder.
+ * booted app: every `*.spec.ts(x)` and `*.test.ts(x)` file except `*.unit.*`,
+ * and anything under a `tests/` folder.
  */
-const INTEGRATION_SPEC = /(?:\.test\.[cm]?[jt]sx?$|(?:^|\/)tests\/.*\.[cm]?[jt]sx?$)/;
+const INTEGRATION_SPEC =
+  /(?:^|\/)(?!.*\.unit\.(?:spec|test)\.)(?:[^/]*\.(?:spec|test)\.[cm]?[jt]sx?|tests\/.*\.[cm]?[jt]sx?)$/;
 
 /** `@warlock.js` packages whose imports need no booted app. */
 const PURE_PACKAGES = new Set(["@warlock.js/seal"]);
@@ -85,7 +87,7 @@ function touchesApp(
  * Integration specs pay for the booted framework (config, connectors, database)
  * or at least for the integration project's setup file. A spec whose imports
  * reach no framework package, no `app/` module and no file that does is a unit
- * spec in the wrong project; the warning says to rename it to `*.spec.ts`.
+ * spec in the wrong project; the warning says to rename it to `<name>.unit.spec.ts`.
  *
  * Deliberately conservative: any `@warlock.js/*` import except `seal`, any
  * `app/...` import, or a relative import (two levels deep) that has one, counts
@@ -106,7 +108,7 @@ export function integrationSpecProblems(
       code: "WL9024",
       source: "convention",
       severity: "warning",
-      message: `${relativePath} runs in the integration project but imports nothing that needs the app. Move it to the unit project: rename it to *.spec.ts (outside tests/).`,
+      message: `${relativePath} runs in the integration project but imports nothing that needs the app. Move it to the unit project: rename it to <name>.unit.spec.ts (outside tests/).`,
       file: relativePath,
       line: 1,
       column: 1,
