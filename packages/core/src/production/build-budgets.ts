@@ -5,7 +5,8 @@ export type PageBudget = { js?: string; css?: string };
 /**
  * The inline payload budget (`build.budgets.payload`): how much hydration data
  * one rendered document may embed. Measured at runtime, per document, and
- * reported once per route; see `web/src/server/payload-budget.ts`.
+ * reported once per route (`web/src/server/payload-budget.ts`); `warlock build`
+ * also checks the sections it can measure (translations and the route table).
  */
 export type PayloadBudget = {
   /** Limit for one document, e.g. "64kb"; defaults to 64kb. */
@@ -14,7 +15,9 @@ export type PayloadBudget = {
   pages?: Record<string, string>;
   /**
    * `"warn"` (default) logs a warning and `"error"` logs at error level. Neither
-   * fails a request: the budget reports, it does not gate.
+   * fails a request: the budget reports at runtime. At build, `"error"` fails
+   * `warlock build` for a page whose build-measured sections exceed its limit
+   * and `"warn"` prints a warning.
    */
   mode?: "warn" | "error";
 };
@@ -24,7 +27,7 @@ export type BuildBudgets = {
   pages?: Record<string, PageBudget>;
   /** Defaults to error when budgets are configured. */
   mode?: "error" | "warn";
-  /** Inline payload budget per rendered document. Checked at runtime, not by `warlock build`. */
+  /** Inline payload budget per rendered document. Checked at runtime; `warlock build` checks translations and routes. */
   payload?: PayloadBudget;
 };
 export type BudgetPage = {
