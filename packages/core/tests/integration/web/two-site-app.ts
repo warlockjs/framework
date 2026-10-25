@@ -30,6 +30,20 @@ async function linkWorkspaceDependencies(directory: string): Promise<void> {
 
   await mkdir(target, { recursive: true });
 
+  // The framework packages themselves, as a workspace install links them: the
+  // config bundle keeps `@warlock.js/*` imports external.
+  await mkdir(join(target, "@warlock.js"), { recursive: true });
+
+  for (const name of await readdir(join(workspace, "packages"))) {
+    if (name === "create-warlock") continue;
+
+    await symlink(join(workspace, "packages", name), join(target, "@warlock.js", name), "dir").catch(
+      (error: NodeJS.ErrnoException) => {
+        if (error.code !== "EEXIST") throw error;
+      },
+    );
+  }
+
   const link = async (from: string, to: string) => {
     await symlink(from, to, "dir").catch((error: NodeJS.ErrnoException) => {
       if (error.code !== "EEXIST") throw error;
@@ -207,16 +221,37 @@ afterAll(teardownTest);
   );
   await write(
     "tests/sites.test.ts",
-    `import { expect, it } from "vitest";
-import { testGet } from "@warlock.js/core/tests";
+    `import { request } from "node:http";
+import { expect, it } from "vitest";
+import { getTestServerUrl } from "@warlock.js/core/tests";
+
+// \`fetch\` does not promise to send a custom Host header, so the request goes
+// through node:http, which does.
+function get(host: string): Promise<{ status: number; body: string }> {
+  return new Promise((resolve, reject) => {
+    const target = new URL(getTestServerUrl());
+    const outgoing = request(
+      { host: target.hostname, port: target.port, path: "/", method: "GET", headers: { host, accept: "text/html" } },
+      (incoming) => {
+        let body = "";
+
+        incoming.setEncoding("utf8");
+        incoming.on("data", (chunk) => (body += chunk));
+        incoming.on("end", () => resolve({ status: incoming.statusCode ?? 0, body }));
+      },
+    );
+
+    outgoing.on("error", reject);
+    outgoing.end();
+  });
+}
 
 it.each(${JSON.stringify(Object.entries(SITE_HOSTS))})("renders the %s site's root page under the HTTP test server", async (site, host) => {
-  const response = await testGet("/", { headers: { host } });
-  const body = await response.text();
+  const response = await get(host);
 
-  expect(response.status, body.slice(0, 2000)).toBe(200);
-  expect(body).toContain(site + " home");
-  expect(body).toContain("${NAMED_ROUTE}");
+  expect(response.status, response.body.slice(0, 2000)).toBe(200);
+  expect(response.body).toContain(site + " home");
+  expect(response.body).toContain("${NAMED_ROUTE}");
 });
 `,
   );

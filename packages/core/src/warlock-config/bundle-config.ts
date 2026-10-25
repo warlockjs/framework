@@ -35,6 +35,8 @@ const ALIAS_PROBE = Symbol("warlock-config-alias-probe");
  *   `import.meta` expressions are replaced: text in strings and comments is
  *   left alone. `import.meta.resolve()` is not rewritten; resolve from
  *   `import.meta.url` instead (`new URL("./asset", import.meta.url)`).
+ * - `@warlock.js/*` is external even when a tsconfig `paths` pattern maps it to
+ *   local source.
  * - A specifier that matches a tsconfig `paths` pattern is inlined only when it
  *   resolves to a file outside `node_modules`; a catch-all pattern such as
  *   `"*": ["./types/*"]` never pulls a package in.
@@ -69,6 +71,11 @@ export async function bundleWarlockConfig(configPath: string): Promise<string> {
             if (args.kind === "entry-point" || path.isAbsolute(args.path)) return undefined;
 
             if (args.pluginData?.[ALIAS_PROBE]) return undefined;
+
+            // The framework is never inlined, even where a monorepo's tsconfig
+            // `paths` points `@warlock.js/*` at local source: a second copy of
+            // core (its container, its connectors) would not be the application's.
+            if (args.path.startsWith("@warlock.js/")) return { path: args.path, external: true };
 
             if (!isPathAlias(args.path)) return { path: args.path, external: true };
 

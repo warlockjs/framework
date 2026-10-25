@@ -7,6 +7,7 @@ import path from "node:path";
 const mocks = vi.hoisted(() => ({
   load: vi.fn(async () => undefined),
   bootstrap: vi.fn(async () => undefined),
+  registerConfiguredConnectors: vi.fn(),
   init: vi.fn(async () => undefined),
   dispose: vi.fn(async () => undefined),
   initializeAll: vi.fn(async () => undefined),
@@ -45,6 +46,9 @@ vi.mock("../application", () => ({
   },
 }));
 vi.mock("../bootstrap", () => ({ bootstrap: mocks.bootstrap }));
+vi.mock("../connectors/register-configured-connectors", () => ({
+  registerConfiguredConnectors: mocks.registerConfiguredConnectors,
+}));
 vi.mock("../config/load-config-files", () => ({ loadConfigFiles: mocks.loadConfigFiles }));
 vi.mock("../connectors/connectors-manager", () => ({
   connectorsManager: {
@@ -152,5 +156,14 @@ describe("startHttpTestServer", () => {
     await startHttpTestServer();
 
     expect(mocks.webConnectorConstruction).toHaveBeenCalledOnce();
+  });
+
+  it("registers the connectors the warlock config declares after the bootstrap", async () => {
+    await startHttpTestServer();
+
+    expect(mocks.registerConfiguredConnectors).toHaveBeenCalledOnce();
+    expect(mocks.registerConfiguredConnectors.mock.invocationCallOrder[0]).toBeGreaterThan(
+      mocks.bootstrap.mock.invocationCallOrder[0] as number,
+    );
   });
 });

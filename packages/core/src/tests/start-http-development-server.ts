@@ -14,6 +14,7 @@ import { Application } from "../application";
 import { bootstrap } from "../bootstrap";
 import { loadConfigFiles } from "../config/load-config-files";
 import { connectorsManager } from "../connectors/connectors-manager";
+import { registerConfiguredConnectors } from "../connectors/register-configured-connectors";
 import { ConnectorLifecyclePhase } from "../connectors/types";
 import { filesOrchestrator } from "../dev-server/files-orchestrator";
 import { assertPortIsAvailable } from "../http/port-preflight";
@@ -237,6 +238,11 @@ export async function startHttpTestServer(options: StartHttpTestServerOptions = 
     // Bootstrap (env, etc.)
     await timed("config", () => warlockConfigManager.load());
     await timed("bootstrap", () => bootstrap());
+
+    // The connectors `warlock.config.ts` declares (the web connector among them)
+    // register here, as `warlock dev` does; without this the test server serves
+    // HTTP only and every page answers 404.
+    registerConfiguredConnectors();
 
     // Initialize file orchestrator (but don't watch)
     await timed("orchestrator", async () => {
