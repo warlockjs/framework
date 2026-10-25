@@ -79,7 +79,7 @@ describe("describeToolSchema()", () => {
     const forced = report.issues.filter((issue) => issue.code === "optional-forced-required");
 
     expect(forced).toHaveLength(1);
-    expect(forced[0]).toMatchObject({ path: "properties.note", severity: "warning" });
+    expect(forced[0]).toMatchObject({ path: "properties.note", severity: "info" });
     expect(forced[0]?.targets).toEqual(["openai-strict", "anthropic", "google"]);
     expect(report.ok).toBe(true);
   });

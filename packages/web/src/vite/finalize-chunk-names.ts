@@ -312,7 +312,9 @@ export async function finalizeChunkNames(input: {
 
     const mapFile = path.join(input.outDir, `${state.fileName}.map`);
     if (existsSync(mapFile) && target !== state.fileName) {
-      await rename(mapFile, path.join(input.outDir, `${target}.map`));
+      const renamedMap = path.join(input.outDir, `${target}.map`);
+      await rename(mapFile, renamedMap);
+      await renameSourceMapFile(renamedMap, path.basename(target));
     }
   }
 
@@ -327,4 +329,21 @@ export async function finalizeChunkNames(input: {
   await rewriteJsonFile(path.join(input.outDir, BUDGET_MODULES_FILE), rewrite);
 
   return { renamed, deduplicated };
+}
+
+/**
+ * A renamed chunk's source map still names the old file in its `file` field;
+ * point it at the new name. A map that is not valid JSON is left as it is.
+ */
+async function renameSourceMapFile(mapPath: string, fileName: string): Promise<void> {
+  try {
+    const map = JSON.parse(await readFile(mapPath, "utf8")) as { file?: unknown };
+
+    if (typeof map.file !== "string" || map.file === fileName) return;
+
+    map.file = fileName;
+    await writeFile(mapPath, JSON.stringify(map), "utf8");
+  } catch {
+    // Not JSON: nothing to rewrite.
+  }
 }

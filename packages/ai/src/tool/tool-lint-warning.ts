@@ -41,20 +41,21 @@ export function warnOnToolSchema(tool: ToolConfig<unknown, unknown>): ToolSchema
   }
 
   const key = `${report.name}:${report.schemaHash}`;
+  const findings = report.issues.filter((issue) => issue.severity !== "info");
 
-  if (report.issues.length === 0 || warned.has(key)) return report;
+  if (findings.length === 0 || warned.has(key)) return report;
 
   warned.add(key);
 
   log.warn(
     "ai.tool",
     "schema.lint",
-    `tool "${report.name}" (~${report.tokens} tokens per call) has ${report.issues.length} schema ${report.issues.length === 1 ? "finding" : "findings"}`,
+    `tool "${report.name}" (~${report.tokens} tokens per call) has ${findings.length} schema ${findings.length === 1 ? "finding" : "findings"}`,
     {
       tool: report.name,
       tokens: report.tokens,
       schemaHash: report.schemaHash,
-      issues: report.issues.map(
+      issues: findings.map(
         (issue) =>
           `${issue.severity} [${issue.targets.join(", ")}]${issue.path ? ` ${issue.path}` : ""}: ${issue.message}`,
       ),

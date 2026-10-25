@@ -23,7 +23,8 @@ export const TOOL_SCHEMA_TARGETS: ReadonlyArray<ToolSchemaTarget> = [
 ];
 
 /** `"error"` — the provider rejects or drops the tool; `"warning"` — it works but not as written. */
-export type ToolSchemaSeverity = "error" | "warning";
+/** `info` findings are reported by `describeToolSchema` but never warned about at definition time. */
+export type ToolSchemaSeverity = "error" | "warning" | "info";
 
 /** Stable code of one finding, for filtering and tests. */
 export type ToolSchemaIssueCode =
@@ -373,7 +374,9 @@ export function describeToolSchema(
             issues.add(
               {
                 code: "optional-forced-required",
-                severity: "warning",
+                // Strict providers require every key; sending an optional field as
+                // required-and-nullable is the intended mapping, so this is a note.
+                severity: "info",
                 path: joinPath(path, `properties.${key}`),
                 message: `"${key}" is optional in the schema but is sent as required and nullable, so the model must always fill it (with null when it has nothing). Make it required on purpose or split the tool.`,
               },
