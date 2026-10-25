@@ -81,9 +81,15 @@ function sharedStore(): AgentTraceStore {
   // from, the same store.
   const holder = globalThis as SharedGlobal;
 
-  holder[SHARED_KEY] ??= createAgentTraceStore();
+  const existing = holder[SHARED_KEY];
 
-  return holder[SHARED_KEY];
+  if (existing) return existing;
+
+  const created = createAgentTraceStore();
+
+  holder[SHARED_KEY] = created;
+
+  return created;
 }
 
 /**

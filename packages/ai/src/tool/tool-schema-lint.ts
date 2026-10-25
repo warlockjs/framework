@@ -284,7 +284,7 @@ export function describeToolSchema(
   const description = typeof tool.description === "string" ? tool.description : "";
 
   const tokens = estimateInputTokens([], {
-    tools: [tool],
+    tools: [tool as ToolConfig<unknown, unknown>],
     ...(options.charsPerToken !== undefined ? { charsPerToken: options.charsPerToken } : {}),
     perMessageTokens: 0,
   });
