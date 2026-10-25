@@ -25,21 +25,42 @@ export type PackageManagerDetection = {
   packageManager: PackageManager;
   /**
    * The lockfiles found side by side when the choice had to be made between
-   * them (no `packageManager` field, no workspace marker). Empty otherwise.
+   * them (no `packageManager` field, no install marker). Empty otherwise.
    */
   ambiguous: string[];
+  /** One line saying why this manager was chosen, e.g. for the CLI to print. */
+  reason: string;
 };
+
+/**
+ * What each package manager leaves inside `node_modules` when it installs.
+ * A stale lockfile or workspace file proves nothing about the last install;
+ * these markers do.
+ */
+const INSTALL_MARKERS: ReadonlyArray<{ file: string; packageManager: PackageManager }> = [
+  { file: ".package-lock.json", packageManager: "npm" },
+  { file: ".pnpm", packageManager: "pnpm" },
+  { file: ".modules.yaml", packageManager: "pnpm" },
+  { file: ".yarn-state.yml", packageManager: "yarn" },
+  { file: ".yarn-integrity", packageManager: "yarn" },
+  { file: ".bun", packageManager: "bun" },
+];
 
 /**
  * Detect the project's package manager. The rule, in order:
  *
  * 1. the nearest `packageManager` field in a package.json;
- * 2. a `pnpm-workspace.yaml` (its `pnpm-lock.yaml` wins over compatibility lockfiles);
- * 3. the nearest directory holding a lockfile: the only one, `bun.lock` when
- *    present (Bun also writes a `yarn.lock`), otherwise the most recently
- *    modified, because the lockfile the project installs with is the one its
- *    package manager rewrites;
- * 4. the package manager running the CLI, then npm.
+ * 2. the manager that installed `node_modules` (npm `.package-lock.json`, pnpm
+ *    `.pnpm` / `.modules.yaml`, yarn `.yarn-state.yml` / `.yarn-integrity`,
+ *    bun `.bun`), because that is the lockfile actually in use;
+ * 3. the nearest directory holding a lockfile: the one that covers every
+ *    dependency in package.json, then `bun.lock` when present (Bun also writes
+ *    a `yarn.lock`), otherwise the most recently modified. A stale
+ *    `pnpm-workspace.yaml` never outranks a lockfile;
+ * 4. a `pnpm-workspace.yaml` with no lockfile at all;
+ * 5. the package manager running the CLI, then npm.
+ *
+ * `reason` always says which step decided.
  */
 export async function detectPackageManagerDetails(
   startDir: string = rootPath(),
@@ -56,36 +77,81 @@ export async function detectPackageManagerDetails(
   for (const dir of dirs) {
     const declared = await readDeclaredPackageManager(dir);
 
-    if (declared) return { packageManager: declared, ambiguous: [] };
+    if (declared) {
+      return {
+        packageManager: declared,
+        ambiguous: [],
+        reason: `the "packageManager" field in ${path.join(dir, "package.json")}`,
+      };
+    }
   }
 
-  // 2. a workspace governs descendants, but its own real lockfile wins over a marker
+  // 2. what installed node_modules
+  let restrictTo: PackageManager[] | undefined;
+
   for (const dir of dirs) {
-    if (await fileExistsAsync(path.join(dir, "pnpm-workspace.yaml"))) {
-      if (await fileExistsAsync(path.join(dir, "pnpm-lock.yaml"))) {
-        return { packageManager: "pnpm", ambiguous: [] };
-      }
+    const installed = await findInstallMarkers(dir);
 
-      const found = await findLockfiles(dir);
+    if (installed.length === 0) continue;
 
-      return found.length > 0 ? chooseLockfile(found) : { packageManager: "pnpm", ambiguous: [] };
+    const managers = [...new Set(installed.map((marker) => marker.packageManager))];
+    const [only] = managers;
+
+    if (managers.length === 1 && only) {
+      return {
+        packageManager: only,
+        ambiguous: [],
+        reason: `node_modules was installed by ${only} (${path.join(dir, "node_modules", installed[0]?.file ?? "")})`,
+      };
     }
+
+    restrictTo = managers;
+    break;
   }
 
   // 3. lockfiles, nearest level first
   for (const dir of dirs) {
-    const found = await findLockfiles(dir);
+    let found = await findLockfiles(dir);
 
-    if (found.length > 0) return chooseLockfile(found);
+    if (restrictTo) {
+      const allowed = found.filter((entry) => restrictTo?.includes(entry.packageManager));
+
+      if (allowed.length > 0) found = allowed;
+    }
+
+    if (found.length > 0) return chooseLockfile(found, await readDependencyNames(dir), dir);
+  }
+
+  if (restrictTo?.[0]) {
+    return {
+      packageManager: restrictTo[0],
+      ambiguous: [],
+      reason: `node_modules carries markers from ${restrictTo.join(" and ")}; no lockfile to choose between them`,
+    };
+  }
+
+  // 4. a workspace marker with no lockfile anywhere
+  for (const dir of dirs) {
+    if (await fileExistsAsync(path.join(dir, "pnpm-workspace.yaml"))) {
+      return {
+        packageManager: "pnpm",
+        ambiguous: [],
+        reason: `${path.join(dir, "pnpm-workspace.yaml")} exists and no lockfile was found`,
+      };
+    }
   }
 
   const agent = process.env.npm_config_user_agent?.split("/")[0];
 
   if (agent === "pnpm" || agent === "yarn" || agent === "bun") {
-    return { packageManager: agent, ambiguous: [] };
+    return { packageManager: agent, ambiguous: [], reason: `the CLI was started by ${agent}` };
   }
 
-  return { packageManager: "npm", ambiguous: [] };
+  return {
+    packageManager: "npm",
+    ambiguous: [],
+    reason: "no packageManager field, install marker or lockfile found; defaulting to npm",
+  };
 }
 
 /**
@@ -114,22 +180,98 @@ async function findLockfiles(dir: string): Promise<FoundLockfile[]> {
   return found;
 }
 
-function chooseLockfile(found: FoundLockfile[]): PackageManagerDetection {
+async function findInstallMarkers(dir: string) {
+  const found: Array<{ file: string; packageManager: PackageManager }> = [];
+
+  for (const marker of INSTALL_MARKERS) {
+    if (await fileExistsAsync(path.join(dir, "node_modules", marker.file))) found.push(marker);
+  }
+
+  return found;
+}
+
+/** The direct dependency names in the directory's package.json, if readable. */
+async function readDependencyNames(dir: string): Promise<string[]> {
+  try {
+    const json = JSON.parse(await readFile(path.join(dir, "package.json"), "utf8"));
+
+    return Object.keys({
+      ...json.dependencies,
+      ...json.devDependencies,
+      ...json.optionalDependencies,
+    });
+  } catch {
+    return [];
+  }
+}
+
+/** Whether the lockfile mentions every direct dependency of package.json. */
+async function lockfileCovers(dir: string, file: string, names: string[]): Promise<boolean> {
+  if (names.length === 0) return true;
+
+  try {
+    const content = await readFile(path.join(dir, file), "utf8");
+
+    return names.every((name) => content.includes(name));
+  } catch {
+    // binary (bun.lockb) or unreadable: cannot tell, so do not rule it out
+    return true;
+  }
+}
+
+async function chooseLockfile(
+  found: FoundLockfile[],
+  dependencyNames: string[],
+  dir: string,
+): Promise<PackageManagerDetection> {
   const [first] = found;
 
-  if (!first) return { packageManager: "npm", ambiguous: [] };
+  if (!first) return { packageManager: "npm", ambiguous: [], reason: "defaulting to npm" };
 
-  if (found.length === 1) return { packageManager: first.packageManager, ambiguous: [] };
+  if (found.length === 1) {
+    return {
+      packageManager: first.packageManager,
+      ambiguous: [],
+      reason: `${first.file} is the only lockfile`,
+    };
+  }
 
   const names = found.map((entry) => entry.file);
-  const bun = found.find((entry) => entry.packageManager === "bun");
+  const consistent: FoundLockfile[] = [];
 
-  if (bun) return { packageManager: "bun", ambiguous: names };
+  for (const entry of found) {
+    if (await lockfileCovers(dir, entry.file, dependencyNames)) consistent.push(entry);
+  }
+
+  const pool = consistent.length > 0 ? consistent : found;
+  const [poolFirst] = pool;
+
+  if (pool.length === 1 && poolFirst) {
+    return {
+      packageManager: poolFirst.packageManager,
+      ambiguous: names,
+      reason: `${poolFirst.file} is the only lockfile that matches package.json (found ${names.join(", ")})`,
+    };
+  }
+
+  const bun = pool.find((entry) => entry.packageManager === "bun");
+
+  if (bun) {
+    return {
+      packageManager: "bun",
+      ambiguous: names,
+      reason: `${bun.file} is present (Bun also writes a yarn.lock; found ${names.join(", ")})`,
+    };
+  }
 
   // Stable sort: on equal times the LOCKFILES order decides.
-  const newest = [...found].sort((a, b) => b.modifiedAt - a.modifiedAt)[0] ?? first;
+  const newest = [...pool].sort((a, b) => b.modifiedAt - a.modifiedAt)[0] ?? first;
 
-  return { packageManager: newest.packageManager, ambiguous: names };
+  return {
+    packageManager: newest.packageManager,
+    ambiguous: names,
+    reason: `${newest.file} is the most recently written of ${names.join(", ")}`,
+  };
 }
 
 /** The manager named by the app's `packageManager` field, if any. */

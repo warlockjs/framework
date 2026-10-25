@@ -67,9 +67,22 @@ export function shortSkillLine(description: string, max = 120): string {
   return sentence.length > max ? `${sentence.slice(0, max - 1).trimEnd()}…` : sentence;
 }
 
+/** The content of a `SKILL.md`, or `undefined` when it is missing or unreadable. */
+function readSkill(file: string): { file: string; content: string } | undefined {
+  if (!existsSync(file)) return undefined;
+
+  try {
+    return { file, content: readFileSync(file, "utf8") };
+  } catch {
+    return undefined;
+  }
+}
+
 /**
  * Every skill the installed `@warlock.js/*` packages ship, read from
- * `<cwd>/node_modules/@warlock.js/<package>/skills/<slug>/SKILL.md`.
+ * `<cwd>/node_modules/@warlock.js/<package>/skills/<slug>/SKILL.md`, plus a
+ * package's single `skills/SKILL.md` (slug: the front-matter `name`, else the
+ * package name).
  * Sorted by package, then slug. Reads only the local install: no network.
  *
  * @param cwd The project root.
@@ -80,31 +93,43 @@ export function listInstalledSkills(cwd: string): InstalledSkill[] {
 
   for (const packageFolder of directories(scope)) {
     const skillsRoot = path.join(scope, packageFolder, "skills");
+    const packageName = `@warlock.js/${packageFolder}`;
 
-    for (const slug of directories(skillsRoot)) {
-      const file = path.join(skillsRoot, slug, "SKILL.md");
+    // A package that ships one skill puts it at `skills/SKILL.md`: its slug is
+    // the front-matter `name`, else the package name.
+    const single = readSkill(path.join(skillsRoot, "SKILL.md"));
 
-      if (!existsSync(file)) continue;
-
-      let content: string;
-
-      try {
-        content = readFileSync(file, "utf8");
-      } catch {
-        continue;
-      }
-
-      const front = parseSkillFrontMatter(content);
+    if (single) {
+      const front = parseSkillFrontMatter(single.content);
+      const slug = front.name ?? packageFolder;
 
       skills.push({
-        package: `@warlock.js/${packageFolder}`,
+        package: packageName,
+        slug,
+        name: slug,
+        description: front.description ?? "",
+        file: path.relative(cwd, single.file).split(path.sep).join("/"),
+      });
+    }
+
+    for (const slug of directories(skillsRoot)) {
+      const skill = readSkill(path.join(skillsRoot, slug, "SKILL.md"));
+
+      if (!skill) continue;
+
+      const front = parseSkillFrontMatter(skill.content);
+
+      skills.push({
+        package: packageName,
         slug,
         name: front.name ?? slug,
         description: front.description ?? "",
-        file: path.relative(cwd, file).split(path.sep).join("/"),
+        file: path.relative(cwd, skill.file).split(path.sep).join("/"),
       });
     }
   }
 
-  return skills;
+  return skills.sort(
+    (a, b) => a.package.localeCompare(b.package) || a.slug.localeCompare(b.slug),
+  );
 }

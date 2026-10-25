@@ -48,21 +48,29 @@ What it does, in order:
 2. Collects every `@warlock.js/*` package across `dependencies` and `devDependencies`. Only the `@warlock.js/` scope is considered — `create-warlock` and unrelated dependencies are never touched.
 3. Looks up each package's latest version on the npm registry, in parallel.
 4. Rewrites each matching spec, **preserving the range operator**: `^4.2.0` → `^4.3.0`, `~4.2.0` → `~4.3.0`, an exact `4.2.0` → `4.3.0`. Specs that are not a plain semver — `workspace:*`, `*`, `latest`, git/file URLs — are left exactly as written, and any package already at or ahead of latest is skipped.
-5. Runs the project's install to reconcile `node_modules`. The package manager is the `packageManager` field, then a workspace file, then the nearest lockfile; when several lockfiles sit side by side, `bun.lock` wins and otherwise the most recently modified one (the command says which). Skipped with `--no-install`.
+5. Runs the project's install to reconcile `node_modules`. The package manager is chosen in this order, and the command always prints which one it picked and why:
+   1. the `packageManager` field in `package.json`;
+   2. the manager that installed `node_modules` (the marker it left there: npm's `node_modules/.package-lock.json`, the pnpm `.pnpm` folder or `.modules.yaml`, yarn's `.yarn-state.yml` or `.yarn-integrity`, bun's `.bun`);
+   3. the nearest lockfile that lists every dependency in `package.json`; when several remain, `bun.lock` wins and otherwise the most recently modified one;
+   4. a workspace file, only when no lockfile exists at all.
+
+   A stale workspace file next to an old lockfile never outranks the lockfile your installs actually use. Skipped with `--no-install`.
 
 With npm it first removes the `@warlock.js/*`, `vite`, `vitest`, `@vitest/*` and `@vitejs/*` entries from `package-lock.json`, so one `npm install` re-resolves them together (the family's peers name each other). **Use npm 11.6.2 or newer**: npm 10.9, bundled with Node 22.15, can fail with `ERESOLVE` or an arborist `edgesOut` crash; the command warns when npm is older, and `npx npm@11 install` is the way around it.
 
 The family's packages pin each other to the exact same version (lockstep), so a mixed set is not a valid install. `warlock check` reports it as `WL8010`; fix it with `warlock update`. `warlock upgrade` never moves a package down: one already newer than `--to` is left and listed.
 
-| Lockfile                 | Install        | Add (`warlock add`) |
-| ------------------------ | -------------- | ------------------- |
-| `bun.lock` / `bun.lockb` | `bun install`  | `bun add`           |
-| `package-lock.json`      | `npm install`  | `npm install`       |
-| `yarn.lock`              | `yarn install` | `yarn add`          |
-| `pnpm-lock.yaml`         | `pnpm install` | `pnpm add`          |
-| _none_                   | `npm install`  | `npm install`       |
+| Lockfile                 | Manager |
+| ------------------------ | ------- |
+| `bun.lock` / `bun.lockb` | bun     |
+| `package-lock.json`      | npm     |
+| `yarn.lock`              | yarn    |
+| `pnpm-lock.yaml`         | pnpm    |
+| _none_                   | npm     |
 
-Bun is checked **first**: a Bun project may also carry a `yarn.lock` (Bun writes one for tooling compatibility), and matching yarn there would run the wrong installer against the wrong lockfile. `warlock update` and `warlock add` share this detection, so they can never disagree.
+Each manager runs its own install command (`warlock add` uses the matching add command). Set `"packageManager"` in `package.json` to pin the choice.
+
+Among lockfiles of equal standing, Bun is checked **first**: a Bun project may also carry a `yarn.lock` (Bun writes one for tooling compatibility), and matching yarn there would run the wrong installer against the wrong lockfile. `warlock update` and `warlock add` share this detection, so they can never disagree.
 
 Re-running on an already-current project is a no-op: nothing resolves as newer, so it prints "All @warlock.js packages are already up to date" and exits without writing or installing.
 

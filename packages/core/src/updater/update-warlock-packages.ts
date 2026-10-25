@@ -176,8 +176,12 @@ export async function updateWarlockPackages(
   printUpdates(updates);
 
   if (!runInstall) {
-    const command = getInstallCommand(await detectPackageManager());
+    const detection = await detectPackageManagerDetails();
+    const command = getInstallCommand(detection.packageManager);
 
+    console.log(
+      colors.dim(`Package manager: ${detection.packageManager}, because ${detection.reason}.`),
+    );
     console.log(colors.dim(`Skipped install (--no-install). Run ${command} to apply the changes.`));
     return { outcome: "updated", updates };
   }
@@ -323,13 +327,14 @@ function printUpdates(updates: PackageUpdate[], { pending = false } = {}): void 
 
 /** Reconcile node_modules to the rewritten package.json via the project PM. */
 async function installDependencies(): Promise<void> {
-  const { packageManager, ambiguous } = await detectPackageManagerDetails();
+  const { packageManager, ambiguous, reason } = await detectPackageManagerDetails();
   const installCommand = getInstallCommand(packageManager);
+
+  console.log(`${colors.cyan("›")} Package manager: ${colors.bold(packageManager)}, because ${reason}.`);
 
   if (ambiguous.length > 0) {
     console.log(
-      `${colors.yellow("⚠")} Found ${ambiguous.join(" and ")}; installing with ` +
-        `${colors.bold(packageManager)}, the one written most recently. Set "packageManager" in package.json to choose.`,
+      `${colors.yellow("⚠")} Found ${ambiguous.join(" and ")}. Set "packageManager" in package.json to choose.`,
     );
   }
 

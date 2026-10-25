@@ -38,10 +38,81 @@ describe("detectPackageManager", () => {
     expect(await detectPackageManager(app)).toBe(expected);
   });
 
-  it("retains a locked pnpm workspace ahead of compatibility lockfiles", async () => {
-    for (const file of ["pnpm-workspace.yaml", "pnpm-lock.yaml", "bun.lock", "package-lock.json"])
-      writeFileSync(path.join(app, file), "{}");
-    expect(await detectPackageManager(app)).toBe("pnpm");
+  it("does not let a stale pnpm workspace and lockfile beat the newer lockfile in use", async () => {
+    writeFileSync(path.join(app, "pnpm-workspace.yaml"), "allowBuilds: {}\n");
+    writeFileSync(path.join(app, "pnpm-lock.yaml"), "");
+    writeFileSync(path.join(app, "package-lock.json"), "{}");
+    const old = new Date(Date.now() - 60_000);
+    utimesSync(path.join(app, "pnpm-lock.yaml"), old, old);
+
+    const detection = await detectPackageManagerDetails(app);
+    expect(detection.packageManager).toBe("npm");
+    expect(detection.reason).toContain("package-lock.json");
+  });
+
+  it("prefers the lockfile that lists every dependency in package.json", async () => {
+    writeFileSync(
+      path.join(app, "package.json"),
+      JSON.stringify({ dependencies: { "@warlock.js/core": "5.38.0" } }),
+    );
+    writeFileSync(
+      path.join(app, "package-lock.json"),
+      '{"packages":{"node_modules/@warlock.js/core":{}}}',
+    );
+    writeFileSync(path.join(app, "pnpm-lock.yaml"), "lockfileVersion: 9\n");
+    // the stale pnpm lockfile is the newest file, yet it does not match package.json
+    const old = new Date(Date.now() - 60_000);
+    utimesSync(path.join(app, "package-lock.json"), old, old);
+
+    const detection = await detectPackageManagerDetails(app);
+    expect(detection.packageManager).toBe("npm");
+    expect(detection.reason).toContain("matches package.json");
+  });
+
+  it.each([
+    [".package-lock.json", "npm"],
+    [".pnpm", "pnpm"],
+    [".modules.yaml", "pnpm"],
+    [".yarn-state.yml", "yarn"],
+    [".yarn-integrity", "yarn"],
+    [".bun", "bun"],
+  ])(
+    "uses the manager that installed node_modules (%s -> %s) over lockfiles",
+    async (marker, expected) => {
+      mkdirSync(path.join(app, "node_modules"), { recursive: true });
+      writeFileSync(path.join(app, "node_modules", marker), "");
+      for (const file of ["pnpm-workspace.yaml", "pnpm-lock.yaml", "package-lock.json", "yarn.lock"])
+        writeFileSync(path.join(app, file), "{}");
+
+      const detection = await detectPackageManagerDetails(app);
+      expect(detection.packageManager).toBe(expected);
+      expect(detection.reason).toContain("node_modules");
+    },
+  );
+
+  it("lets the packageManager field beat the node_modules marker", async () => {
+    mkdirSync(path.join(app, "node_modules"), { recursive: true });
+    writeFileSync(path.join(app, "node_modules", ".package-lock.json"), "{}");
+    writeFileSync(path.join(app, "package.json"), JSON.stringify({ packageManager: "yarn@4" }));
+    expect(await detectPackageManager(app)).toBe("yarn");
+  });
+
+  it("chooses between the lockfiles of the managers that left markers when both did", async () => {
+    mkdirSync(path.join(app, "node_modules"), { recursive: true });
+    writeFileSync(path.join(app, "node_modules", ".package-lock.json"), "{}");
+    writeFileSync(path.join(app, "node_modules", ".modules.yaml"), "");
+    writeFileSync(path.join(app, "yarn.lock"), "");
+    writeFileSync(path.join(app, "package-lock.json"), "{}");
+    expect(await detectPackageManager(app)).toBe("npm");
+  });
+
+  it("always explains the choice", async () => {
+    expect((await detectPackageManagerDetails(app)).reason).toMatch(/npm/);
+    process.env.npm_config_user_agent = "yarn/1.22.0";
+    expect((await detectPackageManagerDetails(app)).reason).toContain("yarn");
+    delete process.env.npm_config_user_agent;
+    writeFileSync(path.join(app, "yarn.lock"), "");
+    expect((await detectPackageManagerDetails(app)).reason).toContain("yarn.lock");
   });
 
   it("honours the parent lockfile alongside its workspace marker", async () => {
@@ -61,11 +132,11 @@ describe("detectPackageManager", () => {
     expect(await detectPackageManager(app)).toBe("yarn");
   });
 
-  it("prefers a pnpm workspace over a stray package-lock.json in the app", async () => {
+  it("uses the app's own lockfile over a workspace marker further up", async () => {
     writeFileSync(path.join(app, "package-lock.json"), "{}");
     writeFileSync(path.join(tmp, "pnpm-workspace.yaml"), "packages:\n  - apps/*\n");
     writeFileSync(path.join(tmp, "pnpm-lock.yaml"), "");
-    expect(await detectPackageManager(app)).toBe("pnpm");
+    expect(await detectPackageManager(app)).toBe("npm");
   });
 
   it("uses the most recently written lockfile when several share a level", async () => {
@@ -94,7 +165,7 @@ describe("detectPackageManager", () => {
     expect((await detectPackageManagerDetails(app)).ambiguous).toEqual([]);
     writeFileSync(path.join(app, "pnpm-lock.yaml"), "");
     writeFileSync(path.join(app, "package.json"), JSON.stringify({ packageManager: "pnpm@9" }));
-    expect(await detectPackageManagerDetails(app)).toEqual({
+    expect(await detectPackageManagerDetails(app)).toMatchObject({
       packageManager: "pnpm",
       ambiguous: [],
     });
