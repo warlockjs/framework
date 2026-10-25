@@ -71,9 +71,14 @@ export function isPageLayoutFilePath(file: string, appSrcRoot: string): boolean 
   );
 }
 
-/** Error boundaries participate in reload tracking but never in router ownership. */
+/**
+ * Error boundaries and the forbidden page participate in reload tracking but
+ * never in router ownership: neither has a route of its own.
+ */
 export function isErrorPageFilePath(file: string): boolean {
-  return path.basename(file) === "error.page.tsx";
+  const base = path.basename(file);
+
+  return base === "error.page.tsx" || base === "forbidden.page.tsx";
 }
 
 export function isPageSetupFilePath(file: string, appSrcRoot: string): boolean {

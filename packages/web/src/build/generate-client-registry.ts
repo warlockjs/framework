@@ -137,6 +137,8 @@ function loadSource(
   page: DiscoveredRoutablePage,
   errorPageFile: string | undefined,
   errorSetupFile: string | undefined,
+  forbiddenPageFile: string | undefined,
+  forbiddenSetupFile: string | undefined,
   toImportSpecifier: (file: string) => string,
 ): string[] {
   // These bindings deliberately retain the REAL module namespace objects
@@ -199,10 +201,26 @@ function loadSource(
     }
   }
 
+  let forbiddenModule = "";
+  if (forbiddenPageFile !== undefined) {
+    bindings.push("ForbiddenPageModule");
+    specifiers.push(toImportSpecifier(forbiddenPageFile));
+    if (forbiddenSetupFile !== undefined) {
+      bindings.push("ForbiddenPageSetupModule");
+      specifiers.push(`${toImportSpecifier(forbiddenSetupFile)}?warlock-setup-register`);
+      forbiddenModule =
+        "{ ...ForbiddenPageModule, ...(ForbiddenPageSetupModule.register === undefined ? {} : { register: ForbiddenPageSetupModule.register }) }";
+    } else {
+      forbiddenModule = "ForbiddenPageModule";
+    }
+  }
+
   // `App` is OMITTED, never emitted as `App: undefined`: the runtime validator
   // reads an own `App` key as a promise that a module namespace is behind it.
   const app = page.appFile === undefined ? "" : `, App: ${appModule}`;
   const errorPage = errorPageFile === undefined ? "" : `, ErrorPage: ${errorModule}`;
+  const forbiddenPage =
+    forbiddenPageFile === undefined ? "" : `, ForbiddenPage: ${forbiddenModule}`;
 
   const pageModule =
     page.setupFile === undefined
@@ -215,7 +233,7 @@ function loadSource(
     ...specifiers.map((specifier) => `        import(${quote(specifier)}),`),
     "      ]);",
     "",
-    `      return { Page: ${pageModule}, layouts: [${layoutBindings.join(", ")}]${app}${errorPage} };`,
+    `      return { Page: ${pageModule}, layouts: [${layoutBindings.join(", ")}]${app}${errorPage}${forbiddenPage} };`,
     "    },",
   ];
 }
@@ -224,6 +242,8 @@ function entrySource(
   page: DiscoveredRoutablePage,
   errorPageFile: string | undefined,
   errorSetupFile: string | undefined,
+  forbiddenPageFile: string | undefined,
+  forbiddenSetupFile: string | undefined,
   toImportSpecifier: (file: string) => string,
 ): string[] {
   return [
@@ -235,7 +255,14 @@ function entrySource(
     // convention waiting to disagree with the server's.
     `    name: ${quote(page.routeName)},`,
     `    path: ${quote(page.routePath)},`,
-    ...loadSource(page, errorPageFile, errorSetupFile, toImportSpecifier),
+    ...loadSource(
+      page,
+      errorPageFile,
+      errorSetupFile,
+      forbiddenPageFile,
+      forbiddenSetupFile,
+      toImportSpecifier,
+    ),
     "  },",
   ];
 }
@@ -253,6 +280,9 @@ export function generateClientRegistry(options: GenerateClientRegistryOptions): 
   const errorPage = pages.find((page) => page.type === "error");
   const errorPageFile = errorPage?.pageFile;
   const errorSetupFile = errorPage?.setupFile;
+  const forbiddenPage = pages.find((page) => page.type === "forbidden");
+  const forbiddenPageFile = forbiddenPage?.pageFile;
+  const forbiddenSetupFile = forbiddenPage?.setupFile;
 
   assertUniqueNames(routablePages);
 
@@ -276,7 +306,14 @@ export function generateClientRegistry(options: GenerateClientRegistryOptions): 
           ...HEADER,
           `${declaration} [`,
           ...routablePages.flatMap((page) =>
-            entrySource(page, errorPageFile, errorSetupFile, toImportSpecifier),
+            entrySource(
+              page,
+              errorPageFile,
+              errorSetupFile,
+              forbiddenPageFile,
+              forbiddenSetupFile,
+              toImportSpecifier,
+            ),
           ),
           "];",
         ];

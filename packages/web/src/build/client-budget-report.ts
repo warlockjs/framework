@@ -177,6 +177,9 @@ export async function writeClientBudgetReport(options: {
       const errorPage = discovered.find(
         (entry) => entry.type === "error" && entry.site === page.site,
       );
+      const forbiddenPage = discovered.find(
+        (entry) => entry.type === "forbidden" && entry.site === page.site,
+      );
       return {
         page: page.routePath,
         source: relative(page.pageFile),
@@ -187,12 +190,14 @@ export async function writeClientBudgetReport(options: {
           ...page.layouts,
           ...(page.appFile ? [page.appFile] : []),
           ...(errorPage ? [errorPage.pageFile] : []),
+          ...(forbiddenPage ? [forbiddenPage.pageFile] : []),
         ].map(relative),
         optionalModules: [
           page.setupFile,
           ...(page.layoutSetupFiles ?? []),
           page.appSetupFile,
           errorPage?.setupFile,
+          forbiddenPage?.setupFile,
         ]
           .filter((file): file is string => file !== undefined)
           .map((file) => `${relative(file)}?warlock-setup-register`),

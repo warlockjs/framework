@@ -150,8 +150,26 @@ export type DiscoveredErrorPage = {
   site?: string;
 };
 
-/** The complete static web graph: routable leaves plus the optional error boundary. */
-export type DiscoveredPage = DiscoveredRoutablePage | DiscoveredErrorPage;
+/**
+ * The optional forbidden page: what a visitor sees for a 401/403 on a page
+ * route that has no sign-in redirect. Like the error page it has no route
+ * identity.
+ */
+export type DiscoveredForbiddenPage = {
+  type: "forbidden";
+  /** Absolute path to the `forbidden.page.tsx` of the site (or of the app). */
+  pageFile: string;
+  /** Optional `forbidden.setup.ts` companion for the page's server exports. */
+  setupFile?: string;
+  webRoot: string;
+  appFile?: string;
+  appSetupFile?: string;
+  /** Key of the site this forbidden page belongs to; absent in single-site mode. */
+  site?: string;
+};
+
+/** The complete static web graph: routable leaves plus the optional error and forbidden pages. */
+export type DiscoveredPage = DiscoveredRoutablePage | DiscoveredErrorPage | DiscoveredForbiddenPage;
 
 /** A `locales.json` file found under a web root. Its contents are read later. */
 export type DiscoveredLocaleFile = {
@@ -173,6 +191,19 @@ export function isDiscoveredRoutablePage(page: DiscoveredPage): page is Discover
 
 export function isErrorPageFile(file: string): boolean {
   return path.basename(file) === "error.page.tsx";
+}
+
+export function isForbiddenPageFile(file: string): boolean {
+  return path.basename(file) === "forbidden.page.tsx";
+}
+
+export class DuplicateForbiddenPageError extends Error {
+  public constructor(firstFile: string, secondFile: string) {
+    super(
+      `Two forbidden pages were found: "${firstFile}" and "${secondFile}". An application may own exactly one \`forbidden.page.tsx\` anywhere beneath src/web (one per site in multi-site mode).`,
+    );
+    this.name = "DuplicateForbiddenPageError";
+  }
 }
 
 export class DuplicateErrorPageError extends Error {
@@ -859,7 +890,10 @@ function prepareSites(
     };
   });
 
-  const special = new Map<string, { notFound: string[]; error: string[] }>();
+  const special = new Map<
+    string,
+    { notFound: string[]; error: string[]; forbidden: string[] }
+  >();
 
   for (const { pageFile } of pageFiles) {
     const unit = unitOwning(units, pageFile);
@@ -871,9 +905,14 @@ function prepareSites(
       continue;
     }
 
-    const entry = special.get(unit.key as string) ?? { notFound: [], error: [] };
+    const entry = special.get(unit.key as string) ?? {
+      notFound: [],
+      error: [],
+      forbidden: [],
+    };
     if (isNotFoundPageFile(pageFile)) entry.notFound.push(pageFile);
     if (isErrorPageFile(pageFile)) entry.error.push(pageFile);
+    if (isForbiddenPageFile(pageFile)) entry.forbidden.push(pageFile);
     special.set(unit.key as string, entry);
   }
 
@@ -881,6 +920,7 @@ function prepareSites(
     for (const [label, files] of [
       ["404", entry.notFound],
       ["error", entry.error],
+      ["forbidden", entry.forbidden],
     ] as const) {
       if (files.length > 1) {
         problems.push(
@@ -923,6 +963,7 @@ export function discoverPageGraph(options: DiscoverPagesOptions): DiscoveredPage
   const pages: DiscoveredPage[] = [];
   const explicitRouteFiles = new Set<string>();
   const errorPages = new Map<string | undefined, DiscoveredErrorPage>();
+  const forbiddenPages = new Map<string | undefined, DiscoveredForbiddenPage>();
 
   for (const { pageFile, webRoot } of sourceGraph.pages) {
     const unit = siteUnits === undefined ? units[0] : unitOwning(units, pageFile);
@@ -972,6 +1013,30 @@ export function discoverPageGraph(options: DiscoverPagesOptions): DiscoveredPage
 
       errorPages.set(siteKey, {
         type: "error",
+        pageFile,
+        webRoot: siteRouteRoot,
+        ...(siteKey === undefined ? {} : { site: siteKey }),
+        ...(setupFile === undefined ? {} : { setupFile }),
+        ...(hasAppFile ? { appFile } : {}),
+        ...(appSetupFile === undefined ? {} : { appSetupFile }),
+      });
+      continue;
+    }
+    if (isForbiddenPageFile(pageFile)) {
+      if (route !== undefined) {
+        throw new ErrorPageDeclaresRouteError(relativeToApp(pageFile), "forbidden");
+      }
+
+      const existingForbiddenPage = forbiddenPages.get(siteKey);
+      if (existingForbiddenPage !== undefined) {
+        throw new DuplicateForbiddenPageError(
+          relativeToApp(existingForbiddenPage.pageFile),
+          relativeToApp(pageFile),
+        );
+      }
+
+      forbiddenPages.set(siteKey, {
+        type: "forbidden",
         pageFile,
         webRoot: siteRouteRoot,
         ...(siteKey === undefined ? {} : { site: siteKey }),
@@ -1182,7 +1247,7 @@ export function discoverPageGraph(options: DiscoverPagesOptions): DiscoveredPage
   // The error page is captured separately above so a second one can be
   // compared against the first before either is trusted — it joins the
   // returned graph here, once discovery knows there is exactly one.
-  pages.push(...errorPages.values());
+  pages.push(...errorPages.values(), ...forbiddenPages.values());
 
   pages.sort(comparePages);
 

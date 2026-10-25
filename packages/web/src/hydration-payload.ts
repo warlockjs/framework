@@ -122,8 +122,10 @@ function requireErrorPagePayload(value: unknown): void {
 
   const errorPage = value as Record<PropertyKey, unknown>;
 
-  if (!hasExactStringKeys(errorPage, ["error", "status"])) malformedPayload();
+  // `debug` (the development error details) rides along outside production.
+  if (!hasExactStringKeys(errorPage, ["error", "status"], ["debug"])) malformedPayload();
   if (!isPlainObject(errorPage.error)) malformedPayload();
+  if (errorPage.debug !== undefined && !isPlainObject(errorPage.debug)) malformedPayload();
 
   const error = errorPage.error as Record<PropertyKey, unknown>;
 

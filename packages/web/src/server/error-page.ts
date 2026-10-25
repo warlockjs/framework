@@ -11,6 +11,7 @@ import type { ServerErrorPageProps } from "../props";
 import { normalizePageModule } from "./normalize-page-module";
 import { PageValidationFailedError } from "./page-validation-failed-error";
 import { isVisitorSafePageError } from "./is-visitor-safe-page-error";
+import { isForbiddenPageStatus } from "../shared/is-forbidden-page-status";
 
 /**
  * One sanitized Seal validation issue: strips every field but
@@ -49,8 +50,39 @@ function sanitizeValidationIssues(errors: unknown): SafeValidationIssue[] {
 /** Raw server-only namespace of an application-owned `error.page.tsx` module. */
 export type ErrorPageModule = Record<string, unknown>;
 
-/** Deliberately lazy: normal requests never even load error.page.tsx. */
-export type ErrorPageModuleLoader = () => Promise<ErrorPageModule>;
+/**
+ * Deliberately lazy: normal requests never even load error.page.tsx.
+ *
+ * The status of the failure being rendered lets one loader serve both special
+ * pages: a 401/403 resolves to the app's `forbidden.page.tsx` when it has one
+ * (see {@link composeErrorPageLoader}). `undefined` means no page owns that
+ * status and the framework default renders.
+ */
+export type ErrorPageModuleLoader = (status?: number) => Promise<ErrorPageModule | undefined>;
+
+export { isForbiddenPageStatus };
+
+/**
+ * Folds an app's `error.page.tsx` and `forbidden.page.tsx` loaders into the one
+ * {@link ErrorPageModuleLoader} the render pipeline takes. A 401/403 prefers the
+ * forbidden page and falls back to the error page, every other status uses the
+ * error page. Returns `undefined` when the app has neither, so the framework
+ * default renders.
+ */
+export function composeErrorPageLoader(loaders: {
+  error?: () => Promise<ErrorPageModule>;
+  forbidden?: () => Promise<ErrorPageModule>;
+}): ErrorPageModuleLoader | undefined {
+  const { error, forbidden } = loaders;
+
+  if (error === undefined && forbidden === undefined) return undefined;
+
+  return async (status) => {
+    if (isForbiddenPageStatus(status) && forbidden !== undefined) return forbidden();
+
+    return error === undefined ? undefined : error();
+  };
+}
 
 /** The one stable message a real visitor sees for an unexpected production failure. */
 export const GENERIC_PRODUCTION_ERROR_MESSAGE = "An unexpected error occurred.";

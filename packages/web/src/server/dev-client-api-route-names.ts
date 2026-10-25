@@ -39,6 +39,8 @@ export type DevClientApiRouteInput = {
   pageFile: string;
   /** The application's error page, when it has one: it can render for any page. */
   errorPageFile?: string;
+  /** The application's forbidden page, when it has one: it can render for any page. */
+  forbiddenPageFile?: string;
 };
 
 /** The per-request route-name function for one page document in development. */
@@ -52,6 +54,7 @@ export function devClientApiRouteNames(input: DevClientApiRouteInput): () => rea
     ...(input.layoutFiles ?? []),
     input.pageFile,
     ...(input.errorPageFile === undefined ? [] : [input.errorPageFile]),
+    ...(input.forbiddenPageFile === undefined ? [] : [input.forbiddenPageFile]),
   ];
 
   return createClientApiRouteResolver(

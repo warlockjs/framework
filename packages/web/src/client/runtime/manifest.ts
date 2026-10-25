@@ -2,7 +2,7 @@ import type { ClientPageEntry, ClientProjectedModule, ClientRouteComposition } f
 
 const ENTRY_KEYS = ["type", "name", "path", "load"] as const;
 const COMPOSITION_REQUIRED_KEYS = ["Page", "layouts"] as const;
-const COMPOSITION_OPTIONAL_KEYS = ["App", "ErrorPage"] as const;
+const COMPOSITION_OPTIONAL_KEYS = ["App", "ErrorPage", "ForbiddenPage"] as const;
 
 type DataRecord = Record<PropertyKey, unknown>;
 
@@ -114,6 +114,10 @@ function validateComposition(input: unknown): ClientRouteComposition {
 
   if (Object.prototype.hasOwnProperty.call(input, "ErrorPage")) {
     validateProjectedModule(input.ErrorPage, `${label} ErrorPage`);
+  }
+
+  if (Object.prototype.hasOwnProperty.call(input, "ForbiddenPage")) {
+    validateProjectedModule(input.ForbiddenPage, `${label} ForbiddenPage`);
   }
 
   return input as ClientRouteComposition;

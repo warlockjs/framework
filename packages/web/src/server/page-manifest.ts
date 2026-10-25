@@ -69,9 +69,11 @@ export type PageManifestSiteEntry = {
   hydrationEntry?: string;
   /** This site's application-owned error boundary. */
   errorPage?: PageManifestErrorPageEntry;
+  /** This site's application-owned forbidden page. */
+  forbiddenPage?: PageManifestErrorPageEntry;
 };
 
-/** The optional application error boundary, kept outside the routable page table. */
+/** An optional application error or forbidden page, kept outside the routable page table. */
 export type PageManifestErrorPageEntry = {
   module: Record<string, unknown>;
   sourceFile: string;
@@ -163,6 +165,8 @@ export type PageManifest = {
   sites?: Readonly<Record<string, PageManifestSiteEntry>>;
   /** An application-owned error boundary. It has no route name or path. */
   errorPage?: PageManifestErrorPageEntry;
+  /** An application-owned forbidden page (401/403). It has no route name or path. */
+  forbiddenPage?: PageManifestErrorPageEntry;
   /**
    * The page table. EMPTY IS A REAL STATE, not a missing one: an empty array
    * means "this bundle was built with web, and it has no pages", which is what

@@ -17,6 +17,11 @@ export type ClientRouteComposition = {
    * the server rendered this module instead of `Page`.
    */
   readonly ErrorPage?: ClientProjectedModule;
+  /**
+   * The app-owned forbidden leaf projected for this route. Hydration selects
+   * it, instead of `ErrorPage`, when the server rendered a 401/403 failure.
+   */
+  readonly ForbiddenPage?: ClientProjectedModule;
 };
 
 export type ClientRouteLoad = () => ClientRouteComposition | Promise<ClientRouteComposition>;

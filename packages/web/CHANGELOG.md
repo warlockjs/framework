@@ -2,6 +2,19 @@
 
 All notable changes to `@warlock.js/web` are documented here.
 
+## 5.38.0
+
+### Added
+
+- `forbidden.page.tsx` (with an optional `forbidden.setup.ts`): the application's page for a refused request. A 401 or 403 on a page route renders it with that status. It declares no `config.route`, a second copy fails the build (one per site in multi-site mode, at `$sites/<name>/forbidden.page.tsx`), and it receives the same `{ error, status }` props as `error.page.tsx`, plus `debug` outside production. A request renders the site's (or the app's) forbidden page, then its `error.page.tsx` with the 401/403 status, then the framework default. The page manifest gains `forbiddenPage` (and a `forbiddenPage` entry per site), the client registry projects it as `ForbiddenPage`, and hydration picks it by the same rule, so the browser hydrates the page the server rendered. Discovery exports `DiscoveredForbiddenPage`, `isForbiddenPageFile` and `DuplicateForbiddenPageError`.
+- The framework's own fallback page now shows the request id and a "Back to home" link, and a 401/403 gets its own plain, accessible "You don't have access to this page." message. Outside production the development details panel still follows it.
+
+### Fixed
+
+- `requireUser({ userType })` and `requireUser({ when })` answered a failed check with a raw JSON body (`{"error":"Forbidden"}`) on a page route. The middleware form now throws `ForbiddenError` (and `UnAuthorizedError` for a guest with no sign-in page or a bearer client), so a page route renders the forbidden page instead. A guest with `auth.pageAuth.loginPath` is still redirected to sign in. To refuse a page request from your own middleware, throw a Core `ForbiddenError`; `response.forbidden()` still writes its own JSON reply.
+- In development, hydrating an error page failed with a malformed-payload error because the payload check rejected the `debug` details the server sends outside production. The check now accepts `debug`.
+- A route-translations lookup for a failure rendered by the error or forbidden page now covers both pages' keys.
+
 ## 5.37.1 - 2026-10-24
 
 ### Fixed

@@ -56,7 +56,7 @@ import {
   localeActionRegistrations,
   localePageRegistrations,
 } from "./locale-routing/locale-page-registrations";
-import type { ErrorPageModule } from "./error-page";
+import { composeErrorPageLoader, type ErrorPageModule } from "./error-page";
 import {
   createPageRouteHandler,
   type PageRouteHandler,
@@ -199,6 +199,7 @@ function installSitePagesFromManifest(
           ...manifest,
           sites: undefined,
           errorPage: entry.errorPage,
+          forbiddenPage: entry.forbiddenPage,
           app: {
             ...entry.app,
             ...(entry.appSetup === undefined
@@ -435,6 +436,14 @@ export function installPageRoutesFromManifest(
                 webRoot: manifestWebRoot ?? path.dirname(manifest.errorPage.sourceFile),
               },
             ]),
+        ...(manifest.forbiddenPage === undefined
+          ? []
+          : [
+              {
+                pageFile: manifest.forbiddenPage.sourceFile,
+                webRoot: manifestWebRoot ?? path.dirname(manifest.forbiddenPage.sourceFile),
+              },
+            ]),
       ],
       localeFiles: localeFiles.map(({ sourceFile, webRoot }) => ({ sourceFile, webRoot })),
     },
@@ -477,6 +486,18 @@ export function installPageRoutesFromManifest(
 
     if (errorPage.route !== undefined) {
       throw new ErrorPageDeclaresRouteError(manifest.errorPage.sourceFile);
+    }
+  }
+
+  if (manifest.forbiddenPage !== undefined) {
+    const forbiddenPage = normalizePageModule(
+      manifestModule(manifest.forbiddenPage),
+      "page",
+      manifest.forbiddenPage.sourceFile,
+    );
+
+    if (forbiddenPage.route !== undefined) {
+      throw new ErrorPageDeclaresRouteError(manifest.forbiddenPage.sourceFile, "forbidden");
     }
   }
 
@@ -527,10 +548,16 @@ export function installPageRoutesFromManifest(
   const loadModule = createPageModuleLoader(manifest);
   // The namespace is already statically imported by the generated barrel, but
   // do not hand it to the render pipeline until a request actually fails.
-  const loadErrorPage =
-    manifest.errorPage === undefined
-      ? undefined
-      : async () => manifestModule(manifest.errorPage!) as ErrorPageModule;
+  const loadErrorPage = composeErrorPageLoader({
+    error:
+      manifest.errorPage === undefined
+        ? undefined
+        : async () => manifestModule(manifest.errorPage!) as ErrorPageModule,
+    forbidden:
+      manifest.forbiddenPage === undefined
+        ? undefined
+        : async () => manifestModule(manifest.forbiddenPage!) as ErrorPageModule,
+  });
 
   // Same partition development makes, on the same rule (the filename), so the
   // two modes cannot disagree about which file is the not-found page. It is

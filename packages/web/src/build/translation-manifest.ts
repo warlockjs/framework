@@ -109,7 +109,9 @@ export function buildTranslationManifest(input: TranslationBuildInput): Translat
   const usage: Record<string, SerializedTranslationUsage> = {};
 
   const routable = input.pages.filter(isDiscoveredRoutablePage);
-  const errorPages = input.pages.filter((page) => page.type === "error");
+  const errorPages = input.pages.filter(
+    (page) => page.type === "error" || page.type === "forbidden",
+  );
   const errorEntries = errorPages.flatMap((page) => [
     page.pageFile,
     ...(page.appFile === undefined ? [] : [page.appFile]),
@@ -146,8 +148,11 @@ export function buildTranslationManifest(input: TranslationBuildInput): Translat
       prune
         ? analyzePageTranslationUsage({
             appSrcRoot: input.srcRoot,
-            entries: [page.pageFile, ...(page.appFile === undefined ? [] : [page.appFile])],
-            setupFiles: definedOf([page.setupFile, page.appSetupFile]),
+            // The error and forbidden pages share one analysis: the route
+            // translations a failure binds come from whichever file the
+            // request binds, and either can render for the same failure.
+            entries: errorEntries,
+            setupFiles: errorSetups,
           }).usage
         : EVERYTHING_USAGE,
     );

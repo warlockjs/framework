@@ -39,7 +39,12 @@ import {
   isFile,
   walkFiles,
 } from "./discover-pages";
-import type { DiscoveredErrorPage, DiscoveredPage, DiscoveredRoutablePage } from "./discover-pages";
+import type {
+  DiscoveredErrorPage,
+  DiscoveredForbiddenPage,
+  DiscoveredPage,
+  DiscoveredRoutablePage,
+} from "./discover-pages";
 import {
   analyzeClientApiRoutes,
   resolveClientApiRouteNames,
@@ -658,6 +663,18 @@ export async function generatePagesBarrel(
       : Object.keys(options.sites).map((site) =>
           discovered.find((page) => page.type === "error" && page.site === site),
         );
+  const forbiddenPage = discovered.find(
+    (page): page is DiscoveredForbiddenPage => page.type === "forbidden",
+  );
+  const siteForbiddenPages =
+    options.sites === undefined
+      ? []
+      : Object.keys(options.sites).map((site) =>
+          discovered.find(
+            (page): page is DiscoveredForbiddenPage =>
+              page.type === "forbidden" && page.site === site,
+          ),
+        );
 
   if (discovered.length === 0) {
     console.log("web configured, 0 pages");
@@ -722,9 +739,15 @@ export async function generatePagesBarrel(
    * modules reach (root, layouts, page, and the error page it may render), out
    * of the names the build may embed at all.
    */
+  const forbiddenPageOf = (site: string | undefined): DiscoveredForbiddenPage | undefined =>
+    discovered.find(
+      (candidate): candidate is DiscoveredForbiddenPage =>
+        candidate.type === "forbidden" && candidate.site === site,
+    );
   const apiRouteNamesOf = (
     page: DiscoveredRoutablePage,
     pageErrorPage: DiscoveredErrorPage | undefined,
+    pageForbiddenPage: DiscoveredForbiddenPage | undefined,
   ): string[] => {
     if (clientApiRouteNames.length === 0) return [];
 
@@ -738,6 +761,9 @@ export async function generatePagesBarrel(
       ...(pageErrorPage === undefined
         ? []
         : [{ file: pageErrorPage.pageFile, setupFile: pageErrorPage.setupFile }]),
+      ...(pageForbiddenPage === undefined
+        ? []
+        : [{ file: pageForbiddenPage.pageFile, setupFile: pageForbiddenPage.setupFile }]),
     ];
 
     return resolveClientApiRouteNames(
@@ -775,7 +801,7 @@ export async function generatePagesBarrel(
       setupFile: page.setupFile,
       site: page.site,
       layouts,
-      apiRouteNames: apiRouteNamesOf(page, errorPageOf(page.site)),
+      apiRouteNames: apiRouteNamesOf(page, errorPageOf(page.site), forbiddenPageOf(page.site)),
     });
   }
 
@@ -824,6 +850,29 @@ export async function generatePagesBarrel(
                     ],
               )),
         ]),
+    ...(options.sites === undefined && forbiddenPage === undefined
+      ? []
+      : options.sites === undefined
+        ? [
+            `import * as forbiddenPage from ${quote(importSpecifierFor(productionDir, forbiddenPage!.pageFile))};`,
+            ...(forbiddenPage!.setupFile === undefined
+              ? []
+              : [
+                  `import * as forbiddenPageSetup from ${quote(importSpecifierFor(productionDir, forbiddenPage!.setupFile))};`,
+                ]),
+          ]
+        : siteForbiddenPages.flatMap((page, index) =>
+            page === undefined
+              ? []
+              : [
+                  `import * as forbiddenPage${index} from ${quote(importSpecifierFor(productionDir, page.pageFile))};`,
+                  ...(page.setupFile === undefined
+                    ? []
+                    : [
+                        `import * as forbiddenPageSetup${index} from ${quote(importSpecifierFor(productionDir, page.setupFile))};`,
+                      ]),
+                ],
+          )),
     ...[...layoutIdentifiers.entries()].flatMap(([layoutFile, layout]) => [
       `import * as ${layout.identifier} from ${quote(importSpecifierFor(productionDir, layoutFile))};`,
       ...(layout.setupFile === undefined
@@ -919,6 +968,14 @@ export async function generatePagesBarrel(
                           ? ""
                           : `, setupModule: errorPageSetup${index}, setupSourceFile: ${relativeToApp(siteErrorPages[index]!.setupFile!)}`
                       } }`
+                }${
+                  siteForbiddenPages[index] === undefined
+                    ? ""
+                    : `, forbiddenPage: { module: forbiddenPage${index}, sourceFile: ${relativeToApp(siteForbiddenPages[index]!.pageFile)}${
+                        siteForbiddenPages[index]!.setupFile === undefined
+                          ? ""
+                          : `, setupModule: forbiddenPageSetup${index}, setupSourceFile: ${relativeToApp(siteForbiddenPages[index]!.setupFile!)}`
+                      } }`
                 } },`,
             ),
             "  },",
@@ -930,6 +987,15 @@ export async function generatePagesBarrel(
             errorPage.setupFile === undefined
               ? ""
               : `, setupModule: errorPageSetup, setupSourceFile: ${relativeToApp(errorPage.setupFile)}`
+          } },`,
+        ]),
+    ...(options.sites !== undefined || forbiddenPage === undefined
+      ? []
+      : [
+          `  forbiddenPage: { module: forbiddenPage, sourceFile: ${relativeToApp(forbiddenPage.pageFile)}${
+            forbiddenPage.setupFile === undefined
+              ? ""
+              : `, setupModule: forbiddenPageSetup, setupSourceFile: ${relativeToApp(forbiddenPage.setupFile)}`
           } },`,
         ]),
     "  pages: [",

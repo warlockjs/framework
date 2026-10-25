@@ -28,6 +28,7 @@ import { loadStreamingReactDomServer } from "./load-react-dom-server";
 import { buildHydrationPayload } from "./build-hydration-payload";
 import {
   hydrationErrorPageProps,
+  isForbiddenPageStatus,
   resolveErrorPageMetadata,
   type ErrorPageModule,
   type ErrorPageModuleLoader,
@@ -374,11 +375,25 @@ function requireRegistry(options: RenderPageRequestOptions): RouteRegistry {
  * boundary. Deliberately generic: the error itself is server knowledge and
  * never serialized into the document.
  */
-function FrameworkRootBoundary({ details }: { details?: PageErrorDetails }): ReactNode {
+function FrameworkRootBoundary({
+  details,
+  status,
+  requestId,
+}: {
+  details?: PageErrorDetails;
+  status?: number;
+  requestId?: string;
+}): ReactNode {
+  const forbidden = isForbiddenPageStatus(status);
+
   return createElement(
     "main",
     { role: "alert" },
-    "Something went wrong.",
+    forbidden ? "You don't have access to this page." : "Something went wrong.",
+    requestId === undefined
+      ? null
+      : createElement("p", { "data-warlock-request-id": "" }, `Request ID: ${requestId}`),
+    createElement("p", null, createElement("a", { href: "/" }, "Back to home")),
     // Outside production only: the caller passes `details` solely there.
     devErrorPanelElement(details),
   );
@@ -482,6 +497,7 @@ function buildBoundaryElement(
   triple: Record<PageLevelName, PageTripleModule>,
   bundle: PageDataBundle,
   record: PageErrorRecord,
+  requestId?: string,
 ): ReactNode {
   const { boundary, error } = record;
   const Boundary = triple[boundary.boundaryLevel].ErrorBoundary as
@@ -496,7 +512,11 @@ function buildBoundaryElement(
         createElement(Boundary, { error, status: record.statusCode ?? 500 }),
         devErrorPanelElement(details),
       )
-    : createElement(FrameworkRootBoundary, { details });
+    : createElement(FrameworkRootBoundary, {
+        details,
+        status: record.statusCode,
+        requestId,
+      });
 
   const wrapped = wrapRootward(triple, bundle, boundary.boundaryLevel, element);
 
@@ -1293,6 +1313,8 @@ async function finishRender(
           triple.app,
           createElement(FrameworkRootBoundary, {
             details: developmentDetails(currentError?.debug),
+            status: currentError?.statusCode,
+            requestId: request.id,
           }),
         ),
       }),
@@ -1325,7 +1347,10 @@ async function finishRender(
     // (`PageErrorRecord.statusCode`, canon `b79c4f55`, point 2) and the error
     // page must receive that, not a blanket 500.
     const props: ServerErrorPageProps = { error: thrown, status: currentError?.statusCode ?? 500 };
-    const module = await loadErrorPage();
+    const module = await loadErrorPage(props.status);
+    // No page owns this status (a forbidden-only app failing with a 500): the
+    // framework default renders.
+    if (module === undefined) return undefined;
     registerModules([module as RegisterableModuleNamespace]);
     // Prefer the digest `buildErrorRecord` already logged for THIS error
     // (`console.error("[warlock] page error", digest, ...)`) so the browser's
@@ -1386,7 +1411,7 @@ async function finishRender(
       }
 
       const element = currentError
-        ? buildBoundaryElement(triple, bundle, currentError)
+        ? buildBoundaryElement(triple, bundle, currentError, request.id)
         : buildPageElement(triple, bundle);
 
       body = renderWithContext(element);
@@ -1628,11 +1653,18 @@ export async function renderPageFailure(options: RenderPageFailureOptions): Prom
       }),
     );
   let body: string;
+  let errorPageMissing = loadErrorPage === undefined;
 
   try {
     if (!loadErrorPage) throw new Error("No application error page is configured.");
     const props: ServerErrorPageProps = { error: thrown, status: 500 };
-    const module = await loadErrorPage();
+    const module = await loadErrorPage(props.status);
+
+    if (module === undefined) {
+      errorPageMissing = true;
+      throw new Error("No application error page is configured.");
+    }
+
     bundle.routeTranslations = bindRequestRouteTranslations(
       request,
       options.getRouteTranslations,
@@ -1661,7 +1693,9 @@ export async function renderPageFailure(options: RenderPageFailureOptions): Prom
       }),
     );
   } catch (errorPageThrown) {
-    if (loadErrorPage) reportErrorPageFailure(bundle.route, errorPageThrown, request, thrown);
+    if (!errorPageMissing) {
+      reportErrorPageFailure(bundle.route, errorPageThrown, request, thrown);
+    }
     bundle.errorPage = undefined;
     bundle.routeTranslations = bindRequestRouteTranslations(
       request,
@@ -1678,6 +1712,8 @@ export async function renderPageFailure(options: RenderPageFailureOptions): Prom
       createElement(DefaultApp, {
         children: createElement(FrameworkRootBoundary, {
           details: describeUnrecordedFailure(thrown, bundle.route, request),
+          status: 500,
+          requestId: request.id,
         }),
       }),
     );
