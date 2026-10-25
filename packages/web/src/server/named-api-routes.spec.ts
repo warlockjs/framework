@@ -1,6 +1,11 @@
 import { router } from "@warlock.js/core";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { isUnderPrivatePrefix, resolveNamedApiRoutes } from "./named-api-routes";
+import {
+  isUnderPrivatePrefix,
+  resolveCachedNamedApiRoutes,
+  resolveNamedApiRoutes,
+  stableRouteNames,
+} from "./named-api-routes";
 
 const REGISTERED = [
   { name: "orders.show", path: "/api/orders/:id", method: "GET" as const },
@@ -173,5 +178,57 @@ describe("web.namedApiRoutes", () => {
     expect(names(resolveNamedApiRoutes(ALL, { guest: true }))).not.toContain("account.update");
     expect(names(resolveNamedApiRoutes(ALL, { guest: false }))).toContain("account.update");
     expect(names(resolveNamedApiRoutes(ALL))).toContain("account.update");
+  });
+});
+
+describe("resolveCachedNamedApiRoutes", () => {
+  it("resolves a production page's table once per site and viewer kind", () => {
+    const registry = vi.spyOn(router, "getNamedApiRoutes").mockReturnValue(REGISTERED);
+    const names = stableRouteNames(["orders.show"]);
+
+    const first = resolveCachedNamedApiRoutes(names, { site: "shop" });
+    const second = resolveCachedNamedApiRoutes(names, { site: "shop" });
+
+    expect(second).toBe(first);
+    expect(registry).toHaveBeenCalledTimes(1);
+
+    resolveCachedNamedApiRoutes(names, { site: "shop", guest: true });
+    resolveCachedNamedApiRoutes(names, { site: "blog" });
+
+    expect(registry).toHaveBeenCalledTimes(3);
+  });
+
+  it("starts over when the configuration is replaced", () => {
+    const registry = vi.spyOn(router, "getNamedApiRoutes").mockReturnValue(REGISTERED);
+    const names = stableRouteNames(["orders.show"]);
+
+    resolveCachedNamedApiRoutes(names, { config: ["orders.*"] });
+    resolveCachedNamedApiRoutes(names, { config: ["admin.*"] });
+
+    expect(registry).toHaveBeenCalledTimes(2);
+  });
+
+  it("resolves names that are not marked stable on every call (development)", () => {
+    const registry = vi.spyOn(router, "getNamedApiRoutes").mockReturnValue(REGISTERED);
+    const names = () => ["orders.show"];
+
+    resolveCachedNamedApiRoutes(names, {});
+    resolveCachedNamedApiRoutes(names, {});
+
+    expect(registry).toHaveBeenCalledTimes(2);
+  });
+
+  it("never caches an unreadable registry", () => {
+    const registry = vi.spyOn(router, "getNamedApiRoutes").mockImplementation(() => {
+      throw new Error("not ready");
+    });
+    const names = stableRouteNames(["orders.show"]);
+
+    expect(resolveCachedNamedApiRoutes(names, {})).toBeUndefined();
+    registry.mockReturnValue(REGISTERED);
+
+    expect(resolveCachedNamedApiRoutes(names, {})).toEqual({
+      "orders.show": { path: "/api/orders/:id", method: "GET" },
+    });
   });
 });

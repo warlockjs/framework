@@ -108,6 +108,8 @@ unregister();
 | `page.middleware` | The complete page middleware chain, with `attrs: { count, outcome }`; `outcome` is `next`, `response`, or `error`. |
 | `loader`          | Each loader level, once per app/layout/page, with `attrs: { level, layoutPath? }`.                                 |
 | `page.cache`      | Page-cache lookup or write, with cache outcome attributes.                                                         |
+| `translations`    | Binding the page's translation snapshot, with `attrs: { route, locale, mode }`; `mode` is `scoped` or `global`. A snapshot is built once per page source and locale, so warm requests are close to zero. |
+| `named-api-routes` | Resolving the document's browser route table, with `attrs: { route }`. Production resolves it once per site and viewer kind, so warm requests are close to zero. |
 | `render.shell`    | Time from render start until React's shell is ready to stream.                                                     |
 | `defer.settle`    | Each deferred value settling, with `attrs: { key, status }`; `status` is `fulfilled` or `rejected`.                |
 | `stream.end`      | The whole streamed response, including every `defer()` value settling.                                             |

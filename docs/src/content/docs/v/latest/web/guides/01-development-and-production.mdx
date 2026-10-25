@@ -254,6 +254,56 @@ the largest module contributors in private build metadata. Configure
 [client performance budgets](/v/latest/core/digging-deeper/build-budgets/)
 describes route overrides, deltas and `npx warlock build --json`.
 
+## Client file names and the integrity check
+
+Every file under `client/assets` is served with a one-year immutable cache, so a
+name must always mean the same bytes. After the bundler finishes, the build
+renames each JavaScript chunk after its **final** bytes, that is, after the
+import specifiers inside it point at the final names of the chunks they import:
+
+- A chunk's name changes whenever its bytes or the bytes of anything it imports
+  change, and it stays the same when nothing changed.
+- Chunks that import each other (a cycle) are named together: a change inside the
+  cycle renames every member.
+- Byte-identical chunks are merged into one file and their importers point at it.
+  Entry chunks are never merged.
+- `client/.vite/manifest.json`, the module preload lists inside the chunks and the
+  budget report all use the final names, and the precompressed `.br` and `.gz`
+  siblings are written after the rename.
+
+Each build also writes `client/.vite/warlock-integrity.json`, a digest for every
+file in `client/assets`. The next `warlock build` reads the previous record before it
+starts and fails when a file name it emits maps to different bytes than the
+previous build used for the same name. The error names every such file. Because
+`warlock build` replaces `build.outdir` as a whole, a failed build restores the
+previous output.
+
+To compare with a build that is not in `build.outdir` (for example the release
+currently deployed), point the web build option `previousBuild` at its
+`client/.vite/warlock-integrity.json` or at its output directory:
+
+```ts
+webConnector({ build: { previousBuild: "../releases/current/dist" } });
+```
+
+Delete the record (or drop the option) when you intentionally stop serving the
+previous build's assets.
+
+## What runs per request
+
+In production, the work that depends only on the build is done once:
+
+| Work                                     | When it runs                                                                                                           |
+| ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| Page route names for the browser route table | At build, baked into the page manifest. The table is resolved once per page, site and viewer kind, then reused.     |
+| Per-page translation usage and shared tables | At build. A page's translation snapshot is built on its first request per locale and reused.                       |
+| Sitemap and robots discovery             | At boot (and on the configured refresh or model events). Requests only serve the generated artifacts.                  |
+
+In development the same work reruns once per file change, not per request. The
+`translations` and `named-api-routes` tracing phases (see
+[request tracing](/v/latest/core/digging-deeper/request-tracing/)) show what
+each request spent on it.
+
 ## Browser regression checks
 
 Use the [browser harness](/v/latest/core/testing/browser-e2e/) to start an owned

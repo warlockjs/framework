@@ -70,7 +70,7 @@ import type { DeferSettlement } from "./defer-settlement";
 import { createSettledThenable } from "../loaders/settled-thenable";
 import { bindRequestRouteTranslations } from "./request-route-translations";
 import type { NamedApiRoutesOption } from "../named-api-routes-config";
-import { resolveNamedApiRoutes } from "./named-api-routes";
+import { resolveCachedNamedApiRoutes, type ResolveNamedApiRoutesOptions } from "./named-api-routes";
 import { siteHydrationUrl } from "./hydration-client-url";
 import { consumePageManifest, type PagePayloadBudget } from "./page-manifest";
 import { reportPayloadBudget } from "./payload-budget";
@@ -684,15 +684,40 @@ function reportRenderError(
  */
 function resolveDocumentNamedApiRoutes(
   routeNames: (() => readonly string[]) | undefined,
-  options: Parameters<typeof resolveNamedApiRoutes>[1],
-): ReturnType<typeof resolveNamedApiRoutes> {
+  options: ResolveNamedApiRoutesOptions,
+): ReturnType<typeof resolveCachedNamedApiRoutes> {
   if (options?.config === false) return undefined;
 
   try {
-    return resolveNamedApiRoutes(routeNames?.(), options);
+    return resolveCachedNamedApiRoutes(routeNames, options);
   } catch (thrown) {
     tagErrorPhase(thrown, "named-api-routes");
     throw thrown;
+  }
+}
+
+/**
+ * Times the document's route table as the "named-api-routes" tracing phase. A
+ * production page resolves its table once per site and viewer kind, so after
+ * the first request the phase is close to zero.
+ */
+function tracedNamedApiRoutes<Result>(
+  request: Parameters<typeof buildTracingContext>[0],
+  route: string,
+  resolve: () => Result,
+): Result {
+  if (!isTracingEnabled()) return resolve();
+
+  const startedAt = performance.now();
+
+  try {
+    return resolve();
+  } finally {
+    dispatchPhase(buildTracingContext(request), {
+      name: "named-api-routes",
+      durationMs: performance.now() - startedAt,
+      attrs: { route },
+    });
   }
 }
 
@@ -1218,13 +1243,15 @@ async function finishRender(
     hydrationClientModulePreloadUrls: streamOptions.hydrationClientModulePreloadUrls,
     localeAlternates: hasExplicitAlternates ? undefined : localeAlternates,
     localeRouting,
-    namedApiRoutes: resolveDocumentNamedApiRoutes(streamOptions.clientApiRouteNames, {
-      config: namedApiRoutesConfig,
-      site: request.site?.key,
-      // Guest only when a session resolver ran and found no user. Without
-      // `web.session` the viewer is unknown, so guarded routes stay.
-      guest: (bundle as Bundle).session !== undefined && (bundle as Bundle).session?.user == null,
-    }),
+    namedApiRoutes: tracedNamedApiRoutes(request, bundle.route.name, () =>
+      resolveDocumentNamedApiRoutes(streamOptions.clientApiRouteNames, {
+        config: namedApiRoutesConfig,
+        site: request.site?.key,
+        // Guest only when a session resolver ran and found no user. Without
+        // `web.session` the viewer is unknown, so guarded routes stay.
+        guest: (bundle as Bundle).session !== undefined && (bundle as Bundle).session?.user == null,
+      }),
+    ),
   };
 
   // Resolve document slots before either wire representation is serialized.

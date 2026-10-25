@@ -125,3 +125,64 @@ export function resolveNamedApiRoutes(
 
   return Object.freeze(result);
 }
+
+const STABLE_ROUTE_NAMES = Symbol.for("warlock.web.stable-route-names");
+
+/** A page's route-name function whose answer never changes while the process runs. */
+export type RouteNamesFunction = (() => readonly string[]) & {
+  readonly [STABLE_ROUTE_NAMES]?: true;
+};
+
+/**
+ * Marks a page's route names as fixed for the life of the process, which is
+ * what a production page's names are: the build baked them into the manifest.
+ * {@link resolveCachedNamedApiRoutes} then computes the page's table once per
+ * viewer kind (site and guest) instead of walking the registry per request.
+ * Development never marks its names: the live registry and the files they come
+ * from change under it.
+ */
+export function stableRouteNames(names: readonly string[]): RouteNamesFunction {
+  return Object.assign(() => names, { [STABLE_ROUTE_NAMES]: true as const });
+}
+
+type CachedTables = {
+  readonly config: unknown;
+  readonly tables: Map<string, NamedApiRouteMetadata>;
+};
+
+const cachedTables = new WeakMap<object, CachedTables>();
+
+/**
+ * {@link resolveNamedApiRoutes} for one document. Names marked with
+ * {@link stableRouteNames} are resolved once per site and viewer kind and the
+ * frozen table is reused; any other names are resolved on every call. A
+ * `web.namedApiRoutes` filter function is therefore called once per route, site
+ * and viewer kind, not once per request, and a replaced configuration starts
+ * the cache over. An unreadable registry is never cached.
+ */
+export function resolveCachedNamedApiRoutes(
+  routeNames: RouteNamesFunction | undefined,
+  options: ResolveNamedApiRoutesOptions,
+): NamedApiRouteMetadata | undefined {
+  if (routeNames === undefined || routeNames[STABLE_ROUTE_NAMES] !== true) {
+    return resolveNamedApiRoutes(routeNames?.(), options);
+  }
+
+  let entry = cachedTables.get(routeNames);
+
+  if (entry === undefined || entry.config !== options.config) {
+    entry = { config: options.config, tables: new Map() };
+    cachedTables.set(routeNames, entry);
+  }
+
+  const key = `${options.site ?? ""}\u0000${options.guest === true ? "guest" : "viewer"}`;
+  const cached = entry.tables.get(key);
+
+  if (cached !== undefined) return cached;
+
+  const table = resolveNamedApiRoutes(routeNames(), options);
+
+  if (table !== undefined) entry.tables.set(key, table);
+
+  return table;
+}

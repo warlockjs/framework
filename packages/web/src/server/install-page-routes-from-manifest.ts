@@ -51,6 +51,7 @@ import { composeLayoutModules } from "./compose-layout-modules";
 import { composePageModule } from "./compose-page-module";
 import { createPageModuleLoader } from "./create-page-module-loader";
 import { resolveLocaleRouting } from "./locale-routing/resolve-locale-routing";
+import { stableRouteNames } from "./named-api-routes";
 import { resolvePayloadBudget } from "./payload-budget";
 import {
   localeActionRegistrations,
@@ -579,7 +580,7 @@ export function installPageRoutesFromManifest(
                 ? []
                 : productionStylesheetUrls(clientDir, [app.sourceFile, notFoundPage.sourceFile]),
             resolveRequestStylesheetUrls,
-            clientApiRouteNames: () => notFoundPage.apiRouteNames ?? [],
+            clientApiRouteNames: stableRouteNames(notFoundPage.apiRouteNames ?? []),
             payloadBudget,
           }),
         );
@@ -671,7 +672,7 @@ export function installPageRoutesFromManifest(
       getRouteTranslations,
       stylesheetUrls,
       resolveRequestStylesheetUrls,
-      clientApiRouteNames: () => page.apiRouteNames ?? [],
+      clientApiRouteNames: stableRouteNames(page.apiRouteNames ?? []),
       payloadBudget,
       cache,
       renderNotFound,

@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { buildHydrationPayload } from "./build-hydration-payload";
+import { installGlobalTranslationDelivery } from "./global-translations";
 import { PageDataSerializationError } from "./page-data-serialization-error";
 import type { PageDataBundle } from "./execute-page-request";
 
@@ -215,5 +216,33 @@ describe("buildHydrationPayload — actionData and session", () => {
     expect(() => buildHydrationPayload(bundleOf(), "en", { session })).toThrow(
       /web\.session's resolver.*products\.details.*\.service/,
     );
+  });
+});
+
+describe("buildHydrationPayload — global translation delivery", () => {
+  afterEach(() => installGlobalTranslationDelivery(undefined));
+
+  it("prunes the registry once per request, however many payloads the render builds", () => {
+    const deliver = vi.fn(() => ({ keywords: { products: { title: "Products" } }, assets: undefined }));
+    installGlobalTranslationDelivery({ sharedGroups: ["app"], deliver });
+    const bundle = bundleOf();
+
+    const first = buildHydrationPayload(bundle, "en");
+    const second = buildHydrationPayload(bundle, "en");
+
+    expect(deliver).toHaveBeenCalledTimes(1);
+    expect(second.translations).toBe(first.translations);
+  });
+
+  it("delivers again for another request or another locale", () => {
+    const deliver = vi.fn(() => ({ keywords: {}, assets: undefined }));
+    installGlobalTranslationDelivery({ sharedGroups: ["app"], deliver });
+    const bundle = bundleOf();
+
+    buildHydrationPayload(bundle, "en");
+    buildHydrationPayload(bundle, "ar");
+    buildHydrationPayload(bundleOf(), "en");
+
+    expect(deliver).toHaveBeenCalledTimes(3);
   });
 });

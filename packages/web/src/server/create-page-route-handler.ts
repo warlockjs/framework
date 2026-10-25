@@ -461,8 +461,27 @@ export function createPageRouteHandler(options: PageRouteHandlerOptions): PageRo
     // The resolver is request-local and never mutates @mongez/localization's registry.
     let routeTranslations: ReturnType<typeof bindRequestRouteTranslations>;
 
+    // "translations" tracing phase: binding the page's translation snapshot. A
+    // snapshot is built once per page source and locale, so a warm request
+    // reads it from a map and the phase is close to zero; a large first
+    // duration means the page paid for building its table.
+    const translationsTracing = isTracingEnabled();
+    const translationsStartedAt = translationsTracing ? performance.now() : 0;
+
     try {
       routeTranslations = bindRequestRouteTranslations(request, getRouteTranslations, pageFile);
+
+      if (translationsTracing) {
+        dispatchPhase(buildTracingContext(request), {
+          name: "translations",
+          durationMs: performance.now() - translationsStartedAt,
+          attrs: {
+            route: name,
+            locale: request.locale,
+            mode: getRouteTranslations === undefined ? "global" : "scoped",
+          },
+        });
+      }
     } catch (thrown) {
       tagErrorPhase(thrown, "translations");
       reportServerError(`page request ${request.method} ${request.path} failed`, thrown, {
