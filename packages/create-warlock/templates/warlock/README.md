@@ -108,6 +108,7 @@ pages served by the same process as the API:
 - `src/web/root.tsx` — the HTML document every page renders inside
 - `src/web/home/index.page.tsx` — the UI at `/`; `index.setup.ts` owns its config (including `config.metadata`), loader, and registration
 - `src/web/404.page.tsx` — the not-found UI; `404.setup.ts` owns its `config.metadata`
+- `src/web/forbidden.page.tsx` — the UI for a 401/403 on a page route (`requireUser()`), never raw JSON; `forbidden.setup.ts` owns its `config.metadata`
 - `src/web/root.setup.ts` — document policy, paired with the `root.tsx` component
 - `*.page.tsx` files under `src/web` are pages; the folder path is the URL
 

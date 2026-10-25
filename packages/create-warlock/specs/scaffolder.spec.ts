@@ -441,6 +441,8 @@ describe("App template emission", () => {
     expect(existsSync(path.join(appPath, "src/web/home/index.page.tsx"))).toBe(true);
     expect(existsSync(path.join(appPath, "src/web/home/index.setup.ts"))).toBe(true);
     expect(existsSync(path.join(appPath, "src/web/404.setup.ts"))).toBe(true);
+    expect(existsSync(path.join(appPath, "src/web/forbidden.page.tsx"))).toBe(true);
+    expect(existsSync(path.join(appPath, "src/web/forbidden.setup.ts"))).toBe(true);
     expect(existsSync(path.join(appPath, "src/web/home/register.ts"))).toBe(false);
     expect(existsSync(path.join(appPath, "src/web/home/styles/home.css"))).toBe(true);
     expect(existsSync(path.join(appPath, "src/app/contact/routes.ts"))).toBe(true);
@@ -468,6 +470,7 @@ describe("App template emission", () => {
     expect(rootSetup).toContain("strictMode: true");
     expect(appCss).toContain('@import "./home/styles/home.css"');
     expect(appCss).toContain('@import "./404.css"');
+    expect(appCss).toContain('@import "./forbidden.css"');
     expect(page).not.toContain('import "./styles/home.css"');
     expect(page).toContain('import type { loader } from "./index.setup"');
     expect(page).not.toContain("getHomeService");

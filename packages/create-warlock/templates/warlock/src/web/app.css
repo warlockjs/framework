@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "./home/styles/home.css";
 @import "./404.css";
+@import "./forbidden.css";
 
 /* Page-level styles live with their pages; this root owns only Tailwind's base layer. */
