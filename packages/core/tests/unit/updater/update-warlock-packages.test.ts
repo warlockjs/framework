@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const fileExistsAsync = vi.fn(async () => true);
+// Only package.json exists; a package-lock.json would be pruned and rewritten by the install step.
+const onlyPackageJson = async (file?: unknown) => !String(file).endsWith("package-lock.json");
+const fileExistsAsync = vi.fn(onlyPackageJson);
 const getJsonFileAsync = vi.fn();
 const putJsonFileAsync = vi.fn(async () => undefined);
 const fetchLatestVersion = vi.fn();
@@ -72,7 +74,7 @@ describe("updateWarlockPackages", () => {
     vi.clearAllMocks();
     vi.spyOn(console, "log").mockImplementation(() => {});
 
-    fileExistsAsync.mockResolvedValue(true);
+    fileExistsAsync.mockImplementation(onlyPackageJson);
     getJsonFileAsync.mockResolvedValue(packageJson());
   });
 

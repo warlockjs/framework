@@ -353,8 +353,8 @@ When a unit needs config values, call
 once per module graph, without hooks, connectors, native loader or fakes.
 Most unit specs need no setup call.
 
-Integration setup boots the framework once per Vitest worker (`tests.lifetime:
-"worker"`): the generated `src/config/tests.ts` also turns on `resetDatabase` (truncates
+Integration setup boots the framework once per Vitest worker (`lifetime: "worker"`
+in `tests`): the generated `src/config/tests.ts` also turns on `resetDatabase` (truncates
 every table or collection before each file, keeping the migrations ledger), the
 integration project has `pool: "forks", isolate: false` with the generated runner, and
 `src/config/database.ts` gives each worker its own database
