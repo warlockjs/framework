@@ -89,9 +89,9 @@ describe("changeClaimedWithoutToolCall()", () => {
         )
       ).passed,
     ).toBe(false);
-    expect(
-      (await scorer(context("x", "I updated your plan.", [{ name: "search" }]))).passed,
-    ).toBe(false);
+    expect((await scorer(context("x", "I updated your plan.", [{ name: "search" }]))).passed).toBe(
+      false,
+    );
   });
 
   it("passes when nothing is claimed", async () => {

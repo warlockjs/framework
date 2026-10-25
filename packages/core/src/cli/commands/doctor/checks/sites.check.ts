@@ -179,7 +179,11 @@ export async function renderSiteRoot(
       target,
       status: response.statusCode,
       ...(response.statusCode >= 500 && {
-        failure: describeFailure(response.statusCode, response.body, response.headers["content-type"]),
+        failure: describeFailure(
+          response.statusCode,
+          response.body,
+          response.headers["content-type"],
+        ),
       }),
     };
   } catch (error) {
@@ -268,9 +272,7 @@ export const sitesCheck: DoctorCheck = {
       .map((outcome) => `${outcome.target.site} ${outcome.status}`)
       .join(", ");
     const skipped =
-      dynamic.length > 0
-        ? `; not rendered (host resolved at runtime): ${dynamic.join(", ")}`
-        : "";
+      dynamic.length > 0 ? `; not rendered (host resolved at runtime): ${dynamic.join(", ")}` : "";
 
     return {
       name: "sites",

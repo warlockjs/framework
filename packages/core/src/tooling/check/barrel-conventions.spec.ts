@@ -3,7 +3,8 @@ import { barrelFindings } from "./barrel-conventions";
 import { checkFileConventions } from "./conventions-step";
 import * as ast from "../syntax/ast";
 
-const BARREL = 'export * from "./create-user.service";\nexport { updateUser } from "./update-user.service";\n';
+const BARREL =
+  'export * from "./create-user.service";\nexport { updateUser } from "./update-user.service";\n';
 
 function findings(file: string, source: string) {
   return barrelFindings(ast.parseSourceFile(file, source));

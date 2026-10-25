@@ -23,16 +23,16 @@ registerTracingHooks({
 
 ## Page-specific phases
 
-| Phase             | Attributes                   | Meaning                                            |
-| ----------------- | ---------------------------- | -------------------------------------------------- |
-| `page.middleware` | `count`, `outcome` (`next`   | `response`                                         | `error`)                           | All page middleware settling |
-| `page.cache`      | `status` (`hit`              | `miss`                                             | `bypass`)                          | Page-cache lookup settling   |
-| `loader`          | `level`, `layoutPath?`       | An app, layout, or page loader                     |
-| `translations`    | `route`, `locale`, `mode`    | Binding the page's translation snapshot (built once per page source and locale, so warm requests are near zero) |
-| `named-api-routes` | `route`                     | Resolving the document's browser route table (once per site and viewer kind in production) |
-| `render.shell`    | —                            | Rendering until React's shell is ready to stream   |
-| `stream.end`      | —                            | Whole streamed response, including deferred values |
-| `defer.settle`    | `key`, `status` (`fulfilled` | `rejected`)                                        | One deferred loader value settling |
+| Phase              | Attributes                   | Meaning                                                                                                         |
+| ------------------ | ---------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `page.middleware`  | `count`, `outcome` (`next`   | `response`                                                                                                      | `error`)                           | All page middleware settling |
+| `page.cache`       | `status` (`hit`              | `miss`                                                                                                          | `bypass`)                          | Page-cache lookup settling   |
+| `loader`           | `level`, `layoutPath?`       | An app, layout, or page loader                                                                                  |
+| `translations`     | `route`, `locale`, `mode`    | Binding the page's translation snapshot (built once per page source and locale, so warm requests are near zero) |
+| `named-api-routes` | `route`                      | Resolving the document's browser route table (once per site and viewer kind in production)                      |
+| `render.shell`     | —                            | Rendering until React's shell is ready to stream                                                                |
+| `stream.end`       | —                            | Whole streamed response, including deferred values                                                              |
+| `defer.settle`     | `key`, `status` (`fulfilled` | `rejected`)                                                                                                     | One deferred loader value settling |
 
 Every phase has `name`, `durationMs`, and `startedAt` (epoch milliseconds).
 Use `key` only to identify a deferred value; do not put sensitive loader data

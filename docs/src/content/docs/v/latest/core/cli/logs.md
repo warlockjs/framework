@@ -21,13 +21,13 @@ Run it from the project root: it reads `storage/logs/requests` under the current
 
 Lists persisted requests, newest first: time, status, method, duration, URL, id, and the error message when there is one.
 
-| Flag          | Type    | Description                                                                             |
-| ------------- | ------- | --------------------------------------------------------------------------------------- |
-| `--status`    | string  | One status (`404`) or a class (`5xx`).                                                  |
-| `--route`     | string  | Routes whose name or pattern contains this text (`posts.list`, `/users`).               |
-| `--since`     | string  | A duration back from now (`30m`, `1h`, `2d`, `1w`) or an ISO date.                      |
-| `--limit, -n` | string  | How many rows. Default 50.                                                              |
-| `--json, -j`  | boolean | Print the rows as JSON.                                                                 |
+| Flag          | Type    | Description                                                               |
+| ------------- | ------- | ------------------------------------------------------------------------- |
+| `--status`    | string  | One status (`404`) or a class (`5xx`).                                    |
+| `--route`     | string  | Routes whose name or pattern contains this text (`posts.list`, `/users`). |
+| `--since`     | string  | A duration back from now (`30m`, `1h`, `2d`, `1w`) or an ISO date.        |
+| `--limit, -n` | string  | How many rows. Default 50.                                                |
+| `--json, -j`  | boolean | Print the rows as JSON.                                                   |
 
 ## `warlock logs request <id>`
 

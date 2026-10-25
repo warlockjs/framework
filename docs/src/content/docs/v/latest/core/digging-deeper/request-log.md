@@ -41,16 +41,16 @@ export default {
 
 The value is read once and cached for the process, like `http.tracing`. A disabled app pays one boolean check per request and allocates nothing.
 
-| Option         | Default                                       | Meaning                                                                                              |
-| -------------- | --------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| `enabled`      | `true` in development, `false` otherwise      | Turn the log on.                                                                                     |
-| `channels`     | a daily JSON-lines file (see below)           | Logger channel names, or channel instances, that receive each record.                                |
-| `only`         | `"all"` in development, `"errors"` otherwise  | `"all"`, `"errors"` (`5xx` or threw), or `"slow"` (at least `slowMs`).                               |
-| `slowMs`       | `1000`                                        | The threshold of `only: "slow"`.                                                                     |
-| `sampleRate`   | `1`                                           | Share of requests kept, 0 to 1. Errors are always kept when `only` includes them (`all`, `errors`).  |
-| `include`      | everything; see below                         | Which parts of a request are recorded.                                                               |
-| `maxBodyBytes` | `16384`                                       | Cap on each recorded body. A larger one is cut and ends with `…[truncated, N bytes]`.                |
-| `retention`    | `{ maxDays: 14, maxSizeMb: 256 }`             | Pruning of the default file channel.                                                                 |
+| Option         | Default                                      | Meaning                                                                                             |
+| -------------- | -------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `enabled`      | `true` in development, `false` otherwise     | Turn the log on.                                                                                    |
+| `channels`     | a daily JSON-lines file (see below)          | Logger channel names, or channel instances, that receive each record.                               |
+| `only`         | `"all"` in development, `"errors"` otherwise | `"all"`, `"errors"` (`5xx` or threw), or `"slow"` (at least `slowMs`).                              |
+| `slowMs`       | `1000`                                       | The threshold of `only: "slow"`.                                                                    |
+| `sampleRate`   | `1`                                          | Share of requests kept, 0 to 1. Errors are always kept when `only` includes them (`all`, `errors`). |
+| `include`      | everything; see below                        | Which parts of a request are recorded.                                                              |
+| `maxBodyBytes` | `16384`                                      | Cap on each recorded body. A larger one is cut and ends with `…[truncated, N bytes]`.               |
+| `retention`    | `{ maxDays: 14, maxSizeMb: 256 }`            | Pruning of the default file channel.                                                                |
 
 `include` takes `headers`, `body`, `query`, `params`, `session`, `response`, `stack`, `logs`, `queries` and `phases`, each a boolean. Everything is on in development. Outside development `body` and `response` (the response body and headers) default to `false`, and request headers pass an allowlist (`accept`, `content-type`, `user-agent`, `host`, `origin`, `referer`, `x-request-id`, `x-forwarded-*`, `traceparent`, `accept-language`, `accept-encoding`, `content-length`), so cookies and credentials are never written, whatever their names.
 
@@ -75,11 +75,37 @@ One JSON object per request. Fields that are off, empty or unknown are left out.
   "ip": "203.0.113.7",
   "status": 500,
   "durationMs": 84.2,
-  "response": { "size": 41, "headers": { "content-type": "application/json" }, "body": { "error": "…" } },
-  "phases": [{ "name": "validation", "durationMs": 1.1 }, { "name": "handler", "durationMs": 80.3 }],
-  "logs": [{ "level": "error", "module": "http", "action": "request-error", "message": "db down", "at": 1792843200123 }],
-  "queries": { "count": 9, "slowest": { "durationMs": 31, "query": "select * from posts where id = ?" }, "nPlusOne": [{ "query": "select * from users where id = ?", "count": 8 }] },
-  "error": { "message": "db down", "name": "Error", "stack": "Error: db down\n    at …", "phase": "loader", "file": "src/app/posts/post.page.tsx", "site": "main" }
+  "response": {
+    "size": 41,
+    "headers": { "content-type": "application/json" },
+    "body": { "error": "…" }
+  },
+  "phases": [
+    { "name": "validation", "durationMs": 1.1 },
+    { "name": "handler", "durationMs": 80.3 }
+  ],
+  "logs": [
+    {
+      "level": "error",
+      "module": "http",
+      "action": "request-error",
+      "message": "db down",
+      "at": 1792843200123
+    }
+  ],
+  "queries": {
+    "count": 9,
+    "slowest": { "durationMs": 31, "query": "select * from posts where id = ?" },
+    "nPlusOne": [{ "query": "select * from users where id = ?", "count": 8 }]
+  },
+  "error": {
+    "message": "db down",
+    "name": "Error",
+    "stack": "Error: db down\n    at …",
+    "phase": "loader",
+    "file": "src/app/posts/post.page.tsx",
+    "site": "main"
+  }
 }
 ```
 

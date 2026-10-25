@@ -293,11 +293,11 @@ previous build's assets.
 
 In production, the work that depends only on the build is done once:
 
-| Work                                     | When it runs                                                                                                           |
-| ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| Page route names for the browser route table | At build, baked into the page manifest. The table is resolved once per page, site and viewer kind, then reused.     |
-| Per-page translation usage and shared tables | At build. A page's translation snapshot is built on its first request per locale and reused.                       |
-| Sitemap and robots discovery             | At boot (and on the configured refresh or model events). Requests only serve the generated artifacts.                  |
+| Work                                         | When it runs                                                                                                    |
+| -------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| Page route names for the browser route table | At build, baked into the page manifest. The table is resolved once per page, site and viewer kind, then reused. |
+| Per-page translation usage and shared tables | At build. A page's translation snapshot is built on its first request per locale and reused.                    |
+| Sitemap and robots discovery                 | At boot (and on the configured refresh or model events). Requests only serve the generated artifacts.           |
 
 In development the same work reruns once per file change, not per request. The
 `translations` and `named-api-routes` tracing phases (see

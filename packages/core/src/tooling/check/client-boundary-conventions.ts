@@ -10,7 +10,8 @@ const RESOLVE_EXTENSIONS = ["", ".ts", ".tsx", ".js", ".jsx", "/index.ts", "/ind
 
 const TEST_FILE = /\.(?:test|spec)\.[cm]?[jt]sx?$/i;
 
-const SERVER_ONLY_SUFFIX = /\.(?:controller|service|repository|model|connector|server)\.[cm]?[jt]sx?$/;
+const SERVER_ONLY_SUFFIX =
+  /\.(?:controller|service|repository|model|connector|server)\.[cm]?[jt]sx?$/;
 
 /** `*.client.ts(x)` or anything under a `.client/` directory. */
 export function isClientModule(relativePath: string): boolean {

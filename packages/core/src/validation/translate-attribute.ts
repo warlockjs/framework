@@ -23,9 +23,7 @@ export type TranslateSealAttributeOptions = {
 function isFieldName(attribute: string, key: string | undefined, allValues: unknown): boolean {
   if (attribute === key) return true;
 
-  return (
-    typeof allValues === "object" && allValues !== null && Object.hasOwn(allValues, attribute)
-  );
+  return typeof allValues === "object" && allValues !== null && Object.hasOwn(allValues, attribute);
 }
 
 /**

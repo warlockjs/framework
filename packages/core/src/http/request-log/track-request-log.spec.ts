@@ -17,7 +17,11 @@ import {
   resetRequestLogScopesForTests,
 } from "./request-log-scope";
 import { isRequestLogEnabled, resetRequestLogConfigForTests } from "./resolve-request-log-config";
-import { finishRequestLog, resetRequestLogWriterForTests, trackRequestLog } from "./track-request-log";
+import {
+  finishRequestLog,
+  resetRequestLogWriterForTests,
+  trackRequestLog,
+} from "./track-request-log";
 import type { RequestLogRecord } from "./request-log.types";
 
 class CaptureChannel extends LogChannel {
@@ -84,9 +88,21 @@ describe("finishRequestLog", () => {
   it("writes one redacted record to the configured channels", () => {
     useConfig({ enabled: true, only: "all", channels: [capture], include: { body: true } });
     beginRequestLogScope("r1");
-    recordRequestLogEntry("r1", { level: "info", module: "app", action: "x", message: "hello", at: 1 });
+    recordRequestLogEntry("r1", {
+      level: "info",
+      module: "app",
+      action: "x",
+      message: "hello",
+      at: 1,
+    });
 
-    finishRequestLog(fakeRequest(), { statusCode: 201 }, endRequestLogScope("r1"), Date.UTC(2026, 0, 1), 12);
+    finishRequestLog(
+      fakeRequest(),
+      { statusCode: 201 },
+      endRequestLogScope("r1"),
+      Date.UTC(2026, 0, 1),
+      12,
+    );
 
     expect(capture.records).toHaveLength(1);
     expect(capture.entries[0]).toMatchObject({ module: "http", action: "request", type: "info" });
@@ -232,8 +248,20 @@ describe("the log collector", () => {
     expect(collector.passive).toBe(true);
 
     beginRequestLogScope("r1");
-    collector.log({ type: "info", module: "app", action: "a", message: "mine", context: { requestId: "r1" } });
-    collector.log({ type: "info", module: "app", action: "a", message: "other", context: { requestId: "r2" } });
+    collector.log({
+      type: "info",
+      module: "app",
+      action: "a",
+      message: "mine",
+      context: { requestId: "r1" },
+    });
+    collector.log({
+      type: "info",
+      module: "app",
+      action: "a",
+      message: "other",
+      context: { requestId: "r2" },
+    });
     collector.log({
       type: "error",
       module: "http",
@@ -252,7 +280,13 @@ describe("the log collector", () => {
     const collector = new RequestLogCollectorChannel(false);
 
     beginRequestLogScope("r1");
-    collector.log({ type: "error", module: "a", action: "b", message: new Error("x"), context: { requestId: "r1" } });
+    collector.log({
+      type: "error",
+      module: "a",
+      action: "b",
+      message: new Error("x"),
+      context: { requestId: "r1" },
+    });
 
     const scope = endRequestLogScope("r1");
 

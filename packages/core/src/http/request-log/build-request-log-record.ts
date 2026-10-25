@@ -117,10 +117,14 @@ export function buildRequestLogRecord(
     draft.params = sanitizeRequestLogValue(input.params) as Record<string, unknown>;
   }
 
-  if (snapshot.query) draft.query = sanitizeRequestLogValue(snapshot.query) as Record<string, unknown>;
+  if (snapshot.query)
+    draft.query = sanitizeRequestLogValue(snapshot.query) as Record<string, unknown>;
 
   if (include.headers && input.headers) {
-    const headers = pickHeaders(input.headers, config.strictHeaders ? REQUEST_HEADER_SET : undefined);
+    const headers = pickHeaders(
+      input.headers,
+      config.strictHeaders ? REQUEST_HEADER_SET : undefined,
+    );
 
     if (Object.keys(headers).length > 0) draft.headers = headers;
   }

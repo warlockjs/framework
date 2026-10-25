@@ -41,7 +41,9 @@ describe("capabilities", () => {
   it("names the capabilities that are provided in the error", () => {
     provideCapability(defineCapability<string>("a.one"), "x");
 
-    expect(() => useCapability(defineCapability<string>("a.two"))).toThrow(/Provided capabilities: a\.one/);
+    expect(() => useCapability(defineCapability<string>("a.two"))).toThrow(
+      /Provided capabilities: a\.one/,
+    );
   });
 
   it("replaces the implementation when provided again", () => {

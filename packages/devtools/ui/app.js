@@ -577,16 +577,16 @@ function agentTurn(turn, trace) {
 function agentRequestDiff(trace, previous) {
   if (!previous) return empty("No earlier run of this agent to compare with.");
   const tools = (item) =>
-    new Map(item.turns.flatMap((turn) => turn.toolsOffered).map((tool) => [tool.name, tool.schemaHash]));
+    new Map(
+      item.turns.flatMap((turn) => turn.toolsOffered).map((tool) => [tool.name, tool.schemaHash]),
+    );
   const now = tools(trace);
   const before = tools(previous);
   const changed = [...now].filter(([name, hash]) => before.has(name) && before.get(name) !== hash);
   const added = [...now.keys()].filter((name) => !before.has(name));
   const removed = [...before.keys()].filter((name) => !now.has(name));
-  const prompt =
-    trace.systemPrompt?.hash === previous.systemPrompt?.hash ? "same" : "changed";
-  const identical =
-    prompt === "same" && !changed.length && !added.length && !removed.length;
+  const prompt = trace.systemPrompt?.hash === previous.systemPrompt?.hash ? "same" : "changed";
+  const identical = prompt === "same" && !changed.length && !added.length && !removed.length;
   return el("p", {
     class: "meta",
     text: identical
@@ -626,7 +626,9 @@ async function agentsView() {
     return section;
   }
   if (!data.runs.length) {
-    section.append(empty("No agent runs yet. Execute an agent in development; runs appear as turns finish."));
+    section.append(
+      empty("No agent runs yet. Execute an agent in development; runs appear as turns finish."),
+    );
     return section;
   }
   const list = el("div", { class: "panel list" });
@@ -661,7 +663,9 @@ async function agentsView() {
         detail.append(
           el("details", { class: "ai-span" }, [
             el("summary", { text: `System prompt ${trace.systemPrompt.hash}` }),
-            el("pre", { text: trace.systemPrompt.text ?? "Text not kept (only the hash is recorded)." }),
+            el("pre", {
+              text: trace.systemPrompt.text ?? "Text not kept (only the hash is recorded).",
+            }),
           ]),
         );
       }
@@ -994,18 +998,18 @@ async function render() {
         : state.tab === "agents"
           ? await agentsView()
           : state.tab === "requests"
-          ? await requestsView()
-          : state.tab === "queries"
-            ? queriesView()
-            : state.tab === "mail"
-              ? await mailView()
-              : state.tab === "logs"
-                ? await logsView()
-                : state.tab === "routes"
-                  ? await routesView()
-                  : state.tab === "processes"
-                    ? await processesView()
-                    : apiView();
+            ? await requestsView()
+            : state.tab === "queries"
+              ? queriesView()
+              : state.tab === "mail"
+                ? await mailView()
+                : state.tab === "logs"
+                  ? await logsView()
+                  : state.tab === "routes"
+                    ? await routesView()
+                    : state.tab === "processes"
+                      ? await processesView()
+                      : apiView();
     if (version === renderVersion) app.replaceChildren(view);
   } catch (error) {
     if (version === renderVersion) app.replaceChildren(errorView(error));

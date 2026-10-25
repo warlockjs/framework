@@ -160,7 +160,7 @@ describe("dev warning for a column read as a property", () => {
     expect((article as unknown as Record<string, unknown>).headline).toBeUndefined();
 
     expect(warn).toHaveBeenCalledTimes(1);
-    expect(warn.mock.calls[0]?.[0]).toContain('Article.headline');
+    expect(warn.mock.calls[0]?.[0]).toContain("Article.headline");
     expect(warn.mock.calls[0]?.[0]).toContain('model.get("headline")');
   });
 

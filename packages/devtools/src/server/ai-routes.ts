@@ -37,7 +37,9 @@ export function registerAiRoutes(server: FastifyInstance, deps: MountDevtoolsRou
       return {
         available: true,
         runs: source.list(
-          request.query.requestId === undefined ? undefined : { requestId: request.query.requestId },
+          request.query.requestId === undefined
+            ? undefined
+            : { requestId: request.query.requestId },
         ),
       };
     },

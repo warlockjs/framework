@@ -105,11 +105,14 @@ export function formatAgentTrace(trace: AgentTrace): string {
       );
       if (call.refusal) lines.push(`      refused: ${call.refusal}`);
       else if (call.error) lines.push(`      error: ${call.error.message}`);
-      else if (call.output !== undefined) lines.push(`      result: ${JSON.stringify(call.output)}`);
+      else if (call.output !== undefined)
+        lines.push(`      result: ${JSON.stringify(call.output)}`);
     }
 
     for (const event of turn.contract) {
-      lines.push(`    contract ${event.type}${"tool" in event ? ` ${event.tool}` : ""}${"name" in event ? ` ${event.name}` : ""}`);
+      lines.push(
+        `    contract ${event.type}${"tool" in event ? ` ${event.tool}` : ""}${"name" in event ? ` ${event.name}` : ""}`,
+      );
     }
 
     if (turn.error) lines.push(`    error: ${turn.error.message}`);

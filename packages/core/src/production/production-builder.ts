@@ -572,7 +572,8 @@ bootstrap();
     const content = files
       .map((file, index) => {
         if (!file.endsWith(".json")) return `import "${file}";`;
-        const moduleFolder = moduleOfLocaleJson(file.replace(/^(?:\.\.\/)+/, "")) ?? file.split("/").at(-3)!;
+        const moduleFolder =
+          moduleOfLocaleJson(file.replace(/^(?:\.\.\/)+/, "")) ?? file.split("/").at(-3)!;
         return [
           `import dictionary${index} from "${file}";`,
           'import { registerLocaleDictionary } from "@warlock.js/core";',

@@ -19,6 +19,46 @@ export default function Page() {
 `;
 
 /**
+ * Link the dependencies the framework sources import into `directory/node_modules`.
+ * The web package's alone are not enough: the HTTP test server loads
+ * `warlock.config.ts` from the core source, which imports core's own dependencies.
+ * The web package's entries win, then core's, then every other package's.
+ */
+async function linkWorkspaceDependencies(directory: string): Promise<void> {
+  const target = join(directory, "node_modules");
+  const owners = ["web", "core", ...(await readdir(join(workspace, "packages")))];
+
+  await mkdir(target, { recursive: true });
+
+  const link = async (from: string, to: string) => {
+    await symlink(from, to, "dir").catch((error: NodeJS.ErrnoException) => {
+      if (error.code !== "EEXIST") throw error;
+    });
+  };
+
+  for (const owner of owners) {
+    const modules = join(workspace, "packages", owner, "node_modules");
+    const entries = await readdir(modules).catch(() => [] as string[]);
+
+    for (const entry of entries) {
+      if (entry === ".bin" || entry.startsWith(".")) continue;
+
+      if (!entry.startsWith("@")) {
+        await link(join(modules, entry), join(target, entry));
+
+        continue;
+      }
+
+      await mkdir(join(target, entry), { recursive: true });
+
+      for (const child of await readdir(join(modules, entry))) {
+        await link(join(modules, entry, child), join(target, entry, child));
+      }
+    }
+  }
+}
+
+/**
  * Write a two-site Warlock Web app (`landing` and `client`), each with a root
  * page that references the named route `ping.show`, into `directory`.
  *
@@ -48,11 +88,7 @@ export async function writeTwoSiteApp(directory: string): Promise<void> {
   });
   paths["@warlock.js/web/connector"] = [join(workspace, "packages/web/src/connector/index.ts")];
 
-  await symlink(
-    join(workspace, "packages/web/node_modules"),
-    join(directory, "node_modules"),
-    "dir",
-  );
+  await linkWorkspaceDependencies(directory);
 
   const write = async (file: string, content: string) => {
     await mkdir(dirname(join(directory, file)), { recursive: true });
@@ -90,7 +126,9 @@ export default defineConfig({devServer:{generateTypings:false,healthCheckers:fal
   await write(
     "src/config/web.ts",
     `export default {sites:${JSON.stringify(
-      Object.fromEntries(Object.entries(SITE_HOSTS).map(([site, host]) => [site, { hosts: [host] }])),
+      Object.fromEntries(
+        Object.entries(SITE_HOSTS).map(([site, host]) => [site, { hosts: [host] }]),
+      ),
     )}};`,
   );
   await write(

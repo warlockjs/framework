@@ -39,7 +39,9 @@ function reportFailureOnce(stage: string, error: unknown): void {
 }
 
 /** The default JSON-lines file channel, created on first use. */
-export function getDefaultRequestLogChannel(config: ResolvedRequestLogConfig): RequestLogFileChannel {
+export function getDefaultRequestLogChannel(
+  config: ResolvedRequestLogConfig,
+): RequestLogFileChannel {
   if (!defaultChannel) {
     defaultChannel = new RequestLogFileChannel({ retention: config.retention });
 
@@ -129,7 +131,9 @@ export function trackRequestLog(request: Request, reply: FastifyReply): void {
     reply.raw.once("close", () => {
       const scope = endRequestLogScope(id);
 
-      setImmediate(() => finishRequestLog(request, reply, scope, startedAt, performance.now() - startedPerf));
+      setImmediate(() =>
+        finishRequestLog(request, reply, scope, startedAt, performance.now() - startedPerf),
+      );
     });
   } catch (error) {
     reportFailureOnce("track", error);
@@ -179,9 +183,7 @@ function gatherRequestLogInput(
   startedAt: number,
   scope: RequestLogScope | undefined,
 ): RequestLogInput {
-  const base = attempt(() => request.baseRequest) as
-    | { method?: string; url?: string }
-    | undefined;
+  const base = attempt(() => request.baseRequest) as { method?: string; url?: string } | undefined;
   const user = attempt(() => (request.locals as unknown as Record<string, unknown>).user) as
     | Record<string, any>
     | undefined;
@@ -232,7 +234,9 @@ function readSession(user: Record<string, any>): { userId?: string | number; use
 
 /** Bytes sent: `Content-Length` when set, else the size of a string or JSON body (only measured when the body is recorded anyway). */
 function responseSize(response: Request["response"], measureBody: boolean): number | undefined {
-  const header = attempt(() => response.getHeader("content-length") ?? response.getHeader("Content-Length"));
+  const header = attempt(
+    () => response.getHeader("content-length") ?? response.getHeader("Content-Length"),
+  );
   const fromHeader = Number(header);
 
   if (header !== undefined && Number.isFinite(fromHeader)) return fromHeader;

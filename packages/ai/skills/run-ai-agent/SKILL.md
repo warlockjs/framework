@@ -588,9 +588,20 @@ All opt-in; an agent without them behaves as before.
 ai.agent({
   model,
   tools: [updatePlan],
-  actWhenAsked: { intents: [/\b(swap|replace|add|remove)\b/i], requiredTools: ["update_plan"], maxReprompts: 1 },
+  actWhenAsked: {
+    intents: [/\b(swap|replace|add|remove)\b/i],
+    requiredTools: ["update_plan"],
+    maxReprompts: 1,
+  },
   onToolRefusal: "retry-once-with-hint", // or { retries, hint, isRefusal }
-  backstops: [{ name: "injury", phase: "before", detect: (t) => /\bpain\b/i.test(t.input), run: async (c) => ({ prompt: "Acknowledge the injury." }) }],
+  backstops: [
+    {
+      name: "injury",
+      phase: "before",
+      detect: (t) => /\bpain\b/i.test(t.input),
+      run: async (c) => ({ prompt: "Acknowledge the injury." }),
+    },
+  ],
 });
 ```
 

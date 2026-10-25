@@ -21,7 +21,10 @@ describe("findUnitGuardViolations", () => {
     ['import { HttpConnector } from "@warlock.js/core";', "HttpConnector"],
     ['import { bootstrap } from "@warlock.js/core";', "bootstrap"],
     ['import { startHttpTestServer } from "@warlock.js/core/tests";', "startHttpTestServer"],
-    ['import { createTestHttpServer as serve } from "@warlock.js/core/tests";', "createTestHttpServer"],
+    [
+      'import { createTestHttpServer as serve } from "@warlock.js/core/tests";',
+      "createTestHttpServer",
+    ],
     ['import { boot } from "../../bootstrap";', "../../bootstrap"],
   ])("names the offending import in %s", (line, name) => {
     const violations = findUnitGuardViolations(line);

@@ -57,15 +57,22 @@ export function formatRequestLogRecord(record: RequestLogRecord): string[] {
     `  route ${record.route.name ?? "-"} ${record.route.pattern ?? ""}`.trimEnd(),
   ];
 
-  if (record.session) lines.push(`  user ${record.session.userType ?? "-"} ${record.session.userId ?? ""}`.trimEnd());
+  if (record.session)
+    lines.push(`  user ${record.session.userType ?? "-"} ${record.session.userId ?? ""}`.trimEnd());
   if (record.ip) lines.push(`  ip ${record.ip}`);
 
   if (record.error) {
-    const where = [record.error.phase, record.error.file, record.error.site].filter(Boolean).join(" · ");
+    const where = [record.error.phase, record.error.file, record.error.site]
+      .filter(Boolean)
+      .join(" · ");
 
-    lines.push("", `Error: ${record.error.name}: ${record.error.message}${where ? `  (${where})` : ""}`);
+    lines.push(
+      "",
+      `Error: ${record.error.name}: ${record.error.message}${where ? `  (${where})` : ""}`,
+    );
 
-    if (record.error.stack) lines.push(...record.error.stack.split("\n").map((line) => `  ${line}`));
+    if (record.error.stack)
+      lines.push(...record.error.stack.split("\n").map((line) => `  ${line}`));
   }
 
   if (record.phases?.length) {
@@ -77,7 +84,10 @@ export function formatRequestLogRecord(record: RequestLogRecord): string[] {
   if (record.queries) {
     const { count, slowest, nPlusOne } = record.queries;
 
-    lines.push("", `Queries: ${count}${slowest ? `, slowest ${slowest.durationMs}ms  ${slowest.query}` : ""}`);
+    lines.push(
+      "",
+      `Queries: ${count}${slowest ? `, slowest ${slowest.durationMs}ms  ${slowest.query}` : ""}`,
+    );
 
     for (const finding of nPlusOne ?? []) lines.push(`  N+1 x${finding.count}  ${finding.query}`);
   }
@@ -141,7 +151,9 @@ export async function runLogsCommand(
     return { exitCode: 0, json: record, lines: formatRequestLogRecord(record) };
   }
 
-  return failure("Usage: warlock logs requests [--status 5xx] [--route name] [--since 1h] [--limit n] | warlock logs request <id>");
+  return failure(
+    "Usage: warlock logs requests [--status 5xx] [--route name] [--since 1h] [--limit n] | warlock logs request <id>",
+  );
 }
 
 /** Action behind `warlock logs <action> [id]`. */

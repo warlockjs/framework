@@ -48,7 +48,8 @@ function fakeRequestLog(records: RequestLogRecord[]): DevtoolsRequestLogSource {
 
   return {
     compile,
-    list: async (filter) => records.map(rowOf).filter(compile(filter)).reverse().slice(0, filter.limit),
+    list: async (filter) =>
+      records.map(rowOf).filter(compile(filter)).reverse().slice(0, filter.limit),
     get: async (id) => records.find((entry) => entry.id === id),
     curl: (entry, baseUrl) => `curl -X ${entry.method} '${baseUrl}${entry.url}'`,
   };
@@ -70,11 +71,22 @@ function build(requestLog?: DevtoolsRequestLogSource) {
 }
 
 function get(server: ReturnType<typeof build>["server"], url: string) {
-  return server.inject({ method: "GET", url, remoteAddress: "127.0.0.1", headers: { host: "localhost:2030" } });
+  return server.inject({
+    method: "GET",
+    url,
+    remoteAddress: "127.0.0.1",
+    headers: { host: "localhost:2030" },
+  });
 }
 
 function liveRequest(collector: ReturnType<typeof build>["collector"], id: string, status: number) {
-  collector.startRequest({ id, method: "GET", path: "/live", route: "/live", startedAt: Date.now() });
+  collector.startRequest({
+    id,
+    method: "GET",
+    path: "/live",
+    route: "/live",
+    startedAt: Date.now(),
+  });
   collector.endRequest(id, { status, durationMs: 4 });
 }
 
@@ -87,7 +99,11 @@ describe("GET /api/requests with a persisted request log", () => {
     liveRequest(collector, "shared", 200);
     liveRequest(collector, "fresh", 200);
 
-    const rows = (await get(server, base)).json() as Array<{ id: string; persisted?: boolean; path: string }>;
+    const rows = (await get(server, base)).json() as Array<{
+      id: string;
+      persisted?: boolean;
+      path: string;
+    }>;
 
     expect(rows.map((row) => row.id).sort()).toEqual(["fresh", "old-1", "old-2", "shared"]);
     expect(rows.find((row) => row.id === "shared")).toMatchObject({ path: "/live" });
@@ -117,7 +133,9 @@ describe("GET /api/requests with a persisted request log", () => {
     const response = await get(server, `${base}?status=bad`);
 
     expect(response.statusCode).toBe(400);
-    expect(response.json()).toMatchObject({ error: expect.stringContaining("Invalid status filter") });
+    expect(response.json()).toMatchObject({
+      error: expect.stringContaining("Invalid status filter"),
+    });
   });
 
   it("is the in-memory list when there is no persisted log", async () => {
@@ -125,7 +143,9 @@ describe("GET /api/requests with a persisted request log", () => {
 
     liveRequest(collector, "only", 200);
 
-    expect(((await get(server, base)).json() as Array<{ id: string }>).map((row) => row.id)).toEqual(["only"]);
+    expect(
+      ((await get(server, base)).json() as Array<{ id: string }>).map((row) => row.id),
+    ).toEqual(["only"]);
   });
 });
 
@@ -136,7 +156,9 @@ describe("GET /api/requests/:id", () => {
         record("boom", {
           status: 500,
           error: { message: "db down", name: "Error", stack: "Error: db down" },
-          logs: [{ level: "error", module: "http", action: "request-error", message: "db down", at: 1 }],
+          logs: [
+            { level: "error", module: "http", action: "request-error", message: "db down", at: 1 },
+          ],
           queries: { count: 3, nPlusOne: [{ query: "select ?", count: 3 }] },
         }),
       ]),

@@ -5,7 +5,10 @@ import {
   LocaleDictionaryError,
   parseLocaleDictionary,
 } from "../../localization/parse-locale-dictionary";
-import { MODULE_LOCALE_JSON_GLOBS, moduleOfLocaleJson } from "../../localization/module-locale-paths";
+import {
+  MODULE_LOCALE_JSON_GLOBS,
+  moduleOfLocaleJson,
+} from "../../localization/module-locale-paths";
 import { createProblem, type ToolingProblem } from "../problem";
 
 /** The longest list of missing locales one problem spells out. */
@@ -32,7 +35,9 @@ export function configuredLocaleCodes(
 
     if (list === undefined) continue;
 
-    const codes = [...list.matchAll(/["'`]([A-Za-z][A-Za-z0-9-]*)["'`]/g)].map((match) => match[1]!);
+    const codes = [...list.matchAll(/["'`]([A-Za-z][A-Za-z0-9-]*)["'`]/g)].map(
+      (match) => match[1]!,
+    );
 
     if (codes.length > 0) return codes;
   }
@@ -79,7 +84,9 @@ export function localeCoverageProblems(
     } catch (error) {
       if (!(error instanceof LocaleDictionaryError)) throw error;
 
-      problems.push(createProblem({ code: "WL1007", source: "convention", message: error.message, file }));
+      problems.push(
+        createProblem({ code: "WL1007", source: "convention", message: error.message, file }),
+      );
       continue;
     }
 

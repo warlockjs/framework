@@ -28,7 +28,10 @@ afterEach(() => {
 
 describe("configuredLocaleCodes", () => {
   it("reads localeCodes from src/config/app.ts", () => {
-    write("src/config/app.ts", 'export default { localeCode: "en", localeCodes: ["en", \'ar\'] };\n');
+    write(
+      "src/config/app.ts",
+      'export default { localeCode: "en", localeCodes: ["en", \'ar\'] };\n',
+    );
 
     expect(configuredLocaleCodes(root)).toEqual(["en", "ar"]);
   });

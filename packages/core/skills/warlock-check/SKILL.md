@@ -49,27 +49,27 @@ jq -r '.problems[] | "\(.file // "-"):\(.line // 0) \(.code) \(.message)\n  → 
 [ "$code" = 2 ] && echo "environment problem — fix the machine, not the code"
 ```
 
-| Code                | Problem                                                                                                       |
-| ------------------- | ------------------------------------------------------------------------------------------------------------- |
-| `WL7101`            | type error (`rule` = `TS2322`, …)                                                                             |
-| `WL7102`            | tsconfig missing/invalid                                                                                      |
-| `WL7201` / `WL7202` | lint error / warning (`rule` = the rule id)                                                                   |
-| `WL7301` / `WL7302` | a test failed / a test file failed to load                                                                    |
-| `WL9001`            | imports an auto-loaded file (`routes.ts`, `main.ts`, `worker.ts`, `events/*`)                                 |
-| `WL9002`            | relative import ends in `.js`                                                                                 |
-| `WL9003`            | relative import into another `src/app/<module>` — use `app/<module>/...`                                      |
-| `WL9004`            | `experimentalDecorators: true` in tsconfig                                                                    |
-| `WL9005`            | `request.all()` passed to a query, a service or `inApp()` — use `request.validated()`                         |
-| `WL9006`            | POST/PUT/PATCH/DELETE route with no auth middleware and no `public: true`                                     |
-| `WL9007`            | redirect / `navigateTo()` / `<Link to>` target from request input without `safeRedirect()`                    |
-| `WL9008`            | raw email, credential or request body in a log call                                                           |
-| `WL9009`            | regex with `*` / `+` / `{n,}` run on request input                                                            |
-| `WL9010`–`WL9012`   | warnings: `await log.*()`, a second controller in a file, a `kind` discriminator                              |
+| Code                | Problem                                                                                                                                               |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `WL7101`            | type error (`rule` = `TS2322`, …)                                                                                                                     |
+| `WL7102`            | tsconfig missing/invalid                                                                                                                              |
+| `WL7201` / `WL7202` | lint error / warning (`rule` = the rule id)                                                                                                           |
+| `WL7301` / `WL7302` | a test failed / a test file failed to load                                                                                                            |
+| `WL9001`            | imports an auto-loaded file (`routes.ts`, `main.ts`, `worker.ts`, `events/*`)                                                                         |
+| `WL9002`            | relative import ends in `.js`                                                                                                                         |
+| `WL9003`            | relative import into another `src/app/<module>` — use `app/<module>/...`                                                                              |
+| `WL9004`            | `experimentalDecorators: true` in tsconfig                                                                                                            |
+| `WL9005`            | `request.all()` passed to a query, a service or `inApp()` — use `request.validated()`                                                                 |
+| `WL9006`            | POST/PUT/PATCH/DELETE route with no auth middleware and no `public: true`                                                                             |
+| `WL9007`            | redirect / `navigateTo()` / `<Link to>` target from request input without `safeRedirect()`                                                            |
+| `WL9008`            | raw email, credential or request body in a log call                                                                                                   |
+| `WL9009`            | regex with `*` / `+` / `{n,}` run on request input                                                                                                    |
+| `WL9010`–`WL9012`   | warnings: `await log.*()`, a second controller in a file, a `kind` discriminator                                                                      |
 | `WL9022`            | server-only code (controller, service, repository, model, route, connector, `*.server.*`) imports a `*.client.*` module — the message names the chain |
-| `WL9023`            | an app-module `index.ts` that only re-exports; **off by default** (`rules.WL9023` in `.warlock-check.json`)   |
-| `WL9105`            | a key of `utils/locales.json` or `utils/locales/<feature>.json` lacks a configured locale (`app.localeCodes`) |
-| `WL8001`–`WL8007`   | this machine: Node version, missing tool, unreachable service, busy port, esbuild binary, git, tool crash/OOM |
-| `WL8010`            | installed `@warlock.js/*` packages on different versions — run `warlock update`                               |
+| `WL9023`            | an app-module `index.ts` that only re-exports; **off by default** (`rules.WL9023` in `.warlock-check.json`)                                           |
+| `WL9105`            | a key of `utils/locales.json` or `utils/locales/<feature>.json` lacks a configured locale (`app.localeCodes`)                                         |
+| `WL8001`–`WL8007`   | this machine: Node version, missing tool, unreachable service, busy port, esbuild binary, git, tool crash/OOM                                         |
+| `WL8010`            | installed `@warlock.js/*` packages on different versions — run `warlock update`                                                                       |
 
 ## `warlock typecheck`
 
@@ -155,7 +155,7 @@ They parse real TypeScript/JSX syntax with the same oxc-parser adapter as the ex
 | `WL9018` | Exported `RequestHandler` in `src/app/**/controllers` lacks `responseSchema`     | Assign `handler.responseSchema` to document each response status.                                                                                                  |
 | `WL9019` | Browser route call (`apiHref`, `useSubmitForm({ route })`) takes a run-time name | Pass a string literal or a template with a static prefix, or declare the names with `config.apiRoutes` in a page setup file.                                       |
 | `WL9020` | Browser code names a route registered with `clientVisible: false` (error)        | Call the endpoint from the server, or remove `clientVisible: false` from the route.                                                                                |
-| `WL9021` | A Cascade column is read or written as a model property (warning)               | Use `model.get("column")` / `model.set("column", value)`; `--fix` rewrites it.                                                                                     |
+| `WL9021` | A Cascade column is read or written as a model property (warning)                | Use `model.get("column")` / `model.set("column", value)`; `--fix` rewrites it.                                                                                     |
 | `WL9024` | Integration spec imports nothing that needs the app (warning)                    | Move it to the unit project: rename `*.test.ts` to `*.spec.ts` outside `tests/`.                                                                                   |
 | `WL9104` | Translation key computed at runtime in `src/web` (the page ships every group)    | Declare the keys with `config.translations` in the page's setup file, for example `["statuses.*"]`.                                                                |
 

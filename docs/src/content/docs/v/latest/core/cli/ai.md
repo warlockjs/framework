@@ -64,13 +64,13 @@ warlock ai tools --tools <module> [--targets openai-strict,anthropic,google] [--
 
 Loads the same `tools` array as `--tools` above and prints, for each tool, its estimated input tokens per call, a short schema hash, and what each provider would reject, ignore or over-charge for in its schema. It needs `@warlock.js/ai` 5.38.0 or newer, calls no model and runs no tool. See [lint tool schemas](/v/latest/ai/tools/lint-tool-schemas/) for the checks.
 
-| Option                  | Meaning                                                                                  |
-| ----------------------- | ---------------------------------------------------------------------------------------- |
-| `--tools <module>`      | Required. A named `tools` array or default-exported array of tools.                      |
-| `--targets <list>`      | Comma-separated providers to check. Default: all three.                                  |
-| `--warn-above <tokens>` | Flag definitions above this estimate (default `500`).                                    |
-| `--fail`                | Exit with code 1 when a tool has an error-level finding, for CI.                         |
-| `--json`                | One JSON summary on stdout (`tools`, `tokens`, `issueCount`); progress goes to stderr.   |
+| Option                  | Meaning                                                                                |
+| ----------------------- | -------------------------------------------------------------------------------------- |
+| `--tools <module>`      | Required. A named `tools` array or default-exported array of tools.                    |
+| `--targets <list>`      | Comma-separated providers to check. Default: all three.                                |
+| `--warn-above <tokens>` | Flag definitions above this estimate (default `500`).                                  |
+| `--fail`                | Exit with code 1 when a tool has an error-level finding, for CI.                       |
+| `--json`                | One JSON summary on stdout (`tools`, `tokens`, `issueCount`); progress goes to stderr. |
 
 ## Inspect an agent run
 

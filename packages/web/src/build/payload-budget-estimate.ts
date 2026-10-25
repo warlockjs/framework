@@ -29,11 +29,7 @@ import {
 } from "../translations/delivery";
 import type { SerializedTranslationUsage } from "../translations/types";
 import type { PagePayloadBudget } from "../server/page-manifest";
-import {
-  formatBytes,
-  payloadBudgetFor,
-  serializedBytes,
-} from "../server/payload-budget";
+import { formatBytes, payloadBudgetFor, serializedBytes } from "../server/payload-budget";
 import type { Keywords } from "@mongez/localization";
 
 /** One page the estimate covers. */
@@ -85,7 +81,9 @@ export function estimatePagePayloads(input: {
     locales.map((locale) => [locale, sharedTableFor(sources, locale, sharedGroups)] as const),
   );
   const routesByName = new Map(
-    input.apiRoutes.filter((route) => route.clientVisible !== false).map((route) => [route.name, route]),
+    input.apiRoutes
+      .filter((route) => route.clientVisible !== false)
+      .map((route) => [route.name, route]),
   );
 
   return input.pages.map((page) => {

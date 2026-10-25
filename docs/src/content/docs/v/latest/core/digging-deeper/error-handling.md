@@ -167,17 +167,17 @@ Every 5xx the HTTP layer answers writes **one** `error`-level logger record, how
 
 The record's `module` is `http` and its `action` is `request.<phase>`. It has the same shape as the page-failure record `@warlock.js/web` writes, with these context fields:
 
-| Field                      | Meaning                                                                                          |
-| -------------------------- | ------------------------------------------------------------------------------------------------ |
-| `name`, `message`, `stack` | The thrown error                                                                                 |
-| `phase`                    | `csrf`, `middleware`, `validation` or `handler`                                                  |
-| `middleware`               | The name of the middleware that threw, when `phase` is `middleware`                              |
-| `handler`                  | The route handler's function name (`(anonymous)` when it has none)                               |
-| `file`                     | The routes file that declares the route                                                          |
-| `routeName`, `routePath`   | The route's name and its pattern (`/posts/:id`)                                                  |
-| `method`, `pathname`       | The request, without its query string                                                            |
-| `requestId`                | The same id as the `X-Request-Id` header                                                         |
-| `statusCode`               | The status the response carries                                                                  |
+| Field                      | Meaning                                                             |
+| -------------------------- | ------------------------------------------------------------------- |
+| `name`, `message`, `stack` | The thrown error                                                    |
+| `phase`                    | `csrf`, `middleware`, `validation` or `handler`                     |
+| `middleware`               | The name of the middleware that threw, when `phase` is `middleware` |
+| `handler`                  | The route handler's function name (`(anonymous)` when it has none)  |
+| `file`                     | The routes file that declares the route                             |
+| `routeName`, `routePath`   | The route's name and its pattern (`/posts/:id`)                     |
+| `method`, `pathname`       | The request, without its query string                               |
+| `requestId`                | The same id as the `X-Request-Id` header                            |
+| `statusCode`               | The status the response carries                                     |
 
 With no log channel configured, the failure still reaches the terminal through `console.error`.
 

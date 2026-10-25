@@ -8,7 +8,10 @@ import {
   type ModuleExports,
 } from "./ai-command.action";
 
-type TraceFormatModule = Pick<typeof import("@warlock.js/ai"), "formatAgentTrace" | "diffAgentTraces">;
+type TraceFormatModule = Pick<
+  typeof import("@warlock.js/ai"),
+  "formatAgentTrace" | "diffAgentTraces"
+>;
 
 /** One row of `GET <devtools>/api/ai/agent-runs`. */
 type AgentRunRow = {
@@ -29,7 +32,9 @@ function stringOption(value: string | number | boolean | undefined): string | un
 }
 
 function isTraceFormatModule(value: ModuleExports): value is ModuleExports & TraceFormatModule {
-  return typeof value.formatAgentTrace === "function" && typeof value.diffAgentTraces === "function";
+  return (
+    typeof value.formatAgentTrace === "function" && typeof value.diffAgentTraces === "function"
+  );
 }
 
 /** The run list as a plain-text table, newest first as the server sends it. */
@@ -114,7 +119,9 @@ export async function aiTraceAction(
 
   if (!runId) {
     const { status, body } = await getJson(api);
-    const payload = body as { available?: boolean; message?: string; runs?: AgentRunRow[] } | undefined;
+    const payload = body as
+      | { available?: boolean; message?: string; runs?: AgentRunRow[] }
+      | undefined;
 
     if (status !== 200 || !payload) {
       throw new WarlockError(
@@ -123,9 +130,12 @@ export async function aiTraceAction(
       );
     }
 
-    if (payload.available === false) throw new Error(payload.message ?? "Agent traces are unavailable.");
+    if (payload.available === false)
+      throw new Error(payload.message ?? "Agent traces are unavailable.");
 
-    console.log(json ? JSON.stringify(payload.runs ?? [], null, 2) : formatAgentRunRows(payload.runs ?? []));
+    console.log(
+      json ? JSON.stringify(payload.runs ?? [], null, 2) : formatAgentRunRows(payload.runs ?? []),
+    );
     return;
   }
 
@@ -142,9 +152,12 @@ export async function aiTraceAction(
   try {
     ai = await load("@warlock.js/ai");
   } catch (cause) {
-    throw new Error("Cannot load @warlock.js/ai. Install it in this project to use warlock ai trace.", {
-      cause,
-    });
+    throw new Error(
+      "Cannot load @warlock.js/ai. Install it in this project to use warlock ai trace.",
+      {
+        cause,
+      },
+    );
   }
 
   if (!isTraceFormatModule(ai)) {

@@ -120,7 +120,9 @@ export function isExcludedFromScratch(relative: string): boolean {
 
   if (segments.length === 0) return false;
 
-  return segments.includes("node_modules") || segments.includes(".git") || segments[0] === "storage";
+  return (
+    segments.includes("node_modules") || segments.includes(".git") || segments[0] === "storage"
+  );
 }
 
 /**
@@ -140,7 +142,9 @@ export async function runUpgradeCheck(options: UpgradeCheckOptions): Promise<Upg
   // Detected on the real project: the copy has no node_modules to read markers from.
   const detection = await detectPackageManagerDetails(root);
 
-  const scratch = mkdtempSync(path.join(options.scratchRoot ?? os.tmpdir(), "warlock-upgrade-check-"));
+  const scratch = mkdtempSync(
+    path.join(options.scratchRoot ?? os.tmpdir(), "warlock-upgrade-check-"),
+  );
 
   try {
     if (isInside(root, scratch)) {
@@ -183,7 +187,9 @@ export async function runUpgradeCheck(options: UpgradeCheckOptions): Promise<Upg
       // The upgrade itself failed: surface its error instead of a partial report.
       const failed = steps.find((entry) => entry.status === "failed");
 
-      throw new UpgradeUsageError(failed?.detail ?? "The upgrade could not be applied to the copy.");
+      throw new UpgradeUsageError(
+        failed?.detail ?? "The upgrade could not be applied to the copy.",
+      );
     }
 
     const base = { cwd: scratch, timeoutMs };
@@ -210,7 +216,14 @@ export async function runUpgradeCheck(options: UpgradeCheckOptions): Promise<Upg
       installed = result;
     }
 
-    const warlockBin = path.join(scratch, "node_modules", "@warlock.js", "core", "bin", "warlock.js");
+    const warlockBin = path.join(
+      scratch,
+      "node_modules",
+      "@warlock.js",
+      "core",
+      "bin",
+      "warlock.js",
+    );
     const projectCommands: Array<{
       id: UpgradeCheckStepId;
       title: string;
@@ -249,12 +262,19 @@ export async function runUpgradeCheck(options: UpgradeCheckOptions): Promise<Upg
         continue;
       }
 
-      await commandStep(steps, entry.id, entry.title, `warlock ${entry.args.slice(1).join(" ")}`, run, {
-        ...base,
-        command: process.execPath,
-        args: entry.args,
-        env: entry.env,
-      });
+      await commandStep(
+        steps,
+        entry.id,
+        entry.title,
+        `warlock ${entry.args.slice(1).join(" ")}`,
+        run,
+        {
+          ...base,
+          command: process.execPath,
+          args: entry.args,
+          env: entry.env,
+        },
+      );
     }
 
     if (!installed) {
@@ -269,7 +289,9 @@ export async function runUpgradeCheck(options: UpgradeCheckOptions): Promise<Upg
       const vitest = resolveVitestEntry(scratch);
 
       if (!vitest) {
-        steps.push(skipped("unit-tests", "Unit test project", "vitest is not installed in the app"));
+        steps.push(
+          skipped("unit-tests", "Unit test project", "vitest is not installed in the app"),
+        );
       } else {
         const outcome = await commandStep(
           steps,
@@ -289,7 +311,11 @@ export async function runUpgradeCheck(options: UpgradeCheckOptions): Promise<Upg
         const last = steps[steps.length - 1];
 
         if (!outcome && last && /no projects matched|project.*not found/i.test(last.output ?? "")) {
-          steps[steps.length - 1] = skipped("unit-tests", "Unit test project", "the app has no `unit` Vitest project");
+          steps[steps.length - 1] = skipped(
+            "unit-tests",
+            "Unit test project",
+            "the app has no `unit` Vitest project",
+          );
         }
       }
     }
@@ -419,7 +445,9 @@ function skipped(id: UpgradeCheckStepId, title: string, reason: string): Upgrade
 
 /** The environment of every child: a heap cap, and an environment that matches the command. */
 function childEnv(memoryMb: number, nodeEnv: "development" | "test"): NodeJS.ProcessEnv {
-  const inherited = (process.env.NODE_OPTIONS ?? "").replace(/--max-old-space-size=\d+/g, "").trim();
+  const inherited = (process.env.NODE_OPTIONS ?? "")
+    .replace(/--max-old-space-size=\d+/g, "")
+    .trim();
 
   return {
     ...process.env,
@@ -498,7 +526,8 @@ export function runCommand(command: CheckCommand): Promise<CheckCommandOutcome> 
 
     const killGroup = (signal: NodeJS.Signals) => {
       try {
-        if (process.platform !== "win32" && child.pid !== undefined) process.kill(-child.pid, signal);
+        if (process.platform !== "win32" && child.pid !== undefined)
+          process.kill(-child.pid, signal);
         else child.kill(signal);
       } catch {
         // already gone

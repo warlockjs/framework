@@ -70,7 +70,8 @@ describe("WL9024", () => {
     const test = `import { buildUser } from "./helpers";\nimport { it } from "vitest";\n`;
     const root = project({
       "src/a.test.ts": test,
-      "src/helpers.ts": 'import { User } from "app/users/models/user";\nexport const buildUser = () => User;\n',
+      "src/helpers.ts":
+        'import { User } from "app/users/models/user";\nexport const buildUser = () => User;\n',
     });
 
     expect(problems(root, "src/a.test.ts", test)).toEqual([]);

@@ -62,9 +62,7 @@ function createApp(): string {
 type Recorded = { command: CheckCommand; scratchFiles: string[] };
 
 /** A fake process runner: records each command and the copy's top-level contents. */
-function fakeRunner(
-  outcome: (command: CheckCommand) => Partial<CheckCommandOutcome> = () => ({}),
-) {
+function fakeRunner(outcome: (command: CheckCommand) => Partial<CheckCommandOutcome> = () => ({})) {
   const recorded: Recorded[] = [];
 
   return {
@@ -182,13 +180,9 @@ describe("warlock upgrade --check", () => {
 
     expect(recorded).toEqual([]);
     expect(result.ok).toBe(true);
-    expect(result.steps.filter((entry) => entry.status === "skipped").map((entry) => entry.id)).toEqual([
-      "install",
-      "typings",
-      "typecheck",
-      "doctor",
-      "unit-tests",
-    ]);
+    expect(
+      result.steps.filter((entry) => entry.status === "skipped").map((entry) => entry.id),
+    ).toEqual(["install", "typings", "typecheck", "doctor", "unit-tests"]);
     expect(result.hits.length).toBeGreaterThan(0);
   });
 
@@ -274,7 +268,9 @@ describe("warlock upgrade --check", () => {
   it("is wired into the command: --json output and a non-zero exit when a step fails", async () => {
     const root = createApp();
     const logs: string[] = [];
-    const { run } = fakeRunner((command) => (command.args.at(-1) === "doctor" ? { exitCode: 1 } : {}));
+    const { run } = fakeRunner((command) =>
+      command.args.at(-1) === "doctor" ? { exitCode: 1 } : {},
+    );
 
     const code = await runUpgradeCommand(
       { to: "5.31", check: true, json: true },

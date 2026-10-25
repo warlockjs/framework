@@ -129,7 +129,5 @@ export function listInstalledSkills(cwd: string): InstalledSkill[] {
     }
   }
 
-  return skills.sort(
-    (a, b) => a.package.localeCompare(b.package) || a.slug.localeCompare(b.slug),
-  );
+  return skills.sort((a, b) => a.package.localeCompare(b.package) || a.slug.localeCompare(b.slug));
 }

@@ -176,7 +176,8 @@ export function toRequestLogEntry(data: LoggingData, now = Date.now()): RequestL
     level: data.type,
     module: data.module,
     action: data.action,
-    message: message.length > MAX_MESSAGE_LENGTH ? `${message.slice(0, MAX_MESSAGE_LENGTH)}…` : message,
+    message:
+      message.length > MAX_MESSAGE_LENGTH ? `${message.slice(0, MAX_MESSAGE_LENGTH)}…` : message,
     at: now,
   };
   const context = compactContext(data.context);
@@ -201,7 +202,8 @@ export function errorFromLogData(data: LoggingData): RequestLogError | undefined
   if (context && typeof context.stack === "string") {
     return toRequestLogError({
       ...context,
-      message: typeof context.message === "string" ? context.message : stringifyMessage(data.message),
+      message:
+        typeof context.message === "string" ? context.message : stringifyMessage(data.message),
     });
   }
 
@@ -219,7 +221,9 @@ function stringifyMessage(message: unknown): string {
 }
 
 /** The context without the request snapshot, or `undefined` when empty or large. */
-function compactContext(context: Record<string, unknown> | undefined): Record<string, unknown> | undefined {
+function compactContext(
+  context: Record<string, unknown> | undefined,
+): Record<string, unknown> | undefined {
   if (!context) return undefined;
 
   const { request: _request, ...rest } = context;

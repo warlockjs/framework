@@ -298,12 +298,9 @@ describe("createRequestStore 5xx record", () => {
     }>;
 
   it("leaves one record with the route and the handler for a controller throw", async () => {
-    const request = createRequest(
-      {},
-      async function showPost() {
-        throw new Error("controller exploded");
-      },
-    );
+    const request = createRequest({}, async function showPost() {
+      throw new Error("controller exploded");
+    });
 
     await createRequestStore(request, createResponse());
 

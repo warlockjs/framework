@@ -22,7 +22,13 @@ Turn it off for one tool, or tune it:
 
 ```ts
 ai.tool({ name: "save_facts", description, input, execute, lint: false });
-ai.tool({ name: "save_facts", description, input, execute, lint: { targets: ["anthropic"], warnAboveTokens: 300 } });
+ai.tool({
+  name: "save_facts",
+  description,
+  input,
+  execute,
+  lint: { targets: ["anthropic"], warnAboveTokens: 300 },
+});
 
 // For the whole app:
 ai.config({ toolLint: false });
@@ -35,16 +41,16 @@ A tool's own `lint` wins over `ai.config({ toolLint })`.
 
 The schema checked is the one the provider adapters send: the shared `extractJsonSchema` output, which for Seal schemas is the `openai-strict` shape.
 
-| Code                                  | Severity | Meaning                                                                                                                                                                          |
-| ------------------------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `optional-forced-required`            | info     | A field declared optional is sent as required and nullable (compared with the `draft-2020-12` extraction), so the model must fill it on every call, with `null` when it has nothing. |
-| `optional-not-required`               | error    | A property is not in `required`; OpenAI strict mode rejects the tool.                                                                                                            |
-| `missing-additional-properties-false` | error    | An object does not set `additionalProperties: false`; OpenAI strict mode rejects it.                                                                                              |
+| Code                                  | Severity | Meaning                                                                                                                                                                                                                                                                                                      |
+| ------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `optional-forced-required`            | info     | A field declared optional is sent as required and nullable (compared with the `draft-2020-12` extraction), so the model must fill it on every call, with `null` when it has nothing.                                                                                                                         |
+| `optional-not-required`               | error    | A property is not in `required`; OpenAI strict mode rejects the tool.                                                                                                                                                                                                                                        |
+| `missing-additional-properties-false` | error    | An object does not set `additionalProperties: false`; OpenAI strict mode rejects it.                                                                                                                                                                                                                         |
 | `unsupported-keyword`                 | warning  | A keyword the provider rejects or ignores. OpenAI strict: `allOf`, `oneOf` (use `anyOf`), `not`, `if`/`then`/`else`, `dependentRequired`, `dependentSchemas`, `patternProperties`, `propertyNames`, `unevaluatedProperties`. Google: the same list without `oneOf`. Anthropic accepts the schema as written. |
-| `root-not-object`                     | error    | The input is not an object schema, so the adapters send the tool with no parameters.                                                                                              |
-| `invalid-name`                        | error    | The name is outside what the provider accepts (`[a-zA-Z0-9_-]{1,64}` for OpenAI and Anthropic; letters, digits, `_ . : -`, starting with a letter or `_`, for Google).            |
-| `oversized-description`               | warning  | A tool description over 1024 characters, or a property description over 512. Both are sent on every call.                                                                          |
-| `heavy-definition`                    | warning  | The estimated token cost is above the budget (default 500).                                                                                                                      |
+| `root-not-object`                     | error    | The input is not an object schema, so the adapters send the tool with no parameters.                                                                                                                                                                                                                         |
+| `invalid-name`                        | error    | The name is outside what the provider accepts (`[a-zA-Z0-9_-]{1,64}` for OpenAI and Anthropic; letters, digits, `_ . : -`, starting with a letter or `_`, for Google).                                                                                                                                       |
+| `oversized-description`               | warning  | A tool description over 1024 characters, or a property description over 512. Both are sent on every call.                                                                                                                                                                                                    |
+| `heavy-definition`                    | warning  | The estimated token cost is above the budget (default 500).                                                                                                                                                                                                                                                  |
 
 Findings that apply to several providers are merged into one entry listing its `targets`.
 

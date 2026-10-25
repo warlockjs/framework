@@ -34,7 +34,8 @@ export function formatUpgradeCheckReport(result: UpgradeCheckResult): string {
 
     for (const file of hit.files.slice(0, 8)) lines.push(`      ${colors.cyan(file)}`);
 
-    if (hit.files.length > 8) lines.push(colors.dim(`      … and ${hit.files.length - 8} more file(s)`));
+    if (hit.files.length > 8)
+      lines.push(colors.dim(`      … and ${hit.files.length - 8} more file(s)`));
 
     lines.push(colors.dim(`      see the ${hit.skill} skill`));
   }

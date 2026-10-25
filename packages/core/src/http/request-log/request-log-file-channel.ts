@@ -47,7 +47,11 @@ export function selectRequestLogFilesToPrune(
   const limit = policy.maxSizeMb * 1024 * 1024;
   const remaining = dated
     .filter(({ file }) => !doomed.has(file.name))
-    .sort((first, second) => first.file.modifiedAt - second.file.modifiedAt || (first.file.name < second.file.name ? -1 : 1));
+    .sort(
+      (first, second) =>
+        first.file.modifiedAt - second.file.modifiedAt ||
+        (first.file.name < second.file.name ? -1 : 1),
+    );
   let total = remaining.reduce((sum, { file }) => sum + file.sizeBytes, 0);
 
   for (const { file } of remaining) {
@@ -144,12 +148,18 @@ export class RequestLogFileChannel extends FileLog {
         }
       }
 
-      const doomed = selectRequestLogFilesToPrune(files, this.policy, `${this.fileName}.${this.extension}`);
+      const doomed = selectRequestLogFilesToPrune(
+        files,
+        this.policy,
+        `${this.fileName}.${this.extension}`,
+      );
 
       for (const name of doomed) {
-        await fs.promises.unlink(path.join(directory, name)).catch((error: NodeJS.ErrnoException) => {
-          if (error.code !== "ENOENT") throw error;
-        });
+        await fs.promises
+          .unlink(path.join(directory, name))
+          .catch((error: NodeJS.ErrnoException) => {
+            if (error.code !== "ENOENT") throw error;
+          });
       }
     } catch (error) {
       this.reportRetentionError(error, this.storagePath);

@@ -36,7 +36,11 @@ vi.mock("../config/load-config-files", () => ({ loadConfigFiles: mocks.appConfig
 vi.mock("./load-unit-config", () => ({ loadUnitConfig: mocks.unitConfig }));
 vi.mock("../dev-server/files-orchestrator", () => ({ filesOrchestrator: { init: mocks.init } }));
 vi.mock("../connectors", () => ({
-  connectorsManager: { observeTimings: vi.fn(), startWithout: mocks.startWithout, shutdown: mocks.shutdown },
+  connectorsManager: {
+    observeTimings: vi.fn(),
+    startWithout: mocks.startWithout,
+    shutdown: mocks.shutdown,
+  },
 }));
 vi.mock("../config", () => ({
   config: {
@@ -178,7 +182,7 @@ describe("test runtime performance modes", () => {
     expect(mocks.captureSnapshot).not.toHaveBeenCalled();
   });
 
-  it("opts one file out of the worker lifetime with setupTest({ lifetime: \"file\" })", async () => {
+  it('opts one file out of the worker lifetime with setupTest({ lifetime: "file" })', async () => {
     mocks.settings = { lifetime: "worker" };
 
     await setupTest(options);
@@ -215,7 +219,7 @@ describe("test runtime performance modes", () => {
     expect(mocks.shutdown).toHaveBeenCalledTimes(1);
   });
 
-  it("rejects a lifetime option other than \"file\"", async () => {
+  it('rejects a lifetime option other than "file"', async () => {
     await expect(setupTest({ ...options, lifetime: "worker" } as never)).rejects.toThrow(
       /only accepts "file"/,
     );

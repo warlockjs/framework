@@ -148,7 +148,10 @@ describe("gateAResolve — module boundary (real Vite builds)", () => {
 
   it("refuses a relative import of a module file that is not browser-safe", async () => {
     await expect(
-      buildPage(`import { enumValue } from "../app/users/enums";\nexport default enumValue;\n`, ERROR),
+      buildPage(
+        `import { enumValue } from "../app/users/enums";\nexport default enumValue;\n`,
+        ERROR,
+      ),
     ).rejects.toThrow(/server file of module "users"/);
   });
 

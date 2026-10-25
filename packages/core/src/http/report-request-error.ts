@@ -112,7 +112,7 @@ export function reportRequestServerError(input: ReportRequestErrorInput): void {
       failure?.message ??
       (error === undefined
         ? `The response status is ${status} but nothing threw.`
-        : safely(() => String(error)) ?? "An unexpected error occurred.");
+        : (safely(() => String(error)) ?? "An unexpected error occurred."));
     const route = safely(() => request.route);
     const routeName = route?.name;
     const file = route?.sourceFile || undefined;

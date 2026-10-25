@@ -1,8 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  diffAgentTraces,
-  formatAgentTrace,
-} from "../../../../../ai/src/trace/agent-trace-diff";
+import { diffAgentTraces, formatAgentTrace } from "../../../../../ai/src/trace/agent-trace-diff";
 import { aiCommandAction } from "./ai-command.action";
 import { aiTraceAction, formatAgentRunRows } from "./ai-trace.action";
 
@@ -54,7 +51,8 @@ function server(routes: Record<string, { status?: number; body?: unknown }>) {
   const urls: string[] = [];
   const fetcher = vi.fn(async (input: string) => {
     urls.push(input);
-    const hit = routes[input.replace("http://localhost:2030/__warlock/api/ai/agent-runs", "") || "/"];
+    const hit =
+      routes[input.replace("http://localhost:2030/__warlock/api/ai/agent-runs", "") || "/"];
     if (!hit) throw new Error("connect ECONNREFUSED");
     return new Response(JSON.stringify(hit.body ?? null), { status: hit.status ?? 200 });
   });
@@ -74,14 +72,19 @@ describe("warlock ai trace", () => {
     await aiTraceAction({ args: ["trace"], options }, { fetch: fetcher });
 
     expect(urls).toEqual(["http://localhost:2030/__warlock/api/ai/agent-runs"]);
-    expect(String(stdout.mock.calls[0]?.[0])).toContain("run_1\tcoach\tcompleted\t2\t1\t1\t10/5\t0.001230");
+    expect(String(stdout.mock.calls[0]?.[0])).toContain(
+      "run_1\tcoach\tcompleted\t2\t1\t1\t10/5\t0.001230",
+    );
   });
 
   it("prints a run with its turns", async () => {
     const stdout = vi.spyOn(console, "log").mockImplementation(() => undefined);
     const { fetcher } = server({ "/run_1": { body: trace("run_1") } });
 
-    await aiTraceAction({ args: ["trace", "run_1"], options }, { fetch: fetcher, load: async () => api });
+    await aiTraceAction(
+      { args: ["trace", "run_1"], options },
+      { fetch: fetcher, load: async () => api },
+    );
 
     const output = String(stdout.mock.calls[0]?.[0]);
 
@@ -95,7 +98,10 @@ describe("warlock ai trace", () => {
     const { fetcher } = server({ "/run_1": { body: trace("run_1") } });
     const load = vi.fn(async () => api);
 
-    await aiTraceAction({ args: ["trace", "run_1"], options: { ...options, json: true } }, { fetch: fetcher, load });
+    await aiTraceAction(
+      { args: ["trace", "run_1"], options: { ...options, json: true } },
+      { fetch: fetcher, load },
+    );
 
     expect(JSON.parse(String(stdout.mock.calls[0]?.[0]))).toMatchObject({ runId: "run_1" });
     expect(load).not.toHaveBeenCalled();
@@ -109,7 +115,9 @@ describe("warlock ai trace", () => {
       { args: ["trace", "a"], options: { ...options, diff: "b" } },
       { fetch: same.fetcher, load: async () => api },
     );
-    expect(String(stdout.mock.calls[0]?.[0])).toContain("sent the same system prompt and the same tool definitions");
+    expect(String(stdout.mock.calls[0]?.[0])).toContain(
+      "sent the same system prompt and the same tool definitions",
+    );
 
     const changed = server({
       "/a": { body: trace("a") },
@@ -148,7 +156,10 @@ describe("warlock ai trace", () => {
     await expect(
       aiTraceAction(
         { args: ["trace"], options },
-        { fetch: server({ "/": { body: { available: false, message: "Install @warlock.js/ai." } } }).fetcher },
+        {
+          fetch: server({ "/": { body: { available: false, message: "Install @warlock.js/ai." } } })
+            .fetcher,
+        },
       ),
     ).rejects.toThrow("Install @warlock.js/ai.");
   });
@@ -157,7 +168,10 @@ describe("warlock ai trace", () => {
     const { fetcher } = server({ "/run_1": { body: trace("run_1") } });
 
     await expect(
-      aiTraceAction({ args: ["trace", "run_1"], options }, { fetch: fetcher, load: async () => ({}) }),
+      aiTraceAction(
+        { args: ["trace", "run_1"], options },
+        { fetch: fetcher, load: async () => ({}) },
+      ),
     ).rejects.toThrow("5.38.0 or newer");
   });
 
@@ -168,7 +182,9 @@ describe("warlock ai trace", () => {
     await aiCommandAction({ args: ["trace"], options }, { fetch: fetcher });
     expect(String(stdout.mock.calls[0]?.[0])).toBe("No agent runs recorded yet.");
 
-    await expect(aiCommandAction({ args: ["nope"], options: {} })).rejects.toThrow("warlock ai trace");
+    await expect(aiCommandAction({ args: ["nope"], options: {} })).rejects.toThrow(
+      "warlock ai trace",
+    );
   });
 });
 

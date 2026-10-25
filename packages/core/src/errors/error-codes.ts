@@ -757,7 +757,7 @@ export const ERROR_CODES = {
     area: "convention",
     category: "code",
     title: "An app module keeps a hand-maintained index.ts barrel",
-    fix: "Import from the file that defines the export and delete the barrel. This rule is off by default; turn it on with `rules: { WL9023: \"warning\" }` in .warlock-check.json.",
+    fix: 'Import from the file that defines the export and delete the barrel. This rule is off by default; turn it on with `rules: { WL9023: "warning" }` in .warlock-check.json.',
     skill: "warlock-conventions",
   },
   WL9024: {

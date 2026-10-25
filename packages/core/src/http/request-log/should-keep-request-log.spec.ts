@@ -33,7 +33,11 @@ describe("shouldKeepRequestLog", () => {
     expect(shouldKeepRequestLog(config, { status: 200, durationMs: 1 }, () => 0.5)).toBe(false);
     expect(shouldKeepRequestLog(config, { status: 500, durationMs: 1 }, () => 0.99)).toBe(true);
     expect(
-      shouldKeepRequestLog({ ...config, only: "errors" }, { status: 500, durationMs: 1 }, () => 0.99),
+      shouldKeepRequestLog(
+        { ...config, only: "errors" },
+        { status: 500, durationMs: 1 },
+        () => 0.99,
+      ),
     ).toBe(true);
   });
 

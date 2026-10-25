@@ -23,19 +23,19 @@ Except for `--section files`, which reads source without booting, it boots exact
 
 ## Sections
 
-| Section     | What it lists                                                                                                                                                                              |
-| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `routes`    | Every registered route: method, path, name, source file, handler, middleware names in run order, auth guard, CSRF, rate limit, logging, request schemas, declared responses.               |
-| `models`    | Model classes from the loaded model modules and `@RegisterModel()`: table, primary key, columns (from the model's Seal `schema`), relations, resource, delete strategy, timestamp columns. |
-| `resources` | Every resource reached from a route response or a model, with its output shape as JSON Schema and the models that use it.                                                                  |
-| `config`    | Every loaded config key as a dotted path with its **type** — never its value — and the `src/config/*` file it came from.                                                                   |
-| `events`    | Listeners app modules registered on `@mongez/events` while loading (`events/`, `main.ts`, `routes.ts`, models), grouped by event, with the file that registered each.                      |
-| `pages`     | Pages `@warlock.js/web` installed: path, name, page file, layout chain (outermost first), which files on the chain export a `loader`, actions, guard. Empty without the web package.       |
-| `jobs`      | Jobs defined with `defineJob()` from `@warlock.js/queue`: name, queue, attempts, backoff, retention. Empty without the queue package.                                                      |
-| `schedules` | Tasks on the `@warlock.js/scheduler` scheduler: name, cron expression, intervals, next run. Empty without the scheduler.                                                                   |
-| `files`     | Source files with module, convention role, exports and resolved imports/importedBy; no app boot for files-only requests.                                                                   |
+| Section     | What it lists                                                                                                                                                                                                           |
+| ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `routes`    | Every registered route: method, path, name, source file, handler, middleware names in run order, auth guard, CSRF, rate limit, logging, request schemas, declared responses.                                            |
+| `models`    | Model classes from the loaded model modules and `@RegisterModel()`: table, primary key, columns (from the model's Seal `schema`), relations, resource, delete strategy, timestamp columns.                              |
+| `resources` | Every resource reached from a route response or a model, with its output shape as JSON Schema and the models that use it.                                                                                               |
+| `config`    | Every loaded config key as a dotted path with its **type** — never its value — and the `src/config/*` file it came from.                                                                                                |
+| `events`    | Listeners app modules registered on `@mongez/events` while loading (`events/`, `main.ts`, `routes.ts`, models), grouped by event, with the file that registered each.                                                   |
+| `pages`     | Pages `@warlock.js/web` installed: path, name, page file, layout chain (outermost first), which files on the chain export a `loader`, actions, guard. Empty without the web package.                                    |
+| `jobs`      | Jobs defined with `defineJob()` from `@warlock.js/queue`: name, queue, attempts, backoff, retention. Empty without the queue package.                                                                                   |
+| `schedules` | Tasks on the `@warlock.js/scheduler` scheduler: name, cron expression, intervals, next run. Empty without the scheduler.                                                                                                |
+| `files`     | Source files with module, convention role, exports and resolved imports/importedBy; no app boot for files-only requests.                                                                                                |
 | `wiring`    | Every auto-loaded file (config, locales, events, `main.ts`, `routes.ts`, workers) with its module and boot load order, then every [capability](../digging-deeper/capabilities.md) slot with its provider and consumers. |
-| `packages`  | Installed `@warlock.js/*` packages and their versions.                                                                                                                                     |
+| `packages`  | Installed `@warlock.js/*` packages and their versions.                                                                                                                                                                  |
 
 ### A route
 
@@ -209,9 +209,27 @@ warlock inspect --json --section wiring
 ```json
 {
   "wiring": [
-    { "type": "file", "role": "config", "file": "src/config/http.ts", "module": "src/config", "order": 1 },
-    { "type": "file", "role": "main", "file": "src/app/billing/main.ts", "module": "src/app/billing", "order": 4 },
-    { "type": "file", "role": "route", "file": "src/app/billing/routes.ts", "module": "src/app/billing", "order": 5 },
+    {
+      "type": "file",
+      "role": "config",
+      "file": "src/config/http.ts",
+      "module": "src/config",
+      "order": 1
+    },
+    {
+      "type": "file",
+      "role": "main",
+      "file": "src/app/billing/main.ts",
+      "module": "src/app/billing",
+      "order": 4
+    },
+    {
+      "type": "file",
+      "role": "route",
+      "file": "src/app/billing/routes.ts",
+      "module": "src/app/billing",
+      "order": 5
+    },
     {
       "type": "capability",
       "name": "billing.invoiceMailer",

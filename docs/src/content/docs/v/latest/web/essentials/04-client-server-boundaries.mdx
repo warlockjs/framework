@@ -101,13 +101,13 @@ An application module (`src/app/<module>/`) is server code: controllers,
 services, repositories, models, routes. Browser code, meaning everything the
 client build reaches from a page, may import only these files from it:
 
-| File                                                          | Why it is safe                          |
-| ------------------------------------------------------------- | --------------------------------------- |
-| `*.client.ts` / `*.client.tsx`, or a `.client/` folder        | It declares itself browser code         |
-| `*.schema.ts`, or anything in a `schema/` folder              | Shared validation, no server dependency |
-| `*.types.ts`, `*.d.ts`, or anything in a `types/` folder      | Types only                              |
-| The module's `web/` folder                                    | Web code that lives beside the module   |
-| JSON, CSS and other non-code files                            | They carry no behavior                  |
+| File                                                     | Why it is safe                          |
+| -------------------------------------------------------- | --------------------------------------- |
+| `*.client.ts` / `*.client.tsx`, or a `.client/` folder   | It declares itself browser code         |
+| `*.schema.ts`, or anything in a `schema/` folder         | Shared validation, no server dependency |
+| `*.types.ts`, `*.d.ts`, or anything in a `types/` folder | Types only                              |
+| The module's `web/` folder                               | Web code that lives beside the module   |
+| JSON, CSS and other non-code files                       | They carry no behavior                  |
 
 Anything else fails the build with the import chain:
 

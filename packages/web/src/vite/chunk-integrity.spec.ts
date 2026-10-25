@@ -91,9 +91,9 @@ describe("readChunkIntegrity", () => {
 
     expect(await readChunkIntegrity(directory)).toEqual(record);
     expect(await readChunkIntegrity(path.join(directory, "client"))).toEqual(record);
-    expect(
-      await readChunkIntegrity(path.join(directory, "client", CHUNK_INTEGRITY_FILE)),
-    ).toEqual(record);
+    expect(await readChunkIntegrity(path.join(directory, "client", CHUNK_INTEGRITY_FILE))).toEqual(
+      record,
+    );
   });
 
   it("is undefined when no record exists", async () => {

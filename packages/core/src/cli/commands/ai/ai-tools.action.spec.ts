@@ -59,7 +59,10 @@ describe("warlock ai tools", () => {
     expect(output).toContain("save_facts  ~");
     expect(output).toContain("error [openai-strict] properties.fact:");
     expect(output).toMatch(/2 tools, ~\d+ tokens per call, \d+ findings\./);
-    expect(load.mock.calls.map(([specifier]) => specifier)).toEqual(["@warlock.js/ai", "./tools.ts"]);
+    expect(load.mock.calls.map(([specifier]) => specifier)).toEqual([
+      "@warlock.js/ai",
+      "./tools.ts",
+    ]);
   });
 
   it("accepts named tools exports", async () => {
@@ -85,7 +88,10 @@ describe("warlock ai tools", () => {
 
     expect(stdout).toHaveBeenCalledOnce();
     expect(JSON.parse(String(stdout.mock.calls[0]?.[0]))).toMatchObject({
-      tools: [{ name: "get_weather", ok: true }, { name: "save_facts", ok: false }],
+      tools: [
+        { name: "get_weather", ok: true },
+        { name: "save_facts", ok: false },
+      ],
     });
     expect(stderr).toHaveBeenCalled();
   });
@@ -110,7 +116,10 @@ describe("warlock ai tools", () => {
     await aiToolsAction({ args: ["tools"], options: { tools: "./tools.ts" } }, { load });
     expect(process.exitCode).toBeUndefined();
 
-    await aiToolsAction({ args: ["tools"], options: { tools: "./tools.ts", fail: true } }, { load });
+    await aiToolsAction(
+      { args: ["tools"], options: { tools: "./tools.ts", fail: true } },
+      { load },
+    );
     expect(process.exitCode).toBe(1);
   });
 
@@ -121,10 +130,16 @@ describe("warlock ai tools", () => {
       "Usage: warlock ai tools",
     );
     await expect(
-      aiToolsAction({ args: ["tools"], options: { tools: "./tools.ts", targets: "azure" } }, { load: quiet }),
+      aiToolsAction(
+        { args: ["tools"], options: { tools: "./tools.ts", targets: "azure" } },
+        { load: quiet },
+      ),
     ).rejects.toThrow("Unknown --targets azure");
     await expect(
-      aiToolsAction({ args: ["tools"], options: { tools: "./tools.ts", warnAbove: "lots" } }, { load: quiet }),
+      aiToolsAction(
+        { args: ["tools"], options: { tools: "./tools.ts", warnAbove: "lots" } },
+        { load: quiet },
+      ),
     ).rejects.toThrow("--warn-above");
     expect(quiet).not.toHaveBeenCalled();
   });
@@ -141,12 +156,18 @@ describe("warlock ai tools", () => {
       ),
     ).rejects.toThrow("Install it in this project");
     await expect(
-      aiToolsAction({ args: ["tools"], options: { tools: "./tools.ts" } }, { load: async () => ({}) }),
+      aiToolsAction(
+        { args: ["tools"], options: { tools: "./tools.ts" } },
+        { load: async () => ({}) },
+      ),
     ).rejects.toThrow("5.38.0 or newer");
     await expect(
       aiToolsAction(
         { args: ["tools"], options: { tools: "./tools.ts" } },
-        { load: async (specifier) => (specifier === "@warlock.js/ai" ? api : { default: [{ name: 1 }] }) },
+        {
+          load: async (specifier) =>
+            specifier === "@warlock.js/ai" ? api : { default: [{ name: 1 }] },
+        },
       ),
     ).rejects.toThrow("array of tool configs");
   });

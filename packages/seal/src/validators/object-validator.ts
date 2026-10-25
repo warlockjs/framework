@@ -336,9 +336,9 @@ export class ObjectValidator<TSchema extends Schema = Schema> extends BaseValida
    * ```
    */
   public withoutInternal(): ObjectValidator<Omit<TSchema, InternalKeys<TSchema>>> {
-    return this.without(...(this.internalKeys() as (keyof TSchema)[])) as unknown as ObjectValidator<
-      Omit<TSchema, InternalKeys<TSchema>>
-    >;
+    return this.without(
+      ...(this.internalKeys() as (keyof TSchema)[]),
+    ) as unknown as ObjectValidator<Omit<TSchema, InternalKeys<TSchema>>>;
   }
 
   /**

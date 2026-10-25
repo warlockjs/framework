@@ -42,7 +42,10 @@ describe("collectWiring", () => {
     provided: true,
     definedIn: path.join(cwd, "src/app/posts/capabilities.ts"),
     providedBy: path.join(cwd, "src/app/posts/main.ts"),
-    consumers: [path.join(cwd, "src/app/posts/services/b.service.ts"), path.join(cwd, "src/app/posts/services/a.service.ts")],
+    consumers: [
+      path.join(cwd, "src/app/posts/services/b.service.ts"),
+      path.join(cwd, "src/app/posts/services/a.service.ts"),
+    ],
     ...overrides,
   });
 
@@ -59,8 +62,20 @@ describe("collectWiring", () => {
 
     expect(wiring).toEqual([
       { type: "file", role: "config", file: "src/config/http.ts", module: "src/config", order: 1 },
-      { type: "file", role: "main", file: "src/app/posts/main.ts", module: "src/app/posts", order: 2 },
-      { type: "file", role: "route", file: "src/app/posts/routes.ts", module: "src/app/posts", order: 3 },
+      {
+        type: "file",
+        role: "main",
+        file: "src/app/posts/main.ts",
+        module: "src/app/posts",
+        order: 2,
+      },
+      {
+        type: "file",
+        role: "route",
+        file: "src/app/posts/routes.ts",
+        module: "src/app/posts",
+        order: 3,
+      },
     ]);
   });
 
@@ -80,7 +95,11 @@ describe("collectWiring", () => {
   });
 
   it("reports an unprovided capability with no provider file", () => {
-    const [entry] = collectWiring(cwd, [], [slot({ provided: false, providedBy: null, consumers: [] })]);
+    const [entry] = collectWiring(
+      cwd,
+      [],
+      [slot({ provided: false, providedBy: null, consumers: [] })],
+    );
 
     expect(entry).toMatchObject({ provided: false, providedBy: null, consumers: [] });
   });

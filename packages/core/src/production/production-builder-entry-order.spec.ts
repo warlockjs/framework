@@ -129,7 +129,11 @@ describe("ProductionBuilder generated entry order", () => {
     const locales = generated["locales.ts"]!;
     const feature = locales
       .split("\n")
-      .find((line) => line.includes("posts/utils/locales/comments.json") && line.startsWith("registerLocaleDictionary"));
+      .find(
+        (line) =>
+          line.includes("posts/utils/locales/comments.json") &&
+          line.startsWith("registerLocaleDictionary"),
+      );
 
     expect(locales).toContain("../../src/app/posts/utils/locales/comments.json");
     expect(feature).toContain('defaultNamespace: "posts"');

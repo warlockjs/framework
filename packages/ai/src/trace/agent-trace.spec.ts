@@ -15,7 +15,9 @@ const stringSchema: StandardSchemaV1<unknown> = {
     version: 1,
     vendor: "test",
     validate: (value: unknown) =>
-      typeof value === "object" && value !== null && typeof (value as { query?: unknown }).query === "string"
+      typeof value === "object" &&
+      value !== null &&
+      typeof (value as { query?: unknown }).query === "string"
         ? { value }
         : { issues: [{ message: "expected a query string" }] },
   },
@@ -52,7 +54,7 @@ function tracedAgent(
       model,
       systemPrompt: "You are a coach.",
       tools: [lookupTool()],
-      trace: { store, text: true },
+      trace: { enabled: true, store, text: true },
       ...extra,
     }),
   };
@@ -156,7 +158,11 @@ describe("agent({ trace })", () => {
   it("records the system prompt, tools offered, calls, results, usage and cost per turn", async () => {
     const model = build(
       [
-        { content: "Looking.", toolCalls: [call({ query: "squat" })], usage: { input: 100, output: 20 } },
+        {
+          content: "Looking.",
+          toolCalls: [call({ query: "squat" })],
+          usage: { input: 100, output: 20 },
+        },
         { content: "Found it.", usage: { input: 150, output: 30 } },
       ],
       { input: 1, output: 2 },
@@ -276,7 +282,7 @@ describe("agent({ trace })", () => {
       model: build([{ content: "secret reply" }]),
       systemPrompt: "You are a coach.",
       tools: [lookupTool()],
-      trace: { store, text: false },
+      trace: { enabled: true, store, text: false },
     });
 
     const result = await coach.execute("go");
@@ -308,7 +314,7 @@ describe("agent({ trace })", () => {
     const traced = await agent({
       model: build(responses),
       tools: [lookupTool()],
-      trace: { store: createAgentTraceStore() },
+      trace: { enabled: true, store: createAgentTraceStore() },
     }).execute("go");
 
     expect(traced.text).toBe(plain.text);
@@ -326,14 +332,17 @@ describe("agent trace redaction", () => {
     });
     const store = createAgentTraceStore();
     const model = build([
-      { content: "", toolCalls: [{ id: "c1", name: "login", input: { query: "u", apiKey: "k-1" } }] },
+      {
+        content: "",
+        toolCalls: [{ id: "c1", name: "login", input: { query: "u", apiKey: "k-1" } }],
+      },
       { content: "ok" },
     ]);
 
     const result = await agent({
       model,
       tools: [secretTool],
-      trace: { store },
+      trace: { enabled: true, store },
     }).execute("log me in");
     const call0 = store.get(result.report.runId)!.turns[0]!.toolCalls[0]!;
 
@@ -349,7 +358,7 @@ describe("agent trace redaction", () => {
     const coach = agent({
       model: build([{ content: "Your key is sk-live-ABCDEF123456." }]),
       systemPrompt: "Use key sk-live-ABCDEF123456 for the API.",
-      trace: { store, text: true },
+      trace: { enabled: true, store, text: true },
     });
 
     const result = await coach.execute("what is my key sk-live-ABCDEF123456?");
@@ -362,7 +371,10 @@ describe("agent trace redaction", () => {
   it("applies extra redact keys and cuts long strings", async () => {
     const store = createAgentTraceStore();
     const model = build([
-      { content: "", toolCalls: [{ id: "c1", name: "echo", input: { note: "n".repeat(50), memberCode: "m-9" } }] },
+      {
+        content: "",
+        toolCalls: [{ id: "c1", name: "echo", input: { note: "n".repeat(50), memberCode: "m-9" } }],
+      },
       { content: "ok" },
     ]);
     const echo = tool({
@@ -374,9 +386,12 @@ describe("agent trace redaction", () => {
     const result = await agent({
       model,
       tools: [echo],
-      trace: { store, redact: { keys: ["memberCode"] }, maxStringLength: 10 },
+      trace: { enabled: true, store, redact: { keys: ["memberCode"] }, maxStringLength: 10 },
     }).execute("go");
-    const input = store.get(result.report.runId)!.turns[0]!.toolCalls[0]!.input as Record<string, string>;
+    const input = store.get(result.report.runId)!.turns[0]!.toolCalls[0]!.input as Record<
+      string,
+      string
+    >;
 
     expect(input.memberCode).toBe("[REDACTED]");
     expect(input.note).toMatch(/^n{10}\.\.\.\[40 more characters\]$/);
@@ -390,7 +405,7 @@ describe("diffAgentTraces()", () => {
       model: build([{ content: "ok" }]),
       systemPrompt,
       tools: [lookupTool(undefined, description)],
-      trace: { store, text: true },
+      trace: { enabled: true, store, text: true },
     }).execute("go");
 
     return store.get(result.report.runId)!;

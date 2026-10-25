@@ -611,7 +611,10 @@ export function createWarlockMcpTools(context: WarlockMcpContext): WarlockMcpToo
           type: "string",
           description: "Only this status (404) or class (5xx).",
         },
-        route: { type: "string", description: "Only routes whose name or pattern contains this text." },
+        route: {
+          type: "string",
+          description: "Only routes whose name or pattern contains this text.",
+        },
         method: { type: "string", description: "Only this HTTP method." },
         since: {
           type: "string",

@@ -47,13 +47,13 @@ The type given to `defineCapability` is checked by `provideCapability` and retur
 
 ## The API
 
-| Call | What it does |
-| --- | --- |
-| `defineCapability<T>(name, options?)` | Declares the slot. `options.description` is shown by `inspect`. `options.required` (default `true`) decides whether `doctor` warns about a missing provider. Defining the same name again (a hot reload) updates the declaration and keeps the provider. |
-| `provideCapability(capability, implementation)` | Fills the slot; a second call replaces the first. |
-| `useCapability(capability)` | Returns the implementation, or throws `CapabilityNotProvidedError` (`WL2008`) naming the fix when nothing provided it. |
-| `hasCapability(capability)` | Whether something provided it; the way to use an optional capability. |
-| `listCapabilities()` | Every capability with `provided`, `definedIn`, `providedBy` and `consumers`. |
+| Call                                            | What it does                                                                                                                                                                                                                                             |
+| ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `defineCapability<T>(name, options?)`           | Declares the slot. `options.description` is shown by `inspect`. `options.required` (default `true`) decides whether `doctor` warns about a missing provider. Defining the same name again (a hot reload) updates the declaration and keeps the provider. |
+| `provideCapability(capability, implementation)` | Fills the slot; a second call replaces the first.                                                                                                                                                                                                        |
+| `useCapability(capability)`                     | Returns the implementation, or throws `CapabilityNotProvidedError` (`WL2008`) naming the fix when nothing provided it.                                                                                                                                   |
+| `hasCapability(capability)`                     | Whether something provided it; the way to use an optional capability.                                                                                                                                                                                    |
+| `listCapabilities()`                            | Every capability with `provided`, `definedIn`, `providedBy` and `consumers`.                                                                                                                                                                             |
 
 Capability names are process-wide strings, so prefix them with the module (`billing.invoiceMailer`).
 

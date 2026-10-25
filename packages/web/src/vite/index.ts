@@ -33,11 +33,7 @@ export type {
   BuildHydrationClientResult,
   HydrationClientBuildOutput,
 } from "./build-client";
-export {
-  ChunkIntegrityError,
-  CHUNK_INTEGRITY_FILE,
-  readChunkIntegrity,
-} from "./chunk-integrity";
+export { ChunkIntegrityError, CHUNK_INTEGRITY_FILE, readChunkIntegrity } from "./chunk-integrity";
 export type { ChunkIntegrityConflict, ChunkIntegrityRecord } from "./chunk-integrity";
 export { gateAResolve } from "./gate-a-resolve";
 export type {

@@ -25,7 +25,12 @@ describe("resolveRequestLogConfig", () => {
       strictHeaders: false,
       retention: { maxDays: 14, maxSizeMb: 256 },
     });
-    expect(resolved.include).toMatchObject({ headers: true, body: true, response: true, logs: true });
+    expect(resolved.include).toMatchObject({
+      headers: true,
+      body: true,
+      response: true,
+      logs: true,
+    });
   });
 
   it("is off outside development, and logs only errors with no bodies once enabled", () => {
@@ -63,7 +68,8 @@ describe("resolveRequestLogConfig", () => {
     });
     expect(resolved.include.phases).toBe(false);
     expect(
-      resolveRequestLogConfig({ enabled: true, include: { body: true } }, "production").include.body,
+      resolveRequestLogConfig({ enabled: true, include: { body: true } }, "production").include
+        .body,
     ).toBe(true);
   });
 

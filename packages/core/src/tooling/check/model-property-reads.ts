@@ -265,12 +265,16 @@ function annotatedModel(type: ast.Node | undefined): string | undefined {
 function producedModel(expression: ast.Node | undefined, facts: ModelFacts): string | undefined {
   if (!expression) return undefined;
 
-  const value = unwrap(expression.type === "AwaitExpression" ? ast.expressionOf(expression) : expression);
+  const value = unwrap(
+    expression.type === "AwaitExpression" ? ast.expressionOf(expression) : expression,
+  );
 
   if (ast.isNewExpression(value)) {
     const callee = unwrap(ast.expressionOf(value));
 
-    return callee.type === "Identifier" && resolveModel(callee.name, facts) ? callee.name : undefined;
+    return callee.type === "Identifier" && resolveModel(callee.name, facts)
+      ? callee.name
+      : undefined;
   }
 
   if (!ast.isCallExpression(value)) return undefined;
@@ -306,7 +310,8 @@ function instanceVariables(sourceFile: ast.SourceFile, facts: ModelFacts): Map<s
 
       declare(
         id.name,
-        annotatedModel(id.typeAnnotation?.typeAnnotation) ?? producedModel(node.init ?? undefined, facts),
+        annotatedModel(id.typeAnnotation?.typeAnnotation) ??
+          producedModel(node.init ?? undefined, facts),
       );
     } else if (
       node.type === "FunctionDeclaration" ||
@@ -331,7 +336,8 @@ function instanceVariables(sourceFile: ast.SourceFile, facts: ModelFacts): Map<s
 
 function enclosingModel(node: ast.Node, facts: ModelFacts): string | undefined {
   for (let current = ast.parentOf(node); current; current = ast.parentOf(current)) {
-    if (current.type === "MethodDefinition" && Reflect.get(current, "static") === true) return undefined;
+    if (current.type === "MethodDefinition" && Reflect.get(current, "static") === true)
+      return undefined;
     if (ast.isClassDeclaration(current)) {
       const name = ast.declarationName(current);
 
@@ -373,11 +379,15 @@ function checkMember(
   if (!column || !resolved?.columns?.has(column) || resolved.members.has(column)) return;
 
   const parent = ast.parentOf(node);
-  const isCallee = parent && ast.isCallExpression(parent) && unwrap(ast.expressionOf(parent)) === node;
+  const isCallee =
+    parent && ast.isCallExpression(parent) && unwrap(ast.expressionOf(parent)) === node;
 
   if (isCallee) return;
 
-  if (parent?.type === "UpdateExpression" || (parent?.type === "UnaryExpression" && Reflect.get(parent, "operator") === "delete")) {
+  if (
+    parent?.type === "UpdateExpression" ||
+    (parent?.type === "UnaryExpression" && Reflect.get(parent, "operator") === "delete")
+  ) {
     return;
   }
 
@@ -388,7 +398,9 @@ function checkMember(
     const statement = ast.parentOf(assignment);
     const right = child(assignment, "right");
     const canFix =
-      Reflect.get(assignment, "operator") === "=" && statement?.type === "ExpressionStatement" && right;
+      Reflect.get(assignment, "operator") === "=" &&
+      statement?.type === "ExpressionStatement" &&
+      right;
 
     findings.push({
       code: "WL9021",

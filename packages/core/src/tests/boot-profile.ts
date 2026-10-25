@@ -163,14 +163,14 @@ export function formatBootProfile(
   profile: BootProfile,
   server?: { steps: Record<string, number> },
 ): string[] {
-  const phases = PHASE_ORDER.map((phase) => `${phase}=${formatMs(profile.phases[phase])}`).join(" ");
+  const phases = PHASE_ORDER.map((phase) => `${phase}=${formatMs(profile.phases[phase])}`).join(
+    " ",
+  );
   const connectors = Object.entries(profile.connectors)
     .sort((a, b) => b[1] - a[1])
     .map(([name, ms]) => `${name}=${formatMs(ms)}`)
     .join(" ");
-  const lines = [
-    `[warlock:test] boot phases ${phases} test=${formatMs(profile.bodyMs)}`,
-  ];
+  const lines = [`[warlock:test] boot phases ${phases} test=${formatMs(profile.bodyMs)}`];
 
   if (connectors) lines.push(`[warlock:test] connectors ${connectors}`);
 

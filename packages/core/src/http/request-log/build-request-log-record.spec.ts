@@ -114,7 +114,10 @@ describe("buildRequestLogRecord", () => {
 
     const withBodies = buildRequestLogRecord(
       input(),
-      resolveRequestLogConfig({ enabled: true, include: { body: true, response: true } }, "production"),
+      resolveRequestLogConfig(
+        { enabled: true, include: { body: true, response: true } },
+        "production",
+      ),
     );
 
     expect(withBodies.body).toEqual({ name: "Ada" });
@@ -198,7 +201,11 @@ describe("buildRequestLogRecord", () => {
 
     const metadata = { file: "avatar.png", mimeType: "image/png" };
 
-    expect(record.body).toEqual({ avatar: metadata, gallery: [metadata], nested: { doc: metadata } });
+    expect(record.body).toEqual({
+      avatar: metadata,
+      gallery: [metadata],
+      nested: { doc: metadata },
+    });
   });
 
   it("truncates a large body with a marker", () => {
@@ -249,7 +256,10 @@ describe("buildRequestLogRecord", () => {
 
     const record = buildRequestLogRecord(
       input(extra),
-      resolveRequestLogConfig({ include: { phases: false, logs: false, queries: false } }, "development"),
+      resolveRequestLogConfig(
+        { include: { phases: false, logs: false, queries: false } },
+        "development",
+      ),
     );
 
     expect(record).not.toHaveProperty("phases");

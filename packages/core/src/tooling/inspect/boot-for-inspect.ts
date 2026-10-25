@@ -31,7 +31,9 @@ export function wiringFilesFromBoot(): WiringSourceFile[] {
   const collector = filesOrchestrator.specialFilesCollector;
 
   return [
-    ...collector.getFilesByType("config").map((file) => ({ role: "config" as const, file: file.relativePath })),
+    ...collector
+      .getFilesByType("config")
+      .map((file) => ({ role: "config" as const, file: file.relativePath })),
     ...SPECIAL_TYPES.flatMap((type) =>
       collector.getFilesByType(type).map((file) => ({ role: type, file: file.relativePath })),
     ),

@@ -45,7 +45,8 @@ export const upgradeCommand = command({
     },
     {
       text: "--skip-install",
-      description: "With --check: apply the upgrade to the copy but install nothing and run no project command",
+      description:
+        "With --check: apply the upgrade to the copy but install nothing and run no project command",
       type: "boolean",
     },
     {

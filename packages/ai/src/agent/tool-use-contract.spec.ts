@@ -131,8 +131,12 @@ describe("agent({ actWhenAsked })", () => {
     await agent({ model, tools: [updatePlan()], actWhenAsked }).execute("swap squats");
 
     const messages = model.callHistory[1]!.messages;
-    const offer = messages.findIndex((m) => m.role === "assistant" && m.content === "Want me to swap it?");
-    const hint = messages.findIndex((m) => m.role === "user" && m.content === defaultActHint(["update_plan"]));
+    const offer = messages.findIndex(
+      (m) => m.role === "assistant" && m.content === "Want me to swap it?",
+    );
+    const hint = messages.findIndex(
+      (m) => m.role === "user" && m.content === defaultActHint(["update_plan"]),
+    );
 
     expect(offer).toBeGreaterThan(-1);
     expect(hint).toBe(offer + 1);
@@ -322,7 +326,10 @@ describe("agent({ onToolRefusal })", () => {
     await agent({
       model,
       tools: [updatePlan(async () => "locked")],
-      onToolRefusal: { retries: 2, isRefusal: (c) => (c.output === "locked" ? "plan is locked" : false) },
+      onToolRefusal: {
+        retries: 2,
+        isRefusal: (c) => (c.output === "locked" ? "plan is locked" : false),
+      },
     }).execute("hello");
 
     // call, give-up, retry 1, give-up (the refusal list was cleared by retry 1).
@@ -352,7 +359,10 @@ describe("agent({ backstops })", () => {
   it("runs an after backstop on the final answer and re-prompts with its prompt", async () => {
     const run = vi.fn(async () => ({ prompt: "Mention the safety line." }));
     const detect = vi.fn((turn: { reply?: string }) => !(turn.reply ?? "").includes("safety"));
-    const model = build([{ content: "Do three sets." }, { content: "Do three sets. Safety first." }]);
+    const model = build([
+      { content: "Do three sets." },
+      { content: "Do three sets. Safety first." },
+    ]);
 
     const result = await agent({
       model,
@@ -404,7 +414,13 @@ describe("agent({ backstops })", () => {
     }).execute("go");
 
     expect(seen).toEqual([
-      { agent: "coach", input: "go", reply: "Final.", tools: ["update_plan"], state: { seen: true } },
+      {
+        agent: "coach",
+        input: "go",
+        reply: "Final.",
+        tools: ["update_plan"],
+        state: { seen: true },
+      },
     ]);
     expect(model.callCount).toBe(2);
   });
@@ -438,7 +454,9 @@ describe("agent({ backstops })", () => {
   it("does nothing when no backstop fires", async () => {
     const model = build([{ content: "Fine." }]);
 
-    await agent({ model, backstops: [{ detect: () => false, run: () => undefined }] }).execute("go");
+    await agent({ model, backstops: [{ detect: () => false, run: () => undefined }] }).execute(
+      "go",
+    );
 
     expect(model.callCount).toBe(1);
   });

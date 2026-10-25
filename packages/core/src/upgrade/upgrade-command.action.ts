@@ -48,7 +48,9 @@ export async function runUpgradeCommand(
         ...(options.from !== undefined && options.from !== true && { from: String(options.from) }),
         skipInstall: Boolean(options.skipInstall),
         keep: Boolean(options.keep),
-        ...(positive(options.timeoutMinutes) && { timeoutMinutes: positive(options.timeoutMinutes) }),
+        ...(positive(options.timeoutMinutes) && {
+          timeoutMinutes: positive(options.timeoutMinutes),
+        }),
         ...(positive(options.memoryMb) && { memoryMb: positive(options.memoryMb) }),
       });
 

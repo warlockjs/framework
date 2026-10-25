@@ -165,7 +165,9 @@ describe("WL9021 fixes", () => {
 
   it("rewrites reads to get()", () => {
     expect(
-      fixed(`${prelude}async function f() { const user = await User.find(1); return user.email.trim(); }`),
+      fixed(
+        `${prelude}async function f() { const user = await User.find(1); return user.email.trim(); }`,
+      ),
     ).toContain('return user.get("email").trim();');
   });
 

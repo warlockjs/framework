@@ -9,9 +9,9 @@ describe("default seal attribute translation", () => {
   it("uses the translated label under attributes.<field>", () => {
     extend("en", { attributes: { weight_kg: "Weight" } });
 
-    expect(
-      translateSealAttribute({ attribute: "weight_kg", key: "weight_kg", translate }),
-    ).toBe("Weight");
+    expect(translateSealAttribute({ attribute: "weight_kg", key: "weight_kg", translate })).toBe(
+      "Weight",
+    );
   });
 
   it("uses validation.attributes.<field> when no attribute group is configured", () => {

@@ -100,7 +100,8 @@ export const validationLabelsCheck: DoctorCheck = {
       if (missing.length === 0) continue;
 
       const listed = missing.slice(0, LISTED_FIELDS).join(", ");
-      const rest = missing.length > LISTED_FIELDS ? ` and ${missing.length - LISTED_FIELDS} more` : "";
+      const rest =
+        missing.length > LISTED_FIELDS ? ` and ${missing.length - LISTED_FIELDS} more` : "";
 
       lines.push(`  - ${locale}: ${listed}${rest}`);
     }

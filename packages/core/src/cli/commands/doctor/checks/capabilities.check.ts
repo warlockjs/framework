@@ -25,7 +25,9 @@ export const capabilitiesCheck: DoctorCheck = {
 
     if (capabilities.length === 0 || !context.booted) return undefined;
 
-    const missing = capabilities.filter((capability) => capability.required && !capability.provided);
+    const missing = capabilities.filter(
+      (capability) => capability.required && !capability.provided,
+    );
 
     if (missing.length > 0) {
       return {

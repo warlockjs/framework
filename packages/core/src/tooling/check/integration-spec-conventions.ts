@@ -68,7 +68,10 @@ function touchesApp(
 
     const targetSource = readSource(cwd, target);
 
-    if (targetSource !== undefined && touchesApp(target, targetSource, cwd, resolve, depth - 1, seen)) {
+    if (
+      targetSource !== undefined &&
+      touchesApp(target, targetSource, cwd, resolve, depth - 1, seen)
+    ) {
       return true;
     }
   }

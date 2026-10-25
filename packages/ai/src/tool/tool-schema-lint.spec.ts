@@ -42,7 +42,11 @@ const strictObject: JsonSchema = {
 
 describe("describeToolSchema()", () => {
   it("reports a clean tool with its estimated token cost and a stable hash", () => {
-    const tool = { name: "get_weather", description: "Weather by city", input: fixed(strictObject) };
+    const tool = {
+      name: "get_weather",
+      description: "Weather by city",
+      input: fixed(strictObject),
+    };
 
     const report = describeToolSchema(tool);
 
@@ -119,7 +123,9 @@ describe("describeToolSchema()", () => {
     });
 
     const byMessage = (needle: string) =>
-      report.issues.find((issue) => issue.code === "unsupported-keyword" && issue.message.includes(needle));
+      report.issues.find(
+        (issue) => issue.code === "unsupported-keyword" && issue.message.includes(needle),
+      );
 
     expect(byMessage('"oneOf"')?.targets).toEqual(["openai-strict"]);
     expect(byMessage('"oneOf"')?.message).toContain("use anyOf");

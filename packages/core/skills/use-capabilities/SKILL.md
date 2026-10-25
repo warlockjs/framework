@@ -39,13 +39,13 @@ export async function sendInvoice(invoiceId: string) {
 
 ## The API
 
-| Call                                          | Does                                                                                                                      |
-| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `defineCapability<T>(name, options?)`         | Declares the slot. `options.description` is shown by `inspect`; `options.required` (default `true`) drives the doctor warning. Defining a name again updates it and keeps the provider. |
-| `provideCapability(capability, implementation)` | Fills the slot. A second call replaces the first.                                                                       |
-| `useCapability(capability)`                   | Returns the implementation. Throws `CapabilityNotProvidedError` (`WL2008`) when nothing provided it.                       |
-| `hasCapability(capability)`                   | `true` when something provided it. Use it for an optional capability (`required: false`).                                  |
-| `listCapabilities()`                          | Every defined capability with `provided`, `definedIn`, `providedBy` and `consumers` (absolute files, best effort).         |
+| Call                                            | Does                                                                                                                                                                                    |
+| ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `defineCapability<T>(name, options?)`           | Declares the slot. `options.description` is shown by `inspect`; `options.required` (default `true`) drives the doctor warning. Defining a name again updates it and keeps the provider. |
+| `provideCapability(capability, implementation)` | Fills the slot. A second call replaces the first.                                                                                                                                       |
+| `useCapability(capability)`                     | Returns the implementation. Throws `CapabilityNotProvidedError` (`WL2008`) when nothing provided it.                                                                                    |
+| `hasCapability(capability)`                     | `true` when something provided it. Use it for an optional capability (`required: false`).                                                                                               |
+| `listCapabilities()`                            | Every defined capability with `provided`, `definedIn`, `providedBy` and `consumers` (absolute files, best effort).                                                                      |
 
 Names are global strings: prefix them with the module (`billing.invoiceMailer`). The type parameter of `defineCapability` is checked at `provideCapability` and returned by `useCapability`; the name is not, so export the capability from the declaring module and import it, never re-declare the name.
 

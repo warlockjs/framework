@@ -37,7 +37,12 @@ export type UnitGuardViolation = {
 const DEFAULT_INCLUDE = /\.spec\.[cm]?[jt]sx?$/;
 
 /** Named exports of `@warlock.js/core` that need a booted app. */
-const APP_EXPORTS = new Set(["connectorsManager", "ConnectorsManager", "bootstrap", "startHttpServer"]);
+const APP_EXPORTS = new Set([
+  "connectorsManager",
+  "ConnectorsManager",
+  "bootstrap",
+  "startHttpServer",
+]);
 
 /** Named exports of `@warlock.js/core/tests` that start the app or its HTTP stack. */
 const APP_TEST_EXPORTS = new Set([
@@ -52,8 +57,7 @@ const APP_TEST_EXPORTS = new Set([
   "actingAs",
 ]);
 
-const IMPORT_STATEMENT =
-  /\bimport\s+(?:type\s+)?(?:([\w$*\s,{}]+?)\s+from\s+)?["']([^"']+)["']/g;
+const IMPORT_STATEMENT = /\bimport\s+(?:type\s+)?(?:([\w$*\s,{}]+?)\s+from\s+)?["']([^"']+)["']/g;
 
 function stripComments(code: string): string {
   return code.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:\\])\/\/.*$/gm, "$1");

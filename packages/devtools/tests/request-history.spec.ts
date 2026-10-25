@@ -42,7 +42,12 @@ describe("mergeRequestHistory", () => {
     const merged = mergeRequestHistory([live("a", 3000), live("b", 1000)], [row("c", 2000)], 10);
 
     expect(merged.map((item) => item.id)).toEqual(["a", "c", "b"]);
-    expect(merged[1]).toMatchObject({ persisted: true, queryCount: 4, warningCount: 1, path: "/old" });
+    expect(merged[1]).toMatchObject({
+      persisted: true,
+      queryCount: 4,
+      warningCount: 1,
+      path: "/old",
+    });
   });
 
   it("does not duplicate a request found in both, and keeps the live one", () => {
@@ -72,14 +77,25 @@ describe("row conversion", () => {
       status: 200,
       time: "2026-01-01T00:00:00.000Z",
     });
-    expect(rowToSummary(summaryToRow(summary))).toMatchObject({ id: "a", startedAt: summary.startedAt });
+    expect(rowToSummary(summaryToRow(summary))).toMatchObject({
+      id: "a",
+      startedAt: summary.startedAt,
+    });
   });
 });
 
 describe("filterFromQuery", () => {
   it("reads the known filters and ignores the rest", () => {
     expect(
-      filterFromQuery({ status: " 5xx ", route: "", method: "post", q: "abc", since: "1h", other: "x", limit: "20" }),
+      filterFromQuery({
+        status: " 5xx ",
+        route: "",
+        method: "post",
+        q: "abc",
+        since: "1h",
+        other: "x",
+        limit: "20",
+      }),
     ).toEqual({ status: "5xx", method: "post", q: "abc", since: "1h", limit: 20 });
   });
 

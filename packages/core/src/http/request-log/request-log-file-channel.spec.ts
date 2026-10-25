@@ -18,7 +18,11 @@ afterEach(() => {
   }
 });
 
-function file(name: string, sizeMb = 1, modifiedAt = Date.parse(name.slice(0, 10))): RequestLogFile {
+function file(
+  name: string,
+  sizeMb = 1,
+  modifiedAt = Date.parse(name.slice(0, 10)),
+): RequestLogFile {
   return { name, sizeBytes: sizeMb * MB, modifiedAt };
 }
 
@@ -114,7 +118,10 @@ describe("RequestLogFileChannel", () => {
     expect(files).toHaveLength(1);
     expect(files[0]).toMatch(/^\d{4}-\d{2}-\d{2}\.jsonl$/);
 
-    const lines = fs.readFileSync(path.join(storagePath, files[0] as string), "utf8").trim().split("\n");
+    const lines = fs
+      .readFileSync(path.join(storagePath, files[0] as string), "utf8")
+      .trim()
+      .split("\n");
 
     expect(lines.map((line) => JSON.parse(line).id)).toEqual(["a", "b"]);
   });

@@ -23,7 +23,11 @@ describe("listInstalledSkills", () => {
   }
 
   it("reads skills/<slug>/SKILL.md", () => {
-    skill("core", "warlock-doctor/SKILL.md", "---\nname: warlock-doctor\ndescription: Run the doctor.\n---\n");
+    skill(
+      "core",
+      "warlock-doctor/SKILL.md",
+      "---\nname: warlock-doctor\ndescription: Run the doctor.\n---\n",
+    );
 
     expect(listInstalledSkills(cwd)).toEqual([
       {
@@ -37,7 +41,11 @@ describe("listInstalledSkills", () => {
   });
 
   it("reads a package's single skills/SKILL.md and slugs it from the front-matter name", () => {
-    skill("ai-anthropic", "SKILL.md", "---\nname: setup-anthropic\ndescription: Wire Anthropic.\n---\n");
+    skill(
+      "ai-anthropic",
+      "SKILL.md",
+      "---\nname: setup-anthropic\ndescription: Wire Anthropic.\n---\n",
+    );
 
     expect(listInstalledSkills(cwd)).toEqual([
       {

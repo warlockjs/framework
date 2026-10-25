@@ -218,8 +218,7 @@ export async function buildHydrationClient(
 
   const outDir = path.resolve(options.outDir);
   // Read before the build: `emptyOutDir` removes the previous record with the rest.
-  const previousIntegrity =
-    options.previousIntegrity ?? (await readChunkIntegrity(outDir));
+  const previousIntegrity = options.previousIntegrity ?? (await readChunkIntegrity(outDir));
   const manifestPath = path.join(outDir, ".vite/manifest.json");
   const { build, createLogger, version } = await import("vite");
   assertViteVersion(version);

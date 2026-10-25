@@ -81,7 +81,12 @@ describe("detectPackageManager", () => {
     async (marker, expected) => {
       mkdirSync(path.join(app, "node_modules"), { recursive: true });
       writeFileSync(path.join(app, "node_modules", marker), "");
-      for (const file of ["pnpm-workspace.yaml", "pnpm-lock.yaml", "package-lock.json", "yarn.lock"])
+      for (const file of [
+        "pnpm-workspace.yaml",
+        "pnpm-lock.yaml",
+        "package-lock.json",
+        "yarn.lock",
+      ])
         writeFileSync(path.join(app, file), "{}");
 
       const detection = await detectPackageManagerDetails(app);

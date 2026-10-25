@@ -79,7 +79,13 @@ export function fixtureReport(): InspectReport {
     resources: [],
     wiring: [
       { type: "file", role: "config", file: "src/config/http.ts", module: "src/config", order: 1 },
-      { type: "file", role: "main", file: "src/app/posts/main.ts", module: "src/app/posts", order: 2 },
+      {
+        type: "file",
+        role: "main",
+        file: "src/app/posts/main.ts",
+        module: "src/app/posts",
+        order: 2,
+      },
       {
         type: "file",
         role: "route",

@@ -14,9 +14,9 @@ warlock doctor --json   # machine-readable, each finding with its stable error c
 warlock doctor --fix    # also move legacy utils/locales.ts files into locales.json
 ```
 
-| Flag         | Type    | Description                                                                        |
-| ------------ | ------- | ---------------------------------------------------------------------------------- |
-| `--json, -j` | boolean | Print the report as JSON (below). stdout carries only the JSON.                    |
+| Flag         | Type    | Description                                                                                                                              |
+| ------------ | ------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `--json, -j` | boolean | Print the report as JSON (below). stdout carries only the JSON.                                                                          |
 | `--fix`      | boolean | Convert safely auto-convertible legacy `utils/locales.ts` files to `locales.json` (or `locales/legacy.json` when `locales.json` exists). |
 
 ```
@@ -34,16 +34,16 @@ Summary: 5 ok, 1 warn, 0 fail
 
 Six checks run in a fixed order — runtime-surface first, release hygiene last:
 
-| Check             | Status meaning                                                                                                                                                                                                              |
-| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `routes`          | Reports the number of registered routes. **`warn`** when zero (a route module probably failed to load silently).                                                                                                            |
-| `config`          | The required top-level config sections (`app`, `http`) are present. A missing one is a **`fail`**.                                                                                                                          |
-| `connectors`      | Lists the registered connectors and which are currently active. Informational — passes as long as it can enumerate.                                                                                                         |
-| `optional-peers`  | Probes the optional peer deps core knows how to use (`sharp`, `nodemailer`, `socket.io`, the AWS SDK family, `redis`, the DB drivers). Missing ones are a **`warn`** — that feature is simply unavailable, never a failure. |
+| Check             | Status meaning                                                                                                                                                                                                                                                                                                                         |
+| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `routes`          | Reports the number of registered routes. **`warn`** when zero (a route module probably failed to load silently).                                                                                                                                                                                                                       |
+| `config`          | The required top-level config sections (`app`, `http`) are present. A missing one is a **`fail`**.                                                                                                                                                                                                                                     |
+| `connectors`      | Lists the registered connectors and which are currently active. Informational — passes as long as it can enumerate.                                                                                                                                                                                                                    |
+| `optional-peers`  | Probes the optional peer deps core knows how to use (`sharp`, `nodemailer`, `socket.io`, the AWS SDK family, `redis`, the DB drivers). Missing ones are a **`warn`** — that feature is simply unavailable, never a failure.                                                                                                            |
 | `sites`           | In an app with `web.sites`, renders the root page of every site that has fixed hostnames through the development page pipeline and **fails** (`WL5005`) on any 5xx, naming the status, the phase and the page file. Dynamic sites (hosts resolved at runtime) are listed as not rendered. See [Multi-site render](#multi-site-render). |
-| `capabilities`    | **`warn`** (`WL2008`) for each required [capability](../digging-deeper/capabilities.md) that nothing provided while the app booted. Silent when the app defines none. |
-| `health`          | The built-in `/health` (liveness) and `/ready` (readiness) endpoints will be exposed. **`warn`** when disabled via `http.health.enabled = false`.                                                                           |
-| `release-hygiene` | The project `package.json` version matches the top `## x.y.z` heading in `CHANGELOG.md`. A mismatch is a **`fail`**; a missing/unparseable changelog is a **`warn`**.                                                       |
+| `capabilities`    | **`warn`** (`WL2008`) for each required [capability](../digging-deeper/capabilities.md) that nothing provided while the app booted. Silent when the app defines none.                                                                                                                                                                  |
+| `health`          | The built-in `/health` (liveness) and `/ready` (readiness) endpoints will be exposed. **`warn`** when disabled via `http.health.enabled = false`.                                                                                                                                                                                      |
+| `release-hygiene` | The project `package.json` version matches the top `## x.y.z` heading in `CHANGELOG.md`. A mismatch is a **`fail`**; a missing/unparseable changelog is a **`warn`**.                                                                                                                                                                  |
 
 ## Statuses and exit code
 
@@ -93,19 +93,19 @@ Every `warn` or `fail` finding carries a stable [error code](./error-codes.md), 
 }
 ```
 
-| Check                   | Codes it reports                                                                           |
-| ----------------------- | ------------------------------------------------------------------------------------------ |
-| `routes`                | `WL2001` a module failed to load, `WL2002` discovery failed, `WL3005` no routes registered |
-| `handler-signature`     | `WL3006` a v4 `(request, response)` handler                                                |
-| `config`                | `WL1001` a required section is missing                                                     |
-| `connectors`            | `WL1009` the connectors list was refused, `WL2003` a connector failed to boot              |
-| `optional-peers`        | `WL2007` a configured driver's package is not installed                                    |
-| `jwt-secret`            | `WL1002` no JWT signing secret                                                             |
-| `health`                | `WL5002` a route claims a probe path, `WL5003` probes not registered                       |
-| `sites`                 | `WL5005` a site's root page answered 5xx in development                                    |
-| `capabilities`          | `WL2008` a required capability has no provider after boot                                  |
+| Check                   | Codes it reports                                                                                 |
+| ----------------------- | ------------------------------------------------------------------------------------------------ |
+| `routes`                | `WL2001` a module failed to load, `WL2002` discovery failed, `WL3005` no routes registered       |
+| `handler-signature`     | `WL3006` a v4 `(request, response)` handler                                                      |
+| `config`                | `WL1001` a required section is missing                                                           |
+| `connectors`            | `WL1009` the connectors list was refused, `WL2003` a connector failed to boot                    |
+| `optional-peers`        | `WL2007` a configured driver's package is not installed                                          |
+| `jwt-secret`            | `WL1002` no JWT signing secret                                                                   |
+| `health`                | `WL5002` a route claims a probe path, `WL5003` probes not registered                             |
+| `sites`                 | `WL5005` a site's root page answered 5xx in development                                          |
+| `capabilities`          | `WL2008` a required capability has no provider after boot                                        |
 | `locales-ts-deprecated` | `WL9101` a legacy `utils/locales.ts`; the detail names each file and whether `--fix` converts it |
-| `release-hygiene`       | `WL9102` version and changelog disagree, `WL9103` changelog missing or unparseable         |
+| `release-hygiene`       | `WL9102` version and changelog disagree, `WL9103` changelog missing or unparseable               |
 
 ## Multi-site render
 

@@ -7,7 +7,7 @@ import type { UpgradeNote } from "./types";
 export const UPGRADE_NOTES: readonly UpgradeNote[] = [
   {
     version: "5.38.0",
-    text: "New apps (`warlock add test`, create-warlock) boot the test framework once per Vitest worker (`tests.lifetime: \"worker\"`, `resetDatabase: true`, `isolate: false`, one database per worker) and guard the unit project against app imports. Existing apps keep their test configuration unchanged; the `test-runtime-worker-lifetime` step lists where to opt in. A spec that changes global configuration opts out of a worker runtime with `setupTest({ lifetime: \"file\" })`.",
+    text: 'New apps (`warlock add test`, create-warlock) boot the test framework once per Vitest worker (`tests.lifetime: "worker"`, `resetDatabase: true`, `isolate: false`, one database per worker) and guard the unit project against app imports. Existing apps keep their test configuration unchanged; the `test-runtime-worker-lifetime` step lists where to opt in. A spec that changes global configuration opts out of a worker runtime with `setupTest({ lifetime: "file" })`.',
   },
   {
     version: "5.36.0",

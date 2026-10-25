@@ -890,10 +890,7 @@ function prepareSites(
     };
   });
 
-  const special = new Map<
-    string,
-    { notFound: string[]; error: string[]; forbidden: string[] }
-  >();
+  const special = new Map<string, { notFound: string[]; error: string[]; forbidden: string[] }>();
 
   for (const { pageFile } of pageFiles) {
     const unit = unitOwning(units, pageFile);

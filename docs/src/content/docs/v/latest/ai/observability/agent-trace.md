@@ -26,16 +26,16 @@ For each run (`AgentTrace`):
 Default: **on in development, off under a test runner and in production.** Control it per agent:
 
 ```ts
-ai.agent({ model, tools, trace: true });             // record everywhere; text only in development
-ai.agent({ model, tools, trace: false });            // never
+ai.agent({ model, tools, trace: true }); // record everywhere; text only in development
+ai.agent({ model, tools, trace: false }); // never
 ai.agent({
   model,
   tools,
   trace: {
-    text: true,                                      // keep prompt, schemas and replies
-    redact: { keys: ["memberCode"] },                // extra secret keys
-    maxStringLength: 4000,                           // cut long strings
-    store: myStore,                                  // default: the shared agentTraces store
+    text: true, // keep prompt, schemas and replies
+    redact: { keys: ["memberCode"] }, // extra secret keys
+    maxStringLength: 4000, // cut long strings
+    store: myStore, // default: the shared agentTraces store
   },
 });
 ```

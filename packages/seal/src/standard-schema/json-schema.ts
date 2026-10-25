@@ -133,7 +133,8 @@ export function wrapNullableStrict(schema: JsonSchemaResult): JsonSchemaResult {
     if (schema.const === null) return schema;
 
     const { const: constant, type, ...rest } = schema;
-    const branch: JsonSchemaResult = type === undefined ? { const: constant } : { const: constant, type };
+    const branch: JsonSchemaResult =
+      type === undefined ? { const: constant } : { const: constant, type };
 
     return { ...rest, anyOf: [branch, { ...NULL_BRANCH }] };
   }

@@ -35,10 +35,7 @@ function trace(runId: string, overrides: Partial<DevtoolsAgentTrace> = {}): Devt
     model: { name: "fake", provider: "mock" },
     usage: { input: 10, output: 5, total: 15 },
     cost: 0.001,
-    turns: [
-      { toolCalls: [{}, { refusal: "Exercise not in library" }] },
-      { toolCalls: [] },
-    ],
+    turns: [{ toolCalls: [{}, { refusal: "Exercise not in library" }] }, { toolCalls: [] }],
     ...overrides,
   };
 }
@@ -167,10 +164,7 @@ describe("attachAgentTraceSource()", () => {
 
 describe("agent trace routes", () => {
   async function fixture(development = true, path = "/__warlock") {
-    const fake = fakeStore([
-      trace("run_1", { status: "failed" }),
-      trace("run_2"),
-    ]);
+    const fake = fakeStore([trace("run_1", { status: "failed" }), trace("run_2")]);
     registry[AGENT_TRACES_KEY] = fake.store;
     const agentTraces = await attachAgentTraceSource();
     const options = resolveDevtoolsOptions({ path });

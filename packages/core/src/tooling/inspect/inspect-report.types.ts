@@ -217,7 +217,14 @@ export type InspectWarning = {
 };
 
 /** The kinds of file the framework loads on its own, in the order it loads them. */
-export const INSPECT_WIRING_ROLES = ["config", "locale", "event", "main", "route", "worker"] as const;
+export const INSPECT_WIRING_ROLES = [
+  "config",
+  "locale",
+  "event",
+  "main",
+  "route",
+  "worker",
+] as const;
 
 /** One auto-loaded file role. */
 export type InspectWiringRole = (typeof INSPECT_WIRING_ROLES)[number];

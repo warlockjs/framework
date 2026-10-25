@@ -329,7 +329,9 @@ describe("request_log tool", () => {
         status: 500,
         durationMs: 30,
         error: { message: "db down", name: "Error", stack: "Error: db down" },
-        logs: [{ level: "error", module: "http", action: "request-error", message: "db down", at: 1 }],
+        logs: [
+          { level: "error", module: "http", action: "request-error", message: "db down", at: 1 },
+        ],
         queries: { count: 2 },
       },
     ];
@@ -359,20 +361,31 @@ describe("request_log tool", () => {
     });
     expect(await run({ status: "5xx" })).toMatchObject({ requests: [{ id: "boom" }] });
     expect(await run({ status: "404" })).toMatchObject({ requests: [{ id: "gone" }] });
-    expect(await run({ route: "posts.list", limit: 1 })).toMatchObject({ requests: [{ id: "boom" }] });
+    expect(await run({ route: "posts.list", limit: 1 })).toMatchObject({
+      requests: [{ id: "boom" }],
+    });
   });
 
   it("returns one request in full by id", async () => {
     const tools = createWarlockMcpTools(fakeMcpContext({ cwd: logProject() }).context);
 
     expect(await tool(tools, "request_log").run({ id: "boom" })).toMatchObject({
-      request: { id: "boom", error: { stack: "Error: db down" }, queries: { count: 2 }, logs: [{ message: "db down" }] },
+      request: {
+        id: "boom",
+        error: { stack: "Error: db down" },
+        queries: { count: 2 },
+        logs: [{ message: "db down" }],
+      },
     });
-    await expect(tool(tools, "request_log").run({ id: "missing" })).rejects.toThrow(/No request with id/);
+    await expect(tool(tools, "request_log").run({ id: "missing" })).rejects.toThrow(
+      /No request with id/,
+    );
   });
 
   it("lists nothing when the app has no request log", async () => {
-    const tools = createWarlockMcpTools(fakeMcpContext({ cwd: "/definitely/not/a/project" }).context);
+    const tools = createWarlockMcpTools(
+      fakeMcpContext({ cwd: "/definitely/not/a/project" }).context,
+    );
 
     expect(await tool(tools, "request_log").run({})).toEqual({ requests: [] });
   });

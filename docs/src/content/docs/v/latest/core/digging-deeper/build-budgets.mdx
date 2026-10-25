@@ -69,10 +69,10 @@ A page's payload has seven sections. `warlock build` can measure two of them
 from what the build knows, for every page, and checks their sum against the
 page's limit:
 
-| Section        | At build | How                                                                                                                                                                                       |
-| -------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Section        | At build | How                                                                                                                                                                                        |
+| -------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `translations` | measured | The page's pruned dictionary (shared groups excluded) plus the shared-table pointer, for the largest locale. An upper bound: it prunes the whole dictionary, not only the page's own keys. |
-| `routes`       | measured | The browser route table of the named API routes the page's client code reaches. An upper bound: `web.namedApiRoutes` filters, site scoping and the guest rule only remove routes.        |
+| `routes`       | measured | The browser route table of the named API routes the page's client code reaches. An upper bound: `web.namedApiRoutes` filters, site scoping and the guest rule only remove routes.          |
 | `page`         | runtime  | Loader data exists only in a request.                                                                                                                                                      |
 | `layout`       | runtime  | Same.                                                                                                                                                                                      |
 | `app`          | runtime  | Same.                                                                                                                                                                                      |

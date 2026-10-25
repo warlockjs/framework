@@ -133,15 +133,19 @@ describe("finalizeChunkNames", () => {
       "leaf-AAAAAAAA.js": { code: "export const r=1;" },
     });
     const files = emitted(directory);
-    const manifest = JSON.parse(fs.readFileSync(path.join(directory, ".vite/manifest.json"), "utf8"));
+    const manifest = JSON.parse(
+      fs.readFileSync(path.join(directory, ".vite/manifest.json"), "utf8"),
+    );
     const modules = JSON.parse(
       fs.readFileSync(path.join(directory, ".vite/budget-modules.json"), "utf8"),
     );
 
     expect(Object.keys(manifest).sort()).toEqual(files.map((file) => `_${file}`));
-    expect(Object.values<{ file: string }>(manifest).map((entry) => entry.file).sort()).toEqual(
-      files.map((file) => `assets/${file}`),
-    );
+    expect(
+      Object.values<{ file: string }>(manifest)
+        .map((entry) => entry.file)
+        .sort(),
+    ).toEqual(files.map((file) => `assets/${file}`));
     expect(Object.keys(modules).sort()).toEqual(files.map((file) => `assets/${file}`));
   });
 

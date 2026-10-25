@@ -240,7 +240,9 @@ export function checkFileConventions(
       ...apiRouteReferenceFindings(sourceFile, apiRouteFacts),
       ...modelPropertyReadFindings(sourceFile, modelFacts),
       // Opt-in: a barrel is a finding only once `rules.WL9023` names a severity.
-      ...(["warning", "error"].includes(options.rules?.WL9023 ?? "") ? barrelFindings(sourceFile) : []),
+      ...(["warning", "error"].includes(options.rules?.WL9023 ?? "")
+        ? barrelFindings(sourceFile)
+        : []),
     ].map((finding) => findingProblem(sourceFile, relativePath, finding)),
   ];
   const lines = source.split(/\r?\n/);

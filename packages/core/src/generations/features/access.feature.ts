@@ -170,7 +170,10 @@ async function scaffoldAccessFiles() {
       ? accessResolverStub
       : accessResolverStub
           .replace('"app/access/models/role"', '"app/access/models/role/role.model"')
-          .replace('"app/access/models/user-role"', '"app/access/models/user-role/user-role.model"'),
+          .replace(
+            '"app/access/models/user-role"',
+            '"app/access/models/user-role/user-role.model"',
+          ),
   );
   console.log(`${colors.green("✓")} Created src/app/access/services/access-resolver.ts`);
 }

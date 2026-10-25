@@ -38,9 +38,20 @@ beforeEach(() => {
     record("broken", {
       status: 500,
       route: { pattern: "/users/:id", name: "users.show" },
-      error: { message: "db down", name: "Error", stack: "Error: db down\n    at repo.ts:1:1", phase: "loader" },
-      logs: [{ level: "error", module: "http", action: "request-error", message: "db down", at: 1 }],
-      queries: { count: 6, slowest: { durationMs: 20, query: "select ?" }, nPlusOne: [{ query: "select ?", count: 6 }] },
+      error: {
+        message: "db down",
+        name: "Error",
+        stack: "Error: db down\n    at repo.ts:1:1",
+        phase: "loader",
+      },
+      logs: [
+        { level: "error", module: "http", action: "request-error", message: "db down", at: 1 },
+      ],
+      queries: {
+        count: 6,
+        slowest: { durationMs: 20, query: "select ?" },
+        nPlusOne: [{ query: "select ?", count: 6 }],
+      },
       phases: [{ name: "handler", durationMs: 7 }],
     }),
   ];
@@ -60,7 +71,11 @@ describe("warlock logs requests", () => {
     const result = await runLogsCommand(["requests"], {}, { directory });
 
     expect(result.exitCode).toBe(0);
-    expect((result.json as Array<{ id: string }>).map((row) => row.id)).toEqual(["broken", "missing", "ok"]);
+    expect((result.json as Array<{ id: string }>).map((row) => row.id)).toEqual([
+      "broken",
+      "missing",
+      "ok",
+    ]);
     expect(result.lines[0]).toContain("broken");
     expect(result.lines[0]).toContain("! db down");
   });
@@ -78,7 +93,10 @@ describe("warlock logs requests", () => {
     const since = await runLogsCommand(["requests"], { since: "1h" }, { directory });
 
     expect((route.json as Array<{ id: string }>).map((row) => row.id)).toEqual(["broken"]);
-    expect((since.json as Array<{ id: string }>).map((row) => row.id)).toEqual(["broken", "missing"]);
+    expect((since.json as Array<{ id: string }>).map((row) => row.id)).toEqual([
+      "broken",
+      "missing",
+    ]);
   });
 
   it("limits the list", async () => {
@@ -88,7 +106,12 @@ describe("warlock logs requests", () => {
   });
 
   it("rejects a bad limit, status or since with exit code 1", async () => {
-    for (const options of [{ limit: "0" }, { limit: "x" }, { status: "teapot" }, { since: "soon" }]) {
+    for (const options of [
+      { limit: "0" },
+      { limit: "x" },
+      { status: "teapot" },
+      { since: "soon" },
+    ]) {
       const result = await runLogsCommand(["requests"], options, { directory });
 
       expect(result.exitCode).toBe(1);
@@ -144,7 +167,10 @@ describe("registration", () => {
   });
 
   it("is listed in the framework commands", () => {
-    const registry = fs.readFileSync(fileURLToPath(new URL("../../framework-cli-commands.ts", import.meta.url)), "utf8");
+    const registry = fs.readFileSync(
+      fileURLToPath(new URL("../../framework-cli-commands.ts", import.meta.url)),
+      "utf8",
+    );
 
     expect(registry).toMatch(/frameworkCommands = \[[\s\S]*logsCommand,/);
   });

@@ -223,7 +223,10 @@ describe("buildHydrationPayload — global translation delivery", () => {
   afterEach(() => installGlobalTranslationDelivery(undefined));
 
   it("prunes the registry once per request, however many payloads the render builds", () => {
-    const deliver = vi.fn(() => ({ keywords: { products: { title: "Products" } }, assets: undefined }));
+    const deliver = vi.fn(() => ({
+      keywords: { products: { title: "Products" } },
+      assets: undefined,
+    }));
     installGlobalTranslationDelivery({ sharedGroups: ["app"], deliver });
     const bundle = bundleOf();
 

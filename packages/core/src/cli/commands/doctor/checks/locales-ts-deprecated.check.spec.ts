@@ -55,7 +55,10 @@ describe("legacy utils/locales.ts migration", () => {
 
   it("writes locales/legacy.json when locales.json already exists and no key overlaps", () => {
     write("src/app/posts/utils/locales.ts", LEGACY);
-    write("src/app/posts/utils/locales.json", '{ "draft": { "en": "Draft", "ar": "Draft (ar)" } }\n');
+    write(
+      "src/app/posts/utils/locales.json",
+      '{ "draft": { "en": "Draft", "ar": "Draft (ar)" } }\n',
+    );
 
     const [inspection] = inspectLocaleSources();
     expect(inspection?.convertible).toBe(true);

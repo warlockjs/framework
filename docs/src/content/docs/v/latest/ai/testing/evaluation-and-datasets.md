@@ -209,7 +209,7 @@ Two built-in scorers catch an agent that talks about acting instead of acting:
 scorers: [
   ai.eval.requiredToolCalled({ tools: ["update_plan"], intents: [/\bswap\b/i] }),
   ai.eval.changeClaimedWithoutToolCall({ tools: ["update_plan"] }),
-]
+];
 ```
 
 `requiredToolCalled` fails with "required tool not called" when a case that asks for an action got no successful call to a required tool. `changeClaimedWithoutToolCall` fails with "change claimed without a tool call" when the reply says something was changed and no change tool completed. The agent options that prevent both are in the [tool-use contract](/v/latest/ai/agents/tool-use-contract/).

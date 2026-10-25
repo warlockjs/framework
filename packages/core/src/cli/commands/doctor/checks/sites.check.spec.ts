@@ -101,8 +101,12 @@ describe("renderSiteRoot", () => {
   });
 
   it("does not treat a redirect or a 404 as a failure", async () => {
-    expect((await renderSiteRoot(fakeServer({ "landing.test": { statusCode: 302 } }), target)).failure).toBeUndefined();
-    expect((await renderSiteRoot(fakeServer({ "landing.test": { statusCode: 404 } }), target)).failure).toBeUndefined();
+    expect(
+      (await renderSiteRoot(fakeServer({ "landing.test": { statusCode: 302 } }), target)).failure,
+    ).toBeUndefined();
+    expect(
+      (await renderSiteRoot(fakeServer({ "landing.test": { statusCode: 404 } }), target)).failure,
+    ).toBeUndefined();
   });
 
   it("names the phase and file of a 5xx from the page error panel", async () => {
@@ -180,7 +184,10 @@ describe("doctor sites check", () => {
   it("scans the router like the dev server and renders each site once", async () => {
     const server = fakeServer({});
     configure(
-      { landing: { hosts: ["landing.test"] }, client: { hosts: ["client.test"], basePath: "/app" } },
+      {
+        landing: { hosts: ["landing.test"] },
+        client: { hosts: ["client.test"], basePath: "/app" },
+      },
       server,
     );
 
@@ -211,10 +218,7 @@ describe("doctor sites check", () => {
   });
 
   it("mentions dynamic sites it could not render", async () => {
-    configure(
-      { landing: { hosts: ["landing.test"] }, tenants: { dynamic: true } },
-      fakeServer({}),
-    );
+    configure({ landing: { hosts: ["landing.test"] }, tenants: { dynamic: true } }, fakeServer({}));
 
     expect((await sitesCheck.run(context()))?.detail).toContain("tenants");
   });

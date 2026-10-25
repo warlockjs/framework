@@ -1,4 +1,9 @@
-import { isFile, isErrorPageFile, isForbiddenPageFile, layoutChainFor } from "../build/discover-pages";
+import {
+  isFile,
+  isErrorPageFile,
+  isForbiddenPageFile,
+  layoutChainFor,
+} from "../build/discover-pages";
 import { pageSetupFileFor } from "../build/page-setup-file";
 import type { TranslationUsage } from "@warlock.js/core";
 import {

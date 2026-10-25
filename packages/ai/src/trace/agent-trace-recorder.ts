@@ -56,7 +56,9 @@ export function resolveTraceOptions(
 
 function capStrings(value: unknown, max: number, depth = 0): unknown {
   if (typeof value === "string") {
-    return value.length > max ? `${value.slice(0, max)}...[${value.length - max} more characters]` : value;
+    return value.length > max
+      ? `${value.slice(0, max)}...[${value.length - max} more characters]`
+      : value;
   }
 
   if (depth >= MAX_VALUE_DEPTH || value === null || typeof value !== "object") return value;
@@ -239,11 +241,7 @@ export class AgentTraceRecorder {
   }
 
   /** Close the run. */
-  public finish(outcome: {
-    status: AgentTraceStatus;
-    usage: Usage;
-    error?: unknown;
-  }): void {
+  public finish(outcome: { status: AgentTraceStatus; usage: Usage; error?: unknown }): void {
     this.guard(() => {
       this.turn = undefined;
       this.trace.status = outcome.status;

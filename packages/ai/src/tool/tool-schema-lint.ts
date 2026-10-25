@@ -179,7 +179,9 @@ function walkSchema(node: unknown, path: string, visit: (node: SchemaNode, path:
   }
 
   if (Array.isArray(node.items)) {
-    node.items.forEach((child, index) => walkSchema(child, joinPath(path, `items.${index}`), visit));
+    node.items.forEach((child, index) =>
+      walkSchema(child, joinPath(path, `items.${index}`), visit),
+    );
   } else {
     walkSchema(node.items, joinPath(path, "items"), visit);
   }
@@ -192,7 +194,9 @@ function walkSchema(node: unknown, path: string, visit: (node: SchemaNode, path:
     const value = node[branch];
 
     if (Array.isArray(value)) {
-      value.forEach((child, index) => walkSchema(child, joinPath(path, `${branch}.${index}`), visit));
+      value.forEach((child, index) =>
+        walkSchema(child, joinPath(path, `${branch}.${index}`), visit),
+      );
     }
   }
 
@@ -350,7 +354,10 @@ export function describeToolSchema(
         }
       }
 
-      if (typeof node.description === "string" && node.description.length > maxPropertyDescription) {
+      if (
+        typeof node.description === "string" &&
+        node.description.length > maxPropertyDescription
+      ) {
         issues.add(
           {
             code: "oversized-description",
@@ -430,9 +437,7 @@ export function describeToolSchema(
     name: tool.name,
     tokens,
     descriptionChars: description.length,
-    schemaHash: hashText(
-      stableJson({ name: tool.name, description, parameters: sent ?? null }),
-    ),
+    schemaHash: hashText(stableJson({ name: tool.name, description, parameters: sent ?? null })),
     targets,
     issues: list,
     ok: !list.some((issue) => issue.severity === "error"),

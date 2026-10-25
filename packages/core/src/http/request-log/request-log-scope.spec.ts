@@ -45,7 +45,13 @@ describe("request log scope", () => {
     beginRequestLogScope("a");
 
     for (let index = 0; index < 250; index++) {
-      recordRequestLogEntry("a", { level: "info", module: "m", action: "x", message: `${index}`, at: index });
+      recordRequestLogEntry("a", {
+        level: "info",
+        module: "m",
+        action: "x",
+        message: `${index}`,
+        at: index,
+      });
     }
 
     const scope = endRequestLogScope("a");
@@ -100,7 +106,10 @@ describe("request log scope", () => {
 
 describe("error records", () => {
   it("builds one from an Error", () => {
-    expect(toRequestLogError(new TypeError("bad"))).toMatchObject({ message: "bad", name: "TypeError" });
+    expect(toRequestLogError(new TypeError("bad"))).toMatchObject({
+      message: "bad",
+      name: "TypeError",
+    });
   });
 
   it("reads the page error record from an error log entry", () => {
@@ -132,13 +141,22 @@ describe("error records", () => {
 
   it("reads an Error message from an error log entry", () => {
     expect(
-      errorFromLogData({ type: "error", module: "http", action: "request-error", message: new Error("db down") }),
+      errorFromLogData({
+        type: "error",
+        module: "http",
+        action: "request-error",
+        message: new Error("db down"),
+      }),
     ).toMatchObject({ message: "db down", name: "Error" });
   });
 
   it("ignores entries that are not errors or carry no error", () => {
-    expect(errorFromLogData({ type: "info", module: "a", action: "b", message: new Error("x") })).toBeUndefined();
-    expect(errorFromLogData({ type: "error", module: "a", action: "b", message: "plain" })).toBeUndefined();
+    expect(
+      errorFromLogData({ type: "info", module: "a", action: "b", message: new Error("x") }),
+    ).toBeUndefined();
+    expect(
+      errorFromLogData({ type: "error", module: "a", action: "b", message: "plain" }),
+    ).toBeUndefined();
   });
 });
 
@@ -189,7 +207,9 @@ describe("requestLogQueryShape", () => {
   });
 
   it("names document queries by collection and command", () => {
-    expect(requestLogQueryShape({ collection: "posts", command: "find", durationMs: 1 })).toBe("posts.find");
+    expect(requestLogQueryShape({ collection: "posts", command: "find", durationMs: 1 })).toBe(
+      "posts.find",
+    );
     expect(requestLogQueryShape({ durationMs: 1 })).toBe("unknown");
   });
 });

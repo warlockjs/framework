@@ -56,7 +56,8 @@ function ui(routes: Record<string, unknown>) {
     urls,
     context,
     render: () => runInContext("agentsView()", context) as Promise<Element>,
-    select: (runId: string) => runInContext(`state.selectedAgentRun = ${JSON.stringify(runId)}`, context),
+    select: (runId: string) =>
+      runInContext(`state.selectedAgentRun = ${JSON.stringify(runId)}`, context),
   };
 }
 
@@ -83,7 +84,11 @@ function trace(runId: string, promptHash = "p1", toolHash = "abcdef123456") {
     input: "swap squats",
     systemPrompt: { hash: promptHash, text: "You are a coach." },
     toolSchemas: {
-      [toolHash]: { name: "update_plan", description: "Change the plan.", schema: '{"type":"object"}' },
+      [toolHash]: {
+        name: "update_plan",
+        description: "Change the plan.",
+        schema: '{"type":"object"}',
+      },
     },
     turns: [
       {
@@ -108,7 +113,9 @@ function trace(runId: string, promptHash = "p1", toolHash = "abcdef123456") {
         ],
         usage: { input: 10, output: 5, total: 15 },
         cost: 0.001,
-        contract: [{ type: "refusal-retry", tripIndex: 0, tool: "update_plan", reason: "not in library" }],
+        contract: [
+          { type: "refusal-retry", tripIndex: 0, tool: "update_plan", reason: "not in library" },
+        ],
       },
     ],
     usage: { input: 10, output: 5, total: 15 },
@@ -118,7 +125,8 @@ function trace(runId: string, promptHash = "p1", toolHash = "abcdef123456") {
 describe("Agents panel rendering", () => {
   it("renders install guidance and an empty state", async () => {
     expect(
-      (await ui({ "/": { available: false, message: "Install @warlock.js/ai 5.38" } }).render()).text,
+      (await ui({ "/": { available: false, message: "Install @warlock.js/ai 5.38" } }).render())
+        .text,
     ).toContain("Install @warlock.js/ai 5.38");
     expect((await ui({ "/": { available: true, runs: [] } }).render()).text).toContain(
       "No agent runs yet",
@@ -129,7 +137,9 @@ describe("Agents panel rendering", () => {
     const view = await ui({ "/": { available: true, runs: [row("run_1")] } }).render();
 
     expect(view.text).toContain("coach · completed · 40 ms");
-    expect(view.text).toContain("2 turns · 2 tool calls · 1 refused · 10 input · 5 output · $0.001230 USD");
+    expect(view.text).toContain(
+      "2 turns · 2 tool calls · 1 refused · 10 input · 5 output · $0.001230 USD",
+    );
     expect(view.text).toContain("mock/<img onerror=alert(1)>");
     expect(view.find("img")).toEqual([]);
     expect(view.find("input")[0]?.attributes["aria-label"]).toContain("HTTP request id");
@@ -159,7 +169,9 @@ describe("Agents panel rendering", () => {
     expect(view.text).toContain("System prompt p1");
     expect(view.text).toContain("You are a coach.");
     expect(view.text).toContain("Tool update_plan@abcdef12");
-    expect(view.text).toContain("turn 0 · tool_calls · 12 ms · 10 input · 5 output · $0.001000 USD");
+    expect(view.text).toContain(
+      "turn 0 · tool_calls · 12 ms · 10 input · 5 output · $0.001000 USD",
+    );
     expect(view.text).toContain("Tools offered (~40 tokens): update_plan@abcdef12");
     expect(view.text).toContain("update_plan · failed · 3 ms · refused: Exercise not in library");
     expect(view.text).toContain("contract: refusal-retry update_plan (not in library)");

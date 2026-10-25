@@ -24,7 +24,8 @@ export function generatedBarrels(): boolean {
 
 /** Read `generate.barrels` from `warlock.config.ts` once, at the start of a generator. */
 export async function loadGeneratedBarrels(): Promise<void> {
-  const { warlockConfigManager } = await import("../../../../warlock-config/warlock-config.manager");
+  const { warlockConfigManager } =
+    await import("../../../../warlock-config/warlock-config.manager");
 
   await warlockConfigManager.load();
 

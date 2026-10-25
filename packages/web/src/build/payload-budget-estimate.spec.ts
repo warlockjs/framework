@@ -19,7 +19,12 @@ const sources = [
 
 const apiRoutes = [
   { name: "orders.show", path: "/api/orders/:id", method: "GET" },
-  { name: "internal.reindex", path: "/internal/reindex", method: "POST", clientVisible: false as const },
+  {
+    name: "internal.reindex",
+    path: "/internal/reindex",
+    method: "POST",
+    clientVisible: false as const,
+  },
 ];
 
 const usage = {

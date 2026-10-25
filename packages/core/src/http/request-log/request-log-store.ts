@@ -23,7 +23,10 @@ export type RequestLogReadOptions = {
  * Parse a `--status` filter: an exact status (`404`) or a class (`5xx`).
  * Throws on anything else.
  */
-export function parseRequestLogStatusFilter(value: string | number): { exact?: number; class?: number } {
+export function parseRequestLogStatusFilter(value: string | number): {
+  exact?: number;
+  class?: number;
+} {
   const text = String(value).trim().toLowerCase();
   const classMatch = /^([1-5])xx$/.exec(text);
 
@@ -31,7 +34,9 @@ export function parseRequestLogStatusFilter(value: string | number): { exact?: n
 
   if (/^[1-5]\d\d$/.test(text)) return { exact: Number(text) };
 
-  throw new Error(`Invalid status filter ${JSON.stringify(value)}: use a status like 404 or a class like 5xx.`);
+  throw new Error(
+    `Invalid status filter ${JSON.stringify(value)}: use a status like 404 or a class like 5xx.`,
+  );
 }
 
 /**
@@ -52,7 +57,9 @@ export function parseRequestLogTime(value: string | number, now: number = Date.n
   const parsed = Date.parse(text);
 
   if (Number.isNaN(parsed)) {
-    throw new Error(`Invalid time ${JSON.stringify(value)}: use a duration like 1h, an ISO date, or epoch milliseconds.`);
+    throw new Error(
+      `Invalid time ${JSON.stringify(value)}: use a duration like 1h, an ISO date, or epoch milliseconds.`,
+    );
   }
 
   return parsed;
@@ -83,7 +90,8 @@ export function compileRequestLogFilter(
   filter: RequestLogFilter = {},
   now: number = Date.now(),
 ): (row: RequestLogSummary) => boolean {
-  const status = filter.status === undefined ? undefined : parseRequestLogStatusFilter(filter.status);
+  const status =
+    filter.status === undefined ? undefined : parseRequestLogStatusFilter(filter.status);
   const since = filter.since === undefined ? undefined : parseRequestLogTime(filter.since, now);
   const until = filter.until === undefined ? undefined : parseRequestLogTime(filter.until, now);
   const method = filter.method?.toUpperCase();
@@ -146,7 +154,13 @@ async function listFiles(directory: string): Promise<string[]> {
   }
 
   return files
-    .sort((first, second) => (second.day < first.day ? -1 : second.day > first.day ? 1 : second.modifiedAt - first.modifiedAt))
+    .sort((first, second) =>
+      second.day < first.day
+        ? -1
+        : second.day > first.day
+          ? 1
+          : second.modifiedAt - first.modifiedAt,
+    )
     .map(({ file }) => file);
 }
 
@@ -172,7 +186,9 @@ function parseRecord(line: string): RequestLogRecord | undefined {
   try {
     const record = JSON.parse(line) as RequestLogRecord;
 
-    return record && record.type === "request" && typeof record.id === "string" ? record : undefined;
+    return record && record.type === "request" && typeof record.id === "string"
+      ? record
+      : undefined;
   } catch {
     // A half-written last line, or a line from something else.
     return undefined;
@@ -258,7 +274,8 @@ function shellQuote(value: string): string {
 export function requestLogToCurl(record: RequestLogRecord, baseUrl = "http://localhost"): string {
   const headers = record.headers ?? {};
   const host = typeof headers.host === "string" ? headers.host : undefined;
-  const proto = typeof headers["x-forwarded-proto"] === "string" ? headers["x-forwarded-proto"] : "http";
+  const proto =
+    typeof headers["x-forwarded-proto"] === "string" ? headers["x-forwarded-proto"] : "http";
   const origin = host ? `${proto}://${host}` : baseUrl.replace(/\/$/, "");
   const parts = ["curl", "-X", record.method, shellQuote(`${origin}${record.url}`)];
 
@@ -271,7 +288,10 @@ export function requestLogToCurl(record: RequestLogRecord, baseUrl = "http://loc
   }
 
   if (record.body !== undefined) {
-    parts.push("--data-raw", shellQuote(typeof record.body === "string" ? record.body : JSON.stringify(record.body)));
+    parts.push(
+      "--data-raw",
+      shellQuote(typeof record.body === "string" ? record.body : JSON.stringify(record.body)),
+    );
   }
 
   return parts.join(" ");

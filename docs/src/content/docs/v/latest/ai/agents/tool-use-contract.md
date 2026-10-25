@@ -23,13 +23,13 @@ const coach = ai.agent({
 });
 ```
 
-| Field          | Meaning                                                                                                                              |
-| -------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `intents`      | Any match makes the turn an action request. Each entry is a case-insensitive substring, a `RegExp`, or `(input) => boolean`.         |
-| `requiredTools`| Tools that count as acting. A call that failed does not count.                                                                       |
-| `require`      | `"any"` (default) or `"all"` of `requiredTools`.                                                                                     |
-| `hint`         | The re-prompt text, or `({ input, reply, requiredTools, tripIndex }) => string`. Default: ask the model to call the tool now.         |
-| `maxReprompts` | Re-prompts per run. Default `1`.                                                                                                     |
+| Field           | Meaning                                                                                                                       |
+| --------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `intents`       | Any match makes the turn an action request. Each entry is a case-insensitive substring, a `RegExp`, or `(input) => boolean`.  |
+| `requiredTools` | Tools that count as acting. A call that failed does not count.                                                                |
+| `require`       | `"any"` (default) or `"all"` of `requiredTools`.                                                                              |
+| `hint`          | The re-prompt text, or `({ input, reply, requiredTools, tripIndex }) => string`. Default: ask the model to call the tool now. |
+| `maxReprompts`  | Re-prompts per run. Default `1`.                                                                                              |
 
 The model's first answer stays in the history, followed by the hint as a user message. The re-prompt uses one of the run's `maxTrips`; with none left it does not happen. When streaming, the text of the first answer has already reached the client.
 
@@ -61,7 +61,7 @@ ai.agent({
   backstops: [
     {
       name: "injury-capture",
-      phase: "before",                                         // default "after"
+      phase: "before", // default "after"
       detect: (turn) => /\b(hurt|injur|pain)\b/i.test(turn.input),
       run: async ({ input, state }) => {
         await saveInjury(input);

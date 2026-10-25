@@ -330,7 +330,9 @@ async function installDependencies(): Promise<void> {
   const { packageManager, ambiguous, reason } = await detectPackageManagerDetails();
   const installCommand = getInstallCommand(packageManager);
 
-  console.log(`${colors.cyan("›")} Package manager: ${colors.bold(packageManager)}, because ${reason}.`);
+  console.log(
+    `${colors.cyan("›")} Package manager: ${colors.bold(packageManager)}, because ${reason}.`,
+  );
 
   if (ambiguous.length > 0) {
     console.log(

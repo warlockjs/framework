@@ -229,7 +229,7 @@ export function refusalReason(
 /** Normalize `onToolRefusal` to a config, or `undefined` when off. */
 export function resolveRefusalConfig(
   option: ToolRefusalOption | undefined,
-): Required<Pick<ToolRefusalConfig, "retries">> & ToolRefusalConfig | undefined {
+): (Required<Pick<ToolRefusalConfig, "retries">> & ToolRefusalConfig) | undefined {
   if (option === undefined || option === "off") return undefined;
   if (option === "retry-once-with-hint") return { retries: 1 };
 

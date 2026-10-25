@@ -63,7 +63,13 @@ describe("filters", () => {
 
   it("matches rows by status, route, method, time and text", () => {
     const row = summarizeRequestLog(
-      record({ id: "abc123", method: "POST", url: "/posts?x=1", status: 503, time: new Date(now - 10 * 60 * 1000).toISOString() }),
+      record({
+        id: "abc123",
+        method: "POST",
+        url: "/posts?x=1",
+        status: 503,
+        time: new Date(now - 10 * 60 * 1000).toISOString(),
+      }),
     );
 
     expect(compileRequestLogFilter({ status: "5xx" }, now)(row)).toBe(true);
@@ -93,7 +99,12 @@ describe("listRequestLogs", () => {
       "2026-10-24",
       [
         record({ id: "a", time: "2026-10-24T10:00:00.000Z" }),
-        record({ id: "b", time: "2026-10-24T11:00:00.000Z", status: 500, error: { message: "boom", name: "Error" } }),
+        record({
+          id: "b",
+          time: "2026-10-24T11:00:00.000Z",
+          status: 500,
+          error: { message: "boom", name: "Error" },
+        }),
       ],
       ['{"type":"request","id":"half'],
     );
@@ -101,7 +112,12 @@ describe("listRequestLogs", () => {
     const rows = await listRequestLogs({}, { directory });
 
     expect(rows.map((row) => row.id)).toEqual(["b", "a", "old"]);
-    expect(rows[0]).toMatchObject({ status: 500, error: "boom", route: "/posts", routeName: "posts.list" });
+    expect(rows[0]).toMatchObject({
+      status: 500,
+      error: "boom",
+      route: "/posts",
+      routeName: "posts.list",
+    });
   });
 
   it("filters and limits", async () => {
@@ -112,9 +128,17 @@ describe("listRequestLogs", () => {
       record({ id: "d", status: 502 }),
     ]);
 
-    expect((await listRequestLogs({ status: "5xx" }, { directory })).map((row) => row.id)).toEqual(["d", "b"]);
-    expect((await listRequestLogs({ status: 404 }, { directory })).map((row) => row.id)).toEqual(["c"]);
-    expect((await listRequestLogs({ limit: 2 }, { directory })).map((row) => row.id)).toEqual(["d", "c"]);
+    expect((await listRequestLogs({ status: "5xx" }, { directory })).map((row) => row.id)).toEqual([
+      "d",
+      "b",
+    ]);
+    expect((await listRequestLogs({ status: 404 }, { directory })).map((row) => row.id)).toEqual([
+      "c",
+    ]);
+    expect((await listRequestLogs({ limit: 2 }, { directory })).map((row) => row.id)).toEqual([
+      "d",
+      "c",
+    ]);
   });
 });
 
@@ -122,7 +146,11 @@ describe("getRequestLog", () => {
   it("opens one record by id, or undefined", async () => {
     writeDay("2026-10-24", [
       record({ id: "a" }),
-      record({ id: "b", logs: [{ level: "info", module: "m", action: "a", message: "hi", at: 1 }], queries: { count: 2 } }),
+      record({
+        id: "b",
+        logs: [{ level: "info", module: "m", action: "a", message: "hi", at: 1 }],
+        queries: { count: 2 },
+      }),
     ]);
 
     expect(await getRequestLog("b", { directory })).toMatchObject({
