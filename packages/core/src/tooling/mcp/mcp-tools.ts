@@ -140,6 +140,7 @@ function sectionEntryMatches(section: InspectSection, entry: unknown, filter: st
     schedules: ["name"],
     packages: ["name"],
     files: ["file", "module", "role"],
+    wiring: ["file", "name", "module", "role", "type"],
   };
 
   return includesText(
@@ -170,6 +171,8 @@ const SECTION_DESCRIPTIONS: Record<InspectSection, string> = {
   files:
     "Source files, convention roles, exports and resolved imports/importedBy (static analysis, no execution).",
   packages: "Installed @warlock.js/* packages and their versions.",
+  wiring:
+    "Every auto-loaded file (config, locales, events, main.ts, routes.ts, workers) with its module and boot load order, then every capability slot (defineCapability) with whether it is provided, which file provides it and which files read it.",
 };
 
 function inspectSectionTool(context: WarlockMcpContext, section: InspectSection): WarlockMcpTool {

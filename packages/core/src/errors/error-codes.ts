@@ -217,6 +217,15 @@ export const ERROR_CODES = {
     fix: "Install the package named in the message (for example `pnpm add sharp`), or stop configuring the driver.",
     skill: "update-packages",
   },
+  WL2008: {
+    code: "WL2008",
+    area: "boot",
+    category: "code",
+    title: "A capability was used, or required at boot, without a provider",
+    fix: "Call provideCapability(capability, implementation) from a module that loads at boot (main.ts, routes.ts or an event file), or define the capability with { required: false } if it is optional.",
+    skill: "use-capabilities",
+    errorNames: ["CapabilityNotProvidedError"],
+  },
 
   // ── WL3xxx routing ───────────────────────────────────────────────────────
   WL3001: {

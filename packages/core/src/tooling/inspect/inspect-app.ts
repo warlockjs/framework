@@ -1,4 +1,5 @@
 import { Application } from "../../application/application";
+import { listCapabilities } from "../../capabilities/capability";
 import { SchemaRegistry } from "../../openapi/schema-registry";
 import { router } from "../../router/router";
 import type { Route } from "../../router/types";
@@ -15,6 +16,7 @@ import {
 } from "./collect-packages";
 import { collectPages, installedPagesFromConnectors } from "./collect-pages";
 import { collectRoutes } from "./collect-routes";
+import { collectWiring, wiringFilesFromScan, type WiringSourceFile } from "./collect-wiring";
 import { groupListeners, type RecordedListener } from "./event-recorder";
 import {
   INSPECT_SCHEMA_VERSION,
@@ -36,6 +38,11 @@ export type InspectOptions = {
   modelModules?: readonly InspectModelModule[];
   /** Listeners recorded while app modules were imported (see `EventRecorder`). */
   events?: readonly RecordedListener[];
+  /**
+   * The auto-loaded files in boot load order (see `wiringFilesFromBoot`).
+   * Default: a static scan of the project, roles in boot order.
+   */
+  wiringFiles?: readonly WiringSourceFile[];
   /** Warnings found before inspecting (by the boot pass); listed first. */
   warnings?: readonly InspectWarning[];
   /** App modules that failed to import; each becomes a `WL2001` warning. */
@@ -140,7 +147,20 @@ export async function inspectApp(options: InspectOptions = {}): Promise<InspectR
     ? collectModels(options.modelModules ?? [], registry, warnings)
     : { models: [], resourceModels: new Map<string, string[]>() };
 
-  if (wants.has("files")) report.files = collectFiles(cwd, warnings);
+  if (wants.has("files") || (wants.has("wiring") && !options.wiringFiles)) {
+    const scanned = collectFiles(cwd, warnings);
+
+    if (wants.has("files")) report.files = scanned;
+    if (wants.has("wiring")) {
+      report.wiring = collectWiring(
+        cwd,
+        options.wiringFiles ?? wiringFilesFromScan(scanned),
+        listCapabilities(),
+      );
+    }
+  } else if (wants.has("wiring")) {
+    report.wiring = collectWiring(cwd, options.wiringFiles ?? [], listCapabilities());
+  }
 
   if (wants.has("routes")) report.routes = routes;
   if (wants.has("models")) report.models = models;

@@ -182,6 +182,20 @@ describe("the tool set", () => {
     expect(await tool(tools, "inspect_app").run({})).toMatchObject({ counts: { files: 2 } });
   });
 
+  it("serves the wiring section as inspect_wiring", async () => {
+    const tools = createWarlockMcpTools(fakeMcpContext().context);
+
+    expect(tools.map((entry) => entry.name)).toContain("inspect_wiring");
+    expect(await tool(tools, "inspect_wiring").run({ filter: "posts.notifier" })).toMatchObject({
+      total: 4,
+      wiring: [{ type: "capability", name: "posts.notifier", provided: true }],
+    });
+    expect(await tool(tools, "inspect_wiring").run({ filter: "main" })).toMatchObject({
+      wiring: [{ type: "file", role: "main", order: 2 }],
+    });
+    expect(await tool(tools, "inspect_app").run({})).toMatchObject({ counts: { wiring: 4 } });
+  });
+
   it("filters inspect sections", async () => {
     const tools = createWarlockMcpTools(fakeMcpContext().context);
     const config = await tool(tools, "inspect_config").run({ filter: "database" });

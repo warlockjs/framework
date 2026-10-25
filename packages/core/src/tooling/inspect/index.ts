@@ -1,4 +1,10 @@
-export { bootForInspect, inspectOptionsFromBoot, type InspectBootResult } from "./boot-for-inspect";
+export {
+  bootForInspect,
+  inspectOptionsFromBoot,
+  wiringFilesFromBoot,
+  type InspectBootResult,
+} from "./boot-for-inspect";
+export { collectWiring, wiringFilesFromScan, type WiringSourceFile } from "./collect-wiring";
 export { EventRecorder, groupListeners, type RecordedListener } from "./event-recorder";
 export {
   inspectApp,

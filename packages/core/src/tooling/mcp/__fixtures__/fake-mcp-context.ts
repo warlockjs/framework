@@ -77,6 +77,27 @@ export function fixtureReport(): InspectReport {
       },
     ],
     resources: [],
+    wiring: [
+      { type: "file", role: "config", file: "src/config/http.ts", module: "src/config", order: 1 },
+      { type: "file", role: "main", file: "src/app/posts/main.ts", module: "src/app/posts", order: 2 },
+      {
+        type: "file",
+        role: "route",
+        file: "src/app/posts/routes.ts",
+        module: "src/app/posts",
+        order: 3,
+      },
+      {
+        type: "capability",
+        name: "posts.notifier",
+        description: "Tells followers about a post",
+        required: true,
+        provided: true,
+        definedIn: "src/app/posts/capabilities.ts",
+        providedBy: "src/app/posts/main.ts",
+        consumers: ["src/app/posts/services/publish.service.ts"],
+      },
+    ],
     config: [
       { key: "app.name", type: "string", file: "src/config/app.ts" },
       { key: "database.port", type: "number", file: "src/config/database.ts" },

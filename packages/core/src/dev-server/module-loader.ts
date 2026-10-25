@@ -41,7 +41,7 @@ export class ModuleLoadError extends Error {
  * bound, worker last so scheduled jobs and queue definitions see routes
  * already registered. Dev always loads worker files since dev runs every role.
  */
-const SPECIAL_TYPES: readonly SpecialFileType[] = [
+export const SPECIAL_TYPES: readonly SpecialFileType[] = [
   "locale",
   "event",
   "main",
