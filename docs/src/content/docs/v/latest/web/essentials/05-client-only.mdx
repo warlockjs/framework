@@ -106,5 +106,11 @@ rendered. Inside `<ClientOnly>`, that cannot happen on the server. The
 `<Suspense>` boundary supplies a fallback while the browser fetches the lazy
 chunk.
 
+A `*.client.tsx` file name does not change this: it keeps server-only code from
+importing the module (`warlock check` reports `WL9022`), but a page that imports
+it still evaluates it on the server. In development a warning names a `.client`
+module that reads `window`, `document` or another browser global at the top
+level.
+
 For the broader import boundary, see
 [Client/server boundaries](/v/latest/web/essentials/client-server-boundaries/).

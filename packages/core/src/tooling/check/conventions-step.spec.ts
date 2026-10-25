@@ -185,3 +185,31 @@ describe("convention checks", () => {
     },
   );
 });
+
+describe("co-located types", () => {
+  it("accepts small exported input and output types beside the service that uses them", () => {
+    const source = [
+      'import { findUserService } from "app/users/services/find-user.service";',
+      "",
+      "export type CreatePostInput = { title: string; authorId: string };",
+      "export type CreatePostResult = { id: string; title: string };",
+      "export type PostStatus = 'draft' | 'published';",
+      "",
+      "export async function createPostService(input: CreatePostInput): Promise<CreatePostResult> {",
+      "  await findUserService(input.authorId);",
+      "  return { id: '1', title: input.title };",
+      "}",
+      "",
+    ].join("\n");
+
+    expect(codes("src/app/posts/services/create-post.service.ts", source)).toEqual([]);
+  });
+
+  it("accepts the same in a repository and a controller", () => {
+    const source =
+      "export type ListInput = { page: number };\nexport const run = (input: ListInput) => input;\n";
+
+    expect(codes("src/app/posts/repositories/posts.repository.ts", source)).toEqual([]);
+    expect(codes("src/app/posts/controllers/list-posts.controller.ts", source)).toEqual([]);
+  });
+});

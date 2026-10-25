@@ -5,13 +5,13 @@ description: 'Scaffold a new feature module under `src/app/<name>/` via `warlock
 
 # Warlock — create a module
 
-A module is a self-contained feature folder under `src/app/<name>/`. The CLI scaffolds the standard subfolders; the framework auto-loads `routes.ts`, `main.ts`, every `.ts(x)` file inside `events/`, and `utils/locales.ts`. You never `import` those files. (`src/app/main.ts` at the project root is also auto-loaded for global one-time application setup; connector instances belong in `warlock.config.ts > connectors`.)
+A module is a self-contained feature folder under `src/app/<name>/`. The CLI scaffolds the standard subfolders; the framework auto-loads `routes.ts`, `main.ts`, every `.ts(x)` file inside `events/`, and `utils/locales.json` (plus `utils/locales/<feature>.json`). You never `import` those files. (`src/app/main.ts` at the project root is also auto-loaded for global one-time application setup; connector instances belong in `warlock.config.ts > connectors`.)
 
 ## The shape
 
 ```bash
 npx warlock generate.module products            # full CRUD bootstrap (default — controllers, model, services, repository, resource, schemas, routes, seed)
-npx warlock generate.module products --minimal  # bare bones (routes.ts + main.ts + utils/locales.ts + empty subfolders)
+npx warlock generate.module products --minimal  # bare bones (routes.ts + main.ts + utils/locales.json + empty subfolders)
 ```
 
 Full CRUD is the default — opt down to a bare skeleton with `--minimal` (`-m`) when you want to build the module piece by piece. `--force` (`-f`) overwrites existing files. Every generator takes `--dry-run` (write nothing, list the plan) and `--json` (one machine-readable report on stdout). To add one endpoint from its request schema — controller, service, resource, route, locale key and an HTTP test — use `warlock make endpoint` (the `make-endpoint` topic). The plural form is auto-derived: `generate.module product` and `generate.module products` produce the same `src/app/products/` folder.
@@ -37,7 +37,7 @@ src/app/products/
   models/
     product/
       product.model.ts
-      index.ts
+      index.ts                 ← optional barrel; omitted when `generate.barrels` is false
       migrations/              ← migration file is created here by the default CRUD scaffold
   repositories/
     products.repository.ts
@@ -49,14 +49,14 @@ src/app/products/
   events/                       ← auto-loaded by the framework
   types/
   utils/
-    locales.ts                  ← `groupedTranslations("products", { ... })`
+    locales.json                ← `{ "notFound": { "en": "...", "ar": "..." } }`; add `locales/<feature>.json` to split by feature
   seeds/
     products.seed.ts
   routes.ts                     ← auto-loaded; RESTful chain pre-wired with `guarded(...)`
   main.ts                       ← auto-loaded once on boot
 ```
 
-With `--minimal`, only `routes.ts`, `main.ts`, `utils/locales.ts`, and the empty subfolders are created — fill them in manually with the per-component generators below.
+With `--minimal`, only `routes.ts`, `main.ts`, `utils/locales.json`, and the empty subfolders are created — fill them in manually with the per-component generators below.
 
 ## Auto-loaded files
 
@@ -65,7 +65,7 @@ The framework discovers these by convention — do not import them anywhere:
 - `routes.ts` — runs `router.<verb>(...)` calls on boot
 - `main.ts` — one-time setup (event listeners, custom registrations, boot-time hooks)
 - `events/*.ts(x)` — **any** `.ts(x)` file inside this folder is auto-loaded (convention is `*.event.ts`; the framework doesn't enforce the suffix)
-- `utils/locales.ts` — auto-loaded; holds `groupedTranslations(...)`
+- `utils/locales.json` and `utils/locales/<feature>.json` — auto-loaded translation dictionaries (the old `utils/locales.ts` is deprecated)
 
 Branching at registration time breaks HMR. Conditional behavior belongs inside controllers/services, not around `router.get(...)`.
 
@@ -175,7 +175,7 @@ await warmupProductCache();
 - **`generate.module` does not run the migration.** It only creates the migration file. Run `npx warlock migrate` separately to apply it.
 - **`models/<entity>/` is its own folder, not a flat file.** The generator puts `product.model.ts` inside `models/product/` so migrations can sit beside the model in `models/product/migrations/`.
 - **Don't import `routes.ts`, `main.ts`, or anything in `events/`.** They're auto-loaded; double-loading errors out at boot.
-- **`utils/locales.ts` is mandatory for translation keys.** Skip it and `t("products.notFound")` silently falls back to the key itself.
+- **`utils/locales.json` is where translation keys live.** Skip it and `t("products.notFound")` silently falls back to the key itself.
 - **The CRUD list service uses `listCached`, not `list`.** Switch to `list(...)` if your data churns faster than the cache invalidates.
 
 ## See also
@@ -187,7 +187,7 @@ await warmupProductCache();
 - The `define-resource` topic — the output mapper for the model.
 - The `validate-input` topic — wiring `schema/*.schema.ts` to controllers.
 - The `write-seeder` topic — populating the generated `seeds/` folder.
-- The `use-localization` topic — populating the generated `utils/locales.ts`.
+- The `use-localization` topic — populating the generated `utils/locales.json`.
 
 ## Verify generated imports
 

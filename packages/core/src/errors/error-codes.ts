@@ -744,6 +744,22 @@ export const ERROR_CODES = {
     fix: 'Read it with `model.get("column")` and write it with `model.set("column", value)`; `warlock check --fix` rewrites it.',
     skill: "warlock-check",
   },
+  WL9022: {
+    code: "WL9022",
+    area: "convention",
+    category: "code",
+    title: "Server-only code imports a .client module",
+    fix: "Remove the import: a *.client.ts(x) module may be imported by pages, layouts and components, never by controllers, services, repositories, models, routes, connectors or *.server.ts files. Pass the data through a loader, or move shared logic to a file that is neither.",
+    skill: "warlock-conventions",
+  },
+  WL9023: {
+    code: "WL9023",
+    area: "convention",
+    category: "code",
+    title: "An app module keeps a hand-maintained index.ts barrel",
+    fix: "Import from the file that defines the export and delete the barrel. This rule is off by default; turn it on with `rules: { WL9023: \"warning\" }` in .warlock-check.json.",
+    skill: "warlock-conventions",
+  },
   WL9024: {
     code: "WL9024",
     area: "convention",
@@ -782,6 +798,14 @@ export const ERROR_CODES = {
     category: "code",
     title: "Translation key is computed at runtime, so the page cannot ship only the keys it uses",
     fix: 'Declare the keys or prefixes the page renders in its setup file, for example `export const config = { translations: ["statuses.*", "members.title"] }`. Until then the page ships every translation group.',
+    skill: "use-localization",
+  },
+  WL9105: {
+    code: "WL9105",
+    area: "convention",
+    category: "code",
+    title: "A translation key is missing a configured locale",
+    fix: "Add the missing locale to the key in its locales.json (or locales/<feature>.json) file; the configured locales are app.localeCodes, or `localeCodes` in .warlock-check.json.",
     skill: "use-localization",
   },
 } as const satisfies Record<string, ErrorCodeDefinition>;

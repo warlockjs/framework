@@ -1,8 +1,13 @@
+import { isModuleLocaleJsonPath } from "../localization/module-locale-paths";
+
 const GROUPED_TRANSLATIONS_MARKER = "groupedTranslations";
 
-/** `src/app/<module>/utils/locales.json`, the data-only module dictionary. */
+/**
+ * `src/app/<module>/utils/locales.json` or `utils/locales/<feature>.json`, the
+ * data-only module dictionaries.
+ */
 export function isModuleLocaleDictionaryPath(path: string): boolean {
-  return /^src\/app\/[^/]+\/utils\/locales\.json$/.test(path.replace(/\\\\/g, "/"));
+  return path.replace(/\\/g, "/").startsWith("src/") && isModuleLocaleJsonPath(path);
 }
 
 /**

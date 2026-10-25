@@ -1788,13 +1788,12 @@ describe("isClientFile — `.client` suffix and `.client/` segment recognition",
 });
 
 /**
- * The graph decision behind the diagnostic (canon c3abc87b): the import graph is
- * authoritative and `.client` is only a marker. A SERVER-reachable importer
- * (importerIsClientBound=false) reaching a `.client` target warns and names the
- * edge; an all-client edge and a server edge to a non-`.client` target stay
- * silent.
+ * `.client.*` is a client-only boundary. A SERVER-reachable importer
+ * (importerIsClientBound=false) reaching a `.client` target is refused and the
+ * message names the import chain; an all-client edge and a server edge to a
+ * non-`.client` target stay silent.
  */
-describe("serverReachedClientDiagnostic — warns only on a server → .client edge", () => {
+describe("serverReachedClientDiagnostic — refuses only a server → .client edge", () => {
   it("GUILTY: a server importer resolving to a .client target yields a message naming the edge", () => {
     const message = serverReachedClientDiagnostic({
       importerIsClientBound: false,
@@ -1803,7 +1802,8 @@ describe("serverReachedClientDiagnostic — warns only on a server → .client e
     });
     expect(message).toBeDefined();
     expect(message).toContain("/app/blog/web/data.loader.ts → /app/blog/web/widget.client.ts");
-    expect(message).toContain("marker");
+    expect(message).toContain("Import chain:");
+    expect(message).toContain("client-only");
   });
 
   it("INNOCENT (all-client): a client-bound importer → .client target yields no message", () => {

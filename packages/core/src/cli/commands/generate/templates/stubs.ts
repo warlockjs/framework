@@ -1,4 +1,5 @@
 import type { ParsedName } from "../types";
+import { modelImportPath } from "../utils/barrels";
 import { Name } from "../utils/name-parser";
 
 /**
@@ -252,7 +253,7 @@ export function crudRepositoryStub(entity: Name): string {
   const modulePluralName = entity.plural;
   return `import type { FilterRules, RepositoryOptions, TypedRepositoryOptions } from "@warlock.js/core";
 import { RepositoryManager } from "@warlock.js/core";
-import { ${moduleSingularName.pascal} } from "../models/${moduleSingularName.kebab}";
+import { ${moduleSingularName.pascal} } from "${modelImportPath(moduleSingularName.kebab)}";
 
 type ${moduleSingularName.pascal}ListFilter = {
   // Repository list filters
@@ -285,7 +286,7 @@ export const ${modulePluralName.camel}Repository = new ${modulePluralName.pascal
  */
 export function crudCreateServiceStub(entity: Name): string {
   const moduleSingularName = entity.singular;
-  return `import { ${moduleSingularName.pascal} } from "../models/${moduleSingularName.kebab}";
+  return `import { ${moduleSingularName.pascal} } from "${modelImportPath(moduleSingularName.kebab)}";
 import type { Create${moduleSingularName.pascal}Schema } from "../schema/create-${moduleSingularName.kebab}.schema";
 
 export async function create${moduleSingularName.pascal}Service(data: Create${moduleSingularName.pascal}Schema) {
@@ -368,7 +369,7 @@ export async function delete${singular.pascal}Service(id: number | string) {
  */
 export function crudSeedStub(entity: Name): string {
   return `import { seeder } from "@warlock.js/core";
-import { ${entity.singular.pascal} } from "../models/${entity.singular.kebab}";
+import { ${entity.singular.pascal} } from "${modelImportPath(entity.singular.kebab)}";
 
 export default seeder({
   name: "Seed ${entity.plural.pascal}",
@@ -558,7 +559,7 @@ ${withResource ? `  public static resource = ${name.singular.pascal}Resource;` :
 export function repositoryStub(name: Name): string {
   return `import type { FilterRules, RepositoryOptions, TypedRepositoryOptions } from "@warlock.js/core";
 import { RepositoryManager } from "@warlock.js/core";
-import { ${name.singular.pascal} } from "../models/${name.singular.kebab}";
+import { ${name.singular.pascal} } from "${modelImportPath(name.singular.kebab)}";
 
 type ${name.singular.pascal}ListFilter = {
   // Repository list filters

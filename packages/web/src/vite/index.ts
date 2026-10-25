@@ -88,6 +88,8 @@ export type WarlockClientBoundaryOptions = Parameters<typeof gateAResolve>[0] & 
 export type BuildWarlockHydrationClientOptions = Readonly<{
   appRoot: string;
   fonts?: readonly import("../fonts/types").WebFont[];
+  /** Forwarded to {@link warlockClientBoundary}; `web.moduleBoundary`. */
+  moduleBoundary?: WarlockClientBoundaryOptions["moduleBoundary"];
   webRoot: string;
   /** Forwarded to {@link warlockClientBoundary}; must match the server's `build.srcDir`. */
   srcDir?: WarlockClientBoundaryOptions["srcDir"];
@@ -242,6 +244,7 @@ export async function buildWarlockHydrationClient(
       ...warlockClientBoundary({
         appRoot: options.appRoot,
         srcDir: options.srcDir,
+        moduleBoundary: options.moduleBoundary,
         sites: options.sites,
       }),
       ...(options.fonts?.length

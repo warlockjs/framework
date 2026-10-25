@@ -61,6 +61,16 @@ describe("FilesOrchestrator.getAllFilesFromFilesystem — module locales.json", 
     expect(jsonFiles.every((file) => isLocaleFile(file))).toBe(true);
   });
 
+  it("includes per-feature dictionaries under utils/locales/", async () => {
+    write("src/app/posts/utils/locales/comments.json", '{ "title": { "en": "Comments" } }\n');
+    write("src/app/posts/utils/locales/nested/deep.json", "{}\n");
+
+    const files = await new FilesOrchestrator().getAllFilesFromFilesystem();
+
+    expect(files).toContain("src/app/posts/utils/locales/comments.json");
+    expect(files).not.toContain("src/app/posts/utils/locales/nested/deep.json");
+  });
+
   it("lists each file once", async () => {
     const files = await new FilesOrchestrator().getAllFilesFromFilesystem();
 

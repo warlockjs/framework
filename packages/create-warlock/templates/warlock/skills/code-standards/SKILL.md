@@ -134,9 +134,11 @@ import { OrderStatus } from "app/orders/types/order.type";
 import { listUsersService } from "../../users/services";
 ```
 
-### 2.2 Barrel files — sub-folder level, not module level
+### 2.2 Barrel files — optional, sub-folder level, never module level
 
-Barrels (`index.ts`) make a module easier to consume **at the sub-folder level** — `services/`, `utils/`, `types/`. They become a problem when you put one at the **module root** and turn it into a giant re-export of everything inside.
+Barrels are optional. A module works with none: import from the file that defines the export. A hand-maintained barrel is a file every feature has to edit, which is where merge conflicts and circular imports come from, so add one only where a folder has several files that other modules consume together. Turn on the opt-in `WL9023` rule (`"rules": { "WL9023": "warning" }` in `.warlock-check.json`) to flag barrels, and set `generate: { barrels: false }` in `warlock.config.ts` so generators write none.
+
+Where you do use them, barrels (`index.ts`) make a module easier to consume **at the sub-folder level** — `services/`, `utils/`, `types/`. They become a problem when you put one at the **module root** and turn it into a giant re-export of everything inside.
 
 The right shape:
 
@@ -162,6 +164,22 @@ import { listUsersService, formatUserName, User } from "app/users";
 ```
 
 The module-root barrel is the one that causes circular imports and tree-shaking misses. This recommendation applies to server app modules under `src/app/**`. Web feature folders under `src/web/**` have no barrels: imports point to the exact component or hook file so client bundles stay lean and server-only code is never pulled through a barrel. See the `web-code-standards` skill.
+
+### 2.2.1 Small types beside the code that uses them
+
+A `*.service.ts`, `*.repository.ts` or `*.controller.ts` file may export the small input and output types it is written around, next to the function:
+
+```typescript
+// app/orders/services/create-order.service.ts
+export type CreateOrderInput = { customerId: string; lines: OrderLine[] };
+export type CreateOrderResult = { id: string; total: number };
+
+export async function createOrderService(input: CreateOrderInput): Promise<CreateOrderResult> {
+  // ...
+}
+```
+
+`warlock check` raises nothing for this, and another module or a page can share the type with `import type { CreateOrderInput } from "app/orders/services/create-order.service"` (a type-only import is erased, so it never pulls the service into the browser). Move a type to `types/` or `schema/` when several files need it, or when the browser needs the value and not only the type. Do not make a file per type. Web UI is unchanged: one component per file, logic in `*.setup.ts`.
 
 ### 2.3 No file extension in import paths
 

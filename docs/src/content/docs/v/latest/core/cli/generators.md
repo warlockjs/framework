@@ -90,7 +90,7 @@ src/app/products/
   events/
   types/
   utils/
-    locales.ts
+    locales.json
   seeds/
     products.seed.ts
   routes.ts
@@ -125,6 +125,23 @@ This is the workflow you'll use most. Each generator does one job; combine them 
 
 For pages, shared-schema forms and module CRUD interfaces, see [Web UI generators](./web-generators).
 
+## Barrels are optional
+
+The model generator writes `models/<name>/index.ts`, and the files it generates
+import the model through that folder. Barrels are optional: set
+`generate: { barrels: false }` in `warlock.config.ts` and `generate.module`,
+`generate.model` and `generate.repository` write no `index.ts` and import the
+model file (`../models/product/product.model`) instead. The default is `true`.
+
+```ts title="warlock.config.ts"
+export default defineConfig({
+  generate: { barrels: false },
+});
+```
+
+To flag barrels that already exist, turn on `WL9023` in `.warlock-check.json`;
+see [warlock check](./check.md).
+
 ## The generators in detail
 
 ### `generate.module <name>`
@@ -141,7 +158,7 @@ What you always get (either mode):
 
 - The folder layout (`controllers/`, `services/`, `models/`, `repositories/`, `schema/`, `resources/`, `events/`, `types/`, `utils/`).
 - `main.ts` — empty, comment explaining what it's for.
-- `utils/locales.ts` — translation grouping stub.
+- `utils/locales.json` — the module's translation dictionary (add `utils/locales/<feature>.json` files to split it by feature).
 
 What the default (full) scaffold adds on top: models, migrations, controllers, services, resource, repository, schema files (value + inferred type per file), a seed file — and a pre-wired `routes.ts`. `--minimal` leaves `routes.ts` empty and skips all of that.
 

@@ -51,8 +51,8 @@ src/app/<module>/
   controllers/              ← HTTP handlers (one per endpoint)
     <verb>-<noun>.controller.ts
   services/                 ← business logic (one per use case)
-    index.ts                ← sub-folder barrel ✅
-    <verb>-<noun>.service.ts
+    index.ts                ← optional sub-folder barrel
+    <verb>-<noun>.service.ts   ← may export its small input/output types
   models/
     <noun>/                 ← model folder (Cascade convention)
       <noun>.model.ts
@@ -66,10 +66,10 @@ src/app/<module>/
   resources/                ← output mappers (defineResource)
     <noun>.resource.ts
   types/                    ← TypeScript types and enums
-    index.ts                ← sub-folder barrel ✅
+    index.ts                ← optional sub-folder barrel
     <noun>-status.type.ts
   utils/                    ← pure helpers used inside the module
-    index.ts                ← sub-folder barrel ✅
+    index.ts                ← optional sub-folder barrel
     <verb>-<noun>.ts
   events/                   ← if the module emits events
     <noun>-<verb>.event.ts
@@ -83,16 +83,18 @@ src/app/<module>/
 
 Don't create `events/` if the module emits nothing. Don't create `errors/` until you have an error to put there. The layout is a vocabulary, not a checklist.
 
-### 2.2 No module-root `index.ts`
+### 2.2 No module-root `index.ts`; sub-folder barrels are optional
 
 This is the one absolute rule:
 
 ```
 ❌ src/app/orders/index.ts                ← banned
-✅ src/app/orders/services/index.ts        ← good (sub-folder barrel)
-✅ src/app/orders/utils/index.ts           ← good
-✅ src/app/orders/types/index.ts           ← good
+✅ src/app/orders/services/index.ts        ← allowed (optional sub-folder barrel)
+✅ src/app/orders/utils/index.ts           ← allowed
+✅ src/app/orders/types/index.ts           ← allowed
 ```
+
+A module needs no barrel at all; importing from the file that defines the export is fine. `rules: { "WL9023": "warning" }` in `.warlock-check.json` flags hand-maintained barrels, and `generate: { barrels: false }` in `warlock.config.ts` stops generators from writing them.
 
 See the `code-standards` skill § 2.2 for the reasoning.
 
@@ -102,12 +104,28 @@ See the `code-standards` skill § 2.2 for the reasoning.
 
 ### 3.1 Public (importable from other modules)
 
-- `src/app/<module>/services` (the sub-folder barrel)
-- `src/app/<module>/utils` (the sub-folder barrel)
-- `src/app/<module>/types` (the sub-folder barrel)
+- `src/app/<module>/services` (the sub-folder barrel, or the service file when there is none)
+- `src/app/<module>/utils` (the sub-folder barrel, or the file)
+- `src/app/<module>/types` (the sub-folder barrel, or the file)
 - `src/app/<module>/resources/<noun>.resource.ts`
 - `src/app/<module>/models/<noun>` (the model folder — for `BelongsTo("Name")` registrations and typed references)
 - `src/app/<module>/errors/<noun>-<reason>.error.ts`
+
+### 3.1.1 Browser-safe (importable from browser code)
+
+`src/app/<module>/` is server code. Code the client build reaches (pages, layouts, components) may import from a module **only**:
+
+- `*.client.ts` / `*.client.tsx` files
+- schema files: `*.schema.ts`, or anything under `schema/`
+- type files: `*.types.ts`, `*.d.ts`, or anything under `types/`
+- the module's `web/` folder
+- non-code files (JSON, CSS)
+
+Anything else (a service, repository, controller, model, route file, a plain helper) fails the client build with the import chain. `import type { CreateOrderInput } from "app/orders/services/create-order.service"` is always fine because a type-only import is erased. `web.moduleBoundary` in `src/config/web.ts` is `"error"` by default, `"warn"` while migrating, `"off"` to disable.
+
+### 3.1.2 `*.client.*` is browser code
+
+A `*.client.ts(x)` file may be imported by pages, layouts and components; it still renders on the server unless the component is wrapped in `<ClientOnly>`. Controllers, services, repositories, models, routes, connectors and `*.server.ts` files must never import it (`npx warlock check` reports `WL9022` with the import chain).
 
 ### 3.2 Private (not importable from other modules)
 
@@ -279,7 +297,7 @@ When you create a new module:
 2. **Create the folder.** `mkdir src/app/<noun>`.
 3. **Add `README.md`** at the module root. One paragraph: what the module owns, who owns the code, public surface.
 4. **Scaffold only what you need.** Don't pre-create `events/` and `errors/` if you won't use them today.
-5. **Add sub-folder barrels** only where you have 2+ files. A single service doesn't need a `services/index.ts` yet — but it will the moment a second service lands.
+5. **Add sub-folder barrels** only if the team wants them; they are optional, and `generate: { barrels: false }` makes generators write none.
 6. **Wire `routes.ts`** for any HTTP endpoints, register events for any emitted signals.
 7. **Verify no module-root `index.ts`** was created.
 
@@ -292,7 +310,8 @@ Before merging a change that adds, restructures, or imports across modules:
 - [ ] New module is named after a single domain noun
 - [ ] Standard folder layout from § 2 (only the folders the module needs)
 - [ ] No module-root `index.ts` created
-- [ ] Sub-folder barrels exist for `services/`, `utils/`, `types/` where applicable
+- [ ] Barrels, if any, are sub-folder barrels; none is required
+- [ ] Browser code imports from `app/<module>/` only `*.client.*`, schema, types and `web/` files
 - [ ] No imports from another module's `controllers/`, `repositories/`, `schema/`
 - [ ] No circular imports between modules (Oxlint `no-cycle` clean)
 - [ ] Cross-module communication uses direct service call or `@mongez/events` — never shared mutable globals

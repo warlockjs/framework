@@ -26,6 +26,12 @@ All notable changes to `@warlock.js/web` are documented here.
 ### Fixed
 
 - `WebConnector.shutdown()` closes the Vite dev server, its HMR websocket and its file watchers whenever Vite was created, not only after `start()` completed. A boot that failed after creating Vite, or a shutdown between `boot()` and `start()`, used to leave Vite running and keep a test or dev process from exiting. A failure to close one part no longer skips the others, and the first failure is reported afterwards.
+- The client build enforces a module boundary: browser code may import from `app/<module>/...` only browser-safe files, which are `*.client.ts(x)`, schema files (`*.schema.ts` or a `schema/` folder), type files (`*.types.ts`, `*.d.ts` or a `types/` folder), the module's `web/` folder and non-code files. Any other file (a controller, service, repository, model, route file or plain helper) fails the build with the import chain. A type-only import is erased and always allowed. `web.moduleBoundary` sets `"error"` (default), `"warn"` (report and continue, for migration) or `"off"`, in development and in `warlock build`.
+- Development SSR warns once per `*.client.*` module that reads `window`, `document`, `navigator`, `localStorage` or another browser global while it is being imported (outside a function or a `typeof` guard), naming the file and line.
+
+### Changed
+
+- `*.client.ts(x)` is now an enforced client-only boundary. Pages, layouts and components may import it, and it renders on the server unless the component is wrapped in `<ClientOnly>`; server-only code (loaders in setup files, controllers, services, repositories, models, routes, connectors and `*.server.ts` files) may not import it. In development SSR such an import is an error naming the import chain instead of a warning. `warlock check` reports the same import as `WL9021`.
 
 ## 5.37.1 - 2026-10-24
 ## 5.38.0

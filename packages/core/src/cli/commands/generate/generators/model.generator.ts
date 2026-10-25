@@ -4,6 +4,7 @@ import path from "node:path";
 import type { CommandActionData } from "../../../../commands/types";
 import { migrationTimestamp } from "../../../../generations/features/shared/migration-timestamp";
 import { migrationStub, modelStub, resourceStub } from "../templates/stubs";
+import { generatedBarrels, loadGeneratedBarrels } from "../utils/barrels";
 import { parseModulePath, singularName } from "../utils/name-parser";
 import {
   componentExists,
@@ -48,6 +49,7 @@ export async function generateModel(data: CommandActionData): Promise<void> {
   const name = singularName(componentName);
   const force = data.options.force || data.options.f;
   setDryRun(Boolean(data.options.dryRun));
+  await loadGeneratedBarrels();
   // --force only creates what is missing; replacing edited files needs --overwrite too
   setSkipExisting(!data.options.overwrite);
   const withResource = data.options.withResource || data.options.rs;
@@ -84,10 +86,12 @@ export async function generateModel(data: CommandActionData): Promise<void> {
     }
   }
 
-  // Generate index.ts
-  const indexContent = `export * from "./${name.kebab}.model";
+  // Generate index.ts (barrels are optional: `generate.barrels: false` skips it)
+  if (generatedBarrels()) {
+    const indexContent = `export * from "./${name.kebab}.model";
 `;
-  await putFileAsync(path.join(modelDir, "index.ts"), indexContent);
+    await putFileAsync(path.join(modelDir, "index.ts"), indexContent);
+  }
 
   // Generate migration (skip when one already exists, e.g. on --force)
   const migrationsDir = path.join(modelDir, "migrations");

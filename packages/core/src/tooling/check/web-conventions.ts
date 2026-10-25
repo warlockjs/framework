@@ -13,6 +13,8 @@ import {
 
 export type ConventionOptions = {
   componentLineLimit?: number;
+  /** The locales every translation key must carry; default: `localeCodes` in `src/config/app.ts`. */
+  localeCodes?: string[];
   rules?: Partial<
     Record<import("../../errors/error-codes").WarlockErrorCode, "off" | "warning" | "error">
   >;

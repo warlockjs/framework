@@ -232,8 +232,11 @@ not every dictionary in the app. This works in both translation modes, and the
 two modes differ only in where the dictionary comes from:
 
 - **Route dictionaries** (`locales.json` under `src/web`), the scoped mode.
-- **Global registry** (`extend()`, `groupedTranslations()` and the `register()`
-  hooks), the default for a starter app.
+- **Global registry** (`extend()`, `groupedTranslations()`, the `register()`
+  hooks and the module dictionaries `src/app/<module>/utils/locales.json` and
+  `utils/locales/<feature>.json`), the default for a starter app. Per-feature
+  files are merged into the registry before the tables are built, so their keys
+  are shared, pruned and typed like any other.
 
 The same two mechanisms apply to both:
 

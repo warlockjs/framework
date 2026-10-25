@@ -27,9 +27,10 @@ import { Path } from "../utils/normalized-path";
 import { SpecialFilesCollector } from "./special-files-collector";
 import { tsconfigManager } from "./tsconfig-manager";
 import { ensureWarlockDirectory, getFilesFromDirectory } from "./utils";
+import { MODULE_LOCALE_JSON_GLOBS } from "../localization/module-locale-paths";
 
 /** Module dictionaries, relative to `src/`; matches what `isLocaleFile` accepts as JSON. */
-export const MODULE_LOCALES_JSON_GLOB = "app/*/utils/locales.json";
+export const MODULE_LOCALES_JSON_GLOB = `{${MODULE_LOCALE_JSON_GLOBS.join(",")}}`;
 
 /**
  * Register a cleanup callback that fires before the current module is
@@ -288,7 +289,7 @@ export class FilesOrchestrator {
 
   /**
    * Glob the src directory, returning relative paths: every `.ts`/`.tsx`
-   * file plus each module's `utils/locales.json`.
+   * file plus each module's `utils/locales.json` and `utils/locales/<feature>.json`.
    *
    * The JSON dictionaries must be in the boot set: the module loader
    * registers them like any other locale file, but a code-only glob left them

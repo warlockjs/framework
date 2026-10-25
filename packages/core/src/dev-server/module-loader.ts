@@ -6,6 +6,7 @@ import { router } from "../router/router";
 import { devLogError, formatModuleNotFoundError } from "./dev-logger";
 import { extractTranslationKeys } from "./extract-translation-keys";
 import type { CleanupFunction, FileManager } from "./file-manager";
+import { moduleOfLocaleJson } from "../localization/module-locale-paths";
 import { warnForLegacyLocales } from "./legacy-locales-warning";
 import { getDevelopmentModelModuleRegistry } from "./model-module-registry";
 import type { SpecialFileType, SpecialFilesCollector } from "./special-files-collector";
@@ -119,7 +120,7 @@ export class ModuleLoader {
       const cleanup = registerLocaleDictionary({
         sourceFile: file.relativePath,
         source: file.source,
-        defaultNamespace: file.relativePath.split("/")[2]!,
+        defaultNamespace: moduleOfLocaleJson(file.relativePath) ?? file.relativePath.split("/")[2]!,
       });
       file.addCleanup(cleanup);
       return undefined;

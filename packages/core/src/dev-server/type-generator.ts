@@ -17,6 +17,7 @@ import {
   isTranslationRegisteringSource,
 } from "./translation-keys-sources";
 import { parseLocaleDictionary } from "../localization";
+import { moduleOfLocaleJson } from "../localization/module-locale-paths";
 import { getFilesFromDirectory } from "./utils";
 import {
   extractModelResourceEntries,
@@ -470,7 +471,7 @@ ${interfaceContent}
         const dictionary = parseLocaleDictionary({
           sourceFile: path,
           source: fileManager.source,
-          defaultNamespace: path.split("/")[2]!,
+          defaultNamespace: moduleOfLocaleJson(path) ?? path.split("/")[2]!,
         });
         for (const key of Object.keys(dictionary.entries)) {
           keys.add(key);
@@ -491,14 +492,14 @@ ${interfaceContent}
     // code; use the runtime parser to keep `$group` and flattening identical.
     for (const absolutePath of await getFilesFromDirectory(
       join(process.cwd(), "src", "app"),
-      "**/utils/locales.json",
+      "**/utils/{locales.json,locales/*.json}",
     )) {
       const path = Path.toRelative(absolutePath);
       sourceFiles.add(path);
       const dictionary = parseLocaleDictionary({
         sourceFile: path,
         source: await readFile(absolutePath, "utf-8"),
-        defaultNamespace: path.split("/")[2]!,
+        defaultNamespace: moduleOfLocaleJson(path) ?? path.split("/")[2]!,
       });
       for (const key of Object.keys(dictionary.entries)) {
         keys.add(key);
@@ -598,7 +599,8 @@ ${entries}
   }
 
   private isLocalesFile(path: string): boolean {
-    return Path.normalize(path).includes("/utils/locales.");
+    const normalized = Path.normalize(path);
+    return normalized.includes("/utils/locales.") || normalized.includes("/utils/locales/");
   }
 
   /**

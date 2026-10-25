@@ -23,6 +23,9 @@ import {
 } from "./model-property-reads";
 import { translationProblems } from "./translation-conventions";
 import { integrationSpecProblems } from "./integration-spec-conventions";
+import { barrelFindings } from "./barrel-conventions";
+import { clientBoundaryProblems } from "./client-boundary-conventions";
+import { configuredLocaleCodes, localeCoverageProblems } from "./locale-conventions";
 import { positionOf, type SourceFinding } from "./source-ast";
 
 /** Extensions tried when resolving an extension-less import. */
@@ -202,6 +205,13 @@ function findingProblem(
  *   `set()` fix (see `modelPropertyReadFindings`);
  * - `WL9024` (warning) an integration spec that imports nothing needing the app
  *   (see `integrationSpecProblems`).
+ * - `WL9022` server-only code that imports a `.client.*` module, directly or
+ *   through other files (see `clientBoundaryProblems`);
+ * - `WL9023` an `index.ts` barrel in an app module, only when `rules.WL9023`
+ *   in `.warlock-check.json` turns it on (see `barrelFindings`).
+ *
+ * Module dictionaries are checked by {@link runConventions}, not here, since
+ * they are JSON files of the project and not source files.
  *
  * A `// warlock-check-ignore WL9006` comment on the problem's line or the line
  * above silences that code there; without codes it silences every one.
@@ -217,6 +227,7 @@ export function checkFileConventions(
   const sourceFile = ast.parseSourceFile(relativePath, source);
   const problems = [
     ...importProblems(sourceFile, relativePath, cwd),
+    ...clientBoundaryProblems(sourceFile, relativePath, cwd),
     ...translationProblems(relativePath, source),
     ...integrationSpecProblems(relativePath, source, cwd, (specifier, importer) =>
       resolveSpecifier(specifier, importer, cwd),
@@ -228,6 +239,8 @@ export function checkFileConventions(
       ...responseSchemaFindings(sourceFile),
       ...apiRouteReferenceFindings(sourceFile, apiRouteFacts),
       ...modelPropertyReadFindings(sourceFile, modelFacts),
+      // Opt-in: a barrel is a finding only once `rules.WL9023` names a severity.
+      ...(["warning", "error"].includes(options.rules?.WL9023 ?? "") ? barrelFindings(sourceFile) : []),
     ].map((finding) => findingProblem(sourceFile, relativePath, finding)),
   ];
   const lines = source.split(/\r?\n/);
@@ -319,6 +332,16 @@ export function runConventions(
     problems.push(...checkFileConventions(file, source, cwd, options, apiRouteFacts, modelFacts));
   }
 
+  // `WL9105`: every key of every module dictionary carries every configured locale.
+  problems.push(
+    ...localeCoverageProblems(cwd, configuredLocaleCodes(cwd, options.localeCodes))
+      .filter((problem) => options.rules?.[problem.code] !== "off")
+      .map((problem) => {
+        const severity = options.rules?.[problem.code];
+        return severity === "error" || severity === "warning" ? { ...problem, severity } : problem;
+      }),
+  );
+
   return problems;
 }
 
@@ -332,6 +355,12 @@ export function readConventionOptions(cwd: string): ConventionOptions {
   const limit: unknown = Reflect.get(value, "componentLineLimit");
   if (limit !== undefined && (typeof limit !== "number" || !Number.isInteger(limit) || limit < 1))
     throw new Error("componentLineLimit must be a positive integer.");
+  const localeCodes: unknown = Reflect.get(value, "localeCodes");
+  if (
+    localeCodes !== undefined &&
+    (!Array.isArray(localeCodes) || !localeCodes.every((code) => typeof code === "string"))
+  )
+    throw new Error("localeCodes must be an array of locale code strings.");
   const rules: unknown = Reflect.get(value, "rules");
   const overrides: NonNullable<ConventionOptions["rules"]> = {};
   if (rules !== undefined) {
@@ -348,6 +377,7 @@ export function readConventionOptions(cwd: string): ConventionOptions {
   }
   return {
     ...(typeof limit === "number" ? { componentLineLimit: limit } : {}),
+    ...(Array.isArray(localeCodes) ? { localeCodes: localeCodes as string[] } : {}),
     rules: overrides,
   };
 }

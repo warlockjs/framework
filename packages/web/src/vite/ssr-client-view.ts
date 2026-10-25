@@ -209,16 +209,16 @@ type ServerReachedClientEdge = {
 };
 
 /**
- * The PURE decision behind the `.client`-reached-from-the-server diagnostic,
- * factored out so it is unit-testable without booting Vite.
+ * The PURE decision behind the server-code-imports-`.client` refusal, factored
+ * out so it is unit-testable without booting Vite.
  *
- * Canon c3abc87b: the import graph is authoritative and `.client` is a developer
- * marker, NOT enforced isolation. So a warning is warranted for exactly one
- * shape — a SERVER-side importer (`importerIsClientBound === false`) reaching a
- * `.client` target. An all-client graph (a client-bound importer → `.client`)
- * is the marker being used as intended and must stay silent, as must any edge
- * whose target is not a `.client` module. Returns the message to print, or
- * `undefined` when nothing should warn.
+ * `.client.*` is a client-only boundary: such a module may be imported by
+ * pages, layouts and components (and then renders on the server unless wrapped
+ * in `<ClientOnly>`), but never by server-only code. A SERVER-side importer
+ * (`importerIsClientBound === false`) reaching a `.client` target is therefore
+ * an error. An all-client graph (a client-bound importer → `.client`) and any
+ * edge whose target is not a `.client` module stay silent. Returns the message
+ * to refuse with, or `undefined` when nothing should be refused.
  */
 export function serverReachedClientDiagnostic({
   importerIsClientBound,
@@ -230,11 +230,11 @@ export function serverReachedClientDiagnostic({
   if (!isClientFile(resolvedTarget)) return undefined;
 
   return [
-    `[warlock:web] a server-reachable module imports a .client module.`,
+    `[warlock:web] server-only code imports a .client module.`,
     ``,
-    `Edge: ${moduleKey(importer)} → ${moduleKey(resolvedTarget)}`,
-    `Cause: "${moduleKey(importer)}" is reachable from the SERVER graph, yet it imports the .client module "${moduleKey(resolvedTarget)}". The import graph is what actually decides where code runs; ".client" is only a developer marker of intent.`,
-    `Fix: ".client" does NOT create the isolation its name suggests — this edge still pulls the target into the server graph. Move the import behind a real client boundary (a component/.page/layout the client graph reaches) if it must not run on the server.`,
+    `Import chain: ${moduleKey(importer)} → ${moduleKey(resolvedTarget)}`,
+    `Cause: "${moduleKey(importer)}" is reachable from the SERVER graph, yet it imports the client-only module "${moduleKey(resolvedTarget)}". A .client.* module may be imported by pages, layouts and components, never by controllers, services, repositories, models, routes, connectors, loaders or *.server.ts files.`,
+    `Fix: Remove the import from the server code. Pass the data the client module needs through a loader, or move the shared logic into a universal file that is neither .client nor server-only.`,
   ].join("\n");
 }
 
@@ -254,10 +254,6 @@ export function clientEnvironmentOnly(plugin: Plugin, ssrState: SsrBoundaryState
     typeof plugin.resolveId === "function" ? plugin.resolveId : plugin.resolveId?.handler;
   const originalBuildStart =
     typeof plugin.buildStart === "function" ? plugin.buildStart : plugin.buildStart?.handler;
-
-  // Each unique server-importer → .client-target edge warns at most once for the
-  // life of this plugin instance; `resolveId` fires repeatedly for the same edge.
-  const warnedServerReachedClientEdges = new Set<string>();
 
   return {
     ...plugin,
@@ -320,18 +316,16 @@ export function clientEnvironmentOnly(plugin: Plugin, ssrState: SsrBoundaryState
             ssrState.clientBoundModules.has(importerKey) ||
             isStatelessClientSurface(importerKey, ssrState.appRoot);
           if (!isClientBound) {
-            // A server edge. Resolution is unchanged — this branch STILL returns
-            // null and never surfaces a refusal — but if this server-reachable
-            // importer names a `.client` module, warn (non-fatally) that
-            // `.client` is a marker, not enforced isolation.
+            // A server edge. Resolution is unchanged, except that an app-source
+            // importer naming a `.client` module is refused: `.client.*` is a
+            // client-only boundary and server-only code must never import it.
             //
             // The resolve below is judged under `ssr: false`, so Gate A's own
             // resolveId can refuse a legitimately server-only import (it throws
-            // `this.error`). That refusal must not escape a diagnostic that only
-            // ADDS a warning, so it is swallowed: a `.client` file is recognized
-            // NOWHERE in Gate A (the very defect this diagnostic exists for), so
-            // a genuine `.client` target resolves cleanly and is still caught —
-            // only non-`.client` server imports throw, and those are not our case.
+            // `this.error`). That refusal must not escape this check, so it is
+            // swallowed: a genuine `.client` target resolves cleanly and is still
+            // caught; only non-`.client` server imports throw, and those are not
+            // this check's case.
             let targetId: string | undefined;
             try {
               const serverEdgeTarget = await originalResolveId.call(this, source, importer, {
@@ -353,12 +347,8 @@ export function clientEnvironmentOnly(plugin: Plugin, ssrState: SsrBoundaryState
               resolvedTarget: targetId,
               importer,
             });
-            if (message && targetId) {
-              const edgeKey = `${importerKey}→${moduleKey(targetId)}`;
-              if (!warnedServerReachedClientEdges.has(edgeKey)) {
-                warnedServerReachedClientEdges.add(edgeKey);
-                console.warn(message);
-              }
+            if (message && targetId && isAppSourcePath(moduleKey(importer), ssrState.appRoot)) {
+              this.error(message);
             }
             return null;
           }

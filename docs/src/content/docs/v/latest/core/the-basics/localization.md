@@ -119,8 +119,52 @@ replaces that group. Nested keys are flattened, every dictionary is strictly
 validated, and one key cannot be owned by two dictionaries (or by a dictionary
 and a static registration). Do not import the file; Warlock loads it.
 
-`utils/locales.ts` remains supported but is deprecated and will be removed in
-v6. Run `warlock doctor --fix` to migrate it. The legacy registration form is:
+### One file per feature
+
+A module's dictionary grows with every feature, and one shared JSON file is where
+parallel work collides. Put each feature's keys in its own file,
+`utils/locales/<feature>.json`, next to (or instead of) `utils/locales.json`:
+
+```json title="src/app/products/utils/locales/reviews.json"
+{
+  "reviewAdded": { "en": "Review added", "ar": "تمت إضافة التقييم" }
+}
+```
+
+Every file of the module is merged into one translation registry when it loads:
+in `warlock dev`, in the production build and in test workers
+(`loadTestLocales`). The default group is still the module (`products.reviewAdded`),
+a root `$group` still replaces it, and one key can be owned by one file only, so
+two files that define the same key fail at load and name both. Web's per-page
+translation tables are built from the same registry and include these keys. Only
+`utils/locales.json` and the files directly inside `utils/locales/` are loaded.
+
+### Check that every key has every locale
+
+```bash
+npx warlock check
+```
+
+reports `WL9105` for each key missing one of the configured locales, naming the
+file and the key, without booting the app. The configured locales are
+`localeCodes` in `src/config/app.ts`; a `localeCodes` array in `.warlock-check.json`
+overrides them. When neither names any locale the rule is skipped. Boot fails on
+the same gap, so the check moves the error into the pull request.
+
+### Migrating from `utils/locales.ts`
+
+`utils/locales.ts` is deprecated. It still loads, and the dev server and
+`warlock build` print one warning that names every such file; `warlock doctor`
+lists them under `WL9101`. Removal is planned for v6. Run `warlock doctor --fix`
+to convert each file that holds one literal `groupedTranslations` call:
+
+- into the module's `utils/locales.json`, or
+- into `utils/locales/legacy.json` when `locales.json` already exists and shares
+  no key with the file.
+
+A file with computed keys or other code is left alone and listed as manual
+work. Comments in the TypeScript source are not carried into the JSON. The
+legacy registration form is:
 
 ```ts title="src/app/products/utils/locales.ts"
 import { groupedTranslations } from "@mongez/localization";

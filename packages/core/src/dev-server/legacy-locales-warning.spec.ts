@@ -31,6 +31,20 @@ describe("legacy locales.ts development warning", () => {
     );
   });
 
+  it("names each legacy file", () => {
+    warnForLegacyLocales([
+      "src/app/access/utils/locales.ts",
+      "src/app/blog/utils/locales.json",
+      "src/app/blog/utils/locales.ts",
+    ]);
+
+    const message = vi.mocked(log.warn).mock.calls[0]?.[2] as string;
+
+    expect(message).toContain("src/app/access/utils/locales.ts");
+    expect(message).toContain("src/app/blog/utils/locales.ts");
+    expect(message).not.toContain("src/app/blog/utils/locales.json");
+  });
+
   it("does not warn without legacy locales.ts files, including JSON-only apps", () => {
     warnForLegacyLocales([]);
     warnForLegacyLocales(["src/app/access/utils/locales.json"]);

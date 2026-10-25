@@ -1,6 +1,7 @@
 import { colors } from "@mongez/copper";
 import type { CommandActionData } from "../../../../commands/types";
 import { repositoryStub } from "../templates/stubs";
+import { loadGeneratedBarrels } from "../utils/barrels";
 import { putFileAsync, setDryRun } from "../utils/writer";
 import { parseModulePath, parseName } from "../utils/name-parser";
 import {
@@ -38,6 +39,7 @@ export async function generateRepository(data: CommandActionData): Promise<void>
   const name = parseName(componentName);
   const force = data.options.force || data.options.f;
   setDryRun(Boolean(data.options.dryRun));
+  await loadGeneratedBarrels();
 
   // Check if repository already exists
   if ((await componentExists(module, "repositories", `${name.kebab}.repository`)) && !force) {

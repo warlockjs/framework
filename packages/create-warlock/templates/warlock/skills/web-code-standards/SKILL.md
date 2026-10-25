@@ -47,6 +47,16 @@ both places. Put component props in that dedicated type module by default;
 keep a tiny private prop type beside a component only when extracting it would
 make the feature harder to read.
 
+Browser code may import from `app/<module>/...` only `*.client.ts(x)` files,
+schema (`*.schema.ts`, `schema/`), types (`*.types.ts`, `types/`) and the
+module's `web/` folder; other files of a module are server code and fail the
+client build with the import chain. Use `import type` to share the input and
+output types a service exports. A `*.client.ts(x)` file may be imported by
+pages and components (it still renders on the server unless wrapped in
+`<ClientOnly>`) and never by server-only code; `warlock check` reports `WL9022`
+for that. These rules do not change the web layout: one component per file,
+logic in `*.setup.ts` and `use-*.ts`.
+
 ## 1. Keep the page contract, make the implementation thin
 
 Page logic lives in the matching `.setup.ts` file: `config`, `loader`,

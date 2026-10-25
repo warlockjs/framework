@@ -21,6 +21,7 @@ import {
   crudUpdateSchemaStub,
   crudUpdateServiceStub,
 } from "../templates/stubs";
+import { generatedBarrels, loadGeneratedBarrels } from "../utils/barrels";
 import { pluralName, singularName } from "../utils/name-parser";
 import { moduleExists } from "../utils/path-resolver";
 import {
@@ -46,6 +47,7 @@ export async function generateModule(data: CommandActionData): Promise<void> {
   const name = pluralName(moduleName);
   const force = data.options.force || data.options.f;
   setDryRun(Boolean(data.options.dryRun));
+  await loadGeneratedBarrels();
   // --force only creates what is missing; replacing edited files needs --overwrite too
   setSkipExisting(!data.options.overwrite);
 
@@ -165,11 +167,13 @@ groupedTranslations("${name.camel}", {
       crudModelStub(entity),
     );
 
-    // Create model index
-    await putFileAsync(
-      path.join(modulePath, "models", entity.kebab, "index.ts"),
-      `export * from "./${entity.kebab}.model";\n`,
-    );
+    // Create model index (barrels are optional: `generate.barrels: false` skips it)
+    if (generatedBarrels()) {
+      await putFileAsync(
+        path.join(modulePath, "models", entity.kebab, "index.ts"),
+        `export * from "./${entity.kebab}.model";\n`,
+      );
+    }
 
     // Create migrations folder
     await ensureDirectoryAsync(path.join(modulePath, "models", entity.kebab, "migrations"));

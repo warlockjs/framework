@@ -49,6 +49,14 @@ export type WebConfigurations = {
    * narrows it, `{ privatePrefixes }` keeps path prefixes out for everyone.
    */
   namedApiRoutes?: NamedApiRoutesOption;
+  /**
+   * What the client build does when browser code imports a file of an
+   * `app/<module>/` that is not browser-safe (`.client.*`, schema, types, or the
+   * module's `web/` folder). `"error"` (default) fails the build, `"warn"`
+   * reports the import and continues while an app migrates, `"off"` disables
+   * the rule.
+   */
+  moduleBoundary?: "error" | "warn" | "off";
   /** Opt-in multi-site mode: several sites (fixed hosts or resolver-driven) in one app. */
   sites?: SitesConfig;
   /** Maps a request host to a dynamic site; `null` means unknown host. */

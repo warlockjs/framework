@@ -103,7 +103,7 @@ Wire it as a global middleware in `src/config/http.ts` so every request runs thr
 
 ## Step 3 — Translations per module
 
-Every module owns its translations in `utils/locales.ts` — the file is auto-loaded by the framework. The scaffold gives you this when you run `pnpm warlock generate.module <name>`:
+Every module owns its translations in `utils/locales.ts` — the file is auto-loaded by the framework. This is the deprecated form: new modules use `utils/locales.json` (and `utils/locales/<feature>.json`), and `warlock doctor --fix` converts the old file; see [Localization](/v/latest/core/the-basics/localization/). The scaffold gives you this when you run `pnpm warlock generate.module <name>`:
 
 ```ts title="src/app/products/utils/locales.ts"
 import { groupedTranslations } from "@mongez/localization";
