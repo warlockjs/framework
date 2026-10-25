@@ -15,6 +15,12 @@ import {
   EMPTY_API_ROUTE_FACTS,
   type ApiRouteFacts,
 } from "./api-route-references";
+import {
+  collectModelFacts,
+  EMPTY_MODEL_FACTS,
+  modelPropertyReadFindings,
+  type ModelFacts,
+} from "./model-property-reads";
 import { translationProblems } from "./translation-conventions";
 import { positionOf, type SourceFinding } from "./source-ast";
 
@@ -169,6 +175,7 @@ function findingProblem(
     source: "convention",
     severity: finding.severity ?? "error",
     message: finding.message,
+    fix: finding.fix,
     file: relativePath,
     ...positionOf(sourceFile, finding.node),
   });
@@ -189,7 +196,9 @@ function findingProblem(
  * - `WL9010`–`WL9012` warnings: `await log.*()`, a second controller in one
  *   file, a `kind` discriminator;
  * - `WL9019` (warning) and `WL9020` (error) the browser route references
- *   (see `apiRouteReferenceFindings`).
+ *   (see `apiRouteReferenceFindings`);
+ * - `WL9021` (warning) a Cascade column read as a property, with a `get()` /
+ *   `set()` fix (see `modelPropertyReadFindings`).
  *
  * A `// warlock-check-ignore WL9006` comment on the problem's line or the line
  * above silences that code there; without codes it silences every one.
@@ -200,6 +209,7 @@ export function checkFileConventions(
   cwd: string,
   options: ConventionOptions = {},
   apiRouteFacts: ApiRouteFacts = EMPTY_API_ROUTE_FACTS,
+  modelFacts: ModelFacts = EMPTY_MODEL_FACTS,
 ): ToolingProblem[] {
   const sourceFile = ast.parseSourceFile(relativePath, source);
   const problems = [
@@ -211,6 +221,7 @@ export function checkFileConventions(
       ...webFindings(sourceFile, options),
       ...responseSchemaFindings(sourceFile),
       ...apiRouteReferenceFindings(sourceFile, apiRouteFacts),
+      ...modelPropertyReadFindings(sourceFile, modelFacts),
     ].map((finding) => findingProblem(sourceFile, relativePath, finding)),
   ];
   const lines = source.split(/\r?\n/);
@@ -280,6 +291,7 @@ export function runConventions(
   files: readonly string[],
   project?: string,
   apiRouteFacts: ApiRouteFacts = collectApiRouteFacts(cwd, files),
+  modelFacts: ModelFacts = collectModelFacts(cwd, files),
 ): ToolingProblem[] {
   const options = readConventionOptions(cwd);
   const problems = checkTsconfigConventions(cwd, project)
@@ -298,7 +310,7 @@ export function runConventions(
       continue;
     }
 
-    problems.push(...checkFileConventions(file, source, cwd, options, apiRouteFacts));
+    problems.push(...checkFileConventions(file, source, cwd, options, apiRouteFacts, modelFacts));
   }
 
   return problems;

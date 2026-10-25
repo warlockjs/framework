@@ -12,6 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - Validation messages name a field without a translated label in words: `max_dumbbell_kg` reads "Max dumbbell kg" and `firstName` reads "First name" instead of the raw key. Labels under `attributes.<field>` still win, and `validation.attributes.<field>` is read too when `validation.attributeGroup` is not set. Only the validated field and sibling fields a rule refers to are turned into words. `validation.humanizeAttributes: false` keeps the raw key.
 - `warlock doctor` check `validation-labels` (`WL4002`), off by default: with `validation.warnMissingLabels: true` it lists request-schema fields that have no label in a locale of `app.localeCodes`.
+- `warlock check` rule `WL9021` (warning): a Cascade column read or written as a model property (`user.email`). It recognises instances from `new User()`, the single-record finders (`find`, `first`, `create`, ...), a `User` annotation and `this` inside a model class, and compares the name with the keys of the model's `static schema` when they can be read statically. `warlock check --fix` rewrites reads to `model.get("column")` and plain `model.column = value;` statements to `model.set("column", value)`.
 
 ## 5.37.1 - 2026-10-24
 ## 5.38.0

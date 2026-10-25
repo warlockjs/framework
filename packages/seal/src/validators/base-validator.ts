@@ -30,6 +30,8 @@ export class BaseValidator<TInput = unknown, TOutput = TInput> {
   protected defaultValue: any | (() => any);
   protected description?: string;
   protected shouldOmit = false;
+  /** Set by `.internal()`: the server fills this field, request schemas leave it out. */
+  protected serverSet = false;
   protected isNullable = false;
   protected isMutable = false;
   /** Treat empty or whitespace-only form strings as an absent value. */
@@ -364,6 +366,7 @@ export class BaseValidator<TInput = unknown, TOutput = TInput> {
     cloned.dataTransformers = [...this.dataTransformers];
     cloned.defaultValue = this.defaultValue;
     cloned.shouldOmit = this.shouldOmit;
+    cloned.serverSet = this.serverSet;
     cloned.description = this.description;
     cloned.attributesText = { ...this.attributesText };
     cloned.translatedAttributes = { ...this.translatedAttributes };
@@ -416,6 +419,40 @@ export class BaseValidator<TInput = unknown, TOutput = TInput> {
    */
   public exclude() {
     return this.omit();
+  }
+
+  /**
+   * Mark this field as set by the server, never by the client.
+   *
+   * The field stays a normal member of the schema: it validates, casts and
+   * infers exactly as before, so a Cascade model can write it. Request schemas
+   * derived with `ObjectValidator#withoutInternal()` (or `Model.requestSchema()`)
+   * leave it out, so the same declaration serves the model and the request.
+   *
+   * Brands the return type with `{ isInternal: true }` so the derived schema
+   * drops the key at the type level too.
+   *
+   * @example
+   * ```ts
+   * const postSchema = v.object({
+   *   title: v.string().required(),
+   *   authorId: v.int().required().internal(),
+   * });
+   *
+   * const requestSchema = postSchema.withoutInternal(); // { title }
+   * ```
+   */
+  public internal(): this & { isInternal: true } {
+    const instance = this.instance;
+    instance.serverSet = true;
+    return instance as this & { isInternal: true };
+  }
+
+  /**
+   * Whether `.internal()` marked this field as server-set
+   */
+  public isServerSet(): boolean {
+    return this.serverSet;
   }
 
   /**

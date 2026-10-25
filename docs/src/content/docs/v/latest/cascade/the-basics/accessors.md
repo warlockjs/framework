@@ -20,6 +20,61 @@ const email = user.get("email", "n/a"); // any, with default
 
 `get` reads a field from the model's data. If the field is absent, it returns the default (or `undefined` if you didn't pass one). This is the canonical reader for instance state.
 
+### Exact types from the schema
+
+Type the model with the schema's output type and `get()` / `set()` know every column:
+
+```ts
+import { Model, type ModelData } from "@warlock.js/cascade";
+import { v } from "@warlock.js/seal";
+
+export const postSchema = v.object({
+  title: v.string().required(),
+  views: v.int().default(0),
+  publishedAt: v.date().nullable(),
+  authorId: v.int().required().internal(),
+});
+
+export type PostSchema = ModelData<typeof postSchema>;
+
+export class Post extends Model<PostSchema> {
+  public static table = "posts";
+  public static schema = postSchema;
+}
+
+post.get("title"); // string
+post.get("views"); // number (a default makes it always present)
+post.get("publishedAt"); // Date | null
+post.get("publishedAt", new Date()); // Date (the default replaces null/undefined)
+post.get("tilte"); // type error: not a column of Post
+
+post.set("views", 10); // ok
+post.set("views", "10"); // type error: string is not number
+post.set("publishedAt", null); // ok, the column is nullable
+```
+
+`ModelData<typeof schema>` is `Infer.Output<typeof schema>`: dates are `Date`, `v.int()` and `v.number()` are `number`, `.nullable()` adds `| null`, `.optional()` adds `undefined`, and `.default()` removes it. A model declared without a schema type (`extends Model`) keeps loose, `any`-typed access, so existing code keeps compiling.
+
+Only top-level columns are typed. A dot path (`"profile.address.city"`) is accepted for any column and returns `any`; pass a type argument when you want one: `post.get<string>("meta.seoTitle")`. The path is not checked on purpose, because a recursive path type is what makes large schemas slow to compile.
+
+### A column is not a property
+
+`post.title` is always `undefined`: the data lives in `post.data`, and the only property shortcuts are `id`, `uuid`, `createdAt` and `updatedAt`. Use `post.get("title")`.
+
+- `warlock check` reports `post.title` reads on Cascade models as `WL9021` and `warlock check --fix` rewrites them to `post.get("title")`.
+- In development (any `NODE_ENV` except `production`) Cascade warns once per model and column the first time such a property is read. Nothing is installed in production.
+
+### Read-only snapshots
+
+`toSnapshot()` returns a typed, read-only copy of the model's data, without the `hidden` columns. Unlike `toJSON()` it ignores `resource`, `resourceColumns` and `toJsonColumns`, so its type is exactly the schema:
+
+```ts
+const snapshot = post.toSnapshot(); // ModelDataSnapshot<PostSchema>
+snapshot.publishedAt; // Date | null
+```
+
+Use `ModelDataSnapshot<PostSchema>` as the input type of a resource or presenter.
+
 ### Dot-notation paths
 
 JSON columns and nested objects walk by dot path:

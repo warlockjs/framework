@@ -7,7 +7,12 @@ import { unknownKeyRule } from "../rules/common/unknown-key";
 import type { JsonSchemaResult, JsonSchemaTarget } from "../standard-schema/json-schema";
 import { applyNullable, wrapNullableStrict } from "../standard-schema/json-schema";
 import type { Schema, SchemaContext, ValidationResult } from "../types";
-import type { InferInputObjectShape, InferOutputObjectShape } from "../types/inference-types";
+import type {
+  InferInputObjectShape,
+  InferOutputObjectShape,
+  InternalKeys,
+  PartialSchema,
+} from "../types/inference-types";
 import { BaseValidator } from "./base-validator";
 import { ComputedValidator } from "./computed-validator";
 
@@ -287,22 +292,53 @@ export class ObjectValidator<TSchema extends Schema = Schema> extends BaseValida
   }
 
   /**
-   * Mark all or the given schema fields as optional
+   * Mark all or the given schema fields as optional.
+   *
+   * The result keeps its types: each named field becomes optional in the
+   * inferred shape, the others are untouched.
    */
-  public partial<K extends keyof TSchema>(...keys: K[]) {
-    const validationSchema = this.clone();
+  public partial<K extends keyof TSchema = keyof TSchema>(
+    ...keys: K[]
+  ): ObjectValidator<PartialSchema<TSchema, K>> {
+    const validationSchema = this.clone() as any;
 
     if (keys.length === 0) {
       keys = Object.keys(validationSchema.schema) as K[];
     }
 
-    for (const [key, validator] of Object.entries(validationSchema.schema)) {
-      if (keys.length === 0 || keys.includes(key as K)) {
-        (validationSchema.schema as Schema)[key] = validator.optional();
+    for (const [key, validator] of Object.entries(validationSchema.schema as Schema)) {
+      if (keys.includes(key as K)) {
+        validationSchema.schema[key] = validator.optional();
       }
     }
 
-    return validationSchema;
+    return validationSchema as ObjectValidator<PartialSchema<TSchema, K>>;
+  }
+
+  /**
+   * The keys of the fields marked with `.internal()`
+   */
+  public internalKeys(): InternalKeys<TSchema>[] {
+    return Object.entries(this.schema)
+      .filter(([, validator]) => validator.isServerSet())
+      .map(([key]) => key) as InternalKeys<TSchema>[];
+  }
+
+  /**
+   * A copy of this schema without the fields marked with `.internal()`.
+   * Use it for request validation: the server sets those fields itself.
+   * Configuration (`allowUnknown`, `stripUnknown`, ...) is preserved.
+   *
+   * @example
+   * ```ts
+   * const requestSchema = postSchema.withoutInternal();
+   * const createSchema = postSchema.withoutInternal().pick("title");
+   * ```
+   */
+  public withoutInternal(): ObjectValidator<Omit<TSchema, InternalKeys<TSchema>>> {
+    return this.without(...(this.internalKeys() as (keyof TSchema)[])) as unknown as ObjectValidator<
+      Omit<TSchema, InternalKeys<TSchema>>
+    >;
   }
 
   /**

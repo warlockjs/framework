@@ -591,3 +591,11 @@ Browser code names a route registered with `clientVisible: false`. Such a route 
 ```bash
 npx warlock explain WL9020
 ```
+
+### WL9021
+
+A Cascade column is read or written as a property of a model instance (`user.email`). Model data lives behind `get()` and `set()`, so the property is `undefined` at runtime and a write never reaches the dirty tracker. Use `user.get("email")` and `user.set("email", value)`. The check recognises instances from `new User()`, `await User.find()` and the other single-record finders, a `User` annotation and `this` inside a model class, and compares the name with the keys of the model's `static schema` when they can be read statically. `warlock check --fix` rewrites reads and plain `model.column = value;` statements. Defaults to a warning; configure severity in `.warlock-check.json`.
+
+```bash
+npx warlock explain WL9021
+```

@@ -18,6 +18,7 @@ import {
 } from "./check-report.types";
 import { runConventions } from "./conventions-step";
 import { collectApiRouteFacts } from "./api-route-references";
+import { collectModelFacts } from "./model-property-reads";
 import { checkNodeVersion } from "./environment-step";
 import { checkFamilyVersions } from "./family-versions-step";
 import { runLint } from "./lint-step";
@@ -186,6 +187,7 @@ export async function runCheck(options: CheckOptions = {}): Promise<CheckReport>
           fixTargets,
           options.project,
           collectApiRouteFacts(cwd, await listSourceFiles(cwd)),
+          collectModelFacts(cwd, await listSourceFiles(cwd)),
         ),
       );
     } catch (error) {
@@ -290,6 +292,7 @@ export async function runCheck(options: CheckOptions = {}): Promise<CheckReport>
         conventionFiles,
         options.project,
         collectApiRouteFacts(cwd, await listSourceFiles(cwd)),
+        collectModelFacts(cwd, await listSourceFiles(cwd)),
       ),
     };
   });

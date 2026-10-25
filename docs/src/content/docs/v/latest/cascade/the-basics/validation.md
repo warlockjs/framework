@@ -231,6 +231,37 @@ What it does:
 
 When to reach for it: **document-style** denormalisation where you specifically want to _embed_ (not reference) another model. Most apps use foreign keys + relations (covered in the [Relationships essentials](../the-basics/03-relationships.md)) and never need `embed`; reach for it when you've decided a column should hold a snapshot.
 
+## Server-set fields — declare once
+
+Some columns are never sent by the client: `authorId`, `tenantId`, `status` after a transition. Mark them `.internal()` on the model schema:
+
+```ts
+export const postSchema = v.object({
+  title: v.string().required(),
+  body: v.string().required(),
+  authorId: v.int().required().internal(),
+});
+```
+
+An internal field is a normal column. `Post.create({ title, body, authorId })` validates and writes it, and `get()` / `set()` type it. What changes is the request side: `Post.requestSchema()` returns the schema without internal fields, both at runtime and in the inferred type, so a client-sent `authorId` is never accepted and the two schemas cannot drift apart.
+
+```ts
+const createPostSchema = Post.requestSchema().pick("title", "body");
+const updatePostSchema = Post.requestSchema().partial();
+
+export const createPostController: RequestHandler = async ({ request, response }) => {
+  const data = request.validated(); // { title, body }: authorId was never accepted
+
+  const post = await Post.create({ ...data, authorId: request.locals.user.id });
+
+  return response.success({ post });
+};
+
+createPostController.validation = { schema: createPostSchema };
+```
+
+The controller sets the server-side value itself, from the authenticated user or the route. `requestSchema()` returns a seal object validator, so `pick()`, `without()` and `partial()` keep their inferred types; `schema.withoutInternal()` is the same operation on any seal object schema, and `schema.internalKeys()` lists the marked fields.
+
 ## Where to put schema declarations
 
 Conventions, not rules — Cascade doesn't care where the schema is defined as long as it's set on `Model.schema`. The patterns that work well:

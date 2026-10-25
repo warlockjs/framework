@@ -1,5 +1,5 @@
 import { type GenericObject } from "@mongez/reinforcements";
-import type { ObjectValidator } from "@warlock.js/seal";
+import type { InternalKeys, ObjectValidator, Schema } from "@warlock.js/seal";
 import type {
   DriverContract,
   PaginationOptions,
@@ -106,7 +106,8 @@ import {
   removeGlobalModelScope,
   removeLocalModelScope,
 } from "./methods/scope-methods";
-import { modelToJSON } from "./methods/serialization-methods";
+import { guardColumnPropertyReads } from "./methods/column-read-guard";
+import { modelToJSON, modelToSnapshot } from "./methods/serialization-methods";
 import {
   cleanupModelEvents,
   getGlobalEvents,
@@ -128,15 +129,25 @@ import type {
   GlobalScopeDefinition,
   GlobalScopeOptions,
   LocalScopeCallback,
+  ModelDataSnapshot,
+  ModelKey,
+  ModelPath,
   ModelSchema,
+  ModelValue,
 } from "./model.types";
 import { getAllModelsFromRegistry, getModelFromRegistry } from "./register-model";
 export type {
   ChildModel,
   GlobalScopeDefinition,
   GlobalScopeOptions,
+  IsLooseModelSchema,
   LocalScopeCallback,
+  ModelData,
+  ModelDataSnapshot,
+  ModelKey,
+  ModelPath,
   ModelSchema,
+  ModelValue,
   ScopeTiming,
 } from "./model.types";
 
@@ -576,7 +587,7 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
       return;
     }
 
-    this.capturedPrimaryKey = this.get(this.self().primaryKey);
+    this.capturedPrimaryKey = getFieldValue(this, this.self().primaryKey);
     this.primaryKeyCaptured = true;
   }
 
@@ -592,7 +603,9 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
    * current value, which is what an insert would use anyway.
    */
   public get trustedPrimaryKey(): any {
-    return this.primaryKeyCaptured ? this.capturedPrimaryKey : this.get(this.self().primaryKey);
+    return this.primaryKeyCaptured
+      ? this.capturedPrimaryKey
+      : getFieldValue(this, this.self().primaryKey);
   }
 
   /**
@@ -654,6 +667,8 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
    * ```
    */
   public constructor(initialData: Partial<TSchema> = {}) {
+    guardColumnPropertyReads(this.self());
+
     this.data = initialData as TSchema;
     this.dirtyTracker = this.self().getDriver().getDirtyTracker(this.data);
   }
@@ -739,14 +754,14 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
         inferBelongsToForeignKey(relationName, this.relationDefaultsOrUndefined());
 
       if (relationData === null) {
-        this.set(foreignKey, null);
+        setFieldValue(this, foreignKey, null);
       } else if (relationData) {
         const related = relationData as Model;
         const ownerKey = definition.localKey ?? related.self().primaryKey ?? "id";
         const ownerValue = related.get(ownerKey);
 
         if (ownerValue !== undefined && ownerValue !== null) {
-          this.set(foreignKey, ownerValue);
+          setFieldValue(this, foreignKey, ownerValue);
         }
       }
     }
@@ -881,7 +896,7 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
    * Get model id
    */
   public get id(): number | string {
-    return this.get(this.self().primaryKey);
+    return getFieldValue(this, this.self().primaryKey);
   }
 
   /**
@@ -904,7 +919,7 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
    * ```
    */
   public get uuid(): string {
-    const value = this.get(this.self().primaryKey);
+    const value = getFieldValue(this, this.self().primaryKey);
 
     return value === undefined || value === null ? value : String(value);
   }
@@ -924,13 +939,13 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
    * user.get("address.city", "Unknown"); // "Unknown" if address.city is missing
    * ```
    */
-  public get<TKey extends keyof TSchema & string>(field: TKey): TSchema[TKey];
-  public get<TKey extends keyof TSchema & string>(
+  public get<TKey extends ModelKey<TSchema>>(field: TKey): ModelValue<TSchema, TKey>;
+  public get<TKey extends ModelKey<TSchema>>(
     field: TKey,
-    defaultValue: TSchema[TKey],
-  ): TSchema[TKey];
-  public get<Type extends unknown = any>(field: string): Type;
-  public get<Type extends unknown = any>(field: string, defaultValue: Type): Type;
+    defaultValue: NonNullable<ModelValue<TSchema, TKey>>,
+  ): NonNullable<ModelValue<TSchema, TKey>>;
+  public get<Type = any>(field: ModelKey<TSchema> | ModelPath): Type;
+  public get<Type = any>(field: ModelKey<TSchema> | ModelPath, defaultValue: Type): Type;
   public get(field: string, defaultValue?: unknown): any {
     return getFieldValue(this, field, defaultValue);
   }
@@ -980,8 +995,8 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
    * user.set("name", "Bob").set("address.city", "NYC");
    * ```
    */
-  public set<TKey extends keyof TSchema & string>(field: TKey, value: TSchema[TKey]): this;
-  public set(field: string, value: unknown): this;
+  public set<TKey extends ModelKey<TSchema>>(field: TKey, value: ModelValue<TSchema, TKey>): this;
+  public set(field: ModelPath, value: unknown): this;
   public set(field: string, value: unknown): this {
     return setFieldValue(this, field, value) as this;
   }
@@ -1102,7 +1117,7 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
    * Determine if current model is active
    */
   public get isActive(): boolean {
-    return this.get<boolean>(this.isActiveColumn);
+    return getFieldValue(this, this.isActiveColumn) as boolean;
   }
 
   /**
@@ -1113,7 +1128,7 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
 
     if (!createdAtColumn) return;
 
-    return this.get<Date>(createdAtColumn);
+    return getFieldValue(this, createdAtColumn) as Date;
   }
 
   /**
@@ -1124,7 +1139,7 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
 
     if (!updatedAtColumn) return;
 
-    return this.get<Date>(updatedAtColumn);
+    return getFieldValue(this, updatedAtColumn) as Date;
   }
 
   /**
@@ -2690,5 +2705,46 @@ export abstract class Model<TSchema extends ModelSchema = ModelSchema> {
    */
   public toJSON() {
     return modelToJSON(this);
+  }
+
+  /**
+   * A typed, read-only copy of the model's data, without the `hidden` fields.
+   *
+   * Unlike `toJSON()` it ignores `resource`, `resourceColumns` and
+   * `toJsonColumns`, and its type is the model's schema, so it can feed a
+   * resource or a presenter with exact types. Dates stay `Date`.
+   *
+   * @example
+   * ```typescript
+   * const snapshot = user.toSnapshot();
+   * snapshot.createdAt; // Date
+   * ```
+   */
+  public toSnapshot(): ModelDataSnapshot<TSchema> {
+    return modelToSnapshot(this) as ModelDataSnapshot<TSchema>;
+  }
+
+  /**
+   * The request schema of this model: its schema without the fields marked
+   * `.internal()`, which only the server sets.
+   *
+   * Chain `pick()`, `without()` and `partial()` to shape it; they keep the
+   * inferred types.
+   *
+   * @example
+   * ```typescript
+   * const createPostSchema = Post.requestSchema().pick("title", "body");
+   * const updatePostSchema = Post.requestSchema().partial();
+   * ```
+   */
+  public static requestSchema<TShape extends Schema>(this: {
+    schema?: ObjectValidator<TShape>;
+    name: string;
+  }): ObjectValidator<Omit<TShape, InternalKeys<TShape>>> {
+    if (!this.schema) {
+      throw new Error(`Model "${this.name}" has no static schema to derive a request schema from.`);
+    }
+
+    return this.schema.withoutInternal();
   }
 }

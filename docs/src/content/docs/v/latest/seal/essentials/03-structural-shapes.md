@@ -68,8 +68,24 @@ userBase.merge(auditFields);
 // Subset / superset
 userBase.pick("email", "name"); // only those two keys
 userBase.without("passwordHash"); // drop one
-userBase.partial("email"); // mark specific keys optional
+userBase.partial("email"); // mark specific keys optional (and optional in the inferred type)
 userBase.requiredFields("email", "name"); // force-required specific keys
+```
+
+`partial()` with no arguments makes every key optional, and `pick()`, `without()` and `partial()` all keep the inferred type of the result.
+
+### Server-set fields — `.internal()`
+
+Mark a field `.internal()` when the server fills it and a client must never send it. The field validates, casts and infers like any other; `withoutInternal()` derives the request-facing schema without it:
+
+```ts
+const post = v.object({
+  title: v.string().required(),
+  authorId: v.int().required().internal(),
+});
+
+post.internalKeys(); // ["authorId"]
+const request = post.withoutInternal(); // { title: string }
 ```
 
 These return new validators — the source is untouched.

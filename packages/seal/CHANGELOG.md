@@ -14,6 +14,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - `toJsonSchema("openai-strict")` keeps an optional `v.enum()`, `v.literal()`, `in()` list or union nullable: `null` is added to an `enum`, a `const` becomes `anyOf: [{ const }, { type: "null" }]`, `anyOf`/`oneOf` gain one `{ type: "null" }` branch, and `allOf`/`$ref` schemas are wrapped in `anyOf`. Before, such fields were listed in `required` with no way to send `null`.
 - `.nullable()` on an enum, a literal, a scalar or a union no longer produces a `type` of `[undefined, "null"]` for `draft-2020-12`; the same shapes as above are used, and `openapi-3.0` adds `null` to the `enum` next to `nullable: true`. A nullable single literal now emits `anyOf: [{ const }, { type: "null" }]` instead of a bare `const`.
+- `.internal()` marks a field as set by the server. It validates and infers like any other field; `ObjectValidator#withoutInternal()` returns the schema without those fields (type included) for request validation, and `internalKeys()` lists them. `BaseValidator#isServerSet()` reads the mark.
+
+### Changed
+
+- `ObjectValidator#partial()` keeps its types: the named keys (all keys when none are named) become optional in the inferred shape.
 
 ## 5.34.3 - 2026-10-20
 

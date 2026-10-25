@@ -267,6 +267,7 @@ They parse real TypeScript/JSX syntax with the same oxc-parser adapter as the ex
 | `WL9018` | Exported `RequestHandler` in `src/app/**/controllers` lacks `responseSchema`                             | Assign `handler.responseSchema` to document each response status.                                                                                                  |
 | `WL9019` | A browser route call (`apiHref`, `useSubmitForm({ route })`) takes a name that is only known at run time | Pass a string literal or a template with a static prefix, or declare the names with `config.apiRoutes` in a page setup file.                                       |
 | `WL9020` | Browser code references a route registered with `clientVisible: false` (an error, not a warning)         | Call the endpoint from the server, or drop `clientVisible: false` from the route.                                                                                  |
+| `WL9021` | A Cascade column is read or written as a model property (`user.email`)                                  | Use `user.get("email")` / `user.set("email", value)`; `--fix` rewrites it.                                                                                         |
 | `WL9104` | Translation key computed at runtime in `src/web` (a page then ships every group)                         | Declare the keys with `config.translations` in the page's setup file.                                                                                              |
 
 Web rules apply to `src/web/**/*.tsx`. Components are top-level JSX-returning functions
@@ -304,7 +305,8 @@ Vitest uses related mode. TypeScript still compiles incrementally as a program, 
 diagnostics to the selection and its importers; this is not a partial compilation.
 
 `--fix` applies safe convention edits before the pipeline. Currently it removes `.js`
-suffixes from relative imports (`WL9002`). Ignored/disabled findings are not fixed.
+suffixes from relative imports (`WL9002`) and rewrites `model.column` property reads
+on Cascade models to `model.get("column")` (`WL9021`). Ignored/disabled findings are not fixed.
 Component extraction, control replacement and response schemas require human decisions.
 Problems that have a safe edit include optional `fix: { start, end, text }` in JSON;
 `start` and `end` are zero-based source string offsets with an exclusive end.
