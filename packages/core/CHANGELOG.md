@@ -19,6 +19,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Changed
 
 - The three separate error-level entries for a 5xx (`request-error`, `model-write-validation-error` and `unhandled-request-error`) are replaced by the single record above. The per-request `http.log` line is unchanged.
+- `setupTest({ lifetime: "file" })` opts one file out of a worker-scoped runtime (`tests.lifetime: "worker"`). The worker's shared runtime is shut down, the file boots a fresh one that its own `teardownTest()` closes, and the next file returns to the worker lifetime. Use it for a spec that changes global configuration the per-file reset does not undo.
+- A worker-scoped runtime now resets more between files, in addition to the database and the fakes: test HTTP servers left open are closed, the request context is cleared, the route table returns to the snapshot taken after the app booted (routes a file registered by hand are removed, the app's own stay), and a real in-memory cache driver is flushed. `router.captureBootSnapshot()` and `router.restoreBootSnapshot()` are the router side of it.
+- Per-phase boot profile. With `tests.profileSetup: true` or `WARLOCK_TEST_PROFILE=1`, each file's profile also carries one `connector.<name>` entry per connector (`boot()` plus `start()`) and `appModules`, `startHttpTestServer()` prints and publishes its own phases, and `TestSetupReporter` prints the phases (config, translations, connectors, fakes, routes, reset, teardown), each connector, the HTTP test server's boot and the slowest files in the run summary. `WARLOCK_TEST_PROFILE_JSON=<path>` or `new TestSetupReporter({ json, slowest })` also writes the profile as JSON. `connectorsManager.observeTimings()` exposes the connector timings.
+- `guardUnitProject()` in `@warlock.js/core/vite`: a plugin for the Vitest `unit` project that fails a spec importing a connector, `connectorsManager`, `bootstrap` or a test-server helper, or calling `setupTest()` without `{ mode: "unit" }`, with a message naming the import and pointing to the integration project. `setupTest()` outside unit mode also throws when `WARLOCK_TEST_PROJECT=unit`.
+- `warlock check` reports `WL9024` (a warning) for an integration spec (`*.test.ts`, or a spec under `tests/`) that imports nothing needing the app, with the hint to move it to the unit project.
+- Upgrade codemod `test-runtime-worker-lifetime` lists where an existing app can opt in to the worker lifetime (`src/config/tests.ts` without a `lifetime`) and a `unit` project without `guardUnitProject()`. It edits nothing; existing apps keep their test configuration. The 5.38 upgrade note says the same.
+
+### Changed
+
+- `warlock add test` generates the worker lifetime as the default: `src/config/tests.ts` sets `lifetime: "worker"` and `resetDatabase: true` unless `WARLOCK_TEST_LIFETIME=file`, the integration project has `isolate: false` from the same variable, and the `unit` project runs in threads with `guardUnitProject()`. Existing files are never overwritten.
+
+### Fixed
+
+- A test run that booted the web connector no longer ends with `something prevents 2 Vite servers from exiting` and `close timed out after 10000ms`. `stopHttpTestServer()` and the worker teardown shut the web connector down even when it had booted but not started, closing Vite, its HMR websocket and its file watchers, and teardown names any connector still active afterwards.
+- The 5.36 upgrade note and the testing docs and skills now say that Vitest 5's `clearMocks: true` default also clears calls a module made when it was imported (a scheduler registering jobs from a `main.ts`), before the first test runs. Import the module inside the test, or set `clearMocks: false`.
 
 ## 5.37.1 - 2026-10-24
 ## 5.38.0

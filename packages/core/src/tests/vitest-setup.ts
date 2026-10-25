@@ -28,12 +28,14 @@ import { config } from "../config";
 import { loadUnitConfig } from "./load-unit-config";
 import { resetTestDatabase, type ResetTestDatabaseOptions } from "./reset-test-database";
 import { closeOpenTestHttpServers } from "./open-test-servers";
+import { captureTestRouterSnapshot, resetTestRuntimeState } from "./reset-test-state";
 import {
   testRuntimeScope,
   markTestFileOpen,
   selectTestLifetime,
   timeTestStep,
   finishTestProfile,
+  recordConnectorTiming,
 } from "./test-runtime-scope";
 import { Application } from "../application/application";
 import { bootstrap } from "../bootstrap";
@@ -84,6 +86,15 @@ export type TestSetupOptions = {
   mode?: "unit" | "integration";
   /** File label for setup profiling. Pass expect.getState().testPath from Vitest. */
   file?: string;
+  /**
+   * `"file"` opts this file out of a worker-scoped runtime (`tests.lifetime:
+   * "worker"`): the worker's shared runtime is closed, this file boots a fresh
+   * one and `teardownTest()` closes it again, and the next file goes back to
+   * the worker lifetime. Use it for a spec that changes global configuration
+   * (`config.set`, environment variables, driver options) the per-file reset
+   * does not undo. Has no effect under the default file lifetime.
+   */
+  lifetime?: "file";
   /**
    * Which connectors to start.
    *
@@ -179,6 +190,8 @@ const POISONED_MESSAGE =
 export async function setupTest(options?: TestSetupOptions): Promise<void> {
   const scope = testRuntimeScope();
   const mode = options?.mode ?? "integration";
+  if (options?.lifetime !== undefined && options.lifetime !== "file")
+    throw new TestLifecycleError('setupTest({ lifetime }) only accepts "file".');
   if (scope.fileOpen && scope.mode !== mode) {
     throw new TestLifecycleError("Cannot mix unit and integration runtimes in one file.");
   }
@@ -212,6 +225,12 @@ export async function setupTest(options?: TestSetupOptions): Promise<void> {
     markTestFileOpen();
     return;
   }
+  if (process.env.WARLOCK_TEST_PROJECT === "unit") {
+    throw new TestLifecycleError(
+      'setupTest() boots the whole framework, and this file runs in the unit project. Call setupTest({ mode: "unit", importModule }) for config values only, or move the spec to the integration project (name it *.test.ts).',
+    );
+  }
+
   warnMissingImportModule(options?.importModule);
 
   const registry = getTestLifecycleRegistry();
@@ -229,6 +248,14 @@ export async function setupTest(options?: TestSetupOptions): Promise<void> {
 
   if (registry.state === "ready") {
     assertReadySelectionMatches(registry.activeSelection, requested);
+    if (options?.lifetime === "file" && scope.lifetime === "worker" && !scope.fileOpen) {
+      // This file mutates global state the per-file reset does not cover: close
+      // the worker's runtime and boot one that belongs to this file alone.
+      await teardownFileRuntime();
+      scope.boundary = undefined;
+
+      return setupTest(options);
+    }
     if (scope.lifetime === "worker" && !scope.fileOpen) {
       scope.boundary ??= Promise.resolve().then(async () => {
         beginFileProfile(options?.file);
@@ -571,7 +598,10 @@ async function runTestRuntimeStartup(
     await timeTestStep("appConfig", () => loadConfigFiles(true));
     registry.cleanupLocales = await timeTestStep("locales", () => loadTestLocales());
     if (!profileEnabled()) scope.profile = undefined;
-    scope.lifetime = selectTestLifetime(readRuntimeConfiguration().lifetime);
+    // An opt-out is validated like any other value, so a bad `tests.lifetime`
+    // still fails loudly even in a file that does not use it.
+    const configuredLifetime = selectTestLifetime(readRuntimeConfiguration().lifetime);
+    scope.lifetime = options?.lifetime === "file" ? "file" : configuredLifetime;
     scope.shutdown = async () => {
       const started = performance.now();
       try {
@@ -605,14 +635,24 @@ async function runTestRuntimeStartup(
 
     publishEffectiveSelection(effectiveSelection);
 
-    await timeTestStep("connectors", () => startSelectedConnectors(effectiveSelection));
+    connectorsManager.observeTimings((timing) => recordConnectorTiming(timing));
+
+    try {
+      await timeTestStep("connectors", () => startSelectedConnectors(effectiveSelection));
+    } finally {
+      connectorsManager.observeTimings(undefined);
+    }
 
     // After the connectors, so the cache and storage fakes replace drivers
     // that are already configured instead of being replaced by them.
     await timeTestStep("fakes", () =>
       installTestFakes(fakes, { isolatedStorage: scope.lifetime === "worker" }),
     );
-    if (scope.lifetime === "worker") await timeTestStep("reset", () => resetBetweenFiles());
+    if (scope.lifetime === "worker") {
+      // The booted application is the state every later file returns to.
+      await captureTestRouterSnapshot();
+      await timeTestStep("reset", () => resetBetweenFiles());
+    }
 
     if (!bound.hasExpired()) {
       scope.fileOpen = true;
@@ -819,6 +859,9 @@ function beginFileProfile(file?: string): void {
 async function resetBetweenFiles(): Promise<void> {
   // Servers a previous file forgot to close still hold routes and a port.
   await closeOpenTestHttpServers();
+  // Routes registered by hand, a request context left entered, a real
+  // in-memory cache. The fakes were already reinstalled by the caller.
+  await resetTestRuntimeState();
   const { resetDatabase } = readRuntimeConfiguration();
   if (resetDatabase === true) await resetTestDatabase();
   else if (resetDatabase && typeof resetDatabase === "object")

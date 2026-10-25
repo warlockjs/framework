@@ -5,10 +5,16 @@ import type {
 } from "@warlock.js/cascade";
 import { env } from "@warlock.js/core";
 
+// Each Vitest worker keeps its own database and truncates it between test files
+// (src/config/tests.ts), so tests run against "<DB_NAME>_test_<worker id>".
+const databaseName = process.env.VITEST
+  ? `${env("DB_NAME", "app")}_test_${process.env.VITEST_POOL_ID ?? 1}`
+  : env("DB_NAME");
+
 const databaseConfigurations: ConnectionOptions<MongoDriverOptions, MongoClientOptions> = {
   driver: env("DB_DRIVER", "mongodb"),
   name: "default",
-  database: env("DB_NAME"),
+  database: databaseName,
   host: env("DB_HOST", "localhost"),
   port: env("DB_PORT", 27017),
   username: env("DB_USERNAME"),

@@ -94,9 +94,32 @@ describe("add test — worker lifetime switch", () => {
       /config\/tests\.ts$/.test(path),
     )?.[1];
 
-    expect(viteConfig).toContain('isolate: process.env.WARLOCK_TEST_LIFETIME !== "worker"');
+    expect(viteConfig).toContain('isolate: process.env.WARLOCK_TEST_LIFETIME === "file"');
     expect(viteConfig).toContain("extends: true");
     expect(testsConfig).toContain('lifetime: workerLifetime ? "worker" : "file"');
     expect(testsConfig).toContain("resetDatabase: workerLifetime");
+  });
+
+  it("makes worker lifetime with a database reset the default, and file lifetime the opt-out", async () => {
+    await testFeature.onExecuting?.({} as never);
+
+    const testsConfig = [...written.entries()].find(([path]) =>
+      /config\/tests\.ts$/.test(path),
+    )?.[1];
+    const setup = [...written.entries()].find(([path]) => /test-setup\.ts$/.test(path))?.[1];
+
+    expect(testsConfig).toContain('process.env.WARLOCK_TEST_LIFETIME !== "file"');
+    expect(testsConfig).toContain("workerDatabaseName");
+    expect(setup).toContain('lifetime: "file"');
+  });
+
+  it("guards the unit project against app imports", async () => {
+    await testFeature.onExecuting?.({} as never);
+
+    const viteConfig = [...written.entries()].find(([path]) => /vite\.config\.ts$/.test(path))?.[1];
+
+    expect(viteConfig).toContain("guardUnitProject()");
+    expect(viteConfig).toContain('env: { WARLOCK_TEST_PROJECT: "unit" }');
+    expect(viteConfig).toContain('pool: "threads"');
   });
 });

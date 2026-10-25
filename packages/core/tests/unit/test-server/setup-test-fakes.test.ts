@@ -26,6 +26,7 @@ vi.mock("../../../src/tests/fakes/test-fakes", () => ({
 
 vi.mock("../../../src/connectors", () => ({
   connectorsManager: {
+    observeTimings: vi.fn(),
     start: vi.fn(async () => undefined),
     startWithout: vi.fn(async () => {
       order.push("start connectors");

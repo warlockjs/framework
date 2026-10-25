@@ -114,7 +114,8 @@ An unknown fake name or a non-boolean value fails setup with the list of known f
 
 ## Gotchas
 
-- **Recorded state lives for the test file.** Call `clear()` in `beforeEach` when tests in one file must not see each other's mails or jobs.
+- **Recorded state lives for the test file.** Call `clear()` in `beforeEach` when tests in one file must not see each other's mails or jobs. With `tests.lifetime: "worker"` the fakes are reinstalled before every file, so a file always starts empty.
+- **Vitest 5 defaults `clearMocks` to true, and that also clears calls a module made when it was imported.** A scheduler that registers jobs, or an event bus that subscribes, from a `main.ts` imported at the top of the spec has its recorded calls cleared before the first test, so asserting them fails although the code ran. Import the module inside the test (`await import("./main")`) after the mocks are set up, or set `clearMocks: false` for the project. The Warlock fakes (`mailFake`, `queueFake`, ...) record on their own and are not affected by `clearMocks`, which only touches `vi.fn()` mocks and spies.
 - **Real deliveries in tests need an opt-out.** A test that relied on a real SMTP sink, a Redis cache shared between the HTTP server and the workers, or a real bucket now gets the fake — set that fake to `false`.
 - **The queue seam is public.** `setDispatchInterceptor({ dispatch, find? })` from `@warlock.js/queue` replaces the broker for every job in the process; `queueFake` is built on it.
 

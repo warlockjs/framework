@@ -23,6 +23,9 @@ All notable changes to `@warlock.js/web` are documented here.
 - `requireUser({ userType })` and `requireUser({ when })` answered a failed check with a raw JSON body (`{"error":"Forbidden"}`) on a page route. The middleware form now throws `ForbiddenError` (and `UnAuthorizedError` for a guest with no sign-in page or a bearer client), so a page route renders the forbidden page instead. A guest with `auth.pageAuth.loginPath` is still redirected to sign in. To refuse a page request from your own middleware, throw a Core `ForbiddenError`; `response.forbidden()` still writes its own JSON reply.
 - In development, hydrating an error page failed with a malformed-payload error because the payload check rejected the `debug` details the server sends outside production. The check now accepts `debug`.
 - A route-translations lookup for a failure rendered by the error or forbidden page now covers both pages' keys.
+### Fixed
+
+- `WebConnector.shutdown()` closes the Vite dev server, its HMR websocket and its file watchers whenever Vite was created, not only after `start()` completed. A boot that failed after creating Vite, or a shutdown between `boot()` and `start()`, used to leave Vite running and keep a test or dev process from exiting. A failure to close one part no longer skips the others, and the first failure is reported afterwards.
 
 ## 5.37.1 - 2026-10-24
 ## 5.38.0

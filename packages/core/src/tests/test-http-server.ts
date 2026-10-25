@@ -28,6 +28,7 @@ import {
   actingAs,
 } from "./authenticated-test-client";
 import { forgetOpenTestServer, trackOpenTestServer } from "./open-test-servers";
+import { timeTestStep } from "./test-runtime-scope";
 import { type TestRequestClient, createTestRequestClient } from "./test-helpers";
 
 export type CreateTestHttpServerOptions = {
@@ -82,7 +83,10 @@ async function loadAppModulesOnce(importModule: AppModuleImporter | undefined): 
     try {
       await filesOrchestrator.init();
       await filesOrchestrator.initializeAll();
-      await filesOrchestrator.moduleLoader.loadAll();
+      await timeTestStep("appModules", () => filesOrchestrator.moduleLoader.loadAll());
+      // The application's own routes are now part of the state a worker-scoped
+      // runtime returns to between files.
+      router.captureBootSnapshot();
     } finally {
       setAppModuleImporter(undefined);
     }

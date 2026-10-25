@@ -17,8 +17,14 @@ const mocks = vi.hoisted(() => ({
   startWithout: vi.fn(async () => undefined),
   shutdown: vi.fn(async () => undefined),
   resetDatabase: vi.fn(async () => [] as string[]),
+  captureSnapshot: vi.fn(async () => undefined),
+  resetState: vi.fn(async () => ({ routesRestored: true, cacheFlushed: false })),
 }));
 vi.mock("./reset-test-database", () => ({ resetTestDatabase: mocks.resetDatabase }));
+vi.mock("./reset-test-state", () => ({
+  captureTestRouterSnapshot: mocks.captureSnapshot,
+  resetTestRuntimeState: mocks.resetState,
+}));
 vi.mock("../application/application", () => ({
   Application: { setEnvironment: vi.fn(), runShutdownHooks: vi.fn() },
 }));
@@ -30,7 +36,7 @@ vi.mock("../config/load-config-files", () => ({ loadConfigFiles: mocks.appConfig
 vi.mock("./load-unit-config", () => ({ loadUnitConfig: mocks.unitConfig }));
 vi.mock("../dev-server/files-orchestrator", () => ({ filesOrchestrator: { init: mocks.init } }));
 vi.mock("../connectors", () => ({
-  connectorsManager: { startWithout: mocks.startWithout, shutdown: mocks.shutdown },
+  connectorsManager: { observeTimings: vi.fn(), startWithout: mocks.startWithout, shutdown: mocks.shutdown },
 }));
 vi.mock("../config", () => ({
   config: {
@@ -139,6 +145,82 @@ describe("test runtime performance modes", () => {
     expect(mocks.resetDatabase).toHaveBeenNthCalledWith(1, { except: ["countries"] });
   });
 
+  it("resets the in-memory runtime state before each worker-lifetime file, after leaked servers close", async () => {
+    const order: string[] = [];
+    mocks.resetState.mockImplementation(async () => {
+      order.push("state");
+      return { routesRestored: true, cacheFlushed: false };
+    });
+    mocks.resetDatabase.mockImplementation(async () => {
+      order.push("database");
+      return [];
+    });
+    mocks.settings = { lifetime: "worker", resetDatabase: true };
+    const leaked = vi.fn(async () => {
+      order.push("server");
+    });
+
+    await setupTest(options);
+    // The booted application is captured once, then the first file is reset.
+    expect(mocks.captureSnapshot).toHaveBeenCalledTimes(1);
+    trackOpenTestServer({ close: leaked });
+    await teardownTest();
+    await setupTest(options);
+
+    expect(mocks.captureSnapshot).toHaveBeenCalledTimes(1);
+    expect(order).toEqual(["state", "database", "server", "state", "database"]);
+  });
+
+  it("does not reset the in-memory state under file lifetime", async () => {
+    await setupTest(options);
+    await teardownTest();
+    expect(mocks.resetState).not.toHaveBeenCalled();
+    expect(mocks.captureSnapshot).not.toHaveBeenCalled();
+  });
+
+  it("opts one file out of the worker lifetime with setupTest({ lifetime: \"file\" })", async () => {
+    mocks.settings = { lifetime: "worker" };
+
+    await setupTest(options);
+    await teardownTest();
+    expect(mocks.bootstrap).toHaveBeenCalledTimes(1);
+    expect(mocks.shutdown).not.toHaveBeenCalled();
+
+    // The opted-out file closes the shared runtime and boots a private one ...
+    await setupTest({ ...options, lifetime: "file" });
+    expect(mocks.shutdown).toHaveBeenCalledTimes(1);
+    expect(mocks.bootstrap).toHaveBeenCalledTimes(2);
+    expect(testRuntimeScope().lifetime).toBe("file");
+
+    // ... that its own teardown closes again.
+    await teardownTest();
+    expect(mocks.shutdown).toHaveBeenCalledTimes(2);
+
+    // The next file is back on the worker lifetime.
+    await setupTest(options);
+    expect(testRuntimeScope().lifetime).toBe("worker");
+    expect(mocks.bootstrap).toHaveBeenCalledTimes(3);
+    await teardownTest();
+    await setupTest(options);
+    expect(mocks.bootstrap).toHaveBeenCalledTimes(3);
+  });
+
+  it("opts the first file of a worker out without a prior shared runtime", async () => {
+    mocks.settings = { lifetime: "worker" };
+
+    await setupTest({ ...options, lifetime: "file" });
+    expect(testRuntimeScope().lifetime).toBe("file");
+    await teardownTest();
+
+    expect(mocks.shutdown).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects a lifetime option other than \"file\"", async () => {
+    await expect(setupTest({ ...options, lifetime: "worker" } as never)).rejects.toThrow(
+      /only accepts "file"/,
+    );
+  });
+
   it("rejects an invalid tests.resetDatabase value", async () => {
     mocks.settings = { lifetime: "worker", resetDatabase: "yes" };
     await expect(setupTest(options)).rejects.toThrow(/resetDatabase must be true/);
@@ -187,6 +269,17 @@ describe("test runtime performance modes", () => {
     expect(mocks.startWithout).not.toHaveBeenCalled();
     expect(clockFake.isInstalled()).toBe(false);
     expect(mocks.shutdown).not.toHaveBeenCalled();
+  });
+
+  it("refuses to boot the framework from the unit project, but still allows unit mode", async () => {
+    vi.stubEnv("WARLOCK_TEST_PROJECT", "unit");
+
+    await expect(setupTest(options)).rejects.toThrow(/unit project/);
+    expect(mocks.bootstrap).not.toHaveBeenCalled();
+
+    await setupTest({ mode: "unit", importModule: options.importModule });
+    await teardownTest();
+    expect(mocks.unitConfig).toHaveBeenCalledTimes(1);
   });
 
   it("requires the Vitest importer in unit mode", async () => {

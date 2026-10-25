@@ -770,26 +770,60 @@ export class WebConnector extends BaseConnector {
   public async shutdown(): Promise<void> {
     // Card 1db238ca: give any `web.errors.report()` calls still in flight a
     // bounded chance to finish before the process goes away Ã¢â‚¬â€ BEFORE the
-    // `!this.active` guard below, deliberately: `this.active` is only ever
+    // Vite guard in `disposeViteServer`, deliberately: `this.active` is only ever
     // set by the DEV branch of `start()` (see its own doc), so a production
     // boot (no Vite, `this.active` stays `false` its whole life) would
     // otherwise skip this flush entirely on every graceful shutdown, which is
     // exactly the hosting mode this flush matters most for.
-    await flushPendingServerErrorReports();
+    try {
+      await flushPendingServerErrorReports();
 
-    await shutdownSitemapRuntime();
+      await shutdownSitemapRuntime();
+    } finally {
+      // In a `finally`: a flush that rejects must not leave Vite, its HMR
+      // socket and its file watchers holding the process open.
+      await this.disposeViteServer();
+    }
+  }
 
-    // Before the `active` guard: boot subscribes, `start()` is what sets `active`.
+  /**
+   * Close the Vite dev server, its HMR websocket and its file watchers.
+   *
+   * Keyed on the server existing, not on `active`: `active` is set only by
+   * `start()`, so a boot that created Vite and then failed (or a process that
+   * was shut down between `boot()` and `start()`) would otherwise leave the
+   * server running. Each step is independent, so one that fails cannot skip the
+   * others, and the first failure is rethrown once everything was attempted.
+   * Safe to call twice.
+   */
+  protected async disposeViteServer(): Promise<void> {
     this.unsubscribeHttpRebuilt?.();
     this.unsubscribeHttpRebuilt = undefined;
 
-    if (!this.active) return;
+    const vite = this.vite;
+
+    if (vite === undefined) return;
 
     if (container.has("http.server")) {
       container.get("http.server").server.closeAllConnections();
     }
 
-    await this.vite?.close();
+    const errors: unknown[] = [];
+    const attempt = async (close: () => unknown): Promise<void> => {
+      try {
+        await close();
+      } catch (error) {
+        errors.push(error);
+      }
+    };
+
+    // The HMR websocket is attached to the HTTP server and the watcher is a
+    // chokidar instance; `vite.close()` owns both, but closing them first
+    // keeps the process free to exit even when `close()` itself is slow.
+    await attempt(() => vite.ws?.close());
+    await attempt(() => vite.watcher?.close());
+    await attempt(() => vite.close());
+
     this.vite = undefined;
     setServerStackFixer(undefined);
     this.installedPages = [];
@@ -800,6 +834,8 @@ export class WebConnector extends BaseConnector {
     this.reportUnregisteredPages = undefined;
 
     this.active = false;
+
+    if (errors.length > 0) throw errors[0];
   }
 
   /**

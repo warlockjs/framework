@@ -20,8 +20,10 @@ import { assertPortIsAvailable } from "../http/port-preflight";
 import { getHttpReadyReport } from "../http/ready-report";
 import { loadEnvironmentFiles } from "../utils/load-environment";
 import { warlockConfigManager } from "../warlock-config/warlock-config.manager";
+import { performance } from "node:perf_hooks";
 import { installTestFakes, restoreTestFakes } from "./fakes/test-fakes";
 import type { TestFakesSelection } from "./fakes/test-fakes";
+import { formatSteps, publishTestServerBootProfile } from "./test-runtime-scope";
 import { publishTestServerPort, withdrawTestServerPort } from "./test-server-port-channel";
 
 let isServerRunning = false;
@@ -204,42 +206,63 @@ export async function startHttpTestServer(options: StartHttpTestServerOptions = 
 
   console.log("[test-server] Starting HTTP test server...");
 
+  // Boot phases, kept whatever the profile setting says (a handful of numbers),
+  // and printed or published only when profiling is on.
+  const steps: Record<string, number> = {};
+  const timed = async <T>(step: string, run: () => Promise<T>): Promise<T> => {
+    const started = performance.now();
+
+    try {
+      return await run();
+    } finally {
+      steps[step] = (steps[step] ?? 0) + performance.now() - started;
+    }
+  };
+
+  connectorsManager.observeTimings((timing) => {
+    const step = `connector.${timing.connector}`;
+
+    steps[step] = (steps[step] ?? 0) + timing.ms;
+  });
+
   try {
     // `globalSetup` runs in Vitest's main process, where Vitest's worker env
     // setup has not run. Load `.env.test` here, before any config is read.
-    await loadEnvironmentFiles();
+    await timed("environment", () => loadEnvironmentFiles());
 
     // Set environment
     Application.setRuntimeStrategy("development");
     Application.setEnvironment("test");
 
     // Bootstrap (env, etc.)
-    await warlockConfigManager.load();
-    await bootstrap();
+    await timed("config", () => warlockConfigManager.load());
+    await timed("bootstrap", () => bootstrap());
 
     // Initialize file orchestrator (but don't watch)
-    await filesOrchestrator.init();
-    await filesOrchestrator.initializeAll();
+    await timed("orchestrator", async () => {
+      await filesOrchestrator.init();
+      await filesOrchestrator.initializeAll();
+    });
 
     // Load config files
-    await loadConfigFiles(true);
+    await timed("appConfig", () => loadConfigFiles(true));
 
     // Early-phase connectors (database, cache, logger, storage, mailer,
     // herald) must start BEFORE app modules load: a module's `main.ts` boot
     // side-effect can query the DB at import time, so the data source has to
     // be registered first. This mirrors the dev/prod boot order (see
     // `cli-commands.manager`, `production-builder`, and `DevelopmentServer`).
-    if (options.web === false) {
-      await startTestServerPhase(ConnectorLifecyclePhase.Early);
-    } else {
-      await connectorsManager.startPhase(ConnectorLifecyclePhase.Early);
-    }
+    await timed("earlyConnectors", () =>
+      options.web === false
+        ? startTestServerPhase(ConnectorLifecyclePhase.Early)
+        : connectorsManager.startPhase(ConnectorLifecyclePhase.Early),
+    );
 
     // Fakes before app modules load, so module boot code already sees them.
-    await installTestFakes(options.fakes);
+    await timed("fakes", () => installTestFakes(options.fakes));
 
     // Load application modules (their boot side-effects now see a live DB).
-    await filesOrchestrator.moduleLoader.loadAll();
+    await timed("appModules", () => filesOrchestrator.moduleLoader.loadAll());
 
     const portMode = await applyTestServerPort(options.port);
     const readyReportBefore = getHttpReadyReport();
@@ -251,17 +274,19 @@ export async function startHttpTestServer(options: StartHttpTestServerOptions = 
 
     // Late-phase connectors (http, socket) bind after app code has
     // registered its routes and listeners.
-    if (options.web === false) {
-      await startTestServerPhase(ConnectorLifecyclePhase.Late);
-    } else {
-      await connectorsManager.startPhase(ConnectorLifecyclePhase.Late);
-    }
+    await timed("lateConnectors", () =>
+      options.web === false
+        ? startTestServerPhase(ConnectorLifecyclePhase.Late)
+        : connectorsManager.startPhase(ConnectorLifecyclePhase.Late),
+    );
 
     if (portMode === "ephemeral") {
       publishEphemeralPort(readyReportBefore);
     }
 
     isServerRunning = true;
+
+    reportServerBootProfile(steps);
   } catch (error) {
     // This function owns the connectors it starts, so a failure part-way
     // through has to leave nothing behind. Without this, `isServerRunning` was
@@ -273,7 +298,23 @@ export async function startHttpTestServer(options: StartHttpTestServerOptions = 
     // Rethrown unchanged: the startup failure is the one the caller needs to
     // read. A cleanup failure that replaced it would hide the actual cause.
     throw error;
+  } finally {
+    connectorsManager.observeTimings(undefined);
   }
+}
+
+/**
+ * Print and publish the server's boot phases when profiling is on
+ * (`WARLOCK_TEST_PROFILE=1` or `tests.profileSetup`). The reporter adds them to
+ * its JSON, so the web connector and Vite show up next to the worker phases.
+ */
+function reportServerBootProfile(steps: Record<string, number>): void {
+  const settings = config.get<{ profileSetup?: unknown }>("tests", {}) ?? {};
+
+  if (process.env.WARLOCK_TEST_PROFILE !== "1" && settings.profileSetup !== true) return;
+
+  console.info(`[warlock:test] server pid=${process.pid} ${formatSteps(steps)}`);
+  publishTestServerBootProfile({ pid: process.pid, steps });
 }
 
 /**
@@ -310,6 +351,27 @@ async function unwindPartialStartup(): Promise<void> {
 }
 
 /**
+ * Name any connector that still reports itself active after shutdown.
+ *
+ * A web connector whose Vite dev server (with its HMR websocket and file
+ * watchers) is still open keeps the process from exiting, and Vitest then only
+ * reports "something prevents N Vite servers from exiting" after its close
+ * timeout. Naming the connector here points at the one to fix.
+ */
+function warnAboutConnectorsLeftActive(): void {
+  const active = connectorsManager
+    .list()
+    .filter((connector) => connector.isActive?.())
+    .map((connector) => connector.name);
+
+  if (active.length === 0) return;
+
+  console.warn(
+    `[test-server] Connectors still active after shutdown: ${active.join(", ")}. Their servers or watchers may keep the test process from exiting.`,
+  );
+}
+
+/**
  * Stop the HTTP test server
  * Call this in Vitest's globalTeardown
  */
@@ -331,6 +393,8 @@ export async function stopHttpTestServer(): Promise<void> {
     } finally {
       await filesOrchestrator.dispose();
     }
+
+    warnAboutConnectorsLeftActive();
 
     console.log("[test-server] HTTP test server stopped");
   } catch (error) {

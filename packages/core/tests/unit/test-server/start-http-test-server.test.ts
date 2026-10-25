@@ -72,6 +72,8 @@ vi.mock("../../../src/connectors/connectors-manager", async () => {
 
   return {
     connectorsManager: {
+      list: () => [],
+      observeTimings: vi.fn(),
       startPhase: vi.fn(async (phase: string) => {
         if (phase !== "late") return;
 

@@ -727,6 +727,14 @@ export const ERROR_CODES = {
     fix: 'Read it with `model.get("column")` and write it with `model.set("column", value)`; `warlock check --fix` rewrites it.',
     skill: "warlock-check",
   },
+  WL9024: {
+    code: "WL9024",
+    area: "convention",
+    category: "code",
+    title: "An integration spec never touches the app",
+    fix: "Move it to the unit project: rename the *.test.ts file to *.spec.ts (outside tests/), so it skips the booted framework.",
+    skill: "test-service",
+  },
   WL9101: {
     code: "WL9101",
     area: "convention",

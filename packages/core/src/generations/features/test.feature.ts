@@ -49,9 +49,15 @@ export async function teardown() {
       `/**
  * Test Setup - runs before EVERY test file
  *
- * Vitest runs setupFiles before each test file and rebuilds the module
- * registry with it, so this pair boots and closes the test runtime once per
- * test file.
+ * Vitest runs setupFiles before each test file. With the generated
+ * src/config/tests.ts (lifetime: "worker") the framework boots once per Vitest
+ * worker and every file starts from a reset state: the database is truncated,
+ * the fakes, the request context and the route table are restored. A spec that
+ * changes global configuration the reset does not undo opts out for its file:
+ *
+ *   await setupTest({ importModule: (file) => import(file), lifetime: "file" });
+ *
+ * Set WARLOCK_TEST_LIFETIME=file to boot per file for the whole run instead.
  *
  * setupTest() gets no connectors option on purpose: an explicit connectors
  * value outranks tests.connectors from src/config/tests.ts, so passing one
@@ -85,13 +91,17 @@ afterAll(teardownTest);
       `/**
  * Test runtime settings.
  *
- * WARLOCK_TEST_LIFETIME=worker boots the framework once per Vitest worker instead of once
- * per test file. It needs the integration project's isolate: false (vite.config.ts derives
- * that from the same variable) and a database of its own per worker, because resetDatabase
- * truncates every table before each file. Point your database config at
- * workerDatabaseName("app_test") from "@warlock.js/core/tests" when VITEST is set.
+ * The framework boots once per Vitest worker and every test file starts from a reset state
+ * (the default since 5.38). WARLOCK_TEST_LIFETIME=file boots it once per test file instead,
+ * which is slower but isolates module state; vite.config.ts derives the integration
+ * project's isolate flag from the same variable.
+ *
+ * resetDatabase truncates every table before each file, so each worker needs a database of
+ * its own: point your database config at workerDatabaseName("app_test") from
+ * "@warlock.js/core/tests" (or append VITEST_POOL_ID to the name) when VITEST is set.
+ * A spec that changes global configuration opts out with setupTest({ lifetime: "file" }).
  */
-const workerLifetime = process.env.WARLOCK_TEST_LIFETIME === "worker";
+const workerLifetime = process.env.WARLOCK_TEST_LIFETIME !== "file";
 
 export default {
   lifetime: workerLifetime ? "worker" : "file",
@@ -135,7 +145,12 @@ export default class WarlockTestRunner extends TestRunner {
   if (!viteConfigExists) {
     await putFileAsync(
       viteConfigPath,
-      `import { lowerStage3Decorators, recommendedTestWorkers, TestSetupReporter } from "@warlock.js/core/vite";
+      `import {
+  guardUnitProject,
+  lowerStage3Decorators,
+  recommendedTestWorkers,
+  TestSetupReporter,
+} from "@warlock.js/core/vite";
 import mongezVite from "@mongez/vite";
 import { defineConfig } from "vitest/config";
 
@@ -147,9 +162,14 @@ export default defineConfig({
     projects: [
       {
         extends: true,
+        // Fails a unit spec that imports a connector, starts a test server or calls
+        // setupTest() outside unit mode: those belong to the integration project.
+        plugins: [guardUnitProject()],
         test: {
           name: "unit",
           environment: "node",
+          pool: "threads",
+          env: { WARLOCK_TEST_PROJECT: "unit" },
           include: ["src/**/*.spec.ts"],
           exclude: ["src/**/tests/**"],
         },
@@ -161,8 +181,8 @@ export default defineConfig({
           environment: "node",
           pool: "forks",
           // Worker lifetime shares one module graph per fork, so it needs isolate: false.
-          // Switch both with WARLOCK_TEST_LIFETIME=worker (see src/config/tests.ts).
-          isolate: process.env.WARLOCK_TEST_LIFETIME !== "worker",
+          // WARLOCK_TEST_LIFETIME=file switches both back (see src/config/tests.ts).
+          isolate: process.env.WARLOCK_TEST_LIFETIME === "file",
           runner: "./src/test-runner.ts",
           globalSetup: "./src/test-global-setup.ts",
           setupFiles: ["./src/test-setup.ts"],

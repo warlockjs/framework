@@ -6,8 +6,12 @@ import type { UpgradeNote } from "./types";
  */
 export const UPGRADE_NOTES: readonly UpgradeNote[] = [
   {
+    version: "5.38.0",
+    text: "New apps (`warlock add test`, create-warlock) boot the test framework once per Vitest worker (`tests.lifetime: \"worker\"`, `resetDatabase: true`, `isolate: false`, one database per worker) and guard the unit project against app imports. Existing apps keep their test configuration unchanged; the `test-runtime-worker-lifetime` step lists where to opt in. A spec that changes global configuration opts out of a worker runtime with `setupTest({ lifetime: \"file\" })`.",
+  },
+  {
     version: "5.36.0",
-    text: "Vitest 5 changes defaults: `clearMocks` is true, `json`/`junit` reporters write to `.vitest/` instead of stdout, `-t` joins names with ` > `, nested `vi.mock`/`vi.hoisted` calls throw and unawaited `resolves`/`rejects` assertions fail the test. Vite 8 needs Node.js 20.19 or 22.12+ and bundles with Rolldown.",
+    text: "Vitest 5 changes defaults: `clearMocks` is true, `json`/`junit` reporters write to `.vitest/` instead of stdout, `-t` joins names with ` > `, nested `vi.mock`/`vi.hoisted` calls throw and unawaited `resolves`/`rejects` assertions fail the test. `clearMocks: true` also clears the calls a module made when it was imported (for example a scheduler registering jobs from a `main.ts`) before the first test runs, so a test asserting those calls fails: import the module inside the test, or set `clearMocks: false`. Vite 8 needs Node.js 20.19 or 22.12+ and bundles with Rolldown.",
   },
   {
     version: "5.34.0",

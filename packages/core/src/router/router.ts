@@ -181,6 +181,11 @@ export class Router {
   private routesVersion = 0;
 
   /**
+   * The route table a worker-scoped test runtime returns to between files.
+   */
+  private bootSnapshot?: Route[];
+
+  /**
    * In-progress atomic replacement, when one exists. Reads continue to use
    * {@link routes}; mutations and collision checks use this isolated draft.
    */
@@ -935,6 +940,42 @@ export class Router {
       this.routeReplacementTransaction = undefined;
       throw error;
     }
+  }
+
+  /**
+   * Remember the routes registered right now, as the state to come back to.
+   *
+   * A worker-scoped test runtime calls this once the application has booted
+   * (and again after the app modules loaded), so {@link restoreBootSnapshot} can
+   * remove the routes a test file registered by hand without touching the ones
+   * the application declares.
+   */
+  public captureBootSnapshot(): void {
+    this.bootSnapshot = [...this.routes];
+  }
+
+  /**
+   * Put the route table back to {@link captureBootSnapshot}'s state.
+   *
+   * @returns `false` when no snapshot was captured, so nothing changed
+   */
+  public restoreBootSnapshot(): boolean {
+    if (!this.bootSnapshot) return false;
+
+    const kept = new Set(this.bootSnapshot);
+
+    if (this.routes.length === kept.size && this.routes.every((route) => kept.has(route))) {
+      return true;
+    }
+
+    for (const sourceFile of new Set(this.routes.map((route) => route.sourceFile))) {
+      if (sourceFile) forgetPositionalHandlerSuspects(sourceFile);
+    }
+
+    this.routes = [...this.bootSnapshot];
+    this.routesVersion++;
+
+    return true;
   }
 
   /**

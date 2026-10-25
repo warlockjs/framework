@@ -1,4 +1,5 @@
 import config from "@mongez/config";
+import { performance } from "node:perf_hooks";
 import { Application } from "../application";
 import { log } from "@warlock.js/logger";
 import { AccessConnector } from "./access-connector";
@@ -16,7 +17,22 @@ import { DEFAULT_SHUTDOWN_TIMEOUT } from "./shutdown-timeout";
 import { ConnectorLifecyclePhase } from "./types";
 import type { Connector, ConnectorName } from "./types";
 
+/**
+ * How long one connector took to `boot()` or `start()`.
+ */
+export type ConnectorTiming = {
+  connector: ConnectorName;
+  step: "boot" | "start";
+  ms: number;
+};
+
 export class ConnectorsManager {
+  /**
+   * Receives the duration of every `boot()` and `start()` this manager runs.
+   * Set by the test runtime's boot profile; unset (and free) otherwise.
+   */
+  private timingObserver?: (timing: ConnectorTiming) => void;
+
   /**
    * Connectors list
    */
@@ -90,6 +106,35 @@ export class ConnectorsManager {
   }
 
   /**
+   * Report how long each connector's `boot()` and `start()` takes, or stop
+   * reporting with `undefined`. Used by the test boot profile.
+   */
+  public observeTimings(observer: ((timing: ConnectorTiming) => void) | undefined): void {
+    this.timingObserver = observer;
+  }
+
+  /**
+   * Run one lifecycle call, reporting its duration to the observer when set.
+   */
+  private async timed(
+    connector: Connector,
+    step: ConnectorTiming["step"],
+    run: () => Promise<void>,
+  ): Promise<void> {
+    const observer = this.timingObserver;
+
+    if (!observer) return run();
+
+    const started = performance.now();
+
+    try {
+      await run();
+    } finally {
+      observer({ connector: connector.name, step, ms: performance.now() - started });
+    }
+  }
+
+  /**
    * Get all connectors
    */
   public list(): Connector[] {
@@ -116,11 +161,11 @@ export class ConnectorsManager {
       : this.connectors;
 
     for (const connector of connectorsList) {
-      await connector.boot();
+      await this.timed(connector, "boot", () => connector.boot());
     }
 
     for (const connector of connectorsList) {
-      await connector.start();
+      await this.timed(connector, "start", () => connector.start());
     }
   }
 
@@ -139,11 +184,11 @@ export class ConnectorsManager {
     );
 
     for (const connector of phaseConnectors) {
-      await connector.boot();
+      await this.timed(connector, "boot", () => connector.boot());
     }
 
     for (const connector of phaseConnectors) {
-      await connector.start();
+      await this.timed(connector, "start", () => connector.start());
     }
   }
 

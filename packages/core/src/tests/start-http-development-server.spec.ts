@@ -49,6 +49,7 @@ vi.mock("../config/load-config-files", () => ({ loadConfigFiles: mocks.loadConfi
 vi.mock("../connectors/connectors-manager", () => ({
   connectorsManager: {
     list: () => mocks.connectors,
+    observeTimings: vi.fn(),
     startPhase: mocks.startPhase,
     shutdown: mocks.shutdown,
   },
@@ -114,6 +115,23 @@ describe("startHttpTestServer", () => {
     expect(mocks.shutdown.mock.invocationCallOrder[0]).toBeLessThan(
       mocks.dispose.mock.invocationCallOrder[0] ?? 0,
     );
+  });
+
+  it("names a connector that is still active after shutdown", async () => {
+    await startHttpTestServer({ web: false });
+    mocks.connectors.push({
+      name: "web",
+      lifecyclePhase: "late",
+      boot: async () => undefined,
+      start: async () => undefined,
+      isActive: () => true,
+    } as unknown as (typeof mocks.connectors)[number]);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    await stopHttpTestServer();
+
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("still active after shutdown: web"));
+    warn.mockRestore();
   });
 
   it("loads .env.test when NODE_ENV is unset before starting the server", async () => {
