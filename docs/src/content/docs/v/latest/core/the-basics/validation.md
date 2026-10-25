@@ -336,6 +336,27 @@ export default {
 
 The `:input` placeholder is replaced with the translated attribute name. Errors come out fully localised per the current request's locale.
 
+A field name is resolved in this order:
+
+1. `.label("...")` on the field, when set.
+2. `attributes.<field>` in the request's locale, then `validation.attributes.<field>` (unless `validation.attributeGroup` is set, which is then the only group used).
+3. The field name in words: `max_dumbbell_kg` becomes "Max dumbbell kg" and `firstName` becomes "First name".
+
+Only the field being validated and sibling fields a rule refers to are turned into words. Set `validation.humanizeAttributes: false` to keep the raw key, or supply `validation.translateAttribute` to take over completely. An override of a rule message under `validation.<rule>` still wins, and a translated message that still has an unfilled `:placeholder` falls back to seal's own message.
+
+### Finding fields without a label
+
+`warlock doctor` can list request-schema fields that have no label in a configured locale (`app.localeCodes`). It is off by default; turn it on in the validation config:
+
+```ts
+// src/config/validation.ts
+export default {
+  warnMissingLabels: true,
+};
+```
+
+The `validation-labels` check then warns (code `WL4002`) with the fields missing per locale. It stays silent when `validation.translateAttribute` is set.
+
 ## Database-aware validators
 
 Two rules ship in `@warlock.js/cascade` and are auto-registered: `unique` and `exists`. Both take a Cascade model class (or a registered model name string) and run a query against the model's table.

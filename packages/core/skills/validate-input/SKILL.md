@@ -99,6 +99,10 @@ type UpdateProductOutput = Infer.Output<typeof updateProductSchema>;
 
 The bare `Infer<T>` is the input shape (what the client sends). `Infer.Output<T>` is what's available after validation and transformation. For most service signatures, `Infer<typeof schema>` is what you want.
 
+## Field names in messages
+
+`:input` in a message is the field's label: `.label("...")`, else `attributes.<field>` (or `validation.attributes.<field>`) in the request's locale, else the key in words (`max_dumbbell_kg` becomes "Max dumbbell kg"). Set `validation.humanizeAttributes: false` for the raw key. `validation.warnMissingLabels: true` makes `warlock doctor` list schema fields with no label per locale (`WL4002`).
+
 ## Database-aware rules
 
 The DB validators come from two plugins: base `unique`/`exists` (registered by `@warlock.js/cascade`) and request-aware `…ExceptCurrentId`/`…ExceptCurrentUser` (registered by `@warlock.js/core`). All four chain onto scalar validators:
