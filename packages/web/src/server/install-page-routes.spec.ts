@@ -1095,7 +1095,11 @@ describe("installPageRoutes — the not-found page", () => {
     expect(registered.map((route) => route.path)).toEqual(["/"]);
     expect(registered.some((route) => route.path === "/404")).toBe(false);
     expect(notFound).toHaveLength(1);
-    expect(notFound[0].options).toEqual({ name: NOT_FOUND_ROUTE_NAME, isPage: true });
+    expect(notFound[0].options).toEqual({
+      name: NOT_FOUND_ROUTE_NAME,
+      isPage: true,
+      handlesRefusals: true,
+    });
     // Not in the returned table either, so `href()` cannot resolve it.
     expect(installed.map((page) => page.file)).toEqual([homeFile]);
   });

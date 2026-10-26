@@ -64,6 +64,7 @@ import {
   type PageRouteHandlerOptions,
 } from "./create-page-route-handler";
 import { layoutPrefixesByDirectory } from "./layout-prefixes";
+import { createRefusalPageRenderer } from "./core-refusal-page";
 import { notFoundPageHandlerOptions } from "./not-found-handler-options";
 import { normalizePageModule } from "./normalize-page-module";
 import { productionDeclaredStylesheetUrls, productionStylesheetUrls } from "./stylesheet-urls";
@@ -71,6 +72,7 @@ import type { RequestStylesheetUrlResolver } from "./document-stylesheet-urls";
 import {
   DuplicateNotFoundPageError,
   isNotFoundPageFile,
+  NOT_FOUND_ROUTE_NAME,
   NotFoundPageDeclaresRouteError,
   registerNotFoundPageRoute,
 } from "./not-found-page";
@@ -763,7 +765,31 @@ export function installPageRoutesFromManifest(
     the build carried no `404.page.tsx`, so a production deployment answers 404
     with the right STATUS whether or not anyone has designed the page yet.
   */
-  registerNotFoundPageRoute({ router, renderPage: notFoundPageHandler });
+  registerNotFoundPageRoute({
+    router,
+    renderPage: notFoundPageHandler,
+    renderRefusal: createRefusalPageRenderer({
+      name:
+        siteSlice?.site === undefined
+          ? NOT_FOUND_ROUTE_NAME
+          : `${siteSlice.site}.${NOT_FOUND_ROUTE_NAME}`,
+      appFile: app.sourceFile,
+      errorPageFile: manifest.errorPage?.sourceFile,
+      loadErrorPage,
+      getRouteTranslations,
+      hydrationClientModuleUrl,
+      stylesheetUrls: () =>
+        clientDir === undefined
+          ? []
+          : productionStylesheetUrls(
+              clientDir,
+              [
+                app.sourceFile,
+                manifest.forbiddenPage?.sourceFile ?? manifest.errorPage?.sourceFile,
+              ].filter((file): file is string => file !== undefined),
+            ),
+    }),
+  });
   // `isPage` for the same reason the dev installer carries it — the router's
   // duplicate-name error reads the flag to say which claimant is the page.
 

@@ -47,6 +47,7 @@ import type { PageErrorDetails } from "../components/document-context";
 import { BoundedTaskQueue } from "./bounded-task-queue";
 import type { ServerErrorContext } from "./error-reporting-config";
 import { currentPageErrorScope } from "./page-error-scope";
+import { registeredPageErrorHooks } from "./page-error-hooks";
 
 /** Concurrency limit — at most this many app-hook calls are ever ACTIVE at once. */
 const REPORT_CONCURRENCY = 10;
@@ -106,23 +107,31 @@ function alreadyReportedToAppHook(thrown: unknown): boolean {
  * hands it over.
  */
 function enqueueAppHookReport(thrown: unknown, context: ServerErrorContext): void {
-  const report = config.get("web", {}).errors?.report;
-  if (report === undefined) return;
+  const configured = config.get("web", {}).errors?.report;
+  type Reporter = [label: string, report: NonNullable<typeof configured>];
+  const reporters: Reporter[] = [
+    ...(configured === undefined ? [] : [["web.errors.report()", configured] as Reporter]),
+    ...registeredPageErrorHooks().map((hook): Reporter => ["onPageError() hook", hook]),
+  ];
+
+  if (reporters.length === 0) return;
   if (alreadyReportedToAppHook(thrown)) return;
 
-  reportQueue.push(() =>
-    Promise.resolve()
-      .then(() => report(thrown, context))
-      .catch((reporterError) => {
-        // ISOLATION: logged once, directly, via `console.error` — never routed
-        // back through `reportServerError`/the app hook for THIS failure, so a
-        // reporter that always throws can never recurse into itself.
-        console.error(
-          "[warlock:web] web.errors.report() threw or rejected; the report was not retried:",
-          reporterError,
-        );
-      }),
-  );
+  for (const [label, report] of reporters) {
+    reportQueue.push(() =>
+      Promise.resolve()
+        .then(() => report(thrown, context))
+        .catch((reporterError) => {
+          // ISOLATION: logged once, directly, via `console.error` — never routed
+          // back through `reportServerError`/the app hook for THIS failure, so a
+          // reporter that always throws can never recurse into itself.
+          console.error(
+            `[warlock:web] ${label} threw or rejected; the report was not retried:`,
+            reporterError,
+          );
+        }),
+    );
+  }
 }
 
 /** Registry symbol for the stack mapper; see {@link setServerStackFixer}. */

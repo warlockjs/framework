@@ -39,6 +39,8 @@ export async function writePageFailureResponse(options: {
   hydrationClientModuleUrl?: string;
   cache?: PageCacheOptIn;
   wantsData: boolean;
+  /** The status to answer with; defaults to 500 (a pipeline failure). */
+  status?: number;
   applyBufferedCookie: (response: Response, cookie: BufferedCookie) => void;
 }): Promise<void> {
   const {
@@ -55,6 +57,7 @@ export async function writePageFailureResponse(options: {
     hydrationClientModuleUrl,
     cache,
     wantsData,
+    status = 500,
     applyBufferedCookie,
   } = options;
 
@@ -71,6 +74,7 @@ export async function writePageFailureResponse(options: {
     errorPageFile,
     stylesheetUrls,
     hydrationClientModuleUrl,
+    status,
   });
 
   applyCommit(response, rendered, applyBufferedCookie);
@@ -92,12 +96,12 @@ export async function writePageFailureResponse(options: {
 
   if (wantsData) {
     response.setContentType(DATA_RESPONSE_CONTENT_TYPE);
-    await response.send(stringify(buildHydrationPayload(rendered.bundle!, request.locale)), 500);
+    await response.send(stringify(buildHydrationPayload(rendered.bundle!, request.locale)), status);
     return;
   }
 
   // `renderPageFailure` renders stylesheets and (when hydratable, which this
   // path never is) the hydration module through React already — see that
   // function. Nothing left to splice here either.
-  await response.html(rendered.html, 500);
+  await response.html(rendered.html, status);
 }

@@ -15,6 +15,7 @@
 import {
   Application,
   requestContext,
+  refusalStatusOf,
   type HttpContext,
   type Request,
   type Router,
@@ -187,7 +188,7 @@ export function createSiteDispatch(options: SiteDispatchOptions): SiteDispatch {
       if (selection.kind === "not-found") {
         await response.send(
           { error: "Route not found", path: request.path, method: request.method },
-          404,
+          refusalStatusOf(request) ?? 404,
         );
 
         return;
@@ -195,21 +196,24 @@ export function createSiteDispatch(options: SiteDispatchOptions): SiteDispatch {
 
       const table = tables.get(selection.site)?.get(method);
       const match = table === undefined ? null : matchClientRoute(table.entries, pathname);
+      // A core-level refusal must reach the site's catch-all even when the
+      // refused URL happens to match one of its pages.
+      const refused = refusalStatusOf(request) !== undefined;
       const handler =
-        match === null || table === undefined
+        refused || match === null || table === undefined
           ? notFoundHandlers.get(selection.site)
           : table.handlers.get(match.entry.path);
 
       if (handler === undefined) {
         await response.send(
           { error: "Route not found", path: request.path, method: request.method },
-          404,
+          refusalStatusOf(request) ?? 404,
         );
 
         return;
       }
 
-      applyParams(request, match?.params ?? {});
+      applyParams(request, refused ? {} : (match?.params ?? {}));
 
       request.site = {
         key: selection.site,
@@ -279,6 +283,7 @@ export function createSiteDispatch(options: SiteDispatchOptions): SiteDispatch {
       router.get(SITE_DISPATCH_ROUTE_PATH, dispatch("GET"), {
         name: SITE_DISPATCH_GET_NAME,
         isPage: true,
+        handlesRefusals: true,
       });
       router.post(SITE_DISPATCH_ROUTE_PATH, dispatch("POST"), {
         name: SITE_DISPATCH_POST_NAME,

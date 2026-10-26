@@ -30,6 +30,7 @@ import { resolveRouteRateLimit, resolveStaticRateLimit } from "./resolve-route-r
 import { RouteNameTakenError } from "./route-name-taken-error";
 import { DEV_DISPATCH_METHODS, buildNotFoundBody, createDevRateLimiter } from "./dev-dispatch";
 import { RouteRegistry } from "./route-registry";
+import { REFUSAL_STATUS, requestAcceptsHtml, setRefusalDispatcher } from "../http/refusal-dispatch";
 import { routeNameMethodSuffix } from "./route-name-method-suffix";
 import type {
   GroupedRoutesOptions,
@@ -242,6 +243,8 @@ export class Router {
   }
 
   private constructor() {
+    setRefusalDispatcher((request, reply, status) => this.dispatchRefusal(request, reply, status));
+
     //
   }
 
@@ -1355,6 +1358,43 @@ export class Router {
       .join("&");
 
     return query ? `${path}?${query}` : path;
+  }
+
+  /**
+   * Answer a core-level refusal through the route marked `handlesRefusals`.
+   * Resolves `false` (leaving the response untouched) for non-document
+   * requests or when no such route exists.
+   */
+  private async dispatchRefusal(
+    fastifyRequest: FastifyRequest,
+    fastifyReply: FastifyReply,
+    status: number,
+  ): Promise<boolean> {
+    const method = fastifyRequest.method.toUpperCase();
+
+    if (method !== "GET" && method !== "HEAD") return false;
+
+    if (!requestAcceptsHtml(fastifyRequest.headers.accept)) return false;
+
+    const route = this.routes.find((candidate) => candidate.handlesRefusals === true);
+
+    if (route === undefined) return false;
+
+    (fastifyRequest as unknown as Record<symbol, unknown>)[REFUSAL_STATUS] = status;
+
+    try {
+      await this.handleRoute(route)(fastifyRequest, fastifyReply);
+    } catch (error) {
+      if (!fastifyReply.sent) {
+        delete (fastifyRequest as unknown as Record<symbol, unknown>)[REFUSAL_STATUS];
+
+        return false;
+      }
+
+      log.error("router", "refusal-dispatch", error as Error);
+    }
+
+    return true;
   }
 
   /**

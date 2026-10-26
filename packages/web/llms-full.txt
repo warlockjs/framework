@@ -1871,6 +1871,10 @@ Loaders run **sequentially, root to leaf, each one awaited before the next start
 
 A loader that **throws** is also terminal: it stops lower loaders, discards its own level's buffer, and commits only the levels above it. A thrown `@warlock.js/core` `HttpError` (`ResourceNotFoundError`, `ForbiddenError`, `BadRequestError`, `ConflictError`, …) keeps its own status: a 404 renders your `404.page.tsx` exactly like `response.notFound()`, a 401 or 403 renders your `forbidden.page.tsx` (falling back to `error.page.tsx`, then the framework default), and any other 4xx renders `error.page.tsx` with that status and its own message, without reaching `web.errors.report()`; a plain throw (or a resolved 5xx) still renders `error.page.tsx` with the generic 500.
 
+**Server error hook.** `web.errors.report` in `src/config/web.ts` receives every reported server failure, but a config file loads before the app boots (and in every test worker), so it must not import `src/app` code, even lazily; `warlock doctor` warns (`config-app-imports`) when it does. Register the hook at runtime instead, from a module's `main.ts`: `onPageError((error, info) => { ... })`, imported from `@warlock.js/web/connector`. It gets the same `(error, context)`, runs through the same fire-and-forget queue, adds to `web.errors.report`, and returns a function that unregisters it.
+
+**Core-level refusals.** A request core refuses before routing (a dot-segment path such as `/public/../x` is a 403, a malformed URL a 400) renders `forbidden.page.tsx` (401/403) or `error.page.tsx`, then the framework default, with the refused status, when the request is a `GET` or `HEAD` that names `text/html` in `Accept`. Other requests keep core's JSON.
+
 ## Loader response surface
 
 Each loader gets its own buffered response, never the live one, so that a level discarded by a short-circuit or a throw cannot leak half-written headers or cookies onto a response it no longer owns. These are all of its public methods. The first five return the buffered response, so they chain; the last three return a short-circuit value that you must `return`.

@@ -357,6 +357,12 @@ export type RenderPageFailureOptions = {
    * non-hydrating (see the function doc below).
    */
   hydrationClientModuleUrl?: string;
+  /**
+   * The status the failure page answers with and renders for. Defaults to 500,
+   * the module-load failure this function was written for; a core-level refusal
+   * (a 403 or 400 raised before routing) passes its own.
+   */
+  status?: number;
 };
 
 function requireRegistry(options: RenderPageRequestOptions): RouteRegistry {
@@ -1657,6 +1663,7 @@ async function finishRender(
  */
 export async function renderPageFailure(options: RenderPageFailureOptions): Promise<RenderedPage> {
   const { request, response, name, path, thrown, loadErrorPage } = options;
+  const failureStatus = options.status ?? 500;
   const bundle: PageDataBundle = markNonHydrating({
     route: { name, path, params: {}, query: {} },
     ...(options.routeTranslations === undefined
@@ -1703,7 +1710,7 @@ export async function renderPageFailure(options: RenderPageFailureOptions): Prom
 
   try {
     if (!loadErrorPage) throw new Error("No application error page is configured.");
-    const props: ServerErrorPageProps = { error: thrown, status: 500 };
+    const props: ServerErrorPageProps = { error: thrown, status: failureStatus };
     const module = await loadErrorPage(props.status);
 
     if (module === undefined) {
@@ -1758,7 +1765,7 @@ export async function renderPageFailure(options: RenderPageFailureOptions): Prom
       createElement(DefaultApp, {
         children: createElement(FrameworkRootBoundary, {
           details: describeUnrecordedFailure(thrown, bundle.route, request),
-          status: 500,
+          status: failureStatus,
           requestId: request.id,
         }),
       }),
@@ -1767,7 +1774,7 @@ export async function renderPageFailure(options: RenderPageFailureOptions): Prom
 
   return {
     html: emitDocument(body),
-    status: 500,
+    status: failureStatus,
     headers,
     cookies: [],
     data: undefined,

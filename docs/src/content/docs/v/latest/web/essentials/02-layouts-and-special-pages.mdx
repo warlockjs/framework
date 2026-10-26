@@ -147,6 +147,13 @@ configured (`auth.pageAuth.loginPath`) is still redirected to it; only a
 refusal with nowhere to redirect reaches the forbidden page. API routes keep
 their JSON answers.
 
+Core also refuses some requests before any route runs: a path with dot
+segments such as `/public/../x` (403), or a malformed URL (400). On an app that
+serves pages, a request that accepts HTML (an explicit `text/html` in `Accept`,
+`GET` or `HEAD`) gets the same page a thrown refusal gets — the forbidden page
+for a 401 or 403, otherwise `error.page.tsx`, then the framework default — with
+the refused status. API clients and other requests keep core's JSON answer.
+
 ```ts title="src/web/forbidden.setup.ts"
 import type { PageConfig } from "@warlock.js/web";
 
@@ -349,6 +356,34 @@ A `report` that throws or rejects is caught, logged once to the console, and
 never retried for that failure — it cannot recurse into itself and it cannot
 take the server down. On a graceful shutdown, any `report` calls still in
 flight get a brief, bounded window to finish before the process exits.
+
+### Server: `onPageError` (register at runtime)
+
+A config file runs before the application boots, in every process that reads
+config. If your `report` function calls an application service, importing it
+from `src/config/web.ts` loads that service's whole module graph at startup,
+and a lazy `await import()` inside the function still puts the target in the
+config's dependency graph. Every test worker pays for it again. Keep config
+files free of `src/app` imports and register the hook from a module's
+`main.ts` instead:
+
+```ts title="src/app/monitoring/main.ts"
+import { onPageError } from "@warlock.js/web/connector";
+
+onPageError(async (error, info) => {
+  const { reportToTracker } = await import("./services/tracker.service");
+  await reportToTracker(error, info);
+});
+```
+
+`onPageError(hook)` receives the same `(error, context)` as `web.errors.report`,
+runs through the same bounded, fire-and-forget queue, and runs in addition to
+`web.errors.report` when both are set. Several hooks may be registered; it
+returns a function that removes the hook. Import it from
+`@warlock.js/web/connector`, which stays free of React.
+
+`warlock doctor` warns (`config-app-imports`) when a file under `src/config`
+imports anything from `src/app`, naming the file and the import.
 
 ### Client: `onClientError`
 

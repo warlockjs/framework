@@ -10,6 +10,8 @@ export * from "./error-codes";
 export * from "./events";
 export * from "./health";
 export * from "./request-controller";
+// core-level 4xx refusals answered by a `handlesRefusals` route
+export { refusalStatusOf } from "./refusal-dispatch";
 export * from "./uploaded-file";
 export * from "./uploads-config";
 export * from "./uploads-types";

@@ -1,5 +1,6 @@
 import type { DoctorCheck } from "../check.types";
 import { capabilitiesCheck } from "./capabilities.check";
+import { configAppImportsCheck } from "./config-app-imports.check";
 import { configCheck } from "./config.check";
 import { connectorsCheck } from "./connectors.check";
 import { handlerSignatureCheck } from "./handler-signature.check";
@@ -26,6 +27,7 @@ export const defaultDoctorChecks: DoctorCheck[] = [
   routesCheck,
   handlerSignatureCheck,
   configCheck,
+  configAppImportsCheck,
   connectorsCheck,
   optionalPeersCheck,
   jwtSecretCheck,
