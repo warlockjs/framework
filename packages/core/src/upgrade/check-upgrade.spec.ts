@@ -160,6 +160,45 @@ describe("warlock upgrade --check", () => {
     expect(recorded[0]?.command.args).toEqual(["install"]);
   });
 
+  it("installs with npm 11.6.2 through npx when the npm on PATH is older", async () => {
+    const root = createApp();
+    const { recorded, run } = fakeRunner();
+
+    const result = await runUpgradeCheck({ root, to: "5.31", run, npmVersion: "10.9.2" });
+
+    expect(recorded[0]?.command.command).toBe("npx");
+    expect(recorded[0]?.command.args).toEqual(["-y", "npm@11.6.2", "install"]);
+    expect(result.steps.find((entry) => entry.id === "install")?.command).toBe(
+      "npx -y npm@11.6.2 install",
+    );
+  });
+
+  it("installs with the npm on PATH when it is 11.6.2 or newer, or cannot be read", async () => {
+    for (const npmVersion of ["11.6.2", "11.8.0", null]) {
+      const root = createApp();
+      const { recorded, run } = fakeRunner();
+
+      await runUpgradeCheck({ root, to: "5.31", run, npmVersion });
+
+      expect(recorded[0]?.command.command).toBe("npm");
+      expect(recorded[0]?.command.args).toEqual(["install"]);
+    }
+  });
+
+  it("infers --from from the installed @warlock.js/core", async () => {
+    const root = createApp();
+    mkdirSync(path.join(root, "node_modules/@warlock.js/core"), { recursive: true });
+    writeFileSync(
+      path.join(root, "node_modules/@warlock.js/core/package.json"),
+      JSON.stringify({ name: "@warlock.js/core", version: "5.30.4" }),
+    );
+    const { run } = fakeRunner();
+
+    const result = await runUpgradeCheck({ root, to: "5.31", run, skipInstall: true });
+
+    expect(result.from).toBe("5.30.4");
+  });
+
   it("caps the heap of every child and runs low priority work one command at a time", async () => {
     const root = createApp();
     const { recorded, run } = fakeRunner();

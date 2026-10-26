@@ -68,6 +68,7 @@ The real project is never written: every command runs with the copy as its worki
 
 The check installs dependencies and runs a typecheck and a test project, so it is as heavy as those commands are. It runs one child process at a time, at low priority (`nice` 10), caps each Node process's heap with `--max-old-space-size` (`--memory-mb`, default 4096) and kills a command, including its child processes, after `--timeout-minutes` (default 20). The copy needs disk space for the source tree plus a full `node_modules`; point `TMPDIR` at a volume with room. On a machine other people share, run it under whatever memory and CPU limit you use for builds.
 
+- With npm older than 11.6.2 (the npm bundled with Node 22 crashes on the Warlock family's lockfile), the copy is installed with `npx -y npm@11.6.2 install`. `--from` defaults to the installed `@warlock.js/core`.
 - `--skip-install` applies the upgrade to the copy and stops: you get the breaking changes that hit the app and the diff-level result, with the install, typings, typecheck, doctor and test steps reported as skipped. Use it when you only need to know what the codemods touch.
 - `--keep` leaves the copy (with its `node_modules`) so you can open it, rerun a step or compare files. Delete it when you are done.
 - The copy includes `.env`, so the app boots with its real configuration. `warlock doctor` does not open connections, but the unit project runs your code: give it a test environment.

@@ -553,7 +553,7 @@ The generated `unit` project lists `plugins: [guardUnitProject()]` (from
 imports a connector, `connectorsManager`, `bootstrap` or a test-server helper, or calls
 `setupTest()` without `{ mode: "unit" }`, fails with a message that names the import and
 says to drop `.unit` from its name. The opposite mistake is reported by
-`warlock check` as [`WL9024`](../cli/error-codes.md#wl9021) (a warning): an integration spec
+`warlock check` as [`WL9024`](../cli/error-codes.md#wl9024) (a warning): an integration spec
 that imports nothing needing the app should be renamed to `<name>.unit.spec.ts`.
 Vitest 5 or newer is required for the generated runner (Vitest 5 removed `vitest/runners`; the runner extends `TestRunner` from `vitest`).
 

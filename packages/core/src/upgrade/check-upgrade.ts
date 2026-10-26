@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -7,7 +7,12 @@ import {
   getInstallCommand,
   type PackageManager,
 } from "../updater/package-manager";
-import { pruneFamilyLockEntries } from "../updater/prune-npm-lockfile";
+import {
+  MIN_NPM_VERSION,
+  parseNpmVersion,
+  pruneFamilyLockEntries,
+} from "../updater/prune-npm-lockfile";
+import { isNewerVersion } from "../utils/version-compare";
 import { loadTsMorph } from "./load-ts-morph";
 import {
   detectInstalledVersion,
@@ -105,6 +110,8 @@ export type UpgradeCheckOptions = Pick<RunUpgradeOptions, "to" | "from" | "codem
   scratchRoot?: string;
   /** Override how ts-morph is loaded (tests). */
   loadTsMorph?: RunUpgradeOptions["loadTsMorph"];
+  /** The npm on PATH (tests); `null` means it cannot be run. Default: ask `npm --version`. */
+  npmVersion?: string | null;
   /** Override how child processes run (tests). */
   run?: (command: CheckCommand) => Promise<CheckCommandOutcome>;
 };
@@ -200,15 +207,29 @@ export async function runUpgradeCheck(options: UpgradeCheckOptions): Promise<Upg
     if (skipReason) {
       steps.push(skipped("install", `Install with ${detection.packageManager}`, skipReason));
     } else {
-      const [binary = "npm", ...installArgs] = installCommand.split(" ");
+      let [binary = "npm", ...installArgs] = installCommand.split(" ");
+      let installLabel = installCommand;
 
-      if (detection.packageManager === "npm") pruneScratchLockfile(scratch);
+      if (detection.packageManager === "npm") {
+        pruneScratchLockfile(scratch);
+
+        // npm 10.9 (Node 22's bundled npm) crashes re-resolving the family and the Vite/Vitest
+        // peer set in an existing lockfile, which would skip every later step.
+        const npmVersion =
+          options.npmVersion === undefined ? readNpmVersion() : (options.npmVersion ?? undefined);
+
+        if (npmVersion && isNewerVersion(MIN_NPM_VERSION, npmVersion)) {
+          binary = "npx";
+          installArgs = ["-y", `npm@${MIN_NPM_VERSION}`, ...installArgs];
+          installLabel = `npx -y npm@${MIN_NPM_VERSION} ${installCommand.split(" ").slice(1).join(" ")}`;
+        }
+      }
 
       const result = await commandStep(
         steps,
         "install",
         `Install with ${detection.packageManager}`,
-        installCommand,
+        installLabel,
         run,
         { ...base, command: binary, args: installArgs, env: childEnv(memoryMb, "development") },
       );
@@ -474,6 +495,21 @@ function pruneScratchLockfile(scratch: string): void {
     }
   } catch {
     // an unreadable lockfile is left for the installer to report
+  }
+}
+
+/** The version of the `npm` on PATH, or `undefined` when it cannot be run. */
+function readNpmVersion(): string | undefined {
+  try {
+    return parseNpmVersion(
+      execFileSync("npm", ["--version"], {
+        encoding: "utf8",
+        stdio: "pipe",
+        shell: process.platform === "win32",
+      }),
+    );
+  } catch {
+    return undefined;
   }
 }
 

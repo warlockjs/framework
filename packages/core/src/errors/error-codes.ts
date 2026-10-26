@@ -765,7 +765,7 @@ export const ERROR_CODES = {
     area: "convention",
     category: "code",
     title: "An integration spec never touches the app",
-    fix: "Move it to the unit project: rename the *.test.ts file to *.spec.ts (outside tests/), so it skips the booted framework.",
+    fix: "Move it to the unit project: rename it to <name>.unit.spec.ts (outside tests/), so the unit project runs it and it skips the booted framework.",
     skill: "test-service",
   },
   WL9101: {

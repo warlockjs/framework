@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 > ⚠ **Versioning: `@warlock.js/*` does not follow SemVer strictly — breaking changes may ship in a minor.** This is a deliberate decision, not an oversight: the framework is pre-adoption and the cost of a major per behaviour fix currently outweighs the benefit. **Pin an exact version or a tilde range (`~4.13.0`) if you need to opt into changes rather than receive them.** Every breaking change is marked **BREAKING** in its entry and summarised in an _Upgrading_ section at the top of the release. **This policy will change once the framework has consumers beyond its author.**
 
+## 5.38.1
+
+### Fixed
+
+- `WL9024` applies to any integration spec (any `*.spec.ts` or `*.test.ts` that is not `*.unit.*`, or anything under `tests/`), and its fix text now says to rename the file to `<name>.unit.spec.ts` outside `tests/` (it still said `*.test.ts` to `*.spec.ts`). This corrects the 5.38.0 note below.
+- `warlock upgrade --check` installs in the scratch copy with `npx -y npm@11.6.2` when the npm on PATH is older (npm 10.9 crashes on the family's lockfile with `Cannot read properties of null (reading 'edgesOut')`, which skipped every later step); `--from` is inferred from the installed `@warlock.js/core`.
+
 ## 5.38.0 - 2026-10-25
 
 ### Added
