@@ -574,7 +574,7 @@ export class WebConnector extends BaseConnector {
       if (this.vite) this.attachDevHooks(next);
     });
 
-    const { createUnregisteredPageReporter } = await import("./unregistered-pages");
+    const { createUnregisteredPageReporter } = await this.loadUnregisteredPages();
 
     this.reportUnregisteredPages = createUnregisteredPageReporter({
       appRoot: paths.appRoot,
@@ -1076,6 +1076,15 @@ export class WebConnector extends BaseConnector {
     }
 
     throw new Error("The Vite development server is not part of a production bundle.");
+  }
+
+  /** The unregistered-page reporter (page scanner); development only, see {@link loadDevServerConfig}. */
+  protected async loadUnregisteredPages(): Promise<typeof import("./unregistered-pages")> {
+    if (!(globalThis as ProductionBundleGlobal).__WARLOCK_PRODUCTION_BUNDLE__) {
+      return import("./unregistered-pages");
+    }
+
+    throw new Error("The unregistered-page report is not part of a production bundle.");
   }
 
   /** The page registry plugin; development only, see {@link loadDevServerConfig}. */

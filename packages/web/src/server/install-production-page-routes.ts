@@ -108,12 +108,21 @@ export async function installProductionPageRoutes(
   // the request context on it connects it for every handler registered below.
   // Development cannot do this — its modules live in Vite's separate graph, and
   // it wires the same two seams on the copy Vite evaluated.
-  const webServer = await import("./index");
+  //
+  // The modules are named directly instead of through `./index`: that barrel also
+  // re-exports the development installer, which would carry the page scanner and
+  // the Babel parser into the production bundle.
+  const [{ connectSharedStore }, { connectPageContext }, { installPageRoutesFromManifest }] =
+    await Promise.all([
+      import("../shared"),
+      import("./execute-page-request"),
+      import("./install-page-routes-from-manifest"),
+    ]);
 
-  webServer.connectSharedStore(sharedStore);
-  webServer.connectPageContext(pageContext);
+  connectSharedStore(sharedStore);
+  connectPageContext(pageContext);
 
-  return webServer.installPageRoutesFromManifest({
+  return installPageRoutesFromManifest({
     router,
     manifest,
     hydrationClientModuleUrl: resolveHydrationClientModuleUrl(),

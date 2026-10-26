@@ -11,7 +11,7 @@ All notable changes to `@warlock.js/web` are documented here.
 
 ### Fixed
 
-- A production server built with `singleBundle` carried Vite and the development server inside `app.js`, through the connector's build contribution and its development-server branches. They are left out of the production bundle, and the server never loads Vite.
+- A production server built with `singleBundle` carried Vite and the development server inside `app.js`, through the connector's build contribution and its development-server branches. The page scanner and the Babel parser came in the same way, through the development page installer and the `server` barrel the production installer loaded. All of them are left out of the production bundle, and the server never loads Vite.
 - A build copied away from its project could not find its client bundle: the page manifest stored `dist/client` relative to the working directory. When a `client` folder sits next to the running bundle it is used, so `node app.js` works from any working directory in a copy of `dist/`.
 
 ## 5.38.0 - 2026-10-25
