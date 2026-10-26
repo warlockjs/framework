@@ -13,6 +13,13 @@ CI and the release gate both run this check before artifacts are built.
 
 Run its regression tests with `node --test scripts/check-public-text.test.mjs`.
 
+`releases/` (the family release summaries) is scanned too. `@warlock.js/core` ships
+those summaries for `warlock release-notes`, but a package ships only paths inside its own root, so `packages/core/releases/` holds a copy.
+`node scripts/sync-release-notes.mjs` refreshes it (`--check` fails on a difference,
+and CI runs that), and the release gate syncs it before checking the working tree and
+refuses a version with no `releases/<version>-summary.md`. Tests:
+`node --test scripts/sync-release-notes.test.mjs`.
+
 ## Oxlint adoption
 
 `pnpm lint:oxlint` runs the exact pinned Oxlint version with the root

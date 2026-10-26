@@ -21,6 +21,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - Loading config files walked every module the config reached. `loadConfigFiles` registered each config file together with its whole transitive import graph (dynamic `import()` included), file by file, in every process that loads config. A config such as `src/config/web.ts` whose `errors.report` imported an application service made each test worker spend minutes in setup; the walk grew with the size of the application (about 480 seconds for a 3,000-module graph, measured). Config files are now registered with their direct import edges only; the dev server still builds the full graph from its own scan.
 - A request core refuses before routing answered raw JSON to a browser: a dot-segment or path-traversal path on the public mount (`/public/../x`, 403) and a malformed URL (400). When the app has a route marked `handlesRefusals` (the web package's page catch-all), a `GET` or `HEAD` request that accepts `text/html` is handed to it; other requests keep the JSON answer.
+### Added
+
+- `warlock release-notes` prints the family release summaries that now ship inside the package (`releases/<version>-summary.md`, 5.30.0 onward). With no arguments it prints the installed version's summary; `--from <version>` (optionally `--to <version>`) prints every release after it, oldest first, led by a combined list of breaking changes; `--version <v>` prints one release; `--list` lists the versions with dates; `--json` prints `{ versions: [{ version, date, breaking, markdown }] }`. It reads files only, so it needs no network and no booted app. A version the package does not ship is reported with its GitHub release URL.
+- `warlock upgrade`, `warlock upgrade --check` and `warlock update` end with `What's new: npx warlock release-notes --from <old>`, and the `AGENTS.md` section that `warlock agents-md` generates names the installed version and the command.
+- The `update-packages`, `deploy-release` and `upgrade-from-5-29` skills tell agents to run `npx warlock release-notes --from <current>` before upgrading.
+
+### Changed
+
+- `--version` and `-v` print the Warlock version only when no command is given, so a command can take its own `--version` option.
 
 ## 5.38.0 - 2026-10-25
 

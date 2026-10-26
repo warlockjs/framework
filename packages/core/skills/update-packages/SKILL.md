@@ -7,6 +7,15 @@ description: 'Keep a project current with `warlock update` — bump every `@warl
 
 `warlock update` upgrades a project's Warlock packages in one step, and `warlock dev` tells you when an upgrade is available. Because the whole `@warlock.js/*` family ships in **lockstep** — every package shares one version — keeping them in sync is the normal case, and this command does exactly that.
 
+## Read what changed first
+
+Before upgrading, run `npx warlock release-notes --from <current>` (the version in
+`package.json`, e.g. `5.36`). It prints the summary of every release after it, oldest
+first, led by a combined list of breaking changes, from files shipped in the installed
+`@warlock.js/core`. It needs no network and no booted app; `--json` prints the same as
+data. Read it, then run `warlock update` or `warlock upgrade`. Both end with a
+`What's new:` line naming the command.
+
 ## `warlock update` vs `warlock upgrade`
 
 `warlock update` moves the packages to the latest versions and nothing else.

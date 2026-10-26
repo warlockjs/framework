@@ -10,6 +10,14 @@ same release. Apply only the changes used by the application, then run its type
 check and targeted tests. These minors can contain breaking changes; do not rely
 on a major version boundary to find them.
 
+## Read the release notes first
+
+Run `npx warlock release-notes --from 5.29` before upgrading. It prints the summary of
+every release after 5.29 shipped in the installed `@warlock.js/core`, with a combined
+list of breaking changes first. `--version 5.31.0` prints one release and `--json`
+prints data. A release the package does not ship is at
+`https://github.com/warlockjs/framework/releases/tag/v<version>`.
+
 ## Start with `warlock upgrade`
 
 Run the codemods first; they make the mechanical edits below and list every

@@ -3,7 +3,7 @@
  *
  * ## Why this exists
  *
- * `skills/**` and `llms.txt` / `llms-full.txt` ship INSIDE the published
+ * `skills/**`, `releases/*.md` and `llms.txt` / `llms-full.txt` ship INSIDE the published
  * tarballs — they are documentation users receive, not internal notes. This
  * workspace's own tooling is pnpm-only, but shipped docs must work for an
  * npm (or yarn) consumer too: `create-warlock` even offers a `--pm=npm`
@@ -212,7 +212,7 @@ function toPosix(p: string): string {
 
 /**
  * Discovers every shipped-doc file under the workspace root: each package's
- * `skills/**\/*.md` and its `llms.txt` / `llms-full.txt` — one directory
+ * `skills/**\/*.md`, `releases/*.md` and its `llms.txt` / `llms-full.txt` — one directory
  * level down from the root, mirroring how each package ships its own
  * `skills/` folder and `llms*.txt` at its own package root.
  */
@@ -230,6 +230,10 @@ export function discoverDocFiles(repoRoot: string): DocFile[] {
         found.push({ absPath: llmsPath, relPath: toPosix(path.relative(repoRoot, llmsPath)) });
       }
     }
+
+    // The release summaries a package ships (`releases/<version>-summary.md`).
+    const releasesRoot = path.join(pkgAbsPath, "releases");
+    if (isDirectory(releasesRoot)) walkMarkdown(releasesRoot, repoRoot, found);
 
     const skillsRoot = path.join(pkgAbsPath, "skills");
     if (!isDirectory(skillsRoot)) continue;
@@ -306,7 +310,7 @@ export function runNoPnpmInShippedDocsGate(repoRoot: string): GateReport {
 function formatReport(report: GateReport): { text: string; failed: boolean } {
   const lines: string[] = [];
   lines.push(
-    `no-pnpm-in-shipped-docs: scanned ${report.files.length} file(s) (skills/**/*.md, llms.txt, llms-full.txt).`,
+    `no-pnpm-in-shipped-docs: scanned ${report.files.length} file(s) (skills/**/*.md, releases/*.md, llms.txt, llms-full.txt).`,
   );
   lines.push("");
 

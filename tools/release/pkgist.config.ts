@@ -217,6 +217,11 @@ export default defineConfig({
             // The JSON Schema of the `warlock inspect --json` report, as
             // `@warlock.js/core/schemas/inspect-report.schema.json`.
             "schemas",
+            // `warlock release-notes` reads these. They are a copy of the repository's
+            // `releases/` (the clone list is relative to the package root);
+            // `scripts/sync-release-notes.mjs` keeps them in step and the release
+            // gate runs it before the clean-tree check.
+            "releases",
             "README.md",
             "LICENSE",
             "CHANGELOG.md",

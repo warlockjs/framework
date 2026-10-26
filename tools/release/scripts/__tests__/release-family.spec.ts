@@ -111,6 +111,7 @@ function fixture(overrides: Partial<ReleaseFamilyDependencies> = {}): {
     makeTemporaryDirectory: async () => path.resolve("release-temp"),
     removeDirectory: async () => undefined,
     removeFile: async () => undefined,
+    assertReleaseSummary: async () => undefined,
     writeTextFile: async () => undefined,
     readTextFile: async (filePath) => {
       // Default innocent-case package.json: both own-quality scripts declared.

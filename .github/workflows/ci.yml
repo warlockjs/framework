@@ -97,6 +97,9 @@ jobs:
       - name: Public text contains no private references
         run: pnpm run check:public-text
 
+      - name: Core ships a copy of every release summary
+        run: pnpm run check:release-notes
+
       - name: Oxlint correctness checks (warnings remain advisory)
         run: pnpm run lint:oxlint
 

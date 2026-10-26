@@ -79,6 +79,15 @@ function appSection(report: InspectReport): string[] {
     );
   }
 
+  const core = packages.find((entry) => entry.name === "@warlock.js/core");
+
+  lines.push(
+    core
+      ? `What's new in \`@warlock.js/core@${core.version}\`: run \`npx warlock release-notes\`; before upgrading, run \`npx warlock release-notes --from ${core.version}\`.`
+      : "What's new: run `npx warlock release-notes`; before upgrading, run `npx warlock release-notes --from <current>`.",
+    "",
+  );
+
   return lines;
 }
 

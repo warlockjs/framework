@@ -69,3 +69,30 @@ describe("findViolationsInText", () => {
     assert.equal(findViolationsInText(entry.relPath, "pnpm add replacement").length, 1);
   });
 });
+
+describe("release summaries", () => {
+  it("are discovered under each package's releases folder and checked", async () => {
+    const { mkdtempSync, mkdirSync, rmSync, writeFileSync } = await import("node:fs");
+    const { tmpdir } = await import("node:os");
+    const path = await import("node:path");
+    const { discoverDocFiles, runNoPnpmInShippedDocsGate } =
+      await import("../no-pnpm-in-shipped-docs.ts");
+    const root = mkdtempSync(path.join(tmpdir(), "no-pnpm-releases-"));
+    try {
+      mkdirSync(path.join(root, "core", "releases"), { recursive: true });
+      writeFileSync(
+        path.join(root, "core", "releases", "5.1.0-summary.md"),
+        "npm install x\npnpm add y\n",
+      );
+      assert.deepEqual(
+        discoverDocFiles(root).map((file) => file.relPath),
+        ["core/releases/5.1.0-summary.md"],
+      );
+      const report = runNoPnpmInShippedDocsGate(root);
+      assert.equal(report.violations.length, 1);
+      assert.equal(report.violations[0].line, 2);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
