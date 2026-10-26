@@ -83,9 +83,19 @@ export type WarlockConfig = {
      * Sets `packages: "bundle"` and `splitting: false` as defaults — write
      * either of them yourself and yours wins.
      *
-     * ⚠ Not literally one file: native `.node` addons cannot be inlined by
-     * any bundler and are still emitted alongside it. "Single bundle" means
-     * one JavaScript file plus any native addons your dependencies carry.
+     * Works with `@warlock.js/web`: pages and routes are inlined, React and the
+     * framework are bundled, and the browser bundle stays in `dist/client/`
+     * next to `app.js`. The production server never loads Vite.
+     *
+     * Optional integrations the app does not declare (S3, database drivers,
+     * `jiti`, mail transports) stay lazy runtime imports, with no `external`
+     * list to keep. Packages with a native `.node` binary stay external and are
+     * copied to `dist/node_modules/<package>` with what they need to load; the
+     * build output names each one. "Single bundle" therefore means one
+     * JavaScript file, the client folder and any native addons.
+     *
+     * It does not change the browser bundle: for a desktop or offline app also
+     * set `chunks` and `precompress` in `webConnector({ build })`.
      *
      * Without this flag the build stays the default: dependencies remain real
      * `import` specifiers resolved from `node_modules` at runtime, which is

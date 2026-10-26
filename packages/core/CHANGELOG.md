@@ -6,6 +6,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 > ⚠ **Versioning: `@warlock.js/*` does not follow SemVer strictly — breaking changes may ship in a minor.** This is a deliberate decision, not an oversight: the framework is pre-adoption and the cost of a major per behaviour fix currently outweighs the benefit. **Pin an exact version or a tilde range (`~4.13.0`) if you need to opt into changes rather than receive them.** Every breaking change is marked **BREAKING** in its entry and summarised in an _Upgrading_ section at the top of the release. **This policy will change once the framework has consumers beyond its author.**
 
+## 5.38.1
+
+### Added
+
+- `build.singleBundle` now builds an app that uses `@warlock.js/web`: the server pages and routes are inlined into `dist/app.js`, and `node dist/app.js` starts from a copy of `dist/` with no `node_modules` above it.
+- Optional integrations need no hand-written `external` list. In a `singleBundle` build, a lazy `import()` or `require()` of an optional peer (or optional dependency) that a framework package lists and the app does not declare stays a lazy runtime import that never runs, and the build report names it. An import the app itself makes, or a package the app declares, is still bundled or fails the build.
+- Native addons are handled automatically in a `singleBundle` build. A package with a `.node` binary (or a napi loader whose platform package holds one) stays external and is copied into `dist/node_modules/<package>` with only what it needs to load: its JavaScript, binaries and data files, the dependencies it loads and the platform packages that match this machine. The build report names each one.
+- `warlock build` prints the number of files and the total size of `dist/` when it finishes.
+
+### Changed
+
+- The production bundle defines `globalThis.__WARLOCK_PRODUCTION_BUNDLE__` as `true`, so framework branches that only the development server or the build can reach are removed from it together with the modules they import. A `build.define` entry of the same name overrides it.
+
+### Fixed
+
+- A `singleBundle` build failed on `react-dom/server.node`: the native-addon plugin took any import specifier ending in `.node` for a compiled addon. It now treats only a path that resolves to a real `.node` file as one.
+
 ## 5.38.0 - 2026-10-25
 
 ### Added

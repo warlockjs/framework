@@ -24,7 +24,7 @@ export default function Page() {
  * `warlock.config.ts` from the core source, which imports core's own dependencies.
  * The web package's entries win, then core's, then every other package's.
  */
-async function linkWorkspaceDependencies(directory: string): Promise<void> {
+export async function linkWorkspaceDependencies(directory: string): Promise<void> {
   const target = join(directory, "node_modules");
   const owners = ["web", "core", ...(await readdir(join(workspace, "packages")))];
 
