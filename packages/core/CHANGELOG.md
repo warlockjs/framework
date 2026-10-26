@@ -19,6 +19,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Changed
 
 - `--version` and `-v` print the Warlock version only when no command is given, so a command can take its own `--version` option.
+- The production bundle defines `globalThis.__WARLOCK_PRODUCTION_BUNDLE__` as `true`, so framework branches that only the development server or the build can reach are removed from it together with the modules they import. A `build.define` entry of the same name overrides it.
 
 ### Fixed
 
@@ -32,13 +33,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `warlock build` prints the number of files and the total size of `dist/` when it finishes.
 - A `singleBundle` build settles `process.env.NODE_ENV` to `"production"` inside `react`, `react-dom` and `scheduler` only, so React's development build is dropped from the bundle. A `process.env.NODE_ENV` entry in `build.define` turns this off. Other reads of `NODE_ENV` are untouched.
 - In a `singleBundle` build the native parser `oxc-parser`, imported by framework code that only the build, check and scan commands call, is replaced by a module that throws if it is ever called. The build names it, and `dist/node_modules` is created only for native packages the app itself uses.
-
-### Changed
-
-- The production bundle defines `globalThis.__WARLOCK_PRODUCTION_BUNDLE__` as `true`, so framework branches that only the development server or the build can reach are removed from it together with the modules they import. A `build.define` entry of the same name overrides it.
-
-### Fixed
-
 - `warlock build` in a source checkout runs the route-registration child from its TypeScript source through the CLI loader when the compiled child is absent, instead of failing.
 - A `singleBundle` build failed on `react-dom/server.node`: the native-addon plugin took any import specifier ending in `.node` for a compiled addon. It now treats only a path that resolves to a real `.node` file as one.
 
