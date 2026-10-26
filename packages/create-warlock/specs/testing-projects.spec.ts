@@ -8,7 +8,7 @@ const template = (file: string) =>
 describe("generated testing strategy", () => {
   it("pins a Vitest version with awaited worker cleanup support", () => {
     const manifest: { devDependencies: { vitest: string } } = JSON.parse(template("package.json"));
-    expect(manifest.devDependencies.vitest).toBe("5.0.3");
+    expect(manifest.devDependencies.vitest).toBe("5.0.5");
   });
   it("documents matching project conventions and release commands", () => {
     const skill = template("skills/testing-strategy/SKILL.md");

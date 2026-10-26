@@ -277,7 +277,7 @@ features. A database-free scaffold needs no external database.
 `npx create-warlock my-project --yes --features=test` delegates to `warlock add test`:
 unit `*.spec.ts` outside `tests/` runs without Warlock setup, integration `*.test.ts`
 and specs under `tests/` use framework setup and the generated cleanup runner.
-The template pins Vitest 5.0.3. See the generated `testing-strategy` skill for
+The template pins Vitest 5.0.5. See the generated `testing-strategy` skill for
 `setupTest({ mode: "unit", importModule })`, opt-in `tests.lifetime: "worker"`,
 `tests.resetBetweenFiles`, profiling and the changed-tests release gate.
 
