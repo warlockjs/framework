@@ -136,6 +136,150 @@
   ],
   "releases": [
     {
+      "version": "5.39.1",
+      "id": "v5-39-1",
+      "date": "October 26, 2026",
+      "isUnreleased": false,
+      "summaryHtml": "<strong>Fixes for test-run exits, migrations, standalone builds and log channels.</strong> Shutdown of the HTTP test server, <code>warlock start</code> and per-worker test teardown now stops every running <code>@warlock.js/scheduler</code> scheduler, so a suite whose app starts a scheduler while loading no longer waits out Vitest's 10-second close timeout. <code>warlock migrate</code> releases its lock and closes every data source on every exit path (including <code>Ctrl+C</code> / <code>SIGTERM</code>), bounds the MongoDB connect, prints a heartbeat for long migrations, takes an opt-in <code>--timeout</code>, and names the failing migration and step with recovery advice. <code>build.singleBundle</code> no longer bundles Vite listed under <code>devDependencies</code>, keeps build-time tools out of the bundle, stages aliased native packages under the imported name, stages only reachable native packages and warns about ones it cannot copy. <code>LogChannel.ready</code> resolves after a channel's deferred init, and a channel disposed before init no longer arms its flush timer. No breaking changes. Lockstep release across all 33 packages. Generator matrix scope: <code>none</code>; before publishing, the blog on the 5.39.1 tarballs passed the release gate; after publishing, every package was confirmed at the npm origin.",
+      "matrix": "none",
+      "matrixRows": null,
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 10,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 2
+            },
+            {
+              "type": "Fixed",
+              "n": 8
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "A migration that runs long prints <code>still running \"&lt;name&gt;\", step N of M, &lt;n&gt;s elapsed</code> at 30 s and then every 60 s. Migrations are not aborted by default, so a long index build is never left half-applied."
+            },
+            {
+              "type": "Added",
+              "html": "<code>warlock migrate --timeout &lt;seconds&gt;</code> (or <code>WARLOCK_MIGRATION_TIMEOUT_MS</code>, in milliseconds) opts in to a hard limit per migration. A migration that exceeds it fails with a message naming it, and the command exits 1."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>warlock migrate</code> exited without releasing the migration lock or closing the database client, on success, on failure and on <code>Ctrl+C</code> / <code>SIGTERM</code>. Server-side sessions and the lock document were left behind for the server to expire, so a run started soon after another could stall. It now releases the lock and closes every data source before the process exits on every path (exit 130 / 143 on an interrupt), with a bounded wait so shutdown cannot hang."
+            },
+            {
+              "type": "Fixed",
+              "html": "A failed migration reports which migration (and, on MongoDB, which step) failed, that no ledger row was written, and how to recover."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>build.singleBundle</code> no longer bundles Vite when an app lists <code>vite</code> under <code>devDependencies</code>. Only <code>dependencies</code>, <code>optionalDependencies</code> and <code>peerDependencies</code> count as declared by the app, so a dev dependency no longer turns a framework's lazy <code>import()</code> into an inlined package (which had grown <code>dist</code> by about 60 MB and staged the <code>rolldown</code> and <code>lightningcss</code> native addons)."
+            },
+            {
+              "type": "Fixed",
+              "html": "Build-time tools (<code>vite</code>, <code>rolldown</code>, <code>lightningcss</code>, <code>esbuild</code>, <code>oxc-parser</code>, <code>@vitejs/*</code>, <code>@babel/*</code> except <code>@babel/runtime</code>, and their platform packages) are never bundled or staged by <code>singleBundle</code> builds when framework code imports them, even when the app lists them under <code>dependencies</code>. They are kept in one list. A third-party library that imports one at module level is still bundled so it keeps working with no <code>node_modules</code>. The throwing stand-in for <code>oxc-parser</code> applies only when the app does not declare it. Imports from your own source files are unaffected."
+            },
+            {
+              "type": "Fixed",
+              "html": "A native package installed under an npm alias (<code>\"node-pty\": \"npm:@lydell/node-pty\"</code>) is staged in <code>dist/node_modules</code> under the name that is imported (<code>node-pty</code>), not under the real package name, so the import resolves from <code>dist/</code>."
+            },
+            {
+              "type": "Fixed",
+              "html": "Native packages are staged only when the finished bundle still imports them."
+            },
+            {
+              "type": "Fixed",
+              "html": "The build prints a warning naming a native package it could not copy because its <code>os</code> / <code>cpu</code> / <code>libc</code> exclude the build machine, instead of skipping it silently."
+            },
+            {
+              "type": "Fixed",
+              "html": "The HTTP test server's shutdown now stops every <code>@warlock.js/scheduler</code> scheduler that is still running. An app that starts a scheduler from a module's boot file (as the scaffolded app does) left a timer armed in the Vitest main process, so a green run ended with <code>close timed out after 10000ms</code> and <code>something prevents N Vite servers from exiting</code>, about ten seconds late. The connectors manager now stops running schedulers, waiting up to <code>app.shutdownTimeout</code> for in-flight jobs, before it tears the connectors down; this also applies to <code>warlock start</code> and other shutdown paths."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/cascade",
+          "slug": "cascade",
+          "total": 3,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            },
+            {
+              "type": "Fixed",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>MigrationRunner</code> warns while a migration runs long (<code>still running \"&lt;name&gt;\", step N of M, &lt;n&gt;s elapsed</code>, at 30 s and then every 60 s) and never aborts one by default. A hard limit is opt-in: <code>stepTimeoutMs</code> option, <code>setStepTimeout(ms)</code> / <code>getStepTimeout()</code> or the <code>WARLOCK_MIGRATION_TIMEOUT_MS</code> environment variable. A migration or transactional batch that exceeds it fails with a message naming it. <code>MigrationRunner.releaseActiveLocks()</code> releases the migration lock of a run that is being interrupted. New exports <code>StepTimeoutError</code> and <code>withTimeout</code>."
+            },
+            {
+              "type": "Fixed",
+              "html": "A MongoDB migration that failed part-way now says which step failed (<code>step 3 of 5: createIndex on \"orders\"</code>), how many steps were already applied, that no ledger row was written, and that re-running is safe because index creation is idempotent."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>MongoDbDriver.connect()</code> is bounded (server selection plus connect timeout, 30 s each by default) and fails with a clear message instead of waiting silently. <code>disconnect()</code> falls back to a forced close when the graceful close stalls for 10 seconds."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/logger",
+          "slug": "logger",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            },
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>LogChannel.ready</code>: a promise that resolves once the channel's deferred <code>init()</code> has finished. Await it before relying on the channel being set up, for example before removing its storage directory in a test."
+            },
+            {
+              "type": "Fixed",
+              "html": "A <code>FileLog</code> / <code>JSONFileLog</code> disposed before its deferred <code>init()</code> ran still created its directory and armed the 5-second flush interval afterwards, which kept the process alive and could fail with <code>ENOENT</code> when the directory had been removed. A disposed channel now skips <code>init()</code>, including when <code>dispose()</code> lands while <code>init()</code> is creating the directory."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/scheduler",
+          "slug": "scheduler",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "A started scheduler is now listed in a process-wide registry until it stops, so the host (<code>@warlock.js/core</code>) can stop it on shutdown. Previously an application that never called <code>shutdown()</code> kept the process alive through the scheduler's tick timer."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>shutdown()</code> no longer leaves its timeout timer armed when the running jobs finish first."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "5.39.0",
       "id": "v5-39-0",
       "date": "October 26, 2026",

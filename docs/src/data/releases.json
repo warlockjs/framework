@@ -1,4 +1,9 @@
 {
+  "5.39.1": {
+    "publishedAt": "2026-10-26T20:42:59.638Z",
+    "matrix": "none",
+    "summary": "**Fixes for test-run exits, migrations, standalone builds and log channels.** Shutdown of the HTTP test server, `warlock start` and per-worker test teardown now stops every running `@warlock.js/scheduler` scheduler, so a suite whose app starts a scheduler while loading no longer waits out Vitest's 10-second close timeout. `warlock migrate` releases its lock and closes every data source on every exit path (including `Ctrl+C` / `SIGTERM`), bounds the MongoDB connect, prints a heartbeat for long migrations, takes an opt-in `--timeout`, and names the failing migration and step with recovery advice. `build.singleBundle` no longer bundles Vite listed under `devDependencies`, keeps build-time tools out of the bundle, stages aliased native packages under the imported name, stages only reachable native packages and warns about ones it cannot copy. `LogChannel.ready` resolves after a channel's deferred init, and a channel disposed before init no longer arms its flush timer. No breaking changes. Lockstep release across all 33 packages. Generator matrix scope: `none`; before publishing, the blog on the 5.39.1 tarballs passed the release gate; after publishing, every package was confirmed at the npm origin."
+  },
   "5.39.0": {
     "publishedAt": "2026-10-26T16:52:50.647Z",
     "matrix": "none",
