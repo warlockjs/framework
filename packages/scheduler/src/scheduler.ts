@@ -2,6 +2,7 @@ import { EventEmitter } from "node:events";
 import { Job } from "./job";
 import type { JobAroundHook, JobCallback } from "./job";
 import { hasWorkerRole, rolesLabel } from "./process-roles";
+import { trackRunningScheduler, untrackRunningScheduler } from "./running-schedulers";
 import type { JobResult, SchedulerEvents } from "./types";
 
 /**
@@ -302,6 +303,10 @@ export class Scheduler
     this._isShuttingDown = false;
     this._scheduleTick(this._tickInterval);
 
+    // The host process stops every tracked scheduler when it shuts down, so an
+    // application that never calls `shutdown()` itself still lets the process exit.
+    trackRunningScheduler(this);
+
     this.emit("scheduler:started");
   }
 
@@ -316,6 +321,7 @@ export class Scheduler
 
     clearTimeout(this._timeoutId);
     this._timeoutId = null;
+    untrackRunningScheduler(this);
 
     this.emit("scheduler:stopped");
   }
@@ -335,10 +341,20 @@ export class Scheduler
     const runningJobs = this._jobs.filter((j) => j.isRunning);
 
     if (runningJobs.length > 0) {
-      await Promise.race([
-        Promise.all(runningJobs.map((j) => j.waitForCompletion())),
-        new Promise<void>((resolve) => setTimeout(resolve, timeout)),
-      ]);
+      let cap: NodeJS.Timeout | undefined;
+
+      try {
+        await Promise.race([
+          Promise.all(runningJobs.map((j) => j.waitForCompletion())),
+          new Promise<void>((resolve) => {
+            cap = setTimeout(resolve, timeout);
+          }),
+        ]);
+      } finally {
+        // A cap left armed after the jobs finished would hold the process open
+        // for the rest of the timeout.
+        clearTimeout(cap);
+      }
     }
   }
 

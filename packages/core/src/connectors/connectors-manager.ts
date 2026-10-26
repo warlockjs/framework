@@ -14,6 +14,7 @@ import { NotificationsConnector } from "./notifications-connector";
 import { SocketConnector } from "./socket-connector";
 import { StorageConnector } from "./storage.connector";
 import { DEFAULT_SHUTDOWN_TIMEOUT } from "./shutdown-timeout";
+import { stopRunningSchedulers } from "./stop-running-schedulers";
 import { ConnectorLifecyclePhase } from "./types";
 import type { Connector, ConnectorName } from "./types";
 
@@ -210,6 +211,9 @@ export class ConnectorsManager {
     // App-owned teardown runs first, while every connector (db, cache, http) is
     // still up, so cleanup hooks can use them. Idempotent + error-isolated.
     await Application.runShutdownHooks();
+
+    // Job schedulers the application started keep a timer armed until stopped.
+    await stopRunningSchedulers(config.get("app.shutdownTimeout", DEFAULT_SHUTDOWN_TIMEOUT));
 
     // HTTP stops accepting and drains in-flight requests FIRST, while storage,
     // socket, etc. are still up; then the rest go in reverse priority. Copy the

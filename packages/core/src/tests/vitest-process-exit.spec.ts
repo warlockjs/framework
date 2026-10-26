@@ -19,7 +19,11 @@ type Run = { code: number | null; output: string; elapsed: number; killed: boole
  * integration project with the global-setup HTTP server, the Warlock runner and
  * `setupTest()`), exactly as an app's `vitest run` does.
  */
-function runFixture(lifetime: "file" | "worker", web = false): Promise<Run> {
+function runFixture(
+  lifetime: "file" | "worker",
+  web = false,
+  inheritRootConfig = true,
+): Promise<Run> {
   const vitest = path.join(path.dirname(require.resolve("vitest/package.json")), "vitest.mjs");
   const environment = Object.fromEntries(
     Object.entries(process.env).filter(([key]) => !key.startsWith("VITEST")),
@@ -34,6 +38,7 @@ function runFixture(lifetime: "file" | "worker", web = false): Promise<Run> {
         NODE_ENV: "test",
         EXIT_APP_LIFETIME: lifetime,
         EXIT_APP_WEB: web ? "1" : "0",
+        EXIT_APP_EXTENDS: inheritRootConfig ? "true" : "false",
       },
       stdio: ["ignore", "pipe", "pipe"],
     });
@@ -68,6 +73,24 @@ describe("vitest process exit", () => {
       expect(run.killed).toBe(false);
       expect(run.code).toBe(0);
       expect(run.elapsed).toBeLessThan(EXIT_BOUND_MS);
+    },
+    EXIT_BOUND_MS + 15_000,
+  );
+
+  // The fixture's `jobs` module starts a scheduler from its boot file, as the
+  // scaffolded app does, and never stops it. A scheduler keeps a timer armed
+  // until it is stopped, so the server's shutdown has to stop it: otherwise the
+  // Vitest main process stays alive after the run until its close timeout.
+  it.each([true, false])(
+    "exits promptly with a started scheduler when the projects inherit the root config: %s",
+    async (inheritRootConfig) => {
+      const run = await runFixture("file", false, inheritRootConfig);
+
+      expect(run.output).toContain("3 passed");
+      expect(run.output).toContain("[test-server] HTTP test server stopped");
+      expect(run.output).not.toMatch(/prevents|close timed out/);
+      expect(run.killed).toBe(false);
+      expect(run.code).toBe(0);
     },
     EXIT_BOUND_MS + 15_000,
   );
