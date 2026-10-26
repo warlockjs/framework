@@ -229,6 +229,7 @@ async function freshWebGraph() {
     hydrationModule,
     routerModule,
     webServerModule,
+    manifestInstallerModule,
   ] = await Promise.all([
     import("../../src/server/page-manifest"),
     import("../../src/server/web-connector"),
@@ -237,6 +238,7 @@ async function freshWebGraph() {
     import("../../src/server/hydration-client-url"),
     import("../../../core/src/router/router"),
     import("../../src/server/index"),
+    import("../../src/server/install-page-routes-from-manifest"),
   ]);
 
   return {
@@ -247,6 +249,10 @@ async function freshWebGraph() {
     Application: applicationModule.Application,
     router: routerModule.router,
     webServer: webServerModule,
+    // The production path names this module directly (not through the barrel,
+    // which would pull the dev installer into a production bundle), so this is
+    // the namespace whose export it actually calls.
+    manifestInstaller: manifestInstallerModule,
     providePageManifest: registry.providePageManifest,
     consumePageManifest: registry.consumePageManifest,
   };
@@ -834,7 +840,10 @@ describe("WebConnector — the manifest mode branch", () => {
         // path WITH a server, not proving it can survive without one.
         graph.container.set("http.server", { server: {}, addHook: vi.fn() } as never);
 
-        const installFromManifest = vi.spyOn(graph.webServer, "installPageRoutesFromManifest");
+        const installFromManifest = vi.spyOn(
+          graph.manifestInstaller,
+          "installPageRoutesFromManifest",
+        );
         const connector = new graph.WebConnector({ appSrcRoot });
 
         await connector.boot();
