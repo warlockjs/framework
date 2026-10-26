@@ -22,8 +22,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - A native package installed under an npm alias (`"node-pty": "npm:@lydell/node-pty"`) is staged in `dist/node_modules` under the name that is imported (`node-pty`), not under the real package name, so the import resolves from `dist/`.
 - Native packages are staged only when the finished bundle still imports them.
 - The build prints a warning naming a native package it could not copy because its `os` / `cpu` / `libc` exclude the build machine, instead of skipping it silently.
-### Fixed
-
 - The HTTP test server's shutdown now stops every `@warlock.js/scheduler` scheduler that is still running. An app that starts a scheduler from a module's boot file (as the scaffolded app does) left a timer armed in the Vitest main process, so a green run ended with `close timed out after 10000ms` and `something prevents N Vite servers from exiting`, about ten seconds late. The connectors manager now stops running schedulers, waiting up to `app.shutdownTimeout` for in-flight jobs, before it tears the connectors down; this also applies to `warlock start` and other shutdown paths.
 
 ## 5.39.0 - 2026-10-26
