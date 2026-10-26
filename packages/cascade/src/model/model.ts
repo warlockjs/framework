@@ -143,10 +143,12 @@ export type {
   IsLooseModelSchema,
   LocalScopeCallback,
   ModelData,
+  ModelColumns,
   ModelDataSnapshot,
   ModelKey,
   ModelPath,
   ModelSchema,
+  ModelSystemColumns,
   ModelValue,
   ScopeTiming,
 } from "./model.types";
@@ -991,7 +993,7 @@ export abstract class Model<out TSchema extends ModelSchema = ModelSchema> {
    * Automatically updates the dirty tracker to reflect the change.
    *
    * @param field - The field name or dot-notation path (e.g., "address.city")
-   * @param value - The value to assign
+   * @param value - The value to assign. Checked against the column type; a dot path accepts anything
    * @returns The model instance for method chaining
    *
    * @example
@@ -999,8 +1001,11 @@ export abstract class Model<out TSchema extends ModelSchema = ModelSchema> {
    * user.set("name", "Bob").set("address.city", "NYC");
    * ```
    */
-  public set<TKey extends ModelKey<TSchema>>(field: TKey, value: ModelValue<TSchema, TKey>): this;
+  // The dot-path overload comes first so the column overload is the last one tried:
+  // TypeScript reports the last overload's error, which then names the real mismatch
+  // (the value type, or an unknown column) instead of the dot-path template.
   public set(field: ModelPath, value: unknown): this;
+  public set<TKey extends ModelKey<TSchema>>(field: TKey, value: ModelValue<TSchema, TKey>): this;
   public set(field: string, value: unknown): this {
     return setFieldValue(this, field, value) as this;
   }

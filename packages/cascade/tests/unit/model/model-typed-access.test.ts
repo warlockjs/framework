@@ -2,7 +2,12 @@ import { v } from "@warlock.js/seal";
 import { afterAll, afterEach, beforeAll, describe, expect, expectTypeOf, it, vi } from "vitest";
 import { dataSourceRegistry } from "../../../src/data-source/data-source-registry";
 import { Model } from "../../../src/model/model";
-import type { ModelData, ModelDataSnapshot } from "../../../src/model/model.types";
+import type {
+  ModelData,
+  ModelDataSnapshot,
+  ModelKey,
+  ModelValue,
+} from "../../../src/model/model.types";
 import { createMockDriver } from "../../utils/test-helpers";
 
 const postSchema = v.object({
@@ -95,6 +100,78 @@ describe("Model get() and set() are typed from the schema", () => {
 
     expect(rejected).toBeTypeOf("function");
     expect(post.get("views")).toBe(10);
+  });
+
+  it("accepts Cascade's system columns without declaring them", () => {
+    expectTypeOf(post.get("id")).toEqualTypeOf<number>();
+    expectTypeOf(post.get("_id")).toBeUnknown();
+    expectTypeOf(post.get("created_at")).toEqualTypeOf<Date>();
+    expectTypeOf(post.get("updated_at")).toEqualTypeOf<Date>();
+    expectTypeOf(post.get("createdAt")).toEqualTypeOf<Date>();
+    expectTypeOf(post.get("deleted_at")).toEqualTypeOf<Date | null>();
+    expectTypeOf(post.get("deletedAt")).toEqualTypeOf<Date | null>();
+
+    post.set("updated_at", new Date());
+
+    const rejected = (): void => {
+      // @ts-expect-error id is a number
+      post.set("id", "1");
+    };
+
+    expect(rejected).toBeTypeOf("function");
+  });
+
+  it("lets the schema override a system column", () => {
+    const stringIdSchema = v.object({ id: v.string().required(), name: v.string().required() });
+
+    class Tag extends Model<ModelData<typeof stringIdSchema>> {
+      public static table = "typed_tags";
+      public get tagId(): string {
+        return this.get("id");
+      }
+    }
+
+    expectTypeOf(new Tag({ id: "a" }).get("id")).toEqualTypeOf<string>();
+  });
+
+  it("keeps the WithSystemColumns workaround compiling", () => {
+    type WithSystemColumns<T> = T & { id: number; created_at: Date; updated_at: Date };
+
+    class Legacy extends Model<WithSystemColumns<PostSchema>> {
+      public static table = "typed_legacy";
+      public get legacyId(): number {
+        return this.get("id");
+      }
+    }
+
+    expectTypeOf(new Legacy({}).get("created_at")).toEqualTypeOf<Date>();
+    expectTypeOf(new Legacy({}).get("title")).toEqualTypeOf<string>();
+  });
+
+  it("points a wrong set() value at the value, and sets a runtime-named column", () => {
+    const runtimeKey = (key: ModelKey<PostSchema>, other: string): void => {
+      // @ts-expect-error a string is not a column key
+      post.set(other, 1);
+    };
+
+    const setByKey = <TKey extends ModelKey<PostSchema>>(
+      key: TKey,
+      value: ModelValue<PostSchema, TKey>,
+    ): void => {
+      post.set(key, value);
+    };
+
+    const setUnionKey = (key: "title" | "views"): void => {
+      post.set(key, "text");
+      // @ts-expect-error neither a string nor a number is a boolean
+      post.set(key, true);
+    };
+
+    setByKey("title", "From a variable");
+
+    expect(post.get("title")).toBe("From a variable");
+    expect(runtimeKey).toBeTypeOf("function");
+    expect(setUnionKey).toBeTypeOf("function");
   });
 
   it("keeps models without a schema type loosely typed", () => {

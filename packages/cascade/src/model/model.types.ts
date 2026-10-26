@@ -39,16 +39,54 @@ export type ModelSchema = Record<string, any>;
 export type IsLooseModelSchema<TSchema> = string extends keyof TSchema ? true : false;
 
 /**
- * The column names `get()`, `set()` and friends accept for a model schema.
- * A typed schema allows exactly its keys; a loose one allows any string.
+ * The columns Cascade manages on every record, so `get()` and `set()` accept
+ * them on a typed model without declaring them in the schema.
+ *
+ * - `id` is the numeric id Cascade generates. A model with string ids
+ *   declares `id: string` in its schema, and the schema wins.
+ * - `_id` is the MongoDB document id.
+ * - Timestamp column names depend on the driver (`createdAt` on MongoDB,
+ *   `created_at` on Postgres) and can be renamed or disabled per model, so
+ *   both spellings are allowed. A model that renames one declares it in
+ *   its schema, and the schema wins.
+ * - `deleted_at` / `deletedAt` hold the soft-delete time, `null` while the
+ *   record is live.
  */
-export type ModelKey<TSchema> = string extends keyof TSchema ? string : keyof TSchema & string;
+export type ModelSystemColumns = {
+  id: number;
+  _id: unknown;
+  created_at: Date;
+  updated_at: Date;
+  deleted_at: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+  deletedAt: Date | null;
+};
+
+/**
+ * A model schema plus Cascade's system columns. A column the schema declares
+ * keeps the schema type. A loose schema stays as it is.
+ */
+export type ModelColumns<TSchema> = string extends keyof TSchema
+  ? TSchema
+  : Omit<ModelSystemColumns, keyof TSchema> & TSchema;
+
+/**
+ * The column names `get()`, `set()` and friends accept for a model schema.
+ * A typed schema allows its keys and the system columns; a loose one allows
+ * any string.
+ */
+export type ModelKey<TSchema> = string extends keyof TSchema
+  ? string
+  : keyof ModelColumns<TSchema> & string;
 
 /**
  * The value type of one column: the schema type for a typed model, `any`
  * for a loose one.
  */
-export type ModelValue<TSchema, TKey> = TKey extends keyof TSchema ? TSchema[TKey] : never;
+export type ModelValue<TSchema, TKey> = TKey extends keyof ModelColumns<TSchema>
+  ? ModelColumns<TSchema>[TKey]
+  : never;
 
 /**
  * A dot-notation path into a nested column (`"address.city"`). Nested paths
