@@ -34,6 +34,10 @@ Look at the project's `package.json > scripts` to see the local shortcuts. Under
 
 ---
 
+## What changed in a release
+
+[`warlock release-notes`](./release-notes.md) prints the release summaries shipped inside `@warlock.js/core`: the installed version by default, `--from <version>` for every release since one, with the breaking changes first. It needs no network and no booted app.
+
 ## Reporting issues
 
 [`warlock issue`](./issue.md) prepares a framework bug report or feature request with installed versions and a safe static config summary, even when the app cannot boot. Search existing reports, review a minimal public repro, and ask the user before filing an agent-prepared draft.

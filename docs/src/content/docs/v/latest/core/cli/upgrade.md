@@ -25,6 +25,12 @@ it) that version is the target itself, so there is nothing to upgrade across
 and the command stops with an error asking for `--from`. An app on 5.29 passes
 `--from 5.29` so the 5.30 changes run too.
 
+Before you upgrade, read what changed with
+[`warlock release-notes`](./release-notes.md): `npx warlock release-notes --from 5.30` prints
+the summary of every release after 5.30, led by a combined list of breaking changes. It reads
+files shipped in `@warlock.js/core`, so it needs no network. `warlock upgrade`, `warlock upgrade
+--check` and `warlock update` end with a `What's new:` line naming that command.
+
 Then install (the command prints the right install command for your package
 manager), run the type check and the tests, and work through the review list.
 
