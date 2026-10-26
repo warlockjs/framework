@@ -57,6 +57,28 @@ post.set("publishedAt", null); // ok, the column is nullable
 
 Only top-level columns are typed. A dot path (`"profile.address.city"`) is accepted for any column and returns `any`; pass a type argument when you want one: `post.get<string>("meta.seoTitle")`. The path is not checked on purpose, because a recursive path type is what makes large schemas slow to compile.
 
+### System columns
+
+Cascade's own columns are part of the typed key space, so you do not declare them in the schema: `get("id")` is `number`, `get("_id")` is `unknown` (the MongoDB document id), `get("created_at")` and `get("updated_at")` are `Date`, and `get("deleted_at")` is `Date | null`. The camelCase spellings (`createdAt`, `updatedAt`, `deletedAt`) are accepted too, because MongoDB names them that way by default and Postgres uses snake case. Timestamp columns can be renamed or disabled per model, and the type cannot know which, so a model that renames or drops one declares that column in its schema. A column the schema declares always wins, so a model with string ids declares `id: v.string().required()` and `get("id")` is `string`. A `Model<WithSystemColumns<Schema>>` workaround keeps compiling.
+
+### Setting a column named at runtime
+
+A wrong value reports on the value (`Type 'string' is not assignable to type 'number'`), not on the key. To set a column whose name is only known at runtime, type the key as a `ModelKey` and pass it to `set()`, which checks the value against that column:
+
+```ts
+import type { ModelKey, ModelValue } from "@warlock.js/cascade";
+
+function setColumn<K extends ModelKey<PostSchema>>(
+  post: Post,
+  key: K,
+  value: ModelValue<PostSchema, K>,
+) {
+  post.set(key, value);
+}
+```
+
+A plain `string` key is not accepted on a typed model. Narrow it first, or use `merge({ [key]: value })`, which is not checked per column.
+
 ### A column is not a property
 
 `post.title` is always `undefined`: the data lives in `post.data`, and the only property shortcuts are `id`, `uuid`, `createdAt` and `updatedAt`. Use `post.get("title")`.

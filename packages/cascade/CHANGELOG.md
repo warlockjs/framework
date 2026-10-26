@@ -4,6 +4,13 @@ All notable changes to `@warlock.js/cascade` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.38.1
+
+### Fixed
+
+- `get()` and `set()` on a model declared with a schema type accept Cascade's system columns without declaring them: `id` (`number`), `_id`, `created_at` / `updated_at` (`Date`), `deleted_at` (`Date | null`) and their camelCase spellings. A column the schema declares keeps its own type, so a renamed timestamp or a string `id` goes in the schema. New `ModelSystemColumns` and `ModelColumns` types.
+- `set(key, value)` with a wrong value type now reports the value mismatch instead of a misleading error about dot paths. A column named at runtime is set with a key typed `K extends ModelKey<Schema>`.
+
 ## 5.38.0 - 2026-10-25
 
 ### Added

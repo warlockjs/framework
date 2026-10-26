@@ -1294,7 +1294,7 @@ export class User extends Model<UserSchema> {
 
 ## Typed reads, snapshots and server-set fields
 
-Type the model with `ModelData<typeof schema>` (the schema's output type) and `get()` / `set()` are checked against it: `get("publishedAt")` is `Date | null`, `get("views")` is `number` when the column has a `.default()`, `get("tilte")` and `set("views", "10")` are type errors. A model without a schema type stays loose. Dot paths (`"profile.city"`) are accepted for any column and return `any`; pass a type argument for a precise type.
+Type the model with `ModelData<typeof schema>` (the schema's output type) and `get()` / `set()` are checked against it: `get("publishedAt")` is `Date | null`, `get("views")` is `number` when the column has a `.default()`, `get("tilte")` and `set("views", "10")` are type errors. Cascade's system columns need no declaration: `get("id")` is `number`, `get("_id")` is `unknown`, `created_at` / `updated_at` are `Date`, `deleted_at` is `Date | null` (camelCase spellings too); a column the schema declares wins, so a renamed timestamp or a string `id` goes in the schema. A wrong `set()` value reports on the value; to set a column named at runtime, type the key `K extends ModelKey<Schema>` and call `set(key, value)` (a plain `string` key is rejected; `merge({ [key]: value })` is unchecked). A model without a schema type stays loose. Dot paths (`"profile.city"`) are accepted for any column and return `any`; pass a type argument for a precise type.
 
 ```ts
 export type PostSchema = ModelData<typeof postSchema>;
