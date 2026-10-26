@@ -1,4 +1,5 @@
 import { colors } from "@mongez/copper";
+import { releaseNotesPointer } from "../release-notes/release-notes";
 import type { UpgradeCheckResult } from "./check-upgrade";
 
 function seconds(durationMs: number): string {
@@ -88,6 +89,7 @@ export function formatUpgradeCheckReport(result: UpgradeCheckResult): string {
       ? `The copy was kept at ${colors.cyan(result.scratch)}. Delete it when you are done.`
       : colors.dim("The copy was deleted."),
     `To apply the upgrade for real: ${colors.cyan(`warlock upgrade --from ${result.from} --to ${result.to}`)}`,
+    colors.dim(releaseNotesPointer(result.from)),
   );
 
   return lines.join("\n");

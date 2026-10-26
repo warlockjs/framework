@@ -116,6 +116,14 @@ describe("renderAgentsMdSection", () => {
     expect(section).not.toContain("2026-01-01");
   });
 
+  it("names the installed core version and the release-notes command", () => {
+    const section = renderAgentsMdSection(report(routes));
+
+    expect(section).toContain(
+      "What's new in `@warlock.js/core@5.31.0`: run `npx warlock release-notes`; before upgrading, run `npx warlock release-notes --from 5.31.0`.",
+    );
+  });
+
   it("is deterministic regardless of input order", () => {
     const first = renderAgentsMdSection(report(routes));
     const second = renderAgentsMdSection(report([...routes].reverse()));

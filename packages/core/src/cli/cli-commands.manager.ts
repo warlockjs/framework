@@ -240,9 +240,10 @@ export class CLICommandsManager {
       await manifestManager.removeCommandsFile();
     }
 
-    // `-v` is only the version flag when no command was given: after a command
-    // name it is that command's own short flag (`--with-validation`).
-    if (options.version || (options.v && !name)) {
+    // `--version` and `-v` are only the version flag when no command was given:
+    // after a command name they belong to that command (`-v` is
+    // `--with-validation`; `release-notes --version 5.38.0` names a release).
+    if ((options.version || options.v) && !name) {
       await displayWarlockVersionInTerminal();
       process.exit(0);
     }

@@ -1,4 +1,5 @@
 import { colors } from "@mongez/copper";
+import { releaseNotesPointer } from "../release-notes/release-notes";
 import type { UpgradeResult } from "./types";
 
 /** The human-readable `warlock upgrade` report. */
@@ -60,6 +61,7 @@ export function formatUpgradeReport(result: UpgradeResult): string {
   }
   lines.push(
     `Then run your type check and tests. The ${colors.cyan("upgrade-from-5-29")} skill explains each change.`,
+    colors.dim(releaseNotesPointer(result.from)),
   );
 
   return lines.join("\n");

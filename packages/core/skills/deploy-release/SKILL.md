@@ -14,6 +14,8 @@ candidate -> gate -> migrations --prove -> stage -> activate -> verify
 
 Warlock never calls PM2, systemd or any process manager. The only restart is the command you set in `release.restart.command`.
 
+When the deploy also upgrades the framework, run `npx warlock release-notes --from <current>` first (`<current>` is the `@warlock.js/core` version now in `package.json`). It lists the breaking changes of every release in between; `warlock upgrade --check` rehearses them on a copy.
+
 ## Configure
 
 ```ts title="warlock.config.ts"

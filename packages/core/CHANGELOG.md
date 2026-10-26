@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 > ⚠ **Versioning: `@warlock.js/*` does not follow SemVer strictly — breaking changes may ship in a minor.** This is a deliberate decision, not an oversight: the framework is pre-adoption and the cost of a major per behaviour fix currently outweighs the benefit. **Pin an exact version or a tilde range (`~4.13.0`) if you need to opt into changes rather than receive them.** Every breaking change is marked **BREAKING** in its entry and summarised in an _Upgrading_ section at the top of the release. **This policy will change once the framework has consumers beyond its author.**
 
+## 5.38.1
+
+### Added
+
+- `warlock release-notes` prints the family release summaries that now ship inside the package (`releases/<version>-summary.md`, 5.30.0 onward). With no arguments it prints the installed version's summary; `--from <version>` (optionally `--to <version>`) prints every release after it, oldest first, led by a combined list of breaking changes; `--version <v>` prints one release; `--list` lists the versions with dates; `--json` prints `{ versions: [{ version, date, breaking, markdown }] }`. It reads files only, so it needs no network and no booted app. A version the package does not ship is reported with its GitHub release URL.
+- `warlock upgrade`, `warlock upgrade --check` and `warlock update` end with `What's new: npx warlock release-notes --from <old>`, and the `AGENTS.md` section that `warlock agents-md` generates names the installed version and the command.
+- The `update-packages`, `deploy-release` and `upgrade-from-5-29` skills tell agents to run `npx warlock release-notes --from <current>` before upgrading.
+
+### Changed
+
+- `--version` and `-v` print the Warlock version only when no command is given, so a command can take its own `--version` option.
+
 ## 5.38.0 - 2026-10-25
 
 ### Added

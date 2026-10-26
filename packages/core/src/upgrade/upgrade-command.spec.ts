@@ -74,6 +74,7 @@ describe("warlock upgrade", () => {
     expect(report).toContain('+  log.info("jobs", "run", "Started");');
     expect(report).toContain("src/app/jobs/job.schema.ts:3");
     expect(report).toContain("upgrade-from-5-29");
+    expect(report).toContain("What's new: npx warlock release-notes --from 5.29.0");
   });
 
   it("applies the edits and bumps the family versions without --dry-run", async () => {

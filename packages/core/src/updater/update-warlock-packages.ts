@@ -1,6 +1,7 @@
 import { colors } from "@mongez/copper";
 import { fileExistsAsync, getJsonFileAsync, putJsonFileAsync } from "@warlock.js/fs";
 import { execSync } from "node:child_process";
+import { releaseNotesPointer } from "../release-notes/release-notes";
 import { rootPath } from "../utils";
 import { fetchLatestVersion } from "../utils/npm-registry";
 import { isNewerVersion } from "../utils/version-compare";
@@ -167,6 +168,7 @@ export async function updateWarlockPackages(
 
   if (options.dryRun) {
     printUpdates(updates, { pending: true });
+    printReleaseNotesPointer(updates);
     return { outcome: "outdated", updates };
   }
 
@@ -183,6 +185,7 @@ export async function updateWarlockPackages(
       colors.dim(`Package manager: ${detection.packageManager}, because ${detection.reason}.`),
     );
     console.log(colors.dim(`Skipped install (--no-install). Run ${command} to apply the changes.`));
+    printReleaseNotesPointer(updates);
     return { outcome: "updated", updates };
   }
 
@@ -195,6 +198,8 @@ export async function updateWarlockPackages(
     );
     return { outcome: "install-failed", updates, error: error as Error };
   }
+
+  printReleaseNotesPointer(updates);
 
   return { outcome: "updated", updates };
 }
@@ -323,6 +328,13 @@ function printUpdates(updates: PackageUpdate[], { pending = false } = {}): void 
         `${colors.dim(update.from)} ${colors.dim("→")} ${colors.greenBright(update.to)}`,
     );
   }
+}
+
+/** End an update with one line pointing at the release summaries since the old version. */
+function printReleaseNotesPointer(updates: PackageUpdate[]): void {
+  const core = updates.find((update) => update.name === "@warlock.js/core") ?? updates[0];
+
+  if (core) console.log(colors.dim(releaseNotesPointer(core.from)));
 }
 
 /** Reconcile node_modules to the rewritten package.json via the project PM. */
