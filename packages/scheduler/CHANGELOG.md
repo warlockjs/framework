@@ -4,6 +4,13 @@ All notable changes to `@warlock.js/scheduler` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.39.1
+
+### Fixed
+
+- A started scheduler is now listed in a process-wide registry until it stops, so the host (`@warlock.js/core`) can stop it on shutdown. Previously an application that never called `shutdown()` kept the process alive through the scheduler's tick timer.
+- `shutdown()` no longer leaves its timeout timer armed when the running jobs finish first.
+
 ## 5.34.3 - 2026-10-20
 
 ### Changed

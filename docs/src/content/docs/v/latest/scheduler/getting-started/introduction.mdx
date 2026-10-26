@@ -123,6 +123,8 @@ process.on("SIGTERM", async () => {
 });
 ```
 
+When the process runs on Warlock, `@warlock.js/core` also stops every scheduler that is still running as part of its own shutdown (before the database and HTTP connectors close), waiting up to `app.shutdownTimeout` for running jobs. That is what lets a test run that booted your modules exit once the HTTP test server stops. Calling `scheduler.shutdown()` yourself stays valid and is safe to combine with it.
+
 ## What's Next
 
 | Topic                                                  | Description                                         |

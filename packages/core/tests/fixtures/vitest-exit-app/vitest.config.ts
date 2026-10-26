@@ -8,28 +8,42 @@ const worker = process.env.EXIT_APP_LIFETIME === "worker";
 
 // Mirrors the layout `warlock add test` generates: a plain unit project and an
 // integration project with a global-setup HTTP server and the Warlock runner.
-export default defineConfig({
+const shared = {
   resolve: {
     alias: [
       { find: /^@warlock\.js\/core\/tests$/, replacement: path.join(core, "tests/index.ts") },
       { find: /^@warlock\.js\/core$/, replacement: path.join(core, "index.ts") },
-      ...["seal", "cascade", "context", "logger", "cache", "fs", "herald"].map((name) => ({
-        find: new RegExp(`^@warlock\\.js/${name}$`),
-        replacement: source(name),
-      })),
+      ...["seal", "cascade", "context", "logger", "cache", "fs", "herald", "scheduler"].map(
+        (name) => ({
+          find: new RegExp(`^@warlock\\.js/${name}$`),
+          replacement: source(name),
+        }),
+      ),
     ],
   },
   server: { fs: { allow: [packages] } },
+};
+
+// `EXIT_APP_EXTENDS=false` declares the inline projects with `extends: false`,
+// so each carries its own copy of the shared options instead of inheriting the
+// root config.
+const inherit = process.env.EXIT_APP_EXTENDS !== "false";
+const own = inherit ? {} : shared;
+
+export default defineConfig({
+  ...shared,
   test: {
     env: { NODE_ENV: "test" },
     maxWorkers: 2,
     projects: [
       {
-        extends: true,
+        ...own,
+        extends: inherit,
         test: { name: "unit", environment: "node", include: ["tests/**/*.spec.ts"] },
       },
       {
-        extends: true,
+        ...own,
+        extends: inherit,
         test: {
           name: "integration",
           environment: "node",
