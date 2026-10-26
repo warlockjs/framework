@@ -122,8 +122,20 @@ node dist/app.js        # no node_modules, no launcher
 
 It sets `packages: "bundle"` and `splitting: false` **as defaults you can still override** — write `splitting: true` yourself and yours wins.
 
-:::caution[Not literally a single file]
-Native `.node` addons cannot be inlined by any bundler and are still emitted next to `dist/app.js`. If your dependencies include one (`sharp`, for example), ship the folder — "single bundle" means one JavaScript file plus any native addons.
+The output also works for an app that uses `@warlock.js/web`: the server pages and routes are inlined into `dist/app.js`, `React` and the framework packages are bundled, and the browser bundle sits in `dist/client/`. Copy `dist/` anywhere and run `node app.js`; the process finds its `client/` folder next to the bundle, whatever its working directory is. The production server never loads Vite.
+
+**Optional integrations need no `external` list.** The framework reaches S3, database drivers, mail transports, `jiti` and similar packages through `import()` calls that only run when you configure them. In a `singleBundle` build, an optional peer (or optional dependency) that a framework package lists, that your `package.json` does not declare and that is imported lazily stays a lazy runtime import instead of failing the bundle. The build prints the list. A package your app declares is always bundled, and anything your own code imports that cannot be resolved still fails the build.
+
+**Native addons are staged for you.** Packages with a compiled `.node` binary (and napi loaders whose platform package holds one) cannot be inlined. The build keeps them external and copies each into `dist/node_modules/<package>`, with only what it needs to load (its JavaScript, binaries and data files, the dependencies it loads and the platform packages that match the build machine), and names them in the build output. Build on the platform you deploy to. Because `dist/node_modules` sits beside `app.js`, `node dist/app.js` finds them with no `node_modules` anywhere above `dist/`.
+
+Build-time tools that framework code imports but only the build and check commands call (the `oxc-parser` native parser) are left out and replaced by a module that throws if called, and the page scanner and Vite are not part of the bundle, so a typical app stages no native package at all. React's production build is selected: `process.env.NODE_ENV` is settled to `"production"` inside `react`, `react-dom` and `scheduler` only (set `process.env.NODE_ENV` in `build.define` to take over).
+
+When the build finishes it prints the number of files and the total size of `dist/`.
+
+`singleBundle` does not change how the browser bundle is built. For a desktop or offline app, see the [desktop and offline app recipe](../digging-deeper/deployment.md#desktop-and-offline-apps).
+
+:::note[Imports in `warlock.config.ts` ship in the bundle]
+The server bundle imports `warlock.config.ts` to register your connectors, so whatever that file imports is bundled too. Keep imports that only the build needs (Vite plugins, for example) in a module the config loads lazily.
 :::
 
 #### `esmShim` — why a bundled build used to crash at runtime

@@ -254,6 +254,21 @@ the largest module contributors in private build metadata. Configure
 [client performance budgets](/v/latest/core/digging-deeper/build-budgets/)
 describes route overrides, deltas and `npx warlock build --json`.
 
+## Client bundle files
+
+By default the client bundle has one lazy chunk per page plus shared chunks, a `vendor-react` chunk, and a `.br` and `.gz` copy of every asset. Two connector build options change that:
+
+```ts title="warlock.config.ts"
+webConnector({ build: { chunks: "merged", precompress: false } });
+```
+
+| Option        | Values                            | Default   | Effect                                                                                                                                                                                                  |
+| ------------- | --------------------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `chunks`      | `"split"`, `"merged"`, `"single"` | `"split"` | `"merged"` packs the small shared chunks together by size and keeps each page lazy. `"single"` builds one JavaScript entry and one stylesheet with dynamic imports inlined; it needs a single-site app. |
+| `precompress` | `boolean`                         | `true`    | `false` skips the `.br` and `.gz` copies. Turn it off when the files are served from local disk.                                                                                                        |
+
+Every mode keeps the final-bytes file names, the merge of byte-identical chunks, the integrity check, the preload lists and the payload budgets. `build.singleBundle` in the core config builds the server as one file and does not change these options. For a desktop or offline app set both; see the [desktop and offline app recipe](/v/latest/core/digging-deeper/deployment/#desktop-and-offline-apps).
+
 ## Client file names and the integrity check
 
 Every file under `client/assets` is served with a one-year immutable cache, so a

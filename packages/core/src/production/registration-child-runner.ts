@@ -192,6 +192,20 @@ function defaultForkProcess(entry: string, options: { cwd: string }): Registrati
     windowsHide: true,
   };
 
+  // A source checkout: the CLI bin boots the TypeScript child through its loader.
+  if (path.basename(entry) === "warlock.js") {
+    forkOptions.env = {
+      ...process.env,
+      WARLOCK_SOURCE_ENTRY: path.join(
+        path.dirname(entry),
+        "..",
+        "src",
+        "production",
+        "route-registration-child.ts",
+      ),
+    };
+  }
+
   return fork(entry, [], forkOptions);
 }
 
@@ -209,6 +223,14 @@ function resolveCompiledChildEntry(): string {
 
           if (existsSync(child)) {
             return child;
+          }
+
+          // Not built (a source checkout): run the TypeScript child through the CLI bin's loader.
+          const bin = path.join(directory, "bin", "warlock.js");
+          const source = path.join(directory, "src", "production", "route-registration-child.ts");
+
+          if (existsSync(bin) && existsSync(source)) {
+            return bin;
           }
 
           throw new Error(

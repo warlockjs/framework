@@ -40,6 +40,14 @@ import { bundleFrameworkDependencies } from "./bundle-framework-dependencies";
 import { dedupe, runEmitContributions, runGenerateContributions } from "./build-contributions";
 import { writeDistBuildManifestAsync } from "./dist-build-manifest";
 import { nativeNodeModulesPlugin } from "./esbuild-plugins";
+import { reactProductionEnv } from "./react-production-env";
+import { stageNativePackages } from "./native-addons";
+import {
+  createSingleBundleReport,
+  externalizedButBundled,
+  singleBundleResolve,
+} from "./single-bundle-resolve";
+import { formatDistSummary, summarizeDist } from "./dist-summary";
 import { assertEsbuildBinaryIsLinked } from "./esbuild-preflight";
 import { collectRouteRegistrationSnapshot } from "./route-registration-snapshot";
 import { clearOwnedRouteTypes } from "../dev-server/route-types-publisher";
@@ -274,6 +282,7 @@ export class ProductionBuilder {
     await removeDirectoryAsync(this.productionDir);
 
     console.log(colors.green("Build complete!"));
+    console.log(formatDistSummary(await summarizeDist(finalOutDir)));
     console.log(`Start production server by running ${colors.cyan("warlock start")}`);
   }
 
@@ -854,8 +863,15 @@ bootstrap();
     const userExternal: string[] | undefined = esbuildOptions.external;
     const userLoader: ConnectorEsbuildPatch["loader"] = esbuildOptions.loader;
 
-    const define =
-      contributedDefine || userDefine ? { ...contributedDefine, ...userDefine } : undefined;
+    // `__WARLOCK_PRODUCTION_BUNDLE__` marks the bundle as the production server's,
+    // so framework branches that only the development server or the build can
+    // reach (guarded by this global) are removed along with the modules they
+    // import. It sits first: a contributor or the user can still override it.
+    const define = {
+      "globalThis.__WARLOCK_PRODUCTION_BUNDLE__": "true",
+      ...contributedDefine,
+      ...userDefine,
+    };
 
     const loader =
       contributedLoader || userLoader ? { ...contributedLoader, ...userLoader } : undefined;
@@ -875,8 +891,10 @@ bootstrap();
       );
     }
 
-    try {
-      await esbuild.build({
+    let singleBundleReport = createSingleBundleReport();
+
+    const runBuild = (neverExternal: ReadonlySet<string>) =>
+      esbuild.build({
         platform: "node",
         entryPoints: [entryPoint],
         bundle: true,
@@ -914,6 +932,18 @@ bootstrap();
           ...(perEdgeExternals
             ? [bundleFrameworkDependencies({ appRoot: rootPath(), aliasKeys: Object.keys(alias) })]
             : []),
+          // React's production build, unless the app defines NODE_ENV itself.
+          ...(singleBundle && !userDefine?.["process.env.NODE_ENV"] ? [reactProductionEnv()] : []),
+          ...(singleBundle
+            ? [
+                singleBundleResolve({
+                  appRoot: rootPath(),
+                  aliasKeys: Object.keys(alias),
+                  report: singleBundleReport,
+                  neverExternal,
+                }),
+              ]
+            : []),
           // Contributor plugins run last: they load their own file types and
           // must not shadow the resolvers above.
           ...(contributedPlugins ?? []),
@@ -931,7 +961,7 @@ bootstrap();
         // AFTER the spread for the same reason `banner` is: a spread replaces
         // these objects instead of merging them, so the merged values are
         // re-applied here. The user still wins — they were merged in last.
-        ...(define ? { define } : {}),
+        define,
         ...(external ? { external } : {}),
         ...(loader ? { loader } : {}),
         // AFTER the spread, and intentionally so: `banner` is an object, and
@@ -940,10 +970,81 @@ bootstrap();
         // the shim; left to the spread, the shim would delete theirs. The
         // merge is the only form that keeps both.
         ...(banner ? { banner } : {}),
+        ...(singleBundle ? { metafile: true } : {}),
       });
+
+    try {
+      let result = await runBuild(new Set());
+
+      if (singleBundle && result?.metafile) {
+        // A package left external at one import and bundled at another would
+        // fail at startup at the first. Build again with those bundled.
+        const conflicts = externalizedButBundled(singleBundleReport, result.metafile.inputs);
+
+        if (conflicts.length > 0) {
+          singleBundleReport = createSingleBundleReport();
+          result = await runBuild(new Set(conflicts));
+        }
+      }
     } catch (e) {
       console.log(e);
       throw e;
+    }
+
+    if (singleBundle) {
+      await this.reportSingleBundle(writeOutDir, singleBundleReport);
+    }
+  }
+
+  /**
+   * Copy the native packages a single-bundle build left external into
+   * `<outdir>/node_modules`, and say what was left out of the bundle.
+   */
+  private async reportSingleBundle(
+    writeOutDir: string,
+    report: ReturnType<typeof createSingleBundleReport>,
+  ): Promise<void> {
+    if (report.native.size > 0) {
+      const { staged, missing } = await stageNativePackages(writeOutDir, [
+        ...report.native.values(),
+      ]);
+
+      for (const name of report.native.keys()) {
+        console.log(
+          colors.cyan(`   Native addon: ${name} -> ${this.options.outdir}/node_modules/${name}`),
+        );
+      }
+
+      const loaded = staged.filter((name) => !report.native.has(name));
+
+      if (loaded.length > 0) {
+        console.log(colors.gray(`   Also copied for it: ${loaded.join(", ")}`));
+      }
+
+      if (missing.length > 0) {
+        console.warn(
+          colors.yellow(
+            `   Native addon dependencies not found on disk, not copied: ${missing.join(", ")}`,
+          ),
+        );
+      }
+    }
+
+    if (report.buildTimeOnly.size > 0) {
+      console.log(
+        colors.gray(
+          `   Build-time tools left out of the bundle: ${[...report.buildTimeOnly].sort().join(", ")}`,
+        ),
+      );
+    }
+
+    if (report.optional.size > 0) {
+      console.log(
+        colors.gray(
+          "   Optional integrations left as lazy runtime imports (not installed by the app): " +
+            [...report.optional.keys()].sort().join(", "),
+        ),
+      );
     }
   }
 

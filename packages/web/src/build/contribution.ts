@@ -22,6 +22,7 @@ import type {
 } from "@warlock.js/core";
 import type { PluginOption } from "vite";
 import type { SitesConfig } from "../sites/site-config.types";
+import { resolveClientChunkMode } from "../vite/client-chunk-mode";
 import { clientVisibleRouteNames } from "../routing/named-api-routes";
 import { resolvePayloadBudget } from "../server/payload-budget";
 import type { TranslationBuildOptions } from "./translation-manifest";
@@ -80,6 +81,23 @@ export type WebBuildOptions = {
    * build used for different bytes fails the build.
    */
   previousBuild?: string;
+  /**
+   * How the browser bundle is split into files: `"split"` (default: a React vendor chunk,
+   * the entry, and a lazy chunk per page plus shared chunks), `"merged"` (the same lazy page
+   * loading with small shared chunks packed together, far fewer files) or `"single"` (one
+   * JavaScript entry and one stylesheet, dynamic imports inlined; single-site apps only).
+   * Chunk names still follow their final bytes, and the integrity check, preload lists and
+   * payload budgets work in every mode.
+   *
+   * `build.singleBundle` in core's build config does not change this. For a desktop or
+   * offline app, set both.
+   */
+  chunks?: "split" | "merged" | "single";
+  /**
+   * Write a `.br` and a `.gz` copy next to every client asset. Default `true`. Turn it off when
+   * the files are served from local disk and the copies only add files.
+   */
+  precompress?: boolean;
 };
 
 function resolveClientOutDir(context: ConnectorBuildContext): string {
@@ -214,6 +232,15 @@ export function createWebBuildContribution(
 ): ConnectorBuildContribution {
   if (options.clientOutDir !== undefined) {
     throw new ClientOutDirNotSupportedError();
+  }
+
+  // Fail at config time, not after the server bundle is built.
+  resolveClientChunkMode(options.chunks);
+
+  if (options.precompress !== undefined && typeof options.precompress !== "boolean") {
+    throw new TypeError(
+      `Invalid web build option precompress: ${JSON.stringify(options.precompress)}. Use true or false.`,
+    );
   }
 
   let pageCount = 0;
@@ -407,6 +434,7 @@ export function createWebBuildContribution(
           sites,
           fonts,
           previousIntegrity,
+          chunks: options.chunks,
           plugins: [...connectorPlugins, clientBudgetModules(context.appRoot)],
         });
 
@@ -430,8 +458,10 @@ export function createWebBuildContribution(
           translationAssets,
         );
 
-        const { precompressAssets } = await import("./precompress-assets");
-        await precompressAssets(path.join(resolveClientOutDir(context), "assets"));
+        if (options.precompress !== false) {
+          const { precompressAssets } = await import("./precompress-assets");
+          await precompressAssets(path.join(resolveClientOutDir(context), "assets"));
+        }
       }
 
       if (publicFiles.length > 0) {

@@ -11,6 +11,13 @@ All notable changes to `@warlock.js/web` are documented here.
 ### Fixed
 
 - A core-level refusal on a page host answered raw JSON in a browser: `/public/../x` (403, dot-segment guard) and a malformed URL (400). A `GET` or `HEAD` request that names `text/html` in `Accept` now renders the site's `forbidden.page.tsx` for 401 and 403, otherwise `error.page.tsx`, then the framework fallback page, with the refused status. In multi-site mode the site is chosen by host as for any page. API clients and other requests keep the JSON answer.
+- Connector build options `webConnector({ build: { chunks, precompress } })`. `chunks` is `"split"` (the default: a React vendor chunk, the entry, a lazy chunk per page and shared chunks), `"merged"` (the same lazy page loading with small shared chunks packed together by size, far fewer files) or `"single"` (one JavaScript entry and one stylesheet, dynamic imports inlined; single-site apps only). `precompress: false` skips the `.br` and `.gz` copies of every client asset (default `true`). Final-bytes chunk names, dedupe, the integrity check, preload lists and payload budgets work in every mode. `build.singleBundle` in core does not change them; the desktop and offline app recipe sets both.
+- Exports from `@warlock.js/web/vite`: `ClientChunkMode`, `resolveClientChunkMode` and `clientCodeSplitting`; `buildHydrationClient` takes `chunks`.
+
+### Fixed
+
+- A production server built with `singleBundle` carried Vite and the development server inside `app.js`, through the connector's build contribution and its development-server branches. The page scanner and the Babel parser came in the same way, through the development page installer and the `server` barrel the production installer loaded. All of them are left out of the production bundle, and the server never loads Vite.
+- A build copied away from its project could not find its client bundle: the page manifest stored `dist/client` relative to the working directory. When a `client` folder sits next to the running bundle it is used, so `node app.js` works from any working directory in a copy of `dist/`.
 
 ## 5.38.0 - 2026-10-25
 

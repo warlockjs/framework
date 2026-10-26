@@ -104,6 +104,10 @@ npx warlock routes --method GET --path /welcome
 
 The desired result is one page route at `/` and, when the stock JSON route existed, one API route at `/welcome`.
 
+## Fewer client files for a desktop or offline app
+
+`webConnector({ build: { chunks, precompress } })` shapes the browser bundle: `chunks: "split"` (default), `"merged"` (small shared chunks packed together, pages still lazy) or `"single"` (one JavaScript entry and one stylesheet; single-site apps only), and `precompress: false` to skip the `.br` and `.gz` copies. Pair it with `build: { singleBundle: true }` in core's config for a server that runs with `node dist/app.js` and no `node_modules`; `singleBundle` does not change these options. Run the server with the `client/` folder next to `app.js`.
+
 ## Gotchas
 
 - **The collision scan is not codebase-wide.** A root route declared outside `src/app/shared/routes.ts` is not moved. Check `warlock routes` after installation.

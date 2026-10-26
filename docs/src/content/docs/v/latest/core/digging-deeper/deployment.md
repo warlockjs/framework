@@ -405,6 +405,37 @@ Warlock produces a standard Node ESM bundle plus your `node_modules` — anywher
 - [Application](../architecture-concepts/application.md) — the static gateway to `environment`, runtime mode, and the well-known paths.
 - [Configuration](../getting-started/03-configuration.md) — the two config layers and how `.env` values feed `src/config/*`.
 
+## Desktop and offline apps
+
+A desktop shell (a Tauri app with a Node sidecar, for example) ships a Node binary plus the built app, with no `node_modules` and as few files as possible. Set three things:
+
+```ts title="warlock.config.ts"
+import { defineConfig } from "@warlock.js/core";
+import { webConnector } from "@warlock.js/web/connector";
+
+export default defineConfig({
+  build: {
+    singleBundle: true, // dist/app.js with the framework, React and your pages inlined
+  },
+  connectors: [
+    webConnector({
+      build: {
+        chunks: "single", // or "merged" to keep per-page lazy loading
+        precompress: false, // no .br / .gz copies next to local files
+      },
+    }),
+  ],
+});
+```
+
+```bash
+npx warlock build
+```
+
+`singleBundle` does not change the browser bundle, so `chunks` and `precompress` are set on the connector. The build prints the file count and total size of `dist/`. Ship the contents of `dist/`: `app.js`, `client/`, `node_modules/` (only when a native addon was found; the build names each one) and your `.env`. Start it with `node app.js` from any working directory. The server finds `client/` next to `app.js`.
+
+Run the build on the operating system and CPU the app will run on, because native packages are copied for the build machine's platform. See [`singleBundle`](../architecture-concepts/warlock-config.md#singlebundle--one-file-you-can-just-run) and the [web production build](/v/latest/web/guides/01-development-and-production/#client-bundle-files).
+
 ## Client asset budgets
 
 `npx warlock build` reports per-page gzip JavaScript and CSS, including deltas

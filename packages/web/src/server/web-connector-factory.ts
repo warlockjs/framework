@@ -36,6 +36,7 @@ import {
   type ConnectorName,
 } from "@warlock.js/core";
 import { createWebBuildContribution, type WebBuildOptions } from "../build/contribution";
+import type { ProductionBundleGlobal } from "./production-bundle";
 import type { WebConnector, WebConnectorOptions } from "./web-connector";
 
 /**
@@ -93,13 +94,19 @@ export function webConnector(options: WebConnectorFactoryOptions = {}): Connecto
   // construction cannot make dev and `warlock build` observe different lists.
   const connectorPlugins = [...(connectorOptions.plugins ?? [])];
 
-  const build: ConnectorBuildContribution = createWebBuildContribution(
-    {
-      ...buildOptions,
-      webRoot: buildOptions?.webRoot ?? webRoot,
-    },
-    connectorPlugins,
-  );
+  // `warlock build` loads this config in its own process to run the contribution.
+  // The production bundle only boots the connector: it never builds, and the
+  // build toolchain (Vite, Babel, the page scanner) stays out of it.
+  const build: ConnectorBuildContribution = (globalThis as ProductionBundleGlobal)
+    .__WARLOCK_PRODUCTION_BUNDLE__
+    ? {}
+    : createWebBuildContribution(
+        {
+          ...buildOptions,
+          webRoot: buildOptions?.webRoot ?? webRoot,
+        },
+        connectorPlugins,
+      );
 
   let instance: WebConnector | undefined;
 

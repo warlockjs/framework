@@ -1,4 +1,5 @@
 import path from "node:path";
+import type { ProductionBundleGlobal } from "./production-bundle";
 import { resolvePageRouteIdentity } from "../routing/route-identity";
 import type { Router } from "@warlock.js/core";
 import type { ViteDevServer } from "vite";
@@ -59,6 +60,18 @@ export function pageRouteSourceFiles(routes: ReturnType<Router["list"]>): string
 }
 
 /**
+ * The development page installer. Guarded so a production bundle leaves it, the
+ * page scanner and the Babel parser out; see `./production-bundle`.
+ */
+async function loadInstallPageRoutes(): Promise<typeof import("./install-page-routes")> {
+  if (!(globalThis as ProductionBundleGlobal).__WARLOCK_PRODUCTION_BUNDLE__) {
+    return import("./install-page-routes");
+  }
+
+  throw new Error("Page hot reload is not part of a production bundle.");
+}
+
+/**
  * Inspect only in-place page edits. Vite's SSR graph is invalidated explicitly
  * before evaluation because core's file watcher and Vite's watcher have no
  * ordering contract. Component-only edits compare equal and stay in Fast
@@ -76,7 +89,7 @@ export async function pageRoutesNeedReplacement(
 
   if (changes.inspectionNeeded.length === 0) return replace;
 
-  const { filesystemPageFileFor, loadComposedModule } = await import("./install-page-routes");
+  const { filesystemPageFileFor, loadComposedModule } = await loadInstallPageRoutes();
 
   const installedByFile = new Map(
     options.installedPages.map((page) => [pathKey(page.file), page] as const),

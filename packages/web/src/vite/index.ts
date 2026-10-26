@@ -99,6 +99,8 @@ export type BuildWarlockHydrationClientOptions = Readonly<{
   sites?: SitesConfig;
   /** The previous build's name-to-bytes record; see {@link BuildHydrationClientOptions.previousIntegrity}. */
   previousIntegrity?: BuildHydrationClientOptions["previousIntegrity"];
+  /** How the bundle is split into files; see {@link BuildHydrationClientOptions.chunks}. */
+  chunks?: BuildHydrationClientOptions["chunks"];
 }>;
 
 /**
@@ -232,6 +234,7 @@ export async function buildWarlockHydrationClient(
     external: options.external,
     cssModulesRoot: options.appRoot,
     previousIntegrity: options.previousIntegrity,
+    chunks: options.chunks,
     // Build logs list output paths relative to the app, not to the installed
     // `@warlock.js/web` package Vite runs from.
     logRoot: options.appRoot,

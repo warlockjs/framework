@@ -73,7 +73,12 @@ if (existsSync(publishedEntry)) {
  * behaviour: resolution. The sequence below is what makes that possible.
  */
 async function bootFromSource() {
-  const sourceEntry = path.join(binDir, "..", "src", "cli", "start.ts");
+  // A source checkout has no compiled child processes, so the route-registration
+  // runner forks this file with the child's TypeScript entry named here. The
+  // variable is consumed so nothing this process starts inherits it.
+  const sourceEntry =
+    process.env.WARLOCK_SOURCE_ENTRY ?? path.join(binDir, "..", "src", "cli", "start.ts");
+  delete process.env.WARLOCK_SOURCE_ENTRY;
 
   if (!existsSync(sourceEntry)) {
     console.error(

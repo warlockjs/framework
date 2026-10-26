@@ -212,6 +212,7 @@ describe("esbuild merge precedence — defaults < contributor < user config", ()
     );
 
     expect(options.define).toEqual({
+      "globalThis.__WARLOCK_PRODUCTION_BUNDLE__": "true",
       "import.meta.env.DEV": "true",
       "import.meta.env.SSR": "true",
       "process.env.APP": '"user"',
@@ -227,11 +228,22 @@ describe("esbuild merge precedence — defaults < contributor < user config", ()
     expect(options.external).toEqual(["react", "react-dom", "sharp"]);
   });
 
-  it("omits define and external entirely when neither side set them", async () => {
+  it("defines only the production-bundle marker and omits external when neither side set them", async () => {
     const options = await bundleWith({}, {});
 
-    expect(options).not.toHaveProperty("define");
+    expect(options.define).toEqual({ "globalThis.__WARLOCK_PRODUCTION_BUNDLE__": "true" });
     expect(options).not.toHaveProperty("external");
+  });
+
+  it("lets the user config override the production-bundle marker", async () => {
+    const options = await bundleWith(
+      {
+        define: { "globalThis.__WARLOCK_PRODUCTION_BUNDLE__": "false" },
+      } as Partial<ResolvedBuildConfig>,
+      {},
+    );
+
+    expect(options.define).toEqual({ "globalThis.__WARLOCK_PRODUCTION_BUNDLE__": "false" });
   });
 
   it("does not let a contributor reach the framework's own keys", async () => {

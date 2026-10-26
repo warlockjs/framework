@@ -4,11 +4,11 @@ import type { SiteDispatchInstall } from "./site-dispatch";
 
 const installPageRoutesFromManifest = vi.fn((_options: unknown) => []);
 
-vi.mock("./index", () => ({
-  connectSharedStore: vi.fn(),
-  connectPageContext: vi.fn(),
-  installPageRoutesFromManifest,
-}));
+// The installer names these modules directly, not the `./index` barrel, which also
+// re-exports the development installer.
+vi.mock("../shared", () => ({ connectSharedStore: vi.fn() }));
+vi.mock("./execute-page-request", () => ({ connectPageContext: vi.fn() }));
+vi.mock("./install-page-routes-from-manifest", () => ({ installPageRoutesFromManifest }));
 
 afterEach(() => {
   installPageRoutesFromManifest.mockClear();
