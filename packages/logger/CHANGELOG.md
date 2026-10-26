@@ -4,6 +4,16 @@ All notable changes to `@warlock.js/logger` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.39.1
+
+### Added
+
+- `LogChannel.ready`: a promise that resolves once the channel's deferred `init()` has finished. Await it before relying on the channel being set up, for example before removing its storage directory in a test.
+
+### Fixed
+
+- A `FileLog` / `JSONFileLog` disposed before its deferred `init()` ran still created its directory and armed the 5-second flush interval afterwards, which kept the process alive and could fail with `ENOENT` when the directory had been removed. A disposed channel now skips `init()`, including when `dispose()` lands while `init()` is creating the directory.
+
 ## 5.38.0 - 2026-10-25
 
 ### Added

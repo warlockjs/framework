@@ -307,6 +307,8 @@ export class FileLog extends LogChannel<FileLogConfig> implements LogContract {
    * call more than once.
    */
   public dispose(): void {
+    this.isDisposed = true;
+
     if (this.flushIntervalHandle) {
       clearInterval(this.flushIntervalHandle);
       this.flushIntervalHandle = undefined;
@@ -399,6 +401,8 @@ export class FileLog extends LogChannel<FileLogConfig> implements LogContract {
     const logsDirectory = this.storagePath;
 
     await ensureDirectoryAsync(logsDirectory);
+
+    if (this.isDisposed) return;
 
     this.initMessageFlush();
 

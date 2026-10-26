@@ -609,4 +609,31 @@ describe("FileLog", () => {
       expect(filesInStorage).toEqual([`${channel.fileName}.${channel.extension}`]);
     });
   });
+
+  describe("lifecycle", () => {
+    it("resolves ready once the deferred init has created the directory", async () => {
+      const nested = path.join(storagePath, "nested", "logs");
+      const channel = track(new FileLog({ storagePath: nested }));
+
+      await channel.ready;
+
+      expect(fs.existsSync(nested)).toBe(true);
+      expect(
+        (channel as unknown as { flushIntervalHandle?: unknown }).flushIntervalHandle,
+      ).toBeDefined();
+    });
+
+    it("skips init when disposed before it runs, so no flush timer is armed", async () => {
+      const nested = path.join(storagePath, "never-created");
+      const channel = new FileLog({ storagePath: nested });
+
+      channel.dispose();
+      await channel.ready;
+
+      expect(fs.existsSync(nested)).toBe(false);
+      expect(
+        (channel as unknown as { flushIntervalHandle?: unknown }).flushIntervalHandle,
+      ).toBeUndefined();
+    });
+  });
 });

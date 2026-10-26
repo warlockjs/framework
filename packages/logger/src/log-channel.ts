@@ -50,6 +50,20 @@ export abstract class LogChannel<
   protected isInitialized = false;
 
   /**
+   * Set by channels that can be discarded (see `FileLog.dispose()`). A channel
+   * disposed before its deferred `init()` runs skips it, so it never starts
+   * timers or touches storage after it was thrown away.
+   */
+  protected isDisposed = false;
+
+  /**
+   * Resolves once the channel's deferred `init()` has finished, or was skipped
+   * because the channel was disposed first. Await it when you need the channel
+   * fully set up, for example before removing its storage in a test.
+   */
+  public readonly ready: Promise<void>;
+
+  /**
    * Where {@link reportError} sends failures; set by the logger the channel
    * is added to.
    */
@@ -63,13 +77,19 @@ export abstract class LogChannel<
       this.setConfigurations(configurations);
     }
 
-    setTimeout(async () => {
-      if (this.init) {
-        await this.init();
-      }
+    this.ready = new Promise<void>((resolve) => {
+      setTimeout(async () => {
+        try {
+          if (this.init && !this.isDisposed) {
+            await this.init();
+          }
 
-      this.isInitialized = true;
-    }, 0);
+          this.isInitialized = true;
+        } finally {
+          resolve();
+        }
+      }, 0);
+    });
   }
 
   /**

@@ -28,6 +28,7 @@ abstract class LogChannel<Options extends BasicLogConfigurations = BasicLogConfi
 | `flush`            | `(): void \| Promise<void>` _(optional)_              | Implement for an async drain when the channel buffers and delivers over async I/O (network, async disk). Awaited by `log.flush()` on shutdown.                             |
 | `getRedactConfig`  | `(): RedactConfig \| undefined`                       | Returns the channel's `redact` config (additive on top of the logger-wide floor). Subclasses normally don't override — set `redact` in the channel options instead.        |
 | `setErrorReporter` | `(reporter: ChannelErrorReporter \| undefined): void` | Where `reportError()` sends failures. `Logger` sets it when the channel is added (`addChannel`, `setChannels`, `configure({ channels })`), forwarding to `onChannelError`. |
+| `ready`            | `Promise<void>`                                       | Resolves once the deferred `init()` has finished, or was skipped because the channel was disposed first.                                                                   |
 
 ## Protected members (for subclasses)
 
@@ -37,6 +38,7 @@ abstract class LogChannel<Options extends BasicLogConfigurations = BasicLogConfi
 | `defaultConfigurations`   | `Options`                                       | Override to provide option defaults (merged under user-supplied config).                                                                                                    |
 | `channelConfigurations`   | `Options`                                       | The user-supplied config (merged over defaults).                                                                                                                            |
 | `isInitialized`           | `boolean`                                       | `true` once `init()` has resolved.                                                                                                                                          |
+| `isDisposed`              | `boolean`                                       | Set it in your `dispose()`; a channel disposed before its deferred `init()` runs skips `init()`. `FileLog.dispose()` sets it.                                               |
 | `config`                  | `<K extends keyof Options>(key: K): Options[K]` | Type-safe accessor — returns the channel config value, falling back to the default.                                                                                         |
 | `setConfigurations`       | `(configurations: Options): this`               | Merge more options into the channel config.                                                                                                                                 |
 | `shouldBeLogged`          | `(data: LoggingData): boolean`                  | `false` if `data.type` isn't in `levels`, or if the `filter` predicate returns `false`. Call it at the top of your `log()`.                                                 |
@@ -46,7 +48,7 @@ abstract class LogChannel<Options extends BasicLogConfigurations = BasicLogConfi
 
 ## Initialization timing
 
-The constructor schedules `init()` via `setTimeout(0)` and flips `isInitialized` to `true` once it resolves. Entries logged in the first tick — before `init()` completes — can reach `log()` before async setup finishes. Guard against half-initialized resources in your `log()`, or buffer until ready. See [Custom Channel](../channels/05-custom/).
+The constructor schedules `init()` via `setTimeout(0)` and flips `isInitialized` to `true` once it resolves. Entries logged in the first tick — before `init()` completes — can reach `log()` before async setup finishes. Guard against half-initialized resources in your `log()`, or buffer until ready. Code that needs the channel fully set up can `await channel.ready`. See [Custom Channel](../channels/05-custom/).
 
 ## See also
 

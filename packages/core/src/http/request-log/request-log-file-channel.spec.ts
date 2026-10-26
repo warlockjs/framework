@@ -75,9 +75,6 @@ describe("selectRequestLogFilesToPrune", () => {
   });
 });
 
-/** Let the channel's deferred init (directory, flush timer, first prune) finish. */
-const settle = () => new Promise((resolve) => setTimeout(resolve, 50));
-
 describe("RequestLogFileChannel", () => {
   function directory(): string {
     const created = fs.mkdtempSync(path.join(os.tmpdir(), "request-log-"));
@@ -94,7 +91,7 @@ describe("RequestLogFileChannel", () => {
       retention: { maxDays: 14, maxSizeMb: 256 },
     });
 
-    await settle();
+    await channel.ready;
 
     channel.log({
       type: "info",
@@ -138,7 +135,7 @@ describe("RequestLogFileChannel", () => {
       retention: { maxDays: 7, maxSizeMb: 256 },
     });
 
-    await settle();
+    await channel.ready;
     await channel.prune();
     channel.dispose();
 
