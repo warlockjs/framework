@@ -181,8 +181,14 @@ export function singleBundleResolve(options: {
           const lazy = LAZY_KINDS.has(args.kind);
 
           // A module-level import of a tool whose exports are known gets a stub
-          // that throws when called, whoever imports it.
-          if (!lazy && name === specifier && name in BUILD_TIME_ONLY_PACKAGES) {
+          // that throws when called, whoever imports it, unless the app declares
+          // it: then it follows the same rule as the other build-time tools.
+          if (
+            !lazy &&
+            name === specifier &&
+            name in BUILD_TIME_ONLY_PACKAGES &&
+            !appDeclares(appManifest, name)
+          ) {
             report.buildTimeOnly.add(name);
 
             return { path: name, namespace: BUILD_TIME_ONLY_NAMESPACE };

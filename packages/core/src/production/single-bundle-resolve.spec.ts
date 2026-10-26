@@ -301,6 +301,49 @@ describe("build-time tools", () => {
     rmSync(app, { recursive: true, force: true });
   });
 
+  it("bundles oxc-parser for a third-party importer when the app declares it", async () => {
+    for (const group of ["dependencies", "optionalDependencies", "peerDependencies"]) {
+      const app = mkdtempSync(path.join(tmpdir(), "warlock-single-bundle-app-"));
+      const put = (relative: string, content: string) => {
+        mkdirSync(path.dirname(path.join(app, relative)), { recursive: true });
+        writeFileSync(path.join(app, relative), content);
+      };
+      const installed = (name: string, files: Record<string, string>) => {
+        put(
+          `node_modules/${name}/package.json`,
+          JSON.stringify({ name, version: "1.0.0", main: "index.js" }),
+        );
+        for (const [file, content] of Object.entries(files))
+          put(`node_modules/${name}/${file}`, content);
+      };
+
+      put(
+        "package.json",
+        JSON.stringify({
+          name: "app",
+          dependencies: { scanner: "1.0.0" },
+          [group]: { scanner: "1.0.0", "oxc-parser": "1.0.0" },
+        }),
+      );
+      installed("oxc-parser", { "index.js": "export const parseSync = () => 'REAL_PARSER';\n" });
+      installed("scanner", {
+        "index.js":
+          "import { parseSync } from 'oxc-parser'; export const scan = () => parseSync();\n",
+      });
+      put("src/main.js", "import { scan } from 'scanner'; console.log(scan());\n");
+
+      const { report, text, error } = await bundle("src/main.js", app);
+
+      expect(error, group).toBeUndefined();
+      expect(text, group).toContain("REAL_PARSER");
+      expect(text, group).not.toContain(
+        "is a build-time tool and is not part of a production bundle",
+      );
+      expect(report.buildTimeOnly.has("oxc-parser"), group).toBe(false);
+      rmSync(app, { recursive: true, force: true });
+    }
+  });
+
   it("knows the tools by name and by scope", () => {
     for (const name of [
       "vite",
