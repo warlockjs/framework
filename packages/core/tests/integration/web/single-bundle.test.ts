@@ -21,11 +21,9 @@ import { workspace } from "./two-site-app";
  * copies `dist/` to a folder with no `node_modules` anywhere above it and boots
  * `node app.js` from there.
  *
- * `warlock build` from a source checkout needs core's compiled
- * route-registration child (`esm/production/route-registration-child.mjs`),
- * which only exists after a package build, so the test skips without it.
+ * `warlock build` from a source checkout runs the route-registration child from its
+ * TypeScript source through the CLI loader, so the test needs no package build.
  */
-const child = join(workspace, "packages/core/esm/production/route-registration-child.mjs");
 const warlock = join(workspace, "packages/core/bin/warlock.js");
 
 const directories: string[] = [];
@@ -118,7 +116,7 @@ async function waitFor(url: string, timeoutMs: number): Promise<void> {
   }
 }
 
-describe.skipIf(!existsSync(child))("singleBundle with the web connector", () => {
+describe("singleBundle with the web connector", () => {
   it("builds one server file plus client/, and boots from a copy with no node_modules", async () => {
     const app = await temporary("warlock-single-bundle-app-");
 
@@ -151,10 +149,11 @@ describe.skipIf(!existsSync(child))("singleBundle with the web connector", () =>
     expect(bundle).not.toMatch(/node_modules\/\.pnpm\/vite@/);
     expect(bundle).not.toMatch(/from "vite"/);
 
-    // Only native packages may sit in dist/node_modules.
-    for (const file of files.filter((file) => file.startsWith("node_modules/"))) {
-      expect(file).toMatch(/^node_modules\/(oxc-parser|@oxc-parser|@oxc-project)\//);
-    }
+    // The page scanner and the Babel parser are build-time work, React is its production
+    // build, and the app uses no native package, so nothing is staged.
+    expect(bundle).not.toMatch(/@babel[+/]parser/);
+    expect(bundle).not.toMatch(/react-dom-client\.development/);
+    expect(files.filter((file) => file.startsWith("node_modules/"))).toEqual([]);
 
     const standalone = await temporary("warlock-standalone-");
 

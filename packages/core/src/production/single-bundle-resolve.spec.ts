@@ -90,11 +90,33 @@ beforeAll(() => {
     "package.json",
     JSON.stringify({
       name: "app",
-      dependencies: { framework: "1.0.0", "plain-dep": "1.0.0", "uses-native": "1.0.0" },
+      dependencies: {
+        framework: "1.0.0",
+        "plain-dep": "1.0.0",
+        "uses-native": "1.0.0",
+        scanner: "1.0.0",
+      },
     }),
   );
   write("src/lazy.js", 'import { load } from "framework"; load();\n');
   write("src/native.js", 'import n from "uses-native"; console.log(n);\n');
+  pkg(
+    "oxc-parser",
+    { main: "index.js" },
+    {
+      "index.js": "export const parseSync = () => 'REAL_PARSER'; export const visitorKeys = {};\n",
+      "x.node": "bin",
+    },
+  );
+  pkg(
+    "scanner",
+    { main: "index.js" },
+    {
+      "index.js":
+        'import { parseSync } from "oxc-parser"; export const scan = () => parseSync();\n',
+    },
+  );
+  write("src/uses-scanner.js", 'import { scan } from "scanner"; console.log(typeof scan);\n');
   write("src/missing.js", 'import "not-installed-anywhere";\n');
   write("src/missing-lazy.js", 'await import("not-installed-anywhere");\n');
 });
@@ -129,6 +151,17 @@ describe("singleBundleResolve", () => {
       path.join(root, "node_modules", "native-core"),
     );
     expect(text).toMatch(/from "native-core"/);
+  });
+
+  it("replaces a build-time tool imported by a dependency with a module that throws, and stages nothing", async () => {
+    const { report, text, error } = await bundle("src/uses-scanner.js");
+
+    expect(error).toBeUndefined();
+    expect([...report.buildTimeOnly]).toEqual(["oxc-parser"]);
+    expect(report.native.size).toBe(0);
+    expect(text).not.toContain("REAL_PARSER");
+    expect(text).toContain("is a build-time tool and is not part of a production bundle");
+    expect(text).not.toMatch(/from "oxc-parser"/);
   });
 
   it("still fails for anything the app itself imports and cannot resolve", async () => {

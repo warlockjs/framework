@@ -14,6 +14,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Optional integrations need no hand-written `external` list. In a `singleBundle` build, a lazy `import()` or `require()` of an optional peer (or optional dependency) that a framework package lists and the app does not declare stays a lazy runtime import that never runs, and the build report names it. An import the app itself makes, or a package the app declares, is still bundled or fails the build.
 - Native addons are handled automatically in a `singleBundle` build. A package with a `.node` binary (or a napi loader whose platform package holds one) stays external and is copied into `dist/node_modules/<package>` with only what it needs to load: its JavaScript, binaries and data files, the dependencies it loads and the platform packages that match this machine. The build report names each one.
 - `warlock build` prints the number of files and the total size of `dist/` when it finishes.
+- A `singleBundle` build settles `process.env.NODE_ENV` to `"production"` inside `react`, `react-dom` and `scheduler` only, so React's development build is dropped from the bundle. A `process.env.NODE_ENV` entry in `build.define` turns this off. Other reads of `NODE_ENV` are untouched.
+- In a `singleBundle` build the native parser `oxc-parser`, imported by framework code that only the build, check and scan commands call, is replaced by a module that throws if it is ever called. The build names it, and `dist/node_modules` is created only for native packages the app itself uses.
 
 ### Changed
 
@@ -21,6 +23,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- `warlock build` in a source checkout runs the route-registration child from its TypeScript source through the CLI loader when the compiled child is absent, instead of failing.
 - A `singleBundle` build failed on `react-dom/server.node`: the native-addon plugin took any import specifier ending in `.node` for a compiled addon. It now treats only a path that resolves to a real `.node` file as one.
 
 ## 5.38.0 - 2026-10-25

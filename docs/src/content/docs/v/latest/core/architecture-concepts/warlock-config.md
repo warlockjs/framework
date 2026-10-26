@@ -128,6 +128,8 @@ The output also works for an app that uses `@warlock.js/web`: the server pages a
 
 **Native addons are staged for you.** Packages with a compiled `.node` binary (and napi loaders whose platform package holds one) cannot be inlined. The build keeps them external and copies each into `dist/node_modules/<package>`, with only what it needs to load (its JavaScript, binaries and data files, the dependencies it loads and the platform packages that match the build machine), and names them in the build output. Build on the platform you deploy to. Because `dist/node_modules` sits beside `app.js`, `node dist/app.js` finds them with no `node_modules` anywhere above `dist/`.
 
+Build-time tools that framework code imports but only the build and check commands call (the `oxc-parser` native parser) are left out and replaced by a module that throws if called, and the page scanner and Vite are not part of the bundle, so a typical app stages no native package at all. React's production build is selected: `process.env.NODE_ENV` is settled to `"production"` inside `react`, `react-dom` and `scheduler` only (set `process.env.NODE_ENV` in `build.define` to take over).
+
 When the build finishes it prints the number of files and the total size of `dist/`.
 
 `singleBundle` does not change how the browser bundle is built. For a desktop or offline app, see the [desktop and offline app recipe](../digging-deeper/deployment.md#desktop-and-offline-apps).

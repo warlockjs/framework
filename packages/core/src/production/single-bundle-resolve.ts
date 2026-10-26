@@ -17,10 +17,33 @@ export type SingleBundleReport = {
   native: Map<string, NativePackage>;
   /** Optional integrations the app does not install, left as lazy runtime imports */
   optional: Map<string, { importedBy: string }>;
+  /** Build-time tools replaced by a module that throws when called */
+  buildTimeOnly: Set<string>;
 };
 
 export function createSingleBundleReport(): SingleBundleReport {
-  return { native: new Map(), optional: new Map() };
+  return { native: new Map(), optional: new Map(), buildTimeOnly: new Set() };
+}
+
+/**
+ * Build-time tools the framework imports at module level while only its build,
+ * check and scan commands call them, with the value exports it uses. A
+ * production server never runs them, and bundling a native parser would force a
+ * `node_modules` folder beside `app.js` for code that is never executed. When
+ * framework code (not the app) imports one, the bundle gets a module whose
+ * exports throw a clear error if anything ever calls them.
+ */
+export const BUILD_TIME_ONLY_PACKAGES: Readonly<Record<string, readonly string[]>> = {
+  "oxc-parser": ["parseSync", "visitorKeys"],
+};
+
+const BUILD_TIME_ONLY_NAMESPACE = "warlock-build-time-only";
+
+function buildTimeOnlyModule(name: string, exports: readonly string[]): string {
+  return [
+    `const fail = () => { throw new Error(${JSON.stringify(`${name} is a build-time tool and is not part of a production bundle.`)}); };`,
+    ...exports.map((exported) => `export const ${exported} = new Proxy(fail, { get: fail });`),
+  ].join("\n");
 }
 
 /** Import kinds that run lazily or inside a guard, never at module evaluation. */
@@ -88,6 +111,11 @@ export function singleBundleResolve(options: {
   return {
     name: "warlock:single-bundle-resolve",
     setup(build) {
+      build.onLoad({ filter: /.*/, namespace: BUILD_TIME_ONLY_NAMESPACE }, (args) => ({
+        contents: buildTimeOnlyModule(args.path, BUILD_TIME_ONLY_PACKAGES[args.path] ?? []),
+        loader: "js",
+      }));
+
       build.onResolve({ filter: /.*/ }, async (args) => {
         if (args.pluginData?.warlockSingleBundle) return undefined;
         if (args.namespace !== "file" && args.namespace !== "") return undefined;
@@ -99,6 +127,19 @@ export function singleBundleResolve(options: {
 
         const name = packageNameOfSpecifier(specifier);
         const importer = args.importer;
+
+        if (
+          name === specifier &&
+          name in BUILD_TIME_ONLY_PACKAGES &&
+          importer &&
+          path.isAbsolute(importer) &&
+          !isAppOwned(importer) &&
+          !appDeclares(appManifest, name)
+        ) {
+          report.buildTimeOnly.add(name);
+
+          return { path: name, namespace: BUILD_TIME_ONLY_NAMESPACE };
+        }
 
         if (importer && path.isAbsolute(importer) && !isAppOwned(importer)) {
           const ownerDirectory = findPackageDirectory(importer);

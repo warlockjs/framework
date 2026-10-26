@@ -40,6 +40,7 @@ import { bundleFrameworkDependencies } from "./bundle-framework-dependencies";
 import { dedupe, runEmitContributions, runGenerateContributions } from "./build-contributions";
 import { writeDistBuildManifestAsync } from "./dist-build-manifest";
 import { nativeNodeModulesPlugin } from "./esbuild-plugins";
+import { reactProductionEnv } from "./react-production-env";
 import { stageNativePackages } from "./native-addons";
 import {
   createSingleBundleReport,
@@ -931,6 +932,8 @@ bootstrap();
           ...(perEdgeExternals
             ? [bundleFrameworkDependencies({ appRoot: rootPath(), aliasKeys: Object.keys(alias) })]
             : []),
+          // React's production build, unless the app defines NODE_ENV itself.
+          ...(singleBundle && !userDefine?.["process.env.NODE_ENV"] ? [reactProductionEnv()] : []),
           ...(singleBundle
             ? [
                 singleBundleResolve({
@@ -1025,6 +1028,14 @@ bootstrap();
           ),
         );
       }
+    }
+
+    if (report.buildTimeOnly.size > 0) {
+      console.log(
+        colors.gray(
+          `   Build-time tools left out of the bundle: ${[...report.buildTimeOnly].sort().join(", ")}`,
+        ),
+      );
     }
 
     if (report.optional.size > 0) {
