@@ -97,19 +97,24 @@ const MIGRATION_LOCK_TTL_MS = 10 * 60 * 1000;
 const MIGRATION_LOCK_WAIT_MS = 60 * 1000;
 const MIGRATION_LOCK_RETRY_MS = 1000;
 
-/** Default bound for one migration (or one transactional batch of them): 10 minutes. */
-export const DEFAULT_MIGRATION_TIMEOUT_MS = 10 * 60 * 1000;
+/** First "still running" notice for a long migration, then one per interval. */
+const HEARTBEAT_FIRST_MS = 30 * 1000;
+const HEARTBEAT_EVERY_MS = 60 * 1000;
 
-/** Environment override for the per-migration bound, in milliseconds. `0` disables it. */
+/**
+ * Environment variable that opts into a hard per-migration bound, in
+ * milliseconds. Unset (the default) or `0` means no bound: a long index build
+ * on a large collection is legitimate, and aborting it half-way is worse.
+ */
 const MIGRATION_TIMEOUT_ENV = "WARLOCK_MIGRATION_TIMEOUT_MS";
 
 function defaultMigrationTimeoutMs(): number {
   const raw = process.env[MIGRATION_TIMEOUT_ENV];
-  if (raw === undefined || raw.trim() === "") return DEFAULT_MIGRATION_TIMEOUT_MS;
+  if (raw === undefined || raw.trim() === "") return 0;
 
   const parsed = Number(raw);
 
-  return Number.isFinite(parsed) && parsed >= 0 ? parsed : DEFAULT_MIGRATION_TIMEOUT_MS;
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
 }
 
 /** Held lock for one data source. `refresh` extends the TTL; `release` frees it. */
@@ -195,13 +200,40 @@ export class MigrationRunner {
   /** Whether to log operations */
   private readonly verbose: boolean;
 
-  /** Bound for one migration, in milliseconds (`0` = unbounded). */
+  /** Opt-in hard bound for one migration, in milliseconds (`0` = none). */
   private stepTimeoutMs: number;
 
+  private readonly heartbeat: { first: number; every: number };
+
   /**
-   * Bound every migration (and every transactional batch) to `ms` milliseconds.
-   * A migration that does not finish fails with a message naming it, instead of
-   * hanging the process. `0` removes the bound.
+   * Warn while `label` keeps running: at the first interval, then repeatedly.
+   * Returns a function that stops the notices.
+   */
+  private startHeartbeat(label: string, progress: { step: number; total: number }): () => void {
+    const startedAt = Date.now();
+    let timer: NodeJS.Timeout | undefined;
+
+    const tick = () => {
+      const seconds = Math.round((Date.now() - startedAt) / 1000);
+      const step = progress.total > 0 ? `, step ${progress.step} of ${progress.total}` : "";
+
+      log.warn("database", "migration", `still running ${label}${step}, ${seconds}s elapsed`);
+      timer = setTimeout(tick, this.heartbeat.every);
+      timer.unref?.();
+    };
+
+    timer = setTimeout(tick, this.heartbeat.first);
+    timer.unref?.();
+
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
+  }
+
+  /**
+   * Opt in to a hard bound: abort any migration (or transactional batch) that
+   * runs longer than `ms` milliseconds, with a message naming it. Off by default
+   * (`0`), because aborting a long but healthy index build leaves it half-applied.
    */
   public setStepTimeout(ms: number): this {
     this.stepTimeoutMs = ms;
@@ -224,11 +256,17 @@ export class MigrationRunner {
       dataSource?: DataSource;
       migrationsTable?: string;
       verbose?: boolean;
-      /** Bound for one migration, in milliseconds. `0` disables it. */
+      /** Opt-in hard bound for one migration, in milliseconds. `0` (default) means none. */
       stepTimeoutMs?: number;
+      /** Delay before the first "still running" notice and between later ones. */
+      heartbeatMs?: { first: number; every: number };
     } = {},
   ) {
     this.stepTimeoutMs = options.stepTimeoutMs ?? defaultMigrationTimeoutMs();
+    this.heartbeat = options.heartbeatMs ?? {
+      first: HEARTBEAT_FIRST_MS,
+      every: HEARTBEAT_EVERY_MS,
+    };
     this.dataSource = options.dataSource;
     this.migrationsTable = options.migrationsTable ?? "_migrations";
     this.verbose = options.verbose ?? true;
@@ -811,9 +849,15 @@ export class MigrationRunner {
         const execution =
           first.transactional && driver.transaction ? driver.transaction(executeRun) : executeRun();
 
-        await withTimeout(execution, this.stepTimeoutMs, () =>
-          this.timeoutMessage(batchNames, "up"),
-        );
+        const stopHeartbeat = this.startHeartbeat(`"${batchNames}"`, { step: 0, total: 0 });
+
+        try {
+          await withTimeout(execution, this.stepTimeoutMs, () =>
+            this.timeoutMessage(batchNames, "up"),
+          );
+        } finally {
+          stopHeartbeat();
+        }
       } catch (err) {
         failed = true;
         errorMessage = err instanceof Error ? err.message : String(err);
@@ -1233,15 +1277,19 @@ export class MigrationRunner {
     options: { dryRun?: boolean; record?: boolean; batch?: number } = {},
   ): Promise<MigrationResult> {
     const name = MigrationClass.migrationName;
+    const progress = { step: 0, total: 0 };
+    const stopHeartbeat = this.startHeartbeat(`"${name}"`, progress);
 
     try {
       return await withTimeout(
-        this.runMigrationUnbounded(MigrationClass, direction, options),
+        this.runMigrationUnbounded(MigrationClass, direction, options, progress),
         this.stepTimeoutMs,
         () => this.timeoutMessage(name, direction),
       );
     } catch (error) {
       throw this.explainFailure(name, direction, error);
+    } finally {
+      stopHeartbeat();
     }
   }
 
@@ -1250,7 +1298,7 @@ export class MigrationRunner {
 
     return (
       `Migration "${names}" (${direction}) did not finish within ${seconds}s. ` +
-      `Raise the bound with --timeout <seconds> or ${MIGRATION_TIMEOUT_ENV}, or set 0 to disable it.`
+      `The bound was set with --timeout or ${MIGRATION_TIMEOUT_ENV}; raise it, or remove it to let migrations run as long as they need.`
     );
   }
 
@@ -1291,6 +1339,7 @@ export class MigrationRunner {
       record?: boolean;
       batch?: number;
     } = {},
+    progress: { step: number; total: number } = { step: 0, total: 0 },
   ): Promise<MigrationResult> {
     const { dryRun = false, record = true } = options;
     const startTime = Date.now();
@@ -1356,6 +1405,10 @@ export class MigrationRunner {
 
         const applyMigration = async (): Promise<void> => {
           if (directExecution) {
+            migration.onStep = (step, total) => {
+              progress.step = step;
+              progress.total = total;
+            };
             await migration.execute();
             return;
           }

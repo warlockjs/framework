@@ -181,9 +181,7 @@ async function runMigrateAction(options: CommandActionData) {
     const seconds = Number(timeout);
 
     if (!Number.isFinite(seconds) || seconds < 0) {
-      throw new Error(
-        `--timeout expects a number of seconds (0 disables the bound), got "${timeout}"`,
-      );
+      throw new Error(`--timeout expects a number of seconds (0 means no limit), got "${timeout}"`);
     }
 
     migrationRunner.setStepTimeout(seconds * 1000);

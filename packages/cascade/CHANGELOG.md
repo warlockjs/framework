@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
-- `MigrationRunner` bounds each migration: `stepTimeoutMs` option, `setStepTimeout(ms)` / `getStepTimeout()` and the `WARLOCK_MIGRATION_TIMEOUT_MS` environment variable (default 10 minutes, `0` disables). A migration or transactional batch that does not finish fails with a message naming it. `MigrationRunner.releaseActiveLocks()` releases the migration lock of a run that is being interrupted. New exports `StepTimeoutError` and `withTimeout`.
+- `MigrationRunner` warns while a migration runs long (`still running "<name>", step N of M, <n>s elapsed`, at 30 s and then every 60 s) and never aborts one by default. A hard limit is opt-in: `stepTimeoutMs` option, `setStepTimeout(ms)` / `getStepTimeout()` or the `WARLOCK_MIGRATION_TIMEOUT_MS` environment variable. A migration or transactional batch that exceeds it fails with a message naming it. `MigrationRunner.releaseActiveLocks()` releases the migration lock of a run that is being interrupted. New exports `StepTimeoutError` and `withTimeout`.
 
 ### Fixed
 

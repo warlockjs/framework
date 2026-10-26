@@ -1,3 +1,4 @@
+import { log } from "@warlock.js/logger";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { MigrationRunner } from "../../../src/migration/migration-runner";
 import { StepTimeoutError, withTimeout } from "../../../src/utils/with-timeout";
@@ -40,7 +41,11 @@ const migration = (name: string, execute: () => Promise<void>) => {
     public setDryRun() {}
     public async up() {}
     public async down() {}
-    public execute = execute;
+    public onStep?: (step: number, total: number) => void;
+    public execute = async () => {
+      this.onStep?.(2, 5);
+      await execute();
+    };
   }
 
   return M as any;
@@ -99,6 +104,31 @@ describe("migration failure reporting", () => {
     await runner.runAll();
 
     expect(ledger.map((row) => row.name)).toEqual(["quick"]);
+  });
+
+  it("does not abort a long migration by default and warns while it runs", async () => {
+    vi.unstubAllEnvs();
+    const warn = vi.spyOn(log, "warn").mockImplementation((() => undefined) as never);
+    const { source, ledger } = makeDirectSource();
+    const runner = new MigrationRunner({
+      dataSource: source,
+      verbose: false,
+      heartbeatMs: { first: 20, every: 20 },
+    });
+
+    expect(runner.getStepTimeout()).toBe(0);
+
+    runner.register(migration("slow_index", () => new Promise<void>((r) => setTimeout(r, 90))));
+    await runner.runAll();
+
+    const notices = warn.mock.calls.map((call) => String(call[2]));
+    expect(
+      notices.some((text) => /still running "slow_index", step 2 of 5, \d+s elapsed/.test(text)),
+    ).toBe(true);
+    expect(notices.filter((text) => text.includes("still running")).length).toBeGreaterThan(1);
+    expect(ledger.map((row) => row.name)).toEqual(["slow_index"]);
+
+    warn.mockRestore();
   });
 
   it("reads the bound from the environment and lets 0 disable it", () => {

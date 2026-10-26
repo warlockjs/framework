@@ -457,7 +457,7 @@ Postgres wraps each migration in a transaction by default (DDL is transactional 
 
 When a MongoDB migration fails part-way, the error names the migration and the step (for example `step 3 of 5: createIndex on "orders"`), says that no ledger row was written so the migration is still pending, and how many of its steps were already applied. Re-running the migration is safe because index creation is idempotent.
 
-Each migration is also bounded in time (10 minutes by default). Set `new MigrationRunner({ stepTimeoutMs })`, call `migrationRunner.setStepTimeout(ms)`, or set `WARLOCK_MIGRATION_TIMEOUT_MS`; `0` removes the bound. A migration that exceeds it fails with a `StepTimeoutError` as the cause.
+A migration that runs long is never aborted by default, because stopping a healthy index build on a large collection would leave it half-applied. Instead the runner warns while it runs (`still running "<migration>", step 3 of 5, 30s elapsed`, first at 30 s, then every 60 s). To abort a migration that exceeds a limit, opt in with `new MigrationRunner({ stepTimeoutMs })`, `migrationRunner.setStepTimeout(ms)` or `WARLOCK_MIGRATION_TIMEOUT_MS`; it then fails with a `StepTimeoutError` as the cause.
 
 Override per migration when an operation can't be transactional (Postgres `CREATE INDEX CONCURRENTLY` cannot run inside a transaction):
 

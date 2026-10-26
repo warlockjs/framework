@@ -278,7 +278,7 @@ warlock migrate --path src/app/orders/models/order/migrations
 | `--yes, -y`      | boolean | With `--fresh` or `--rollback`: confirm without asking. See below.          |
 | `--force`        | boolean | Same as `--yes`.                                                            |
 | `--path, -p`     | string  | Path to a specific migration file or folder. Defaults to running all.       |
-| `--timeout, -t`  | number  | Seconds one migration may run before it fails (default 600, `0` disables).  |
+| `--timeout, -t`  | number  | Abort a migration that runs longer than this many seconds (off by default). |
 | `--list, -l`     | boolean | Migration state: executed migrations, then what will run next.              |
 | `--pending`      | boolean | Only what will run next, in execution order. Sets an exit code — see below. |
 | `--all, -a`      | boolean | List _every_ migration file in the app, executed or not.                    |
@@ -294,7 +294,7 @@ The minimal preload — only `database` and `logger` connectors — keeps migrat
 
 `warlock migrate` releases the migration lock and closes every database connection (ending the sessions it opened, which also aborts any open transaction) before the process exits, whether the run succeeded, failed or was interrupted with `Ctrl+C` / `SIGTERM` (exit code 130 / 143).
 
-Each migration is bounded: if one does not finish within `--timeout` seconds (default 600; the `WARLOCK_MIGRATION_TIMEOUT_MS` environment variable sets the same bound in milliseconds, `0` disables it), the command fails with `Migration "<name>" (up) did not finish within <n>s` and exits 1. Connecting to MongoDB is bounded the same way, so an unreachable server or a replica set without a primary ends in an error instead of silence.
+By default a migration is never aborted for taking long, since stopping a legitimate index build on a large collection would leave it half-applied. While one runs long, the command prints `still running "<name>", step N of M, <n>s elapsed` at 30 s and then every 60 s. To abort instead, pass `--timeout <seconds>` (or set `WARLOCK_MIGRATION_TIMEOUT_MS`, in milliseconds): a migration that exceeds it fails with `Migration "<name>" (up) did not finish within <n>s` and the command exits 1. Connecting to MongoDB is always bounded (30 s server selection), so an unreachable server or a replica set without a primary ends in an error instead of silence.
 
 A failed migration is named in the error. A ledger row is written only after all of a migration's steps applied, so a failed or timed-out migration stays pending. On MongoDB, steps cannot be rolled back, so the message also says how many steps were applied before the failure. Run `warlock migrate` again to continue (index creation is idempotent), or `warlock migrate --rollback` to start over.
 

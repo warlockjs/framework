@@ -1086,6 +1086,14 @@ export abstract class Migration implements MigrationContract {
   }
 
   /**
+   * Called before each operation `execute()` runs, with the 1-based step and the
+   * total. The runner uses it for its "still running" notice.
+   *
+   * @internal
+   */
+  public onStep?: (step: number, total: number) => void;
+
+  /**
    * Execute all pending operations directly through the migration driver.
    *
    * SQL-capable drivers go through toSQL() + raw query execution instead
@@ -1102,6 +1110,8 @@ export abstract class Migration implements MigrationContract {
     this.pendingOperations.length = 0;
 
     for (const [index, op] of operations.entries()) {
+      this.onStep?.(index + 1, operations.length);
+
       try {
         await this.executeOperation(op);
       } catch (error) {

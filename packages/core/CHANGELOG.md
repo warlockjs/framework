@@ -10,7 +10,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
-- `warlock migrate --timeout <seconds>` (default 600, `0` disables; `WARLOCK_MIGRATION_TIMEOUT_MS` sets the same bound in milliseconds) bounds each migration. A migration that does not finish fails with a message naming it, and the command exits 1.
+- A migration that runs long prints `still running "<name>", step N of M, <n>s elapsed` at 30 s and then every 60 s. Migrations are not aborted by default, so a long index build is never left half-applied.
+- `warlock migrate --timeout <seconds>` (or `WARLOCK_MIGRATION_TIMEOUT_MS`, in milliseconds) opts in to a hard limit per migration. A migration that exceeds it fails with a message naming it, and the command exits 1.
 
 ### Fixed
 
