@@ -2,6 +2,16 @@
 
 All notable changes to `@warlock.js/web` are documented here.
 
+## 5.38.1
+
+### Added
+
+- `onPageError(hook)`, exported from `@warlock.js/web/connector`: registers a server error-report hook at runtime, from a module's `main.ts`. It receives the same `(error, context)` as `web.errors.report`, runs through the same bounded fire-and-forget queue next to it, and returns a function that removes it. Use it instead of importing application code into `src/config/web.ts`. Exports the `PageErrorHook`, `PageErrorInfo` and `PageErrorKind` types.
+
+### Fixed
+
+- A core-level refusal on a page host answered raw JSON in a browser: `/public/../x` (403, dot-segment guard) and a malformed URL (400). A `GET` or `HEAD` request that names `text/html` in `Accept` now renders the site's `forbidden.page.tsx` for 401 and 403, otherwise `error.page.tsx`, then the framework fallback page, with the refused status. In multi-site mode the site is chosen by host as for any page. API clients and other requests keep the JSON answer.
+
 ## 5.38.0 - 2026-10-25
 
 ### Added

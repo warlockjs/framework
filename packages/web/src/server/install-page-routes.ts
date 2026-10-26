@@ -76,6 +76,7 @@ import {
 } from "./locale-routing/locale-page-registrations";
 import { composeErrorPageLoader, type ErrorPageModule } from "./error-page";
 import { layoutPrefixesByDirectory } from "./layout-prefixes";
+import { createRefusalPageRenderer } from "./core-refusal-page";
 import { notFoundPageHandlerOptions } from "./not-found-handler-options";
 import { devClientApiRouteNames, type NamedApiRouteRegistry } from "./dev-client-api-route-names";
 import { resolvePayloadBudget, type PayloadBudgetConfig } from "./payload-budget";
@@ -87,6 +88,7 @@ import {
   DuplicateNotFoundPageError,
   isNotFoundPageFile,
   NotFoundPageDeclaresRouteError,
+  NOT_FOUND_ROUTE_NAME,
   registerNotFoundPageRoute,
 } from "./not-found-page";
 import type { LayoutModuleShape } from "./page-module-shapes";
@@ -1084,6 +1086,25 @@ async function installDiscoveredPageRoutes(
         router,
         renderPage: notFoundPageHandler,
         localeCodes: localeRouting.strategy === "none" ? undefined : localeRouting.codes,
+        renderRefusal: createRefusalPageRenderer({
+          name:
+            siteScope?.site === undefined
+              ? NOT_FOUND_ROUTE_NAME
+              : `${siteScope.site}.${NOT_FOUND_ROUTE_NAME}`,
+          appFile,
+          errorPageFile,
+          loadErrorPage,
+          getRouteTranslations,
+          hydrationClientModuleUrl,
+          stylesheetUrls: () =>
+            devHandlerStylesheetUrls(
+              stylesheetRoot,
+              [appFile, forbiddenPageFile ?? errorPageFile].filter(
+                (file): file is string => file !== undefined,
+              ),
+              vite.moduleGraph,
+            ),
+        }),
       });
 
     if (notFoundPageFile === undefined) {

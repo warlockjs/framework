@@ -60,7 +60,8 @@
  */
 import type { HttpContext } from "@warlock.js/core";
 import type { PageRouteHandler } from "./create-page-route-handler";
-import type { Router } from "@warlock.js/core";
+import { refusalStatusOf, type Router } from "@warlock.js/core";
+import type { RefusalPageRenderer } from "./core-refusal-page";
 import { FRAMEWORK_DEFAULT_NOT_FOUND_STYLESHEET } from "./framework-default-not-found-stylesheet";
 
 /**
@@ -256,6 +257,43 @@ function resolveDefaultNotFoundDocumentLocale(locale: unknown): {
 }
 
 export function frameworkDefaultNotFoundDocument(locale?: string, nonce?: string): string {
+  return frameworkDefaultStatusDocument(
+    { status: 404, title: "Page not found", message: "This page could not be found." },
+    locale,
+    nonce,
+  );
+}
+
+/** The wording the framework fallback shows for a core-level refusal. */
+const REFUSAL_DOCUMENT_TEXT: Record<number, { title: string; message: string }> = {
+  400: { title: "Bad request", message: "This request could not be understood." },
+  401: { title: "Sign-in required", message: "You need to sign in to see this page." },
+  403: { title: "Forbidden", message: "You do not have access to this page." },
+};
+
+/**
+ * The framework fallback for a core-level refusal (a path-traversal 403, a
+ * malformed-URL 400) on a host that serves pages but ships no page of its own
+ * for it. Same string-only construction and stylesheet as the 404 fallback.
+ */
+export function frameworkDefaultRefusalDocument(
+  status: number,
+  locale?: string,
+  nonce?: string,
+): string {
+  const text = REFUSAL_DOCUMENT_TEXT[status] ?? {
+    title: "Request refused",
+    message: "This request could not be completed.",
+  };
+
+  return frameworkDefaultStatusDocument({ status, ...text }, locale, nonce);
+}
+
+function frameworkDefaultStatusDocument(
+  document: { status: number; title: string; message: string },
+  locale?: string,
+  nonce?: string,
+): string {
   const { lang, dir } = resolveDefaultNotFoundDocumentLocale(locale);
 
   return `<!doctype html>
@@ -264,14 +302,14 @@ export function frameworkDefaultNotFoundDocument(locale?: string, nonce?: string
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex">
-  <title>404 | Page not found</title>
+  <title>${document.status} | ${document.title}</title>
   <style${nonce === undefined ? "" : ` nonce="${nonce}"`}>${FRAMEWORK_DEFAULT_NOT_FOUND_STYLESHEET}</style>
 </head>
 <body>
   <main>
     <div class="rule" aria-hidden="true"></div>
-    <h1>404</h1>
-    <p dir="auto">This page could not be found.</p>
+    <h1>${document.status}</h1>
+    <p dir="auto">${document.message}</p>
     <a href="/" dir="auto">Return home</a>
   </main>
 </body>
@@ -296,6 +334,11 @@ export type NotFoundRouteHandlerOptions = {
    * renders, so `/ar/missing` answers in `ar`.
    */
   localeCodes?: readonly string[];
+  /**
+   * Renders a core-level refusal (a path-traversal 403, a malformed-URL 400)
+   * that core handed to this route. Without it the refusal keeps a JSON body.
+   */
+  renderRefusal?: RefusalPageRenderer;
 };
 
 /**
@@ -306,10 +349,53 @@ export type NotFoundRouteHandlerOptions = {
  * API request can reach a React render even if the page module is broken.
  */
 export function createNotFoundRouteHandler(options: NotFoundRouteHandlerOptions): PageRouteHandler {
-  const { renderPage, localeCodes } = options;
+  const { renderPage, localeCodes, renderRefusal } = options;
 
   return async (context: HttpContext) => {
     const { request, response } = context;
+    const refusedStatus = refusalStatusOf(request);
+
+    // Core refused this request before routing and handed it here because it
+    // asks for a document. Same gate as a miss: API clients keep JSON.
+    if (refusedStatus !== undefined) {
+      const refusalAccept = request.header("accept");
+
+      if (
+        classifyUnmatchedRequest({
+          method: request.method,
+          accept: Array.isArray(refusalAccept) ? refusalAccept.join(",") : refusalAccept,
+        }) === "page"
+      ) {
+        response.header("Cache-Control", "no-store");
+
+        try {
+          if (renderRefusal !== undefined) {
+            await renderRefusal(context, refusedStatus);
+
+            return;
+          }
+        } catch (error) {
+          // The refusal page is the last line of defence: a broken site page
+          // falls back to the framework document, never to raw JSON.
+          console.error("[warlock:web] rendering the refusal page failed:", error);
+        }
+
+        await response.html(
+          frameworkDefaultRefusalDocument(refusedStatus, request.locale, request.nonce),
+          refusedStatus,
+        );
+
+        return;
+      }
+
+      await response.send(
+        { error: "Refused", path: request.path, method: request.method },
+        refusedStatus,
+      );
+
+      return;
+    }
+
     // A catch-all 404 must never become a cached answer for a later route.
     // Set this before classifying so it also travels with an application's
     // custom 404 page, whose rendering remains otherwise entirely its own.
@@ -358,13 +444,15 @@ export function registerNotFoundPageRoute(options: {
   router: Router;
   renderPage?: PageRouteHandler;
   localeCodes?: readonly string[];
+  renderRefusal?: RefusalPageRenderer;
 }): void {
   options.router.get(
     NOT_FOUND_ROUTE_PATH,
     createNotFoundRouteHandler({
       renderPage: options.renderPage,
       localeCodes: options.localeCodes,
+      renderRefusal: options.renderRefusal,
     }),
-    { name: NOT_FOUND_ROUTE_NAME, isPage: true },
+    { name: NOT_FOUND_ROUTE_NAME, isPage: true, handlesRefusals: true },
   );
 }

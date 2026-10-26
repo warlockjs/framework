@@ -25,6 +25,9 @@
 export { createWebBuildContribution, WebPackageRootResolutionError } from "../build/contribution";
 export type { WebBuildOptions } from "../build/contribution";
 
+export { onPageError } from "../server/page-error-hooks";
+export type { PageErrorHook, PageErrorInfo, PageErrorKind } from "../server/page-error-hooks";
+
 export { consumePageManifest, providePageManifest } from "../server/page-manifest";
 export type {
   PageManifest,

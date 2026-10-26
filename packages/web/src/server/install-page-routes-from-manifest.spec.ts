@@ -873,7 +873,11 @@ describe("installPageRoutesFromManifest — the not-found page", () => {
     expect(registered.map((route) => route.path)).toEqual(["/"]);
     expect(notFound).toHaveLength(1);
     expect(notFound[0].path).toBe(NOT_FOUND_ROUTE_PATH);
-    expect(notFound[0].options).toEqual({ name: NOT_FOUND_ROUTE_NAME, isPage: true });
+    expect(notFound[0].options).toEqual({
+      name: NOT_FOUND_ROUTE_NAME,
+      isPage: true,
+      handlesRefusals: true,
+    });
   });
 
   it("keeps the not-found page out of the returned table, so href() cannot point at it", () => {
