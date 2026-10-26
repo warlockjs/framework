@@ -58,6 +58,7 @@ describe("default doctor check set", () => {
       "routes",
       "handler-signature",
       "config",
+      "config-app-imports",
       "connectors",
       "optional-peers",
       "jwt-secret",
