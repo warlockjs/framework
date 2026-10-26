@@ -20,6 +20,7 @@ import { isTestFile } from "../utils/is-test-file";
 import { warlockConfigManager } from "../warlock-config/warlock-config.manager";
 import { environment } from "../utils/environment";
 import { exitCodeFor, PENDING_EXIT_CODE } from "./pending-exit-code";
+import { installMigrateInterruptHandlers, shutdownMigrateConnections } from "./migrate-shutdown";
 import {
   resolvePendingMigrations,
   type PendingMigrationsResult,
@@ -127,6 +128,8 @@ async function pendingMigrationsAction() {
     );
   }
 
+  await shutdownMigrateConnections();
+
   process.exit(exitCode);
 }
 
@@ -146,8 +149,45 @@ async function allMigrationsFilesAction() {
  * If rollback is provided, then run the migration runner against all files in reverse order
  */
 export async function migrateAction(options: CommandActionData) {
-  const { fresh, path, rollback, all, list, pending, sql, pendingOnly, compact, yes, force } =
-    options.options;
+  const removeInterruptHandlers = installMigrateInterruptHandlers();
+
+  try {
+    await runMigrateAction(options);
+  } finally {
+    // Every exit path (success, failure, interrupt) releases the lock and closes
+    // the client here, before the CLI's own `process.exit`.
+    await shutdownMigrateConnections();
+    removeInterruptHandlers();
+  }
+}
+
+async function runMigrateAction(options: CommandActionData) {
+  const {
+    fresh,
+    path,
+    rollback,
+    all,
+    list,
+    pending,
+    sql,
+    pendingOnly,
+    compact,
+    yes,
+    force,
+    timeout,
+  } = options.options;
+
+  if (timeout !== undefined) {
+    const seconds = Number(timeout);
+
+    if (!Number.isFinite(seconds) || seconds < 0) {
+      throw new Error(
+        `--timeout expects a number of seconds (0 disables the bound), got "${timeout}"`,
+      );
+    }
+
+    migrationRunner.setStepTimeout(seconds * 1000);
+  }
 
   if (list) {
     return await listMigrationsAction();
@@ -169,6 +209,7 @@ export async function migrateAction(options: CommandActionData) {
 
   if (fresh && rollback) {
     console.log(colors.redBright("You can't use --fresh and --rollback together"));
+    await shutdownMigrateConnections();
     process.exit(1);
   }
 
@@ -215,6 +256,7 @@ async function confirmDestructiveRollback(yes: boolean): Promise<boolean> {
     return proceed;
   } catch (error) {
     console.error(colors.redBright(error instanceof Error ? error.message : String(error)));
+    await shutdownMigrateConnections();
     process.exit(1);
   }
 }

@@ -278,6 +278,7 @@ warlock migrate --path src/app/orders/models/order/migrations
 | `--yes, -y`      | boolean | With `--fresh` or `--rollback`: confirm without asking. See below.          |
 | `--force`        | boolean | Same as `--yes`.                                                            |
 | `--path, -p`     | string  | Path to a specific migration file or folder. Defaults to running all.       |
+| `--timeout, -t`  | number  | Seconds one migration may run before it fails (default 600, `0` disables).  |
 | `--list, -l`     | boolean | Migration state: executed migrations, then what will run next.              |
 | `--pending`      | boolean | Only what will run next, in execution order. Sets an exit code — see below. |
 | `--all, -a`      | boolean | List _every_ migration file in the app, executed or not.                    |
@@ -288,6 +289,14 @@ warlock migrate --path src/app/orders/models/order/migrations
 The minimal preload — only `database` and `logger` connectors — keeps migrations fast.
 
 `--fresh` and `--rollback` print a summary of what they will remove (collections or tables dropped, fields or columns unset, with document or row counts) before they run. In development they proceed after the summary. In any other environment they ask for confirmation; pass `--yes` or `--force` in scripts. With no terminal and neither flag they refuse and exit with code 1. On MongoDB, a plain `dropColumn()` inside a migration's `down()` is skipped rather than unsetting the field on every document: see [Rolling back on SQL versus MongoDB](../../cascade/the-basics/migrations.md#rolling-back-on-sql-versus-mongodb).
+
+#### Failures, timeouts and shutdown
+
+`warlock migrate` releases the migration lock and closes every database connection (ending the sessions it opened, which also aborts any open transaction) before the process exits, whether the run succeeded, failed or was interrupted with `Ctrl+C` / `SIGTERM` (exit code 130 / 143).
+
+Each migration is bounded: if one does not finish within `--timeout` seconds (default 600; the `WARLOCK_MIGRATION_TIMEOUT_MS` environment variable sets the same bound in milliseconds, `0` disables it), the command fails with `Migration "<name>" (up) did not finish within <n>s` and exits 1. Connecting to MongoDB is bounded the same way, so an unreachable server or a replica set without a primary ends in an error instead of silence.
+
+A failed migration is named in the error. A ledger row is written only after all of a migration's steps applied, so a failed or timed-out migration stays pending. On MongoDB, steps cannot be rolled back, so the message also says how many steps were applied before the failure. Run `warlock migrate` again to continue (index creation is idempotent), or `warlock migrate --rollback` to start over.
 
 #### Checking what will run next
 

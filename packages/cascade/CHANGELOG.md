@@ -4,6 +4,17 @@ All notable changes to `@warlock.js/cascade` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.39.1
+
+### Added
+
+- `MigrationRunner` bounds each migration: `stepTimeoutMs` option, `setStepTimeout(ms)` / `getStepTimeout()` and the `WARLOCK_MIGRATION_TIMEOUT_MS` environment variable (default 10 minutes, `0` disables). A migration or transactional batch that does not finish fails with a message naming it. `MigrationRunner.releaseActiveLocks()` releases the migration lock of a run that is being interrupted. New exports `StepTimeoutError` and `withTimeout`.
+
+### Fixed
+
+- A MongoDB migration that failed part-way now says which step failed (`step 3 of 5: createIndex on "orders"`), how many steps were already applied, that no ledger row was written, and that re-running is safe because index creation is idempotent.
+- `MongoDbDriver.connect()` is bounded (server selection plus connect timeout, 30 s each by default) and fails with a clear message instead of waiting silently. `disconnect()` falls back to a forced close when the graceful close stalls for 10 seconds.
+
 ## 5.39.0 - 2026-10-26
 
 ### Fixed

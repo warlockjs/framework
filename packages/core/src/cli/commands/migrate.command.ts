@@ -37,6 +37,12 @@ export const migrateCommand = command({
       type: "string",
     },
     {
+      text: "--timeout, -t",
+      description:
+        "Seconds one migration may run before it fails with a clear error (default 600, 0 disables; env WARLOCK_MIGRATION_TIMEOUT_MS in milliseconds)",
+      type: "number",
+    },
+    {
       text: "--list, -l",
       description: "Show migration state: executed migrations, then what will run next",
       type: "boolean",

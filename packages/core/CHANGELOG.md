@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 > ⚠ **Versioning: `@warlock.js/*` does not follow SemVer strictly — breaking changes may ship in a minor.** This is a deliberate decision, not an oversight: the framework is pre-adoption and the cost of a major per behaviour fix currently outweighs the benefit. **Pin an exact version or a tilde range (`~4.13.0`) if you need to opt into changes rather than receive them.** Every breaking change is marked **BREAKING** in its entry and summarised in an _Upgrading_ section at the top of the release. **This policy will change once the framework has consumers beyond its author.**
 
+## 5.39.1
+
+### Added
+
+- `warlock migrate --timeout <seconds>` (default 600, `0` disables; `WARLOCK_MIGRATION_TIMEOUT_MS` sets the same bound in milliseconds) bounds each migration. A migration that does not finish fails with a message naming it, and the command exits 1.
+
+### Fixed
+
+- `warlock migrate` exited without releasing the migration lock or closing the database client, on success, on failure and on `Ctrl+C` / `SIGTERM`. Server-side sessions and the lock document were left behind for the server to expire, so a run started soon after another could stall. It now releases the lock and closes every data source before the process exits on every path (exit 130 / 143 on an interrupt), with a bounded wait so shutdown cannot hang.
+- A failed migration reports which migration (and, on MongoDB, which step) failed, that no ledger row was written, and how to recover.
+
 ## 5.39.0 - 2026-10-26
 
 ### Added

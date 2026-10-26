@@ -81,6 +81,7 @@ export * from "./utils/sanitize-filter";
 export * from "./utils/database-writer.utils";
 export * from "./utils/define-model";
 export * from "./utils/once-connected";
+export { StepTimeoutError, withTimeout } from "./utils/with-timeout";
 
 // Migration System
 export * from "./migration";

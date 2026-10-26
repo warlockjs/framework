@@ -48,6 +48,7 @@ import { MongoIdGenerator } from "./mongodb-id-generator";
 import { MongoMigrationDriver } from "./mongodb-migration-driver";
 import { MongoQueryBuilder } from "./mongodb-query-builder";
 import { MongoSyncAdapter } from "./mongodb-sync-adapter";
+import { withTimeout } from "../../utils/with-timeout";
 import { toMongoUpdate } from "./mongodb-update-translator";
 import type { MongoDriverOptions } from "./types";
 
@@ -118,6 +119,9 @@ async function assertModuleIsLoaded() {
     return await assertModuleIsLoaded();
   }
 }
+
+/** How long a graceful `client.close()` may take before it is forced. */
+const DISCONNECT_TIMEOUT_MS = 10_000;
 
 /**
  * Transaction session -> the driver (data source) that opened it.
@@ -314,7 +318,19 @@ export class MongoDbDriver implements DriverContract {
         "connection",
         `Connecting to database ${colors.bold(colors.yellowBright(this.databaseName))}`,
       );
-      await client.connect();
+      // The driver's own selection timeout normally ends a failed connect; this
+      // bound makes sure a stalled handshake still turns into an error.
+      const options = this.buildClientOptions();
+      const connectBudget =
+        (options.serverSelectionTimeoutMS ?? 30_000) + (options.connectTimeoutMS ?? 30_000);
+
+      await withTimeout(
+        client.connect(),
+        connectBudget,
+        () =>
+          `Connecting to database "${this.databaseName}" did not finish within ${Math.round(connectBudget / 1000)}s. ` +
+          `Check that the server is reachable and, for a replica set, that a primary is elected.`,
+      );
       this.client = client;
       this.database = client.db(this.databaseName);
 
@@ -406,8 +422,17 @@ export class MongoDbDriver implements DriverContract {
       return;
     }
 
+    const client = this.client;
+
     try {
-      await this.client.close();
+      // `close()` ends every server-side session the client opened, which also
+      // aborts any transaction still open on them. A stalled close falls back to
+      // a forced close so shutdown can never hang on it.
+      await withTimeout(client.close(), DISCONNECT_TIMEOUT_MS, () => "close timed out").catch(
+        async () => {
+          await client.close(true).catch(() => undefined);
+        },
+      );
     } finally {
       this.connected = false;
       this.emit("disconnected");

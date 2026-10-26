@@ -455,6 +455,10 @@ export default Migration.create({
 
 Postgres wraps each migration in a transaction by default (DDL is transactional in PG), so a mid-migration failure rolls back cleanly. MongoDB can't run DDL in a transaction — its migrations are non-transactional by nature.
 
+When a MongoDB migration fails part-way, the error names the migration and the step (for example `step 3 of 5: createIndex on "orders"`), says that no ledger row was written so the migration is still pending, and how many of its steps were already applied. Re-running the migration is safe because index creation is idempotent.
+
+Each migration is also bounded in time (10 minutes by default). Set `new MigrationRunner({ stepTimeoutMs })`, call `migrationRunner.setStepTimeout(ms)`, or set `WARLOCK_MIGRATION_TIMEOUT_MS`; `0` removes the bound. A migration that exceeds it fails with a `StepTimeoutError` as the cause.
+
 Override per migration when an operation can't be transactional (Postgres `CREATE INDEX CONCURRENTLY` cannot run inside a transaction):
 
 ```ts

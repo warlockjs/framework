@@ -13,6 +13,7 @@ import {
   type MigrationStep,
 } from "./migration";
 import { sortMigrations, sortMigrationsForRollback } from "./migration-order";
+import { StepTimeoutError, withTimeout } from "../utils/with-timeout";
 import { parseCreatedAt } from "./parse-created-at";
 import { SQLGrammar } from "./sql-grammar";
 import type {
@@ -95,6 +96,21 @@ const MIGRATION_LOCK_KEY = "warlock:migrations";
 const MIGRATION_LOCK_TTL_MS = 10 * 60 * 1000;
 const MIGRATION_LOCK_WAIT_MS = 60 * 1000;
 const MIGRATION_LOCK_RETRY_MS = 1000;
+
+/** Default bound for one migration (or one transactional batch of them): 10 minutes. */
+export const DEFAULT_MIGRATION_TIMEOUT_MS = 10 * 60 * 1000;
+
+/** Environment override for the per-migration bound, in milliseconds. `0` disables it. */
+const MIGRATION_TIMEOUT_ENV = "WARLOCK_MIGRATION_TIMEOUT_MS";
+
+function defaultMigrationTimeoutMs(): number {
+  const raw = process.env[MIGRATION_TIMEOUT_ENV];
+  if (raw === undefined || raw.trim() === "") return DEFAULT_MIGRATION_TIMEOUT_MS;
+
+  const parsed = Number(raw);
+
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : DEFAULT_MIGRATION_TIMEOUT_MS;
+}
 
 /** Held lock for one data source. `refresh` extends the TTL; `release` frees it. */
 type MigrationLock = {
@@ -179,6 +195,25 @@ export class MigrationRunner {
   /** Whether to log operations */
   private readonly verbose: boolean;
 
+  /** Bound for one migration, in milliseconds (`0` = unbounded). */
+  private stepTimeoutMs: number;
+
+  /**
+   * Bound every migration (and every transactional batch) to `ms` milliseconds.
+   * A migration that does not finish fails with a message naming it, instead of
+   * hanging the process. `0` removes the bound.
+   */
+  public setStepTimeout(ms: number): this {
+    this.stepTimeoutMs = ms;
+
+    return this;
+  }
+
+  /** The current per-migration bound in milliseconds (`0` = unbounded). */
+  public getStepTimeout(): number {
+    return this.stepTimeoutMs;
+  }
+
   /**
    * Create a new migration runner.
    *
@@ -189,8 +224,11 @@ export class MigrationRunner {
       dataSource?: DataSource;
       migrationsTable?: string;
       verbose?: boolean;
+      /** Bound for one migration, in milliseconds. `0` disables it. */
+      stepTimeoutMs?: number;
     } = {},
   ) {
+    this.stepTimeoutMs = options.stepTimeoutMs ?? defaultMigrationTimeoutMs();
     this.dataSource = options.dataSource;
     this.migrationsTable = options.migrationsTable ?? "_migrations";
     this.verbose = options.verbose ?? true;
@@ -289,6 +327,28 @@ export class MigrationRunner {
 
   /** Locks held by the run in progress (Mongo TTL heartbeat). */
   private activeLocks: MigrationLock[] = [];
+
+  /**
+   * Release every lock the run in progress holds. Safe to call more than once;
+   * used by the CLI on an interrupt, where the `finally` of {@link withLock}
+   * never gets to run.
+   */
+  public async releaseActiveLocks(): Promise<void> {
+    const held = this.activeLocks;
+    this.activeLocks = [];
+
+    for (const lock of held.reverse()) {
+      try {
+        await lock.release();
+      } catch (error) {
+        log.warn(
+          "database",
+          "migration",
+          `Failed to release migration lock: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    }
+  }
 
   /** Extend every held lock's TTL; called between migrations. */
   private async refreshLocks(): Promise<void> {
@@ -747,11 +807,13 @@ export class MigrationRunner {
       };
 
       try {
-        if (first.transactional && driver.transaction) {
-          await driver.transaction(executeRun);
-        } else {
-          await executeRun();
-        }
+        const batchNames = run.map((data) => data.name).join(", ");
+        const execution =
+          first.transactional && driver.transaction ? driver.transaction(executeRun) : executeRun();
+
+        await withTimeout(execution, this.stepTimeoutMs, () =>
+          this.timeoutMessage(batchNames, "up"),
+        );
       } catch (err) {
         failed = true;
         errorMessage = err instanceof Error ? err.message : String(err);
@@ -1166,6 +1228,62 @@ export class MigrationRunner {
    * Run a single migration.
    */
   private async runMigration(
+    MigrationClass: MigrationClass,
+    direction: "up" | "down",
+    options: { dryRun?: boolean; record?: boolean; batch?: number } = {},
+  ): Promise<MigrationResult> {
+    const name = MigrationClass.migrationName;
+
+    try {
+      return await withTimeout(
+        this.runMigrationUnbounded(MigrationClass, direction, options),
+        this.stepTimeoutMs,
+        () => this.timeoutMessage(name, direction),
+      );
+    } catch (error) {
+      throw this.explainFailure(name, direction, error);
+    }
+  }
+
+  private timeoutMessage(names: string, direction: "up" | "down"): string {
+    const seconds = Math.round(this.stepTimeoutMs / 1000);
+
+    return (
+      `Migration "${names}" (${direction}) did not finish within ${seconds}s. ` +
+      `Raise the bound with --timeout <seconds> or ${MIGRATION_TIMEOUT_ENV}, or set 0 to disable it.`
+    );
+  }
+
+  /**
+   * Turn a failure into one that says which migration failed, whether it left
+   * partial changes behind, and how to recover. The ledger row is only written
+   * after a migration's steps all applied, so a failed migration never has one.
+   */
+  private explainFailure(name: string, direction: "up" | "down", error: unknown): Error {
+    const original = error instanceof Error ? error : new Error(String(error));
+    const applied = (original as { appliedSteps?: number }).appliedSteps ?? 0;
+    const timedOut = original instanceof StepTimeoutError;
+    const partial = direction === "up" && (timedOut || applied > 0);
+
+    let message = timedOut ? original.message : `Migration "${name}" failed: ${original.message}`;
+
+    if (partial) {
+      message +=
+        `\nNo ledger row was written for "${name}", so it is still pending.` +
+        (applied > 0
+          ? ` ${applied} of its steps were applied before the failure and are not rolled back unless the migration is transactional.`
+          : ` Some of its steps may already be applied.`) +
+        ` Re-running \`warlock migrate\` is safe because index creation is idempotent; ` +
+        `to start over, run \`warlock migrate --rollback\`.`;
+    }
+
+    const explained = new Error(message, { cause: original });
+    explained.stack = original.stack;
+
+    return explained;
+  }
+
+  private async runMigrationUnbounded(
     MigrationClass: MigrationClass,
     direction: "up" | "down",
     options: {

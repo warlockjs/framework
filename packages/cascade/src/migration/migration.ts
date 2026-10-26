@@ -1098,11 +1098,26 @@ export abstract class Migration implements MigrationContract {
   public async execute(): Promise<void> {
     this.assertNoGeneratedIndexNameCollisions();
 
-    for (const op of this.pendingOperations) {
-      await this.executeOperation(op);
-    }
-
+    const operations = [...this.pendingOperations];
     this.pendingOperations.length = 0;
+
+    for (const [index, op] of operations.entries()) {
+      try {
+        await this.executeOperation(op);
+      } catch (error) {
+        // Say how far the migration got: operations before this one are already
+        // applied, and no ledger row exists for the migration.
+        const failure = error instanceof Error ? error : new Error(String(error));
+        const described = new Error(
+          `${failure.message} (step ${index + 1} of ${operations.length}: ${op.type} on "${this.table}")`,
+          { cause: failure },
+        );
+        described.stack = failure.stack;
+        Object.assign(described, { appliedSteps: index, failedStep: index + 1 });
+
+        throw described;
+      }
+    }
   }
 
   /**
