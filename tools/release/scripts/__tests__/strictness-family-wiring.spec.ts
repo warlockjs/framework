@@ -85,6 +85,7 @@ function fixture(overrides: Partial<ReleaseFamilyDependencies> = {}): {
     makeTemporaryDirectory: async () => path.resolve("release-temp"),
     removeDirectory: async () => undefined,
     removeFile: async () => undefined,
+    assertReleaseSummary: async () => undefined,
     writeTextFile: async () => undefined,
     readTextFile: async (filePath) => {
       if (path.basename(filePath) === "package.json") {

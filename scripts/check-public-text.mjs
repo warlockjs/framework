@@ -18,8 +18,8 @@ if (
 
 /** Roots that must exist; a missing one is an error. */
 const requiredRoots = ["packages", "docs/src"];
-/** Roots scanned when present (the deployed llms files live here). */
-const optionalRoots = ["docs/public"];
+/** Roots scanned when present (the deployed llms files and the family release summaries live here). */
+const optionalRoots = ["docs/public", "releases"];
 
 /**
  * Tracked files under the scan roots, or `undefined` when `repositoryRoot` is not the top of a git

@@ -105,3 +105,14 @@ test("fails when a required scan root is missing", () => {
   rmSync(path.join(root, "docs"), { recursive: true });
   assert.throws(() => findPublicTextIssues(root), /ENOENT/);
 });
+
+test("scans the root releases folder", () => {
+  const root = fixture();
+  mkdirSync(path.join(root, "releases"));
+  writeFileSync(path.join(root, "releases/5.1.0-summary.md"), "# 5.1.0\nWR-029\n");
+  const issues = findPublicTextIssues(root, []);
+  assert.deepEqual(
+    issues.map((issue) => [issue.file, issue.line]),
+    [["releases/5.1.0-summary.md", 2]],
+  );
+});

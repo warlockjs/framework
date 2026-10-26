@@ -27,6 +27,7 @@ import {
   type WarlockFamily,
   type WarlockFamilyMember,
 } from "./warlock-family.ts";
+import { assertReleaseSummaryExists } from "./release-summary-gate.ts";
 import { runZeroEditGeneratorGate, type GeneratorGateContext } from "./zero-edit-generator-gate.ts";
 import { runStrictnessGate, type StrictnessGateRunResult } from "./strictness-gate.ts";
 
@@ -244,6 +245,12 @@ export interface ReleaseFamilyDependencies {
    * real packages.
    */
   runStrictnessGate?(): Promise<StrictnessGateRunResult>;
+  /**
+   * Refuse a version whose `releases/<version>-summary.md` (and its copy in
+   * `packages/core/releases/`) is missing. Injectable so tests need not touch
+   * the real repository's summaries.
+   */
+  assertReleaseSummary?(version: string): Promise<void>;
   now?(): Date;
   /** Every operator-facing progress/summary line goes through this, never a bare `console.log`. */
   report?(line: string): void;
@@ -493,6 +500,17 @@ async function prepareAndGate(
   // and running it after 28 builds would waste the whole build for a defect
   // this could have caught first. OVER allowance or UNMEASURED refuses the
   // gate outright, with no handoff, same as every other refusal below.
+  // The release summary ships inside `@warlock.js/core`. Sync its published copy
+  // first (a stale copy then shows up as an uncommitted change in core's surface),
+  // then refuse a version that has no summary at all, before any slow work starts.
+  await runtime.runCommand({
+    command: process.execPath,
+    args: [path.join(REPO_ROOT, "scripts/sync-release-notes.mjs")],
+    cwd: REPO_ROOT,
+    env: process.env,
+  });
+  await runtime.assertReleaseSummary(version);
+
   // Regenerate before validation and clean-tree checks. Stale projections become
   // visible changes to review and commit before this gate may pack a member.
   await runtime.runCommand({
@@ -3092,6 +3110,7 @@ function withDefaults(dependencies: ReleaseFamilyDependencies): Runtime {
       dependencies.removeDirectory ??
       ((directory) => rm(directory, { recursive: true, force: true })),
     removeFile: dependencies.removeFile ?? removeFileIfPresent,
+    assertReleaseSummary: dependencies.assertReleaseSummary ?? assertReleaseSummaryExists,
     fileExists: dependencies.fileExists ?? (async (filePath) => existsSync(filePath)),
     writeHandoff: dependencies.writeHandoff ?? writeHandoffAtomically,
     sha256File: dependencies.sha256File ?? defaultSha256File,
