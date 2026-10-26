@@ -178,20 +178,31 @@ export function singleBundleResolve(options: {
           !isAppOwned(importer) &&
           isBuildTimeTool(name)
         ) {
-          report.buildTimeOnly.add(name);
+          const lazy = LAZY_KINDS.has(args.kind);
 
           // A module-level import of a tool whose exports are known gets a stub
-          // that throws when called. Any other import stays external: a lazy
-          // one is never reached by a server, and nothing inlines a copy.
-          if (
-            name === specifier &&
-            name in BUILD_TIME_ONLY_PACKAGES &&
-            !LAZY_KINDS.has(args.kind)
-          ) {
+          // that throws when called, whoever imports it.
+          if (!lazy && name === specifier && name in BUILD_TIME_ONLY_PACKAGES) {
+            report.buildTimeOnly.add(name);
+
             return { path: name, namespace: BUILD_TIME_ONLY_NAMESPACE };
           }
 
-          return { path: specifier, external: true };
+          // A lazy import is never reached by a production server, and a
+          // module-level import from framework code only runs in build commands.
+          // Both stay external. A module-level import from any other package is
+          // a runtime need of that package and is bundled like any dependency.
+          const ownerDirectory = findPackageDirectory(importer);
+          const ownerName = ownerDirectory ? readManifest(ownerDirectory)?.name : undefined;
+          const frameworkOwned =
+            ownerName !== undefined &&
+            (ownerName.startsWith("@warlock.js/") || ownerName === "create-warlock");
+
+          if (lazy || frameworkOwned) {
+            report.buildTimeOnly.add(name);
+
+            return { path: specifier, external: true };
+          }
         }
 
         if (importer && path.isAbsolute(importer) && !isAppOwned(importer)) {

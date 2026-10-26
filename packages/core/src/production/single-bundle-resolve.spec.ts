@@ -258,6 +258,49 @@ describe("build-time tools", () => {
     rmSync(app, { recursive: true, force: true });
   });
 
+  it("bundles a build-time tool that a third-party runtime dependency imports at module level", async () => {
+    const app = mkdtempSync(path.join(tmpdir(), "warlock-single-bundle-app-"));
+    const put = (relative: string, content: string) => {
+      mkdirSync(path.dirname(path.join(app, relative)), { recursive: true });
+      writeFileSync(path.join(app, relative), content);
+    };
+    const installed = (name: string, files: Record<string, string>) => {
+      put(
+        `node_modules/${name}/package.json`,
+        JSON.stringify({ name, version: "1.0.0", main: "index.js" }),
+      );
+      for (const [file, content] of Object.entries(files))
+        put(`node_modules/${name}/${file}`, content);
+    };
+
+    put(
+      "package.json",
+      JSON.stringify({ name: "app", dependencies: { lib: "1.0.0", "@warlock.js/fake": "1.0.0" } }),
+    );
+    installed("@babel/parser", { "index.js": "export const PARSER_BODY = 'babel-parser';\n" });
+    installed("lib", {
+      "index.js": "import { PARSER_BODY } from '@babel/parser'; export default PARSER_BODY;\n",
+    });
+    installed("@warlock.js/fake", {
+      "index.js": "import { PARSER_BODY } from '@babel/parser'; export default PARSER_BODY;\n",
+    });
+    put("src/third-party.js", "import lib from 'lib'; console.log(lib);\n");
+    put("src/framework.js", "import fake from '@warlock.js/fake'; console.log(fake);\n");
+
+    const thirdParty = await bundle("src/third-party.js", app);
+
+    expect(thirdParty.error).toBeUndefined();
+    expect(thirdParty.text).toContain("babel-parser");
+    expect(thirdParty.text).not.toMatch(/from "@babel\/parser"/);
+
+    const framework = await bundle("src/framework.js", app);
+
+    expect(framework.error).toBeUndefined();
+    expect(framework.text).not.toContain("babel-parser");
+    expect(framework.text).toMatch(/from "@babel\/parser"/);
+    rmSync(app, { recursive: true, force: true });
+  });
+
   it("knows the tools by name and by scope", () => {
     for (const name of [
       "vite",

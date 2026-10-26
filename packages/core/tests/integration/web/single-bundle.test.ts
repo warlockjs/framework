@@ -1,6 +1,7 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { cp, mkdtemp, readdir, readFile, rm, stat } from "node:fs/promises";
 import { existsSync } from "node:fs";
+import { createRequire } from "node:module";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
@@ -124,6 +125,10 @@ describe("singleBundle with the web connector", () => {
       build: "{ singleBundle: true, minify: false }",
       web: ', build: { chunks: "single", precompress: false }',
     });
+
+    // Precondition: Vite is installed where the app can resolve it, so leaving it
+    // out of the bundle is the build's doing and not an absent package.
+    expect(() => createRequire(join(app, "package.json")).resolve("vite")).not.toThrow();
 
     const built = await run([warlock, "build"], app, 540_000);
 
