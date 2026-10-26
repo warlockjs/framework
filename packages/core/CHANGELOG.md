@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 > ⚠ **Versioning: `@warlock.js/*` does not follow SemVer strictly — breaking changes may ship in a minor.** This is a deliberate decision, not an oversight: the framework is pre-adoption and the cost of a major per behaviour fix currently outweighs the benefit. **Pin an exact version or a tilde range (`~4.13.0`) if you need to opt into changes rather than receive them.** Every breaking change is marked **BREAKING** in its entry and summarised in an _Upgrading_ section at the top of the release. **This policy will change once the framework has consumers beyond its author.**
 
+## 5.39.1
+
+### Fixed
+
+- `build.singleBundle` no longer bundles Vite when an app lists `vite` under `devDependencies`. Only `dependencies`, `optionalDependencies` and `peerDependencies` count as declared by the app, so a dev dependency no longer turns a framework's lazy `import()` into an inlined package (which had grown `dist` by about 60 MB and staged the `rolldown` and `lightningcss` native addons).
+- Build-time tools (`vite`, `rolldown`, `lightningcss`, `esbuild`, `oxc-parser`, `@vitejs/*`, `@babel/*` except `@babel/runtime`, and their platform packages) are never bundled or staged by `singleBundle` builds, even when the app lists them under `dependencies`. They are kept in one list. Imports from your own source files are unaffected.
+- A native package installed under an npm alias (`"node-pty": "npm:@lydell/node-pty"`) is staged in `dist/node_modules` under the name that is imported (`node-pty`), not under the real package name, so the import resolves from `dist/`.
+- Native packages are staged only when the finished bundle still imports them.
+- The build prints a warning naming a native package it could not copy because its `os` / `cpu` / `libc` exclude the build machine, instead of skipping it silently.
+
 ## 5.39.0 - 2026-10-26
 
 ### Added

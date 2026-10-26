@@ -37,6 +37,44 @@ export const BUILD_TIME_ONLY_PACKAGES: Readonly<Record<string, readonly string[]
   "oxc-parser": ["parseSync", "visitorKeys"],
 };
 
+/**
+ * Tools used only to build, check or develop an app. Framework code reaches
+ * them through lazy `import()` calls (Vite's dev server, the page scanner) or
+ * module-level imports that only build commands call. A production server never
+ * runs them, so a `singleBundle` build never inlines them and never stages their
+ * native binaries (`rolldown`, `lightningcss`, `esbuild`, `oxc-parser`),
+ * whatever the app's `package.json` says: listing `vite` under `dependencies`
+ * does not make it part of the server.
+ *
+ * Entries ending in `/` or `-` are scope or name prefixes. The rule applies to
+ * imports made by packages; the app's own source files are never rewritten by it.
+ */
+export const BUILD_TIME_TOOL_PACKAGES: readonly string[] = [
+  "vite",
+  "rolldown",
+  "@rolldown/",
+  "lightningcss",
+  "lightningcss-",
+  "@vitejs/",
+  "esbuild",
+  "@esbuild/",
+  "oxc-parser",
+  "@oxc-parser/",
+  "@babel/",
+];
+
+/** Names under a {@link BUILD_TIME_TOOL_PACKAGES} prefix that are runtime libraries. */
+const RUNTIME_EXCEPTIONS = new Set(["@babel/runtime"]);
+
+/** Whether a package name is one of the build-time tools. */
+export function isBuildTimeTool(name: string): boolean {
+  if (RUNTIME_EXCEPTIONS.has(name)) return false;
+
+  return BUILD_TIME_TOOL_PACKAGES.some((entry) =>
+    entry.endsWith("/") || entry.endsWith("-") ? name.startsWith(entry) : name === entry,
+  );
+}
+
 const BUILD_TIME_ONLY_NAMESPACE = "warlock-build-time-only";
 
 function buildTimeOnlyModule(name: string, exports: readonly string[]): string {
@@ -49,12 +87,18 @@ function buildTimeOnlyModule(name: string, exports: readonly string[]): string {
 /** Import kinds that run lazily or inside a guard, never at module evaluation. */
 const LAZY_KINDS = new Set(["dynamic-import", "require-call"]);
 
-function appDeclares(appManifest: ReturnType<typeof readManifest>, name: string): boolean {
+/**
+ * Whether the app declares `name` as something it runs with. `dependencies`,
+ * `optionalDependencies` and `peerDependencies` count; `devDependencies` do
+ * not, because they are installed to build and test the app and are not part of
+ * what runs in production. A dev dependency must therefore not turn a
+ * framework's lazy import into a bundled package.
+ */
+export function appDeclares(appManifest: ReturnType<typeof readManifest>, name: string): boolean {
   return [
     appManifest?.dependencies,
     appManifest?.optionalDependencies,
     appManifest?.peerDependencies,
-    (appManifest as { devDependencies?: Record<string, string> } | undefined)?.devDependencies,
   ].some((group) => group !== undefined && name in group);
 }
 
@@ -129,16 +173,25 @@ export function singleBundleResolve(options: {
         const importer = args.importer;
 
         if (
-          name === specifier &&
-          name in BUILD_TIME_ONLY_PACKAGES &&
           importer &&
           path.isAbsolute(importer) &&
           !isAppOwned(importer) &&
-          !appDeclares(appManifest, name)
+          isBuildTimeTool(name)
         ) {
           report.buildTimeOnly.add(name);
 
-          return { path: name, namespace: BUILD_TIME_ONLY_NAMESPACE };
+          // A module-level import of a tool whose exports are known gets a stub
+          // that throws when called. Any other import stays external: a lazy
+          // one is never reached by a server, and nothing inlines a copy.
+          if (
+            name === specifier &&
+            name in BUILD_TIME_ONLY_PACKAGES &&
+            !LAZY_KINDS.has(args.kind)
+          ) {
+            return { path: name, namespace: BUILD_TIME_ONLY_NAMESPACE };
+          }
+
+          return { path: specifier, external: true };
         }
 
         if (importer && path.isAbsolute(importer) && !isAppOwned(importer)) {
@@ -175,10 +228,12 @@ export function singleBundleResolve(options: {
         const directory = findPackageDirectory(resolved.path);
 
         if (directory && isNativePackage(directory)) {
-          const nativeName = readManifest(directory)?.name ?? name;
-
-          if (!report.native.has(nativeName)) {
-            report.native.set(nativeName, { name: nativeName, directory });
+          // Staged under the name that is imported: the folder name in
+          // `node_modules`, which is the alias key for an npm alias such as
+          // `"node-pty": "npm:@lydell/node-pty"`, not the `name` inside the
+          // package's own manifest.
+          if (!report.native.has(name)) {
+            report.native.set(name, { name, directory });
           }
 
           return { path: specifier, external: true };
@@ -227,4 +282,46 @@ export function externalizedButBundled(
   const bundled = bundledPackageNames(inputs);
 
   return [...report.optional.keys()].filter((name) => bundled.has(name));
+}
+
+/**
+ * Package names the bundle still imports at run time, read from an esbuild
+ * metafile: every external import of every output file.
+ */
+export function externalImportNames(outputs: Record<string, unknown>): Set<string> {
+  const names = new Set<string>();
+
+  for (const output of Object.values(outputs)) {
+    const imports = (output as { imports?: { path: string; external?: boolean }[] }).imports;
+
+    for (const entry of imports ?? []) {
+      if (entry.external && isBareSpecifier(entry.path)) {
+        names.add(packageNameOfSpecifier(entry.path));
+      }
+    }
+  }
+
+  return names;
+}
+
+/**
+ * Drop native packages the finished bundle never imports (for example one whose
+ * only importer was tree-shaken away), so nothing unreachable is staged.
+ * Returns the names removed.
+ */
+export function pruneUnreachableNative(
+  report: SingleBundleReport,
+  outputs: Record<string, unknown>,
+): string[] {
+  const reachable = externalImportNames(outputs);
+  const removed: string[] = [];
+
+  for (const name of [...report.native.keys()]) {
+    if (!reachable.has(name)) {
+      report.native.delete(name);
+      removed.push(name);
+    }
+  }
+
+  return removed;
 }

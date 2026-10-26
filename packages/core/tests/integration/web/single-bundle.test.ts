@@ -155,6 +155,9 @@ describe("singleBundle with the web connector", () => {
     expect(bundle).not.toMatch(/react-dom-client\.development/);
     expect(files.filter((file) => file.startsWith("node_modules/"))).toEqual([]);
 
+    // Vite is a dev dependency of the app: nothing of it or its native addons is in dist.
+    expect(bundle).not.toMatch(/node_modules\/(\.pnpm\/)?(vite|rolldown|lightningcss)[@/]/);
+
     const standalone = await temporary("warlock-standalone-");
 
     await cp(dist, standalone, { recursive: true });

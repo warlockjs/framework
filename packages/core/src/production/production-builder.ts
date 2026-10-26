@@ -45,6 +45,7 @@ import { stageNativePackages } from "./native-addons";
 import {
   createSingleBundleReport,
   externalizedButBundled,
+  pruneUnreachableNative,
   singleBundleResolve,
 } from "./single-bundle-resolve";
 import { formatDistSummary, summarizeDist } from "./dist-summary";
@@ -985,6 +986,9 @@ bootstrap();
           singleBundleReport = createSingleBundleReport();
           result = await runBuild(new Set(conflicts));
         }
+
+        // Stage only the native packages the finished bundle really imports.
+        if (result?.metafile) pruneUnreachableNative(singleBundleReport, result.metafile.outputs);
       }
     } catch (e) {
       console.log(e);
@@ -1005,7 +1009,7 @@ bootstrap();
     report: ReturnType<typeof createSingleBundleReport>,
   ): Promise<void> {
     if (report.native.size > 0) {
-      const { staged, missing } = await stageNativePackages(writeOutDir, [
+      const { staged, missing, skipped } = await stageNativePackages(writeOutDir, [
         ...report.native.values(),
       ]);
 
@@ -1019,6 +1023,14 @@ bootstrap();
 
       if (loaded.length > 0) {
         console.log(colors.gray(`   Also copied for it: ${loaded.join(", ")}`));
+      }
+
+      if (skipped.length > 0) {
+        console.warn(
+          colors.yellow(
+            `   Native addon not copied, it does not support ${process.platform}/${process.arch}, so importing it fails at run time: ${skipped.join(", ")}`,
+          ),
+        );
       }
 
       if (missing.length > 0) {

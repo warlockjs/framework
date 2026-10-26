@@ -240,11 +240,14 @@ export type StagedNativePackages = {
   staged: string[];
   /** Dependencies that could not be located on disk */
   missing: string[];
+  /** Requested packages not copied because their `os` / `cpu` / `libc` exclude this machine */
+  skipped: string[];
 };
 
 /**
  * Copy each native package, plus the dependencies it loads at runtime, into
- * `<distDirectory>/node_modules/<name>` so `node dist/app.js` finds them with
+ * `<distDirectory>/node_modules/<name>` (`name` is the imported name, so an npm
+ * alias is staged under the alias, not under the real package name) so `node dist/app.js` finds them with
  * no `node_modules` above `dist/`.
  *
  * Only what is needed to load is copied: the manifest, JavaScript, the
@@ -260,7 +263,9 @@ export async function stageNativePackages(
 ): Promise<StagedNativePackages> {
   const staged = new Map<string, string>();
   const missing: string[] = [];
+  const skipped: string[] = [];
   const queue: NativePackage[] = [...packages];
+  const requested = new Set(packages.map((entry) => entry.name));
 
   while (queue.length > 0) {
     const current = queue.shift()!;
@@ -269,7 +274,11 @@ export async function stageNativePackages(
 
     const manifest = readManifest(current.directory) ?? {};
 
-    if (!matchesPlatform(manifest, platform)) continue;
+    if (!matchesPlatform(manifest, platform)) {
+      if (requested.has(current.name)) skipped.push(current.name);
+
+      continue;
+    }
 
     staged.set(current.name, current.directory);
     await copyPackageFiles(
@@ -295,5 +304,5 @@ export async function stageNativePackages(
     }
   }
 
-  return { staged: [...staged.keys()], missing };
+  return { staged: [...staged.keys()], missing, skipped };
 }
