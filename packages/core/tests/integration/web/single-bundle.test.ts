@@ -1,6 +1,7 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { cp, mkdtemp, readdir, readFile, rm, stat } from "node:fs/promises";
 import { existsSync } from "node:fs";
+import { createRequire } from "node:module";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
@@ -125,6 +126,10 @@ describe("singleBundle with the web connector", () => {
       web: ', build: { chunks: "single", precompress: false }',
     });
 
+    // Precondition: Vite is installed where the app can resolve it, so leaving it
+    // out of the bundle is the build's doing and not an absent package.
+    expect(() => createRequire(join(app, "package.json")).resolve("vite")).not.toThrow();
+
     const built = await run([warlock, "build"], app, 540_000);
 
     expect(built.code, built.output.slice(-4000)).toBe(0);
@@ -154,6 +159,9 @@ describe("singleBundle with the web connector", () => {
     expect(bundle).not.toMatch(/@babel[+/]parser/);
     expect(bundle).not.toMatch(/react-dom-client\.development/);
     expect(files.filter((file) => file.startsWith("node_modules/"))).toEqual([]);
+
+    // Vite is a dev dependency of the app: nothing of it or its native addons is in dist.
+    expect(bundle).not.toMatch(/node_modules\/(\.pnpm\/)?(vite|rolldown|lightningcss)[@/]/);
 
     const standalone = await temporary("warlock-standalone-");
 

@@ -122,6 +122,21 @@ describe("stageNativePackages", () => {
     expect(staged("stage-me-other-os")).toBe(false);
   });
 
+  it("stages under the requested name and reports a package this platform cannot use", async () => {
+    const aliased = pkg("real-name", {}, { "index.js": "", "a.node": "bin" });
+    const foreign = pkg("foreign", { os: ["plan9"] }, { "x.node": "bin" });
+    const dist = path.join(root, "dist3");
+    const result = await stageNativePackages(dist, [
+      { name: "alias-name", directory: aliased },
+      { name: "foreign", directory: foreign },
+    ]);
+
+    expect(result.staged).toEqual(["alias-name"]);
+    expect(result.skipped).toEqual(["foreign"]);
+    expect(existsSync(path.join(dist, "node_modules", "alias-name", "a.node"))).toBe(true);
+    expect(existsSync(path.join(dist, "node_modules", "real-name"))).toBe(false);
+  });
+
   it("reports a required dependency it cannot find", async () => {
     const main = pkg("lonely", { dependencies: { "ghost-dep": "1.0.0" } }, { "index.js": "" });
     const result = await stageNativePackages(path.join(root, "dist2"), [

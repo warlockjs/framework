@@ -80,6 +80,8 @@ export async function writeSingleBundleApp(
         "@warlock.js/core": "*",
         "@warlock.js/web": "*",
       },
+      // Build tooling listed as a dev dependency must stay out of the server bundle.
+      devDependencies: { vite: "*" },
     }),
   );
   await write(

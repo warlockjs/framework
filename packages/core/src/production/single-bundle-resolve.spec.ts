@@ -1,10 +1,16 @@
 import esbuild from "esbuild";
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { clearNativePackageCache } from "./native-addons";
-import { createSingleBundleReport, singleBundleResolve } from "./single-bundle-resolve";
+import { clearNativePackageCache, stageNativePackages } from "./native-addons";
+import {
+  appDeclares,
+  createSingleBundleReport,
+  isBuildTimeTool,
+  pruneUnreachableNative,
+  singleBundleResolve,
+} from "./single-bundle-resolve";
 
 let root: string;
 
@@ -23,7 +29,7 @@ function pkg(name: string, manifest: object, files: Record<string, string>): voi
     write(`node_modules/${name}/${file}`, content);
 }
 
-async function bundle(entry: string) {
+async function bundle(entry: string, appRoot: string = root) {
   const report = createSingleBundleReport();
   let error: unknown;
   let text = "";
@@ -35,10 +41,10 @@ async function bundle(entry: string) {
       bundle: true,
       write: false,
       logLevel: "silent",
-      entryPoints: [path.join(root, entry)],
-      outfile: path.join(root, "out.js"),
+      entryPoints: [path.join(appRoot, entry)],
+      outfile: path.join(appRoot, "out.js"),
       packages: "bundle",
-      plugins: [singleBundleResolve({ appRoot: root, aliasKeys: [], report })],
+      plugins: [singleBundleResolve({ appRoot, aliasKeys: [], report })],
     });
     text = result.outputFiles[0]!.text;
   } catch (caught) {
@@ -170,5 +176,249 @@ describe("singleBundleResolve", () => {
 
     expect(String(statik.error)).toContain("not-installed-anywhere");
     expect(String(lazy.error)).toContain("not-installed-anywhere");
+  });
+});
+
+/** A second app with its own manifest, for tests that depend on where a package is listed. */
+function appWith(manifest: object, aliasedNative = false): string {
+  const app = mkdtempSync(path.join(tmpdir(), "warlock-single-bundle-app-"));
+  const put = (relative: string, content: string) => {
+    mkdirSync(path.dirname(path.join(app, relative)), { recursive: true });
+    writeFileSync(path.join(app, relative), content);
+  };
+  const installed = (name: string, extra: object, files: Record<string, string>) => {
+    put(`node_modules/${name}/package.json`, JSON.stringify({ name, version: "1.0.0", ...extra }));
+    for (const [file, content] of Object.entries(files))
+      put(`node_modules/${name}/${file}`, content);
+  };
+
+  put("package.json", JSON.stringify({ name: "app", ...manifest }));
+  installed(
+    "host",
+    {
+      main: "index.js",
+      peerDependencies: { vite: "*" },
+      optionalDependencies: { "node-pty": "*" },
+    },
+    {
+      "index.js":
+        'export const dev = () => import("vite"); export const pty = () => import("node-pty");\n',
+    },
+  );
+  installed(
+    "vite",
+    { main: "index.js", dependencies: { rolldown: "1.0.0" } },
+    { "index.js": "import 'rolldown'; export const REAL_VITE = 1;\n" },
+  );
+  installed(
+    "rolldown",
+    { main: "index.js" },
+    { "index.js": "export default 1;\n", "r.node": "bin" },
+  );
+
+  if (aliasedNative) {
+    // npm installs `"node-pty": "npm:@lydell/node-pty"` as node_modules/node-pty.
+    installed(
+      "node-pty",
+      { main: "index.js" },
+      { "index.js": "module.exports = {};\n", "pty.node": "bin" },
+    );
+    put(
+      "node_modules/node-pty/package.json",
+      JSON.stringify({ name: "@lydell/node-pty", version: "1.0.0", main: "index.js" }),
+    );
+  }
+
+  put("src/main.js", 'import { dev, pty } from "host"; dev(); pty();\n');
+
+  return app;
+}
+
+describe("build-time tools", () => {
+  it("does not bundle vite listed in devDependencies, and stages no native addon for it", async () => {
+    const app = appWith({ dependencies: { host: "1.0.0" }, devDependencies: { vite: "1.0.0" } });
+    const { report, text, error } = await bundle("src/main.js", app);
+
+    expect(error).toBeUndefined();
+    expect(text).toMatch(/import\("vite"\)/);
+    expect(text).not.toContain("REAL_VITE");
+    expect(report.native.has("rolldown")).toBe(false);
+    rmSync(app, { recursive: true, force: true });
+  });
+
+  it("does not bundle vite listed in dependencies either", async () => {
+    const app = appWith({ dependencies: { host: "1.0.0", vite: "1.0.0" } });
+    const { report, text, error } = await bundle("src/main.js", app);
+
+    expect(error).toBeUndefined();
+    expect(text).toMatch(/import\("vite"\)/);
+    expect(text).not.toContain("REAL_VITE");
+    expect(report.native.has("rolldown")).toBe(false);
+    expect([...report.buildTimeOnly]).toContain("vite");
+    rmSync(app, { recursive: true, force: true });
+  });
+
+  it("bundles a build-time tool that a third-party runtime dependency imports at module level", async () => {
+    const app = mkdtempSync(path.join(tmpdir(), "warlock-single-bundle-app-"));
+    const put = (relative: string, content: string) => {
+      mkdirSync(path.dirname(path.join(app, relative)), { recursive: true });
+      writeFileSync(path.join(app, relative), content);
+    };
+    const installed = (name: string, files: Record<string, string>) => {
+      put(
+        `node_modules/${name}/package.json`,
+        JSON.stringify({ name, version: "1.0.0", main: "index.js" }),
+      );
+      for (const [file, content] of Object.entries(files))
+        put(`node_modules/${name}/${file}`, content);
+    };
+
+    put(
+      "package.json",
+      JSON.stringify({ name: "app", dependencies: { lib: "1.0.0", "@warlock.js/fake": "1.0.0" } }),
+    );
+    installed("@babel/parser", { "index.js": "export const PARSER_BODY = 'babel-parser';\n" });
+    installed("lib", {
+      "index.js": "import { PARSER_BODY } from '@babel/parser'; export default PARSER_BODY;\n",
+    });
+    installed("@warlock.js/fake", {
+      "index.js": "import { PARSER_BODY } from '@babel/parser'; export default PARSER_BODY;\n",
+    });
+    put("src/third-party.js", "import lib from 'lib'; console.log(lib);\n");
+    put("src/framework.js", "import fake from '@warlock.js/fake'; console.log(fake);\n");
+
+    const thirdParty = await bundle("src/third-party.js", app);
+
+    expect(thirdParty.error).toBeUndefined();
+    expect(thirdParty.text).toContain("babel-parser");
+    expect(thirdParty.text).not.toMatch(/from "@babel\/parser"/);
+
+    const framework = await bundle("src/framework.js", app);
+
+    expect(framework.error).toBeUndefined();
+    expect(framework.text).not.toContain("babel-parser");
+    expect(framework.text).toMatch(/from "@babel\/parser"/);
+    rmSync(app, { recursive: true, force: true });
+  });
+
+  it("bundles oxc-parser for a third-party importer when the app declares it", async () => {
+    for (const group of ["dependencies", "optionalDependencies", "peerDependencies"]) {
+      const app = mkdtempSync(path.join(tmpdir(), "warlock-single-bundle-app-"));
+      const put = (relative: string, content: string) => {
+        mkdirSync(path.dirname(path.join(app, relative)), { recursive: true });
+        writeFileSync(path.join(app, relative), content);
+      };
+      const installed = (name: string, files: Record<string, string>) => {
+        put(
+          `node_modules/${name}/package.json`,
+          JSON.stringify({ name, version: "1.0.0", main: "index.js" }),
+        );
+        for (const [file, content] of Object.entries(files))
+          put(`node_modules/${name}/${file}`, content);
+      };
+
+      put(
+        "package.json",
+        JSON.stringify({
+          name: "app",
+          dependencies: { scanner: "1.0.0" },
+          [group]: { scanner: "1.0.0", "oxc-parser": "1.0.0" },
+        }),
+      );
+      installed("oxc-parser", { "index.js": "export const parseSync = () => 'REAL_PARSER';\n" });
+      installed("scanner", {
+        "index.js":
+          "import { parseSync } from 'oxc-parser'; export const scan = () => parseSync();\n",
+      });
+      put("src/main.js", "import { scan } from 'scanner'; console.log(scan());\n");
+
+      const { report, text, error } = await bundle("src/main.js", app);
+
+      expect(error, group).toBeUndefined();
+      expect(text, group).toContain("REAL_PARSER");
+      expect(text, group).not.toContain(
+        "is a build-time tool and is not part of a production bundle",
+      );
+      expect(report.buildTimeOnly.has("oxc-parser"), group).toBe(false);
+      rmSync(app, { recursive: true, force: true });
+    }
+  });
+
+  it("knows the tools by name and by scope", () => {
+    for (const name of [
+      "vite",
+      "rolldown",
+      "lightningcss",
+      "lightningcss-linux-x64-gnu",
+      "@vitejs/plugin-react",
+      "esbuild",
+      "@esbuild/linux-x64",
+      "oxc-parser",
+      "@babel/core",
+    ]) {
+      expect(isBuildTimeTool(name), name).toBe(true);
+    }
+
+    for (const name of ["@babel/runtime", "react", "viteish", "fastify"]) {
+      expect(isBuildTimeTool(name), name).toBe(false);
+    }
+  });
+
+  it("counts only dependencies, optionalDependencies and peerDependencies as declared", () => {
+    const manifest = {
+      dependencies: { a: "1" },
+      optionalDependencies: { b: "1" },
+      peerDependencies: { c: "1" },
+      devDependencies: { d: "1" },
+    } as Parameters<typeof appDeclares>[0];
+
+    expect(["a", "b", "c", "d"].map((name) => appDeclares(manifest, name))).toEqual([
+      true,
+      true,
+      true,
+      false,
+    ]);
+  });
+});
+
+describe("aliased native packages", () => {
+  it("records a native package under the imported name, not the real package name", async () => {
+    const app = appWith(
+      { dependencies: { host: "1.0.0", "node-pty": "npm:@lydell/node-pty" } },
+      true,
+    );
+    const { report, error } = await bundle("src/main.js", app);
+
+    expect(error).toBeUndefined();
+    expect([...report.native.keys()]).toEqual(["node-pty"]);
+
+    const dist = path.join(app, "dist");
+    const result = await stageNativePackages(dist, [...report.native.values()]);
+
+    expect(result.staged).toEqual(["node-pty"]);
+    expect(existsSync(path.join(dist, "node_modules", "node-pty", "pty.node"))).toBe(true);
+    expect(existsSync(path.join(dist, "node_modules", "@lydell"))).toBe(false);
+    rmSync(app, { recursive: true, force: true });
+  });
+});
+
+describe("pruneUnreachableNative", () => {
+  it("keeps only native packages the bundle still imports", () => {
+    const report = createSingleBundleReport();
+
+    report.native.set("kept", { name: "kept", directory: "/x/kept" });
+    report.native.set("gone", { name: "gone", directory: "/x/gone" });
+
+    const removed = pruneUnreachableNative(report, {
+      "app.js": {
+        imports: [
+          { path: "kept/lib/a.js", external: true },
+          { path: "gone", external: false },
+        ],
+      },
+    });
+
+    expect(removed).toEqual(["gone"]);
+    expect([...report.native.keys()]).toEqual(["kept"]);
   });
 });
