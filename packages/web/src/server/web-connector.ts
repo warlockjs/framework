@@ -47,6 +47,7 @@ import { fileURLToPath } from "node:url";
 import type { FastifyReply, FastifyRequest, HookHandlerDoneFunction } from "fastify";
 import type { Alias, PluginOption, ViteDevServer } from "vite";
 import { assertViteVersion } from "../vite/assert-vite-version";
+import type { ProductionBundleGlobal } from "./production-bundle";
 import {
   Application,
   BaseConnector,
@@ -935,7 +936,7 @@ export class WebConnector extends BaseConnector {
         // Advance observable state only after the router transaction commits.
         // A rejected install keeps both the old route table and browser live.
         this.installedPages = nextInstalledPages;
-        const { invalidateClientPageRegistry } = await import("../vite/page-registry-plugin");
+        const { invalidateClientPageRegistry } = await this.loadPageRegistryPlugin();
 
         invalidateClientPageRegistry(vite);
         for (const site of Object.keys(config.get("web", {}).sites ?? {})) {
@@ -1065,6 +1066,27 @@ export class WebConnector extends BaseConnector {
     };
   }
 
+  /**
+   * The development server's Vite configuration module. Guarded so a production
+   * bundle does not include it, or Vite: see `./production-bundle`.
+   */
+  protected async loadDevServerConfig(): Promise<typeof import("../vite/dev-server-config")> {
+    if (!(globalThis as ProductionBundleGlobal).__WARLOCK_PRODUCTION_BUNDLE__) {
+      return import("../vite/dev-server-config");
+    }
+
+    throw new Error("The Vite development server is not part of a production bundle.");
+  }
+
+  /** The page registry plugin; development only, see {@link loadDevServerConfig}. */
+  protected async loadPageRegistryPlugin(): Promise<typeof import("../vite/page-registry-plugin")> {
+    if (!(globalThis as ProductionBundleGlobal).__WARLOCK_PRODUCTION_BUNDLE__) {
+      return import("../vite/page-registry-plugin");
+    }
+
+    throw new Error("The Vite page registry is not part of a production bundle.");
+  }
+
   protected async createViteServer(
     fastify: FastifyInstance,
     paths: Awaited<ReturnType<WebConnector["resolvePaths"]>>,
@@ -1072,7 +1094,7 @@ export class WebConnector extends BaseConnector {
     const { createServer, buildErrorMessage, searchForWorkspaceRoot, version } =
       await import("vite");
     assertViteVersion(version);
-    const { createWebConnectorViteConfig } = await import("../vite/dev-server-config");
+    const { createWebConnectorViteConfig } = await this.loadDevServerConfig();
 
     // Vite's own default for `server.fs.allow`, reproduced rather than dropped:
     // naming the key at all REPLACES the default, and an application that

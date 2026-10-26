@@ -2,6 +2,18 @@
 
 All notable changes to `@warlock.js/web` are documented here.
 
+## 5.38.1
+
+### Added
+
+- Connector build options `webConnector({ build: { chunks, precompress } })`. `chunks` is `"split"` (the default: a React vendor chunk, the entry, a lazy chunk per page and shared chunks), `"merged"` (the same lazy page loading with small shared chunks packed together by size, far fewer files) or `"single"` (one JavaScript entry and one stylesheet, dynamic imports inlined; single-site apps only). `precompress: false` skips the `.br` and `.gz` copies of every client asset (default `true`). Final-bytes chunk names, dedupe, the integrity check, preload lists and payload budgets work in every mode. `build.singleBundle` in core does not change them; the desktop and offline app recipe sets both.
+- Exports from `@warlock.js/web/vite`: `ClientChunkMode`, `resolveClientChunkMode` and `clientCodeSplitting`; `buildHydrationClient` takes `chunks`.
+
+### Fixed
+
+- A production server built with `singleBundle` carried Vite and the development server inside `app.js`, through the connector's build contribution and its development-server branches. They are left out of the production bundle, and the server never loads Vite.
+- A build copied away from its project could not find its client bundle: the page manifest stored `dist/client` relative to the working directory. When a `client` folder sits next to the running bundle it is used, so `node app.js` works from any working directory in a copy of `dist/`.
+
 ## 5.38.0 - 2026-10-25
 
 ### Added

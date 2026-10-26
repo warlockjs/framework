@@ -9,6 +9,7 @@ import {
   writeChunkIntegrity,
   type ChunkIntegrityRecord,
 } from "./chunk-integrity";
+import { resolveClientChunkMode, type ClientChunkMode } from "./client-chunk-mode";
 import { cssModulesConfig } from "./css-modules-config";
 import { finalizeChunkNames } from "./finalize-chunk-names";
 import {
@@ -50,6 +51,8 @@ export interface BuildHydrationClientOptions {
    * file name that maps to different bytes than the record fails the build.
    */
   previousIntegrity?: ChunkIntegrityRecord;
+  /** How the bundle is split into files. Default `"split"`. */
+  chunks?: ClientChunkMode;
 }
 
 /**
@@ -132,6 +135,48 @@ export function warlockHydrationManualChunks(id: string): string | undefined {
 export const HYDRATION_CODE_SPLITTING = {
   groups: [{ name: (id: string) => warlockHydrationManualChunks(id) }],
 };
+
+export {
+  CLIENT_CHUNK_MODES,
+  resolveClientChunkMode,
+  type ClientChunkMode,
+} from "./client-chunk-mode";
+
+/** Smallest a merged shared chunk grows to before a new one starts, in bytes. */
+export const MERGED_CHUNK_MIN_SIZE = 20 * 1024;
+
+/** Largest a merged shared chunk grows to, in bytes. */
+export const MERGED_CHUNK_MAX_SIZE = 300 * 1024;
+
+/**
+ * The Rolldown `codeSplitting` option for a chunk mode.
+ *
+ * `merged` keeps the React vendor group first (a stable hash across deploys),
+ * then packs every module that two or more chunks share into a few chunks of
+ * `MERGED_CHUNK_MIN_SIZE`..`MERGED_CHUNK_MAX_SIZE`. Modules only one page uses
+ * stay in that page's chunk, so each page still loads on demand. `single`
+ * turns code splitting off, which inlines dynamic imports.
+ */
+export function clientCodeSplitting(mode: ClientChunkMode) {
+  if (mode === "single") return false as const;
+
+  if (mode === "merged") {
+    return {
+      groups: [
+        { name: (id: string) => warlockHydrationManualChunks(id), priority: 10 },
+        {
+          name: "shared",
+          minShareCount: 2,
+          minSize: MERGED_CHUNK_MIN_SIZE,
+          maxSize: MERGED_CHUNK_MAX_SIZE,
+          priority: 1,
+        },
+      ],
+    };
+  }
+
+  return HYDRATION_CODE_SPLITTING;
+}
 
 export interface BuildHydrationClientResult {
   entry: HydrationClientEntry;
@@ -237,6 +282,14 @@ export async function buildHydrationClient(
   };
   const siteNames =
     options.sites !== undefined && options.sites.length > 0 ? options.sites : undefined;
+  const chunkMode = resolveClientChunkMode(options.chunks);
+
+  if (chunkMode === "single" && siteNames !== undefined) {
+    throw new Error(
+      'web build option chunks: "single" cannot be used with several sites: each site has its own ' +
+        'hydration entry, and one file cannot hold more than one. Use "merged", or build one site per app.',
+    );
+  }
   const viteResult = await build({
     root: viteRoot,
     customLogger,
@@ -259,6 +312,8 @@ export async function buildHydrationClient(
         }),
     build: {
       copyPublicDir: false,
+      // One stylesheet in single mode; a split stylesheet is one more file to ship.
+      ...(chunkMode === "single" ? { cssCodeSplit: false } : {}),
       emptyOutDir: true,
       manifest: true,
       outDir,
@@ -286,7 +341,7 @@ export async function buildHydrationClient(
           // Vite 8 bundles with Rolldown, where the function form of Rollup's
           // `manualChunks` is deprecated in favour of `codeSplitting` groups
           // (https://vite.dev/guide/migration, "Removed" / "Deprecated").
-          codeSplitting: HYDRATION_CODE_SPLITTING,
+          codeSplitting: clientCodeSplitting(chunkMode),
         },
       },
       watch: null,

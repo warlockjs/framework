@@ -22,6 +22,7 @@
 
 // Type-only: erased at run time, so this module stays dependency-free.
 import type { PageManifestTranslations } from "../translations/types";
+import { resolveBuiltClientDir } from "./built-client-dir";
 
 export type PageManifestLayoutEntry = {
   /** The imported layout module namespace object (default export = component, optional `prefix`). */
@@ -194,7 +195,10 @@ export function providePageManifest(manifest: PageManifest): void {
     );
   }
 
-  providedManifest = manifest;
+  providedManifest =
+    manifest.clientDir === undefined
+      ? manifest
+      : { ...manifest, clientDir: resolveBuiltClientDir(manifest.clientDir) };
 }
 
 /**

@@ -9,6 +9,7 @@
  * `import()`s each page's SOURCE file — never reachable in a production
  * build, which is why production always registers its own source first.
  */
+import type { ProductionBundleGlobal } from "../server/production-bundle";
 import type { DiscoverPagesOptions } from "../build/discover-pages";
 import {
   expandLocaleEntries,
@@ -88,9 +89,15 @@ async function readSitemapPages(
     options.pageSource ??
     getProductionSitemapPageSource() ??
     (async () => {
-      const { listRoutablePages } = await import("../build/list-routable-pages");
+      // Development only: a production bundle always has the build's page
+      // manifest, and this branch (with its Babel parser) is left out of it.
+      if (!(globalThis as ProductionBundleGlobal).__WARLOCK_PRODUCTION_BUNDLE__) {
+        const { listRoutablePages } = await import("../build/list-routable-pages");
 
-      return listRoutablePages(options);
+        return listRoutablePages(options);
+      }
+
+      throw new Error("The production sitemap needs the page manifest from the build.");
     });
 
   return pageSource();
