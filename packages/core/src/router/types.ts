@@ -270,6 +270,13 @@ export interface RouteOptions {
    */
   isPage?: boolean;
   /**
+   * Let this GET route answer core-level refusals (a path-traversal 403 on the
+   * public mount, a malformed-URL 400) for requests that accept HTML. The route
+   * handler reads the refused status with `refusalStatusOf(request)`. Used by the
+   * web page host's catch-all; API routes never set it.
+   */
+  handlesRefusals?: boolean;
+  /**
    * How the rate limiter treats this route.
    *
    * - an object: the route gets its own limit and bucket instead of the

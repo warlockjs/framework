@@ -11,6 +11,8 @@ import type {
   RouteOptions,
 } from "fastify";
 
+import { dispatchRefusal } from "./refusal-dispatch";
+
 type FileRoute = { url: string; file?: string; rootPath?: string };
 type ReplyDecorator = (this: FastifyReply, ...args: unknown[]) => FastifyReply;
 
@@ -246,6 +248,14 @@ async function prepareStatic(
         if (error?.code === "ERR_STREAM_PREMATURE_CLOSE") {
           reply.request.raw.destroy();
           return;
+        }
+        // A traversal / malformed-path refusal (403, 400, ...) on a page host
+        // answers a browser with the site's page instead of raw JSON.
+        const status = error?.statusCode;
+        if (typeof status === "number" && status >= 400 && status < 500 && status !== 404) {
+          return dispatchRefusal(request, reply, status).then((handled) =>
+            handled ? reply : server.errorHandler(error, request, reply),
+          );
         }
         return server.errorHandler(error, request, reply);
       },

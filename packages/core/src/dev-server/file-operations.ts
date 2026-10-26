@@ -25,8 +25,16 @@ export class FileOperations {
   /**
    * Register and process a new file. Recursively pulls in any
    * not-yet-tracked dependencies so the dep graph is complete.
+   *
+   * `followDependencies: false` registers the file and its direct import edges
+   * only. A caller that needs one file's own metadata (a config file, loaded
+   * before the rest of the project is scanned) must not pay for walking every
+   * module that file reaches, dynamic imports included.
    */
-  public async addFile(relativePath: string): Promise<FileManager> {
+  public async addFile(
+    relativePath: string,
+    options: { followDependencies?: boolean } = {},
+  ): Promise<FileManager> {
     const existing = this.files.get(relativePath);
     if (existing) return existing;
 
@@ -37,7 +45,7 @@ export class FileOperations {
 
     await fileManager.process();
 
-    for (const depPath of fileManager.dependencies) {
+    for (const depPath of options.followDependencies === false ? [] : fileManager.dependencies) {
       if (!this.files.has(depPath)) {
         try {
           await this.addFile(depPath);

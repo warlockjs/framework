@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 > ⚠ **Versioning: `@warlock.js/*` does not follow SemVer strictly — breaking changes may ship in a minor.** This is a deliberate decision, not an oversight: the framework is pre-adoption and the cost of a major per behaviour fix currently outweighs the benefit. **Pin an exact version or a tilde range (`~4.13.0`) if you need to opt into changes rather than receive them.** Every breaking change is marked **BREAKING** in its entry and summarised in an _Upgrading_ section at the top of the release. **This policy will change once the framework has consumers beyond its author.**
 
+## 5.38.1
+
+### Added
+
+- `warlock doctor` check `config-app-imports`: warns when a file under `src/config` imports (statically or with `import()`) anything under `src/app`, naming the file and the import. Type-only imports are not reported.
+- Route option `handlesRefusals` and the `refusalStatusOf(request)` helper. A `GET` route marked `handlesRefusals` answers core-level refusals for requests that accept HTML.
+
+### Fixed
+
+- Loading config files walked every module the config reached. `loadConfigFiles` registered each config file together with its whole transitive import graph (dynamic `import()` included), file by file, in every process that loads config. A config such as `src/config/web.ts` whose `errors.report` imported an application service made each test worker spend minutes in setup; the walk grew with the size of the application (about 480 seconds for a 3,000-module graph, measured). Config files are now registered with their direct import edges only; the dev server still builds the full graph from its own scan.
+- A request core refuses before routing answered raw JSON to a browser: a dot-segment or path-traversal path on the public mount (`/public/../x`, 403) and a malformed URL (400). When the app has a route marked `handlesRefusals` (the web package's page catch-all), a `GET` or `HEAD` request that accepts `text/html` is handed to it; other requests keep the JSON answer.
+
 ## 5.38.0 - 2026-10-25
 
 ### Added

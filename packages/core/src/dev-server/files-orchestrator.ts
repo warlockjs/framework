@@ -138,8 +138,11 @@ export class FilesOrchestrator {
     // Keep isInitialized true so another boot does not stack another hook.
   }
 
-  public async add(relativePath: string): Promise<FileManager> {
-    return this.fileOperations.addFile(relativePath);
+  public async add(
+    relativePath: string,
+    options?: { followDependencies?: boolean },
+  ): Promise<FileManager> {
+    return this.fileOperations.addFile(relativePath, options);
   }
 
   public async load<T>(relativePath: string, type = "other") {

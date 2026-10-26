@@ -11,6 +11,7 @@ import type {
 type DrainServer = NodeHttpServer | Http2Server | Http2SecureServer;
 type DrainResponse = ServerResponse | Http2ServerResponse;
 import { normalizeRequestPath } from "../router/normalize-request-path";
+import { dispatchRefusal } from "./refusal-dispatch";
 import { registerErrorResponseFormatter } from "./error-response";
 import type { HttpServerOptions } from "./types";
 
@@ -99,6 +100,16 @@ export function startHttpServer(options?: HttpServerOptions): FastifyInstance {
     // `http.gracefulShutdown.forceCloseConnections`.
     ...options,
     forceCloseConnections,
+    // Malformed URLs and similar refusals happen before any route exists. A
+    // page host answers a document request with its page; everything else keeps
+    // Fastify's own error response.
+    frameworkErrors(error, request, reply) {
+      const status = (error as { statusCode?: number }).statusCode ?? 400;
+
+      void dispatchRefusal(request as never, reply as never, status).then((handled) => {
+        if (!handled) void (reply as { send(payload: unknown): unknown }).send(error);
+      });
+    },
     // Fastify calls this before route matching in both production `scan()` and
     // the development wildcard dispatcher. Compose an app-supplied rewrite
     // first, then apply the one framework request-path normalizer so the two

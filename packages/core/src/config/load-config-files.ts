@@ -29,7 +29,9 @@ export async function loadConfigFiles(config: string[] | true) {
   await filesOrchestrator.init();
 
   const configFiles = await Promise.all(
-    relativePaths.map((relativePath) => filesOrchestrator.add(relativePath)),
+    relativePaths.map((relativePath) =>
+      filesOrchestrator.add(relativePath, { followDependencies: false }),
+    ),
   );
 
   filesOrchestrator.specialFilesCollector.collect(filesOrchestrator.files);
