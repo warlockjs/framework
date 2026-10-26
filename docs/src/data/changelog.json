@@ -136,6 +136,194 @@
   ],
   "releases": [
     {
+      "version": "5.39.0",
+      "id": "v5-39-0",
+      "date": "October 26, 2026",
+      "isUnreleased": false,
+      "summaryHtml": "<strong>Standalone builds, release notes in every install and typed-model fixes.</strong> <code>build.singleBundle</code> now works with web pages: the server is one <code>dist/app.js</code> that runs with no <code>node_modules</code>, native addons are staged automatically, optional integrations are detected, build-time tools are left out and React runs its production build. <code>webConnector({ build: { chunks, precompress } })</code> controls the client output (<code>split</code>, <code>merged</code> or <code>single</code> chunks, with or without <code>.br</code>/<code>.gz</code> copies), with a desktop and offline recipe. The release summaries now ship inside <code>@warlock.js/core</code>, read by <code>warlock release-notes</code> (<code>--from</code>, <code>--list</code>, <code>--json</code>) and pointed to by <code>warlock upgrade</code> and <code>warlock update</code>. Typed models accept their system columns (<code>id</code>, timestamps, soft delete) and <code>set()</code> reports value mismatches clearly. Config files no longer walk the app graph at boot, <code>onPageError()</code> registers the error-report hook at runtime, and <code>warlock doctor</code> warns when config imports app code. Browser requests that core refuses on a page host render the site page. New apps and <code>warlock upgrade --check</code> install on npm 10.9. No breaking changes. Lockstep release across all 33 packages. Generator matrix scope: <code>none</code>; before publishing, the blog on the 5.39.0 tarballs passed the release gate; after publishing, every package was confirmed at the npm origin.",
+      "matrix": "none",
+      "matrixRows": null,
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 19,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 5
+            },
+            {
+              "type": "Changed",
+              "n": 2
+            },
+            {
+              "type": "Fixed",
+              "n": 12
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>warlock doctor</code> check <code>config-app-imports</code>: warns when a file under <code>src/config</code> imports (statically or with <code>import()</code>) anything under <code>src/app</code>, naming the file and the import. Type-only imports are not reported."
+            },
+            {
+              "type": "Added",
+              "html": "Route option <code>handlesRefusals</code> and the <code>refusalStatusOf(request)</code> helper. A <code>GET</code> route marked <code>handlesRefusals</code> answers core-level refusals for requests that accept HTML."
+            },
+            {
+              "type": "Added",
+              "html": "<code>warlock release-notes</code> prints the family release summaries that now ship inside the package (<code>releases/&lt;version&gt;-summary.md</code>, 5.30.0 onward). With no arguments it prints the installed version's summary; <code>--from &lt;version&gt;</code> (optionally <code>--to &lt;version&gt;</code>) prints every release after it, oldest first, led by a combined list of breaking changes; <code>--version &lt;v&gt;</code> prints one release; <code>--list</code> lists the versions with dates; <code>--json</code> prints <code>{ versions: [{ version, date, breaking, markdown }] }</code>. It reads files only, so it needs no network and no booted app. A version the package does not ship is reported with its GitHub release URL."
+            },
+            {
+              "type": "Added",
+              "html": "<code>warlock upgrade</code>, <code>warlock upgrade --check</code> and <code>warlock update</code> end with <code>What's new: npx warlock release-notes --from &lt;old&gt;</code>, and the <code>AGENTS.md</code> section that <code>warlock agents-md</code> generates names the installed version and the command."
+            },
+            {
+              "type": "Added",
+              "html": "The <code>update-packages</code>, <code>deploy-release</code> and <code>upgrade-from-5-29</code> skills tell agents to run <code>npx warlock release-notes --from &lt;current&gt;</code> before upgrading."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>--version</code> and <code>-v</code> print the Warlock version only when no command is given, so a command can take its own <code>--version</code> option."
+            },
+            {
+              "type": "Changed",
+              "html": "The production bundle defines <code>globalThis.__WARLOCK_PRODUCTION_BUNDLE__</code> as <code>true</code>, so framework branches that only the development server or the build can reach are removed from it together with the modules they import. A <code>build.define</code> entry of the same name overrides it."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>WL9024</code> applies to any integration spec (any <code>*.spec.ts</code> or <code>*.test.ts</code> that is not <code>*.unit.*</code>, or anything under <code>tests/</code>), and its fix text now says to rename the file to <code>&lt;name&gt;.unit.spec.ts</code> outside <code>tests/</code> (it still said <code>*.test.ts</code> to <code>*.spec.ts</code>). This corrects the 5.38.0 note below."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>warlock upgrade --check</code> installs in the scratch copy with <code>npx -y npm@11.6.2</code> when the npm on PATH is older (npm 10.9 crashes on the family's lockfile with <code>Cannot read properties of null (reading 'edgesOut')</code>, which skipped every later step); <code>--from</code> is inferred from the installed <code>@warlock.js/core</code>."
+            },
+            {
+              "type": "Fixed",
+              "html": "Loading config files walked every module the config reached. <code>loadConfigFiles</code> registered each config file together with its whole transitive import graph (dynamic <code>import()</code> included), file by file, in every process that loads config. A config such as <code>src/config/web.ts</code> whose <code>errors.report</code> imported an application service made each test worker spend minutes in setup; the walk grew with the size of the application (about 480 seconds for a 3,000-module graph, measured). Config files are now registered with their direct import edges only; the dev server still builds the full graph from its own scan."
+            },
+            {
+              "type": "Fixed",
+              "html": "A request core refuses before routing answered raw JSON to a browser: a dot-segment or path-traversal path on the public mount (<code>/public/../x</code>, 403) and a malformed URL (400). When the app has a route marked <code>handlesRefusals</code> (the web package's page catch-all), a <code>GET</code> or <code>HEAD</code> request that accepts <code>text/html</code> is handed to it; other requests keep the JSON answer."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>build.singleBundle</code> now builds an app that uses <code>@warlock.js/web</code>: the server pages and routes are inlined into <code>dist/app.js</code>, and <code>node dist/app.js</code> starts from a copy of <code>dist/</code> with no <code>node_modules</code> above it."
+            },
+            {
+              "type": "Fixed",
+              "html": "Optional integrations need no hand-written <code>external</code> list. In a <code>singleBundle</code> build, a lazy <code>import()</code> or <code>require()</code> of an optional peer (or optional dependency) that a framework package lists and the app does not declare stays a lazy runtime import that never runs, and the build report names it. An import the app itself makes, or a package the app declares, is still bundled or fails the build."
+            },
+            {
+              "type": "Fixed",
+              "html": "Native addons are handled automatically in a <code>singleBundle</code> build. A package with a <code>.node</code> binary (or a napi loader whose platform package holds one) stays external and is copied into <code>dist/node_modules/&lt;package&gt;</code> with only what it needs to load: its JavaScript, binaries and data files, the dependencies it loads and the platform packages that match this machine. The build report names each one."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>warlock build</code> prints the number of files and the total size of <code>dist/</code> when it finishes."
+            },
+            {
+              "type": "Fixed",
+              "html": "A <code>singleBundle</code> build settles <code>process.env.NODE_ENV</code> to <code>\"production\"</code> inside <code>react</code>, <code>react-dom</code> and <code>scheduler</code> only, so React's development build is dropped from the bundle. A <code>process.env.NODE_ENV</code> entry in <code>build.define</code> turns this off. Other reads of <code>NODE_ENV</code> are untouched."
+            },
+            {
+              "type": "Fixed",
+              "html": "In a <code>singleBundle</code> build the native parser <code>oxc-parser</code>, imported by framework code that only the build, check and scan commands call, is replaced by a module that throws if it is ever called. The build names it, and <code>dist/node_modules</code> is created only for native packages the app itself uses."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>warlock build</code> in a source checkout runs the route-registration child from its TypeScript source through the CLI loader when the compiled child is absent, instead of failing."
+            },
+            {
+              "type": "Fixed",
+              "html": "A <code>singleBundle</code> build failed on <code>react-dom/server.node</code>: the native-addon plugin took any import specifier ending in <code>.node</code> for a compiled addon. It now treats only a path that resolves to a real <code>.node</code> file as one."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/web",
+          "slug": "web",
+          "total": 6,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            },
+            {
+              "type": "Fixed",
+              "n": 5
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>onPageError(hook)</code>, exported from <code>@warlock.js/web/connector</code>: registers a server error-report hook at runtime, from a module's <code>main.ts</code>. It receives the same <code>(error, context)</code> as <code>web.errors.report</code>, runs through the same bounded fire-and-forget queue next to it, and returns a function that removes it. Use it instead of importing application code into <code>src/config/web.ts</code>. Exports the <code>PageErrorHook</code>, <code>PageErrorInfo</code> and <code>PageErrorKind</code> types."
+            },
+            {
+              "type": "Fixed",
+              "html": "A core-level refusal on a page host answered raw JSON in a browser: <code>/public/../x</code> (403, dot-segment guard) and a malformed URL (400). A <code>GET</code> or <code>HEAD</code> request that names <code>text/html</code> in <code>Accept</code> now renders the site's <code>forbidden.page.tsx</code> for 401 and 403, otherwise <code>error.page.tsx</code>, then the framework fallback page, with the refused status. In multi-site mode the site is chosen by host as for any page. API clients and other requests keep the JSON answer."
+            },
+            {
+              "type": "Fixed",
+              "html": "Connector build options <code>webConnector({ build: { chunks, precompress } })</code>. <code>chunks</code> is <code>\"split\"</code> (the default: a React vendor chunk, the entry, a lazy chunk per page and shared chunks), <code>\"merged\"</code> (the same lazy page loading with small shared chunks packed together by size, far fewer files) or <code>\"single\"</code> (one JavaScript entry and one stylesheet, dynamic imports inlined; single-site apps only). <code>precompress: false</code> skips the <code>.br</code> and <code>.gz</code> copies of every client asset (default <code>true</code>). Final-bytes chunk names, dedupe, the integrity check, preload lists and payload budgets work in every mode. <code>build.singleBundle</code> in core does not change them; the desktop and offline app recipe sets both."
+            },
+            {
+              "type": "Fixed",
+              "html": "Exports from <code>@warlock.js/web/vite</code>: <code>ClientChunkMode</code>, <code>resolveClientChunkMode</code> and <code>clientCodeSplitting</code>; <code>buildHydrationClient</code> takes <code>chunks</code>."
+            },
+            {
+              "type": "Fixed",
+              "html": "A production server built with <code>singleBundle</code> carried Vite and the development server inside <code>app.js</code>, through the connector's build contribution and its development-server branches. The page scanner and the Babel parser came in the same way, through the development page installer and the <code>server</code> barrel the production installer loaded. All of them are left out of the production bundle, and the server never loads Vite."
+            },
+            {
+              "type": "Fixed",
+              "html": "A build copied away from its project could not find its client bundle: the page manifest stored <code>dist/client</code> relative to the working directory. When a <code>client</code> folder sits next to the running bundle it is used, so <code>node app.js</code> works from any working directory in a copy of <code>dist/</code>."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/cascade",
+          "slug": "cascade",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "<code>get()</code> and <code>set()</code> on a model declared with a schema type accept Cascade's system columns without declaring them: <code>id</code> (<code>number</code>), <code>_id</code>, <code>created_at</code> / <code>updated_at</code> (<code>Date</code>), <code>deleted_at</code> (<code>Date | null</code>) and their camelCase spellings. A column the schema declares keeps its own type, so a renamed timestamp or a string <code>id</code> goes in the schema. New <code>ModelSystemColumns</code> and <code>ModelColumns</code> types."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>set(key, value)</code> with a wrong value type now reports the value mismatch instead of a misleading error about dot paths. A column named at runtime is set with a key typed <code>K extends ModelKey&lt;Schema&gt;</code>."
+            }
+          ]
+        },
+        {
+          "name": "create-warlock",
+          "slug": "create-warlock",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "<code>npm install</code> in a fresh scaffold no longer crashes on npm 10.9 (the npm bundled with Node 22) with <code>Cannot read properties of null (reading 'edgesOut')</code>: the template pins Vitest 5.0.5, because the Vitest releases before it trip that npm bug on their own. The <code>edgesOut</code> hint stays as a last resort."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "5.38.0",
       "id": "v5-38-0",
       "date": "October 25, 2026",

@@ -1,4 +1,9 @@
 {
+  "5.39.0": {
+    "publishedAt": "2026-10-26T16:52:50.647Z",
+    "matrix": "none",
+    "summary": "**Standalone builds, release notes in every install and typed-model fixes.** `build.singleBundle` now works with web pages: the server is one `dist/app.js` that runs with no `node_modules`, native addons are staged automatically, optional integrations are detected, build-time tools are left out and React runs its production build. `webConnector({ build: { chunks, precompress } })` controls the client output (`split`, `merged` or `single` chunks, with or without `.br`/`.gz` copies), with a desktop and offline recipe. The release summaries now ship inside `@warlock.js/core`, read by `warlock release-notes` (`--from`, `--list`, `--json`) and pointed to by `warlock upgrade` and `warlock update`. Typed models accept their system columns (`id`, timestamps, soft delete) and `set()` reports value mismatches clearly. Config files no longer walk the app graph at boot, `onPageError()` registers the error-report hook at runtime, and `warlock doctor` warns when config imports app code. Browser requests that core refuses on a page host render the site page. New apps and `warlock upgrade --check` install on npm 10.9. No breaking changes. Lockstep release across all 33 packages. Generator matrix scope: `none`; before publishing, the blog on the 5.39.0 tarballs passed the release gate; after publishing, every package was confirmed at the npm origin."
+  },
   "5.38.0": {
     "publishedAt": "2026-10-25T21:20:38.523Z",
     "matrix": "none",
