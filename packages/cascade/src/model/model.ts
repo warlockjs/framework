@@ -36,6 +36,7 @@ import { modelSync } from "../sync/model-sync";
 import type { ModelSyncOperationContract } from "../sync/types";
 import type { DeleteStrategy, StrictMode } from "../types";
 import {
+  assignFields,
   decrementField,
   getBooleanField,
   getFieldValue,
@@ -1071,21 +1072,53 @@ export abstract class Model<out TSchema extends ModelSchema = ModelSchema> {
   /**
    * Merges new values into the model's data and marks changed fields as dirty.
    *
-   * Performs a deep merge, preserving existing nested structures.
-   * Automatically updates the dirty tracker to reflect all changes.
+   * Nested plain objects are **deep-merged** into the stored value, so a key
+   * you leave out of a nested object is kept, not removed. To replace an
+   * object column whole (and drop keys the new value omits), use
+   * {@link Model.assign} or `set(column, value)`.
    *
    * @param values - Partial data to merge into the model
    * @returns The model instance for method chaining
    *
    * @example
    * ```typescript
-   * user.merge({ name: "Charlie", address: { city: "LA" } });
+   * // stored: { filters: { status: "open", owner: "ann" } }
+   * model.merge({ filters: { status: "closed" } });
+   * model.get("filters"); // { status: "closed", owner: "ann" }  (owner kept)
    * ```
    */
   public merge(values: Partial<TSchema>): this;
   public merge(values: Record<string, unknown>): this;
   public merge(values: Record<string, unknown>): this {
     return mergeFields(this, values) as this;
+  }
+
+  /**
+   * Replaces each given column whole, exactly as `set(key, value)` would.
+   *
+   * Unlike {@link Model.merge}, a nested object is not merged into the stored
+   * one: keys the new value omits are removed. Columns not named in `values`
+   * stay untouched. Changed columns are marked dirty, and a persisted model
+   * ignores identity columns (`id`, `_id`, the primary key) just as `merge()` does,
+   * so `model.assign(req.body)` cannot retarget the save.
+   *
+   * @param values - Columns to replace
+   * @returns The model instance for method chaining
+   *
+   * @example
+   * ```typescript
+   * // stored: { filters: { status: "open", owner: "ann" } }
+   * model.merge({ filters: { status: "closed" } });
+   * // filters -> { status: "closed", owner: "ann" }  (deep merge keeps owner)
+   *
+   * model.assign({ filters: { status: "closed" } });
+   * // filters -> { status: "closed" }                (replaced, owner gone)
+   * ```
+   */
+  public assign(values: Partial<TSchema>): this;
+  public assign(values: Record<string, unknown>): this;
+  public assign(values: Record<string, unknown>): this {
+    return assignFields(this, values) as this;
   }
 
   /**

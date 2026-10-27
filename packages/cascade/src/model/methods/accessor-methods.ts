@@ -97,6 +97,23 @@ export function mergeFields(model: Model, values: Record<string, unknown>): Mode
 }
 
 /**
+ * Replace top-level columns, one `set()` per key: nested plain objects are
+ * stored whole, so keys missing from the new value are gone.
+ *
+ * Applies the same identity-column protection as {@link mergeFields}, so a
+ * request body cannot retarget the save.
+ */
+export function assignFields(model: Model, values: Record<string, unknown>): Model {
+  const safeValues = stripIdentityColumns(model, values);
+
+  for (const [key, value] of Object.entries(safeValues)) {
+    setFieldValue(model, key, value);
+  }
+
+  return model;
+}
+
+/**
  * Merge a document the DRIVER produced (generated `_id`, `RETURNING *`, DB
  * defaults) back onto the model, identity columns included.
  *

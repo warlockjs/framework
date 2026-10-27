@@ -18,6 +18,7 @@ import {
 import {
   collectModelFacts,
   EMPTY_MODEL_FACTS,
+  modelMergeFindings,
   modelPropertyReadFindings,
   type ModelFacts,
 } from "./model-property-reads";
@@ -203,6 +204,8 @@ function findingProblem(
  *   (see `apiRouteReferenceFindings`);
  * - `WL9021` (warning) a Cascade column read as a property, with a `get()` /
  *   `set()` fix (see `modelPropertyReadFindings`);
+ * - `WL9025` (warning) `model.merge({ column })` on an object-typed schema column
+ *   (see `modelMergeFindings`);
  * - `WL9024` (warning) an integration spec that imports nothing needing the app
  *   (see `integrationSpecProblems`).
  * - `WL9022` server-only code that imports a `.client.*` module, directly or
@@ -239,6 +242,7 @@ export function checkFileConventions(
       ...responseSchemaFindings(sourceFile),
       ...apiRouteReferenceFindings(sourceFile, apiRouteFacts),
       ...modelPropertyReadFindings(sourceFile, modelFacts),
+      ...modelMergeFindings(sourceFile, modelFacts),
       // Opt-in: a barrel is a finding only once `rules.WL9023` names a severity.
       ...(["warning", "error"].includes(options.rules?.WL9023 ?? "")
         ? barrelFindings(sourceFile)

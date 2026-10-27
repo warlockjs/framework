@@ -768,6 +768,14 @@ export const ERROR_CODES = {
     fix: "Move it to the unit project: rename it to <name>.unit.spec.ts (outside tests/), so the unit project runs it and it skips the booted framework.",
     skill: "test-service",
   },
+  WL9025: {
+    code: "WL9025",
+    area: "convention",
+    category: "code",
+    title: "merge() on an object column keeps the keys the new value omits",
+    fix: 'Replace the column with `model.assign({ column: value })` or `model.set("column", value)`; `merge()` deep-merges plain objects. Keep `merge()` only when a partial update of the nested object is intended.',
+    skill: "warlock-check",
+  },
   WL9101: {
     code: "WL9101",
     area: "convention",

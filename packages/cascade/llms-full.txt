@@ -1214,11 +1214,12 @@ await user.save();
 
 Quick reference:
 
-| Situation              | Pattern                   |
-| ---------------------- | ------------------------- |
-| 1–2 specific fields    | `user.set(k, v).save()`   |
-| Bulk from an object    | `user.merge(data).save()` |
-| After spread mutations | `user.save()`             |
+| Situation              | Pattern                    |
+| ---------------------- | -------------------------- |
+| 1–2 specific fields    | `user.set(k, v).save()`    |
+| Bulk from an object    | `user.merge(data).save()`  |
+| Replace object columns | `user.assign(data).save()` |
+| After spread mutations | `user.save()`              |
 
 ## Remove a field — `.unset(field)`
 
@@ -1314,6 +1315,7 @@ Mark a column the server alone sets with `.internal()` (`authorId: v.int().requi
 - Don't read a column as a property (`post.title`); use `post.get("title")`.
 - Don't redeclare server-set fields on a request schema; mark them `.internal()` on the model schema and use `Model.requestSchema()`.
 - Don't `await user.save()` and forget the `await` — your changes live only on the instance and never reach the DB.
+- Don't `.merge()` an object column when the value is the complete new one: nested plain objects are deep-merged, so omitted keys stay stored. Use `.assign({ column })` or `.set("column", value)` (`warlock check` warns with `WL9025`).
 - Don't expect schema defaults to apply on `.merge()` — defaults fire on `.create()` only.
 
 ## See also
@@ -2975,6 +2977,19 @@ user.getDirtyColumns(); // ["profile.age"]
 conversation.merge({ lastOutboundAt: new Date() });
 conversation.getDirtyColumns(); // ["lastOutboundAt"]
 ```
+
+### Removed keys survive a merge
+
+Because plain objects merge key-by-key, **omitting a key from a nested object does not remove it**: `model.merge({ filters: { status: "closed" } })` keeps every other stored key of `filters`, and `save()` writes nothing for the missing ones. When the object you pass is the complete new value of the column (an update service where an absent key means "cleared"), replace the column instead:
+
+```ts
+// stored: { filters: { status: "open", owner: "ada" } }
+model.assign({ filters: { status: "closed" } }); // many columns, each replaced whole
+model.set("filters", { status: "closed" }); // one column
+model.getDirtyColumns(); // ["filters"]
+```
+
+`assign()` strips identity columns on a persisted model just like `merge()`. `warlock check` flags `merge()` on an object, record or array-of-objects schema column with `WL9025` (a warning, no autofix, since the two methods behave differently).
 
 :::note[Fixed in 4.9.1]
 Before 4.9.1 a `Date` merged over a column that **already held a `Date`** was silently dropped: the merge treated it as a mergeable container and recursed into it, and a `Date` has no own enumerable properties, so nothing was copied. The column never went dirty and `save()` returned `{ success: true, modifiedCount: 0 }` with no `UPDATE` issued. Writing into an empty column always worked, so only overwrites were affected. If you are on 4.9.0 or earlier, upgrade.

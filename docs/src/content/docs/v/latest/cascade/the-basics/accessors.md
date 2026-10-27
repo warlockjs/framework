@@ -7,7 +7,7 @@ sidebar:
 
 Cascade models hold their state in a single `data` object. You don't manipulate it directly; you go through the accessor methods. This keeps dirty-tracking, dot-notation paths, and the change pipeline consistent — every read goes through one place, every write goes through another.
 
-This guide is the field-level companion to [CRUD basics](../the-basics/01-crud-basics.md). CRUD covers create/update/delete at the whole-model level; this page covers `get`, `set`, `merge`, `unset`, `increment`, `decrement`, plus the typed shortcuts.
+This guide is the field-level companion to [CRUD basics](../the-basics/01-crud-basics.md). CRUD covers create/update/delete at the whole-model level; this page covers `get`, `set`, `merge`, `assign`, `unset`, `increment`, `decrement`, plus the typed shortcuts.
 
 ## Reading — `get(field, default?)`
 
@@ -172,6 +172,26 @@ user.set("profile", { address: { city: "London" } }); // wipes existing profile
 ```
 
 Both record dirty state on the affected paths.
+
+## `assign(values)` — replace many columns at once
+
+`merge` keeps nested keys the new value leaves out, so clearing a key of an object column with `merge` does nothing. `assign` replaces each column named in `values` whole, exactly like `set(column, value)` for each key, and leaves every other column alone:
+
+```ts
+// stored: { filters: { status: "open", owner: "ada" } }
+
+user.merge({ filters: { status: "closed" } });
+// filters -> { status: "closed", owner: "ada" }   owner is kept
+
+user.assign({ filters: { status: "closed" } });
+// filters -> { status: "closed" }                 owner is gone
+```
+
+`assign` strips identity columns from a persisted model just as `merge` does, so `user.assign(req.body)` cannot retarget the save. Use it for update services where a missing key means "cleared".
+
+:::tip[`warlock check` flags the mistake]
+`WL9025` warns when `model.merge({ ... })` on a Cascade model names a column that its `static schema` declares as an object, record or array-of-objects column. See [error codes](../../core/cli/error-codes.md#wl9025).
+:::
 
 ## `unset(...fields)` — remove a field
 

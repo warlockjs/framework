@@ -6,6 +6,7 @@ import {
   collectModelFacts,
   EMPTY_MODEL_FACTS,
   modelFactsOf,
+  modelMergeFindings,
   modelPropertyReadFindings,
   type ModelFacts,
 } from "./model-property-reads";
@@ -216,5 +217,139 @@ describe("WL9021 through the conventions step", () => {
 
   it("collects model facts from files on disk", () => {
     expect(collectModelFacts("/nonexistent", ["src/app/missing.ts"]).size).toBe(0);
+  });
+});
+
+describe("WL9025 merge() on an object column", () => {
+  const REPORT_MODEL = `
+    import { Model } from "@warlock.js/cascade";
+    import { v } from "@warlock.js/seal";
+
+    export class Report extends Model {
+      public static schema = v.object({
+        name: v.string().required(),
+        filters: v.object({ status: v.string() }).optional(),
+        extras: v.record(v.string()).optional(),
+        rows: v.array(v.object({ a: v.string() })).optional(),
+        tags: v.array(v.string()).optional(),
+      });
+    }
+  `;
+
+  function mergeFindings(source: string, facts: ModelFacts = EMPTY_MODEL_FACTS) {
+    return modelMergeFindings(ast.parseSourceFile("src/app/a.ts", source), facts);
+  }
+
+  it("flags an object column in a merge literal", () => {
+    const found = mergeFindings(`${REPORT_MODEL}
+      async function update() {
+        const report = await Report.find(1);
+        report.merge({ name: "x", filters: { status: "closed" } });
+      }`);
+
+    expect(found).toHaveLength(1);
+    expect(found[0]).toMatchObject({ code: "WL9025", severity: "warning" });
+    expect(found[0].fix).toBeUndefined();
+    expect(found[0].message).toContain("`filters` column (object)");
+    expect(found[0].message).toContain("assign");
+    expect(found[0].message).toContain("set");
+  });
+
+  it("flags record and array-of-objects columns, naming the type", () => {
+    const found = mergeFindings(`${REPORT_MODEL}
+      function update(report: Report) {
+        report.merge({ extras: {}, rows: [] });
+      }`);
+
+    expect(found.map((finding) => finding.message)).toEqual([
+      expect.stringContaining("`extras` column (record)"),
+      expect.stringContaining("`rows` column (array of objects)"),
+    ]);
+  });
+
+  it("flags this.merge inside a model class and shorthand keys", () => {
+    const found = mergeFindings(`${REPORT_MODEL}
+      export class Child extends Report {
+        public reset(filters: unknown) {
+          this.merge({ filters });
+        }
+      }`);
+
+    expect(found).toHaveLength(1);
+  });
+
+  it("does not flag scalar or array-of-scalar columns", () => {
+    const found = mergeFindings(`${REPORT_MODEL}
+      function update(report: Report) {
+        report.merge({ name: "x", tags: ["a"] });
+      }`);
+
+    expect(found).toEqual([]);
+  });
+
+  it("does not flag assign() or set()", () => {
+    const found = mergeFindings(`${REPORT_MODEL}
+      function update(report: Report) {
+        report.assign({ filters: { status: "closed" } });
+        report.set("filters", { status: "closed" });
+      }`);
+
+    expect(found).toEqual([]);
+  });
+
+  it("does not flag merge on a non-model receiver", () => {
+    const found = mergeFindings(`${REPORT_MODEL}
+      import _ from "lodash";
+      class Bag { merge(values: object) { return values; } }
+      function update(bag: Bag) {
+        const copy = new Bag();
+        copy.merge({ filters: { a: 1 } });
+        bag.merge({ filters: { a: 1 } });
+        _.merge({}, { filters: { a: 1 } });
+      }`);
+
+    expect(found).toEqual([]);
+  });
+
+  it("does not flag a merge of a variable or a spread", () => {
+    const found = mergeFindings(`${REPORT_MODEL}
+      function update(report: Report, values: Record<string, unknown>) {
+        report.merge(values);
+        report.merge({ ...values });
+      }`);
+
+    expect(found).toEqual([]);
+  });
+
+  it("uses facts gathered from other files, and a subclass column shadows the parent's", () => {
+    const facts = new Map(modelFactsOf(ast.parseSourceFile("src/app/report.ts", REPORT_MODEL)));
+    const found = mergeFindings(
+      `function update(report: Report) { report.merge({ filters: {} }); }`,
+      facts,
+    );
+
+    expect(found).toHaveLength(1);
+
+    const shadowed = new Map(facts).set("Plain", {
+      parent: "Report",
+      columns: new Set(["filters"]),
+      members: new Set<string>(),
+      objectColumns: new Map(),
+    });
+
+    expect(
+      mergeFindings(`function update(p: Plain) { p.merge({ filters: {} }); }`, shadowed),
+    ).toEqual([]);
+  });
+
+  it("is reported by the file check as WL9025", () => {
+    const problems = checkFileConventions(
+      "src/app/users/a.ts",
+      `${REPORT_MODEL}
+      function update(report: Report) { report.merge({ filters: {} }); }`,
+      "/nonexistent",
+    );
+
+    expect(problems.map((problem) => problem.code)).toContain("WL9025");
   });
 });

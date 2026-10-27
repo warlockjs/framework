@@ -13,16 +13,17 @@ You don't have to interact with it explicitly. `set`, `merge`, `unset`, `increme
 
 Anything that mutates `model.data` through the accessor API:
 
-| Action                               | Dirty effect                                    |
-| ------------------------------------ | ----------------------------------------------- |
-| `set("name", "Ada")`                 | `name` marked dirty with new value              |
-| `merge({ name: "Ada" })`             | Each merged path marked dirty                   |
-| `unset("nickname")`                  | `nickname` marked **removed**                   |
-| `increment("loginCount")`            | `loginCount` marked dirty (new value)           |
-| `decrement(...)`                     | same                                            |
-| Hydration after `find()` / `where()` | **Clears** the tracker — model is fresh from DB |
-| `save()`                             | **Clears** the tracker after success            |
-| Reading via `get()`, `getString()`   | nothing                                         |
+| Action                               | Dirty effect                                      |
+| ------------------------------------ | ------------------------------------------------- |
+| `set("name", "Ada")`                 | `name` marked dirty with new value                |
+| `merge({ name: "Ada" })`             | Each merged path marked dirty                     |
+| `assign({ prefs: { a: 1 } })`        | Each named column replaced whole and marked dirty |
+| `unset("nickname")`                  | `nickname` marked **removed**                     |
+| `increment("loginCount")`            | `loginCount` marked dirty (new value)             |
+| `decrement(...)`                     | same                                              |
+| Hydration after `find()` / `where()` | **Clears** the tracker — model is fresh from DB   |
+| `save()`                             | **Clears** the tracker after success              |
+| Reading via `get()`, `getString()`   | nothing                                           |
 
 Reads never mark anything. The model only knows about a change if it went through a write accessor.
 

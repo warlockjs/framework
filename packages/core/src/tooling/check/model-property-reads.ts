@@ -20,6 +20,12 @@ export type ModelFact = {
   columns: ReadonlySet<string> | undefined;
   /** Instance members the class declares itself (getters, methods, fields). */
   members: ReadonlySet<string>;
+  /**
+   * Schema columns whose value is a plain object, with the type to show
+   * (`object`, `record`, `array of objects`). Only statically readable
+   * `v.object` / `v.record` / `v.array(v.object(...))` columns appear.
+   */
+  objectColumns?: ReadonlyMap<string, string>;
 };
 
 export type ModelFacts = ReadonlyMap<string, ModelFact>;
@@ -127,6 +133,90 @@ function schemaKeys(
   return undefined;
 }
 
+/** The `X` of the innermost `v.X(...)` call of a validator chain, with that call. */
+function validatorBase(
+  expression: ast.Node | undefined,
+): { type: string; call: ast.Node } | undefined {
+  if (!expression) return undefined;
+
+  let current = unwrap(expression);
+  let found: { type: string; call: ast.Node } | undefined;
+
+  while (ast.isCallExpression(current)) {
+    const callee = unwrap(ast.expressionOf(current));
+
+    if (!isMemberAccess(callee)) return found;
+
+    const name = memberName(callee);
+    const receiver = unwrap(ast.expressionOf(callee));
+
+    if (name && receiver.type === "Identifier") found = { type: name, call: current };
+
+    current = receiver;
+  }
+
+  return found;
+}
+
+/** `object`, `record` or `array of objects` when a column validator stores a plain object. */
+function objectColumnType(expression: ast.Node | undefined): string | undefined {
+  const base = validatorBase(expression);
+
+  if (!base) return undefined;
+  if (base.type === "object" || base.type === "record") return base.type;
+
+  if (base.type === "array") {
+    const item = validatorBase(children(base.call, "arguments")[0]);
+
+    return item?.type === "object" || item?.type === "record" ? "array of objects" : undefined;
+  }
+
+  return undefined;
+}
+
+/** The `v.object({...})` literal of a `static schema`, through constants and chained calls. */
+function schemaLiteral(
+  expression: ast.Node | undefined,
+  constants: ReadonlyMap<string, ast.Node>,
+  depth = 0,
+): ast.Node | undefined {
+  if (!expression || depth > 4) return undefined;
+
+  const current = unwrap(expression);
+
+  if (current.type === "Identifier")
+    return schemaLiteral(constants.get(current.name), constants, depth + 1);
+
+  const base = validatorBase(current);
+
+  if (base?.type !== "object") return undefined;
+
+  const argument = children(base.call, "arguments")[0];
+
+  return argument && ast.isObjectLiteralExpression(argument) ? argument : undefined;
+}
+
+function objectColumnsOf(
+  expression: ast.Node | undefined,
+  constants: ReadonlyMap<string, ast.Node>,
+): Map<string, string> {
+  const columns = new Map<string, string>();
+  const literal = schemaLiteral(expression, constants);
+
+  if (!literal) return columns;
+
+  for (const property of children(literal, "properties")) {
+    if (property.type !== "Property") continue;
+
+    const name = keyName(child(property, "key"));
+    const type = objectColumnType(child(property, "value"));
+
+    if (name !== undefined && type) columns.set(name, type);
+  }
+
+  return columns;
+}
+
 function classFact(
   declaration: ast.Node,
   constants: ReadonlyMap<string, ast.Node>,
@@ -142,6 +232,7 @@ function classFact(
 
   const members = new Set<string>();
   let columns: Set<string> | undefined;
+  let objectColumns: Map<string, string> | undefined;
 
   for (const member of children(child(declaration, "body") ?? declaration, "body")) {
     const memberKey = keyName(child(member, "key"));
@@ -153,6 +244,7 @@ function classFact(
     if (isStatic) {
       if (memberKey === "schema" && member.type === "PropertyDefinition") {
         columns = schemaKeys(child(member, "value"), constants);
+        objectColumns = objectColumnsOf(child(member, "value"), constants);
       }
 
       continue;
@@ -161,7 +253,7 @@ function classFact(
     members.add(memberKey);
   }
 
-  return { name, fact: { parent: parent.name, columns, members } };
+  return { name, fact: { parent: parent.name, columns, members, objectColumns } };
 }
 
 /** The model classes declared in one parsed file. */
@@ -213,17 +305,22 @@ export function collectModelFacts(cwd: string, files: readonly string[]): ModelF
   return facts;
 }
 
-type Resolved = { columns: ReadonlySet<string> | undefined; members: ReadonlySet<string> };
+type Resolved = {
+  columns: ReadonlySet<string> | undefined;
+  members: ReadonlySet<string>;
+  objectColumns: ReadonlyMap<string, string>;
+};
 
 /** Resolve inheritance; `undefined` when the class is not a model. */
 function resolveModel(name: string, facts: ModelFacts): Resolved | undefined {
   const members = new Set<string>(MODEL_MEMBERS);
   const columns = new Set<string>();
+  const objectColumns = new Map<string, string>();
   let current: string | undefined = name;
 
   for (let depth = 0; depth < 10 && current !== undefined; depth++) {
     if (FRAMEWORK_MODELS.has(current) && !facts.has(current)) {
-      return { columns: columns.size > 0 ? columns : undefined, members };
+      return { columns: columns.size > 0 ? columns : undefined, members, objectColumns };
     }
 
     const fact = facts.get(current);
@@ -231,6 +328,11 @@ function resolveModel(name: string, facts: ModelFacts): Resolved | undefined {
     if (!fact) return undefined;
 
     for (const member of fact.members) members.add(member);
+
+    // A subclass column shadows the parent's, so only unseen columns count.
+    for (const [column, type] of fact.objectColumns ?? []) {
+      if (!columns.has(column)) objectColumns.set(column, type);
+    }
 
     if (fact.columns) {
       for (const column of fact.columns) columns.add(column);
@@ -432,6 +534,89 @@ function checkMember(
         ? undefined
         : { start: node.object.end, end: node.end, text: replaced },
   });
+}
+
+function receiverModel(
+  object: ast.Node,
+  receivers: ReadonlyMap<string, string>,
+  facts: ModelFacts,
+  node: ast.Node,
+): string | undefined {
+  const target = unwrap(object);
+
+  if (target.type === "Identifier") return receivers.get(target.name);
+  if (target.type === "ThisExpression") return enclosingModel(node, facts);
+
+  return undefined;
+}
+
+function checkMerge(
+  node: ast.Node,
+  receivers: ReadonlyMap<string, string>,
+  facts: ModelFacts,
+  findings: SourceFinding[],
+): void {
+  if (!ast.isCallExpression(node)) return;
+
+  const callee = unwrap(ast.expressionOf(node));
+
+  if (!isMemberAccess(callee) || memberName(callee) !== "merge") return;
+
+  const model = receiverModel(callee.object, receivers, facts, node);
+  const resolved = model ? resolveModel(model, facts) : undefined;
+
+  if (!resolved || resolved.objectColumns.size === 0) return;
+
+  const argument = children(node, "arguments")[0];
+
+  if (!argument || !ast.isObjectLiteralExpression(argument)) return;
+
+  for (const property of children(argument, "properties")) {
+    if (property.type !== "Property") continue;
+
+    const key = keyName(child(property, "key"));
+    const type = key === undefined ? undefined : resolved.objectColumns.get(key);
+
+    if (key === undefined || !type) continue;
+
+    findings.push({
+      code: "WL9025",
+      severity: "warning",
+      node: property,
+      message: `\`merge()\` deep-merges the \`${key}\` column (${type}), so keys missing from this value stay stored. Use \`assign({ ${key}: ... })\` or \`set("${key}", value)\` to replace it.`,
+    });
+  }
+}
+
+/**
+ * `WL9025` (warning): `model.merge({ column: {...} })` where the model's
+ * schema declares `column` as an object, record or array-of-objects column.
+ * `merge()` deep-merges plain objects, so a key left out of the new value is
+ * kept in the stored one; `assign()` / `set()` replace the column. No fix:
+ * the two behave differently.
+ *
+ * Receivers resolve exactly as for `WL9021` (instances from `new`, finders,
+ * annotations and `this`), and the schema must be statically readable, so a
+ * `.merge()` on any other object is never flagged.
+ */
+export function modelMergeFindings(
+  sourceFile: ast.SourceFile,
+  facts: ModelFacts = EMPTY_MODEL_FACTS,
+): SourceFinding[] {
+  if (TEST_FILE.test(sourceFile.fileName)) return [];
+
+  const known = new Map<string, ModelFact>(facts);
+
+  for (const [name, fact] of modelFactsOf(sourceFile)) known.set(name, fact);
+
+  if (known.size === 0) return [];
+
+  const receivers = instanceVariables(sourceFile, known);
+  const findings: SourceFinding[] = [];
+
+  visitAll(sourceFile, (node) => checkMerge(node, receivers, known, findings));
+
+  return findings;
 }
 
 /**

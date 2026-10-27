@@ -636,6 +636,14 @@ An integration spec (any `*.spec.ts` or `*.test.ts` that is not `*.unit.*`, or a
 npx warlock explain WL9024
 ```
 
+### WL9025
+
+`model.merge({ column: {...} })` on a Cascade model whose `static schema` declares `column` as an object, record or array-of-objects column. `merge()` deep-merges plain objects, so a key the new value leaves out stays stored (for example a cleared filter comes back after `save()`). Use `model.assign({ column: value })` or `model.set("column", value)` to replace the column. The check only flags receivers it can resolve to a model class (`new User()`, the single-record finders, a `User` annotation, `this` in a model class) and columns whose validator it can read statically (`v.object`, `v.record`, `v.array(v.object(...))`). There is no automatic fix because the two methods behave differently. Defaults to a warning; configure severity in `.warlock-check.json`.
+
+```bash
+npx warlock explain WL9025
+```
+
 ### WL9105
 
 A translation key in a module's `locales.json` or `locales/<feature>.json` is missing one of the configured locales. The configured locales are `localeCodes` in `src/config/app.ts` or in `.warlock-check.json`; the rule is skipped when neither is set. Defaults to an error; configure severity in `.warlock-check.json`.

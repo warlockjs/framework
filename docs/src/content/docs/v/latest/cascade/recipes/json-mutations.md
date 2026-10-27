@@ -45,6 +45,8 @@ await user.save();
 
 Reach for `set` when you want field-level replacement. Reach for `merge` when you want field-level addition.
 
+Because `merge` never removes a nested key, an update that clears a key (omits it from the object) must replace the column instead. `assign({ profile: { ... } })` does that for several columns at once, `set("profile", value)` for one. `warlock check` warns about this with `WL9025`.
+
 ## Updating an array entry by id
 
 Replacing one item in an array — flip a notification preference, edit a single tag — needs you to find the entry, build the updated array, and write it back:
