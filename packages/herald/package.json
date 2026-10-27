@@ -1,6 +1,6 @@
 {
   "name": "@warlock.js/herald",
-  "version": "5.39.1",
+  "version": "5.39.2",
   "type": "module",
   "description": "Message bus/brokers for RabbitMQ, Kafka, and more",
   "main": "./src/index.ts",
