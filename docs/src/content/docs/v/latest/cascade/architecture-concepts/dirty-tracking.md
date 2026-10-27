@@ -17,7 +17,7 @@ Anything that mutates `model.data` through the accessor API:
 | ------------------------------------ | ------------------------------------------------- |
 | `set("name", "Ada")`                 | `name` marked dirty with new value                |
 | `merge({ name: "Ada" })`             | Each merged path marked dirty                     |
-| `assign({ prefs: { a: 1 } })`        | Each named column replaced whole and marked dirty |
+| `set({ prefs: { a: 1 } })`           | Each named column replaced whole and marked dirty |
 | `unset("nickname")`                  | `nickname` marked **removed**                     |
 | `increment("loginCount")`            | `loginCount` marked dirty (new value)             |
 | `decrement(...)`                     | same                                              |

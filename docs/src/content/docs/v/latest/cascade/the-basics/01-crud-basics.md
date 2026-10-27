@@ -64,10 +64,11 @@ await user.merge({ profile: { age: 26 } }).save(); // profile.city untouched
 await user.merge({ lastSeenAt: new Date() }).save(); // replaces the previous Date
 ```
 
-Deep merging also means a nested key you leave out is **kept**, not removed. When the payload is the whole new value of an object column, use `.assign()` (many columns) or `.set()` (one column) instead; both replace the column. `warlock check` warns about `merge()` on such a column (`WL9025`).
+Deep merging also means a nested key you leave out is **kept**, not removed. When the payload is the whole new value of an object column, use `.set({ column: value })` (many columns) or `.set("column", value)` (one column) instead; `set` always replaces the column whole, and a dot path such as `"filters.status"` replaces just that leaf. `warlock check` warns about `merge()` on such a column (`WL9025`).
 
 ```ts
-await user.assign({ filters: { status: "closed" } }).save(); // other filter keys are gone
+await user.set({ filters: { status: "closed" } }).save(); // other filter keys are gone
+await user.set({ "filters.status": "closed" }).save(); // only that leaf changes
 ```
 
 :::caution[Upgrade to 4.9.1 if you merge `Date` columns]
@@ -100,12 +101,12 @@ Without `await user.save()`, your changes live only on the instance and never re
 
 ### Quick reference
 
-| Situation              | Pattern                    | Notes                           |
-| ---------------------- | -------------------------- | ------------------------------- |
-| 1–2 specific fields    | `user.set(k, v).save()`    | Reads like a sentence           |
-| Bulk from an object    | `user.merge(data).save()`  | The update-service idiom        |
-| After spread mutations | `user.save()`              | Easy to forget the await        |
-| Replace object columns | `user.assign(data).save()` | Omitted nested keys are removed |
+| Situation              | Pattern                   | Notes                           |
+| ---------------------- | ------------------------- | ------------------------------- |
+| 1–2 specific fields    | `user.set(k, v).save()`   | Reads like a sentence           |
+| Bulk from an object    | `user.merge(data).save()` | The update-service idiom        |
+| After spread mutations | `user.save()`             | Easy to forget the await        |
+| Replace object columns | `user.set(data).save()`   | Omitted nested keys are removed |
 
 ## Remove a field — `.unset()`
 

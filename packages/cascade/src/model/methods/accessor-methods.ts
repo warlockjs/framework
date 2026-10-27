@@ -97,14 +97,38 @@ export function mergeFields(model: Model, values: Record<string, unknown>): Mode
 }
 
 /**
- * Replace top-level columns, one `set()` per key: nested plain objects are
- * stored whole, so keys missing from the new value are gone.
- *
- * Applies the same identity-column protection as {@link mergeFields}, so a
- * request body cannot retarget the save.
+ * Throw when one key is another key or a dot-path prefix of it
+ * (`settings` with `settings.theme`, `a.b` with `a.b.c`): the two writes
+ * overlap, and the result would depend on their order.
  */
-export function assignFields(model: Model, values: Record<string, unknown>): Model {
+function assertNoOverlappingKeys(keys: string[]): void {
+  for (const outer of keys) {
+    for (const inner of keys) {
+      if (outer !== inner && inner.startsWith(`${outer}.`)) {
+        throw new Error(
+          `model.set(): the keys "${outer}" and "${inner}" overlap. "${inner}" is inside "${outer}", so set one or the other, not both.`,
+        );
+      }
+    }
+  }
+}
+
+/**
+ * Object form of `set()`: one `set(key, value)` per entry, all or nothing.
+ *
+ * A top-level key replaces the whole field; a dot-path key writes only that
+ * leaf. Overlapping keys throw before anything is written. Applies the same
+ * identity-column protection as {@link mergeFields}, so a request body cannot
+ * retarget the save.
+ */
+export function setFields(model: Model, values: Record<string, unknown>): Model {
+  if (values === null || typeof values !== "object" || Array.isArray(values)) {
+    throw new TypeError("model.set() expects a field name and a value, or an object of fields.");
+  }
+
   const safeValues = stripIdentityColumns(model, values);
+
+  assertNoOverlappingKeys(Object.keys(safeValues));
 
   for (const [key, value] of Object.entries(safeValues)) {
     setFieldValue(model, key, value);

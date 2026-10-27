@@ -773,7 +773,7 @@ export const ERROR_CODES = {
     area: "convention",
     category: "code",
     title: "merge() on an object column keeps the keys the new value omits",
-    fix: 'Replace the column with `model.assign({ column: value })` or `model.set("column", value)`; `merge()` deep-merges plain objects. Keep `merge()` only when a partial update of the nested object is intended.',
+    fix: 'Replace the column with `model.set({ column: value })` or `model.set("column", value)`; `merge()` deep-merges plain objects. Keep `merge()` only when a partial update of the nested object is intended.',
     skill: "warlock-check",
   },
   WL9101: {

@@ -251,8 +251,8 @@ describe("WL9025 merge() on an object column", () => {
     expect(found[0]).toMatchObject({ code: "WL9025", severity: "warning" });
     expect(found[0].fix).toBeUndefined();
     expect(found[0].message).toContain("`filters` column (object)");
-    expect(found[0].message).toContain("assign");
-    expect(found[0].message).toContain("set");
+    expect(found[0].message).toContain("set({ filters: ... })");
+    expect(found[0].message).not.toContain("assign");
   });
 
   it("flags record and array-of-objects columns, naming the type", () => {
@@ -287,10 +287,10 @@ describe("WL9025 merge() on an object column", () => {
     expect(found).toEqual([]);
   });
 
-  it("does not flag assign() or set()", () => {
+  it("does not flag set()", () => {
     const found = mergeFindings(`${REPORT_MODEL}
       function update(report: Report) {
-        report.assign({ filters: { status: "closed" } });
+        report.set({ filters: { status: "closed" }, "settings.theme": "dark" });
         report.set("filters", { status: "closed" });
       }`);
 

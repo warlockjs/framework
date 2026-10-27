@@ -117,12 +117,16 @@ Because plain objects merge key-by-key, **omitting a key from a nested object do
 
 ```ts
 // stored: { filters: { status: "open", owner: "ada" } }
-model.assign({ filters: { status: "closed" } }); // many columns, each replaced whole
+model.set({ filters: { status: "closed" } }); // many columns, each replaced whole
 model.set("filters", { status: "closed" }); // one column
 model.getDirtyColumns(); // ["filters"]
+
+// a dot path writes only that leaf; siblings survive
+model.set({ "filters.status": "closed" });
 ```
 
-`assign()` strips identity columns on a persisted model just like `merge()`. `warlock check` flags `merge()` on an object, record or array-of-objects schema column with `WL9025` (a warning, no autofix, since the two methods behave differently).
+`set` always replaces: a top-level key stores the value whole (objects and arrays too), a dot-path key replaces one leaf, and `merge` is the only method that deep-merges. Keys that overlap in one call (`"filters"` with `"filters.status"`) throw before anything is written.
+`set({ ... })` strips identity columns on a persisted model just like `merge()`. `warlock check` flags `merge()` on an object, record or array-of-objects schema column with `WL9025` (a warning, no autofix, since the two methods behave differently).
 
 :::note[Fixed in 4.9.1]
 Before 4.9.1 a `Date` merged over a column that **already held a `Date`** was silently dropped: the merge treated it as a mergeable container and recursed into it, and a `Date` has no own enumerable properties, so nothing was copied. The column never went dirty and `save()` returned `{ success: true, modifiedCount: 0 }` with no `UPDATE` issued. Writing into an empty column always worked, so only overwrites were affected. If you are on 4.9.0 or earlier, upgrade.

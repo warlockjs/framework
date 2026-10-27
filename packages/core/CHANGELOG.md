@@ -10,7 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
-- `warlock check` rule `WL9025` (warning): `model.merge({ column: {...} })` on a Cascade model whose `static schema` declares the column as an object, record or array-of-objects validator. `merge()` deep-merges, so keys the new value omits stay stored; the message suggests `assign()` or `set()`. Receivers resolve like `WL9021`; there is no autofix.
+- `warlock check` rule `WL9025` (warning): `model.merge({ column: {...} })` on a Cascade model whose `static schema` declares the column as an object, record or array-of-objects validator. `merge()` deep-merges, so keys the new value omits stay stored; the message suggests `set({ column: ... })` or `set("column", value)`. Receivers resolve like `WL9021`; there is no autofix.
 
 ## 5.39.1 - 2026-10-26
 

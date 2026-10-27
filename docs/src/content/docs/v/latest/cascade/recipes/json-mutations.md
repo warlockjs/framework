@@ -45,7 +45,7 @@ await user.save();
 
 Reach for `set` when you want field-level replacement. Reach for `merge` when you want field-level addition.
 
-Because `merge` never removes a nested key, an update that clears a key (omits it from the object) must replace the column instead. `assign({ profile: { ... } })` does that for several columns at once, `set("profile", value)` for one. `warlock check` warns about this with `WL9025`.
+Because `merge` never removes a nested key, an update that clears a key (omits it from the object) must replace the column instead. `set({ profile: { ... } })` does that for several columns at once, `set("profile", value)` for one; `set({ "profile.city": "London" })` writes a single leaf. `warlock check` warns about this with `WL9025`.
 
 ## Updating an array entry by id
 

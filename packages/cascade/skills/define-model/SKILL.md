@@ -112,12 +112,12 @@ await user.save();
 
 Quick reference:
 
-| Situation              | Pattern                    |
-| ---------------------- | -------------------------- |
-| 1–2 specific fields    | `user.set(k, v).save()`    |
-| Bulk from an object    | `user.merge(data).save()`  |
-| Replace object columns | `user.assign(data).save()` |
-| After spread mutations | `user.save()`              |
+| Situation              | Pattern                   |
+| ---------------------- | ------------------------- |
+| 1–2 specific fields    | `user.set(k, v).save()`   |
+| Bulk from an object    | `user.merge(data).save()` |
+| Replace object columns | `user.set(data).save()`   |
+| After spread mutations | `user.save()`             |
 
 ## Remove a field — `.unset(field)`
 
@@ -213,7 +213,7 @@ Mark a column the server alone sets with `.internal()` (`authorId: v.int().requi
 - Don't read a column as a property (`post.title`); use `post.get("title")`.
 - Don't redeclare server-set fields on a request schema; mark them `.internal()` on the model schema and use `Model.requestSchema()`.
 - Don't `await user.save()` and forget the `await` — your changes live only on the instance and never reach the DB.
-- Don't `.merge()` an object column when the value is the complete new one: nested plain objects are deep-merged, so omitted keys stay stored. Use `.assign({ column })` or `.set("column", value)` (`warlock check` warns with `WL9025`).
+- Don't `.merge()` an object column when the value is the complete new one: nested plain objects are deep-merged, so omitted keys stay stored. Use `.set({ column })` or `.set("column", value)` (`warlock check` warns with `WL9025`).
 - Don't expect schema defaults to apply on `.merge()` — defaults fire on `.create()` only.
 
 ## See also

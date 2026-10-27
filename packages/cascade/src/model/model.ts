@@ -36,7 +36,6 @@ import { modelSync } from "../sync/model-sync";
 import type { ModelSyncOperationContract } from "../sync/types";
 import type { DeleteStrategy, StrictMode } from "../types";
 import {
-  assignFields,
   decrementField,
   getBooleanField,
   getFieldValue,
@@ -47,6 +46,7 @@ import {
   incrementField,
   mergeFields,
   setFieldValue,
+  setFields,
   unsetFields,
 } from "./methods/accessor-methods";
 import { deleteOneRecord, deleteRecords, destroyModel } from "./methods/delete-methods";
@@ -133,6 +133,7 @@ import type {
   ModelDataSnapshot,
   ModelKey,
   ModelPath,
+  ModelSetValues,
   ModelSchema,
   ModelValue,
 } from "./model.types";
@@ -148,6 +149,7 @@ export type {
   ModelDataSnapshot,
   ModelKey,
   ModelPath,
+  ModelSetValues,
   ModelSchema,
   ModelSystemColumns,
   ModelValue,
@@ -990,24 +992,42 @@ export abstract class Model<out TSchema extends ModelSchema = ModelSchema> {
   /**
    * Sets a field value in the model's data and marks it as dirty.
    *
-   * Supports both top-level keys and dot-notation paths for nested assignment.
-   * Automatically updates the dirty tracker to reflect the change.
+   * `set` always replaces: a top-level key stores the value whole (objects and
+   * arrays too, never merged), and a dot path (`"address.city"`) writes only
+   * that nested leaf. To deep-merge a nested object instead, use
+   * {@link Model.merge}.
    *
-   * @param field - The field name or dot-notation path (e.g., "address.city")
+   * Pass an object to set several fields in one call. Each entry behaves
+   * exactly like `set(key, value)` for that key. Identity columns (`id`,
+   * `_id`, the primary key) are ignored on a persisted model, as in `merge()`,
+   * so `model.set(req.body)` cannot retarget the save. Keys that overlap
+   * (`"settings"` with `"settings.theme"`) throw before anything is written.
+   *
+   * @param field - The field name or dot-notation path, or an object of fields
    * @param value - The value to assign. Checked against the column type; a dot path accepts anything
    * @returns The model instance for method chaining
    *
    * @example
    * ```typescript
    * user.set("name", "Bob").set("address.city", "NYC");
+   *
+   * // several fields at once
+   * user.set({ name: "Bob", settings: { theme: "dark" }, "address.city": "NYC" });
    * ```
    */
-  // The dot-path overload comes first so the column overload is the last one tried:
-  // TypeScript reports the last overload's error, which then names the real mismatch
-  // (the value type, or an unknown column) instead of the dot-path template.
+  // The object overload comes first (its single argument can never match the
+  // two-argument overloads). The dot-path overload comes before the column overload so
+  // the column overload is the last one tried: TypeScript reports the last overload's
+  // error, which then names the real mismatch (the value type, or an unknown column)
+  // instead of the dot-path template.
+  public set(values: ModelSetValues<TSchema>): this;
   public set(field: ModelPath, value: unknown): this;
   public set<TKey extends ModelKey<TSchema>>(field: TKey, value: ModelValue<TSchema, TKey>): this;
-  public set(field: string, value: unknown): this {
+  public set(field: string | ModelSetValues<TSchema>, value?: unknown): this {
+    if (typeof field === "object") {
+      return setFields(this, field as Record<string, unknown>) as this;
+    }
+
     return setFieldValue(this, field, value) as this;
   }
 
@@ -1075,7 +1095,8 @@ export abstract class Model<out TSchema extends ModelSchema = ModelSchema> {
    * Nested plain objects are **deep-merged** into the stored value, so a key
    * you leave out of a nested object is kept, not removed. To replace an
    * object column whole (and drop keys the new value omits), use
-   * {@link Model.assign} or `set(column, value)`.
+   * `set({ column: value })` or `set(column, value)`; `set("a.b", value)`
+   * writes one nested leaf.
    *
    * @param values - Partial data to merge into the model
    * @returns The model instance for method chaining
@@ -1091,34 +1112,6 @@ export abstract class Model<out TSchema extends ModelSchema = ModelSchema> {
   public merge(values: Record<string, unknown>): this;
   public merge(values: Record<string, unknown>): this {
     return mergeFields(this, values) as this;
-  }
-
-  /**
-   * Replaces each given column whole, exactly as `set(key, value)` would.
-   *
-   * Unlike {@link Model.merge}, a nested object is not merged into the stored
-   * one: keys the new value omits are removed. Columns not named in `values`
-   * stay untouched. Changed columns are marked dirty, and a persisted model
-   * ignores identity columns (`id`, `_id`, the primary key) just as `merge()` does,
-   * so `model.assign(req.body)` cannot retarget the save.
-   *
-   * @param values - Columns to replace
-   * @returns The model instance for method chaining
-   *
-   * @example
-   * ```typescript
-   * // stored: { filters: { status: "open", owner: "ann" } }
-   * model.merge({ filters: { status: "closed" } });
-   * // filters -> { status: "closed", owner: "ann" }  (deep merge keeps owner)
-   *
-   * model.assign({ filters: { status: "closed" } });
-   * // filters -> { status: "closed" }                (replaced, owner gone)
-   * ```
-   */
-  public assign(values: Partial<TSchema>): this;
-  public assign(values: Record<string, unknown>): this;
-  public assign(values: Record<string, unknown>): this {
-    return assignFields(this, values) as this;
   }
 
   /**

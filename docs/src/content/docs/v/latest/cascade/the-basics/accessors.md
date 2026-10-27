@@ -173,9 +173,11 @@ user.set("profile", { address: { city: "London" } }); // wipes existing profile
 
 Both record dirty state on the affected paths.
 
-## `assign(values)` — replace many columns at once
+## `set(values)` — set many fields at once
 
-`merge` keeps nested keys the new value leaves out, so clearing a key of an object column with `merge` does nothing. `assign` replaces each column named in `values` whole, exactly like `set(column, value)` for each key, and leaves every other column alone:
+Pass an object to `set` to write several fields in one call. Each entry behaves exactly like `set(key, value)` for that key, and every other field stays untouched. The rule is the same as for the single form: **`set` replaces, `merge` deep-merges, and a dot path targets one leaf.**
+
+`merge` keeps nested keys the new value leaves out, so clearing a key of an object column with `merge` does nothing. A top-level key in `set` replaces the whole column, objects and arrays included:
 
 ```ts
 // stored: { filters: { status: "open", owner: "ada" } }
@@ -183,11 +185,18 @@ Both record dirty state on the affected paths.
 user.merge({ filters: { status: "closed" } });
 // filters -> { status: "closed", owner: "ada" }   owner is kept
 
-user.assign({ filters: { status: "closed" } });
+user.set({ filters: { status: "closed" } });
 // filters -> { status: "closed" }                 owner is gone
+
+user.set({ "filters.status": "closed" });
+// filters -> { status: "closed", owner: "ada" }   only that leaf is written
 ```
 
-`assign` strips identity columns from a persisted model just as `merge` does, so `user.assign(req.body)` cannot retarget the save. Use it for update services where a missing key means "cleared".
+Values are cast, dirty-tracked and written as whole-field updates exactly as with the single form, and the method returns the model. In a typed model every key is a schema column, a system column or a dot path, and each value is checked against its column's type.
+
+`set` strips identity columns (`id`, `_id`, the primary key) from a persisted model just as `merge` does, so `user.set(req.body)` cannot retarget the save. Cascade has no guarded or fillable list: besides the identity columns, every key in the object is written, so pick the fields you accept before passing a request body.
+
+Keys that overlap in one call, such as `settings` with `settings.theme`, or `a.b` with `a.b.c`, throw an error that names both keys before anything is written. Set the whole column or the leaf, not both.
 
 :::tip[`warlock check` flags the mistake]
 `WL9025` warns when `model.merge({ ... })` on a Cascade model names a column that its `static schema` declares as an object, record or array-of-objects column. See [error codes](../../core/cli/error-codes.md#wl9025).

@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
-- `model.assign(values)` replaces each named column whole, exactly as `set(key, value)` would, without the deep merge `merge()` applies to nested plain objects: keys the new value omits are removed. Persisted models drop identity columns from the values, as `merge()` does. The `merge()` JSDoc now says that nested objects are deep-merged and that removed keys are kept.
+- `model.set({ ... })` accepts an object and sets several fields in one call. Each entry behaves exactly like `set(key, value)`: a top-level key replaces the whole field (objects and arrays are never merged), and a dot-path key such as `"settings.theme"` writes only that leaf. Casting, dirty tracking and whole-field updates are the same as the single form. Persisted models drop identity columns from the object, as `merge()` does, and keys that overlap (`settings` with `settings.theme`) throw before anything is written. In a typed model each key is a column, a system column or a dot path, and each value is checked against its column type. So `set` replaces, a dot path targets a leaf, and `merge` deep-merges. The `merge()` JSDoc now says that nested objects are deep-merged and that removed keys are kept.
 
 ## 5.39.1 - 2026-10-26
 

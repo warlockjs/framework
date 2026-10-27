@@ -96,6 +96,21 @@ export type ModelValue<TSchema, TKey> = TKey extends keyof ModelColumns<TSchema>
 export type ModelPath = `${string}.${string}`;
 
 /**
+ * The object accepted by `set({ ... })`: each key is a column (system columns
+ * included) with that column's value type, or a dot path (`"address.city"`)
+ * with any value. An unknown key on a typed model is an error. A loose model
+ * accepts any key.
+ *
+ * Overlapping keys (`a` with `a.b`) are rejected at runtime, not here: a type
+ * that detects prefix overlap between literal keys is brittle and slow.
+ */
+export type ModelSetValues<TSchema> = {
+  [TKey in ModelKey<TSchema>]?: ModelValue<TSchema, TKey>;
+} & {
+  [TPath in ModelPath]?: unknown;
+};
+
+/**
  * The data a model holds, inferred from its seal schema with casts applied
  * (`v.date()` is `Date`, `v.int()` is `number`, `.nullable()` is `T | null`,
  * `.default()` is always present).

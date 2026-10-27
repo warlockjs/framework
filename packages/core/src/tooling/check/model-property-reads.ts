@@ -583,7 +583,7 @@ function checkMerge(
       code: "WL9025",
       severity: "warning",
       node: property,
-      message: `\`merge()\` deep-merges the \`${key}\` column (${type}), so keys missing from this value stay stored. Use \`assign({ ${key}: ... })\` or \`set("${key}", value)\` to replace it.`,
+      message: `\`merge()\` deep-merges the \`${key}\` column (${type}), so keys missing from this value stay stored. Use \`set({ ${key}: ... })\` or \`set("${key}", value)\` to replace it.`,
     });
   }
 }
@@ -592,7 +592,7 @@ function checkMerge(
  * `WL9025` (warning): `model.merge({ column: {...} })` where the model's
  * schema declares `column` as an object, record or array-of-objects column.
  * `merge()` deep-merges plain objects, so a key left out of the new value is
- * kept in the stored one; `assign()` / `set()` replace the column. No fix:
+ * kept in the stored one; `set()` replaces the column. No fix:
  * the two behave differently.
  *
  * Receivers resolve exactly as for `WL9021` (instances from `new`, finders,
