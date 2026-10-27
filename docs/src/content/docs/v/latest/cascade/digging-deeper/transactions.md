@@ -154,8 +154,26 @@ Product.events().onSaved(() => afterCommit(() => regenerateSitemap()));
 - **Outside a transaction**, `fn` runs on the next microtask. The caller does not await it.
 - **Errors** thrown by a callback are logged. They never change the transaction result and never stop the remaining callbacks.
 - Callbacks run after the transaction context has exited, so any database work they do is outside the finished transaction.
+- Called from work that runs after the transaction ended (a timer armed inside it), `fn` runs on the next microtask.
 
 Good fits: cache clears, sitemap regeneration, emails, webhooks. `afterCommit` is in-memory, so a crash between COMMIT and the callback loses it; when the side effect must survive that, use an outbox / job queue.
+
+## Work scheduled inside a transaction
+
+A `setTimeout`, a queue push or a fire-and-forget promise started inside the callback usually runs after the transaction has ended. That work runs **outside the transaction and with no session**: its Cascade queries behave as if no transaction had ever been opened, `transaction()` called from it opens a fresh transaction, and `afterCommit()` called from it runs on the next microtask.
+
+```ts
+await transaction(async () => {
+  const user = await User.create({ name: "Sara" });
+
+  // Runs after COMMIT, outside the transaction, with no session.
+  setTimeout(() => User.find(user.id), 100);
+});
+```
+
+- **It is not rolled back.** If the transaction rolls back, the scheduled work still runs, and any writes it makes are committed on their own.
+- **To see committed data**, queue the work with `afterCommit()`: it runs after the outermost COMMIT and is discarded on rollback.
+- **Do not rely on the transaction** for anything armed this way, including reads that need the transaction's uncommitted writes. Do that work before the callback returns.
 
 ## Patterns
 

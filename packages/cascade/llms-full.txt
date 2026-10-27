@@ -1927,8 +1927,13 @@ Product.events().onSaved(() => afterCommit(() => regenerateSitemap()));
 - **Outside a transaction:** runs on the next microtask (the caller does not await it).
 - **Errors** are logged and never change the transaction result or stop the remaining callbacks.
 - Callbacks run after the transaction context has exited, so DB work inside them is **not** part of the finished transaction.
+- `afterCommit()` called from work that runs after the transaction ended (a timer armed inside it) runs on the next microtask.
 
 Use the outbox pattern above instead when the side effect must survive a crash between COMMIT and the callback — `afterCommit` is in-memory.
+
+## Work scheduled inside a transaction (timers, queues, fire-and-forget)
+
+A `setTimeout`, queue push or un-awaited promise started inside `transaction(async () => { ... })` runs after the transaction ended. It runs **outside the transaction, with no session**: its queries are ordinary non-transactional queries, a `transaction()` it starts opens a fresh transaction, and it is **not** rolled back if the transaction rolls back. When it must run only after a successful COMMIT, queue it with `afterCommit(fn)` instead. Do transactional reads and writes before the callback returns.
 
 ## Things NOT to do
 

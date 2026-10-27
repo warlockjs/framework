@@ -16,7 +16,10 @@ import type {
   UpdateOptions,
 } from "mongodb";
 import { EventEmitter } from "node:events";
-import { databaseTransactionContext } from "../../context/database-transaction-context";
+import {
+  databaseTransactionContext,
+  type TransactionContextStore,
+} from "../../context/database-transaction-context";
 import { flushAfterCommit } from "../../transactions/after-commit";
 import type {
   AtomicUpdate,
@@ -751,7 +754,8 @@ export class MongoDbDriver implements DriverContract {
 
     await session.startTransaction(this.transactionOptions);
     transactionOwners.set(session, this);
-    databaseTransactionContext.enter({ session });
+    const store: TransactionContextStore = { session };
+    databaseTransactionContext.enter(store);
     let finished = false;
 
     const finalize = async (operation: () => Promise<void>, committing = false): Promise<void> => {
@@ -767,6 +771,9 @@ export class MongoDbDriver implements DriverContract {
         }
       } finally {
         finished = true;
+        // Work armed earlier still holds this store; exit() only replaces it
+        // for the current async chain.
+        databaseTransactionContext.end(store);
         databaseTransactionContext.exit();
         await session.endSession().catch(() => undefined);
       }
@@ -838,6 +845,8 @@ export class MongoDbDriver implements DriverContract {
     // Filled only after a successful commit; flushed once the context is gone.
     let committedCallbacks: Array<() => void | Promise<void>> = [];
     let result!: T;
+    // One store per attempt (withTransaction may retry the callback)
+    const stores: TransactionContextStore[] = [];
 
     try {
       // Tag the session with this driver so another data source's queries
@@ -851,7 +860,10 @@ export class MongoDbDriver implements DriverContract {
       // it starts uses the transaction session, with a fresh afterCommit queue.
       await session.withTransaction(
         async () => {
-          await databaseTransactionContext.run({ session, afterCommit: [] }, async () => {
+          const store: TransactionContextStore = { session, afterCommit: [] };
+          stores.push(store);
+
+          await databaseTransactionContext.run(store, async () => {
             result = await fn(ctx);
 
             // Read the queue while still inside the transaction context
@@ -866,6 +878,11 @@ export class MongoDbDriver implements DriverContract {
     } finally {
       // Guaranteed session cleanup
       await session.endSession().catch(() => undefined);
+
+      // Late work armed inside the callback must not reuse the ended session
+      for (const store of stores) {
+        databaseTransactionContext.end(store);
+      }
     }
 
     // Committed and outside the transaction context: run afterCommit() hooks

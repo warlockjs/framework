@@ -10,6 +10,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - `model.set({ ... })` accepts an object and sets several fields in one call. Each entry behaves exactly like `set(key, value)`: a top-level key replaces the whole field (objects and arrays are never merged), and a dot-path key such as `"settings.theme"` writes only that leaf. Casting, dirty tracking and whole-field updates are the same as the single form. Persisted models drop identity columns from the object, as `merge()` does, and keys that overlap (`settings` with `settings.theme`) throw before anything is written. In a typed model each key is a column, a system column or a dot path, and each value is checked against its column type. So `set` replaces, a dot path targets a leaf, and `merge` deep-merges. The `merge()` JSDoc now says that nested objects are deep-merged and that removed keys are kept.
 
+### Fixed
+
+- Work armed inside `transaction()` (a `setTimeout`, a queue, a fire-and-forget promise) no longer reuses the transaction's session after it ended. Before, a Cascade query in that work ran on the finished MongoDB session and threw `MongoExpiredSessionError: Use of expired sessions is not permitted`, and on PostgreSQL it ran on a pool client that had already been released. Now, once a transaction commits, rolls back or fails, that work runs with no session, outside any transaction: `hasActiveTransaction()` is false, `afterCommit()` runs on the next microtask, and `transaction()` opens a fresh transaction. This covers `transaction()` on both drivers and MongoDB's `beginTransaction()`, including retried MongoDB attempts. Use `afterCommit()` for work that must run after the COMMIT.
+
 ## 5.39.1 - 2026-10-26
 
 ### Added

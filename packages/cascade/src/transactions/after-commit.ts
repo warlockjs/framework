@@ -21,6 +21,8 @@ function reportFailure(error: unknown): void {
  *   or the remaining callbacks.
  * - Callbacks run after the transaction context has exited, so any DB work
  *   they do is outside the finished transaction.
+ * - Called from work that runs after the transaction ended (a timer or queue
+ *   armed inside it), the callback runs on the next microtask.
  *
  * @example
  * Product.events().onSaved(() => afterCommit(() => regenerateSitemap()));

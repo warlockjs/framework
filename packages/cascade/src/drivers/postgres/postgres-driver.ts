@@ -12,7 +12,10 @@
 
 import { colors } from "@mongez/copper";
 import { log } from "@warlock.js/logger";
-import { databaseTransactionContext } from "../../context/database-transaction-context";
+import {
+  databaseTransactionContext,
+  type TransactionContextStore,
+} from "../../context/database-transaction-context";
 import { flushAfterCommit } from "../../transactions/after-commit";
 import type {
   AtomicUpdate,
@@ -1417,44 +1420,52 @@ export class PostgresDriver implements DriverContract {
 
     // Run the callback INSIDE the async context (not enter-after-await) so every
     // query it starts — even without the client passed — uses the transaction.
-    await databaseTransactionContext.run({ session: tx.context, afterCommit: [] }, async () => {
-      try {
-        // Execute callback
-        result = await fn(ctx);
+    const store: TransactionContextStore = { session: tx.context, afterCommit: [] };
 
-        // Auto-commit on success
-        commitStarted = true;
-        await tx.commit();
+    try {
+      await databaseTransactionContext.run(store, async () => {
+        try {
+          // Execute callback
+          result = await fn(ctx);
 
-        // Read the queue while still inside the transaction context
-        committedCallbacks = databaseTransactionContext.takeAfterCommit();
-      } catch (error) {
-        if (commitStarted) {
-          // COMMIT itself failed: the original error propagates unchanged and
-          // no ROLLBACK is issued after it.
-          log.error(
-            `database.postgress`,
-            "transaction",
-            "Transaction COMMIT failed; client discarded, no rollback issued",
-          );
-        } else {
-          // Auto-rollback on any error (including explicit rollback). A failing
-          // ROLLBACK is logged, never thrown: the callback's error is the one
-          // the caller needs, and rollback() has already discarded the client.
-          try {
-            await tx.rollback();
+          // Auto-commit on success
+          commitStarted = true;
+          await tx.commit();
+
+          // Read the queue while still inside the transaction context
+          committedCallbacks = databaseTransactionContext.takeAfterCommit();
+        } catch (error) {
+          if (commitStarted) {
+            // COMMIT itself failed: the original error propagates unchanged and
+            // no ROLLBACK is issued after it.
             log.error(
               `database.postgress`,
               "transaction",
-              "Transaction operation failed, rolled back everything",
+              "Transaction COMMIT failed; client discarded, no rollback issued",
             );
-          } catch (rollbackError) {
-            log.error(`database.postgress`, "transaction", rollbackError);
+          } else {
+            // Auto-rollback on any error (including explicit rollback). A failing
+            // ROLLBACK is logged, never thrown: the callback's error is the one
+            // the caller needs, and rollback() has already discarded the client.
+            try {
+              await tx.rollback();
+              log.error(
+                `database.postgress`,
+                "transaction",
+                "Transaction operation failed, rolled back everything",
+              );
+            } catch (rollbackError) {
+              log.error(`database.postgress`, "transaction", rollbackError);
+            }
           }
+          throw error;
         }
-        throw error;
-      }
-    });
+      });
+    } finally {
+      // The client is back in the pool: late work armed inside the callback
+      // must not run queries on it.
+      databaseTransactionContext.end(store);
+    }
 
     // Committed and outside the transaction context: run afterCommit() hooks
     await flushAfterCommit(committedCallbacks);
