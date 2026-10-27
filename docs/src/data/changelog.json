@@ -136,6 +136,60 @@
   ],
   "releases": [
     {
+      "version": "5.39.2",
+      "id": "v5-39-2",
+      "date": "October 27, 2026",
+      "isUnreleased": false,
+      "summaryHtml": "<strong><code>model.set()</code> takes an object, a check for deep-merged object columns, and a transaction session fix.</strong> <code>model.set({ ... })</code> sets several fields in one call: a top-level key replaces the whole field, a dot-path key such as <code>\"settings.theme\"</code> writes one leaf, persisted models ignore identity columns, and overlapping keys throw before anything is written; each key and value is typed from the model schema. <code>warlock check</code> adds <code>WL9025</code>, a warning for <code>model.merge({ ... })</code> on a column the schema declares as an object, record or array of objects, since <code>merge()</code> keeps nested keys the caller removed. Work armed inside <code>transaction()</code> (a timer, a queue, a fire-and-forget promise) that runs after the transaction ended no longer reuses its session: on MongoDB it threw <code>MongoExpiredSessionError</code>, on PostgreSQL it ran on a released pool client; it now runs with no session, outside any transaction, and <code>afterCommit()</code> remains the tool for work that must follow a COMMIT. No breaking changes. Lockstep release across all 33 packages. Generator matrix scope: <code>none</code>; before publishing, the blog on the 5.39.2 tarballs passed the release gate; after publishing, every package was confirmed at the npm origin.",
+      "matrix": "none",
+      "matrixRows": null,
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/cascade",
+          "slug": "cascade",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            },
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>model.set({ ... })</code> accepts an object and sets several fields in one call. Each entry behaves exactly like <code>set(key, value)</code>: a top-level key replaces the whole field (objects and arrays are never merged), and a dot-path key such as <code>\"settings.theme\"</code> writes only that leaf. Casting, dirty tracking and whole-field updates are the same as the single form. Persisted models drop identity columns from the object, as <code>merge()</code> does, and keys that overlap (<code>settings</code> with <code>settings.theme</code>) throw before anything is written. In a typed model each key is a column, a system column or a dot path, and each value is checked against its column type. So <code>set</code> replaces, a dot path targets a leaf, and <code>merge</code> deep-merges. The <code>merge()</code> JSDoc now says that nested objects are deep-merged and that removed keys are kept."
+            },
+            {
+              "type": "Fixed",
+              "html": "Work armed inside <code>transaction()</code> (a <code>setTimeout</code>, a queue, a fire-and-forget promise) no longer reuses the transaction's session after it ended. Before, a Cascade query in that work ran on the finished MongoDB session and threw <code>MongoExpiredSessionError: Use of expired sessions is not permitted</code>, and on PostgreSQL it ran on a pool client that had already been released. Now, once a transaction commits, rolls back or fails, that work runs with no session, outside any transaction: <code>hasActiveTransaction()</code> is false, <code>afterCommit()</code> runs on the next microtask, and <code>transaction()</code> opens a fresh transaction. This covers <code>transaction()</code> on both drivers and MongoDB's <code>beginTransaction()</code>, including retried MongoDB attempts. Use <code>afterCommit()</code> for work that must run after the COMMIT."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>warlock check</code> rule <code>WL9025</code> (warning): <code>model.merge({ column: {...} })</code> on a Cascade model whose <code>static schema</code> declares the column as an object, record or array-of-objects validator. <code>merge()</code> deep-merges, so keys the new value omits stay stored; the message suggests <code>set({ column: ... })</code> or <code>set(\"column\", value)</code>. Receivers resolve like <code>WL9021</code>; there is no autofix."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "5.39.1",
       "id": "v5-39-1",
       "date": "October 26, 2026",

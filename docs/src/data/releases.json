@@ -1,4 +1,9 @@
 {
+  "5.39.2": {
+    "publishedAt": "2026-10-27T21:13:33.416Z",
+    "matrix": "none",
+    "summary": "**`model.set()` takes an object, a check for deep-merged object columns, and a transaction session fix.** `model.set({ ... })` sets several fields in one call: a top-level key replaces the whole field, a dot-path key such as `\"settings.theme\"` writes one leaf, persisted models ignore identity columns, and overlapping keys throw before anything is written; each key and value is typed from the model schema. `warlock check` adds `WL9025`, a warning for `model.merge({ ... })` on a column the schema declares as an object, record or array of objects, since `merge()` keeps nested keys the caller removed. Work armed inside `transaction()` (a timer, a queue, a fire-and-forget promise) that runs after the transaction ended no longer reuses its session: on MongoDB it threw `MongoExpiredSessionError`, on PostgreSQL it ran on a released pool client; it now runs with no session, outside any transaction, and `afterCommit()` remains the tool for work that must follow a COMMIT. No breaking changes. Lockstep release across all 33 packages. Generator matrix scope: `none`; before publishing, the blog on the 5.39.2 tarballs passed the release gate; after publishing, every package was confirmed at the npm origin."
+  },
   "5.39.1": {
     "publishedAt": "2026-10-26T20:42:59.638Z",
     "matrix": "none",
