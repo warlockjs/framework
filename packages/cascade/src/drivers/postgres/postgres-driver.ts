@@ -187,6 +187,13 @@ async function loadPg(): Promise<typeof import("pg")> {
 const transactionOwners = new WeakMap<object, PostgresDriver>();
 
 /**
+ * Internal marker: `transaction()` passes it to `beginTransaction()` so the
+ * transaction is NOT entered into the caller's async context (`transaction()`
+ * scopes its own store with `run()` instead).
+ */
+const DETACHED = Symbol("detached-transaction");
+
+/**
  * PostgreSQL database driver implementing the Cascade DriverContract.
  *
  * Provides connection pooling, CRUD operations, transactions, and
@@ -1273,13 +1280,31 @@ export class PostgresDriver implements DriverContract {
    * Begin a new database transaction.
    *
    * Acquires a client from the pool and starts a transaction.
-   * The client is stored in AsyncLocalStorage for automatic
-   * participation by subsequent queries.
+   * The context is entered synchronously, before the first `await`, so it lands
+   * in the CALLER's async flow: queries the caller runs after
+   * `await beginTransaction()` use this client until `commit()` / `rollback()`.
    *
    * @param options - Optional transaction options
    * @returns Transaction contract with commit/rollback methods
    */
-  public async beginTransaction(
+  public beginTransaction(
+    options?: PostgresTransactionOptions,
+    detached?: typeof DETACHED,
+  ): Promise<DriverTransactionContract<PgPoolClient>> {
+    const store: TransactionContextStore = { session: undefined, afterCommit: [] };
+
+    if (detached !== DETACHED) {
+      databaseTransactionContext.enter(store);
+    }
+
+    return this.startManualTransaction(store, options).catch((error) => {
+      databaseTransactionContext.end(store);
+      throw error;
+    });
+  }
+
+  private async startManualTransaction(
+    store: TransactionContextStore,
     options?: PostgresTransactionOptions,
   ): Promise<DriverTransactionContract<PgPoolClient>> {
     const settings = Object.entries(options?.settings ?? {});
@@ -1335,33 +1360,34 @@ export class PostgresDriver implements DriverContract {
       throw error;
     }
 
+    transactionOwners.set(client, this);
+    store.session = client;
+
+    // COMMIT/ROLLBACK failing must still release the client — a bare
+    // `await client.query(...); client.release();` skips release() on that
+    // throw. A failed COMMIT releases with the error (exactly once) so pg
+    // discards the client instead of recycling a connection left in an unknown
+    // transaction state; the original COMMIT error still propagates and the
+    // caller must NOT issue ROLLBACK afterwards (see transaction()). Either
+    // way the store ends, so the caller's flow and any late work stop using
+    // the released client.
+    const finish = async (sql: "COMMIT" | "ROLLBACK"): Promise<void> => {
+      try {
+        await this.executePostgresQuery(() => client.query(sql), sql);
+      } catch (error) {
+        client.release(error instanceof Error ? error : new Error(String(error)));
+        throw error;
+      } finally {
+        databaseTransactionContext.end(store);
+      }
+
+      client.release();
+    };
+
     return {
       context: client,
-      commit: async () => {
-        // COMMIT/ROLLBACK failing must still release the client — a bare
-        // `await client.query(...); client.release();` skips release() on
-        // that throw, which is the other leak this card describes. A failed
-        // COMMIT releases with the error (exactly once) so pg discards the
-        // client instead of recycling a connection left in an unknown
-        // transaction state; the original COMMIT error still propagates and
-        // the caller must NOT issue ROLLBACK afterwards (see transaction()).
-        try {
-          await this.executePostgresQuery(() => client.query("COMMIT"), "COMMIT");
-        } catch (error) {
-          client.release(error instanceof Error ? error : new Error(String(error)));
-          throw error;
-        }
-        client.release();
-      },
-      rollback: async () => {
-        try {
-          await this.executePostgresQuery(() => client.query("ROLLBACK"), "ROLLBACK");
-        } catch (error) {
-          client.release(error instanceof Error ? error : new Error(String(error)));
-          throw error;
-        }
-        client.release();
-      },
+      commit: () => finish("COMMIT"),
+      rollback: () => finish("ROLLBACK"),
     };
   }
 
@@ -1401,7 +1427,7 @@ export class PostgresDriver implements DriverContract {
       return fn(ctx);
     }
 
-    const tx = await this.beginTransaction(options);
+    const tx = await this.beginTransaction(options, DETACHED);
 
     // Tag the session with this driver so another data source's queries
     // running inside the callback never pick it up.

@@ -747,15 +747,40 @@ export class MongoDbDriver implements DriverContract {
 
   /**
    * Begin a MongoDB transaction, returning commit/rollback helpers.
+   *
+   * The transaction context is entered synchronously, before the first
+   * `await`, so it lands in the CALLER's async flow: queries the caller runs
+   * after `await beginTransaction()` use the session until `commit()` /
+   * `rollback()`. (Entering after an await would only reach this method's own
+   * continuation.) The store is filled in once the session is ready and is
+   * marked ended on commit, rollback or failure.
    */
-  public async beginTransaction(): Promise<DriverTransactionContract<ClientSession>> {
+  public beginTransaction(): Promise<DriverTransactionContract<ClientSession>> {
+    const store: TransactionContextStore = { session: undefined, afterCommit: [] };
+
+    databaseTransactionContext.enter(store);
+
+    return this.startManualTransaction(store).catch((error) => {
+      databaseTransactionContext.end(store);
+      throw error;
+    });
+  }
+
+  private async startManualTransaction(
+    store: TransactionContextStore,
+  ): Promise<DriverTransactionContract<ClientSession>> {
     const client = this.getClientInstance();
     const session = client.startSession();
 
-    await session.startTransaction(this.transactionOptions);
+    try {
+      await session.startTransaction(this.transactionOptions);
+    } catch (error) {
+      await session.endSession().catch(() => undefined);
+      throw error;
+    }
+
     transactionOwners.set(session, this);
-    const store: TransactionContextStore = { session };
-    databaseTransactionContext.enter(store);
+    store.session = session;
     let finished = false;
 
     const finalize = async (operation: () => Promise<void>, committing = false): Promise<void> => {
@@ -767,14 +792,15 @@ export class MongoDbDriver implements DriverContract {
         await operation();
 
         if (committing) {
-          committedCallbacks = databaseTransactionContext.takeAfterCommit();
+          // Read from the store itself: commit() may run in another async flow.
+          committedCallbacks = store.afterCommit ?? [];
+          store.afterCommit = [];
         }
       } finally {
         finished = true;
-        // Work armed earlier still holds this store; exit() only replaces it
-        // for the current async chain.
+        // The caller's flow and any work armed earlier hold this store; ending
+        // it makes all of them stop handing out the session.
         databaseTransactionContext.end(store);
-        databaseTransactionContext.exit();
         await session.endSession().catch(() => undefined);
       }
 

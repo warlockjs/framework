@@ -94,6 +94,8 @@ try {
 }
 ```
 
+`beginTransaction()` binds the transaction to the async flow that called it. Every query that flow runs after `await driver.beginTransaction()` (driver calls, models, query builders) uses the transaction's session until you call `commit()` or `rollback()`. After either one, that same flow runs with no session, outside any transaction. Requests, timers and jobs running at the same time never see the session. You can also use `tx.context` (the MongoDB session or the PostgreSQL client) directly. Because it attaches to the async flow that called it, call `beginTransaction()` inside the async function that runs the transactional work, and always commit or roll back, for example with `try` / `finally`.
+
 You own commit, rollback, and cleanup. The pattern is more error-prone (forget to commit in one branch and you've leaked a session); reach for it only when the callback form genuinely can't express your flow.
 
 ## What runs inside the transaction

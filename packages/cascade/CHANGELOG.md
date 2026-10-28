@@ -4,6 +4,12 @@ All notable changes to `@warlock.js/cascade` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.39.3 - 2026-10-28
+
+### Fixed
+
+- A manual `const tx = await driver.beginTransaction()` now puts the queries you run afterwards inside the transaction. Before, the transaction was bound only to the driver's own internal step, so on MongoDB your next queries silently ran outside the transaction (no atomicity, and `rollback()` did not undo them), and on PostgreSQL they ran on other pool connections the same way. Now every query the calling flow runs after `await beginTransaction()` uses the transaction's session until `commit()` or `rollback()`, and runs with no session afterwards. Other requests, timers and jobs running at the same time never see it. `transaction(fn)` is unchanged.
+
 ## 5.39.2 - 2026-10-27
 
 ### Added

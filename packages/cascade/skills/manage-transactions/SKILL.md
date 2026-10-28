@@ -72,6 +72,10 @@ Postgres has no such requirement — transactions work out of the box.
 
 A throw anywhere inside unwinds the **whole** outer transaction — Postgres aborts a transaction on the first error, so there is no automatic per-block savepoint. For independent partial rollback of an inner block, drop to the manual API (`driver.beginTransaction()`) and use savepoints explicitly.
 
+### Manual `beginTransaction()`
+
+`const tx = await driver.beginTransaction()` binds the transaction to the calling async flow: every query that flow runs afterwards (driver calls, models, query builders) uses the session until `tx.commit()` / `tx.rollback()`, then runs with no session, outside any transaction. Concurrent requests, timers and jobs never see it. `tx.context` is the MongoDB session or PostgreSQL client for direct use. Because it attaches to the calling async flow, call it inside the async function that runs the transactional work, and always commit or roll back (`try` / `finally`); prefer `transaction(fn)` unless you need this control.
+
 ## Explicit rollback
 
 The callback receives a transaction context; call `ctx.rollback()` to roll back without throwing:
