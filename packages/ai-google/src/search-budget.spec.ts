@@ -9,15 +9,25 @@ const search = ai.providerTool({ provider: "google", definition: { googleSearch:
 const code = ai.providerTool({ provider: "google", definition: { codeExecution: {} } });
 
 function setup(queriesPerCall: string[]) {
-  const response = {
+  // Like the real API, report queries only when the search tool was sent.
+  const respond = (request: { config?: { tools?: unknown[] } }) => ({
     text: "answer",
-    candidates: [{ index: 0, groundingMetadata: { webSearchQueries: queriesPerCall } }],
+    candidates: [
+      {
+        index: 0,
+        ...(JSON.stringify(request.config?.tools ?? []).includes("googleSearch")
+          ? { groundingMetadata: { webSearchQueries: queriesPerCall } }
+          : {}),
+      },
+    ],
     usageMetadata: { promptTokenCount: 1 },
-  };
-  const generateContent = vi.fn(async (_request: { config?: { tools?: unknown[] } }) => response);
-  const generateContentStream = vi.fn(async (_request: { config?: { tools?: unknown[] } }) =>
+  });
+  const generateContent = vi.fn(async (request: { config?: { tools?: unknown[] } }) =>
+    respond(request),
+  );
+  const generateContentStream = vi.fn(async (request: { config?: { tools?: unknown[] } }) =>
     (async function* () {
-      yield response;
+      yield respond(request);
     })(),
   );
   const client = { models: { generateContent, generateContentStream } } as unknown as GoogleGenAI;
