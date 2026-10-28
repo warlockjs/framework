@@ -140,9 +140,20 @@ export class CompilerSession {
     const project = this.snapshot.getProject(this.configPath);
     if (!project?.program.getSourceFile(file)) return [];
     const source = this.contents.get(path.resolve(requested)) ?? readFileSync(requested, "utf8");
+    // On Windows the checker reports declaration paths in lower case; map them back to the
+    // spelling of the project's file list so callers can compare them with `path.resolve` output.
+    const spelled =
+      process.platform === "win32"
+        ? new Map(this.fileNames.map((name) => [name.toLowerCase(), name]))
+        : undefined;
     return importSpecifiers(file, source).flatMap((imported) => {
       const symbol = project.checker.getSymbolAtPosition(file, imported.node.start + 1);
-      return symbol?.declarations.map((declaration) => nativePath(declaration.path)) ?? [];
+      return (
+        symbol?.declarations.map((declaration) => {
+          const resolved = nativePath(declaration.path);
+          return spelled?.get(resolved.toLowerCase()) ?? resolved;
+        }) ?? []
+      );
     });
   }
 

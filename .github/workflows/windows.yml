@@ -86,25 +86,5 @@ jobs:
         working-directory: .
         run: pnpm install --frozen-lockfile
 
-      - name: Diagnose junction resolution (temporary)
-        if: matrix.package == 'web'
-        run: |
-          node -e "
-          const fs=require('fs'),path=require('path'),{pathToFileURL}=require('url');
-          const t=path.join(process.env.RUNNER_TEMP,'jn');
-          fs.rmSync(t,{recursive:true,force:true});fs.mkdirSync(t);
-          fs.symlinkSync(path.resolve('node_modules'),path.join(t,'node_modules'),'junction');
-          console.log('entries',fs.readdirSync(path.join(t,'node_modules')).slice(0,10));
-          const r=path.resolve('node_modules/react');
-          console.log('react lstat',fs.lstatSync(r).isSymbolicLink(),fs.readlinkSync(r));
-          try{console.log('cjs',require.resolve('react',{paths:[t]}))}catch(e){console.log('cjs failed',e.message)}
-          fs.writeFileSync(path.join(t,'x.mjs'),'import r from \'react\';console.log(\'esm ok\',typeof r)');
-          import(pathToFileURL(path.join(t,'x.mjs')).href).catch(e=>console.log('esm failed',e.message));
-          "
-
-      - name: Diagnose native compiler paths (temporary)
-        if: matrix.package == 'core'
-        run: node --import tsx windows-debug.mts
-
       - name: Test
         run: pnpm run test
