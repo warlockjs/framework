@@ -238,3 +238,22 @@ describe("registry lease identity reads", () => {
     }
   });
 });
+
+describe("guardian that closes without answering", () => {
+  it("is no proof rather than a parse error", async () => {
+    const pid = 800_000 + Math.floor(Math.random() * 90_000);
+    const address = guardianAddress(process.platform, pid, process.getuid?.() ?? 0);
+    const server = createServer((socket) => {
+      socket.on("error", () => undefined);
+      socket.on("data", () => socket.end());
+    });
+    await new Promise<void>((resolve) => server.listen(address, resolve));
+    try {
+      await expect(
+        guardianProof(pid, "a".repeat(64), "a".repeat(64), 2000),
+      ).resolves.toBeUndefined();
+    } finally {
+      server.close();
+    }
+  });
+});

@@ -104,10 +104,16 @@ export async function guardianProof(
       if (data.length > 1024) fail(new Error("Invalid process ownership response"));
     });
     socket.on("error", (error: NodeJS.ErrnoException) => {
-      if (["ENOENT", "ECONNREFUSED"].includes(error.code ?? "")) resolve(undefined);
+      if (["ENOENT", "ECONNREFUSED", "EPIPE", "ECONNRESET"].includes(error.code ?? ""))
+        resolve(undefined);
       else reject(error);
     });
     socket.on("end", () => {
+      // A guardian that is exiting closes the pipe without answering; that is no proof, not corrupt data.
+      if (!data) {
+        resolve(undefined);
+        return;
+      }
       try {
         resolve(parseGuardianProof(data, pid, nonce, token));
       } catch (error) {
