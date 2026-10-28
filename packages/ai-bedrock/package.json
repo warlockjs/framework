@@ -35,8 +35,8 @@
     "@warlock.js/ai": "*"
   },
   "dependencies": {
-    "@aws-sdk/client-bedrock": "^3.1048.0",
-    "@aws-sdk/client-bedrock-runtime": "^3.1048.0",
+    "@aws-sdk/client-bedrock": "^3.1157.0",
+    "@aws-sdk/client-bedrock-runtime": "^3.1157.0",
     "@warlock.js/logger": "workspace:^"
   },
   "packageManager": "pnpm@11.24.0"
