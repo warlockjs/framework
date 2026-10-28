@@ -6,6 +6,11 @@ import {
   peekAppSingleton,
 } from "./app-singleton";
 
+type Fixture = typeof import("./__fixtures__/singleton-fixture");
+
+const loadCopy = (copy: string) =>
+  import(`./__fixtures__/singleton-fixture?copy=${copy}`) as Promise<Fixture>;
+
 afterEach(async () => {
   await disposeAllAppSingletons();
 });
@@ -21,8 +26,8 @@ describe("appSingleton", () => {
   it("is shared by two evaluations of the same file (connector installs, route reads)", async () => {
     // Different query strings make the module runner evaluate the file twice,
     // exactly like a second module graph or a reload generation does.
-    const connectorCopy = await import("./__fixtures__/singleton-fixture?copy=connector");
-    const routeCopy = await import("./__fixtures__/singleton-fixture?copy=route");
+    const connectorCopy = await loadCopy("connector");
+    const routeCopy = await loadCopy("route");
 
     expect(connectorCopy.moduleCopyId).not.toBe(routeCopy.moduleCopyId);
     expect(routeCopy.getFixtureRuntime()).toBe(connectorCopy.getFixtureRuntime());

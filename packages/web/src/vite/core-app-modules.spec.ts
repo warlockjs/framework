@@ -387,9 +387,7 @@ export { als };`,
   }, 120_000);
 
   it("appSingleton gives a module that must stay in Vite the same value core's copy installed", async () => {
-    const singletonSource = fileURLToPath(
-      import.meta.resolve("@warlock.js/core/src/loader/app-singleton"),
-    );
+    const singletonSource = path.resolve(WEB_ROOT, "..", "core", "src", "loader", "app-singleton.ts");
     const viteOnly = appFile("shared", "singleton-vite-only.ts");
     fs.writeFileSync(
       viteOnly,
