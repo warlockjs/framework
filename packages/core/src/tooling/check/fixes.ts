@@ -1,13 +1,14 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import type { ToolingProblem } from "../problem";
+import type { SourceFile } from "../syntax/ast";
 import { importSpecifiers } from "../syntax/imports";
 
 export type ProblemFix = { start: number; end: number; text: string };
 
 /** Only relative .js imports: removing the suffix preserves TypeScript resolution. */
-export function importFixes(file: string, source: string): ProblemFix[] {
-  return importSpecifiers(file, source)
+export function importFixes(file: string, source: string, parsed?: SourceFile): ProblemFix[] {
+  return importSpecifiers(file, parsed ?? source)
     .filter(
       ({ specifier, node }) =>
         specifier.startsWith(".") &&

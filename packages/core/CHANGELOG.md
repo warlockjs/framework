@@ -8,9 +8,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## 5.39.3 - 2026-10-28
 
-### Fixed
-
-- A spec or test file placed next to a CLI command (for example `import-guides.command.spec.ts` beside `import-guides.command.ts`) no longer breaks `warlock migrate` and every other CLI command. Command discovery now skips `*.spec.*` and `*.test.*` files, so a `vi.mock()` call in a test is never imported outside Vitest. The same rule now applies to `main`, `routes`, `worker`, `events` and locale files.
 ### Added
 
 - `warlock check` prints one line to stderr when each step starts and ends, and the conventions step reports its milestones (facts collected, every 1000 files with the slowest rule so far). stdout is unchanged, so `--json` still prints only the JSON report.
@@ -20,6 +17,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - `warlock check` could run for tens of minutes in the conventions step on a large app. The `.client` boundary rule (`WL9022`) re-read, re-parsed and re-resolved every shared file for each controller, service, model and route it checked, so the work grew with server-only files times the size of the import graph. Import chains are now read once per run and files known to reach no `.client` module are never walked again, which makes the step roughly linear in the number of files.
 - The conventions step listed and parsed the project twice to collect its project-wide facts; it now lists the files once.
+- A check over thousands of files stalled for several seconds at a time, and used far more memory than needed, because every parsed syntax tree kept its parent links in a `WeakMap`, which the garbage collector resolves slowly once many trees are alive. Parent links are now stored on the nodes themselves, and each file is parsed once per rule instead of several times; the conventions step on a 7,500-file app dropped from about 105 s to about 14 s, and no rule is skipped by the time budget.
+- A spec or test file placed next to a CLI command (for example `import-guides.command.spec.ts` beside `import-guides.command.ts`) no longer breaks `warlock migrate` and every other CLI command. Command discovery now skips `*.spec.*` and `*.test.*` files, so a `vi.mock()` call in a test is never imported outside Vitest. The same rule now applies to `main`, `routes`, `worker`, `events` and locale files.
 
 ## 5.39.2 - 2026-10-27
 

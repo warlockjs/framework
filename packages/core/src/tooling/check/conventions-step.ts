@@ -119,7 +119,7 @@ export function resolveSpecifier(
 
 /** Every module specifier a source file imports, with its position. */
 function importsOf(sourceFile: ast.SourceFile): { specifier: string; node: ast.Node }[] {
-  return importSpecifiers(sourceFile.fileName, sourceFile.text);
+  return importSpecifiers(sourceFile.fileName, sourceFile);
 }
 
 /** `// warlock-check-ignore [WLxxxx …]` on a problem's line or the line above it. */
@@ -147,7 +147,7 @@ function importProblems(
   cwd: string,
 ): ToolingProblem[] {
   const problems: ToolingProblem[] = [];
-  const fixes = importFixes(relativePath, sourceFile.text);
+  const fixes = importFixes(relativePath, sourceFile.text, sourceFile);
   const importerModule = moduleOf(relativePath);
 
   for (const { specifier, node } of importsOf(sourceFile)) {

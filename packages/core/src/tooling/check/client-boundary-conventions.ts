@@ -146,7 +146,7 @@ function importsOfFile(
 
 function valueImports(
   relativePath: string,
-  source: string,
+  source: string | ast.SourceFile,
 ): { specifier: string; node: ast.Node }[] {
   try {
     return importSpecifiers(relativePath, source).filter(({ node }) => !isTypeOnly(node));
@@ -232,7 +232,7 @@ export function clientBoundaryProblems(
 
   const problems: ToolingProblem[] = [];
 
-  for (const { specifier, node } of valueImports(relativePath, sourceFile.text)) {
+  for (const { specifier, node } of valueImports(relativePath, sourceFile)) {
     const chain = chainToClientModule(relativePath, specifier, cwd, cache);
 
     if (!chain) continue;

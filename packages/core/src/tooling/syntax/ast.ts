@@ -2,8 +2,13 @@ import { parseSync, visitorKeys, type Node, type Program } from "oxc-parser";
 export type * from "oxc-parser";
 
 export type SourceFile = Program & { fileName: string; text: string };
-const parents = new WeakMap<Node, Node>();
-const sources = new WeakMap<Node, SourceFile>();
+/**
+ * Parent links live on the nodes themselves, as a non-enumerable property.
+ * They used to sit in a `WeakMap`, whose entries chain from child to parent
+ * to grandparent; the garbage collector resolves such ephemeron chains
+ * slowly, which stalled a check over thousands of files for seconds at a time.
+ */
+const PARENT = Symbol("warlock.parent");
 
 export function forEachChild(node: Node, visit: (node: Node) => void): void {
   const record = node as unknown as Record<string, unknown>;
@@ -18,9 +23,8 @@ export function forEachChild(node: Node, visit: (node: Node) => void): void {
 export function parseSourceFile(fileName: string, text: string): SourceFile {
   const source = Object.assign(parseSync(fileName, text).program, { fileName, text });
   const attach = (node: Node): void => {
-    sources.set(node, source);
     forEachChild(node, (child) => {
-      parents.set(child, node);
+      Object.defineProperty(child, PARENT, { value: node, configurable: true });
       attach(child);
     });
   };
@@ -28,12 +32,14 @@ export function parseSourceFile(fileName: string, text: string): SourceFile {
   return source;
 }
 export function parentOf(node: Node): Node | undefined {
-  return parents.get(node);
+  return (node as unknown as Record<symbol, Node | undefined>)[PARENT];
 }
 export function sourceOf(node: Node): SourceFile {
-  const source = sources.get(node);
-  if (!source) throw new Error("Node has no source file.");
-  return source;
+  let current = node;
+  for (let parent = parentOf(current); parent; parent = parentOf(current)) current = parent;
+  if (current.type !== "Program" || !("text" in current))
+    throw new Error("Node has no source file.");
+  return current as SourceFile;
 }
 export function textOf(node: Node): string {
   return node.type === "Identifier" ? node.name : sourceOf(node).text.slice(node.start, node.end);

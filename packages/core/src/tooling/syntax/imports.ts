@@ -1,9 +1,12 @@
-import { forEachChild, parseSourceFile, type Node } from "./ast";
+import { forEachChild, parseSourceFile, type Node, type SourceFile } from "./ast";
 
-/** Module references in real syntax, including type-only, dynamic and require references. */
+/**
+ * Module references in real syntax, including type-only, dynamic and require
+ * references. Pass an already parsed file to skip parsing it again.
+ */
 export function importSpecifiers(
   fileName: string,
-  source: string,
+  source: string | SourceFile,
 ): { specifier: string; node: Node; dynamic: boolean }[] {
   const found: { specifier: string; node: Node; dynamic: boolean }[] = [];
   const visit = (node: Node): void => {
@@ -31,6 +34,6 @@ export function importSpecifiers(
     }
     forEachChild(node, visit);
   };
-  visit(parseSourceFile(fileName, source));
+  visit(typeof source === "string" ? parseSourceFile(fileName, source) : source);
   return found;
 }
