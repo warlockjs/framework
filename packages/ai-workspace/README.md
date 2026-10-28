@@ -129,11 +129,11 @@ for (const file of await ws.glob("src/models/**/*.ts")) {
   and redirections kept inside the jail.
 - **Backends** — `local` (default; `@warlock.js/fs` + `node:child_process`) and
   `mock` (in-memory, for hermetic disk-free tests).
-- **Tools** under `ws.tools.*` — `read_file`, `edit_file`, `multi_edit`, `write_file`,
+- **Tools** under `ws.tools.*` — `read_file`, `edit_file`, `multi_edit`, `apply_patch`, `write_file`,
   `list_dir`, `run_shell` (optionally in the background), `shell_output`,
   `shell_kill`, `run_tests`, `grep`, `glob`, `todo_write`, `todo_read` — each a
   `ToolContract` (with a JSON Schema of its input) ready for `ai.agent({ tools })`.
-- **Direct methods** — `readFile` / `writeFile` / `editFile` / `multiEdit` /
+- **Direct methods** — `readFile` / `writeFile` / `editFile` / `multiEdit` / `applyPatch` /
   `listDir` / `exec` / `startShell` / `shellOutput` / `shellKill` / `listShells` /
   `grep` / `glob` / `exists` / `mkdir` / `remove` / `readTodos` / `writeTodos`,
   sharing the exact same policy seam, and `dispose()`.

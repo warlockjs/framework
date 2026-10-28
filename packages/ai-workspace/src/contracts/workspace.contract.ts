@@ -1,5 +1,7 @@
 import type { ToolContract } from "@warlock.js/ai";
 import type {
+  ApplyPatchInput,
+  ApplyPatchResult,
   EditFileInput,
   EditFileResult,
   ExecOptions,
@@ -45,6 +47,8 @@ export interface WorkspaceTools {
   editFile(opts?: { name?: string }): ToolContract;
   /** The `multi_edit` tool (several replacements in one file, all or none). */
   multiEdit(opts?: { name?: string }): ToolContract;
+  /** The `apply_patch` tool (a unified diff across files: modify, create, delete, rename; all or none). */
+  applyPatch(opts?: { name?: string }): ToolContract;
   /** The `write_file` tool (atomic full-content write). */
   writeFile(opts?: { name?: string }): ToolContract;
   /** The `list_dir` tool (bounded, jailed directory listing). */
@@ -112,6 +116,9 @@ export interface Workspace {
 
   /** Apply several exact-string edits to one file — all of them or none. */
   multiEdit(input: MultiEditInput): Promise<MultiEditResult>;
+
+  /** Apply a unified diff (modify, create, delete, rename) to the workspace — all of it or none. */
+  applyPatch(input: ApplyPatchInput): Promise<ApplyPatchResult>;
 
   /** List a jailed directory (bounded, ignores applied, symlinks not followed). */
   listDir(path?: string, opts?: ListDirOptions): Promise<ListDirResult>;

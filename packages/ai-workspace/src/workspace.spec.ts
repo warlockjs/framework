@@ -155,6 +155,7 @@ describe("workspace (integration over the real local backend)", () => {
       "read_file",
       "edit_file",
       "multi_edit",
+      "apply_patch",
       "write_file",
       "list_dir",
       "run_shell",
@@ -209,6 +210,9 @@ describe("workspace (integration over the real local backend)", () => {
     await expect(ro.exec("node -v")).rejects.toBeInstanceOf(WorkspacePolicyError);
     await expect(
       ro.multiEdit({ path: "seed.txt", edits: [{ oldString: "seeded", newString: "x" }] }),
+    ).rejects.toBeInstanceOf(WorkspacePolicyError);
+    await expect(
+      ro.applyPatch({ patch: "--- a/seed.txt\n+++ b/seed.txt\n@@ -1 +1 @@\n-seeded\n+x\n" }),
     ).rejects.toBeInstanceOf(WorkspacePolicyError);
     await expect(ro.startShell("node -v")).rejects.toBeInstanceOf(WorkspacePolicyError);
   });

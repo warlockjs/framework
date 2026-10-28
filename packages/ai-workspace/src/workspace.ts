@@ -6,6 +6,8 @@ import { WorkspacePolicyError } from "./errors";
 import { createOps } from "./ops";
 import { ShellJobs } from "./shell-jobs";
 import { TodoStore } from "./todos";
+import { applyPatchWithOps } from "./patch/apply-patch-generic";
+import { makeApplyPatchTool } from "./tools/apply-patch";
 import { makeEditFileTool } from "./tools/edit-file";
 import { makeGlobTool } from "./tools/glob";
 import { makeGrepTool } from "./tools/grep";
@@ -19,6 +21,8 @@ import { makeShellOutputTool } from "./tools/shell-output";
 import { makeTodoReadTool, makeTodoWriteTool } from "./tools/todo";
 import { makeWriteFileTool } from "./tools/write-file";
 import type {
+  ApplyPatchInput,
+  ApplyPatchResult,
   EditFileInput,
   EditFileResult,
   ExecOptions,
@@ -51,6 +55,7 @@ const ALL_TOOL_NAMES: readonly WorkspaceToolName[] = [
   "readFile",
   "editFile",
   "multiEdit",
+  "applyPatch",
   "writeFile",
   "listDir",
   "runShell",
@@ -176,6 +181,7 @@ class WorkspaceImpl implements Workspace {
       readFile: (opts) => erase(makeReadFileTool(this.ops, opts)),
       editFile: (opts) => erase(makeEditFileTool(this.ops, opts)),
       multiEdit: (opts) => erase(makeMultiEditTool(this.ops, opts)),
+      applyPatch: (opts) => erase(makeApplyPatchTool(this.ops, opts)),
       writeFile: (opts) => erase(makeWriteFileTool(this.ops, opts)),
       listDir: (opts) => erase(makeListDirTool(this.ops, opts)),
       runShell: (opts) =>
@@ -210,6 +216,7 @@ class WorkspaceImpl implements Workspace {
       readFile: (opts) => build("readFile", opts),
       editFile: (opts) => build("editFile", opts),
       multiEdit: (opts) => build("multiEdit", opts),
+      applyPatch: (opts) => build("applyPatch", opts),
       writeFile: (opts) => build("writeFile", opts),
       listDir: (opts) => build("listDir", opts),
       runShell: (opts) => build("runShell", opts),
@@ -265,6 +272,12 @@ class WorkspaceImpl implements Workspace {
     this.assertWritable("multiEdit");
 
     return this.ops.multiEdit(input);
+  }
+
+  public async applyPatch(input: ApplyPatchInput): Promise<ApplyPatchResult> {
+    this.assertWritable("applyPatch");
+
+    return this.ops.applyPatch ? this.ops.applyPatch(input) : applyPatchWithOps(this.ops, input);
   }
 
   public listDir(dirPath?: string, opts?: ListDirOptions): Promise<ListDirResult> {

@@ -1,6 +1,9 @@
 // Contracts — the public type surface (Workspace object, policy, ops,
 // backend, and the tool IO shapes), re-exported as pure types.
 export type {
+  ApplyPatchFileResult,
+  ApplyPatchInput,
+  ApplyPatchResult,
   EditFileInput,
   EditFileResult,
   ExecOptions,
@@ -84,6 +87,12 @@ export type {
 export { analyzeArgvCommand, tokenizeCommand } from "./policy/tokenize-command";
 export type { ArgvAnalysis } from "./policy/tokenize-command";
 
+// Patch engine (pure: parse a unified diff, apply hunks to text)
+export { applyPatchWithOps } from "./patch/apply-patch-generic";
+export { applyHunks } from "./patch/apply-hunks";
+export { parsePatch } from "./patch/parse-patch";
+export type { FilePatch, FilePatchKind, PatchHunk, PatchLine } from "./patch/parse-patch";
+
 // Ops layer
 export { createOps } from "./ops";
 
@@ -93,6 +102,7 @@ export { createMockBackend } from "./backends/mock";
 export type { MockBackendSeed, MockExecResult } from "./backends/mock";
 
 // Tool factories
+export { makeApplyPatchTool } from "./tools/apply-patch";
 export { makeEditFileTool } from "./tools/edit-file";
 export { makeGlobTool } from "./tools/glob";
 export type { MakeGlobToolOptions } from "./tools/glob";

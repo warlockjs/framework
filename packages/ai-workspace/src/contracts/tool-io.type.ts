@@ -14,6 +14,7 @@ export type WorkspaceToolName =
   | "readFile"
   | "editFile"
   | "multiEdit"
+  | "applyPatch"
   | "writeFile"
   | "listDir"
   | "runShell"
@@ -139,6 +140,40 @@ export interface MultiEditResult {
   replacements: number;
   /** SHA-256 of the file content after all edits. */
   hash: string;
+}
+
+/**
+ * Input to the `apply_patch` tool / `applyPatch()` direct method — a unified
+ * diff (plain or `git diff` style) that may modify, create, delete and rename
+ * several files. It applies completely or not at all.
+ */
+export interface ApplyPatchInput {
+  /** The unified diff text. */
+  patch: string;
+  /** Check that every hunk applies, and report what would change, without writing anything. */
+  dryRun?: boolean;
+}
+
+/** What a patch did (or, on a dry run, would do) to one file. */
+export interface ApplyPatchFileResult {
+  /** Workspace-relative path after the change (the removed path for a delete). */
+  path: string;
+  /** What happened to the file. */
+  action: "modified" | "created" | "deleted" | "renamed";
+  /** The previous path, for a rename. */
+  oldPath?: string;
+  /** Number of hunks applied. */
+  hunks: number;
+  /** SHA-256 of the file after the change; absent for a delete. */
+  hash?: string;
+}
+
+/** Result of a successful patch. */
+export interface ApplyPatchResult {
+  /** Per-file outcome, in patch order. */
+  files: ApplyPatchFileResult[];
+  /** True when nothing was written because `dryRun` was set. */
+  dryRun: boolean;
 }
 
 /** Input to the `write_file` tool / `writeFile()` direct method. */

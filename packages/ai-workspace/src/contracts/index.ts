@@ -4,6 +4,9 @@
 // error classes.
 
 export type {
+  ApplyPatchFileResult,
+  ApplyPatchInput,
+  ApplyPatchResult,
   EditFileInput,
   EditFileResult,
   ExecOptions,

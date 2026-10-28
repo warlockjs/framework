@@ -5,7 +5,10 @@ import { globToRegExp, isInside, matchesAnyGlob } from "./policy/jail";
 import { buildCommandEnv, resolveInJail } from "./policy/policy";
 import { checkShellCommand } from "./policy/shell-check";
 import { DEFAULT_MAX_BACKGROUND_JOBS, ShellJobs } from "./shell-jobs";
+import { executePatch } from "./patch/execute-patch";
 import type {
+  ApplyPatchInput,
+  ApplyPatchResult,
   EditFileInput,
   EditFileResult,
   ExecOptions,
@@ -423,6 +426,25 @@ class Ops implements WorkspaceOps {
         replacements,
         hash: fs.hash.string(content),
       };
+    });
+  }
+
+  public async applyPatch(input: ApplyPatchInput): Promise<ApplyPatchResult> {
+    return executePatch(input, {
+      resolve: (inputPath) => resolveInJail(this.policy, inputPath),
+      exists: (absolutePath) => this.backend.exists(absolutePath),
+      stat: this.backend.stat
+        ? (absolutePath) =>
+            (this.backend.stat as NonNullable<WorkspaceBackend["stat"]>)(absolutePath)
+        : undefined,
+      read: (absolutePath) => this.backend.readFile(absolutePath),
+      write: async (absolutePath, content) => {
+        await this.backend.mkdir(path.dirname(absolutePath));
+        await this.backend.writeFile(absolutePath, content);
+      },
+      remove: (absolutePath) => this.backend.remove(absolutePath),
+      withLock: (key, task) => this.withPathLock(key, task),
+      display: (absolutePath) => path.relative(this.policy.cwd, absolutePath),
     });
   }
 
