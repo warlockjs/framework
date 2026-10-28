@@ -25,17 +25,41 @@ import type {
 } from "./types";
 
 /** Deliberately does not inherit app secrets, NODE_OPTIONS, or service endpoints. */
+/** System variables Windows programs need to start; none of them carries user data or secrets. */
+const WINDOWS_SYSTEM_VARIABLES = [
+  "SystemDrive",
+  "ProgramFiles",
+  "ProgramFiles(x86)",
+  "ProgramW6432",
+  "ProgramData",
+  "CommonProgramFiles",
+  "ALLUSERSPROFILE",
+  "NUMBER_OF_PROCESSORS",
+  "PROCESSOR_ARCHITECTURE",
+  "OS",
+];
+
 export function isolatedEnvironment(
   directory: string,
   additions: Record<string, string>,
   paths: string[] = [],
+  platform: NodeJS.Platform = process.platform,
 ): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = {};
-  for (const key of ["PATH", "SystemRoot", "WINDIR", "COMSPEC", "PATHEXT", "LANG", "LC_ALL", "TZ"])
-    if (process.env[key]) env[key] = process.env[key];
+  const inherited = ["PATH", "SystemRoot", "WINDIR", "COMSPEC", "PATHEXT", "LANG", "LC_ALL", "TZ"];
+  if (platform === "win32") inherited.push(...WINDOWS_SYSTEM_VARIABLES);
+  for (const key of inherited) if (process.env[key]) env[key] = process.env[key];
   return {
     ...env,
     ...additions,
+    // Windows programs such as Chrome locate their profile folder through these; without them
+    // Chrome cannot find an app-data folder and ignores `--user-data-dir`.
+    ...(platform === "win32"
+      ? {
+          APPDATA: join(directory, "home", "AppData", "Roaming"),
+          LOCALAPPDATA: join(directory, "home", "AppData", "Local"),
+        }
+      : {}),
     HOME: join(directory, "home"),
     USERPROFILE: join(directory, "home"),
     XDG_CONFIG_HOME: join(directory, "config"),
@@ -167,9 +191,14 @@ export class AppFixture {
     // cp preserves links by default; reject app links to keep writes disposable.
     // Dependencies are the sole explicit read-only-by-contract shared link.
     await linkDependencies(source, directory);
-    for (const path of [dataRoot, "home", "config", "cache", "tmp"].map((path) =>
-      isAbsolute(path) ? path : join(this.root, path),
-    ))
+    for (const path of [
+      dataRoot,
+      "home",
+      "config",
+      "cache",
+      "tmp",
+      ...(process.platform === "win32" ? ["home/AppData/Local", "home/AppData/Roaming"] : []),
+    ].map((path) => (isAbsolute(path) ? path : join(this.root, path))))
       await mkdir(path, { recursive: true });
     const reservation = await reservePort();
     const context: FixtureContext = {

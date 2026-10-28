@@ -61,6 +61,19 @@ export function runCompiler(cwd: string, args: string[]) {
   return { diagnostics, output, status: result.status, pid: result.pid };
 }
 
+/**
+ * A path from the native compiler in the host's own spelling: native separators and, on Windows,
+ * an upper-case drive letter (the compiler may report either case), so it compares equal to the
+ * output of `path.resolve`.
+ */
+export function nativePath(file: string): string {
+  const normalized = path.normalize(file);
+
+  return /^[a-z]:/.test(normalized)
+    ? normalized[0].toUpperCase() + normalized.slice(1)
+    : normalized;
+}
+
 export type SourceUpdate = { path: string; content: string };
 
 /** One native server per dev session; snapshots retain the configured declaration roots. */
@@ -116,7 +129,7 @@ export class CompilerSession {
       this.snapshot
         .getProject(this.configPath)
         ?.program.getSourceFileNames()
-        .map((file) => path.normalize(file)) ?? []
+        .map((file) => nativePath(file)) ?? []
     );
   }
 
@@ -129,7 +142,7 @@ export class CompilerSession {
     const source = this.contents.get(path.resolve(requested)) ?? readFileSync(requested, "utf8");
     return importSpecifiers(file, source).flatMap((imported) => {
       const symbol = project.checker.getSymbolAtPosition(file, imported.node.start + 1);
-      return symbol?.declarations.map((declaration) => path.normalize(declaration.path)) ?? [];
+      return symbol?.declarations.map((declaration) => nativePath(declaration.path)) ?? [];
     });
   }
 
@@ -145,7 +158,7 @@ export class CompilerSession {
         const before = content.slice(0, Math.max(0, diagnostic.pos));
         const lines = before.split("\n");
         return {
-          fileName: path.normalize(diagnostic.fileName),
+          fileName: nativePath(diagnostic.fileName),
           code: diagnostic.code,
           message: diagnostic.text,
           severity: diagnostic.category === 1 ? "error" : "warning",

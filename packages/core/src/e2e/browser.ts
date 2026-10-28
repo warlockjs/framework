@@ -89,6 +89,10 @@ export class OwnedBrowser {
       );
     const profile = join(this.root, "browser-profile");
     await mkdir(profile, { recursive: true });
+    if (process.platform === "win32") {
+      await mkdir(join(this.root, "home", "AppData", "Local"), { recursive: true });
+      await mkdir(join(this.root, "home", "AppData", "Roaming"), { recursive: true });
+    }
     // Headless flag: https://developer.chrome.com/docs/chromium/headless
     // Port 0 and discovery: https://chromedevtools.github.io/devtools-protocol/#how-do-i-access-the-browser-target
     // Profile required by Chrome 136+: https://developer.chrome.com/blog/remote-debugging-port

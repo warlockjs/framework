@@ -1,7 +1,12 @@
 import { existsSync, mkdirSync } from "node:fs";
 import path from "node:path";
 import { createProblem, type ToolingProblem } from "../problem";
-import { CompilerSession, runCompiler, type CompilerDiagnostic } from "../typescript/compiler";
+import {
+  CompilerSession,
+  nativePath,
+  runCompiler,
+  type CompilerDiagnostic,
+} from "../typescript/compiler";
 
 export type TypecheckOptions = {
   cwd?: string;
@@ -103,7 +108,7 @@ export function runTypecheck(options: TypecheckOptions = {}): TypecheckResult {
   ]);
   const sources = compiled.output
     .split(/\r?\n/)
-    .map((line) => (path.isAbsolute(line) ? path.normalize(line) : ""))
+    .map((line) => (path.isAbsolute(line) ? nativePath(line) : ""))
     .filter((file) => isProjectFile(file, cwd));
   const wanted = options.files
     ? new Set(options.files.map((file) => path.resolve(cwd, file)))
