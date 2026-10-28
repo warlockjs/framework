@@ -10,10 +10,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - `ai.snapshot.sqlite({ path })` stores have a `close()` method that closes the database file the store opened. Call it before deleting or moving the file: Windows refuses to delete a file that is still open. A database passed as `database` is never closed by the store. The store reopens on its next call.
 - `lint: { ignore: [codes] }` on a tool, and `ignore` in `ai.config({ toolLint })`, drop chosen schema-lint finding codes (for example `missing-additional-properties-false`) for schemas an app deliberately sends as is, such as remote MCP tools. Ignored findings are left out of the report and never warn.
-
-### Changed
-
-- The `[ai.tool][schema.lint]` warning is remembered process-wide, so a tool definition evaluated twice in one process (a dev reload) prints its findings once.
 - End an agent run right after a tool, with no further model call: `stopAfterTools: ["post_message"]` and `stopWhen: ({ toolCalls, text, usage, messages, tripIndex }) => boolean` on the agent, and `endsTurn: true | ({ input, output }) => boolean` on a tool. The trip is recorded with the new `finishReason: "tool_stop"`, `result.text` is the text the model wrote beside the calls, and usage covers only the calls made. A failed tool call never stops the run through `stopAfterTools` or `endsTurn`. `mode: "silent"` keeps working as before.
 - `contextEditing: { clearToolResults: { afterTokens?, keep?, exclude?, placeholder?, countTokens? } }` on the agent clears old tool results from the history before each model call, with no summarizing call and with every tool call still paired to its result. It runs before `compaction`. A model that advertises the new `capabilities.nativeContextEditing` receives the rule as `ModelCallOptions.contextEditing` instead, and `native: false` forces client-side clearing.
 - `ai.pricing({ tables })` (`pricingCatalogue`) builds one overridable price list from provider tables such as `ANTHROPIC_MODEL_PRICING`: later tables win, `.set(model, pricing)` overrides, dated snapshot ids resolve to their alias, and `.cost()` / `.costUSD()` price a `Usage`. `budget({ pricing })` accepts a catalogue.
@@ -21,12 +17,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `scoped: { window: "all" }` keeps a budget ledger that never resets, for per-session or lifetime caps. With `key` set from `context.options?.sessionId` it caps one session; `reserve` refuses the call before it is made.
 - `ai.human.approval()` accepts per-tool modes (`tools: { read_file: "allow", delete_file: "deny", run_shell: "ask" }`, `defaultMode`, `denyReason`), and `policy` is now optional when modes cover the tools.
 - `ai.human.approval({ remember })` remembers an approval for the rest of the session: a handler decision `{ type: "approve", remember: "tool" | "args" }` auto-approves that tool, or that tool with identical arguments, for later calls with the same `sessionId`. `ai.human.approvalMemory()` is the in-process memory; implement `ApprovalMemory` to persist approvals.
+- `SDKAdapterContract.models?()` and the `ModelInfo` / `ModelKind` / `ListModelsOptions` types give every adapter one shape for a live model listing (`id`, `label`, `provider`, `kind`, and `created`, `contextWindow`, `maxOutputTokens`, `description` when the provider reports them). An adapter without a listing API has no `models` method.
+- `inferModelKind(id)` classifies a model id as chat, embedding, image, audio, moderation or other, for providers whose listing carries no modality field.
 
 ### Changed
 
+- The `[ai.tool][schema.lint]` warning is remembered process-wide, so a tool definition evaluated twice in one process (a dev reload) prints its findings once.
 - `FinishReason` has a new member, `"tool_stop"`, set by the agent on a trip that a stop rule ended. Code that switches exhaustively on `LLMTrip.finishReason` should handle it.
-- `SDKAdapterContract.models?()` and the `ModelInfo` / `ModelKind` / `ListModelsOptions` types give every adapter one shape for a live model listing (`id`, `label`, `provider`, `kind`, and `created`, `contextWindow`, `maxOutputTokens`, `description` when the provider reports them). An adapter without a listing API has no `models` method.
-- `inferModelKind(id)` classifies a model id as chat, embedding, image, audio, moderation or other, for providers whose listing carries no modality field.
 
 ## 5.38.0 - 2026-10-25
 
