@@ -29,6 +29,7 @@ export * from "./errors/warlock-error";
 export * from "./http";
 export * from "./image";
 export * from "./logger";
+export * from "./loader/app-singleton";
 export * from "./localization";
 export * from "./mail";
 export * from "./openapi";

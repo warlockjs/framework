@@ -25,7 +25,7 @@ When the framework is wrong or missing a capability, follow the `report-framewor
 - **CLI & running the app:** generate-web-ui, run-app, deploy-release, write-cli-command, add-connector, health-checks, warlock-doctor, warlock-inspect, use-capabilities, warlock-check, generate-openapi
 - **Agent tooling:** warlock-mcp, warlock-trace, warlock-agents-md, warlock-board
 - **Storage, files & mail:** store-file, upload-file, process-image, send-mail
-- **Security & utilities:** hash-password, encrypt-data, store-secrets, retry-operation, benchmark-code, request-memo, request-tracing, request-log
+- **Security & utilities:** hash-password, encrypt-data, store-secrets, retry-operation, app-singletons, benchmark-code, request-memo, request-tracing, request-log
 - **Testing:** test-browser, test-http, test-service, test-fakes, model-factories
 
 ## Conventions and pitfalls

@@ -10,6 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- `appSingleton(key, create, { dispose, disposeOnReload })`, with `peekAppSingleton`, `disposeAppSingleton` and `disposeAllAppSingletons`: process-wide values stored on `globalThis` under `Symbol.for(key)`. In `warlock dev` a source file can be evaluated more than once (every hot reload creates a new generation, and a module that must stay in the page renderer's Vite graph is a second copy), so a module-level variable installed by a connector can read as empty in a route. A singleton is shared by every copy, is disposed on application shutdown and dev restart, and with `disposeOnReload` is disposed when its module reloads.
 - `warlock check` prints one line to stderr when each step starts and ends, and the conventions step reports its milestones (facts collected, every 1000 files with the slowest rule so far). stdout is unchanged, so `--json` still prints only the JSON report.
 - Each convention rule has a time budget over a run (30 seconds by default). A rule that goes over it is skipped for the remaining files and reported as a `WL9026` warning naming the rule and the time it used, instead of hanging the command. Set `ruleBudgetMs` in `.warlock-check.json` to change it; `0` turns it off.
 

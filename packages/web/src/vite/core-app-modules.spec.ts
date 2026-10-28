@@ -386,6 +386,46 @@ export { als };`,
     }
   }, 120_000);
 
+  it("appSingleton gives a module that must stay in Vite the same value core's copy installed", async () => {
+    const singletonSource = fileURLToPath(
+      import.meta.resolve("@warlock.js/core/src/loader/app-singleton"),
+    );
+    const viteOnly = appFile("shared", "singleton-vite-only.ts");
+    fs.writeFileSync(
+      viteOnly,
+      [
+        `import { appSingleton } from ${JSON.stringify(singletonSource)};`,
+        `export const mode = import.meta.env.MODE;`,
+        `export const runtime = () => appSingleton("spec.web.runtime.v1", () => ({ owner: "vite" }));`,
+      ].join("\n"),
+      "utf8",
+    );
+
+    const vite = await createViteServer([
+      coreAppModules({ appSrcRoot: path.join(root, "src"), registry, nativeImport }),
+    ]);
+
+    try {
+      // Core's side (the connector) installs the value first, natively.
+      const native = await nativeImport(pathToFileURL(singletonSource).href);
+      const installed = (native as unknown as Record<string, any>).appSingleton(
+        "spec.web.runtime.v1",
+        () => ({ owner: "connector" }),
+      );
+
+      const inVite = (await vite.ssrLoadModule(viteOnly)) as unknown as {
+        runtime(): unknown;
+      };
+
+      expect(inVite.runtime()).toBe(installed);
+    } finally {
+      await vite.close();
+      delete (globalThis as Record<symbol, unknown>)[
+        Symbol.for("warlock.appSingleton:spec.web.runtime.v1")
+      ];
+    }
+  }, 60_000);
+
   it("is dev SSR only and inert without core's carrier", async () => {
     const plugin = coreAppModules({ appSrcRoot: path.join(root, "src") });
     expect(plugin.enforce).toBe("pre");
