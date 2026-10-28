@@ -1,3 +1,4 @@
+import { disposeAllAppSingletons } from "../loader/app-singleton";
 import { log } from "@warlock.js/logger";
 import { BOOT_SIGNAL_VERSION, sendBootSignal } from "./boot-signal";
 import {
@@ -382,6 +383,9 @@ export class Application {
     for (const listener of listeners) {
       await this.runShutdownListener(listener);
     }
+
+    // App singletons last, so teardown listeners can still use them.
+    await this.runShutdownListener(disposeAllAppSingletons);
   }
 
   /**

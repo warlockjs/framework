@@ -1,5 +1,11 @@
 # Changelog — @warlock.js/process
 
+## 5.40.0 - 2026-10-28
+
+### Fixed
+
+- Calling `supervisor()` a second time in the same process with the same registry and owner (for example from a second copy of the module after a dev hot reload) now returns the live supervisor instead of failing every launch with "Process registry is already in use". Once `stopAll()` has finished the registry is free and a new supervisor is created. A different owner on the same registry is still refused.
+
 ## 5.34.3 - 2026-10-20
 
 ### Changed

@@ -329,7 +329,21 @@ describe.skipIf(!["linux", "darwin", "win32"].includes(process.platform))(
     it("refuses a second active writer for the same registry", async () => {
       const first = create();
       await first.recover();
-      await expect(create().recover()).rejects.toThrow("already in use");
+      await expect(create({ owner: "another-app" }).recover()).rejects.toThrow("already in use");
+    });
+
+    it("hands a second supervisor() call for the same registry and owner the live one", async () => {
+      const first = create();
+      await first.recover();
+      const second = create();
+      expect(second).toBe(first);
+      await expect(second.recover()).resolves.toBeDefined();
+
+      await first.stopAll();
+      // After shutdown the registry is free again and a new supervisor is created.
+      const third = create();
+      expect(third).not.toBe(first);
+      await expect(third.recover()).resolves.toBeDefined();
     });
 
     it("adopts a verified orphan selected by keep and can stop it by PID", async () => {

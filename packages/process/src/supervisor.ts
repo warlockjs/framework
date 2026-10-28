@@ -96,7 +96,13 @@ export function supervisor(options: SupervisorOptions): ProcessSupervisor {
   const graceMs = options.stopGraceMs ?? 1000;
   if (!Number.isSafeInteger(pollMs) || pollMs < 10 || !Number.isSafeInteger(graceMs) || graceMs < 0)
     throw new Error("Invalid polling interval or stop grace period");
-  const registry = new Registry(path.resolve(options.registry), options.owner);
+  const registryPath = path.resolve(options.registry);
+  // `warlock dev` can evaluate this module more than once in one process. A second supervisor over
+  // the same registry would find its own process holding the lock, so reuse the live one.
+  const sameProcess = sameProcessSupervisors();
+  const live = sameProcess.get(registryPath);
+  if (live && live.owner === options.owner) return live.api;
+  const registry = new Registry(registryPath, options.owner);
   const entries = new Map<number, RegistryEntry>();
   const active = new Map<number, Active>();
   let ready: Promise<void> | undefined;
@@ -566,5 +572,23 @@ export function supervisor(options: SupervisorOptions): ProcessSupervisor {
       return shutdown;
     },
   };
+  const stopAll = api.stopAll;
+  api.stopAll = () => {
+    const stopping = stopAll();
+    const forget = () => {
+      if (sameProcess.get(registryPath)?.api === api) sameProcess.delete(registryPath);
+    };
+    stopping.then(forget, forget);
+    return stopping;
+  };
+  sameProcess.set(registryPath, { owner: options.owner, api });
   return api;
+}
+
+const SUPERVISORS = Symbol.for("@warlock.js/process.supervisors");
+
+/** Live supervisors of this process by registry path; shared by every copy of this module. */
+function sameProcessSupervisors(): Map<string, { owner: string; api: ProcessSupervisor }> {
+  const holder = globalThis as unknown as Record<symbol, Map<string, any> | undefined>;
+  return (holder[SUPERVISORS] ??= new Map());
 }
