@@ -21,7 +21,8 @@ describe("health registry", () => {
     vi.clearAllMocks();
     ({ Application } = await import("../../../src/application/application"));
     ({ health } = await import("../../../src/http/health"));
-  });
+    // A cold import of the application module can take several seconds while the full suite runs.
+  }, 30_000);
 
   it("reports liveness ok while the process is up", () => {
     expect(health.liveness().status).toBe("ok");
