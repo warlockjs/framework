@@ -4,6 +4,12 @@ All notable changes to `create-warlock` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.39.3 - 2026-10-28
+
+### Fixed
+
+- A project scaffolded without the web feature no longer fails its first `tsc` with `Cannot find module '@warlock.js/web'`. The starter's `src/config/web.ts` imports a type from `@warlock.js/web`, so it is now only kept in projects that install web; API-only projects no longer get it, and `warlock add sitemap` creates it when needed.
+
 ## 5.39.0 - 2026-10-26
 
 ### Fixed

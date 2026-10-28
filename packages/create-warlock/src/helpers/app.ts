@@ -397,6 +397,9 @@ export class App {
     if (!useWeb) {
       for (const entry of [
         "src/web",
+        // Its only content is a type from `@warlock.js/web`, which a non-web
+        // project does not install. `warlock add sitemap` recreates it if needed.
+        "src/config/web.ts",
         "e2e/home.e2e.ts",
         "src/app/contact",
         "src/app/locale",

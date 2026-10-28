@@ -1,4 +1,5 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
+import { builtinModules } from "node:module";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -419,6 +420,7 @@ describe("App template emission", () => {
       true,
     );
     expect(existsSync(path.join(appPath, "src/web"))).toBe(false);
+    expect(existsSync(path.join(appPath, "src/config/web.ts"))).toBe(false);
     expect(existsSync(path.join(appPath, "e2e/home.e2e.ts"))).toBe(false);
     expect(existsSync(path.join(appPath, "skills/web-code-standards/SKILL.md"))).toBe(false);
     expect(readFileSync(path.join(appPath, "AGENTS.md"), "utf8")).not.toContain(
@@ -427,6 +429,58 @@ describe("App template emission", () => {
     expect(existsSync(path.join(appPath, "src/app/shared/routes.ts"))).toBe(false);
     expect(existsSync(path.join(appPath, "public/home.css"))).toBe(false);
   });
+
+  it.each([false, true])(
+    "every package imported by the generated src/** and config files is a declared dependency (web: %s)",
+    (useWeb) => {
+      const app = new App(makeApplication(appPath, { features: useWeb ? ["web"] : [] }));
+
+      app.use("warlock").configureWebStarter(useWeb);
+
+      const packageJson = JSON.parse(readFileSync(path.join(appPath, "package.json"), "utf8"));
+      const declared = new Set([
+        ...Object.keys(packageJson.dependencies ?? {}),
+        ...Object.keys(packageJson.devDependencies ?? {}),
+        // Installed by `warlock add web`, which runs after the template is emitted.
+        ...(useWeb ? ["@warlock.js/web", "react", "react-dom"] : []),
+      ]);
+      // Project path aliases from tsconfig.json (app/, web/, @shared/, ...).
+      const tsconfig = readFileSync(path.join(appPath, "tsconfig.json"), "utf8");
+      const aliasRoots = [...tsconfig.matchAll(/^\s*"([^"*]+)\/\*"\s*:/gm)].map((m) => m[1]);
+
+      const files: string[] = [path.join(appPath, "warlock.config.ts")];
+      const walk = (dir: string) => {
+        for (const entry of readdirSync(dir, { withFileTypes: true })) {
+          const full = path.join(dir, entry.name);
+          if (entry.isDirectory()) walk(full);
+          else if (/\.(ts|tsx|mts)$/.test(entry.name) && !entry.name.endsWith(".d.ts"))
+            files.push(full);
+        }
+      };
+      walk(path.join(appPath, "src"));
+
+      const missing: string[] = [];
+      for (const file of files) {
+        const source = readFileSync(file, "utf8");
+        const specifiers = [...source.matchAll(/(?:from|import)\s*\(?\s*["']([^"']+)["']/g)].map(
+          (m) => m[1],
+        );
+
+        for (const specifier of specifiers) {
+          if (specifier.startsWith(".") || specifier.startsWith("node:")) continue;
+          if (aliasRoots.some((alias) => specifier === alias || specifier.startsWith(`${alias}/`)))
+            continue;
+          const parts = specifier.split("/");
+          const name = specifier.startsWith("@") ? parts.slice(0, 2).join("/") : parts[0];
+          if (!declared.has(name) && !builtinModules.includes(name)) {
+            missing.push(`${path.relative(appPath, file)} imports ${name}`);
+          }
+        }
+      }
+
+      expect(missing).toEqual([]);
+    },
+  );
 
   it("emits the web-owned home with its CSS, APIs, aliases, and connector", () => {
     const app = new App(makeApplication(appPath, { features: ["web"] }));
