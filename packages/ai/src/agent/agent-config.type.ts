@@ -18,6 +18,8 @@ import type { SkillsContract } from "../skills/contracts/skills.contract";
 import type { AgentToolEntry } from "../tool/executable-as-tool";
 import type { AgentCompactionConfig } from "./compaction.type";
 import type { JudgeConfig } from "./judge-config.type";
+import type { AgentContextEditingConfig } from "./context-editing.type";
+import type { AgentStopWhen } from "./stop-turn.type";
 import type { AgentTraceOptions } from "../trace/agent-trace.type";
 import type { ActWhenAskedConfig, AgentBackstop, ToolRefusalOption } from "./tool-use-contract";
 
@@ -140,6 +142,39 @@ export type AgentConfig<TOutput = unknown> = {
   maxTrips?: number;
   /** Opt-in history compaction before model trips; disabled when omitted. */
   compaction?: AgentCompactionConfig;
+  /**
+   * Provider-neutral context editing: clear old tool results before each
+   * model call, without a summarising call. Uses the provider's native
+   * feature when the model advertises one (Anthropic). Runs before
+   * `compaction`. Disabled when omitted.
+   */
+  contextEditing?: AgentContextEditingConfig;
+  /**
+   * Names of tools that end the run once they have succeeded. After the
+   * trip's tool calls run, the agent makes no further model call: the trip
+   * is recorded with `finishReason: "tool_stop"`, `result.text` is the text
+   * the model wrote beside the calls, and usage covers only the calls made.
+   * A failed call never stops the run. Combine with `stopWhen` for rules
+   * that depend on the call's input or output; a tool can also declare
+   * `endsTurn` itself.
+   *
+   * @example
+   * agent({ model, tools: [postMessage, search], stopAfterTools: ["post_message"] });
+   */
+  stopAfterTools?: string[];
+  /**
+   * Called after each trip's tool calls ran. Return `true` to end the run
+   * without another model call (`finishReason: "tool_stop"`). Throwing
+   * counts as `false` and is logged.
+   *
+   * @example
+   * agent({
+   *   model,
+   *   tools,
+   *   stopWhen: ({ toolCalls }) => toolCalls.some((call) => call.name === "park_turn"),
+   * });
+   */
+  stopWhen?: AgentStopWhen;
   /**
    * Base model call options sent on every trip of every run. A run's
    * `AgentExecuteOptions.modelOptions` is shallow-merged over these for

@@ -6,6 +6,7 @@ import type {
 import type { ModelPricing } from "../../contracts/result/model-pricing.type";
 import type { Usage } from "../../contracts/result/usage.type";
 import { BudgetExceededError, ScopedBudgetExceededError, type BudgetUnit } from "../../errors";
+import { isPricingCatalogue, type PricingCatalogue } from "../../pricing/pricing-catalogue";
 import { computeCost, totalCost } from "../../utils/compute-cost";
 import { estimateInputTokens } from "../../utils/estimate-input-tokens";
 import { namespacedState } from "../utils";
@@ -63,7 +64,20 @@ export type {
  *   pricing: { "claude-sonnet-4-6": { input: 3, output: 15, cachedInput: 0.3, cacheWrite: 3.75 } },
  * });
  */
-export type BudgetPricing = Record<string, BudgetPricingEntry>;
+export type BudgetPricing = Record<string, BudgetPricingEntry> | PricingCatalogue;
+
+function pricingEntry(
+  pricing: BudgetPricing | undefined,
+  modelName: string,
+): BudgetPricingEntry | undefined {
+  if (!pricing) return undefined;
+
+  return isPricingCatalogue(pricing)
+    ? pricing.get(modelName)
+    : Object.hasOwn(pricing, modelName)
+      ? pricing[modelName]
+      : undefined;
+}
 
 /** One {@link BudgetPricing} entry: a `ModelPricing` or the legacy per-1K shape. */
 export type BudgetPricingEntry =
@@ -187,6 +201,16 @@ export type BudgetOptions = {
    */
   scoped?: ScopedBudgetOptions;
   /**
+   * Called after every model call with what it cost, before the caps are
+   * compared, so spend is recorded even on the call that breaches a cap.
+   * Use it to persist spend (a database row, a billing event, a metric).
+   * An error thrown here is logged and ignored; it never fails the run.
+   *
+   * @example
+   * budget({ maxCostUSD: 1, onSpend: (spend) => ledger.insert(spend.sessionId, spend.costUSD) });
+   */
+  onSpend?: (spend: BudgetSpend) => void | Promise<void>;
+  /**
    * Reserve each trip's worst-case spend before the call instead of only
    * booking usage after it — see {@link BudgetReserveOptions}.
    *
@@ -194,6 +218,28 @@ export type BudgetOptions = {
    * budget({ maxCostUSD: 0.5, reserve: { outputTokens: 4_096 } });
    */
   reserve?: BudgetReserveOptions;
+};
+
+/**
+ * What `onSpend` receives after every model call the budget saw. Persist
+ * it to your own ledger, billing table or metrics.
+ */
+export type BudgetSpend = {
+  /** Model name, as in `ModelContract.name`. */
+  model: string;
+  provider?: string;
+  agent?: string;
+  sessionId?: string;
+  /** Index of the trip within the run. */
+  tripIndex: number;
+  /** Usage of this call. */
+  usage: Usage;
+  /** USD cost of this call, or `undefined` when the model is unpriced. */
+  costUSD?: number;
+  /** Totals for the run so far, this call included. */
+  run: { tokens: number; costUSD: number };
+  /** The scoped ledger key, when `scoped` is configured. */
+  scopedKey?: string;
 };
 
 /** One unit of an in-flight reservation (run-level amounts and the scoped ledger inputs). */
@@ -274,7 +320,7 @@ function resolveTripCost(
   >,
   budgetPricing: BudgetPricing | undefined,
 ): number | undefined {
-  const explicitPricing = budgetPricing?.[context.model.name];
+  const explicitPricing = pricingEntry(budgetPricing, context.model.name);
 
   if (explicitPricing && "inputPer1K" in explicitPricing) {
     return (
@@ -290,7 +336,10 @@ function resolveTripCost(
 
 /** True when `budget()` can price the running model (explicit entry or model pricing). */
 function hasPricing(context: MiddlewareExecuteContext, budgetPricing: BudgetPricing | undefined) {
-  return budgetPricing?.[context.model.name] !== undefined || context.model.pricing !== undefined;
+  return (
+    pricingEntry(budgetPricing, context.model.name) !== undefined ||
+    context.model.pricing !== undefined
+  );
 }
 
 /**
@@ -410,6 +459,10 @@ function breachContract(
 }
 
 function scopedWindowStart(window: ScopedBudgetWindow, now = new Date()): number {
+  if (window === "all") {
+    return 0;
+  }
+
   if (window === "day") {
     return Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
   }
@@ -619,7 +672,7 @@ export function budget(options: BudgetOptions): AgentMiddleware {
         );
         const outputTokens = Math.max(0, reserve.outputTokens);
         if (needsCost && (reserve.serverToolRequests ?? 0) > 0 && options.onUnpriced !== "allow") {
-          const price = options.pricing?.[context.model.name] ?? context.model.pricing;
+          const price = pricingEntry(options.pricing, context.model.name) ?? context.model.pricing;
           if (!price || "inputPer1K" in price || price.serverTools?.webSearch === undefined) {
             unpricedModelBreach(name, `${context.model.name} (web search)`);
           }
@@ -726,6 +779,24 @@ export function budget(options: BudgetOptions): AgentMiddleware {
                 actualFor(unit),
               );
             }
+          }
+        }
+
+        if (options.onSpend) {
+          try {
+            await options.onSpend({
+              model: context.model.name,
+              provider: context.model.provider,
+              agent: context.agent.name,
+              sessionId: context.options?.sessionId,
+              tripIndex: context.tripIndex,
+              usage: response.usage,
+              ...(tripCost !== undefined ? { costUSD: tripCost } : {}),
+              run: { tokens: counters.tokens, costUSD: counters.costUSD },
+              ...(counters.scopedKey ? { scopedKey: counters.scopedKey } : {}),
+            });
+          } catch {
+            // A persistence hook must never fail a call that is already paid for.
           }
         }
 

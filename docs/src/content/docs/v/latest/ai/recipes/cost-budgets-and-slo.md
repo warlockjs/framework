@@ -266,7 +266,7 @@ import { ScopedBudgetExceededError } from "@warlock.js/ai";
 const dailyCap = ai.middleware.budget({
   scoped: {
     key: (ctx) => `user:${ctx.options?.sessionId}`, // string, or a resolver from middleware context
-    window: "day", // "day" | "month" — UTC boundary
+    window: "day", // "day" | "month" (UTC boundary) | "all" (never resets: a per-session or lifetime cap)
     maxTokens: 100_000,
     store: memoryScopedBudgetStore(), // in-process ledger
   },
@@ -338,6 +338,7 @@ The budget accumulates `response.usage.total` after each trip. A semantic-cache 
 - [Attach middleware](/v/latest/ai/reliability/attach-middleware/) — the budget built-in, install order, and the onion model.
 - [Handle errors](/v/latest/ai/reliability/handle-errors/) — `BudgetExceededError`, `error.code`, and `error.category`.
 - [Cost per tenant](/v/latest/ai/recipes/cost-aggregate-per-tenant/) — record what was actually spent alongside the cap.
+- [Price list and spend limits](/v/latest/ai/recipes/cost-spend-limits-and-prices/) — one overridable price list, the `onSpend` hook, and per-session caps.
 
 ## Reserve hosted-search fees
 

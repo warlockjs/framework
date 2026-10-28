@@ -1,3 +1,4 @@
+import { approvalMemory } from "./approval-memory";
 import { humanApproval } from "./human-approval";
 import { resume } from "./resume";
 import { interruptMemory, interruptPg, interruptRedis } from "./stores";
@@ -20,6 +21,7 @@ import { interruptMemory, interruptPg, interruptRedis } from "./stores";
  */
 export const human = {
   approval: humanApproval,
+  approvalMemory,
   resume,
   interrupt: {
     memory: interruptMemory,

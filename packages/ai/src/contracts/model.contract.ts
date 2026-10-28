@@ -125,6 +125,17 @@ export type ModelCallOptions = {
     ttl?: "5m" | "1h";
   };
   /**
+   * Vendor-neutral context editing hint. Adapters whose
+   * `capabilities.nativeContextEditing` is true translate it into the
+   * provider's own feature (Anthropic `clear_tool_uses`); others ignore it.
+   * The agent sets it from `AgentConfig.contextEditing`. `afterTokens` is
+   * the input size that triggers clearing, `keep` how many of the newest
+   * tool results stay, `exclude` tool names that are never cleared.
+   */
+  contextEditing?: {
+    clearToolResults?: { afterTokens?: number; keep?: number; exclude?: string[] };
+  };
+  /**
    * Provider-specific request options, keyed by the adapter's wire format
    * (`anthropic`, `openai`, …). Each adapter reads only its own key and
    * ignores the rest, so one `modelOptions` object can serve a fallback
@@ -203,6 +214,12 @@ export type ModelCapabilities = {
    * When false/absent the agent skips emitting cache breakpoints.
    */
   promptCaching?: boolean;
+  /**
+   * True when the adapter maps `ModelCallOptions.contextEditing` to a
+   * provider-side feature (Anthropic context editing). The agent then
+   * sends the hint instead of editing the history itself.
+   */
+  nativeContextEditing?: boolean;
   /**
    * True when the adapter accepts audio `ContentPart` input (A2). The
    * agent gates `{ type: "audio" }` attachments on this flag — when

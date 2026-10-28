@@ -528,6 +528,8 @@ expect(report.passed).toBe(true);
 
 Supervisor-oriented helpers — see [Run supervisor](/v/latest/ai/orchestration/run-supervisor/) for `ai.router()` (generate the routing agent) and `ai.fanOut()` (voting / self-consistency). `ai.mockRouter(decisions)` replays canned routing decisions for supervisor tests.
 
+Clearing old tool results without a summary call is covered in [Manage context](/v/latest/ai/agents/manage-context/) (`contextEditing`); stopping the loop after a tool is in [End a turn from a tool](/v/latest/ai/agents/end-a-turn/).
+
 ## Automatic compaction inside an agent run
 
 Compaction is disabled by default. Set `compaction.afterTokens` to an explicit

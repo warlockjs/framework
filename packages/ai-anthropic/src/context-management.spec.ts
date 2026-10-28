@@ -416,3 +416,42 @@ describe("preserved thinking after client-side compaction", () => {
     });
   });
 });
+
+describe("vendor-neutral contextEditing", () => {
+  it("advertises native context editing", () => {
+    expect(model().capabilities.nativeContextEditing).toBe(true);
+  });
+
+  it("maps clearToolResults to clear_tool_uses with the beta", () => {
+    const built = model().buildRequest([{ role: "user", content: "hi" }], {
+      contextEditing: { clearToolResults: { afterTokens: 60_000, keep: 4, exclude: ["plan"] } },
+    });
+
+    expect(built.betas).toEqual(["context-management-2025-06-27"]);
+    expect(built.body.context_management).toEqual({
+      edits: [
+        {
+          type: "clear_tool_uses_20250919",
+          trigger: { type: "input_tokens", value: 60_000 },
+          keep: { type: "tool_uses", value: 4 },
+          exclude_tools: ["plan"],
+        },
+      ],
+    });
+  });
+
+  it("lets the typed Anthropic option win over the neutral hint", () => {
+    const built = request(
+      { contextManagement: { clearToolUses: { keep: 9 } } },
+      { contextEditing: { clearToolResults: { keep: 2 } } },
+    );
+
+    expect(built.body.context_management).toEqual({
+      edits: [{ type: "clear_tool_uses_20250919", keep: { type: "tool_uses", value: 9 } }],
+    });
+  });
+
+  it("sends nothing without a hint", () => {
+    expect(model().buildRequest([{ role: "user", content: "hi" }]).body.context_management).toBeUndefined();
+  });
+});

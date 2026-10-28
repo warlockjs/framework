@@ -11,6 +11,13 @@ export type {
   AgentCompactionContext,
   AgentCompactionRecord,
 } from "./compaction.type";
+export { DEFAULT_CLEARED_TOOL_RESULT } from "./context-editing.type";
+export type {
+  AgentContextEditingConfig,
+  ClearToolResultsConfig,
+  ContextEditRecord,
+} from "./context-editing.type";
+export type { AgentStopContext, AgentStopWhen } from "./stop-turn.type";
 export {
   DEFAULT_COMPACTION_INSTRUCTIONS,
   renderTranscript,

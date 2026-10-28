@@ -48,7 +48,11 @@ const support = ai.agent({
 ```ts
 interface HumanApprovalOptions {
   name?: string; // middleware name — must be unique per agent (default "human-approval")
-  policy: InterruptPolicy; // which tool calls require a human
+  policy?: InterruptPolicy; // which tool calls require a human
+  tools?: Record<string, "allow" | "deny" | "ask">; // per-tool mode, beats the policy
+  defaultMode?: "allow" | "deny" | "ask"; // for tools nothing else covers
+  denyReason?: string; // what the model is told when a call is denied
+  remember?: true | { memory?: ApprovalMemory }; // remember approvals per session
   handler: ApprovalHandler; // how a gated call reaches a human and yields a decision
   store?: InterruptStore; // durable persistence (only used in suspend-and-resume mode)
 }
@@ -86,13 +90,65 @@ For the `predicate` form, the callback receives a read-only `PolicyContext` (`to
 
 For the list variants, the optional `tags(toolName)` callback derives the tags surfaced on `request.context.tags` — a reviewer surface can group or prioritize on them.
 
+### Per-tool modes
+
+When you would rather say it per tool than write a policy, pass `tools`:
+
+```ts
+humanApproval({
+  tools: {
+    read_file: "allow", // always runs, never asks
+    delete_file: "deny", // never runs; the model is told why (denyReason)
+    run_shell: "ask", // goes to the handler
+  },
+  defaultMode: "ask", // everything else (default when there is no policy)
+  handler,
+});
+```
+
+A `tools` entry beats `policy`; for tools it does not list, `policy` decides when there is one, otherwise `defaultMode` (default `"ask"`). A denied call comes back to the model as an `ApprovalRejectedError`, like a rejection.
+
+### Remember an approval for the session
+
+Without `remember`, the same tool asks again on every call. Turn it on and let the reviewer say how far an approval goes:
+
+```ts
+const approvals = ai.human.approvalMemory(); // optional: keep it to clear a session later
+
+const agent = ai.agent({
+  model,
+  tools,
+  middleware: [
+    ai.human.approval({
+      tools: { run_shell: "ask" },
+      remember: { memory: approvals }, // or `remember: true`
+      handler: async (request) => {
+        const answer = await ui.prompt(request); // "once" | "tool" | "args" | "no"
+        if (answer === "no") return { type: "reject", reason: "declined" };
+        return answer === "once" ? { type: "approve" } : { type: "approve", remember: answer };
+      },
+    }),
+  ],
+});
+
+await agent.execute("clean up the build folder", { sessionId });
+approvals.clear(sessionId); // when the session ends
+```
+
+- `remember: "tool"` approves every later call to that tool in the session.
+- `remember: "args"` approves only calls to that tool with identical arguments (key order does not matter).
+- Approvals are scoped to the run's `sessionId`; a run without one is always asked.
+- Only `approve` decisions are remembered. A rejection or an edit is asked again next time.
+- The default memory lives in the process. Implement `ApprovalMemory` (`has`, `add`, `clear`) to keep approvals in your database; the handler is not called for a remembered approval.
+- Remembered approvals also apply to calls resumed through `ai.human.resume`.
+
 ### Decisions — what the reviewer returns
 
 The `handler` returns (sync or as a promise) an `ApprovalDecision`, a union keyed on `type`:
 
 ```ts
 type ApprovalDecision =
-  | { type: "approve" } // run the real tool, args unchanged
+  | { type: "approve"; remember?: "tool" | "args" } // run the real tool, args unchanged
   | { type: "reject"; reason: string } // short-circuit; model sees a typed error
   | { type: "edit"; args: unknown; reason?: string }; // run the tool with replaced args
 ```

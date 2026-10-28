@@ -65,6 +65,7 @@ import {
   safeJsonParse,
   stampReportLineage,
 } from "../utils";
+import { clearOldToolResults, nativeContextEditingHint, resolveRule, validateContextEditing } from "./context-editing";
 import { compactAgentMessages, isUserMessageIndex, validateCompaction } from "./compaction";
 import type { AgentCompactionRecord } from "./compaction.type";
 import type { AgentConfig } from "./agent-config.type";
@@ -309,6 +310,7 @@ export function agent<TOutput = unknown>(config: AgentConfig<TOutput>): AgentCon
   // authoring-time rules in `domains/ai/conventions/errors.md`.
   validateMiddleware(config.middleware);
   validateCompaction(config.compaction);
+  validateContextEditing(config.contextEditing);
 
   // Resolve the agent's identity. Explicit `name` wins; otherwise we
   // synthesize a DETERMINISTIC fingerprint from the config's
@@ -998,6 +1000,11 @@ class Execution<TOutput> {
     // is empty so this is `0` and the loop behaves exactly as before; on
     // a resume the already-settled trips are skipped entirely — their
     // model calls and tool dispatches are never re-issued.
+    // A resumed run whose last trip ended it (tool_stop) has nothing left to do.
+    if (this.trips[this.trips.length - 1]?.finishReason === "tool_stop") {
+      return;
+    }
+
     for (let tripIndex = this.trips.length; tripIndex < this.maxTrips; tripIndex++) {
       if (this.options?.signal?.aborted) {
         this.error = this.makeCancelledError();
@@ -1122,6 +1129,7 @@ class Execution<TOutput> {
     const isPausedTrip = response.finishReason === "pause_turn";
 
     const tripToolCalls: ToolCall[] = [];
+    let stoppedByTools = false;
 
     if (isToolCallTrip) {
       this.messages.push({
@@ -1137,6 +1145,7 @@ class Execution<TOutput> {
       }
       if (response.toolCalls?.length) {
         tripToolCalls.push(...(await this.dispatchToolCalls(response.toolCalls, tripIndex)));
+        stoppedByTools = await this.toolsEndTheRun(tripToolCalls, response.content, tripIndex);
       }
     } else if (isPausedTrip) {
       this.messages.push({
@@ -1150,7 +1159,7 @@ class Execution<TOutput> {
       index: tripIndex,
       input: tripInput,
       output: response.content,
-      finishReason: response.finishReason,
+      finishReason: stoppedByTools ? "tool_stop" : response.finishReason,
       startedAt: tripStartedAt.toISOString(),
       endedAt: new Date().toISOString(),
       duration: performance.now() - tripStart,
@@ -1225,11 +1234,76 @@ class Execution<TOutput> {
     // Composite (`asTool`-wrapped) tools never set `mode: "silent"`
     // in v1 — silent-composite mechanics are deferred per plan
     // 2026-05-07-silent-tools.md (Q4). They behave as feedback.
+    if (stoppedByTools && serverToolCalls.length === 0) {
+      return "stop";
+    }
+
     const allSilent =
       serverToolCalls.length === 0 &&
       (response.toolCalls ?? []).every((request) => this.silentToolCalls.has(request.id));
 
     return allSilent ? "stop" : "continue";
+  }
+
+  /**
+   * Whether the tool calls a trip just ran end the run: a successful call
+   * to a tool listed in `stopAfterTools` or declaring `endsTurn`, or
+   * `stopWhen` returning `true`. Failed calls never trigger the tool-level
+   * rules. A throwing `endsTurn` / `stopWhen` counts as `false`.
+   */
+  private async toolsEndTheRun(
+    calls: readonly ToolCall[],
+    text: string,
+    tripIndex: number,
+  ): Promise<boolean> {
+    const stopNames = this.config.stopAfterTools;
+    const stopWhen = this.config.stopWhen;
+
+    for (const call of calls) {
+      if (call.error) continue;
+
+      if (stopNames?.includes(call.name)) return true;
+
+      const endsTurn = this.effectiveTools.find((entry) => entry.name === call.name)?.endsTurn;
+
+      try {
+        if (
+          endsTurn === true ||
+          (typeof endsTurn === "function" &&
+            endsTurn({ input: call.input as never, output: call.output as never }))
+        ) {
+          return true;
+        }
+      } catch (thrown) {
+        this.logger.warn(LOG_MODULE, "endsTurn.error", "a tool's endsTurn threw and was ignored", {
+          runId: this.runId,
+          tool: call.name,
+          error: thrown instanceof Error ? thrown.message : String(thrown),
+        });
+      }
+    }
+
+    if (!stopWhen) return false;
+
+    try {
+      return Boolean(
+        await stopWhen({
+          tripIndex,
+          toolCalls: calls,
+          text,
+          usage: this.usage,
+          messages: this.messages,
+        }),
+      );
+    } catch (thrown) {
+      this.logger.warn(LOG_MODULE, "stopWhen.error", "stopWhen threw and was ignored", {
+        runId: this.runId,
+        tripIndex,
+        error: thrown instanceof Error ? thrown.message : String(thrown),
+      });
+
+      return false;
+    }
   }
 
   /**
@@ -1506,6 +1580,21 @@ class Execution<TOutput> {
    * hooks can recover from provider failures (fallback chain).
    */
   private async runTripThroughPipeline(tripIndex: number): Promise<ModelResponse> {
+    const editing = this.config.contextEditing;
+    const editRule = resolveRule(editing);
+
+    if (editing && editRule && !this.editsContextNatively()) {
+      const callOptions = this.buildModelCallOptions();
+      const record = await clearOldToolResults(editRule, this.messages, callOptions, tripIndex);
+
+      if (record) {
+        this.logger.debug(LOG_MODULE, "context.edited", "cleared old tool results", {
+          runId: this.runId,
+          ...record,
+        });
+      }
+    }
+
     if (this.config.compaction) {
       const callOptions = this.buildModelCallOptions();
       const outcome = await compactAgentMessages(
@@ -1535,6 +1624,14 @@ class Execution<TOutput> {
       () => this.getModelResponse(tripIndex),
       this.logger,
     )) as ModelResponse;
+  }
+
+  /** Whether the model edits context itself, so the agent only passes the hint. */
+  private editsContextNatively(): boolean {
+    return (
+      this.config.contextEditing?.native !== false &&
+      this.config.model.capabilities?.nativeContextEditing === true
+    );
   }
 
   /**
@@ -1568,8 +1665,13 @@ class Execution<TOutput> {
     const functionTools = this.effectiveTools.filter((entry) => !isProviderTool(entry));
     const providerTools = this.effectiveTools.filter(isProviderTool);
     const runOptions = this.runModelOptions();
+    const nativeEditing =
+      this.config.contextEditing && this.editsContextNatively()
+        ? nativeContextEditingHint(this.config.contextEditing)
+        : undefined;
 
     return {
+      ...(nativeEditing ? { contextEditing: nativeEditing } : {}),
       ...this.config.modelOptions,
       ...runOptions,
       tools: this.toolsForModel(functionTools),

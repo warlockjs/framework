@@ -6,6 +6,7 @@ import { checkpointMemory, checkpointPg, checkpointRedis } from "./checkpoint";
 import { setAIConfig } from "./config";
 import { dataset, evalScorers } from "./eval";
 import { humanApproval } from "./human/human-approval";
+import { approvalMemory } from "./human/approval-memory";
 import { human } from "./human/register";
 import { image } from "./image";
 import { speech } from "./speech";
@@ -18,6 +19,7 @@ import {
 import { resume } from "./human/resume";
 import { interruptMemory, interruptPg, interruptRedis } from "./human/stores";
 import { guardrail as guardrailSuite } from "./guard/guardrail";
+import { pricingCatalogue } from "./pricing";
 import { budget, readBudgetFallbackSignal } from "./middleware/builtins/budget";
 import { memory } from "./memory";
 import { measure } from "./measure";
@@ -162,6 +164,8 @@ export interface Ai {
   prompts: ReturnType<typeof defaultPromptsManager>;
   vcr: typeof vcr;
   mockRouter: typeof mockRouter;
+  /** Build an app-owned, overridable price list (`pricingCatalogue({ tables })`). */
+  pricing: typeof pricingCatalogue;
   middleware: {
     budget: typeof budget;
     guardrail: typeof guardrail;
@@ -199,6 +203,7 @@ export interface Ai {
    */
   human: {
     approval: typeof humanApproval;
+    approvalMemory: typeof approvalMemory;
     resume: typeof resume;
     interrupt: {
       memory: typeof interruptMemory;
@@ -317,6 +322,7 @@ export const ai = {
   prompts: defaultPromptsManager(),
   vcr,
   mockRouter,
+  pricing: pricingCatalogue,
   middleware: {
     budget,
     guardrail,
