@@ -98,8 +98,6 @@ jobs:
           const r=path.resolve('node_modules/react');
           console.log('react lstat',fs.lstatSync(r).isSymbolicLink(),fs.readlinkSync(r));
           try{console.log('cjs',require.resolve('react',{paths:[t]}))}catch(e){console.log('cjs failed',e.message)}
-          try{console.log('esm',import.meta?.resolve)}catch{}
-          import(pathToFileURL(path.join(t,'x.mjs')).href).catch(()=>{});
           fs.writeFileSync(path.join(t,'x.mjs'),'import r from \'react\';console.log(\'esm ok\',typeof r)');
           import(pathToFileURL(path.join(t,'x.mjs')).href).catch(e=>console.log('esm failed',e.message));
           "
