@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Fixed
 
 - `putJsonFile` and `putJsonFileAsync` now write atomically (a temporary file in the same folder, then a rename). A process reading the file during a rewrite used to be able to see a truncated file and fail with `Unexpected end of JSON input`.
+- Atomic writes on Windows now retry the final rename for about 4 seconds (10 ms doubling to a 150 ms cap) when another process has the target file open, instead of failing after 5 quick attempts with `AtomicWriteError` (`EPERM`). Other platforms keep the short schedule. `getJsonFileAsync` also retries a read that hits a transient `EPERM` or `EBUSY`.
 
 ## 5.34.3 - 2026-10-20
 

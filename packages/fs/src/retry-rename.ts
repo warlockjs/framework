@@ -10,10 +10,32 @@ export type RenameRetryOptions = {
   attempts?: number;
   /** Delay before the second attempt, doubled on each subsequent retry. Defaults to 20ms. */
   initialDelayMs?: number;
+  /** Upper bound for a single wait. Unbounded by default off Windows. */
+  maxDelayMs?: number;
 };
 
-const DEFAULT_ATTEMPTS = 5;
-const DEFAULT_INITIAL_DELAY_MS = 20;
+/**
+ * Windows refuses to rename over a file another handle has open (a sharing
+ * violation reported as EPERM / EACCES / EBUSY), and a reader polling the file
+ * can keep it open for a while, so it retries for several seconds: 10 ms
+ * doubling to a 150 ms cap, 30 attempts, about 4 s in total. Elsewhere a
+ * rename over an open file just works, so the short schedule is unchanged.
+ */
+const IS_WINDOWS = process.platform === "win32";
+const DEFAULT_ATTEMPTS = IS_WINDOWS ? 30 : 5;
+const DEFAULT_INITIAL_DELAY_MS = IS_WINDOWS ? 10 : 20;
+const DEFAULT_MAX_DELAY_MS = IS_WINDOWS ? 150 : Number.POSITIVE_INFINITY;
+
+/** Waits between the attempts of a retry schedule (one fewer than `attempts`). */
+export function renameRetryDelays(
+  attempts: number,
+  initialDelayMs: number,
+  maxDelayMs: number,
+): number[] {
+  return Array.from({ length: Math.max(attempts - 1, 0) }, (_, index) =>
+    Math.min(initialDelayMs * 2 ** index, maxDelayMs),
+  );
+}
 
 function isRetryableRenameError(error: unknown): error is NodeJS.ErrnoException {
   return (
@@ -53,6 +75,11 @@ export async function renameWithRetry(
   const attempts = options.attempts ?? DEFAULT_ATTEMPTS;
   const initialDelayMs = options.initialDelayMs ?? DEFAULT_INITIAL_DELAY_MS;
 
+  const delays = renameRetryDelays(
+    attempts,
+    initialDelayMs,
+    options.maxDelayMs ?? DEFAULT_MAX_DELAY_MS,
+  );
   let lastError: unknown;
 
   for (let attempt = 1; attempt <= attempts; attempt++) {
@@ -67,7 +94,7 @@ export async function renameWithRetry(
       }
 
       if (attempt < attempts) {
-        await delay(initialDelayMs * 2 ** (attempt - 1));
+        await delay(delays[attempt - 1] ?? 0);
       }
     }
   }
