@@ -33,11 +33,11 @@ Public methods: `spawn`, `spawnPty`, `list`, `stop`, `stopPid`, `recover`,
 `stopAll`. Handles provide streams, `exited` (reason, exit code, signal, peak
 memory) and idempotent `stop`. Unowned PIDs throw `ProcessNotOwnedError`.
 
-| Platform | Identity and enforcement                                                                                                    |
-| -------- | --------------------------------------------------------------------------------------------------------------------------- |
-| Linux    | `/proc` start ticks + boot ID + environment token; cgroup v2 → inherited rlimit/RSS fallback.                               |
-| macOS    | `ps` start time (`LC_ALL=C TZ=UTC`) + environment token; inherited CPU/data rlimits and tree RSS polling.                   |
-| Windows  | PowerShell/CIM creation time + environment token; `taskkill /PID <pid> /T /F` and tree working-set polling (`rss-polling`). |
+| Platform | Identity and enforcement                                                                                                                            |
+| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Linux    | `/proc` start ticks + boot ID + environment token; cgroup v2 → inherited rlimit/RSS fallback.                                                       |
+| macOS    | `ps` start time (`LC_ALL=C TZ=UTC`) + environment token; inherited CPU/data rlimits and tree RSS polling.                                           |
+| Windows  | CIM creation time (one long-lived PowerShell helper) + environment token; `taskkill /PID <pid> /T /F` and tree working-set polling (`rss-polling`). |
 
 macOS and Windows memory caps are softer than Linux cgroups: polling can miss
 peaks and overshoot. No custom native code or identity-helper setup is required.
@@ -45,7 +45,7 @@ On these platforms the handle PID belongs to a small Node guardian that launches
 the workload after registry persistence. It proves its inherited environment
 token through a live local socket/named pipe; polling includes guardian overhead
 and descendants. Recovery uses the same PID/start-time/token verification.
-Windows needs Windows PowerShell with CIM available. `cpuSeconds` is POSIX-only;
+Windows needs Windows PowerShell with CIM available. `pollIntervalMs` defaults to 100 ms on Linux, 500 on macOS and 1500 on Windows; `observationTimeoutMs` to 2 s on Linux and 15 s elsewhere. `cpuSeconds` is POSIX-only;
 `virtualMemoryBytes` is Linux-only. Timeouts work on all three platforms.
 Windows stops force the entire PID tree immediately; Job Objects are a future
 improvement for hard containment and memory caps.

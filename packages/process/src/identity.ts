@@ -3,7 +3,8 @@ import { readFile } from "node:fs/promises";
 import { promisify } from "node:util";
 
 import { guardianProof } from "./guardian";
-import { portableIdentity, type Command } from "./platform";
+import { defaultObservationTimeoutMs, portableIdentity, type Command } from "./platform";
+import type { WindowsProcessHelper } from "./windows-helper";
 
 const execute = promisify(execFile);
 export async function executeCommand(command: Command): Promise<string> {
@@ -15,6 +16,15 @@ export async function executeCommand(command: Command): Promise<string> {
   });
   return stdout;
 }
+/** How a supervisor observes processes off Linux. Linux ignores all of it. */
+export type Observation = {
+  /** Longest wait for a guardian reply or a helper answer. */
+  timeoutMs?: number;
+  /** Long-lived Windows helper; without it each observation runs PowerShell once. */
+  helper?: WindowsProcessHelper;
+  /** Accept a process-table snapshot this old (polling only, never before a signal). */
+  maxAgeMs?: number;
+};
 export const TOKEN_ENV = "WARLOCK_PROCESS_TOKEN";
 export type Identity = { start: string; group: number; state: string; rss: number; token?: string };
 
@@ -39,6 +49,7 @@ export async function identity(
   pid: number,
   token = false,
   expectedToken?: string,
+  observation: Observation = {},
 ): Promise<Identity | undefined> {
   if (!Number.isSafeInteger(pid) || pid <= 1) return undefined;
   try {
@@ -79,10 +90,26 @@ export async function identity(
           ?.slice(TOKEN_ENV.length + 1),
       };
     }
-    if (process.platform === "darwin" || process.platform === "win32")
-      return await portableIdentity(process.platform, pid, token, executeCommand, (selected) =>
-        guardianProof(selected, undefined, expectedToken),
+    if (process.platform === "darwin" || process.platform === "win32") {
+      const { helper } = observation;
+      return await portableIdentity(
+        process.platform,
+        pid,
+        token,
+        executeCommand,
+        (selected) =>
+          guardianProof(
+            selected,
+            undefined,
+            expectedToken,
+            observation.timeoutMs ?? defaultObservationTimeoutMs(process.platform),
+          ),
+        process.platform === "win32" && helper
+          ? (pids, tree, maxAgeMs) => helper.query(pids, tree, maxAgeMs)
+          : undefined,
+        observation.maxAgeMs,
       );
+    }
     return undefined;
   } catch (error) {
     const code = (error as { code?: unknown }).code;
@@ -104,8 +131,11 @@ export class ProcessNotOwnedError extends Error {
   }
 }
 
-export async function owns(entry: { pid: number; start: string; token: string }): Promise<boolean> {
-  const current = await identity(entry.pid, true, entry.token);
+export async function owns(
+  entry: { pid: number; start: string; token: string },
+  observation?: Observation,
+): Promise<boolean> {
+  const current = await identity(entry.pid, true, entry.token, observation);
   return (
     current?.start === entry.start && current.token === entry.token && current.group === entry.pid
   );

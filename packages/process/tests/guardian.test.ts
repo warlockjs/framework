@@ -27,6 +27,7 @@ it.each(["darwin", "win32"])(
       WARLOCK_PROCESS_TOKEN: token,
       WARLOCK_PROCESS_LAUNCH: JSON.stringify(["worker", "argument with spaces", "$(literal)"]),
     };
+    const later: (() => void)[] = [];
     runInNewContext(guardianScript, {
       require: (name: string) => {
         if (name === "node:crypto") return { createHmac };
@@ -37,6 +38,7 @@ it.each(["darwin", "win32"])(
       },
       process: { platform, pid: 42, getuid: () => 1000, env, on: vi.fn(), exit, kill },
       console: { error: vi.fn() },
+      setImmediate: (callback: () => void) => later.push(callback),
     });
     expect(listen.mock.calls[0]?.[0]).toBe(guardianAddress(platform, 42, 1000));
     expect(spawn).not.toHaveBeenCalled();
@@ -61,8 +63,12 @@ it.each(["darwin", "win32"])(
     });
     request({ resume: "wrong-token" });
     expect(spawn).not.toHaveBeenCalled();
+    const resumed = request({ resume: sign(nonce + ":resume") });
     request({ resume: sign(nonce + ":resume") });
-    request({ resume: sign(nonce + ":resume") });
+    // The reply is written before the workload starts.
+    expect(resumed.end).toHaveBeenCalledTimes(1);
+    expect(spawn).not.toHaveBeenCalled();
+    for (const callback of later.splice(0)) callback();
     expect(spawn).toHaveBeenCalledTimes(1);
     expect(spawn).toHaveBeenCalledWith("worker", ["argument with spaces", "$(literal)"], {
       env: { APP_MODE: "test" },
