@@ -1,6 +1,8 @@
 import { InvalidRequestError, isProviderTool, type ModelCallOptions } from "@warlock.js/ai";
 import type {
   EmbedderContract,
+  ListModelsOptions,
+  ModelInfo,
   ImageModelContract,
   ModelContract,
   ModelPricing,
@@ -18,7 +20,8 @@ import { inferReasoningCapability, inferVisionCapability } from "./known-models"
 /**
  * The xAI OpenAI-compatible base URL. xAI exposes Chat Completions at
  * `POST /v1/chat/completions` on this host, so the whole adapter rides
- * on the OpenAI wire protocol.
+ * on the OpenAI wire protocol. Native web search / X search are served by
+ * `POST /v1/responses` on the same host and are routed there.
  */
 const XAI_BASE_URL = "https://api.x.ai/v1";
 
@@ -122,31 +125,86 @@ export class XaiSDK implements SDKAdapterContract {
    * xai.model({ name: "grok-3-mini" });   // reasoning auto-true, vision false
    */
   public model(config: XaiModelConfig): ModelContract {
+    const { api, ...modelConfig } = config;
     const model = this.openai.model({
-      ...config,
+      ...modelConfig,
       // xAI names don't match OpenAI's vision/reasoning prefixes, so we
       // resolve them here and pass explicit flags through — explicit
       // config always wins over the OpenAI adapter's own inference.
       vision: config.vision ?? inferVisionCapability(config.name),
       reasoning: config.reasoning ?? inferReasoningCapability(config.name),
     });
-    // Preserve xAI transport constraints even when a gateway relabels the provider.
-    // https://docs.x.ai/developers/tools/web-search — native search uses Responses.
+    // Native web_search / x_search exist only on xAI's Responses API
+    // (POST /v1/responses; https://docs.x.ai/developers/tools/web-search).
+    // Ordinary calls stay on Chat Completions; a call that carries one of those
+    // tools, or a model built with `api: "responses"`, goes to Responses.
+    // Preserved even when a gateway relabels the provider.
+    if (api !== undefined && api !== "chat" && api !== "responses") {
+      throw new InvalidRequestError(
+        `Unknown xAI api "${String(api)}"; expected "chat" or "responses".`,
+        { context: { provider: model.provider, model: config.name, api } },
+      );
+    }
+
+    const openai = this.openai;
+    let responses: ModelContract | undefined;
+    const responsesModel = (): ModelContract => {
+      responses ??= openai.compatibleResponses({
+        ...modelConfig,
+        vision: config.vision ?? inferVisionCapability(config.name),
+        reasoning: config.reasoning ?? inferReasoningCapability(config.name),
+      });
+
+      return responses;
+    };
+    const route = (options: ModelCallOptions | undefined): ModelContract => {
+      if (api === "responses") {
+        return responsesModel();
+      }
+
+      if (!requestsNativeSearch(model.provider, options)) {
+        return model;
+      }
+
+      if (api === "chat") {
+        throw new InvalidRequestError(
+          'xAI native web_search / x_search requires POST /v1/responses, but this model is pinned to api: "chat". Remove api: "chat" or use api: "responses".',
+          { context: { provider: model.provider, model: config.name, api } },
+        );
+      }
+
+      if (model.provider !== XAI_PROVIDER) {
+        throw new InvalidRequestError(
+          `xAI native web_search / x_search requires POST /v1/responses, which is only chosen automatically for the "${XAI_PROVIDER}" provider label; this SDK is labeled "${model.provider}". Set api: "responses" on the model if the gateway forwards /v1/responses.`,
+          { context: { provider: model.provider, model: config.name } },
+        );
+      }
+
+      return responsesModel();
+    };
+
     return {
       name: model.name,
       provider: model.provider,
       capabilities: model.capabilities,
       ...(model.pricing ? { pricing: model.pricing } : {}),
       async complete(messages, options) {
-        rejectNativeSearch(model.provider, options);
-        return model.complete(messages, options);
+        return route(options).complete(messages, options);
       },
       async *stream(messages, options) {
-        rejectNativeSearch(model.provider, options);
-        yield* model.stream(messages, options);
+        yield* route(options).stream(messages, options);
       },
       ...(model.countTokens ? { countTokens: model.countTokens.bind(model) } : {}),
     };
+  }
+
+  /**
+   * List the Grok models this account can use, live from `GET /v1/models`,
+   * mapped to the common `ModelInfo` shape. Delegates to the wrapped
+   * OpenAI-compatible listing.
+   */
+  public async models(options?: ListModelsOptions): Promise<ModelInfo[]> {
+    return this.openai.models(options);
   }
 
   /**
@@ -182,21 +240,16 @@ export class XaiSDK implements SDKAdapterContract {
   }
 }
 
-/** A provider label does not change the underlying Chat Completions transport. */
-function rejectNativeSearch(provider: string, options: ModelCallOptions | undefined): void {
+/** `true` when the call carries xAI's Responses-only search tools for this provider label. */
+function requestsNativeSearch(provider: string, options: ModelCallOptions | undefined): boolean {
   const entries = [
     ...(options?.providerTools ?? []),
     ...(options?.tools ?? []).filter(isProviderTool),
   ];
-  if (
-    entries.some(
-      (entry) =>
-        entry.provider === provider &&
-        (entry.definition.type === "web_search" || entry.definition.type === "x_search"),
-    )
-  ) {
-    throw new InvalidRequestError(
-      "xAI native web_search / x_search requires POST /v1/responses. XaiSDK currently supports Chat Completions only; use xAI's Responses API with the vendor SDK for native search.",
-    );
-  }
+
+  return entries.some(
+    (entry) =>
+      entry.provider === provider &&
+      (entry.definition.type === "web_search" || entry.definition.type === "x_search"),
+  );
 }

@@ -2,6 +2,7 @@ import type OpenAI from "openai";
 import { ai, type ModelStreamChunk } from "@warlock.js/ai";
 import { describe, expect, it, vi } from "vitest";
 import { OpenAIModel } from "./model";
+import { OpenAISDK } from "./sdk";
 import { OpenAIResponsesModel } from "./responses-model";
 import { OPENAI_SERVER_TOOL_PRICING } from "./known-pricing";
 
@@ -123,5 +124,113 @@ describe("native-search edge cases", () => {
       model.complete(messages, { providerOptions: { qwen: { enableSearch: "yes" } } }),
     ).rejects.toThrow("boolean");
     expect(calls).toHaveLength(1);
+  });
+});
+
+describe("hosted web_search on the direct OpenAI provider", () => {
+  const search = ai.providerTool({ provider: "openai", definition: { type: "web_search" } });
+
+  function sdkWithFetch() {
+    const requests: Array<{ url: string; body: Record<string, unknown> }> = [];
+    const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
+      requests.push({ url: String(input), body: JSON.parse(String(init?.body)) });
+      const url = String(input);
+      return new Response(
+        JSON.stringify(
+          url.endsWith("/responses")
+            ? {
+                id: "r",
+                object: "response",
+                status: "completed",
+                output: [
+                  hosted,
+                  {
+                    type: "message",
+                    id: "m",
+                    role: "assistant",
+                    status: "completed",
+                    content: [{ type: "output_text", text: "answer", annotations: [] }],
+                  },
+                ],
+                usage: { input_tokens: 1, output_tokens: 1, total_tokens: 2 },
+              }
+            : {
+                id: "c",
+                object: "chat.completion",
+                created: 0,
+                model: "gpt-4.1",
+                choices: [
+                  {
+                    index: 0,
+                    message: { role: "assistant", content: "chat" },
+                    finish_reason: "stop",
+                  },
+                ],
+                usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+              },
+        ),
+        { headers: { "Content-Type": "application/json" } },
+      );
+    });
+    return { sdk: new OpenAISDK({ apiKey: "k", fetch }), requests, fetch };
+  }
+
+  it("routes a call carrying web_search to POST /responses without changing the model", async () => {
+    const { sdk, requests } = sdkWithFetch();
+    const model = sdk.model({ name: "gpt-4.1" });
+    const response = await model.complete(messages, { tools: [search] });
+
+    expect(response.content).toBe("answer");
+    expect(response.usage.serverToolUse).toEqual({ webSearchRequests: 1 });
+    expect(requests).toHaveLength(1);
+    expect(requests[0]?.url).toMatch(/\/responses$/u);
+    expect(requests[0]?.body.tools).toEqual([{ type: "web_search" }]);
+  });
+
+  it("keeps ordinary calls on Chat Completions", async () => {
+    const { sdk, requests } = sdkWithFetch();
+    const response = await sdk.model({ name: "gpt-4.1" }).complete(messages);
+
+    expect(response.content).toBe("chat");
+    expect(requests[0]?.url).toMatch(/\/chat\/completions$/u);
+  });
+
+  it("throws a clear error, before transport, when the model is pinned to api: chat", async () => {
+    const { sdk, fetch } = sdkWithFetch();
+    const model = sdk.model({ name: "gpt-4.1", api: "chat" });
+
+    await expect(model.complete(messages, { tools: [search] })).rejects.toThrow(
+      'pinned to api: "chat"',
+    );
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it.each(["gpt-4.1-nano", "gpt-3.5-turbo", "o3-mini", "gpt-4-turbo"])(
+    "refuses web_search on %s with a capability error and no request",
+    async (name) => {
+      const { sdk, fetch } = sdkWithFetch();
+      const model = sdk.model({ name });
+
+      await expect(model.complete(messages, { tools: [search] })).rejects.toThrow(
+        "not available on",
+      );
+      await expect(async () => {
+        for await (const chunk of model.stream(messages, { tools: [search] })) void chunk;
+      }).rejects.toThrow("not available on");
+      expect(fetch).not.toHaveBeenCalled();
+    },
+  );
+
+  it("refuses web_search on gpt-5 with minimal reasoning only", async () => {
+    const { sdk, fetch } = sdkWithFetch();
+    const model = sdk.model({ name: "gpt-5" });
+
+    await expect(
+      model.complete(messages, { tools: [search], reasoning: { effort: "minimal" } }),
+    ).rejects.toThrow("minimal reasoning");
+    expect(fetch).not.toHaveBeenCalled();
+    await expect(
+      model.complete(messages, { tools: [search], reasoning: { effort: "low" } }),
+    ).resolves.toMatchObject({ content: "answer" });
   });
 });

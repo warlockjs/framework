@@ -125,6 +125,15 @@ retrieval embeddings. Groq has no image API either, so `GroqSDK` does not
 define `image()` — `groq.image(...)` is a compile-time error.
 :::
 
+## List models
+
+`await groq.models()` lists the models your key can use from
+`GET /openai/v1/models` and returns `ModelInfo[]`: `id` (pass it as `name`),
+`label`, `provider`, `kind` (classified from the id, so Whisper and TTS ids
+come back as `"audio"`), `created` and `contextWindow` (`context_window`).
+Models Groq marks `active: false` are left out. Failures throw the usual
+provider errors, never an empty list. Pass `{ signal }` to cancel.
+
 ## Pricing and usage
 
 `pricing` is a registry keyed by model name, rates in **USD per 1,000,000

@@ -164,6 +164,14 @@ and streaming therefore behave exactly as documented for OpenAI; see
 [the OpenAI provider](/v/latest/ai/providers/openai/) for the wire-level
 detail, including the `responseFormat` override modes.
 
+## List models
+
+`await deepseek.models()` lists the models your key can use from `GET /models`
+and returns `ModelInfo[]` (`id`, `label`, `provider`, `kind`). DeepSeek's
+listing is just ids and owner, so `kind` is classified from the id. Failures
+throw the usual provider errors, never an empty list. Pass `{ signal }` to
+cancel.
+
 ## Pricing and usage
 
 Every response reports token `usage` (`input`, `output`, `total`) — on

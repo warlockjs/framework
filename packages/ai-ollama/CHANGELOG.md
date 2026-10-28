@@ -4,6 +4,12 @@ All notable changes to `@warlock.js/ai-ollama` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.40.0 - 2026-10-28
+
+### Added
+
+- `ollama.models()` lists the models pulled on the daemon from `GET /api/tags` as `ModelInfo[]`, with the last-modified time as `created` and embedding models (`bert` families) as `kind: "embedding"`.
+
 ## 5.34.3 - 2026-10-20
 
 ### Changed

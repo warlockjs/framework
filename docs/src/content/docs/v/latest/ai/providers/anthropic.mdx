@@ -318,6 +318,16 @@ const response = await model.complete([
 ]);
 ```
 
+## List models
+
+`await anthropic.models()` lists the Claude models your key can use from
+`GET /v1/models` and returns `ModelInfo[]`: `id` (pass it as `name`), `label`
+(the display name), `provider`, `kind: "chat"`, `created` (release date, Unix
+seconds), and `contextWindow` / `maxOutputTokens` when the API reports
+`max_input_tokens` / `max_tokens`. Pagination is followed to the end and
+failures throw the usual provider errors, never an empty list. Pass `{ signal }`
+to cancel.
+
 ## Pricing and usage
 
 Every response reports token `usage`, on `model.complete()` and the

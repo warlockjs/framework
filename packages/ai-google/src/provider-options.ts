@@ -1,7 +1,16 @@
+import type { GoogleSearchBudget } from "./search-budget";
 import { InvalidRequestError, type ModelCallOptions } from "@warlock.js/ai";
 
 /** Adapter-only fields merged after the neutral request parameters. */
-export type GoogleCallOptions = { body?: Record<string, unknown> };
+export type GoogleCallOptions = {
+  body?: Record<string, unknown>;
+  /**
+   * Bound Google Search across the calls of one run. See
+   * `googleSearchBudget()`: the Gemini API has no per-request limit, so this
+   * stops offering the search tool once the allowance is spent.
+   */
+  search?: { budget?: GoogleSearchBudget };
+};
 
 const RESERVED_FIELDS = new Set(["systemInstruction", "tools", "abortSignal", "httpOptions"]);
 

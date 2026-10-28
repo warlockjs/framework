@@ -87,6 +87,18 @@ export type XaiModelConfig = ModelConfig & {
    * model({ name: "grok-4.3", promptCacheKey: `conversation:${conversationId}` });
    */
   promptCacheKey?: string;
+  /**
+   * Wire API. Omitted (the default) uses Chat Completions and switches a call
+   * to the Responses API (`POST /v1/responses`) only when that call carries
+   * xAI's native `web_search` or `x_search` tool. `"responses"` sends every
+   * call to Responses, the only way to use Responses on a gateway that
+   * relabels `provider`. `"chat"` pins Chat Completions: a search tool then
+   * throws instead of switching.
+   *
+   * Responses calls are stateless (`store: false`) and send neither encrypted
+   * reasoning nor search-source `include` fields.
+   */
+  api?: "chat" | "responses";
 };
 
 /**

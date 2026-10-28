@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 
 - The provider-neutral `contextEditing.clearToolResults` rule (from the agent's `contextEditing` option) maps to a `clear_tool_uses` context edit: `afterTokens` becomes the input-token trigger, `keep` the number of tool uses kept and `exclude` the excluded tools. An explicit `providerOptions.anthropic.contextManagement.clearToolUses` still wins. The model now reports `capabilities.nativeContextEditing`.
+- `anthropic.models()` lists the Claude models the key can use from `GET /v1/models` as `ModelInfo[]`, following pagination, with release date and token limits when the API reports them.
 
 ## 5.34.3 - 2026-10-20
 

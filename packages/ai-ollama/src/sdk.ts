@@ -1,15 +1,17 @@
 import { Ollama } from "ollama";
 import type {
   EmbedderContract,
+  ListModelsOptions,
+  ModelInfo,
   ModelContract,
   ModelPricing,
   SDKAdapterContract,
 } from "@warlock.js/ai";
-import { approximateTokenCount } from "@warlock.js/ai";
+import { approximateTokenCount, inferModelKind } from "@warlock.js/ai";
 import type { OllamaEmbedderConfig, OllamaModelConfig, OllamaSDKConfig } from "./config.type";
 import { OllamaEmbedder } from "./embedder";
 import { OllamaModel } from "./model";
-import { signalAwareFetch } from "./utils";
+import { signalAwareFetch, withCallSignal, wrapOllamaError } from "./utils";
 
 /**
  * Ollama-backed implementation of `SDKAdapterContract`.
@@ -90,5 +92,51 @@ export class OllamaSDK implements SDKAdapterContract {
    */
   public embedder(config: OllamaEmbedderConfig): EmbedderContract {
     return new OllamaEmbedder(this.client, config, this.provider);
+  }
+
+  /**
+   * List the models pulled on the Ollama host, live from `GET /api/tags`,
+   * mapped to {@link ModelInfo}. `created` is the model's last-modified time
+   * (Ollama reports no release date). `kind` is `"embedding"` for the
+   * encoder families (`bert`, `nomic-bert`) and classified from the name
+   * otherwise. A host that is down throws the adapter's usual provider
+   * error, never an empty list.
+   *
+   * @example
+   * const models = await ollama.models();
+   * models.map((model) => model.id); // ["llama3.1:8b", "nomic-embed-text:latest"]
+   */
+  public async models(options?: ListModelsOptions): Promise<ModelInfo[]> {
+    let listing: Awaited<ReturnType<Ollama["list"]>>;
+
+    try {
+      listing = await withCallSignal(options?.signal, () => this.client.list());
+    } catch (thrown) {
+      throw wrapOllamaError(thrown);
+    }
+
+    const found = new Map<string, ModelInfo>();
+
+    for (const entry of listing.models ?? []) {
+      const id = entry.name ?? entry.model;
+
+      if (typeof id !== "string" || id === "") {
+        continue;
+      }
+
+      const families = [entry.details?.family, ...(entry.details?.families ?? [])];
+      const encoder = families.some((family) => /bert/iu.test(family ?? ""));
+      const modified = new Date(entry.modified_at as unknown as string | Date).getTime();
+
+      found.set(id, {
+        id,
+        label: id,
+        provider: this.provider,
+        kind: encoder ? "embedding" : inferModelKind(id),
+        ...(Number.isNaN(modified) ? {} : { created: Math.floor(modified / 1000) }),
+      });
+    }
+
+    return [...found.values()];
   }
 }

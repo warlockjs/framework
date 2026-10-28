@@ -23,6 +23,7 @@ import type {
   Part,
   Tool,
 } from "@google/genai";
+import { isSearchDefinition, searchBudgetOf } from "./search-budget";
 import { applyGrounding, groundingMetadata } from "./utils/grounding";
 import { mergeProviderBody } from "./provider-options";
 import type { GoogleModelConfig } from "./config.type";
@@ -162,6 +163,7 @@ export class GoogleModel implements ModelContract {
     const usage = this.extractUsage(response);
     const grounding = new Map<number, GroundingMetadata>();
     applyGrounding(usage, grounding, response);
+    searchBudgetOf(options)?.record(usage.serverToolUse?.webSearchRequests ?? 0);
     const providerMetadata = groundingMetadata(grounding);
     attachCost(usage, this.pricing);
 
@@ -376,6 +378,7 @@ export class GoogleModel implements ModelContract {
       usage,
     });
 
+    searchBudgetOf(options)?.record(usage.serverToolUse?.webSearchRequests ?? 0);
     const providerMetadata = groundingMetadata(grounding);
     yield { type: "done", finishReason, usage, ...(providerMetadata ? { providerMetadata } : {}) };
   }
@@ -462,7 +465,24 @@ export class GoogleModel implements ModelContract {
       model: this.name,
       logger: this.logger,
     });
-    const mapped: Tool[] = [...(toGoogleTools(tools) ?? []), ...(definitions as unknown as Tool[])];
+    const budget = searchBudgetOf(options);
+    // The Gemini API cannot bound searches inside one call, so a spent budget
+    // is enforced here by not offering Google Search again.
+    const offered =
+      budget && budget.remaining <= 0
+        ? definitions.filter((definition) => !isSearchDefinition(definition))
+        : definitions;
+
+    if (offered.length < definitions.length) {
+      this.logger.warn(
+        LOG_MODULE,
+        "search-budget",
+        "Google Search budget is spent; calling without the search tool",
+        { model: this.name, max: budget?.max, used: budget?.used },
+      );
+    }
+
+    const mapped: Tool[] = [...(toGoogleTools(tools) ?? []), ...(offered as unknown as Tool[])];
 
     return mapped.length > 0 ? { tools: mapped } : {};
   }

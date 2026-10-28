@@ -1,4 +1,6 @@
 import type {
+  ListModelsOptions,
+  ModelInfo,
   EmbedderConfig,
   EmbedderContract,
   ModelContract,
@@ -143,5 +145,18 @@ export class MistralSDK implements SDKAdapterContract {
     // `embedder` is optional on the contract but always present on the
     // wrapped OpenAI adapter — assert it for the delegation.
     return this.openai.embedder!(config);
+  }
+  /**
+   * List the models this Mistral account can use, live from the provider's
+   * OpenAI-compatible `GET /models`, mapped to the common `ModelInfo`
+   * shape. `contextWindow` comes from `max_context_length`, `label` from the model `name`, and a model that reports `capabilities.completion_chat: false` gets `kind: "other"`. Failures are thrown as the adapter's usual provider
+   * errors, never an empty list.
+   *
+   * @example
+   * const models = await mistral.models();
+   * models.map((model) => model.id);
+   */
+  public async models(options?: ListModelsOptions): Promise<ModelInfo[]> {
+    return this.openai.models(options);
   }
 }

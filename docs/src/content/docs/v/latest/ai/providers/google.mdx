@@ -278,6 +278,18 @@ const { data, usage } = await ai.image({
 See [`ai.image`](/v/latest/ai/) for the full verb surface (options,
 cost-truth, `GeneratedImage`).
 
+## List models
+
+`await google.models()` lists the models your key or project can use from the
+Gemini API and returns `ModelInfo[]`: `id` (the `models/` prefix is removed;
+pass it as `name`), `label` (display name), `provider`, `contextWindow` and
+`maxOutputTokens` (the input and output token limits), and `description`.
+`kind` follows the model's `supportedActions`: `generateContent` is `"chat"`
+(or `"audio"` / `"image"` for TTS and image ids), `embedContent` is
+`"embedding"`, `predict` is `"image"`. Google reports no creation date, so
+`created` is absent. Pagination is followed to the end and failures throw the
+usual provider errors. Pass `{ signal }` to cancel.
+
 ## Pricing and usage
 
 Every response reports token `usage` (`input`, `output`, `total`), on
@@ -393,6 +405,39 @@ const search = ai.providerTool({ provider: "google", definition: { googleSearch:
 ```
 
 With `streamChunks` (on by default under `agent.stream()`), `stream()` also yields `reasoning` for thought parts (they are only sent with `providerOptions: { google: { body: { thinkingConfig: { includeThoughts: true } } } }`) and `usage` for every chunk carrying `usageMetadata`. See [Stream reasoning and tool arguments](/v/latest/ai/agents/stream-reasoning-and-tool-args/).
+
+## Bound Google Search with a budget
+
+The Gemini API has **no per-request search limit**: `{ googleSearch: {} }` takes
+no `max_uses` or query cap, and the model decides how many queries one
+`generateContent` call runs. The adapter can bound searches across the calls of
+one run instead. Create a budget and pass it on every call of that run:
+
+```ts
+import { googleSearchBudget } from "@warlock.js/ai-google";
+
+const budget = googleSearchBudget(3);
+const search = ai.providerTool({ provider: "google", definition: { googleSearch: {} } });
+
+await model.complete(messages, {
+  tools: [search],
+  providerOptions: { google: { search: { budget } } },
+});
+budget.used; // unique queries Google reported so far
+budget.remaining; // what is left
+```
+
+After each call (streamed or not) the adapter adds the unique, non-empty
+`webSearchQueries` Google reported to the budget, the same count Gemini 3
+bills. Once `remaining` reaches zero it stops sending the `googleSearch`
+(and `googleSearchRetrieval`) tool, logs a warning, and later calls run
+without search; other tools such as `codeExecution` are kept.
+`googleSearchBudget(0)` turns search off for that run.
+
+What this does not do: a single call that is already running can still make
+more queries than the budget has left, because the API offers no way to stop it
+mid-call. Size the budget with that overshoot in mind, and share one budget
+object across the trips of an agent run so the allowance is not per trip.
 
 ## Search grounding metadata and fees
 

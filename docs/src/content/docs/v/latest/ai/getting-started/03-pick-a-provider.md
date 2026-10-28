@@ -38,8 +38,11 @@ interface SDKAdapterContract {
   model(config): ModelContract; // the provider label lives on ModelContract.provider
   count(text, model?): Promise<number>; // token counting
   embedder?(config): EmbedderContract; // optional — not every provider supports embeddings
+  models?(options?): Promise<ModelInfo[]>; // optional — live model listing
 }
 ```
+
+`models()` lists what the account can use, live from the provider, in one shape (`id`, `label`, `provider`, `kind`, plus `created`, `contextWindow`, `maxOutputTokens`, `description` when the provider reports them). Every first-party adapter implements it; an adapter without a listing API simply has no `models` method, so check for it before calling. `inferModelKind(id)` is the id-based classifier the adapters use when a provider's listing has no modality field.
 
 That's the surface your code touches. Whichever adapter you pick:
 

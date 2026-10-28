@@ -1,6 +1,8 @@
 import OpenAI from "openai";
 import type {
   EmbedderContract,
+  ListModelsOptions,
+  ModelInfo,
   ImageModelContract,
   ModelContract,
   ModelPricing,
@@ -18,6 +20,8 @@ import type {
   OpenAISpeechConfig,
   OpenAITranscriptionConfig,
 } from "./config.type";
+import { toModelInfo } from "./list-models";
+import { wrapOpenAIError } from "./utils";
 import { OpenAIEmbedder } from "./embedder";
 import { OpenAIImageModel } from "./image";
 import { OpenAIModel } from "./model";
@@ -128,6 +132,25 @@ export class OpenAISDK implements SDKAdapterContract {
   }
 
   /**
+   * Build the Responses-API model for an OpenAI-compatible vendor that serves
+   * `POST /v1/responses` itself (xAI). For vendor wrapper packages: the direct
+   * OpenAI provider reaches the same adapter through `model({ api:
+   * "responses" })`, and every other label is refused there on purpose. The
+   * returned model keeps this SDK's provider label, sends `store: false`, and
+   * leaves out the OpenAI-only `include` fields (encrypted reasoning, search
+   * sources), so nothing the vendor does not know is sent.
+   */
+  public compatibleResponses(config: OpenAIModelConfig): ModelContract {
+    const resolvedPricing = config.pricing ?? this.pricing?.[config.name];
+    const resolvedConfig: OpenAIModelConfig =
+      resolvedPricing === config.pricing ? config : { ...config, pricing: resolvedPricing };
+
+    return new OpenAIResponsesModel(this.client, resolvedConfig, this.provider, {
+      compatible: true,
+    });
+  }
+
+  /**
    * Rough token-count estimate for a given text. Uses a
    * character-heuristic (`approximateTokenCount`) from the core package
    * — good enough for budgeting and quota guards, not for billing.
@@ -136,6 +159,42 @@ export class OpenAISDK implements SDKAdapterContract {
    */
   public async count(text: string, _model?: string): Promise<number> {
     return approximateTokenCount(text);
+  }
+
+  /**
+   * List the models this account can use, live from `GET /models`, mapped to
+   * {@link ModelInfo}. Works for OpenAI and for every OpenAI-compatible vendor
+   * that implements the listing (the wrapper packages for xAI, Groq,
+   * DeepSeek and Mistral call this). Follows pagination to the end; a
+   * vendor-marked inactive model is left out. Failures are thrown as the
+   * adapter's usual provider errors, never an empty list.
+   *
+   * `kind` comes from the vendor's own flags when it has them (Mistral
+   * `capabilities`) and from the model id otherwise, so treat it as a filter
+   * hint for ids OpenAI does not describe.
+   *
+   * @example
+   * const models = await openai.models();
+   * const chat = models.filter((model) => model.kind === "chat");
+   */
+  public async models(options?: ListModelsOptions): Promise<ModelInfo[]> {
+    const found = new Map<string, ModelInfo>();
+
+    try {
+      for await (const entry of this.client.models.list(
+        options?.signal ? { signal: options.signal } : undefined,
+      )) {
+        const info = toModelInfo(entry, this.provider);
+
+        if (info) {
+          found.set(info.id, info);
+        }
+      }
+    } catch (thrown) {
+      throw wrapOpenAIError(thrown);
+    }
+
+    return [...found.values()];
   }
 
   /**

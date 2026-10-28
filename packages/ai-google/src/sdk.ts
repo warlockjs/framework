@@ -1,12 +1,15 @@
 import { GoogleGenAI } from "@google/genai";
 import type {
   EmbedderContract,
+  ListModelsOptions,
+  ModelInfo,
+  ModelKind,
   ImageModelContract,
   ModelContract,
   ModelPricing,
   SDKAdapterContract,
 } from "@warlock.js/ai";
-import { approximateTokenCount } from "@warlock.js/ai";
+import { approximateTokenCount, inferModelKind } from "@warlock.js/ai";
 import type {
   GoogleEmbedderConfig,
   GoogleImageConfig,
@@ -18,6 +21,7 @@ import { GeminiImageModel } from "./gemini-image";
 import { GoogleImageModel } from "./image";
 import { googlePricingFor } from "./known-pricing";
 import { GoogleModel } from "./model";
+import { wrapGoogleError } from "./utils";
 
 /**
  * Pick the transport for an image model id.
@@ -164,4 +168,74 @@ export class GoogleSDK implements SDKAdapterContract {
 
     return new GoogleImageModel(this.ai, resolvedConfig, this.provider);
   }
+
+  /**
+   * List the models this key or project can use, live from the Gemini API
+   * `models.list` endpoint, mapped to {@link ModelInfo}. Follows pagination to
+   * the end. `kind` comes from the model's `supportedActions`:
+   * `generateContent` is `"chat"` (unless the id is an image or audio
+   * model), `embedContent` is `"embedding"`, `predict` / `predictLongRunning`
+   * is `"image"`. Google reports no creation date, so `created` is left out.
+   * Failures are thrown as the adapter's usual provider errors.
+   *
+   * @example
+   * const models = await google.models();
+   * const chat = models.filter((model) => model.kind === "chat");
+   */
+  public async models(options?: ListModelsOptions): Promise<ModelInfo[]> {
+    const found = new Map<string, ModelInfo>();
+
+    try {
+      const pager = await this.ai.models.list({
+        config: {
+          pageSize: 1000,
+          ...(options?.signal ? { abortSignal: options.signal } : {}),
+        },
+      });
+
+      for await (const entry of pager) {
+        const rawName = entry.name;
+
+        if (typeof rawName !== "string" || rawName === "") {
+          continue;
+        }
+
+        const id = rawName.replace(/^(?:publishers\/[^/]+\/)?models\//u, "");
+        const actions = entry.supportedActions ?? [];
+
+        found.set(id, {
+          id,
+          label: entry.displayName || id,
+          provider: this.provider,
+          kind: kindOfActions(actions, id),
+          ...(entry.inputTokenLimit ? { contextWindow: entry.inputTokenLimit } : {}),
+          ...(entry.outputTokenLimit ? { maxOutputTokens: entry.outputTokenLimit } : {}),
+          ...(entry.description ? { description: entry.description } : {}),
+        });
+      }
+    } catch (thrown) {
+      throw wrapGoogleError(thrown);
+    }
+
+    return [...found.values()];
+  }
+}
+
+/** Map Gemini `supportedActions` to a {@link ModelKind}; fall back to the id when none are listed. */
+function kindOfActions(actions: string[], id: string): ModelKind {
+  const inferred = inferModelKind(id);
+
+  if (actions.includes("embedContent") || actions.includes("batchEmbedContents")) {
+    return "embedding";
+  }
+
+  if (actions.includes("predict") || actions.includes("predictLongRunning")) {
+    return inferred === "audio" ? "audio" : "image";
+  }
+
+  if (actions.includes("generateContent")) {
+    return inferred === "embedding" || inferred === "moderation" ? "other" : inferred;
+  }
+
+  return actions.length === 0 ? inferred : "other";
 }

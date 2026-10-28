@@ -8,6 +8,7 @@ export * from "./config";
 export * from "./contracts";
 export * from "./errors";
 export * from "./eval";
+export { inferModelKind } from "./model-discovery";
 // Image generation (`ai.image`) — the image-output verb of the modality
 // track (Theme I). The `ImageModelContract` / `GeneratedImage` types ride
 // out via `./contracts`; this surfaces the facade verb + cost helper.

@@ -223,6 +223,20 @@ await model.complete(
 );
 ```
 
+## List models
+
+`await bedrock.models()` lists the foundation models offered in the SDK's region
+from `ListFoundationModels` and returns `ModelInfo[]`: `id` (the model id),
+`label` (provider and model name), `provider`, and `kind` from the output
+modalities (`TEXT` is `"chat"`, `EMBEDDING`, `IMAGE`). Models whose lifecycle
+status is `LEGACY` are left out. The listing has no release date or token
+limits, so those fields are absent. It uses the SDK's credentials, region and
+`apiKey`, but needs the `bedrock:ListFoundationModels` permission, and a
+separate control-plane client (`@aws-sdk/client-bedrock`) is created on first
+use. Some models can only be invoked through a cross-region inference profile id
+(for example `us.` plus the id), which this listing does not return. Failures
+throw the usual provider errors. Pass `{ signal }` to cancel.
+
 ## Pricing and usage
 
 Every response reports token `usage` (`input`, `output`, `total`), on

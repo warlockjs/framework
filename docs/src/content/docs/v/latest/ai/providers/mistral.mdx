@@ -121,6 +121,15 @@ absence is the capability guard, and `mistral.image(...)` is a compile-time
 error rather than a runtime failure.
 :::
 
+## List models
+
+`await mistral.models()` lists the models your key can use from `GET /v1/models`
+and returns `ModelInfo[]`: `id` (pass it as `name`), `label` (the model `name`),
+`provider`, `kind`, `created`, `contextWindow` (`max_context_length`) and
+`description`. A model that reports `capabilities.completion_chat: false`
+gets `kind: "other"`; the rest are classified from the id. Failures throw the
+usual provider errors, never an empty list. Pass `{ signal }` to cancel.
+
 ## Pricing and usage
 
 The adapter ships a default registry (`MISTRAL_DEFAULT_PRICING`, USD per

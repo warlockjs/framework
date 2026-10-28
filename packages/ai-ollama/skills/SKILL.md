@@ -184,3 +184,7 @@ model has no `countTokens` method. `sdk.count(text)` remains an offline estimate
 - The `run-ai-agent` topic of the `warlock-js-ai` skill
 - The `pick-ai-provider` topic of the `warlock-js-ai` skill
 - The `embed-text` topic of the `warlock-js-ai` skill
+
+## List models
+
+`await ollama.models()` returns `ModelInfo[]` from `GET /api/tags` (last-modified as `created`; `bert` families are `"embedding"`).

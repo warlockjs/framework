@@ -25,6 +25,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Changed
 
 - `FinishReason` has a new member, `"tool_stop"`, set by the agent on a trip that a stop rule ended. Code that switches exhaustively on `LLMTrip.finishReason` should handle it.
+- `SDKAdapterContract.models?()` and the `ModelInfo` / `ModelKind` / `ListModelsOptions` types give every adapter one shape for a live model listing (`id`, `label`, `provider`, `kind`, and `created`, `contextWindow`, `maxOutputTokens`, `description` when the provider reports them). An adapter without a listing API has no `models` method.
+- `inferModelKind(id)` classifies a model id as chat, embedding, image, audio, moderation or other, for providers whose listing carries no modality field.
 
 ## 5.38.0 - 2026-10-25
 

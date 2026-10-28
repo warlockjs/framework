@@ -15,6 +15,8 @@ import {
   type Usage,
 } from "@warlock.js/ai";
 import { log, type Logger } from "@warlock.js/logger";
+import { assertHostedSearchSupported, requestsHostedSearch } from "./native-search";
+import { OpenAIResponsesModel } from "./responses-model";
 import type OpenAI from "openai";
 import { compatibleSearchParams, mergeProviderBody } from "./provider-options";
 import type { OpenAIModelConfig } from "./config.type";
@@ -80,6 +82,7 @@ export class OpenAIModel implements ModelContract {
   private readonly client: OpenAI;
   private readonly config: OpenAIModelConfig;
   private readonly logger: Logger = log;
+  private searchModel?: OpenAIResponsesModel;
 
   public constructor(client: OpenAI, config: OpenAIModelConfig, provider: string = "openai") {
     // `api: "responses"` belongs to `OpenAIResponsesModel`, which only the
@@ -125,6 +128,12 @@ export class OpenAIModel implements ModelContract {
    * instance's `ModelConfig` defaults for this call only.
    */
   public async complete(messages: Message[], options?: ModelCallOptions): Promise<ModelResponse> {
+    const searchRoute = this.hostedSearchRoute(options);
+
+    if (searchRoute) {
+      return searchRoute.complete(messages, options);
+    }
+
     // Per-call request/response logs are hot-path in production agents
     // — keep them at `debug` so `info` stays reserved for lifecycle
     // events (agent starting/completed, etc.). Operators who need to
@@ -213,6 +222,13 @@ export class OpenAIModel implements ModelContract {
     messages: Message[],
     options?: ModelCallOptions,
   ): AsyncIterable<ModelStreamChunk> {
+    const searchRoute = this.hostedSearchRoute(options);
+
+    if (searchRoute) {
+      yield* searchRoute.stream(messages, options);
+      return;
+    }
+
     this.logger.debug(LOG_MODULE, "request", "Starting streaming call to chat.completions", {
       model: this.name,
       messageCount: messages.length,
@@ -353,6 +369,35 @@ export class OpenAIModel implements ModelContract {
   }
 
   /**
+   * OpenAI's hosted `web_search` tool exists only on the Responses API, and
+   * Chat Completions answers it with a 400. When a call on the direct
+   * `"openai"` provider carries it, the call is served by the Responses
+   * adapter instead (same client, same pricing, same model name), unless the
+   * model was pinned to `api: "chat"` or cannot search at all: both throw a
+   * clear error before any request, never a silent fallback to something
+   * else. Every other call stays on Chat Completions.
+   */
+  private hostedSearchRoute(
+    options: ModelCallOptions | undefined,
+  ): OpenAIResponsesModel | undefined {
+    if (this.provider !== "openai" || !requestsHostedSearch(options, this.provider)) {
+      return undefined;
+    }
+
+    if (this.config.api === "chat") {
+      throw new InvalidRequestError(
+        `OpenAI's hosted web_search tool needs the Responses API, but "${this.name}" is pinned to api: "chat". Remove api: "chat" (the call is then routed to the Responses API) or use api: "responses".`,
+        { context: { provider: this.provider, model: this.name, api: "chat", tool: "web_search" } },
+      );
+    }
+
+    assertHostedSearchSupported(this.name, options);
+    this.searchModel ??= new OpenAIResponsesModel(this.client, this.config, this.provider);
+
+    return this.searchModel;
+  }
+
+  /**
    * Spread-friendly `tools` fragment: the function tools, then the
    * provider-defined entries whose `provider` equals this model's
    * provider label (`"openai"`, or the vendor label an OpenAI-compatible
@@ -397,7 +442,7 @@ export class OpenAIModel implements ModelContract {
       )
     ) {
       throw new InvalidRequestError(
-        "xAI native web_search / x_search requires POST /v1/responses. XaiSDK currently supports Chat Completions only; use xAI's Responses API with the vendor SDK for native search.",
+        "xAI native web_search / x_search requires POST /v1/responses. Build the model with XaiSDK from @warlock.js/ai-xai, which routes those calls to the Responses API.",
       );
     }
     const mapped = [
