@@ -175,6 +175,15 @@ export type ToolRequestContext = {
 };
 
 /**
+ * Per-call rule for {@link ToolConfig.endsTurn}. Declared with method
+ * syntax so tools with different input/output types stay assignable to
+ * `ToolContract<unknown, unknown>`.
+ */
+export type EndsTurnRule<TInput, TOutput> = {
+  bivarianceHack(call: { input: TInput; output: TOutput }): boolean;
+}["bivarianceHack"];
+
+/**
  * Contract that every tool must implement.
  * Tools are callable functions exposed to the LLM during agent execution.
  *
@@ -243,7 +252,7 @@ export interface ToolConfig<TInput = unknown, TOutput = unknown> {
    * @example
    * tool({ name: "park", endsTurn: ({ output }) => output.parked, execute: park });
    */
-  endsTurn?: boolean | ((call: { input: TInput; output: TOutput }) => boolean);
+  endsTurn?: boolean | EndsTurnRule<TInput, TOutput>;
   /**
    * Development-time schema check of this definition (see
    * `describeToolSchema`). `ai.tool()` logs one warning per definition when

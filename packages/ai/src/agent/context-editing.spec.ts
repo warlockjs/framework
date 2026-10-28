@@ -55,7 +55,12 @@ describe("clearOldToolResults", () => {
   it("skips excluded tools and a custom placeholder applies", async () => {
     const messages = history(4);
 
-    await clearOldToolResults({ keep: 1, exclude: ["plan"], placeholder: "[gone]" }, messages, {}, 0);
+    await clearOldToolResults(
+      { keep: 1, exclude: ["plan"], placeholder: "[gone]" },
+      messages,
+      {},
+      0,
+    );
 
     const tools = messages.filter((message) => message.role === "tool");
 
@@ -70,7 +75,9 @@ describe("clearOldToolResults", () => {
   it("waits for afterTokens", async () => {
     const messages = history(5);
 
-    expect(await clearOldToolResults({ keep: 1, afterTokens: 100_000 }, messages, {}, 0)).toBeUndefined();
+    expect(
+      await clearOldToolResults({ keep: 1, afterTokens: 100_000 }, messages, {}, 0),
+    ).toBeUndefined();
     expect(messages.some((message) => message.content === DEFAULT_CLEARED_TOOL_RESULT)).toBe(false);
 
     const record = await clearOldToolResults({ keep: 1, afterTokens: 50 }, messages, {}, 0);
@@ -80,8 +87,18 @@ describe("clearOldToolResults", () => {
 
   it("uses a custom token counter", async () => {
     const messages = history(3);
-    const never = await clearOldToolResults({ keep: 0, afterTokens: 10, countTokens: () => 5 }, messages, {}, 0);
-    const always = await clearOldToolResults({ keep: 0, afterTokens: 10, countTokens: () => 50 }, messages, {}, 0);
+    const never = await clearOldToolResults(
+      { keep: 0, afterTokens: 10, countTokens: () => 5 },
+      messages,
+      {},
+      0,
+    );
+    const always = await clearOldToolResults(
+      { keep: 0, afterTokens: 10, countTokens: () => 50 },
+      messages,
+      {},
+      0,
+    );
 
     expect(never).toBeUndefined();
     expect(always?.clearedResults).toBe(3);
@@ -160,7 +177,9 @@ describe("agent contextEditing", () => {
       clearToolResults: { keep: 1, afterTokens: 500, exclude: ["plan"] },
     });
     expect(
-      lastCall.messages.filter((m) => m.role === "tool").every((m) => m.content?.includes("big-result-")),
+      lastCall.messages
+        .filter((m) => m.role === "tool")
+        .every((m) => String(m.content).includes("big-result-")),
     ).toBe(true);
   });
 
@@ -183,14 +202,16 @@ describe("agent contextEditing", () => {
     const lastCall = model.callHistory.at(-1)!;
 
     expect(lastCall.options?.contextEditing).toBeUndefined();
-    expect(lastCall.messages.find((m) => m.role === "tool")?.content).toBe(DEFAULT_CLEARED_TOOL_RESULT);
+    expect(lastCall.messages.find((m) => m.role === "tool")?.content).toBe(
+      DEFAULT_CLEARED_TOOL_RESULT,
+    );
   });
 
   it("rejects an invalid rule when the agent is created", () => {
     const model = MockSDK({ responses: [{ content: "x" }] }).model({ name: "m" });
 
-    expect(() =>
-      agent({ model, contextEditing: { clearToolResults: { keep: -1 } } }),
-    ).toThrow(AgentExecutionError);
+    expect(() => agent({ model, contextEditing: { clearToolResults: { keep: -1 } } })).toThrow(
+      AgentExecutionError,
+    );
   });
 });

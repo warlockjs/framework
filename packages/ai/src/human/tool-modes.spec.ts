@@ -9,13 +9,13 @@ import { humanApproval } from "./human-approval";
 function context(
   toolName: string,
   input: unknown = {},
-  sessionId: string | undefined = "s1",
+  sessionId: string | null = "s1",
 ): MiddlewareToolContext {
   return {
     agent: { name: "support", isAnonymous: false },
     model: { name: "mock-model" },
     input: "go",
-    options: sessionId ? { sessionId } : undefined,
+    options: sessionId !== null ? { sessionId } : undefined,
     state: new Map<string, unknown>(),
     tripIndex: 0,
     messages: [],
@@ -125,8 +125,8 @@ describe("humanApproval — remember for the session", () => {
     expect(approve).toHaveBeenCalledTimes(2);
 
     const noSession = humanApproval({ tools: { t: "ask" }, remember: true, handler: approve });
-    await run(noSession, context("t", {}, undefined));
-    await run(noSession, context("t", {}, undefined));
+    await run(noSession, context("t", {}, null));
+    await run(noSession, context("t", {}, null));
     expect(approve).toHaveBeenCalledTimes(4);
 
     const reject = vi.fn((): ApprovalDecision => ({ type: "reject", reason: "no" }));
