@@ -142,3 +142,79 @@ describe("guardian reply order", () => {
     },
   );
 });
+
+describe("sampling a process that is exiting", () => {
+  const fake = (real: identities.Identity) => ({ ...real, token: undefined });
+  async function run(freshStaysMismatched: boolean) {
+    const directory = await mkdtemp(path.join(tmpdir(), "warlock-exit-"));
+    const original = identities.identity;
+    let armed = false;
+    const instance = supervisor({
+      owner: "example-app",
+      registry: path.join(directory, "registry.json"),
+      pollIntervalMs: 20,
+      stopGraceMs: 40,
+      cgroupRoot: path.join(directory, "none"),
+    });
+    const spy = vi
+      .spyOn(identities, "identity")
+      .mockImplementation(async (pid, token, expected, observation) => {
+        const real = await original(pid, token, expected, observation);
+        // Stale snapshot reads (polling) see a listed process without its token.
+        if (armed && real && token && (freshStaysMismatched || observation?.maxAgeMs !== undefined))
+          return fake(real);
+        return real;
+      });
+    try {
+      const handle = await instance.spawn({
+        kind: "worker",
+        command: process.execPath,
+        args: ["-e", "setTimeout(() => {}, 600)"],
+      });
+      armed = true;
+      handle.stdout.resume();
+      handle.stderr.resume();
+      const outcome = await Promise.race([
+        handle.exited.then(
+          () => "exited",
+          (error: unknown) =>
+            error instanceof identities.ProcessNotOwnedError ? "not-owned" : "other",
+        ),
+        new Promise((resolve) => setTimeout(() => resolve("running"), 300)),
+      ]);
+      return { outcome, handle };
+    } finally {
+      spy.mockRestore();
+      await instance.stopAll().catch(() => undefined);
+      await rm(directory, { recursive: true, force: true });
+    }
+  }
+
+  it.runIf(process.platform === "linux")(
+    "re-reads fresh before calling a stale mismatch a failure",
+    async () => {
+      expect((await run(false)).outcome).toBe("running");
+    },
+  );
+
+  it.runIf(process.platform === "linux")(
+    "still reports a live process whose identity really differs",
+    async () => {
+      expect((await run(true)).outcome).toBe("not-owned");
+    },
+  );
+});
+
+describe.runIf(process.platform === "win32")("real Windows helper output shape", () => {
+  it("returns zero, one and many rows", async () => {
+    const helper = new helpers.WindowsProcessHelper();
+    try {
+      expect(await helper.query([2_000_000_000])).toHaveLength(0);
+      const one = await helper.query([process.pid]);
+      expect(one.map((row) => row.pid)).toEqual([process.pid]);
+      expect((await helper.query([], true)).length).toBeGreaterThan(2);
+    } finally {
+      await helper.close();
+    }
+  }, 60_000);
+});

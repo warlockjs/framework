@@ -301,7 +301,17 @@ export function supervisor(options: SupervisorOptions): ProcessSupervisor {
       sampling = true;
       try {
         const entry = running.entry;
-        const current = await identity(entry.pid, true, entry.token, polling());
+        let current = await identity(entry.pid, true, entry.token, polling());
+        const matches = (value: typeof current) =>
+          value?.start === entry.start && value.token === entry.token && value.group === entry.pid;
+        // A snapshot taken while the process was exiting can still list it after
+        // its guardian is gone. Before calling a mismatch a failure, read fresh
+        // (no snapshot) a few times; a process that vanished simply exited.
+        for (let attempt = 0; current && !matches(current) && attempt < 3; attempt++) {
+          if (running.finished) return;
+          await delay(50);
+          current = await identity(entry.pid, true, entry.token, observe());
+        }
         if (running.finished) return;
         if (
           current?.start !== entry.start ||
