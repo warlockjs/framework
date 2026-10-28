@@ -11,6 +11,7 @@ export { file as snapshotFile, type FileSnapshotStoreOptions } from "./file";
 export {
   sqlite as snapshotSqlite,
   type SqliteDatabaseLike,
+  type SqliteSnapshotStore,
   type SqliteSnapshotStoreOptions,
   type SqliteStatementLike,
 } from "./sqlite";

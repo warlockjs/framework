@@ -135,6 +135,17 @@ describe("owned app fixture", () => {
     expect(env.NODE_OPTIONS).toBeUndefined();
   });
 
+  it("gives Windows programs an owned app-data folder instead of the user's", () => {
+    vi.stubEnv("LOCALAPPDATA", "C:\\Users\\someone\\AppData\\Local");
+    vi.stubEnv("ProgramFiles", "C:\\Program Files");
+    const env = isolatedEnvironment("/owned", {}, [], "win32");
+    expect(env.LOCALAPPDATA).toContain("owned");
+    expect(env.LOCALAPPDATA).not.toContain("someone");
+    expect(env.APPDATA).toContain("owned");
+    expect(env.ProgramFiles).toBe("C:\\Program Files");
+    expect(isolatedEnvironment("/owned", {}, [], "linux").LOCALAPPDATA).toBeUndefined();
+  });
+
   it("requires the recorded unique owner path, rather than a process name or port", () => {
     expect(commandLineOwns("node\0/owned/owner-unique.mjs\0", "/owned/owner-unique.mjs")).toBe(
       true,

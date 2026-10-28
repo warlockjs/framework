@@ -1,0 +1,90 @@
+name: Windows
+
+# Runs the unit suites of the packages Windows apps depend on, on a Windows
+# runner: fs, process, core, web and ai.
+#
+# This is a separate workflow, not a job of ci.yml, so a red Windows run does
+# not turn the main CI result red while Windows support is being brought up.
+# Once it is stable, add it to branch protection or fold it into ci.yml.
+#
+# What does not run here, and why:
+#  - Redis-backed specs (queue, cache, rate limit, throttle): GitHub's Windows
+#    runners cannot run service containers, so WARLOCK_REDIS_INTEGRATION and
+#    QUEUE_REDIS_* are left unset and those specs skip themselves.
+#  - Mongo-backed specs: same reason, no service container on Windows.
+#  - Typecheck: platform independent and already covered on Linux.
+# Specs that need symlinks create directory links as junctions, which work
+# without privileges, and skip file-symlink cases when the runner refuses them.
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: "24"
+  PNPM_VERSION: "11.24.0"
+
+jobs:
+  package:
+    name: ${{ matrix.package }} (Windows)
+    # Same rule as ci.yml: nightly runs wait until the repository is public.
+    if: github.event_name != 'schedule' || !github.event.repository.private
+    runs-on: windows-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        package: [fs, process, core, web, ai]
+    env:
+      CI: "1"
+      NO_COLOR: "1"
+    defaults:
+      run:
+        shell: bash
+        working-directory: packages/${{ matrix.package }}
+    steps:
+      # The repository stores files byte for byte (.gitattributes: `* -text`),
+      # so keep git from translating line endings on this checkout too.
+      - name: Keep line endings as committed
+        shell: bash
+        working-directory: .
+        run: git config --global core.autocrlf false
+
+      # Temp folders created by the specs. The runner's default temp folder is an 8.3 short path
+      # (C:\Users\RUNNER~1\...) on a different drive from the checkout; Vite, vitest and libvips
+      # compare such paths with their long spelling, which fails unrelated specs. RUNNER_TEMP sits
+      # beside the checkout.
+      - name: Use a temp folder beside the checkout
+        shell: bash
+        working-directory: .
+        run: |
+          echo "TEMP=$RUNNER_TEMP" >> "$GITHUB_ENV"
+          echo "TMP=$RUNNER_TEMP" >> "$GITHUB_ENV"
+
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install
+        working-directory: .
+        run: pnpm install --frozen-lockfile
+
+      - name: Test
+        run: pnpm run test

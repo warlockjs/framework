@@ -1,3 +1,4 @@
+import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { WarlockError } from "../errors/warlock-error";
 
@@ -116,7 +117,10 @@ function callerFile(): string | null {
       }
     }
 
-    if (file === ownFile || file.startsWith("node:")) continue;
+    // Stack frames use forward slashes on Windows; `ownFile` uses backslashes.
+    if (file.startsWith("node:") || (ownFile && path.normalize(file) === path.normalize(ownFile))) {
+      continue;
+    }
 
     return file;
   }

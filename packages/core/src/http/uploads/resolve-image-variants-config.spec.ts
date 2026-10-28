@@ -140,33 +140,41 @@ describe("cache directory resolution on disk", () => {
     await fs.rm(workspace, { recursive: true, force: true });
   });
 
-  it("reports a cache directory beneath a regular file as a configuration error", async () => {
-    const file = path.join(workspace, "not-a-directory");
-    await fs.writeFile(file, "plain file");
-    const images = { variants: { thumb: { width: 10 } }, cacheDirectory: path.join(file, "cache") };
+  // Windows reports ENOENT, not ENOTDIR, for a path that runs through a file, so the problem is only
+  // found at the first write there.
+  it.skipIf(process.platform === "win32")(
+    "reports a cache directory beneath a regular file as a configuration error",
+    async () => {
+      const file = path.join(workspace, "not-a-directory");
+      await fs.writeFile(file, "plain file");
+      const images = {
+        variants: { thumb: { width: 10 } },
+        cacheDirectory: path.join(file, "cache"),
+      };
 
-    const thrown = (() => {
-      try {
-        resolveImageVariantsConfig(images, disk);
-      } catch (error) {
-        return error;
-      }
-    })();
-    expect(thrown).toBeInstanceOf(ImageVariantsConfigError);
-    expect((thrown as Error).message).toMatch(
-      /could not be resolved: .*not-a-directory.*\(ENOTDIR\)/,
-    );
-    expect(((thrown as Error).cause as NodeJS.ErrnoException).code).toBe("ENOTDIR");
+      const thrown = (() => {
+        try {
+          resolveImageVariantsConfig(images, disk);
+        } catch (error) {
+          return error;
+        }
+      })();
+      expect(thrown).toBeInstanceOf(ImageVariantsConfigError);
+      expect((thrown as Error).message).toMatch(
+        /could not be resolved: .*not-a-directory.*\(ENOTDIR\)/,
+      );
+      expect(((thrown as Error).cause as NodeJS.ErrnoException).code).toBe("ENOTDIR");
 
-    config.set("uploads.images", images);
-    const purge = purgeImageVariants().then(
-      () => undefined,
-      (error: unknown) => error,
-    );
-    const purgeError = await purge;
-    expect(purgeError).toBeInstanceOf(ImageVariantsConfigError);
-    expect(((purgeError as Error).cause as NodeJS.ErrnoException).code).toBe("ENOTDIR");
-  });
+      config.set("uploads.images", images);
+      const purge = purgeImageVariants().then(
+        () => undefined,
+        (error: unknown) => error,
+      );
+      const purgeError = await purge;
+      expect(purgeError).toBeInstanceOf(ImageVariantsConfigError);
+      expect(((purgeError as Error).cause as NodeJS.ErrnoException).code).toBe("ENOTDIR");
+    },
+  );
 
   it("resolves each path once for repeated resolutions of the same configuration", () => {
     const images = {

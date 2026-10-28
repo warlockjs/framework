@@ -31,7 +31,7 @@ beforeAll(async () => {
   );
   const scope = path.join(fixture, "node_modules/@warlock.js");
   await mkdir(scope, { recursive: true });
-  await symlink(CORE_ROOT, path.join(scope, "core"), "dir");
+  await symlink(CORE_ROOT, path.join(scope, "core"), "junction");
 });
 
 afterAll(async () => {

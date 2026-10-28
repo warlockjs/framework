@@ -103,6 +103,8 @@ const store = ai.snapshot.sqlite({ database: new Database("./data/agent.db") });
 
 Both serve every snapshot consumer: `durable` agents and planners, workflow and supervisor snapshots, and [`ai.session()`](/v/latest/ai/agents/conversation-sessions/) conversations. Both are single-host: several processes on one file race at write time, so give each process its own store or use `pg` / `redis`.
 
+A `sqlite({ path })` store keeps its database file open until you call `await store.close()`; do that before deleting or moving the file, because Windows refuses to delete an open file. A database you pass as `database` is yours to close.
+
 ### Local file permissions
 
 On POSIX, file snapshots default to `dirMode: 0o700` and `fileMode: 0o600`. Every directory the store creates uses `dirMode` (subject to umask). Existing directories, including user-created parents, are never chmod-ed. The temporary JSON file is created with `fileMode`, then chmod-ed before atomic rename so each saved file has exactly that mode, even on rewrite or under a restrictive umask. Files written before this change become private when rewritten; untouched files keep their old permissions.

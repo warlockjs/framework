@@ -109,7 +109,9 @@ export function collectFiles(cwd: string, warnings: InspectWarning[] = []): Insp
   } catch (error) {
     warnings.push({ code: null, source: "tsconfig.json", message: String(error) });
   }
-  const probe = (base: string): string | undefined => {
+  const probe = (requested: string): string | undefined => {
+    // `resolvePathAlias` returns forward slashes on Windows; the scanned set holds native paths.
+    const base = path.normalize(requested);
     const extension = path.extname(base);
     const stem = /\.[cm]?jsx?$/.test(extension) ? base.slice(0, -extension.length) : base;
     const candidates = stem !== base ? EXTENSIONS.map((ext) => stem + ext) : [];

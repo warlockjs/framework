@@ -4,6 +4,12 @@ All notable changes to `@warlock.js/ai` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.40.0 - 2026-10-28
+
+### Added
+
+- `ai.snapshot.sqlite({ path })` stores have a `close()` method that closes the database file the store opened. Call it before deleting or moving the file: Windows refuses to delete a file that is still open. A database passed as `database` is never closed by the store. The store reopens on its next call.
+
 ## 5.38.0 - 2026-10-25
 
 ### Added

@@ -16,7 +16,9 @@ describe("native compiler adapter", () => {
       { code: 2322, line: 2, column: 4, message: "Wrong type.\n  Details." },
       { code: 18003, line: 1, column: 1, message: "No inputs." },
     ]);
-    expect(diagnostics[0]?.fileName).toContain("C:/app/file.ts");
+    expect(path.normalize(diagnostics[0]?.fileName ?? "")).toContain(
+      path.normalize("C:/app/file.ts"),
+    );
   });
   it("updates one session from unsaved source and preserves diagnostic columns after Unicode", () => {
     const root = mkdtempSync(path.join(tmpdir(), "warlock-native-compiler-"));

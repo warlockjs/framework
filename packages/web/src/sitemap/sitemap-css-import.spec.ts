@@ -2,14 +2,19 @@ import { spawn } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { createRequire } from "node:module";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = path.resolve(here, "../../../..");
 const coreSource = path.join(repositoryRoot, "packages/core/src");
 const webSource = path.join(repositoryRoot, "packages/web/src");
-const tsx = path.join(repositoryRoot, "node_modules/.bin/tsx");
+// Run node with the tsx loader: the `.bin/tsx` shim is a `.cmd` file on Windows and cannot be
+// spawned directly.
+const tsxLoader = pathToFileURL(
+  createRequire(path.join(repositoryRoot, "package.json")).resolve("tsx"),
+).href;
 
 const directories: string[] = [];
 
@@ -39,11 +44,11 @@ function discoverInNode(appRoot: string): Promise<{ code: number | null; output:
     "discover.mts",
     `
     process.chdir(${JSON.stringify(appRoot)});
-    const { filesOrchestrator } = await import(${JSON.stringify(path.join(coreSource, "dev-server/files-orchestrator.ts"))});
-    const { warlockConfigManager } = await import(${JSON.stringify(path.join(coreSource, "warlock-config/warlock-config.manager.ts"))});
+    const { filesOrchestrator } = await import(${JSON.stringify(pathToFileURL(path.join(coreSource, "dev-server/files-orchestrator.ts")).href)});
+    const { warlockConfigManager } = await import(${JSON.stringify(pathToFileURL(path.join(coreSource, "warlock-config/warlock-config.manager.ts")).href)});
     await warlockConfigManager.load();
     await filesOrchestrator.init();
-    const { listRoutablePages } = await import(${JSON.stringify(path.join(webSource, "build/list-routable-pages.ts"))});
+    const { listRoutablePages } = await import(${JSON.stringify(pathToFileURL(path.join(webSource, "build/list-routable-pages.ts")).href)});
     const pages = await listRoutablePages({ appRoot: ${JSON.stringify(appRoot)} });
     console.log("PAGES:" + JSON.stringify(pages.map((page) => [page.routePath, typeof page.sitemap])));
     process.exit(0);
@@ -51,7 +56,7 @@ function discoverInNode(appRoot: string): Promise<{ code: number | null; output:
   );
 
   return new Promise((resolve, reject) => {
-    const child = spawn(tsx, [script], {
+    const child = spawn(process.execPath, ["--import", tsxLoader, script], {
       cwd: appRoot,
       env: { ...process.env, NODE_ENV: "test" },
       stdio: ["ignore", "pipe", "pipe"],

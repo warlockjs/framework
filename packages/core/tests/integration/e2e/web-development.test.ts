@@ -1,4 +1,5 @@
-import { mkdir, mkdtemp, readdir, rm, symlink, writeFile } from "node:fs/promises";
+import { linkNodeModules } from "../../test-support/link-node-modules";
+import { mkdir, mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -29,11 +30,7 @@ it.each(["shared", "identifiers"])(
             "const Form = 'form';",
           );
     try {
-      await symlink(
-        join(workspace, "packages/web/node_modules"),
-        join(source, "node_modules"),
-        "dir",
-      );
+      linkNodeModules(join(workspace, "packages/web/node_modules"), join(source, "node_modules"));
       const paths: Record<string, string[]> = {};
       const aliases: { find: string; replacement: string }[] = [];
       for (const name of await readdir(join(workspace, "packages"))) {

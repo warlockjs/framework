@@ -11,11 +11,11 @@ import {
 } from "./pm2-config";
 
 const input: Pm2AppInput = {
-  root: "/srv/store",
+  root: path.resolve("/srv/store"),
   project: "@example/store",
   app: { appName: "api" },
   environment: "production",
-  entryPath: "/srv/store/output/server.mjs",
+  entryPath: path.resolve("/srv/store", "output/server.mjs"),
   sourcemap: true,
   http: { host: "0.0.0.0", port: 8080 },
 };

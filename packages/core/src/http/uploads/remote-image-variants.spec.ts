@@ -140,7 +140,8 @@ describe("remote disk image variants", () => {
   it("renders a non-default disk, reuses derivatives, and invalidates rewritten bytes without metadata", async () => {
     const input = { disk: "cloud", path: "photo.png", variant: "thumb", format: "webp" as const };
     const first = (await resolveImageVariant(input))!;
-    expect(await sharp(first.absolutePath).metadata()).toMatchObject({
+    // From a buffer: sharp keeps a file it opened locked on Windows, which blocks the purge below.
+    expect(await sharp(await fs.readFile(first.absolutePath)).metadata()).toMatchObject({
       width: 16,
       height: 8,
       format: "webp",

@@ -105,7 +105,7 @@ export async function createCandidate(
     if (context.config.linkNodeModules) {
       const modules = path.join(context.root, "node_modules");
 
-      if (await exists(modules)) await symlink(modules, path.join(source, "node_modules"), "dir");
+      if (await exists(modules)) await symlink(modules, path.join(source, "node_modules"), "junction");
     }
 
     let lockfile: ReleaseManifest["lockfile"] = null;

@@ -2,7 +2,7 @@ import fs from "node:fs/promises";
 import { createRequire } from "node:module";
 import os from "node:os";
 import path from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { build } from "esbuild";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { FileManager } from "../file-manager";
@@ -272,7 +272,9 @@ describe("Oxlint background file checks", () => {
     async (code) => {
       const longPath = `src/${"long-".repeat(6_000)}.ts`;
       const execute = vi.fn(async (_binary: string, args: string[]) => {
-        if (args.includes(longPath)) throw Object.assign(new Error("spawn failed"), { code });
+        // Arguments are relative to cwd in the platform's own spelling (backslashes on Windows).
+        if (args.some((arg) => arg.length === longPath.length))
+          throw Object.assign(new Error("spawn failed"), { code });
         return emptyReport();
       });
       const files = ["src/a.ts", longPath, "src/b.ts"].map((relativePath) => ({
@@ -537,7 +539,9 @@ describe("Oxlint background file checks", () => {
       let baseUrl = import.meta.url;
       if (mode === "published") {
         await build({
-          entryPoints: [new URL("./workers/oxlint-health.worker.ts", import.meta.url).pathname],
+          entryPoints: [
+            fileURLToPath(new URL("./workers/oxlint-health.worker.ts", import.meta.url)),
+          ],
           outfile: path.join(cwd, "compiled-worker.mjs"),
           bundle: true,
           platform: "node",

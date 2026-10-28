@@ -154,7 +154,8 @@ export function render(Provider, Page, locale) {
         const delay = Math.max(0, 150 - (Date.now() - lastEdit));
         if (delay) await new Promise<void>((resolve) => setTimeout(resolve, delay));
         lastEdit = Date.now();
-        const expected = new Set([localeFile, pageFile]);
+        // Vite reports forward-slash paths on Windows; compare in one spelling.
+        const expected = new Set([localeFile, pageFile].map((file) => path.normalize(file)));
         const observed = new Promise<void>((resolve, reject) => {
           const timeout = setTimeout(() => {
             listeners.delete(listener);
@@ -165,7 +166,7 @@ export function render(Provider, Page, locale) {
             );
           }, 8_000);
           const listener = (file: string) => {
-            expected.delete(file);
+            expected.delete(path.normalize(file));
             if (expected.size === 0) {
               clearTimeout(timeout);
               listeners.delete(listener);

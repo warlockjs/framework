@@ -61,6 +61,19 @@ export function runCompiler(cwd: string, args: string[]) {
   return { diagnostics, output, status: result.status, pid: result.pid };
 }
 
+/**
+ * A path from the native compiler in the host's own spelling: native separators and, on Windows,
+ * an upper-case drive letter (the compiler may report either case), so it compares equal to the
+ * output of `path.resolve`.
+ */
+export function nativePath(file: string): string {
+  const normalized = path.normalize(file);
+
+  return /^[a-z]:/.test(normalized)
+    ? normalized[0].toUpperCase() + normalized.slice(1)
+    : normalized;
+}
+
 export type SourceUpdate = { path: string; content: string };
 
 /** One native server per dev session; snapshots retain the configured declaration roots. */
@@ -111,31 +124,52 @@ export class CompilerSession {
   }
 
   get fileNames(): readonly string[] {
-    return this.snapshot.getProject(this.configPath)?.program.getSourceFileNames() ?? [];
+    // The native API reports forward-slash paths on Windows; callers compare with `path` output.
+    return (
+      this.snapshot
+        .getProject(this.configPath)
+        ?.program.getSourceFileNames()
+        .map((file) => nativePath(file)) ?? []
+    );
   }
 
   /** Ask the checker to resolve module references using the project's actual options. */
-  importFiles(file: string): string[] {
+  importFiles(requested: string): string[] {
+    // The native API keys files by forward-slash paths, also on Windows.
+    const file = requested.replaceAll("\\", "/");
     const project = this.snapshot.getProject(this.configPath);
     if (!project?.program.getSourceFile(file)) return [];
-    const source = this.contents.get(path.resolve(file)) ?? readFileSync(file, "utf8");
+    const source = this.contents.get(path.resolve(requested)) ?? readFileSync(requested, "utf8");
+    // On Windows the checker reports declaration paths in lower case; map them back to the
+    // spelling of the project's file list so callers can compare them with `path.resolve` output.
+    const spelled =
+      process.platform === "win32"
+        ? new Map(this.fileNames.map((name) => [name.toLowerCase(), name]))
+        : undefined;
     return importSpecifiers(file, source).flatMap((imported) => {
       const symbol = project.checker.getSymbolAtPosition(file, imported.node.start + 1);
-      return symbol?.declarations.map((declaration) => declaration.path) ?? [];
+      return (
+        symbol?.declarations.map((declaration) => {
+          const resolved = nativePath(declaration.path);
+          return spelled?.get(resolved.toLowerCase()) ?? resolved;
+        }) ?? []
+      );
     });
   }
 
-  diagnostics(file: string): CompilerDiagnostic[] {
+  diagnostics(requested: string): CompilerDiagnostic[] {
+    const file = requested.replaceAll("\\", "/");
     const program = this.snapshot.getProject(this.configPath)?.program;
     if (!program?.getSourceFile(file)) return [];
     return [...program.getSyntacticDiagnostics(file), ...program.getSemanticDiagnostics(file)]
       .filter((diagnostic) => diagnostic.category === 1 || diagnostic.category === 0)
       .map((diagnostic) => {
-        const content = this.contents.get(path.resolve(file)) ?? readFileSync(file, "utf8");
+        const content =
+          this.contents.get(path.resolve(requested)) ?? readFileSync(requested, "utf8");
         const before = content.slice(0, Math.max(0, diagnostic.pos));
         const lines = before.split("\n");
         return {
-          fileName: diagnostic.fileName,
+          fileName: nativePath(diagnostic.fileName),
           code: diagnostic.code,
           message: diagnostic.text,
           severity: diagnostic.category === 1 ? "error" : "warning",

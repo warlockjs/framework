@@ -752,7 +752,7 @@ describe.skipIf(!sharpAvailable)("uploadedFileController — variants", () => {
     const files = listFiles(cacheDirectory);
 
     expect(files).toHaveLength(1);
-    expect(files.filter((file) => file.includes(".tmp-"))).toEqual([]);
+    expect(files.filter((file) => file.includes(".tmp"))).toEqual([]);
   });
 
   it("returns a bare 500, and leaves no .tmp- or final file, when generation fails", async () => {

@@ -1,3 +1,4 @@
+import { pathToFileURL } from "node:url";
 import { createJsonRpcClient, type JsonRpcClientHandle } from "@warlock.js/ai-tools";
 import { createRequire } from "node:module";
 import path from "node:path";
@@ -217,7 +218,7 @@ describe("warlock mcp over stdio", () => {
     const client = createJsonRpcClient({
       type: "stdio",
       command: process.execPath,
-      args: ["--import", tsx, path.join(here, "__fixtures__/stdio-server.ts")],
+      args: ["--import", pathToFileURL(tsx).href, path.join(here, "__fixtures__/stdio-server.ts")],
     });
 
     clients.push(client);

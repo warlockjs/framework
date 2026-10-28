@@ -72,7 +72,7 @@ describe("warlock issue environment", () => {
     symlinkSync(
       path.join(fixture, "linked-package"),
       path.join(fixture, "node_modules/@warlock.js/web"),
-      "dir",
+      "junction",
     );
     install("typescript", "7.0.2");
     write("node_modules/@warlock.js/broken/package.json", "{broken");
