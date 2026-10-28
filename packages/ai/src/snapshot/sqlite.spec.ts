@@ -49,6 +49,8 @@ describe("ai.snapshot.sqlite", () => {
 
       const reopened = sqlite<Snapshot>({ path, table: "snapshots" });
       expect(await reopened.load("session:chat")).toEqual({ runId: "session:chat", value: 3 });
+      await store.close();
+      await reopened.close();
     },
   );
 

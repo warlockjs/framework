@@ -29,6 +29,17 @@ export type SqliteStatementLike = {
 export type SqliteDatabaseLike = {
   exec(sql: string): unknown;
   prepare(sql: string): SqliteStatementLike;
+  close?(): unknown;
+};
+
+/** A SQLite snapshot store; `close()` releases the database file the store opened itself. */
+export type SqliteSnapshotStore<TSnapshot extends { runId: string }> = SnapshotStore<TSnapshot> & {
+  /**
+   * Close the database the store opened from `path`. A database passed as `database` stays open:
+   * it belongs to the caller. Needed before deleting the file on Windows, which refuses to delete
+   * an open file. The store reopens on the next call.
+   */
+  close(): Promise<void>;
 };
 
 /**
@@ -61,7 +72,7 @@ type SnapshotRow = { payload: string };
  * snapshot. Writes are a single `INSERT … ON CONFLICT DO UPDATE`, so a save
  * is atomic. The database opens lazily on the first call.
  */
-class SqliteSnapshotStore<TSnapshot extends { runId: string }> implements SnapshotStore<TSnapshot> {
+class SqliteStore<TSnapshot extends { runId: string }> implements SqliteSnapshotStore<TSnapshot> {
   private database?: Promise<SqliteDatabaseLike>;
 
   public constructor(
@@ -104,6 +115,16 @@ class SqliteSnapshotStore<TSnapshot extends { runId: string }> implements Snapsh
     return rows
       .map((row) => row.run_id)
       .filter((runId) => prefix === undefined || runId.startsWith(prefix));
+  }
+
+  public async close(): Promise<void> {
+    const opening = this.database;
+
+    this.database = undefined;
+
+    if (!opening || this.options.database) return;
+
+    (await opening.catch(() => undefined))?.close?.();
   }
 
   public schema(): string {
@@ -190,7 +211,7 @@ async function openBuiltin(path: string): Promise<SqliteDatabaseLike> {
  */
 export function sqlite<TSnapshot extends { runId: string } = SupervisorSnapshot>(
   options: SqliteSnapshotStoreOptions,
-): SnapshotStore<TSnapshot> {
+): SqliteSnapshotStore<TSnapshot> {
   if (!options || (options.database === undefined && !options.path)) {
     throw new Error("SQLite snapshot store requires a 'path' or an open 'database'.");
   }
@@ -210,5 +231,5 @@ export function sqlite<TSnapshot extends { runId: string } = SupervisorSnapshot>
     );
   }
 
-  return new SqliteSnapshotStore<TSnapshot>(options, table);
+  return new SqliteStore<TSnapshot>(options, table);
 }

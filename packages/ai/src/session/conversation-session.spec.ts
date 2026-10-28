@@ -285,7 +285,7 @@ describe("ai.session", () => {
   });
 
   it("works on the SQLite store", async () => {
-    let sqliteStore: SnapshotStore<ConversationSessionRecord>;
+    let sqliteStore: ReturnType<typeof sqlite<ConversationSessionRecord>>;
     try {
       await import(/* @vite-ignore */ "node:sqlite");
       sqliteStore = sqlite<ConversationSessionRecord>({ path: join(dir, "sessions.db") });
@@ -298,8 +298,12 @@ describe("ai.session", () => {
       agent: agent({ model: scriptedModel().model }),
     });
 
-    await chat.send("hello");
-    expect(await chat.history()).toHaveLength(2);
+    try {
+      await chat.send("hello");
+      expect(await chat.history()).toHaveLength(2);
+    } finally {
+      await sqliteStore.close();
+    }
   });
 
   it("validates its configuration", () => {
