@@ -217,7 +217,13 @@ export class OwnedProcess {
     if (process.platform === "win32") {
       // Windows has no POSIX process groups. /T targets this verified PID's tree.
       // https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/taskkill
-      await utility("taskkill.exe", ["/PID", String(this.record.pid), "/T", "/F"], this.records);
+      try {
+        await utility("taskkill.exe", ["/PID", String(this.record.pid), "/T", "/F"], this.records);
+      } catch (error) {
+        // A browser's helper processes can exit between taskkill listing and ending the tree; that
+        // leaves nothing to stop. Anything else still fails, and the exit wait below still runs.
+        if (!/no running instance|not found/i.test(String(error))) throw error;
+      }
     } else {
       process.kill(-this.record.pid, "SIGTERM");
       await delay(250);

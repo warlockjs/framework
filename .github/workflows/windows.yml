@@ -102,5 +102,9 @@ jobs:
           import(pathToFileURL(path.join(t,'x.mjs')).href).catch(e=>console.log('esm failed',e.message));
           "
 
+      - name: Diagnose native compiler paths (temporary)
+        if: matrix.package == 'core'
+        run: node --import tsx windows-debug.mts
+
       - name: Test
         run: pnpm run test
