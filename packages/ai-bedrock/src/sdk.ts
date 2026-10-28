@@ -52,7 +52,7 @@ import { wrapBedrockError } from "./utils";
 export class BedrockSDK implements SDKAdapterContract {
   private readonly client: BedrockRuntimeClient;
   /** Control-plane client for `ListFoundationModels`; built on first use from the same config. */
-  private readonly controlConfig: ConstructorParameters<typeof BedrockClient>[0];
+  private readonly controlConfig: NonNullable<ConstructorParameters<typeof BedrockClient>[0]>;
   private controlClient?: BedrockClient;
   private readonly provider: string;
   private readonly pricing?: Record<string, ModelPricing>;
@@ -62,7 +62,9 @@ export class BedrockSDK implements SDKAdapterContract {
 
     const resolvedConfig = apiKey === undefined ? clientConfig : withApiKey(clientConfig, apiKey);
     this.client = new BedrockRuntimeClient(resolvedConfig);
-    this.controlConfig = resolvedConfig as ConstructorParameters<typeof BedrockClient>[0];
+    this.controlConfig = resolvedConfig as NonNullable<
+      ConstructorParameters<typeof BedrockClient>[0]
+    >;
     this.provider = provider ?? "bedrock";
     this.pricing = pricing;
   }

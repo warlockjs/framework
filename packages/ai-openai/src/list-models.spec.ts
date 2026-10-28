@@ -52,11 +52,10 @@ describe("OpenAISDK.models()", () => {
     ]);
   });
 
-  it("uses the relabelled provider and follows pagination to the end", async () => {
+  it("tags the relabelled provider and drops duplicate ids (the listing is a single page)", async () => {
     const fetch = vi
       .fn<typeof globalThis.fetch>()
-      .mockResolvedValueOnce(json({ data: [{ id: "a" }], has_more: true, last_id: "a" }))
-      .mockResolvedValueOnce(json({ data: [{ id: "a" }, { id: "b" }], has_more: false }));
+      .mockResolvedValue(json({ data: [{ id: "a" }, { id: "a" }, { id: "b" }] }));
     const models = await new OpenAISDK({ apiKey: "k", fetch, provider: "gateway" }).models();
 
     expect(models.map((model) => [model.id, model.provider])).toEqual([

@@ -23,7 +23,10 @@ import { MockTranscriptionModel } from "./mock-transcription-model";
  * const result = await model.complete([{ role: "user", content: "Hi" }]);
  * console.log(result.content); // "Hello from mock!"
  */
-export function MockSDK(config: MockSDKConfig = {}): Omit<SDKAdapterContract, "model"> & {
+export function MockSDK(config: MockSDKConfig = {}): Omit<
+  SDKAdapterContract,
+  "model" | "models"
+> & {
   /**
    * Narrower than `SDKAdapterContract.model()` on purpose — the
    * instance really is a `MockModel`, so tests can reach `.calls` /
@@ -32,7 +35,12 @@ export function MockSDK(config: MockSDKConfig = {}): Omit<SDKAdapterContract, "m
    * `MockModel` implements `ModelContract`.
    */
   model(modelConfig: ModelConfig): MockModel;
-  /** All model instances created by this SDK — for inspecting calls in tests */
+  /**
+   * All model instances created by this SDK — for inspecting calls in tests.
+   * This array is the mock's long-standing public field, so it keeps the name;
+   * the mock therefore has no live `models()` listing (the contract method is
+   * optional).
+   */
   models: MockModel[];
   /** All image-model instances created by this SDK — for inspecting calls in tests */
   imageModels: MockImageModel[];
