@@ -452,6 +452,8 @@ describe("vendor-neutral contextEditing", () => {
   });
 
   it("sends nothing without a hint", () => {
-    expect(model().buildRequest([{ role: "user", content: "hi" }]).body.context_management).toBeUndefined();
+    expect(
+      model().buildRequest([{ role: "user", content: "hi" }]).body.context_management,
+    ).toBeUndefined();
   });
 });

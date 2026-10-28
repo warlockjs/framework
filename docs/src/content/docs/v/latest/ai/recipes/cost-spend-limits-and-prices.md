@@ -55,11 +55,11 @@ const guard = ai.middleware.budget({
 
 ## Caps per run, session and caller
 
-| Cap | Option |
-| --- | --- |
-| One run | `maxCostUSD` / `maxTokens` |
-| One session (never resets) | `scoped: { key: (ctx) => ctx.options?.sessionId, window: "all", maxCostUSD, store }` |
-| One caller per day or month (UTC) | `scoped: { key: userId, window: "day" \| "month", maxCostUSD, store }` |
+| Cap                               | Option                                                                               |
+| --------------------------------- | ------------------------------------------------------------------------------------ |
+| One run                           | `maxCostUSD` / `maxTokens`                                                           |
+| One session (never resets)        | `scoped: { key: (ctx) => ctx.options?.sessionId, window: "all", maxCostUSD, store }` |
+| One caller per day or month (UTC) | `scoped: { key: userId, window: "day" \| "month", maxCostUSD, store }`               |
 
 ```ts
 const sessionCap = ai.middleware.budget({

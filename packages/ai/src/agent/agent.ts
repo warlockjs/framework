@@ -65,7 +65,12 @@ import {
   safeJsonParse,
   stampReportLineage,
 } from "../utils";
-import { clearOldToolResults, nativeContextEditingHint, resolveRule, validateContextEditing } from "./context-editing";
+import {
+  clearOldToolResults,
+  nativeContextEditingHint,
+  resolveRule,
+  validateContextEditing,
+} from "./context-editing";
 import { compactAgentMessages, isUserMessageIndex, validateCompaction } from "./compaction";
 import type { AgentCompactionRecord } from "./compaction.type";
 import type { AgentConfig } from "./agent-config.type";
