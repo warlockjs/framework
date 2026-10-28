@@ -161,6 +161,40 @@ describe("DependencyGraph — invalidation chain", () => {
 
     expect(new Set(chain)).toEqual(new Set(["a.ts", "b.ts"]));
   });
+
+  it("skips importers that reach the file only through type-only edges", () => {
+    // types.ts is imported as a type by many files; changing it re-evaluates nothing.
+    graph.addDependency("consumer.ts", "types.ts", true);
+    graph.addDependency("route.ts", "consumer.ts");
+    graph.addDependency("runtime.ts", "types.ts", false);
+
+    expect(graph.getInvalidationChain("types.ts")).toEqual(["types.ts", "runtime.ts"]);
+  });
+
+  it("keeps type-only importers when asked for full reachability", () => {
+    graph.addDependency("consumer.ts", "types.ts", true);
+
+    expect(graph.getInvalidationChain("types.ts", { includeTypeOnly: true })).toEqual([
+      "types.ts",
+      "consumer.ts",
+    ]);
+  });
+
+  it("does not reach a sibling that shares an importer with the changed file", () => {
+    graph.addDependency("barrel.ts", "a.ts");
+    graph.addDependency("barrel.ts", "b.ts");
+    graph.addDependency("page.ts", "b.ts");
+
+    expect(new Set(graph.getInvalidationChain("a.ts"))).toEqual(new Set(["a.ts", "barrel.ts"]));
+  });
+
+  it("walks a very long import chain without overflowing the stack", () => {
+    for (let index = 0; index < 20_000; index++) {
+      graph.addDependency(`f${index + 1}.ts`, `f${index}.ts`);
+    }
+
+    expect(graph.getInvalidationChain("f0.ts")).toHaveLength(20_001);
+  });
 });
 
 describe("DependencyGraph — cycle detection", () => {

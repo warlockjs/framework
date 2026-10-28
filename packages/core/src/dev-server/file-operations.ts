@@ -15,6 +15,18 @@ import { areSetsEqual } from "./utils";
  * so the orchestrator and event handler can stay declarative.
  */
 export class FileOperations {
+  /**
+   * Import-specifier index: last path segment of every relative or aliased
+   * string in a file's source, mapped to the files that mention it. Lets
+   * `reloadFilesWaitingForDependency` look up the few files that could be
+   * waiting for a new file instead of re-parsing every tracked file for each
+   * file added (quadratic on a large app's boot).
+   */
+  private readonly specifierIndex = new Map<string, Set<string>>();
+
+  /** Index keys each file contributed, so an update or delete can undo them. */
+  private readonly indexedKeys = new Map<string, Set<string>>();
+
   public constructor(
     private readonly files: Map<string, FileManager>,
     private readonly dependencyGraph: DependencyGraph,
@@ -44,6 +56,7 @@ export class FileOperations {
     this.files.set(relativePath, fileManager);
 
     await fileManager.process();
+    this.indexSource(relativePath, fileManager);
 
     for (const depPath of options.followDependencies === false ? [] : fileManager.dependencies) {
       if (!this.files.has(depPath)) {
@@ -83,6 +96,8 @@ export class FileOperations {
       const hasChanged = await fileManager.process();
       if (!hasChanged) return false;
 
+      this.indexSource(relativePath, fileManager);
+
       if (!areSetsEqual(oldDependencies, fileManager.dependencies)) {
         this.dependencyGraph.updateFile(
           relativePath,
@@ -107,6 +122,7 @@ export class FileOperations {
 
     const dependents = this.dependencyGraph.getDependents(relativePath);
 
+    this.unindexSource(relativePath);
     this.dependencyGraph.removeFile(relativePath);
     this.specialFilesCollector.removeFile(relativePath);
     this.manifest.removeFile(relativePath);
@@ -128,10 +144,23 @@ export class FileOperations {
    */
   private async reloadFilesWaitingForDependency(newFilePath: string): Promise<void> {
     const dependents: string[] = [];
+    const candidates = new Set<string>();
 
-    for (const [existingPath, existingFile] of this.files) {
+    for (const key of FileOperations.indexKeysForPath(newFilePath)) {
+      for (const candidate of this.specifierIndex.get(key) ?? []) {
+        candidates.add(candidate);
+      }
+    }
+
+    for (const existingPath of candidates) {
       if (existingPath === newFilePath) continue;
-      if (existingFile.state !== "ready") continue;
+
+      const existingFile = this.files.get(existingPath);
+      if (!existingFile || existingFile.state !== "ready") continue;
+
+      // Already resolved to the new file (the usual case while the boot scan
+      // walks imports): nothing would change by re-processing it.
+      if (existingFile.dependencies.has(newFilePath)) continue;
 
       try {
         const importMap = await parseImports(existingFile.source, existingFile.absolutePath);
@@ -160,6 +189,58 @@ export class FileOperations {
         // File still has issues — ignore.
       }
     }
+  }
+
+  /** Index keys a file at `relativePath` can be imported under. */
+  private static indexKeysForPath(relativePath: string): string[] {
+    const segments = relativePath.split("/").filter(Boolean);
+    const last = (segments.pop() ?? "").replace(/\.[^./]+$/, "");
+    const keys = [last];
+
+    // `./folder` resolves to `folder/index.ts`.
+    if (last === "index" && segments.length > 0) keys.push(segments[segments.length - 1]!);
+
+    return keys;
+  }
+
+  private indexSource(relativePath: string, fileManager: FileManager): void {
+    this.unindexSource(relativePath);
+
+    const keys = new Set<string>();
+    const literal = /["']([^"'\n]{1,300})["']/g;
+    let match: RegExpExecArray | null;
+
+    while ((match = literal.exec(fileManager.source)) !== null) {
+      const specifier = match[1]!;
+      // Relative and aliased specifiers only; bare packages never resolve to
+      // a project file.
+      if (!/^(\.|[@~#$]?[\w-]*\/)/.test(specifier) && !specifier.startsWith("@")) continue;
+
+      const segments = specifier.split("/").filter((segment) => segment && segment !== ".");
+      const last = (segments.pop() ?? "").replace(/\.[^./]+$/, "");
+      if (last && last !== "..") keys.add(last);
+    }
+
+    this.indexedKeys.set(relativePath, keys);
+
+    for (const key of keys) {
+      let paths = this.specifierIndex.get(key);
+      if (!paths) this.specifierIndex.set(key, (paths = new Set()));
+      paths.add(relativePath);
+    }
+  }
+
+  private unindexSource(relativePath: string): void {
+    const keys = this.indexedKeys.get(relativePath);
+    if (!keys) return;
+
+    for (const key of keys) {
+      const paths = this.specifierIndex.get(key);
+      paths?.delete(relativePath);
+      if (paths?.size === 0) this.specifierIndex.delete(key);
+    }
+
+    this.indexedKeys.delete(relativePath);
   }
 
   public updateFileDependents(): void {

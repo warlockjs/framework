@@ -1,4 +1,4 @@
-import { ensureDirectoryAsync } from "@warlock.js/fs";
+import { atomicWriteAsync, ensureDirectoryAsync } from "@warlock.js/fs";
 import { constants } from "fs";
 import { access, readFile, writeFile } from "fs/promises";
 import { moduleResolve } from "import-meta-resolve";
@@ -718,7 +718,7 @@ ${keyEntries}
     }
     this.manifest.lastBuildTime = Date.now();
 
-    await writeFile(this.manifestPath, JSON.stringify(this.manifest, null, 2), "utf-8");
+    await atomicWriteAsync(this.manifestPath, JSON.stringify(this.manifest, null, 2));
   }
 
   /**

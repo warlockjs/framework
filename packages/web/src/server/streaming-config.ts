@@ -9,7 +9,7 @@
  * and reads it, so the shape and the reader can never drift onto two
  * different keys.
  */
-import { config } from "@warlock.js/core";
+import { config, environment } from "@warlock.js/core";
 import type { CrawlerDetectionOptions, WebConfigurations } from "../configurations";
 
 // Compatibility exports for existing server imports. The augmentation remains
@@ -40,6 +40,15 @@ export function resolveDeferTimeoutMs(): number {
 /** Card `904a04eb`'s stated default. */
 const DEFAULT_LOADER_TIMEOUT_MS = 15_000;
 
+/**
+ * Development default. The first page after a start or a reload pays for
+ * compiling the modules its loaders import, which on a large app takes far
+ * longer than a production loader ever should; a 15 s bound turned that
+ * one-time cost into a 504 error page. An explicit `web.loaderTimeout` always
+ * wins, and production keeps {@link DEFAULT_LOADER_TIMEOUT_MS}.
+ */
+const DEFAULT_DEV_LOADER_TIMEOUT_MS = 90_000;
+
 /** Raised at request time when `web.loaderTimeout` is misconfigured. */
 export class LoaderTimeoutConfigError extends Error {
   public constructor(message: string) {
@@ -57,7 +66,9 @@ export class LoaderTimeoutConfigError extends Error {
  */
 export function resolveLoaderTimeoutMs(): number {
   const web = config.get("web", {});
-  const value = web.loaderTimeout ?? DEFAULT_LOADER_TIMEOUT_MS;
+  const value =
+    web.loaderTimeout ??
+    (environment() === "development" ? DEFAULT_DEV_LOADER_TIMEOUT_MS : DEFAULT_LOADER_TIMEOUT_MS);
 
   if (!Number.isInteger(value) || value < 0) {
     throw new LoaderTimeoutConfigError(

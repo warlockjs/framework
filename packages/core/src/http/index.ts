@@ -10,6 +10,13 @@ export * from "./error-codes";
 export * from "./events";
 export * from "./health";
 export * from "./request-controller";
+// dev hot-reload ordering: hold, drain, dispose, serve the new generation
+export {
+  reloadGate,
+  ReloadGate,
+  whenReloadSettled,
+  RELOAD_RETRY_AFTER_SECONDS,
+} from "./reload-gate";
 // core-level 4xx refusals answered by a `handlesRefusals` route
 export { refusalStatusOf } from "./refusal-dispatch";
 export * from "./uploaded-file";
