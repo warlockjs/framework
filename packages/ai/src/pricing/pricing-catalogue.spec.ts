@@ -5,7 +5,9 @@ import { BudgetExceededError } from "../errors";
 import { MockSDK } from "../mock/mock-sdk";
 import { isPricingCatalogue, pricingCatalogue } from "./pricing-catalogue";
 
-const CLAUDE = { "claude-sonnet-4-6": { input: 3, output: 15, cachedInput: 0.3, cacheWrite: 3.75 } };
+const CLAUDE = {
+  "claude-sonnet-4-6": { input: 3, output: 15, cachedInput: 0.3, cacheWrite: 3.75 },
+};
 const GPT = { "gpt-4o": { input: 2.5, output: 10 }, "claude-sonnet-4-6": { input: 1, output: 1 } };
 
 describe("pricingCatalogue", () => {
@@ -25,7 +27,9 @@ describe("pricingCatalogue", () => {
     });
 
     expect(prices.get("claude-sonnet-4-6-20250929")).toEqual({ input: 2, output: 8 });
-    expect(pricingCatalogue({ tables: [CLAUDE] }).get("claude-sonnet-4-6-2025-09-29")?.input).toBe(3);
+    expect(pricingCatalogue({ tables: [CLAUDE] }).get("claude-sonnet-4-6-2025-09-29")?.input).toBe(
+      3,
+    );
   });
 
   it("does not resolve inherited object keys", () => {

@@ -8,12 +8,12 @@ sidebar:
 
 A tool-heavy run grows with every trip: each result stays in the history and is re-sent on every later call. Two agent options keep that in check. Both are off by default and both work with every provider.
 
-| | `contextEditing` | `compaction` |
-| --- | --- | --- |
-| What it does | Replaces the content of **old tool results** with a short placeholder | Replaces an **old slice of the conversation** with a summary |
-| Extra model call | No | Yes (your `summarize` callback) |
-| Provider-native form | Anthropic `clear_tool_uses` | Anthropic server-side compaction (`providerOptions`) |
-| Loses | Tool output (the call and its arguments stay visible) | Detail of everything in the slice |
+|                      | `contextEditing`                                                      | `compaction`                                                 |
+| -------------------- | --------------------------------------------------------------------- | ------------------------------------------------------------ |
+| What it does         | Replaces the content of **old tool results** with a short placeholder | Replaces an **old slice of the conversation** with a summary |
+| Extra model call     | No                                                                    | Yes (your `summarize` callback)                              |
+| Provider-native form | Anthropic `clear_tool_uses`                                           | Anthropic server-side compaction (`providerOptions`)         |
+| Loses                | Tool output (the call and its arguments stay visible)                 | Detail of everything in the slice                            |
 
 When both are set, editing runs first and compaction summarizes what is still too large.
 

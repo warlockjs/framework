@@ -26,11 +26,7 @@ export type {
   PgClientLike,
   RedisClientLike,
 } from "./contracts";
-export type {
-  HumanApprovalOptions,
-  RememberApprovalsOptions,
-  ToolApprovalMode,
-} from "./contracts";
+export type { HumanApprovalOptions, RememberApprovalsOptions, ToolApprovalMode } from "./contracts";
 export { approvalMemory } from "./approval-memory";
 export type { ResumeOptions, ResumeResult } from "./contracts";
 

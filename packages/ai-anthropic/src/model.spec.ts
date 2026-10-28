@@ -559,6 +559,7 @@ describe("AnthropicModel.complete()", () => {
       vision: true,
       reasoning: true,
       promptCaching: true,
+      nativeContextEditing: true,
       pdf: true,
     });
   });

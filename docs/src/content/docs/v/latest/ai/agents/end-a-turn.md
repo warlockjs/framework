@@ -10,10 +10,10 @@ By default an agent calls the model again after every round of tool results, so 
 
 Three options end the run right after the tools ran. Use whichever fits.
 
-| Option | Where | Decides from |
-| --- | --- | --- |
-| `stopAfterTools: ["post_message"]` | agent config | the tool name |
-| `endsTurn: true` or `endsTurn: ({ input, output }) => boolean` | the tool | the call's input and output |
+| Option                                                                   | Where        | Decides from                           |
+| ------------------------------------------------------------------------ | ------------ | -------------------------------------- |
+| `stopAfterTools: ["post_message"]`                                       | agent config | the tool name                          |
+| `endsTurn: true` or `endsTurn: ({ input, output }) => boolean`           | the tool     | the call's input and output            |
 | `stopWhen: ({ toolCalls, text, usage, messages, tripIndex }) => boolean` | agent config | anything about the trip, sync or async |
 
 ```ts

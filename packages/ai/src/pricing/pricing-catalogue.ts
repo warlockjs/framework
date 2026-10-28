@@ -92,9 +92,7 @@ export function pricingCatalogue(
       return [...new Set([...tables.flatMap((table) => Object.keys(table)), ...overrides.keys()])];
     },
     toRecord() {
-      return Object.fromEntries(
-        catalogue.models().map((model) => [model, find(model)!] as const),
-      );
+      return Object.fromEntries(catalogue.models().map((model) => [model, find(model)!] as const));
     },
   };
 
