@@ -132,6 +132,11 @@ browser-safe module files, set `moduleBoundary: "error"` in `src/config/web.ts`
 to fail the build instead. New apps from `create-warlock` start with `"error"`,
 and the default becomes `"error"` in a later release.
 
+In `"warn"` mode each unique violation (importer and target) is printed once
+per dev session, with its import chain. Repeats are only counted: a summary line
+reports how many more warnings were suppressed. `"error"` mode is unchanged and
+refuses every offending import.
+
 ```ts title="src/config/web.ts"
 const webConfigurations: WebConfigurations = {
   moduleBoundary: "error", // "warn" (default) | "error" | "off"

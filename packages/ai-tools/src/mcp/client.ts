@@ -183,6 +183,7 @@ class McpClientImpl implements McpClient {
       name: prefixedName,
       description: descriptor.description ?? `Invoke the remote MCP tool "${remoteName}".`,
       input,
+      ...(this.options.lint !== undefined ? { lint: this.options.lint } : {}),
       execute: async (args, ctx) => {
         this.assertOpen("tools/call");
 

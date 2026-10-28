@@ -8,8 +8,14 @@ import {
   type ToolSchemaReport,
 } from "./tool-schema-lint";
 
-/** Definitions already reported, keyed by name and schema hash, so each warns once. */
-const warned = new Set<string>();
+/**
+ * Definitions already reported, keyed by name and schema hash, so each warns
+ * once per process. Held on `globalThis` so a dev server that evaluates this
+ * module twice still prints each finding once.
+ */
+const WARNED_SLOT = Symbol.for("warlock.ai.toolLintWarned");
+const warned: Set<string> = ((globalThis as Record<symbol, unknown>)[WARNED_SLOT] ??=
+  new Set<string>()) as Set<string>;
 
 /**
  * Check a tool definition when `ai.tool()` builds it and log one warning
@@ -17,8 +23,9 @@ const warned = new Set<string>();
  * development (not production, not under a test runner), once per tool
  * definition, and never throws.
  *
- * Turn it off for one tool with `lint: false`, for the app with
- * `ai.config({ toolLint: false })`.
+ * Turn it off for one tool with `lint: false`, silence chosen finding codes
+ * with `lint: { ignore: [...] }` (per tool or in `ai.config({ toolLint })`),
+ * or turn it off for the app with `ai.config({ toolLint: false })`.
  */
 export function warnOnToolSchema(tool: ToolConfig<unknown, unknown>): ToolSchemaReport | undefined {
   if (tool.lint === false || !isDevRuntime()) return undefined;

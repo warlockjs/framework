@@ -548,7 +548,7 @@ Browser code may import from `app/<module>/...` only `*.client.ts(x)`, schema
 (`*.schema.ts`, `schema/`), types (`*.types.ts`, `types/`), the module's `web/`
 folder and non-code files; anything else fails the client build with the import
 chain. Use `import type` to share types that sit next to a service.
-`web.moduleBoundary` controls it: `"warn"` (default) reports and continues, `"error"` fails the build (new apps set it), `"off"` skips the rule.
+`web.moduleBoundary` controls it: `"warn"` (default) reports each unique violation once per dev session, then a count, and continues, `"error"` fails the build (new apps set it), `"off"` skips the rule.
 
 ### Static assets use `public/`
 

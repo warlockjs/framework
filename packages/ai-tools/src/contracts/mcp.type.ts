@@ -1,4 +1,4 @@
-import type { ToolContract } from "@warlock.js/ai";
+import type { DescribeToolSchemaOptions, ToolContract } from "@warlock.js/ai";
 
 /**
  * Type contracts for the Model Context Protocol surface — the
@@ -56,6 +56,14 @@ export interface McpClientOptions {
   namePrefix?: string;
   /** Only adapt tools whose (unprefixed) name passes this filter. */
   filter?: (toolName: string) => boolean;
+  /**
+   * Development-time schema check of the adapted remote tools. Remote
+   * schemas are sent as the server wrote them, so the app often cannot fix
+   * what the check reports. `false` silences it for every tool of this
+   * server; `{ ignore: [codes] }` drops chosen finding codes. Defaults to
+   * `ai.config({ toolLint })`.
+   */
+  lint?: false | DescribeToolSchemaOptions;
   /**
    * Per-call timeout for `tools/call`, in milliseconds.
    *

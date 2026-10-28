@@ -9,6 +9,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 
 - `ai.snapshot.sqlite({ path })` stores have a `close()` method that closes the database file the store opened. Call it before deleting or moving the file: Windows refuses to delete a file that is still open. A database passed as `database` is never closed by the store. The store reopens on its next call.
+- `lint: { ignore: [codes] }` on a tool, and `ignore` in `ai.config({ toolLint })`, drop chosen schema-lint finding codes (for example `missing-additional-properties-false`) for schemas an app deliberately sends as is, such as remote MCP tools. Ignored findings are left out of the report and never warn.
+
+### Changed
+
+- The `[ai.tool][schema.lint]` warning is remembered process-wide, so a tool definition evaluated twice in one process (a dev reload) prints its findings once.
 
 ## 5.38.0 - 2026-10-25
 

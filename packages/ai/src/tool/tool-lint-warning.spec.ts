@@ -44,6 +44,19 @@ describe("ai.tool() definition-time schema warning", () => {
     setAIConfig({ toolLint: undefined });
   });
 
+  it("drops ignored finding codes per tool and from the app default", () => {
+    define("a_tool", {
+      lint: { ignore: ["missing-additional-properties-false", "optional-not-required"] },
+    });
+    expect(warn).not.toHaveBeenCalled();
+
+    setAIConfig({
+      toolLint: { ignore: ["missing-additional-properties-false", "optional-not-required"] },
+    });
+    define("b_tool");
+    expect(warn).not.toHaveBeenCalled();
+  });
+
   it("warns once per tool definition with the findings and token estimate", () => {
     define();
     define();

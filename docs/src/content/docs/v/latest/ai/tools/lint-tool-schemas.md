@@ -37,6 +37,25 @@ ai.config({ toolLint: { targets: ["openai-strict"], maxDescriptionChars: 600 } }
 
 A tool's own `lint` wins over `ai.config({ toolLint })`.
 
+To acknowledge findings on a schema you deliberately send as is, such as a remote MCP tool, drop chosen finding codes instead of silencing the whole check:
+
+```ts
+ai.tool({
+  name: "remote_search",
+  description,
+  input,
+  execute,
+  lint: { ignore: ["missing-additional-properties-false", "optional-not-required"] },
+});
+
+// Every tool of one MCP server, or the whole app:
+ai.mcp(server, { lint: false });
+ai.mcp(server, { lint: { ignore: ["unsupported-keyword"] } });
+ai.config({ toolLint: { ignore: ["heavy-definition"] } });
+```
+
+Each finding is printed once per process (the same tool definition on a later agent start, or after a dev reload, stays silent).
+
 ## What is checked
 
 The schema checked is the one the provider adapters send: the shared `extractJsonSchema` output, which for Seal schemas is the `openai-strict` shape.

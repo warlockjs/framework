@@ -17,6 +17,7 @@ import {
 } from "../config/locale-configuration";
 import type { Middleware, Route } from "../router";
 import { resolveRouteValidation } from "../router/resolve-route-validation";
+import { armRequestSummary, phaseLogLevel } from "./request-phase-log";
 import { validateAll } from "../validation/validateAll";
 import { CookieJarUnavailableError } from "./errors";
 import { createRequestStore } from "./middleware/inject-request-context";
@@ -912,7 +913,7 @@ export class Request<RequestValidation = any> {
       module: "request",
       action: this.route.method + " " + this.route.path.replace("/*", "") + `:${this.id}`,
       message,
-      type: level,
+      type: phaseLogLevel(level),
       context: {
         request: this.toLogSnapshot(),
       },
@@ -1065,6 +1066,7 @@ export class Request<RequestValidation = any> {
     try {
       // call executingAction event
 
+      armRequestSummary(this);
       this.log("Executing the request");
 
       return await createRequestStore(this, this.response);

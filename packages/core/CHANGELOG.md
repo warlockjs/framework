@@ -10,8 +10,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- `http.logPhases: "info"` brings back the per-phase request lines at `info`. They are written at `debug` by default (see Changed).
 - `warlock check` prints one line to stderr when each step starts and ends, and the conventions step reports its milestones (facts collected, every 1000 files with the slowest rule so far). stdout is unchanged, so `--json` still prints only the JSON report.
 - Each convention rule has a time budget over a run (30 seconds by default). A rule that goes over it is skipped for the remaining files and reported as a `WL9026` warning naming the rule and the time it used, instead of hanging the command. Set `ruleBudgetMs` in `.warlock-check.json` to change it; `0` turns it off.
+
+### Changed
+
+- With `http.log: true`, each request now writes one `info` summary line (`GET /orders 200 12ms [request id]`) and its per-phase lines (executing, middleware, handler, response, and the validation steps) at `debug`, so a polled endpoint no longer floods the log. Warnings and errors keep their level, and a 5xx still leaves its single `request.<phase>` error record instead of a summary line. Set `http.logPhases: "info"` for the old verbose output.
+- Documented that `Application.onceBooted` / `whenBooted` is the app-level ready hook: it runs after every connector has booted and started, in `warlock dev`, `warlock start` and production builds, once per process (HMR reloads do not re-run it).
 
 ### Fixed
 

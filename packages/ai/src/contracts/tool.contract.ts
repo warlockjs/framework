@@ -233,7 +233,8 @@ export interface ToolConfig<TInput = unknown, TOutput = unknown> {
    * `describeToolSchema`). `ai.tool()` logs one warning per definition when
    * a provider would reject, ignore or over-charge for the schema. `false`
    * silences it for this tool; an object tunes the check (targets,
-   * description limits, token budget). Defaults to `ai.config({ toolLint })`.
+   * description limits, token budget) or drops chosen finding codes with
+   * `ignore: ["unsupported-keyword"]`. Defaults to `ai.config({ toolLint })`.
    */
   lint?: false | DescribeToolSchemaOptions;
   /**

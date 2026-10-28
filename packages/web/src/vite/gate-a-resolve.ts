@@ -1183,6 +1183,42 @@ export function gateAResolve(options: GateAOptions = {}): Plugin {
     return relative.startsWith("..") ? source : relative.replace(/\.[cm]?[jt]sx?$/, "");
   }
 
+  /**
+   * Warn-mode noise control. A dev session re-resolves the same import on every
+   * reload and from many entry points, so one violation used to print thousands
+   * of times. Each importer/target pair now prints once per plugin instance
+   * (one dev session); the repeats are only counted and summarised.
+   */
+  const reportedWarnings = new Set<string>();
+  let suppressedWarnings = 0;
+  let nextSummaryAt = 100;
+
+  /**
+   * True when this violation has not been printed yet. Repeats are counted and
+   * summarised every 100 suppressed hits and when the bundle ends.
+   */
+  function shouldPrintWarning(
+    context: { warn(message: string): void },
+    importer: string | undefined,
+    target: string,
+  ): boolean {
+    const key = `${importer ?? ""}\0${target}`;
+    if (!reportedWarnings.has(key)) {
+      reportedWarnings.add(key);
+      return true;
+    }
+    suppressedWarnings += 1;
+    if (suppressedWarnings >= nextSummaryAt) {
+      nextSummaryAt = suppressedWarnings + 100;
+      context.warn(boundarySummary());
+    }
+    return false;
+  }
+
+  function boundarySummary(): string {
+    return `Gate A: ${suppressedWarnings} more boundary warning(s) were repeats of ${reportedWarnings.size} unique violation(s) already printed above. Set web.moduleBoundary to "error" to enforce them.`;
+  }
+
   function reportModuleBoundary(
     context: { error(message: string): never; warn(message: string): void },
     mode: "error" | "warn",
@@ -1190,6 +1226,8 @@ export function gateAResolve(options: GateAOptions = {}): Plugin {
     source: string,
     importer: string | undefined,
   ): void {
+    if (mode === "warn" && !shouldPrintWarning(context, importer, displayBoundarySource(source)))
+      return;
     const message = [
       mode === "error"
         ? `Gate A refused an import: browser code reaches a server file of an app module.`
@@ -1238,6 +1276,11 @@ export function gateAResolve(options: GateAOptions = {}): Plugin {
      * the first module is loaded, so the refusal lands before anything has been
      * bundled.
      */
+    buildEnd() {
+      if (suppressedWarnings > 0) this.warn(boundarySummary());
+      suppressedWarnings = 0;
+      nextSummaryAt = 100;
+    },
     buildStart() {
       const externalized = externalizedBuiltins(rawExternal);
       if (externalized.length === 0) return;
@@ -1428,7 +1471,7 @@ export function gateAResolve(options: GateAOptions = {}): Plugin {
             appRoot,
             typeOnly,
           );
-          if (aliasViolation) {
+          if (aliasViolation && shouldPrintWarning(this, importer, aliasPath)) {
             this.warn({
               message: [
                 `Gate A WOULD refuse this import — reported as a WARNING, not enforced yet.`,

@@ -262,7 +262,9 @@ log.setRedact({
 
 ## Request logs and sensitive routes
 
-Core logs each request's lifecycle (`Starting Request` / `Completed Request`, middleware, handler) with `http.log`. Those entries never carry the `Request` or `Response` objects — only a bounded, plain-data `RequestLogSnapshot` under `context.request`:
+With `http.log: true`, core writes one `info` summary line per request (`GET /orders 200 12ms [request id]`; a 5xx writes its error record instead). The per-phase lines (start, middleware, validation, handler, response) are written at `debug`; set `http.logPhases: "info"` to bring them back at `info`.
+
+Request log entries never carry the `Request` or `Response` objects — only a bounded, plain-data `RequestLogSnapshot` under `context.request`:
 
 ```ts
 {

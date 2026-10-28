@@ -1,7 +1,7 @@
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { build } from "vite";
+import { build, type Plugin } from "vite";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { gateAResolve, isBrowserSafeModuleFile, moduleSurfaceOf } from "./gate-a-resolve";
 
@@ -21,6 +21,7 @@ async function buildPage(
   body: string,
   options: { moduleBoundary?: "error" | "warn" | "off" } = {},
   warnings: string[] = [],
+  plugin: Plugin = gateAResolve({ appRoot: ROOT, ...options }),
 ) {
   write(PAGE, body);
   return build({
@@ -29,7 +30,7 @@ async function buildPage(
     resolve: {
       alias: [{ find: /^app\//, replacement: `${APP.replace(/\\/g, "/")}/` }],
     },
-    plugins: [gateAResolve({ appRoot: ROOT, ...options })],
+    plugins: [plugin],
     build: {
       write: false,
       minify: false,
@@ -189,6 +190,16 @@ describe("gateAResolve — module boundary (real Vite builds)", () => {
       ].join("\n"),
     );
     expect(code(result)).not.toContain("server-value");
+  });
+
+  it("prints a repeated warn-mode violation once per session, then a count", async () => {
+    const warnings: string[] = [];
+    const plugin = gateAResolve({ appRoot: ROOT, moduleBoundary: "warn" });
+    await buildPage(SERVICE_IMPORT, {}, warnings, plugin);
+    await buildPage(SERVICE_IMPORT, {}, warnings, plugin);
+    const printed = warnings.filter((message) => message.includes("WOULD refuse"));
+    expect(printed).toHaveLength(1);
+    expect(warnings.join("\n")).toContain("more boundary warning(s)");
   });
 
   it('reports instead of refusing when moduleBoundary is "warn"', async () => {

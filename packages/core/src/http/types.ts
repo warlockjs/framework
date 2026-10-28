@@ -265,9 +265,18 @@ export interface HttpConfigurations {
    */
   port?: number;
   /**
-   * Log requests
+   * Log requests: one summary line per request at `info` (method, path,
+   * status, duration, request id). A 5xx leaves its error record instead.
    */
   log?: boolean;
+  /**
+   * Level of the per-phase request lines (start, middleware, validation,
+   * handler, response) written while `log` is on. `"debug"` (default) keeps
+   * them out of the normal log; `"info"` restores the verbose output.
+   *
+   * @default "debug"
+   */
+  logPhases?: "debug" | "info";
   /**
    * What request log entries carry of each request's input. Entries carry a
    * bounded `RequestLogSnapshot`, never the `Request`/`Response`

@@ -2,6 +2,12 @@
 
 All notable changes to `@warlock.js/web` are documented here.
 
+## 5.40.0 - 2026-10-28
+
+### Changed
+
+- With `web.moduleBoundary: "warn"`, each unique module-boundary violation (importer and target) is printed once per dev session instead of on every re-resolve, followed by a count of the repeats that were suppressed (periodically and when the bundle ends). A busy dev session used to print thousands of identical warnings. `"error"` mode is unchanged.
+
 ## 5.39.0 - 2026-10-26
 
 ### Added

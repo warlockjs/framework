@@ -68,6 +68,12 @@ export type DescribeToolSchemaOptions = {
   warnAboveTokens?: number;
   /** Characters per token for the estimate. Default `4`, see `estimateInputTokens`. */
   charsPerToken?: number;
+  /**
+   * Finding codes to drop from the report, for a schema the app deliberately
+   * sends as is (a remote MCP tool, say). The dropped findings are not
+   * counted and never warn.
+   */
+  ignore?: ReadonlyArray<ToolSchemaIssueCode>;
 };
 
 /** The result of {@link describeToolSchema}. */
@@ -431,7 +437,10 @@ export function describeToolSchema(
     }
   }
 
-  const list = issues.list();
+  const ignored = options.ignore;
+  const list = ignored?.length
+    ? issues.list().filter((issue) => !ignored.includes(issue.code))
+    : issues.list();
 
   return {
     name: tool.name,

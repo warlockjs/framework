@@ -8,6 +8,7 @@ import { isIterable, isPlainObject, isScalar } from "@mongez/supportive-is";
 import type { LogLevel } from "@warlock.js/logger";
 import { log } from "@warlock.js/logger";
 import type { ValidationResult } from "@warlock.js/seal";
+import { phaseLogLevel } from "./request-phase-log";
 import type { ValidationResponseConfiguration } from "../validation/types";
 import { validationFailureStatus } from "../validation/validation-failure-status";
 import type { FastifyReply } from "fastify";
@@ -384,7 +385,7 @@ export class Response {
       module: "response",
       action: this.route.method + " " + this.route.path.replace("/*", "") + `:${this.request.id}`,
       message,
-      type: level,
+      type: phaseLogLevel(level),
       context: {
         request: this.request.toLogSnapshot(),
         response: { statusCode: this.statusCode },
