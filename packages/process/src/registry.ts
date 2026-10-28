@@ -76,10 +76,11 @@ export class Registry {
   constructor(
     public readonly file: string,
     private readonly owner: string,
+    private readonly read: (pid: number) => ReturnType<typeof identity> = (pid) => identity(pid),
   ) {}
   async open(): Promise<RegistryEntry[]> {
     await mkdir(path.dirname(this.file), { recursive: true, mode: 0o700 });
-    const self = await identity(process.pid);
+    const self = await this.read(process.pid);
     if (!self) throw new Error("Cannot verify registry writer identity");
     const lock = `${this.file}.lock`;
     try {
@@ -92,7 +93,7 @@ export class Registry {
         const lease: unknown = JSON.parse(await readFile(path.join(lock, "writer.json"), "utf8"));
         if (!record(lease) || typeof lease.pid !== "number" || typeof lease.start !== "string")
           throw new Error("Invalid registry writer lease; inspect it manually");
-        const writer = await identity(lease.pid);
+        const writer = await this.read(lease.pid);
         if (writer?.start === lease.start) throw new Error("Process registry is already in use");
         const stale = `${lock}.${randomBytes(8).toString("hex")}`;
         await rename(lock, stale);

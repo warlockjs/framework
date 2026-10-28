@@ -122,7 +122,22 @@ export function supervisor(options: SupervisorOptions): ProcessSupervisor {
   function polling(): Observation {
     return { ...observe(), maxAgeMs: pollMs };
   }
-  const registry = new Registry(registryPath, options.owner);
+  /**
+   * Registry lease checks read identities too. Off Linux they go through the shared
+   * helper, and a transient failure (an exiting process reports no creation time) is
+   * retried instead of failing the whole operation.
+   */
+  async function lease(pid: number) {
+    for (let attempt = 1; ; attempt++) {
+      try {
+        return await identity(pid, false, undefined, observe());
+      } catch (error) {
+        if (process.platform === "linux" || attempt >= 3) throw error;
+        await delay(200);
+      }
+    }
+  }
+  const registry = new Registry(registryPath, options.owner, lease);
   const entries = new Map<number, RegistryEntry>();
   const active = new Map<number, Active>();
   let ready: Promise<void> | undefined;

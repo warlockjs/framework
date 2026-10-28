@@ -218,3 +218,23 @@ describe.runIf(process.platform === "win32")("real Windows helper output shape",
     }
   }, 60_000);
 });
+
+describe("registry lease identity reads", () => {
+  it("uses the injected reader for the writer's own identity", async () => {
+    const directory = await mkdtemp(path.join(tmpdir(), "warlock-lease-"));
+    try {
+      const read = vi.fn(async (pid: number) => ({
+        start: "s",
+        group: pid,
+        state: "R",
+        rss: 0,
+      }));
+      const registry = new Registry(path.join(directory, "registry.json"), "example-app", read);
+      await registry.open();
+      expect(read).toHaveBeenCalledWith(process.pid);
+      await registry.close();
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+});
