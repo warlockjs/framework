@@ -13,7 +13,17 @@ export type SupervisorOptions = {
   /** Absolute or cwd-relative JSON file. One supervisor per registry. */
   registry: string;
   defaults?: ProcessLimits;
+  /**
+   * How often running processes are sampled. Defaults per platform: 100 on Linux
+   * (reads /proc), 500 on macOS and 1500 on Windows (each sample queries the OS).
+   */
   pollIntervalMs?: number;
+  /**
+   * Longest wait, in milliseconds, for the ownership check off Linux (the guardian's
+   * reply and, on Windows, the process helper's answer). Defaults to 2000 on Linux and
+   * 15000 on Windows and macOS. Raise it on a heavily loaded machine.
+   */
+  observationTimeoutMs?: number;
   stopGraceMs?: number;
   /** Linux delegated cgroup v2 directory; defaults to this process's cgroup. */
   cgroupRoot?: string;

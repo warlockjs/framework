@@ -3,10 +3,16 @@ import { randomBytes } from "node:crypto";
 import path from "node:path";
 import { PassThrough, Writable } from "node:stream";
 import { setTimeout as delay } from "node:timers/promises";
-import { identity, owns, ProcessNotOwnedError, executeCommand } from "./identity";
+import { identity, owns, ProcessNotOwnedError, executeCommand, type Observation } from "./identity";
 import { guardianProof, launchCommand } from "./guardian";
-import { supported, taskkillCommand } from "./platform";
+import {
+  defaultObservationTimeoutMs,
+  defaultPollIntervalMs,
+  supported,
+  taskkillCommand,
+} from "./platform";
 import { Registry, type RegistryEntry } from "./registry";
+import { createWindowsHelper, type WindowsProcessHelper } from "./windows-helper";
 import {
   attachCgroup,
   cgroupMemory,
@@ -92,10 +98,24 @@ export function supervisor(options: SupervisorOptions): ProcessSupervisor {
   validateLimits(options.defaults ?? {});
   // Caller-owned configuration must not change an active supervisor's identity.
   options = { ...options, defaults: { ...options.defaults } };
-  const pollMs = options.pollIntervalMs ?? 100;
+  const pollMs = options.pollIntervalMs ?? defaultPollIntervalMs(process.platform);
   const graceMs = options.stopGraceMs ?? 1000;
   if (!Number.isSafeInteger(pollMs) || pollMs < 10 || !Number.isSafeInteger(graceMs) || graceMs < 0)
     throw new Error("Invalid polling interval or stop grace period");
+  const observationMs =
+    options.observationTimeoutMs ?? defaultObservationTimeoutMs(process.platform);
+  if (!Number.isSafeInteger(observationMs) || observationMs < 100)
+    throw new Error("Invalid observationTimeoutMs: expected an integer of at least 100");
+  // One helper per supervisor, created on first use and closed by stopAll().
+  let helper: WindowsProcessHelper | undefined;
+  function observe(): Observation {
+    if (process.platform === "win32") helper ??= createWindowsHelper({ timeoutMs: observationMs });
+    return { timeoutMs: observationMs, helper };
+  }
+  /** Polling tolerates a snapshot up to one interval old; signals never do. */
+  function polling(): Observation {
+    return { ...observe(), maxAgeMs: pollMs };
+  }
   const registry = new Registry(path.resolve(options.registry), options.owner);
   const entries = new Map<number, RegistryEntry>();
   const active = new Map<number, Active>();
@@ -123,9 +143,9 @@ export function supervisor(options: SupervisorOptions): ProcessSupervisor {
   const save = () => registry.save([...entries.values()]);
 
   async function signal(entry: RegistryEntry, value: NodeJS.Signals): Promise<void> {
-    if (!(await owns(entry))) throw new ProcessNotOwnedError(entry.pid);
+    if (!(await owns(entry, observe()))) throw new ProcessNotOwnedError(entry.pid);
     if (process.platform !== "linux" && value === "SIGCONT") {
-      const proof = await guardianProof(entry.pid, entry.token);
+      const proof = await guardianProof(entry.pid, entry.token, entry.token, observationMs);
       if (!proof || proof.token !== entry.token || proof.gated)
         throw new ProcessNotOwnedError(entry.pid);
       return;
@@ -134,7 +154,7 @@ export function supervisor(options: SupervisorOptions): ProcessSupervisor {
       try {
         await executeCommand(taskkillCommand(entry.pid));
       } catch (error) {
-        if (await owns(entry)) throw error;
+        if (await owns(entry, observe())) throw error;
       }
       return;
     }
@@ -153,18 +173,18 @@ export function supervisor(options: SupervisorOptions): ProcessSupervisor {
     const tracked = active.get(entry.pid);
     let running: Active;
     if (!tracked) {
-      if (!(await owns(entry))) throw new ProcessNotOwnedError(entry.pid);
+      if (!(await owns(entry, observe()))) throw new ProcessNotOwnedError(entry.pid);
       entry.cgroup = await recoveredCgroup(entry.pid, entry.token);
       running = track(entry);
     } else running = tracked;
     if (running.finished) return running.finish(null, null);
     if (running.stopping) return running.stopping;
     const stopping = (async () => {
-      if (!(await owns(entry))) throw new ProcessNotOwnedError(entry.pid);
+      if (!(await owns(entry, observe()))) throw new ProcessNotOwnedError(entry.pid);
       running.reason ??= reason;
       await signal(entry, "SIGTERM");
       const deadline = Date.now() + graceMs;
-      while (await owns(entry)) {
+      while (await owns(entry, observe())) {
         if (Date.now() >= deadline) {
           await signal(entry, "SIGKILL");
           break;
@@ -172,7 +192,7 @@ export function supervisor(options: SupervisorOptions): ProcessSupervisor {
         await delay(20);
       }
       const killedDeadline = Date.now() + 5000;
-      while (await owns(entry)) {
+      while (await owns(entry, observe())) {
         if (Date.now() >= killedDeadline)
           throw new Error(`Process ${entry.pid} did not exit after SIGKILL`);
         await delay(20);
@@ -187,7 +207,10 @@ export function supervisor(options: SupervisorOptions): ProcessSupervisor {
       // The leader may exit between identity verification and a signal. A
       // missing identity is harmless for a tracked handle; a live mismatch is
       // still an ownership failure and must never receive another signal.
-      if (error instanceof ProcessNotOwnedError && !(await identity(entry.pid))) {
+      if (
+        error instanceof ProcessNotOwnedError &&
+        !(await identity(entry.pid, false, undefined, observe()))
+      ) {
         await running.finish(null, null);
         return;
       }
@@ -272,7 +295,7 @@ export function supervisor(options: SupervisorOptions): ProcessSupervisor {
       sampling = true;
       try {
         const entry = running.entry;
-        const current = await identity(entry.pid, true, entry.token);
+        const current = await identity(entry.pid, true, entry.token, polling());
         if (running.finished) return;
         if (
           current?.start !== entry.start ||
@@ -415,13 +438,23 @@ export function supervisor(options: SupervisorOptions): ProcessSupervisor {
     let entry: RegistryEntry | undefined;
     try {
       const deadline = Date.now() + 5000;
-      let current = await identity(pid, true, token);
+      // Off Linux an identity read costs a helper query, so poll the guardian's
+      // pipe (cheap) until it reports the gate, and read the identity once.
+      const portable = process.platform !== "linux";
+      const gate = async () => {
+        if (portable) {
+          const proof = await guardianProof(pid, undefined, token, observationMs);
+          if (!proof?.gated) return undefined;
+        }
+        return identity(pid, true, token, observe());
+      };
+      let current = await gate();
       while (!current?.state.startsWith("T") || current.token !== token) {
         if (spawnError) throw spawnError;
         if (exit || Date.now() >= deadline)
           throw new Error("Child failed to reach the resource setup gate");
         await delay(10);
-        current = await identity(pid, true, token);
+        current = await gate();
       }
       if (current.group !== pid) throw new Error("Child did not create an isolated process group");
       entry = {
@@ -459,10 +492,10 @@ export function supervisor(options: SupervisorOptions): ProcessSupervisor {
       return running.handle;
     } catch (error) {
       // This PID was created by this call. Kill only after its random token is verified.
-      const current = await identity(pid, true, token);
+      const current = await identity(pid, true, token, observe());
       if (current?.token === token) {
         const failed = { pid, token, start: current.start };
-        if (await owns(failed)) {
+        if (await owns(failed, observe())) {
           try {
             if (process.platform === "win32") await executeCommand(taskkillCommand(pid));
             else process.kill(-pid, "SIGKILL");
@@ -509,7 +542,7 @@ export function supervisor(options: SupervisorOptions): ProcessSupervisor {
         const result: RecoveryResult = { adopted: [], stopped: [], cleared: [] };
         for (const entry of [...entries.values()]) {
           if (active.has(entry.pid)) continue;
-          if (!(await owns(entry))) {
+          if (!(await owns(entry, observe()))) {
             entries.delete(entry.pid);
             result.cleared.push(entry.pid);
             continue;
@@ -546,7 +579,7 @@ export function supervisor(options: SupervisorOptions): ProcessSupervisor {
           const errors: unknown[] = [];
           for (const entry of [...entries.values()]) {
             try {
-              if (await owns(entry)) await stopEntry(entry);
+              if (await owns(entry, observe())) await stopEntry(entry);
               else {
                 const running = active.get(entry.pid);
                 if (running) await running.finish(null, null);
@@ -560,6 +593,7 @@ export function supervisor(options: SupervisorOptions): ProcessSupervisor {
           if (errors.length)
             throw new AggregateError(errors, "Some owned processes could not be stopped");
         } finally {
+          await helper?.close();
           await registry.close();
         }
       });

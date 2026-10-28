@@ -1,5 +1,21 @@
 # Changelog — @warlock.js/process
 
+## 5.40.0 - 2026-10-28
+
+### Added
+
+- `observationTimeoutMs` supervisor option: how long the ownership check waits for a guardian reply (and, on Windows, the process helper). Defaults to 2 s on Linux and 15 s on Windows and macOS; the timeout error now names the option.
+- Platform defaults for `pollIntervalMs`: 100 ms on Linux, 500 ms on macOS, 1500 ms on Windows. Explicit values still win.
+
+### Changed
+
+- Windows keeps one long-lived PowerShell helper per supervisor instead of starting PowerShell twice per observation. Observations made together share one query, polling reuses a snapshot up to one interval old, the helper restarts if it dies and closes with `stopAll()`.
+- On Windows and macOS the launch gate waits on the guardian's pipe instead of reading the full process identity every 10 ms.
+
+### Fixed
+
+- Members failed to start on a busy Windows machine with `Process ownership observation timed out`. The guardian now replies to the resume request before it launches the workload, so a slow program start no longer counts against the client's timeout.
+
 ## 5.34.3 - 2026-10-20
 
 ### Changed

@@ -37,7 +37,7 @@ it("routes Windows label stops, stopPid and stopAll through verified PID tree co
   });
   const execute = vi.spyOn(identities, "executeCommand").mockImplementation(async (command) => {
     const pid = Number(command.args[1]);
-    expect(owns).toHaveBeenCalledWith(expect.objectContaining({ pid }));
+    expect(owns).toHaveBeenCalledWith(expect.objectContaining({ pid }), expect.anything());
     expect(command).toEqual({ file: "taskkill.exe", args: ["/PID", String(pid), "/T", "/F"] });
     alive.delete(pid);
     return "";

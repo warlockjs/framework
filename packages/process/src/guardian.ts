@@ -1,6 +1,7 @@
 import { createHmac, randomBytes } from "node:crypto";
 import { connect } from "node:net";
 import type { Command, OwnershipProof } from "./platform";
+import { defaultObservationTimeoutMs } from "./platform";
 import { launcher } from "./resources";
 import type { ProcessLimits } from "./types";
 
@@ -25,9 +26,7 @@ const address = process.platform === "win32"
   : "/tmp/warlock-process-" + process.getuid() + "-" + process.pid + ".sock";
 let gated = true;
 const finish = (code) => { server.close(); process.exit(code); };
-const start = () => {
-  if (!gated) return;
-  gated = false;
+const launch = () => {
   const [command, ...args] = JSON.parse(process.env.WARLOCK_PROCESS_LAUNCH);
   const env = { ...process.env };
   for (const key of Object.keys(env)) {
@@ -53,8 +52,12 @@ const server = createServer((socket) => {
       const request = JSON.parse(input);
       if (!/^[a-f0-9]{64}$/.test(request.nonce)) { socket.destroy(); return; }
       const sign = (value) => createHmac("sha256", token).update(value).digest("hex");
-      if (request.resume === sign(request.nonce + ":resume")) start();
+      const resume = gated && request.resume === sign(request.nonce + ":resume");
+      // Reply first, then start the workload: a slow program start must never
+      // eat into the client's observation timeout.
+      if (resume) gated = false;
       socket.end(JSON.stringify({ pid: process.pid, digest: sign(request.nonce + ":" + process.pid + ":" + gated), gated }) + "\n");
+      if (resume) setImmediate(launch);
     } catch { socket.destroy(); }
   });
 });
@@ -70,6 +73,7 @@ export async function guardianProof(
   pid: number,
   resume?: string,
   expectedToken: string | undefined = resume,
+  timeoutMs: number = defaultObservationTimeoutMs(process.platform),
 ): Promise<OwnershipProof | undefined> {
   if (!expectedToken) return undefined;
   const token = expectedToken;
@@ -83,7 +87,13 @@ export async function guardianProof(
       socket.destroy();
       reject(error);
     };
-    socket.setTimeout(2000, () => fail(new Error("Process ownership observation timed out")));
+    socket.setTimeout(timeoutMs, () =>
+      fail(
+        new Error(
+          `Process ownership observation timed out after ${timeoutMs} ms; raise the observationTimeoutMs supervisor option`,
+        ),
+      ),
+    );
     socket.on("connect", () =>
       socket.write(
         JSON.stringify({ nonce, resume: resume ? sign(nonce + ":resume") : undefined }) + "\n",

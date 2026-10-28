@@ -5,7 +5,7 @@ export type Command = { file: string; args: string[]; env?: Record<string, strin
 export type Execute = (command: Command) => Promise<string>;
 export type OwnershipProof = { pid: number; token: string; gated: boolean };
 export type ReadProof = (pid: number) => Promise<OwnershipProof | undefined>;
-type Row = {
+export type Row = {
   pid: number;
   parent: number;
   start: string;
@@ -13,6 +13,19 @@ type Row = {
   group: number;
   state: string;
 };
+
+/**
+ * Defaults per platform. Linux reads /proc directly, so it is cheap to poll
+ * often and a guardian reply is never awaited. Windows and macOS observe
+ * through helper programs and a named pipe, which need more time and a slower
+ * poll to stay out of the workload's way.
+ */
+export function defaultPollIntervalMs(platform: string): number {
+  return platform === "win32" ? 1500 : platform === "darwin" ? 500 : 100;
+}
+export function defaultObservationTimeoutMs(platform: string): number {
+  return platform === "win32" || platform === "darwin" ? 15_000 : 2000;
+}
 
 export class UnsupportedProcessPlatformError extends Error {
   constructor(public readonly platform: string) {
@@ -109,7 +122,10 @@ export function windowsCommand(pid: number, tree = false): Command {
   };
 }
 export function parseWindowsRows(source: string): Row[] {
-  const value: unknown = JSON.parse(source.replace(/^\uFEFF/, ""));
+  return windowsRows(JSON.parse(source.replace(/^\uFEFF/, "")));
+}
+/** Validates rows decoded from PowerShell, whether one-shot or from the long-lived helper. */
+export function windowsRows(value: unknown): Row[] {
   if (!Array.isArray(value)) throw new Error("Invalid Windows process observation");
   return value.map((row: unknown) => {
     if (
@@ -166,6 +182,9 @@ export function treeMemory(rows: Row[], pid: number): number {
   return [...included.values()].reduce((total, row) => total + row.rss, 0);
 }
 
+/** Reads process rows. `tree` asks for the whole table; `maxAgeMs` accepts a recent snapshot. */
+export type RowSource = (pids: number[], tree: boolean, maxAgeMs?: number) => Promise<Row[]>;
+
 /** All OS effects are injected; foreign-platform specs never execute real commands. */
 export async function portableIdentity(
   platform: PortablePlatform,
@@ -173,16 +192,20 @@ export async function portableIdentity(
   token: boolean,
   execute: Execute,
   readProof: ReadProof,
+  source?: RowSource,
+  maxAgeMs = 0,
 ): Promise<Identity | undefined> {
   validPid(pid);
   const command = platform === "darwin" ? darwinCommand : windowsCommand;
   const parse = platform === "darwin" ? parseDarwinRows : parseWindowsRows;
-  const rows = parse(await execute(command(pid, token)));
+  const read: RowSource =
+    source ?? (async (pids, tree) => parse(await execute(command(pids[0] ?? pid, tree))));
+  const rows = await read([pid], token, maxAgeMs);
   const before = rows.find((row) => row.pid === pid);
   if (!before || /^[ZX]/.test(before.state)) return undefined;
   if (!token) return before;
   const proof = await readProof(pid);
-  const after = parse(await execute(command(pid))).find((row) => row.pid === pid);
+  const after = (await read([pid], false, maxAgeMs)).find((row) => row.pid === pid);
   if (
     !after ||
     after.start !== before.start ||

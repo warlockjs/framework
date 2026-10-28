@@ -74,18 +74,18 @@ it as `type`. It has no role in ownership or process selection.
 
 ## API
 
-| API                                                                                      | Behavior                                                                                                                                                                                                                            |
-| ---------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `supervisor({ owner, registry, defaults?, pollIntervalMs?, stopGraceMs?, cgroupRoot? })` | Creates a lazy supervisor; first operation opens the registry. Default poll interval is 100 ms; stop grace is 1000 ms.                                                                                                              |
-| `await spawn({ kind, command, args?, cwd?, env?, labels?, limits? })`                    | Returns `{ pid, stdin, stdout, stderr, exited, stop() }`. Per-launch limits override defaults.                                                                                                                                      |
-| `await handle.exited`                                                                    | Resolves to `{ reason, code, signal, peakMemoryBytes }`. Reasons: `exit`, `timeout`, `memory-cap`, `stopped`. Registry persistence or supervision observation errors reject it; a rejected promise does not prove the child exited. |
-| `await handle.stop()`                                                                    | Stops its verified POSIX group or Windows PID tree; repeated calls after exit are harmless.                                                                                                                                         |
-| `await stop({ labels })`                                                                 | Stops entries containing every requested label/value. `stop()` selects all entries.                                                                                                                                                 |
-| `await stopPid(pid)`                                                                     | Only accepts a verified registry entry; otherwise throws `ProcessNotOwnedError`.                                                                                                                                                    |
-| `await list({ labels })`                                                                 | Returns process metadata, limits, enforcement and peak memory; never environment tokens.                                                                                                                                            |
-| `await recover({ keep? })`                                                               | Clears mismatched/dead identities, adopts verified entries selected by `keep`, and stops other verified entries. Returns PID arrays `{ adopted, stopped, cleared }`. Default: stop verified orphans.                                |
-| `await stopAll()`                                                                        | Stops verified entries and releases the registry writer lease. Idempotent; closes the supervisor permanently.                                                                                                                       |
-| `await spawnPty(options)`                                                                | Optional terminal launch; adds `write(text)` and `resize(columns, rows)`.                                                                                                                                                           |
+| API                                                                                                             | Behavior                                                                                                                                                                                                                            |
+| --------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `supervisor({ owner, registry, defaults?, pollIntervalMs?, observationTimeoutMs?, stopGraceMs?, cgroupRoot? })` | Creates a lazy supervisor; first operation opens the registry. Poll interval and observation timeout default per platform (see below); stop grace is 1000 ms.                                                                       |
+| `await spawn({ kind, command, args?, cwd?, env?, labels?, limits? })`                                           | Returns `{ pid, stdin, stdout, stderr, exited, stop() }`. Per-launch limits override defaults.                                                                                                                                      |
+| `await handle.exited`                                                                                           | Resolves to `{ reason, code, signal, peakMemoryBytes }`. Reasons: `exit`, `timeout`, `memory-cap`, `stopped`. Registry persistence or supervision observation errors reject it; a rejected promise does not prove the child exited. |
+| `await handle.stop()`                                                                                           | Stops its verified POSIX group or Windows PID tree; repeated calls after exit are harmless.                                                                                                                                         |
+| `await stop({ labels })`                                                                                        | Stops entries containing every requested label/value. `stop()` selects all entries.                                                                                                                                                 |
+| `await stopPid(pid)`                                                                                            | Only accepts a verified registry entry; otherwise throws `ProcessNotOwnedError`.                                                                                                                                                    |
+| `await list({ labels })`                                                                                        | Returns process metadata, limits, enforcement and peak memory; never environment tokens.                                                                                                                                            |
+| `await recover({ keep? })`                                                                                      | Clears mismatched/dead identities, adopts verified entries selected by `keep`, and stops other verified entries. Returns PID arrays `{ adopted, stopped, cleared }`. Default: stop verified orphans.                                |
+| `await stopAll()`                                                                                               | Stops verified entries and releases the registry writer lease. Idempotent; closes the supervisor permanently.                                                                                                                       |
+| `await spawnPty(options)`                                                                                       | Optional terminal launch; adds `write(text)` and `resize(columns, rows)`.                                                                                                                                                           |
 
 Adopted processes cannot regain their original stdio pipes or exit codes.
 Their original deadline still applies. Recovery requires matching owner,
@@ -105,18 +105,18 @@ Do not place registries in untrusted or shared writable directories.
 
 ## Limits and platform support
 
-| Platform | Identity                                                         | Enforcement                                                                                                                                                                        |
-| -------- | ---------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Linux    | `/proc` start ticks + boot ID + environment token                | Cgroup v2 → inherited rlimit/RSS fallback. Delegated `memory.max` caps the subtree; `memory.peak` reports kernel peaks when available; cleanup uses `cgroup.kill` where permitted. |
-| macOS    | `ps` start time (`LC_ALL=C TZ=UTC`) + guardian environment token | `RLIMIT_CPU`/`RLIMIT_DATA` plus tree RSS polling (`rlimit-polling`). Softer than Linux cgroups.                                                                                    |
-| Windows  | PowerShell/CIM creation time + guardian environment token        | PID-only `taskkill /PID <pid> /T /F` tree stops; tree working-set polling (`rss-polling`). Softer than Linux cgroups.                                                              |
+| Platform | Identity                                                                          | Enforcement                                                                                                                                                                        |
+| -------- | --------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Linux    | `/proc` start ticks + boot ID + environment token                                 | Cgroup v2 → inherited rlimit/RSS fallback. Delegated `memory.max` caps the subtree; `memory.peak` reports kernel peaks when available; cleanup uses `cgroup.kill` where permitted. |
+| macOS    | `ps` start time (`LC_ALL=C TZ=UTC`) + guardian environment token                  | `RLIMIT_CPU`/`RLIMIT_DATA` plus tree RSS polling (`rlimit-polling`). Softer than Linux cgroups.                                                                                    |
+| Windows  | CIM creation time (one long-lived PowerShell helper) + guardian environment token | PID-only `taskkill /PID <pid> /T /F` tree stops; tree working-set polling (`rss-polling`). Softer than Linux cgroups.                                                              |
 
 Linux without delegation reports `enforcement: "rlimit-polling"`. Inherited
 CPU/address-space limits apply; Linux ignores `RLIMIT_RSS`, so the resident-memory
 cap is leader RSS polling only. macOS and Windows include the guardian and
 observed descendants in memory samples; shared pages can be counted more than
 once. Windows always forces the verified PID tree immediately; `stopGraceMs`
-applies to POSIX signals only. PowerShell/CIM must be available on Windows;
+applies to POSIX signals only. Windows PowerShell with CIM must be available;
 observation failures surface to the caller and prevent killing. Job Objects
 are a future improvement for hard Windows containment and memory caps, and
 are not required for this release. Other OSes throw the exported
@@ -153,6 +153,26 @@ Polling may miss short peaks and overshoot the cap until the next interval.
 Linux fallback accounting covers the leader; macOS/Windows sample the tree,
 including guardian overhead. Commands and IPC add sampling latency, especially
 on Windows; `pollIntervalMs` is a minimum interval and slow samples do not overlap.
+
+### Platform defaults and Windows notes
+
+| Option                 | Linux  | macOS  | Windows |
+| ---------------------- | ------ | ------ | ------- |
+| `pollIntervalMs`       | 100 ms | 500 ms | 1500 ms |
+| `observationTimeoutMs` | 2 s    | 15 s   | 15 s    |
+
+Explicit options always win. `observationTimeoutMs` bounds how long the ownership
+check waits for a guardian's reply and, on Windows, for the process helper's answer;
+the timeout error names the option, so raise it on a heavily loaded machine.
+
+On Windows one PowerShell helper per supervisor stays running and answers process
+queries over stdin/stdout, so observing many processes does not start a PowerShell per
+PID. Observations made together share one query, and a poll accepts a process-table
+snapshot up to one `pollIntervalMs` old; signals and ownership checks before a stop
+always read fresh. The helper restarts if it dies and shuts down with `stopAll()`.
+The guardian replies to the resume request before it starts the workload, so a slow
+program start never counts against the timeout. Windows tree stops use
+`taskkill /PID <pid> /T /F`; no native addon is involved.
 Descendants that stay in the launch group receive stop signals. Without cgroups, a process
 that creates another session can escape; if the leader exits during graceful
 stop, the supervisor cannot safely re-verify it for escalation and will not

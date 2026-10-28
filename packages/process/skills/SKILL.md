@@ -94,7 +94,7 @@ PTY stdout combines terminal output; stderr is empty. `stdin` is writable too.
   `RLIMIT_RSS`; fallback RSS accounting covers the leader and can overshoot.
   V8 reserves large address space; avoid small address-space limits.
 - macOS reads `ps` start times with `LC_ALL=C TZ=UTC`, applies CPU/data rlimits
-  and polls tree RSS. Windows uses PowerShell/CIM creation times, polls tree
+  and polls tree RSS. Windows reads CIM creation times through one long-lived PowerShell helper per supervisor, polls tree
   working sets (`enforcement: "rss-polling"`) and stops verified trees with
   `taskkill /PID <pid> /T /F`. Memory caps on both are softer than Linux cgroups.
 - Both use a Node guardian as the handle PID. It proves the random token from
@@ -102,6 +102,10 @@ PTY stdout combines terminal output; stderr is empty. `stdin` is writable too.
   until registry persistence, and survives supervisor restarts for recovery.
   Memory includes the guardian and its descendants. No identity-helper setup
   or custom native compilation is needed.
+- Defaults per platform: `pollIntervalMs` 100 ms Linux, 500 macOS, 1500 Windows;
+  `observationTimeoutMs` (ownership check wait) 2 s Linux, 15 s macOS/Windows. Explicit
+  options win. Raise `observationTimeoutMs` on a loaded machine; the timeout error names it.
+  The guardian replies to resume before launching the workload.
 - Windows needs PowerShell/CIM. `cpuSeconds` is POSIX-only and
   `virtualMemoryBytes` Linux-only; unsupported limits fail before launch.
   Timeouts apply everywhere. Windows always forces the PID tree immediately;
