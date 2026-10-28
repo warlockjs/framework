@@ -172,6 +172,18 @@ export function supervisor(options: SupervisorOptions): ProcessSupervisor {
       if ((error as NodeJS.ErrnoException).code !== "ESRCH") throw error;
     }
   }
+  /**
+   * A process that is exiting can still be listed for a moment after its guardian
+   * (and so its token) is gone. Read fresh a few times; only a process that has
+   * disappeared counts as gone, and a live one keeps its not-owned failure.
+   */
+  async function gone(pid: number): Promise<boolean> {
+    for (let attempt = 0; attempt < 5; attempt++) {
+      if (!(await identity(pid, false, undefined, observe()))) return true;
+      await delay(100);
+    }
+    return false;
+  }
   async function stopEntry(
     entry: RegistryEntry,
     reason: ProcessExit["reason"] = "stopped",
@@ -213,10 +225,7 @@ export function supervisor(options: SupervisorOptions): ProcessSupervisor {
       // The leader may exit between identity verification and a signal. A
       // missing identity is harmless for a tracked handle; a live mismatch is
       // still an ownership failure and must never receive another signal.
-      if (
-        error instanceof ProcessNotOwnedError &&
-        !(await identity(entry.pid, false, undefined, observe()))
-      ) {
+      if (error instanceof ProcessNotOwnedError && (await gone(entry.pid))) {
         await running.finish(null, null);
         return;
       }
