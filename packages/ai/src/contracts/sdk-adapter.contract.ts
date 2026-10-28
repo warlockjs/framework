@@ -1,3 +1,4 @@
+import type { ListModelsOptions, ModelInfo } from "./model-info.type";
 import type { EmbedderConfig, EmbedderContract } from "./embedder.contract";
 import type { ImageModelConfig, ImageModelContract } from "./image-model.contract";
 import type { ModelContract } from "./model.contract";
@@ -98,6 +99,20 @@ export interface SDKAdapterContract {
    * const { data } = await ai.image({ model, prompt: "a red bicycle" });
    */
   image?(config: ImageModelConfig): ImageModelContract;
+
+  /**
+   * List the models the provider offers to this account, live, mapped to the
+   * common {@link ModelInfo} shape. Optional: the first-party adapters
+   * implement it where the provider has a listing API, and the structural
+   * absence of the method means the adapter cannot list. Follows pagination
+   * to the end. Failures surface as the adapter's usual provider errors
+   * (auth, rate limit, timeout), never as an empty list.
+   *
+   * @example
+   * const models = await openai.models?.();
+   * const chat = models?.filter((model) => model.kind === "chat");
+   */
+  models?(options?: ListModelsOptions): Promise<ModelInfo[]>;
 
   /**
    * Create a text-to-speech model bound to this SDK's client, for use

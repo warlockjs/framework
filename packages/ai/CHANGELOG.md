@@ -4,6 +4,13 @@ All notable changes to `@warlock.js/ai` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.40.0 - 2026-10-28
+
+### Added
+
+- `SDKAdapterContract.models?()` and the `ModelInfo` / `ModelKind` / `ListModelsOptions` types give every adapter one shape for a live model listing (`id`, `label`, `provider`, `kind`, and `created`, `contextWindow`, `maxOutputTokens`, `description` when the provider reports them). An adapter without a listing API has no `models` method.
+- `inferModelKind(id)` classifies a model id as chat, embedding, image, audio, moderation or other, for providers whose listing carries no modality field.
+
 ## 5.38.0 - 2026-10-25
 
 ### Added

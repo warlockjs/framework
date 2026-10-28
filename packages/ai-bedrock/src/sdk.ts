@@ -1,5 +1,13 @@
+import {
+  BedrockClient,
+  ListFoundationModelsCommand,
+  type ListFoundationModelsCommandOutput,
+} from "@aws-sdk/client-bedrock";
 import { BedrockRuntimeClient } from "@aws-sdk/client-bedrock-runtime";
 import type {
+  ListModelsOptions,
+  ModelInfo,
+  ModelKind,
   EmbedderContract,
   ModelContract,
   ModelPricing,
@@ -9,6 +17,7 @@ import { approximateTokenCount, InvalidRequestError } from "@warlock.js/ai";
 import type { BedrockEmbedderConfig, BedrockModelConfig, BedrockSDKConfig } from "./config.type";
 import { BedrockEmbedder } from "./embedder";
 import { BedrockModel } from "./model";
+import { wrapBedrockError } from "./utils";
 
 /**
  * AWS Bedrock-backed implementation of `SDKAdapterContract`.
@@ -42,15 +51,18 @@ import { BedrockModel } from "./model";
  */
 export class BedrockSDK implements SDKAdapterContract {
   private readonly client: BedrockRuntimeClient;
+  /** Control-plane client for `ListFoundationModels`; built on first use from the same config. */
+  private readonly controlConfig: ConstructorParameters<typeof BedrockClient>[0];
+  private controlClient?: BedrockClient;
   private readonly provider: string;
   private readonly pricing?: Record<string, ModelPricing>;
 
   public constructor(config: BedrockSDKConfig) {
     const { provider, pricing, apiKey, ...clientConfig } = config;
 
-    this.client = new BedrockRuntimeClient(
-      apiKey === undefined ? clientConfig : withApiKey(clientConfig, apiKey),
-    );
+    const resolvedConfig = apiKey === undefined ? clientConfig : withApiKey(clientConfig, apiKey);
+    this.client = new BedrockRuntimeClient(resolvedConfig);
+    this.controlConfig = resolvedConfig as ConstructorParameters<typeof BedrockClient>[0];
     this.provider = provider ?? "bedrock";
     this.pricing = pricing;
   }
@@ -93,6 +105,68 @@ export class BedrockSDK implements SDKAdapterContract {
    */
   public embedder(config: BedrockEmbedderConfig): EmbedderContract {
     return new BedrockEmbedder(this.client, config, this.provider);
+  }
+
+  /**
+   * List the foundation models Bedrock offers in this SDK's region, live from
+   * `ListFoundationModels`, mapped to {@link ModelInfo}. Uses the same
+   * credentials, region and API key as the runtime client (a separate
+   * `BedrockClient` is created on first use; the API needs the
+   * `bedrock:ListFoundationModels` permission). Models whose lifecycle status
+   * is `LEGACY` are left out. `kind` follows the model's output modalities
+   * (`TEXT` chat, `EMBEDDING`, `IMAGE`). The listing carries no release date
+   * or token limits, so those fields are absent. The ids are foundation-model
+   * ids; some models can only be invoked through a cross-region inference
+   * profile id (for example `us.` + id), which this listing does not return.
+   * Failures are thrown as the adapter's usual provider errors.
+   *
+   * @example
+   * const models = await bedrock.models();
+   * const chat = models.filter((model) => model.kind === "chat");
+   */
+  public async models(options?: ListModelsOptions): Promise<ModelInfo[]> {
+    this.controlClient ??= new BedrockClient(this.controlConfig);
+
+    let response: ListFoundationModelsCommandOutput;
+
+    try {
+      response = await this.controlClient.send(
+        new ListFoundationModelsCommand({}),
+        options?.signal ? { abortSignal: options.signal } : undefined,
+      );
+    } catch (thrown) {
+      throw wrapBedrockError(thrown);
+    }
+
+    const found = new Map<string, ModelInfo>();
+
+    for (const summary of response.modelSummaries ?? []) {
+      const id = summary.modelId;
+
+      if (!id || summary.modelLifecycle?.status === "LEGACY") {
+        continue;
+      }
+
+      const outputs = summary.outputModalities ?? [];
+      const kind: ModelKind = outputs.includes("EMBEDDING")
+        ? "embedding"
+        : outputs.includes("IMAGE")
+          ? "image"
+          : outputs.includes("TEXT")
+            ? "chat"
+            : "other";
+
+      found.set(id, {
+        id,
+        label: summary.providerName
+          ? `${summary.providerName} ${summary.modelName ?? id}`
+          : (summary.modelName ?? id),
+        provider: this.provider,
+        kind,
+      });
+    }
+
+    return [...found.values()];
   }
 }
 

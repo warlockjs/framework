@@ -4,6 +4,13 @@ All notable changes to `@warlock.js/ai-google` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.40.0 - 2026-10-28
+
+### Added
+
+- `googleSearchBudget(maxQueries)` and `providerOptions.google.search.budget` bound Google Search across the calls of one run. The Gemini API has no per-request search limit, so after each call the adapter adds the unique queries Google reported to the budget and, once it is spent, stops sending the `googleSearch` tool on later calls (other tools are kept). One call that is already running can still overshoot the budget.
+- `google.models()` lists the models the key can use as `ModelInfo[]`, with `kind` from each model's `supportedActions`, token limits and description.
+
 ## 5.34.3 - 2026-10-20
 
 ### Changed

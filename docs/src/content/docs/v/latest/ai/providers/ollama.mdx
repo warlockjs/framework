@@ -157,6 +157,16 @@ ollama.embedder({ name: "nomic-embed-text", dimensions: 512 });
 
 Image attachments are sent as inlined `base64` bytes.
 
+## List models
+
+`await ollama.models()` lists the models pulled on the daemon from
+`GET /api/tags` and returns `ModelInfo[]`: `id` (the tag, for example
+`llama3.1:8b`; pass it as `name`), `label`, `provider`, `kind` and `created`
+(the model's last-modified time, since Ollama reports no release date). Models
+in the `bert` / `nomic-bert` families are `"embedding"`; the rest are classified
+from the name. If the daemon is down this throws the usual provider error rather
+than returning an empty list. Pass `{ signal }` to cancel.
+
 ## Pricing and usage
 
 Every response reports token `usage` derived from Ollama's eval counts

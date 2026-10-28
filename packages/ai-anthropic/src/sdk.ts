@@ -1,8 +1,14 @@
 import Anthropic from "@anthropic-ai/sdk";
-import type { ModelPricing, SDKAdapterContract } from "@warlock.js/ai";
+import type {
+  ListModelsOptions,
+  ModelInfo,
+  ModelPricing,
+  SDKAdapterContract,
+} from "@warlock.js/ai";
 import { approximateTokenCount } from "@warlock.js/ai";
 import type { AnthropicModelConfig, AnthropicSDKConfig } from "./config.type";
 import { AnthropicModel } from "./model";
+import { wrapAnthropicError } from "./utils";
 
 /**
  * Anthropic-backed implementation of `SDKAdapterContract`.
@@ -86,5 +92,53 @@ export class AnthropicSDK implements SDKAdapterContract {
    */
   public async count(text: string, _model?: string): Promise<number> {
     return approximateTokenCount(text);
+  }
+
+  /**
+   * List the Claude models this account can use, live from `GET /v1/models`,
+   * mapped to {@link ModelInfo}. Follows pagination to the end. `created` is
+   * the release date, `contextWindow` and `maxOutputTokens` come from
+   * Anthropic's `max_input_tokens` / `max_tokens` when the API reports them.
+   * Every entry is a chat model (`kind: "chat"`). Failures are thrown as the
+   * adapter's usual provider errors, never an empty list.
+   *
+   * @example
+   * const models = await anthropic.models();
+   * models.map((model) => model.id); // ["claude-sonnet-4-5-...", ...]
+   */
+  public async models(options?: ListModelsOptions): Promise<ModelInfo[]> {
+    const found = new Map<string, ModelInfo>();
+
+    try {
+      for await (const entry of this.client.models.list(
+        { limit: 1000 },
+        options?.signal ? { signal: options.signal } : undefined,
+      )) {
+        const row = entry as unknown as Record<string, unknown>;
+        const id = row.id;
+
+        if (typeof id !== "string" || id === "") {
+          continue;
+        }
+
+        const released = typeof row.created_at === "string" ? Date.parse(row.created_at) : NaN;
+        const contextWindow = row.max_input_tokens;
+        const maxOutputTokens = row.max_tokens;
+
+        found.set(id, {
+          id,
+          label: typeof row.display_name === "string" && row.display_name ? row.display_name : id,
+          provider: this.provider,
+          kind: "chat",
+          ...(Number.isNaN(released) ? {} : { created: Math.floor(released / 1000) }),
+          ...(typeof contextWindow === "number" ? { contextWindow } : {}),
+          ...(typeof maxOutputTokens === "number" ? { maxOutputTokens } : {}),
+        });
+      }
+    } catch (thrown) {
+      throw wrapAnthropicError(thrown);
+    }
+
+    return [...found.values()];
   }
 }

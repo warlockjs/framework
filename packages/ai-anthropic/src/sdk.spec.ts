@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { ProviderAuthError } from "@warlock.js/ai";
+import { describe, expect, it, vi } from "vitest";
 import { AnthropicSDK } from "./sdk";
 
 describe("AnthropicSDK", () => {
@@ -143,5 +144,87 @@ describe("AnthropicSDK", () => {
     const sdk = new AnthropicSDK({ apiKey: "test-key" });
 
     expect((sdk as { embedder?: unknown }).embedder).toBeUndefined();
+  });
+});
+
+describe("AnthropicSDK.models()", () => {
+  const page = (data: unknown[], hasMore = false, lastId?: string) =>
+    new Response(
+      JSON.stringify({ data, has_more: hasMore, first_id: null, last_id: lastId ?? null }),
+      {
+        headers: { "Content-Type": "application/json" },
+      },
+    );
+
+  it("lists GET /v1/models, follows pagination and maps release date and limits", async () => {
+    const fetch = vi
+      .fn<typeof globalThis.fetch>()
+      .mockResolvedValueOnce(
+        page(
+          [
+            {
+              type: "model",
+              id: "claude-sonnet-4-5-20250929",
+              display_name: "Claude Sonnet 4.5",
+              created_at: "2025-09-29T00:00:00Z",
+              max_input_tokens: 200000,
+              max_tokens: 64000,
+            },
+          ],
+          true,
+          "claude-sonnet-4-5-20250929",
+        ),
+      )
+      .mockResolvedValueOnce(
+        page([
+          {
+            type: "model",
+            id: "claude-haiku-4-5",
+            display_name: "Claude Haiku 4.5",
+            created_at: "2025-10-01T00:00:00Z",
+          },
+        ]),
+      );
+    const models = await new AnthropicSDK({ apiKey: "k", fetch }).models();
+
+    expect(String(fetch.mock.calls[0]?.[0])).toContain("/v1/models");
+    expect(String(fetch.mock.calls[1]?.[0])).toContain("after_id=claude-sonnet-4-5-20250929");
+    expect(models).toEqual([
+      {
+        id: "claude-sonnet-4-5-20250929",
+        label: "Claude Sonnet 4.5",
+        provider: "anthropic",
+        kind: "chat",
+        created: 1_759_104_000,
+        contextWindow: 200000,
+        maxOutputTokens: 64000,
+      },
+      {
+        id: "claude-haiku-4-5",
+        label: "Claude Haiku 4.5",
+        provider: "anthropic",
+        kind: "chat",
+        created: 1_759_276_800,
+      },
+    ]);
+  });
+
+  it("throws a provider error on an auth failure", async () => {
+    const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          type: "error",
+          error: { type: "authentication_error", message: "invalid x-api-key" },
+        }),
+        {
+          status: 401,
+          headers: { "Content-Type": "application/json" },
+        },
+      ),
+    );
+
+    await expect(
+      new AnthropicSDK({ apiKey: "k", fetch, maxRetries: 0 }).models(),
+    ).rejects.toBeInstanceOf(ProviderAuthError);
   });
 });

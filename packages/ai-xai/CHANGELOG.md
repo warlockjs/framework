@@ -4,6 +4,17 @@ All notable changes to `@warlock.js/ai-xai` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.40.0 - 2026-10-28
+
+### Added
+
+- Native `web_search` and `x_search` now work. A call that carries one of those tools is sent to xAI's Responses API (`POST /v1/responses`) with the same model, key and pricing; every other call stays on Chat Completions. `xai.model({ api: "responses" })` sends every call there, and `api: "chat"` pins Chat Completions (a search tool then throws before any request).
+- `xai.models()` lists the Grok models the key can use from `GET /v1/models` as `ModelInfo[]`.
+
+### Changed
+
+- Native search no longer throws "requires the Responses API"; it is routed to it. On a gateway that relabels `provider`, the switch is not automatic: set `api: "responses"` on the model.
+
 ## 5.34.3 - 2026-10-20
 
 ### Changed

@@ -85,6 +85,22 @@ strict: true`); pass `responseFormat: "json_object"` or `"text"` on the
   `pricing` map (USD per million tokens) for a cost breakdown on every
   `usage`.
 
+## List models
+
+`await openai.models()` lists the models your key can use from `GET /v1/models`
+and returns `ModelInfo[]`: `id` (pass it as `name`), `label`, `provider`, `kind`
+(`"chat"`, `"embedding"`, `"image"`, `"audio"`, `"moderation"` or `"other"`), and
+`created` (Unix seconds) when reported. OpenAI's listing carries no modality
+field, so `kind` is classified from the model id: treat it as a filter hint for
+ids it does not know. Pagination is followed to the end and failures throw the
+usual provider errors (for example `ProviderAuthError`), never an empty list.
+Works the same on OpenAI-compatible gateways that implement `GET /models`, with
+`provider` set to the SDK's label. Pass `{ signal }` to cancel.
+
+```ts
+const chat = (await openai.models()).filter((model) => model.kind === "chat");
+```
+
 ## Pricing and usage
 
 Every response reports token `usage` (`input`, `output`, `total`), on
@@ -390,6 +406,29 @@ const webSearch = ai.providerTool({ provider: "openai", definition: { type: "web
 ```
 
 With `streamChunks` (on by default under `agent.stream()`), the Responses model yields `reasoning` for reasoning-summary and reasoning-text deltas (summaries need `body: { reasoning: { summary: "auto" } }`) and `tool-args` for `response.function_call_arguments.delta`. The Chat model yields `tool-args` for argument fragments and `reasoning` for a compatible vendor's `reasoning_content` / `reasoning` delta. See [Stream reasoning and tool arguments](/v/latest/ai/agents/stream-reasoning-and-tool-args/).
+
+### Native web search chooses the API for you
+
+Chat Completions cannot run OpenAI's hosted `web_search`. On the direct
+`"openai"` provider, a call that carries a `web_search` tool (or its dated and
+`_preview` variants) is served by the Responses API automatically, with the same
+model name, client and pricing; calls without it stay on Chat Completions.
+
+```ts
+const model = openai.model({ name: "gpt-4.1" }); // no `api` needed
+await model.complete(messages, { tools: [webSearch] }); // sent to POST /v1/responses
+```
+
+Nothing falls back silently. The adapter throws `InvalidRequestError` before any
+request when:
+
+- the model is pinned with `api: "chat"` (remove it, or use `api: "responses"`);
+- the model is one OpenAI documents as unable to search: `gpt-3.5*`, `gpt-4` and `gpt-4-turbo`, `gpt-4.1-nano`, `o1-mini`, `o1-preview`, `o3-mini`, and non-chat ids such as embeddings, `whisper`, `tts`, `dall-e` and `gpt-image*`;
+- a `gpt-5*` call asks for `reasoning.effort: "minimal"`, which OpenAI's search tool does not accept.
+
+Any other id, including ones this list does not know, is sent and OpenAI
+decides. `gpt-4o-mini` and `gpt-4.1-mini` can search; OpenAI bills extra
+search-content tokens on them, so check the price before enabling search there.
 
 ## Hosted-search metering and metadata
 

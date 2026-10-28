@@ -10,6 +10,7 @@ export function hostedOutput(
   usage: Usage,
   output: OpenAI.Responses.ResponseOutputItem[],
   pricing: ModelPricing | undefined,
+  key: string = "openai",
 ): Record<string, unknown> | undefined {
   const hosted = output.filter(
     (item) => item.type !== "message" && item.type !== "reasoning" && item.type !== "function_call",
@@ -18,5 +19,5 @@ export function hostedOutput(
   if (searches.length)
     usage.serverToolUse = { ...usage.serverToolUse, webSearchRequests: searches.length };
   attachCost(usage, pricing);
-  return hosted.length ? { openai: { output: hosted } } : undefined;
+  return hosted.length ? { [key]: { output: hosted } } : undefined;
 }

@@ -102,8 +102,25 @@ export class OpenAIResponsesModel implements ModelContract {
   private readonly config: OpenAIModelConfig;
   private readonly logger: Logger = log;
 
-  public constructor(client: OpenAI, config: OpenAIModelConfig, provider: string = "openai") {
-    if (provider !== "openai") {
+  /** `true` for an OpenAI-compatible vendor (xAI) that serves `/v1/responses` itself. */
+  private readonly compatible: boolean;
+
+  /**
+   * `options.compatible` lets a vendor package that implements `/v1/responses`
+   * (xAI) reuse this adapter under its own provider label. It is accepted
+   * only from those packages' own code: it drops the OpenAI-only request
+   * fields (`include` of encrypted reasoning and search sources), so no
+   * reasoning replay happens and no field unknown to the vendor is sent.
+   */
+  public constructor(
+    client: OpenAI,
+    config: OpenAIModelConfig,
+    provider: string = "openai",
+    options: { compatible?: boolean } = {},
+  ) {
+    this.compatible = options.compatible === true;
+
+    if (provider !== "openai" && !this.compatible) {
       throw new InvalidRequestError(
         `api: "responses" is supported only on the direct "openai" provider; got provider "${provider}".`,
         { context: { provider, model: config.name, api: "responses" } },
@@ -169,7 +186,12 @@ export class OpenAIResponsesModel implements ModelContract {
       hasToolCalls: toolCalls !== undefined,
     });
     const usage = this.extractUsage(response.usage);
-    const providerMetadata = hostedOutput(usage, output, this.pricing);
+    const providerMetadata = hostedOutput(
+      usage,
+      output,
+      this.pricing,
+      this.compatible ? this.provider : "openai",
+    );
 
     this.logger.debug(LOG_MODULE, "response", "call to responses.create succeeded", {
       finishReason,
@@ -360,7 +382,12 @@ export class OpenAIResponsesModel implements ModelContract {
     // Terminal output is authoritative; fall back to item.done events when absent.
     // Never add both snapshots, which would double-count hosted calls.
     const output = terminal.output?.length ? terminal.output : outputItems;
-    const providerMetadata = hostedOutput(usage, output, this.pricing);
+    const providerMetadata = hostedOutput(
+      usage,
+      output,
+      this.pricing,
+      this.compatible ? this.provider : "openai",
+    );
 
     this.logger.debug(LOG_MODULE, "response", "Streaming call to responses.create succeeded", {
       finishReason,
@@ -393,15 +420,12 @@ export class OpenAIResponsesModel implements ModelContract {
     const maxTokens = options?.maxTokens ?? this.config.maxTokens;
     const temperature = options?.temperature ?? this.config.temperature;
 
-    return mergeProviderBody<OpenAI.Responses.ResponseCreateParamsNonStreaming>(
-      {
-        model: this.name,
-        ...(instructions !== undefined ? { instructions } : {}),
-        input,
-        store: false,
-        // Stateless replay: ask for the encrypted reasoning blobs so they can be
-        // sent back on the next tool turn (decision 3).
-        include: [
+    // Stateless replay: ask for the encrypted reasoning blobs so they can be
+    // sent back on the next tool turn (decision 3). OpenAI-only fields.
+    const include: Array<"reasoning.encrypted_content" | "web_search_call.action.sources"> = this
+      .compatible
+      ? []
+      : [
           "reasoning.encrypted_content",
           ...(tools?.some(
             (tool) =>
@@ -412,7 +436,15 @@ export class OpenAIResponsesModel implements ModelContract {
           )
             ? ["web_search_call.action.sources" as const]
             : []),
-        ],
+        ];
+
+    return mergeProviderBody<OpenAI.Responses.ResponseCreateParamsNonStreaming>(
+      {
+        model: this.name,
+        ...(instructions !== undefined ? { instructions } : {}),
+        input,
+        store: false,
+        ...(include.length > 0 ? { include } : {}),
         ...(maxTokens !== undefined ? { max_output_tokens: maxTokens } : {}),
         ...(!this.capabilities.reasoning && temperature !== undefined ? { temperature } : {}),
         ...(tools ? { tools } : {}),

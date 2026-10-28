@@ -133,8 +133,9 @@ and namespaced counters when recomputing costs yourself.
 ## xAI
 
 [xAI's documented native search](https://docs.x.ai/developers/tools/web-search)
-uses `POST /v1/responses` with `{ type: "web_search" }`. `XaiSDK` currently
-wraps Chat Completions: native `web_search` / `x_search` definitions throw a
-clear `InvalidRequestError` before transport. Use the vendor's Responses SDK
-for that feature. Setting `api: "responses"` on a compatible `OpenAISDK` is
-also unsupported; the framework's Responses adapter remains direct-OpenAI-only.
+uses `POST /v1/responses` with `{ type: "web_search" }`. `XaiSDK` keeps Chat
+Completions as its default and routes a call to the Responses API when it
+carries a native `web_search` / `x_search` tool, or when the model is built with
+`api: "responses"`; see [xAI native search](/v/latest/ai/providers/xai/#native-web-search-and-x-search).
+Setting `api: "responses"` on a plain compatible `OpenAISDK` is still
+unsupported; only `XaiSDK` opts in to that transport.

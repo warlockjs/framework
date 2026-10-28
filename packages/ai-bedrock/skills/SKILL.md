@@ -317,3 +317,7 @@ no count or search fee is inferred from `server_tool_use` system-tool blocks.
 Hosted system tools continue to stay outside function dispatch. Direct
 Anthropic counters are not assumed to exist on Converse. Supply fees only when
 your own verified metering establishes the billing unit.
+
+## List models
+
+`await bedrock.models()` returns `ModelInfo[]` from `ListFoundationModels` (needs `bedrock:ListFoundationModels`; legacy models left out; `kind` from output modalities).

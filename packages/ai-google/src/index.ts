@@ -12,3 +12,5 @@ export type {
 export type { GoogleCallOptions } from "./provider-options";
 
 export { GOOGLE_SERVER_TOOL_PRICING } from "./known-pricing";
+export { googleSearchBudget } from "./search-budget";
+export type { GoogleSearchBudget } from "./search-budget";

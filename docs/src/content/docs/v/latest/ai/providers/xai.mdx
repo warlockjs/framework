@@ -252,14 +252,31 @@ Models from this adapter have no native `countTokens` method. Check
 `model.countTokens` before using an optional native counting capability;
 `sdk.count(text)` is a separate offline estimate.
 
-## Native web search requires Responses
+## Native web search and X search
 
-[xAI's official web-search guide](https://docs.x.ai/developers/tools/web-search)
-(verified 2026-10-18) sends `{ type: "web_search" }` to `POST /v1/responses`.
-`XaiSDK` currently wraps Chat Completions, so native `web_search` and `x_search`
-provider tools are explicitly unsupported and throw `InvalidRequestError`
-before transport, explaining that the vendor's Responses API is required.
-Use xAI's own Responses SDK for native search. The framework's
-`api: "responses"` adapter remains direct-OpenAI-only; passing a tool definition
-does not change this transport. No xAI hosted-search request count or list fee
-is guessed. See [compatible native search](/v/latest/ai/providers/openai-compatible/#xai).
+xAI's native `web_search` and `x_search` tools exist only on the Responses API
+(`POST /v1/responses`, [xAI's web-search guide](https://docs.x.ai/developers/tools/web-search)).
+`XaiSDK` keeps Chat Completions as the default and switches a call to
+Responses when that call carries one of those tools:
+
+```ts
+import { ai } from "@warlock.js/ai";
+
+const search = ai.providerTool({ provider: "xai", definition: { type: "web_search" } });
+const model = xai.model({ name: "grok-4" });
+
+const { text } = await ai.agent({ model, tools: [search] }).execute("What shipped this week?");
+```
+
+- Calls without those tools still use Chat Completions, so nothing else changes.
+- `xai.model({ name, api: "responses" })` sends every call to Responses; `api: "chat"` pins Chat Completions, and a search tool then throws `InvalidRequestError` before any request.
+- The Responses path reuses the OpenAI adapter's Responses model: function tools, structured output, streaming and token usage work as there. It is stateless (`store: false`) and leaves out the OpenAI-only `include` fields (encrypted reasoning, search sources), so nothing xAI does not document is sent.
+- Each `web_search_call` item in the answer counts once in `usage.serverToolUse.webSearchRequests`, and the raw hosted output items are on `providerMetadata.xai.output`. No xAI search fee is guessed: set `pricing.serverTools.webSearch` yourself if you want it costed.
+- On a gateway that relabels `provider`, the switch is not made automatically (the label may not forward `/v1/responses`); set `api: "responses"` on the model to opt in.
+
+## List models
+
+`await xai.models()` returns the models your key can use from `GET /v1/models`
+as `ModelInfo[]` (`id`, `label`, `provider`, `kind`, and `created` when
+reported). `kind` is classified from the model id, since the OpenAI-compatible
+listing carries no modality field.

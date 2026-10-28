@@ -1,4 +1,6 @@
 import type {
+  ListModelsOptions,
+  ModelInfo,
   EmbedderContract,
   ImageModelContract,
   ModelContract,
@@ -181,5 +183,18 @@ export class DeepSeekSDK implements SDKAdapterContract {
    */
   public image(config: DeepSeekImageConfig): ImageModelContract {
     return this.openai.image(config);
+  }
+  /**
+   * List the models this DeepSeek account can use, live from the provider's
+   * OpenAI-compatible `GET /models`, mapped to the common `ModelInfo`
+   * shape. DeepSeek lists its chat models (`deepseek-chat`, `deepseek-reasoner`). Failures are thrown as the adapter's usual provider
+   * errors, never an empty list.
+   *
+   * @example
+   * const models = await deepseek.models();
+   * models.map((model) => model.id);
+   */
+  public async models(options?: ListModelsOptions): Promise<ModelInfo[]> {
+    return this.openai.models(options);
   }
 }

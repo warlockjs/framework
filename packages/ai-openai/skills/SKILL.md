@@ -444,3 +444,11 @@ Abort signals cancel transport; retries are disabled. `invoke().error` is a
 `ToolExecutionError` whose `cause` is the mapped provider error (or
 `AgentCancelledError` for caller cancellation). `execute()` returns data only
 and throws mapped errors. Never infer fees from function calls or prose.
+
+## Native web search picks the API
+
+On the direct `"openai"` provider a call carrying the hosted `web_search` tool is served by the Responses API automatically (same model, client and pricing); other calls stay on Chat Completions. It throws `InvalidRequestError` before any request on models OpenAI documents as unable to search (`gpt-3.5*`, `gpt-4`, `gpt-4-turbo`, `gpt-4.1-nano`, `o1-mini`, `o1-preview`, `o3-mini`, non-chat ids), on `gpt-5*` with `reasoning.effort: "minimal"`, and on a model pinned to `api: "chat"`. Never a silent fallback.
+
+## List models
+
+`await openai.models()` returns `ModelInfo[]` from `GET /models` (also on compatible gateways, with the SDK's provider label); `kind` is classified from the id.

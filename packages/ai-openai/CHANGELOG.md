@@ -4,6 +4,18 @@ All notable changes to `@warlock.js/ai-openai` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.40.0 - 2026-10-28
+
+### Added
+
+- `openai.models()` lists the models the key can use from `GET /models` as `ModelInfo[]`, following pagination. Works on OpenAI-compatible gateways too, with the SDK's provider label. Groq's `context_window` and `active`, Mistral's `name`, `description`, `max_context_length` and `capabilities`, and `created_at` dates are read when present.
+- `OpenAIResponsesModel` is exported, and `OpenAISDK.compatibleResponses()` builds it for vendor packages that serve `/v1/responses` (used by the xAI adapter). That mode sends `store: false` and leaves out the OpenAI-only `include` fields.
+
+### Changed
+
+- On the direct `"openai"` provider, a call that carries the hosted `web_search` tool (or its dated and `_preview` variants) is now served by the Responses API automatically instead of failing with a 400 on Chat Completions. Calls without it stay on Chat Completions.
+- Hosted `web_search` now fails with a clear `InvalidRequestError`, before any request, on models OpenAI documents as unable to search (`gpt-3.5*`, `gpt-4`, `gpt-4-turbo`, `gpt-4.1-nano`, `o1-mini`, `o1-preview`, `o3-mini` and non-chat ids), on `gpt-5*` with minimal reasoning, and on a model pinned to `api: "chat"`. Nothing falls back silently.
+
 ## 5.34.3 - 2026-10-20
 
 ### Changed

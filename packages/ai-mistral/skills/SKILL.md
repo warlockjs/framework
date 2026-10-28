@@ -130,3 +130,7 @@ OpenAI-only bodies across a mixed-provider fallback chain.
 Models from this adapter have no native `countTokens` method. Check
 `model.countTokens` before using an optional native counting capability;
 `sdk.count(text)` is a separate offline estimate.
+
+## List models
+
+`await mistral.models()` returns `ModelInfo[]` (`contextWindow`, `description`, `kind: "other"` when `capabilities.completion_chat` is false).

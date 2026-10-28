@@ -1,4 +1,6 @@
 import type {
+  ListModelsOptions,
+  ModelInfo,
   EmbedderContract,
   ModelContract,
   ModelPricing,
@@ -151,6 +153,19 @@ export class GroqSDK implements SDKAdapterContract {
   // its structural absence IS the capability guard, so
   // `ai.groq.image(...)` is a compile-time error rather than a runtime
   // surprise (mirrors Anthropic / Bedrock / Ollama).
+  /**
+   * List the models this Groq account can use, live from the provider's
+   * OpenAI-compatible `GET /models`, mapped to the common `ModelInfo`
+   * shape. Groq models marked inactive are left out; `contextWindow` comes from `context_window`. Failures are thrown as the adapter's usual provider
+   * errors, never an empty list.
+   *
+   * @example
+   * const models = await groq.models();
+   * models.map((model) => model.id);
+   */
+  public async models(options?: ListModelsOptions): Promise<ModelInfo[]> {
+    return this.openai.models(options);
+  }
 }
 
 /**

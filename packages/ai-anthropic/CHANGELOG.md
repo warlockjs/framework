@@ -4,6 +4,12 @@ All notable changes to `@warlock.js/ai-anthropic` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.40.0 - 2026-10-28
+
+### Added
+
+- `anthropic.models()` lists the Claude models the key can use from `GET /v1/models` as `ModelInfo[]`, following pagination, with release date and token limits when the API reports them.
+
 ## 5.34.3 - 2026-10-20
 
 ### Changed
