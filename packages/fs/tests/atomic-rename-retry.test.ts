@@ -77,7 +77,7 @@ describe("atomic write — rename retry on transient Windows locks", () => {
     expect(atomicError.message).toContain(String(atomicError.attempts));
     expect(atomicError.cause).toBeDefined();
     expect(await tempFilesIn(dir)).toEqual([]);
-  });
+  }, 20_000);
 
   it("throws immediately after a single attempt on a non-retryable error (ENOSPC)", async () => {
     const target = path.join(dir, "full-disk.json");

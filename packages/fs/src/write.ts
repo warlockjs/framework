@@ -38,9 +38,34 @@ export function putJsonFile(filePath: string, value: unknown): void {
 
   try {
     writeFileSync(temporaryPath, JSON.stringify(value, null, 2), "utf-8");
-    renameSync(temporaryPath, filePath);
+    renameSyncWithRetry(temporaryPath, filePath);
   } catch (error) {
     rmSync(temporaryPath, { force: true });
     throw error;
+  }
+}
+
+/**
+ * Rename over `to`, retrying a Windows sharing violation (EPERM / EACCES /
+ * EBUSY, another handle has the target open) for about 4 seconds. Elsewhere
+ * the first attempt succeeds, so the schedule never runs.
+ */
+function renameSyncWithRetry(from: string, to: string): void {
+  const sleeper = new Int32Array(new SharedArrayBuffer(4));
+  const attempts = process.platform === "win32" ? 30 : 1;
+
+  for (let attempt = 1; ; attempt++) {
+    try {
+      renameSync(from, to);
+
+      return;
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      const transient = code === "EPERM" || code === "EACCES" || code === "EBUSY";
+
+      if (!transient || attempt >= attempts) throw error;
+
+      Atomics.wait(sleeper, 0, 0, Math.min(10 * 2 ** (attempt - 1), 150));
+    }
   }
 }
