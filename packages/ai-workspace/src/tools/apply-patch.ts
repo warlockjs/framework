@@ -1,6 +1,7 @@
 import type { StandardSchemaV1 } from "@standard-schema/spec";
 import { tool, type ToolContract } from "@warlock.js/ai";
 import type { ApplyPatchInput, ApplyPatchResult, WorkspaceOps } from "../contracts";
+import { applyPatchWithOps } from "../patch/apply-patch-generic";
 import { APPLY_PATCH_JSON_SCHEMA } from "./json-schemas";
 import { withJsonSchema } from "./schema";
 
@@ -75,6 +76,6 @@ export function makeApplyPatchTool(
       "so small line drift is fine; binary files are refused. Use dryRun to check first.",
     action: (input) => (input.dryRun === true ? "Checking a patch" : "Applying a patch"),
     input: inputSchema,
-    execute: (input) => ops.applyPatch(input),
+    execute: (input) => (ops.applyPatch ? ops.applyPatch(input) : applyPatchWithOps(ops, input)),
   });
 }

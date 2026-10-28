@@ -15,6 +15,8 @@ import { createMockBackend } from "../backends/mock";
 import type { WorkspaceBackend } from "../contracts";
 import { WorkspaceEditError, WorkspacePolicyError } from "../errors";
 import { createOps } from "../ops";
+import { applyPatchWithOps } from "./apply-patch-generic";
+import type { WorkspaceOps } from "../contracts";
 import { makeApplyPatchTool } from "../tools/apply-patch";
 
 let root: string;
@@ -28,7 +30,9 @@ const seed = (name: string, content: string): void => {
   mkdirSync(path.dirname(path.join(root, name)), { recursive: true });
   writeFileSync(path.join(root, name), content);
 };
-const ops = () => createOps(createLocalBackend(), { cwd: root });
+const ops = () =>
+  createOps(createLocalBackend(), { cwd: root }) as WorkspaceOps &
+    Required<Pick<WorkspaceOps, "applyPatch">>;
 
 describe("ops.applyPatch", () => {
   it("modifies, creates, deletes and renames in one patch", async () => {
@@ -105,7 +109,7 @@ describe("ops.applyPatch", () => {
     });
 
     await expect(
-      createOps(failing, { cwd: root }).applyPatch({
+      (createOps(failing, { cwd: root }) as Required<Pick<WorkspaceOps, "applyPatch">>).applyPatch({
         patch:
           "--- a/a.txt\n+++ b/a.txt\n@@ -1 +1 @@\n-one\n+ONE\n--- a/b.txt\n+++ b/b.txt\n@@ -1 +1 @@\n-two\n+TWO\n",
       }),
@@ -222,5 +226,95 @@ describe("ops.applyPatch", () => {
 
     expect(bad.error).toBeDefined();
     expect(WorkspaceEditError).toBeDefined();
+  });
+});
+
+describe("applyPatch on a custom ops without its own applyPatch", () => {
+  /** Delegating ops that deliberately leaves `applyPatch` out. */
+  function customOps(failWriteOn?: string): WorkspaceOps {
+    const inner = createOps(createLocalBackend(), { cwd: root });
+
+    return {
+      readFile: (p: string, o?: { offset?: number; limit?: number }) => inner.readFile(p, o),
+      writeFile: async (p: string, c: string) => {
+        if (failWriteOn !== undefined && p.endsWith(failWriteOn)) {
+          throw new Error("disk full");
+        }
+
+        return inner.writeFile(p, c);
+      },
+      exists: (p: string) => inner.exists(p),
+      remove: (p: string) => inner.remove(p),
+    } as unknown as WorkspaceOps;
+  }
+
+  const PATCH = [
+    "--- a/a.txt",
+    "+++ b/a.txt",
+    "@@ -1,2 +1,2 @@",
+    " one",
+    "-two",
+    "+TWO",
+    "--- /dev/null",
+    "+++ b/sub/new.txt",
+    "@@ -0,0 +1 @@",
+    "+fresh",
+    "--- a/gone.txt",
+    "+++ /dev/null",
+    "@@ -1 +0,0 @@",
+    "-bye",
+    "diff --git a/old.txt b/moved.txt",
+    "rename from old.txt",
+    "rename to moved.txt",
+    "",
+  ].join("\n");
+
+  it("applies a multi-file patch through the generic path", async () => {
+    seed("a.txt", "one\r\ntwo\r\n");
+    seed("gone.txt", "bye\n");
+    seed("old.txt", "keep\n");
+
+    const ops = customOps();
+
+    expect(ops.applyPatch).toBeUndefined();
+
+    const result = await applyPatchWithOps(ops, { patch: PATCH });
+
+    expect(result.files.map((file) => file.action)).toEqual([
+      "modified",
+      "created",
+      "deleted",
+      "renamed",
+    ]);
+    expect(read("a.txt")).toBe("one\r\nTWO\r\n");
+    expect(read("sub/new.txt")).toBe("fresh\n");
+    expect(read("moved.txt")).toBe("keep\n");
+    expect(existsSync(path.join(root, "gone.txt"))).toBe(false);
+    expect(existsSync(path.join(root, "old.txt"))).toBe(false);
+  });
+
+  it("rolls back already-written files when a later write fails", async () => {
+    seed("a.txt", "one\ntwo\n");
+    seed("gone.txt", "bye\n");
+    seed("old.txt", "keep\n");
+
+    await expect(applyPatchWithOps(customOps("moved.txt"), { patch: PATCH })).rejects.toThrowError(
+      /rolled back/,
+    );
+
+    expect(read("a.txt")).toBe("one\ntwo\n");
+    expect(read("gone.txt")).toBe("bye\n");
+    expect(read("old.txt")).toBe("keep\n");
+    expect(existsSync(path.join(root, "sub/new.txt"))).toBe(false);
+    expect(existsSync(path.join(root, "moved.txt"))).toBe(false);
+  });
+
+  it("changes nothing when a hunk does not apply", async () => {
+    seed("a.txt", "nothing like it\n");
+
+    await expect(applyPatchWithOps(customOps(), { patch: PATCH })).rejects.toMatchObject({
+      type: "hunk-failed",
+    });
+    expect(read("a.txt")).toBe("nothing like it\n");
   });
 });

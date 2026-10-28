@@ -232,7 +232,7 @@ await ws.dispose(); // kills background commands; refuses new commands
 - File patches apply in order against a virtual tree, so a patch can delete a path and create it again, or swap two files by renames.
 - `dryRun: true` validates and reports without writing.
 
-It returns `{ files: [{ path, action, oldPath?, hunks, hash? }], dryRun }` where `action` is `"modified"`, `"created"`, `"deleted"` or `"renamed"`. Directly: `await ws.applyPatch({ patch })`. It is not part of `readonly()`. The patch engine itself is exported as `parsePatch(text)` and `applyHunks(content, hunks, path)` for code that needs to apply a diff to a string.
+It returns `{ files: [{ path, action, oldPath?, hunks, hash? }], dryRun }` where `action` is `"modified"`, `"created"`, `"deleted"` or `"renamed"`. Directly: `await ws.applyPatch({ patch })`. It is not part of `readonly()`. A custom `WorkspaceOps` does not have to implement `applyPatch`: without it, the same engine runs on its `exists`, `readFile`, `writeFile` and `remove` (`applyPatchWithOps`), with the same checks and rollback. The patch engine itself is exported as `parsePatch(text)` and `applyHunks(content, hunks, path)` for code that needs to apply a diff to a string.
 
 ## Several edits at once — `multi_edit`
 

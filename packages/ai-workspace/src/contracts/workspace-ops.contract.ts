@@ -68,8 +68,10 @@ export interface WorkspaceOps {
    * files. Every path goes through the jail, binary files are refused, and
    * the patch is atomic: all hunks apply (and are written, with a rollback if
    * a write fails) or nothing changes. `dryRun` checks without writing.
+   * Optional: a custom implementation that omits it gets a generic one built
+   * on `exists`, `readFile`, `writeFile` and `remove` (see `applyPatchWithOps`).
    */
-  applyPatch(input: ApplyPatchInput): Promise<ApplyPatchResult>;
+  applyPatch?(input: ApplyPatchInput): Promise<ApplyPatchResult>;
 
   /**
    * Run a command line after checking every command in it against the

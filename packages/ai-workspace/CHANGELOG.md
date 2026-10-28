@@ -11,7 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `apply_patch` tool and `ws.applyPatch({ patch, dryRun? })`: apply a unified diff (plain or `git diff` style) that modifies, creates, deletes and renames several files in one call. The patch is atomic: every hunk is checked first and the files are written only if all apply, with a rollback if a write fails. Paths go through the workspace jail (`..`, absolute paths and symlinks out are refused), hunks are matched by context so small line drift is fine, CRLF and LF files keep their line endings, and binary patches or binary target files are refused with a clear error. `apply_patch` is part of `tools.all()` and is left out of `readonly()`.
 - `WorkspaceEditError.type` gains `"patch-invalid"`, `"hunk-failed"` (with `hunkIndex`), `"binary-file"`, `"file-exists"` and `"file-missing"`.
 - `parsePatch()` and `applyHunks()` are exported for applying a unified diff to a string without a workspace.
-- `WorkspaceOps` and `Workspace` gain `applyPatch`; a custom implementation or test double must add it.
+- `applyPatch` is optional on a custom `WorkspaceOps`: an implementation without it still gets `apply_patch` and `ws.applyPatch()`, built on its `exists`, `readFile`, `writeFile` and `remove` with the same all-or-nothing behaviour (also exported as `applyPatchWithOps`).
 - `ApplyPatchInput`, `ApplyPatchResult` and `ApplyPatchFileResult` types; `"applyPatch"` joins `WorkspaceToolName`.
 
 ## 5.34.3 - 2026-10-20

@@ -6,6 +6,7 @@ import { WorkspacePolicyError } from "./errors";
 import { createOps } from "./ops";
 import { ShellJobs } from "./shell-jobs";
 import { TodoStore } from "./todos";
+import { applyPatchWithOps } from "./patch/apply-patch-generic";
 import { makeApplyPatchTool } from "./tools/apply-patch";
 import { makeEditFileTool } from "./tools/edit-file";
 import { makeGlobTool } from "./tools/glob";
@@ -276,7 +277,7 @@ class WorkspaceImpl implements Workspace {
   public async applyPatch(input: ApplyPatchInput): Promise<ApplyPatchResult> {
     this.assertWritable("applyPatch");
 
-    return this.ops.applyPatch(input);
+    return this.ops.applyPatch ? this.ops.applyPatch(input) : applyPatchWithOps(this.ops, input);
   }
 
   public listDir(dirPath?: string, opts?: ListDirOptions): Promise<ListDirResult> {
