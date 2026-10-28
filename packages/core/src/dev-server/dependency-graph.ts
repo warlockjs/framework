@@ -203,26 +203,37 @@ export class DependencyGraph {
   /**
    * Get invalidation chain for a file
    * Returns all files that need to be reloaded when this file changes
-   * Includes the file itself and all transitive dependents
+   * Includes the file itself and all transitive dependents.
+   *
+   * An importer that reaches the changed file only through type-only edges
+   * (`import type`, `export type`) is not part of the chain: the compiler
+   * erases those imports, so the importer never evaluates the changed module
+   * and re-importing it (plus everything above it) is wasted work. Pass
+   * `includeTypeOnly: true` for the full structural reachability set.
+   *
    * @param file The file that changed
-   * @returns Array of files to invalidate (in order)
+   * @returns Array of files to invalidate (breadth first, the file first)
    */
-  public getInvalidationChain(file: string): string[] {
+  public getInvalidationChain(
+    file: string,
+    { includeTypeOnly = false }: { includeTypeOnly?: boolean } = {},
+  ): string[] {
     const chain: string[] = [file];
     const visited = new Set([file]);
 
-    const traverse = (current: string) => {
-      const deps = this.getDependents(current);
-      for (const dep of deps) {
-        if (!visited.has(dep)) {
-          visited.add(dep);
-          chain.push(dep);
-          traverse(dep); // Recursive traversal
-        }
-      }
-    };
+    // Iterative: a long import chain must not overflow the call stack.
+    for (let index = 0; index < chain.length; index++) {
+      const current = chain[index]!;
 
-    traverse(file);
+      for (const dependent of this.getDependents(current)) {
+        if (visited.has(dependent)) continue;
+        if (!includeTypeOnly && this.isEdgeTypeOnly(dependent, current)) continue;
+
+        visited.add(dependent);
+        chain.push(dependent);
+      }
+    }
+
     return chain;
   }
 

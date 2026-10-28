@@ -2,6 +2,16 @@
 
 All notable changes to `@warlock.js/web` are documented here.
 
+## 5.40.0 - 2026-10-28
+
+### Changed
+
+- In development, `web.loaderTimeout` defaults to 90 seconds instead of 15, because the first page after a start or a reload also pays for compiling the modules its loaders import. Production keeps 15 seconds, and an explicit `web.loaderTimeout` always wins.
+
+### Fixed
+
+- The first page after a `warlock dev` restart could fail with `PageLoaderTimeoutError` (a 504 after about 20 seconds) while the server was still compiling. The loader timeout clock now starts only after a hot reload in progress has finished.
+
 ## 5.39.0 - 2026-10-26
 
 ### Added

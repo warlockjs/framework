@@ -143,3 +143,97 @@ describe("LayerExecutor.executeBatchReload — opt-in per-phase reload timings",
     expect(typeof timings.connectorRestartMs).toBe("number");
   });
 });
+
+describe("LayerExecutor.executeBatchReload — narrow invalidation and reload order", () => {
+  afterEach(() => {
+    devLogHMRMock.mockClear();
+  });
+
+  function buildChainExecutor(chains: Record<string, string[]>, files: Map<string, FileManager>) {
+    const dependencyGraph = { getInvalidationChain: (path: string) => chains[path] ?? [path] };
+    const moduleLoader = {
+      cleanupDeletedModule: vi.fn(),
+      runCleanup: vi.fn(),
+      loadModule: vi.fn(),
+      reloadModule: vi.fn().mockResolvedValue(undefined),
+    };
+    const executor = new LayerExecutor(
+      dependencyGraph as never,
+      { getFilesByType: () => [] } as never,
+      moduleLoader as never,
+      vi.fn(),
+      vi.fn().mockResolvedValue(undefined),
+    );
+
+    return { executor, files };
+  }
+
+  it("re-reads only the changed files, not their thousands of importers", async () => {
+    const changed = fakeFile("src/a.ts", "model");
+    const importers = Array.from({ length: 50 }, (_, index) =>
+      fakeFile(`src/i${index}.ts`, "other" as never),
+    );
+    const files = new Map([
+      [changed.relativePath, changed],
+      ...importers.map((f) => [f.relativePath, f] as const),
+    ]);
+    const { executor } = buildChainExecutor(
+      { "src/a.ts": [changed.relativePath, ...importers.map((f) => f.relativePath)] },
+      files,
+    );
+
+    await executor.executeBatchReload(["src/a.ts"], files, []);
+
+    expect(changed.process).toHaveBeenCalledWith({ force: true });
+    for (const importer of importers) expect(importer.process).not.toHaveBeenCalled();
+  });
+
+  it("reports each changed file's own dependents, not a running total", async () => {
+    const a = fakeFile("src/a.ts", "model");
+    const b = fakeFile("src/b.ts", "model");
+    const files = new Map([
+      [a.relativePath, a],
+      [b.relativePath, b],
+    ]);
+    const { executor } = buildChainExecutor(
+      { "src/a.ts": ["src/a.ts", "x", "y"], "src/b.ts": ["src/b.ts", "z"] },
+      files,
+    );
+
+    await executor.executeBatchReload(["src/a.ts", "src/b.ts"], files, []);
+
+    expect(devLogHMRMock).toHaveBeenCalledWith("src/a.ts", 2, expect.any(Number));
+    expect(devLogHMRMock).toHaveBeenCalledWith("src/b.ts", 1, expect.any(Number));
+  });
+
+  it("holds the request gate for the whole reload, then opens it", async () => {
+    const { reloadGate } = await import("../http/reload-gate");
+    const file = fakeFile("src/a.ts", "model");
+    const files = new Map([[file.relativePath, file]]);
+    const { executor } = buildChainExecutor({}, files);
+    let closedDuringReload = false;
+
+    vi.mocked(file.process).mockImplementation(async () => {
+      closedDuringReload = reloadGate.closed;
+
+      return true;
+    });
+
+    await executor.executeBatchReload(["src/a.ts"], files, []);
+
+    expect(closedDuringReload).toBe(true);
+    expect(reloadGate.closed).toBe(false);
+  });
+
+  it("opens the gate even when the reload throws", async () => {
+    const { reloadGate } = await import("../http/reload-gate");
+    const file = fakeFile("src/a.ts", "model");
+    const files = new Map([[file.relativePath, file]]);
+    const { executor } = buildChainExecutor({}, files);
+
+    vi.mocked(file.process).mockRejectedValue(new Error("boom"));
+
+    await expect(executor.executeBatchReload(["src/a.ts"], files, [])).rejects.toThrow("boom");
+    expect(reloadGate.closed).toBe(false);
+  });
+});

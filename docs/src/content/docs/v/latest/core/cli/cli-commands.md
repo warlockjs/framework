@@ -124,6 +124,8 @@ The check itself is best-effort and non-blocking: it never delays or breaks star
 
 #### Per-phase reload timings — new in 5.12
 
+A hot reload runs in a fixed order: new requests wait, requests already running finish on the old code (up to 5 seconds), the old modules are disposed and the new ones imported, then the held requests continue on the new code. A request that waits more than 15 seconds for a reload gets `503` with `Retry-After: 2`. The `+N modules` count on the `hmr update` line is the number of importers re-imported for that file; importers that only `import type` from it are not counted, because the compiler erases those imports. Code that must wait for a reload can use `whenReloadSettled()` from `@warlock.js/core`.
+
 Set `devServer.timings: true` in `warlock.config.ts` to print a one-line, per-phase breakdown next to the existing `hmr update` line on every hot reload:
 
 ```ts title="warlock.config.ts"

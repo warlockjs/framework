@@ -13,6 +13,7 @@ type DrainResponse = ServerResponse | Http2ServerResponse;
 import { normalizeRequestPath } from "../router/normalize-request-path";
 import { dispatchRefusal } from "./refusal-dispatch";
 import { registerErrorResponseFormatter } from "./error-response";
+import { registerReloadGate } from "./reload-gate";
 import type { HttpServerOptions } from "./types";
 
 export type FastifyInstance = ReturnType<typeof Fastify>;
@@ -124,6 +125,7 @@ export function startHttpServer(options?: HttpServerOptions): FastifyInstance {
   });
 
   registerErrorResponseFormatter(server);
+  registerReloadGate(server);
 
   // `"idle"` promises that idle keep-alive connections close on shutdown. Fastify
   // only reaps the ones idle at the moment close starts; a connection whose

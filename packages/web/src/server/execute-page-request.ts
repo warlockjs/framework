@@ -6,6 +6,7 @@ import {
   isTracingEnabled,
   Response,
   type Request,
+  whenReloadSettled,
 } from "@warlock.js/core";
 import { getSealConfig, v } from "@warlock.js/seal";
 import { enterSharedScope, sealShared, shared } from "../shared";
@@ -745,6 +746,9 @@ export async function executePageRequest<TResult = PageDataBundle>(
     // value (its own race lives in `defer-settlement.ts`) and never the
     // render that follows this loop.
     const loaderTimeoutMs = resolveLoaderTimeoutMs();
+    // A dev-server reload in progress is not the loaders' time: wait for the
+    // new generation before the clock starts (a no-op outside a reload).
+    await whenReloadSettled();
     let loaderTimeoutTimer: ReturnType<typeof setTimeout> | undefined;
     // Settles (by rejecting) AT MOST ONCE, so every await below can safely
     // race the SAME promise object as many times as the loop needs — a

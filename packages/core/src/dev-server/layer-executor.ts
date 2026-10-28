@@ -2,6 +2,7 @@ import { loadEnv } from "@mongez/dotenv";
 import { configManager } from "../config/config-manager";
 import { connectorsManager } from "../connectors/connectors-manager";
 import type { DependencyGraph } from "./dependency-graph";
+import { reloadGate } from "../http/reload-gate";
 import { devLogHMR, devLogTimings } from "./dev-logger";
 import { FileManager } from "./file-manager";
 import { isTimingsEnabled } from "./flags";
@@ -55,6 +56,38 @@ export class LayerExecutor {
       return;
     }
 
+    // The order of a reload: hold new requests, let running ones finish on
+    // the old generation (bounded), dispose it and import the new one, then
+    // open the gate so held requests continue on the new generation.
+    reloadGate.begin();
+
+    try {
+      await reloadGate.drain();
+      await this.reloadGeneration(
+        changedPaths,
+        filesMap,
+        deletedFiles,
+        allChangedPaths,
+        incomingTimings,
+      );
+    } finally {
+      reloadGate.end();
+    }
+  }
+
+  private async reloadGeneration(
+    changedPaths: string[],
+    filesMap: Map<string, FileManager>,
+    deletedFiles: string[],
+    allChangedPaths?: string[],
+    incomingTimings?: IncomingReloadTimings,
+  ): Promise<void> {
+    const envFilesChanged = (allChangedPaths ?? []).some(isEnvPath);
+
+    if (changedPaths.length === 0 && deletedFiles.length === 0 && !envFilesChanged) {
+      return;
+    }
+
     // Deletes: clean up routes/cleanup hooks for files that no longer exist.
     for (const path of deletedFiles) {
       const file = filesMap.get(path);
@@ -76,10 +109,15 @@ export class LayerExecutor {
     const invalidationChain = new Set<string>();
     const pendingHmrLogs: { path: string; dependents: number }[] = [];
     for (const path of changedPaths) {
-      for (const file of this.dependencyGraph.getInvalidationChain(path)) {
+      const pathChain = this.dependencyGraph.getInvalidationChain(path);
+
+      for (const file of pathChain) {
         invalidationChain.add(file);
       }
-      pendingHmrLogs.push({ path, dependents: invalidationChain.size - 1 });
+
+      // Per changed file, not the running union: a three-file save used to
+      // print each later file with the earlier files' dependents added in.
+      pendingHmrLogs.push({ path, dependents: pathChain.length - 1 });
     }
 
     const chain = Array.from(invalidationChain);
@@ -88,12 +126,16 @@ export class LayerExecutor {
 
     // Step 1: bump version counters so the next import() is fresh.
     const moduleGraphStartedAt = timingsEnabled ? performance.now() : 0;
+    // Only the files that actually changed are re-read and re-parsed; their
+    // importers keep the same source, so re-processing each of them (thousands
+    // on a busy barrel) only burned disk and parser time.
+    const changedSet = new Set(changedPaths);
     for (const relativePath of chain) {
       const file = filesMap.get(relativePath);
       if (!file) continue;
       this.moduleLoader.runCleanup(file);
       this.bumpVersion(file.absolutePath);
-      await file.process({ force: true });
+      if (changedSet.has(relativePath)) await file.process({ force: true });
     }
     const moduleGraphInvalidationMs = timingsEnabled ? performance.now() - moduleGraphStartedAt : 0;
 
@@ -159,7 +201,8 @@ export class LayerExecutor {
     // demoted to the file's value just because the file was touched.
     if (isEnvAffected) await loadEnv(undefined, environmentLoaderOptions);
 
-    const isAffected = (file: FileManager) => isFileAffected(file, chain);
+    const chainSet = new Set(chain);
+    const isAffected = (file: FileManager) => isFileAffected(file, chainSet);
 
     // Models self-register via the @RegisterModel decorator and rely on the
     // module-loader's registerCleanup() to attach Model.$cleanup (which
@@ -232,10 +275,10 @@ function isEnvPath(path: string): boolean {
 /**
  * A file is "affected" if it itself is in the chain or imports something in it.
  */
-function isFileAffected(file: FileManager, chain: string[]): boolean {
-  if (chain.includes(file.relativePath)) return true;
+function isFileAffected(file: FileManager, chain: ReadonlySet<string>): boolean {
+  if (chain.has(file.relativePath)) return true;
   for (const dep of file.dependencies) {
-    if (chain.includes(dep)) return true;
+    if (chain.has(dep)) return true;
   }
   return false;
 }

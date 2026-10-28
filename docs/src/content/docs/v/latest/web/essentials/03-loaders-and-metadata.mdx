@@ -194,7 +194,9 @@ and never checks `signal` still runs to the end.
 ## Loader timeout — `web.loaderTimeout`
 
 The loaders of one request (app → layout → page, plus validation) must finish
-within `web.loaderTimeout` milliseconds, 15000 by default. If they don't,
+within `web.loaderTimeout` milliseconds, 15000 by default (90000 under
+`warlock dev`, where the first page also pays for compiling its modules). The
+clock starts after any dev hot reload in progress has finished. If they don't,
 `signal` fires and the request gets your `error.page.tsx` with status 504 (a
 504 error record on a client navigation). Deferred values and rendering are
 not bounded by it. Set `0` to turn the limit off:

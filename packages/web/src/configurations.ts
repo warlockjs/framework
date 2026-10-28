@@ -35,7 +35,11 @@ export type WebConfigurations = {
   fonts?: readonly import("./fonts/types").WebFont[];
   streaming?: WebStreamingConfigurations;
   forms?: WebFormsConfigurations;
-  /** Milliseconds for the non-deferred app → layout → page loader chain; `0` disables it. */
+  /**
+   * Milliseconds for the non-deferred app → layout → page loader chain; `0` disables it.
+   * Defaults to 15000 (90000 in development, where the first page also pays for compiling
+   * its modules). The clock starts after any dev hot reload in progress has finished.
+   */
   loaderTimeout?: number;
   sitemap?: WebSitemapConfig;
   robots?: RobotsConfig;
