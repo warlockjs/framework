@@ -115,7 +115,7 @@ describe("DevelopmentModelModuleRegistry", () => {
     let linkExists = true;
     vi.spyOn(fs.realpathSync, "native").mockImplementation((input) => {
       if (String(input) === symlinkPath) {
-        if (linkExists) return absolutePath;
+        if (linkExists) return nativeRealpath(absolutePath);
         throw new Error("ENOENT");
       }
       return nativeRealpath(input);

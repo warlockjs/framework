@@ -103,7 +103,7 @@ export function runTypecheck(options: TypecheckOptions = {}): TypecheckResult {
   ]);
   const sources = compiled.output
     .split(/\r?\n/)
-    .map((line) => (path.isAbsolute(line) ? line : ""))
+    .map((line) => (path.isAbsolute(line) ? path.normalize(line) : ""))
     .filter((file) => isProjectFile(file, cwd));
   const wanted = options.files
     ? new Set(options.files.map((file) => path.resolve(cwd, file)))

@@ -15,15 +15,24 @@ function normalizeInputPath(absolutePath: string): string {
 }
 
 function canonicalPath(absolutePath: string): string {
-  let resolvedPath = path.resolve(absolutePath);
+  let existing = path.resolve(absolutePath);
+  const missing: string[] = [];
 
-  try {
-    resolvedPath = fs.realpathSync.native(resolvedPath);
-  } catch {
-    // A deleted model must still resolve to the key it had before deletion.
+  // A deleted model must still resolve to the key it had before deletion: resolve the nearest
+  // folder that still exists and put the missing names back. Without this a Windows 8.3 short
+  // name (`RUNNER~1`) or a link in the parents yields a different key once the file is gone.
+  for (;;) {
+    try {
+      return normalizeInputPath(path.join(fs.realpathSync.native(existing), ...missing));
+    } catch {
+      const parent = path.dirname(existing);
+
+      if (parent === existing) return normalizeInputPath(path.resolve(absolutePath));
+
+      missing.unshift(path.basename(existing));
+      existing = parent;
+    }
   }
-
-  return normalizeInputPath(resolvedPath);
 }
 
 /** Internal writer for the container's read-only development model carrier. */

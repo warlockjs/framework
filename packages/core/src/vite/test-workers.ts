@@ -30,20 +30,20 @@ export function recommendedTestWorkers(
     const entry = read("/proc/self/cgroup")
       .split("\n")
       .find((line) => line.startsWith("0::"));
-    if (entry) directory = path.resolve(root, `.${entry.slice(3)}`);
+    if (entry) directory = path.posix.resolve(root, `.${entry.slice(3)}`);
     if (directory !== root && !directory.startsWith(`${root}/`)) directory = root;
   } catch {
     /* Non-Linux hosts use CPU affinity. */
   }
   for (;;) {
     try {
-      const quota = cpuQuotaWorkers(read(path.join(directory, "cpu.max")));
+      const quota = cpuQuotaWorkers(read(path.posix.join(directory, "cpu.max")));
       if (quota !== undefined) workers = Math.min(workers, quota);
     } catch {
       /* Missing/unreadable quotas do not replace the affinity limit. */
     }
     if (directory === root) break;
-    directory = path.dirname(directory);
+    directory = path.posix.dirname(directory);
   }
   return workers;
 }

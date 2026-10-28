@@ -60,6 +60,17 @@ jobs:
         working-directory: .
         run: git config --global core.autocrlf false
 
+      # Temp folders created by the specs. The runner's default temp folder is an 8.3 short path
+      # (C:\Users\RUNNER~1\...) on a different drive from the checkout; Vite, vitest and libvips
+      # compare such paths with their long spelling, which fails unrelated specs. RUNNER_TEMP sits
+      # beside the checkout.
+      - name: Use a temp folder beside the checkout
+        shell: bash
+        working-directory: .
+        run: |
+          echo "TEMP=$RUNNER_TEMP" >> "$GITHUB_ENV"
+          echo "TMP=$RUNNER_TEMP" >> "$GITHUB_ENV"
+
       - uses: actions/checkout@v7
 
       - uses: pnpm/action-setup@v6

@@ -1,6 +1,6 @@
 import { constants } from "node:fs";
 import { access, mkdir, readFile } from "node:fs/promises";
-import { delimiter, join, resolve } from "node:path";
+import path, { resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { CdpConnection } from "./cdp";
 import { isolatedEnvironment } from "./fixture";
@@ -11,6 +11,8 @@ import type { BrowserOptions, E2EEvidence } from "./types";
 const DEFAULT_STARTUP_TIMEOUT_MS = 30_000;
 
 export function browserCandidates(platform: NodeJS.Platform, env: NodeJS.ProcessEnv): string[] {
+  // Build paths in the flavor of the platform asked about, not of the machine running this.
+  const { join, delimiter } = platform === "win32" ? path.win32 : path.posix;
   const names =
     platform === "win32"
       ? ["chrome.exe", "msedge.exe"]
@@ -23,9 +25,9 @@ export function browserCandidates(platform: NodeJS.Platform, env: NodeJS.Process
           "microsoft-edge-stable",
         ];
   const paths = (env.PATH ?? "")
-    .split(platform === "win32" ? ";" : delimiter)
+    .split(delimiter)
     .filter(Boolean)
-    .flatMap((path) => names.map((name) => join(path, name)));
+    .flatMap((directory) => names.map((name) => join(directory, name)));
   if (platform === "darwin")
     paths.push(
       "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
@@ -35,7 +37,7 @@ export function browserCandidates(platform: NodeJS.Platform, env: NodeJS.Process
     );
   if (platform === "win32")
     for (const root of [env.PROGRAMFILES, env["PROGRAMFILES(X86)"], env.LOCALAPPDATA].filter(
-      (path): path is string => Boolean(path),
+      (directory): directory is string => Boolean(directory),
     ))
       paths.push(
         join(root, "Google", "Chrome", "Application", "chrome.exe"),

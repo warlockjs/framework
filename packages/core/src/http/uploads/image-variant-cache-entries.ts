@@ -6,7 +6,7 @@ const SOURCE = /^[a-f0-9]{64}$/;
 const GENERATION = /^(?:\d+--?\d+|[a-f0-9]{64})$/;
 const DERIVATIVE = /^[a-f0-9]{64}\.(?:jpg|png|webp|avif)$/;
 const TEMPORARY =
-  /^(?:[a-f0-9]{64}\.(?:jpg|png|webp|avif)\.tmp-[a-f0-9]{16}|\.source\.json\.[a-f0-9]{12}\.tmp)$/;
+  /^(?:[a-f0-9]{64}\.(?:jpg|png|webp|avif)\.tmp-[a-f0-9]{16}|\.t-[a-f0-9]{16}\.tmp|\.source\.json\.[a-f0-9]{12}\.tmp)$/;
 
 export type VariantCacheEntry = {
   target: string;

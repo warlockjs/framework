@@ -1,3 +1,4 @@
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { WarlockError } from "../../../errors/warlock-error";
 import {
@@ -48,7 +49,7 @@ describe("warlock trace argument helpers", () => {
       return '{"from":"file"}';
     });
 
-    expect(read).toEqual(["/project/payload.json"]);
+    expect(read).toEqual([path.resolve("/project", "payload.json")]);
     expect(body).toEqual({ from: "file" });
   });
 

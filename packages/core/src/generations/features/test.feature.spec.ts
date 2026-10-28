@@ -96,7 +96,7 @@ describe("add test — worker lifetime switch", () => {
 
     const viteConfig = [...written.entries()].find(([path]) => /vite\.config\.ts$/.test(path))?.[1];
     const testsConfig = [...written.entries()].find(([path]) =>
-      /config\/tests\.ts$/.test(path),
+      /config[\\/]tests\.ts$/.test(path),
     )?.[1];
 
     expect(viteConfig).toContain('isolate: process.env.WARLOCK_TEST_LIFETIME === "file"');
@@ -109,7 +109,7 @@ describe("add test — worker lifetime switch", () => {
     await testFeature.onExecuting?.({} as never);
 
     const testsConfig = [...written.entries()].find(([path]) =>
-      /config\/tests\.ts$/.test(path),
+      /config[\\/]tests\.ts$/.test(path),
     )?.[1];
     const setup = [...written.entries()].find(([path]) => /test-setup\.ts$/.test(path))?.[1];
 

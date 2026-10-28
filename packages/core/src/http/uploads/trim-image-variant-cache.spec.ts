@@ -182,12 +182,13 @@ describe("image derivative cache housekeeping", () => {
     const generation = path.dirname(keep);
     const orphan = `${keep}.tmp-${"0".repeat(16)}`;
     const orphanManifest = path.join(generation, ".source.json.abcdef123456.tmp");
+    const orphanShort = path.join(generation, `.t-${"2".repeat(16)}.tmp`);
     const fresh = `${keep}.tmp-${"1".repeat(16)}`;
     const unrelated = [path.join(generation, ".tmp-user"), path.join(root, ".tmp-user")];
-    for (const file of [orphan, orphanManifest, fresh, ...unrelated]) {
+    for (const file of [orphan, orphanManifest, orphanShort, fresh, ...unrelated]) {
       await fs.writeFile(file, "partial");
     }
-    for (const file of [orphan, orphanManifest, ...unrelated]) {
+    for (const file of [orphan, orphanManifest, orphanShort, ...unrelated]) {
       await age(file, ORPHAN_TEMP_AGE_MS + 60_000);
     }
     await age(fresh, ORPHAN_TEMP_AGE_MS - 60_000);
@@ -196,6 +197,7 @@ describe("image derivative cache housekeeping", () => {
 
     await expect(fs.access(orphan)).rejects.toMatchObject({ code: "ENOENT" });
     await expect(fs.access(orphanManifest)).rejects.toMatchObject({ code: "ENOENT" });
+    await expect(fs.access(orphanShort)).rejects.toMatchObject({ code: "ENOENT" });
     await expect(fs.access(fresh)).resolves.toBeUndefined();
     for (const file of unrelated) expect(await fs.readFile(file, "utf8")).toBe("partial");
     await expect(fs.access(keep)).resolves.toBeUndefined();

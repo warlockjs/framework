@@ -15,6 +15,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- On Windows, image variants failed with a 500 when the cache folder sat deeper than about 100 characters under the project: sharp cannot open a path over 260 characters, and the temporary file name carried the full 64-character hash. The temporary file is now a short `.t-<random>.tmp` beside the target; stale ones are still cleaned up, and the older `.tmp-` names are still recognised.
+- On Windows, `warlock typecheck`, `warlock check` (changed-file selection) and `warlock inspect` compared the compiler's forward-slash paths with backslash paths and found no files or imports, so aliased imports looked unresolved and changed-file runs checked nothing. Paths are now normalised.
+- The development model registry kept a different key for a deleted model than for the published one when the project path contained a Windows 8.3 short name or a link, so removals were not recorded against the right entry.
+- The capability inventory could report the framework's own file as the place a capability was defined when running on Windows.
+- The end-to-end browser finder built Linux and macOS candidate paths with the host's path rules; it now uses the rules of the platform it is asked about. The test-worker recommendation reads Linux cgroup paths with POSIX rules on every host.
 - On Windows, `warlock release` linked `node_modules` into the frozen source and the staged release with a directory symlink, which needs administrator rights; it now uses a junction, which does not (no change on Linux and macOS).
 - `warlock check` could run for tens of minutes in the conventions step on a large app. The `.client` boundary rule (`WL9022`) re-read, re-parsed and re-resolved every shared file for each controller, service, model and route it checked, so the work grew with server-only files times the size of the import graph. Import chains are now read once per run and files known to reach no `.client` module are never walked again, which makes the step roughly linear in the number of files.
 - The conventions step listed and parsed the project twice to collect its project-wide facts; it now lists the files once.

@@ -28,7 +28,7 @@ async function fileExists(target: string): Promise<boolean> {
 /**
  * Render a derivative and write it atomically.
  *
- * The image is written to `<target>.tmp-<random>` and then renamed onto the
+ * The image is written to a short `.t-<random>.tmp` file beside the target and then renamed onto the
  * target, so a reader sees no file or a complete one, never a partial one. On
  * any failure the temp file is removed before the error is rethrown.
  */
@@ -52,7 +52,12 @@ export async function generateImageVariant({
 
   await fs.mkdir(path.dirname(targetPath), { recursive: true });
 
-  const temporaryPath = `${targetPath}.tmp-${randomBytes(8).toString("hex")}`;
+  // A short name: sharp (libvips) cannot open a path over 260 characters on Windows, and the cache
+  // directory is already about 100 characters deeper than its root.
+  const temporaryPath = path.join(
+    path.dirname(targetPath),
+    `.t-${randomBytes(8).toString("hex")}.tmp`,
+  );
 
   try {
     await image.save(temporaryPath);

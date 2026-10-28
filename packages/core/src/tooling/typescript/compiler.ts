@@ -111,7 +111,13 @@ export class CompilerSession {
   }
 
   get fileNames(): readonly string[] {
-    return this.snapshot.getProject(this.configPath)?.program.getSourceFileNames() ?? [];
+    // The native API reports forward-slash paths on Windows; callers compare with `path` output.
+    return (
+      this.snapshot
+        .getProject(this.configPath)
+        ?.program.getSourceFileNames()
+        .map((file) => path.normalize(file)) ?? []
+    );
   }
 
   /** Ask the checker to resolve module references using the project's actual options. */
@@ -121,7 +127,7 @@ export class CompilerSession {
     const source = this.contents.get(path.resolve(file)) ?? readFileSync(file, "utf8");
     return importSpecifiers(file, source).flatMap((imported) => {
       const symbol = project.checker.getSymbolAtPosition(file, imported.node.start + 1);
-      return symbol?.declarations.map((declaration) => declaration.path) ?? [];
+      return symbol?.declarations.map((declaration) => path.normalize(declaration.path)) ?? [];
     });
   }
 
@@ -135,7 +141,7 @@ export class CompilerSession {
         const before = content.slice(0, Math.max(0, diagnostic.pos));
         const lines = before.split("\n");
         return {
-          fileName: diagnostic.fileName,
+          fileName: path.normalize(diagnostic.fileName),
           code: diagnostic.code,
           message: diagnostic.text,
           severity: diagnostic.category === 1 ? "error" : "warning",

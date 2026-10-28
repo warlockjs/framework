@@ -272,7 +272,9 @@ describe("Oxlint background file checks", () => {
     async (code) => {
       const longPath = `src/${"long-".repeat(6_000)}.ts`;
       const execute = vi.fn(async (_binary: string, args: string[]) => {
-        if (args.includes(longPath)) throw Object.assign(new Error("spawn failed"), { code });
+        // Arguments are relative to cwd in the platform's own spelling (backslashes on Windows).
+        if (args.some((arg) => arg.length === longPath.length))
+          throw Object.assign(new Error("spawn failed"), { code });
         return emptyReport();
       });
       const files = ["src/a.ts", longPath, "src/b.ts"].map((relativePath) => ({
