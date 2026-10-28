@@ -51,6 +51,19 @@ describe("special file patterns", () => {
   });
 });
 
+describe("special file patterns skip spec and test files", () => {
+  it.each([
+    [isMainFile, "src/app/blog/main.spec.ts"],
+    [isRouteFile, "src/app/blog/routes.test.ts"],
+    [isEventFile, "src/app/blog/events/on-post.spec.ts"],
+    [isEventFile, "src/app/blog/events/on-post.test.tsx"],
+    [isLocaleFile, "src/app/blog/utils/locales.spec.ts"],
+    [isConfigFile, "src/config/app.spec.ts"],
+  ])("%p rejects %s", (predicate, path) => {
+    expect(predicate(path)).toBe(false);
+  });
+});
+
 describe("isCodeFile", () => {
   it.each([
     ["src/app/a.ts", true],

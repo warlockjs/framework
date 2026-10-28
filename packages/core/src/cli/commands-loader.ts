@@ -3,14 +3,27 @@ import { Path } from "../utils/normalized-path";
 import { getFilesFromDirectory } from "../dev-server/utils";
 import { srcPath } from "../utils";
 import { CLICommand } from "../commands/cli-command";
+import { isTestFile } from "../utils/is-test-file";
 import { isMatchingCommandName } from "./cli-commands.utils";
+
+const COMMANDS_PATTERN = "**/commands/*.{ts,tsx}";
+
+/**
+ * Absolute paths of every app command file. Spec and test files that sit next
+ * to a command are skipped: importing one outside a test runner crashes the CLI.
+ */
+async function commandFiles(): Promise<string[]> {
+  const files = await getFilesFromDirectory(srcPath("app"), COMMANDS_PATTERN);
+
+  return files.filter((file) => !isTestFile(file));
+}
 
 export class CLICommandsLoader {
   /**
    * Locate command by name
    */
   public async locate(commandName: string): Promise<CLICommand | undefined> {
-    const files = await getFilesFromDirectory(srcPath("app"), "**/commands/*.{ts,tsx}");
+    const files = await commandFiles();
     // now convert them into relative paths
     const relativeFiles = files.map((path) => Path.toRelative(path));
 
@@ -32,7 +45,7 @@ export class CLICommandsLoader {
    * Used for warm cache functionality
    */
   public async scanAll(): Promise<CLICommand[]> {
-    const files = await getFilesFromDirectory(srcPath("app"), "**/commands/*.{ts,tsx}");
+    const files = await commandFiles();
     const relativeFiles = files.map((path) => Path.toRelative(path));
     const commands: CLICommand[] = [];
 

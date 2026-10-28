@@ -60,6 +60,7 @@ export async function loadMigrations(pattern?: string): Promise<number> {
     absolute: true,
     cwd: process.cwd(),
     onlyFiles: true,
+    ignore: ["**/*.{spec,test}.{ts,tsx,js,jsx,mjs,cjs,mts,cts}"],
   });
 
   // name -> file, so a collision can name both paths.

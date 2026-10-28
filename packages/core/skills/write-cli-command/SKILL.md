@@ -7,7 +7,7 @@ description: 'Author a custom `warlock <my-cmd>` command via the `command()` fac
 
 A Warlock CLI command is a `CLICommand` instance produced by the `command()` factory. Three ways to surface it:
 
-1. **Project commands** — drop a `<name>.command.ts` file under `src/app/<module>/commands/` with the `CLICommand` as the default export. Auto-discovered.
+1. **Project commands** — drop a `<name>.command.ts` file under `src/app/<module>/commands/` with the `CLICommand` as the default export. Auto-discovered; `*.spec.*` and `*.test.*` files beside a command are skipped.
 2. **Plugin commands** — exposed as a factory function (`registerXCommand()`) from a package, registered via `warlock.config.ts > cli.commands: [...]`.
 3. **Framework commands** — `migrate`, `seed`, `dev`, `build`, `generate.*`, `storage.put`, `drop.tables`, etc. Built into core. You don't write these; you copy their shape.
 

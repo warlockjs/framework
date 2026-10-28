@@ -766,7 +766,7 @@ warlock test --json                             # Vitest's JSON report on stdout
 
 Three places to surface a custom CLI:
 
-1. **Project-local** — drop `<name>.command.ts` under `src/app/<module>/commands/`. Auto-discovered.
+1. **Project-local** — drop `<name>.command.ts` under `src/app/<module>/commands/`. Auto-discovered. Spec and test files (`*.spec.*`, `*.test.*`) next to a command are never loaded, so a `vi.mock()` in a test cannot break the CLI.
 2. **Package-exported** — your package exports `registerXCommand()`; the consuming project lists it under `warlock.config.ts > cli.commands`.
 3. **Framework** — built into `@warlock.js/core`. You don't write these.
 
