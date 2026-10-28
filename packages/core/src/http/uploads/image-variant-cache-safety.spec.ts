@@ -124,7 +124,13 @@ describe("image variant cache overlap safety", () => {
     const linkedGeneration = path.join(sourceDirectory, "50-60");
     await fs.symlink(backup, linkedGeneration, "junction");
     const linkedFile = path.join(path.dirname(target), `${"d".repeat(64)}.webp`);
-    await fs.symlink(external, linkedFile);
+    // A file symlink needs a privilege Windows withholds by default; the directory links above
+    // are junctions and always work, so the rest of the case still runs without this one.
+    let fileLinked = true;
+    await fs.symlink(external, linkedFile).catch((error: NodeJS.ErrnoException) => {
+      if (process.platform !== "win32" || error.code !== "EPERM") throw error;
+      fileLinked = false;
+    });
 
     await pruneStaleVariantGenerations(sourceDirectory, "30-40");
     for (const file of owned) {
@@ -135,7 +141,7 @@ describe("image variant cache overlap safety", () => {
     }
     expect(await fs.readFile(external, "utf8")).toBe("outside bytes");
     expect((await fs.lstat(linkedGeneration)).isSymbolicLink()).toBe(true);
-    expect((await fs.lstat(linkedFile)).isSymbolicLink()).toBe(true);
+    if (fileLinked) expect((await fs.lstat(linkedFile)).isSymbolicLink()).toBe(true);
     expect((await fs.stat(path.dirname(target))).isDirectory()).toBe(true);
   });
 

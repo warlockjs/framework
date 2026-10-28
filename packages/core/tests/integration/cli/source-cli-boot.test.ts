@@ -66,7 +66,7 @@ beforeAll(async () => {
   await mkdir(scope, { recursive: true });
 
   for (const name of ["core", "cache", "logger"]) {
-    await symlink(path.join(PACKAGES_ROOT, name), path.join(scope, name), "dir");
+    await symlink(path.join(PACKAGES_ROOT, name), path.join(scope, name), "junction");
   }
 });
 

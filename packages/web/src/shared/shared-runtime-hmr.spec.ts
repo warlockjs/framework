@@ -21,7 +21,7 @@ describe("shared runtime across watched server edits", () => {
     const source = await readFile(join(webRoot, "src/shared.ts"), "utf8");
     try {
       await writeFile(join(root, "shared.ts"), source);
-      await symlink(join(webRoot, "node_modules"), join(root, "node_modules"), "dir");
+      await symlink(join(webRoot, "node_modules"), join(root, "node_modules"), "junction");
       server = await createServer({
         root,
         configFile: false,

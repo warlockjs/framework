@@ -109,7 +109,7 @@ describe("image derivative cache limits", () => {
     const keep = await derivative("a", 10);
     const unrelated = path.join(root, "notes.txt");
     await fs.writeFile(unrelated, "keep");
-    await fs.symlink(path.dirname(root), path.join(root, "external"));
+    await fs.symlink(path.dirname(root), path.join(root, "external"), "junction");
     const images = resolveImageVariantsConfig(
       { variants: { thumb: { width: 10 } }, cacheDirectory: root, maxCacheBytes: 1 },
       `${root}-sources`,

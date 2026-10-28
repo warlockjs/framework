@@ -40,14 +40,14 @@ export async function linkWorkspaceDependencies(directory: string): Promise<void
     await symlink(
       join(workspace, "packages", name),
       join(target, "@warlock.js", name),
-      "dir",
+      "junction",
     ).catch((error: NodeJS.ErrnoException) => {
       if (error.code !== "EEXIST") throw error;
     });
   }
 
   const link = async (from: string, to: string) => {
-    await symlink(from, to, "dir").catch((error: NodeJS.ErrnoException) => {
+    await symlink(from, to, "junction").catch((error: NodeJS.ErrnoException) => {
       if (error.code !== "EEXIST") throw error;
     });
   };

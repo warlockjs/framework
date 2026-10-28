@@ -96,7 +96,7 @@ export async function stageRelease(context: ReleaseContext, id: string): Promise
       await symlink(
         path.join(context.root, "node_modules"),
         path.join(temporary, "node_modules"),
-        "dir",
+        "junction",
       );
     }
 

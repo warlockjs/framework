@@ -471,6 +471,15 @@ warlock test --json                    # machine-readable results on stdout
 
 See [CLI commands](../cli/cli-commands.md#test-filters) for every flag.
 
+## Running tests on Windows
+
+The test helpers exported from `@warlock.js/core/tests` build their files with `node:path` and `os.tmpdir()`, so they behave the same on Windows as elsewhere. The differences that reach app test suites come from the operating system:
+
+- **Symlinks.** Creating a file symlink on Windows needs administrator rights or Developer Mode, and fails with `EPERM` otherwise. A directory link made with `fs.symlink(target, link, "junction")` needs neither, so link `node_modules` folders and fixture directories as junctions (the option is ignored on Linux and macOS). Skip a test that needs a file symlink with `it.skipIf(process.platform === "win32")`.
+- **Permissions.** `chmod` and `mode & 0o777` checks have no effect on Windows; skip tests that assert Unix permission bits.
+- **Paths.** Build expected paths with `path.join`/`path.resolve`, or convert a `file:` URL with `fileURLToPath` instead of reading `URL.pathname`, which yields `/C:/…`.
+- **Services.** Redis and Mongo service containers are not available on GitHub's Windows runners, so keep specs that need them behind an opt-in variable such as `WARLOCK_REDIS_INTEGRATION`.
+
 ## Caveats and trade-offs
 
 When a unit test copies TypeScript source into a temporary directory for a fresh

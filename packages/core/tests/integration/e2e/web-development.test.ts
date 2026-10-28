@@ -32,7 +32,7 @@ it.each(["shared", "identifiers"])(
       await symlink(
         join(workspace, "packages/web/node_modules"),
         join(source, "node_modules"),
-        "dir",
+        "junction",
       );
       const paths: Record<string, string[]> = {};
       const aliases: { find: string; replacement: string }[] = [];

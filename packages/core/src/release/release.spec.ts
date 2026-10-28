@@ -104,6 +104,10 @@ afterEach(async () => {
   await rm(root, { recursive: true, force: true });
 });
 
+// The release pipeline is a server-side deploy feature: it archives with `tar`, runs shell gates and
+// switches `current` through a relative directory symlink, which Windows only allows to elevated users.
+const posixDeploy = process.platform === "win32" ? describe.skip : describe;
+
 describe("compareVersions", () => {
   it("orders numerically, not as text", () => {
     expect(compareVersions("1.10.0", "1.2.0")).toBeGreaterThan(0);
@@ -150,7 +154,7 @@ describe("resolveReleaseConfig", () => {
   });
 });
 
-describe("createCandidate", () => {
+posixDeploy("createCandidate", () => {
   it("freezes the commit with a manifest", async () => {
     const commit = await commitVersion("1.0.0");
     const manifest = await createCandidate(makeContext());
@@ -204,7 +208,7 @@ describe("createCandidate", () => {
   });
 });
 
-describe("runGate", () => {
+posixDeploy("runGate", () => {
   it("runs the checks in order inside the frozen source and records them", async () => {
     await commitVersion("1.0.0");
     const context = makeContext();
@@ -238,7 +242,7 @@ describe("runGate", () => {
   });
 });
 
-describe("stageRelease", () => {
+posixDeploy("stageRelease", () => {
   it("refuses a candidate that did not pass the gate", async () => {
     await commitVersion("1.0.0");
     const context = makeContext();
@@ -272,7 +276,7 @@ describe("stageRelease", () => {
   });
 });
 
-describe("activateRelease", () => {
+posixDeploy("activateRelease", () => {
   it("refuses a candidate that is not staged", async () => {
     await commitVersion("1.0.0");
     const context = makeContext();
@@ -400,7 +404,7 @@ describe("activateRelease", () => {
   });
 });
 
-describe("rollbackRelease", () => {
+posixDeploy("rollbackRelease", () => {
   it("has nothing to do without a previous release", async () => {
     await commitVersion("1.0.0");
     const context = makeContext();
@@ -443,7 +447,7 @@ describe("rollbackRelease", () => {
   });
 });
 
-describe("pruneReleases", () => {
+posixDeploy("pruneReleases", () => {
   it("keeps the newest, current and previous; removes only when asked", async () => {
     const context = makeContext();
     const ids: string[] = [];
@@ -475,7 +479,7 @@ describe("pruneReleases", () => {
   });
 });
 
-describe("verifyRelease", () => {
+posixDeploy("verifyRelease", () => {
   let server: Server;
   let url: string;
   let requests: number;
@@ -558,7 +562,7 @@ describe("verifyRelease", () => {
   });
 });
 
-describe("proveMigrations", () => {
+posixDeploy("proveMigrations", () => {
   function fakeDatabase(options: { apply?: string[]; indexOnRun?: boolean } = {}) {
     const state = {
       executed: ["001-users"],
@@ -635,7 +639,7 @@ describe("proveMigrations", () => {
   });
 });
 
-describe("runReleaseAction", () => {
+posixDeploy("runReleaseAction", () => {
   const unusedMigrations = async () => {
     throw new Error("database must not be opened");
   };

@@ -15,6 +15,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- On Windows, `warlock release` linked `node_modules` into the frozen source and the staged release with a directory symlink, which needs administrator rights; it now uses a junction, which does not (no change on Linux and macOS).
 - `warlock check` could run for tens of minutes in the conventions step on a large app. The `.client` boundary rule (`WL9022`) re-read, re-parsed and re-resolved every shared file for each controller, service, model and route it checked, so the work grew with server-only files times the size of the import graph. Import chains are now read once per run and files known to reach no `.client` module are never walked again, which makes the step roughly linear in the number of files.
 - The conventions step listed and parsed the project twice to collect its project-wide facts; it now lists the files once.
 - A check over thousands of files stalled for several seconds at a time, and used far more memory than needed, because every parsed syntax tree kept its parent links in a `WeakMap`, which the garbage collector resolves slowly once many trees are alive. Parent links are now stored on the nodes themselves, and each file is parsed once per rule instead of several times; the conventions step on a 7,500-file app dropped from about 105 s to about 14 s, and no rule is skipped by the time budget.
