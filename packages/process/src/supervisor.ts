@@ -122,7 +122,22 @@ export function supervisor(options: SupervisorOptions): ProcessSupervisor {
   function polling(): Observation {
     return { ...observe(), maxAgeMs: pollMs };
   }
-  const registry = new Registry(registryPath, options.owner);
+  /**
+   * Registry lease checks read identities too. Off Linux they go through the shared
+   * helper, and a transient failure (an exiting process reports no creation time) is
+   * retried instead of failing the whole operation.
+   */
+  async function lease(pid: number) {
+    for (let attempt = 1; ; attempt++) {
+      try {
+        return await identity(pid, false, undefined, observe());
+      } catch (error) {
+        if (process.platform === "linux" || attempt >= 3) throw error;
+        await delay(200);
+      }
+    }
+  }
+  const registry = new Registry(registryPath, options.owner, lease);
   const entries = new Map<number, RegistryEntry>();
   const active = new Map<number, Active>();
   let ready: Promise<void> | undefined;
@@ -172,6 +187,18 @@ export function supervisor(options: SupervisorOptions): ProcessSupervisor {
       if ((error as NodeJS.ErrnoException).code !== "ESRCH") throw error;
     }
   }
+  /**
+   * A process that is exiting can still be listed for a moment after its guardian
+   * (and so its token) is gone. Read fresh a few times; only a process that has
+   * disappeared counts as gone, and a live one keeps its not-owned failure.
+   */
+  async function gone(pid: number): Promise<boolean> {
+    for (let attempt = 0; attempt < 5; attempt++) {
+      if (!(await identity(pid, false, undefined, observe()))) return true;
+      await delay(100);
+    }
+    return false;
+  }
   async function stopEntry(
     entry: RegistryEntry,
     reason: ProcessExit["reason"] = "stopped",
@@ -213,10 +240,7 @@ export function supervisor(options: SupervisorOptions): ProcessSupervisor {
       // The leader may exit between identity verification and a signal. A
       // missing identity is harmless for a tracked handle; a live mismatch is
       // still an ownership failure and must never receive another signal.
-      if (
-        error instanceof ProcessNotOwnedError &&
-        !(await identity(entry.pid, false, undefined, observe()))
-      ) {
+      if (error instanceof ProcessNotOwnedError && (await gone(entry.pid))) {
         await running.finish(null, null);
         return;
       }
@@ -301,7 +325,17 @@ export function supervisor(options: SupervisorOptions): ProcessSupervisor {
       sampling = true;
       try {
         const entry = running.entry;
-        const current = await identity(entry.pid, true, entry.token, polling());
+        let current = await identity(entry.pid, true, entry.token, polling());
+        const matches = (value: typeof current) =>
+          value?.start === entry.start && value.token === entry.token && value.group === entry.pid;
+        // A snapshot taken while the process was exiting can still list it after
+        // its guardian is gone. Before calling a mismatch a failure, read fresh
+        // (no snapshot) a few times; a process that vanished simply exited.
+        for (let attempt = 0; current && !matches(current) && attempt < 3; attempt++) {
+          if (running.finished) return;
+          await delay(50);
+          current = await identity(entry.pid, true, entry.token, observe());
+        }
         if (running.finished) return;
         if (
           current?.start !== entry.start ||
