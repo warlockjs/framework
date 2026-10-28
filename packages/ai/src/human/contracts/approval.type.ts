@@ -90,6 +90,13 @@ export interface ApprovalRequest {
 }
 
 /**
+ * How long an approval carries, when the middleware has `remember`
+ * configured. `"tool"` approves every later call to the same tool in the
+ * session; `"args"` only calls to the same tool with identical arguments.
+ */
+export type ApprovalRemember = "tool" | "args";
+
+/**
  * A human's ruling on an {@link ApprovalRequest}.
  *
  * A discriminated union keyed on `type` (never `kind`):
@@ -100,7 +107,7 @@ export interface ApprovalRequest {
  *   audit context.
  */
 export type ApprovalDecision =
-  | { type: "approve" }
+  | { type: "approve"; remember?: ApprovalRemember }
   | { type: "reject"; reason: string }
   | { type: "edit"; args: unknown; reason?: string };
 

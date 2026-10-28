@@ -12,8 +12,10 @@ import type {
   PolicyContext,
 } from "./contracts";
 import { ApprovalRejectedError, InterruptSuspendedError } from "./errors";
-import { createApprovalBindingKey } from "./approval-binding";
-import { evaluatePolicy } from "./policy";
+import { createApprovalBindingKey, stableStringify } from "./approval-binding";
+import { approvalMemory } from "./approval-memory";
+import type { ApprovalMemory, ApprovalMemoryEntry } from "./contracts";
+import { evaluatePolicy, type PolicyVerdict } from "./policy";
 import { takeSeededDecision } from "./resume-seed";
 
 /** Default middleware name when {@link HumanApprovalOptions.name} is omitted. */
@@ -180,15 +182,83 @@ export function humanApproval(options: HumanApprovalOptions): AgentMiddleware {
   const name = options.name ?? DEFAULT_NAME;
   const { policy, handler } = options;
 
+  if (!policy && !options.tools && !options.defaultMode) {
+    throw new TypeError(
+      "humanApproval requires a policy, a tools map or a defaultMode to decide which calls need approval.",
+    );
+  }
+
+  const memory: ApprovalMemory | undefined = options.remember
+    ? ((options.remember === true ? undefined : options.remember.memory) ?? approvalMemory())
+    : undefined;
+  const denyReason = options.denyReason ?? "this tool is not allowed";
+
+  /** Entries that cover this call, widest first. */
+  function entriesFor(ctx: MiddlewareToolContext): ApprovalMemoryEntry[] {
+    return [
+      { type: "tool", toolName: ctx.tool.name },
+      {
+        type: "args",
+        toolName: ctx.tool.name,
+        argsKey: stableStringify(ctx.request.input),
+      },
+    ];
+  }
+
   return {
     name,
     tool: {
       async before(ctx: MiddlewareToolContext): Promise<ToolInvokeResult<unknown> | void> {
-        const verdict = evaluatePolicy(policy, toPolicyContext(ctx));
+        const mode =
+          options.tools && Object.hasOwn(options.tools, ctx.tool.name)
+            ? options.tools[ctx.tool.name]
+            : undefined;
+
+        if (mode === "allow") {
+          return;
+        }
+
+        if (mode === "deny") {
+          return failedResult(
+            new ApprovalRejectedError(`Tool call "${ctx.tool.name}" denied — ${denyReason}`, {
+              reason: denyReason,
+              toolName: ctx.tool.name,
+            }),
+            ctx.tool.name,
+          );
+        }
+
+        const verdict: PolicyVerdict =
+          mode === "ask"
+            ? { requiresApproval: true }
+            : policy
+              ? evaluatePolicy(policy, toPolicyContext(ctx))
+              : { requiresApproval: (options.defaultMode ?? "ask") === "ask" };
+
+        if (!policy && mode === undefined && options.defaultMode === "deny") {
+          return failedResult(
+            new ApprovalRejectedError(`Tool call "${ctx.tool.name}" denied — ${denyReason}`, {
+              reason: denyReason,
+              toolName: ctx.tool.name,
+            }),
+            ctx.tool.name,
+          );
+        }
 
         // Not gated — let the real tool run unchanged.
         if (!verdict.requiresApproval) {
           return;
+        }
+
+        // Approved earlier in this session — skip the human.
+        const sessionId = ctx.options?.sessionId;
+
+        if (memory && sessionId) {
+          for (const entry of entriesFor(ctx)) {
+            if (await memory.has(sessionId, entry)) {
+              return;
+            }
+          }
         }
 
         const interruptId = makeInterruptId(ctx);
@@ -224,6 +294,12 @@ export function humanApproval(options: HumanApprovalOptions): AgentMiddleware {
         }
 
         if (decision.type === "approve") {
+          if (memory && sessionId && decision.remember) {
+            const [toolEntry, argsEntry] = entriesFor(ctx);
+
+            await memory.add(sessionId, decision.remember === "tool" ? toolEntry! : argsEntry!);
+          }
+
           // Run the real tool with the model's original args.
           return;
         }

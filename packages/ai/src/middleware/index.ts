@@ -8,6 +8,7 @@ export {
   type BudgetFallbackSignal,
   type BudgetOptions,
   type BudgetPricing,
+  type BudgetSpend,
   type ScopedBudgetOptions,
   type ScopedBudgetReserveInput,
   type ScopedBudgetReserveResult,

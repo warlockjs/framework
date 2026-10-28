@@ -1,6 +1,6 @@
 ---
 name: approve-tool-calls
-description: 'Gate an agent''s tool calls behind a human with `ai.human.approval(options)` (the `tool.before` approval-gate middleware) — ships in @warlock.js/ai core. Triggers: `ai.human.approval`, `humanApproval`, `HumanApprovalOptions`, `ApprovalRequest`, `ApprovalDecision`, `ApprovalHandler`, `InterruptPolicy`, `evaluatePolicy`, `ApprovalRejectedError`, `policy: { type: "allowlist" | "denylist" | "predicate" }`, decision `{ type: "approve" | "reject" | "edit" }`; ''human in the loop'', ''approve a tool call before it runs'', ''ask a human before the agent sends/charges/deletes'', ''pause before a dangerous tool'', ''let an operator edit the tool args'', ''reject a tool call with a reason the model can self-correct from''. Typical import `import { ai } from "@warlock.js/ai"`. Skip: persisting the request and resuming hours later out-of-process — the `durable-resume` topic; the agent/middleware/tool primitives themselves — `@warlock.js/ai`.'
+description: 'Gate an agent''s tool calls behind a human with `ai.human.approval(options)` (the `tool.before` approval-gate middleware) — ships in @warlock.js/ai core. Triggers: `tools: { name: "allow" | "deny" | "ask" }`, `defaultMode`, `remember`, `ai.human.approvalMemory`, `ApprovalMemory`, `ai.human.approval`, `humanApproval`, `HumanApprovalOptions`, `ApprovalRequest`, `ApprovalDecision`, `ApprovalHandler`, `InterruptPolicy`, `evaluatePolicy`, `ApprovalRejectedError`, `policy: { type: "allowlist" | "denylist" | "predicate" }`, decision `{ type: "approve" | "reject" | "edit" }`; ''human in the loop'', ''approve a tool call before it runs'', ''ask a human before the agent sends/charges/deletes'', ''pause before a dangerous tool'', ''let an operator edit the tool args'', ''reject a tool call with a reason the model can self-correct from''. Typical import `import { ai } from "@warlock.js/ai"`. Skip: persisting the request and resuming hours later out-of-process — the `durable-resume` topic; the agent/middleware/tool primitives themselves — `@warlock.js/ai`.'
 ---
 
 # Approve tool calls — the human-in-the-loop gate
@@ -86,6 +86,27 @@ The predicate sees a read-only `PolicyContext` — `toolName`, `toolDescription`
 Compose with `forTool(names, mw)` from `@warlock.js/ai` for static, name-based scoping and let `policy` be the dynamic, args-aware layer on top.
 
 `evaluatePolicy(policy, context)` is the exported, pure core if you want to reuse the gate decision outside the middleware (it never throws, does no IO, and returns `{ requiresApproval, tags? }`).
+
+## Per-tool modes and remembering approvals
+
+Instead of (or beside) a policy, name a mode per tool; a `tools` entry beats `policy`:
+
+```ts
+ai.human.approval({
+  tools: { read_file: "allow", delete_file: "deny", run_shell: "ask" },
+  defaultMode: "ask", // unlisted tools; with no policy this is the default
+  denyReason: "deletes are disabled",
+  remember: true, // or { memory: ai.human.approvalMemory() }
+  handler: async (request) => ({ type: "approve", remember: "tool" }), // or "args"
+});
+```
+
+`"deny"` short-circuits an `ApprovalRejectedError` (the model self-corrects).
+With `remember`, an `approve` decision carrying `remember: "tool"` auto-approves
+that tool for the rest of the run's `sessionId`; `"args"` only identical
+arguments. Runs without a `sessionId` are always asked; reject and edit are never
+remembered. Implement `ApprovalMemory` (`has` / `add` / `clear`) to persist
+approvals; call `memory.clear(sessionId)` when a session ends.
 
 ## The request a reviewer rules on
 

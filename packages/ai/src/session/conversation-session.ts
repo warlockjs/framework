@@ -300,6 +300,7 @@ function conversationAfterRun<TOutput>(
   if (
     finalTrip &&
     finalTrip.finishReason !== "tool_calls" &&
+    finalTrip.finishReason !== "tool_stop" &&
     finalTrip.finishReason !== "pause_turn"
   ) {
     messages.push({

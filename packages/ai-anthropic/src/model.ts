@@ -260,6 +260,9 @@ export class AnthropicModel implements ModelContract {
       // accounting (`cachedTokens` / `cacheWriteTokens`), so advertise
       // the capability unconditionally.
       promptCaching: true,
+      // `ModelCallOptions.contextEditing.clearToolResults` maps to the
+      // `clear_tool_uses` context edit (see `resolveContextManagement`).
+      nativeContextEditing: true,
       // The Messages API accepts PDF/document content blocks
       // (`DocumentBlockParam`) on vision-capable Claude models.
       pdf: true,
@@ -803,7 +806,7 @@ export class AnthropicModel implements ModelContract {
       this.applyBlockBinding(body, anthropic.thinkingBlockBinding, betas);
     }
 
-    const edits = buildContextEdits(anthropic);
+    const edits = buildContextEdits(anthropic, options?.contextEditing);
 
     if (edits.length > 0) {
       if (anthropic.body?.context_management !== undefined) {
@@ -1374,9 +1377,16 @@ type ContextEdit = { type: string } & Record<string, unknown>;
  * `context_management.edits`. `clear_thinking_20251015` must come first
  * when strategies are combined (Anthropic docs, "Context editing").
  */
-function buildContextEdits(anthropic: AnthropicCallOptions): ContextEdit[] {
+function buildContextEdits(
+  anthropic: AnthropicCallOptions,
+  neutral?: ModelCallOptions["contextEditing"],
+): ContextEdit[] {
   const edits: ContextEdit[] = [];
-  const { clearThinking, clearToolUses } = anthropic.contextManagement ?? {};
+  const { clearThinking } = anthropic.contextManagement ?? {};
+  // The vendor-neutral hint fills in only what the typed Anthropic options
+  // leave unset, so an explicit `contextManagement.clearToolUses` wins.
+  const clearToolUses: true | AnthropicClearToolUses | undefined =
+    anthropic.contextManagement?.clearToolUses ?? neutralClearToolUses(neutral);
 
   if (clearThinking) {
     edits.push(clearThinkingEdit(clearThinking === true ? {} : clearThinking));
@@ -1407,6 +1417,20 @@ function buildContextEdits(anthropic: AnthropicCallOptions): ContextEdit[] {
   }
 
   return edits;
+}
+
+function neutralClearToolUses(
+  neutral: ModelCallOptions["contextEditing"],
+): AnthropicClearToolUses | undefined {
+  const rule = neutral?.clearToolResults;
+
+  if (!rule) return undefined;
+
+  return {
+    ...(rule.afterTokens !== undefined ? { trigger: { inputTokens: rule.afterTokens } } : {}),
+    ...(rule.keep !== undefined ? { keep: rule.keep } : {}),
+    ...(rule.exclude?.length ? { excludeTools: rule.exclude } : {}),
+  };
 }
 
 function clearThinkingEdit(options: AnthropicClearThinking): ContextEdit {

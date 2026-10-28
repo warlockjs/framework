@@ -1,6 +1,6 @@
 ---
 name: attach-ai-middleware
-description: 'Wire agent middleware — ai.middleware.budget (token / USD caps + SLO/cost contract w/ maxLatencyMs + onViolation fallback), ai.middleware.guardrail (pre / post content checks), ai.middleware.semanticCache (exact + vector cache), supervisor-level middleware, plus authoring custom hooks (execute / trip / tool). Triggers: `reserve`, `BudgetReserveOptions`, `estimateInputTokens`, `countInputTokens`, `ai.middleware.budget`, `ai.middleware.guardrail`, `ai.middleware.semanticCache`, `ai.middleware.compose`, `ai.middleware.forTool`, `AgentMiddleware`, `BudgetExceededError`, `GuardrailViolationError`, `BudgetContract`, `maxLatencyMs`, `onViolation`, `readBudgetFallbackSignal`, `supervisor middleware`, `SemanticCacheOptions`, `SemanticCacheScope`; ''cap token cost'', ''SLO budget'', ''block pii in prompts'', ''semantic cache before LLM'', ''supervisor-level middleware'', ''write custom hook'', ''isolate semantic cache per session/tenant''; typical import `import { ai } from "@warlock.js/ai"`. Skip: agent lifecycle — the `run-ai-agent` topic; cache drivers — the `persist-ai-data` topic; competing libs `langchain` callbacks.'
+description: 'Wire agent middleware — ai.middleware.budget (token / USD caps + SLO/cost contract w/ maxLatencyMs + onViolation fallback), ai.middleware.guardrail (pre / post content checks), ai.middleware.semanticCache (exact + vector cache), supervisor-level middleware, plus authoring custom hooks (execute / trip / tool). Triggers: `onSpend`, `BudgetSpend`, `window: "all"`, `ai.pricing`, `pricingCatalogue`, `PricingCatalogue`, `reserve`, `BudgetReserveOptions`, `estimateInputTokens`, `countInputTokens`, `ai.middleware.budget`, `ai.middleware.guardrail`, `ai.middleware.semanticCache`, `ai.middleware.compose`, `ai.middleware.forTool`, `AgentMiddleware`, `BudgetExceededError`, `GuardrailViolationError`, `BudgetContract`, `maxLatencyMs`, `onViolation`, `readBudgetFallbackSignal`, `supervisor middleware`, `SemanticCacheOptions`, `SemanticCacheScope`; ''cap token cost'', ''SLO budget'', ''block pii in prompts'', ''semantic cache before LLM'', ''supervisor-level middleware'', ''write custom hook'', ''isolate semantic cache per session/tenant''; typical import `import { ai } from "@warlock.js/ai"`. Skip: agent lifecycle — the `run-ai-agent` topic; cache drivers — the `persist-ai-data` topic; competing libs `langchain` callbacks.'
 ---
 
 # Middleware — agent-level pipeline
@@ -53,6 +53,10 @@ ai.middleware.budget({
 Breach → `BudgetExceededError` on `result.error`. Inspect `error.unit` (`"tokens" | "usd"`), `error.limit`, `error.actual`. Warn mode logs and continues — useful for measuring before enforcing.
 
 USD pricing resolves from the `pricing[modelName]` entry, else the model's own `ModelPricing` (per-model, SDK registry, or built-in list price). Unpriced + `maxCostUSD` fails closed before the first call unless `onUnpriced: "allow"`.
+
+### Prices, spend hook and per-session caps
+
+`pricing` takes a record or an `ai.pricing({ tables })` catalogue (provider tables such as `ANTHROPIC_MODEL_PRICING`, later tables win, `.set(model, price)` overrides, dated snapshot ids resolve to their alias; `.costUSD(usage, model)` prices a `Usage`). `onSpend(spend)` runs after every model call, before the caps are compared (so the breaching call is recorded), with `{ model, provider, sessionId, tripIndex, usage, costUSD, run, scopedKey }`; persist it there (errors are swallowed). `scoped: { window: "all" }` is a ledger that never resets: with `key: (ctx) => ctx.options?.sessionId` it is a per-session cap, with a user id a per-caller one. Add `reserve` to refuse a call _before_ it is made.
 
 ### Reserve-then-commit — `budget({ reserve })`
 

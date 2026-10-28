@@ -1,6 +1,6 @@
 ---
 name: run-ai-agent
-description: 'Build agents with ai.agent({...}) — the single-LLM-turn primitive. Covers execute / stream, attachments, structured output, placeholders, events, agent.eval scoring, the judge-safe preset for resilient LLM-as-judge / verdict classifiers (ai.agent.judge / judge: true — lenient JSON parse + repair + never-throw, for Nova-class models), and auto-adapting raw executables in tools:[]. Triggers: `compaction`, `AgentCompactionConfig`, `AgentCompactionRecord`, `afterTokens`, `countTokens`, `ai.agent`, `maxConcurrentTools`, `toolDispatch`, `ai.agent.judge`, `agent.execute`, `agent.stream`, `agent.eval`, `AgentResult`, `AgentReport`, `AgentToolEntry`, `JudgeConfig`, `JudgeAgentConfig`, `judge`, `repairAttempts`, `streamingToolGuard`, `attachments`, `repair`, `maxTrips`, `sessionId`, `spawnSubAgent`, `SpawnSubAgentSpec`, `toolDispatch`, `finishReason`, `pause_turn`, `continueOnOutputLimit`, `AgentIncompleteError`, `incomplete`, `modelOptions`, `callId`, `refusal`, `context_exceeded`, `blocks`, `ProviderContentBlock`, `providerOptions`, `ai.compaction.summarize`, `summarizeCompaction`, `DEFAULT_COMPACTION_INSTRUCTIONS`, `renderTranscript`, `Message.compaction`, `agent.trip.reasoning`, `agent.tool.streaming`, `agent.trip.usage`, `streamChunks`, `ModelStreamChunk`; ''run an agent'', ''stream an agent response'', ''show the model thinking'', ''stream tool arguments'', ''structured output schema'', ''pass image to agent'', ''evaluate an agent'', ''LLM-as-judge that survives malformed JSON'', ''grade with a Nova model without crashing'', ''put a supervisor in tools'', ''cancel an agent run'', ''spawn a one-shot sub-agent with a per-task budget''; typical import `import { ai } from "@warlock.js/ai"`. Skip: tool definition — the `define-ai-tool` topic; workflows — the `run-ai-workflow` topic; eval matchers / batch / fallback detail — the `ai-dx-helpers` topic; competing libs `langchain`, `ai` (Vercel), raw `openai`.'
+description: 'Build agents with ai.agent({...}) — the single-LLM-turn primitive. Covers execute / stream, attachments, structured output, placeholders, events, agent.eval scoring, the judge-safe preset for resilient LLM-as-judge / verdict classifiers (ai.agent.judge / judge: true — lenient JSON parse + repair + never-throw, for Nova-class models), and auto-adapting raw executables in tools:[]. Triggers: `stopAfterTools`, `stopWhen`, `endsTurn`, `tool_stop`, `contextEditing`, `clearToolResults`, `compaction`, `AgentCompactionConfig`, `AgentCompactionRecord`, `afterTokens`, `countTokens`, `ai.agent`, `maxConcurrentTools`, `toolDispatch`, `ai.agent.judge`, `agent.execute`, `agent.stream`, `agent.eval`, `AgentResult`, `AgentReport`, `AgentToolEntry`, `JudgeConfig`, `JudgeAgentConfig`, `judge`, `repairAttempts`, `streamingToolGuard`, `attachments`, `repair`, `maxTrips`, `sessionId`, `spawnSubAgent`, `SpawnSubAgentSpec`, `toolDispatch`, `finishReason`, `pause_turn`, `continueOnOutputLimit`, `AgentIncompleteError`, `incomplete`, `modelOptions`, `callId`, `refusal`, `context_exceeded`, `blocks`, `ProviderContentBlock`, `providerOptions`, `ai.compaction.summarize`, `summarizeCompaction`, `DEFAULT_COMPACTION_INSTRUCTIONS`, `renderTranscript`, `Message.compaction`, `agent.trip.reasoning`, `agent.tool.streaming`, `agent.trip.usage`, `streamChunks`, `ModelStreamChunk`; ''run an agent'', ''stream an agent response'', ''show the model thinking'', ''stream tool arguments'', ''structured output schema'', ''pass image to agent'', ''evaluate an agent'', ''LLM-as-judge that survives malformed JSON'', ''grade with a Nova model without crashing'', ''put a supervisor in tools'', ''cancel an agent run'', ''spawn a one-shot sub-agent with a per-task budget''; typical import `import { ai } from "@warlock.js/ai"`. Skip: tool definition — the `define-ai-tool` topic; workflows — the `run-ai-workflow` topic; eval matchers / batch / fallback detail — the `ai-dx-helpers` topic; competing libs `langchain`, `ai` (Vercel), raw `openai`.'
 ---
 
 # `ai.agent()` — single-turn primitive
@@ -466,6 +466,52 @@ const result = await ai.spawnSubAgent({
 `SpawnSubAgentSpec` accepts `toolDispatch` and `maxConcurrentTools` with the same defaults as `ai.agent()`: concurrent calls, up to four at once. Upgrading from 5.29 to 5.30 changed sub-agent tools to this concurrent default too; use `toolDispatch: "sequential"` when tool side effects require ordering.
 
 The one field a bare agent config doesn't surface ergonomically is `budget` (`BudgetOptions` — `maxTokens` / `maxCostUSD`), equivalent to `ai.agent({ middleware: [ai.middleware.budget(...)] })` but promoted to a first-class spec field so a delegated subtask can't overrun its cap (distinct from `maxTrips`, which caps round-trips, not spend). The surface is **narrower** than `agent.execute()`: one-shot, with no `history`, `placeholders`, per-call events, or `repair`. The spawned `report` slots under the caller's `report.children[]`, so cost and traces roll up uniformly. Reach for it when you want a named single-use delegation with a hard spend cap; otherwise just build an `ai.agent()` and call it.
+
+## End the run after a tool — `stopAfterTools`, `stopWhen`, `endsTurn`
+
+By default the agent calls the model again after every round of tool results.
+When a tool _is_ the answer (post a message, hand off, park the turn), end the
+run right after it ran, with no further model call:
+
+```ts
+ai.agent({
+  model,
+  tools: [search, postMessage, parkTurn],
+  stopAfterTools: ["post_message"], // by name
+  stopWhen: ({ toolCalls, text, usage, messages, tripIndex }) =>
+    toolCalls.some((call) => call.name === "park_turn"), // by rule, sync or async
+});
+
+ai.tool({ name: "park_turn", /* ... */ endsTurn: ({ input, output }) => output.parked }); // or `true`
+```
+
+The stopping trip has `finishReason: "tool_stop"` (agent-set, never from a
+provider); `result.text` is the text written beside the calls; usage covers
+only the calls made. A failed tool call never stops the run through
+`stopAfterTools` / `endsTurn` (the model should see the error); `stopWhen` sees
+failed calls too (`call.error`). A throwing callback counts as "do not stop".
+`mode: "silent"` is the older static form (keeps `finishReason: "tool_calls"`).
+
+## Clear old tool results — `contextEditing`
+
+```ts
+ai.agent({
+  model,
+  tools,
+  contextEditing: {
+    clearToolResults: { afterTokens: 60_000, keep: 4, exclude: ["plan"], placeholder: "[cleared]" },
+  },
+});
+```
+
+Replaces the content of tool results older than the newest `keep` (default 3)
+with a placeholder once the history is estimated at `afterTokens` (omit it to
+clear every trip; `countTokens` gives an exact count). No model call, and
+call/result pairing stays intact. A model with
+`capabilities.nativeContextEditing` (Anthropic) gets the rule as
+`ModelCallOptions.contextEditing` and maps it to `clear_tool_uses` instead;
+`native: false` forces client-side clearing. Runs before `compaction`
+(summarizing); use both for long autonomous runs.
 
 ## Automatic compaction inside an agent run
 

@@ -4,6 +4,12 @@ All notable changes to `@warlock.js/ai-anthropic` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.40.0 - 2026-10-28
+
+### Added
+
+- The provider-neutral `contextEditing.clearToolResults` rule (from the agent's `contextEditing` option) maps to a `clear_tool_uses` context edit: `afterTokens` becomes the input-token trigger, `keep` the number of tool uses kept and `exclude` the excluded tools. An explicit `providerOptions.anthropic.contextManagement.clearToolUses` still wins. The model now reports `capabilities.nativeContextEditing`.
+
 ## 5.34.3 - 2026-10-20
 
 ### Changed

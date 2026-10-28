@@ -100,6 +100,7 @@ export * from "./model";
 export * from "./object-stream";
 export * from "./orchestrator";
 export * from "./planner";
+export * from "./pricing";
 export * from "./prompt";
 export * from "./prompts";
 export * from "./rag";

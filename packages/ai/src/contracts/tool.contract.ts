@@ -229,6 +229,22 @@ export interface ToolConfig<TInput = unknown, TOutput = unknown> {
    */
   mode?: ToolMode;
   /**
+   * End the agent run after this tool succeeds, without another model call.
+   * `true` ends the turn on every successful call; a function decides per
+   * call from the validated input and the tool's output. A failed call
+   * never ends the turn, so the model can read the error and recover.
+   * Unlike `mode: "silent"`, the decision can depend on the call, and the
+   * trip is recorded with `finishReason: "tool_stop"`. See `stopWhen` and
+   * `stopAfterTools` on the agent config for the agent-level equivalents.
+   *
+   * @example
+   * tool({ name: "post_message", endsTurn: true, execute: async (input) => send(input) });
+   *
+   * @example
+   * tool({ name: "park", endsTurn: ({ output }) => output.parked, execute: park });
+   */
+  endsTurn?: boolean | ((call: { input: TInput; output: TOutput }) => boolean);
+  /**
    * Development-time schema check of this definition (see
    * `describeToolSchema`). `ai.tool()` logs one warning per definition when
    * a provider would reject, ignore or over-charge for the schema. `false`

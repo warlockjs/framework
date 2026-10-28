@@ -1,7 +1,11 @@
 import type { BudgetUnit } from "../../errors";
 
-/** UTC window identities supported by a scoped budget ledger. */
-export type ScopedBudgetWindow = "day" | "month";
+/**
+ * Window identities supported by a scoped budget ledger: the current UTC
+ * `day` or `month`, or `all` — one ledger per key that never resets (a
+ * per-session or lifetime cap).
+ */
+export type ScopedBudgetWindow = "day" | "month" | "all";
 
 /** An atomic ledger increment request. */
 export type ScopedBudgetReserveInput = {

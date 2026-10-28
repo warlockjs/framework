@@ -11,6 +11,10 @@
  * - `pause_turn` — the provider paused a long-running turn (Anthropic
  *   server tools). Send the assistant turn back unchanged to resume; the
  *   agent does this automatically within `maxTrips`.
+ * - `tool_stop` — set on an agent trip by the agent itself, never by a
+ *   provider: the tools that trip ran ended the run (`stopAfterTools`,
+ *   `stopWhen` or a tool's `endsTurn`), so no further model call was made.
+ *   The trip's `output` is whatever text the model wrote beside the calls.
  * - `refusal` — the provider's safety layer declined the request. Fall
  *   back to another model or surface the refusal; do not retry as-is.
  * - `error` — anything else, including unknown provider values.
@@ -29,5 +33,6 @@ export type FinishReason =
   | "length"
   | "context_exceeded"
   | "pause_turn"
+  | "tool_stop"
   | "refusal"
   | "error";

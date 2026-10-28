@@ -4,6 +4,22 @@ All notable changes to `@warlock.js/ai` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.40.0 - 2026-10-28
+
+### Added
+
+- End an agent run right after a tool, with no further model call: `stopAfterTools: ["post_message"]` and `stopWhen: ({ toolCalls, text, usage, messages, tripIndex }) => boolean` on the agent, and `endsTurn: true | ({ input, output }) => boolean` on a tool. The trip is recorded with the new `finishReason: "tool_stop"`, `result.text` is the text the model wrote beside the calls, and usage covers only the calls made. A failed tool call never stops the run through `stopAfterTools` or `endsTurn`. `mode: "silent"` keeps working as before.
+- `contextEditing: { clearToolResults: { afterTokens?, keep?, exclude?, placeholder?, countTokens? } }` on the agent clears old tool results from the history before each model call, with no summarizing call and with every tool call still paired to its result. It runs before `compaction`. A model that advertises the new `capabilities.nativeContextEditing` receives the rule as `ModelCallOptions.contextEditing` instead, and `native: false` forces client-side clearing.
+- `ai.pricing({ tables })` (`pricingCatalogue`) builds one overridable price list from provider tables such as `ANTHROPIC_MODEL_PRICING`: later tables win, `.set(model, pricing)` overrides, dated snapshot ids resolve to their alias, and `.cost()` / `.costUSD()` price a `Usage`. `budget({ pricing })` accepts a catalogue.
+- `budget({ onSpend })` is called after every model call, before the caps are compared, with the model, session id, usage, USD cost and running totals, so spend can be persisted. A failing hook never fails the run.
+- `scoped: { window: "all" }` keeps a budget ledger that never resets, for per-session or lifetime caps. With `key` set from `context.options?.sessionId` it caps one session; `reserve` refuses the call before it is made.
+- `ai.human.approval()` accepts per-tool modes (`tools: { read_file: "allow", delete_file: "deny", run_shell: "ask" }`, `defaultMode`, `denyReason`), and `policy` is now optional when modes cover the tools.
+- `ai.human.approval({ remember })` remembers an approval for the rest of the session: a handler decision `{ type: "approve", remember: "tool" | "args" }` auto-approves that tool, or that tool with identical arguments, for later calls with the same `sessionId`. `ai.human.approvalMemory()` is the in-process memory; implement `ApprovalMemory` to persist approvals.
+
+### Changed
+
+- `FinishReason` has a new member, `"tool_stop"`, set by the agent on a trip that a stop rule ended. Code that switches exhaustively on `LLMTrip.finishReason` should handle it.
+
 ## 5.38.0 - 2026-10-25
 
 ### Added
