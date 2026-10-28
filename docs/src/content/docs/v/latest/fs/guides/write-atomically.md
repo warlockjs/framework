@@ -83,6 +83,12 @@ Atomic is about _visibility_, not _coordination_ or _durability_. Know the edges
   stays intra-mount. Renames across mounts aren't atomic — not a concern unless
   you've engineered an unusual union mount.
 
+- **Open readers on Windows.** Windows cannot replace a file while another
+  handle has it open. The final rename retries for about 4 seconds, so ordinary
+  reads that open, read and close the file are fine. A process that keeps the
+  file open the whole time (or reads it in a tight loop with no pause) blocks
+  the replace, and the write fails with `AtomicWriteError`.
+
 ## When to skip it
 
 `{ atomic: true }` isn't free — it's a temp-file create, a full write, and a

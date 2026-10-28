@@ -30,7 +30,12 @@ describe("putJsonFile / putJsonFileAsync", () => {
         } catch {
           failures++;
         }
-        await new Promise((resolve) => setImmediate(resolve));
+        // Windows cannot replace a file while another handle has it open, so a reader that
+        // never lets go would block every rename. Real readers pause between reads; on Windows
+        // this one does too, which leaves room for the write's retries.
+        await new Promise((resolve) =>
+          process.platform === "win32" ? setTimeout(resolve, 5) : setImmediate(resolve),
+        );
       }
     })();
 
