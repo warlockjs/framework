@@ -94,7 +94,8 @@ afterAll(async () => {
   setDryRun(false);
   vi.restoreAllMocks();
   process.chdir(originalCwd);
-  await rm(tempDir, { recursive: true, force: true });
+  // The native compiler process can hold the folder for a moment after it is closed on Windows.
+  await rm(tempDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
 });
 
 describe("make endpoint output type-checks against the real framework sources", () => {

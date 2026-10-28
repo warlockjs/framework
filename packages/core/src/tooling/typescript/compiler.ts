@@ -121,23 +121,27 @@ export class CompilerSession {
   }
 
   /** Ask the checker to resolve module references using the project's actual options. */
-  importFiles(file: string): string[] {
+  importFiles(requested: string): string[] {
+    // The native API keys files by forward-slash paths, also on Windows.
+    const file = requested.replaceAll("\\", "/");
     const project = this.snapshot.getProject(this.configPath);
     if (!project?.program.getSourceFile(file)) return [];
-    const source = this.contents.get(path.resolve(file)) ?? readFileSync(file, "utf8");
+    const source = this.contents.get(path.resolve(requested)) ?? readFileSync(requested, "utf8");
     return importSpecifiers(file, source).flatMap((imported) => {
       const symbol = project.checker.getSymbolAtPosition(file, imported.node.start + 1);
       return symbol?.declarations.map((declaration) => path.normalize(declaration.path)) ?? [];
     });
   }
 
-  diagnostics(file: string): CompilerDiagnostic[] {
+  diagnostics(requested: string): CompilerDiagnostic[] {
+    const file = requested.replaceAll("\\", "/");
     const program = this.snapshot.getProject(this.configPath)?.program;
     if (!program?.getSourceFile(file)) return [];
     return [...program.getSyntacticDiagnostics(file), ...program.getSemanticDiagnostics(file)]
       .filter((diagnostic) => diagnostic.category === 1 || diagnostic.category === 0)
       .map((diagnostic) => {
-        const content = this.contents.get(path.resolve(file)) ?? readFileSync(file, "utf8");
+        const content =
+          this.contents.get(path.resolve(requested)) ?? readFileSync(requested, "utf8");
         const before = content.slice(0, Math.max(0, diagnostic.pos));
         const lines = before.split("\n");
         return {
