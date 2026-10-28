@@ -44,11 +44,11 @@ function discoverInNode(appRoot: string): Promise<{ code: number | null; output:
     "discover.mts",
     `
     process.chdir(${JSON.stringify(appRoot)});
-    const { filesOrchestrator } = await import(${JSON.stringify(path.join(coreSource, "dev-server/files-orchestrator.ts"))});
-    const { warlockConfigManager } = await import(${JSON.stringify(path.join(coreSource, "warlock-config/warlock-config.manager.ts"))});
+    const { filesOrchestrator } = await import(${JSON.stringify(pathToFileURL(path.join(coreSource, "dev-server/files-orchestrator.ts")).href)});
+    const { warlockConfigManager } = await import(${JSON.stringify(pathToFileURL(path.join(coreSource, "warlock-config/warlock-config.manager.ts")).href)});
     await warlockConfigManager.load();
     await filesOrchestrator.init();
-    const { listRoutablePages } = await import(${JSON.stringify(path.join(webSource, "build/list-routable-pages.ts"))});
+    const { listRoutablePages } = await import(${JSON.stringify(pathToFileURL(path.join(webSource, "build/list-routable-pages.ts")).href)});
     const pages = await listRoutablePages({ appRoot: ${JSON.stringify(appRoot)} });
     console.log("PAGES:" + JSON.stringify(pages.map((page) => [page.routePath, typeof page.sitemap])));
     process.exit(0);

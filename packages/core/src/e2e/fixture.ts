@@ -1,5 +1,6 @@
 import {
   cp,
+  readdir,
   mkdir,
   mkdtemp,
   readFile,
@@ -71,11 +72,7 @@ async function linkDependencies(source: string, target: string): Promise<void> {
     const modules = join(current, "node_modules");
     try {
       if ((await stat(modules)).isDirectory()) {
-        await symlink(
-          await realpath(modules),
-          join(target, "node_modules"),
-          process.platform === "win32" ? "junction" : "dir",
-        );
+        await linkModules(await realpath(modules), join(target, "node_modules"));
         return;
       }
     } catch (error) {
@@ -84,6 +81,36 @@ async function linkDependencies(source: string, target: string): Promise<void> {
     const parent = dirname(current);
     if (parent === current) return;
     current = parent;
+  }
+}
+
+/**
+ * Make `destination` resolve like the `source` node_modules folder.
+ *
+ * Linux and macOS link the folder as a whole. On Windows a pnpm folder holds relative links, which
+ * Windows resolves against the path they were reached through, so a linked folder shows every
+ * package as missing; each package gets its own junction to its real location instead.
+ */
+async function linkModules(source: string, destination: string): Promise<void> {
+  if (process.platform !== "win32") {
+    await symlink(source, destination, "dir");
+    return;
+  }
+  await mkdir(destination, { recursive: true });
+  const link = async (from: string, to: string) =>
+    symlink(await realpath(from), to, "junction").catch((error: NodeJS.ErrnoException) => {
+      if (error.code !== "EEXIST") throw error;
+    });
+  for (const entry of await readdir(source)) {
+    if (entry.startsWith(".")) continue;
+    const from = join(source, entry);
+    if (!entry.startsWith("@")) {
+      if ((await stat(from)).isDirectory()) await link(from, join(destination, entry));
+      continue;
+    }
+    await mkdir(join(destination, entry), { recursive: true });
+    for (const child of await readdir(from))
+      await link(join(from, child), join(destination, entry, child));
   }
 }
 

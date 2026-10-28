@@ -1,6 +1,6 @@
 import { constants } from "node:fs";
 import { access, mkdir, readFile } from "node:fs/promises";
-import path, { resolve } from "node:path";
+import path, { join, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { CdpConnection } from "./cdp";
 import { isolatedEnvironment } from "./fixture";
@@ -12,7 +12,7 @@ const DEFAULT_STARTUP_TIMEOUT_MS = 30_000;
 
 export function browserCandidates(platform: NodeJS.Platform, env: NodeJS.ProcessEnv): string[] {
   // Build paths in the flavor of the platform asked about, not of the machine running this.
-  const { join, delimiter } = platform === "win32" ? path.win32 : path.posix;
+  const { join: joinPath, delimiter } = platform === "win32" ? path.win32 : path.posix;
   const names =
     platform === "win32"
       ? ["chrome.exe", "msedge.exe"]
@@ -27,21 +27,21 @@ export function browserCandidates(platform: NodeJS.Platform, env: NodeJS.Process
   const paths = (env.PATH ?? "")
     .split(delimiter)
     .filter(Boolean)
-    .flatMap((directory) => names.map((name) => join(directory, name)));
+    .flatMap((directory) => names.map((name) => joinPath(directory, name)));
   if (platform === "darwin")
     paths.push(
       "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
       "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
-      join(env.HOME ?? "", "Applications/Google Chrome.app/Contents/MacOS/Google Chrome"),
-      join(env.HOME ?? "", "Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge"),
+      joinPath(env.HOME ?? "", "Applications/Google Chrome.app/Contents/MacOS/Google Chrome"),
+      joinPath(env.HOME ?? "", "Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge"),
     );
   if (platform === "win32")
     for (const root of [env.PROGRAMFILES, env["PROGRAMFILES(X86)"], env.LOCALAPPDATA].filter(
       (directory): directory is string => Boolean(directory),
     ))
       paths.push(
-        join(root, "Google", "Chrome", "Application", "chrome.exe"),
-        join(root, "Microsoft", "Edge", "Application", "msedge.exe"),
+        joinPath(root, "Google", "Chrome", "Application", "chrome.exe"),
+        joinPath(root, "Microsoft", "Edge", "Application", "msedge.exe"),
       );
   return paths;
 }

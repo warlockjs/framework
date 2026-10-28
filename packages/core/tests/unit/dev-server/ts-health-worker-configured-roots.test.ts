@@ -1,5 +1,6 @@
+import { linkNodeModules } from "../../test-support/link-node-modules";
 import { afterEach, describe, expect, it } from "vitest";
-import { mkdir, mkdtemp, readFile, rm, symlink, unlink, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, unlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { build } from "esbuild";
@@ -119,10 +120,9 @@ async function createHealthWorker(mode: "source" | "published", root: string): P
   expect(externalImports).toContain("typescript/unstable/sync");
   // Model core's own installed dependency tree, retaining each package's real
   // location so native optional bindings resolve from their owning package.
-  await symlink(
+  linkNodeModules(
     fileURLToPath(new URL("../../../node_modules", import.meta.url)),
     path.join(root, "node_modules"),
-    "junction",
   );
   return createWorker(
     "./ts-health.worker",
