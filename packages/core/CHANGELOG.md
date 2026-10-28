@@ -11,6 +11,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Fixed
 
 - A spec or test file placed next to a CLI command (for example `import-guides.command.spec.ts` beside `import-guides.command.ts`) no longer breaks `warlock migrate` and every other CLI command. Command discovery now skips `*.spec.*` and `*.test.*` files, so a `vi.mock()` call in a test is never imported outside Vitest. The same rule now applies to `main`, `routes`, `worker`, `events` and locale files.
+### Added
+
+- `warlock check` prints one line to stderr when each step starts and ends, and the conventions step reports its milestones (facts collected, every 1000 files with the slowest rule so far). stdout is unchanged, so `--json` still prints only the JSON report.
+- Each convention rule has a time budget over a run (30 seconds by default). A rule that goes over it is skipped for the remaining files and reported as a `WL9026` warning naming the rule and the time it used, instead of hanging the command. Set `ruleBudgetMs` in `.warlock-check.json` to change it; `0` turns it off.
+
+### Fixed
+
+- `warlock check` could run for tens of minutes in the conventions step on a large app. The `.client` boundary rule (`WL9022`) re-read, re-parsed and re-resolved every shared file for each controller, service, model and route it checked, so the work grew with server-only files times the size of the import graph. Import chains are now read once per run and files known to reach no `.client` module are never walked again, which makes the step roughly linear in the number of files.
+- The conventions step listed and parsed the project twice to collect its project-wide facts; it now lists the files once.
 
 ## 5.39.2 - 2026-10-27
 

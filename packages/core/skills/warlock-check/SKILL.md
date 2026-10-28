@@ -145,20 +145,21 @@ and work through the manual-review list. Use `--lint=oxc` for new apps.
 The following codes default to **warnings**, so upgrading does not fail existing projects.
 They parse real TypeScript/JSX syntax with the same oxc-parser adapter as the existing conventions.
 
-| Code     | Convention                                                                                    | Remedy                                                                                                                                                             |
-| -------- | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `WL9013` | A component file exceeds 150 lines                                                            | Split components and extract hooks; configure `componentLineLimit`.                                                                                                |
-| `WL9014` | More than one component in a file                                                             | Move each component into its own TSX file.                                                                                                                         |
-| `WL9015` | State/effects or event-handler functions inside a component                                   | Move `useState`, `useReducer`, `useEffect`, `useLayoutEffect` and handlers into `use-*.ts` hooks.                                                                  |
-| `WL9016` | Native select, checkbox, radio, date, time or datetime-local input                            | Use the design-system control. Native controls are allowed in `src/web/design-system/**`.                                                                          |
-| `WL9017` | DOM input/textarea/select native validation                                                   | Use shared schema validation instead of `required`, `pattern`, `min`, `max`, `minLength`, `maxLength` or input `type="email"`. Custom component props are allowed. |
-| `WL9018` | Exported `RequestHandler` in `src/app/**/controllers` lacks `responseSchema`                  | Assign `handler.responseSchema` to document each response status.                                                                                                  |
-| `WL9019` | Browser route call (`apiHref`, `useSubmitForm({ route })`) takes a run-time name              | Pass a string literal or a template with a static prefix, or declare the names with `config.apiRoutes` in a page setup file.                                       |
-| `WL9020` | Browser code names a route registered with `clientVisible: false` (error)                     | Call the endpoint from the server, or remove `clientVisible: false` from the route.                                                                                |
-| `WL9021` | A Cascade column is read or written as a model property (warning)                             | Use `model.get("column")` / `model.set("column", value)`; `--fix` rewrites it.                                                                                     |
-| `WL9025` | `merge()` on an object column of a Cascade model keeps the keys the new value omits (warning) | Use `model.set({ column: value })` or `model.set("column", value)`; there is no automatic fix.                                                                     |
-| `WL9024` | Integration spec imports nothing that needs the app (warning)                                 | Move it to the unit project: rename it to `<name>.unit.spec.ts` outside `tests/`.                                                                                  |
-| `WL9104` | Translation key computed at runtime in `src/web` (the page ships every group)                 | Declare the keys with `config.translations` in the page's setup file, for example `["statuses.*"]`.                                                                |
+| Code     | Convention                                                                                         | Remedy                                                                                                                                                             |
+| -------- | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `WL9013` | A component file exceeds 150 lines                                                                 | Split components and extract hooks; configure `componentLineLimit`.                                                                                                |
+| `WL9014` | More than one component in a file                                                                  | Move each component into its own TSX file.                                                                                                                         |
+| `WL9015` | State/effects or event-handler functions inside a component                                        | Move `useState`, `useReducer`, `useEffect`, `useLayoutEffect` and handlers into `use-*.ts` hooks.                                                                  |
+| `WL9016` | Native select, checkbox, radio, date, time or datetime-local input                                 | Use the design-system control. Native controls are allowed in `src/web/design-system/**`.                                                                          |
+| `WL9017` | DOM input/textarea/select native validation                                                        | Use shared schema validation instead of `required`, `pattern`, `min`, `max`, `minLength`, `maxLength` or input `type="email"`. Custom component props are allowed. |
+| `WL9018` | Exported `RequestHandler` in `src/app/**/controllers` lacks `responseSchema`                       | Assign `handler.responseSchema` to document each response status.                                                                                                  |
+| `WL9019` | Browser route call (`apiHref`, `useSubmitForm({ route })`) takes a run-time name                   | Pass a string literal or a template with a static prefix, or declare the names with `config.apiRoutes` in a page setup file.                                       |
+| `WL9020` | Browser code names a route registered with `clientVisible: false` (error)                          | Call the endpoint from the server, or remove `clientVisible: false` from the route.                                                                                |
+| `WL9021` | A Cascade column is read or written as a model property (warning)                                  | Use `model.get("column")` / `model.set("column", value)`; `--fix` rewrites it.                                                                                     |
+| `WL9025` | `merge()` on an object column of a Cascade model keeps the keys the new value omits (warning)      | Use `model.set({ column: value })` or `model.set("column", value)`; there is no automatic fix.                                                                     |
+| `WL9026` | A convention rule used more than its time budget and was skipped for the rest of the run (warning) | Use `--changed`, raise `ruleBudgetMs` in `.warlock-check.json` (0 turns it off), or turn the rule off.                                                             |
+| `WL9024` | Integration spec imports nothing that needs the app (warning)                                      | Move it to the unit project: rename it to `<name>.unit.spec.ts` outside `tests/`.                                                                                  |
+| `WL9104` | Translation key computed at runtime in `src/web` (the page ships every group)                      | Declare the keys with `config.translations` in the page's setup file, for example `["statuses.*"]`.                                                                |
 
 Web rules apply to `src/web/**/*.tsx`. Components are top-level JSX-returning functions
 with a capitalized name (or an anonymous default export). Hook files and ordinary helpers
@@ -182,6 +183,27 @@ Create `.warlock-check.json` in the project root:
 `rules` accepts `"off"`, `"warning"`, or `"error"` for convention codes, including
 existing codes. Per-line `// warlock-check-ignore WL9015 -- reason` works as before.
 Use `npx warlock explain WL9015` for the registry explanation.
+
+### Progress and the per-rule time budget
+
+`warlock check` writes one line to stderr when each step starts and ends
+(`conventions: running`, `conventions: passed in 12.4s (7500 file(s) checked)`). The
+conventions step adds a line when it collects project facts, one every 1000 files that
+names the slowest rule so far, and one when a rule goes over budget. stdout is untouched, so
+`--json` still prints a single JSON document; redirect stderr (`2>/dev/null`) to silence it.
+
+Each convention rule has a time budget over the whole run: 30 seconds by default. A rule
+that goes over it is skipped for the remaining files and reported as a `WL9026` warning
+naming the rule and the time it used, so one slow rule can no longer hang the command. The
+check is made between files, so a single file that never returns is not interrupted. Set
+`ruleBudgetMs` in `.warlock-check.json` to change the budget, or `0` to turn it off. Use
+`--changed` to check fewer files while a slow rule is investigated.
+
+```json
+{
+  "ruleBudgetMs": 60000
+}
+```
 
 ```bash
 npx warlock check --changed --fix --json

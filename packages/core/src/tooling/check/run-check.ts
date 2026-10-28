@@ -63,6 +63,10 @@ export type CheckOptions = {
   vitestBinary?: string | null;
   /** The Node.js version to check. Default: the running one. */
   nodeVersion?: string;
+  /** Receives one line when a step starts and ends, and the conventions step's own milestones. */
+  onProgress?: (message: string) => void;
+  /** Time one convention rule may use over the run, in milliseconds. Default: `ruleBudgetMs` of `.warlock-check.json`, else 30000. */
+  ruleBudgetMs?: number;
 };
 
 function errorMessage(error: unknown): string {
@@ -124,6 +128,8 @@ export async function runCheck(options: CheckOptions = {}): Promise<CheckReport>
 
     let outcome: StepOutcome;
 
+    options.onProgress?.(`${name}: running`);
+
     try {
       outcome = await body();
     } catch (error) {
@@ -140,12 +146,13 @@ export async function runCheck(options: CheckOptions = {}): Promise<CheckReport>
     }
 
     problems.push(...outcome.problems);
-    steps.push({
-      name,
-      status: outcome.status ?? statusOf(outcome.problems),
-      durationMs: Date.now() - startedAt,
-      detail: outcome.detail,
-    });
+    const status = outcome.status ?? statusOf(outcome.problems);
+    const durationMs = Date.now() - startedAt;
+
+    steps.push({ name, status, durationMs, detail: outcome.detail });
+    options.onProgress?.(
+      `${name}: ${status} in ${(durationMs / 1000).toFixed(1)}s${outcome.detail ? ` (${outcome.detail})` : ""}`,
+    );
   };
 
   await run("environment", async () => {
@@ -180,14 +187,16 @@ export async function runCheck(options: CheckOptions = {}): Promise<CheckReport>
   if (options.fix && !filesBlocked && !skip.has("conventions")) {
     try {
       const fixTargets = await targets();
+      const projectFiles = await listSourceFiles(cwd);
       applyConventionFixes(
         cwd,
         runConventions(
           cwd,
           fixTargets,
           options.project,
-          collectApiRouteFacts(cwd, await listSourceFiles(cwd)),
-          collectModelFacts(cwd, await listSourceFiles(cwd)),
+          collectApiRouteFacts(cwd, projectFiles),
+          collectModelFacts(cwd, projectFiles),
+          { ruleBudgetMs: options.ruleBudgetMs },
         ),
       );
     } catch (error) {
@@ -282,6 +291,7 @@ export async function runCheck(options: CheckOptions = {}): Promise<CheckReport>
 
   await run("conventions", async () => {
     const conventionFiles = await targets();
+    const projectFiles = await listSourceFiles(cwd);
 
     return {
       detail: `${conventionFiles.length} file(s) checked`,
@@ -291,8 +301,9 @@ export async function runCheck(options: CheckOptions = {}): Promise<CheckReport>
         cwd,
         conventionFiles,
         options.project,
-        collectApiRouteFacts(cwd, await listSourceFiles(cwd)),
-        collectModelFacts(cwd, await listSourceFiles(cwd)),
+        collectApiRouteFacts(cwd, projectFiles),
+        collectModelFacts(cwd, projectFiles),
+        { onProgress: options.onProgress, ruleBudgetMs: options.ruleBudgetMs },
       ),
     };
   });

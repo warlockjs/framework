@@ -84,6 +84,66 @@ function isTypeOnly(node: ast.Node): boolean {
   );
 }
 
+/**
+ * What {@link clientBoundaryProblems} learns while it walks import chains,
+ * shared by every file of one run: the resolved value imports of each file
+ * (read, parsed and resolved once) and the files already known to reach no
+ * `.client` module. Without it every server-only file would re-read, re-parse
+ * and re-resolve the same shared utilities, which scales with files times
+ * the size of the import graph.
+ */
+export type ClientBoundaryCache = {
+  /** Resolved project-relative value imports per file; `undefined` when unreadable. */
+  readonly imports: Map<string, { specifier: string; target: string | undefined }[] | undefined>;
+  /** Resolved targets per `importer\0specifier`. */
+  readonly resolved: Map<string, string | undefined>;
+  /** Files proven to reach no `.client` module through passable files. */
+  readonly dead: Set<string>;
+};
+
+export function createClientBoundaryCache(): ClientBoundaryCache {
+  return { imports: new Map(), resolved: new Map(), dead: new Set() };
+}
+
+function resolveCached(
+  specifier: string,
+  importer: string,
+  cwd: string,
+  cache: ClientBoundaryCache,
+): string | undefined {
+  const key = `${importer}\0${specifier}`;
+
+  if (!cache.resolved.has(key)) cache.resolved.set(key, resolveLocal(specifier, importer, cwd));
+
+  return cache.resolved.get(key);
+}
+
+/** The value imports of a project file, resolved, read and parsed once per run. */
+function importsOfFile(
+  file: string,
+  cwd: string,
+  cache: ClientBoundaryCache,
+): { specifier: string; target: string | undefined }[] | undefined {
+  if (cache.imports.has(file)) return cache.imports.get(file);
+
+  let imports: { specifier: string; target: string | undefined }[] | undefined;
+
+  try {
+    const text = readFileSync(path.join(cwd, file), "utf8");
+
+    imports = valueImports(file, text).map(({ specifier }) => ({
+      specifier,
+      target: resolveCached(specifier, file, cwd, cache),
+    }));
+  } catch {
+    imports = undefined;
+  }
+
+  cache.imports.set(file, imports);
+
+  return imports;
+}
+
 function valueImports(
   relativePath: string,
   source: string,
@@ -99,41 +159,55 @@ function valueImports(
  * The shortest chain of project-relative files from `from` to a `.client`
  * module, following value imports through files that are neither server-only
  * (judged on their own) nor browser files. `undefined` when none is reached.
+ *
+ * A search that finds nothing has visited only files that reach nothing, so
+ * they are remembered in the cache and never walked again.
  */
 function chainToClientModule(
   from: string,
   specifier: string,
   cwd: string,
-  readSource: (file: string) => string | undefined,
+  cache: ClientBoundaryCache,
 ): string[] | undefined {
-  const first = resolveLocal(specifier, from, cwd);
+  const first = resolveCached(specifier, from, cwd, cache);
 
   if (!first) return undefined;
 
   const visited = new Set<string>([from]);
-  const queue: string[][] = [[from, first]];
+  // First discoverer of each file, so the chain is rebuilt only when one is found.
+  const previous = new Map<string, string>([[first, from]]);
+  const queue: string[] = [first];
 
-  while (queue.length > 0) {
-    const chain = queue.shift() ?? [];
-    const current = chain.at(-1);
+  for (let head = 0; head < queue.length; head++) {
+    const current = queue[head];
 
-    if (!current || visited.has(current)) continue;
+    if (!current || visited.has(current) || cache.dead.has(current)) continue;
 
     visited.add(current);
 
-    if (isClientModule(current)) return chain;
+    if (isClientModule(current)) {
+      const chain = [current];
+
+      for (let step = previous.get(current); step !== undefined; step = previous.get(step)) {
+        chain.unshift(step);
+      }
+
+      return chain;
+    }
     // Another server-only file is reported on its own; a browser file may use `.client`.
     if (isServerOnlyFile(current) || isWebFile(current)) continue;
 
-    const text = readSource(current);
+    for (const { target } of importsOfFile(current, cwd, cache) ?? []) {
+      if (!target || visited.has(target) || cache.dead.has(target) || previous.has(target))
+        continue;
 
-    if (text === undefined) continue;
-
-    for (const { specifier: next } of valueImports(current, text)) {
-      const target = resolveLocal(next, current, cwd);
-
-      if (target && !visited.has(target)) queue.push([...chain, target]);
+      previous.set(target, current);
+      queue.push(target);
     }
+  }
+
+  for (const file of visited) {
+    if (file !== from) cache.dead.add(file);
   }
 
   return undefined;
@@ -152,25 +226,14 @@ export function clientBoundaryProblems(
   sourceFile: ast.SourceFile,
   relativePath: string,
   cwd: string,
+  cache: ClientBoundaryCache = createClientBoundaryCache(),
 ): ToolingProblem[] {
   if (!isServerOnlyFile(relativePath)) return [];
 
   const problems: ToolingProblem[] = [];
-  const cache = new Map<string, string | undefined>();
-  const readSource = (file: string): string | undefined => {
-    if (!cache.has(file)) {
-      try {
-        cache.set(file, readFileSync(path.join(cwd, file), "utf8"));
-      } catch {
-        cache.set(file, undefined);
-      }
-    }
-
-    return cache.get(file);
-  };
 
   for (const { specifier, node } of valueImports(relativePath, sourceFile.text)) {
-    const chain = chainToClientModule(relativePath, specifier, cwd, readSource);
+    const chain = chainToClientModule(relativePath, specifier, cwd, cache);
 
     if (!chain) continue;
 

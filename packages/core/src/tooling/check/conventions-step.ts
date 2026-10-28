@@ -25,9 +25,43 @@ import {
 import { translationProblems } from "./translation-conventions";
 import { integrationSpecProblems } from "./integration-spec-conventions";
 import { barrelFindings } from "./barrel-conventions";
-import { clientBoundaryProblems } from "./client-boundary-conventions";
+import {
+  clientBoundaryProblems,
+  createClientBoundaryCache,
+  type ClientBoundaryCache,
+} from "./client-boundary-conventions";
+import {
+  createRuleBudget,
+  DEFAULT_RULE_BUDGET_MS,
+  withinBudget,
+  type RuleBudget,
+} from "./rule-budget";
 import { configuredLocaleCodes, localeCoverageProblems } from "./locale-conventions";
 import { positionOf, type SourceFinding } from "./source-ast";
+
+/** The rules the time budget tracks, named by the codes they report. */
+const RULES = {
+  imports: "WL9001-WL9003 imports",
+  clientBoundary: "WL9022 client boundary",
+  translations: "WL9104 translations",
+  integrationSpec: "WL9024 integration specs",
+  security: "WL9005-WL9009 security",
+  codeStyle: "WL9010-WL9012 code style",
+  web: "WL9018 web components",
+  responseSchema: "response schemas",
+  apiRoutes: "WL9019-WL9020 browser routes",
+  modelReads: "WL9021 model property reads",
+  modelMerge: "WL9025 model merge",
+  barrels: "WL9023 barrels",
+} as const;
+
+/** What one convention run shares between its files. */
+export type ConventionRun = {
+  /** Import chains already walked by the `.client` boundary rule. */
+  boundary?: ClientBoundaryCache;
+  /** Time each rule has used so far; a rule over budget is skipped. */
+  budget?: RuleBudget;
+};
 
 /** Extensions tried when resolving an extension-less import. */
 const RESOLVE_EXTENSIONS = [".ts", ".tsx", ".js", ".jsx", "/index.ts", "/index.tsx"];
@@ -226,26 +260,39 @@ export function checkFileConventions(
   options: ConventionOptions = {},
   apiRouteFacts: ApiRouteFacts = EMPTY_API_ROUTE_FACTS,
   modelFacts: ModelFacts = EMPTY_MODEL_FACTS,
+  run: ConventionRun = {},
 ): ToolingProblem[] {
   const sourceFile = ast.parseSourceFile(relativePath, source);
+  const timed = <T>(rule: string, fallback: T, body: () => T): T =>
+    withinBudget(run.budget, rule, fallback, body);
+  const noProblems: ToolingProblem[] = [];
+  const noFindings: SourceFinding[] = [];
   const problems = [
-    ...importProblems(sourceFile, relativePath, cwd),
-    ...clientBoundaryProblems(sourceFile, relativePath, cwd),
-    ...translationProblems(relativePath, source),
-    ...integrationSpecProblems(relativePath, source, cwd, (specifier, importer) =>
-      resolveSpecifier(specifier, importer, cwd),
+    ...timed(RULES.imports, noProblems, () => importProblems(sourceFile, relativePath, cwd)),
+    ...timed(RULES.clientBoundary, noProblems, () =>
+      clientBoundaryProblems(sourceFile, relativePath, cwd, run.boundary),
+    ),
+    ...timed(RULES.translations, noProblems, () => translationProblems(relativePath, source)),
+    ...timed(RULES.integrationSpec, noProblems, () =>
+      integrationSpecProblems(relativePath, source, cwd, (specifier, importer) =>
+        resolveSpecifier(specifier, importer, cwd),
+      ),
     ),
     ...[
-      ...securityFindings(sourceFile),
-      ...codeStyleFindings(sourceFile),
-      ...webFindings(sourceFile, options),
-      ...responseSchemaFindings(sourceFile),
-      ...apiRouteReferenceFindings(sourceFile, apiRouteFacts),
-      ...modelPropertyReadFindings(sourceFile, modelFacts),
-      ...modelMergeFindings(sourceFile, modelFacts),
+      ...timed(RULES.security, noFindings, () => securityFindings(sourceFile)),
+      ...timed(RULES.codeStyle, noFindings, () => codeStyleFindings(sourceFile)),
+      ...timed(RULES.web, noFindings, () => webFindings(sourceFile, options)),
+      ...timed(RULES.responseSchema, noFindings, () => responseSchemaFindings(sourceFile)),
+      ...timed(RULES.apiRoutes, noFindings, () =>
+        apiRouteReferenceFindings(sourceFile, apiRouteFacts),
+      ),
+      ...timed(RULES.modelReads, noFindings, () =>
+        modelPropertyReadFindings(sourceFile, modelFacts),
+      ),
+      ...timed(RULES.modelMerge, noFindings, () => modelMergeFindings(sourceFile, modelFacts)),
       // Opt-in: a barrel is a finding only once `rules.WL9023` names a severity.
       ...(["warning", "error"].includes(options.rules?.WL9023 ?? "")
-        ? barrelFindings(sourceFile)
+        ? timed(RULES.barrels, noFindings, () => barrelFindings(sourceFile))
         : []),
     ].map((finding) => findingProblem(sourceFile, relativePath, finding)),
   ];
@@ -307,48 +354,121 @@ export function checkTsconfigConventions(cwd: string, project = "tsconfig.json")
   ];
 }
 
+/** Options of {@link runConventions} beyond the project. */
+export type RunConventionsOptions = {
+  /** Receives one human-readable line per milestone (start, every 1000 files, a rule over budget). */
+  onProgress?: (message: string) => void;
+  /** Overrides `ruleBudgetMs` from `.warlock-check.json`. */
+  ruleBudgetMs?: number;
+};
+
 /**
  * Run every convention check over `files` (project-relative) plus the
  * project tsconfig.
+ *
+ * Each rule has a time budget over the whole run (`ruleBudgetMs`, default 30
+ * seconds): a rule over it is skipped for the remaining files and reported as
+ * a `WL9026` warning naming the rule and the time it used.
  */
 export function runConventions(
   cwd: string,
   files: readonly string[],
   project?: string,
-  apiRouteFacts: ApiRouteFacts = collectApiRouteFacts(cwd, files),
-  modelFacts: ModelFacts = collectModelFacts(cwd, files),
+  apiRouteFacts?: ApiRouteFacts,
+  modelFacts?: ModelFacts,
+  runOptions: RunConventionsOptions = {},
 ): ToolingProblem[] {
+  const { onProgress } = runOptions;
   const options = readConventionOptions(cwd);
+  const severityOf = (problem: ToolingProblem): ToolingProblem => {
+    const severity = options.rules?.[problem.code];
+    return severity === "error" || severity === "warning" ? { ...problem, severity } : problem;
+  };
   const problems = checkTsconfigConventions(cwd, project)
     .filter((problem) => options.rules?.[problem.code] !== "off")
-    .map((problem) => {
-      const severity = options.rules?.[problem.code];
-      return severity === "error" || severity === "warning" ? { ...problem, severity } : problem;
-    });
+    .map(severityOf);
+
+  const timer = performance.now();
+  const budgetMs = runOptions.ruleBudgetMs ?? options.ruleBudgetMs ?? DEFAULT_RULE_BUDGET_MS;
+  const budget = createRuleBudget(budgetMs, (rule, elapsedMs) =>
+    onProgress?.(
+      `conventions: rule "${rule}" used ${formatSeconds(elapsedMs)} and is over its ${formatSeconds(budgetMs)} budget; skipping it for the remaining files`,
+    ),
+  );
+
+  onProgress?.(`conventions: collecting project facts for ${files.length} file(s)`);
+
+  const routeFacts = apiRouteFacts ?? collectApiRouteFacts(cwd, files);
+  const models = modelFacts ?? collectModelFacts(cwd, files);
+  const run: ConventionRun = { boundary: createClientBoundaryCache(), budget };
+
+  onProgress?.(`conventions: checking ${files.length} file(s)`);
+
+  let done = 0;
 
   for (const file of files) {
-    let source: string;
+    let source: string | undefined;
 
     try {
       source = readFileSync(path.join(cwd, file), "utf8");
     } catch {
-      continue;
+      source = undefined;
     }
 
-    problems.push(...checkFileConventions(file, source, cwd, options, apiRouteFacts, modelFacts));
+    if (source !== undefined) {
+      problems.push(...checkFileConventions(file, source, cwd, options, routeFacts, models, run));
+    }
+
+    done++;
+
+    if (done % 1000 === 0 && done < files.length) {
+      onProgress?.(
+        `conventions: ${done}/${files.length} file(s) in ${formatSeconds(performance.now() - timer)}, slowest rule ${slowestRule(budget)}`,
+      );
+    }
   }
 
   // `WL9105`: every key of every module dictionary carries every configured locale.
   problems.push(
     ...localeCoverageProblems(cwd, configuredLocaleCodes(cwd, options.localeCodes))
       .filter((problem) => options.rules?.[problem.code] !== "off")
-      .map((problem) => {
-        const severity = options.rules?.[problem.code];
-        return severity === "error" || severity === "warning" ? { ...problem, severity } : problem;
-      }),
+      .map(severityOf),
+  );
+
+  for (const [rule, { skippedFiles }] of budget.exhausted) {
+    const problem = createProblem({
+      code: "WL9026",
+      source: "convention",
+      severity: "warning",
+      message: `Rule "${rule}" used ${formatSeconds(budget.elapsed.get(rule) ?? 0)}, over its ${formatSeconds(budgetMs)} budget, and was skipped for the remaining ${skippedFiles} file(s); its findings are incomplete.`,
+    });
+
+    if (options.rules?.[problem.code] !== "off") problems.push(severityOf(problem));
+  }
+
+  onProgress?.(
+    `conventions: done in ${formatSeconds(performance.now() - timer)}, slowest rule ${slowestRule(budget)}`,
   );
 
   return problems;
+}
+
+function formatSeconds(milliseconds: number): string {
+  return `${(milliseconds / 1000).toFixed(1)}s`;
+}
+
+function slowestRule(budget: RuleBudget): string {
+  let name = "none";
+  let slowest = 0;
+
+  for (const [rule, elapsed] of budget.elapsed) {
+    if (elapsed > slowest) {
+      name = rule;
+      slowest = elapsed;
+    }
+  }
+
+  return `${name} (${formatSeconds(slowest)})`;
 }
 
 /** Optional JSON configuration; malformed configuration is reported by the check step. */
@@ -367,6 +487,12 @@ export function readConventionOptions(cwd: string): ConventionOptions {
     (!Array.isArray(localeCodes) || !localeCodes.every((code) => typeof code === "string"))
   )
     throw new Error("localeCodes must be an array of locale code strings.");
+  const ruleBudgetMs: unknown = Reflect.get(value, "ruleBudgetMs");
+  if (
+    ruleBudgetMs !== undefined &&
+    (typeof ruleBudgetMs !== "number" || !Number.isFinite(ruleBudgetMs) || ruleBudgetMs < 0)
+  )
+    throw new Error("ruleBudgetMs must be a number of milliseconds, 0 or more.");
   const rules: unknown = Reflect.get(value, "rules");
   const overrides: NonNullable<ConventionOptions["rules"]> = {};
   if (rules !== undefined) {
@@ -383,6 +509,7 @@ export function readConventionOptions(cwd: string): ConventionOptions {
   }
   return {
     ...(typeof limit === "number" ? { componentLineLimit: limit } : {}),
+    ...(typeof ruleBudgetMs === "number" ? { ruleBudgetMs } : {}),
     ...(Array.isArray(localeCodes) ? { localeCodes: localeCodes as string[] } : {}),
     rules: overrides,
   };

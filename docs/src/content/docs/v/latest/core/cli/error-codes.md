@@ -644,6 +644,14 @@ npx warlock explain WL9024
 npx warlock explain WL9025
 ```
 
+### WL9026
+
+A convention rule of `warlock check` used more than its time budget over the run (30 seconds by default) and was skipped for the remaining files, so its findings are incomplete. The message names the rule and the time it used. Use `--changed` to check fewer files, raise `ruleBudgetMs` in `.warlock-check.json` (`0` turns the budget off), or turn the rule off with `rules`. Defaults to a warning.
+
+```bash
+npx warlock explain WL9026
+```
+
 ### WL9105
 
 A translation key in a module's `locales.json` or `locales/<feature>.json` is missing one of the configured locales. The configured locales are `localeCodes` in `src/config/app.ts` or in `.warlock-check.json`; the rule is skipped when neither is set. Defaults to an error; configure severity in `.warlock-check.json`.

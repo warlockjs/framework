@@ -776,6 +776,14 @@ export const ERROR_CODES = {
     fix: 'Replace the column with `model.set({ column: value })` or `model.set("column", value)`; `merge()` deep-merges plain objects. Keep `merge()` only when a partial update of the nested object is intended.',
     skill: "warlock-check",
   },
+  WL9026: {
+    code: "WL9026",
+    area: "convention",
+    category: "code",
+    title: "A convention rule ran over its time budget and was skipped",
+    fix: 'The rule stopped for the rest of the run, so its findings are incomplete. Use `--changed` to check fewer files, raise `ruleBudgetMs` in .warlock-check.json (0 turns the budget off), or turn the rule off with `rules: { WLxxxx: "off" }`.',
+    skill: "warlock-check",
+  },
   WL9101: {
     code: "WL9101",
     area: "convention",

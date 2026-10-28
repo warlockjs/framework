@@ -15,6 +15,8 @@ export type ConventionOptions = {
   componentLineLimit?: number;
   /** The locales every translation key must carry; default: `localeCodes` in `src/config/app.ts`. */
   localeCodes?: string[];
+  /** Milliseconds one convention rule may use over a whole run; `0` turns the budget off. Default 30000. */
+  ruleBudgetMs?: number;
   rules?: Partial<
     Record<import("../../errors/error-codes").WarlockErrorCode, "off" | "warning" | "error">
   >;

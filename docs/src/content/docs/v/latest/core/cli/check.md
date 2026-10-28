@@ -39,7 +39,7 @@ src/app/posts/services/publish.service.ts:2:24  WL9003  "../../users/models/user
 | `--skip, -s`    | string  | Comma-separated steps to skip: `environment`, `typecheck`, `lint`, `tests`, `conventions`. |
 | `--lint`        | string  | `oxlint` (default and only supported value).                                               |
 | `--project, -p` | string  | tsconfig path (default `tsconfig.json`).                                                   |
-| `--json, -j`    | boolean | Print the report as JSON. stdout carries only the JSON.                                    |
+| `--json, -j`    | boolean | Print the report as JSON. stdout carries only the JSON; progress lines go to stderr.       |
 
 ## Exit codes
 
@@ -269,6 +269,7 @@ They parse real TypeScript/JSX syntax with the same oxc-parser adapter as the ex
 | `WL9020` | Browser code references a route registered with `clientVisible: false` (an error, not a warning)         | Call the endpoint from the server, or drop `clientVisible: false` from the route.                                                                                  |
 | `WL9021` | A Cascade column is read or written as a model property (`user.email`)                                   | Use `user.get("email")` / `user.set("email", value)`; `--fix` rewrites it.                                                                                         |
 | `WL9025` | `merge()` on an object column of a Cascade model keeps the keys the new value omits (warning)            | Use `model.set({ column: value })` or `model.set("column", value)`; there is no automatic fix.                                                                     |
+| `WL9026` | A convention rule used more than its time budget and was skipped for the rest of the run (warning)       | Use `--changed`, raise `ruleBudgetMs` in `.warlock-check.json` (0 turns it off), or turn the rule off.                                                             |
 | `WL9024` | An integration spec (not `*.unit.*`, or under `tests/`) imports nothing that needs the app (a warning)   | Move it to the unit project: rename it to `<name>.unit.spec.ts` outside `tests/`.                                                                                  |
 | `WL9104` | Translation key computed at runtime in `src/web` (a page then ships every group)                         | Declare the keys with `config.translations` in the page's setup file.                                                                                              |
 
@@ -318,6 +319,27 @@ Create `.warlock-check.json` in the project root:
 `rules` accepts `"off"`, `"warning"`, or `"error"` for convention codes, including
 existing codes. Per-line `// warlock-check-ignore WL9015 -- reason` works as before.
 Use `npx warlock explain WL9015` for the registry explanation.
+
+### Progress and the per-rule time budget
+
+`warlock check` writes one line to stderr when each step starts and ends
+(`conventions: running`, `conventions: passed in 12.4s (7500 file(s) checked)`). The
+conventions step adds a line when it collects project facts, one every 1000 files that
+names the slowest rule so far, and one when a rule goes over budget. stdout is untouched, so
+`--json` still prints a single JSON document; redirect stderr (`2>/dev/null`) to silence it.
+
+Each convention rule has a time budget over the whole run: 30 seconds by default. A rule
+that goes over it is skipped for the remaining files and reported as a `WL9026` warning
+naming the rule and the time it used, so one slow rule can no longer hang the command. The
+check is made between files, so a single file that never returns is not interrupted. Set
+`ruleBudgetMs` in `.warlock-check.json` to change the budget, or `0` to turn it off. Use
+`--changed` to check fewer files while a slow rule is investigated.
+
+```json
+{
+  "ruleBudgetMs": 60000
+}
+```
 
 ```bash
 npx warlock check --changed --fix --json
