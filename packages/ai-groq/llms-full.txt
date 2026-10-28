@@ -147,4 +147,8 @@ Models from this adapter have no native `countTokens` method. Check
 `model.countTokens` before using an optional native counting capability;
 `sdk.count(text)` is a separate offline estimate.
 
+## List models
+
+`await groq.models()` returns `ModelInfo[]` with `contextWindow`; inactive models are left out.
+
 

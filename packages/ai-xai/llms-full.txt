@@ -154,16 +154,12 @@ Models from this adapter have no native `countTokens` method. Check
 `model.countTokens` before using an optional native counting capability;
 `sdk.count(text)` is a separate offline estimate.
 
-## Native web search requires Responses
+## Native web search and X search
 
-[xAI's official web-search guide](https://docs.x.ai/developers/tools/web-search)
-(verified 2026-10-18) sends `{ type: "web_search" }` to `POST /v1/responses`.
-`XaiSDK` currently wraps Chat Completions, so native `web_search` and `x_search`
-provider tools are explicitly unsupported and throw `InvalidRequestError`
-before transport, explaining that the vendor's Responses API is required.
-Use xAI's own Responses SDK for native search. The framework's
-`api: "responses"` adapter remains direct-OpenAI-only; passing a tool definition
-does not change this transport. No xAI hosted-search request count or list fee
-is guessed. See [compatible native search](https://warlock.js.org/v/latest/ai/providers/openai-compatible/#xai).
+`web_search` and `x_search` exist only on xAI's Responses API. Chat Completions stays the default; a call carrying `ai.providerTool({ provider: "xai", definition: { type: "web_search" } })` (or `x_search`) is routed to `POST /v1/responses` automatically (stateless, no OpenAI-only `include` fields). `xai.model({ api: "responses" })` sends every call there; `api: "chat"` pins Chat Completions and a search tool then throws before transport. On a relabelled gateway (`provider` changed) set `api: "responses"` explicitly. Hosted calls count in `usage.serverToolUse.webSearchRequests`; output items are on `providerMetadata.xai.output`. No xAI search fee is guessed.
+
+## List models
+
+`await xai.models()` returns `ModelInfo[]` from `GET /v1/models` (`id`, `label`, `provider`, `kind` classified from the id, `created`).
 
 

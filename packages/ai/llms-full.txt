@@ -444,7 +444,7 @@ const concierge = ai.agent({
 
 ---
 name: approve-tool-calls
-description: 'Gate an agent''s tool calls behind a human with `ai.human.approval(options)` (the `tool.before` approval-gate middleware) — ships in @warlock.js/ai core. Triggers: `ai.human.approval`, `humanApproval`, `HumanApprovalOptions`, `ApprovalRequest`, `ApprovalDecision`, `ApprovalHandler`, `InterruptPolicy`, `evaluatePolicy`, `ApprovalRejectedError`, `policy: { type: "allowlist" | "denylist" | "predicate" }`, decision `{ type: "approve" | "reject" | "edit" }`; ''human in the loop'', ''approve a tool call before it runs'', ''ask a human before the agent sends/charges/deletes'', ''pause before a dangerous tool'', ''let an operator edit the tool args'', ''reject a tool call with a reason the model can self-correct from''. Typical import `import { ai } from "@warlock.js/ai"`. Skip: persisting the request and resuming hours later out-of-process — the `durable-resume` topic; the agent/middleware/tool primitives themselves — `@warlock.js/ai`.'
+description: 'Gate an agent''s tool calls behind a human with `ai.human.approval(options)` (the `tool.before` approval-gate middleware) — ships in @warlock.js/ai core. Triggers: `tools: { name: "allow" | "deny" | "ask" }`, `defaultMode`, `remember`, `ai.human.approvalMemory`, `ApprovalMemory`, `ai.human.approval`, `humanApproval`, `HumanApprovalOptions`, `ApprovalRequest`, `ApprovalDecision`, `ApprovalHandler`, `InterruptPolicy`, `evaluatePolicy`, `ApprovalRejectedError`, `policy: { type: "allowlist" | "denylist" | "predicate" }`, decision `{ type: "approve" | "reject" | "edit" }`; ''human in the loop'', ''approve a tool call before it runs'', ''ask a human before the agent sends/charges/deletes'', ''pause before a dangerous tool'', ''let an operator edit the tool args'', ''reject a tool call with a reason the model can self-correct from''. Typical import `import { ai } from "@warlock.js/ai"`. Skip: persisting the request and resuming hours later out-of-process — the `durable-resume` topic; the agent/middleware/tool primitives themselves — `@warlock.js/ai`.'
 ---
 
 # Approve tool calls — the human-in-the-loop gate
@@ -531,6 +531,27 @@ Compose with `forTool(names, mw)` from `@warlock.js/ai` for static, name-based s
 
 `evaluatePolicy(policy, context)` is the exported, pure core if you want to reuse the gate decision outside the middleware (it never throws, does no IO, and returns `{ requiresApproval, tags? }`).
 
+## Per-tool modes and remembering approvals
+
+Instead of (or beside) a policy, name a mode per tool; a `tools` entry beats `policy`:
+
+```ts
+ai.human.approval({
+  tools: { read_file: "allow", delete_file: "deny", run_shell: "ask" },
+  defaultMode: "ask", // unlisted tools; with no policy this is the default
+  denyReason: "deletes are disabled",
+  remember: true, // or { memory: ai.human.approvalMemory() }
+  handler: async (request) => ({ type: "approve", remember: "tool" }), // or "args"
+});
+```
+
+`"deny"` short-circuits an `ApprovalRejectedError` (the model self-corrects).
+With `remember`, an `approve` decision carrying `remember: "tool"` auto-approves
+that tool for the rest of the run's `sessionId`; `"args"` only identical
+arguments. Runs without a `sessionId` are always asked; reject and edit are never
+remembered. Implement `ApprovalMemory` (`has` / `add` / `clear`) to persist
+approvals; call `memory.clear(sessionId)` when a session ends.
+
 ## The request a reviewer rules on
 
 For a gated call the middleware builds an `ApprovalRequest` and hands it to your `handler`:
@@ -587,7 +608,7 @@ Only a _handler bug_ — a non-sentinel throw from your handler — propagates, 
 
 ---
 name: attach-ai-middleware
-description: 'Wire agent middleware — ai.middleware.budget (token / USD caps + SLO/cost contract w/ maxLatencyMs + onViolation fallback), ai.middleware.guardrail (pre / post content checks), ai.middleware.semanticCache (exact + vector cache), supervisor-level middleware, plus authoring custom hooks (execute / trip / tool). Triggers: `reserve`, `BudgetReserveOptions`, `estimateInputTokens`, `countInputTokens`, `ai.middleware.budget`, `ai.middleware.guardrail`, `ai.middleware.semanticCache`, `ai.middleware.compose`, `ai.middleware.forTool`, `AgentMiddleware`, `BudgetExceededError`, `GuardrailViolationError`, `BudgetContract`, `maxLatencyMs`, `onViolation`, `readBudgetFallbackSignal`, `supervisor middleware`, `SemanticCacheOptions`, `SemanticCacheScope`; ''cap token cost'', ''SLO budget'', ''block pii in prompts'', ''semantic cache before LLM'', ''supervisor-level middleware'', ''write custom hook'', ''isolate semantic cache per session/tenant''; typical import `import { ai } from "@warlock.js/ai"`. Skip: agent lifecycle — the `run-ai-agent` topic; cache drivers — the `persist-ai-data` topic; competing libs `langchain` callbacks.'
+description: 'Wire agent middleware — ai.middleware.budget (token / USD caps + SLO/cost contract w/ maxLatencyMs + onViolation fallback), ai.middleware.guardrail (pre / post content checks), ai.middleware.semanticCache (exact + vector cache), supervisor-level middleware, plus authoring custom hooks (execute / trip / tool). Triggers: `onSpend`, `BudgetSpend`, `window: "all"`, `ai.pricing`, `pricingCatalogue`, `PricingCatalogue`, `reserve`, `BudgetReserveOptions`, `estimateInputTokens`, `countInputTokens`, `ai.middleware.budget`, `ai.middleware.guardrail`, `ai.middleware.semanticCache`, `ai.middleware.compose`, `ai.middleware.forTool`, `AgentMiddleware`, `BudgetExceededError`, `GuardrailViolationError`, `BudgetContract`, `maxLatencyMs`, `onViolation`, `readBudgetFallbackSignal`, `supervisor middleware`, `SemanticCacheOptions`, `SemanticCacheScope`; ''cap token cost'', ''SLO budget'', ''block pii in prompts'', ''semantic cache before LLM'', ''supervisor-level middleware'', ''write custom hook'', ''isolate semantic cache per session/tenant''; typical import `import { ai } from "@warlock.js/ai"`. Skip: agent lifecycle — the `run-ai-agent` topic; cache drivers — the `persist-ai-data` topic; competing libs `langchain` callbacks.'
 ---
 
 # Middleware — agent-level pipeline
@@ -640,6 +661,10 @@ ai.middleware.budget({
 Breach → `BudgetExceededError` on `result.error`. Inspect `error.unit` (`"tokens" | "usd"`), `error.limit`, `error.actual`. Warn mode logs and continues — useful for measuring before enforcing.
 
 USD pricing resolves from the `pricing[modelName]` entry, else the model's own `ModelPricing` (per-model, SDK registry, or built-in list price). Unpriced + `maxCostUSD` fails closed before the first call unless `onUnpriced: "allow"`.
+
+### Prices, spend hook and per-session caps
+
+`pricing` takes a record or an `ai.pricing({ tables })` catalogue (provider tables such as `ANTHROPIC_MODEL_PRICING`, later tables win, `.set(model, price)` overrides, dated snapshot ids resolve to their alias; `.costUSD(usage, model)` prices a `Usage`). `onSpend(spend)` runs after every model call, before the caps are compared (so the breaching call is recorded), with `{ model, provider, sessionId, tripIndex, usage, costUSD, run, scopedKey }`; persist it there (errors are swallowed). `scoped: { window: "all" }` is a ledger that never resets: with `key: (ctx) => ctx.options?.sessionId` it is a per-session cap, with a user id a per-caller one. Add `reserve` to refuse a call _before_ it is made.
 
 ### Reserve-then-commit — `budget({ reserve })`
 
@@ -1234,6 +1259,7 @@ Compact mode drops `description` / `title` / `examples` / `example` / `default` 
 const report = ai.tools.describe(tool);            // { name, tokens, descriptionChars, schemaHash, targets, issues, ok }
 const { tools, tokens } = ai.tools.describeAll(tools);
 ai.tool({ ..., lint: false });                      // silence one tool
+ai.tool({ ..., lint: { ignore: ["unsupported-keyword"] } }); // drop chosen finding codes (also in ai.config({ toolLint }) and ai.mcp(server, { lint }))
 ai.tool({ ..., lint: { targets: ["anthropic"], warnAboveTokens: 300 } });
 ai.config({ toolLint: false });                     // silence the app
 ```
@@ -4481,7 +4507,7 @@ Factory-time resolution reads whatever is pinned **at that moment** — so warm 
 
 ---
 name: run-ai-agent
-description: 'Build agents with ai.agent({...}) — the single-LLM-turn primitive. Covers execute / stream, attachments, structured output, placeholders, events, agent.eval scoring, the judge-safe preset for resilient LLM-as-judge / verdict classifiers (ai.agent.judge / judge: true — lenient JSON parse + repair + never-throw, for Nova-class models), and auto-adapting raw executables in tools:[]. Triggers: `compaction`, `AgentCompactionConfig`, `AgentCompactionRecord`, `afterTokens`, `countTokens`, `ai.agent`, `maxConcurrentTools`, `toolDispatch`, `ai.agent.judge`, `agent.execute`, `agent.stream`, `agent.eval`, `AgentResult`, `AgentReport`, `AgentToolEntry`, `JudgeConfig`, `JudgeAgentConfig`, `judge`, `repairAttempts`, `streamingToolGuard`, `attachments`, `repair`, `maxTrips`, `sessionId`, `spawnSubAgent`, `SpawnSubAgentSpec`, `toolDispatch`, `finishReason`, `pause_turn`, `continueOnOutputLimit`, `AgentIncompleteError`, `incomplete`, `modelOptions`, `callId`, `refusal`, `context_exceeded`, `blocks`, `ProviderContentBlock`, `providerOptions`, `ai.compaction.summarize`, `summarizeCompaction`, `DEFAULT_COMPACTION_INSTRUCTIONS`, `renderTranscript`, `Message.compaction`, `agent.trip.reasoning`, `agent.tool.streaming`, `agent.trip.usage`, `streamChunks`, `ModelStreamChunk`; ''run an agent'', ''stream an agent response'', ''show the model thinking'', ''stream tool arguments'', ''structured output schema'', ''pass image to agent'', ''evaluate an agent'', ''LLM-as-judge that survives malformed JSON'', ''grade with a Nova model without crashing'', ''put a supervisor in tools'', ''cancel an agent run'', ''spawn a one-shot sub-agent with a per-task budget''; typical import `import { ai } from "@warlock.js/ai"`. Skip: tool definition — the `define-ai-tool` topic; workflows — the `run-ai-workflow` topic; eval matchers / batch / fallback detail — the `ai-dx-helpers` topic; competing libs `langchain`, `ai` (Vercel), raw `openai`.'
+description: 'Build agents with ai.agent({...}) — the single-LLM-turn primitive. Covers execute / stream, attachments, structured output, placeholders, events, agent.eval scoring, the judge-safe preset for resilient LLM-as-judge / verdict classifiers (ai.agent.judge / judge: true — lenient JSON parse + repair + never-throw, for Nova-class models), and auto-adapting raw executables in tools:[]. Triggers: `stopAfterTools`, `stopWhen`, `endsTurn`, `tool_stop`, `contextEditing`, `clearToolResults`, `compaction`, `AgentCompactionConfig`, `AgentCompactionRecord`, `afterTokens`, `countTokens`, `ai.agent`, `maxConcurrentTools`, `toolDispatch`, `ai.agent.judge`, `agent.execute`, `agent.stream`, `agent.eval`, `AgentResult`, `AgentReport`, `AgentToolEntry`, `JudgeConfig`, `JudgeAgentConfig`, `judge`, `repairAttempts`, `streamingToolGuard`, `attachments`, `repair`, `maxTrips`, `sessionId`, `spawnSubAgent`, `SpawnSubAgentSpec`, `toolDispatch`, `finishReason`, `pause_turn`, `continueOnOutputLimit`, `AgentIncompleteError`, `incomplete`, `modelOptions`, `callId`, `refusal`, `context_exceeded`, `blocks`, `ProviderContentBlock`, `providerOptions`, `ai.compaction.summarize`, `summarizeCompaction`, `DEFAULT_COMPACTION_INSTRUCTIONS`, `renderTranscript`, `Message.compaction`, `agent.trip.reasoning`, `agent.tool.streaming`, `agent.trip.usage`, `streamChunks`, `ModelStreamChunk`; ''run an agent'', ''stream an agent response'', ''show the model thinking'', ''stream tool arguments'', ''structured output schema'', ''pass image to agent'', ''evaluate an agent'', ''LLM-as-judge that survives malformed JSON'', ''grade with a Nova model without crashing'', ''put a supervisor in tools'', ''cancel an agent run'', ''spawn a one-shot sub-agent with a per-task budget''; typical import `import { ai } from "@warlock.js/ai"`. Skip: tool definition — the `define-ai-tool` topic; workflows — the `run-ai-workflow` topic; eval matchers / batch / fallback detail — the `ai-dx-helpers` topic; competing libs `langchain`, `ai` (Vercel), raw `openai`.'
 ---
 
 # `ai.agent()` — single-turn primitive
@@ -4947,6 +4973,52 @@ const result = await ai.spawnSubAgent({
 `SpawnSubAgentSpec` accepts `toolDispatch` and `maxConcurrentTools` with the same defaults as `ai.agent()`: concurrent calls, up to four at once. Upgrading from 5.29 to 5.30 changed sub-agent tools to this concurrent default too; use `toolDispatch: "sequential"` when tool side effects require ordering.
 
 The one field a bare agent config doesn't surface ergonomically is `budget` (`BudgetOptions` — `maxTokens` / `maxCostUSD`), equivalent to `ai.agent({ middleware: [ai.middleware.budget(...)] })` but promoted to a first-class spec field so a delegated subtask can't overrun its cap (distinct from `maxTrips`, which caps round-trips, not spend). The surface is **narrower** than `agent.execute()`: one-shot, with no `history`, `placeholders`, per-call events, or `repair`. The spawned `report` slots under the caller's `report.children[]`, so cost and traces roll up uniformly. Reach for it when you want a named single-use delegation with a hard spend cap; otherwise just build an `ai.agent()` and call it.
+
+## End the run after a tool — `stopAfterTools`, `stopWhen`, `endsTurn`
+
+By default the agent calls the model again after every round of tool results.
+When a tool _is_ the answer (post a message, hand off, park the turn), end the
+run right after it ran, with no further model call:
+
+```ts
+ai.agent({
+  model,
+  tools: [search, postMessage, parkTurn],
+  stopAfterTools: ["post_message"], // by name
+  stopWhen: ({ toolCalls, text, usage, messages, tripIndex }) =>
+    toolCalls.some((call) => call.name === "park_turn"), // by rule, sync or async
+});
+
+ai.tool({ name: "park_turn", /* ... */ endsTurn: ({ input, output }) => output.parked }); // or `true`
+```
+
+The stopping trip has `finishReason: "tool_stop"` (agent-set, never from a
+provider); `result.text` is the text written beside the calls; usage covers
+only the calls made. A failed tool call never stops the run through
+`stopAfterTools` / `endsTurn` (the model should see the error); `stopWhen` sees
+failed calls too (`call.error`). A throwing callback counts as "do not stop".
+`mode: "silent"` is the older static form (keeps `finishReason: "tool_calls"`).
+
+## Clear old tool results — `contextEditing`
+
+```ts
+ai.agent({
+  model,
+  tools,
+  contextEditing: {
+    clearToolResults: { afterTokens: 60_000, keep: 4, exclude: ["plan"], placeholder: "[cleared]" },
+  },
+});
+```
+
+Replaces the content of tool results older than the newest `keep` (default 3)
+with a placeholder once the history is estimated at `afterTokens` (omit it to
+clear every trip; `countTokens` gives an exact count). No model call, and
+call/result pairing stays intact. A model with
+`capabilities.nativeContextEditing` (Anthropic) gets the rule as
+`ModelCallOptions.contextEditing` and maps it to `clear_tool_uses` instead;
+`native: false` forces client-side clearing. Runs before `compaction`
+(summarizing); use both for long autonomous runs.
 
 ## Automatic compaction inside an agent run
 

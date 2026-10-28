@@ -370,4 +370,12 @@ console.log(response.usage.serverToolUse?.webSearchRequests);
 console.log(response.providerMetadata);
 ```
 
+## Bounding Google Search
+
+The Gemini API has no per-request search limit. `googleSearchBudget(max)` plus `providerOptions: { google: { search: { budget } } }` bounds searches across the calls of one run: the adapter adds each call's unique `webSearchQueries` to the budget and stops sending `googleSearch` once it is spent. A call already running can still overshoot. `googleSearchBudget(0)` disables search for that run.
+
+## List models
+
+`await google.models()` returns `ModelInfo[]` (id without `models/`, `label`, `kind` from `supportedActions`, `contextWindow`, `maxOutputTokens`, `description`; no `created`).
+
 

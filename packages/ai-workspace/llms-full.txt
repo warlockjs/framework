@@ -53,7 +53,7 @@ const ws = ai.workspace({
 
 const dev = ai.agent({
   model,
-  tools: ws.tools.all(), // read/edit/multi_edit/write, list_dir, run_shell, run_tests, grep, glob, todo_write/todo_read
+  tools: ws.tools.all(), // read/edit/multi_edit/apply_patch/write, list_dir, run_shell, run_tests, grep, glob, todo_write/todo_read
   maxTrips: 25, // give the loop room to iterate
 });
 
@@ -138,7 +138,7 @@ ai.supervisor({
 
 ---
 name: use-a-workspace
-description: 'Build and operate a policy-jailed filesystem + shell workspace with @warlock.js/ai-workspace. Triggers: `ai.workspace`, `workspace(`, `WorkspacePolicy`, `WorkspaceShellPolicy`, `WorkspaceToolName`, `ws.tools.all`, `ws.tools.pick`, `ws.readFile`, `ws.writeFile`, `ws.editFile`, `ws.exec`, `ws.grep`, `ws.glob`, `ws.readonly`, `ws.scope`, `ws.multiEdit`, `ws.listDir`, `ws.startShell`, `ws.shellOutput`, `ws.shellKill`, `ws.dispose`, `ws.readTodos`, `ws.writeTodos`, `WorkspacePolicyError`, `WorkspaceEditError`, `WorkspaceJobError`, `WorkspaceShellRefusalReason`, `checkShellCommand`, `denyPaths`, `denyPatterns`, `allowCommand`, `interpreter`, `shell.background`, `list.ignore`, `inheritEnv`, `expectHash`, `read.maxBytes`, `bytesCapped`, `cancelled`, `ExecOptions`, `tokenizeCommand`, `read_file`/`edit_file`/`multi_edit`/`write_file`/`list_dir`/`run_shell`/`shell_output`/`shell_kill`/`run_tests`/`grep`/`todo_write`/`todo_read`; ''give an agent file tools'', ''jail an agent to a directory'', ''let an agent read/write/grep a repo'', ''read-only workspace for a reviewer'', ''scope an agent to a subdirectory'', ''run a shell command under policy'', ''edit a file with a stale-hash guard'', ''command injection guard for an agent shell tool'', ''ReDoS-safe grep for an agent'', ''cap how many bytes a read returns'', ''cancel a running workspace command'', ''let the agent use pipes and &&'', ''why was my shell command refused'', ''deny git push --force'', ''run a dev server in the background'', ''atomic multi-edit'', ''list a directory for an agent'', ''todo list tool for an agent''; typical import `import "@warlock.js/ai-workspace"; import { ai } from "@warlock.js/ai"`. Skip: building the agent loop that consumes the tools — the `build-loop-agent` topic; defining a non-filesystem custom tool — the `define-ai-tool` topic of the `warlock-js-ai` skill.'
+description: 'Build and operate a policy-jailed filesystem + shell workspace with @warlock.js/ai-workspace. Triggers: `ai.workspace`, `workspace(`, `WorkspacePolicy`, `WorkspaceShellPolicy`, `WorkspaceToolName`, `ws.tools.all`, `ws.tools.pick`, `ws.readFile`, `ws.writeFile`, `ws.editFile`, `ws.exec`, `ws.grep`, `ws.glob`, `ws.readonly`, `ws.scope`, `ws.multiEdit`, `ws.applyPatch`, `ws.listDir`, `ws.startShell`, `ws.shellOutput`, `ws.shellKill`, `ws.dispose`, `ws.readTodos`, `ws.writeTodos`, `WorkspacePolicyError`, `WorkspaceEditError`, `WorkspaceJobError`, `WorkspaceShellRefusalReason`, `checkShellCommand`, `denyPaths`, `denyPatterns`, `allowCommand`, `interpreter`, `shell.background`, `list.ignore`, `inheritEnv`, `expectHash`, `read.maxBytes`, `bytesCapped`, `cancelled`, `ExecOptions`, `tokenizeCommand`, `read_file`/`edit_file`/`multi_edit`/`apply_patch`/`write_file`/`list_dir`/`run_shell`/`shell_output`/`shell_kill`/`run_tests`/`grep`/`todo_write`/`todo_read`; ''give an agent file tools'', ''jail an agent to a directory'', ''let an agent read/write/grep a repo'', ''read-only workspace for a reviewer'', ''scope an agent to a subdirectory'', ''run a shell command under policy'', ''edit a file with a stale-hash guard'', ''command injection guard for an agent shell tool'', ''ReDoS-safe grep for an agent'', ''cap how many bytes a read returns'', ''cancel a running workspace command'', ''let the agent use pipes and &&'', ''why was my shell command refused'', ''deny git push --force'', ''run a dev server in the background'', ''atomic multi-edit'', ''list a directory for an agent'', ''todo list tool for an agent''; typical import `import "@warlock.js/ai-workspace"; import { ai } from "@warlock.js/ai"`. Skip: building the agent loop that consumes the tools — the `build-loop-agent` topic; defining a non-filesystem custom tool — the `define-ai-tool` topic of the `warlock-js-ai` skill.'
 ---
 
 # Use a workspace — a policy jail for an agent's filesystem + shell
@@ -242,7 +242,7 @@ export async function commitWork(cwd: string) {
 
 ### Agent-facing — `ws.tools.*`
 
-Each tool is a `ToolContract` (with a JSON Schema of its input) ready for `ai.agent({ tools })`. The LLM-visible tool names are `read_file`, `edit_file`, `multi_edit`, `write_file`, `list_dir`, `run_shell`, `shell_output`, `shell_kill`, `run_tests`, `grep`, `glob`, `todo_write`, `todo_read` — `shell_output` / `shell_kill` only in `all()` when `shell.background` is set.
+Each tool is a `ToolContract` (with a JSON Schema of its input) ready for `ai.agent({ tools })`. The LLM-visible tool names are `read_file`, `edit_file`, `multi_edit`, `apply_patch`, `write_file`, `list_dir`, `run_shell`, `shell_output`, `shell_kill`, `run_tests`, `grep`, `glob`, `todo_write`, `todo_read` — `shell_output` / `shell_kill` only in `all()` when `shell.background` is set.
 
 ```ts
 ws.tools.all(); // every tool, canonical order
@@ -310,6 +310,7 @@ export async function devLoop(cwd: string) {
 ```
 
 - `list_dir({ path?, depth?, ignore? })` → `{ path, entries: [{ path, type, size?, depth }], truncated }`; `denyPaths` always hidden, `list.ignore` (default `node_modules`, `.git`) hidden from listings, symlinks reported but never followed.
+- `apply_patch({ patch, dryRun? })` → `{ files: [{ path, action, oldPath?, hunks, hash? }], dryRun }`; a unified diff that modifies, creates, deletes and renames files, all or none; paths jailed, hunks matched by context, line endings kept, binary files refused (`binary-file`); `dryRun` checks only. Not in `readonly()`.
 - `multi_edit({ path, edits, expectHash? })` → `{ path, edits, replacements, hash }`; same uniqueness rules as `edit_file`, at most 100 edits.
 - Background: `shell_output({ id, since?, waitMs? })` → `{ stdout, stderr, cursor, droppedBytes, truncated, status, exitCode }`; only the newest `shell.maxOutputBytes` per command are kept. States `"running"`, `"exited"`, `"killed"`, `"timed-out"`. Unknown id → `WorkspaceJobError`. Background commands outlive the agent run; `dispose()` (or process exit) kills them. Only processes the workspace spawned are ever signalled.
 - Todos: one in-memory list per workspace, shared with `readonly()` / `scope()`; `todo_write` replaces the whole list (≤ 100 items, status `pending` / `in_progress` / `completed`).
@@ -376,7 +377,7 @@ try {
 ```
 
 - `WorkspacePolicyError.type`: `"path-escape"` (jail escape / deny glob) | `"denied-command"` (the shell policy refused the line — `reason` says why) | `"unsafe-pattern"` (`grep` pattern too long or nested-quantifier ReDoS shape).
-- `WorkspaceEditError.type`: `"not-found"` | `"not-unique"` | `"stale-hash"` (+ `editIndex` for `multiEdit`).
+- `WorkspaceEditError.type`: `"not-found"` | `"not-unique"` | `"stale-hash"` | `"patch-invalid"` | `"hunk-failed"` | `"binary-file"` | `"file-exists"` | `"file-missing"` (+ `editIndex` for `multiEdit`, `hunkIndex` for `applyPatch`).
 - `WorkspaceJobError.type`: `"not-found"` (unknown background command id).
 
 ## Composition — `readonly()` and `scope()`
@@ -386,7 +387,7 @@ const ro = ws.readonly(); // vends only read/grep/glob; mutating direct methods 
 const api = ws.scope("packages/api"); // a sub-jailed workspace rooted at the subdir
 ```
 
-`readonly()` is the least-privilege reviewer projection — `tools.all()` on it returns `read_file`, `list_dir`, `grep`, `glob` and the todo tools only, and `writeFile` / `editFile` / `multiEdit` / `exec` / `startShell` / `shellKill` / `mkdir` / `remove` throw a `WorkspacePolicyError`. Projections share the workspace's background commands and todo list. `scope(subdir)` narrows `cwd` to `join(cwd, subdir)` (same sub-policies, same backend), so a per-package agent gets a tighter blast radius.
+`readonly()` is the least-privilege reviewer projection — `tools.all()` on it returns `read_file`, `list_dir`, `grep`, `glob` and the todo tools only, and `writeFile` / `editFile` / `multiEdit` / `applyPatch` / `exec` / `startShell` / `shellKill` / `mkdir` / `remove` throw a `WorkspacePolicyError`. Projections share the workspace's background commands and todo list. `scope(subdir)` narrows `cwd` to `join(cwd, subdir)` (same sub-policies, same backend), so a per-package agent gets a tighter blast radius.
 
 ## Hermetic tests with the mock backend
 

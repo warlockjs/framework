@@ -508,4 +508,8 @@ No code-execution request count is inferred from blocks. See
 [hosted-tool costs](https://warlock.js.org/v/latest/ai/recipes/cost-tracking/#hosted-tool-request-fees)
 and [fee reservations](https://warlock.js.org/v/latest/ai/recipes/cost-budgets-and-slo/#reserve-hosted-search-fees).
 
+## List models
+
+`await anthropic.models()` returns `ModelInfo[]` from `GET /v1/models` (release date as `created`, `contextWindow` / `maxOutputTokens` when reported).
+
 

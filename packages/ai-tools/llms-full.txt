@@ -81,6 +81,7 @@ The `server` argument is discriminated by `type`:
 ```ts
 ai.mcp(server, {
   namePrefix: "github.", // prepended to every remote tool name
+  lint: false, // or { ignore: [codes] }: silence the dev schema lint for this server's tools
   filter: (name) => name.startsWith("issues_"), // only adapt tools whose name passes
   timeoutMs: 30_000, // per tools/call deadline (default 30s)
   signal: controller.signal, // optional: close the client when this aborts

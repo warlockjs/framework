@@ -33,7 +33,7 @@ When the framework is wrong or missing a capability, follow the `report-framewor
 - **CLI & running the app:** generate-web-ui, run-app, deploy-release, write-cli-command, add-connector, health-checks, warlock-doctor, warlock-inspect, use-capabilities, warlock-check, generate-openapi
 - **Agent tooling:** warlock-mcp, warlock-trace, warlock-agents-md, warlock-board
 - **Storage, files & mail:** store-file, upload-file, process-image, send-mail
-- **Security & utilities:** hash-password, encrypt-data, store-secrets, retry-operation, benchmark-code, request-memo, request-tracing, request-log
+- **Security & utilities:** hash-password, encrypt-data, store-secrets, retry-operation, app-singletons, benchmark-code, request-memo, request-tracing, request-log
 - **Testing:** test-browser, test-http, test-service, test-fakes, model-factories
 
 ## Conventions and pitfalls
@@ -275,6 +275,42 @@ See the [Registering a connector](#registering-a-connector) section above for th
 - The `configure-app` topic — `warlock.config.ts`, config files, env.
 - The `use-app-context` topic — checking environment + paths inside `start()`.
 - The `warlock-conventions` topic — module layout, canonical imports.
+
+
+## app-singletons  `@warlock.js/core/skills/app-singletons/SKILL.md`
+
+---
+name: app-singletons
+description: 'Keep one shared value per process that survives hot reloads and duplicate module copies in `warlock dev`: `appSingleton(key, create, { dispose, disposeOnReload })`, `peekAppSingleton`, `disposeAppSingleton`, `onCleanup`. Triggers: "module-level singleton is empty in a route", "connector installs a runtime but the route sees nothing", "503 only in dev", "same file evaluated twice", "Process registry is already in use", `supervisor()` after a reload, `Symbol.for`, `globalThis` slot, "release resources on hot reload". Skip: per-request state (`use-request-locals`), cache (`@warlock.js/cache`).'
+---
+
+# Warlock — module singletons in dev
+
+An ES module graph cannot be unloaded. In `warlock dev`, a hot reload loads a new generation of the changed file (and its dependents) while the old generation stays in memory, and a module that has to stay in the page renderer's Vite graph (it imports `@warlock.js/web`, lives under `src/web`, or uses `import.meta.env`) is a second copy of the same file. A module-level `let runtime` is therefore **one value per copy**: the connector installs it in one copy and a route reads an empty one in another.
+
+## Use `appSingleton`
+
+```ts
+import { appSingleton } from "@warlock.js/core";
+
+export const getWorkerRuntime = () =>
+  appSingleton("my-app.worker-runtime.v1", () => new WorkerRuntime(), {
+    dispose: (runtime) => runtime.stop(),
+    disposeOnReload: true,
+  });
+```
+
+- The value lives on `globalThis[Symbol.for(...)]`, so every copy of the module and every module that names the key gets the same value. Production behaves the same way.
+- Namespace and version the key (`<app>.<domain>.<name>.v1`); bump the version when the stored shape changes.
+- `dispose` runs on `disposeAppSingleton(key)`, on application shutdown and before a dev restart. A failing `dispose` does not stop the others.
+- `disposeOnReload: true` (dev) disposes the value when the module being loaded is reloaded, so the next generation builds a fresh one instead of sharing a half-stale one. Only effective when `appSingleton` runs while a module is loading; otherwise use `onCleanup(() => disposeAppSingleton(key))`.
+- `peekAppSingleton(key)` reads without creating.
+
+## Rules
+
+- Anything holding a socket, timer, child process or file lock (a `supervisor()` from `@warlock.js/process`, a queue consumer, a poller) must be a singleton with a `dispose`, or be stopped from `onCleanup` / `export function cleanup()`.
+- `supervisor()` called twice in one process with the same registry and owner returns the live supervisor; stop it with `stopAll()` to free the registry lock.
+- Do not rely on a plain module-level variable for state that connectors and routes share.
 
 
 ## benchmark-code  `@warlock.js/core/skills/benchmark-code/SKILL.md`
@@ -1155,7 +1191,7 @@ import { Application, env } from "@warlock.js/core";
 const httpConfigurations: HttpConfigurations = {
   port: env("HTTP_PORT", 3000),
   host: env("HTTP_HOST", "localhost"),
-  log: true,
+  log: true, // one info summary line per request; per-phase lines at debug (logPhases: "info" restores them)
   fileUploadLimit: 12 * 1024 * 1024 * 1024,
   rateLimit: {
     max: 260,
@@ -12826,20 +12862,21 @@ and work through the manual-review list. Use `--lint=oxc` for new apps.
 The following codes default to **warnings**, so upgrading does not fail existing projects.
 They parse real TypeScript/JSX syntax with the same oxc-parser adapter as the existing conventions.
 
-| Code     | Convention                                                                                    | Remedy                                                                                                                                                             |
-| -------- | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `WL9013` | A component file exceeds 150 lines                                                            | Split components and extract hooks; configure `componentLineLimit`.                                                                                                |
-| `WL9014` | More than one component in a file                                                             | Move each component into its own TSX file.                                                                                                                         |
-| `WL9015` | State/effects or event-handler functions inside a component                                   | Move `useState`, `useReducer`, `useEffect`, `useLayoutEffect` and handlers into `use-*.ts` hooks.                                                                  |
-| `WL9016` | Native select, checkbox, radio, date, time or datetime-local input                            | Use the design-system control. Native controls are allowed in `src/web/design-system/**`.                                                                          |
-| `WL9017` | DOM input/textarea/select native validation                                                   | Use shared schema validation instead of `required`, `pattern`, `min`, `max`, `minLength`, `maxLength` or input `type="email"`. Custom component props are allowed. |
-| `WL9018` | Exported `RequestHandler` in `src/app/**/controllers` lacks `responseSchema`                  | Assign `handler.responseSchema` to document each response status.                                                                                                  |
-| `WL9019` | Browser route call (`apiHref`, `useSubmitForm({ route })`) takes a run-time name              | Pass a string literal or a template with a static prefix, or declare the names with `config.apiRoutes` in a page setup file.                                       |
-| `WL9020` | Browser code names a route registered with `clientVisible: false` (error)                     | Call the endpoint from the server, or remove `clientVisible: false` from the route.                                                                                |
-| `WL9021` | A Cascade column is read or written as a model property (warning)                             | Use `model.get("column")` / `model.set("column", value)`; `--fix` rewrites it.                                                                                     |
-| `WL9025` | `merge()` on an object column of a Cascade model keeps the keys the new value omits (warning) | Use `model.set({ column: value })` or `model.set("column", value)`; there is no automatic fix.                                                                     |
-| `WL9024` | Integration spec imports nothing that needs the app (warning)                                 | Move it to the unit project: rename it to `<name>.unit.spec.ts` outside `tests/`.                                                                                  |
-| `WL9104` | Translation key computed at runtime in `src/web` (the page ships every group)                 | Declare the keys with `config.translations` in the page's setup file, for example `["statuses.*"]`.                                                                |
+| Code     | Convention                                                                                         | Remedy                                                                                                                                                             |
+| -------- | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `WL9013` | A component file exceeds 150 lines                                                                 | Split components and extract hooks; configure `componentLineLimit`.                                                                                                |
+| `WL9014` | More than one component in a file                                                                  | Move each component into its own TSX file.                                                                                                                         |
+| `WL9015` | State/effects or event-handler functions inside a component                                        | Move `useState`, `useReducer`, `useEffect`, `useLayoutEffect` and handlers into `use-*.ts` hooks.                                                                  |
+| `WL9016` | Native select, checkbox, radio, date, time or datetime-local input                                 | Use the design-system control. Native controls are allowed in `src/web/design-system/**`.                                                                          |
+| `WL9017` | DOM input/textarea/select native validation                                                        | Use shared schema validation instead of `required`, `pattern`, `min`, `max`, `minLength`, `maxLength` or input `type="email"`. Custom component props are allowed. |
+| `WL9018` | Exported `RequestHandler` in `src/app/**/controllers` lacks `responseSchema`                       | Assign `handler.responseSchema` to document each response status.                                                                                                  |
+| `WL9019` | Browser route call (`apiHref`, `useSubmitForm({ route })`) takes a run-time name                   | Pass a string literal or a template with a static prefix, or declare the names with `config.apiRoutes` in a page setup file.                                       |
+| `WL9020` | Browser code names a route registered with `clientVisible: false` (error)                          | Call the endpoint from the server, or remove `clientVisible: false` from the route.                                                                                |
+| `WL9021` | A Cascade column is read or written as a model property (warning)                                  | Use `model.get("column")` / `model.set("column", value)`; `--fix` rewrites it.                                                                                     |
+| `WL9025` | `merge()` on an object column of a Cascade model keeps the keys the new value omits (warning)      | Use `model.set({ column: value })` or `model.set("column", value)`; there is no automatic fix.                                                                     |
+| `WL9026` | A convention rule used more than its time budget and was skipped for the rest of the run (warning) | Use `--changed`, raise `ruleBudgetMs` in `.warlock-check.json` (0 turns it off), or turn the rule off.                                                             |
+| `WL9024` | Integration spec imports nothing that needs the app (warning)                                      | Move it to the unit project: rename it to `<name>.unit.spec.ts` outside `tests/`.                                                                                  |
+| `WL9104` | Translation key computed at runtime in `src/web` (the page ships every group)                      | Declare the keys with `config.translations` in the page's setup file, for example `["statuses.*"]`.                                                                |
 
 Web rules apply to `src/web/**/*.tsx`. Components are top-level JSX-returning functions
 with a capitalized name (or an anonymous default export). Hook files and ordinary helpers
@@ -12863,6 +12900,27 @@ Create `.warlock-check.json` in the project root:
 `rules` accepts `"off"`, `"warning"`, or `"error"` for convention codes, including
 existing codes. Per-line `// warlock-check-ignore WL9015 -- reason` works as before.
 Use `npx warlock explain WL9015` for the registry explanation.
+
+### Progress and the per-rule time budget
+
+`warlock check` writes one line to stderr when each step starts and ends
+(`conventions: running`, `conventions: passed in 12.4s (7500 file(s) checked)`). The
+conventions step adds a line when it collects project facts, one every 1000 files that
+names the slowest rule so far, and one when a rule goes over budget. stdout is untouched, so
+`--json` still prints a single JSON document; redirect stderr (`2>/dev/null`) to silence it.
+
+Each convention rule has a time budget over the whole run: 30 seconds by default. A rule
+that goes over it is skipped for the remaining files and reported as a `WL9026` warning
+naming the rule and the time it used, so one slow rule can no longer hang the command. The
+check is made between files, so a single file that never returns is not interrupted. Set
+`ruleBudgetMs` in `.warlock-check.json` to change the budget, or `0` to turn it off. Use
+`--changed` to check fewer files while a slow rule is investigated.
+
+```json
+{
+  "ruleBudgetMs": 60000
+}
+```
 
 ```bash
 npx warlock check --changed --fix --json
@@ -14231,7 +14289,7 @@ description: 'Author a custom `warlock <my-cmd>` command via the `command()` fac
 
 A Warlock CLI command is a `CLICommand` instance produced by the `command()` factory. Three ways to surface it:
 
-1. **Project commands** — drop a `<name>.command.ts` file under `src/app/<module>/commands/` with the `CLICommand` as the default export. Auto-discovered.
+1. **Project commands** — drop a `<name>.command.ts` file under `src/app/<module>/commands/` with the `CLICommand` as the default export. Auto-discovered; `*.spec.*` and `*.test.*` files beside a command are skipped.
 2. **Plugin commands** — exposed as a factory function (`registerXCommand()`) from a package, registered via `warlock.config.ts > cli.commands: [...]`.
 3. **Framework commands** — `migrate`, `seed`, `dev`, `build`, `generate.*`, `storage.put`, `drop.tables`, etc. Built into core. You don't write these; you copy their shape.
 
