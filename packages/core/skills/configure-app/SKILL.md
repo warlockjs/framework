@@ -41,7 +41,7 @@ import { Application, env } from "@warlock.js/core";
 const httpConfigurations: HttpConfigurations = {
   port: env("HTTP_PORT", 3000),
   host: env("HTTP_HOST", "localhost"),
-  log: true,
+  log: true, // one info summary line per request; per-phase lines at debug (logPhases: "info" restores them)
   fileUploadLimit: 12 * 1024 * 1024 * 1024,
   rateLimit: {
     max: 260,

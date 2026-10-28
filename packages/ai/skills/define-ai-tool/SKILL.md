@@ -295,6 +295,7 @@ Compact mode drops `description` / `title` / `examples` / `example` / `default` 
 const report = ai.tools.describe(tool);            // { name, tokens, descriptionChars, schemaHash, targets, issues, ok }
 const { tools, tokens } = ai.tools.describeAll(tools);
 ai.tool({ ..., lint: false });                      // silence one tool
+ai.tool({ ..., lint: { ignore: ["unsupported-keyword"] } }); // drop chosen finding codes (also in ai.config({ toolLint }) and ai.mcp(server, { lint }))
 ai.tool({ ..., lint: { targets: ["anthropic"], warnAboveTokens: 300 } });
 ai.config({ toolLint: false });                     // silence the app
 ```

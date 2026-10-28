@@ -152,6 +152,13 @@ describe("mcp() client — handshake + tools/list", () => {
     expect(typeof contract.invoke).toBe("function");
   });
 
+  it("passes the lint option to every adapted tool", async () => {
+    const lint = { ignore: ["missing-additional-properties-false" as const] };
+    const tools = await mcp(scriptedTransport([ECHO_TOOL, ADD_TOOL]), { lint }).tools();
+
+    expect(tools.map((contract) => (contract as { lint?: unknown }).lint)).toEqual([lint, lint]);
+  });
+
   it("advertises each remote tool's input schema to provider adapters", async () => {
     const { extractJsonSchema } = await import("@warlock.js/ai");
     const tools = await mcp(scriptedTransport([ECHO_TOOL])).tools();

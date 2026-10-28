@@ -163,6 +163,12 @@ Every listener — and `whenBooted()`'s resolved value — receives a `BootConte
 
 Both the dev server and the production bundle fire the latch exactly once, after the late phase. App code only ever _reads_ it (`onceBooted` / `whenBooted` / `isBooted`); the internal `markBooted` is a framework concern — don't call it.
 
+### When it fires
+
+`onceBooted` is the app-level "ready" hook: it runs after **every** connector's `boot()` and `start()` has resolved (database, cache, http, socket and your own), in `warlock dev`, `warlock start` and a production build alike. Listeners run in registration order, after the supervisor has been told the app is up.
+
+It fires once per process. In `warlock dev`, a file change reloads modules through HMR without reconnecting the connectors, so the hook does not run again; it runs again only when the dev server restarts the process, because that is a new boot. Keep per-reload work in the module that changes, not in a boot listener.
+
 ### What it's for
 
 `onceBooted` is the home for work that must wait for a complete boot: warming a cache, registering a recurring job, pinging a readiness endpoint, opening an outbound connection that needs the HTTP server already listening, or simply logging a "ready" line with the boot duration. A throwing listener is caught and logged, so one bad hook can't break boot or the other hooks.

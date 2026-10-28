@@ -3,6 +3,7 @@ import { merge } from "@mongez/reinforcements";
 import { log } from "@warlock.js/logger";
 import { v, type ObjectValidator, type ValidationResult } from "@warlock.js/seal";
 import type { Request } from "../http";
+import { phaseLogLevel } from "../http/request-phase-log";
 import { Response } from "../http/response";
 import type { RequestHandlerValidation, Route } from "../router";
 import { validationFailureStatus } from "./validation-failure-status";
@@ -118,6 +119,10 @@ async function sendValidationFailure(
   return response.failedSchema(result);
 }
 
+function validationPhaseLog(action: string, message: string): void {
+  log.log({ module: "validation", action, message, type: phaseLogLevel() });
+}
+
 /**
  * Validate the request route
  */
@@ -128,12 +133,12 @@ export async function validateAll(
 ) {
   if (!validation) return;
 
-  log.info("validation", "started", "Start validating the request");
+  validationPhaseLog("started", "Start validating the request");
 
   let validatedData: Record<string, unknown> | undefined;
 
   if (validation.schema) {
-    log.info("validation", "schema", "Validating request schema");
+    validationPhaseLog("schema", "Validating request schema");
     try {
       const data = resolveDataToParse(validation.validating, validation.schema, request);
       const result = await v.validate(validation.schema, data);
@@ -155,7 +160,7 @@ export async function validateAll(
   }
 
   if (validation.params) {
-    log.info("validation", "params", "Validating route params schema");
+    validationPhaseLog("params", "Validating route params schema");
     try {
       const result = await v.validate(coercingParamsSchema(validation.params), request.params);
 
@@ -188,7 +193,7 @@ export async function validateAll(
 
     // if there is a result, it means it failed
     if (result) {
-      log.info("validation", "failed", "Validation failed");
+      validationPhaseLog("failed", "Validation failed");
 
       // a returned Response already carries its own status; anything else is
       // sent with the configured failure status (400 by default)
@@ -197,6 +202,6 @@ export async function validateAll(
       return response.send(result, config.get("validation.responseStatus", 400));
     }
 
-    log.info("validation", "passed", "Validation passed");
+    validationPhaseLog("passed", "Validation passed");
   }
 }
