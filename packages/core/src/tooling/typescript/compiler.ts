@@ -169,7 +169,7 @@ export class CompilerSession {
         const before = content.slice(0, Math.max(0, diagnostic.pos));
         const lines = before.split("\n");
         return {
-          fileName: nativePath(diagnostic.fileName),
+          fileName: nativePath(diagnostic.fileName ?? requested),
           code: diagnostic.code,
           message: diagnostic.text,
           severity: diagnostic.category === 1 ? "error" : "warning",
