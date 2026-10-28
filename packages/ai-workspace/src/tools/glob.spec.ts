@@ -120,6 +120,7 @@ function seededOps(files: Record<string, string>, opts: { escape?: boolean } = {
     mkdir: unsupported("mkdir"),
     remove: unsupported("remove"),
     multiEdit: unsupported("multiEdit"),
+    applyPatch: unsupported("applyPatch"),
     startShell: unsupported("startShell"),
     shellOutput: unsupported("shellOutput"),
     shellKill: unsupported("shellKill"),

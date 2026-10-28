@@ -19,7 +19,7 @@ const ws = ai.workspace({
 
 const dev = ai.agent({
   model,
-  tools: ws.tools.all(), // read/edit/multi_edit/write, list_dir, run_shell, run_tests, grep, glob, todo_write/todo_read
+  tools: ws.tools.all(), // read/edit/multi_edit/apply_patch/write, list_dir, run_shell, run_tests, grep, glob, todo_write/todo_read
   maxTrips: 25, // give the loop room to iterate
 });
 

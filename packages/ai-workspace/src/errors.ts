@@ -126,8 +126,25 @@ export class WorkspacePolicyError extends AIError {
  *   was not set, so the edit is ambiguous.
  * - `"stale-hash"` — the file's current hash did not match the supplied
  *   `expectHash`; the file changed since it was read.
+ * - `"patch-invalid"` — `applyPatch` was given text that is not a usable
+ *   unified diff (or one that is too large).
+ * - `"hunk-failed"` — a patch hunk's context is not in the file; `hunkIndex`
+ *   names it.
+ * - `"binary-file"` — the patch, or a file it touches, is binary.
+ * - `"file-exists"` — the patch creates (or renames onto) a path that
+ *   already exists.
+ * - `"file-missing"` — the patch modifies, renames or deletes a path that
+ *   does not exist.
  */
-export type WorkspaceEditFailure = "not-found" | "not-unique" | "stale-hash";
+export type WorkspaceEditFailure =
+  | "not-found"
+  | "not-unique"
+  | "stale-hash"
+  | "patch-invalid"
+  | "hunk-failed"
+  | "binary-file"
+  | "file-exists"
+  | "file-missing";
 
 /**
  * Options for {@link WorkspaceEditError} — the structured `type`
@@ -147,6 +164,8 @@ export type WorkspaceEditErrorOptions = AIErrorOptions & {
   actualHash?: string;
   /** 0-based index of the failing edit, for a `multiEdit` rejection. */
   editIndex?: number;
+  /** 0-based index of the hunk that failed, for an `applyPatch` rejection. */
+  hunkIndex?: number;
 };
 
 /**
@@ -179,6 +198,11 @@ export class WorkspaceEditError extends AIError {
    * Nothing was written: a multi-edit applies all of its edits or none.
    */
   public readonly editIndex?: number;
+  /**
+   * For an `applyPatch` rejection, the 0-based index of the hunk that failed
+   * within its file. Nothing was written.
+   */
+  public readonly hunkIndex?: number;
 
   public constructor(message: string, options: WorkspaceEditErrorOptions) {
     super("TOOL_EXEC_FAILED", message, options);
@@ -190,6 +214,7 @@ export class WorkspaceEditError extends AIError {
     this.expectedHash = options.expectedHash;
     this.actualHash = options.actualHash;
     this.editIndex = options.editIndex;
+    this.hunkIndex = options.hunkIndex;
   }
 }
 

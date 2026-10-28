@@ -168,7 +168,7 @@ The model supplies `pattern` freely, so `grep` treats it as untrusted input befo
 
 ### Agent-facing — `ws.tools.*`
 
-Each tool is a `ToolContract` ready for `ai.agent({ tools })`, and publishes a JSON Schema of its input so the provider sends the model the real parameter shape. The LLM-visible tool names are `read_file`, `edit_file`, `multi_edit`, `write_file`, `list_dir`, `run_shell`, `shell_output`, `shell_kill`, `run_tests`, `grep`, `glob`, `todo_write` and `todo_read`. `shell_output` / `shell_kill` are included in `all()` only when `shell.background` is set.
+Each tool is a `ToolContract` ready for `ai.agent({ tools })`, and publishes a JSON Schema of its input so the provider sends the model the real parameter shape. The LLM-visible tool names are `read_file`, `edit_file`, `multi_edit`, `apply_patch`, `write_file`, `list_dir`, `run_shell`, `shell_output`, `shell_kill`, `run_tests`, `grep`, `glob`, `todo_write` and `todo_read`. `shell_output` / `shell_kill` are included in `all()` only when `shell.background` is set.
 
 ```ts
 ws.tools.all(); // every tool, canonical order
@@ -219,6 +219,20 @@ await ws.dispose(); // kills background commands; refuses new commands
 ## List a directory — `list_dir`
 
 `list_dir({ path?, depth?, ignore? })` returns `{ path, entries, truncated }`: entries breadth-first, each level sorted by name, with `type` (`"file"`, `"directory"`, `"symlink"`, `"other"`), `size` for files and `depth` (1 = direct child). It is bounded — `depth` is capped by `list.maxDepth` (default 5) and the listing by `list.maxEntries` (default 500, then `truncated: true`) — and jailed: `denyPaths` are always left out, as are the `list.ignore` globs (default `node_modules`, `.git`) and any `ignore` globs the model passes. Ignored paths are hidden, not blocked: listing `node_modules` directly still works. Symlinks are reported, never followed.
+
+## Patch several files — `apply_patch`
+
+`apply_patch({ patch, dryRun? })` applies a **unified diff** (plain, or `git diff` style) that can modify, create (`--- /dev/null`), delete (`+++ /dev/null`) and rename (`rename from` / `rename to`) several files in one call. It is **atomic**: every hunk of every file is checked in memory first, and the files are written only if all of them apply; if a write fails part-way, the files already written are restored. Nothing changes otherwise.
+
+- Every path (old and new) goes through the same jail as the other file tools, so `..`, absolute paths and symlinks out of the workspace are refused, as are `denyPaths`.
+- Hunks are found by their context, not only by line number, so a few lines of drift are fine. A hunk whose context is not in the file fails with `type: "hunk-failed"` and its `hunkIndex`.
+- Line endings are preserved: untouched lines stay byte-for-byte, and added lines use the file's CRLF or LF style. A patch wrapped in CRLF is accepted. `\ No newline at end of file` is honoured.
+- Binary patches (`Binary files … differ`, `GIT binary patch`) and target files that contain NUL bytes are refused with `type: "binary-file"`. Copies are not supported.
+- A create over an existing path fails with `"file-exists"`; changing, renaming or deleting a missing path fails with `"file-missing"`. A malformed or oversized diff (over 2 MB or 200 files) fails with `"patch-invalid"`.
+- File patches apply in order against a virtual tree, so a patch can delete a path and create it again, or swap two files by renames.
+- `dryRun: true` validates and reports without writing.
+
+It returns `{ files: [{ path, action, oldPath?, hunks, hash? }], dryRun }` where `action` is `"modified"`, `"created"`, `"deleted"` or `"renamed"`. Directly: `await ws.applyPatch({ patch })`. It is not part of `readonly()`. The patch engine itself is exported as `parsePatch(text)` and `applyHunks(content, hunks, path)` for code that needs to apply a diff to a string.
 
 ## Several edits at once — `multi_edit`
 
@@ -309,7 +323,7 @@ try {
 ```
 
 - `WorkspacePolicyError.type`: `"path-escape"` (jail escape / deny glob) | `"denied-command"` (the shell policy refused the line — see `reason` in [Refusal reasons](#refusal-reasons)) | `"unsafe-pattern"` (`grep` pattern too long or nested-quantifier ReDoS shape).
-- `WorkspaceEditError.type`: `"not-found"` | `"not-unique"` | `"stale-hash"`; a `multiEdit` failure also sets `editIndex`.
+- `WorkspaceEditError.type`: `"not-found"` | `"not-unique"` | `"stale-hash"` | `"patch-invalid"` | `"hunk-failed"` | `"binary-file"` | `"file-exists"` | `"file-missing"`; a `multiEdit` failure also sets `editIndex`, and an `applyPatch` hunk failure sets `hunkIndex`.
 - `WorkspaceJobError.type`: `"not-found"` (no background command with that id).
 
 ## Composition — `readonly()` and `scope()`
@@ -319,7 +333,7 @@ const ro = ws.readonly(); // vends only read/grep/glob; mutating direct methods 
 const api = ws.scope("packages/api"); // a sub-jailed workspace rooted at the subdir
 ```
 
-`readonly()` is the least-privilege reviewer projection — `tools.all()` on it returns `read_file`, `list_dir`, `grep`, `glob` and the todo tools only, and `writeFile` / `editFile` / `multiEdit` / `exec` / `startShell` / `shellKill` / `mkdir` / `remove` throw a `WorkspacePolicyError`. Projections share the workspace's background commands and todo list; `dispose()` on any of them disposes the whole workspace. `scope(subdir)` narrows `cwd` to `join(cwd, subdir)` (same sub-policies, same backend), so a per-package agent gets a tighter blast radius:
+`readonly()` is the least-privilege reviewer projection — `tools.all()` on it returns `read_file`, `list_dir`, `grep`, `glob` and the todo tools only, and `writeFile` / `editFile` / `multiEdit` / `applyPatch` / `exec` / `startShell` / `shellKill` / `mkdir` / `remove` throw a `WorkspacePolicyError`. Projections share the workspace's background commands and todo list; `dispose()` on any of them disposes the whole workspace. `scope(subdir)` narrows `cwd` to `join(cwd, subdir)` (same sub-policies, same backend), so a per-package agent gets a tighter blast radius:
 
 ```ts
 const apiDev = ai.agent({ model, tools: ws.scope("packages/api").tools.all() });

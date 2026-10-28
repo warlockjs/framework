@@ -35,6 +35,18 @@ export const EDIT_FILE_JSON_SCHEMA: JsonSchemaObject = {
   required: ["path", "oldString", "newString"],
 };
 
+/** `apply_patch`. */
+export const APPLY_PATCH_JSON_SCHEMA: JsonSchemaObject = {
+  type: "object",
+  properties: {
+    patch: string(
+      "Unified diff (--- a/file, +++ b/file, @@ hunks; git style with rename from/to, new file, deleted file is fine). Applies to all files or none. Binary files are refused.",
+    ),
+    dryRun: boolean("Check that the patch applies without writing anything."),
+  },
+  required: ["patch"],
+};
+
 /** `multi_edit`. */
 export const MULTI_EDIT_JSON_SCHEMA: JsonSchemaObject = {
   type: "object",

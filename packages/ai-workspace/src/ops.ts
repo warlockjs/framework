@@ -5,7 +5,12 @@ import { globToRegExp, isInside, matchesAnyGlob } from "./policy/jail";
 import { buildCommandEnv, resolveInJail } from "./policy/policy";
 import { checkShellCommand } from "./policy/shell-check";
 import { DEFAULT_MAX_BACKGROUND_JOBS, ShellJobs } from "./shell-jobs";
+import { applyHunks } from "./patch/apply-hunks";
+import { parsePatch } from "./patch/parse-patch";
 import type {
+  ApplyPatchFileResult,
+  ApplyPatchInput,
+  ApplyPatchResult,
   EditFileInput,
   EditFileResult,
   ExecOptions,
@@ -41,6 +46,8 @@ const DEFAULT_LIST_IGNORE: readonly string[] = ["node_modules", ".git"];
 const DEFAULT_LIST_MAX_DEPTH = 5;
 /** Default most entries one listing returns. */
 const DEFAULT_LIST_MAX_ENTRIES = 500;
+/** Largest file, in UTF-8 bytes, `applyPatch` will read and rewrite. */
+const MAX_PATCH_FILE_BYTES = 10 * 1024 * 1024;
 /** Most edits one `multiEdit` call may carry. */
 export const MAX_MULTI_EDITS = 100;
 /**
@@ -424,6 +431,240 @@ class Ops implements WorkspaceOps {
         hash: fs.hash.string(content),
       };
     });
+  }
+
+  public async applyPatch(input: ApplyPatchInput): Promise<ApplyPatchResult> {
+    const filePatches = parsePatch(input.patch);
+
+    // Resolve every path through the jail first (symlinks, `..`, deny globs).
+    const targets = await Promise.all(
+      filePatches.map(async (filePatch) => ({
+        filePatch,
+        from:
+          filePatch.oldPath === null ? null : await resolveInJail(this.policy, filePatch.oldPath),
+        to: filePatch.newPath === null ? null : await resolveInJail(this.policy, filePatch.newPath),
+      })),
+    );
+
+    const lockPaths = [
+      ...new Set(
+        targets.flatMap((target) =>
+          [target.from?.absolutePath, target.to?.absolutePath].filter(
+            (value): value is string => value !== undefined,
+          ),
+        ),
+      ),
+    ].sort();
+
+    const run = async (): Promise<ApplyPatchResult> => {
+      // Virtual tree: absolute path -> content (null = removed). Later file
+      // patches see the result of earlier ones.
+      const staged = new Map<string, string | null>();
+      const original = new Map<string, string | null>();
+      const results: ApplyPatchFileResult[] = [];
+
+      const load = async (absolutePath: string, shown: string): Promise<string | null> => {
+        if (staged.has(absolutePath)) {
+          return staged.get(absolutePath) ?? null;
+        }
+
+        if (!(await this.backend.exists(absolutePath))) {
+          original.set(absolutePath, null);
+
+          return null;
+        }
+
+        const stat = this.backend.stat ? await this.backend.stat(absolutePath) : undefined;
+
+        if (stat !== undefined && stat.type !== "file") {
+          throw new WorkspaceEditError(`"${shown}" is not a regular file; it cannot be patched.`, {
+            type: "file-missing",
+            path: shown,
+          });
+        }
+
+        if (stat !== undefined && stat.size > MAX_PATCH_FILE_BYTES) {
+          throw new WorkspaceEditError(
+            `"${shown}" is larger than ${MAX_PATCH_FILE_BYTES} bytes; it cannot be patched.`,
+            { type: "patch-invalid", path: shown },
+          );
+        }
+
+        const content = await this.backend.readFile(absolutePath);
+
+        if (content.includes("\0")) {
+          throw new WorkspaceEditError(
+            `"${shown}" is a binary file; binary files cannot be patched.`,
+            {
+              type: "binary-file",
+              path: shown,
+            },
+          );
+        }
+
+        original.set(absolutePath, content);
+
+        return content;
+      };
+
+      for (const { filePatch, from, to } of targets) {
+        const shownFrom = from?.relativePath || filePatch.oldPath || "";
+        const shownTo = to?.relativePath || filePatch.newPath || "";
+
+        if (filePatch.kind === "create") {
+          const absolutePath = (to as NonNullable<typeof to>).absolutePath;
+
+          if ((await load(absolutePath, shownTo)) !== null) {
+            throw new WorkspaceEditError(
+              `"${shownTo}" already exists; the patch cannot create it.`,
+              {
+                type: "file-exists",
+                path: shownTo,
+              },
+            );
+          }
+
+          const content = applyHunks("", filePatch.hunks, shownTo);
+
+          staged.set(absolutePath, content);
+          results.push({
+            path: shownTo,
+            action: "created",
+            hunks: filePatch.hunks.length,
+            hash: fs.hash.string(content),
+          });
+
+          continue;
+        }
+
+        const source = (from as NonNullable<typeof from>).absolutePath;
+        const current = await load(source, shownFrom);
+
+        if (current === null) {
+          throw new WorkspaceEditError(
+            `"${shownFrom}" does not exist; the patch cannot change it.`,
+            {
+              type: "file-missing",
+              path: shownFrom,
+            },
+          );
+        }
+
+        const updated = applyHunks(current, filePatch.hunks, shownFrom);
+
+        if (filePatch.kind === "delete") {
+          if (updated !== "") {
+            throw new WorkspaceEditError(
+              `The patch deletes "${shownFrom}" but its hunks do not remove all of the file's content.`,
+              {
+                type: "hunk-failed",
+                path: shownFrom,
+                hunkIndex: Math.max(filePatch.hunks.length - 1, 0),
+              },
+            );
+          }
+
+          staged.set(source, null);
+          results.push({ path: shownFrom, action: "deleted", hunks: filePatch.hunks.length });
+
+          continue;
+        }
+
+        if (filePatch.kind === "rename") {
+          const destination = (to as NonNullable<typeof to>).absolutePath;
+
+          if (destination !== source && (await load(destination, shownTo)) !== null) {
+            throw new WorkspaceEditError(
+              `"${shownTo}" already exists; the patch cannot rename "${shownFrom}" onto it.`,
+              { type: "file-exists", path: shownTo },
+            );
+          }
+
+          staged.set(source, null);
+          staged.set(destination, updated);
+          results.push({
+            path: shownTo,
+            action: "renamed",
+            oldPath: shownFrom,
+            hunks: filePatch.hunks.length,
+            hash: fs.hash.string(updated),
+          });
+
+          continue;
+        }
+
+        staged.set(source, updated);
+        results.push({
+          path: shownFrom,
+          action: "modified",
+          hunks: filePatch.hunks.length,
+          hash: fs.hash.string(updated),
+        });
+      }
+
+      if (input.dryRun === true) {
+        return { files: results, dryRun: true };
+      }
+
+      // Commit. Anything that fails part-way is rolled back to the original state.
+      const touched: string[] = [];
+
+      try {
+        for (const [absolutePath, content] of staged) {
+          if (content !== null && content !== (original.get(absolutePath) ?? null)) {
+            await this.backend.mkdir(path.dirname(absolutePath));
+            await this.backend.writeFile(absolutePath, content);
+            touched.push(absolutePath);
+          }
+        }
+
+        for (const [absolutePath, content] of staged) {
+          if (
+            content === null &&
+            original.get(absolutePath) !== null &&
+            original.has(absolutePath)
+          ) {
+            await this.backend.remove(absolutePath);
+            touched.push(absolutePath);
+          }
+        }
+      } catch (error) {
+        const failures: string[] = [];
+
+        for (const absolutePath of touched.reverse()) {
+          try {
+            const before = original.get(absolutePath) ?? null;
+
+            if (before === null) {
+              if (await this.backend.exists(absolutePath)) {
+                await this.backend.remove(absolutePath);
+              }
+            } else {
+              await this.backend.writeFile(absolutePath, before);
+            }
+          } catch {
+            failures.push(path.relative(this.policy.cwd, absolutePath));
+          }
+        }
+
+        const reason = error instanceof Error ? error.message : String(error);
+
+        throw new WorkspaceEditError(
+          `Writing the patch failed (${reason}); ${failures.length === 0 ? "every change was rolled back" : `could not restore: ${failures.join(", ")}`}.`,
+          { type: "patch-invalid", path: "" },
+        );
+      }
+
+      return { files: results, dryRun: false };
+    };
+
+    // Hold every touched path's lock (sorted, so concurrent patches cannot deadlock).
+    const locked = lockPaths.reduceRight<() => Promise<ApplyPatchResult>>(
+      (inner, lockPath) => () => this.withPathLock(lockPath, inner),
+      run,
+    );
+
+    return locked();
   }
 
   /**
