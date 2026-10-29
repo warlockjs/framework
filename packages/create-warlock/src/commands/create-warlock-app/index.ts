@@ -79,6 +79,7 @@ export async function createWarlockApp(application: App): Promise<ScaffoldOutcom
       features.some((feature) =>
         ["web", "tailwind", "shadcn", "design-system", "sitemap"].includes(feature),
       ),
+      versions,
     );
     application.configureLintToolchain();
     application.configureAgentKitTargets(options.agents ?? ["claude"]);

@@ -126,7 +126,7 @@ describe("createWarlockApp — template + base install", () => {
     expect(fake.updatePackageJson).toHaveBeenCalledTimes(1);
     expect(fake.updateDotEnv).toHaveBeenCalledTimes(1);
     expect(fake.configureDatabaseEnv).toHaveBeenCalledWith("mongodb");
-    expect(fake.configureWebStarter).toHaveBeenCalledWith(false);
+    expect(fake.configureWebStarter).toHaveBeenCalledWith(false, expect.any(Object));
     expect(fake.configureLintToolchain).toHaveBeenCalledOnce();
   });
 
@@ -135,7 +135,7 @@ describe("createWarlockApp — template + base install", () => {
 
     await run(fake);
 
-    expect(fake.configureWebStarter).toHaveBeenCalledWith(true);
+    expect(fake.configureWebStarter).toHaveBeenCalledWith(true, expect.any(Object));
   });
 
   it("configures agent-kit targets from the resolved options", async () => {

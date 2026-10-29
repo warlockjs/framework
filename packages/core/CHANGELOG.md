@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 > ⚠ **Versioning: `@warlock.js/*` does not follow SemVer strictly — breaking changes may ship in a minor.** This is a deliberate decision, not an oversight: the framework is pre-adoption and the cost of a major per behaviour fix currently outweighs the benefit. **Pin an exact version or a tilde range (`~4.13.0`) if you need to opt into changes rather than receive them.** Every breaking change is marked **BREAKING** in its entry and summarised in an _Upgrading_ section at the top of the release. **This policy will change once the framework has consumers beyond its author.**
 
+## 5.40.1 - 2026-10-29
+
+### Fixed
+
+- `warlock add` no longer stops when `warlock.config.ts` cannot be loaded. A config that imports a package which is not installed yet (for example the web connector, before `warlock add web` has installed it) printed `Failed to load warlock.config.ts` and aborted the very command that installs the missing package. The command now prints a warning and continues without the config.
+- A failed `warlock.config.ts` load is no longer cached, so a later load in the same process retries instead of replaying the first error.
+
 ## 5.40.0 - 2026-10-29
 
 ### Added

@@ -5,7 +5,7 @@ import { command } from "../../commands/cli-command";
 export const addCommand = command({
   name: "add <features...>",
   description: "Add new feature(s) to the project",
-  preload: { config: ["app"] },
+  preload: { config: ["app"], optionalWarlockConfig: true },
   action: (data) => runGenerationCommand("add", data, addCommandAction),
   options: [
     {

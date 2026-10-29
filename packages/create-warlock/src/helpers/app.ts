@@ -388,7 +388,7 @@ export class App {
    * Exactly one survives the scaffold: web projects keep the SSR page and API
    * example; every other project keeps the dependency-free JSON controller.
    */
-  public configureWebStarter(useWeb: boolean) {
+  public configureWebStarter(useWeb: boolean, versions: Record<string, string> = {}) {
     const remove = (relativePath: string) => {
       const target = path.resolve(this.path, relativePath);
       if (existsSync(target)) rmSync(target, { recursive: true, force: true });
@@ -439,6 +439,15 @@ export class App {
     };
     packageJson.dependencies = {
       ...packageJson.dependencies,
+      // The config imported below needs this package the moment `warlock` boots
+      // it, and the first install runs before any `warlock add web`. Without
+      // it every later `warlock add` dies loading `warlock.config.ts`. Lockstep:
+      // it takes the version the scaffolder resolved for core.
+      "@warlock.js/web":
+        versions["@warlock.js/web"] ??
+        versions["@warlock.js/core"] ??
+        packageJson.dependencies?.["@warlock.js/core"] ??
+        fallbackRange((getJsonFile(packageRoot("package.json")) as { version: string }).version),
       "@mongez/http": "^3.5.0",
       "@mongez/react-form": "^4.0.0",
     };

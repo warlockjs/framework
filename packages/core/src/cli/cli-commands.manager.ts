@@ -763,7 +763,15 @@ export class CLICommandsManager {
     // `.env.<NODE_ENV>` over `.env`, so it must follow `setEnvironment` above.
     await loadEnvironmentFiles();
 
-    await warlockConfigManager.load();
+    try {
+      await warlockConfigManager.load();
+    } catch (error) {
+      if (!preloaders.optionalWarlockConfig) throw error;
+
+      console.warn(
+        `warlock.config.ts could not be loaded, continuing without it: ${(error as Error).message}`,
+      );
+    }
 
     if (preloaders.bootstrap || preloaders.prestart) {
       await filesOrchestrator.init();

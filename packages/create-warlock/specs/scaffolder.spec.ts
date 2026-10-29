@@ -482,6 +482,42 @@ describe("App template emission", () => {
     },
   );
 
+  it("declares every @warlock.js package that warlock.config.ts imports, before any feature is added", () => {
+    // `warlock add` boots warlock.config.ts. A web project imports the web
+    // connector there, so the package must already be a dependency of the first
+    // install, whichever feature runs first.
+    for (const useWeb of [false, true]) {
+      rmSync(appPath, { recursive: true, force: true });
+      const app = new App(makeApplication(appPath, { features: useWeb ? ["web"] : [] }));
+
+      app
+        .use("warlock")
+        .updatePackageJson({ "@warlock.js/core": "5.40.0" })
+        .configureWebStarter(useWeb, { "@warlock.js/core": "5.40.0" });
+      app.configureLintToolchain();
+
+      const config = readFileSync(path.join(appPath, "warlock.config.ts"), "utf8");
+      const manifest = JSON.parse(readFileSync(path.join(appPath, "package.json"), "utf8"));
+      const declared = new Set([
+        ...Object.keys(manifest.dependencies ?? {}),
+        ...Object.keys(manifest.devDependencies ?? {}),
+      ]);
+      const imported = [...config.matchAll(/from "(@warlock\.js\/[^/"]+)(?:\/[^"]*)?"/g)].map(
+        (match) => match[1],
+      );
+
+      expect(imported).toContain("@warlock.js/core");
+      expect(imported.filter((name) => !declared.has(name))).toEqual([]);
+
+      if (useWeb) {
+        expect(config).toContain("@warlock.js/web/connector");
+        expect(manifest.dependencies["@warlock.js/web"]).toBe("5.40.0");
+      } else {
+        expect(declared.has("@warlock.js/web")).toBe(false);
+      }
+    }
+  });
+
   it("emits the web-owned home with its CSS, APIs, aliases, and connector", () => {
     const app = new App(makeApplication(appPath, { features: ["web"] }));
 

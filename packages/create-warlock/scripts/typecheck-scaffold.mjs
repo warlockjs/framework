@@ -37,6 +37,12 @@
  *   node scripts/typecheck-scaffold.mjs            # scaffold, check, clean up
  *   node scripts/typecheck-scaffold.mjs --keep     # leave the project in place
  *   node scripts/typecheck-scaffold.mjs --pm=pnpm  # also accepts yarn
+ *   node scripts/typecheck-scaffold.mjs --stack=web  # the full-stack web starter
+ *
+ * The web starter takes a different route through the scaffolder than the
+ * API-only one: its `warlock.config.ts` imports `@warlock.js/web/connector`, so
+ * every `warlock add` in the feature step must be able to boot that config. A
+ * scaffold that only ever checked the API stack never saw that break.
  */
 
 import { spawn } from "node:child_process";
@@ -52,18 +58,24 @@ const { values } = parseArgs({
     keep: { type: "boolean", default: false },
     lint: { type: "string" },
     pm: { type: "string", default: "npm" },
+    stack: { type: "string", default: "api" },
   },
 });
 const keepArtifacts = values.keep;
 const lint = values.lint ?? "oxc";
 const packageManager = values.pm;
-if (lint !== "oxc" || !["npm", "pnpm", "yarn"].includes(packageManager)) {
+const stack = values.stack;
+if (
+  lint !== "oxc" ||
+  !["npm", "pnpm", "yarn"].includes(packageManager) ||
+  !["api", "web"].includes(stack)
+) {
   throw new Error(
-    "Usage: node scripts/typecheck-scaffold.mjs [--lint=oxc] [--pm=npm|pnpm|yarn] [--keep]",
+    "Usage: node scripts/typecheck-scaffold.mjs [--lint=oxc] [--pm=npm|pnpm|yarn] [--stack=api|web] [--keep]",
   );
 }
 
-const APP_NAME = "scaffold-typecheck-app";
+const APP_NAME = `scaffold-typecheck-${stack}-app`;
 
 /** `.cmd` shims on Windows are not executable without a shell. */
 const isWindows = process.platform === "win32";
@@ -125,6 +137,7 @@ async function main() {
         APP_NAME,
         "--db=mongodb",
         `--pm=${packageManager}`,
+        ...(stack === "web" ? ["--stack=web"] : []),
         // Omit --lint by default so CI exercises the actual scaffolder default.
         ...(values.lint ? [`--lint=${lint}`] : []),
         "--yes",
@@ -142,6 +155,13 @@ async function main() {
       failure =
         "the scaffolded project has no typescript installed — the install did " +
         "not complete, so the typecheck below would be vacuous";
+      return;
+    }
+
+    // A web scaffold whose feature step failed still exits 0 from some older
+    // builds; the dependency being on disk is the proof the feature landed.
+    if (stack === "web" && !existsSync(path.join(appPath, "node_modules", "@warlock.js", "web"))) {
+      failure = "the web scaffold has no @warlock.js/web installed — the web feature did not land";
       return;
     }
 

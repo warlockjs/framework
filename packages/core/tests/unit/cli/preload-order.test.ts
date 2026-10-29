@@ -58,6 +58,8 @@ vi.mock("@warlock.js/fs", () => ({
 const { CLICommand } = await import("../../../src/commands/cli-command");
 const { CLICommandsManager } = await import("../../../src/cli/cli-commands.manager");
 const { Application } = await import("../../../src/application");
+const { warlockConfigManager } = await import("../../../src/warlock-config/warlock-config.manager");
+const { addCommand } = await import("../../../src/cli/commands/add.command");
 
 /** Exposes the protected preload phase without driving the whole argv flow. */
 class PreloadManager extends CLICommandsManager {
@@ -163,5 +165,35 @@ describe("loadPreloaders ordering", () => {
     await new PreloadManager().preload(commandWithPreload({ env: true, warlockConfig: true }));
 
     expect(calls.filter((call) => call === "loadEnv")).toHaveLength(1);
+  });
+
+  it("fails the command when warlock.config.ts cannot be loaded", async () => {
+    vi.mocked(warlockConfigManager.load).mockRejectedValueOnce(new Error("Cannot find package"));
+
+    await expect(
+      new PreloadManager().preload(commandWithPreload({ warlockConfig: true })),
+    ).rejects.toThrow(/Cannot find package/);
+  });
+
+  it("lets an optional-config command continue, with a warning, when the config does not load", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    vi.mocked(warlockConfigManager.load).mockRejectedValueOnce(
+      new Error("Cannot find package '@warlock.js/web'"),
+    );
+
+    await new PreloadManager().preload(
+      commandWithPreload({ configFiles: true, optionalWarlockConfig: true, config: ["app"] }),
+    );
+
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("@warlock.js/web"));
+    // The rest of the preload still runs.
+    expect(calls).toContain("configFiles");
+    warn.mockRestore();
+  });
+
+  it("declares `warlock add` as able to run before warlock.config.ts loads", () => {
+    // `warlock add web` is the repair for a config importing a package that is
+    // not installed yet; it must not die on the very import it fixes.
+    expect(addCommand.commandPreload?.optionalWarlockConfig).toBe(true);
   });
 });
