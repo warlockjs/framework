@@ -136,6 +136,77 @@
   ],
   "releases": [
     {
+      "version": "5.41.0",
+      "id": "v5-41-0",
+      "date": "October 29, 2026",
+      "isUnreleased": false,
+      "summaryHtml": "<strong>Mantine joins shadcn/ui as a second UI kit for the design system.</strong> <code>warlock add design-system --kit mantine</code> (or <code>warlock add mantine</code>) installs Mantine without Tailwind, with the same component files, props and hooks as the shadcn kit, so app code and generators work with either; every control binds to Mongez React Form, and <code>@mantine/form</code> is not used. It pins <code>@mantine/core</code>, <code>hooks</code>, <code>dates</code>, <code>notifications</code> and <code>modals</code>, writes the PostCSS preset and stylesheet imports, and wires the colour-scheme script and providers into <code>src/web/root.tsx</code>; <code>mantine-theme.ts</code> holds the design tokens. Extras: <code>notify</code> and <code>notifyOnSubmit</code> for form toasts, <code>confirm()</code> and a <code>PaginatedTable</code> for paginated list responses. The two kits exclude each other and say how to switch. <code>create-warlock</code> gains <code>--ui=&lt;shadcn|mantine|none&gt;</code> and a \"Full-stack web with Mantine\" menu entry. No breaking changes. Lockstep release across all 33 packages. Generator matrix scope: <code>none</code>; before publishing, the blog on the 5.41.0 tarballs passed the release gate; after publishing, every package was confirmed at the npm origin.",
+      "matrix": "none",
+      "matrixRows": null,
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 3,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 3
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "A second UI kit for the design system: Mantine. <code>warlock add design-system --kit mantine</code> (or <code>warlock add mantine</code>) installs Mantine with the same component files, props, hooks and validation-error display as the shadcn kit, bound to Mongez React Form (<code>@mantine/form</code> is not used). It does not need Tailwind. It adds exact versions of <code>@mantine/core</code>, <code>hooks</code>, <code>dates</code>, <code>notifications</code>, <code>modals</code> and <code>dayjs</code>, writes <code>postcss.config.mjs</code> with <code>postcss-preset-mantine</code>, puts Mantine's stylesheet imports in <code>src/web/app.css</code>, and wires <code>src/web/root.tsx</code> (colour scheme script, <code>mantineHtmlProps</code>, and a provider mounting <code>MantineProvider</code>, the modals manager and the notifications host). Existing files are preserved, and a root with a custom shape is left alone with the lines to add printed."
+            },
+            {
+              "type": "Added",
+              "html": "The Mantine kit ships <code>src/web/design-system/mantine-theme.ts</code> (the design tokens you edit), <code>notify</code> and <code>notifyOnSubmit</code> (toasts that plug into <code>useSubmitForm</code> and <code>useSubmitAction</code>), <code>confirm()</code> and a <code>PaginatedTable</code> shaped after the paginated list response."
+            },
+            {
+              "type": "Added",
+              "html": "<code>warlock add design-system --kit &lt;shadcn|mantine&gt;</code>: <code>shadcn</code> stays the default and still requires Tailwind. The two kits exclude each other: asking for one while the other is installed (detected from files and dependencies), or both in one command, fails before anything is installed or written, with the steps to switch."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/web",
+          "slug": "web",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "The <code>use-the-mantine-kit</code> skill topic covers the Mantine kit of the design system (<code>warlock add design-system --kit mantine</code>): setup, theme, the shared control contract, <code>notify</code>/<code>notifyOnSubmit</code> with <code>useSubmitForm</code> and <code>useSubmitAction</code>, <code>confirm()</code>, <code>PaginatedTable</code> and switching kits. <code>build-accessible-controls</code> now names the two kits."
+            }
+          ]
+        },
+        {
+          "name": "create-warlock",
+          "slug": "create-warlock",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>--ui=&lt;shadcn|mantine|none&gt;</code> chooses the UI kit of a web app. <code>--ui=mantine</code> (or <code>--features=mantine</code>) scaffolds the Mantine kit without Tailwind; <code>shadcn</code> stays the default for <code>--stack=web</code>. The interactive stack menu gains a \"Full-stack web with Mantine\" entry, and Customize lists Mantine among the rendering features. The two kits exclude each other: <code>shadcn</code> with <code>mantine</code>, or <code>--ui</code> with a conflicting feature, fails before any file is written."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "5.40.1",
       "id": "v5-40-1",
       "date": "October 29, 2026",

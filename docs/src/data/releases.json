@@ -1,4 +1,9 @@
 {
+  "5.41.0": {
+    "publishedAt": "2026-10-29T16:35:13.855Z",
+    "matrix": "none",
+    "summary": "**Mantine joins shadcn/ui as a second UI kit for the design system.** `warlock add design-system --kit mantine` (or `warlock add mantine`) installs Mantine without Tailwind, with the same component files, props and hooks as the shadcn kit, so app code and generators work with either; every control binds to Mongez React Form, and `@mantine/form` is not used. It pins `@mantine/core`, `hooks`, `dates`, `notifications` and `modals`, writes the PostCSS preset and stylesheet imports, and wires the colour-scheme script and providers into `src/web/root.tsx`; `mantine-theme.ts` holds the design tokens. Extras: `notify` and `notifyOnSubmit` for form toasts, `confirm()` and a `PaginatedTable` for paginated list responses. The two kits exclude each other and say how to switch. `create-warlock` gains `--ui=<shadcn|mantine|none>` and a \"Full-stack web with Mantine\" menu entry. No breaking changes. Lockstep release across all 33 packages. Generator matrix scope: `none`; before publishing, the blog on the 5.41.0 tarballs passed the release gate; after publishing, every package was confirmed at the npm origin."
+  },
   "5.40.1": {
     "publishedAt": "2026-10-29T15:46:56.397Z",
     "matrix": "none",
