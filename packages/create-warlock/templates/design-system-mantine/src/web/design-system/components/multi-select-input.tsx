@@ -5,15 +5,18 @@ import { frameProps } from "./field-frame";
 
 export default function MultiSelectInput(props: SelectProps) {
   const field = useSelectControl(props, true);
+  const { ref: bindRef } = field.binding;
   return (
     <MultiSelect
-      {...frameProps(props, field)}
-      ref={field.binding.ref}
+      {...frameProps(props, field.error, field.disabled, field.onBlur)}
+      ref={bindRef}
       className={props.className}
       data={props.options.map((option) => ({ ...option }))}
       value={field.selected}
       onChange={(values) => {
-        if (!field.disabled && !props.readOnly) field.changeValue(values);
+        if (!field.disabled && !props.readOnly) {
+          field.changeValue(values);
+        }
       }}
       placeholder={props.placeholder}
       searchable

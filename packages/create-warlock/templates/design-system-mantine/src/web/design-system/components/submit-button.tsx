@@ -5,10 +5,11 @@ import FieldFrame from "./field-frame";
 
 export default function SubmitButton(props: ControlProps) {
   const field = useSubmitControl(props);
+  const { ref: bindRef } = field.binding;
   return (
     <FieldFrame {...props} label={null} error={field.error}>
       <Button
-        ref={field.binding.ref}
+        ref={bindRef}
         id={props.id}
         name={props.name}
         type="submit"

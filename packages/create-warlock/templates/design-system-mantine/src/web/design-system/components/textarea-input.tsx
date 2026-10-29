@@ -5,10 +5,11 @@ import { frameProps } from "./field-frame";
 
 export default function TextareaInput(props: ControlProps) {
   const field = useControl(props, "textarea");
+  const { ref: bindRef } = field.binding;
   return (
     <Textarea
-      {...frameProps(props, field)}
-      ref={field.binding.ref}
+      {...frameProps(props, field.error, field.disabled, field.onBlur)}
+      ref={bindRef}
       className={props.className}
       rows={props.rows}
       value={typeof field.value === "string" ? field.value : ""}

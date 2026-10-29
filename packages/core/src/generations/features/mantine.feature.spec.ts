@@ -103,9 +103,11 @@ describe("warlock add design-system --kit mantine", () => {
     expect(root).toContain('import "./app.css";');
     expect(root).toContain('import { mantineHtmlProps } from "@mantine/core";');
     expect(root).toContain('<html lang="en" {...mantineHtmlProps}>');
-    expect(root).toContain("<DesignSystemColorScheme />");
+    // The element follows the real <Head /> line, not the mention in the starter's comment.
+    expect(root).toMatch(/^\s*<Head \/>\n\s*<DesignSystemColorScheme \/>/m);
+    expect(root.match(/<DesignSystemColorScheme \/>/g)).toHaveLength(1);
     expect(root).toMatch(
-      /<DesignSystemProvider>\s*<div id="vessel">\{children\}<\/div>\s*<\/DesignSystemProvider>/,
+      /^\s*<DesignSystemProvider>\n\s*<div id="vessel">\{children\}<\/div>\n\s*<\/DesignSystemProvider>/m,
     );
     // The imports sit after the framework import, not inside the component.
     expect(root.indexOf("DesignSystemProvider, {")).toBeLessThan(root.indexOf("export default"));

@@ -5,6 +5,7 @@ import { frameProps } from "./field-frame";
 
 export default function FileInput(props: ControlProps) {
   const field = useFileControl(props);
+  const { ref: bindRef } = field.binding;
   const files = Array.isArray(field.value)
     ? field.value
     : field.value instanceof File
@@ -12,8 +13,8 @@ export default function FileInput(props: ControlProps) {
       : null;
   return (
     <MantineFileInput
-      {...frameProps(props, field)}
-      ref={field.binding.ref}
+      {...frameProps(props, field.error, field.disabled, field.onBlur)}
+      ref={bindRef}
       className={props.className}
       disabled={field.disabled || props.readOnly}
       accept={props.accept}

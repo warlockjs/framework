@@ -5,10 +5,11 @@ import { frameProps } from "./field-frame";
 
 export default function SwitchInput(props: CheckProps) {
   const field = useControl(props, "checkbox");
+  const { ref: bindRef } = field.binding;
   return (
     <Switch
-      {...frameProps(props, field)}
-      ref={field.binding.ref}
+      {...frameProps(props, field.error, field.disabled, field.onBlur)}
+      ref={bindRef}
       className={props.className}
       disabled={field.disabled || props.readOnly}
       checked={Boolean(field.checked)}

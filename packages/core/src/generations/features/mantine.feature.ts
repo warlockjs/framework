@@ -137,11 +137,13 @@ async function wireRoot(): Promise<void> {
     return;
   }
 
-  const hasHtml = /<html\b[^>]*>/.test(next);
-  const hasHead = next.includes("<Head />");
-  const hasVessel = next.includes('<div id="vessel">{children}</div>');
+  // Anchored to whole lines: the starter's explanatory comments mention
+  // `<Head />` and `#vessel` too, and an edit there would change nothing.
+  const htmlTag = /^([ \t]*)<html\b([^>]*)>[ \t]*$/m;
+  const headTag = /^([ \t]*)<Head \/>[ \t]*$/m;
+  const vesselTag = /^([ \t]*)<div id="vessel">\{children\}<\/div>[ \t]*$/m;
 
-  if (!hasHtml || !hasHead || !hasVessel) {
+  if (!htmlTag.test(next) || !headTag.test(next) || !vesselTag.test(next)) {
     console.log(
       `${colors.yellowBright("!")} src/web/root.tsx has a custom shape, wire Mantine into it yourself:\n${manualRootSteps}`,
     );
@@ -149,11 +151,11 @@ async function wireRoot(): Promise<void> {
   }
 
   next = next
-    .replace(/<html\b([^>]*)>/, "<html$1 {...mantineHtmlProps}>")
-    .replace("<Head />", "<Head />\n        <DesignSystemColorScheme />")
+    .replace(htmlTag, "$1<html$2 {...mantineHtmlProps}>")
+    .replace(headTag, "$1<Head />\n$1<DesignSystemColorScheme />")
     .replace(
-      '<div id="vessel">{children}</div>',
-      '<DesignSystemProvider>\n          <div id="vessel">{children}</div>\n        </DesignSystemProvider>',
+      vesselTag,
+      '$1<DesignSystemProvider>\n$1  <div id="vessel">{children}</div>\n$1</DesignSystemProvider>',
     );
 
   const imports = [`${mantineImport}`, providerImport];

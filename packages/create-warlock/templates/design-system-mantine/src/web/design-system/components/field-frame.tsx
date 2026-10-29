@@ -45,23 +45,21 @@ export default function FieldFrame({
  */
 export function frameProps(
   props: Pick<ControlProps, "id" | "name" | "label" | "hint" | "dir" | "required" | "readOnly">,
-  field: {
-    error?: ReactNode;
-    disabled?: boolean;
-    binding: { onBlur?: () => unknown; ref: (element: HTMLElement | null) => void };
-  },
+  error: ReactNode,
+  disabled: boolean | undefined,
+  onBlur: (() => unknown) | undefined,
 ) {
   return {
     id: props.id,
     name: props.name,
     label: props.label ?? undefined,
     description: props.hint,
-    error: field.error,
+    error,
     withAsterisk: props.required,
-    disabled: field.disabled,
+    disabled,
     readOnly: props.readOnly,
     dir: props.dir,
-    onBlur: field.binding.onBlur,
+    onBlur,
     "aria-required": props.required || undefined,
   } as const;
 }

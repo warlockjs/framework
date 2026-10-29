@@ -138,6 +138,16 @@ describe("createWarlockApp — template + base install", () => {
     expect(fake.configureWebStarter).toHaveBeenCalledWith(true);
   });
 
+  it("drops the starter's Tailwind setup for the Mantine kit, but not when Tailwind was asked for", async () => {
+    const mantine = makeFakeApp({ features: ["web", "mantine"] });
+    await run(mantine);
+    expect(mantine.configureWebStarter).toHaveBeenCalledWith(true, true);
+
+    const both = makeFakeApp({ features: ["web", "mantine", "tailwind"] });
+    await run(both);
+    expect(both.configureWebStarter).toHaveBeenCalledWith(true);
+  });
+
   it("configures agent-kit targets from the resolved options", async () => {
     const fake = makeFakeApp({ agents: ["claude", "cursor"] });
 

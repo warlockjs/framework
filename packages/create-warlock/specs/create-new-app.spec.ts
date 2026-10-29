@@ -979,14 +979,19 @@ describe("createNewApp — default TTY path", () => {
     expect(capturedApp().name).toBe("typed-app");
   });
 
-  it('offers "Customize" as a third entry in the structural question', async () => {
+  it('offers the Mantine web stack and "Customize" after API and web in the structural question', async () => {
     select.mockResolvedValueOnce("api").mockResolvedValueOnce("mongodb");
 
     await createNewApp({ name: "menu-app" });
 
     const options = (select.mock.calls[0][0] as { options: { value: string }[] }).options;
 
-    expect(options.map((option) => option.value)).toEqual(["api", "web", "customize"]);
+    expect(options.map((option) => option.value)).toEqual([
+      "api",
+      "web",
+      "web-mantine",
+      "customize",
+    ]);
   });
 
   it('picking "Customize" from the menu hands over to the full wizard without re-asking the name', async () => {
@@ -1100,7 +1105,9 @@ describe("createNewApp — default TTY path", () => {
   it("passes --ui through to the feature list", async () => {
     await createNewApp({ name: "mantine-app", stack: "web", ui: "mantine" });
     expect(capturedApp().options.features).toEqual(["web", "mantine"]);
+  });
 
+  it("scaffolds the web stack without a UI kit for --ui=none", async () => {
     await createNewApp({ name: "plain-app", stack: "web", ui: "none" });
     expect(capturedApp().options.features).toEqual(["web"]);
   });

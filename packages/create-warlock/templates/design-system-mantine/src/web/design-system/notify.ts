@@ -17,20 +17,26 @@ export const notify = {
 
 /** The first human-readable message in an HTTP result, a page-action payload or an Error. */
 export function messageFrom(value: unknown): string | undefined {
-  if (!value || typeof value !== "object") return typeof value === "string" ? value : undefined;
+  if (!value || typeof value !== "object") {
+    return typeof value === "string" ? value : undefined;
+  }
   const source = value as {
     message?: unknown;
     formErrors?: unknown;
     error?: { body?: unknown; message?: unknown };
     data?: unknown;
   };
-  if (Array.isArray(source.formErrors) && typeof source.formErrors[0] === "string")
+  if (Array.isArray(source.formErrors) && typeof source.formErrors[0] === "string") {
     return source.formErrors[0];
+  }
   const body = source.error?.body ?? source.data;
   const nested =
     body && typeof body === "object" ? (body as { message?: unknown }).message : undefined;
-  for (const candidate of [nested, source.error?.message, source.message])
-    if (typeof candidate === "string" && candidate !== "") return candidate;
+  for (const candidate of [nested, source.error?.message, source.message]) {
+    if (typeof candidate === "string" && candidate !== "") {
+      return candidate;
+    }
+  }
   return undefined;
 }
 

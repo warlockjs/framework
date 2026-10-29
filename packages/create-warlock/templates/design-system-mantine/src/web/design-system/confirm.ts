@@ -18,7 +18,9 @@ export function confirm(options: ConfirmOptions): Promise<boolean> {
   return new Promise((resolve) => {
     let settled = false;
     const settle = (value: boolean) => {
-      if (settled) return;
+      if (settled) {
+        return;
+      }
       settled = true;
       resolve(value);
     };

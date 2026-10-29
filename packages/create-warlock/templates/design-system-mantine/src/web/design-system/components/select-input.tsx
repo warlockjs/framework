@@ -5,10 +5,11 @@ import { frameProps } from "./field-frame";
 
 export default function SelectInput(props: SelectProps) {
   const field = useSelectControl(props, false);
+  const { ref: bindRef } = field.binding;
   return (
     <Select
-      {...frameProps(props, field)}
-      ref={field.binding.ref}
+      {...frameProps(props, field.error, field.disabled, field.onBlur)}
+      ref={bindRef}
       className={props.className}
       data={props.options.map((option) => ({ ...option }))}
       value={field.selected[0] ?? null}

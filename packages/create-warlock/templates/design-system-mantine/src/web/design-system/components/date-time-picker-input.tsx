@@ -15,10 +15,11 @@ function fromMantine(value: string | null): string {
 
 export default function DateTimePickerInput(props: DateProps) {
   const field = useDateControl(props, true);
+  const { ref: bindRef } = field.binding;
   return (
     <DateTimePicker
-      {...frameProps(props, field)}
-      ref={field.binding.ref}
+      {...frameProps(props, field.error, field.disabled, field.onBlur)}
+      ref={bindRef}
       className={props.className}
       value={toMantine(field.value)}
       onChange={(value) => field.changeValue(fromMantine(value))}

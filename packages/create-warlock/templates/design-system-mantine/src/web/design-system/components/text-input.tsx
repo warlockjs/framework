@@ -5,10 +5,11 @@ import { frameProps } from "./field-frame";
 
 export default function TextInput(props: ControlProps) {
   const field = useControl(props, "text");
+  const { ref: bindRef } = field.binding;
   return (
     <MantineTextInput
-      {...frameProps(props, field)}
-      ref={field.binding.ref}
+      {...frameProps(props, field.error, field.disabled, field.onBlur)}
+      ref={bindRef}
       className={props.className}
       type="text"
       value={typeof field.value === "string" ? field.value : ""}

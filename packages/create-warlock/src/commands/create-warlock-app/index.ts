@@ -75,12 +75,16 @@ export async function createWarlockApp(application: App): Promise<ScaffoldOutcom
       application.configureDatabaseConfig(databaseDriver);
     }
 
-    application.configureWebStarter(
-      features.some((feature) =>
-        ["web", "tailwind", "shadcn", "design-system", "mantine", "sitemap"].includes(feature),
-      ),
-      features.includes("mantine") && !features.includes("tailwind"),
+    const usesWeb = features.some((feature) =>
+      ["web", "tailwind", "shadcn", "design-system", "mantine", "sitemap"].includes(feature),
     );
+
+    // The Mantine kit replaces the starter's Tailwind setup, unless Tailwind was asked for.
+    if (features.includes("mantine") && !features.includes("tailwind")) {
+      application.configureWebStarter(usesWeb, true);
+    } else {
+      application.configureWebStarter(usesWeb);
+    }
     application.configureLintToolchain();
     application.configureAgentKitTargets(options.agents ?? ["claude"]);
   } catch (error) {

@@ -6,10 +6,11 @@ import { frameProps } from "./field-frame";
 /** Stores `YYYY-MM-DD`, the same string the shadcn kit stores. */
 export default function DatePickerInput(props: DateProps) {
   const field = useDateControl(props, false);
+  const { ref: bindRef } = field.binding;
   return (
     <MantineDatePickerInput
-      {...frameProps(props, field)}
-      ref={field.binding.ref}
+      {...frameProps(props, field.error, field.disabled, field.onBlur)}
+      ref={bindRef}
       className={props.className}
       value={field.value || null}
       onChange={(value) => field.changeValue(value ?? "")}
