@@ -2,6 +2,12 @@
 
 All notable changes to `@warlock.js/web` are documented here.
 
+## 5.41.0 - 2026-10-29
+
+### Added
+
+- The `use-the-mantine-kit` skill topic covers the Mantine kit of the design system (`warlock add design-system --kit mantine`): setup, theme, the shared control contract, `notify`/`notifyOnSubmit` with `useSubmitForm` and `useSubmitAction`, `confirm()`, `PaginatedTable` and switching kits. `build-accessible-controls` now names the two kits.
+
 ## 5.40.0 - 2026-10-29
 
 ### Changed

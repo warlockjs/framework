@@ -1,0 +1,217 @@
+---
+title: Mantine
+slug: v/latest/web/getting-started/mantine
+description: Use Mantine as the Warlock Web UI kit, an alternative to Tailwind and shadcn/ui, with controls bound to Mongez React Form.
+sidebar:
+  order: 4
+  label: Mantine
+---
+
+Mantine is the second UI kit for the Warlock design system. It is an alternative
+to the [Tailwind and shadcn/ui kit](/v/latest/web/getting-started/tailwind-and-shadcn/),
+not an addition to it: you pick one per app.
+
+Both kits expose **one contract**: the same component names, file paths, props,
+hooks and validation-error display. Pages, generated forms and your own code
+import `web/design-system/components/text-input` whichever kit is installed.
+
+## Install
+
+```bash
+warlock add design-system --kit mantine
+# the same install, by its feature name
+warlock add mantine
+```
+
+Mantine does **not** need Tailwind. The installer resolves Web first and then:
+
+1. adds `@mantine/core`, `@mantine/hooks`, `@mantine/dates`, `@mantine/notifications`,
+   `@mantine/modals` and `dayjs` (exact versions), plus `postcss-preset-mantine` and
+   `postcss-simple-vars` as development dependencies;
+2. creates `postcss.config.mjs` with the Mantine PostCSS preset, which Vite loads in
+   development and in production builds;
+3. creates `src/web/app.css` with Mantine's stylesheet imports (or adds them at the top
+   of the one you have);
+4. wires `src/web/root.tsx`: the stylesheet import, the colour scheme script in
+   `<head>`, `{...mantineHtmlProps}` on `<html>`, and `DesignSystemProvider` around
+   `#vessel`;
+5. copies the contract components, hooks, theme and extras into `src/web/design-system/`.
+
+Existing files are preserved. If `root.tsx` or the PostCSS config has a shape the
+installer does not recognise, it leaves the file alone and prints the exact lines to
+add. `--no-install` records the dependencies without installing and
+`--dry-run --json` previews everything.
+
+A new app can start with Mantine:
+
+```bash
+npm create warlock@latest my-app -- --stack=web --ui=mantine
+```
+
+`--ui` takes `shadcn`, `mantine` or `none`. In the interactive flow, choosing
+"Full-stack web" asks which kit you want, and Customize lists Mantine among the
+rendering features.
+
+:::note[React version]
+Mantine 9 needs React 19.2 or newer. `warlock add web` installs React 19.2, so a Warlock
+Web app already satisfies it.
+:::
+
+## Theme
+
+`src/web/design-system/mantine-theme.ts` is the file you edit. It maps your design
+tokens (primary colour, radius, fonts, spacing) onto Mantine's theme:
+
+```ts title="src/web/design-system/mantine-theme.ts"
+import { createTheme } from "@mantine/core";
+
+export const theme = createTheme({
+  primaryColor: "violet",
+  defaultRadius: "lg",
+  fontFamily: "Inter, system-ui, sans-serif",
+});
+```
+
+The colour scheme defaults to `auto` (the visitor's system preference). The same
+`defaultColorScheme` feeds the provider and the script in `<head>`.
+
+### No hydration mismatch
+
+The root renders `ColorSchemeScript` in `<head>`, which sets the stored or system colour
+scheme on `<html>` before first paint. Because that script changes an attribute React
+also renders, `<html>` carries `mantineHtmlProps` (a light default for the attribute plus
+`suppressHydrationWarning`), which marks that single attribute as expected to differ. Nothing else in the tree depends on the visitor's colour scheme, so
+React hydrates the same markup the server sent. Mantine's components are safe to render
+on the server, so no `.client` files or `ClientOnly` wrappers are needed.
+
+## Components
+
+Every control from the contract is available, with the same props as the shadcn kit
+(`id`, `name` and `label` are required):
+
+| File                     | Component             | Mantine part      |
+| ------------------------ | --------------------- | ----------------- |
+| `text-input`             | `TextInput`           | `TextInput`       |
+| `email-input`            | `EmailInput`          | `TextInput`       |
+| `password-input`         | `PasswordInput`       | `PasswordInput`   |
+| `textarea-input`         | `TextareaInput`       | `Textarea`        |
+| `select-input`           | `SelectInput`         | `Select`          |
+| `multi-select-input`     | `MultiSelectInput`    | `MultiSelect`     |
+| `checkbox-input`         | `CheckboxInput`       | `Checkbox`        |
+| `radio-input`            | `RadioInput`          | `Radio.Group`     |
+| `switch-input`           | `SwitchInput`         | `Switch`          |
+| `date-picker-input`      | `DatePickerInput`     | `DatePickerInput` |
+| `date-time-picker-input` | `DateTimePickerInput` | `DateTimePicker`  |
+| `time-picker-input`      | `TimePickerInput`     | `TimeInput`       |
+| `file-input`             | `FileInput`           | `FileInput`       |
+| `submit-button`          | `SubmitButton`        | `Button`          |
+| `field-frame`            | `FieldFrame`          | `Input.Wrapper`   |
+
+Stored values match the shadcn kit: dates are `YYYY-MM-DD`, date-times are
+`YYYY-MM-DDTHH:mm`, times are `HH:mm`, a single select is a string, a multiple select is
+a string array, checkboxes and switches are booleans.
+
+## Forms with Mongez React Form
+
+The controls bind to [`@mongez/react-form`](https://mongez.js.org), the ecosystem's form
+library, through the shared hooks in `src/web/design-system/hooks/` (`use-control`,
+`use-date-control`, `use-file-control`, `use-select-control`, `use-submit-control`).
+Those hooks and `types/control-props.ts` are identical in both kits.
+
+```tsx title="src/web/contact/contact.page.tsx"
+import { Form } from "@mongez/react-form";
+import EmailInput from "web/design-system/components/email-input";
+import SubmitButton from "web/design-system/components/submit-button";
+import TextInput from "web/design-system/components/text-input";
+
+export default function ContactPage() {
+  return (
+    <Form>
+      <TextInput id="contact-name" name="name" label="Name" required />
+      <EmailInput id="contact-email" name="email" label="Email" hint="We reply here" />
+      <SubmitButton id="contact-submit" name="submit" label="Send" />
+    </Form>
+  );
+}
+```
+
+Validation errors, from Mongez rules or from the server, reach the control through
+Mantine's own `error` prop. Mantine styles the invalid state and links the message with
+`aria-describedby`. `required` shows the asterisk without a native `required`
+attribute (forms use `noValidate`), `disabled` and `readOnly` behave as in the shadcn
+kit, and a hint is Mantine's `description`.
+
+:::caution[`@mantine/form` is not used]
+Mantine's own form library, `@mantine/form`, is deliberately not installed or used.
+Mongez React Form already owns values, validation, submission state and server error
+mapping for every Warlock app, and `useSubmitForm` and `useSubmitAction` are built on
+it. A second form owner would compete with it for the same inputs. Do not add
+`@mantine/form`; use the controls above.
+:::
+
+## Notifications after a submit
+
+`notify` wraps `@mantine/notifications`, and `notifyOnSubmit` plugs into
+`useSubmitForm` and `useSubmitAction`:
+
+```tsx
+import { Form } from "@mongez/react-form";
+import { useSubmitForm } from "@warlock.js/web/form";
+import { notifyOnSubmit } from "web/design-system/notify";
+
+export default function ContactForm() {
+  const { submit } = useSubmitForm({
+    route: "contact.send",
+    ...notifyOnSubmit({ success: "Message sent" }),
+  });
+
+  return <Form onSubmit={submit}>{/* controls */}</Form>;
+}
+```
+
+Without an `error` message, the failure toast shows the server's message. Call
+`notify.success`, `notify.error`, `notify.info` and `notify.warning` directly from any
+event handler.
+
+## Confirm dialogs
+
+`confirm()` opens a Mantine modal and resolves a boolean:
+
+```tsx
+import { confirm } from "web/design-system/confirm";
+
+async function remove() {
+  if (!(await confirm({ message: "Delete this record?", danger: true }))) return;
+  // delete it
+}
+```
+
+## Paginated table
+
+`PaginatedTable` is a Mantine `Table` with `Pagination`, shaped after the framework's
+paginated API response: the items of a list endpoint plus its `pagination` block
+(`page`, `pages`, `total`, `limit`).
+
+```tsx
+import PaginatedTable from "web/design-system/components/paginated-table";
+
+<PaginatedTable
+  columns={[
+    { key: "name", header: "Name" },
+    { key: "email", header: "Email" },
+  ]}
+  rows={users}
+  pagination={pagination}
+  onPageChange={(page) => loadPage(page)}
+/>;
+```
+
+## Switching kits
+
+The kits exclude each other. `warlock add design-system` refuses, before changing
+anything, when the other kit is installed, and says what to remove. To move from
+shadcn to Mantine, remove `components.json`, `src/web/components/ui` and
+`src/web/design-system`, uninstall the shadcn packages, then run
+`warlock add design-system --kit mantine`. To go back, remove `src/web/design-system`,
+`postcss.config.mjs` and the Mantine imports in `app.css` and `root.tsx`, uninstall the
+Mantine packages, and run `warlock add tailwind` and `warlock add design-system`.

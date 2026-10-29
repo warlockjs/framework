@@ -44,6 +44,7 @@ The first positional argument (or `--name`) is the project name. Value flags acc
 | ------------------------------ | ----------- | ---------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `<positional>` / `--name`      | yes         | — (required)                                                                                   | Project name + target directory                                                                                                                                             |
 | `--stack`                      | yes         | `api`                                                                                          | `api` or `web` — the structural choice; `web` seeds `web`, `shadcn`, and `design-system` by default                                                                         |
+| `--ui`                         | yes         | `shadcn` when `--stack=web`, otherwise none                                                    | `shadcn`, `mantine` or `none` — the UI kit for web apps; the kits exclude each other                                                                                        |
 | `--db` / `--no-db`             | yes / no    | `mongodb`                                                                                      | Database driver — `mongodb`, `postgres`, or `none` (`--no-db` is shorthand for `--db=none`)                                                                                 |
 | `--pm`                         | yes         | inferred (`npm_config_user_agent` or the system)                                               | Package manager — must be `npm` / `yarn` / `pnpm` / `bun`; any other value is rejected before scaffolding starts                                                            |
 | `--features`                   | yes (CSV)   | none, or `["web", "shadcn", "design-system"]` when `--stack=web` and `--features` is not given | Comma-separated optional feature keys                                                                                                                                       |
@@ -285,6 +286,15 @@ dependency versions are copied into the app; existing source is preserved.
 See [Shared form controls](/v/latest/web/getting-started/tailwind-and-shadcn/#shared-form-controls)
 for the component list, props, value shapes, keyboard and date semantics.
 Existing Tailwind apps can use `npx warlock add design-system`.
+
+### Mantine instead of shadcn
+
+`--ui=mantine` (or `--features=mantine`) scaffolds the web stack with the
+[Mantine kit](/v/latest/web/getting-started/mantine/) instead of Tailwind and
+shadcn/ui: same controls and hooks, wired to Mongez React Form, with no Tailwind
+dependency. The interactive "Full-stack web" choice asks which kit to use. The two kits
+exclude each other, so combining `shadcn` and `mantine` in `--features`, or `--ui` with a
+conflicting feature, fails before anything is written.
 
 Starter controllers declare `responseSchema` for their success and explicit error statuses. Keep those contracts aligned when changing controller responses, including the token payloads in authentication controllers.
 

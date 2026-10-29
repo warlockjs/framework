@@ -5,6 +5,12 @@ description: "Use the app design-system Mongez controls for accessible forms: se
 
 # Build accessible controls
 
+The design-system has two kits with one contract (same component files, props, hooks
+and error display): shadcn/Tailwind, the default, and Mantine, installed with
+`npx warlock add design-system --kit mantine` and described in the
+`use-the-mantine-kit` topic. The keyboard and Radix details below describe the shadcn
+kit; Mantine's widgets follow Mantine's own accessibility behavior.
+
 For Tailwind apps, run `npx warlock add design-system`. If Tailwind is missing,
 first run `npx warlock add tailwind`. The installer refuses before changing an
 unconfigured app and preserves existing files. `npm create warlock@latest app --

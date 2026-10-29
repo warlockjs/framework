@@ -538,6 +538,20 @@ from `@mongez/react-form` directly. See
 [Shared form controls](/v/latest/web/getting-started/tailwind-and-shadcn/#shared-form-controls)
 for all component names, props and accessibility/value contracts.
 
+##### Choosing a UI kit
+
+```bash
+npx warlock add design-system --kit mantine   # Mantine kit, no Tailwind needed
+npx warlock add mantine                        # the same install, by feature name
+```
+
+`--kit` takes `shadcn` (the default, described above) or `mantine`. The Mantine kit
+installs Mantine with its PostCSS preset, mounts the provider in `src/web/root.tsx`
+and copies the same fourteen controls, hooks and props types plus `notify`,
+`confirm` and `PaginatedTable`. The two kits exclude each other: asking for one while
+the other is installed (found by files or dependencies) fails before anything is
+written, with the steps to switch. See [Mantine](/v/latest/web/getting-started/mantine/).
+
 ### `update`
 
 Update every `@warlock.js/*` package in your project to its latest published version, then reinstall.
