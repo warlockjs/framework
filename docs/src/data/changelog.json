@@ -136,6 +136,68 @@
   ],
   "releases": [
     {
+      "version": "5.40.1",
+      "id": "v5-40-1",
+      "date": "October 29, 2026",
+      "isUnreleased": false,
+      "summaryHtml": "<strong>New web projects install their features again, and the design-system files pass the app's lint.</strong> Since 5.35, <code>create-warlock --stack=web</code> (or any scaffold with <code>web</code>, <code>tailwind</code>, <code>shadcn</code>, <code>design-system</code> or <code>sitemap</code>) failed in the feature step: <code>warlock add</code> loads <code>warlock.config.ts</code> first, and the web starter's config imported <code>@warlock.js/web</code> before the feature step installed it, so every feature, even the database, was reported as failed. A web scaffold now lists <code>@warlock.js/web</code> from the start, <code>warlock add</code> continues with a warning when the project config cannot load yet, and CI now scaffolds and typechecks a web project too. The controls and hooks that <code>warlock add design-system</code> writes now pass the scaffolded Oxlint config, so a fresh web app no longer reports lint errors in <code>src/web/design-system/</code>. No breaking changes. Lockstep release across all 33 packages. Generator matrix scope: <code>none</code>; before publishing, the blog on the 5.40.1 tarballs passed the release gate; after publishing, every package was confirmed at the npm origin.",
+      "matrix": "none",
+      "matrixRows": null,
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 3,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 3
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "<code>warlock add</code> no longer stops when <code>warlock.config.ts</code> cannot be loaded. A config that imports a package which is not installed yet (for example the web connector, before <code>warlock add web</code> has installed it) printed <code>Failed to load warlock.config.ts</code> and aborted the very command that installs the missing package. The command now prints a warning and continues without the config."
+            },
+            {
+              "type": "Fixed",
+              "html": "A failed <code>warlock.config.ts</code> load is no longer cached, so a later load in the same process retries instead of replaying the first error."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>warlock add design-system</code> writes controls and hooks that pass the app's Oxlint config; before, <code>warlock dev</code> reported <code>curly</code> and <code>react(immutability)</code> errors in <code>src/web/design-system/</code>."
+            }
+          ]
+        },
+        {
+          "name": "create-warlock",
+          "slug": "create-warlock",
+          "total": 3,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 3
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "<code>create-warlock --stack=web</code> (and any scaffold that selects <code>web</code>, <code>tailwind</code>, <code>shadcn</code>, <code>design-system</code> or <code>sitemap</code>) failed in the feature step with <code>Failed to load warlock.config.ts: Cannot find package '@warlock.js/web'</code>, leaving no feature installed. The web starter's <code>warlock.config.ts</code> imports the web connector, but <code>@warlock.js/web</code> was only added to <code>package.json</code> by the first <code>warlock add</code>, which could not start without it. The package is now part of the project's first install, at the same version as the other <code>@warlock.js</code> packages."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>npm run typecheck:scaffold</code> can now scaffold the web stack (<code>-- --stack=web</code>), and the CI \"Fresh scaffold typechecks\" job runs it for both stacks."
+            },
+            {
+              "type": "Fixed",
+              "html": "The design-system files copied into a web app failed the app's own Oxlint config (<code>curly</code>, and <code>react(immutability)</code> on ref writes), so <code>warlock dev</code> reported 13 lint errors in <code>src/web/design-system/</code>. They now pass, and a spec lints the template with the scaffolded config."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "5.40.0",
       "id": "v5-40-0",
       "date": "October 29, 2026",

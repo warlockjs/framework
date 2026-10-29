@@ -21,7 +21,10 @@ describe("design-system template lint", () => {
       { encoding: "utf8" },
     );
 
-    expect(result.stdout + result.stderr).not.toMatch(/error/);
-    expect(result.status).toBe(0);
+    const output = result.stdout + result.stderr;
+
+    expect(result.status, output).toBe(0);
+    // The summary line reads "Found 0 warnings and 0 errors."; anything else is a finding.
+    expect(output).not.toMatch(/[1-9]\d* errors?\b|[1-9]\d* warnings?\b/);
   });
 });

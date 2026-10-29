@@ -1,4 +1,9 @@
 {
+  "5.40.1": {
+    "publishedAt": "2026-10-29T15:46:56.397Z",
+    "matrix": "none",
+    "summary": "**New web projects install their features again, and the design-system files pass the app's lint.** Since 5.35, `create-warlock --stack=web` (or any scaffold with `web`, `tailwind`, `shadcn`, `design-system` or `sitemap`) failed in the feature step: `warlock add` loads `warlock.config.ts` first, and the web starter's config imported `@warlock.js/web` before the feature step installed it, so every feature, even the database, was reported as failed. A web scaffold now lists `@warlock.js/web` from the start, `warlock add` continues with a warning when the project config cannot load yet, and CI now scaffolds and typechecks a web project too. The controls and hooks that `warlock add design-system` writes now pass the scaffolded Oxlint config, so a fresh web app no longer reports lint errors in `src/web/design-system/`. No breaking changes. Lockstep release across all 33 packages. Generator matrix scope: `none`; before publishing, the blog on the 5.40.1 tarballs passed the release gate; after publishing, every package was confirmed at the npm origin."
+  },
   "5.40.0": {
     "publishedAt": "2026-10-29T14:11:11.362Z",
     "matrix": "none",
