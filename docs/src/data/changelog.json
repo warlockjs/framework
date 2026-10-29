@@ -136,6 +136,630 @@
   ],
   "releases": [
     {
+      "version": "5.40.0",
+      "id": "v5-40-0",
+      "date": "October 29, 2026",
+      "isUnreleased": false,
+      "summaryHtml": "<strong><code>warlock check</code> finishes on large apps, a steadier development server, tested Windows support, and turn control, context editing, spend limits and approvals for AI agents.</strong> The conventions step of <code>warlock check</code> no longer runs for tens of minutes on a large app: the <code>.client</code> boundary rule reads each import chain once per run, and parsed syntax trees no longer stall memory cleanup, so about 7,500 files take about 14 seconds. It prints a progress line per step, and a rule that uses more than its 30-second budget is skipped and reported as <code>WL9026</code> instead of hanging the command. Spec and test files beside commands, events, routes and migrations are never auto-loaded. In development the first page waits for the compile, reloads touch only real importers, requests wait out a reload instead of failing, <code>appSingleton()</code> keeps one instance across reloads, boundary warnings print once, and <code>http.log</code> writes one line per request. On Windows the process supervisor answers before it starts the program, takes an <code>observationTimeoutMs</code> option and per-platform poll intervals, and batches process lookups through one helper; image variants, typecheck paths, atomic JSON writes and SQLite stores are fixed there, and the <code>fs</code>, <code>process</code>, <code>core</code>, <code>web</code> and <code>ai</code> suites run on Windows in CI. AI agents can end a turn after a tool (<code>stopAfterTools</code>, <code>stopWhen</code>, <code>endsTurn</code>), clear old tool results for any provider (<code>contextEditing</code>), build one price list (<code>ai.pricing()</code>), report spend (<code>budget({ onSpend })</code>) and remember tool approvals per session; xAI and OpenAI route native web search to the Responses API, Google takes a search budget, every first-party adapter lists live models, and <code>ai-workspace</code> adds an atomic <code>apply_patch</code> tool. A manual <code>beginTransaction()</code> now covers the caller's later queries, new API-only projects typecheck, and a new project's <code>AGENTS.md</code> tells agents to read <code>npx warlock release-notes --from &lt;current&gt;</code> before upgrading. No breaking changes. Lockstep release across all 33 packages. Generator matrix scope: <code>none</code>; before publishing, the blog on the 5.40.0 tarballs passed the release gate; after publishing, every package was confirmed at the npm origin.",
+      "matrix": "none",
+      "matrixRows": null,
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 23,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 5
+            },
+            {
+              "type": "Changed",
+              "n": 2
+            },
+            {
+              "type": "Fixed",
+              "n": 16
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>http.logPhases: \"info\"</code> brings back the per-phase request lines at <code>info</code>. They are written at <code>debug</code> by default (see Changed)."
+            },
+            {
+              "type": "Added",
+              "html": "<code>appSingleton(key, create, { dispose, disposeOnReload })</code>, with <code>peekAppSingleton</code>, <code>disposeAppSingleton</code> and <code>disposeAllAppSingletons</code>: process-wide values stored on <code>globalThis</code> under <code>Symbol.for(key)</code>. In <code>warlock dev</code> a source file can be evaluated more than once (every hot reload creates a new generation, and a module that must stay in the page renderer's Vite graph is a second copy), so a module-level variable installed by a connector can read as empty in a route. A singleton is shared by every copy, is disposed on application shutdown and dev restart, and with <code>disposeOnReload</code> is disposed when its module reloads."
+            },
+            {
+              "type": "Added",
+              "html": "A dev-server hot reload now runs in a fixed order: new requests wait, requests already running finish on the old code (up to 5 seconds), the old modules are disposed and the new ones imported, then the held requests continue on the new code. A request that waits more than 15 seconds for a reload is answered with <code>503</code> and <code>Retry-After</code> instead of failing midway or getting a 404. Exports <code>reloadGate</code> and <code>whenReloadSettled</code> for code that needs to wait for a reload."
+            },
+            {
+              "type": "Added",
+              "html": "<code>warlock check</code> prints one line to stderr when each step starts and ends, and the conventions step reports its milestones (facts collected, every 1000 files with the slowest rule so far). stdout is unchanged, so <code>--json</code> still prints only the JSON report."
+            },
+            {
+              "type": "Added",
+              "html": "Each convention rule has a time budget over a run (30 seconds by default). A rule that goes over it is skipped for the remaining files and reported as a <code>WL9026</code> warning naming the rule and the time it used, instead of hanging the command. Set <code>ruleBudgetMs</code> in <code>.warlock-check.json</code> to change it; <code>0</code> turns it off."
+            },
+            {
+              "type": "Changed",
+              "html": "With <code>http.log: true</code>, each request now writes one <code>info</code> summary line (<code>GET /orders 200 12ms [request id]</code>) and its per-phase lines (executing, middleware, handler, response, and the validation steps) at <code>debug</code>, so a polled endpoint no longer floods the log. Warnings and errors keep their level, and a 5xx still leaves its single <code>request.&lt;phase&gt;</code> error record instead of a summary line. Set <code>http.logPhases: \"info\"</code> for the old verbose output."
+            },
+            {
+              "type": "Changed",
+              "html": "Documented that <code>Application.onceBooted</code> / <code>whenBooted</code> is the app-level ready hook: it runs after every connector has booted and started, in <code>warlock dev</code>, <code>warlock start</code> and production builds, once per process (HMR reloads do not re-run it)."
+            },
+            {
+              "type": "Fixed",
+              "html": "On Windows, image variants failed with a 500 when the cache folder sat deeper than about 100 characters under the project: sharp cannot open a path over 260 characters, and the temporary file name carried the full 64-character hash. The temporary file is now a short <code>.t-&lt;random&gt;.tmp</code> beside the target; stale ones are still cleaned up, and the older <code>.tmp-</code> names are still recognised."
+            },
+            {
+              "type": "Fixed",
+              "html": "On Windows, <code>warlock typecheck</code>, <code>warlock check</code> (changed-file selection) and <code>warlock inspect</code> compared the compiler's forward-slash paths with backslash paths and found no files or imports, so aliased imports looked unresolved and changed-file runs checked nothing. Paths are now normalised."
+            },
+            {
+              "type": "Fixed",
+              "html": "The development model registry kept a different key for a deleted model than for the published one when the project path contained a Windows 8.3 short name or a link, so removals were not recorded against the right entry."
+            },
+            {
+              "type": "Fixed",
+              "html": "The capability inventory could report the framework's own file as the place a capability was defined when running on Windows."
+            },
+            {
+              "type": "Fixed",
+              "html": "The end-to-end browser finder built Linux and macOS candidate paths with the host's path rules; it now uses the rules of the platform it is asked about. The test-worker recommendation reads Linux cgroup paths with POSIX rules on every host."
+            },
+            {
+              "type": "Fixed",
+              "html": "On Windows, the end-to-end app fixture linked the project's pnpm <code>node_modules</code> folder as a whole, which made every package look missing (Windows resolves pnpm's relative links against the junction, not the folder that holds them). Each package is now linked on its own there."
+            },
+            {
+              "type": "Fixed",
+              "html": "On Windows, the end-to-end browser (and app fixture) started with an environment that had no <code>LOCALAPPDATA</code>, so Chrome could not find an app-data folder, ignored the owned profile and never opened its DevTools endpoint. The isolated environment now gives Windows programs an app-data folder inside the owned directory, plus the system variables they need to start."
+            },
+            {
+              "type": "Fixed",
+              "html": "On Windows, the end-to-end browser teardown failed when one of the browser's helper processes exited while its process tree was being ended; that case is no longer an error."
+            },
+            {
+              "type": "Fixed",
+              "html": "On Windows, <code>warlock release</code> linked <code>node_modules</code> into the frozen source and the staged release with a directory symlink, which needs administrator rights; it now uses a junction, which does not (no change on Linux and macOS)."
+            },
+            {
+              "type": "Fixed",
+              "html": "A hot reload after a small edit re-processed and re-imported thousands of modules (a three-file change reported <code>+2309 modules</code> and took almost a minute). Importers that reach the changed file only through <code>import type</code> / <code>export type</code> are no longer invalidated (the compiler erases those imports), only the changed files are re-read from disk, and the <code>+N modules</code> count is now reported per changed file instead of as a running total."
+            },
+            {
+              "type": "Fixed",
+              "html": "Starting <code>warlock dev</code> on a large app spent most of its scan time re-parsing every known file each time a new file was added, so the work grew with the square of the file count. Only files that mention the new file are checked now."
+            },
+            {
+              "type": "Fixed",
+              "html": "The typings manifest and other small JSON state files were written in place, so another process reading one during a rewrite could see a truncated file and fail with <code>Unexpected end of JSON input</code>. They are now written to a temporary file and renamed."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>warlock check</code> could run for tens of minutes in the conventions step on a large app. The <code>.client</code> boundary rule (<code>WL9022</code>) re-read, re-parsed and re-resolved every shared file for each controller, service, model and route it checked, so the work grew with server-only files times the size of the import graph. Import chains are now read once per run and files known to reach no <code>.client</code> module are never walked again, which makes the step roughly linear in the number of files."
+            },
+            {
+              "type": "Fixed",
+              "html": "The conventions step listed and parsed the project twice to collect its project-wide facts; it now lists the files once."
+            },
+            {
+              "type": "Fixed",
+              "html": "A check over thousands of files stalled for several seconds at a time, and used far more memory than needed, because every parsed syntax tree kept its parent links in a <code>WeakMap</code>, which the garbage collector resolves slowly once many trees are alive. Parent links are now stored on the nodes themselves, and each file is parsed once per rule instead of several times; the conventions step on a 7,500-file app dropped from about 105 s to about 14 s, and no rule is skipped by the time budget."
+            },
+            {
+              "type": "Fixed",
+              "html": "A spec or test file placed next to a CLI command (for example <code>import-guides.command.spec.ts</code> beside <code>import-guides.command.ts</code>) no longer breaks <code>warlock migrate</code> and every other CLI command. Command discovery now skips <code>*.spec.*</code> and <code>*.test.*</code> files, so a <code>vi.mock()</code> call in a test is never imported outside Vitest. The same rule now applies to <code>main</code>, <code>routes</code>, <code>worker</code>, <code>events</code> and locale files."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai",
+          "slug": "ai",
+          "total": 13,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 11
+            },
+            {
+              "type": "Changed",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>ai.snapshot.sqlite({ path })</code> stores have a <code>close()</code> method that closes the database file the store opened. Call it before deleting or moving the file: Windows refuses to delete a file that is still open. A database passed as <code>database</code> is never closed by the store. The store reopens on its next call."
+            },
+            {
+              "type": "Added",
+              "html": "<code>lint: { ignore: [codes] }</code> on a tool, and <code>ignore</code> in <code>ai.config({ toolLint })</code>, drop chosen schema-lint finding codes (for example <code>missing-additional-properties-false</code>) for schemas an app deliberately sends as is, such as remote MCP tools. Ignored findings are left out of the report and never warn."
+            },
+            {
+              "type": "Added",
+              "html": "End an agent run right after a tool, with no further model call: <code>stopAfterTools: [\"post_message\"]</code> and <code>stopWhen: ({ toolCalls, text, usage, messages, tripIndex }) =&gt; boolean</code> on the agent, and <code>endsTurn: true | ({ input, output }) =&gt; boolean</code> on a tool. The trip is recorded with the new <code>finishReason: \"tool_stop\"</code>, <code>result.text</code> is the text the model wrote beside the calls, and usage covers only the calls made. A failed tool call never stops the run through <code>stopAfterTools</code> or <code>endsTurn</code>. <code>mode: \"silent\"</code> keeps working as before."
+            },
+            {
+              "type": "Added",
+              "html": "<code>contextEditing: { clearToolResults: { afterTokens?, keep?, exclude?, placeholder?, countTokens? } }</code> on the agent clears old tool results from the history before each model call, with no summarizing call and with every tool call still paired to its result. It runs before <code>compaction</code>. A model that advertises the new <code>capabilities.nativeContextEditing</code> receives the rule as <code>ModelCallOptions.contextEditing</code> instead, and <code>native: false</code> forces client-side clearing."
+            },
+            {
+              "type": "Added",
+              "html": "<code>ai.pricing({ tables })</code> (<code>pricingCatalogue</code>) builds one overridable price list from provider tables such as <code>ANTHROPIC_MODEL_PRICING</code>: later tables win, <code>.set(model, pricing)</code> overrides, dated snapshot ids resolve to their alias, and <code>.cost()</code> / <code>.costUSD()</code> price a <code>Usage</code>. <code>budget({ pricing })</code> accepts a catalogue."
+            },
+            {
+              "type": "Added",
+              "html": "<code>budget({ onSpend })</code> is called after every model call, before the caps are compared, with the model, session id, usage, USD cost and running totals, so spend can be persisted. A failing hook never fails the run."
+            },
+            {
+              "type": "Added",
+              "html": "<code>scoped: { window: \"all\" }</code> keeps a budget ledger that never resets, for per-session or lifetime caps. With <code>key</code> set from <code>context.options?.sessionId</code> it caps one session; <code>reserve</code> refuses the call before it is made."
+            },
+            {
+              "type": "Added",
+              "html": "<code>ai.human.approval()</code> accepts per-tool modes (<code>tools: { read_file: \"allow\", delete_file: \"deny\", run_shell: \"ask\" }</code>, <code>defaultMode</code>, <code>denyReason</code>), and <code>policy</code> is now optional when modes cover the tools."
+            },
+            {
+              "type": "Added",
+              "html": "<code>ai.human.approval({ remember })</code> remembers an approval for the rest of the session: a handler decision <code>{ type: \"approve\", remember: \"tool\" | \"args\" }</code> auto-approves that tool, or that tool with identical arguments, for later calls with the same <code>sessionId</code>. <code>ai.human.approvalMemory()</code> is the in-process memory; implement <code>ApprovalMemory</code> to persist approvals."
+            },
+            {
+              "type": "Added",
+              "html": "<code>SDKAdapterContract.models?()</code> and the <code>ModelInfo</code> / <code>ModelKind</code> / <code>ListModelsOptions</code> types give every adapter one shape for a live model listing (<code>id</code>, <code>label</code>, <code>provider</code>, <code>kind</code>, and <code>created</code>, <code>contextWindow</code>, <code>maxOutputTokens</code>, <code>description</code> when the provider reports them). An adapter without a listing API has no <code>models</code> method."
+            },
+            {
+              "type": "Added",
+              "html": "<code>inferModelKind(id)</code> classifies a model id as chat, embedding, image, audio, moderation or other, for providers whose listing carries no modality field."
+            },
+            {
+              "type": "Changed",
+              "html": "The <code>[ai.tool][schema.lint]</code> warning is remembered process-wide, so a tool definition evaluated twice in one process (a dev reload) prints its findings once."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>FinishReason</code> has a new member, <code>\"tool_stop\"</code>, set by the agent on a trip that a stop rule ended. Code that switches exhaustively on <code>LLMTrip.finishReason</code> should handle it."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/process",
+          "slug": "process",
+          "total": 8,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 2
+            },
+            {
+              "type": "Changed",
+              "n": 2
+            },
+            {
+              "type": "Fixed",
+              "n": 4
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>observationTimeoutMs</code> supervisor option: how long the ownership check waits for a guardian reply (and, on Windows, the process helper). Defaults to 2 s on Linux and 15 s on Windows and macOS; the timeout error now names the option."
+            },
+            {
+              "type": "Added",
+              "html": "Platform defaults for <code>pollIntervalMs</code>: 100 ms on Linux, 500 ms on macOS, 1500 ms on Windows. Explicit values still win."
+            },
+            {
+              "type": "Changed",
+              "html": "Windows keeps one long-lived PowerShell helper per supervisor instead of starting PowerShell twice per observation. Observations made together share one query, polling reuses a snapshot up to one interval old, the helper restarts if it dies and closes with <code>stopAll()</code>."
+            },
+            {
+              "type": "Changed",
+              "html": "On Windows and macOS the launch gate waits on the guardian's pipe instead of reading the full process identity every 10 ms."
+            },
+            {
+              "type": "Fixed",
+              "html": "Stopping a handle immediately after <code>spawn()</code> could fail with <code>ProcessNotOwnedError</code> on Linux while the launcher was replacing itself with the workload. The stop now waits out that moment before verifying ownership."
+            },
+            {
+              "type": "Fixed",
+              "html": "Sampling a process that was exiting could report <code>ProcessNotOwnedError</code> from a slightly stale process-table snapshot. A mismatch is now re-read fresh first, and a process that is gone counts as exited."
+            },
+            {
+              "type": "Fixed",
+              "html": "Calling <code>supervisor()</code> a second time in the same process with the same registry and owner (for example from a second copy of the module after a dev hot reload) now returns the live supervisor instead of failing every launch with \"Process registry is already in use\". Once <code>stopAll()</code> has finished the registry is free and a new supervisor is created. A different owner on the same registry is still refused."
+            },
+            {
+              "type": "Fixed",
+              "html": "Members failed to start on a busy Windows machine with <code>Process ownership observation timed out</code>. The guardian now replies to the resume request before it launches the workload, so a slow program start no longer counts against the client's timeout."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-workspace",
+          "slug": "ai-workspace",
+          "total": 6,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 5
+            },
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>apply_patch</code> tool and <code>ws.applyPatch({ patch, dryRun? })</code>: apply a unified diff (plain or <code>git diff</code> style) that modifies, creates, deletes and renames several files in one call. The patch is atomic: every hunk is checked first and the files are written only if all apply, with a rollback if a write fails. Paths go through the workspace jail (<code>..</code>, absolute paths and symlinks out are refused), hunks are matched by context so small line drift is fine, CRLF and LF files keep their line endings, and binary patches or binary target files are refused with a clear error. <code>apply_patch</code> is part of <code>tools.all()</code> and is left out of <code>readonly()</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<code>WorkspaceEditError.type</code> gains <code>\"patch-invalid\"</code>, <code>\"hunk-failed\"</code> (with <code>hunkIndex</code>), <code>\"binary-file\"</code>, <code>\"file-exists\"</code> and <code>\"file-missing\"</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<code>parsePatch()</code> and <code>applyHunks()</code> are exported for applying a unified diff to a string without a workspace."
+            },
+            {
+              "type": "Added",
+              "html": "<code>applyPatch</code> is optional on a custom <code>WorkspaceOps</code>: an implementation without it still gets <code>apply_patch</code> and <code>ws.applyPatch()</code>, built on its <code>exists</code>, <code>readFile</code>, <code>writeFile</code> and <code>remove</code> with the same all-or-nothing behaviour (also exported as <code>applyPatchWithOps</code>)."
+            },
+            {
+              "type": "Added",
+              "html": "<code>ApplyPatchInput</code>, <code>ApplyPatchResult</code> and <code>ApplyPatchFileResult</code> types; <code>\"applyPatch\"</code> joins <code>WorkspaceToolName</code>."
+            },
+            {
+              "type": "Changed",
+              "html": "The package skill description now names the read, write and test tools (<code>makeReadFileTool</code>, <code>makeWriteFileTool</code>, <code>makeRunTestsTool</code>) and the \"apply a patch\" phrasing, so agents find them from the skill listing alone."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-openai",
+          "slug": "ai-openai",
+          "total": 4,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 2
+            },
+            {
+              "type": "Changed",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>openai.models()</code> lists the models the key can use from <code>GET /models</code> as <code>ModelInfo[]</code>, following pagination. Works on OpenAI-compatible gateways too, with the SDK's provider label. Groq's <code>context_window</code> and <code>active</code>, Mistral's <code>name</code>, <code>description</code>, <code>max_context_length</code> and <code>capabilities</code>, and <code>created_at</code> dates are read when present."
+            },
+            {
+              "type": "Added",
+              "html": "<code>OpenAIResponsesModel</code> is exported, and <code>OpenAISDK.compatibleResponses()</code> builds it for vendor packages that serve <code>/v1/responses</code> (used by the xAI adapter). That mode sends <code>store: false</code> and leaves out the OpenAI-only <code>include</code> fields."
+            },
+            {
+              "type": "Changed",
+              "html": "On the direct <code>\"openai\"</code> provider, a call that carries the hosted <code>web_search</code> tool (or its dated and <code>_preview</code> variants) is now served by the Responses API automatically instead of failing with a 400 on Chat Completions. Calls without it stay on Chat Completions."
+            },
+            {
+              "type": "Changed",
+              "html": "Hosted <code>web_search</code> now fails with a clear <code>InvalidRequestError</code>, before any request, on models OpenAI documents as unable to search (<code>gpt-3.5*</code>, <code>gpt-4</code>, <code>gpt-4-turbo</code>, <code>gpt-4.1-nano</code>, <code>o1-mini</code>, <code>o1-preview</code>, <code>o3-mini</code> and non-chat ids), on <code>gpt-5*</code> with minimal reasoning, and on a model pinned to <code>api: \"chat\"</code>. Nothing falls back silently."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-xai",
+          "slug": "ai-xai",
+          "total": 3,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 2
+            },
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "Native <code>web_search</code> and <code>x_search</code> now work. A call that carries one of those tools is sent to xAI's Responses API (<code>POST /v1/responses</code>) with the same model, key and pricing; every other call stays on Chat Completions. <code>xai.model({ api: \"responses\" })</code> sends every call there, and <code>api: \"chat\"</code> pins Chat Completions (a search tool then throws before any request)."
+            },
+            {
+              "type": "Added",
+              "html": "<code>xai.models()</code> lists the Grok models the key can use from <code>GET /v1/models</code> as <code>ModelInfo[]</code>."
+            },
+            {
+              "type": "Changed",
+              "html": "Native search no longer throws \"requires the Responses API\"; it is routed to it. On a gateway that relabels <code>provider</code>, the switch is not automatic: set <code>api: \"responses\"</code> on the model."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/web",
+          "slug": "web",
+          "total": 3,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 2
+            },
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "With <code>web.moduleBoundary: \"warn\"</code>, each unique module-boundary violation (importer and target) is printed once per dev session instead of on every re-resolve, followed by a count of the repeats that were suppressed (periodically and when the bundle ends). A busy dev session used to print thousands of identical warnings. <code>\"error\"</code> mode is unchanged."
+            },
+            {
+              "type": "Changed",
+              "html": "In development, <code>web.loaderTimeout</code> defaults to 90 seconds instead of 15, because the first page after a start or a reload also pays for compiling the modules its loaders import. Production keeps 15 seconds, and an explicit <code>web.loaderTimeout</code> always wins."
+            },
+            {
+              "type": "Fixed",
+              "html": "The first page after a <code>warlock dev</code> restart could fail with <code>PageLoaderTimeoutError</code> (a 504 after about 20 seconds) while the server was still compiling. The loader timeout clock now starts only after a hot reload in progress has finished."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-anthropic",
+          "slug": "ai-anthropic",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "The provider-neutral <code>contextEditing.clearToolResults</code> rule (from the agent's <code>contextEditing</code> option) maps to a <code>clear_tool_uses</code> context edit: <code>afterTokens</code> becomes the input-token trigger, <code>keep</code> the number of tool uses kept and <code>exclude</code> the excluded tools. An explicit <code>providerOptions.anthropic.contextManagement.clearToolUses</code> still wins. The model now reports <code>capabilities.nativeContextEditing</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<code>anthropic.models()</code> lists the Claude models the key can use from <code>GET /v1/models</code> as <code>ModelInfo[]</code>, following pagination, with release date and token limits when the API reports them."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-google",
+          "slug": "ai-google",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>googleSearchBudget(maxQueries)</code> and <code>providerOptions.google.search.budget</code> bound Google Search across the calls of one run. The Gemini API has no per-request search limit, so after each call the adapter adds the unique queries Google reported to the budget and, once it is spent, stops sending the <code>googleSearch</code> tool on later calls (other tools are kept). One call that is already running can still overshoot the budget."
+            },
+            {
+              "type": "Added",
+              "html": "<code>google.models()</code> lists the models the key can use as <code>ModelInfo[]</code>, with <code>kind</code> from each model's <code>supportedActions</code>, token limits and description."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/cascade",
+          "slug": "cascade",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "A manual <code>const tx = await driver.beginTransaction()</code> now puts the queries you run afterwards inside the transaction. Before, the transaction was bound only to the driver's own internal step, so on MongoDB your next queries silently ran outside the transaction (no atomicity, and <code>rollback()</code> did not undo them), and on PostgreSQL they ran on other pool connections the same way. Now every query the calling flow runs after <code>await beginTransaction()</code> uses the transaction's session until <code>commit()</code> or <code>rollback()</code>, and runs with no session afterwards. Other requests, timers and jobs running at the same time never see it. <code>transaction(fn)</code> is unchanged."
+            },
+            {
+              "type": "Fixed",
+              "html": "The standalone <code>cascade migrate</code> loader skips <code>*.spec.*</code> and <code>*.test.*</code> files that sit in the migrations folder, so a test beside a migration is no longer imported and registered as one."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/fs",
+          "slug": "fs",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "<code>putJsonFile</code> and <code>putJsonFileAsync</code> now write atomically (a temporary file in the same folder, then a rename). A process reading the file during a rewrite used to be able to see a truncated file and fail with <code>Unexpected end of JSON input</code>."
+            },
+            {
+              "type": "Fixed",
+              "html": "Atomic writes on Windows now retry the final rename for about 4 seconds (10 ms doubling to a 150 ms cap) when another process has the target file open, instead of failing after 5 quick attempts with <code>AtomicWriteError</code> (<code>EPERM</code>). Other platforms keep the short schedule. <code>getJsonFileAsync</code> also retries a read that hits a transient <code>EPERM</code> or <code>EBUSY</code>."
+            }
+          ]
+        },
+        {
+          "name": "create-warlock",
+          "slug": "create-warlock",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            },
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "The <code>AGENTS.md</code> of a new project now has an \"Upgrading Warlock.js\" section: read <code>npx warlock release-notes --from &lt;current version&gt;</code> (bundled in <code>@warlock.js/core</code>, so it works offline), run <code>npx warlock update</code>, follow each release's upgrade notes, then run <code>npx warlock check</code> until it passes. It also explains that a package with several skills arrives as one grouped skill, a router <code>SKILL.md</code> listing its topics with one file per topic to open on demand."
+            },
+            {
+              "type": "Fixed",
+              "html": "A project scaffolded without the web feature no longer fails its first <code>tsc</code> with <code>Cannot find module '@warlock.js/web'</code>. The starter's <code>src/config/web.ts</code> imports a type from <code>@warlock.js/web</code>, so it is now only kept in projects that install web; API-only projects no longer get it, and <code>warlock add sitemap</code> creates it when needed."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/access",
+          "slug": "access",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "The package skill description now names <code>cannot</code>, <code>canAll</code>, <code>canAny</code>, <code>authorize</code> and <code>setAccessConfig</code>, so agents find the full checking API from the skill listing alone."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-bedrock",
+          "slug": "ai-bedrock",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>bedrock.models()</code> lists the foundation models in the SDK's region through <code>ListFoundationModels</code> as <code>ModelInfo[]</code>, with <code>kind</code> from the output modalities. Legacy models are left out. It adds <code>@aws-sdk/client-bedrock</code> as a dependency and needs the <code>bedrock:ListFoundationModels</code> permission."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-deepseek",
+          "slug": "ai-deepseek",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>deepseek.models()</code> lists the models the key can use as <code>ModelInfo[]</code>."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-groq",
+          "slug": "ai-groq",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>groq.models()</code> lists the models the key can use as <code>ModelInfo[]</code>, with <code>contextWindow</code>; models Groq marks inactive are left out."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-mistral",
+          "slug": "ai-mistral",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>mistral.models()</code> lists the models the key can use as <code>ModelInfo[]</code>, with <code>contextWindow</code>, <code>description</code> and a <code>kind</code> taken from <code>capabilities.completion_chat</code>."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-ollama",
+          "slug": "ai-ollama",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>ollama.models()</code> lists the models pulled on the daemon from <code>GET /api/tags</code> as <code>ModelInfo[]</code>, with the last-modified time as <code>created</code> and embedding models (<code>bert</code> families) as <code>kind: \"embedding\"</code>."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-tools",
+          "slug": "ai-tools",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>ai.mcp(server, { lint })</code> sets the development schema-lint option on every adapted remote tool: <code>false</code> silences it, <code>{ ignore: [codes] }</code> drops chosen finding codes. Remote schemas are sent as the server wrote them, so the app often cannot act on the findings."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/seal",
+          "slug": "seal",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "The package skill description now names <code>ArrayValidator</code> and the mutator and transform phrasings, so agents find them from the skill listing alone."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "5.39.2",
       "id": "v5-39-2",
       "date": "October 27, 2026",
