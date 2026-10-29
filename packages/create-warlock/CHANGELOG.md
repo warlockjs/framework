@@ -4,6 +4,12 @@ All notable changes to `create-warlock` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.40.1 - 2026-10-29
+
+### Changed
+
+- The `AGENTS.md` of a new project now has an "Upgrading Warlock.js" section: read `npx warlock release-notes --from <current version>` (bundled in `@warlock.js/core`, so it works offline), run `npx warlock update`, follow each release's upgrade notes, then run `npx warlock check` until it passes. It also explains that a package with several skills arrives as one grouped skill, a router `SKILL.md` listing its topics with one file per topic to open on demand.
+
 ## 5.40.0 - 2026-10-29
 
 ### Fixed

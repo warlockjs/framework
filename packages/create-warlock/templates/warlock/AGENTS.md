@@ -51,6 +51,10 @@ The rule is: **skill first, source second, web last.**
   `.cursor/skills/`, GitHub Copilot → `.github/skills/`, Codex → `.codex/skills/`,
   and the equivalent directory for other agents).
 
+Each package with several skills arrives as **one grouped skill**: a router
+`SKILL.md` that lists its topics, plus one file per topic opened on demand. Open the
+router, pick the topic, then read that topic's file.
+
 If a skill you expect is missing, run `npm run skills:sync` (it also runs
 automatically on `postinstall`).
 
@@ -84,6 +88,22 @@ automatically on `postinstall`).
 - `npx warlock check` — verify a change: typecheck, lint, the affected tests and the framework's conventions in one report (`--changed` for only what changed); run it after every change and loop until it exits 0
 - `npm run skills:sync` — re-sync skills from `node_modules` and regenerate the
   derived per-agent files from this `AGENTS.md`
+
+## Upgrading Warlock.js
+
+Read what changed before you bump anything:
+
+1. `npx warlock release-notes --from <current version>` (the version in
+   `package.json`, e.g. `5.36`) prints every later release, oldest first, led by
+   the combined breaking changes. It reads the notes bundled in
+   `node_modules/@warlock.js/core/releases/`, so it works offline; plain
+   `npx warlock release-notes` shows the installed version's notes.
+2. `npx warlock update` moves every `@warlock.js/*` dependency to the latest
+   version and installs (`--dry-run` previews). When a release has breaking changes,
+   `npx warlock upgrade --from <current> --to <version>` also applies the code
+   edits they need.
+3. Follow each release's **Upgrade notes**.
+4. Run `npx warlock check` and loop until it exits 0.
 
 ## Code style
 

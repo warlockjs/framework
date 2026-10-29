@@ -1,5 +1,5 @@
 ---
-description: 'Framework-independent typed validation: `v`, `validate`, `ObjectValidator`, `StringValidator` and `Infer`. Use for "validate a request body", "require an email", optional fields and defaults, schema type inference, custom rules, JSON Schema or Standard Schema. Not this package → @warlock.js/core for database rules and upload validators; @warlock.js/cascade for model schemas and persistence.'
+description: 'Framework-independent typed validation: `v`, `validate`, `ObjectValidator`, `StringValidator`, `ArrayValidator` and `Infer`. Use for "validate a request body", "require an email", optional fields and defaults, schema type inference, custom rules, mutators, transforms, JSON Schema or Standard Schema. Not this package → @warlock.js/core for database rules and upload validators; @warlock.js/cascade for model schemas and persistence.'
 ---
 
 # @warlock.js/seal

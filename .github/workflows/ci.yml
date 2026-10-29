@@ -94,6 +94,9 @@ jobs:
       - name: Skill indexes cover exported topics and use valid references
         run: node --import tsx tools/release/scripts/skill-path-refs.ts
 
+      - name: Skills name every public export or stay within their coverage allowance
+        run: node --import tsx tools/release/scripts/skill-coverage-gate.ts
+
       - name: Public text contains no private references
         run: pnpm run check:public-text
 

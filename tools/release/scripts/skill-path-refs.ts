@@ -20,7 +20,7 @@
  * Grouped indexes must also name every local topic, never name a missing local
  * topic, and keep grouped guidance in topic folders rather than loose files.
  * Single-topic packages use a root SKILL.md; every package exports one skill
- * with a nonempty package description of at most 450 characters.
+ * with a nonempty package description of at most 450 characters (700 for a grouped index).
  */
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
@@ -335,10 +335,10 @@ export function runSkillPackageGate(repoRoot: string): SkillLayoutIssue[] {
         "missing-description",
         "package skill requires a nonempty single-line frontmatter description",
       );
-    } else if (description.length > 450) {
+    } else if (description.length > (hasIndex ? 700 : 450)) {
       addIssue(
         "description-too-long",
-        `package skill description has ${description.length} characters; maximum is 450`,
+        `package skill description has ${description.length} characters; maximum is ${hasIndex ? 700 : 450}`,
       );
     }
   }

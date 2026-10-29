@@ -54,6 +54,14 @@ pinned version in `package.json` in step with the @mongez runner.
 indexes, exactly one exported skill per package, and nonempty package descriptions
 of at most 450 characters. It also runs in the workspace CI workflow and the release workflow.
 Single-topic packages use `skills/SKILL.md`, with reference assets beside it.
+
+`npm run check:skill-coverage` fails a package with two or more topic skills and no
+`skills/index.md`, an index description outside 400-700 characters, and a topic
+`SKILL.md` without `name`/`description`. It also ratchets, per package, how many public
+value exports (from `src/index.ts` and its relative re-exports; types-only exports are not
+counted) no skill mentions in backticks or code. Allowances live in
+`scripts/skill-coverage-allowances.jsonc` and may only go down; print the uncovered
+names with `npm run check:skill-coverage -- --list [package]`.
 Do not mix a root skill with topics or an index. Multi-topic packages use
 `skills/<topic>/SKILL.md` plus `skills/index.md` and at least two topics;
 unindexed or nested topic skills are rejected. Only `index.md` may be loose

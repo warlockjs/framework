@@ -83,11 +83,11 @@ describe("one exported package skill and description budget", () => {
     });
   }
 
-  it("rejects descriptions over 450 decoded characters on root and grouped skills", () => {
+  it("rejects descriptions over 450 (root) or 700 (grouped index) decoded characters", () => {
     withSkills(
       {
         "single/skills/SKILL.md": skill("x".repeat(451)),
-        "grouped/skills/index.md": skill("x".repeat(451)),
+        "grouped/skills/index.md": skill("x".repeat(701)),
         "grouped/skills/a/SKILL.md": skill(),
         "grouped/skills/b/SKILL.md": skill(),
       },
@@ -97,7 +97,7 @@ describe("one exported package skill and description budget", () => {
           issues.map(({ type }) => type),
           ["description-too-long", "description-too-long"],
         );
-        assert.match(issues[0]?.message ?? "", /451 characters/);
+        assert.match(issues[0]?.message ?? "", /701 characters/);
         assert.equal(issues[0]?.relPath, "grouped/skills/index.md");
       },
     );
