@@ -12,6 +12,7 @@ import {
   getAiProviderOptions,
   getAllFeatureKeys,
 } from "../../features/features-map";
+import { applyUiKit } from "../../features/ui-kit";
 import { assertFlagCombinations } from "../../flags/assert-flag-combinations";
 import { assertPackageManagerAvailable } from "../../flags/assert-package-manager";
 import { seedFromFlags } from "../../flags/seed-from-flags";
@@ -30,6 +31,7 @@ import { askAiFeatures } from "../../prompts/ask-ai-features";
 import { askFeatures } from "../../prompts/ask-features";
 import { askProjectName } from "../../prompts/ask-project-name";
 import { askStack } from "../../prompts/ask-stack";
+import { resolveKitConflict } from "../../prompts/ask-ui-kit";
 import { showIntroBanner } from "../../ui/banner";
 import { createWarlockApp } from "../create-warlock-app";
 import getAppPath from "./get-app-path";
@@ -162,12 +164,15 @@ async function createFullWizard(cli: CliFlags, pmDetectionPromise: Promise<void>
   const selectedDriver = getDatabaseDriver(databaseDriver as string);
 
   // Step 4: Edit optional features in paged groups.
-  const selectedFeatures = await askFeatures(seeds.features);
+  const pickedFeatures = await askFeatures(seeds.features);
 
-  if (isCancel(selectedFeatures)) {
+  if (isCancel(pickedFeatures)) {
     cancel("Feature selection cancelled");
     process.exit(0);
   }
+
+  // The two UI kits exclude each other ("Select all" can tick both).
+  const selectedFeatures = await resolveKitConflict(pickedFeatures as string[]);
 
   // Step 4b: AI providers + capability packages — selecting any pulls
   // @warlock.js/ai automatically. The result still flows through the
@@ -218,9 +223,7 @@ async function createFullWizard(cli: CliFlags, pmDetectionPromise: Promise<void>
     options: {
       databaseDriver: databaseDriver as string,
       databasePort: selectedDriver?.defaultPort || 27017,
-      features: (selectedFeatures as string[]).includes("shadcn")
-        ? [...new Set([...(selectedFeatures as string[]), "design-system"])]
-        : (selectedFeatures as string[]),
+      features: applyUiKit(selectedFeatures as string[], undefined),
       aiProviders: selectedAiProviders as string[],
       useGit,
       useJWT,
@@ -257,7 +260,8 @@ async function createDefaultInteractive(cli: CliFlags, pmDetectionPromise: Promi
     return;
   }
 
-  const stack: Stack = choice;
+  const stack: Stack = choice === "web-mantine" ? "web" : choice;
+  const ui = choice === "web-mantine" ? "mantine" : cli.ui;
 
   await pmDetectionPromise;
 
@@ -283,7 +287,7 @@ async function createDefaultInteractive(cli: CliFlags, pmDetectionPromise: Promi
   let options: AppOptions;
 
   try {
-    options = await resolveAppOptions({ ...cli, stack, db: databaseDriver });
+    options = await resolveAppOptions({ ...cli, stack, db: databaseDriver, ui });
   } catch (error) {
     cancel((error as Error).message);
     process.exit(1);
@@ -343,10 +347,9 @@ export function resolveNonInteractiveOptions(cli: CliFlags): SyncAppOptions {
   }
 
   const stack: Stack = cli.stack ?? "api";
-  const requestedFeatures = cli.features ?? (stack === "web" ? ["web", "shadcn"] : []);
-  const features = requestedFeatures.includes("shadcn")
-    ? [...new Set([...requestedFeatures, "design-system"])]
-    : requestedFeatures;
+  const requestedFeatures =
+    cli.features ?? (stack === "web" ? ["web", ...(cli.ui === undefined ? ["shadcn"] : [])] : []);
+  const features = applyUiKit(requestedFeatures, cli.ui);
   const aiProviders = cli.ai ?? [];
 
   const allowedKeys = getAllFeatureKeys();

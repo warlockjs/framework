@@ -111,7 +111,7 @@ guesses.
 | `mysql`    | 3306         | coming soon (disabled in the wizard)                                     |
 | `none`     | —            | opt out — no driver, no driver package, `src/config/database.ts` removed |
 
-**Features** (`--features`): `react`, `react-email`, `mail`, `ses`, `image`, `s3`, `redis`, `scheduler`, `herald`, `socket`, `test`, `access`, `web`, `tailwind`, `shadcn`, `notifications`.
+**Features** (`--features`): `react`, `react-email`, `mail`, `ses`, `image`, `s3`, `redis`, `scheduler`, `herald`, `socket`, `test`, `access`, `web`, `tailwind`, `shadcn`, `mantine`, `notifications`.
 
 **AI providers / packages** (`--ai`): `ai-openai`, `ai-google`, `ai-anthropic`, `ai-bedrock`, `ai-ollama`, plus the capability packages `ai-tools`, `ai-panoptic`, `ai-workspace`. Any pick auto-pulls the core `@warlock.js/ai` package.
 
@@ -298,6 +298,11 @@ import TextInput from "web/design-system/components/text-input";
 All fourteen controls, props and hooks are documented by the Web
 `build-accessible-controls` topic and the generated `web-code-standards` skill.
 Existing apps use `npx warlock add tailwind`, then `npx warlock add design-system`.
+
+`--ui=<shadcn|mantine|none>` (or `--features=mantine`) picks the UI kit for web apps;
+`--ui=mantine` scaffolds the Mantine kit without Tailwind, with the same design-system
+controls. The kits exclude each other, so `shadcn` plus `mantine` is refused before any
+file is written. The interactive "Full-stack web" choice asks for the kit.
 
 Starter controllers include `responseSchema`. Keep these contracts aligned when changing returned bodies, for example `homePageController.responseSchema = { 200: { body: { message: "string", version: "string", docs: "string" } } };`.
 

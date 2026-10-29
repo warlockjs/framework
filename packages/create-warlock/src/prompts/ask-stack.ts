@@ -27,6 +27,11 @@ export async function askStack(): Promise<SetupChoice> {
         hint: "API + SSR React pages, Tailwind and accessible shadcn form controls",
       },
       {
+        value: "web-mantine",
+        label: "Full-stack web with Mantine",
+        hint: "API + SSR React pages and Mantine components, no Tailwind",
+      },
+      {
         value: "customize",
         label: "Customize",
         hint: "Pick package manager, database, features, AI providers and coding agents one by one",

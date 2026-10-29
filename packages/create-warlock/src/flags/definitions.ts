@@ -41,6 +41,12 @@ export const FLAG_DEFINITIONS: FlagDefinition[] = [
     defaultValue: 'none (or ["web"] when --stack=web and --features is not given)',
   },
   {
+    usage: "--ui=<shadcn|mantine|none>",
+    description:
+      "UI kit for web apps: shadcn (Tailwind + shadcn/ui), Mantine (no Tailwind) or none. Both kits expose the same design-system components; they exclude each other",
+    defaultValue: "shadcn when --stack=web, otherwise none",
+  },
+  {
     usage: "--ai=<list>",
     description: `Comma-separated AI provider or capability keys (${AI_FEATURE_KEYS.join(", ")})`,
     defaultValue: "none",

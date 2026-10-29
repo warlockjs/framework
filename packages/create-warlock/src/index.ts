@@ -5,7 +5,7 @@ import { NO_DATABASE } from "./features/database-drivers";
 import { buildHelpText } from "./flags/definitions";
 import { packageRoot } from "./helpers/paths";
 
-const valueFlags = ["name", "db", "pm", "features", "ai", "agents", "stack", "lint"];
+const valueFlags = ["name", "db", "pm", "features", "ai", "agents", "stack", "lint", "ui"];
 
 const HELP_TEXT = buildHelpText();
 
@@ -96,6 +96,9 @@ export function parseFlags(argv: string[]): CliFlags {
         break;
       case "stack":
         flags.stack = value as Stack;
+        break;
+      case "ui":
+        flags.ui = value ?? "";
         break;
       case "interactive":
       case "customize":

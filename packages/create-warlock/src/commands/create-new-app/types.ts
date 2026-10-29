@@ -3,13 +3,18 @@ export type LintToolchain = "oxc";
 /** The one structural fork that changes the generated app's shape. */
 export type Stack = "api" | "web";
 
+/** The UI kit choice: shadcn/Tailwind, Mantine, or neither. */
+export type UiKit = "shadcn" | "mantine" | "none";
+
 /**
- * What the "What are we building?" menu can return: a stack, or `customize` —
+ * What the "What are we building?" menu can return: a stack, `web-mantine` (the
+ * web stack with the Mantine kit instead of shadcn, so the UI kit needs no
+ * prompt of its own), or `customize` —
  * which is a FLOW, not a stack, and hands the run to the full wizard. It is
  * deliberately not a `--stack` value: `--stack=customize --yes` would have no
  * coherent meaning.
  */
-export type SetupChoice = Stack | "customize";
+export type SetupChoice = Stack | "web-mantine" | "customize";
 
 export type AppOptions = {
   databaseDriver: string;
@@ -45,6 +50,8 @@ export type CliFlags = {
   stack?: Stack;
   db?: string;
   features?: string[];
+  /** `--ui=<shadcn|mantine|none>` — the design-system kit for web apps. */
+  ui?: string;
   ai?: string[];
   pm?: string;
   /** `--lint=oxc`; validated before scaffolding. */

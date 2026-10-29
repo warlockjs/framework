@@ -57,7 +57,13 @@
     "class-variance-authority": "0.7.1",
     "clsx": "2.1.1",
     "tailwind-merge": "3.7.0",
-    "jsdom": "30.0.1"
+    "jsdom": "30.0.1",
+    "@mantine/core": "9.7.2",
+    "@mantine/hooks": "9.7.2",
+    "@mantine/dates": "9.7.2",
+    "@mantine/notifications": "9.7.2",
+    "@mantine/modals": "9.7.2",
+    "dayjs": "1.11.23"
   },
   "module": "./src/index.ts",
   "typings": "./src/index.ts",

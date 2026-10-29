@@ -388,7 +388,7 @@ export class App {
    * Exactly one survives the scaffold: web projects keep the SSR page and API
    * example; every other project keeps the dependency-free JSON controller.
    */
-  public configureWebStarter(useWeb: boolean) {
+  public configureWebStarter(useWeb: boolean, withoutTailwind = false) {
     const remove = (relativePath: string) => {
       const target = path.resolve(this.path, relativePath);
       if (existsSync(target)) rmSync(target, { recursive: true, force: true });
@@ -442,12 +442,25 @@ export class App {
       "@mongez/http": "^3.5.0",
       "@mongez/react-form": "^4.0.0",
     };
-    packageJson.devDependencies = {
-      ...packageJson.devDependencies,
-      "@tailwindcss/postcss": "^4.1.16",
-      tailwindcss: "^4.1.16",
-    };
+    // The Mantine kit replaces Tailwind: the starter then carries neither the
+    // dependencies nor the PostCSS config nor the stylesheet's Tailwind import,
+    // and `warlock add mantine` writes its own PostCSS config and imports.
+    if (!withoutTailwind) {
+      packageJson.devDependencies = {
+        ...packageJson.devDependencies,
+        "@tailwindcss/postcss": "^4.1.16",
+        tailwindcss: "^4.1.16",
+      };
+    }
     putJsonFile(packageJsonPath, packageJson);
+
+    if (withoutTailwind) {
+      remove("postcss.config.mjs");
+      const cssPath = path.resolve(this.path, "src/web/app.css");
+      if (existsSync(cssPath)) {
+        putFile(cssPath, (getFile(cssPath) as string).replace(/^@import "tailwindcss";\r?\n/m, ""));
+      }
+    }
 
     const configPath = path.resolve(this.path, "warlock.config.ts");
     const config = getFile(configPath) as string;

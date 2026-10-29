@@ -1088,6 +1088,23 @@ describe("createNewApp — default TTY path", () => {
     expect(createWarlockApp).not.toHaveBeenCalled();
   });
 
+  it("scaffolds the Mantine kit from the menu's Mantine entry without an extra prompt", async () => {
+    select.mockResolvedValueOnce("web-mantine").mockResolvedValueOnce("none");
+
+    await createNewApp({ name: "mantine-app" });
+
+    expect(select).toHaveBeenCalledTimes(2);
+    expect(capturedApp().options.features).toEqual(["web", "mantine"]);
+  });
+
+  it("passes --ui through to the feature list", async () => {
+    await createNewApp({ name: "mantine-app", stack: "web", ui: "mantine" });
+    expect(capturedApp().options.features).toEqual(["web", "mantine"]);
+
+    await createNewApp({ name: "plain-app", stack: "web", ui: "none" });
+    expect(capturedApp().options.features).toEqual(["web"]);
+  });
+
   it("includes the web feature by default when the structural answer is web", async () => {
     await createNewApp({ name: "web-app", stack: "web" });
 

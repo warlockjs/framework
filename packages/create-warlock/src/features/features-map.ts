@@ -106,6 +106,12 @@ export const features: FeatureOption[] = [
     group: "Rendering & Mail",
   },
   {
+    key: "mantine",
+    label: "Mantine UI kit",
+    hint: "Mantine components wired to Mongez React Form, with notify, confirm and a paginated table; an alternative to shadcn, no Tailwind needed",
+    group: "Rendering & Mail",
+  },
+  {
     key: "sitemap",
     label: "Sitemap",
     hint: "Runtime sitemap.xml generation from the page registry — requires app.publicUrl or PUBLIC_APP_URL (pulls web)",

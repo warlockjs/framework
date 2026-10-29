@@ -37,6 +37,8 @@
  *   node scripts/typecheck-scaffold.mjs            # scaffold, check, clean up
  *   node scripts/typecheck-scaffold.mjs --keep     # leave the project in place
  *   node scripts/typecheck-scaffold.mjs --pm=pnpm  # also accepts yarn
+ *   node scripts/typecheck-scaffold.mjs --ui=mantine  # full-stack web app with the Mantine kit
+ *   node scripts/typecheck-scaffold.mjs --ui=shadcn   # full-stack web app with the shadcn kit
  */
 
 import { spawn } from "node:child_process";
@@ -52,6 +54,7 @@ const { values } = parseArgs({
     keep: { type: "boolean", default: false },
     lint: { type: "string" },
     pm: { type: "string", default: "npm" },
+    ui: { type: "string" },
   },
 });
 const keepArtifacts = values.keep;
@@ -61,6 +64,11 @@ if (lint !== "oxc" || !["npm", "pnpm", "yarn"].includes(packageManager)) {
   throw new Error(
     "Usage: node scripts/typecheck-scaffold.mjs [--lint=oxc] [--pm=npm|pnpm|yarn] [--keep]",
   );
+}
+
+const ui = values.ui;
+if (ui !== undefined && !["shadcn", "mantine"].includes(ui)) {
+  throw new Error("Usage: --ui=<shadcn|mantine>; omit it for the API-only scaffold.");
 }
 
 const APP_NAME = "scaffold-typecheck-app";
@@ -124,6 +132,8 @@ async function main() {
         path.join(packageRoot, "index.dev.ts"),
         APP_NAME,
         "--db=mongodb",
+        // A UI kit is a web-app choice, so selecting one scaffolds the web stack.
+        ...(ui ? ["--stack=web", `--ui=${ui}`] : []),
         `--pm=${packageManager}`,
         // Omit --lint by default so CI exercises the actual scaffolder default.
         ...(values.lint ? [`--lint=${lint}`] : []),

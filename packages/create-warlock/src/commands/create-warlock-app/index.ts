@@ -77,8 +77,9 @@ export async function createWarlockApp(application: App): Promise<ScaffoldOutcom
 
     application.configureWebStarter(
       features.some((feature) =>
-        ["web", "tailwind", "shadcn", "design-system", "sitemap"].includes(feature),
+        ["web", "tailwind", "shadcn", "design-system", "mantine", "sitemap"].includes(feature),
       ),
+      features.includes("mantine") && !features.includes("tailwind"),
     );
     application.configureLintToolchain();
     application.configureAgentKitTargets(options.agents ?? ["claude"]);

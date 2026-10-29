@@ -47,7 +47,9 @@ export function seedFromFlags(cli: CliFlags): WizardSeeds {
 function defaultFeatures(cli: CliFlags): string[] {
   const defaults = getDefaultFeatureKeys();
 
-  if (cli.stack !== "web") return defaults;
+  const kit = cli.ui === "shadcn" || cli.ui === "mantine" ? [cli.ui] : [];
 
-  return [...new Set([...defaults, "web"])];
+  if (cli.stack !== "web") return [...new Set([...defaults, ...kit])];
+
+  return [...new Set([...defaults, "web", ...kit])];
 }

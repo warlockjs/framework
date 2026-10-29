@@ -75,6 +75,8 @@
   "include": [
     "templates/design-system/src/**/*.ts",
     "templates/design-system/src/**/*.tsx",
+    "templates/design-system-mantine/src/**/*.ts",
+    "templates/design-system-mantine/src/**/*.tsx",
     "templates/warlock/src/**/*.ts",
     "templates/warlock/src/**/*.tsx",
     "templates/warlock/warlock.config.ts"
