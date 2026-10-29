@@ -220,9 +220,10 @@ export async function runZeroEditGeneratorGate(
 
   if (selection.runComposed) {
     const composed = await scaffold(runtime, context, createCli, casesRoot, "composed");
-    await addFeatures(runtime, context, composed, catalog.features);
+    const composedFeatures = composedRowFeatures(catalog.features);
+    await addFeatures(runtime, context, composed, composedFeatures);
     await assertGeneratedAndInstalled(runtime, context, config.npmCliPath, composed);
-    await exerciseCase(runtime, context, config, composed, baseline, catalog.features);
+    await exerciseCase(runtime, context, config, composed, baseline, composedFeatures);
   }
 
   if (selection.isSubset) {
@@ -239,6 +240,19 @@ export async function runZeroEditGeneratorGate(
 }
 
 const COMPOSED_ROW_KEYWORD = "composed";
+
+/**
+ * Features that are alternatives to another catalog feature and refuse to be
+ * installed beside it. `mantine` is the second design-system kit: it gets its
+ * own isolated row (a fresh app plus `warlock add mantine`), and the composed
+ * row keeps the default shadcn kit (`design-system`).
+ */
+export const COMPOSED_ROW_EXCLUDED_FEATURES: readonly string[] = ["mantine"];
+
+/** The catalog features the composed row installs together. */
+export function composedRowFeatures(catalogFeatures: readonly string[]): string[] {
+  return catalogFeatures.filter((feature) => !COMPOSED_ROW_EXCLUDED_FEATURES.includes(feature));
+}
 
 /**
  * The generator row: a fresh scaffold that runs `warlock make endpoint` and

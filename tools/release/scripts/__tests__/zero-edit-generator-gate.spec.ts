@@ -5,6 +5,7 @@ import path from "node:path";
 import { afterEach, describe, it } from "node:test";
 
 import {
+  composedRowFeatures,
   runZeroEditGeneratorGate,
   type GateCommandRequest,
   type GeneratorGateContext,
@@ -279,6 +280,26 @@ describe("zero-edit generator matrix", () => {
       fixture.events.some(([event]) => event === "isolated-feature-added"),
       false,
     );
+  });
+
+  it("gives the alternative Mantine kit its own row and keeps it out of the composed row", async () => {
+    const fixture = await harness(["web", "design-system", "mantine"]);
+    await runZeroEditGeneratorGate(fixture.context, fixture.dependencies);
+
+    const adds = fixture.commands
+      .filter((command) => command.args[1] === "add")
+      .map((command) => command.args.slice(2));
+    assert.deepEqual(adds, [
+      ["web", "--no-install"],
+      ["design-system", "--no-install"],
+      ["mantine", "--no-install"],
+      ["test", "--no-install"],
+      ["web", "design-system", "--no-install"],
+    ]);
+    assert.deepEqual(composedRowFeatures(["web", "design-system", "mantine"]), [
+      "web",
+      "design-system",
+    ]);
   });
 
   it("runs a fresh isolated row for every derived subject, then one composed row", async () => {
