@@ -128,16 +128,21 @@ profiling without explicit approval).
 the milliseconds spent in each step and in teardown, plus a run summary. That turns TR-01/TR-02
 tuning into data instead of guesses, and gives maintainers comparable numbers from users.
 
-### TR-05 (low, needs investigation): worker count under CPU quotas
+### TR-05 (low): document parallelism and worker count for CPU-capped CI
+
+**Update 2026-10-21: the serial run was the application's choice, not the framework's.** The consumer
+application's release gate runs `vitest run --maxWorkers=2 --no-file-parallelism`, which explains why
+the phase totals matched the wall-clock time. A developer run of the same suite without those flags
+took 1,932 s instead of 4,466 s. This finding no longer suspects the Warlock lifecycle of serialising
+files. TR-01 and TR-02 stand: per-file setup is still the dominant CPU cost however it is scheduled.
 
 Vitest sizes its pool from `os.availableParallelism()`, which reports **48** on this host even when
-the process is confined to 12 CPUs by a cgroup quota. Vitest's per-phase times summed to roughly the
-wall-clock duration, which suggests little effective parallelism. Either too many workers are
-contending for the quota or files are being serialised. This was not confirmed.
+the process is confined to 12 CPUs by a cgroup quota.
 
-**Ask:** check whether something in the Warlock test lifecycle (shared HTTP test server, global
-locks, single memory replica set) serialises files. Document a recommended `maxWorkers` for
-CPU-capped CI, or have the scaffolded Vitest config derive it from the cgroup quota when present.
+**Ask:** document whether Warlock test suites are safe to run with file parallelism (each worker
+needs its own database or isolated fixtures; the shared HTTP test server from global setup is
+reused), and recommend a `maxWorkers` for CPU-capped CI, or have the scaffolded Vitest config derive
+it from the cgroup quota when present.
 
 ### TR-06 (low): document `warlock test --changed` for release gates
 
@@ -159,4 +164,4 @@ These need no framework change and are planned in the application:
 - No fresh minimal reproduction on the latest `@warlock.js/core` release; the observations come from
   5.33.0. The setup steps listed above were read from the installed 5.33.0 package source.
 - No per-step timing (see TR-04). The 2.6 s average is total setup time divided by file count.
-- TR-03 and TR-05 are hypotheses from source reading and the phase totals, not confirmed behaviour.
+- TR-03 is a hypothesis from source reading, not confirmed behaviour. TR-05 was traced to the application's own `--no-file-parallelism` gate flag.
