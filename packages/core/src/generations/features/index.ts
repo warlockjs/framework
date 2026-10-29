@@ -16,6 +16,7 @@ import { devtoolsFeature } from "./devtools.feature";
 import { heraldFeature } from "./herald.feature";
 import { imageFeature } from "./image.feature";
 import { mailFeature } from "./mail.feature";
+import { mantineFeature } from "./mantine.feature";
 import { mongodbFeature } from "./mongodb.feature";
 import { mysqlFeature } from "./mysql.feature";
 import { notificationsFeature } from "./notifications.feature";
@@ -71,6 +72,9 @@ export const featuresMap: Record<string, FeatureDefinition> = {
   // three of them are one stack a reader should meet in build order.
   shadcn: shadcnFeature,
   "design-system": designSystemFeature,
+  // The alternative UI kit, filed right after the kit it replaces. `warlock add
+  // design-system --kit mantine` resolves to this entry.
+  mantine: mantineFeature,
   // Directly after the web/tailwind/shadcn stack, for the same reason: it
   // `requires` web (it reads the page registry `listRoutablePages()`
   // exposes) and a reader scanning `--list` for the page stack should meet it

@@ -31,7 +31,7 @@ export async function assertDesignSystemTailwind(): Promise<void> {
 
 export const designSystemFeature: FeatureDefinition = {
   description:
-    "Accessible shadcn/ui form controls wired to Mongez React Form; requires an existing Tailwind setup.",
+    "Accessible form controls wired to Mongez React Form. Default kit: shadcn/ui, which requires an existing Tailwind setup; use --kit mantine for the Mantine kit, which does not.",
   requires: ["web"],
   dependencies: payload.dependencies,
   async onExecuting(options) {

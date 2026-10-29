@@ -23,6 +23,11 @@ export const addCommand = command({
         "Record dependencies in package.json without installing them — still ejects configs, adds scripts, and runs setup hooks. Used by scaffolders that run a single install afterwards.",
       type: "boolean",
     },
+    {
+      text: "--kit",
+      description:
+        "UI kit for `design-system`: shadcn (default, needs Tailwind) or mantine (no Tailwind needed). The two kits exclude each other.",
+    },
     ...generationOutputOptions,
   ],
 });

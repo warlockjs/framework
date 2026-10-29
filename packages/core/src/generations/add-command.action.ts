@@ -20,6 +20,7 @@ import { rootPath, srcPath } from "../utils";
 import { getWarlockVersion } from "../utils/framework-vesion";
 import { featuresMap } from "./features";
 import { assertDesignSystemTailwind } from "./features/design-system.feature";
+import { assertUiKitFree, requestedUiKit, resolveUiKitFeatures } from "./features/shared/ui-kit";
 import {
   getPnpmVersion,
   isInsideParentPnpmWorkspace,
@@ -93,7 +94,7 @@ function resolveFeatures(features: string[], visited = new Set<string>()): strin
 
 export async function addCommandAction(options: CommandActionData) {
   const features = options.args;
-  const { packageManager, list, noInstall } = options.options;
+  const { packageManager, list, noInstall, kit } = options.options;
 
   if (list) {
     setGenerationDetail(
@@ -120,7 +121,13 @@ export async function addCommandAction(options: CommandActionData) {
 
   validateFeatures(features);
 
-  const resolvedFeatures = resolveFeatures(features);
+  // `design-system --kit mantine` is the Mantine kit; the rewrite happens before
+  // dependencies are collected so each kit installs only its own packages.
+  const resolvedFeatures = resolveFeatures(resolveUiKitFeatures(features, kit));
+
+  // The two kits exclude each other; refuse before anything is installed or written.
+  const uiKit = requestedUiKit(resolvedFeatures);
+  if (uiKit !== undefined) await assertUiKitFree(uiKit);
 
   if (resolvedFeatures.includes("design-system") && !resolvedFeatures.includes("tailwind")) {
     await assertDesignSystemTailwind();
