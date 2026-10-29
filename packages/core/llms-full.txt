@@ -14633,6 +14633,10 @@ npx warlock add tailwind
 npx warlock add design-system
 ```
 
+`npx warlock add design-system --kit mantine` (or `warlock add mantine`) installs the
+Mantine kit instead: no Tailwind needed, the same controls, hooks and props, and a
+refusal before any change when the shadcn kit is installed (and the reverse).
+
 `design-system` refuses before dependency installation when Tailwind is absent
 from `package.json` or `src/web/app.css`. It adds pinned shadcn primitives and
 Mongez controls to `src/web/design-system`, preserving existing source files.

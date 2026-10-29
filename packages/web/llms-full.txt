@@ -23,7 +23,7 @@ Web adds an SSR React page layer to a Warlock app. Pages live under `src/web/**`
 5. Guard pages and read the user (`protect-a-page.md`); a `requireUser()`-guarded page is typed as signed-in (`useUser("route.name")` is non-null).
 6. Translate pages (`localize-pages.md`), then build RTL and mixed-direction layouts (`build-rtl-and-mixed-direction-ui.md`); stream slow data (`stream-deferred-data.md`).
 7. Polish: styles (`serve-styles.md`), self-hosted fonts (`use-web-fonts.md`), sitemap and robots (`generate-sitemap.md`), themes (`multi-theme.md`), multi-site apps (`multi-site.md`), client-only UI and hydration debugging (`render-client-only.md`), images (`render-images.md`), vitals (`measure-web-vitals.md`).
-8. Build form controls with `build-accessible-controls` (the app design-system, keyboard/focus, RTL and date semantics).
+8. Build form controls with `build-accessible-controls` (the app design-system, keyboard/focus, RTL and date semantics). The design-system has a shadcn/Tailwind kit and a Mantine kit with one contract; use `use-the-mantine-kit` for Mantine.
 9. Test page loaders, actions and rendering (`test-a-page.md`).
 10. Observe SSR phases and deferred values with `TracingHooks`, and debug a page that answers 500 from its error log record (`observe-page-requests.md`).
 
@@ -175,6 +175,12 @@ description: "Use the app design-system Mongez controls for accessible forms: se
 ---
 
 # Build accessible controls
+
+The design-system has two kits with one contract (same component files, props, hooks
+and error display): shadcn/Tailwind, the default, and Mantine, installed with
+`npx warlock add design-system --kit mantine` and described in the
+`use-the-mantine-kit` topic. The keyboard and Radix details below describe the shadcn
+kit; Mantine's widgets follow Mantine's own accessibility behavior.
 
 For Tailwind apps, run `npx warlock add design-system`. If Tailwind is missing,
 first run `npx warlock add tailwind`. The installer refuses before changing an
@@ -5964,6 +5970,92 @@ components and named component exports belong in the UI file.
 `warlock dev` picks up setup-file additions, edits, and deletions. Route changes
 update the route graph; setup edits refresh server logic and its client
 registration projection. Component-only edits remain eligible for Fast Refresh.
+
+## use-the-mantine-kit  `@warlock.js/web/skills/use-the-mantine-kit/SKILL.md`
+
+---
+name: use-the-mantine-kit
+description: 'Choose and use the Mantine kit of the app design-system: `warlock add design-system --kit mantine` (or `warlock add mantine`), no Tailwind needed, same component names, props and hooks as the shadcn kit, bound to Mongez React Form. Covers setup (PostCSS preset, provider and colour scheme in `root.tsx`), the theme file, validation errors through Mantine `error`, `notify` and `notifyOnSubmit` with `useSubmitForm`/`useSubmitAction`, `confirm()`, `PaginatedTable`, and switching kits. Triggers: `mantine`, `--kit mantine`, `--ui=mantine`, `MantineProvider`, `ColorSchemeScript`, `mantine-theme.ts`, `notifyOnSubmit`, `PaginatedTable`, "use Mantine", "switch from shadcn". Skip: the shared control contract and accessibility rules — the `build-accessible-controls` topic; Tailwind and shadcn setup — the `serve-styles` topic; submitting to an endpoint — the `submit-a-form` topic; `@mantine/form`, which this kit never uses.'
+---
+
+# Use the Mantine kit
+
+The design system has two kits behind one contract: shadcn/Tailwind and Mantine. The
+file names under `src/web/design-system/components/`, their props, the hooks in
+`src/web/design-system/hooks/` and the way a validation error is shown are the same, so
+pages, generated forms (`warlock generate form`) and these topics work with either.
+Pick one per app; they exclude each other.
+
+## Install
+
+```bash
+npx warlock add design-system --kit mantine   # or: npx warlock add mantine
+npx create-warlock my-app --stack=web --ui=mantine
+```
+
+`--kit` and `--ui` take `shadcn` (the default) or `mantine`; `--ui` also takes `none`.
+The Mantine kit does not require Tailwind. The command refuses before changing
+anything when the other kit is installed (detected from files and dependencies) and
+prints how to switch. It installs exact versions of `@mantine/core`, `hooks`, `dates`,
+`notifications`, `modals` and `dayjs`, plus `postcss-preset-mantine` and
+`postcss-simple-vars` as dev dependencies (Mantine 9 needs React 19.2, which
+`warlock add web` already installs), and:
+
+- writes `postcss.config.mjs` (skipped, with printed instructions, when a PostCSS config
+  exists) and puts Mantine's `@import`s at the top of `src/web/app.css`;
+- edits `src/web/root.tsx` once: `import "./app.css"`, `{...mantineHtmlProps}` on
+  `<html>`, `<DesignSystemColorScheme />` after `<Head />`, and `<DesignSystemProvider>`
+  around the `#vessel` div. A root with another shape is left untouched and the lines are
+  printed.
+
+The provider mounts `MantineProvider`, `ModalsProvider` and `Notifications`. The colour
+scheme script runs before paint and `mantineHtmlProps` suppresses the expected `<html>`
+attribute difference, so hydration is clean; Mantine renders on the server, so no
+`.client` file or `ClientOnly` is needed.
+
+## Theme
+
+Edit `src/web/design-system/mantine-theme.ts` (`createTheme`: primary colour, radius,
+fonts, spacing) and `defaultColorScheme`. Do not duplicate tokens in CSS.
+
+## Forms
+
+Use the controls exactly as in `build-accessible-controls`: default exports from
+`web/design-system/components/<kebab-name>`, required `id`, `name` and `label`, inside
+`Form` from `@mongez/react-form`. Mantine owns the invalid styling: Mongez or server
+errors reach the input through Mantine's `error` prop, `hint` is its `description`,
+`required` shows the asterisk and never the native attribute. Stored values match the
+shadcn kit (`YYYY-MM-DD`, `YYYY-MM-DDTHH:mm`, `HH:mm`, string or string array, boolean).
+
+Never install or import `@mantine/form`: Mongez React Form owns values, validation and
+submission, and `useSubmitForm`/`useSubmitAction` are built on it.
+
+## Notifications, confirm and tables
+
+```tsx
+import { useSubmitForm } from "@warlock.js/web/form";
+import { notifyOnSubmit } from "web/design-system/notify";
+
+const { submit } = useSubmitForm({
+  route: "contact.send",
+  ...notifyOnSubmit({ success: "Message sent" }),
+});
+```
+
+`notifyOnSubmit({ success, error? })` returns `onSuccess` and `onError` callbacks that fit
+both submit hooks; without `error` the server message is shown. `notify.success`,
+`notify.error`, `notify.info` and `notify.warning` show a toast from any handler, and
+`messageFrom(result)` extracts the message. `confirm({ message, title?, danger? })` from
+`web/design-system/confirm` resolves a boolean through a Mantine modal.
+`web/design-system/components/paginated-table` renders `rows` and the `pagination` block
+(`page`, `pages`) a Warlock list endpoint returns; `onPageChange(page)` loads the page.
+
+## Switching kits
+
+Follow the refusal message: to leave shadcn remove `components.json`,
+`src/web/components/ui` and `src/web/design-system` and uninstall its packages; to leave
+Mantine remove `src/web/design-system`, `postcss.config.mjs` and the Mantine imports in
+`app.css` and `root.tsx`. Then run `warlock add design-system --kit <kit>`.
 
 ## use-web-fonts  `@warlock.js/web/skills/use-web-fonts/SKILL.md`
 
