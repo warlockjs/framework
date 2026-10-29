@@ -12,6 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - `warlock add` no longer stops when `warlock.config.ts` cannot be loaded. A config that imports a package which is not installed yet (for example the web connector, before `warlock add web` has installed it) printed `Failed to load warlock.config.ts` and aborted the very command that installs the missing package. The command now prints a warning and continues without the config.
 - A failed `warlock.config.ts` load is no longer cached, so a later load in the same process retries instead of replaying the first error.
+- `warlock add design-system` writes controls and hooks that pass the app's Oxlint config; before, `warlock dev` reported `curly` and `react(immutability)` errors in `src/web/design-system/`.
 
 ## 5.40.0 - 2026-10-29
 

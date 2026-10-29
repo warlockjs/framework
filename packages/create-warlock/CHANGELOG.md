@@ -10,6 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - `create-warlock --stack=web` (and any scaffold that selects `web`, `tailwind`, `shadcn`, `design-system` or `sitemap`) failed in the feature step with `Failed to load warlock.config.ts: Cannot find package '@warlock.js/web'`, leaving no feature installed. The web starter's `warlock.config.ts` imports the web connector, but `@warlock.js/web` was only added to `package.json` by the first `warlock add`, which could not start without it. The package is now part of the project's first install, at the same version as the other `@warlock.js` packages.
 - `npm run typecheck:scaffold` can now scaffold the web stack (`-- --stack=web`), and the CI "Fresh scaffold typechecks" job runs it for both stacks.
+- The design-system files copied into a web app failed the app's own Oxlint config (`curly`, and `react(immutability)` on ref writes), so `warlock dev` reported 13 lint errors in `src/web/design-system/`. They now pass, and a spec lints the template with the scaffolded config.
 
 ## 5.40.0 - 2026-10-29
 
