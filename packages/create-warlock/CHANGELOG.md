@@ -8,7 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
-- `--ui=<shadcn|mantine|none>` chooses the UI kit of a web app. `--ui=mantine` (or `--features=mantine`) scaffolds the Mantine kit without Tailwind; `shadcn` stays the default for `--stack=web`. The interactive "Full-stack web" choice asks which kit to use, and Customize lists Mantine among the rendering features. The two kits exclude each other: `shadcn` with `mantine`, or `--ui` with a conflicting feature, fails before any file is written.
+- `--ui=<shadcn|mantine|none>` chooses the UI kit of a web app. `--ui=mantine` (or `--features=mantine`) scaffolds the Mantine kit without Tailwind; `shadcn` stays the default for `--stack=web`. The interactive stack menu gains a "Full-stack web with Mantine" entry, and Customize lists Mantine among the rendering features. The two kits exclude each other: `shadcn` with `mantine`, or `--ui` with a conflicting feature, fails before any file is written.
+
 ## 5.40.1 - 2026-10-29
 
 ### Fixed
