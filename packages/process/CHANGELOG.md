@@ -1,6 +1,6 @@
 # Changelog — @warlock.js/process
 
-## 5.40.0 - 2026-10-28
+## 5.40.0 - 2026-10-29
 
 ### Fixed
 
