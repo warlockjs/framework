@@ -199,6 +199,20 @@ export function supervisor(options: SupervisorOptions): ProcessSupervisor {
     }
     return false;
   }
+  /**
+   * Right after SIGCONT the launcher is replacing itself with the workload
+   * (exec). For that instant the kernel reports an empty memory map and
+   * environment, so a live, owned process momentarily fails verification. A
+   * handle returned by launch() must always be stoppable, so wait that window
+   * out; a process that stays unverified is still refused.
+   */
+  async function ownsSettled(entry: RegistryEntry): Promise<boolean> {
+    for (let attempt = 0; attempt < 25; attempt++) {
+      if (await owns(entry, observe())) return true;
+      await delay(20);
+    }
+    return false;
+  }
   async function stopEntry(
     entry: RegistryEntry,
     reason: ProcessExit["reason"] = "stopped",
@@ -213,7 +227,7 @@ export function supervisor(options: SupervisorOptions): ProcessSupervisor {
     if (running.finished) return running.finish(null, null);
     if (running.stopping) return running.stopping;
     const stopping = (async () => {
-      if (!(await owns(entry, observe()))) throw new ProcessNotOwnedError(entry.pid);
+      if (!(await ownsSettled(entry))) throw new ProcessNotOwnedError(entry.pid);
       running.reason ??= reason;
       await signal(entry, "SIGTERM");
       const deadline = Date.now() + graceMs;

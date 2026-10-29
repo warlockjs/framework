@@ -4,6 +4,7 @@
 
 ### Fixed
 
+- Stopping a handle immediately after `spawn()` could fail with `ProcessNotOwnedError` on Linux while the launcher was replacing itself with the workload. The stop now waits out that moment before verifying ownership.
 - Sampling a process that was exiting could report `ProcessNotOwnedError` from a slightly stale process-table snapshot. A mismatch is now re-read fresh first, and a process that is gone counts as exited.
 - Calling `supervisor()` a second time in the same process with the same registry and owner (for example from a second copy of the module after a dev hot reload) now returns the live supervisor instead of failing every launch with "Process registry is already in use". Once `stopAll()` has finished the registry is free and a new supervisor is created. A different owner on the same registry is still refused.
 

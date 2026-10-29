@@ -257,3 +257,40 @@ describe("guardian that closes without answering", () => {
     }
   });
 });
+
+describe("stopping right after launch", () => {
+  it.runIf(process.platform === "linux")(
+    "waits out the launcher's exec window instead of refusing a live child",
+    async () => {
+      const directory = await mkdtemp(path.join(tmpdir(), "warlock-stop-"));
+      const instance = supervisor({
+        owner: "example-app",
+        registry: path.join(directory, "registry.json"),
+        pollIntervalMs: 1000,
+        stopGraceMs: 40,
+        cgroupRoot: path.join(directory, "none"),
+      });
+      try {
+        const handle = await instance.spawn({
+          kind: "worker",
+          command: process.execPath,
+          args: ["-e", "setTimeout(() => {}, 5000)"],
+        });
+        handle.stdout.resume();
+        handle.stderr.resume();
+        const original = identities.owns;
+        let misses = 3;
+        // Simulate the transient unverifiable state of an exec in progress.
+        vi.spyOn(identities, "owns").mockImplementation(async (entry, observation) =>
+          misses-- > 0 ? false : original(entry, observation),
+        );
+        await expect(handle.stop()).resolves.toBeUndefined();
+        expect(misses).toBeLessThan(0);
+      } finally {
+        vi.restoreAllMocks();
+        await instance.stopAll().catch(() => undefined);
+        await rm(directory, { recursive: true, force: true });
+      }
+    },
+  );
+});
