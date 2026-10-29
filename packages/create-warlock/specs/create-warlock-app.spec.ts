@@ -126,7 +126,7 @@ describe("createWarlockApp — template + base install", () => {
     expect(fake.updatePackageJson).toHaveBeenCalledTimes(1);
     expect(fake.updateDotEnv).toHaveBeenCalledTimes(1);
     expect(fake.configureDatabaseEnv).toHaveBeenCalledWith("mongodb");
-    expect(fake.configureWebStarter).toHaveBeenCalledWith(false, expect.any(Object));
+    expect(fake.configureWebStarter).toHaveBeenCalledWith(false, expect.any(Object), false);
     expect(fake.configureLintToolchain).toHaveBeenCalledOnce();
   });
 
@@ -135,17 +135,17 @@ describe("createWarlockApp — template + base install", () => {
 
     await run(fake);
 
-    expect(fake.configureWebStarter).toHaveBeenCalledWith(true, expect.any(Object));
+    expect(fake.configureWebStarter).toHaveBeenCalledWith(true, expect.any(Object), false);
   });
 
   it("drops the starter's Tailwind setup for the Mantine kit, but not when Tailwind was asked for", async () => {
     const mantine = makeFakeApp({ features: ["web", "mantine"] });
     await run(mantine);
-    expect(mantine.configureWebStarter).toHaveBeenCalledWith(true, true);
+    expect(mantine.configureWebStarter).toHaveBeenCalledWith(true, expect.any(Object), true);
 
     const both = makeFakeApp({ features: ["web", "mantine", "tailwind"] });
     await run(both);
-    expect(both.configureWebStarter).toHaveBeenCalledWith(true);
+    expect(both.configureWebStarter).toHaveBeenCalledWith(true, expect.any(Object), false);
   });
 
   it("configures agent-kit targets from the resolved options", async () => {
