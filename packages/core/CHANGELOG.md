@@ -13,6 +13,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - A second UI kit for the design system: Mantine. `warlock add design-system --kit mantine` (or `warlock add mantine`) installs Mantine with the same component files, props, hooks and validation-error display as the shadcn kit, bound to Mongez React Form (`@mantine/form` is not used). It does not need Tailwind. It adds exact versions of `@mantine/core`, `hooks`, `dates`, `notifications`, `modals` and `dayjs`, writes `postcss.config.mjs` with `postcss-preset-mantine`, puts Mantine's stylesheet imports in `src/web/app.css`, and wires `src/web/root.tsx` (colour scheme script, `mantineHtmlProps`, and a provider mounting `MantineProvider`, the modals manager and the notifications host). Existing files are preserved, and a root with a custom shape is left alone with the lines to add printed.
 - The Mantine kit ships `src/web/design-system/mantine-theme.ts` (the design tokens you edit), `notify` and `notifyOnSubmit` (toasts that plug into `useSubmitForm` and `useSubmitAction`), `confirm()` and a `PaginatedTable` shaped after the paginated list response.
 - `warlock add design-system --kit <shadcn|mantine>`: `shadcn` stays the default and still requires Tailwind. The two kits exclude each other: asking for one while the other is installed (detected from files and dependencies), or both in one command, fails before anything is installed or written, with the steps to switch.
+## 5.40.1 - 2026-10-29
+
+### Fixed
+
+- `warlock add` no longer stops when `warlock.config.ts` cannot be loaded. A config that imports a package which is not installed yet (for example the web connector, before `warlock add web` has installed it) printed `Failed to load warlock.config.ts` and aborted the very command that installs the missing package. The command now prints a warning and continues without the config.
+- A failed `warlock.config.ts` load is no longer cached, so a later load in the same process retries instead of replaying the first error.
+- `warlock add design-system` writes controls and hooks that pass the app's Oxlint config; before, `warlock dev` reported `curly` and `react(immutability)` errors in `src/web/design-system/`.
 
 ## 5.40.0 - 2026-10-29
 

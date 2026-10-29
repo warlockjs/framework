@@ -1,6 +1,6 @@
 {
   "name": "@warlock.js/process",
-  "version": "5.40.0",
+  "version": "5.40.1",
   "type": "module",
   "description": "App-owned child process supervision with verified identity and resource limits",
   "keywords": [

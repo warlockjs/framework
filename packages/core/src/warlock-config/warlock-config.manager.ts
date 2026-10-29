@@ -134,8 +134,14 @@ export class WarlockConfigManager {
 
     // Start loading
     this.loading = this.doLoad();
-    this.config = await this.loading;
-    this.loading = undefined;
+
+    try {
+      this.config = await this.loading;
+    } finally {
+      // A failed load must not stay cached: a later call retries instead of
+      // replaying the same rejection.
+      this.loading = undefined;
+    }
 
     // Console, not the logger: this runs before any log channel exists.
     for (const warning of getDeprecatedConfigWarnings(this.config)) {

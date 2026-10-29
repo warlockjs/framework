@@ -430,6 +430,8 @@ warlock add test --dry-run --json            # preview files and dependencies as
 | --------------- | ---------------------------------------------------------- |
 | `<features...>` | One or more feature names. Required unless using `--list`. |
 
+`warlock add` runs even when `warlock.config.ts` cannot be loaded, for example because it imports a package that is not installed yet. It prints a warning and continues, so `warlock add web` can install the package the config is waiting for.
+
 | Flag                | Description                                                                                                                                                                                                                                             |
 | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `--package-manager` | Package manager to use (auto-detected if omitted).                                                                                                                                                                                                      |

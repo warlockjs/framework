@@ -80,11 +80,8 @@ export async function createWarlockApp(application: App): Promise<ScaffoldOutcom
     );
 
     // The Mantine kit replaces the starter's Tailwind setup, unless Tailwind was asked for.
-    if (features.includes("mantine") && !features.includes("tailwind")) {
-      application.configureWebStarter(usesWeb, true);
-    } else {
-      application.configureWebStarter(usesWeb);
-    }
+    const withoutTailwind = features.includes("mantine") && !features.includes("tailwind");
+    application.configureWebStarter(usesWeb, versions, withoutTailwind);
     application.configureLintToolchain();
     application.configureAgentKitTargets(options.agents ?? ["claude"]);
   } catch (error) {

@@ -24,9 +24,13 @@ export function useSelectControl(props: SelectProps, multiple = false) {
   const enabled = filtered.filter((option) => !option.disabled);
   const activeOption = enabled[Math.min(active, Math.max(0, enabled.length - 1))];
   const select = (value: string) => {
-    if (field.disabled || props.readOnly) return;
+    if (field.disabled || props.readOnly) {
+      return;
+    }
     field.changeValue(multiple ? toggleSelection(selected, value) : value);
-    if (!multiple) setOpen(false);
+    if (!multiple) {
+      setOpen(false);
+    }
   };
   const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     if (["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) {
@@ -41,10 +45,11 @@ export function useSelectControl(props: SelectProps, multiple = false) {
               Math.max(1, enabled.length);
       setActive(Math.max(0, next));
       const option = enabled[Math.max(0, next)];
-      if (option)
+      if (option) {
         document
           .getElementById(`${props.id}-option-${encodeURIComponent(option.value)}`)
           ?.scrollIntoView({ block: "nearest" });
+      }
     } else if (
       (event.key === "Enter" || (multiple && event.key === " " && search === "")) &&
       activeOption
@@ -72,7 +77,9 @@ export function useSelectControl(props: SelectProps, multiple = false) {
     select,
     onKeyDown,
     clear: () => {
-      if (!field.disabled && !props.readOnly) field.changeValue(multiple ? [] : "");
+      if (!field.disabled && !props.readOnly) {
+        field.changeValue(multiple ? [] : "");
+      }
     },
   };
 }

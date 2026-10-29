@@ -7,12 +7,13 @@ import FieldFrame from "./field-frame";
 export default function RadioInput(props: RadioProps) {
   // Register the group once as a scalar; individual Radix items own keyboard focus.
   const field = useControl(props);
+  const { visibleElementRef } = field;
   return (
     <FieldFrame {...props} error={field.error}>
       <RadioGroup
         {...field.binding}
         ref={(element) => {
-          field.visibleElementRef.current = element;
+          visibleElementRef.current = element;
         }}
         dir={props.dir}
         disabled={field.disabled || props.readOnly}

@@ -11,7 +11,9 @@ export function useFileControl(props: ControlProps) {
   useEffect(() => {
     const clear = () => {
       const input: HTMLInputElement | undefined = field.inputRef.current;
-      if (input) input.value = "";
+      if (input) {
+        input.value = "";
+      }
     };
     const reset = field.formControl.onReset(clear);
     const cleared = field.formControl.onClear(clear);

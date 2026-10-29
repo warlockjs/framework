@@ -126,7 +126,7 @@ describe("createWarlockApp — template + base install", () => {
     expect(fake.updatePackageJson).toHaveBeenCalledTimes(1);
     expect(fake.updateDotEnv).toHaveBeenCalledTimes(1);
     expect(fake.configureDatabaseEnv).toHaveBeenCalledWith("mongodb");
-    expect(fake.configureWebStarter).toHaveBeenCalledWith(false);
+    expect(fake.configureWebStarter).toHaveBeenCalledWith(false, expect.any(Object));
     expect(fake.configureLintToolchain).toHaveBeenCalledOnce();
   });
 
@@ -135,7 +135,7 @@ describe("createWarlockApp — template + base install", () => {
 
     await run(fake);
 
-    expect(fake.configureWebStarter).toHaveBeenCalledWith(true);
+    expect(fake.configureWebStarter).toHaveBeenCalledWith(true, expect.any(Object));
   });
 
   it("drops the starter's Tailwind setup for the Mantine kit, but not when Tailwind was asked for", async () => {

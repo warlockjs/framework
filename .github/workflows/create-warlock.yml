@@ -125,3 +125,9 @@ jobs:
       # would resolve to `any`. See the header of the script.
       - name: Typecheck a freshly scaffolded project
         run: npm run typecheck:scaffold
+
+      # The full-stack web starter is a different scaffold: its config imports
+      # the web connector, so the feature step only works when the web package
+      # is installed before any `warlock add` boots that config.
+      - name: Typecheck a freshly scaffolded web project
+        run: npm run typecheck:scaffold -- --stack=web

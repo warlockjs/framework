@@ -37,8 +37,14 @@
  *   node scripts/typecheck-scaffold.mjs            # scaffold, check, clean up
  *   node scripts/typecheck-scaffold.mjs --keep     # leave the project in place
  *   node scripts/typecheck-scaffold.mjs --pm=pnpm  # also accepts yarn
+ *   node scripts/typecheck-scaffold.mjs --stack=web  # the full-stack web starter
  *   node scripts/typecheck-scaffold.mjs --ui=mantine  # full-stack web app with the Mantine kit
  *   node scripts/typecheck-scaffold.mjs --ui=shadcn   # full-stack web app with the shadcn kit
+ *
+ * The web starter takes a different route through the scaffolder than the
+ * API-only one: its `warlock.config.ts` imports `@warlock.js/web/connector`, so
+ * every `warlock add` in the feature step must be able to boot that config. A
+ * scaffold that only ever checked the API stack never saw that break.
  */
 
 import { spawn } from "node:child_process";
@@ -55,14 +61,21 @@ const { values } = parseArgs({
     lint: { type: "string" },
     pm: { type: "string", default: "npm" },
     ui: { type: "string" },
+    stack: { type: "string", default: "api" },
   },
 });
 const keepArtifacts = values.keep;
 const lint = values.lint ?? "oxc";
 const packageManager = values.pm;
-if (lint !== "oxc" || !["npm", "pnpm", "yarn"].includes(packageManager)) {
+// A UI kit is a web-app choice, so selecting one scaffolds the web stack.
+const stack = values.ui ? "web" : values.stack;
+if (
+  lint !== "oxc" ||
+  !["npm", "pnpm", "yarn"].includes(packageManager) ||
+  !["api", "web"].includes(stack)
+) {
   throw new Error(
-    "Usage: node scripts/typecheck-scaffold.mjs [--lint=oxc] [--pm=npm|pnpm|yarn] [--keep]",
+    "Usage: node scripts/typecheck-scaffold.mjs [--lint=oxc] [--pm=npm|pnpm|yarn] [--stack=api|web] [--ui=shadcn|mantine] [--keep]",
   );
 }
 
@@ -71,7 +84,7 @@ if (ui !== undefined && !["shadcn", "mantine"].includes(ui)) {
   throw new Error("Usage: --ui=<shadcn|mantine>; omit it for the API-only scaffold.");
 }
 
-const APP_NAME = "scaffold-typecheck-app";
+const APP_NAME = `scaffold-typecheck-${ui ?? stack}-app`;
 
 /** `.cmd` shims on Windows are not executable without a shell. */
 const isWindows = process.platform === "win32";
@@ -132,9 +145,9 @@ async function main() {
         path.join(packageRoot, "index.dev.ts"),
         APP_NAME,
         "--db=mongodb",
-        // A UI kit is a web-app choice, so selecting one scaffolds the web stack.
-        ...(ui ? ["--stack=web", `--ui=${ui}`] : []),
+        ...(ui ? [`--ui=${ui}`] : []),
         `--pm=${packageManager}`,
+        ...(stack === "web" ? ["--stack=web"] : []),
         // Omit --lint by default so CI exercises the actual scaffolder default.
         ...(values.lint ? [`--lint=${lint}`] : []),
         "--yes",
@@ -152,6 +165,13 @@ async function main() {
       failure =
         "the scaffolded project has no typescript installed — the install did " +
         "not complete, so the typecheck below would be vacuous";
+      return;
+    }
+
+    // A web scaffold whose feature step failed still exits 0 from some older
+    // builds; the dependency being on disk is the proof the feature landed.
+    if (stack === "web" && !existsSync(path.join(appPath, "node_modules", "@warlock.js", "web"))) {
+      failure = "the web scaffold has no @warlock.js/web installed — the web feature did not land";
       return;
     }
 

@@ -7,6 +7,7 @@ export function useControl(props: ControlProps, type = "text", multiple = false)
     { ...props, type, multiple },
     { multiple, isCollectable: type === "submit" ? () => false : undefined },
   );
+  const { inputRef, visibleElementRef } = control;
   const error = props.error ?? control.error;
   const describedBy =
     [props.hint ? `${props.id}-hint` : "", error ? `${props.id}-error` : ""]
@@ -18,8 +19,8 @@ export function useControl(props: ControlProps, type = "text", multiple = false)
     disabled: control.disabled,
     onBlur: control.onBlur,
     ref: (element: HTMLElement | null) => {
-      control.inputRef.current = element;
-      control.visibleElementRef.current = element;
+      inputRef.current = element;
+      visibleElementRef.current = element;
     },
     "aria-invalid": Boolean(error),
     "aria-required": props.required || undefined,

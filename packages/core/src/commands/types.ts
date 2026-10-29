@@ -79,6 +79,17 @@ export type CLICommandPreload = {
   warlockConfig?: boolean;
 
   /**
+   * Let the command run when `warlock.config.ts` cannot be loaded.
+   *
+   * A command that installs or repairs the project (`warlock add`) is often the
+   * one that fixes the reason the config does not load, for example a connector
+   * import whose package is not installed yet. Failing the command before its
+   * action runs would make that repair impossible, so the load error is printed
+   * as a warning and the command continues without the config.
+   */
+  optionalWarlockConfig?: boolean;
+
+  /**
    * Set runtime strategy
    */
   runtimeStrategy?: RuntimeStrategy;
