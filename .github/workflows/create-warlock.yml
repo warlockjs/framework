@@ -131,3 +131,7 @@ jobs:
       # is installed before any `warlock add` boots that config.
       - name: Typecheck a freshly scaffolded web project
         run: npm run typecheck:scaffold -- --stack=web
+
+      # The Mantine kit replaces Tailwind and wires its own providers into the root.
+      - name: Typecheck a freshly scaffolded Mantine project
+        run: npm run typecheck:scaffold -- --ui=mantine
