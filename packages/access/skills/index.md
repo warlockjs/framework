@@ -1,5 +1,5 @@
 ---
-description: 'Authorization with RBAC and ABAC: `can`, `authorize`, `gate`, `gateAny`, `definePolicy`, `hasRole`, `access` and `AccessResolver`. Use for "check a permission", "only the owner can edit", route policies, tenant roles or custom permission storage. Not this package → @warlock.js/auth for login, tokens and user-type guards; @warlock.js/seal for request validation.'
+description: 'Authorization with RBAC and ABAC: `can`, `cannot`, `canAll`, `canAny`, `authorize`, `gate`, `gateAny`, `definePolicy`, `hasRole`, `access`, `setAccessConfig` and `AccessResolver`. Use for "check a permission", "only the owner can edit", "403 forbidden", route policies, tenant roles or custom permission storage. Not this package → @warlock.js/auth for login, tokens and user-type guards; @warlock.js/seal for request validation.'
 ---
 
 # @warlock.js/access

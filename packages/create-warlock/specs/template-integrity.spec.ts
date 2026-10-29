@@ -476,6 +476,17 @@ describe("framework conventions are verified by warlock check", () => {
     expect(read("../toolchains/oxc/.oxlintrc.json")).not.toContain("@warlock.js/");
   });
 
+  it("tells agents how to upgrade and how grouped package skills work", () => {
+    const agents = read("AGENTS.md");
+
+    expect(agents).toContain("## Upgrading Warlock.js");
+    for (const command of ["warlock release-notes --from", "warlock update", "warlock check"]) {
+      expect(agents).toContain(command);
+    }
+    expect(agents).toContain("node_modules/@warlock.js/core/releases/");
+    expect(agents).toContain("one grouped skill");
+  });
+
   it("tells agents to run warlock check for the conventions it enforces", () => {
     const agents = read("AGENTS.md");
 

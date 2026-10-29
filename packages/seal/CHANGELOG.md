@@ -4,6 +4,12 @@ All notable changes to `@warlock.js/seal` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.40.1 - 2026-10-29
+
+### Changed
+
+- The package skill description now names `ArrayValidator` and the mutator and transform phrasings, so agents find them from the skill listing alone.
+
 ## 5.38.0 - 2026-10-25
 
 ### Added

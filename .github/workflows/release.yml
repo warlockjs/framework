@@ -165,6 +165,10 @@ jobs:
         working-directory: tools/release
         run: npm run check:skill-path-refs
 
+      - name: Skills name every public export or stay within their coverage allowance
+        working-directory: tools/release
+        run: npm run check:skill-coverage
+
       - name: Generate the docs site's Astro types
         # `astro:content` types live in docs/.astro, which is generated and
         # gitignored; without it the strictness ratchet counts phantom errors.

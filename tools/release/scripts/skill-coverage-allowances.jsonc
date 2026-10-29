@@ -1,0 +1,46 @@
+{
+  // Skill coverage ratchet baseline, measured on 2026-10-29 with:
+  //   `node --import tsx scripts/skill-coverage-gate.ts`
+  //
+  // Each number is how many public VALUE exports of a package (names exported
+  // from src/index.ts and its relative re-exports; types-only exports are not
+  // counted) no skill of that package mentions as an identifier inside
+  // backticks or a code block. Print the names with `--list [package]`.
+  // A package whose count goes UP fails the gate. These numbers may only go
+  // DOWN: document the export in a skill, then lower the number here. Never
+  // raise one. Every package that ships a skills/ tree and a src/index.ts
+  // MUST have an entry.
+  "access": 3,
+  "ai": 126,
+  "ai-anthropic": 0,
+  "ai-bedrock": 0,
+  "ai-cli": 45,
+  "ai-deepseek": 2,
+  "ai-google": 0,
+  "ai-groq": 2,
+  "ai-live": 1,
+  "ai-mistral": 0,
+  "ai-ollama": 0,
+  "ai-openai": 3,
+  "ai-panoptic": 9,
+  "ai-tools": 2,
+  "ai-workspace": 18,
+  "ai-xai": 2,
+  "auth": 35,
+  "cache": 13,
+  "cascade": 89,
+  "context": 0,
+  "core": 276,
+  "create-warlock": 0,
+  "devtools": 0,
+  "fs": 7,
+  "herald": 6,
+  "logger": 11,
+  "notifications": 7,
+  "process": 0,
+  "queue": 15,
+  "scheduler": 0,
+  "seal": 260,
+  "sitemap": 9,
+  "web": 18
+}

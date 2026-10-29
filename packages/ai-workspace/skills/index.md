@@ -1,5 +1,5 @@
 ---
-description: 'Policy-confined file and shell tools for coding agents: `workspace`, `createLocalBackend`, `createMockBackend`, `makeEditFileTool`, `makeRunShellTool` and `WorkspacePolicyError`. Use for "let an agent edit files", "sandbox shell commands" or "loop until tests pass". Not this package → @warlock.js/ai-tools for MCP/web tools; @warlock.js/ai for agents; @warlock.js/ai-cli for installed coding CLIs.'
+description: 'Policy-confined file and shell tools for coding agents: `workspace`, `createLocalBackend`, `createMockBackend`, `makeEditFileTool`, `makeReadFileTool`, `makeWriteFileTool`, `makeRunShellTool`, `makeRunTestsTool` and `WorkspacePolicyError`. Use for "let an agent edit files", "sandbox shell commands", "apply a patch" or "loop until tests pass". Not this package → @warlock.js/ai-tools for MCP/web tools; @warlock.js/ai for agents; @warlock.js/ai-cli for installed coding CLIs.'
 ---
 
 # @warlock.js/ai-workspace
