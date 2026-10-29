@@ -4,12 +4,6 @@ All notable changes to `@warlock.js/ai-workspace` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
-## 5.40.1 - 2026-10-29
-
-### Changed
-
-- The package skill description now names the read, write and test tools (`makeReadFileTool`, `makeWriteFileTool`, `makeRunTestsTool`) and the "apply a patch" phrasing, so agents find them from the skill listing alone.
-
 ## 5.40.0 - 2026-10-29
 
 ### Added
@@ -19,6 +13,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `parsePatch()` and `applyHunks()` are exported for applying a unified diff to a string without a workspace.
 - `applyPatch` is optional on a custom `WorkspaceOps`: an implementation without it still gets `apply_patch` and `ws.applyPatch()`, built on its `exists`, `readFile`, `writeFile` and `remove` with the same all-or-nothing behaviour (also exported as `applyPatchWithOps`).
 - `ApplyPatchInput`, `ApplyPatchResult` and `ApplyPatchFileResult` types; `"applyPatch"` joins `WorkspaceToolName`.
+
+### Changed
+
+- The package skill description now names the read, write and test tools (`makeReadFileTool`, `makeWriteFileTool`, `makeRunTestsTool`) and the "apply a patch" phrasing, so agents find them from the skill listing alone.
 
 ## 5.34.3 - 2026-10-20
 
