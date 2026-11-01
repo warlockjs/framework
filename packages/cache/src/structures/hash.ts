@@ -33,19 +33,22 @@ export function murmur3(input: string, seed: number): number {
   let tail = 0;
   const tailOffset = blocks << 2;
 
-  switch (length & 3) {
-    case 3:
-      tail ^= bytes[tailOffset + 2]! << 16;
-    // falls through
-    case 2:
-      tail ^= bytes[tailOffset + 1]! << 8;
-    // falls through
-    case 1:
-      tail ^= bytes[tailOffset]!;
-      tail = Math.imul(tail, 0xcc9e2d51);
-      tail = (tail << 15) | (tail >>> 17);
-      tail = Math.imul(tail, 0x1b873593);
-      hash ^= tail;
+  const remainder = length & 3;
+
+  if (remainder === 3) {
+    tail ^= bytes[tailOffset + 2]! << 16;
+  }
+
+  if (remainder >= 2) {
+    tail ^= bytes[tailOffset + 1]! << 8;
+  }
+
+  if (remainder >= 1) {
+    tail ^= bytes[tailOffset]!;
+    tail = Math.imul(tail, 0xcc9e2d51);
+    tail = (tail << 15) | (tail >>> 17);
+    tail = Math.imul(tail, 0x1b873593);
+    hash ^= tail;
   }
 
   hash ^= length;

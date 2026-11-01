@@ -1706,7 +1706,8 @@ await terms.top(10); // [{ value, count }]
 - Unique counter: 12 KB, standard error 0.81%. Cannot answer "was X counted". Not for billing.
 - Frequency: 2000 x 5 is about 40 KB. Estimates are never below the true count. Not for rare values.
 - Keys follow the driver prefix and are stored as `structures.<kind>.<key>`.
-- A custom driver opts in with `structuresBackend(): CacheStructuresBackend`.
+- A custom driver opts in with `structuresBackend(): CacheStructuresBackend` (the `StructuresCapable` shape; `isStructuresCapable(driver)` checks it). It can return a built-in backend instead of writing its own: `new MemoryStructuresBackend((key) => this.parseKey(key))`, created once and reused, or `new RedisStructuresBackend(() => client, (key) => this.parseKey(key))` for a driver that wraps a Redis client.
+- Handle types for annotations: `BloomFilter`, `CuckooFilter`, `UniqueCounter`, `UniqueCounterGroup` (from `uniqueCounter.merge`), `FrequencyTracker`. Create them through `cache.structures`, never with `new`.
 
 Docs: `/v/latest/cache/structures/`.
 
