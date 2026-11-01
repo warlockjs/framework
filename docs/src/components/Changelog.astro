@@ -87,24 +87,28 @@ const hasContent = releases.length > 0;
           </summary>
 
           <div class="cl-rel-body">
+            {rel.headlineHtml && <p class="cl-rel-summary" set:html={rel.headlineHtml} />}
             {rel.summaryHtml && <p class="cl-rel-summary" set:html={rel.summaryHtml} />}
 
-            {/*
-              How this version was verified before it shipped. The generator
-              matrix is the only check that answers "does what we publish
-              actually work?", it is opt-in, and every release states the scope
-              it ran (canon e00fb7b8). Stating it only in a JSON file nobody
-              renders would not be a public record, so it is rendered here.
-              Absent on releases published before the field existed.
-            */}
-            {rel.matrix && (
-              <p class="cl-rel-matrix" data-matrix={rel.matrix}>
-                <strong>Generator matrix:</strong>{" "}
-                {rel.matrix === "none"
-                  ? "not run for this release."
-                  : rel.matrix === "full"
-                    ? "all rows ran against the staged candidate."
-                    : `selected rows ran against the staged candidate${rel.matrixRows?.length ? ` — ${rel.matrixRows.join(", ")}` : ""}.`}
+            {rel.highlights?.length > 0 && (
+              <ul class="cl-rel-highlights">
+                {rel.highlights.map((h) => <li set:html={h} />)}
+              </ul>
+            )}
+
+            {rel.upgradeNotes?.length > 0 && (
+              <div class="cl-rel-upgrade">
+                <strong>Upgrade notes</strong>
+                <ul>
+                  {rel.upgradeNotes.map((n) => <li set:html={n} />)}
+                </ul>
+              </div>
+            )}
+
+            {rel.notesUrl && (
+              <p class="cl-rel-notes">
+                <a href={rel.notesUrl}>Full release notes</a>
+                {" "}or run <code>npx warlock release-notes</code>.
               </p>
             )}
 
@@ -464,31 +468,47 @@ const hasContent = releases.length > 0;
     line-height: 1.7;
     max-width: 44rem;
   }
-  /* The lede's hairline marks where the bullet stream begins, so when a matrix
-     line follows the summary it is the matrix line that carries the divider —
-     otherwise the rule would cut the lede off from a sentence that belongs
-     with it. */
-  .cl-rel-summary:has(+ .cl-rel-matrix) {
-    padding-bottom: 0.9rem;
+  .cl-rel-summary:has(~ .cl-rel-highlights) {
+    padding-bottom: 0.4rem;
     border-bottom: 0;
+    color: var(--sl-color-white);
+    font-size: 1.05rem;
+    font-weight: 600;
   }
-  .cl-rel-matrix {
+  .cl-rel-highlights,
+  .cl-rel-upgrade ul {
     margin: 0;
-    padding-bottom: 1.6rem;
+    padding-inline-start: 1.2rem;
+    max-width: 44rem;
+    color: var(--sl-color-gray-2);
+    font-size: 0.95rem;
+    line-height: 1.7;
+  }
+  .cl-rel-highlights li,
+  .cl-rel-upgrade li { margin-block: 0.3rem; }
+  .cl-rel-upgrade {
+    margin-top: 1.1rem;
+    max-width: 44rem;
+    padding: 0.8rem 1rem;
+    border-inline-start: 3px solid var(--sl-color-text-accent);
+    background: color-mix(in srgb, var(--sl-color-text-accent) 6%, transparent);
+    border-radius: 0 var(--warlock-radius-sm, 4px) var(--warlock-radius-sm, 4px) 0;
+    font-size: 0.95rem;
+  }
+  .cl-rel-upgrade strong { color: var(--sl-color-white); }
+  .cl-rel-upgrade ul { padding-inline-start: 1.1rem; margin-top: 0.3rem; }
+  .cl-rel-notes {
+    margin: 1rem 0 0;
+    padding-bottom: 1.4rem;
     border-bottom: 1px solid var(--sl-color-hairline);
     color: var(--sl-color-gray-3);
     font-size: 0.9rem;
-    line-height: 1.7;
-    max-width: 44rem;
   }
-  .cl-rel-matrix strong {
-    color: var(--sl-color-gray-2);
-    font-weight: 600;
-  }
-  /* "Not run" is the one value a reader should not skim past — it says this
-     version shipped without the check that answers whether it works. */
-  .cl-rel-matrix[data-matrix="none"] strong {
-    color: var(--sl-color-white);
+  .cl-rel-highlights :global(code),
+  .cl-rel-upgrade :global(code),
+  .cl-rel-notes :global(code) {
+    font-family: var(--sl-font-mono);
+    font-size: 0.86em;
   }
   .cl-rel-summary :global(code) {
     font-family: var(--sl-font-mono);
@@ -498,6 +518,9 @@ const hasContent = releases.length > 0;
     /* Same Starlight specificity issue as .cl-line-text code. */
     background: color-mix(in srgb, var(--sl-color-text-accent) 6%, transparent) !important;
     color: color-mix(in srgb, var(--sl-color-text-accent) 78%, white) !important;
+  }
+  :global(:root[data-theme="light"]) .cl-rel-summary :global(code) {
+    color: var(--sl-color-text-accent) !important;
   }
   .cl-rel-summary :global(strong) { color: var(--sl-color-white); font-weight: 600; }
 

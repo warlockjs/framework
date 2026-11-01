@@ -1,5 +1,7 @@
 // @ts-check
 import { defineConfig } from "astro/config";
+import { readdirSync, readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { unified } from "@astrojs/markdown-remark";
 import starlight from "@astrojs/starlight";
 import mermaid from "astro-mermaid";
@@ -16,9 +18,52 @@ delete process.env.BASE_URL;
 // package has a full Diátaxis tree the items array expands to the five
 // canonical sections per the blueprint.
 
-/** @typedef {{ label: string, dir: string, collapsed?: boolean }} Section */
+/** @typedef {{ label: string, pages: string[] }} PageGroup */
+/** @typedef {{ label: string, dir: string, collapsed?: boolean, groups?: PageGroup[] }} Section */
 /** @typedef {{ label: string, slug: string, sections?: Section[] }} PackageTopicSpec */
-/** @typedef {{ label: string, link?: string, collapsed?: boolean, items?: { autogenerate: { directory: string } }[] }} TopicItem */
+/** @typedef {{ label: string, link?: string, collapsed?: boolean, items?: unknown[] }} TopicItem */
+
+const docsRoot = fileURLToPath(new URL("./src/content/docs/", import.meta.url));
+
+/**
+ * Sub-groups for a long section. `pages` name page files without extension or
+ * numeric prefix (`01-routing.mdx` is `routing`). A page that no group lists
+ * (a newly added one) is still shown, as a plain link after the groups, so
+ * adding a page never needs a config change; list it in a group to place it.
+ */
+function groupedSectionItems(
+  /** @type {string} */ version,
+  /** @type {string} */ slug,
+  /** @type {Section} */ section,
+) {
+  const relative = `v/${version}/${slug}/${section.dir}`;
+  const files = readdirSync(new URL(relative, `file://${docsRoot}`))
+    .filter((file) => /\.mdx?$/.test(file))
+    .sort();
+  /** @type {Map<string, string>} page key -> sidebar slug */ const slugs = new Map();
+
+  for (const file of files) {
+    const base = file.replace(/\.mdx?$/, "");
+    const front = readFileSync(new URL(`${relative}/${file}`, `file://${docsRoot}`), "utf8");
+    const declared = front.match(/^slug:\s*(\S+)\s*$/m)?.[1];
+    slugs.set(base.replace(/^\d+-/, ""), declared ?? `${relative}/${base}`);
+  }
+
+  const placed = new Set();
+  const groups = (section.groups ?? []).map((group) => ({
+    label: group.label,
+    collapsed: true,
+    items: group.pages.flatMap((page) => {
+      const target = slugs.get(page);
+      if (!target) throw new Error(`Sidebar group "${group.label}": no page "${page}" in ${relative}`);
+      placed.add(page);
+      return [{ slug: target }];
+    }),
+  }));
+  const rest = [...slugs].filter(([page]) => !placed.has(page)).map(([, target]) => ({ slug: target }));
+
+  return [...groups, ...rest];
+}
 
 function pkgTopic(
   /** @type {PackageTopicSpec} */ { label, slug, sections = [] },
@@ -30,7 +75,13 @@ function pkgTopic(
     items.push({
       label: section.label,
       collapsed: section.collapsed ?? false,
-      items: [{ autogenerate: { directory: `v/${version}/${slug}/${section.dir}` } }],
+      items: section.groups
+        ? groupedSectionItems(version, slug, section)
+        : [{ autogenerate: { directory: `v/${version}/${slug}/${section.dir}` } }],
+      // Frozen versions keep the flat list: their page set differs from latest.
+      ...(section.groups
+        ? { frozenItems: [{ autogenerate: { directory: `v/${version}/${slug}/${section.dir}` } }] }
+        : {}),
     });
   }
 
@@ -65,8 +116,70 @@ const coreSections = [
   { label: "Getting Started", dir: "getting-started", collapsed: false },
   { label: "Architecture Concepts", dir: "architecture-concepts", collapsed: true },
   { label: "The Basics", dir: "the-basics", collapsed: false },
-  { label: "Digging Deeper", dir: "digging-deeper", collapsed: true },
-  { label: "CLI", dir: "cli", collapsed: true },
+  {
+    label: "Digging Deeper",
+    dir: "digging-deeper",
+    collapsed: true,
+    groups: [
+      {
+        label: "Security and hardening",
+        pages: ["security", "secrets", "encryption", "production-hardening-checklist", "health-checks"],
+      },
+      {
+        label: "Application runtime",
+        pages: [
+          "multiple-servers",
+          "module-singletons",
+          "capabilities",
+          "supported-runtimes",
+          "known-limitations",
+          "build-budgets",
+          "deployment",
+        ],
+      },
+      {
+        label: "Logging and diagnostics",
+        pages: ["logging", "request-log", "request-tracing", "error-handling", "benchmark"],
+      },
+      {
+        label: "Data and files",
+        pages: ["cache", "storage", "file-uploads", "image-processing", "seeding"],
+      },
+      {
+        label: "Events and background work",
+        pages: ["events", "socket", "mail", "background-work", "retry"],
+      },
+    ],
+  },
+  {
+    label: "CLI",
+    dir: "cli",
+    collapsed: true,
+    groups: [
+      {
+        label: "Everyday commands",
+        pages: ["cli-commands", "generators", "web-generators", "routes", "logs", "pm2"],
+      },
+      {
+        label: "Checks and diagnosis",
+        pages: [
+          "check",
+          "doctor",
+          "inspect",
+          "trace",
+          "file-health-checks",
+          "error-codes",
+          "issue",
+          "board",
+        ],
+      },
+      { label: "Upgrades and releases", pages: ["upgrade", "release", "release-notes", "toolchain"] },
+      {
+        label: "Integrations and extending",
+        pages: ["mcp", "ai", "agents-md", "openapi", "custom-cli-command", "custom-connector"],
+      },
+    ],
+  },
   { label: "Testing", dir: "testing", collapsed: true },
   { label: "Recipes", dir: "recipes", collapsed: true },
 ];
@@ -83,7 +196,41 @@ const cascadeSections = [
 
 const webSections = [
   { label: "Getting Started", dir: "getting-started", collapsed: false },
-  { label: "Essentials", dir: "essentials", collapsed: false },
+  {
+    label: "Essentials",
+    dir: "essentials",
+    collapsed: false,
+    groups: [
+      {
+        label: "Pages and routing",
+        pages: [
+          "routing",
+          "layouts-and-special-pages",
+          "page-setup-files",
+          "loaders-and-metadata",
+          "client-navigation",
+        ],
+      },
+      {
+        label: "Rendering",
+        pages: ["client-server-boundaries", "client-only", "streaming-and-defer", "crawler-mode"],
+      },
+      {
+        label: "Interaction and state",
+        pages: [
+          "form-submission",
+          "page-actions",
+          "sessions",
+          "localization",
+          "live-page-data",
+        ],
+      },
+      {
+        label: "Performance and assets",
+        pages: ["page-caching", "web-vitals", "images", "fonts", "scroll-restoration"],
+      },
+    ],
+  },
   { label: "Guides", dir: "guides", collapsed: true },
 ];
 
@@ -535,10 +682,25 @@ function buildTopics(/** @type {string} */ version) {
         return item;
       });
 
+  /**
+   * Every group starts collapsed. Starlight opens a group on its own when it
+   * holds the current page, so only the reader's current group is expanded.
+   * @type {(items: unknown[]) => unknown[]}
+   */
+  const collapsedExceptCurrent = (items) =>
+    items.map((item) => {
+      if (item && typeof item === "object" && "items" in item && Array.isArray(item.items)) {
+        const { frozenItems, ...group } = /** @type {{ frozenItems?: unknown[], items: unknown[] }} */ (item);
+        const children = version === "latest" || !frozenItems ? group.items : frozenItems;
+        return { ...group, collapsed: true, items: collapsedExceptCurrent(children) };
+      }
+      return item;
+    });
+
   return versionedTopics.map(
     (/** @type {{ link: string, label: string, items: unknown[] }} */ topic) => ({
       ...topic,
-      items:
+      items: collapsedExceptCurrent(
         version === "latest" && topic.label === "Core"
           ? [
               topic.items[0],
@@ -546,6 +708,7 @@ function buildTopics(/** @type {string} */ version) {
               ...topic.items.slice(1),
             ]
           : withoutLatestOnly(topic.items),
+      ),
       id: `${version}-${topic.link.split("/").filter(Boolean).at(-1)}`,
     }),
   );
@@ -670,6 +833,7 @@ export default defineConfig({
         Footer: "./src/components/Footer.astro",
       },
       customCss: ["./src/styles/global.css"],
+      routeMiddleware: "./src/route-middleware.ts",
       logo: {
         src: "./src/assets/logo.png",
         alt: "Warlock.js",

@@ -140,9 +140,18 @@
       "id": "v5-42-0",
       "date": "November 1, 2026",
       "isUnreleased": false,
-      "summaryHtml": "<strong>Security response headers on every response, and per-route body limits that work in development and tests.</strong> <code>http.securityHeaders</code> is on by default: <code>frame-ancestors 'none'</code> with <code>X-Frame-Options: DENY</code> (no site can frame the app), <code>nosniff</code>, <code>strict-origin-when-cross-origin</code>, a <code>Permissions-Policy</code> that keeps camera, microphone and geolocation to the app's own pages, and HSTS in production. They are set in the server's first hook, so routed handlers, static files, 404s, early refusals, SSR pages and <code>writeHead</code> responses all carry them; each header can be turned off, a route can override or opt out, and they merge with <code>http.csp</code>. A route's <code>serverOptions.bodyLimit</code> now applies under <code>warlock dev</code> and the HTTP test server, not only in production builds, and its <code>preParsing</code> hooks run there too. Pages no longer log a hydration mismatch on nonced scripts under a CSP header. No breaking changes. Lockstep release across all 33 packages. Generator matrix scope: <code>none</code>; before publishing, the blog on the 5.42.0 tarballs passed the release gate; after publishing, every package was confirmed at the npm origin.",
-      "matrix": "none",
-      "matrixRows": null,
+      "headlineHtml": "Security headers on every response, and per-route body limits that work in development and tests.",
+      "highlights": [
+        "<code>http.securityHeaders</code> is on by default: no site can frame your app, browsers stop guessing content types, and the camera, microphone and location stay limited to your own pages (HSTS in production).",
+        "The headers cover routed handlers, static files, 404s, early refusals and SSR pages; turn any header off, or override it per route with the <code>securityHeaders</code> route option.",
+        "A route's <code>serverOptions.bodyLimit</code> and <code>preParsing</code> hooks now apply under <code>warlock dev</code> and the HTTP test server, not only in production.",
+        "Pages no longer log a hydration mismatch on nonced scripts under a CSP header."
+      ],
+      "upgradeNotes": [
+        "If your app frames its own pages, set <code>http.securityHeaders.frameAncestors</code> to <code>\"self\"</code> or a list of sites; an embeddable route can opt out with the <code>securityHeaders</code> route option."
+      ],
+      "summaryHtml": null,
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/5.42.0-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -222,9 +231,18 @@
       "id": "v5-41-0",
       "date": "October 29, 2026",
       "isUnreleased": false,
-      "summaryHtml": "<strong>Mantine joins shadcn/ui as a second UI kit for the design system.</strong> <code>warlock add design-system --kit mantine</code> (or <code>warlock add mantine</code>) installs Mantine without Tailwind, with the same component files, props and hooks as the shadcn kit, so app code and generators work with either; every control binds to Mongez React Form, and <code>@mantine/form</code> is not used. It pins <code>@mantine/core</code>, <code>hooks</code>, <code>dates</code>, <code>notifications</code> and <code>modals</code>, writes the PostCSS preset and stylesheet imports, and wires the colour-scheme script and providers into <code>src/web/root.tsx</code>; <code>mantine-theme.ts</code> holds the design tokens. Extras: <code>notify</code> and <code>notifyOnSubmit</code> for form toasts, <code>confirm()</code> and a <code>PaginatedTable</code> for paginated list responses. The two kits exclude each other and say how to switch. <code>create-warlock</code> gains <code>--ui=&lt;shadcn|mantine|none&gt;</code> and a \"Full-stack web with Mantine\" menu entry. No breaking changes. Lockstep release across all 33 packages. Generator matrix scope: <code>none</code>; before publishing, the blog on the 5.41.0 tarballs passed the release gate; after publishing, every package was confirmed at the npm origin.",
-      "matrix": "none",
-      "matrixRows": null,
+      "headlineHtml": "Mantine joins shadcn/ui as a second UI kit for the design system.",
+      "highlights": [
+        "<code>warlock add design-system --kit mantine</code> (or <code>warlock add mantine</code>) installs Mantine without Tailwind, with the same component files, props and hooks as the shadcn kit.",
+        "Every control binds to Mongez React Form, so app code and generators work with either kit.",
+        "New helpers: <code>notify</code> and <code>notifyOnSubmit</code> for form toasts, <code>confirm()</code>, and a <code>PaginatedTable</code> for paginated list responses.",
+        "<code>create-warlock</code> gains <code>--ui=&lt;shadcn|mantine|none&gt;</code> and a \"Full-stack web with Mantine\" menu entry."
+      ],
+      "upgradeNotes": [
+        "Nothing to change for apps on the shadcn kit. To switch to Mantine, remove the shadcn kit's files and dependencies, then run the command again."
+      ],
+      "summaryHtml": null,
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/5.41.0-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -293,9 +311,17 @@
       "id": "v5-40-1",
       "date": "October 29, 2026",
       "isUnreleased": false,
-      "summaryHtml": "<strong>New web projects install their features again, and the design-system files pass the app's lint.</strong> Since 5.35, <code>create-warlock --stack=web</code> (or any scaffold with <code>web</code>, <code>tailwind</code>, <code>shadcn</code>, <code>design-system</code> or <code>sitemap</code>) failed in the feature step: <code>warlock add</code> loads <code>warlock.config.ts</code> first, and the web starter's config imported <code>@warlock.js/web</code> before the feature step installed it, so every feature, even the database, was reported as failed. A web scaffold now lists <code>@warlock.js/web</code> from the start, <code>warlock add</code> continues with a warning when the project config cannot load yet, and CI now scaffolds and typechecks a web project too. The controls and hooks that <code>warlock add design-system</code> writes now pass the scaffolded Oxlint config, so a fresh web app no longer reports lint errors in <code>src/web/design-system/</code>. No breaking changes. Lockstep release across all 33 packages. Generator matrix scope: <code>none</code>; before publishing, the blog on the 5.40.1 tarballs passed the release gate; after publishing, every package was confirmed at the npm origin.",
-      "matrix": "none",
-      "matrixRows": null,
+      "headlineHtml": "New web projects install their features again, and the design-system files pass the app's lint.",
+      "highlights": [
+        "<code>create-warlock --stack=web</code> (and any scaffold with <code>web</code>, <code>tailwind</code>, <code>shadcn</code>, <code>design-system</code> or <code>sitemap</code>) no longer reports every feature as failed.",
+        "<code>warlock add</code> continues with a warning when the project config cannot load yet.",
+        "Files written by <code>warlock add design-system</code> pass the scaffolded Oxlint config."
+      ],
+      "upgradeNotes": [
+        "A web app scaffolded on 5.35 to 5.40.0 without its features: run <code>npx warlock add web</code> (then any other features you chose) after updating. For lint errors in <code>src/web/design-system/</code>, rerun <code>npx warlock add design-system</code>."
+      ],
+      "summaryHtml": null,
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/5.40.1-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -355,9 +381,20 @@
       "id": "v5-40-0",
       "date": "October 29, 2026",
       "isUnreleased": false,
-      "summaryHtml": "<strong><code>warlock check</code> finishes on large apps, a steadier development server, tested Windows support, and turn control, context editing, spend limits and approvals for AI agents.</strong> The conventions step of <code>warlock check</code> no longer runs for tens of minutes on a large app: the <code>.client</code> boundary rule reads each import chain once per run, and parsed syntax trees no longer stall memory cleanup, so about 7,500 files take about 14 seconds. It prints a progress line per step, and a rule that uses more than its 30-second budget is skipped and reported as <code>WL9026</code> instead of hanging the command. Spec and test files beside commands, events, routes and migrations are never auto-loaded. In development the first page waits for the compile, reloads touch only real importers, requests wait out a reload instead of failing, <code>appSingleton()</code> keeps one instance across reloads, boundary warnings print once, and <code>http.log</code> writes one line per request. On Windows the process supervisor answers before it starts the program, takes an <code>observationTimeoutMs</code> option and per-platform poll intervals, and batches process lookups through one helper; image variants, typecheck paths, atomic JSON writes and SQLite stores are fixed there, and the <code>fs</code>, <code>process</code>, <code>core</code>, <code>web</code> and <code>ai</code> suites run on Windows in CI. AI agents can end a turn after a tool (<code>stopAfterTools</code>, <code>stopWhen</code>, <code>endsTurn</code>), clear old tool results for any provider (<code>contextEditing</code>), build one price list (<code>ai.pricing()</code>), report spend (<code>budget({ onSpend })</code>) and remember tool approvals per session; xAI and OpenAI route native web search to the Responses API, Google takes a search budget, every first-party adapter lists live models, and <code>ai-workspace</code> adds an atomic <code>apply_patch</code> tool. A manual <code>beginTransaction()</code> now covers the caller's later queries, new API-only projects typecheck, and a new project's <code>AGENTS.md</code> tells agents to read <code>npx warlock release-notes --from &lt;current&gt;</code> before upgrading. No breaking changes. Lockstep release across all 33 packages. Generator matrix scope: <code>none</code>; before publishing, the blog on the 5.40.0 tarballs passed the release gate; after publishing, every package was confirmed at the npm origin.",
-      "matrix": "none",
-      "matrixRows": null,
+      "headlineHtml": "<code>warlock check</code> finishes on large apps, a steadier dev server, tested Windows support, and more control over AI agents.",
+      "highlights": [
+        "<code>warlock check</code> no longer runs for tens of minutes on a large app (about 7,500 files take about 14 seconds), prints progress, and skips a rule that exceeds its 30-second budget with <code>WL9026</code>.",
+        "Development server: the first page waits for the compile, reloads touch only real importers, requests wait out a reload, and <code>appSingleton()</code> keeps one instance across reloads.",
+        "Windows: a more reliable process supervisor, fixes for image variants, typecheck paths and atomic JSON writes, and the <code>fs</code>, <code>process</code>, <code>core</code>, <code>web</code> and <code>ai</code> suites now run on Windows in CI.",
+        "AI agents can end a turn after a tool (<code>stopAfterTools</code>, <code>stopWhen</code>), clear old tool results (<code>contextEditing</code>), build one price list (<code>ai.pricing()</code>), report spend, and remember tool approvals per session.",
+        "xAI and OpenAI route native web search to the Responses API; every first-party adapter lists live models; <code>ai-workspace</code> adds an atomic <code>apply_patch</code> tool.",
+        "A manual <code>beginTransaction()</code> now covers the caller's later queries."
+      ],
+      "upgradeNotes": [
+        "<code>FinishReason</code> has a new member, <code>\"tool_stop\"</code>: add a case where you switch over every finish reason. <code>http.log: true</code> now writes one line per request; set <code>http.logPhases: \"info\"</code> to keep per-phase lines. Code that calls <code>beginTransaction()</code> must commit or roll back, because later queries now run inside it."
+      ],
+      "summaryHtml": null,
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/5.40.0-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -979,9 +1016,11 @@
       "id": "v5-39-2",
       "date": "October 27, 2026",
       "isUnreleased": false,
-      "summaryHtml": "<strong><code>model.set()</code> takes an object, a check for deep-merged object columns, and a transaction session fix.</strong> <code>model.set({ ... })</code> sets several fields in one call: a top-level key replaces the whole field, a dot-path key such as <code>\"settings.theme\"</code> writes one leaf, persisted models ignore identity columns, and overlapping keys throw before anything is written; each key and value is typed from the model schema. <code>warlock check</code> adds <code>WL9025</code>, a warning for <code>model.merge({ ... })</code> on a column the schema declares as an object, record or array of objects, since <code>merge()</code> keeps nested keys the caller removed. Work armed inside <code>transaction()</code> (a timer, a queue, a fire-and-forget promise) that runs after the transaction ended no longer reuses its session: on MongoDB it threw <code>MongoExpiredSessionError</code>, on PostgreSQL it ran on a released pool client; it now runs with no session, outside any transaction, and <code>afterCommit()</code> remains the tool for work that must follow a COMMIT. No breaking changes. Lockstep release across all 33 packages. Generator matrix scope: <code>none</code>; before publishing, the blog on the 5.39.2 tarballs passed the release gate; after publishing, every package was confirmed at the npm origin.",
-      "matrix": "none",
-      "matrixRows": null,
+      "headlineHtml": null,
+      "highlights": [],
+      "upgradeNotes": [],
+      "summaryHtml": "<strong><code>model.set()</code> takes an object, a check for deep-merged object columns, and a transaction session fix.</strong> <code>model.set({ ... })</code> sets several fields in one call: a top-level key replaces the whole field, a dot-path key such as <code>\"settings.theme\"</code> writes one leaf, persisted models ignore identity columns, and overlapping keys throw before anything is written; each key and value is typed from the model schema. <code>warlock check</code> adds <code>WL9025</code>, a warning for <code>model.merge({ ... })</code> on a column the schema declares as an object, record or array of objects, since <code>merge()</code> keeps nested keys the caller removed. Work armed inside <code>transaction()</code> (a timer, a queue, a fire-and-forget promise) that runs after the transaction ended no longer reuses its session: on MongoDB it threw <code>MongoExpiredSessionError</code>, on PostgreSQL it ran on a released pool client; it now runs with no session, outside any transaction, and <code>afterCommit()</code> remains the tool for work that must follow a COMMIT. No breaking changes.",
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/5.39.2-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -1033,9 +1072,11 @@
       "id": "v5-39-1",
       "date": "October 26, 2026",
       "isUnreleased": false,
-      "summaryHtml": "<strong>Fixes for test-run exits, migrations, standalone builds and log channels.</strong> Shutdown of the HTTP test server, <code>warlock start</code> and per-worker test teardown now stops every running <code>@warlock.js/scheduler</code> scheduler, so a suite whose app starts a scheduler while loading no longer waits out Vitest's 10-second close timeout. <code>warlock migrate</code> releases its lock and closes every data source on every exit path (including <code>Ctrl+C</code> / <code>SIGTERM</code>), bounds the MongoDB connect, prints a heartbeat for long migrations, takes an opt-in <code>--timeout</code>, and names the failing migration and step with recovery advice. <code>build.singleBundle</code> no longer bundles Vite listed under <code>devDependencies</code>, keeps build-time tools out of the bundle, stages aliased native packages under the imported name, stages only reachable native packages and warns about ones it cannot copy. <code>LogChannel.ready</code> resolves after a channel's deferred init, and a channel disposed before init no longer arms its flush timer. No breaking changes. Lockstep release across all 33 packages. Generator matrix scope: <code>none</code>; before publishing, the blog on the 5.39.1 tarballs passed the release gate; after publishing, every package was confirmed at the npm origin.",
-      "matrix": "none",
-      "matrixRows": null,
+      "headlineHtml": null,
+      "highlights": [],
+      "upgradeNotes": [],
+      "summaryHtml": "<strong>Fixes for test-run exits, migrations, standalone builds and log channels.</strong> Shutdown of the HTTP test server, <code>warlock start</code> and per-worker test teardown now stops every running <code>@warlock.js/scheduler</code> scheduler, so a suite whose app starts a scheduler while loading no longer waits out Vitest's 10-second close timeout. <code>warlock migrate</code> releases its lock and closes every data source on every exit path (including <code>Ctrl+C</code> / <code>SIGTERM</code>), bounds the MongoDB connect, prints a heartbeat for long migrations, takes an opt-in <code>--timeout</code>, and names the failing migration and step with recovery advice. <code>build.singleBundle</code> no longer bundles Vite listed under <code>devDependencies</code>, keeps build-time tools out of the bundle, stages aliased native packages under the imported name, stages only reachable native packages and warns about ones it cannot copy. <code>LogChannel.ready</code> resolves after a channel's deferred init, and a channel disposed before init no longer arms its flush timer. No breaking changes.",
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/5.39.1-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -1177,9 +1218,11 @@
       "id": "v5-39-0",
       "date": "October 26, 2026",
       "isUnreleased": false,
-      "summaryHtml": "<strong>Standalone builds, release notes in every install and typed-model fixes.</strong> <code>build.singleBundle</code> now works with web pages: the server is one <code>dist/app.js</code> that runs with no <code>node_modules</code>, native addons are staged automatically, optional integrations are detected, build-time tools are left out and React runs its production build. <code>webConnector({ build: { chunks, precompress } })</code> controls the client output (<code>split</code>, <code>merged</code> or <code>single</code> chunks, with or without <code>.br</code>/<code>.gz</code> copies), with a desktop and offline recipe. The release summaries now ship inside <code>@warlock.js/core</code>, read by <code>warlock release-notes</code> (<code>--from</code>, <code>--list</code>, <code>--json</code>) and pointed to by <code>warlock upgrade</code> and <code>warlock update</code>. Typed models accept their system columns (<code>id</code>, timestamps, soft delete) and <code>set()</code> reports value mismatches clearly. Config files no longer walk the app graph at boot, <code>onPageError()</code> registers the error-report hook at runtime, and <code>warlock doctor</code> warns when config imports app code. Browser requests that core refuses on a page host render the site page. New apps and <code>warlock upgrade --check</code> install on npm 10.9. No breaking changes. Lockstep release across all 33 packages. Generator matrix scope: <code>none</code>; before publishing, the blog on the 5.39.0 tarballs passed the release gate; after publishing, every package was confirmed at the npm origin.",
-      "matrix": "none",
-      "matrixRows": null,
+      "headlineHtml": null,
+      "highlights": [],
+      "upgradeNotes": [],
+      "summaryHtml": "<strong>Standalone builds, release notes in every install and typed-model fixes.</strong> <code>build.singleBundle</code> now works with web pages: the server is one <code>dist/app.js</code> that runs with no <code>node_modules</code>, native addons are staged automatically, optional integrations are detected, build-time tools are left out and React runs its production build. <code>webConnector({ build: { chunks, precompress } })</code> controls the client output (<code>split</code>, <code>merged</code> or <code>single</code> chunks, with or without <code>.br</code>/<code>.gz</code> copies), with a desktop and offline recipe. The release summaries now ship inside <code>@warlock.js/core</code>, read by <code>warlock release-notes</code> (<code>--from</code>, <code>--list</code>, <code>--json</code>) and pointed to by <code>warlock upgrade</code> and <code>warlock update</code>. Typed models accept their system columns (<code>id</code>, timestamps, soft delete) and <code>set()</code> reports value mismatches clearly. Config files no longer walk the app graph at boot, <code>onPageError()</code> registers the error-report hook at runtime, and <code>warlock doctor</code> warns when config imports app code. Browser requests that core refuses on a page host render the site page. New apps and <code>warlock upgrade --check</code> install on npm 10.9. No breaking changes.",
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/5.39.0-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -1365,9 +1408,11 @@
       "id": "v5-38-0",
       "date": "October 25, 2026",
       "isUnreleased": false,
-      "summaryHtml": "<strong>Persistent request log, faster test runtimes, stable chunk names and typed models.</strong> <code>http.logging.requests</code> writes one redacted record per request, read by devtools (history, copy as curl), <code>warlock logs</code> and the MCP <code>request_log</code> tool, and every 5xx is logged once as <code>request.&lt;phase&gt;</code>. New apps run tests with worker lifetime and per-file resets, <code>*.unit.spec.ts</code> files run without booting the app, the HTTP test server closes the web connector's Vite servers, and <code>tests.profileSetup</code> prints a per-phase boot profile. Production chunks are named after their final bytes, identical chunks are merged, builds check integrity against the previous build and enforce payload budgets. Seal keeps optional enums and literals nullable in <code>openai-strict</code> and names unlabelled fields in words; AI tools get per-provider schema lint, a tool-use contract, eval scorers and agent traces in devtools. Page routes render a per-site <code>forbidden.page.tsx</code> instead of JSON for 401/403, <code>warlock upgrade --check</code> rehearses upgrades, <code>warlock doctor</code> renders each site, typed capabilities and <code>inspect --section wiring</code> show auto-loaded wiring, and <code>*.client.ts(x)</code> is an enforced client-only boundary. <strong>Breaking:</strong> typed models type <code>get()</code> and <code>set()</code> from their schema. Lockstep release across all 33 packages. Generator matrix scope: <code>none</code>; before publishing, the blog on the 5.38.0 tarballs passed the release gate; after publishing, every package was confirmed at the npm origin.",
-      "matrix": "none",
-      "matrixRows": null,
+      "headlineHtml": null,
+      "highlights": [],
+      "upgradeNotes": [],
+      "summaryHtml": "<strong>Persistent request log, faster test runtimes, stable chunk names and typed models.</strong> <code>http.logging.requests</code> writes one redacted record per request, read by devtools (history, copy as curl), <code>warlock logs</code> and the MCP <code>request_log</code> tool, and every 5xx is logged once as <code>request.&lt;phase&gt;</code>. New apps run tests with worker lifetime and per-file resets, <code>*.unit.spec.ts</code> files run without booting the app, the HTTP test server closes the web connector's Vite servers, and <code>tests.profileSetup</code> prints a per-phase boot profile. Production chunks are named after their final bytes, identical chunks are merged, builds check integrity against the previous build and enforce payload budgets. Seal keeps optional enums and literals nullable in <code>openai-strict</code> and names unlabelled fields in words; AI tools get per-provider schema lint, a tool-use contract, eval scorers and agent traces in devtools. Page routes render a per-site <code>forbidden.page.tsx</code> instead of JSON for 401/403, <code>warlock upgrade --check</code> rehearses upgrades, <code>warlock doctor</code> renders each site, typed capabilities and <code>inspect --section wiring</code> show auto-loaded wiring, and <code>*.client.ts(x)</code> is an enforced client-only boundary. <strong>Breaking:</strong> typed models type <code>get()</code> and <code>set()</code> from their schema.",
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/5.38.0-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -1897,9 +1942,11 @@
       "id": "v5-37-1",
       "date": "October 24, 2026",
       "isUnreleased": false,
-      "summaryHtml": "<strong>Multi-site development fix, page error logging and npm family upgrades.</strong> Multi-site pages no longer answer 500 in development and under the HTTP test server (the route table is read from Core's router; <code>web.namedApiRoutes: false</code> skips it). Every 5xx page failure logs one error record with the message, mapped stack, phase, page file, route, site and request id, and the development error page shows the same details. <code>warlock update</code> on npm removes the family's lock entries and re-resolves them in one install (npm 11.6.2 or newer), <code>WL8010</code> reports mixed family versions, and <code>warlock upgrade</code> no longer downgrades newer packages and names the package manager the project uses. Vitest 5 no longer warns about a repeated <code>lowerStage3Decorators()</code>, worker lifetime supports HTTP and database suites (<code>tests.resetDatabase</code>, <code>workerDatabaseName()</code>), HMR attaches through Vite 8's <code>server.ws</code>, and the client-bundle check no longer reports the app's <code>index.html</code>. Lockstep release across all 33 packages. Generator matrix scope: <code>none</code>; before publishing, the blog on the 5.37.1 tarballs passed the release gate; after publishing, every package was confirmed at the npm origin.",
-      "matrix": "none",
-      "matrixRows": null,
+      "headlineHtml": null,
+      "highlights": [],
+      "upgradeNotes": [],
+      "summaryHtml": "<strong>Multi-site development fix, page error logging and npm family upgrades.</strong> Multi-site pages no longer answer 500 in development and under the HTTP test server (the route table is read from Core's router; <code>web.namedApiRoutes: false</code> skips it). Every 5xx page failure logs one error record with the message, mapped stack, phase, page file, route, site and request id, and the development error page shows the same details. <code>warlock update</code> on npm removes the family's lock entries and re-resolves them in one install (npm 11.6.2 or newer), <code>WL8010</code> reports mixed family versions, and <code>warlock upgrade</code> no longer downgrades newer packages and names the package manager the project uses. Vitest 5 no longer warns about a repeated <code>lowerStage3Decorators()</code>, worker lifetime supports HTTP and database suites (<code>tests.resetDatabase</code>, <code>workerDatabaseName()</code>), HMR attaches through Vite 8's <code>server.ws</code>, and the client-bundle check no longer reports the app's <code>index.html</code>.",
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/5.37.1-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -2040,9 +2087,11 @@
       "id": "v5-37-0",
       "date": "October 24, 2026",
       "isUnreleased": false,
-      "summaryHtml": "<strong>Field-report fixes: route table controls, safe document-store rollbacks, <code>warlock release</code> and eval variance.</strong> Breaking: on MongoDB a plain <code>dropColumn()</code> inside <code>down()</code> is skipped with a warning (pass <code>{ destructive: true }</code> to unset; add-only <code>Migration.alter</code> derives a ledger-only rollback), and <code>warlock migrate --rollback</code>/<code>--fresh</code> and the cascade rollback commands print a destructive-operation summary and need confirmation or <code>--yes</code> outside development. <code>web.namedApiRoutes</code> turns the page route table off, limits it with an allowlist or filter, and keeps <code>privatePrefixes</code> out; routes take a <code>sites</code> option for multi-site apps, and guarded routes are left out for known guests. Route inspection, the generated <code>AGENTS.md</code> facts and <code>WL9006</code> count group guards and <code>markAuthGuard()</code> middleware. <code>warlock release</code> adds candidate, gate, migrations --prove, stage, activate, verify, rollback and prune for application deploys. <code>agent.eval({ repeat })</code> reports pass counts, Wilson and t intervals, an interval-based regression gate and stable versus flaky failures. Fixes: validation messages never keep an unfilled <code>:placeholder</code>, finished Vitest runs exit on their own (the file logger's flush timer no longer holds the process), pages whose components import CSS work in Node page discovery, and development logs the first hydration mismatch. Lockstep release across all 33 packages. Generator matrix scope: <code>none</code>; before publishing, the blog on the 5.37.0 tarballs passed the release gate; after publishing, every package was confirmed at the npm origin.",
-      "matrix": "none",
-      "matrixRows": null,
+      "headlineHtml": null,
+      "highlights": [],
+      "upgradeNotes": [],
+      "summaryHtml": "<strong>Field-report fixes: route table controls, safe document-store rollbacks, <code>warlock release</code> and eval variance.</strong> Breaking: on MongoDB a plain <code>dropColumn()</code> inside <code>down()</code> is skipped with a warning (pass <code>{ destructive: true }</code> to unset; add-only <code>Migration.alter</code> derives a ledger-only rollback), and <code>warlock migrate --rollback</code>/<code>--fresh</code> and the cascade rollback commands print a destructive-operation summary and need confirmation or <code>--yes</code> outside development. <code>web.namedApiRoutes</code> turns the page route table off, limits it with an allowlist or filter, and keeps <code>privatePrefixes</code> out; routes take a <code>sites</code> option for multi-site apps, and guarded routes are left out for known guests. Route inspection, the generated <code>AGENTS.md</code> facts and <code>WL9006</code> count group guards and <code>markAuthGuard()</code> middleware. <code>warlock release</code> adds candidate, gate, migrations --prove, stage, activate, verify, rollback and prune for application deploys. <code>agent.eval({ repeat })</code> reports pass counts, Wilson and t intervals, an interval-based regression gate and stable versus flaky failures. Fixes: validation messages never keep an unfilled <code>:placeholder</code>, finished Vitest runs exit on their own (the file logger's flush timer no longer holds the process), pages whose components import CSS work in Node page discovery, and development logs the first hydration mismatch.",
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/5.37.0-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -2249,9 +2298,11 @@
       "id": "v5-36-0",
       "date": "October 21, 2026",
       "isUnreleased": false,
-      "summaryHtml": "<strong>Smaller, safer page payloads and the Vite 8 / Vitest 5 family.</strong> Breaking: <code>@warlock.js/web</code> needs Vite 8 and plugin-react 6 (a clear error names the upgrade on Vite 7), the test kit and AI matchers need Vitest 5, pages embed only the named API routes their client code reaches (<code>config.apiRoutes</code>, <code>clientVisible: false</code>), and hydration payloads carry only the translation keys a page uses. <code>npx warlock upgrade --from 5.35 --to 5.36.0</code> raises Vite, Vitest and plugin-react and rewrites the Vitest 5 runner import. Shared translation groups ship once per locale as cached, content-hashed tables (fixed per process in production, with a latest-table fallback); other keys are pruned per page from literal keys, count variants, static template prefixes and <code>config.translations</code>, with <code>WL9104</code> for keys built at run time. <code>build.budgets.payload</code> (default 64kb) reports oversized inline payloads by section. Fixes: development page edits no longer wait for the sitemap refresh; cascade persists unsetting a stored empty object; browser e2e click and wait errors keep the real reason near the deadline. The docs site moves to Astro 7. Lockstep release across all 33 packages. Generator matrix scope: <code>none</code>; before publishing, the blog on the 5.36.0 tarballs passed the release gate; after publishing, every package was confirmed at the npm origin and the blog check passed against npm.",
-      "matrix": "none",
-      "matrixRows": null,
+      "headlineHtml": null,
+      "highlights": [],
+      "upgradeNotes": [],
+      "summaryHtml": "<strong>Smaller, safer page payloads and the Vite 8 / Vitest 5 family.</strong> Breaking: <code>@warlock.js/web</code> needs Vite 8 and plugin-react 6 (a clear error names the upgrade on Vite 7), the test kit and AI matchers need Vitest 5, pages embed only the named API routes their client code reaches (<code>config.apiRoutes</code>, <code>clientVisible: false</code>), and hydration payloads carry only the translation keys a page uses. <code>npx warlock upgrade --from 5.35 --to 5.36.0</code> raises Vite, Vitest and plugin-react and rewrites the Vitest 5 runner import. Shared translation groups ship once per locale as cached, content-hashed tables (fixed per process in production, with a latest-table fallback); other keys are pruned per page from literal keys, count variants, static template prefixes and <code>config.translations</code>, with <code>WL9104</code> for keys built at run time. <code>build.budgets.payload</code> (default 64kb) reports oversized inline payloads by section. Fixes: development page edits no longer wait for the sitemap refresh; cascade persists unsetting a stored empty object; browser e2e click and wait errors keep the real reason near the deadline. The docs site moves to Astro 7.",
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/5.36.0-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -2490,9 +2541,11 @@
       "id": "v5-35-0",
       "date": "October 21, 2026",
       "isUnreleased": false,
-      "summaryHtml": "<strong>Design system, web generators, new check rules, API helpers, budgets, accessibility tests and faster test runs.</strong> Breaking: root components now run in the browser so hydration covers the full document ancestry (move server-only root work to the root setup loader), and model resources receive hidden columns with <code>hidden</code> enforced on final output. <code>warlock add design-system</code> scaffolds fourteen accessible shadcn controls wired to Mongez React Form, included by default in full-stack and Tailwind + shadcn starters; <code>warlock generate page</code>, <code>form</code> and <code>crud-ui</code> scaffold pages, forms and guarded CRUD screens. <code>warlock check</code> adds WL9013–WL9018 (component size, component-owned state, native controls and validation, controllers without a response schema) and <code>--fix</code>; <code>warlock inspect --section files</code> and <code>warlock explain &lt;file&gt;</code> map files, imports and the routes that reach them. Core adds <code>AppError</code>, <code>listEndpoint</code>, <code>assertResponseContracts</code>, per-page gzip build budgets and <code>page.assertAccessible()</code> with axe-core; tests gain opt-in worker lifetime, <code>setupTest({ mode: \"unit\" })</code> and setup profiling. Auth bounds Google and JWKS requests; web keeps sessions in sync after refresh, locale changes and page swaps. Lockstep release across all 33 packages. Generator matrix scope: <code>none</code>; before publishing, the blog on the 5.35.0 tarballs passed the release gate; after publishing, every package was confirmed at the npm origin and the blog check passed against npm.",
-      "matrix": "none",
-      "matrixRows": null,
+      "headlineHtml": null,
+      "highlights": [],
+      "upgradeNotes": [],
+      "summaryHtml": "<strong>Design system, web generators, new check rules, API helpers, budgets, accessibility tests and faster test runs.</strong> Breaking: root components now run in the browser so hydration covers the full document ancestry (move server-only root work to the root setup loader), and model resources receive hidden columns with <code>hidden</code> enforced on final output. <code>warlock add design-system</code> scaffolds fourteen accessible shadcn controls wired to Mongez React Form, included by default in full-stack and Tailwind + shadcn starters; <code>warlock generate page</code>, <code>form</code> and <code>crud-ui</code> scaffold pages, forms and guarded CRUD screens. <code>warlock check</code> adds WL9013–WL9018 (component size, component-owned state, native controls and validation, controllers without a response schema) and <code>--fix</code>; <code>warlock inspect --section files</code> and <code>warlock explain &lt;file&gt;</code> map files, imports and the routes that reach them. Core adds <code>AppError</code>, <code>listEndpoint</code>, <code>assertResponseContracts</code>, per-page gzip build budgets and <code>page.assertAccessible()</code> with axe-core; tests gain opt-in worker lifetime, <code>setupTest({ mode: \"unit\" })</code> and setup profiling. Auth bounds Google and JWKS requests; web keeps sessions in sync after refresh, locale changes and page swaps.",
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/5.35.0-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -2819,9 +2872,11 @@
       "id": "v5-34-3",
       "date": "October 20, 2026",
       "isUnreleased": false,
-      "summaryHtml": "<strong>One concise agent skill per package, stronger starter standards, and one JSON error shape.</strong> Every package exports exactly one skill named after it, with package-level descriptions of at most 450 characters (about 13,300 characters in total, down from 22,900). New apps get revised project skills: single-responsibility components, Mongez React Form validation only, custom accessible controls on the project's UI kit, camelCase response fields, <code>{ error: { code, message } }</code> errors, <code>responseSchema</code> and <code>Idempotency-Key</code> guidance, and Oxlint rules that enforce them. Core adds the opt-in <code>http.errorResponse</code> formatter for every JSON error, <code>ResponseStatus</code> gains 413 and 422, and <code>warlock e2e</code> gains <code>browser.startupTimeoutMs</code> (default 30 seconds). Lockstep release across all 33 packages. Generator matrix scope: <code>none</code>; before publishing, the blog on the 5.34.3 tarballs passed the release gate; after publishing, every package was confirmed at the npm origin and the blog check passed against npm.",
-      "matrix": "none",
-      "matrixRows": null,
+      "headlineHtml": null,
+      "highlights": [],
+      "upgradeNotes": [],
+      "summaryHtml": "<strong>One concise agent skill per package, stronger starter standards, and one JSON error shape.</strong> Every package exports exactly one skill named after it, with package-level descriptions of at most 450 characters (about 13,300 characters in total, down from 22,900). New apps get revised project skills: single-responsibility components, Mongez React Form validation only, custom accessible controls on the project's UI kit, camelCase response fields, <code>{ error: { code, message } }</code> errors, <code>responseSchema</code> and <code>Idempotency-Key</code> guidance, and Oxlint rules that enforce them. Core adds the opt-in <code>http.errorResponse</code> formatter for every JSON error, <code>ResponseStatus</code> gains 413 and 422, and <code>warlock e2e</code> gains <code>browser.startupTimeoutMs</code> (default 30 seconds).",
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/5.34.3-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -3452,9 +3507,11 @@
       "id": "v5-34-2",
       "date": "October 19, 2026",
       "isUnreleased": false,
-      "summaryHtml": "<strong>One complete skill index per package.</strong> Skills only; no runtime or API changes. The framework issue-reporting guide is now the <code>report-framework-issue</code> topic of <code>@warlock.js/core</code>, so <code>agent-kit</code> delivers it to apps (it was a loose file that never reached them). Every package index lists all of its topics, stale references are fixed, nine duplicate <code>overview</code> topics are merged into their indexes, and the hand-maintained <code>skills/README.md</code> catalogs are removed in favour of <code>skills/index.md</code>. The release gate and CI now fail when an index names a missing topic, leaves one out, or a package ships a loose skill file. Lockstep release across all 33 packages. Generator matrix scope: <code>none</code>; before publishing, the blog on the 5.34.2 tarballs passed the release gate; after publishing, every package was confirmed at the npm origin and the blog check passed against npm.",
-      "matrix": "none",
-      "matrixRows": null,
+      "headlineHtml": null,
+      "highlights": [],
+      "upgradeNotes": [],
+      "summaryHtml": "<strong>One complete skill index per package.</strong> Skills only; no runtime or API changes. The framework issue-reporting guide is now the <code>report-framework-issue</code> topic of <code>@warlock.js/core</code>, so <code>agent-kit</code> delivers it to apps (it was a loose file that never reached them). Every package index lists all of its topics, stale references are fixed, nine duplicate <code>overview</code> topics are merged into their indexes, and the hand-maintained <code>skills/README.md</code> catalogs are removed in favour of <code>skills/index.md</code>. The release gate and CI now fail when an index names a missing topic, leaves one out, or a package ships a loose skill file.",
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/5.34.2-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -3872,9 +3929,11 @@
       "id": "v5-34-1",
       "date": "October 19, 2026",
       "isUnreleased": false,
-      "summaryHtml": "<strong>Page setup files become the documented way to add page logic, plus MCP and secrets fixes.</strong> A page's <code>config</code>, <code>loader</code>, <code>register</code> and <code>action</code>/<code>actions</code> live in its <code>*.setup.ts</code> file and its UI file holds only components; metadata always lives in <code>config.metadata</code>. A new Page setup files guide, and every web docs example, skill, the starter template and the page/layout/root generators follow it; the setup-file error lists every allowed export. ai-tools: tools from a remote MCP server now show the model their real input schema (Standard JSON Schema), and <code>ai.mcp.serve</code> HTTP transports accept <code>onAuthRefusal</code> to keep an app's own auth-error response, with Host/Origin checks unchanged. Core: <code>secrets.backend()</code> reports whether the keychain, encrypted-file or memory backend is active, reusing core's own selection. Docs: tables in MDX pages render again. No breaking changes. Lockstep release across all 33 packages. Generator matrix scope: <code>none</code>; before publishing, the blog on the 5.34.1 tarballs passed the release gate; after publishing, every package was confirmed at the npm origin and the blog check passed against npm.",
-      "matrix": "none",
-      "matrixRows": null,
+      "headlineHtml": null,
+      "highlights": [],
+      "upgradeNotes": [],
+      "summaryHtml": "<strong>Page setup files become the documented way to add page logic, plus MCP and secrets fixes.</strong> A page's <code>config</code>, <code>loader</code>, <code>register</code> and <code>action</code>/<code>actions</code> live in its <code>*.setup.ts</code> file and its UI file holds only components; metadata always lives in <code>config.metadata</code>. A new Page setup files guide, and every web docs example, skill, the starter template and the page/layout/root generators follow it; the setup-file error lists every allowed export. ai-tools: tools from a remote MCP server now show the model their real input schema (Standard JSON Schema), and <code>ai.mcp.serve</code> HTTP transports accept <code>onAuthRefusal</code> to keep an app's own auth-error response, with Host/Origin checks unchanged. Core: <code>secrets.backend()</code> reports whether the keychain, encrypted-file or memory backend is active, reusing core's own selection. Docs: tables in MDX pages render again. No breaking changes.",
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/5.34.1-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -3972,9 +4031,11 @@
       "id": "v5-34-0",
       "date": "October 19, 2026",
       "isUnreleased": false,
-      "summaryHtml": "<strong>ESLint and Prettier support removed, plus multi-file transactions, browser end-to-end tests, an AI tool catalogue, a local queue driver and MCP serving hooks.</strong> The ESLint checker, <code>--lint eslint</code>, <code>devServer.healthCheckers.eslint</code> and Prettier scripts are gone; each removed option fails with a message naming 5.34.0, and no published package depends on ESLint or Prettier. <code>warlock upgrade --from 5.33 --to 5.34.0</code> migrates apps and now ports custom ESLint rules to Oxlint where an equivalent exists, reporting the rest; new and migrated apps enable Oxlint's <code>correctness</code> rules, and npm apps with a <code>pnpm-workspace.yaml</code> get the right install hint. fs: <code>fs.transaction()</code> stages multi-file writes with read-your-writes, hash or epoch preconditions, a durable journal with crash recovery, operation-id replay and consistent reads. Core: <code>warlock e2e</code> and <code>@warlock.js/core/e2e</code> drive Chrome or Edge over the DevTools protocol with hit-tested clicks, overflow checks at 1280 and 390 px, console and network checks, evidence and PID-verified teardown; an in-memory secrets backend for built-app tests. AI: <code>ai.tools.catalogue()</code> advertises a small core plus governed search and call meta-tools; <code>ai.mcp.serve</code> adds <code>listFilter</code>, HTTP <code>transport.routes</code>, <code>validateCallParams</code> and keeps <code>McpError</code> codes. Queue: <code>driver: \"local\"</code> (SQLite via <code>node:sqlite</code>, no Redis) and <code>driver: \"memory\"</code>. Seal: <code>v.record(key, value)</code>. Web: refresh events carry a <code>reason</code>, and shared data stays fresh across shell swaps. <strong>Breaking:</strong> ESLint/Prettier removal, Oxlint correctness rules, <code>v.object()</code> refuses arrays and non-plain objects. Lockstep release across all 33 packages. Generator matrix scope: <code>none</code>; before publishing, the blog on the 5.34.0 tarballs passed the release gate; after publishing, every package was confirmed at the npm origin and the blog check passed against npm.",
-      "matrix": "none",
-      "matrixRows": null,
+      "headlineHtml": null,
+      "highlights": [],
+      "upgradeNotes": [],
+      "summaryHtml": "<strong>ESLint and Prettier support removed, plus multi-file transactions, browser end-to-end tests, an AI tool catalogue, a local queue driver and MCP serving hooks.</strong> The ESLint checker, <code>--lint eslint</code>, <code>devServer.healthCheckers.eslint</code> and Prettier scripts are gone; each removed option fails with a message naming 5.34.0, and no published package depends on ESLint or Prettier. <code>warlock upgrade --from 5.33 --to 5.34.0</code> migrates apps and now ports custom ESLint rules to Oxlint where an equivalent exists, reporting the rest; new and migrated apps enable Oxlint's <code>correctness</code> rules, and npm apps with a <code>pnpm-workspace.yaml</code> get the right install hint. fs: <code>fs.transaction()</code> stages multi-file writes with read-your-writes, hash or epoch preconditions, a durable journal with crash recovery, operation-id replay and consistent reads. Core: <code>warlock e2e</code> and <code>@warlock.js/core/e2e</code> drive Chrome or Edge over the DevTools protocol with hit-tested clicks, overflow checks at 1280 and 390 px, console and network checks, evidence and PID-verified teardown; an in-memory secrets backend for built-app tests. AI: <code>ai.tools.catalogue()</code> advertises a small core plus governed search and call meta-tools; <code>ai.mcp.serve</code> adds <code>listFilter</code>, HTTP <code>transport.routes</code>, <code>validateCallParams</code> and keeps <code>McpError</code> codes. Queue: <code>driver: \"local\"</code> (SQLite via <code>node:sqlite</code>, no Redis) and <code>driver: \"memory\"</code>. Seal: <code>v.record(key, value)</code>. Web: refresh events carry a <code>reason</code>, and shared data stays fresh across shell swaps. <strong>Breaking:</strong> ESLint/Prettier removal, Oxlint correctness rules, <code>v.object()</code> refuses arrays and non-plain objects.",
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/5.34.0-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -4282,9 +4343,11 @@
       "id": "v5-33-0",
       "date": "October 19, 2026",
       "isUnreleased": false,
-      "summaryHtml": "<strong>Oxlint + Oxfmt become the only default toolchain, plus MCP request context, live page data, app-scoped secrets, AI measurement, PM2 commands and a new process supervisor.</strong> ESLint and Prettier are off by default and deprecated (removal in 5.34.0): an ESLint config alone no longer enables checks, and <code>warlock upgrade --from 5.32 --to 5.33.0</code> migrates an app to Oxlint/Oxfmt. AI: <code>ai.mcp.serve</code> passes <code>requestId</code>, an authenticated <code>principal</code> and cancellation signals to tools, with <code>beforeCall</code> policy after input validation; <code>ai.measure()</code> and <code>warlock ai measure</code> report per-part input tokens and cost, with <code>measure.diff</code>. Web: pages opt into <code>config.live</code> for loader refreshes pushed over sockets with polling fallback, driven by <code>invalidatePageCache(tags)</code>. Core: <code>secrets.get/set/remove/has</code> with OS keychain, scoped environment and encrypted-file backends and log masking; <code>warlock pm2 init</code>/<code>reload</code> with PM2 readiness after boot. Devtools: an AI panel on Panoptic traces and a Processes panel. New package <code>@warlock.js/process</code> (<code>warlock add process</code>) supervises app-owned workers on Linux, macOS and Windows with token and start-time identity, group stops and memory caps. <strong>Breaking:</strong> ESLint/Prettier no longer selected automatically, MCP cancellation and policy order, secret fakes in default test setup. Lockstep release across all 33 packages. Generator matrix scope: <code>none</code>; before publishing, the blog on the 5.33.0 tarballs passed the release gate; after publishing, every package was confirmed at the npm origin and the blog check passed against npm.",
-      "matrix": "none",
-      "matrixRows": null,
+      "headlineHtml": null,
+      "highlights": [],
+      "upgradeNotes": [],
+      "summaryHtml": "<strong>Oxlint + Oxfmt become the only default toolchain, plus MCP request context, live page data, app-scoped secrets, AI measurement, PM2 commands and a new process supervisor.</strong> ESLint and Prettier are off by default and deprecated (removal in 5.34.0): an ESLint config alone no longer enables checks, and <code>warlock upgrade --from 5.32 --to 5.33.0</code> migrates an app to Oxlint/Oxfmt. AI: <code>ai.mcp.serve</code> passes <code>requestId</code>, an authenticated <code>principal</code> and cancellation signals to tools, with <code>beforeCall</code> policy after input validation; <code>ai.measure()</code> and <code>warlock ai measure</code> report per-part input tokens and cost, with <code>measure.diff</code>. Web: pages opt into <code>config.live</code> for loader refreshes pushed over sockets with polling fallback, driven by <code>invalidatePageCache(tags)</code>. Core: <code>secrets.get/set/remove/has</code> with OS keychain, scoped environment and encrypted-file backends and log masking; <code>warlock pm2 init</code>/<code>reload</code> with PM2 readiness after boot. Devtools: an AI panel on Panoptic traces and a Processes panel. New package <code>@warlock.js/process</code> (<code>warlock add process</code>) supervises app-owned workers on Linux, macOS and Windows with token and start-time identity, group stops and memory caps. <strong>Breaking:</strong> ESLint/Prettier no longer selected automatically, MCP cancellation and policy order, secret fakes in default test setup.",
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/5.33.0-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -4622,9 +4685,11 @@
       "id": "v5-32-0",
       "date": "October 18, 2026",
       "isUnreleased": false,
-      "summaryHtml": "<strong>TypeScript 7 across the family, metric-matched web fonts, and fixes from upgrading real apps to 5.31.</strong> Every package, new app and the release tooling move to TypeScript 7.0.2 (the native <code>tsc</code>): the workspace typecheck drops from about 1 min 51 s to 36 s, <code>warlock typecheck</code>/<code>check</code> and the dev-server checker run on the native compiler, and syntax analysis uses oxc-parser. Apps drop <code>baseUrl</code> and <code>moduleResolution: node</code>/<code>node10</code> from their tsconfig. New apps default to Oxlint + Oxfmt; the opt-in ESLint toolchain stays on TypeScript 6.0.3 because typescript-eslint does not support TypeScript 7. Web: declared fonts with preload, metric-matched fallbacks that stop the layout shift when a web font swaps in, and immutable caching. AI: opt-in native MCP results, private permissions for snapshot/session/cassette files, Gemini Developer API token counting with system prompts and tools (with an estimate fallback), hosted-search usage and cost across providers, Qwen search and Kimi search/fetch tools. Security: esbuild 0.28.2 (GHSA-g7r4-m6w7-qqqr). Notifications imports herald as an optional peer instead of bundling a private copy. Agents get <code>report-framework-issue.md</code> and <code>warlock issue</code> to file framework issues with consent. <strong>Breaking:</strong> TypeScript 7 config changes, private AI file modes, herald must be installed for <code>.queue()</code> with the herald backend. Lockstep release across all 32 packages. Generator matrix scope: <code>none</code>; before publishing, the blog on the 5.32.0 tarballs passed the release gate; after publishing, every package was confirmed at the npm origin and the blog check passed against npm.",
-      "matrix": "none",
-      "matrixRows": null,
+      "headlineHtml": null,
+      "highlights": [],
+      "upgradeNotes": [],
+      "summaryHtml": "<strong>TypeScript 7 across the family, metric-matched web fonts, and fixes from upgrading real apps to 5.31.</strong> Every package, new app and the release tooling move to TypeScript 7.0.2 (the native <code>tsc</code>): the workspace typecheck drops from about 1 min 51 s to 36 s, <code>warlock typecheck</code>/<code>check</code> and the dev-server checker run on the native compiler, and syntax analysis uses oxc-parser. Apps drop <code>baseUrl</code> and <code>moduleResolution: node</code>/<code>node10</code> from their tsconfig. New apps default to Oxlint + Oxfmt; the opt-in ESLint toolchain stays on TypeScript 6.0.3 because typescript-eslint does not support TypeScript 7. Web: declared fonts with preload, metric-matched fallbacks that stop the layout shift when a web font swaps in, and immutable caching. AI: opt-in native MCP results, private permissions for snapshot/session/cassette files, Gemini Developer API token counting with system prompts and tools (with an estimate fallback), hosted-search usage and cost across providers, Qwen search and Kimi search/fetch tools. Security: esbuild 0.28.2 (GHSA-g7r4-m6w7-qqqr). Notifications imports herald as an optional peer instead of bundling a private copy. Agents get <code>report-framework-issue.md</code> and <code>warlock issue</code> to file framework issues with consent. <strong>Breaking:</strong> TypeScript 7 config changes, private AI file modes, herald must be installed for <code>.queue()</code> with the herald backend.",
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/5.32.0-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -5422,9 +5487,11 @@
       "id": "v5-31-0",
       "date": "October 18, 2026",
       "isUnreleased": false,
-      "summaryHtml": "<strong>Rate limits that actually apply in production, a toolbelt for AI coding agents, and a broad AI upgrade.</strong> Security: the global HTTP rate limiter (<code>http.rateLimit</code>, 60 requests/minute per IP by default) is now enforced in production — in 5.30 and earlier it never applied to application routes; static files and the <code>/health</code>/<code>/ready</code> probes are exempt by default. Agents get <code>warlock inspect --json</code>, <code>warlock check</code> (typecheck, lint, related tests and framework convention checks with stable <code>WLxxxx</code> codes and an environment-vs-code exit split), <code>warlock explain</code>, <code>warlock mcp</code>, <code>warlock trace</code>, a generated app <code>AGENTS.md</code>, <code>warlock board</code>, <code>warlock make endpoint</code>, <code>--dry-run --json</code> on every generator, a test kit with fakes on by default and model factories, and <code>warlock upgrade</code> codemods. AI: a run cut off by the output or context limit ends as <code>AgentIncompleteError</code> instead of an empty success, cost is cache-aware with verified price tables and reserve-then-commit budgets, reasoning/tool-argument/usage stream chunks, provider-defined tools, conversation sessions with file and SQLite stores, compaction for thinking runs, MCP serving over HTTP with auth, a coding-agent workspace tool belt, and the new <code>@warlock.js/ai-cli</code> that drives 14 vendor coding CLIs as agents. Also: built apps start on Bun and Deno (<code>warlock dev</code> stays on Node), Node 22.15 is the minimum, a confined no-follow reader in <code>@warlock.js/fs</code>, FileLog naming and retention, route-level validation failure responses, and <code>v.union</code> tries every matching object member. <strong>Breaking:</strong> enforced rate limits, incomplete agent runs, <code>v.union</code> error paths, sortable FileLog names, and more — see the upgrade notes and <code>warlock upgrade --from 5.30 --to 5.31.0</code>. Lockstep release across all 32 packages, one of them new (<code>@warlock.js/ai-cli</code>). Generator matrix scope: <code>none</code>; before publishing, the blog on the 5.31.0 tarballs passed the release gate; after publishing, every package was confirmed at the npm origin and the blog check passed against npm.",
-      "matrix": "none",
-      "matrixRows": null,
+      "headlineHtml": null,
+      "highlights": [],
+      "upgradeNotes": [],
+      "summaryHtml": "<strong>Rate limits that actually apply in production, a toolbelt for AI coding agents, and a broad AI upgrade.</strong> Security: the global HTTP rate limiter (<code>http.rateLimit</code>, 60 requests/minute per IP by default) is now enforced in production — in 5.30 and earlier it never applied to application routes; static files and the <code>/health</code>/<code>/ready</code> probes are exempt by default. Agents get <code>warlock inspect --json</code>, <code>warlock check</code> (typecheck, lint, related tests and framework convention checks with stable <code>WLxxxx</code> codes and an environment-vs-code exit split), <code>warlock explain</code>, <code>warlock mcp</code>, <code>warlock trace</code>, a generated app <code>AGENTS.md</code>, <code>warlock board</code>, <code>warlock make endpoint</code>, <code>--dry-run --json</code> on every generator, a test kit with fakes on by default and model factories, and <code>warlock upgrade</code> codemods. AI: a run cut off by the output or context limit ends as <code>AgentIncompleteError</code> instead of an empty success, cost is cache-aware with verified price tables and reserve-then-commit budgets, reasoning/tool-argument/usage stream chunks, provider-defined tools, conversation sessions with file and SQLite stores, compaction for thinking runs, MCP serving over HTTP with auth, a coding-agent workspace tool belt, and the new <code>@warlock.js/ai-cli</code> that drives 14 vendor coding CLIs as agents. Also: built apps start on Bun and Deno (<code>warlock dev</code> stays on Node), Node 22.15 is the minimum, a confined no-follow reader in <code>@warlock.js/fs</code>, FileLog naming and retention, route-level validation failure responses, and <code>v.union</code> tries every matching object member. <strong>Breaking:</strong> enforced rate limits, incomplete agent runs, <code>v.union</code> error paths, sortable FileLog names, and more — see the upgrade notes and <code>warlock upgrade --from 5.30 --to 5.31.0</code>. Lockstep release across all 32 packages, one of them new (<code>@warlock.js/ai-cli</code>).",
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/5.31.0-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -7197,9 +7264,11 @@
       "id": "v5-30-0",
       "date": "October 16, 2026",
       "isUnreleased": false,
-      "summaryHtml": "<strong>Fixes for issues found while building real apps on 5.29, plus a security and correctness review.</strong> Security: request logs no longer carry OAuth codes, signed-URL credentials or raw <code>Request</code>/<code>Response</code> objects (route <code>logging</code> policy, masked URLs and query), log and cache output masks email addresses with a linear pattern, <code>&lt;Form&gt;</code> only enhances same-origin targets and redirects refuse <code>javascript:</code> targets on the server and the client, SSE event names and ids are stripped of line breaks, login throttles key by an HMAC of the credential, and parallel AI tool calls are capped and serialised per file. HTTP: a request-lifetime <code>request.signal</code>, bounded SSE and stream retention with backpressure, graceful shutdown that closes idle keep-alive connections, typed <code>http.serverOptions</code>, <code>http.errorMapper</code>, shared rate limits through <code>@warlock.js/cache</code>, and <code>@warlock.js/core/errors</code>. Seal: <code>v.literal(\"\")</code> and <code>.default(\"\")</code> keep empty strings, optional discriminated unions accept omitted fields, and <code>validate()</code> returns typed output. Web: 4xx error pages hydrate, <code>&lt;Head /&gt;</code> renders the viewport, <code>&lt;Form independent&gt;</code>, redirect submissions wait for the new page, and production starts without Vite or Babel. <strong>Breaking:</strong> log methods return the logger instead of a promise (<code>await log.flush()</code> waits), and AI tool calls in one trip run concurrently by default (<code>toolDispatch: \"sequential\"</code>). <code>create-warlock</code> works on pnpm 9 and 10 again. Lockstep release across all 31 packages. Generator matrix scope: <code>none</code>; before publishing, the blog on the 5.30.0 tarballs passed the release gate; after publishing, the registry confirm timed out on a delayed <code>@warlock.js/ai-mistral</code> publish, every package was then confirmed at npm origin and the family installed from npm, and the blog check against npm was not run in that job.",
-      "matrix": "none",
-      "matrixRows": null,
+      "headlineHtml": null,
+      "highlights": [],
+      "upgradeNotes": [],
+      "summaryHtml": "<strong>Fixes for issues found while building real apps on 5.29, plus a security and correctness review.</strong> Security: request logs no longer carry OAuth codes, signed-URL credentials or raw <code>Request</code>/<code>Response</code> objects (route <code>logging</code> policy, masked URLs and query), log and cache output masks email addresses with a linear pattern, <code>&lt;Form&gt;</code> only enhances same-origin targets and redirects refuse <code>javascript:</code> targets on the server and the client, SSE event names and ids are stripped of line breaks, login throttles key by an HMAC of the credential, and parallel AI tool calls are capped and serialised per file. HTTP: a request-lifetime <code>request.signal</code>, bounded SSE and stream retention with backpressure, graceful shutdown that closes idle keep-alive connections, typed <code>http.serverOptions</code>, <code>http.errorMapper</code>, shared rate limits through <code>@warlock.js/cache</code>, and <code>@warlock.js/core/errors</code>. Seal: <code>v.literal(\"\")</code> and <code>.default(\"\")</code> keep empty strings, optional discriminated unions accept omitted fields, and <code>validate()</code> returns typed output. Web: 4xx error pages hydrate, <code>&lt;Head /&gt;</code> renders the viewport, <code>&lt;Form independent&gt;</code>, redirect submissions wait for the new page, and production starts without Vite or Babel. <strong>Breaking:</strong> log methods return the logger instead of a promise (<code>await log.flush()</code> waits), and AI tool calls in one trip run concurrently by default (<code>toolDispatch: \"sequential\"</code>). <code>create-warlock</code> works on pnpm 9 and 10 again.",
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/5.30.0-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -7929,9 +7998,11 @@
       "id": "v5-29-0",
       "date": "October 1, 2026",
       "isUnreleased": false,
-      "summaryHtml": "<strong>Fixes for applications upgrading from 5.27, typed nullable and list resources, and one module graph in dev.</strong> <code>locales.json</code> files under <code>$sites/&lt;site&gt;/…</code> (and other <code>$</code> folders) work again: the folder only names the group when <code>$group</code> is missing (a 5.27 regression). In <code>warlock dev</code>, the dev server has its own Vite cache so a vitest run no longer breaks it, multi-site roots get their site's translations, the original error of a broken page is logged first instead of a follow-on <code>useLocale()</code> error, and <code>src/app</code> modules imported by pages share the instance the API side uses. New in <code>@warlock.js/core</code>: <code>nullable(Resource)</code> for resources that may be <code>null</code> (resources, <code>responseSchema</code>, OpenAPI, route types) and <code>[Resource]</code> list fields in <code>defineResource</code>; cast strings inside <code>arrayOf</code> item schemas are no longer dropped. <code>useTrans()</code> returns <code>string</code> instead of <code>any</code>. Every package's skills now refer to other topics by name, so the links work after they are copied into an app. Lockstep release across all 31 packages. Generator matrix scope: <code>none</code>; before publishing, the blog on the 5.29.0 tarballs passed install, typecheck, a fresh migrate and seed, devtools in dev with the API docs, a production build with browser smoke, and the <code>--role=worker</code> and <code>--role=api</code> starts; after publishing, the same check passed against npm.",
-      "matrix": "none",
-      "matrixRows": null,
+      "headlineHtml": null,
+      "highlights": [],
+      "upgradeNotes": [],
+      "summaryHtml": "<strong>Fixes for applications upgrading from 5.27, typed nullable and list resources, and one module graph in dev.</strong> <code>locales.json</code> files under <code>$sites/&lt;site&gt;/…</code> (and other <code>$</code> folders) work again: the folder only names the group when <code>$group</code> is missing (a 5.27 regression). In <code>warlock dev</code>, the dev server has its own Vite cache so a vitest run no longer breaks it, multi-site roots get their site's translations, the original error of a broken page is logged first instead of a follow-on <code>useLocale()</code> error, and <code>src/app</code> modules imported by pages share the instance the API side uses. New in <code>@warlock.js/core</code>: <code>nullable(Resource)</code> for resources that may be <code>null</code> (resources, <code>responseSchema</code>, OpenAPI, route types) and <code>[Resource]</code> list fields in <code>defineResource</code>; cast strings inside <code>arrayOf</code> item schemas are no longer dropped. <code>useTrans()</code> returns <code>string</code> instead of <code>any</code>. Every package's skills now refer to other topics by name, so the links work after they are copied into an app.",
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/5.29.0-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -8474,9 +8545,11 @@
       "id": "v5-28-0",
       "date": "October 1, 2026",
       "isUnreleased": false,
-      "summaryHtml": "<strong>Postman collections, Swagger UI, and fixes from production use.</strong> <code>warlock generate.postman</code> writes a Postman Collection v2.1.0 from the same OpenAPI document as <code>generate.openapi</code> (tag folders, example bodies, saved responses, <code>{{baseUrl}}</code>/<code>{{token}}</code>, bearer auth on guarded routes), and <code>@warlock.js/devtools</code> adds Swagger UI beside Scalar at <code>/__warlock/docs/swagger</code> with OpenAPI and Postman downloads. The web skills were audited against the code and expanded (page metadata, cookies, images, testing pages, hydration debugging), and every package's <code>llms.txt</code> now lists each skill with its description. <strong>Fixed:</strong> replacing or unsetting a nested object in Cascade no longer leaves empty parent objects; expected 4xx errors log one <code>warn</code> line instead of an error-level stack; <code>v.object()</code> output follows the declared key order; the per-site sitemap is served as <code>application/xml</code>; an empty nested-resource list outputs <code>[]</code>. <strong>Behaviour changes:</strong> <code>set(\"field\", obj)</code> writes the nested object as one value; 4xx errors log at <code>warn</code>. Lockstep release across all 31 packages. Generator matrix scope: <code>none</code>; before publishing, the blog on the 5.28.0 tarballs passed install, typecheck, a fresh migrate and seed, devtools in dev including the API docs (OpenAPI, Postman, Scalar, Swagger UI), a production build with browser smoke, and the <code>--role=worker</code> and <code>--role=api</code> starts; after publishing, the same check passed against npm.",
-      "matrix": "none",
-      "matrixRows": null,
+      "headlineHtml": null,
+      "highlights": [],
+      "upgradeNotes": [],
+      "summaryHtml": "<strong>Postman collections, Swagger UI, and fixes from production use.</strong> <code>warlock generate.postman</code> writes a Postman Collection v2.1.0 from the same OpenAPI document as <code>generate.openapi</code> (tag folders, example bodies, saved responses, <code>{{baseUrl}}</code>/<code>{{token}}</code>, bearer auth on guarded routes), and <code>@warlock.js/devtools</code> adds Swagger UI beside Scalar at <code>/__warlock/docs/swagger</code> with OpenAPI and Postman downloads. The web skills were audited against the code and expanded (page metadata, cookies, images, testing pages, hydration debugging), and every package's <code>llms.txt</code> now lists each skill with its description. <strong>Fixed:</strong> replacing or unsetting a nested object in Cascade no longer leaves empty parent objects; expected 4xx errors log one <code>warn</code> line instead of an error-level stack; <code>v.object()</code> output follows the declared key order; the per-site sitemap is served as <code>application/xml</code>; an empty nested-resource list outputs <code>[]</code>. <strong>Behaviour changes:</strong> <code>set(\"field\", obj)</code> writes the nested object as one value; 4xx errors log at <code>warn</code>.",
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/5.28.0-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -8939,9 +9012,11 @@
       "id": "v5-27-0",
       "date": "October 1, 2026",
       "isUnreleased": false,
-      "summaryHtml": "<strong>Typed API responses, typed page data, OpenAPI, and reasoning with tools on GPT-6.</strong> Controllers declare <code>responseSchema</code> and the generated route types carry it: <code>ApiResponse&lt;\"auth.login\"&gt;</code> and <code>useSubmitForm({ route })</code> know the response body, and undeclared routes stay <code>unknown</code>. <code>defineResource()</code> infers its output type, <code>Serialized&lt;T&gt;</code> describes what the client receives, and page loader data is typed as what actually reaches the page (models map to their resource automatically). Pages guarded by <code>requireUser()</code> get a non-null user in their loader and in <code>useUser(\"route.name\")</code>. <code>warlock generate.openapi</code> writes an OpenAPI 3.1 file for Postman and Insomnia, and <code>warlock dev</code> adds interactive API docs at <code>/__warlock/docs</code>. <code>@warlock.js/ai-openai</code> adds the opt-in Responses API (<code>api: \"responses\"</code>) so reasoning models can use tools with reasoning on, including streaming and reasoning carried across tool turns. <strong>Fixed:</strong> a promise nested in page loader data is now serialized after it settles (a model inside one made devalue throw). <strong>Behaviour changes:</strong> page <code>data</code> types are the serialized shape; <code>@mongez/supportive-is</code> 3.0 checkers are type predicates. Lockstep release across all 31 packages. Generator matrix scope: <code>none</code>; before publishing, the blog on the 5.27.0 tarballs passed install, typecheck, a fresh migrate and seed, devtools in dev, a production build with browser smoke, and the <code>--role=worker</code> and <code>--role=api</code> starts; after publishing, the same check passed against npm.",
-      "matrix": "none",
-      "matrixRows": null,
+      "headlineHtml": null,
+      "highlights": [],
+      "upgradeNotes": [],
+      "summaryHtml": "<strong>Typed API responses, typed page data, OpenAPI, and reasoning with tools on GPT-6.</strong> Controllers declare <code>responseSchema</code> and the generated route types carry it: <code>ApiResponse&lt;\"auth.login\"&gt;</code> and <code>useSubmitForm({ route })</code> know the response body, and undeclared routes stay <code>unknown</code>. <code>defineResource()</code> infers its output type, <code>Serialized&lt;T&gt;</code> describes what the client receives, and page loader data is typed as what actually reaches the page (models map to their resource automatically). Pages guarded by <code>requireUser()</code> get a non-null user in their loader and in <code>useUser(\"route.name\")</code>. <code>warlock generate.openapi</code> writes an OpenAPI 3.1 file for Postman and Insomnia, and <code>warlock dev</code> adds interactive API docs at <code>/__warlock/docs</code>. <code>@warlock.js/ai-openai</code> adds the opt-in Responses API (<code>api: \"responses\"</code>) so reasoning models can use tools with reasoning on, including streaming and reasoning carried across tool turns. <strong>Fixed:</strong> a promise nested in page loader data is now serialized after it settles (a model inside one made devalue throw). <strong>Behaviour changes:</strong> page <code>data</code> types are the serialized shape; <code>@mongez/supportive-is</code> 3.0 checkers are type predicates.",
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/5.27.0-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -9163,9 +9238,11 @@
       "id": "v5-26-0",
       "date": "September 30, 2026",
       "isUnreleased": false,
-      "summaryHtml": "<strong>Security upgrades, module <code>locales.json</code>, typed URLs, and loaders that return resources.</strong> Fastify and its plugins move up a major for security fixes (only <code>router.directory()</code> <code>setHeaders</code> callers change code: use <code>reply.header()</code>). Modules register translations from <code>utils/locales.json</code>; <code>warlock doctor --fix</code> converts legacy <code>locales.ts</code>, which is deprecated for v6. Route params validate with <code>validation.params</code> (<code>v.int()</code> turns <code>:id</code> into a number). <code>href()</code>, <code>navigateTo()</code> and the new <code>apiHref()</code> take <code>{ name, params, query }</code>. Page and layout loaders can return resources, serialized like response bodies. <code>whereTrusted()</code> allows code-authored Mongo operators, auth cookies can be scoped per request with <code>cookieDomain(request)</code>, and the AI adapters gain wider reasoning-effort levels, prompt caching controls and correct parameters for current Claude and OpenAI reasoning models. <strong>Behaviour changes:</strong> IPv6 rate limits group by /64, package migrations run before app migrations, <code>navigateTo()</code> hard-navigates before hydration, and <code>request.user</code> and <code>RequestUserMovedError</code> are removed (use <code>request.locals.user</code>). <code>t()</code>, <code>request.t()</code> and <code>request.trans()</code> are typed as <code>string</code>. Lockstep release across all 31 packages. Generator matrix scope: <code>none</code>; before publishing, the blog on the 5.26.0 tarballs passed install, typecheck, a fresh migrate and seed, devtools in dev, a production build with browser smoke, and the <code>--role=worker</code> and <code>--role=api</code> starts.",
-      "matrix": "none",
-      "matrixRows": null,
+      "headlineHtml": null,
+      "highlights": [],
+      "upgradeNotes": [],
+      "summaryHtml": "<strong>Security upgrades, module <code>locales.json</code>, typed URLs, and loaders that return resources.</strong> Fastify and its plugins move up a major for security fixes (only <code>router.directory()</code> <code>setHeaders</code> callers change code: use <code>reply.header()</code>). Modules register translations from <code>utils/locales.json</code>; <code>warlock doctor --fix</code> converts legacy <code>locales.ts</code>, which is deprecated for v6. Route params validate with <code>validation.params</code> (<code>v.int()</code> turns <code>:id</code> into a number). <code>href()</code>, <code>navigateTo()</code> and the new <code>apiHref()</code> take <code>{ name, params, query }</code>. Page and layout loaders can return resources, serialized like response bodies. <code>whereTrusted()</code> allows code-authored Mongo operators, auth cookies can be scoped per request with <code>cookieDomain(request)</code>, and the AI adapters gain wider reasoning-effort levels, prompt caching controls and correct parameters for current Claude and OpenAI reasoning models. <strong>Behaviour changes:</strong> IPv6 rate limits group by /64, package migrations run before app migrations, <code>navigateTo()</code> hard-navigates before hydration, and <code>request.user</code> and <code>RequestUserMovedError</code> are removed (use <code>request.locals.user</code>). <code>t()</code>, <code>request.t()</code> and <code>request.trans()</code> are typed as <code>string</code>.",
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/5.26.0-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -9556,9 +9633,11 @@
       "id": "v5-25-0",
       "date": "September 29, 2026",
       "isUnreleased": false,
-      "summaryHtml": "<strong>Devtools, deploy in parts, and the first release built on GitHub Actions.</strong> The new <code>@warlock.js/devtools</code> adds a development dashboard at <code>/__warlock</code>: each request's phases, SQL and MongoDB queries with EXPLAIN, cache and log activity, captured mails and N+1 warnings. Add it with <code>warlock add devtools</code>; <code>warlock dev</code> loads it automatically and production never mounts it. <code>warlock start --role=api|web|worker</code> and <code>--sites=a,b</code> run one build as separate processes. Pages get per-locale <code>alternates</code> metadata and the matched <code>route</code> in loaders and actions; <code>setupTest({ importModule })</code> loads app modules through Vitest's module graph. <strong>Behaviour changes:</strong> model-write validation failures answer 500 by default (configurable with <code>http.modelValidationErrorStatus</code>), and blank form values count as missing for non-string validators. Fixes include MongoDB upserts assigning auto ids, a clear <code>UnsupportedLockForUpdateError</code> on MongoDB, nullable objects in seal, <code>warlock seed</code> and <code>migrate</code> skipping test files, and plugin routes keeping their params in dev. Lockstep release across all 31 packages. Generator matrix scope: <code>none</code>; before publishing, the blog on the 5.25.0 tarballs passed install, typecheck, a fresh migrate and seed, devtools in dev, a production build with browser smoke, and the <code>--role=worker</code> and <code>--role=api</code> starts.",
-      "matrix": "none",
-      "matrixRows": null,
+      "headlineHtml": null,
+      "highlights": [],
+      "upgradeNotes": [],
+      "summaryHtml": "<strong>Devtools, deploy in parts, and the first release built on GitHub Actions.</strong> The new <code>@warlock.js/devtools</code> adds a development dashboard at <code>/__warlock</code>: each request's phases, SQL and MongoDB queries with EXPLAIN, cache and log activity, captured mails and N+1 warnings. Add it with <code>warlock add devtools</code>; <code>warlock dev</code> loads it automatically and production never mounts it. <code>warlock start --role=api|web|worker</code> and <code>--sites=a,b</code> run one build as separate processes. Pages get per-locale <code>alternates</code> metadata and the matched <code>route</code> in loaders and actions; <code>setupTest({ importModule })</code> loads app modules through Vitest's module graph. <strong>Behaviour changes:</strong> model-write validation failures answer 500 by default (configurable with <code>http.modelValidationErrorStatus</code>), and blank form values count as missing for non-string validators. Fixes include MongoDB upserts assigning auto ids, a clear <code>UnsupportedLockForUpdateError</code> on MongoDB, nullable objects in seal, <code>warlock seed</code> and <code>migrate</code> skipping test files, and plugin routes keeping their params in dev.",
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/5.25.0-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -9906,9 +9985,11 @@
       "id": "v5-24-0",
       "date": "September 27, 2026",
       "isUnreleased": false,
-      "summaryHtml": "<strong>Safer human-in-the-loop approvals and working Claude extended thinking.</strong> A durable HITL approval is now bound to the exact agent session, tool and arguments it approved, so it can no longer be consumed by a concurrent run or applied to a different call; pending approvals from earlier versions ask again. Claude extended thinking now works on Anthropic and Bedrock across tool calls (signed thinking blocks are replayed), and <code>maxTokens</code> must exceed the thinking budget. Named <code>ErrorBoundary</code> components receive the HTTP <code>status</code>; <code>PageLoaderContext</code> no longer needs type arguments; Postgres transactions accept <code>settings</code> applied as <code>SET LOCAL</code>; <code>request.input()</code> sees multi-site route params; <code>merge({ col: null })</code> saves NULL. Lockstep release across all 30 packages. Generator matrix scope: <code>none</code>; the blog on 5.24.0 from npm passed its production browser smoke.",
-      "matrix": "none",
-      "matrixRows": null,
+      "headlineHtml": null,
+      "highlights": [],
+      "upgradeNotes": [],
+      "summaryHtml": "<strong>Safer human-in-the-loop approvals and working Claude extended thinking.</strong> A durable HITL approval is now bound to the exact agent session, tool and arguments it approved, so it can no longer be consumed by a concurrent run or applied to a different call; pending approvals from earlier versions ask again. Claude extended thinking now works on Anthropic and Bedrock across tool calls (signed thinking blocks are replayed), and <code>maxTokens</code> must exceed the thinking budget. Named <code>ErrorBoundary</code> components receive the HTTP <code>status</code>; <code>PageLoaderContext</code> no longer needs type arguments; Postgres transactions accept <code>settings</code> applied as <code>SET LOCAL</code>; <code>request.input()</code> sees multi-site route params; <code>merge({ col: null })</code> saves NULL.",
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/5.24.0-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -10044,9 +10125,11 @@
       "id": "v5-23-2",
       "date": "September 26, 2026",
       "isUnreleased": false,
-      "summaryHtml": "<strong>Multi-site locale routing and site-origin URLs.</strong> In a multi-site app, <code>&lt;Link&gt;</code>, <code>localizedPath()</code>, hreflang and the routing handed to the browser now follow each request's own site (its <code>localeRouting</code>), where before no locale prefix was ever added. Canonical, <code>og:url</code> and hreflang use the request's site origin instead of the app's single public URL. <code>warlock build</code> no longer fails when a site sets its own <code>localeRouting</code>. A page's declared <code>route.name</code> now reaches the generated route types when its loader lives in a companion <code>.setup.ts</code>. Lockstep release across all 30 packages. Generator matrix scope: <code>none</code>; the four-site demo (19/19 in dev and production, including new locale checks) and the blog cover the change.",
-      "matrix": "none",
-      "matrixRows": null,
+      "headlineHtml": null,
+      "highlights": [],
+      "upgradeNotes": [],
+      "summaryHtml": "<strong>Multi-site locale routing and site-origin URLs.</strong> In a multi-site app, <code>&lt;Link&gt;</code>, <code>localizedPath()</code>, hreflang and the routing handed to the browser now follow each request's own site (its <code>localeRouting</code>), where before no locale prefix was ever added. Canonical, <code>og:url</code> and hreflang use the request's site origin instead of the app's single public URL. <code>warlock build</code> no longer fails when a site sets its own <code>localeRouting</code>. A page's declared <code>route.name</code> now reaches the generated route types when its loader lives in a companion <code>.setup.ts</code>.",
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/5.23.2-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -10085,9 +10168,11 @@
       "id": "v5-23-1",
       "date": "September 26, 2026",
       "isUnreleased": false,
-      "summaryHtml": "<strong>Multi-site: <code>$sites</code> folders, dev hydration, and production routing.</strong> Sites now live only in <code>src/web/$sites/&lt;key&gt;/</code> (the folder name is the site key); <code>web.sites.&lt;key&gt;.pages</code> is removed and a leftover <code>pages</code> is a boot error naming the folder to move. Fixes: in <code>warlock dev</code>, each site's client entry now loads only its own pages (it failed with \"Two pages resolve to the same route path\" and never hydrated); adding or removing a page in dev no longer fails with a duplicate site-dispatch route name; <code>$sites/&lt;key&gt;</code> never leaks into page URLs or route names in production. Lockstep release across all 30 packages.",
-      "matrix": null,
-      "matrixRows": null,
+      "headlineHtml": null,
+      "highlights": [],
+      "upgradeNotes": [],
+      "summaryHtml": "<strong>Multi-site: <code>$sites</code> folders, dev hydration, and production routing.</strong> Sites now live only in <code>src/web/$sites/&lt;key&gt;/</code> (the folder name is the site key); <code>web.sites.&lt;key&gt;.pages</code> is removed and a leftover <code>pages</code> is a boot error naming the folder to move. Fixes: in <code>warlock dev</code>, each site's client entry now loads only its own pages (it failed with \"Two pages resolve to the same route path\" and never hydrated); adding or removing a page in dev no longer fails with a duplicate site-dispatch route name; <code>$sites/&lt;key&gt;</code> never leaks into page URLs or route names in production.",
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/5.23.1-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -10130,9 +10215,11 @@
       "id": "v5-23-0",
       "date": "September 26, 2026",
       "isUnreleased": false,
-      "summaryHtml": "<strong>Multi-site web applications, safer traffic controls, and Postgres correctness.</strong> Web adds <code>web.sites</code> and <code>resolveHost</code> for fixed and tenant-resolved domains, with isolated roots, routes, page caches, sitemap/robots, cross-site links, <code>siteUrl()</code>, and <code>tlsAsk</code>; it also fixes Real-Estate multi-site production and page-action edge cases. Core adds per-user <code>rateLimit({ key: \"user\" })</code>. Cascade adds opt-in Postgres <code>naming: \"snake_case\"</code> and safe <code>bigint</code>/<code>int8</code> parsing. Queue carries request context into jobs, and Scheduler adds <code>scheduler.around</code>. Lockstep release across all 30 packages.",
-      "matrix": null,
-      "matrixRows": null,
+      "headlineHtml": null,
+      "highlights": [],
+      "upgradeNotes": [],
+      "summaryHtml": "<strong>Multi-site web applications, safer traffic controls, and Postgres correctness.</strong> Web adds <code>web.sites</code> and <code>resolveHost</code> for fixed and tenant-resolved domains, with isolated roots, routes, page caches, sitemap/robots, cross-site links, <code>siteUrl()</code>, and <code>tlsAsk</code>; it also fixes Real-Estate multi-site production and page-action edge cases. Core adds per-user <code>rateLimit({ key: \"user\" })</code>. Cascade adds opt-in Postgres <code>naming: \"snake_case\"</code> and safe <code>bigint</code>/<code>int8</code> parsing. Queue carries request context into jobs, and Scheduler adds <code>scheduler.around</code>.",
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/5.23.0-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -10423,9 +10510,11 @@
       "id": "v5-22-1",
       "date": "September 25, 2026",
       "isUnreleased": false,
-      "summaryHtml": "<strong>Installed app corrections.</strong> Web resolves page sessions from Core's shared configuration, restoring signed-in loaders, actions, and <code>useUser()</code> in installed apps. Create Warlock loads generated page styles through the app stylesheet so sitemap generation can import page modules in Node. Lockstep corrective release across all 30 packages. Generator matrix scope: <code>none</code>; local-registry and separate fresh-install checks are recorded in the release summary.",
-      "matrix": "none",
-      "matrixRows": null,
+      "headlineHtml": null,
+      "highlights": [],
+      "upgradeNotes": [],
+      "summaryHtml": "<strong>Installed app corrections.</strong> Web resolves page sessions from Core's shared configuration, restoring signed-in loaders, actions, and <code>useUser()</code> in installed apps. Create Warlock loads generated page styles through the app stylesheet so sitemap generation can import page modules in Node. Lockstep corrective release across all 30 packages.",
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/5.22.1-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -10452,9 +10541,11 @@
       "id": "v5-22-0",
       "date": "September 25, 2026",
       "isUnreleased": false,
-      "summaryHtml": "<strong>Page action and session contracts, durable Cascade jobs, and safer AI serving.</strong> Web and Auth add action-specific validated input, session-aware page and layout loaders, buffered logout cookie clearing, and a 503 action helper. Cascade restores PostgreSQL TTL purge jobs after reconnect and retries post-commit sync fan-out; Core preserves configured local-storage path prefixes. AI serving adds server-owned sessions, request limits, disconnect cancellation, safer MCP environment handling, unpriced-model budget rejection, and Core-owned SSRF address classification. Sixteen approved Mongez skills-only patches and grouped agent-kit skills are included. Lockstep release across all 30 packages. Generator matrix scope: <code>none</code>; local-registry package checks and separate fresh-install checks are recorded in the release summary.",
-      "matrix": "none",
-      "matrixRows": null,
+      "headlineHtml": null,
+      "highlights": [],
+      "upgradeNotes": [],
+      "summaryHtml": "<strong>Page action and session contracts, durable Cascade jobs, and safer AI serving.</strong> Web and Auth add action-specific validated input, session-aware page and layout loaders, buffered logout cookie clearing, and a 503 action helper. Cascade restores PostgreSQL TTL purge jobs after reconnect and retries post-commit sync fan-out; Core preserves configured local-storage path prefixes. AI serving adds server-owned sessions, request limits, disconnect cancellation, safer MCP environment handling, unpriced-model budget rejection, and Core-owned SSRF address classification. Sixteen approved Mongez skills-only patches and grouped agent-kit skills are included.",
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/5.22.0-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -10615,9 +10706,11 @@
       "id": "v5-21-0",
       "date": "September 25, 2026",
       "isUnreleased": false,
-      "summaryHtml": "<strong>Page actions and sessions in pages.</strong> Pages can export <code>action</code>/<code>actions</code> and post with <code>&lt;Form&gt;</code> (works without JavaScript; <code>useActionData</code>, <code>FieldError</code>, <code>useIsSubmitting</code>), and read the signed-in user with <code>useUser()</code>, guarded server-side by <code>requireUser</code>/<code>requireGuest</code> from <code>@warlock.js/web/session</code>. <strong>Upgrade review required:</strong> a full framework sweep ships ~140 fixes with behaviour changes across core, cascade, web and auth (see each package changelog). Lockstep release across all 30 packages. Generator matrix ran <code>subset</code> scope (<code>baseline</code>, <code>scheduler</code>, <code>postgres</code>, <code>redis</code>, <code>web</code>, <code>sitemap</code>, <code>socket</code> rows); Hasan authorised it on 2026-09-24: \"Don't wait for any other approvals, you have green light to do everything needed to have 5.21 released, don't stop before the release, no complete the push and publish/release\".",
-      "matrix": "subset",
-      "matrixRows": ["baseline", "scheduler", "postgres", "redis", "web", "sitemap", "socket"],
+      "headlineHtml": null,
+      "highlights": [],
+      "upgradeNotes": [],
+      "summaryHtml": "<strong>Page actions and sessions in pages.</strong> Pages can export <code>action</code>/<code>actions</code> and post with <code>&lt;Form&gt;</code> (works without JavaScript; <code>useActionData</code>, <code>FieldError</code>, <code>useIsSubmitting</code>), and read the signed-in user with <code>useUser()</code>, guarded server-side by <code>requireUser</code>/<code>requireGuest</code> from <code>@warlock.js/web/session</code>. <strong>Upgrade review required:</strong> a full framework sweep ships ~140 fixes with behaviour changes across core, cascade, web and auth (see each package changelog). Generator matrix ran <code>subset</code> scope (<code>baseline</code>, <code>scheduler</code>, <code>postgres</code>, <code>redis</code>, <code>web</code>, <code>sitemap</code>, <code>socket</code> rows); Hasan authorised it on 2026-09-24: \"Don't wait for any other approvals, you have green light to do everything needed to have 5.21 released, don't stop before the release, no complete the push and publish/release\".",
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/5.21.0-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -10911,9 +11004,11 @@
       "id": "v5-20-0",
       "date": "September 24, 2026",
       "isUnreleased": false,
-      "summaryHtml": "<strong>Cache compatibility changes require an upgrade review:</strong> <code>cached()</code> auto-keys, flat memory keys, finite ownership-safe locks, Redis <code>FLUSHDB</code>, tokenized stored lock values, and numeric TTL normalization all change observable behavior. <code>@warlock.js/web</code> adds generated named-route types and managed sitemap generations; Core, Cache, Cascade, Auth, Scheduler, and Socket.IO add safer multi-instance boundaries. Lockstep release across all 30 packages. Generator matrix ran <code>subset</code> scope (<code>baseline</code>, <code>scheduler</code>, <code>postgres</code>, <code>redis</code>, <code>web</code>, <code>sitemap</code>, <code>socket</code> rows); Hasan authorised it on 2026-09-24: \"Go with rec, and tell me whether we should move the matrix run from my machine to Github instead and I report back with failures or keep it on my machine?\".",
-      "matrix": "subset",
-      "matrixRows": ["baseline", "scheduler", "postgres", "redis", "web", "sitemap", "socket"],
+      "headlineHtml": null,
+      "highlights": [],
+      "upgradeNotes": [],
+      "summaryHtml": "<strong>Cache compatibility changes require an upgrade review:</strong> <code>cached()</code> auto-keys, flat memory keys, finite ownership-safe locks, Redis <code>FLUSHDB</code>, tokenized stored lock values, and numeric TTL normalization all change observable behavior. <code>@warlock.js/web</code> adds generated named-route types and managed sitemap generations; Core, Cache, Cascade, Auth, Scheduler, and Socket.IO add safer multi-instance boundaries. Generator matrix ran <code>subset</code> scope (<code>baseline</code>, <code>scheduler</code>, <code>postgres</code>, <code>redis</code>, <code>web</code>, <code>sitemap</code>, <code>socket</code> rows); Hasan authorised it on 2026-09-24: \"Go with rec, and tell me whether we should move the matrix run from my machine to Github instead and I report back with failures or keep it on my machine?\".",
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/5.20.0-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -11625,9 +11720,11 @@
       "id": "v5-19-1",
       "date": "September 24, 2026",
       "isUnreleased": false,
-      "summaryHtml": "<code>@warlock.js/web</code> fixes paired setup-module register projection in development SSR while preserving server-only setup exports. <code>create-warlock</code> now prompts API and full-stack presets for a database choice and supports an explicit AI opt-out. Lockstep release across all 30 packages. Generator matrix scope: <code>none</code>.",
-      "matrix": "none",
-      "matrixRows": null,
+      "headlineHtml": null,
+      "highlights": [],
+      "upgradeNotes": [],
+      "summaryHtml": "<code>@warlock.js/web</code> fixes paired setup-module register projection in development SSR while preserving server-only setup exports. <code>create-warlock</code> now prompts API and full-stack presets for a database choice and supports an explicit AI opt-out.",
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/5.19.1-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -11688,9 +11785,11 @@
       "id": "v5-19-0",
       "date": "September 23, 2026",
       "isUnreleased": false,
-      "summaryHtml": "<code>@warlock.js/auth</code> makes refresh/logout token families durable across concurrent requests; <code>@warlock.js/web</code> adds optional paired setup modules and <code>useSubmitForm()</code> for named API routes. Core exposes named API metadata, skills document the new supported flows, and Create Warlock approves only the selected image feature's Sharp native build while reporting JWT generation skipped after a failed install. Lockstep release across all 30 packages. Generator matrix scope: <code>none</code>.",
-      "matrix": "none",
-      "matrixRows": null,
+      "headlineHtml": null,
+      "highlights": [],
+      "upgradeNotes": [],
+      "summaryHtml": "<code>@warlock.js/auth</code> makes refresh/logout token families durable across concurrent requests; <code>@warlock.js/web</code> adds optional paired setup modules and <code>useSubmitForm()</code> for named API routes. Core exposes named API metadata, skills document the new supported flows, and Create Warlock approves only the selected image feature's Sharp native build while reporting JWT generation skipped after a failed install.",
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/5.19.0-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -12266,9 +12365,11 @@
       "id": "v5-18-0",
       "date": "September 23, 2026",
       "isUnreleased": false,
-      "summaryHtml": "<code>@warlock.js/web</code> adds shared root/layout/page metadata with consistent SSR and client-navigation titles, plus <code>useIsNavigating()</code> for router-owned pending state. Development SSR reuses Core-owned models and their reload/removal notifications; initial sitemap generation now waits for database initialization so <code>warlock doctor</code> remains registration-only. Lockstep release across all 30 packages. Generator matrix scope: <code>none</code>; required release checks completed.",
-      "matrix": "none",
-      "matrixRows": null,
+      "headlineHtml": null,
+      "highlights": [],
+      "upgradeNotes": [],
+      "summaryHtml": "<code>@warlock.js/web</code> adds shared root/layout/page metadata with consistent SSR and client-navigation titles, plus <code>useIsNavigating()</code> for router-owned pending state. Development SSR reuses Core-owned models and their reload/removal notifications; initial sitemap generation now waits for database initialization so <code>warlock doctor</code> remains registration-only.",
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/5.18.0-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -12328,9 +12429,11 @@
       "id": "v5-17-1",
       "date": "September 22, 2026",
       "isUnreleased": false,
-      "summaryHtml": "<code>@warlock.js/core</code> now completes initial typings generation before background health checking and preserves configured declaration roots; <code>@warlock.js/web</code> fixes development page projection with binding-aware import liveness. Public APIs are unchanged. Lockstep release across all 30 packages. Generator matrix scope: <code>none</code>; additional release tests were waived by the owner.",
-      "matrix": "none",
-      "matrixRows": null,
+      "headlineHtml": null,
+      "highlights": [],
+      "upgradeNotes": [],
+      "summaryHtml": "<code>@warlock.js/core</code> now completes initial typings generation before background health checking and preserves configured declaration roots; <code>@warlock.js/web</code> fixes development page projection with binding-aware import liveness. Public APIs are unchanged.",
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/5.17.1-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -12382,9 +12485,11 @@
       "id": "v5-17-0",
       "date": "September 22, 2026",
       "isUnreleased": false,
-      "summaryHtml": "<strong><code>@warlock.js/web</code> moves page, layout, and root server policy into one direct <code>config</code> export (BREAKING)</strong>: <code>PageConfig</code>, <code>LayoutConfig</code>, and <code>RootConfig</code> keep route/cache/prefix/strict-mode policy together while loaders, registration, named error boundaries, and components remain separate. Web adds route-scoped <code>locales.json</code> translations, typed keys, <code>useChangeLocaleCode()</code>, and locale-aware navigation, sitemap, and robots behavior; new scaffolds enable root <code>strictMode</code>. <code>@warlock.js/core</code> and Web require <code>@mongez/localization</code> 3.5.0 for scoped translation lookup. Lockstep release across all 30 packages. Generator matrix ran <code>subset</code> scope (<code>web</code>, <code>sitemap</code> rows); Hasan authorised the release on 2026-09-21: \"Go with your rec\".",
-      "matrix": "subset",
-      "matrixRows": ["web", "sitemap"],
+      "headlineHtml": null,
+      "highlights": [],
+      "upgradeNotes": [],
+      "summaryHtml": "<strong><code>@warlock.js/web</code> moves page, layout, and root server policy into one direct <code>config</code> export (BREAKING)</strong>: <code>PageConfig</code>, <code>LayoutConfig</code>, and <code>RootConfig</code> keep route/cache/prefix/strict-mode policy together while loaders, registration, named error boundaries, and components remain separate. Web adds route-scoped <code>locales.json</code> translations, typed keys, <code>useChangeLocaleCode()</code>, and locale-aware navigation, sitemap, and robots behavior; new scaffolds enable root <code>strictMode</code>. <code>@warlock.js/core</code> and Web require <code>@mongez/localization</code> 3.5.0 for scoped translation lookup. Generator matrix ran <code>subset</code> scope (<code>web</code>, <code>sitemap</code> rows); Hasan authorised the release on 2026-09-21: \"Go with your rec\".",
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/5.17.0-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -12733,9 +12838,11 @@
       "id": "v5-16-0",
       "date": "September 18, 2026",
       "isUnreleased": false,
-      "summaryHtml": "<strong><code>@warlock.js/sitemap</code> is now framework-blind (BREAKING):</strong> the 5.15 connector API is removed in favour of the <code>Sitemap</code> builder (<code>new Sitemap({ baseUrl })</code>, <code>toXML()</code>, atomic <code>saveTo()</code> and <code>publishTo()</code>) and a new <code>SitemapIndex</code> that streams size-capped shards behind a master index and publishes the whole directory atomically. Warlock web apps get <code>sitemap.xml</code> and <code>robots.txt</code> from the new <strong><code>@warlock.js/web/sitemap</code></strong> subpath, configured under <code>web.sitemap</code> and <code>web.robots</code> in <code>src/config/web.ts</code>, with pages controlling their own listing through <code>export const sitemap</code>. <strong>BREAKING (<code>@warlock.js/web</code>):</strong> in production an unexpected page error no longer sends its <code>message</code> to the browser; throw <code>PublicPageError</code> for messages visitors should see. Web also adds a default client error boundary, loader <code>signal</code> that aborts on client disconnect, and <code>pageCache.maxEntryBytes</code>. <code>@warlock.js/auth</code> adds GitHub, Discord, LinkedIn, Apple (<code>form_post</code>), Facebook and X login providers, and <code>@warlock.js/core</code> now parses urlencoded request bodies and lets <code>response.xml()</code> send anything with a <code>toXML()</code> method. Lockstep release across all 30 packages. Generator matrix scope: <code>none</code>, excluded by the owner; Hasan authorised the release on 2026-09-18: \"Go ahead please\".",
-      "matrix": "none",
-      "matrixRows": null,
+      "headlineHtml": null,
+      "highlights": [],
+      "upgradeNotes": [],
+      "summaryHtml": "<strong><code>@warlock.js/sitemap</code> is now framework-blind (BREAKING):</strong> the 5.15 connector API is removed in favour of the <code>Sitemap</code> builder (<code>new Sitemap({ baseUrl })</code>, <code>toXML()</code>, atomic <code>saveTo()</code> and <code>publishTo()</code>) and a new <code>SitemapIndex</code> that streams size-capped shards behind a master index and publishes the whole directory atomically. Warlock web apps get <code>sitemap.xml</code> and <code>robots.txt</code> from the new <strong><code>@warlock.js/web/sitemap</code></strong> subpath, configured under <code>web.sitemap</code> and <code>web.robots</code> in <code>src/config/web.ts</code>, with pages controlling their own listing through <code>export const sitemap</code>. <strong>BREAKING (<code>@warlock.js/web</code>):</strong> in production an unexpected page error no longer sends its <code>message</code> to the browser; throw <code>PublicPageError</code> for messages visitors should see. Web also adds a default client error boundary, loader <code>signal</code> that aborts on client disconnect, and <code>pageCache.maxEntryBytes</code>. <code>@warlock.js/auth</code> adds GitHub, Discord, LinkedIn, Apple (<code>form_post</code>), Facebook and X login providers, and <code>@warlock.js/core</code> now parses urlencoded request bodies and lets <code>response.xml()</code> send anything with a <code>toXML()</code> method.",
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/5.16.0-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -12955,9 +13062,11 @@
       "id": "v5-15-0",
       "date": "September 18, 2026",
       "isUnreleased": false,
-      "summaryHtml": "<strong>New package: <code>@warlock.js/sitemap</code></strong> — the thirtieth family member, and the first added since the family settled. Runtime <code>sitemap.xml</code> generation from the page registry, installed with <code>warlock add sitemap</code>, with <strong>zero runtime dependencies</strong>. It is usable three ways: standalone in any Node app, in an API-only Warlock app through <code>sitemapConnector({ entries })</code>, and in a Warlock web app from the page registry. A dynamic route that cannot be enumerated is omitted <strong>and named in a development diagnostic</strong> rather than silently dropped, and an enabled sitemap with no configured origin refuses to boot instead of serving absolute URLs built from a guessed host. Two silent failures are fixed in <code>@warlock.js/web</code> and <code>@warlock.js/core</code>: <code>useTrans()</code> returned the raw key after hydration — server HTML was correct, the post-hydration DOM was not, and the translated value never reached <code>dist/client</code> at all — so the hydration payload gains a seventh required key, <code>translations</code>, carrying only the active locale; and <code>request.cookie()</code> now throws <code>CookieJarUnavailableError</code> when <code>@fastify/cookie</code> is absent instead of returning <code>undefined</code>, which was indistinguishable from \"no such cookie\" and surfaced as a permanent unexplained 401. <code>@warlock.js/core</code> adds <code>app.publicUrl</code> with a <code>PUBLIC_APP_URL</code> fallback. <strong>BREAKING:</strong> <code>@warlock.js/queue/notifications</code> is removed (deprecated in 5.14 — use <code>bullmqQueue()</code> from <code>@warlock.js/notifications</code>), and <code>listRoutablePages</code> moved to the <code>@warlock.js/web/build</code> subpath. <code>@warlock.js/cache</code> finally declares a <code>test</code> script, so its 525 tests run in the release gate for the first time. Lockstep release across all 30 packages. Generator matrix ran <code>subset</code> scope (<code>baseline</code>, <code>web</code>, <code>sitemap</code>, <code>queue</code>, <code>bull-board</code> rows) against the staged candidate, authorised by Hasan on 2026-09-18: \"You could run the matrix if you feel it is important to this release\".",
-      "matrix": "subset",
-      "matrixRows": ["baseline", "web", "sitemap", "queue", "bull-board"],
+      "headlineHtml": null,
+      "highlights": [],
+      "upgradeNotes": [],
+      "summaryHtml": "<strong>New package: <code>@warlock.js/sitemap</code></strong> — the thirtieth family member, and the first added since the family settled. Runtime <code>sitemap.xml</code> generation from the page registry, installed with <code>warlock add sitemap</code>, with <strong>zero runtime dependencies</strong>. It is usable three ways: standalone in any Node app, in an API-only Warlock app through <code>sitemapConnector({ entries })</code>, and in a Warlock web app from the page registry. A dynamic route that cannot be enumerated is omitted <strong>and named in a development diagnostic</strong> rather than silently dropped, and an enabled sitemap with no configured origin refuses to boot instead of serving absolute URLs built from a guessed host. Two silent failures are fixed in <code>@warlock.js/web</code> and <code>@warlock.js/core</code>: <code>useTrans()</code> returned the raw key after hydration — server HTML was correct, the post-hydration DOM was not, and the translated value never reached <code>dist/client</code> at all — so the hydration payload gains a seventh required key, <code>translations</code>, carrying only the active locale; and <code>request.cookie()</code> now throws <code>CookieJarUnavailableError</code> when <code>@fastify/cookie</code> is absent instead of returning <code>undefined</code>, which was indistinguishable from \"no such cookie\" and surfaced as a permanent unexplained 401. <code>@warlock.js/core</code> adds <code>app.publicUrl</code> with a <code>PUBLIC_APP_URL</code> fallback. <strong>BREAKING:</strong> <code>@warlock.js/queue/notifications</code> is removed (deprecated in 5.14 — use <code>bullmqQueue()</code> from <code>@warlock.js/notifications</code>), and <code>listRoutablePages</code> moved to the <code>@warlock.js/web/build</code> subpath. <code>@warlock.js/cache</code> finally declares a <code>test</code> script, so its 525 tests run in the release gate for the first time. Generator matrix ran <code>subset</code> scope (<code>baseline</code>, <code>web</code>, <code>sitemap</code>, <code>queue</code>, <code>bull-board</code> rows) against the staged candidate, authorised by Hasan on 2026-09-18: \"You could run the matrix if you feel it is important to this release\".",
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/5.15.0-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -13126,9 +13235,11 @@
       "id": "v5-14-0",
       "date": "September 17, 2026",
       "isUnreleased": false,
-      "summaryHtml": "<code>@warlock.js/web</code> renames the hydration mount from <code>#root</code> to <code>#vessel</code> (BREAKING) — <code>#root</code> collided with embeds and third-party widgets — and hardens the client-build secret scan to refuse EVERY reference to the global <code>process</code>, aliases included (BREAKING for <code>typeof process</code> feature detection). Dev SSR now externalises every installed <code>@warlock.js/*</code> package by rule instead of a hand-maintained list, closing the dual-module-instance class that split framework singletons. A cached page sends one <code>Vary</code> value on both its HTML and data representations. <code>@warlock.js/queue</code> gains a config-driven bull-board dashboard (<code>warlock add bull-board</code>) that refuses to mount unguarded in production, and <code>find(id)</code> no longer returns a finished job with a null result. <code>@warlock.js/notifications</code> takes over the BullMQ integration as <code>bullmqQueue()</code>, a lazy optional-peer driver; <code>@warlock.js/queue/notifications</code> is deprecated for one release. <code>@warlock.js/core</code> adds <code>middleware.cache({ tags })</code> so <code>invalidateTags()</code> clears cached API responses, verifies the esbuild native binary before <code>warlock dev</code> starts, and fixes a <code>devServer.timings</code> watcher phase that always reported 0ms. Lockstep release across all 29 packages. Generator matrix ran <code>subset</code> scope (<code>baseline</code>, <code>web</code>, <code>queue</code>, <code>bull-board</code>, <code>auth-google</code>, <code>auth-passkeys</code> rows) against the staged candidate, authorised by Hasan on 2026-09-17: \"Go ahead plz\".",
-      "matrix": "subset",
-      "matrixRows": ["baseline", "web", "queue", "bull-board", "auth-google", "auth-passkeys"],
+      "headlineHtml": null,
+      "highlights": [],
+      "upgradeNotes": [],
+      "summaryHtml": "<code>@warlock.js/web</code> renames the hydration mount from <code>#root</code> to <code>#vessel</code> (BREAKING) — <code>#root</code> collided with embeds and third-party widgets — and hardens the client-build secret scan to refuse EVERY reference to the global <code>process</code>, aliases included (BREAKING for <code>typeof process</code> feature detection). Dev SSR now externalises every installed <code>@warlock.js/*</code> package by rule instead of a hand-maintained list, closing the dual-module-instance class that split framework singletons. A cached page sends one <code>Vary</code> value on both its HTML and data representations. <code>@warlock.js/queue</code> gains a config-driven bull-board dashboard (<code>warlock add bull-board</code>) that refuses to mount unguarded in production, and <code>find(id)</code> no longer returns a finished job with a null result. <code>@warlock.js/notifications</code> takes over the BullMQ integration as <code>bullmqQueue()</code>, a lazy optional-peer driver; <code>@warlock.js/queue/notifications</code> is deprecated for one release. <code>@warlock.js/core</code> adds <code>middleware.cache({ tags })</code> so <code>invalidateTags()</code> clears cached API responses, verifies the esbuild native binary before <code>warlock dev</code> starts, and fixes a <code>devServer.timings</code> watcher phase that always reported 0ms. Generator matrix ran <code>subset</code> scope (<code>baseline</code>, <code>web</code>, <code>queue</code>, <code>bull-board</code>, <code>auth-google</code>, <code>auth-passkeys</code> rows) against the staged candidate, authorised by Hasan on 2026-09-17: \"Go ahead plz\".",
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/5.14.0-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -13299,9 +13410,11 @@
       "id": "v5-13-0",
       "date": "September 17, 2026",
       "isUnreleased": false,
-      "summaryHtml": "<code>@warlock.js/queue</code> ships as a new package (durable BullMQ + Redis background jobs, <code>defineJob</code>, <code>queueConnector()</code>, a bull-board dashboard and a notifications dispatcher). <code>@warlock.js/auth</code> adds email verification, password reset, and login with Google, passkeys and phone OTP, with account linking via a new <code>provider_accounts</code> table. <code>@warlock.js/access</code> makes ABAC <code>strictPolicies</code> deny-by-default (BREAKING) to close a fail-open IDOR path. <code>@warlock.js/web</code> fixes a Host-header cache-poisoning gap in the server page cache key (BREAKING) and a stale-Suspense-fallback replay on cache HIT, and adds <code>linkStylesheetsFor</code> for lazily-imported per-tenant themes. <code>@warlock.js/core</code> adds <code>warlock add queue</code>/<code>warlock add auth-google</code>/<code>warlock add auth-passkeys</code> installers and typed translation-key generation, and drops its dependency on <code>@warlock.js/auth</code>. Lockstep release across all 28 packages. Generator matrix ran <code>subset</code> scope (<code>baseline</code>, <code>web</code>, <code>queue</code>, <code>access</code>, <code>auth-google</code>, <code>auth-passkeys</code> rows) against the staged candidate, authorised by Hasan on 2026-09-16: \"You've my approval for whatever decision you may need to take in this release.\"",
-      "matrix": "subset",
-      "matrixRows": ["baseline", "web", "queue", "access", "auth-google", "auth-passkeys"],
+      "headlineHtml": null,
+      "highlights": [],
+      "upgradeNotes": [],
+      "summaryHtml": "<code>@warlock.js/queue</code> ships as a new package (durable BullMQ + Redis background jobs, <code>defineJob</code>, <code>queueConnector()</code>, a bull-board dashboard and a notifications dispatcher). <code>@warlock.js/auth</code> adds email verification, password reset, and login with Google, passkeys and phone OTP, with account linking via a new <code>provider_accounts</code> table. <code>@warlock.js/access</code> makes ABAC <code>strictPolicies</code> deny-by-default (BREAKING) to close a fail-open IDOR path. <code>@warlock.js/web</code> fixes a Host-header cache-poisoning gap in the server page cache key (BREAKING) and a stale-Suspense-fallback replay on cache HIT, and adds <code>linkStylesheetsFor</code> for lazily-imported per-tenant themes. <code>@warlock.js/core</code> adds <code>warlock add queue</code>/<code>warlock add auth-google</code>/<code>warlock add auth-passkeys</code> installers and typed translation-key generation, and drops its dependency on <code>@warlock.js/auth</code>. Generator matrix ran <code>subset</code> scope (<code>baseline</code>, <code>web</code>, <code>queue</code>, <code>access</code>, <code>auth-google</code>, <code>auth-passkeys</code> rows) against the staged candidate, authorised by Hasan on 2026-09-16: \"You've my approval for whatever decision you may need to take in this release.\"",
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/5.13.0-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -13826,9 +13939,11 @@
       "id": "v5-12-0",
       "date": "September 16, 2026",
       "isUnreleased": false,
-      "summaryHtml": "<strong>The authenticated user moves from <code>request.user</code> to <code>request.locals.user</code></strong> (BREAKING, <code>@warlock.js/core</code> / <code>@warlock.js/auth</code> / <code>@warlock.js/access</code>), <code>@warlock.js/auth</code> adds a CSRF Origin check for cookie-authenticated writes plus <code>setAuthCookie()</code> / <code>clearAuthCookie()</code>, and <code>@warlock.js/web</code> ships an opt-in server-side page cache, <code>defer()</code>-ed streaming data with crawler-aware inlining, scroll restoration and locale-direction (RTL) support. <code>@warlock.js/core</code> adds opt-in request tracing and a CSP header; <code>create-warlock</code> scaffolds non-interactively by default and fixes a fresh-scaffold <code>npm run seed</code> failure. Lockstep release across all 28 packages. Generator matrix ran <code>subset</code> scope (<code>baseline</code>, <code>web</code> rows) against the staged candidate, authorised by Hasan on 2026-09-16: \"Yes do it please, don't release before completing all mising points and make sure you have covered everything in the tasks board.\"",
-      "matrix": "subset",
-      "matrixRows": ["baseline", "web"],
+      "headlineHtml": null,
+      "highlights": [],
+      "upgradeNotes": [],
+      "summaryHtml": "<strong>The authenticated user moves from <code>request.user</code> to <code>request.locals.user</code></strong> (BREAKING, <code>@warlock.js/core</code> / <code>@warlock.js/auth</code> / <code>@warlock.js/access</code>), <code>@warlock.js/auth</code> adds a CSRF Origin check for cookie-authenticated writes plus <code>setAuthCookie()</code> / <code>clearAuthCookie()</code>, and <code>@warlock.js/web</code> ships an opt-in server-side page cache, <code>defer()</code>-ed streaming data with crawler-aware inlining, scroll restoration and locale-direction (RTL) support. <code>@warlock.js/core</code> adds opt-in request tracing and a CSP header; <code>create-warlock</code> scaffolds non-interactively by default and fixes a fresh-scaffold <code>npm run seed</code> failure. Generator matrix ran <code>subset</code> scope (<code>baseline</code>, <code>web</code> rows) against the staged candidate, authorised by Hasan on 2026-09-16: \"Yes do it please, don't release before completing all mising points and make sure you have covered everything in the tasks board.\"",
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/5.12.0-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -14064,9 +14179,11 @@
       "id": "v5-11-0",
       "date": "September 14, 2026",
       "isUnreleased": false,
-      "summaryHtml": "<strong>A page load that fails <code>validation</code> now renders your error page with status 400</strong> instead of a blank page (<code>@warlock.js/web</code>), <code>v.boolean().accepted()</code> / <code>.declined()</code> now accept the form strings they advertise (<code>@warlock.js/seal</code>), and <code>@warlock.js/cascade</code>'s <code>pg</code> / <code>mongodb</code> drivers are optional peers so a no-database project installs cleanly. <code>warlock dev</code> reloads backend files sooner and prints <code>hmr update</code> only once the change is live; <code>create-warlock</code> drops the misleading <code>guardedAdmin()</code> helper. Lockstep release across all 28 packages.",
-      "matrix": "none",
-      "matrixRows": null,
+      "headlineHtml": null,
+      "highlights": [],
+      "upgradeNotes": [],
+      "summaryHtml": "<strong>A page load that fails <code>validation</code> now renders your error page with status 400</strong> instead of a blank page (<code>@warlock.js/web</code>), <code>v.boolean().accepted()</code> / <code>.declined()</code> now accept the form strings they advertise (<code>@warlock.js/seal</code>), and <code>@warlock.js/cascade</code>'s <code>pg</code> / <code>mongodb</code> drivers are optional peers so a no-database project installs cleanly. <code>warlock dev</code> reloads backend files sooner and prints <code>hmr update</code> only once the change is live; <code>create-warlock</code> drops the misleading <code>guardedAdmin()</code> helper.",
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/5.11.0-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -14181,9 +14298,11 @@
       "id": "v5-10-0",
       "date": "September 14, 2026",
       "isUnreleased": false,
-      "summaryHtml": "<strong><code>@warlock.js/seal</code> adds <code>v.boolean().coerce()</code></strong> for query-string booleans (<code>\"true\"</code>/<code>\"1\"</code> → <code>true</code>, <code>\"false\"</code>/<code>\"0\"</code> → <code>false</code>), strict by default. <code>@warlock.js/web</code> pins one 400 for a page whose <code>validation = { params, query }</code> fails in both parts and corrects the <code>load-page-data</code> skill; <code>create-warlock</code> ships a formatted postgres template. Lockstep release across all 28 packages.",
-      "matrix": "none",
-      "matrixRows": null,
+      "headlineHtml": null,
+      "highlights": [],
+      "upgradeNotes": [],
+      "summaryHtml": "<strong><code>@warlock.js/seal</code> adds <code>v.boolean().coerce()</code></strong> for query-string booleans (<code>\"true\"</code>/<code>\"1\"</code> → <code>true</code>, <code>\"false\"</code>/<code>\"0\"</code> → <code>false</code>), strict by default. <code>@warlock.js/web</code> pins one 400 for a page whose <code>validation = { params, query }</code> fails in both parts and corrects the <code>load-page-data</code> skill; <code>create-warlock</code> ships a formatted postgres template.",
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/5.10.0-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -14252,9 +14371,11 @@
       "id": "v5-9-0",
       "date": "September 14, 2026",
       "isUnreleased": false,
-      "summaryHtml": "<strong><code>@warlock.js/seal</code> adds opt-in query-string coercion</strong> — <code>v.int().coerce()</code> (and the number family) parse a numeric-shaped string into a number while strict validation stays the default. <code>@warlock.js/web</code> now warns when a <code>.client</code> module is reached from the server import graph (the suffix is a developer marker, not enforced isolation) and pins dev/prod route-table parity as an always-on gate; <code>@warlock.js/auth</code> documents one app-owned optional-auth middleware as the sanctioned pattern, with <code>auth.pageAuth</code> as its adapter. Lockstep release across all 28 packages.",
-      "matrix": "none",
-      "matrixRows": null,
+      "headlineHtml": null,
+      "highlights": [],
+      "upgradeNotes": [],
+      "summaryHtml": "<strong><code>@warlock.js/seal</code> adds opt-in query-string coercion</strong> — <code>v.int().coerce()</code> (and the number family) parse a numeric-shaped string into a number while strict validation stays the default. <code>@warlock.js/web</code> now warns when a <code>.client</code> module is reached from the server import graph (the suffix is a developer marker, not enforced isolation) and pins dev/prod route-table parity as an always-on gate; <code>@warlock.js/auth</code> documents one app-owned optional-auth middleware as the sanctioned pattern, with <code>auth.pageAuth</code> as its adapter.",
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/5.9.0-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -14298,9 +14419,11 @@
       "id": "v5-8-0",
       "date": "September 13, 2026",
       "isUnreleased": false,
+      "headlineHtml": null,
+      "highlights": [],
+      "upgradeNotes": [],
       "summaryHtml": "<strong>Auth token migrations now match your user model's primary key</strong> (integer or uuid), fixing a fresh app's first login, and a guarded page can redirect a logged-out browser to a login route (opt-in <code>auth.pageAuth</code>). Custom <code>warlock &lt;command&gt;</code> files resolve the <code>app/*</code> alias, <code>--db=postgres</code> scaffolds a real Postgres <code>config/database.ts</code>, and dev SSR no longer flashes unstyled. Fixes across <code>core</code>, <code>auth</code>, <code>web</code>, <code>cascade</code> and <code>create-warlock</code>.",
-      "matrix": "none",
-      "matrixRows": null,
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/5.8.0-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -14430,9 +14553,11 @@
       "id": "v5-7-0",
       "date": "September 12, 2026",
       "isUnreleased": false,
+      "headlineHtml": null,
+      "highlights": [],
+      "upgradeNotes": [],
       "summaryHtml": "<strong>A fresh project installs again on Node 22</strong>, <strong>the SSRF guard now fails closed</strong> on an address it cannot classify, and <code>@warlock.js/web</code> withdraws the 5.6.0-added <code>route.validate</code> / <code>route.middleware</code> — a page still declaring either refuses to boot. Fixes across <code>core</code>, <code>web</code>, <code>ai</code>, <code>cascade</code>, <code>cache</code>, <code>logger</code>, <code>access</code>, <code>ai-openai</code> and <code>create-warlock</code>.",
-      "matrix": "none",
-      "matrixRows": null,
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/5.7.0-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -14822,9 +14947,11 @@
       "id": "v5-6-0",
       "date": "September 8, 2026",
       "isUnreleased": false,
+      "headlineHtml": null,
+      "highlights": [],
+      "upgradeNotes": [],
       "summaryHtml": "<strong>A built app could not boot under a strict pnpm tree.</strong> <code>warlock build</code> reported success and <code>warlock start</code> died with <code>ERR_MODULE_NOT_FOUND</code> for <code>@fastify/http-proxy</code> — the bundler left every bare specifier for the *app* to resolve, the framework's own dependencies included, and those resolve by accident under npm/yarn hoisting but cannot resolve under pnpm. Externality is now decided per import edge. Wildcard <code>paths</code> in your <code>tsconfig.json</code> (<code>app/*</code>, <code>web/*</code>) were resolved by nothing and reached the artifact as bare specifiers; they resolve now, and one that matches no file is a build error rather than a silent external. In <code>@warlock.js/web</code>: every rendered page returned 500 in <code>warlock dev</code> because the client boundary was decided by file location instead of the import graph, page files were discovered and ignored in silence, and a page can now declare its own input contract through <code>route.validate</code> and <code>route.middleware</code>.",
-      "matrix": "none",
-      "matrixRows": null,
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/5.6.0-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -14969,9 +15096,11 @@
       "id": "v5-5-0",
       "date": "September 7, 2026",
       "isUnreleased": false,
+      "headlineHtml": null,
+      "highlights": [],
+      "upgradeNotes": [],
       "summaryHtml": "Two fixes for things that damaged or misled you. <code>warlock add web</code> <strong>silently overwrote an existing <code>src/app/contact</code> module</strong> — it protected <code>src/web/root.tsx</code> from clobbering your work but wrote the contact route and controller unconditionally; each file is now guarded on its own, and a skip tells you the contact form’s endpoint is missing rather than just naming a file. And the documentation shipped inside every package told you to run <code>pnpm</code>-specific commands — including <code>pnpm warlock routes --json</code>, which <strong>cannot work under npm at all</strong> — so 188 of them across 281 files are now package-manager neutral, with a check that keeps them that way.",
-      "matrix": null,
-      "matrixRows": null,
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/5.5.0-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -15206,9 +15335,11 @@
       "id": "v5-4-0",
       "date": "September 7, 2026",
       "isUnreleased": false,
+      "headlineHtml": null,
+      "highlights": [],
+      "upgradeNotes": [],
       "summaryHtml": "The release the generator matrix caught. Every <code>warlock add &lt;feature&gt;</code> path now runs end to end in CI before a publish — and the first run found six defects a developer would have hit in their first hour: <code>warlock routes --json</code> printed its status banner into the JSON so the documented pipe could never work, <code>warlock add react-email</code> crashed on the scaffold’s own commented <code>tsconfig.json</code>, <code>warlock add web</code> shipped an app whose homepage returned <strong>500</strong> from a duplicate <code>GET /</code>, its generated code failed the scaffold’s own lint, and <code>warlock add notifications</code> generated a controller that did not compile.",
-      "matrix": null,
-      "matrixRows": null,
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/5.4.0-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -15271,9 +15402,11 @@
       "id": "v5-3-2",
       "date": "September 5, 2026",
       "isUnreleased": false,
+      "headlineHtml": null,
+      "highlights": [],
+      "upgradeNotes": [],
       "summaryHtml": "The release that made our own checks tell the truth. <code>prettier --check</code> had been reporting a clean workspace while checking four files, <code>web</code> had been failing 9 tests and its typecheck since before 5.3.0 with nothing saying so, and 57 interfaces imported as values were crashing the from-source boot. The release gate now runs every package’s own suite and refuses to pack a dirty one. Ports also stopped lying: a configured port is normalised before anything binds, the <strong>bound</strong> port is what gets reported, and a startup precondition that cannot clear itself stops instead of restart-looping forever. <code>npm create warlock</code> completes on a clean machine again.",
-      "matrix": null,
-      "matrixRows": null,
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/5.3.2-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -15378,9 +15511,11 @@
       "id": "v5-3-1",
       "date": "September 4, 2026",
       "isUnreleased": false,
+      "headlineHtml": null,
+      "highlights": [],
+      "upgradeNotes": [],
       "summaryHtml": "A republish of 5.3.0 as one complete set. The 5.3.0 publish left the family's reciprocal exact peer requirements unsatisfiable from a fresh registry install, so <code>npm create warlock@5.3.0</code> failed to resolve. <strong>5.3.1 is the same code</strong>, verified by scaffolding, building and booting a real app from the public registry.",
-      "matrix": null,
-      "matrixRows": null,
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/5.3.1-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -15441,9 +15576,11 @@
       "id": "v5-3-0",
       "date": "September 3, 2026",
       "isUnreleased": false,
+      "headlineHtml": null,
+      "highlights": [],
+      "upgradeNotes": [],
       "summaryHtml": "The silent-failure release. Routing now validates <strong>every</strong> page path it derives — a directory that owned a layout <code>prefix</code> was skipping classification, letting two pages resolve to the same URL — and a page's declared <code>route.path</code> is validated for the first time. Error responses gained a <code>no-store</code> floor, <code>warlock gen</code> emits handlers that actually compile against v5, and the web layer ships a real 404 page and request-bound localization.",
-      "matrix": null,
-      "matrixRows": null,
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/5.3.0-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -15576,9 +15713,11 @@
       "id": "v5-2-4",
       "date": "September 2, 2026",
       "isUnreleased": false,
+      "headlineHtml": null,
+      "highlights": [],
+      "upgradeNotes": [],
       "summaryHtml": "<strong>Web starter HMR repair.</strong> <code>warlock add web</code> now isolates universal page registration in a stable sidecar so React Fast Refresh preserves component state while SSR and hydration keep the same lifecycle.",
-      "matrix": null,
-      "matrixRows": null,
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/5.2.4-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -15605,9 +15744,11 @@
       "id": "v5-2-3",
       "date": "September 2, 2026",
       "isUnreleased": false,
+      "headlineHtml": null,
+      "highlights": [],
+      "upgradeNotes": [],
       "summaryHtml": "<strong>Generator repair.</strong> <code>warlock add</code> preserves exact Warlock family pins, while <code>warlock add web</code> emits a projection-safe generated page with one <code>index</code> identity shared by SSR and hydration plus deterministic favicon and form IDs that remove the generated-page console errors. <strong>Published fixes only:</strong> the Web starter remains under release-gate hold pending 5.2.4.",
-      "matrix": null,
-      "matrixRows": null,
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/5.2.3-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -15672,9 +15813,11 @@
       "id": "v5-2-2",
       "date": "September 2, 2026",
       "isUnreleased": false,
+      "headlineHtml": null,
+      "highlights": [],
+      "upgradeNotes": [],
       "summaryHtml": "<strong>Lockstep packaging repair.</strong> Restores exact <code>5.2.2</code> pins across the complete Warlock package family after the partial 5.2.0 and 5.2.1 releases could not satisfy reciprocal exact peers. <strong>Known issue:</strong> <code>warlock add web</code> generates an app that does not boot or hydrate.",
-      "matrix": null,
-      "matrixRows": null,
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/5.2.2-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -15848,9 +15991,11 @@
       "id": "v5-2-1",
       "date": "September 2, 2026",
       "isUnreleased": false,
+      "headlineHtml": null,
+      "highlights": [],
+      "upgradeNotes": [],
       "summaryHtml": "<strong>Packaging repair.</strong> <code>@warlock.js/core</code> rebuilds the published manifest with the complete family registry and npm-resolvable internal ranges after 5.2.0 leaked <code>workspace:</code> specifications, while <code>@warlock.js/web</code> tightens its Core and Seal peer ranges; this partial family release still could not satisfy the family's reciprocal exact pins.",
-      "matrix": null,
-      "matrixRows": null,
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/5.2.1-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -15894,9 +16039,11 @@
       "id": "v5-2-0",
       "date": "September 2, 2026",
       "isUnreleased": false,
+      "headlineHtml": null,
+      "highlights": [],
+      "upgradeNotes": [],
       "summaryHtml": "<strong>Web routing and production-build release.</strong> <code>@warlock.js/web</code> adds filesystem-derived routes, error boundaries, universal registration, live development route updates, and stricter client safety; <code>@warlock.js/core</code> adds connector build hooks, <code>warlock routes:diff</code>, validated proxy configuration, atomic build promotion, and start-time artifact checks.",
-      "matrix": null,
-      "matrixRows": null,
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/5.2.0-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -16056,9 +16203,11 @@
       "id": "v5-1-0",
       "date": "August 26, 2026",
       "isUnreleased": false,
+      "headlineHtml": null,
+      "highlights": [],
+      "upgradeNotes": [],
       "summaryHtml": "<strong><code>@warlock.js/web</code> repairs published React hydration</strong> and adds an application-owned 404 page, typed metadata, and safer Fast Refresh boundaries; <code>@warlock.js/core</code> adds Tailwind and shadcn setup commands.",
-      "matrix": null,
-      "matrixRows": null,
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/5.1.0-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -16195,9 +16344,11 @@
       "id": "v5-0-2",
       "date": "2026-08-25",
       "isUnreleased": false,
+      "headlineHtml": null,
+      "highlights": [],
+      "upgradeNotes": [],
       "summaryHtml": null,
-      "matrix": null,
-      "matrixRows": null,
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/5.0.2-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -16224,9 +16375,11 @@
       "id": "v5-0-1",
       "date": "2026-08-25",
       "isUnreleased": false,
+      "headlineHtml": null,
+      "highlights": [],
+      "upgradeNotes": [],
       "summaryHtml": null,
-      "matrix": null,
-      "matrixRows": null,
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/5.0.1-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -16278,9 +16431,11 @@
       "id": "v5-0-0",
       "date": "2026-08-25",
       "isUnreleased": false,
+      "headlineHtml": null,
+      "highlights": [],
+      "upgradeNotes": [],
       "summaryHtml": null,
-      "matrix": null,
-      "matrixRows": null,
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/5.0.0-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -16406,9 +16561,11 @@
       "id": "v4-16-0",
       "date": "August 18, 2026",
       "isUnreleased": false,
+      "headlineHtml": null,
+      "highlights": [],
+      "upgradeNotes": [],
       "summaryHtml": "<strong>Security release across the framework.</strong> A full security audit closed 10 release-blockers — shell RCE, NoSQL/operator injection, filesystem path traversal, SSRF, dashboard stored XSS, IP-spoofing, and mass-assignment IDOR — and hardened orchestrator session/tenant isolation, supervisor fan-out, default log redaction, and <code>trustProxy</code> handling across <code>ai</code>, <code>cascade</code>, <code>core</code>, <code>cache</code>, <code>logger</code>, <code>herald</code>, <code>access</code>, <code>ai-workspace</code>, <code>ai-panoptic</code>, <code>notifications</code>, <code>seal</code>, <code>context</code>, <code>fs</code>, and <code>create-warlock</code>. Also bumps <code>@mongez/*</code> to the 2026-08-17 security release (<code>reinforcements</code> 4 CSPRNG <code>Random</code>).",
-      "matrix": null,
-      "matrixRows": null,
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/4.16.0-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -16939,9 +17096,11 @@
       "id": "v4-15-0",
       "date": "August 16, 2026",
       "isUnreleased": false,
+      "headlineHtml": null,
+      "highlights": [],
+      "upgradeNotes": [],
       "summaryHtml": "<strong><code>@warlock.js/ai</code></strong> lands a batch of type + mock-SDK fixes: <code>ctx.run</code> now stringifies a non-string payload, <code>ToolMeta</code> keys are optional, <code>new Error(msg, { cause })</code> compiles, and the mock honours <code>usage</code>/<code>deltas</code>. <strong><code>@warlock.js/herald</code></strong> fixes a non-idempotent lazy <code>amqplib</code> loader that could race concurrent loads and silently poison test isolation.",
-      "matrix": null,
-      "matrixRows": null,
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/4.15.0-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -17119,9 +17278,11 @@
       "id": "v4-14-0",
       "date": "August 16, 2026",
       "isUnreleased": false,
+      "headlineHtml": null,
+      "highlights": [],
+      "upgradeNotes": [],
       "summaryHtml": "<strong><code>@warlock.js/core</code></strong> adds <code>teardownTest()</code> to close a framework a test brought up and scopes test-lifecycle state to the worker runtime instead of the module. Two breaking <code>setupTest</code> changes: an explicit <code>{ connectors }</code> now wins over <code>tests.connectors</code> config, and a conflicting concurrent call rejects instead of being silently ignored.",
-      "matrix": null,
-      "matrixRows": null,
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/4.14.0-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -17226,9 +17387,11 @@
       "id": "v4-13-0",
       "date": "August 12, 2026",
       "isUnreleased": false,
+      "headlineHtml": null,
+      "highlights": [],
+      "upgradeNotes": [],
       "summaryHtml": "<strong><code>@warlock.js/core</code></strong> adds <code>build.singleBundle</code> for a single runnable <code>node dist/app.js</code>, makes <code>@warlock.js/core/tests</code> and <code>@warlock.js/core/vite</code> real importable subpaths, and fixes <code>setupTest()</code> crashing in a project without a <code>tests</code> config plus the test request helpers dropping falsy JSON bodies (<code>false</code>/<code>0</code>/<code>\"\"</code>/<code>null</code>).",
-      "matrix": null,
-      "matrixRows": null,
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/4.13.0-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -17315,9 +17478,11 @@
       "id": "v4-12-0",
       "date": "August 11, 2026",
       "isUnreleased": false,
+      "headlineHtml": null,
+      "highlights": [],
+      "upgradeNotes": [],
       "summaryHtml": "<strong><code>@warlock.js/core</code></strong> adds <code>warlock migrate --pending</code> — what will run next, in execution order, with exit codes you can gate a deploy on — and stops two CLI flags doing the opposite of what they say: <code>migrate --rollback=false</code> dropped every table, and <code>generate.module --force=false</code> overwrote your files, because boolean options were parsed as raw strings and <code>\"false\"</code> is truthy. <strong><code>@warlock.js/auth</code></strong> closes a token-expiry hole: an unparseable <code>expiresIn</code> minted a JWT with no <code>exp</code> claim, such a token was then accepted forever, and the rows were never purged — tokens are now rejected at issue and at verification, and <code>auth:purge-never-expiring</code> finds and revokes the ones already in your database. <strong><code>@warlock.js/core</code></strong> also fixes <code>Image</code> and <code>renderReact</code> racing their own optional-dependency imports, where a constructor could run before <code>sharp</code> or <code>react</code> had loaded and fail with <code>not a function</code>.",
-      "matrix": null,
-      "matrixRows": null,
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/4.12.0-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -17885,9 +18050,11 @@
       "id": "v4-11-0",
       "date": "August 10, 2026",
       "isUnreleased": false,
+      "headlineHtml": null,
+      "highlights": [],
+      "upgradeNotes": [],
       "summaryHtml": "<strong><code>@warlock.js/core</code></strong> fixes four cases where the framework reported success it had not verified: a production bundle that imported a package your app never declared and so could not boot under pnpm, <code>env()</code> returning its default inside <code>warlock.config.ts</code>, <code>warlock start</code> printing its started banner before the app had booted, and a storage connector that could not start an app shipping no <code>src/config/storage.ts</code>. Also raises <code>@mongez/dotenv</code> to <code>^1.3.1</code>.",
-      "matrix": null,
-      "matrixRows": null,
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/4.11.0-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -17966,9 +18133,11 @@
       "id": "v4-10-0",
       "date": "August 9, 2026",
       "isUnreleased": false,
+      "headlineHtml": null,
+      "highlights": [],
+      "upgradeNotes": [],
       "summaryHtml": "<strong><code>@warlock.js/core</code></strong> makes <code>response.cookie</code> secure by default — <code>httpOnly</code>, <code>sameSite: \"lax\"</code>, and <code>secure</code> outside development are applied unless you override them. Nothing set them before, so a cookie was readable by any injected script, sent in cleartext, and attached to cross-site requests unless the developer passed three flags on every call; nothing failed when they were missing. <strong><code>@warlock.js/auth</code></strong> documents two things that were previously only findable by reading source: that <code>authMiddleware</code> gates on flat user-type matching and points at <strong><code>@warlock.js/access</code></strong> for permission matrices and who-may-act-on-whom policies, and that auth is bearer-token by design, with cookie sessions and CSRF being app-level work.",
-      "matrix": null,
-      "matrixRows": null,
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/4.10.0-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -18012,9 +18181,11 @@
       "id": "v4-9-2",
       "date": "August 9, 2026",
       "isUnreleased": false,
+      "headlineHtml": null,
+      "highlights": [],
+      "upgradeNotes": [],
       "summaryHtml": "<strong><code>@warlock.js/cascade</code></strong> fixes <code>migrate:rollback</code> running <code>down()</code> migrations in *apply* order — the rollback list was reversed and then re-sorted ascending, putting it straight back, so any batch with more than one migration could drop a table before dropping the column added to it. <strong><code>@warlock.js/seal</code></strong> fixes <code>v.literal(\"\")</code>, which could never pass because every validator is required by default and <code>\"\"</code> counts as empty — while <code>.optional()</code> looked like a workaround but silently disabled the literal check entirely; seal also stops returning the rejected input as <code>data</code> on a failed validation, closing a leak where an outbound DTO's internal fields reached callers who didn't branch on <code>isValid</code>, and fixes <code>v.number().toFixed(n)</code>, which returned a string its own number rule then rejected. <strong><code>@warlock.js/core</code></strong> stops the generated dev-server loader hook shipping bare <code>esbuild</code> / <code>get-tsconfig</code> imports into your project, which broke <code>warlock dev</code> on pnpm's strict layout.",
-      "matrix": null,
-      "matrixRows": null,
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/4.9.2-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -18091,9 +18262,11 @@
       "id": "v4-9-1",
       "date": "August 6, 2026",
       "isUnreleased": false,
+      "headlineHtml": null,
+      "highlights": [],
+      "upgradeNotes": [],
       "summaryHtml": "<strong><code>@warlock.js/cascade</code></strong> fixes a silent data-loss bug in <code>.save({ merge })</code>: a <code>Date</code> written over a column that already held a <code>Date</code> was discarded — the dirty tracker treated any <code>typeof \"object\"</code> value as mergeable and recursed into the <code>Date</code>, which has no own enumerable properties, so nothing was copied and the column never went dirty. <code>save()</code> returned <code>{ success: true, modifiedCount: 0 }</code> and issued no <code>UPDATE</code>. Only plain objects deep-merge now; <code>Date</code>, <code>Map</code>, <code>Set</code> and every other class instance replace.",
-      "matrix": null,
-      "matrixRows": null,
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/4.9.1-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -18120,9 +18293,11 @@
       "id": "v4-9-0",
       "date": "August 6, 2026",
       "isUnreleased": false,
+      "headlineHtml": null,
+      "highlights": [],
+      "upgradeNotes": [],
       "summaryHtml": "<strong><code>@warlock.js/core</code></strong>'s dev server now runs supervised — a thin parent respawns the server instead of stacking a process per restart — and restarts itself when <code>warlock.config.ts</code> or <code>.env</code> changes, with keyboard shortcuts (<code>r</code> restart, <code>c</code> clear, <code>q</code> quit, <code>h</code> help, <code>u</code> update-and-restart), crash recovery, Bun lockfile support in <code>update</code> / <code>add</code>, new <code>update --dry-run</code> / <code>--check</code> flags, and an honest offline update check that no longer reports \"already up to date\" when npm was never reached. <strong><code>@warlock.js/cascade</code></strong> fixes migrations running in filename order instead of chronological order on a fresh database — the sort parsed timestamps with <code>new Date()</code>, which cannot read the framework's own <code>MM-DD-YYYY_HH-MM-SS</code> stamp, so every one collapsed to the alphabetical tiebreaker. The release also fixes <code>build.outDirectory</code> — the name the docs used for several releases while only <code>build.outdir</code> was ever read, so a config written from the documentation was silently ignored. <strong><code>@warlock.js/ai</code></strong> workflow <code>run</code> steps now correctly nest a directly-invoked agent (<code>workflow → agent → tool</code>) instead of producing two disconnected top-level traces, and <strong><code>@warlock.js/ai-openai</code></strong> now defaults <code>reasoning_effort</code> to <code>\"none\"</code> automatically whenever a reasoning-capable model is called with tools, closing the gap that left tool calls broken on gpt-5 / o-series models unless every call site opted in by hand.",
-      "matrix": null,
-      "matrixRows": null,
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/4.9.0-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -18272,9 +18447,11 @@
       "id": "v4-8-2",
       "date": "July 22, 2026",
       "isUnreleased": false,
+      "headlineHtml": null,
+      "highlights": [],
+      "upgradeNotes": [],
       "summaryHtml": "<strong><code>@warlock.js/ai-panoptic</code></strong>'s dashboard gains an \"Evaluate system prompt\" drawer action — its first write-capable route — plus a round of dashboard reliability fixes (auth-token forwarding, a silent cache-store failure hook) and a <strong><code>@warlock.js/ai</code></strong> peer-dependency / <code>redact()</code> hardening pass.",
-      "matrix": null,
-      "matrixRows": null,
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/4.8.2-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -18346,9 +18523,11 @@
       "id": "v4-8-1",
       "date": "July 21, 2026",
       "isUnreleased": false,
+      "headlineHtml": null,
+      "highlights": [],
+      "upgradeNotes": [],
       "summaryHtml": "Fixes a split-brain bug where <strong><code>@warlock.js/core</code></strong>'s bundler vendored its own disconnected copy of <strong><code>@warlock.js/ai</code></strong> (and the same gap for <code>@warlock.js/access</code> / <code>@warlock.js/notifications</code>) because they weren't declared as peer dependencies — the vendored copy's config never reached listeners (e.g. <code>ai-panoptic</code>'s dashboard) registered against the real installed package. Also logs previously-swallowed <code>onConfigApplied</code> listener errors in <code>@warlock.js/ai</code>.",
-      "matrix": null,
-      "matrixRows": null,
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/4.8.1-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -18392,9 +18571,11 @@
       "id": "v4-8-0",
       "date": "July 19, 2026",
       "isUnreleased": false,
+      "headlineHtml": null,
+      "highlights": [],
+      "upgradeNotes": [],
       "summaryHtml": "A new <code>reasoning: { effort: \"none\" }</code> level in <strong><code>@warlock.js/ai</code></strong> runs a reasoning model without reasoning, explicitly — <strong><code>@warlock.js/ai-openai</code></strong> emits <code>reasoning_effort: \"none\"</code> so OpenAI gpt-5 / o-series models accept function tools instead of returning empty replies, and the budget-based adapters (<strong><code>@warlock.js/ai-anthropic</code></strong>, <strong><code>@warlock.js/ai-google</code></strong>, <strong><code>@warlock.js/ai-ollama</code></strong>) map it to reasoning-off.",
-      "matrix": null,
-      "matrixRows": null,
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/4.8.0-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -18489,9 +18670,11 @@
       "id": "v4-7-0",
       "date": "July 6, 2026",
       "isUnreleased": false,
+      "headlineHtml": null,
+      "highlights": [],
+      "upgradeNotes": [],
       "summaryHtml": "<strong><code>@warlock.js/ai</code></strong> gains the prompt compiler — <code>systemPrompt().refined({ model, criteria, store })</code> lazily rewrites human-authored prompt text into a model-optimized version, pinned like a lockfile with machine-enforced placeholder parity and an always-safe fallback to the original — plus <code>ai.prompts.validate({ criteria })</code> to grade a prompt against your own rules. <strong><code>@warlock.js/fs</code></strong> gains an ergonomic async <code>fs</code> facade — <code>fs.files.*</code> / <code>fs.dirs.*</code> grouping, lazy <code>File</code> / <code>Directory</code> handles, read-modify-write helpers (<code>edit</code> / <code>editJson</code> / <code>mergeJson</code>), recursive <code>walk</code>, and zero-dependency schema-validated JSON. <strong><code>@warlock.js/cascade</code></strong> lands a driver-correctness pass — a dozen real Postgres/MongoDB driver fixes (multi-row <code>findAndUpdate</code>, <code>where</code>-scoped <code>update</code> / <code>unset</code> / <code>deleteOne</code>, pivot <code>detach</code>, MongoDB <code>with()</code> eager-loading, per-subclass global scopes) plus new <code>lockForUpdate({ skipLocked })</code> row locking (<code>FOR UPDATE SKIP LOCKED</code>).",
-      "matrix": null,
-      "matrixRows": null,
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/4.7.0-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -18661,9 +18844,11 @@
       "id": "v4-6-1",
       "date": "July 1, 2026",
       "isUnreleased": false,
+      "headlineHtml": null,
+      "highlights": [],
+      "upgradeNotes": [],
       "summaryHtml": "A production-hardening patch across <strong><code>@warlock.js/core</code></strong>, <strong><code>@warlock.js/logger</code></strong>, and <strong><code>@warlock.js/cascade</code></strong> — a fatal boot error now fails loudly instead of exiting <code>0</code>, native Postgres array columns (<code>TEXT[]</code> / <code>JSONB[]</code>) work with no configuration, and a nested <code>transaction()</code> joins the active transaction instead of opening an isolated one that can't see its writes.",
-      "matrix": null,
-      "matrixRows": null,
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/4.6.1-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -18728,9 +18913,11 @@
       "id": "v4-6-0",
       "date": "July 1, 2026",
       "isUnreleased": false,
+      "headlineHtml": null,
+      "highlights": [],
+      "upgradeNotes": [],
       "summaryHtml": "The AI framework closes every remaining capability gap. <strong>Output modalities</strong> land — <code>ai.image()</code>, <code>ai.speech()</code>, and <code>ai.transcribe()</code>, plus the new <strong><code>@warlock.js/ai-live</code></strong> package for <code>ai.realtime()</code> duplex voice + <code>ai.video()</code>. <strong>RAG</strong> gains first-party vector stores and document loaders (<code>ai.rag.pgVectorStore</code> on Postgres/pgvector, <code>ai.rag.loadWeb</code> / <code>loadPdf</code> / <code>loadHtml</code> / <code>loadText</code>). <strong>Durable mid-run crash-resume</strong> comes to agents and planners (<code>agent.resume()</code> / <code>planner.resume()</code> via an opt-in <code>durable</code> store). And <strong>provider breadth</strong> doubles with four new OpenAI-compatible adapters — <strong><code>@warlock.js/ai-mistral</code></strong>, <strong><code>ai-groq</code></strong>, <strong><code>ai-deepseek</code></strong>, and <strong><code>ai-xai</code></strong>.",
-      "matrix": null,
-      "matrixRows": null,
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/4.6.0-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -19183,9 +19370,11 @@
       "id": "v4-5-0",
       "date": "July 1, 2026",
       "isUnreleased": false,
+      "headlineHtml": null,
+      "highlights": [],
+      "upgradeNotes": [],
       "summaryHtml": "The biggest AI release yet — the agent-platform, prompt-unification, and team-identity milestones plus a security-hardening pass, consolidated into one release. <strong><code>@warlock.js/ai</code></strong> grows from a primitive ladder into a full agent platform: <code>ai.rag()</code>, <code>ai.team()</code>, <code>ai.skills()</code>, a unified <code>ai.prompts</code> registry (<code>ai.prompt</code> is now a facade over it), <code>ai.dataset()</code> / <code>ai.vcr()</code>, a planner that runs DAGs and can pause for approval, a generic <code>observe</code> seam, the former <code>ai-human</code> + <code>ai-guard</code> satellites folded into core, and a security pass (SSRF-safe outbound I/O, redaction, attachment policy, SSE serving, streaming structured output). <strong><code>@warlock.js/ai-panoptic</code></strong> becomes batteries-included with a redesigned, auth-gated local dashboard (group-by-type, cost heatmap, timeline, search / filter, restart-persistent store) and first-class <code>team</code>-type traces. The first releases of <strong><code>@warlock.js/ai-tools</code></strong> (ready-made tools + MCP) and <strong><code>@warlock.js/ai-workspace</code></strong> (a policy-jailed coding workspace), plus a broad <strong><code>@warlock.js/core</code></strong> hardening pass.",
-      "matrix": null,
-      "matrixRows": null,
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/4.5.0-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -19690,9 +19879,11 @@
       "id": "v4-4-0",
       "date": "June 21, 2026",
       "isUnreleased": false,
+      "headlineHtml": null,
+      "highlights": [],
+      "upgradeNotes": [],
       "summaryHtml": "<strong><code>@warlock.js/core</code></strong> completes the production lifecycle — a booted hook, a shutdown hook, graceful HTTP draining, and built-in <code>/health</code> + <code>/ready</code> endpoints for zero-downtime deploys. Plus AI fixes across <strong><code>@warlock.js/ai</code></strong>, <strong><code>@warlock.js/ai-openai</code></strong>, and <strong><code>@warlock.js/ai-panoptic</code></strong> (opt-in content capture, corrected Langfuse token accounting).",
-      "matrix": null,
-      "matrixRows": null,
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/4.4.0-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -19835,9 +20026,11 @@
       "id": "v4-3-0",
       "date": "June 21, 2026",
       "isUnreleased": false,
+      "headlineHtml": null,
+      "highlights": [],
+      "upgradeNotes": [],
       "summaryHtml": "Self-update tooling — <strong><code>@warlock.js/core</code></strong> gains the <code>warlock update</code> command and a new-release notice in <code>warlock dev</code>. <strong><code>@warlock.js/ai</code></strong> caps the primitive ladder with <code>ai.orchestrator()</code>, <code>ai.planner()</code>, and <code>ai.memory()</code>, plus a cost-truth pass across every provider. The new <strong><code>@warlock.js/ai-panoptic</code></strong> package adds observability. ⚠ <strong>Breaking:</strong> snapshot persistence moves from a <code>CacheDriver</code> to the dedicated <code>SnapshotStore</code>.",
-      "matrix": null,
-      "matrixRows": null,
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/4.3.0-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -20111,9 +20304,11 @@
       "id": "v4-2-11",
       "date": "June 17, 2026",
       "isUnreleased": false,
+      "headlineHtml": null,
+      "highlights": [],
+      "upgradeNotes": [],
       "summaryHtml": "Soft deletes go end-to-end in <strong><code>@warlock.js/cascade</code></strong>. <strong><code>@warlock.js/core</code></strong> adds <code>warlock add notifications</code>, and <strong><code>@warlock.js/notifications</code></strong> gains model-driven column mapping, read-state, and multi-tenant support.",
-      "matrix": null,
-      "matrixRows": null,
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/4.2.11-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -20344,9 +20539,11 @@
       "id": "v4-2-10",
       "date": "June 17, 2026",
       "isUnreleased": false,
+      "headlineHtml": null,
+      "highlights": [],
+      "upgradeNotes": [],
       "summaryHtml": "Patch: <strong><code>@warlock.js/auth</code></strong> moves its internal <code>@mongez/*</code> utilities from peer to regular dependencies, clearing the install warnings. <strong><code>@warlock.js/logger</code></strong> softens its console timestamp to gray.",
-      "matrix": null,
-      "matrixRows": null,
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/4.2.10-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -20407,9 +20604,11 @@
       "id": "v4-2-9",
       "date": "June 17, 2026",
       "isUnreleased": false,
+      "headlineHtml": null,
+      "highlights": [],
+      "upgradeNotes": [],
       "summaryHtml": "Patch: <strong><code>@warlock.js/logger</code></strong>'s console output is retuned for scannability — a dimmed time-only timestamp, aligned level columns, and a restored white-on-red <code>fatal</code> badge.",
-      "matrix": null,
-      "matrixRows": null,
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/4.2.9-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -20436,9 +20635,11 @@
       "id": "v4-2-8",
       "date": "June 17, 2026",
       "isUnreleased": false,
+      "headlineHtml": null,
+      "highlights": [],
+      "upgradeNotes": [],
       "summaryHtml": "Patch: <strong><code>@warlock.js/logger</code></strong> now prints each level's name beside its icon (<code>ℹ info</code>, <code>⚠ warn</code>, <code>✗ error</code>, …) for at-a-glance reading.",
-      "matrix": null,
-      "matrixRows": null,
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/4.2.8-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -20465,9 +20666,11 @@
       "id": "v4-2-7",
       "date": "June 17, 2026",
       "isUnreleased": false,
+      "headlineHtml": null,
+      "highlights": [],
+      "upgradeNotes": [],
       "summaryHtml": "Patch: <strong><code>create-warlock</code></strong> now ships its <code>templates/</code> folder, fixing the \"Something went wrong\" error when scaffolding a new project.",
-      "matrix": null,
-      "matrixRows": null,
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/4.2.7-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -20494,9 +20697,11 @@
       "id": "v4-2-6",
       "date": "June 17, 2026",
       "isUnreleased": false,
+      "headlineHtml": null,
+      "highlights": [],
+      "upgradeNotes": [],
       "summaryHtml": "Patch: <strong><code>create-warlock</code></strong> ships its <code>bin</code> folder again, restoring the CLI that was dropped from 4.2.5.",
-      "matrix": null,
-      "matrixRows": null,
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/4.2.6-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -20523,9 +20728,11 @@
       "id": "v4-2-5",
       "date": "June 15, 2026",
       "isUnreleased": false,
+      "headlineHtml": null,
+      "highlights": [],
+      "upgradeNotes": [],
       "summaryHtml": "Patch: <code>warlock add notifications</code> now scaffolds the in-app notifications HTTP surface — routes plus a list / mark-read / clear controller, gated by auth.",
-      "matrix": null,
-      "matrixRows": null,
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/4.2.5-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -20552,9 +20759,11 @@
       "id": "v4-2-4",
       "date": "June 15, 2026",
       "isUnreleased": false,
+      "headlineHtml": null,
+      "highlights": [],
+      "upgradeNotes": [],
       "summaryHtml": "Patch: corrects a worker-loader build path in <strong><code>@warlock.js/core</code></strong> that 4.2.3 left broken.",
-      "matrix": null,
-      "matrixRows": null,
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/4.2.4-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -20581,9 +20790,11 @@
       "id": "v4-2-3",
       "date": "June 15, 2026",
       "isUnreleased": false,
+      "headlineHtml": null,
+      "highlights": [],
+      "upgradeNotes": [],
       "summaryHtml": "Patch: ships the worker scripts as <strong><code>@warlock.js/core</code></strong> build entry points. A wrong path here blocked publishing for some packages — fixed in 4.2.4.",
-      "matrix": null,
-      "matrixRows": null,
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/4.2.3-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -20610,9 +20821,11 @@
       "id": "v4-2-2",
       "date": "June 15, 2026",
       "isUnreleased": false,
+      "headlineHtml": null,
+      "highlights": [],
+      "upgradeNotes": [],
       "summaryHtml": "Patch: ships the <code>warlock</code> CLI entry (<code>cli/start</code>) in <strong><code>@warlock.js/core</code></strong>'s build.",
-      "matrix": null,
-      "matrixRows": null,
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/4.2.2-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -20639,9 +20852,11 @@
       "id": "v4-2-1",
       "date": "June 15, 2026",
       "isUnreleased": false,
+      "headlineHtml": null,
+      "highlights": [],
+      "upgradeNotes": [],
       "summaryHtml": "Patch: <strong><code>@warlock.js/core</code></strong> and <strong><code>@warlock.js/cascade</code></strong> ship their <code>bin</code> folders, restoring the <code>warlock</code> and <code>cascade</code> CLIs dropped from 4.2.0.",
-      "matrix": null,
-      "matrixRows": null,
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/4.2.1-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -20685,9 +20900,11 @@
       "id": "v4-2-0",
       "date": "June 15, 2026",
       "isUnreleased": false,
+      "headlineHtml": null,
+      "highlights": [],
+      "upgradeNotes": [],
       "summaryHtml": "A security overhaul of <strong><code>@warlock.js/auth</code></strong> — brute-force throttling, atomic refresh-token rotation, and CSPRNG secrets (the <code>jwt</code> config gives way to <code>accessToken</code> / <code>refreshToken</code>). Introduces two packages: <strong><code>@warlock.js/notifications</code></strong> (multi-channel notifications) and <strong><code>@warlock.js/access</code></strong> (RBAC + ABAC authorization).",
-      "matrix": null,
-      "matrixRows": null,
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/4.2.0-summary.md",
       "mode": "detail",
       "packages": [
         {
@@ -20970,9 +21187,11 @@
       "id": "v4-1-15",
       "date": "June 4, 2026",
       "isUnreleased": false,
+      "headlineHtml": null,
+      "highlights": [],
+      "upgradeNotes": [],
       "summaryHtml": "The first public release of <strong>Warlock.js</strong> — 17 packages published together at <code>4.1.15</code>. Every change from here on is recorded per package and aggregated on this page.",
-      "matrix": null,
-      "matrixRows": null,
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/4.1.15-summary.md",
       "mode": "notes",
       "packages": []
     }

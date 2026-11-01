@@ -6,7 +6,7 @@
 // direct-execution guard at the bottom of generate-changelog.mjs.
 import assert from "node:assert/strict";
 import test from "node:test";
-import { cmpVersionDesc } from "./generate-changelog.mjs";
+import { cmpVersionDesc, releaseEntryFields } from "./generate-changelog.mjs";
 
 function assertDesc(
   /** @type {string} */ higher,
@@ -76,4 +76,45 @@ test("sorts a mixed version list into descending SemVer order", () => {
     "1.0.0-alpha",
   ];
   assert.deepEqual([...input].sort(cmpVersionDesc), expected);
+});
+
+test("a release entry renders its headline, bullets and upgrade notes, and none of the process fields", () => {
+  const fields = releaseEntryFields(
+    {
+      headline: "Ships `thing`.",
+      highlights: ["First **change**.", "  ", "Second change."],
+      upgradeNotes: ["Run `npx warlock update`."],
+      matrix: "none",
+      matrixRows: ["a"],
+    },
+    "5.42.0",
+  );
+  assert.equal(fields.headlineHtml, "Ships <code>thing</code>.");
+  assert.deepEqual(fields.highlights, ["First <strong>change</strong>.", "Second change."]);
+  assert.deepEqual(fields.upgradeNotes, ["Run <code>npx warlock update</code>."]);
+  assert.equal(fields.summaryHtml, null);
+  assert.match(fields.notesUrl ?? "", /releases\/5\.42\.0-summary\.md$/);
+  assert.ok(!("matrix" in fields) && !("matrixRows" in fields));
+});
+
+test("an older entry with only a summary paragraph still renders it", () => {
+  const fields = releaseEntryFields({ summary: "Old **text**." }, "5.1.0");
+  assert.equal(fields.headlineHtml, null);
+  assert.equal(fields.summaryHtml, "Old <strong>text</strong>.");
+  assert.deepEqual(fields.highlights, []);
+});
+
+test("a non-release key gets no release-notes link", () => {
+  assert.equal(releaseEntryFields({}, "Unreleased").notesUrl, null);
+});
+
+test("process sentences are cut from an older summary paragraph", () => {
+  const fields = releaseEntryFields(
+    {
+      summary:
+        "Fixes `x`. No breaking changes. Lockstep release across all 33 packages. Generator matrix scope: `none`; before publishing, the blog passed the release gate.",
+    },
+    "5.39.0",
+  );
+  assert.equal(fields.summaryHtml, "Fixes <code>x</code>. No breaking changes.");
 });

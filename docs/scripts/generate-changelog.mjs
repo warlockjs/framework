@@ -5,7 +5,7 @@
  *
  * Sources:
  *   - <pkg>/CHANGELOG.md   → the typed CHANGES (### Added/Changed/Fixed/...).
- *   - src/data/releases.json → the release DATE + "what shipped" SUMMARY.
+ *   - src/data/releases.json → the release DATE + reader-facing headline, highlights and upgrade notes.
  *
  * Output (src/data/changelog.json) is grouped FOR A UNIFIED MONOREPO RELEASE:
  * each release lists its changes by TYPE (Added, Changed, Fixed, Deprecated,
@@ -50,7 +50,7 @@ const TYPE_ORDER = [
 
 /** @typedef {{ title: string | null, items: string[] }} ChangeCategory */
 /** @typedef {{ version: string, date: string | null, categories: ChangeCategory[] }} ChangelogVersion */
-/** @typedef {{ publishedAt?: unknown, date?: string, summary?: string, featured?: string[], matrix?: unknown, matrixRows?: unknown }} ReleaseMeta */
+/** @typedef {{ publishedAt?: unknown, date?: string, summary?: string, headline?: string, highlights?: string[], upgradeNotes?: string[], featured?: string[], matrix?: unknown, matrixRows?: unknown }} ReleaseMeta */
 /** @typedef {Record<string, ReleaseMeta>} ReleaseMetaMap */
 /** @typedef {{ name: string, slug: string, byType: Map<string, string[]> }} PackageBucket */
 /** @typedef {{ date: string | null, pkgs: Map<string, PackageBucket>, present: { name: string, slug: string }[] }} VersionBucket */
@@ -227,17 +227,49 @@ const releaseDateFormatter = new Intl.DateTimeFormat("en-US", {
   timeZone: "UTC",
 });
 
+const RELEASE_NOTES_BASE = "https://github.com/warlockjs/framework/blob/main/releases";
+
+/** Keep only non-empty strings from a hand-edited list. */
+function stringList(/** @type {unknown} */ value) {
+  return Array.isArray(value)
+    ? value.filter((v) => typeof v === "string" && v.trim()).map((v) => v.trim())
+    : [];
+}
+
 /**
- * The generator-matrix scope a release ran, or `null` when the entry does not
- * say.
- *
- * An unrecognised value is `null` rather than passed through: this reaches a
- * published page as a claim about how a version was verified, and a typo that
- * renders as-is would be a claim nobody checked. `null` renders as "not
- * recorded", which is the true statement in both cases.
+ * Older `summary` paragraphs end with release-process sentences (lockstep
+ * note, generator-matrix scope, gate and registry confirmation). Readers do not
+ * need them, so they are cut from the rendered text; the data keeps them.
  */
-function normaliseMatrixScope(/** @type {unknown} */ value) {
-  return value === "full" || value === "subset" || value === "none" ? value : null;
+function withoutProcessNotes(/** @type {string} */ summary) {
+  return summary
+    .replace(/\s*Generator matrix scope:[\s\S]*$/, "")
+    .replace(/\s*Lockstep release across all \d+ packages\./, "")
+    .trim();
+}
+
+/**
+ * The reader-facing part of a release entry: a one-line headline, a few
+ * bullets of what changed for users, optional upgrade notes and a link to the
+ * full release notes. Process records such as `matrix` stay in releases.json
+ * for the release tooling and are deliberately not carried to the page. An
+ * older entry with only a `summary` paragraph still renders through
+ * `summaryHtml`.
+ */
+export function releaseEntryFields(
+  /** @type {ReleaseMeta} */ meta,
+  /** @type {string} */ version,
+) {
+  const headline = typeof meta.headline === "string" && meta.headline.trim() ? meta.headline : null;
+  return {
+    headlineHtml: headline ? renderInline(headline) : null,
+    highlights: stringList(meta.highlights).map(renderInline),
+    upgradeNotes: stringList(meta.upgradeNotes).map(renderInline),
+    summaryHtml: !headline && meta.summary ? renderInline(withoutProcessNotes(meta.summary)) : null,
+    notesUrl: /^\d+\.\d+\.\d+$/.test(version)
+      ? `${RELEASE_NOTES_BASE}/${version}-summary.md`
+      : null,
+  };
 }
 
 function formatPublishedAt(/** @type {unknown} */ publishedAt) {
@@ -396,7 +428,6 @@ async function main() {
     if (!bucket) throw new Error(`Missing changelog bucket for ${version}`);
     const m = meta[version] || {};
     const date = formatPublishedAt(m.publishedAt) || m.date || bucket.date || null;
-    const summaryHtml = m.summary ? renderInline(m.summary) : null;
 
     // Group BY PACKAGE: one block per package, with per-type counts + a
     // type-tagged item list (ordered by TYPE_ORDER within the package).
@@ -434,14 +465,7 @@ async function main() {
       id: versionId(version),
       date,
       isUnreleased: /unreleased/i.test(version),
-      summaryHtml,
-      // How this version was verified. Carried through to the page because a
-      // scope stated only in a JSON file nobody renders is not a public record
-      // — and the record is the entire safeguard that replaced the mandatory
-      // generator gate (canon e00fb7b8). Absent on releases published before
-      // the field existed, which is honest: nothing knows what they ran.
-      matrix: normaliseMatrixScope(m.matrix),
-      matrixRows: Array.isArray(m.matrixRows) ? m.matrixRows : null,
+      ...releaseEntryFields(m, version),
       mode,
       packages: pkgBlocks,
     };

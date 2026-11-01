@@ -104,6 +104,12 @@
   --sl-color-gray-6: #e2e8f0;
   --sl-color-gray-7: #f1f5f9;
   --sl-color-black: #ffffff;
+
+  /* Surface tokens are dark by default (:root). Components paint cards, pills
+   * and form controls with them while their text uses theme-aware Starlight
+   * tokens, so they must flip with the theme or the text vanishes. */
+  --warlock-surface-dark: #f8fafc;
+  --warlock-surface-darker: #f1f5f9;
 }
 
 /* ---------- Body baseline ---------- */
@@ -567,7 +573,8 @@ pre {
 /* Section group label — uppercase, tracked, muted */
 .sidebar-content ul.top-level > li > details > summary,
 .sidebar-content ul.top-level > li > summary,
-.sidebar-content ul.top-level > li > .group-label {
+.sidebar-content ul.top-level > li > .group-label,
+.sidebar-content ul.top-level > li > a {
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -585,7 +592,8 @@ pre {
 }
 
 .sidebar-content ul.top-level > li > details > summary:hover,
-.sidebar-content ul.top-level > li > summary:hover {
+.sidebar-content ul.top-level > li > summary:hover,
+.sidebar-content ul.top-level > li > a:hover {
   color: var(--sl-color-white);
   background-color: color-mix(in srgb, var(--sl-color-text-accent) 5%, transparent);
 }
@@ -595,10 +603,23 @@ pre {
   color: var(--sl-color-text);
 }
 
+/* Starlight wraps a group label in a larger span; match it to the link rows. */
+.sidebar-content ul.top-level > li > details > summary .large {
+  font-size: inherit;
+  font-weight: inherit;
+}
+
+/* Top-level links ("Overview", "Upgrade to v5") share the group-label style so
+ * the first level reads as one list; the current one keeps the active look. */
+.sidebar-content ul.top-level > li > a[aria-current="page"] {
+  color: var(--sl-color-text-accent);
+}
+
 /* Tiny square bullet before each group label */
 .sidebar-content ul.top-level > li > details > summary::before,
 .sidebar-content ul.top-level > li > summary::before,
-.sidebar-content ul.top-level > li > .group-label::before {
+.sidebar-content ul.top-level > li > .group-label::before,
+.sidebar-content ul.top-level > li > a::before {
   content: "";
   width: 5px;
   height: 5px;
@@ -909,6 +930,78 @@ pre.mermaid svg .edgeLabel p {
 :root[data-theme="light"] pre.mermaid svg .edgeLabel p {
   color: var(--sl-color-text) !important;
   background-color: #ffffff !important;
+}
+
+/* Light mode. The mermaid theme variables in astro.config.mjs are dark-palette
+ * literals (mermaid cannot read CSS variables), and they apply in both
+ * themes, which painted navy nodes with pale text on the white card. Re-skin
+ * the rendered SVG here; dark mode keeps the config values untouched. */
+:root[data-theme="light"] pre.mermaid svg {
+  --mm-node: #fffbeb;
+  --mm-stroke: #a16207;
+  --mm-text: #0f172a;
+  --mm-line: #475569;
+}
+
+:root[data-theme="light"] pre.mermaid svg .node rect,
+:root[data-theme="light"] pre.mermaid svg .node polygon,
+:root[data-theme="light"] pre.mermaid svg .node circle,
+:root[data-theme="light"] pre.mermaid svg .node ellipse,
+:root[data-theme="light"] pre.mermaid svg .node path,
+:root[data-theme="light"] pre.mermaid svg rect.actor,
+:root[data-theme="light"] pre.mermaid svg .actor,
+:root[data-theme="light"] pre.mermaid svg .statediagram-state rect,
+:root[data-theme="light"] pre.mermaid svg g.classGroup rect {
+  fill: var(--mm-node) !important;
+  stroke: var(--mm-stroke) !important;
+}
+
+:root[data-theme="light"] pre.mermaid svg .cluster rect,
+:root[data-theme="light"] pre.mermaid svg .cluster polygon {
+  fill: rgba(161, 98, 7, 0.05) !important;
+  stroke: #cbd5e1 !important;
+}
+
+:root[data-theme="light"] pre.mermaid svg .note,
+:root[data-theme="light"] pre.mermaid svg rect.note {
+  fill: #fef9c3 !important;
+  stroke: var(--mm-stroke) !important;
+}
+
+:root[data-theme="light"] pre.mermaid svg text,
+:root[data-theme="light"] pre.mermaid svg .nodeLabel,
+:root[data-theme="light"] pre.mermaid svg .nodeLabel p,
+:root[data-theme="light"] pre.mermaid svg .label,
+:root[data-theme="light"] pre.mermaid svg .label div,
+:root[data-theme="light"] pre.mermaid svg .label span,
+:root[data-theme="light"] pre.mermaid svg .cluster-label span,
+:root[data-theme="light"] pre.mermaid svg foreignObject,
+:root[data-theme="light"] pre.mermaid svg foreignObject span,
+:root[data-theme="light"] pre.mermaid svg foreignObject p,
+:root[data-theme="light"] pre.mermaid svg foreignObject div {
+  color: var(--mm-text) !important;
+}
+
+:root[data-theme="light"] pre.mermaid svg text,
+:root[data-theme="light"] pre.mermaid svg .actor text,
+:root[data-theme="light"] pre.mermaid svg tspan {
+  fill: var(--mm-text) !important;
+  stroke: none !important;
+}
+
+:root[data-theme="light"] pre.mermaid svg .flowchart-link,
+:root[data-theme="light"] pre.mermaid svg .edgePath path,
+:root[data-theme="light"] pre.mermaid svg .messageLine0,
+:root[data-theme="light"] pre.mermaid svg .messageLine1,
+:root[data-theme="light"] pre.mermaid svg .actor-line,
+:root[data-theme="light"] pre.mermaid svg line.loopLine {
+  stroke: var(--mm-line) !important;
+}
+
+:root[data-theme="light"] pre.mermaid svg marker path,
+:root[data-theme="light"] pre.mermaid svg .arrowheadPath {
+  fill: var(--mm-line) !important;
+  stroke: var(--mm-line) !important;
 }
 
 /* Cluster (subgraph) styling — slightly lifted */

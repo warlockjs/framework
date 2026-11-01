@@ -6,9 +6,9 @@ sidebar:
   label: "Security"
 ---
 
-This page is a map, not a manual. Warlock doesn't ship a monolithic "security module" — instead, security shows up as a handful of focused pieces: crypto helpers for secrets, a suite of protective HTTP middleware, a few transport knobs in `src/config/http.ts`, and validation as a hard request boundary. This page links them together so you can see the whole surface at once, then sends you to the page that goes deep on each.
+Lock down an app in an afternoon: keep secrets out of source, put the protective middleware on the routes that need it, turn on the transport hardening, and validate every input. The [hardening checklist](#hardening-checklist) at the end lists each step with the setting it uses.
 
-Nothing here is novel — it's the honest inventory of what exists today, with each knob verified against the code that reads it. If a security feature isn't listed here, assume it isn't built.
+Warlock has no single "security module". The pieces are crypto helpers for secrets, protective HTTP middleware, a few knobs in `src/config/http.ts`, and validation as a hard request boundary. Each section below names the page that goes deep on its piece, and every knob listed here is one the code reads today.
 
 ## The 30-second look
 
