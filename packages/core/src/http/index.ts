@@ -3,6 +3,7 @@ export * from "./conditional-request";
 export * from "./config";
 export * from "./createHttpApplication";
 export * from "./csp";
+export * from "./security-headers";
 export * from "./csrf-default-guard";
 export * from "./csrf-origin-policy";
 export * from "./database/RequestLog";

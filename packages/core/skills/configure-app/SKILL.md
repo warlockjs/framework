@@ -65,6 +65,7 @@ const httpConfigurations: HttpConfigurations = {
       "img-src": ["'self'", "data:", "https://cdn.example.com"],
     },
   },
+  securityHeaders: { frameAncestors: "self" },
 };
 
 export default httpConfigurations;
@@ -87,6 +88,31 @@ serverOptions: {
 Framework-owned settings (`trustProxy`, `bodyLimit`,
 `gracefulShutdown.forceCloseConnections`) have their own `http.*` keys;
 setting them in `serverOptions` as well overrides those keys.
+
+### `securityHeaders` — security response headers (5.42.0)
+
+On by default, on every response (routed, static files, 404s, early refusals,
+`reply.raw.writeHead` handlers): CSP `frame-ancestors 'none'` with
+`X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`,
+`Referrer-Policy: strict-origin-when-cross-origin`, a `Permissions-Policy`
+that turns camera, microphone, geolocation, usb and motion sensors off, and
+(production only) `Strict-Transport-Security: max-age=31536000;
+includeSubDomains`. Keys: `frameAncestors` (`"none"` | `"self"` | list),
+`contentTypeOptions`, `referrerPolicy`, `permissionsPolicy` (object merged per
+feature, or string), `hsts` (`{ maxAge, includeSubDomains, preload,
+onlyInProduction }`). `false` drops a header; `securityHeaders: false` drops
+all. A route overrides or opts out with `router.get(path, handler,
+{ securityHeaders: { frameAncestors: [...] } | false })`. With `csp` on there is
+one CSP header; a `frame-ancestors` in `csp.directives` wins over
+`securityHeaders.frameAncestors`. To add other headers use
+`app.http.addHook("onRequest", …)` and `reply.raw.setHeader()`.
+
+Building blocks, exported from `@warlock.js/core`: `buildSecurityHeaders`,
+`mergeSecurityHeadersConfig`, `resolveSecurityHeadersConfig`,
+`applySecurityHeadersToRaw`, `applyRouteSecurityHeaders`,
+`registerSecurityHeaders`, `serializePermissionsPolicy`, `frameOptionsFor`,
+`frameAncestorSources`, `effectiveFrameAncestors`, `SECURITY_HEADER_NAMES`,
+`DEFAULT_PERMISSIONS_POLICY`, `DEFAULT_REFERRER_POLICY`, `DEFAULT_HSTS_MAX_AGE`.
 
 ### `csp` — Content-Security-Policy (5.12.0)
 

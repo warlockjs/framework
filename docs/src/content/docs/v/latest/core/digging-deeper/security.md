@@ -209,6 +209,47 @@ The framework starts from a conservative default policy and lets an app override
 
 Malformed directive values fail the boot, not a random request: a value containing `;` (would truncate the directive) or with an odd number of `'` characters (a truncated/malformed keyword like `'self`) throws `InvalidCspDirectiveError` when the server starts, naming the offending directive and value.
 
+### Security response headers — new in 5.42
+
+`http.securityHeaders` stamps browser-hardening headers on **every** response, and it is **on by default**: routed handlers, static files, 404s, and early refusals (CORS, 413 body limit, 429 rate limit, 405, malformed URLs, the page host's refusals), including handlers that call `reply.raw.writeHead()`. The headers are set in the server's first `onRequest` hook, on the Node response, so nothing later can miss them. It works the same in production, `warlock dev` and `createTestHttpServer`.
+
+| Header                                                         | Default                                                                                     | Config key                                                                            |
+| -------------------------------------------------------------- | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| `Content-Security-Policy: frame-ancestors` + `X-Frame-Options` | `frame-ancestors 'none'` + `DENY`                                                           | `frameAncestors`: `"none"`, `"self"` (`SAMEORIGIN`), or a list (no `X-Frame-Options`) |
+| `X-Content-Type-Options`                                       | `nosniff`                                                                                   | `contentTypeOptions`                                                                  |
+| `Referrer-Policy`                                              | `strict-origin-when-cross-origin`                                                           | `referrerPolicy`                                                                      |
+| `Permissions-Policy`                                           | accelerometer, camera, geolocation, gyroscope, magnetometer, microphone, usb all off (`()`) | `permissionsPolicy`                                                                   |
+| `Strict-Transport-Security`                                    | production only: `max-age=31536000; includeSubDomains`                                      | `hsts`: `{ maxAge, includeSubDomains, preload, onlyInProduction }`                    |
+
+```ts title="src/config/http.ts"
+export default {
+  securityHeaders: {
+    frameAncestors: ["'self'", "https://portal.example.com"],
+    permissionsPolicy: { microphone: ["self"] }, // merged over the defaults per feature
+    hsts: { preload: true }, // preload is opt-in
+    // referrerPolicy: false,   // drop one header
+  },
+  // securityHeaders: false,    // or disable all of them
+};
+```
+
+Set any key to `false` to drop that header, or `securityHeaders: false` to disable them all. `hsts` is sent only when `NODE_ENV` is `production` unless `onlyInProduction: false`.
+
+Defaults and compatibility: `frame-ancestors 'none'` stops every site, including your own, from framing the app. If your app embeds its own pages in an iframe, use `"self"`; if it turns on the camera, microphone or geolocation, allow them in `permissionsPolicy`.
+
+**Per route.** A route can override the app config (merged key by key) or opt out, e.g. an embeddable widget:
+
+```ts
+router.get("/widget", widget, {
+  securityHeaders: { frameAncestors: ["https://partner.example.com"] },
+});
+router.get("/internal", internal, { securityHeaders: false });
+```
+
+**With `http.csp`.** When `http.csp` is on, the response carries one `Content-Security-Policy` header with `frame-ancestors` exactly once. Precedence: a `frame-ancestors` you declare in `http.csp.directives` wins (and `X-Frame-Options` follows it); otherwise the `securityHeaders.frameAncestors` policy replaces the CSP default. Responses that bypass routing (static files, 404s) carry a `frame-ancestors`-only policy, since the full CSP is built per routed request. With `csp.reportOnly`, the enforcing `frame-ancestors` header is still sent next to the report-only policy.
+
+Need a header the framework does not manage? `app.http.addHook("onRequest", …)` (see the container page) is the supported way to reach the Fastify instance; set values with `reply.raw.setHeader()` so `writeHead` keeps them.
+
 ### `trustProxy` shapes
 
 `http.trustProxy` is passed to Fastify untouched, and `request.detectIp()` (and its `realIp` alias) reads the resolved client off `request.ip` — so both agree.

@@ -1,5 +1,6 @@
 import config from "@mongez/config";
 import type { Request } from "./request";
+import { frameAncestorSources, resolveSecurityHeadersConfig } from "./security-headers";
 import type { Response } from "./response";
 
 /**
@@ -168,6 +169,7 @@ export function validateCspConfigAtBoot(): void {
 export function mergeCspDirectives(
   appDirectives: Record<string, string[]> | undefined,
   nonce: string,
+  frameAncestors?: string[],
 ): Record<string, string[]> {
   const merged: Record<string, string[]> = {};
 
@@ -175,6 +177,12 @@ export function mergeCspDirectives(
     merged[directive] = appDirectives?.[directive]
       ? [...appDirectives[directive]]
       : [...defaultValues];
+  }
+
+  // `http.securityHeaders.frameAncestors` replaces the default, but an
+  // explicit `frame-ancestors` in the app's own directives always wins.
+  if (frameAncestors && !appDirectives?.["frame-ancestors"]) {
+    merged["frame-ancestors"] = [...frameAncestors];
   }
 
   if (appDirectives) {
@@ -213,8 +221,12 @@ export function serializeCspDirectives(directives: Record<string, string[]>): st
  * Build the full `Content-Security-Policy` (or `-Report-Only`) header value
  * for one request, using that request's own nonce.
  */
-export function buildCspHeaderValue(cspConfig: CspConfig, nonce: string): string {
-  return serializeCspDirectives(mergeCspDirectives(cspConfig.directives, nonce));
+export function buildCspHeaderValue(
+  cspConfig: CspConfig,
+  nonce: string,
+  frameAncestors?: string[],
+): string {
+  return serializeCspDirectives(mergeCspDirectives(cspConfig.directives, nonce, frameAncestors));
 }
 
 /**
@@ -240,5 +252,14 @@ export function applyCspHeader(request: Request, response: Response): void {
     ? "Content-Security-Policy-Report-Only"
     : "Content-Security-Policy";
 
-  response.header(headerName, buildCspHeaderValue(cspConfig, request.nonce));
+  // One CSP header carries `frame-ancestors` exactly once: the policy from
+  // `http.securityHeaders` (route override included) when it is on, which
+  // replaces this header's earlier frame-ancestors-only copy.
+  const securityConfig = resolveSecurityHeadersConfig(request.route?.securityHeaders);
+  const frameAncestors =
+    securityConfig && securityConfig.frameAncestors !== false
+      ? frameAncestorSources(securityConfig.frameAncestors ?? "none")
+      : undefined;
+
+  response.header(headerName, buildCspHeaderValue(cspConfig, request.nonce, frameAncestors));
 }

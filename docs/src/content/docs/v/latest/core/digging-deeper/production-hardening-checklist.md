@@ -29,6 +29,8 @@ Work top to bottom — the order roughly follows boot: secrets first, then the t
 - [ ] **Sign cookies** by setting `http.cookies.secret` whenever a cookie value must not be client-forgeable. See [Security](./security.md).
 - [ ] **Keep `http.requestId` enabled** so every request is traceable end-to-end; inherited ids are already validated against log-injection. See [Security](./security.md).
 
+- [ ] **Keep `http.securityHeaders` on (default since 5.42).** Every response carries `frame-ancestors`/`X-Frame-Options`, `nosniff`, `Referrer-Policy`, `Permissions-Policy` and, in production, HSTS. Loosen per key or per route only where needed. See [Security → Security response headers](./security.md#security-response-headers--new-in-542).
+
 ## Abuse & rate limiting
 
 - [ ] **Add `middleware.rateLimit()`** to login, OTP, password-reset, and other abuse-prone endpoints — tighter than the global `http.rateLimit` backstop.
