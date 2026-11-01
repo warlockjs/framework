@@ -213,19 +213,19 @@ Malformed directive values fail the boot, not a random request: a value containi
 
 `http.securityHeaders` stamps browser-hardening headers on **every** response, and it is **on by default**: routed handlers, static files, 404s, and early refusals (CORS, 413 body limit, 429 rate limit, 405, malformed URLs, the page host's refusals), including handlers that call `reply.raw.writeHead()`. The headers are set in the server's first `onRequest` hook, on the Node response, so nothing later can miss them. It works the same in production, `warlock dev` and `createTestHttpServer`.
 
-| Header                                                         | Default                                                                                     | Config key                                                                            |
-| -------------------------------------------------------------- | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| `Content-Security-Policy: frame-ancestors` + `X-Frame-Options` | `frame-ancestors 'none'` + `DENY`                                                           | `frameAncestors`: `"none"`, `"self"` (`SAMEORIGIN`), or a list (no `X-Frame-Options`) |
-| `X-Content-Type-Options`                                       | `nosniff`                                                                                   | `contentTypeOptions`                                                                  |
-| `Referrer-Policy`                                              | `strict-origin-when-cross-origin`                                                           | `referrerPolicy`                                                                      |
-| `Permissions-Policy`                                           | accelerometer, camera, geolocation, gyroscope, magnetometer, microphone, usb all off (`()`) | `permissionsPolicy`                                                                   |
-| `Strict-Transport-Security`                                    | production only: `max-age=31536000; includeSubDomains`                                      | `hsts`: `{ maxAge, includeSubDomains, preload, onlyInProduction }`                    |
+| Header                                                         | Default                                                                                                                    | Config key                                                                            |
+| -------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| `Content-Security-Policy: frame-ancestors` + `X-Frame-Options` | `frame-ancestors 'none'` + `DENY`                                                                                          | `frameAncestors`: `"none"`, `"self"` (`SAMEORIGIN`), or a list (no `X-Frame-Options`) |
+| `X-Content-Type-Options`                                       | `nosniff`                                                                                                                  | `contentTypeOptions`                                                                  |
+| `Referrer-Policy`                                              | `strict-origin-when-cross-origin`                                                                                          | `referrerPolicy`                                                                      |
+| `Permissions-Policy`                                           | camera, microphone, geolocation for your own pages only (`(self)`); accelerometer, gyroscope, magnetometer, usb off (`()`) | `permissionsPolicy`                                                                   |
+| `Strict-Transport-Security`                                    | production only: `max-age=31536000; includeSubDomains`                                                                     | `hsts`: `{ maxAge, includeSubDomains, preload, onlyInProduction }`                    |
 
 ```ts title="src/config/http.ts"
 export default {
   securityHeaders: {
     frameAncestors: ["'self'", "https://portal.example.com"],
-    permissionsPolicy: { microphone: ["self"] }, // merged over the defaults per feature
+    permissionsPolicy: { camera: [] }, // merged over the defaults per feature; [] turns it off
     hsts: { preload: true }, // preload is opt-in
     // referrerPolicy: false,   // drop one header
   },
@@ -235,7 +235,7 @@ export default {
 
 Set any key to `false` to drop that header, or `securityHeaders: false` to disable them all. `hsts` is sent only when `NODE_ENV` is `production` unless `onlyInProduction: false`.
 
-Defaults and compatibility: `frame-ancestors 'none'` stops every site, including your own, from framing the app. If your app embeds its own pages in an iframe, use `"self"`; if it turns on the camera, microphone or geolocation, allow them in `permissionsPolicy`.
+Defaults and compatibility: `frame-ancestors 'none'` stops every site, including your own, from framing the app. If your app embeds its own pages in an iframe, use `"self"`. Camera, microphone and geolocation stay available to your own pages; an embedded third-party frame that needs one must be listed in `permissionsPolicy`.
 
 **Per route.** A route can override the app config (merged key by key) or opt out, e.g. an embeddable widget:
 

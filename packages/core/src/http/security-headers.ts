@@ -98,16 +98,17 @@ export type SecurityHeadersConfig = {
 export type RouteSecurityHeaders = SecurityHeadersConfig | false;
 
 /**
- * Features switched off unless the app re-enables them in
- * `http.securityHeaders.permissionsPolicy`.
+ * Camera, microphone and geolocation stay available to the app's own pages
+ * (`self`) and are blocked for embedded third-party frames; the motion sensors
+ * and USB are off. Override per feature in `http.securityHeaders.permissionsPolicy`.
  */
 export const DEFAULT_PERMISSIONS_POLICY: Readonly<Record<string, readonly string[]>> = {
   accelerometer: [],
-  camera: [],
-  geolocation: [],
+  camera: ["self"],
+  geolocation: ["self"],
   gyroscope: [],
   magnetometer: [],
-  microphone: [],
+  microphone: ["self"],
   usb: [],
 };
 

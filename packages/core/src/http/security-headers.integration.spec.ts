@@ -35,7 +35,7 @@ function expectDefaults(response: Response) {
   expect(response.headers.get("content-security-policy")).toBe("frame-ancestors 'none'");
   expect(response.headers.get("x-content-type-options")).toBe("nosniff");
   expect(response.headers.get("referrer-policy")).toBe("strict-origin-when-cross-origin");
-  expect(response.headers.get("permissions-policy")).toContain("camera=()");
+  expect(response.headers.get("permissions-policy")).toContain("camera=(self)");
 }
 
 describe("security headers on the test server", () => {

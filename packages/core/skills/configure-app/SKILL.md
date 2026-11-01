@@ -95,7 +95,8 @@ On by default, on every response (routed, static files, 404s, early refusals,
 `reply.raw.writeHead` handlers): CSP `frame-ancestors 'none'` with
 `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`,
 `Referrer-Policy: strict-origin-when-cross-origin`, a `Permissions-Policy`
-that turns camera, microphone, geolocation, usb and motion sensors off, and
+that keeps camera, microphone and geolocation to your own pages and turns usb
+and motion sensors off, and
 (production only) `Strict-Transport-Security: max-age=31536000;
 includeSubDomains`. Keys: `frameAncestors` (`"none"` | `"self"` | list),
 `contentTypeOptions`, `referrerPolicy`, `permissionsPolicy` (object merged per

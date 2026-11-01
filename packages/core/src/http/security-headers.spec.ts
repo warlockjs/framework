@@ -40,7 +40,7 @@ describe("buildSecurityHeaders", () => {
       "X-Content-Type-Options": "nosniff",
       "Referrer-Policy": "strict-origin-when-cross-origin",
       "Permissions-Policy":
-        "accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), usb=()",
+        "accelerometer=(), camera=(self), geolocation=(self), gyroscope=(), magnetometer=(), microphone=(self), usb=()",
     });
   });
 
@@ -91,12 +91,12 @@ describe("buildSecurityHeaders", () => {
 
   it("merges permissionsPolicy objects over the defaults per feature", () => {
     const value = buildSecurityHeaders({
-      permissionsPolicy: { camera: ["self"], fullscreen: ["self", "https://x.example.com"] },
+      permissionsPolicy: { camera: [], fullscreen: ["self", "https://x.example.com"] },
     })["Permissions-Policy"];
 
-    expect(value).toContain("camera=(self)");
+    expect(value).toContain("camera=()");
     expect(value).toContain('fullscreen=(self "https://x.example.com")');
-    expect(value).toContain("microphone=()");
+    expect(value).toContain("microphone=(self)");
     expect(serializePermissionsPolicy({ geolocation: ["*"] })).toBe("geolocation=*");
   });
 
