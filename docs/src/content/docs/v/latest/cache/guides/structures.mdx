@@ -1,0 +1,134 @@
+---
+title: "Probabilistic Structures"
+slug: v/latest/cache/structures
+---
+
+`cache.structures` gives you four tiny data structures that answer big questions with a few kilobytes: "was this seen before?", "how many distinct users?", "how often did this term appear?". They trade a small, known error for memory you can ignore.
+
+```ts
+import { cache } from "@warlock.js/cache";
+
+const usernames = cache.structures.bloom("users.usernames", { expectedItems: 1_000_000, errorRate: 0.01 });
+await usernames.add("hasan");
+
+if (!(await usernames.mightContain(input))) {
+  // definitely free: skip the database lookup
+}
+```
+
+They live on the cache manager (not on every driver) and are supported on **`redis`** and the memory drivers (`memory`, `memoryExtended`, `lru`). Any other driver throws `CacheUnsupportedError`; custom drivers need no change.
+
+Every structure takes `ttl` (a number of seconds or a string like `"40d"`). It is set when the structure is first written and is not pushed back by later writes, so `"1h"` gives you a window that ends an hour after its first event.
+
+Keys follow the driver's `globalPrefix`, and the structures are stored apart from your plain keys (`structures.<kind>.<key>`).
+
+## Bloom filter: "definitely not" or "probably yes"
+
+```ts
+const filter = cache.structures.bloom("users.usernames", {
+  expectedItems: 1_000_000,
+  errorRate: 0.01, // default
+});
+
+await filter.add("hasan"); // true when it was not (probably) there before
+await filter.mightContain("hasan"); // true
+await filter.mightContain("nobody"); // false means it was never added
+```
+
+`false` is always right. `true` is wrong `errorRate` of the time.
+
+| Items     | Error rate | Memory  | Hashes |
+| --------- | ---------- | ------- | ------ |
+| 1,000,000 | 1%         | ~1.2 MB | 7      |
+| 1,000,000 | 0.1%       | ~1.8 MB | 10     |
+
+Good for: username-taken checks, a shield in front of lookups for random ids, blocklists, "already sent this email?".
+
+Not for: anything where a wrong "yes" is unacceptable (permissions, payments), or sets you need to shrink or list. You cannot remove an item or list the contents; use a cuckoo filter if you need removal.
+
+Add far more than `expectedItems` and the error rate climbs; size it for the growth you expect.
+
+## Cuckoo filter: membership with removal
+
+```ts
+const banned = cache.structures.cuckoo("users.banned", { expectedItems: 100_000 });
+
+await banned.add(userId);
+await banned.mightContain(userId); // true
+await banned.remove(userId); // true when something was removed
+await banned.mightContain(userId); // false
+```
+
+Same promise as the Bloom filter, plus `remove`.
+
+:::caution Only remove what you added
+Removing an item that was never added corrupts the filter and can make other items disappear. Remove only what you know you added, once per add.
+:::
+
+With RedisBloom this is a real cuckoo filter. On every other backend it is a counting Bloom filter: the same API and error rate, with a small counter per position instead of a bit, so memory is larger (a hash on Redis). `remove` returns `false` without touching anything when the item clearly was not added.
+
+## Unique counter: how many distinct values
+
+```ts
+const dau = cache.structures.uniqueCounter(`stats.dau.${today}`, { ttl: "40d" });
+
+await dau.add(request.user.id);
+await dau.count(); // approximate number of distinct ids
+
+// Union across counters without changing them
+const week = await cache.structures.uniqueCounter.merge(lastSevenDaysKeys).count();
+```
+
+A HyperLogLog: about 12 KB per counter and a standard error of 0.81%, whether you count a thousand or a billion. Counting the same value again changes nothing. `merge` counts the union, so a week is the distinct users across seven daily counters (someone active every day counts once).
+
+Not for: "did user 42 visit?" (it cannot tell), and not for billing, which needs exact counts.
+
+On Redis this is the native `PFADD` / `PFCOUNT` / multi-key `PFCOUNT`.
+
+## Frequency: how often, and what is most common
+
+```ts
+const searches = cache.structures.frequency("search.terms.hourly", {
+  width: 2000,
+  depth: 5,
+  topK: 100,
+  ttl: "1h",
+});
+
+await searches.add(query.toLowerCase()); // or add(query, 3)
+await searches.estimate("laptop"); // never lower than the true count
+await searches.top(10); // [{ value: "laptop", count: 120 }, ...]
+```
+
+A Count-Min sketch plus a Top-K list. With `width: 2000, depth: 5` it uses about 40 KB. It only ever **over**-estimates, and by at most about 0.14% of all events seen, 99.3% of the time. `topK` (default 10) is how many leaders are remembered for `top()`; `top(n)` returns up to that many, highest first.
+
+Not for: rare values. A value seen a handful of times can be swamped by the overestimate; use it for the head of the distribution.
+
+## What runs where
+
+| Backend | Bloom, frequency, cuckoo | Unique counter |
+| ------- | ------------------------ | -------------- |
+| Redis with RedisBloom | native `BF.*`, `CF.*`, `CMS.*`, `TOPK.*` | native HyperLogLog |
+| Redis without it | bitmaps, hashes and a sorted set | native HyperLogLog |
+| `memory`, `memoryExtended`, `lru` | in process | in process |
+| `file`, `pg`, `null`, `mock`, custom | `CacheUnsupportedError` | `CacheUnsupportedError` |
+
+Redis checks once for RedisBloom (with `MODULE LIST`) and remembers the answer; if the command is refused it uses the portable path. Switching between the two on an existing key is not supported: they store data differently. In-memory structures are per process, follow `flush()` and `removeNamespace()`, and vanish on restart.
+
+On the portable Redis path each add is a few commands, not one atomic script; it stays correct under concurrency because every step only sets bits or adds to counters.
+
+## Writing your own driver support
+
+A driver opts in by implementing one method:
+
+```ts
+import type { CacheStructuresBackend } from "@warlock.js/cache";
+
+class MyDriver extends BaseCacheDriver<Client, Options> {
+  public structuresBackend(): CacheStructuresBackend {
+    return new MyStructuresBackend(this);
+  }
+}
+```
+
+`CacheStructuresBackend` is a small set of primitives (bit set/get, counter grids, distinct counts, a ranked list); the structures are built on top of it, so you do not reimplement hashing or sizing.
