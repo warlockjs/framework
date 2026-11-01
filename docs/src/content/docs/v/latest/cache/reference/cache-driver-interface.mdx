@@ -211,6 +211,16 @@ Example:
 const stock = await cache.decrement("inventory.widget", 5);
 ```
 
+## extend(key, ttl)
+
+Keep an entry and make it expire `ttl` from now. The deadline is reset to `ttl` from the call; `ttl` is not added to the time left. Resolves to `false` when the key is missing or expired, and never creates a key.
+
+```ts
+extend(key: CacheKey, ttl: CacheTtl): Promise<boolean>;
+```
+
+`ttl` takes seconds or a duration string (`"30m"`); `0` or `Infinity` removes the expiry. `BaseCacheDriver` provides a read-and-rewrite default; drivers with a native expiry command override it. See [Sliding Expiry](/v/latest/cache/extend/).
+
 ## update(key, fn, options?)
 
 Atomically read, transform, and write a cached value. The callback receives the current value (or `null` on miss) and returns the next value. Returning `null` removes the entry.
@@ -449,6 +459,7 @@ export interface CacheDriver<ClientType, Options> {
   // Atomic + mutation
   increment(key: string | GenericObject, value?: number): Promise<number>;
   decrement(key: string | GenericObject, value?: number): Promise<number>;
+  extend(key: string | GenericObject, ttl: number | string): Promise<boolean>;
   update<T = any>(
     key: string | GenericObject,
     fn: (current: T | null) => T | null | Promise<T | null>,
@@ -571,7 +582,7 @@ See [Event System](/v/latest/cache/events/).
 
 ## Implementing a Custom Driver
 
-- Extend [BaseCacheDriver](/v/latest/cache/base-cache-driver/) to reuse key parsing, logging, TTL handling, event emission, and default implementations for `has`, `remember`, `pull`, `forever`, `increment`, `decrement`, `many`, `setMany`, `tags`, `update`, `merge`, and `list`.
+- Extend [BaseCacheDriver](/v/latest/cache/base-cache-driver/) to reuse key parsing, logging, TTL handling, event emission, and default implementations for `has`, `remember`, `pull`, `forever`, `increment`, `decrement`, `extend`, `many`, `setMany`, `tags`, `update`, `merge`, and `list`.
 - Implement these required abstract methods: `set()`, `get()`, `remove()`, `flush()`, `removeNamespace()`.
 - In `set()`, call `this.resolveSetOptions(ttlOrOptions)` to normalize the third argument into `{ ttl, tags, onConflict }`.
 - Override `update` / `merge` / `list` only when your driver can offer stronger semantics (e.g. Redis-native commands). Throw `CacheUnsupportedError` from any op your driver can't safely support.

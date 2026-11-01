@@ -12,6 +12,8 @@ import type {
 } from "../types";
 import { cosineSimilarity, parseTtl } from "../utils";
 import { BaseCacheDriver } from "./base-cache-driver";
+import { MemoryStructuresBackend } from "../structures/memory-structures-backend";
+import type { CacheStructuresBackend, StructuresCapable } from "../structures/types";
 import { InMemoryTagIndex } from "./in-memory-tag-index";
 
 /**
@@ -34,7 +36,7 @@ function cloneValue<T>(value: T): T {
 
 export class MemoryCacheDriver
   extends BaseCacheDriver<MemoryCacheDriver, MemoryCacheOptions>
-  implements CacheDriver<MemoryCacheDriver, MemoryCacheOptions>
+  implements CacheDriver<MemoryCacheDriver, MemoryCacheOptions>, StructuresCapable
 {
   /**
    * {@inheritdoc}
@@ -130,6 +132,21 @@ export class MemoryCacheDriver
   }
 
   /**
+   * Backing store of `cache.structures` (bloom, cuckoo, unique counter,
+   * frequency), created on first use.
+   */
+  protected structureStore?: MemoryStructuresBackend;
+
+  /**
+   * {@inheritdoc}
+   */
+  public structuresBackend(): CacheStructuresBackend {
+    this.structureStore ??= new MemoryStructuresBackend((key) => this.parseKey(key));
+
+    return this.structureStore;
+  }
+
+  /**
    * Delete an entry and every side record (expiry, vector). Synchronous.
    */
   protected dropEntry(parsedKey: string) {
@@ -205,11 +222,14 @@ export class MemoryCacheDriver
     this.tagIndex.removeNamespace(namespace);
 
     if (namespace === "") {
+      this.structureStore?.clear();
       this.entries.clear();
       this.expiry.clear();
       this.vectorIndex.clear();
     } else {
       const prefix = namespace + ".";
+
+      this.structureStore?.clearPrefix(prefix);
 
       for (const key of [...this.entries.keys()]) {
         if (key === namespace || key.startsWith(prefix)) {
@@ -364,6 +384,36 @@ export class MemoryCacheDriver
   /**
    * {@inheritdoc}
    *
+   * The deadline moves in place, synchronously, so concurrent callers never
+   * interleave with the read.
+   */
+  public async extend(key: CacheKey, ttl: CacheTtl): Promise<boolean> {
+    const seconds = this.resolveExtendTtl(ttl);
+    const parsedKey = this.parseKey(key);
+    const entry = this.readLive(parsedKey);
+
+    if (!entry) {
+      return false;
+    }
+
+    if (Number.isFinite(seconds)) {
+      entry.ttl = seconds;
+      entry.expiresAt = this.getExpiresAt(seconds);
+      this.expiry.set(parsedKey, entry.expiresAt as number);
+    } else {
+      delete entry.ttl;
+      delete entry.expiresAt;
+      this.expiry.delete(parsedKey);
+    }
+
+    this.touch(parsedKey, entry);
+
+    return true;
+  }
+
+  /**
+   * {@inheritdoc}
+   *
    * Read and delete run synchronously, so a value is handed out exactly once
    * even when concurrent callers pull the same key.
    */
@@ -488,6 +538,7 @@ export class MemoryCacheDriver
       this.expiry.clear();
       this.vectorIndex.clear();
       this.tagIndex.clear();
+      this.structureStore?.clear();
     }
 
     this.log("flushed");

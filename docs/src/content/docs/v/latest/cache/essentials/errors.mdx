@@ -79,6 +79,7 @@ The driver doesn't implement the requested operation.
 Today this fires on:
 
 - `cache.update()` / `cache.merge()` on the file driver (no file-lock primitive yet)
+- `cache.structures.*` operations on drivers that do not support them (anything except `redis`, `memory`, `memoryExtended` and `lru`) — see [Probabilistic Structures](/v/latest/cache/structures/)
 - `cache.set(k, v, { vector })` and `cache.similar(...)` on drivers that don't index vectors (file, redis until RediSearch lands, pg without the `vector` config block) — see [Similarity Retrieval](/v/latest/cache/similarity/)
 
 ```ts

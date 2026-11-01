@@ -514,6 +514,10 @@ export interface TaggedCacheDriver {
    * Decrement with tags
    */
   decrement(key: CacheKey, value?: number): Promise<number>;
+  /**
+   * Reset the entry's expiry to `ttl` from now. See `CacheDriver.extend`.
+   */
+  extend(key: CacheKey, ttl: CacheTtl): Promise<boolean>;
 }
 
 export type MemoryCacheOptions = {
@@ -953,6 +957,18 @@ export interface CacheDriver<ClientType, Options> {
    */
   decrement(key: CacheKey, value?: number): Promise<number>;
   /**
+   * Keep an entry and make it expire `ttl` from now (a sliding expiry).
+   *
+   * The deadline is RESET to `ttl` from the moment of the call; `ttl` is not
+   * added to the time the entry had left. Resolves to `false` when the key is
+   * missing or already expired (nothing is created). `0` or `Infinity` removes
+   * the expiry. Equivalent to Laravel's `Cache::touch`.
+   *
+   * @param key The cache key
+   * @param ttl Seconds, or a duration string such as `"30m"`
+   */
+  extend(key: CacheKey, ttl: CacheTtl): Promise<boolean>;
+  /**
    * Get multiple values from cache at once
    */
   many(keys: CacheKey[]): Promise<any[]>;
@@ -1090,6 +1106,10 @@ export interface TaggedScopedCacheContract {
   increment(key: CacheKey, value?: number, options?: { ttl?: CacheTtl }): Promise<number>;
   decrement(key: CacheKey, value?: number): Promise<number>;
   /**
+   * Reset the entry's expiry to `ttl` from now. See `CacheDriver.extend`.
+   */
+  extend(key: CacheKey, ttl: CacheTtl): Promise<boolean>;
+  /**
    * Invalidate every entry tagged with the union of scope tags + handle tags.
    * Forwarded to the underlying tag index — tags are global, scope-agnostic.
    */
@@ -1155,6 +1175,10 @@ export interface ScopedCacheContract {
   // Mutations
   increment(key: CacheKey, value?: number, options?: { ttl?: CacheTtl }): Promise<number>;
   decrement(key: CacheKey, value?: number): Promise<number>;
+  /**
+   * Reset the entry's expiry to `ttl` from now. See `CacheDriver.extend`.
+   */
+  extend(key: CacheKey, ttl: CacheTtl): Promise<boolean>;
   update<T = any>(
     key: CacheKey,
     fn: (current: T | null) => T | null | Promise<T | null>,

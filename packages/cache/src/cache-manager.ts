@@ -1,5 +1,7 @@
+import { runIdempotent, type IdempotentFlights, type IdempotentOptions } from "./idempotent";
 import { CacheMetricsCollector } from "./metrics";
 import { ScopedCache } from "./scoped-cache";
+import { createStructures, structuresBackendOf, type CacheStructures } from "./structures";
 import type {
   CacheConfigurations,
   CacheDriver,
@@ -541,6 +543,61 @@ export class CacheManager implements CacheDriver<any, any> {
 
   /**
    * {@inheritdoc}
+   *
+   * @example
+   * await cache.extend(`session.${id}`, "30m"); // active again: 30 minutes from now
+   */
+  public async extend(key: CacheKey, ttl: CacheTtl): Promise<boolean> {
+    this.ensureDriverInitialized();
+    return this.currentDriver!.extend(key, ttl);
+  }
+
+  /**
+   * In-flight `idempotent()` runs, per driver.
+   */
+  protected idempotentFlights: IdempotentFlights = new WeakMap();
+
+  /**
+   * Run `fn` once per `key`: concurrent calls share the single run, and repeat
+   * calls within `ttl` get the stored result instead of running again. Use it
+   * for work that must not repeat, such as charging a payment, handling a
+   * webhook delivery or a retried job.
+   *
+   * A run that throws stores nothing: every caller sharing that run gets the
+   * error, and the next call runs `fn` again. `ttl: 0` only shares in-flight
+   * runs and never touches the store. See {@link IdempotentOptions} for
+   * `distributed`.
+   *
+   * @example
+   * const charge = await cache.idempotent(`charge.${orderId}`, () => gateway.charge(order), {
+   *   ttl: "24h",
+   * });
+   */
+  public async idempotent<T>(
+    key: CacheKey,
+    fn: () => Promise<T>,
+    options: IdempotentOptions,
+  ): Promise<T> {
+    this.ensureDriverInitialized();
+
+    const driver = options.driver ? await this.load(options.driver) : this.currentDriver!;
+
+    return runIdempotent(driver, this.idempotentFlights, key, fn, options);
+  }
+
+  /**
+   * Probabilistic structures (Bloom and cuckoo filters, unique counters,
+   * frequency tracking) stored in the current driver. Supported on the `redis`
+   * and memory drivers; others throw `CacheUnsupportedError`.
+   */
+  public readonly structures: CacheStructures = createStructures(() => {
+    this.ensureDriverInitialized();
+
+    return structuresBackendOf(this.currentDriver!);
+  });
+
+  /**
+   * {@inheritdoc}
    */
   public async many(keys: CacheKey[]): Promise<any[]> {
     this.ensureDriverInitialized();
@@ -750,3 +807,14 @@ export class CacheManager implements CacheDriver<any, any> {
 }
 
 export const cache = new CacheManager();
+
+/**
+ * Run `fn` once per `key` on the default `cache`. See {@link CacheManager.idempotent}.
+ */
+export function idempotent<T>(
+  key: CacheKey,
+  fn: () => Promise<T>,
+  options: IdempotentOptions,
+): Promise<T> {
+  return cache.idempotent(key, fn, options);
+}

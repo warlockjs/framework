@@ -708,6 +708,40 @@ export abstract class BaseCacheDriver<
 
   /**
    * {@inheritdoc}
+   *
+   * Default implementation: read the value and write it back with the new ttl,
+   * serialized per key in THIS process. Drivers with a native expiry command
+   * or in-place metadata override it.
+   */
+  public async extend(key: CacheKey, ttl: CacheTtl): Promise<boolean> {
+    const seconds = this.resolveExtendTtl(ttl);
+
+    return this.runSerialized(this.parseKey(key), async () => {
+      const value = await this.get(key);
+
+      if (value === null) {
+        return false;
+      }
+
+      await this.set(key, value, seconds);
+
+      return true;
+    });
+  }
+
+  /**
+   * Resolve the `ttl` argument of `extend()` into seconds. `0` and `Infinity`
+   * both mean "no expiry" and resolve to `Infinity`; negative numbers, NaN and
+   * unparseable strings throw a `CacheConfigurationError`.
+   */
+  protected resolveExtendTtl(ttl: CacheTtl): number {
+    const seconds = parseTtl(ttl);
+
+    return seconds === 0 ? Infinity : seconds;
+  }
+
+  /**
+   * {@inheritdoc}
    */
   public async forever(key: CacheKey, value: any): Promise<any> {
     // Event is emitted by set() method

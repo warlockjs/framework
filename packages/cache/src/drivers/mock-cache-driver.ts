@@ -291,6 +291,32 @@ export class MockCacheDriver
   }
 
   /**
+   * Synchronous in-place deadline reset.
+   */
+  public async extend(key: CacheKey, ttl: CacheTtl): Promise<boolean> {
+    const seconds = this.resolveExtendTtl(ttl);
+    const parsedKey = this.parseKey(key);
+
+    this.recordCall("extend", parsedKey, [ttl]);
+
+    const entry = this.liveEntry(parsedKey);
+
+    if (!entry) {
+      return false;
+    }
+
+    if (Number.isFinite(seconds)) {
+      entry.ttl = seconds;
+      entry.expiresAt = Date.now() + seconds * 1000;
+    } else {
+      delete entry.ttl;
+      delete entry.expiresAt;
+    }
+
+    return true;
+  }
+
+  /**
    * Synchronous read-and-delete: a value is handed out exactly once.
    */
   public async pull<T = any>(key: CacheKey): Promise<T | null> {

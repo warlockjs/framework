@@ -1,0 +1,70 @@
+---
+title: "Sliding Expiry (extend)"
+slug: v/latest/cache/extend
+---
+
+`cache.extend(key, ttl)` keeps a cached value and makes it expire `ttl` from now. Use it when activity should keep an entry alive: a user is active, so keep their session for another 30 minutes.
+
+```ts
+import { cache } from "@warlock.js/cache";
+
+// On every authenticated request
+const stillThere = await cache.extend(`session.${sessionId}`, "30m");
+
+if (!stillThere) {
+  // the session expired (or never existed): ask the user to sign in again
+}
+```
+
+It resolves to `true` when the entry was extended and `false` when the key is missing or already expired. It never creates a key and never changes the stored value.
+
+## It resets the deadline, it does not add to it
+
+`extend` sets the expiry to `ttl` **from the moment of the call**. It does not add `ttl` to the time the entry had left.
+
+```ts
+await cache.set("session.1", data, "10m"); // expires in 10 minutes
+// ...6 minutes later, 4 minutes are left...
+await cache.extend("session.1", "10m"); // now expires in 10 minutes, not 14
+```
+
+Calling it with a shorter `ttl` than the time left shortens the entry. If you only ever want to lengthen, compare first, or keep the `ttl` you pass at least as long as the original.
+
+Laravel calls this `Cache::touch`.
+
+## Accepted `ttl` values
+
+The same forms `set` accepts:
+
+| `ttl`                       | Result                                  |
+| --------------------------- | --------------------------------------- |
+| `1800` (number)             | 1800 seconds from now                   |
+| `"30m"`, `"2h"`, `"7d"`     | the duration from now                   |
+| `Infinity` or `0`           | the entry never expires (expiry removed) |
+| negative, `NaN`, bad string | throws `CacheConfigurationError`        |
+
+## Works everywhere keys do
+
+```ts
+const tenant = cache.namespace("tenant.7");
+await tenant.extend("session", "1h"); // extends "tenant.7.session"
+
+const users = cache.tags(["users"]);
+await users.extend("user.1", "10m"); // tags are left untouched
+```
+
+## Driver behaviour
+
+| Driver                                        | How                                                                   |
+| --------------------------------------------- | --------------------------------------------------------------------- |
+| `redis`                                       | one atomic `PEXPIRE` (or `PERSIST` for no expiry); also moves the `swr` freshness marker |
+| `pg`                                          | one atomic `UPDATE … RETURNING` on a live row                         |
+| `memory`, `memoryExtended`, `lru`, `mock`     | in place, synchronous, atomic within the process                      |
+| `file` and custom drivers on `BaseCacheDriver` | read the value and write it back with the new `ttl`, serialized per key in the process |
+| `null`                                        | always `false`                                                        |
+
+On `memoryExtended`, later reads slide the deadline by the new `ttl`, not the one the entry was written with.
+
+:::note Sliding sessions
+`extend` on every request costs one cheap command on Redis. If a request fires many times a second per session, extend at most once a minute (for example, only when less than half the time is left) to save round trips.
+:::

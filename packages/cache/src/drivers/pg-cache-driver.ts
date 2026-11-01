@@ -665,6 +665,29 @@ export class PgCacheDriver
   /**
    * {@inheritdoc}
    *
+   * One atomic `UPDATE … RETURNING` on a live row; an expired or missing row
+   * updates nothing. `NULL` expiry means the row never expires.
+   */
+  public async extend(key: CacheKey, ttl: CacheTtl): Promise<boolean> {
+    const seconds = this.resolveExtendTtl(ttl);
+    const parsedKey = this.parseKey(key);
+    const t = this.table;
+
+    const { rows } = await this.pgClient.query(
+      `/* cache:extend */ UPDATE ${t}
+       SET expires_at = CASE WHEN $2::double precision IS NULL THEN NULL
+                             ELSE now() + make_interval(secs => $2::double precision) END
+       WHERE key = $1 AND (expires_at IS NULL OR expires_at > now())
+       RETURNING key`,
+      [parsedKey, this.ttlToSeconds(seconds)],
+    );
+
+    return rows.length > 0;
+  }
+
+  /**
+   * {@inheritdoc}
+   *
    * One atomic `DELETE … RETURNING`, so a value is handed out exactly once
    * across servers. Expired rows count as missing.
    */

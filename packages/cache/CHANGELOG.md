@@ -4,6 +4,14 @@ All notable changes to `@warlock.js/cache` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.43.0
+
+### Added
+
+- `cache.extend(key, ttl)` keeps a cached value and resets its expiry to `ttl` from now (a sliding expiry such as "keep the session another 30 minutes"). It does not add `ttl` to the time left, resolves to `false` for a missing or expired key, and accepts the same seconds and duration strings as `set` (`0` or `Infinity` removes the expiry). It is implemented on every driver (Redis `PEXPIRE`, Postgres `UPDATE`, in-place on the memory family and mock, read-and-rewrite on `file` and on custom `BaseCacheDriver` subclasses) and forwarded by namespaces and tagged caches. Laravel calls this `Cache::touch`.
+- `idempotent(key, fn, { ttl })`, also `cache.idempotent(...)`: concurrent calls with one key share a single run, and repeat calls within `ttl` return the stored result (the Idempotency-Key pattern for payments, webhooks and retried jobs). `ttl: 0` is pure in-flight dedupe that never touches the store; a failed run is never stored; `distributed: true` uses the cache lock so servers sharing a driver run `fn` once.
+- `cache.structures` offers `bloom`, `cuckoo`, `uniqueCounter` (HyperLogLog, with `uniqueCounter.merge(keys)`) and `frequency` (Count-Min plus Top-K) in a few kilobytes. They run on Redis (RedisBloom when the server has it, bitmaps, hashes, native HyperLogLog and sorted sets otherwise) and on the `memory`, `memoryExtended` and `lru` drivers; other drivers throw `CacheUnsupportedError`. A custom driver opts in by implementing `structuresBackend()`.
+
 ## 5.34.3 - 2026-10-20
 
 ### Changed

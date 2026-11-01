@@ -11,6 +11,8 @@ import type {
 } from "../types";
 import { CacheConfigurationError, CacheError, CacheUnsupportedError } from "../types";
 import { parseTtl, safeErrorInfo } from "../utils";
+import { RedisStructuresBackend } from "../structures/redis-structures-backend";
+import type { CacheStructuresBackend, StructuresCapable } from "../structures/types";
 import { BaseCacheDriver } from "./base-cache-driver";
 
 // ============================================================
@@ -122,7 +124,7 @@ const REMOVE_BATCH_SIZE = 500;
 
 export class RedisCacheDriver
   extends BaseCacheDriver<ReturnType<typeof createClient>, RedisOptions>
-  implements CacheDriver<ReturnType<typeof createClient>, RedisOptions>
+  implements CacheDriver<ReturnType<typeof createClient>, RedisOptions>, StructuresCapable
 {
   /**
    * Cache driver name
@@ -793,6 +795,59 @@ export class RedisCacheDriver
     await this.emit("set", { key: parsedKey, value: result, ttl: undefined });
 
     return result || 0;
+  }
+
+  /**
+   * {@inheritdoc}
+   *
+   * `PEXPIRE` (or `PERSIST` for no expiry) on the key and its freshness
+   * sidecar: one atomic command, `0` when the key does not exist.
+   */
+  public async extend(key: CacheKey, ttl: CacheTtl): Promise<boolean> {
+    const seconds = this.resolveExtendTtl(ttl);
+    const parsedKey = this.parseKey(key);
+    const client = this.client as any;
+
+    const applied = Number.isFinite(seconds)
+      ? await client.pExpire(parsedKey, Math.ceil(seconds * 1000))
+      : await client.persist(parsedKey);
+
+    // node-redis returns a boolean in v4 and a number in v5; `persist` also
+    // returns false/0 for a live key that already had no expiry.
+    if (!applied && Number.isFinite(seconds)) {
+      return false;
+    }
+
+    if (!applied) {
+      return Number(await client.exists(parsedKey)) > 0;
+    }
+
+    const sidecar = this.swrMetaKey(parsedKey);
+
+    if (Number.isFinite(seconds)) {
+      await client.pExpire(sidecar, Math.ceil(seconds * 1000));
+    } else {
+      await client.persist(sidecar);
+    }
+
+    return true;
+  }
+
+  private structureBackend?: RedisStructuresBackend;
+
+  /**
+   * {@inheritdoc}
+   *
+   * Uses RedisBloom (`BF.*`, `CF.*`, `CMS.*`, `TOPK.*`) when the server has
+   * it, and plain Redis commands otherwise.
+   */
+  public structuresBackend(): CacheStructuresBackend {
+    this.structureBackend ??= new RedisStructuresBackend(
+      () => this.client as any,
+      (key) => this.parseKey(key),
+    );
+
+    return this.structureBackend;
   }
 
   /**

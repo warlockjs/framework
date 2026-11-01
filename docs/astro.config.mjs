@@ -332,6 +332,9 @@ const cacheTopic = {
         cacheItem("Bulk Operations", "bulk-operations"),
         cacheItem("Stampede Prevention", "stampede-prevention"),
         cacheItem("Similarity Retrieval", "similarity"),
+        cacheItem("Sliding Expiry (extend)", "extend"),
+        cacheItem("Idempotent Calls", "idempotent"),
+        cacheItem("Probabilistic Structures", "structures"),
       ],
     },
     {

@@ -171,6 +171,22 @@ class FakeRedisClient {
     return 1;
   }
 
+  public async pExpire(key: string, milliseconds: number): Promise<boolean> {
+    if (!this.store.has(key)) return false;
+    this.expires.set(key, Date.now() + milliseconds);
+    return true;
+  }
+
+  public async persist(key: string): Promise<boolean> {
+    if (!this.store.has(key) || !this.expires.has(key)) return false;
+    this.expires.delete(key);
+    return true;
+  }
+
+  public async exists(key: string): Promise<number> {
+    return this.store.has(key) ? 1 : 0;
+  }
+
   public async flushDb(): Promise<void> {
     this.store.clear();
     this.sets.clear();
@@ -1146,5 +1162,56 @@ describe("RedisCacheDriver — tag index (native SET)", () => {
     await fakeClient.set("cache.tags.legacy", JSON.stringify(["old.1"]));
 
     await expect(driver.tagMembers("cache:tags:legacy")).resolves.toEqual(["old.1"]);
+  });
+
+  describe("extend", () => {
+    it("resets the expiry with PEXPIRE and keeps the value", async () => {
+      const driver = await connected("app");
+      const pExpire = vi.spyOn(fakeClient, "pExpire");
+
+      await driver.set("k", { a: 1 }, 10);
+      await expect(driver.extend("k", "30m")).resolves.toBe(true);
+
+      expect(pExpire).toHaveBeenCalledWith("app.k", 1_800_000);
+      expect(fakeClient.expires.get("app.k")! - Date.now()).toBeGreaterThan(1_790_000);
+      await expect(driver.get("k")).resolves.toEqual({ a: 1 });
+    });
+
+    it("also moves the freshness sidecar of a swr entry", async () => {
+      const driver = await connected();
+
+      await driver.set("k", "v", { ttl: 10, staleAt: Date.now() + 5000 });
+      await driver.extend("k", 100);
+
+      const sidecar = fakeClient.expires.get("k::swrmeta")!;
+      expect(sidecar - Date.now()).toBeGreaterThan(99_000);
+    });
+
+    it("returns false and creates nothing for a missing key", async () => {
+      const driver = await connected();
+
+      await expect(driver.extend("missing", 60)).resolves.toBe(false);
+      expect(fakeClient.store.has("missing")).toBe(false);
+    });
+
+    it("removes the expiry with PERSIST for Infinity, and still reports a live key", async () => {
+      const driver = await connected();
+
+      await driver.set("k", "v", 10);
+      await expect(driver.extend("k", Infinity)).resolves.toBe(true);
+      expect(fakeClient.expires.has("k")).toBe(false);
+
+      // already without expiry: PERSIST reports 0, the key is still live
+      await expect(driver.extend("k", Infinity)).resolves.toBe(true);
+      await expect(driver.extend("gone", Infinity)).resolves.toBe(false);
+    });
+
+    it("rejects an invalid ttl before touching Redis", async () => {
+      const driver = await connected();
+      const pExpire = vi.spyOn(fakeClient, "pExpire");
+
+      await expect(driver.extend("k", -5)).rejects.toThrow(CacheConfigurationError);
+      expect(pExpire).not.toHaveBeenCalled();
+    });
   });
 });

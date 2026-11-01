@@ -304,6 +304,7 @@ These come with sensible defaults — you only override them if your backend can
 - `pull()` — `get()` + `remove()`
 - `forever()` — `set(key, value, Infinity)`
 - `increment()` / `decrement()` — read-mutate-write counter (non-atomic — override for Redis `INCRBY`)
+- `extend()` — reads the value and rewrites it with the new ttl (override with a native expiry command, like Redis `PEXPIRE`)
 - `many()` / `setMany()` — `Promise.all` over `get`/`set`
 - `tags()` — wraps the driver in a `TaggedCache` instance
 - `update()` / `merge()` — chain-serialized read-modify-write (in-process locking)
@@ -327,6 +328,10 @@ public async increment(key: CacheKey, value: number = 1): Promise<number> {
   return result;
 }
 ```
+
+### Opting in to `cache.structures`
+
+`cache.structures` (Bloom and cuckoo filters, unique counters, frequency tracking) is not part of the driver contract. A driver supports it by adding one method that returns a `CacheStructuresBackend`; drivers without the method make `cache.structures` throw `CacheUnsupportedError`, so existing custom drivers need no change. See [Probabilistic Structures](/v/latest/cache/structures/).
 
 ### Without support — throw `CacheUnsupportedError`
 

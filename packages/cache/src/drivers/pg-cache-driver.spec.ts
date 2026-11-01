@@ -85,6 +85,16 @@ class FakePool implements PgClientLike {
       return { rows: [{ value: amount }], rowCount: 1 };
     }
 
+    // UPDATE … SET expires_at = now() + ttl (or NULL) WHERE key = $1 AND live RETURNING key
+    if (sql.startsWith("/* cache:extend */")) {
+      expect(sql).toContain("RETURNING key");
+      const [key, ttlSecs] = values as [string, number | null];
+      const row = this.store.get(key);
+      if (!isLive(row)) return { rows: [], rowCount: 0 };
+      row.expires_at = FakePool.secsToDate(ttlSecs);
+      return { rows: [{ key }], rowCount: 1 };
+    }
+
     // DELETE … WHERE key = $1 AND live RETURNING value
     if (sql.startsWith("/* cache:pull */")) {
       expect(sql).toContain("RETURNING value");
@@ -1155,5 +1165,73 @@ describe("PgCacheDriver — tag index (atomic JSON-array row)", () => {
     await driver.tagRemove("cache:tags:t", ["a"]);
 
     expect(pool.store.get("cache.tags.t")?.value).toEqual(["b", "c"]);
+  });
+});
+
+describe("PgCacheDriver — extend", () => {
+  let driver: PgCacheDriver;
+  let pool: FakePool;
+
+  beforeEach(async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    pool = new FakePool();
+    driver = new PgCacheDriver();
+    driver.setOptions({ client: pool });
+    driver.setLoggingState(false);
+    await driver.connect();
+  });
+
+  afterEach(async () => {
+    await driver.disconnect();
+    vi.useRealTimers();
+  });
+
+  it("resets the expiry to ttl from now instead of adding to the time left", async () => {
+    await driver.set("k", "v", 10);
+    vi.advanceTimersByTime(6000);
+
+    await expect(driver.extend("k", 10)).resolves.toBe(true);
+
+    vi.advanceTimersByTime(9000);
+    await expect(driver.get("k")).resolves.toBe("v");
+
+    vi.advanceTimersByTime(2000);
+    await expect(driver.get("k")).resolves.toBeNull();
+  });
+
+  it("accepts duration strings", async () => {
+    await driver.set("k", "v", 5);
+
+    await expect(driver.extend("k", "1m")).resolves.toBe(true);
+
+    expect(pool.store.get("k")!.expires_at!.getTime()).toBe(Date.now() + 60_000);
+  });
+
+  it("returns false for a missing or expired key and writes nothing", async () => {
+    await expect(driver.extend("missing", 60)).resolves.toBe(false);
+    expect(pool.store.has("missing")).toBe(false);
+
+    await driver.set("k", "v", 1);
+    vi.advanceTimersByTime(2000);
+
+    await expect(driver.extend("k", 60)).resolves.toBe(false);
+  });
+
+  it("clears the expiry for Infinity", async () => {
+    await driver.set("k", "v", 5);
+
+    await expect(driver.extend("k", Infinity)).resolves.toBe(true);
+
+    expect(pool.store.get("k")!.expires_at).toBeNull();
+  });
+
+  it("issues one UPDATE statement", async () => {
+    await driver.set("k", "v", 5);
+    pool.queryLog.length = 0;
+
+    await driver.extend("k", 30);
+
+    expect(pool.queryLog).toHaveLength(1);
+    expect(pool.queryLog[0]!.text).toContain("UPDATE");
   });
 });
