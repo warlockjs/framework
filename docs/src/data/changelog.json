@@ -136,6 +136,120 @@
   ],
   "releases": [
     {
+      "version": "5.43.0",
+      "id": "v5-43-0",
+      "date": "November 1, 2026",
+      "isUnreleased": false,
+      "headlineHtml": "Sliding cache expiry, idempotent runs, probabilistic cache structures, job timeouts, and fewer AI model calls.",
+      "highlights": [
+        "<code>cache.extend(key, ttl)</code> keeps a value and resets its expiry to <code>ttl</code> from now, on every driver (Laravel's <code>Cache::touch</code>).",
+        "<code>idempotent(key, fn, { ttl })</code> runs concurrent calls with one key once and replays the stored result within <code>ttl</code>: the Idempotency-Key pattern for payments, webhooks and retried jobs.",
+        "<code>cache.structures</code> adds Bloom and Cuckoo filters, a HyperLogLog unique counter and a Count-Min frequency tracker with Top-K, on Redis and the memory drivers.",
+        "Jobs take <code>timeout</code> and <code>failOnTimeout</code>: an attempt that runs too long fails with <code>JobTimeoutError</code>, and handlers get <code>ctx.signal</code> to stop work.",
+        "<code>ai.semanticRouter()</code> routes supervisor runs by embedding similarity and only asks the model when unsure; tools can <code>memoize</code> results, and <code>ai.middleware.dedupe()</code> shares identical in-flight model calls."
+      ],
+      "upgradeNotes": [
+        "A custom cache driver that implements <code>CacheDriver</code> directly, without extending <code>BaseCacheDriver</code>, must add <code>extend(key, ttl)</code>."
+      ],
+      "summaryHtml": null,
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/5.43.0-summary.md",
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/ai",
+          "slug": "ai",
+          "total": 4,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 4
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>ai.semanticRouter({ name, embedder, intents, examples, confidence: { min, margin }, fallback, store?, learn?, messageCache? })</code> routes the first iteration of a supervisor run by embedding similarity to example phrases and sends only unsure messages to <code>fallback</code> (usually <code>ai.router({ model, intents })</code>). It plugs into <code>ai.supervisor({ router })</code>. <code>examples</code> keys are validated against <code>intents</code>; an intent without examples is reachable only through the fallback. Example vectors are embedded once and stored under supervisor name, embedder model, intent and phrase hash, in process memory by default or in any <code>@warlock.js/cache</code> driver (Redis, pg) through <code>store</code>; changed phrases or a new embedder recompute only what changed and unused entries are removed. Scoring uses an in-memory copy, message embeddings are cached by exact text (<code>messageCache</code>), and <code>warm()</code> embeds ahead of the first message. <code>learn: true | { maxPerIntent, minScore }</code> stores agreeing fallback decisions as new examples, capped per intent."
+            },
+            {
+              "type": "Added",
+              "html": "Iteration <code>decision</code> records and the <code>supervisor.router.decided</code> event carry <code>routedBy: \"semantic\" | \"fallback\"</code>, <code>score</code> and <code>runnerUp</code> when a semantic router decided (<code>RouterDecisionMeta</code>)."
+            },
+            {
+              "type": "Added",
+              "html": "<code>memoize: true | { scope: \"run\" | \"session\", ttl? }</code> on a tool reuses the result of an identical call (arguments compared with sorted keys) inside the run, or across runs of one <code>sessionId</code>, for read-only tools. Failed calls are not kept. A reused result is marked <code>memoized: true</code> on its <code>ToolCall</code> record and in the <code>agent.tool.called</code> event."
+            },
+            {
+              "type": "Added",
+              "html": "<code>ai.middleware.dedupe({ name?, key? })</code> makes identical model calls that are in flight at the same moment share one provider call; waiting runs get the response with zero usage. Streaming runs are not deduplicated. <code>MiddlewareExecuteContext.streaming</code> tells middleware whether the run uses <code>agent.stream()</code>."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/cache",
+          "slug": "cache",
+          "total": 3,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 3
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>cache.extend(key, ttl)</code> keeps a cached value and resets its expiry to <code>ttl</code> from now (a sliding expiry such as \"keep the session another 30 minutes\"). It does not add <code>ttl</code> to the time left, resolves to <code>false</code> for a missing or expired key, and accepts the same seconds and duration strings as <code>set</code> (<code>0</code> or <code>Infinity</code> removes the expiry). It is implemented on every driver (Redis <code>PEXPIRE</code>, Postgres <code>UPDATE</code>, in-place on the memory family and mock, read-and-rewrite on <code>file</code> and on custom <code>BaseCacheDriver</code> subclasses) and forwarded by namespaces and tagged caches. Laravel calls this <code>Cache::touch</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<code>idempotent(key, fn, { ttl })</code>, also <code>cache.idempotent(...)</code>: concurrent calls with one key share a single run, and repeat calls within <code>ttl</code> return the stored result (the Idempotency-Key pattern for payments, webhooks and retried jobs). <code>ttl: 0</code> is pure in-flight dedupe that never touches the store; a failed run is never stored; <code>distributed: true</code> uses the cache lock so servers sharing a driver run <code>fn</code> once."
+            },
+            {
+              "type": "Added",
+              "html": "<code>cache.structures</code> offers <code>bloom</code>, <code>cuckoo</code>, <code>uniqueCounter</code> (HyperLogLog, with <code>uniqueCounter.merge(keys)</code>) and <code>frequency</code> (Count-Min plus Top-K) in a few kilobytes. They run on Redis (RedisBloom when the server has it, bitmaps, hashes, native HyperLogLog and sorted sets otherwise) and on the <code>memory</code>, <code>memoryExtended</code> and <code>lru</code> drivers; other drivers throw <code>CacheUnsupportedError</code>. A custom driver opts in by implementing <code>structuresBackend()</code>."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/queue",
+          "slug": "queue",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "Job timeouts: <code>defineJob({ timeout: \"2m\", failOnTimeout?: boolean })</code>, also accepted per dispatch and in <code>queue.defaultJobOptions</code> (dispatch &gt; <code>defineJob</code> &gt; defaults). An attempt that outlives its limit fails with the new exported <code>JobTimeoutError</code> (job name, limit in <code>timeout</code>, <code>failOnTimeout</code>), so failed jobs and events show a clear reason, and normal <code>attempts</code> and <code>backoff</code> apply. <code>failOnTimeout: true</code> fails the job without retrying (BullMQ <code>UnrecoverableError</code> on Redis). Enforced in the shared processing path, so BullMQ, <code>local</code> and <code>memory</code> behave the same. A zero, negative or unparsable timeout throws."
+            },
+            {
+              "type": "Added",
+              "html": "<code>ctx.signal</code> is now passed to handlers on every driver whenever the job has a <code>timeout</code>, and aborts with the <code>JobTimeoutError</code>. A handler that ignores the signal keeps running in the background after its attempt fails, so pass the signal to <code>fetch</code> and database calls."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>npx warlock release-notes</code> includes the 5.43.0 notes: sliding cache expiry (<code>cache.extend</code>), <code>idempotent()</code>, probabilistic cache structures, job timeouts, and AI semantic routing, tool-result memoization and in-flight model-call dedupe."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "5.42.0",
       "id": "v5-42-0",
       "date": "November 1, 2026",

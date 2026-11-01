@@ -1,4 +1,19 @@
 {
+  "5.43.0": {
+    "publishedAt": "2026-11-01T17:26:22.371Z",
+    "matrix": "none",
+    "headline": "Sliding cache expiry, idempotent runs, probabilistic cache structures, job timeouts, and fewer AI model calls.",
+    "highlights": [
+      "`cache.extend(key, ttl)` keeps a value and resets its expiry to `ttl` from now, on every driver (Laravel's `Cache::touch`).",
+      "`idempotent(key, fn, { ttl })` runs concurrent calls with one key once and replays the stored result within `ttl`: the Idempotency-Key pattern for payments, webhooks and retried jobs.",
+      "`cache.structures` adds Bloom and Cuckoo filters, a HyperLogLog unique counter and a Count-Min frequency tracker with Top-K, on Redis and the memory drivers.",
+      "Jobs take `timeout` and `failOnTimeout`: an attempt that runs too long fails with `JobTimeoutError`, and handlers get `ctx.signal` to stop work.",
+      "`ai.semanticRouter()` routes supervisor runs by embedding similarity and only asks the model when unsure; tools can `memoize` results, and `ai.middleware.dedupe()` shares identical in-flight model calls."
+    ],
+    "upgradeNotes": [
+      "A custom cache driver that implements `CacheDriver` directly, without extending `BaseCacheDriver`, must add `extend(key, ttl)`."
+    ]
+  },
   "5.42.0": {
     "publishedAt": "2026-11-01T11:07:28.105Z",
     "matrix": "none",
