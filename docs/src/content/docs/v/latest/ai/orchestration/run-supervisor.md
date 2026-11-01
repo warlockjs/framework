@@ -88,6 +88,58 @@ const supportBot = ai.supervisor({
 
 The result is a plain `AgentContract` — usable standalone or as `router`. Hand-writing the agent still works; `ai.router()` is the shortcut.
 
+#### `ai.semanticRouter()` — skip the router model for clear-cut requests
+
+Most traffic to a support or triage supervisor matches a few well-known phrasings. `ai.semanticRouter()` embeds example phrases for each intent and routes a message by similarity; only the unsure cases reach the model, which you give it as `fallback`:
+
+```ts
+const intents = { billing, orders, smalltalk };
+
+const support = ai.supervisor({
+  name: "support",
+  intents,
+  router: ai.semanticRouter({
+    name: "support",
+    embedder: openai.embedder({ name: "text-embedding-3-small" }),
+    intents,
+    examples: {
+      billing: ["where is my invoice", "I need a refund"],
+      orders: ["where is my parcel", "track my order"],
+      // smalltalk has no examples: only the fallback can pick it
+    },
+    confidence: { min: 0.8, margin: 0.05 },
+    fallback: ai.router({ model, intents }),
+  }),
+});
+```
+
+It plugs in wherever `router` goes. It decides the **first** iteration of a run (the user's message); later iterations, where the router reads what the agents produced, always go to the fallback.
+
+| Option | Meaning |
+| --- | --- |
+| `name` | The supervisor's name; part of every stored vector's key. |
+| `embedder` | Any embedder, the same contract `semanticCache` and RAG use. |
+| `intents` | The `intents` object you give `ai.supervisor()`. A key in `examples` that is not an intent throws at construction. |
+| `examples` | Phrases per intent. An intent without examples is reachable only through `fallback`. |
+| `confidence.min` | Lowest similarity of the best intent that skips the fallback. |
+| `confidence.margin` | Lowest gap to the runner-up (default `0`). Two close intents go to the fallback instead of a coin flip. |
+| `fallback` | The model router for everything else. |
+| `store` | Where example vectors live. Default: process memory. Any `@warlock.js/cache` driver works (Redis, pg). |
+| `learn` | `true` or `{ maxPerIntent, minScore }`, see below. |
+| `messageCache` | `{ max, ttlMs }` for the exact-text embedding cache (default 256 texts, 60 s). |
+
+**Vectors are embedded once.** Each example is stored under supervisor name, embedder model, intent and a hash of the phrase. Edit one phrase, or switch embedder, and only the changed vectors are recomputed; entries no longer used are removed. Each process scores against an in-memory copy, so a message costs one embedding call and no store read. `await router.warm()` embeds ahead of the first message.
+
+:::caution
+The default memory store starts empty on every process start, so each instance re-embeds all its examples at boot. With several instances, or frequent restarts, pass a Redis or pg `store` so they share the vectors: `store: cache.driver("redis", { client })`.
+:::
+
+**Seeing who decided.** Each iteration snapshot's `decision` and the `supervisor.router.decided` event carry `routedBy: "semantic" | "fallback"`, the best `score` and the `runnerUp` (`{ intent, score }`), so you can tune `confidence` from real traffic. A semantic decision has zero usage and its router report shows no model trips.
+
+**`learn`.** With `learn: true`, a fallback decision is stored as a new example when the model picked the same intent as the nearest example and the similarity was at least `minScore` (default `confidence.min - 0.1`). Over time the phrasings you actually see move to the cheap path. At most `maxPerIntent` (default 20) learned phrases are kept per intent, oldest dropped first. Learned phrases live in the same `store`.
+
+If the embedder or the store fails, the message goes to the fallback; routing never fails because of the shortcut.
+
 #### `ai.fanOut()` — voting / self-consistency
 
 `ai.fanOut(unit, n)` spreads one agent or workflow into `n` distinctly-keyed intent entries (`writer1..writerN`) so the supervisor can dispatch them in parallel and a downstream intent can pick the best or majority answer. Spread it into `intents`:

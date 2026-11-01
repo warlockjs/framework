@@ -1,6 +1,6 @@
 ---
 title: "Attach middleware"
-description: Built-in middleware (budget, guardrail, semanticCache) plus authoring your own. Ordering invariants you must follow.
+description: Built-in middleware (budget, guardrail, semanticCache, dedupe) plus authoring your own. Ordering invariants you must follow.
 sidebar:
   order: 4
   label: "Attach middleware"
@@ -141,6 +141,24 @@ ai.middleware.semanticCache({ embedder, threshold: 0.95, scope: (ctx) => tenantI
 - **a resolver function** — `(context) => key | undefined`; `undefined` falls back to the unscoped pool.
 
 Entries written before upgrading to this scoping are unscoped and are only read back by unscoped (or `"shared"`) runs.
+
+## `ai.middleware.dedupe`
+
+When a burst of users sends the same prompt at the same moment (a popular question after an email campaign, a retried webhook), every run would make its own provider call. `dedupe()` lets the first one go to the model and hands its response to the identical requests that arrive while it is in flight:
+
+```ts
+const myAgent = ai.agent({
+  model,
+  middleware: [ai.middleware.semanticCache({ embedder, threshold: 0.95 }), ai.middleware.dedupe()],
+});
+```
+
+- "Identical" means the same agent, model, messages and `modelOptions`. Pass `dedupe({ key: (ctx) => ... })` to choose your own key, or return `undefined` to leave a call alone.
+- The waiting runs get the response with zero usage, so budgets count one call.
+- Nothing is kept once the call ends; for reuse over time use `semanticCache`. List `dedupe()` after it, so a cache hit never starts a flight.
+- If the first call fails, each waiting run makes its own call.
+- The in-flight map is local to the process: two servers still make two calls.
+- **Streaming runs (`agent.stream()`) are not deduplicated**: every stream must deliver its own chunks as they arrive.
 
 ## Writing your own middleware
 

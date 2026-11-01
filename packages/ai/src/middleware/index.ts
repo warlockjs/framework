@@ -34,6 +34,7 @@ export {
   type SemanticCacheOptions,
   type SemanticCacheScope,
 } from "./builtins/semantic-cache";
+export { dedupe, type DedupeOptions } from "./builtins/dedupe";
 export { composeMiddleware, forTool } from "./helpers";
 export { runPipeline } from "./pipeline";
 export type { MiddlewareContextByLevel, MiddlewareLevel } from "./pipeline";

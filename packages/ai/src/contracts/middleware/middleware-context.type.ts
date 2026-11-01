@@ -50,6 +50,8 @@ export type MiddlewareExecuteContext = {
   readonly options: AgentExecuteOptions<unknown> | undefined;
   readonly state: MiddlewareState;
   readonly signal?: AbortSignal;
+  /** `true` when the run was started with `agent.stream()`. */
+  readonly streaming?: boolean;
 };
 
 /**

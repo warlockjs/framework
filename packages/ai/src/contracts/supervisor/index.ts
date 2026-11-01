@@ -31,6 +31,7 @@ export type {
   DecisionSource,
   IterationDecision,
   IterationSnapshot,
+  RouterDecisionMeta,
 } from "./iteration-snapshot.type";
 export type { Next } from "./next.type";
 export type { RouteContext } from "./route-context.type";

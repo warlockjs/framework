@@ -198,6 +198,34 @@ execute: async ({ query }) => {
 };
 ```
 
+## `memoize` — reuse results of read-only tools
+
+An agent often asks the same lookup twice in one run. Mark a read-only tool with `memoize` and a repeat call with the same arguments returns the first result without running `execute()`:
+
+```ts
+const getOrder = ai.tool({
+  name: "get_order",
+  description: "Fetch an order by id",
+  input: orderIdSchema,
+  memoize: true,
+  execute: ({ id }) => orders.find(id),
+});
+
+const getPlans = ai.tool({
+  name: "get_plans",
+  description: "List the plans on sale",
+  memoize: { scope: "session", ttl: 60_000 },
+  execute: () => plans.list(),
+});
+```
+
+- `memoize: true` is `{ scope: "run" }`: results are shared inside one agent run, including identical calls inside one parallel trip.
+- `{ scope: "session" }` shares them across runs with the same `sessionId`, for `ttl` milliseconds (default 5 minutes). Without a `sessionId` it behaves as `"run"`. The session memo lives in this process's memory.
+- Arguments are compared after sorting object keys, so `{ a: 1, b: 2 }` and `{ b: 2, a: 1 }` are the same call.
+- A failed call is never kept; the next call runs the tool again.
+- A hit costs nothing and is marked `memoized: true` on the tool's call record (`result.report.children`) and in the `agent.tool.called` event. Middleware around the tool call (budgets, approvals) still runs.
+- Use it for **read-only** tools only. A tool with side effects would silently skip them on a repeat call.
+
 ## Parallel tool calls
 
 When the model asks for several tools in one turn, the agent runs them **concurrently** and waits for all of them before the next trip. The results reach the model in the order it requested them, whichever finishes first.

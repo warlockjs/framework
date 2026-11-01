@@ -24,6 +24,7 @@ import { budget, readBudgetFallbackSignal } from "./middleware/builtins/budget";
 import { memory } from "./memory";
 import { measure } from "./measure";
 import { guardrail } from "./middleware/builtins/guardrail";
+import { dedupe } from "./middleware/builtins/dedupe";
 import { semanticCache } from "./middleware/builtins/semantic-cache";
 import { composeMiddleware, forTool } from "./middleware/helpers";
 import { mockRouter } from "./mock";
@@ -61,7 +62,7 @@ import {
   snapshotRedis,
   snapshotSqlite,
 } from "./snapshot";
-import { fanOut, router } from "./supervisor";
+import { fanOut, router, semanticRouter } from "./supervisor";
 import { supervisor } from "./supervisor/supervisor";
 import { team } from "./team/team";
 import { instruction } from "./system-prompt/instruction";
@@ -126,6 +127,8 @@ export interface Ai {
   };
   spawnSubAgent: typeof spawnSubAgent;
   router: typeof router;
+  /** Embedding-based router for `ai.supervisor({ router })`; wraps `ai.router()` as its `fallback`. */
+  semanticRouter: typeof semanticRouter;
   fanOut: typeof fanOut;
   batch: typeof batch;
   /** Structured-output streaming — partial-object snapshots + a strict final parse (A1). */
@@ -170,6 +173,8 @@ export interface Ai {
     budget: typeof budget;
     guardrail: typeof guardrail;
     semanticCache: typeof semanticCache;
+    /** Share one model call between identical simultaneous requests. */
+    dedupe: typeof dedupe;
     compose: typeof composeMiddleware;
     forTool: typeof forTool;
     readBudgetFallbackSignal: typeof readBudgetFallbackSignal;
@@ -235,6 +240,7 @@ export interface Ai {
  * - `ai.planner(...)` — build an executable that generates an ordered plan over registered capabilities, then runs it step-by-step.
  * - `ai.spawnSubAgent(spec)` — thin wrapper that builds a fresh one-shot `agent()` with an optional per-task `budget` and runs the task once. A general primitive (not planner-specific).
  * - `ai.router(...)` — build a supervisor-compatible routing agent from named intents.
+ * - `ai.semanticRouter(...)` — route by embedding similarity to example phrases; a model router handles the unsure cases.
  * - `ai.fanOut(unit, count)` — spread one agent/workflow into N intent entries for voting / self-consistency.
  * - `ai.batch(executable, items, opts?)` — run any executable over a dataset with bounded concurrency + per-item retry.
  * - `ai.fallbackModel(models, opts?)` — wrap an ordered model list that fails over to the next on transient provider errors.
@@ -305,6 +311,7 @@ export const ai = {
   }),
   spawnSubAgent,
   router,
+  semanticRouter,
   fanOut,
   batch,
   streamObject,
@@ -327,6 +334,7 @@ export const ai = {
     budget,
     guardrail,
     semanticCache,
+    dedupe,
     compose: composeMiddleware,
     forTool,
     readBudgetFallbackSignal,

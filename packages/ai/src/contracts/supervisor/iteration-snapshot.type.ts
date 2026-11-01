@@ -59,6 +59,19 @@ export type AckSnapshot = Readonly<{
 export type DecisionSource = "route" | "router" | "initialAgent" | "classifier";
 
 /**
+ * What a semantic router (`ai.semanticRouter`) reports about its decision.
+ * All fields are absent for decisions made by any other router or callback.
+ */
+export type RouterDecisionMeta = {
+  /** `"semantic"` when embeddings decided alone, `"fallback"` when the model router did. */
+  routedBy?: "semantic" | "fallback";
+  /** Similarity of the best-matching intent (0 to 1). */
+  score?: number;
+  /** The second-best intent and its similarity. */
+  runnerUp?: { intent: string; score: number };
+};
+
+/**
  * Dispatch decision record — everything a reader needs to answer the
  * question "why did this iteration run these agents?" without
  * replaying the router agent.
@@ -74,7 +87,7 @@ export type IterationDecision = Readonly<{
   reasoning?: string;
   /** Wall-clock time spent deciding (router call or callback). */
   durationMs: number;
-}>;
+} & RouterDecisionMeta>;
 
 /**
  * One full iteration's forensic record, written after the iteration

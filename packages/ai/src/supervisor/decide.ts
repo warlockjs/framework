@@ -3,7 +3,10 @@ import type { AgentContract } from "../contracts/agent/agent.contract";
 import type { Message } from "../contracts/conversation-message.type";
 import { END, type EndSentinel } from "../contracts/end.type";
 import type { BaseReport } from "../contracts/result/base-report.type";
-import type { IterationSnapshot } from "../contracts/supervisor/iteration-snapshot.type";
+import type {
+  IterationSnapshot,
+  RouterDecisionMeta,
+} from "../contracts/supervisor/iteration-snapshot.type";
 import type { Next } from "../contracts/supervisor/next.type";
 import type { RouteContext } from "../contracts/supervisor/route-context.type";
 import type { RouterEntry } from "../contracts/supervisor/router-entry.type";
@@ -21,7 +24,7 @@ import { buildRouterContextMessage } from "./router-prompt";
  * iteration snapshot can surface it to debuggers.
  */
 export type DispatchDecision =
-  | {
+  | ({
       kind: "end";
       source: "route" | "router" | "initialAgent" | "classifier";
       raw: Next;
@@ -30,7 +33,7 @@ export type DispatchDecision =
       usage?: { input: number; output: number; total: number };
       /** Full router-agent report when this decision came from a router. */
       routerReport?: BaseReport;
-    }
+    } & RouterDecisionMeta
   | {
       kind: "dispatch";
       intents: string[];
@@ -41,7 +44,7 @@ export type DispatchDecision =
       usage?: { input: number; output: number; total: number };
       /** Full router-agent report when this decision came from a router. */
       routerReport?: BaseReport;
-    };
+    } & RouterDecisionMeta);
 
 export type DecideParams = {
   config: SupervisorConfig<unknown>;
@@ -260,6 +263,7 @@ async function decideViaRouter(params: DecideParams): Promise<DispatchDecision> 
   return {
     ...decision,
     reasoning: typeof reasoning === "string" ? reasoning : undefined,
+    ...readRouterDecisionMeta(data),
     usage: routerResult.usage,
     routerReport: routerResult.report,
   };
@@ -568,4 +572,29 @@ function wrapRouteError(supervisorName: string, thrown: unknown): AIError {
     `\`route\` callback threw in supervisor "${supervisorName}": ${message}`,
     { cause: thrown },
   );
+}
+
+/**
+ * Pick the semantic-router fields (`routedBy`, `score`, `runnerUp`) off a
+ * router agent's output, ignoring anything malformed.
+ */
+function readRouterDecisionMeta(data: object): RouterDecisionMeta {
+  const record = data as { routedBy?: unknown; score?: unknown; runnerUp?: unknown };
+  const meta: RouterDecisionMeta = {};
+
+  if (record.routedBy === "semantic" || record.routedBy === "fallback") {
+    meta.routedBy = record.routedBy;
+  }
+
+  if (typeof record.score === "number") {
+    meta.score = record.score;
+  }
+
+  const runnerUp = record.runnerUp as { intent?: unknown; score?: unknown } | undefined;
+
+  if (runnerUp && typeof runnerUp.intent === "string" && typeof runnerUp.score === "number") {
+    meta.runnerUp = { intent: runnerUp.intent, score: runnerUp.score };
+  }
+
+  return meta;
 }

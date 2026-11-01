@@ -5,6 +5,15 @@ export { resolveIntentEntries, type ResolvedIntentEntry } from "./entries";
 export { SupervisorExecution } from "./execution";
 export { fanOut, type FanOutOptions, type FanOutUnit } from "./fan-out";
 export { router, type RouterConfig, type RouterIntents, type RouterOutput } from "./router-factory";
+export {
+  semanticRouter,
+  type SemanticRouter,
+  type SemanticRouterConfidence,
+  type SemanticRouterConfig,
+  type SemanticRouterLearnOptions,
+  type SemanticRouterMessageCache,
+  type SemanticRouterStore,
+} from "./semantic-router";
 export { buildRouterContextMessage } from "./router-prompt";
 export { computeSignature as computeSupervisorSignature } from "./signature";
 export {

@@ -4,6 +4,15 @@ All notable changes to `@warlock.js/ai` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.43.0
+
+### Added
+
+- `ai.semanticRouter({ name, embedder, intents, examples, confidence: { min, margin }, fallback, store?, learn?, messageCache? })` routes the first iteration of a supervisor run by embedding similarity to example phrases and sends only unsure messages to `fallback` (usually `ai.router({ model, intents })`). It plugs into `ai.supervisor({ router })`. `examples` keys are validated against `intents`; an intent without examples is reachable only through the fallback. Example vectors are embedded once and stored under supervisor name, embedder model, intent and phrase hash, in process memory by default or in any `@warlock.js/cache` driver (Redis, pg) through `store`; changed phrases or a new embedder recompute only what changed and unused entries are removed. Scoring uses an in-memory copy, message embeddings are cached by exact text (`messageCache`), and `warm()` embeds ahead of the first message. `learn: true | { maxPerIntent, minScore }` stores agreeing fallback decisions as new examples, capped per intent.
+- Iteration `decision` records and the `supervisor.router.decided` event carry `routedBy: "semantic" | "fallback"`, `score` and `runnerUp` when a semantic router decided (`RouterDecisionMeta`).
+- `memoize: true | { scope: "run" | "session", ttl? }` on a tool reuses the result of an identical call (arguments compared with sorted keys) inside the run, or across runs of one `sessionId`, for read-only tools. Failed calls are not kept. A reused result is marked `memoized: true` on its `ToolCall` record and in the `agent.tool.called` event.
+- `ai.middleware.dedupe({ name?, key? })` makes identical model calls that are in flight at the same moment share one provider call; waiting runs get the response with zero usage. Streaming runs are not deduplicated. `MiddlewareExecuteContext.streaming` tells middleware whether the run uses `agent.stream()`.
+
 ## 5.40.0 - 2026-10-29
 
 ### Added
