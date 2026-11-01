@@ -55,12 +55,15 @@ function groupedSectionItems(
     collapsed: true,
     items: group.pages.flatMap((page) => {
       const target = slugs.get(page);
-      if (!target) throw new Error(`Sidebar group "${group.label}": no page "${page}" in ${relative}`);
+      if (!target)
+        throw new Error(`Sidebar group "${group.label}": no page "${page}" in ${relative}`);
       placed.add(page);
       return [{ slug: target }];
     }),
   }));
-  const rest = [...slugs].filter(([page]) => !placed.has(page)).map(([, target]) => ({ slug: target }));
+  const rest = [...slugs]
+    .filter(([page]) => !placed.has(page))
+    .map(([, target]) => ({ slug: target }));
 
   return [...groups, ...rest];
 }
@@ -123,7 +126,13 @@ const coreSections = [
     groups: [
       {
         label: "Security and hardening",
-        pages: ["security", "secrets", "encryption", "production-hardening-checklist", "health-checks"],
+        pages: [
+          "security",
+          "secrets",
+          "encryption",
+          "production-hardening-checklist",
+          "health-checks",
+        ],
       },
       {
         label: "Application runtime",
@@ -173,7 +182,10 @@ const coreSections = [
           "board",
         ],
       },
-      { label: "Upgrades and releases", pages: ["upgrade", "release", "release-notes", "toolchain"] },
+      {
+        label: "Upgrades and releases",
+        pages: ["upgrade", "release", "release-notes", "toolchain"],
+      },
       {
         label: "Integrations and extending",
         pages: ["mcp", "ai", "agents-md", "openapi", "custom-cli-command", "custom-connector"],
@@ -217,13 +229,7 @@ const webSections = [
       },
       {
         label: "Interaction and state",
-        pages: [
-          "form-submission",
-          "page-actions",
-          "sessions",
-          "localization",
-          "live-page-data",
-        ],
+        pages: ["form-submission", "page-actions", "sessions", "localization", "live-page-data"],
       },
       {
         label: "Performance and assets",
@@ -479,9 +485,9 @@ const cacheTopic = {
         cacheItem("Bulk Operations", "bulk-operations"),
         cacheItem("Stampede Prevention", "stampede-prevention"),
         cacheItem("Similarity Retrieval", "similarity"),
-        cacheItem("Sliding Expiry (extend)", "extend"),
-        cacheItem("Idempotent Calls", "idempotent"),
-        cacheItem("Probabilistic Structures", "structures"),
+        { ...cacheItem("Sliding Expiry (extend)", "extend"), latestOnly: true },
+        { ...cacheItem("Idempotent Calls", "idempotent"), latestOnly: true },
+        { ...cacheItem("Probabilistic Structures", "structures"), latestOnly: true },
       ],
     },
     {
@@ -690,7 +696,8 @@ function buildTopics(/** @type {string} */ version) {
   const collapsedExceptCurrent = (items) =>
     items.map((item) => {
       if (item && typeof item === "object" && "items" in item && Array.isArray(item.items)) {
-        const { frozenItems, ...group } = /** @type {{ frozenItems?: unknown[], items: unknown[] }} */ (item);
+        const { frozenItems, ...group } =
+          /** @type {{ frozenItems?: unknown[], items: unknown[] }} */ (item);
         const children = version === "latest" || !frozenItems ? group.items : frozenItems;
         return { ...group, collapsed: true, items: collapsedExceptCurrent(children) };
       }
