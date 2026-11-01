@@ -96,7 +96,8 @@ required reviewer, by owner choice: a green gate authorises the publish.
    and `git ls-remote origin refs/tags/v<version>` (one tag). If the in-run
    registry blog step fails, re-run `blog-check.yml` in `registry` mode before
    calling it done.
-5. **Docs** (after npm is confirmed): add the `releases.json` entry (its
+5. **Docs** (after npm is confirmed): add the `releases.json` entry (`headline`,
+   `highlights`, optional `upgradeNotes`; its
    `publishedAt` is `npm view @warlock.js/core time --json` for the version),
    run `node docs/scripts/generate-changelog.mjs` and
    `node docs/scripts/check-changelog-freshness.mjs` from the repository root,
@@ -628,9 +629,13 @@ that gate passes, and do not run this work in parallel with publication.
 
 1. Read `time[<exact-version>]` for `@warlock.js/core` from the npm registry
    origin. Add that full ISO timestamp as `publishedAt` in
-   `docs/src/data/releases.json`, keyed by the exact version, plus one short
-   `summary`. Inline `code`, **bold**, and links are allowed; the generated
-   per-package bullets carry the detail.
+   `docs/src/data/releases.json`, keyed by the exact version, plus the
+   reader-facing entry: `headline` (one line), `highlights` (3 to 6 bullets of
+   what changed for users) and, when there is something to do, `upgradeNotes`.
+   Inline `code`, **bold**, and links are allowed. Write for the person
+   upgrading: no process notes (matrix scope, release gate, npm origin) in
+   these fields. The `matrix` field stays in the entry as data and is never
+   rendered; the page links to `releases/<version>-summary.md` on its own.
 2. From the monorepo root, invoke the checked-in scripts directly — never
    through `npx`, `pnpm exec`, or a package-manager alias:
 
