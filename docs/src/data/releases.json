@@ -1,4 +1,9 @@
 {
+  "5.42.0": {
+    "publishedAt": "2026-11-01T11:07:28.105Z",
+    "matrix": "none",
+    "summary": "**Security response headers on every response, and per-route body limits that work in development and tests.** `http.securityHeaders` is on by default: `frame-ancestors 'none'` with `X-Frame-Options: DENY` (no site can frame the app), `nosniff`, `strict-origin-when-cross-origin`, a `Permissions-Policy` that keeps camera, microphone and geolocation to the app's own pages, and HSTS in production. They are set in the server's first hook, so routed handlers, static files, 404s, early refusals, SSR pages and `writeHead` responses all carry them; each header can be turned off, a route can override or opt out, and they merge with `http.csp`. A route's `serverOptions.bodyLimit` now applies under `warlock dev` and the HTTP test server, not only in production builds, and its `preParsing` hooks run there too. Pages no longer log a hydration mismatch on nonced scripts under a CSP header. No breaking changes. Lockstep release across all 33 packages. Generator matrix scope: `none`; before publishing, the blog on the 5.42.0 tarballs passed the release gate; after publishing, every package was confirmed at the npm origin."
+  },
   "5.41.0": {
     "publishedAt": "2026-10-29T16:35:13.855Z",
     "matrix": "none",

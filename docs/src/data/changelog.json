@@ -136,6 +136,88 @@
   ],
   "releases": [
     {
+      "version": "5.42.0",
+      "id": "v5-42-0",
+      "date": "November 1, 2026",
+      "isUnreleased": false,
+      "summaryHtml": "<strong>Security response headers on every response, and per-route body limits that work in development and tests.</strong> <code>http.securityHeaders</code> is on by default: <code>frame-ancestors 'none'</code> with <code>X-Frame-Options: DENY</code> (no site can frame the app), <code>nosniff</code>, <code>strict-origin-when-cross-origin</code>, a <code>Permissions-Policy</code> that keeps camera, microphone and geolocation to the app's own pages, and HSTS in production. They are set in the server's first hook, so routed handlers, static files, 404s, early refusals, SSR pages and <code>writeHead</code> responses all carry them; each header can be turned off, a route can override or opt out, and they merge with <code>http.csp</code>. A route's <code>serverOptions.bodyLimit</code> now applies under <code>warlock dev</code> and the HTTP test server, not only in production builds, and its <code>preParsing</code> hooks run there too. Pages no longer log a hydration mismatch on nonced scripts under a CSP header. No breaking changes. Lockstep release across all 33 packages. Generator matrix scope: <code>none</code>; before publishing, the blog on the 5.42.0 tarballs passed the release gate; after publishing, every package was confirmed at the npm origin.",
+      "matrix": "none",
+      "matrixRows": null,
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 8,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 4
+            },
+            {
+              "type": "Changed",
+              "n": 1
+            },
+            {
+              "type": "Fixed",
+              "n": 3
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>http.securityHeaders</code>: security response headers on every response, on by default. They are set in the server's first <code>onRequest</code> hook on the Node response, so routed handlers, static files, 404s, early refusals (CORS, 413, 429, 405, malformed URLs, the page host's refusals), SSR pages and handlers that call <code>reply.raw.writeHead()</code> all carry them, in production, <code>warlock dev</code> and <code>createTestHttpServer</code>. Defaults: CSP <code>frame-ancestors 'none'</code> with <code>X-Frame-Options: DENY</code>, <code>X-Content-Type-Options: nosniff</code>, <code>Referrer-Policy: strict-origin-when-cross-origin</code>, a <code>Permissions-Policy</code> that keeps camera, microphone and geolocation to the app's own pages and turns accelerometer, gyroscope, magnetometer and usb off, and, in production only, <code>Strict-Transport-Security: max-age=31536000; includeSubDomains</code> (<code>preload</code> is opt-in). Each header is configurable or <code>false</code>; <code>http.securityHeaders: false</code> disables all."
+            },
+            {
+              "type": "Added",
+              "html": "A route can override or opt out with the <code>securityHeaders</code> route option, for example an embeddable widget with its own <code>frameAncestors</code>."
+            },
+            {
+              "type": "Added",
+              "html": "With <code>http.csp</code> on, the response carries one <code>Content-Security-Policy</code> header with <code>frame-ancestors</code> once; a <code>frame-ancestors</code> in <code>http.csp.directives</code> wins over <code>securityHeaders.frameAncestors</code>."
+            },
+            {
+              "type": "Added",
+              "html": "Exported <code>buildSecurityHeaders</code>, <code>mergeSecurityHeadersConfig</code>, <code>resolveSecurityHeadersConfig</code>, <code>applySecurityHeadersToRaw</code>, <code>applyRouteSecurityHeaders</code>, <code>registerSecurityHeaders</code>, <code>serializePermissionsPolicy</code>, <code>frameOptionsFor</code>, <code>frameAncestorSources</code>, <code>effectiveFrameAncestors</code>, <code>DEFAULT_PERMISSIONS_POLICY</code>, <code>DEFAULT_REFERRER_POLICY</code>, <code>DEFAULT_HSTS_MAX_AGE</code>, <code>SECURITY_HEADER_NAMES</code> and the types <code>SecurityHeadersConfig</code>, <code>HstsConfig</code>, <code>FrameAncestorsPolicy</code>, <code>RouteSecurityHeaders</code>."
+            },
+            {
+              "type": "Changed",
+              "html": "Apps that do not set <code>http.securityHeaders</code> now send the headers above. Pages that frame your own site need <code>frameAncestors: \"self\"</code>; embedded third-party frames that use the camera, microphone or geolocation need to be listed in <code>permissionsPolicy</code>. Opt out with <code>http.securityHeaders: false</code>."
+            },
+            {
+              "type": "Fixed",
+              "html": "<strong>A route's <code>serverOptions.bodyLimit</code> now works under <code>warlock dev</code> and the HTTP test server.</strong> Both used to answer 413 for every body above the global limit, so the option only took effect in a production build. The dev dispatcher now holds each request to its matched route's <code>bodyLimit</code> (the global <code>http.bodyLimit</code> otherwise): a declared <code>Content-Length</code> above the limit is refused before the body is read, and a chunked body is counted as it streams and refused as soon as it passes the limit, with the same 413 <code>FST_ERR_CTP_BODY_TOO_LARGE</code> as production. Changing a limit applies on the next hot reload. Multipart uploads stay bounded by <code>http.fileUploadLimit</code>."
+            },
+            {
+              "type": "Fixed",
+              "html": "<strong>A route's <code>serverOptions.preParsing</code> hooks now run in the dev server</strong>, and may replace the payload stream, as in production."
+            },
+            {
+              "type": "Fixed",
+              "html": "<strong>The dev server warns about <code>serverOptions</code> it cannot apply.</strong> One boot warning per route and key for <code>schema</code>, <code>errorHandler</code>, <code>onSend</code>, <code>onResponse</code> and the other registration-time options, so a dev/production difference is no longer silent."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/web",
+          "slug": "web",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Pages no longer log a React hydration mismatch on the nonced <code>&lt;script&gt;</code> tags when the response carries a Content-Security-Policy header (which the default security headers now always send, and <code>http.csp</code> sent before). Browsers hide a nonce's value from the DOM under a CSP, so the framework's payload, route-table and client-entry scripts now suppress that one expected difference."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "5.41.0",
       "id": "v5-41-0",
       "date": "October 29, 2026",
