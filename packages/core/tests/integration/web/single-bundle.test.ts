@@ -31,12 +31,20 @@ const directories: string[] = [];
 const processes: ChildProcess[] = [];
 
 afterAll(async () => {
-  for (const running of processes) {
-    if (running.exitCode === null && running.pid !== undefined) running.kill("SIGTERM");
-  }
+  // Windows keeps a directory locked while a process started in it runs, so
+  // wait for each exit before removing the directories.
+  await Promise.all(
+    processes.map(async (running) => {
+      if (running.exitCode !== null || running.pid === undefined) return;
+
+      const exited = new Promise((resolve) => running.once("exit", resolve));
+      running.kill("SIGTERM");
+      await Promise.race([exited, new Promise((resolve) => setTimeout(resolve, 5_000))]);
+    }),
+  );
 
   for (const directory of directories) {
-    await rm(directory, { recursive: true, force: true });
+    await rm(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
   }
 });
 
