@@ -225,6 +225,25 @@ describe("ai.semanticRouter — routing", () => {
     expect(sdk.models[0].callCount).toBe(1);
   });
 
+  it("reads the whole input on the first iteration, even when it repeats the input label", async () => {
+    const { fallback } = makeFallback(["orders", "model pick"]);
+    const embedder = new KeywordEmbedder();
+    const semantic = semanticRouter({
+      name: "support",
+      embedder,
+      intents,
+      examples,
+      confidence: { min: 0.8 },
+      fallback,
+    });
+
+    await semantic.execute(
+      "Iteration: 1 / 5\n\nHistory:\n(none yet)\n\nOriginal input: my parcel\nOriginal input: copied text",
+    );
+
+    expect(embedder.embedCalls).toEqual(["my parcel\nOriginal input: copied text"]);
+  });
+
   it("falls back instead of failing when the embedder throws", async () => {
     const { fallback } = makeFallback(["orders", "model pick"]);
     const embedder = new KeywordEmbedder();

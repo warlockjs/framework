@@ -9,6 +9,7 @@ import type { RouterDecisionMeta } from "../contracts/supervisor/iteration-snaps
 import { generateRunId } from "../utils/generate-run-id";
 import { hashText } from "../utils/hash-text";
 import type { RouterIntents, RouterOutput } from "./router-factory";
+import { ROUTER_INPUT_LABEL } from "./router-prompt";
 
 /**
  * Where the semantic router keeps its example vectors. Only `get`, `set`
@@ -88,7 +89,6 @@ const DEFAULT_MAX_PER_INTENT = 20;
 const DEFAULT_MESSAGE_CACHE_MAX = 256;
 const DEFAULT_MESSAGE_CACHE_TTL_MS = 60_000;
 const MAX_LEARNED_PHRASE_LENGTH = 500;
-const ORIGINAL_INPUT_MARKER = "\nOriginal input: ";
 
 /** Process-local default store. */
 function memoryStore(): SemanticRouterStore {
@@ -139,17 +139,25 @@ function cosine(a: number[], b: number[]): number {
  * `router.input`) is the input itself.
  */
 function readRouterMessage(message: string): { input: string; firstIteration: boolean } {
-  const markerAt = message.lastIndexOf(ORIGINAL_INPUT_MARKER);
+  const iteration = /^Iteration: (\d+) \//m.exec(message);
 
-  if (markerAt === -1) {
+  if (!iteration) {
     return { input: message.trim(), firstIteration: true };
   }
 
-  const iteration = /^Iteration: (\d+) \//m.exec(message);
+  if (iteration[1] !== "1") {
+    return { input: "", firstIteration: false };
+  }
+
+  // On the first iteration nothing between the iteration line and the input
+  // spans lines (no history, no feedback), so the first label after it starts
+  // the input, even when the input itself contains the label.
+  const marker = `\n${ROUTER_INPUT_LABEL}`;
+  const markerAt = message.indexOf(marker, iteration.index);
 
   return {
-    input: message.slice(markerAt + ORIGINAL_INPUT_MARKER.length).trim(),
-    firstIteration: !iteration || iteration[1] === "1",
+    input: markerAt === -1 ? "" : message.slice(markerAt + marker.length).trim(),
+    firstIteration: true,
   };
 }
 
