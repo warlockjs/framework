@@ -34,3 +34,30 @@ test("catalogs one root or grouped front door, using agent-kit package slugs", (
   assert.equal(skills[0].description, 'Package routing: say "hello"');
   assert.equal(skills[0].characters, skills[0].description.length);
 });
+
+test("allows a grouped index up to 700 characters and a single skill up to 450", (t) => {
+  const root = mkdtempSync(path.join(os.tmpdir(), "skill-limits-"));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const write = (dir, file, length) => {
+    mkdirSync(path.join(root, dir, "skills"), { recursive: true });
+    writeFileSync(
+      path.join(root, dir, "package.json"),
+      JSON.stringify({ name: `@warlock.js/${dir}` }),
+    );
+    writeFileSync(
+      path.join(root, dir, "skills", file),
+      `---\ndescription: "${"a".repeat(length)}"\n---\n`,
+    );
+  };
+
+  write("grouped", "index.md", 700);
+  write("single", "SKILL.md", 450);
+  assert.equal(collectPackageSkills(root).length, 2);
+
+  write("grouped", "index.md", 701);
+  assert.throws(() => collectPackageSkills(root), /grouped/);
+
+  write("grouped", "index.md", 700);
+  write("single", "SKILL.md", 451);
+  assert.throws(() => collectPackageSkills(root), /single/);
+});

@@ -26,7 +26,10 @@ export function collectPackageSkills(packagesRoot) {
         : scalar?.startsWith("'")
           ? scalar.slice(1, -1).replace(/''/g, "'")
           : scalar;
-      if (typeof description !== "string" || !description.trim() || description.length > 450) {
+      // Same limits as the release gate: a grouped package's index.md routes many topics, so it
+      // may run to 700 characters; a single-skill package stays at 450.
+      const limit = source === "skills/index.md" ? 700 : 450;
+      if (typeof description !== "string" || !description.trim() || description.length > limit) {
         throw new Error(`Invalid package skill description: ${manifest.name}`);
       }
       const slug = manifest.name.replace(/^@/, "").replace(/[/.]/g, "-").toLowerCase();

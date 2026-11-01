@@ -1,12 +1,12 @@
 {
-  "totalCharacters": 13325,
+  "totalCharacters": 13509,
   "skills": [
     {
       "package": "@warlock.js/access",
       "slug": "warlock-js-access",
       "source": "packages/access/skills/index.md",
-      "description": "Authorization with RBAC and ABAC: `can`, `authorize`, `gate`, `gateAny`, `definePolicy`, `hasRole`, `access` and `AccessResolver`. Use for \"check a permission\", \"only the owner can edit\", route policies, tenant roles or custom permission storage. Not this package → @warlock.js/auth for login, tokens and user-type guards; @warlock.js/seal for request validation.",
-      "characters": 363
+      "description": "Authorization with RBAC and ABAC: `can`, `cannot`, `canAll`, `canAny`, `authorize`, `gate`, `gateAny`, `definePolicy`, `hasRole`, `access`, `setAccessConfig` and `AccessResolver`. Use for \"check a permission\", \"only the owner can edit\", \"403 forbidden\", route policies, tenant roles or custom permission storage. Not this package → @warlock.js/auth for login, tokens and user-type guards; @warlock.js/seal for request validation.",
+      "characters": 429
     },
     {
       "package": "@warlock.js/ai",
@@ -103,8 +103,8 @@
       "package": "@warlock.js/ai-workspace",
       "slug": "warlock-js-ai-workspace",
       "source": "packages/ai-workspace/skills/index.md",
-      "description": "Policy-confined file and shell tools for coding agents: `workspace`, `createLocalBackend`, `createMockBackend`, `makeEditFileTool`, `makeRunShellTool` and `WorkspacePolicyError`. Use for \"let an agent edit files\", \"sandbox shell commands\" or \"loop until tests pass\". Not this package → @warlock.js/ai-tools for MCP/web tools; @warlock.js/ai for agents; @warlock.js/ai-cli for installed coding CLIs.",
-      "characters": 398
+      "description": "Policy-confined file and shell tools for coding agents: `workspace`, `createLocalBackend`, `createMockBackend`, `makeEditFileTool`, `makeReadFileTool`, `makeWriteFileTool`, `makeRunShellTool`, `makeRunTestsTool` and `WorkspacePolicyError`. Use for \"let an agent edit files\", \"sandbox shell commands\", \"apply a patch\" or \"loop until tests pass\". Not this package → @warlock.js/ai-tools for MCP/web tools; @warlock.js/ai for agents; @warlock.js/ai-cli for installed coding CLIs.",
+      "characters": 476
     },
     {
       "package": "@warlock.js/ai-xai",
@@ -215,8 +215,8 @@
       "package": "@warlock.js/seal",
       "slug": "warlock-js-seal",
       "source": "packages/seal/skills/index.md",
-      "description": "Framework-independent typed validation: `v`, `validate`, `ObjectValidator`, `StringValidator` and `Infer`. Use for \"validate a request body\", \"require an email\", optional fields and defaults, schema type inference, custom rules, JSON Schema or Standard Schema. Not this package → @warlock.js/core for database rules and upload validators; @warlock.js/cascade for model schemas and persistence.",
-      "characters": 393
+      "description": "Framework-independent typed validation: `v`, `validate`, `ObjectValidator`, `StringValidator`, `ArrayValidator` and `Infer`. Use for \"validate a request body\", \"require an email\", optional fields and defaults, schema type inference, custom rules, mutators, transforms, JSON Schema or Standard Schema. Not this package → @warlock.js/core for database rules and upload validators; @warlock.js/cascade for model schemas and persistence.",
+      "characters": 433
     },
     {
       "package": "@warlock.js/sitemap",
