@@ -63,6 +63,8 @@ export default httpConfigurations;
 
 This is a Fastify plugin limit — the multipart parser rejects bodies that exceed it before the request ever hits a controller. Set it generously above your largest expected file, then validate stricter limits in the schema per-field.
 
+> **Not the JSON body limit.** `fileUploadLimit` bounds multipart file parts. JSON bodies are bounded by `http.bodyLimit`, which one route can raise with `serverOptions.bodyLimit` (see [routing](../the-basics/routing-deep.md)). Multipart requests are never held to `bodyLimit`.
+
 ## Reading files from the request
 
 Two readers on `Request`:

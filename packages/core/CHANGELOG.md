@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 > ⚠ **Versioning: `@warlock.js/*` does not follow SemVer strictly — breaking changes may ship in a minor.** This is a deliberate decision, not an oversight: the framework is pre-adoption and the cost of a major per behaviour fix currently outweighs the benefit. **Pin an exact version or a tilde range (`~4.13.0`) if you need to opt into changes rather than receive them.** Every breaking change is marked **BREAKING** in its entry and summarised in an _Upgrading_ section at the top of the release. **This policy will change once the framework has consumers beyond its author.**
 
+## 5.42.0 - 2026-11-01
+
+### Fixed
+
+- **A route's `serverOptions.bodyLimit` now works under `warlock dev` and the HTTP test server.** Both used to answer 413 for every body above the global limit, so the option only took effect in a production build. The dev dispatcher now holds each request to its matched route's `bodyLimit` (the global `http.bodyLimit` otherwise): a declared `Content-Length` above the limit is refused before the body is read, and a chunked body is counted as it streams and refused as soon as it passes the limit, with the same 413 `FST_ERR_CTP_BODY_TOO_LARGE` as production. Changing a limit applies on the next hot reload. Multipart uploads stay bounded by `http.fileUploadLimit`.
+- **A route's `serverOptions.preParsing` hooks now run in the dev server**, and may replace the payload stream, as in production.
+- **The dev server warns about `serverOptions` it cannot apply.** One boot warning per route and key for `schema`, `errorHandler`, `onSend`, `onResponse` and the other registration-time options, so a dev/production difference is no longer silent.
+
 ## 5.41.0 - 2026-10-29
 
 ### Added
