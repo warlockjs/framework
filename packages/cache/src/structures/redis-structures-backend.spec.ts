@@ -53,7 +53,9 @@ class FakeServer {
 
         bits.add(offset);
         this.bits.set(key, bits);
-        this.ttls.has(key) || this.ttls.set(key, -1);
+        if (!this.ttls.has(key)) {
+          this.ttls.set(key, -1);
+        }
 
         return previous;
       }
@@ -65,7 +67,9 @@ class FakeServer {
 
         hash.set(rest[0]!, next);
         this.hashes.set(key, hash);
-        this.ttls.has(key) || this.ttls.set(key, -1);
+        if (!this.ttls.has(key)) {
+          this.ttls.set(key, -1);
+        }
 
         return next;
       }
@@ -81,7 +85,9 @@ class FakeServer {
 
         set.add(rest[0]!);
         this.hlls.set(key, set);
-        this.ttls.has(key) || this.ttls.set(key, -1);
+        if (!this.ttls.has(key)) {
+          this.ttls.set(key, -1);
+        }
 
         return set.size > before ? 1 : 0;
       }
@@ -99,7 +105,9 @@ class FakeServer {
 
         zset.set(rest[1]!, Number(rest[0]));
         this.zsets.set(key, zset);
-        this.ttls.has(key) || this.ttls.set(key, -1);
+        if (!this.ttls.has(key)) {
+          this.ttls.set(key, -1);
+        }
 
         return 1;
       }
@@ -133,7 +141,9 @@ class FakeServer {
 
         filter.add(item);
         this.bloom.set(key, filter);
-        this.ttls.has(key) || this.ttls.set(key, -1);
+        if (!this.ttls.has(key)) {
+          this.ttls.set(key, -1);
+        }
 
         return [isNew ? 1 : 0];
       }
@@ -145,7 +155,9 @@ class FakeServer {
 
         filter.set(item, (filter.get(item) ?? 0) + 1);
         this.cuckoo.set(key, filter);
-        this.ttls.has(key) || this.ttls.set(key, -1);
+        if (!this.ttls.has(key)) {
+          this.ttls.set(key, -1);
+        }
 
         return [1];
       }
@@ -154,7 +166,11 @@ class FakeServer {
         const count = filter?.get(rest[0]!) ?? 0;
 
         if (count === 0) return 0;
-        count === 1 ? filter!.delete(rest[0]!) : filter!.set(rest[0]!, count - 1);
+        if (count === 1) {
+          filter!.delete(rest[0]!);
+        } else {
+          filter!.set(rest[0]!, count - 1);
+        }
 
         return 1;
       }
@@ -170,7 +186,9 @@ class FakeServer {
 
         if (!sketch) throw new Error("CMS: key does not exist");
         sketch.set(rest[0]!, (sketch.get(rest[0]!) ?? 0) + Number(rest[1]));
-        this.ttls.has(key) || this.ttls.set(key, -1);
+        if (!this.ttls.has(key)) {
+          this.ttls.set(key, -1);
+        }
 
         return [sketch.get(rest[0]!)];
       }
@@ -191,7 +209,9 @@ class FakeServer {
 
         if (!list) throw new Error("TOPK: key does not exist");
         list.set(rest[0]!, (list.get(rest[0]!) ?? 0) + Number(rest[1]));
-        this.ttls.has(key) || this.ttls.set(key, -1);
+        if (!this.ttls.has(key)) {
+          this.ttls.set(key, -1);
+        }
 
         return [null];
       }

@@ -36,14 +36,42 @@ async function start(mode: Mode) {
   return { server, port: (server.server.address() as { port: number }).port };
 }
 
-async function post(port: number, path: string, body: Buffer, contentType = "application/json") {
-  const response = await fetch(`http://127.0.0.1:${port}${path}`, {
-    method: "POST",
-    headers: { "content-type": contentType },
-    body: new Uint8Array(body),
-  });
+/**
+ * POST a body with `content-length`. The response is read as soon as it
+ * arrives: a refused body gets its 413 while the upload is still running, and
+ * the server then resets the connection (Windows reports ECONNRESET), which
+ * must not hide the response already received.
+ */
+function post(port: number, path: string, body: Buffer, contentType = "application/json") {
+  return new Promise<{ status: number; body: string }>((resolve, reject) => {
+    let answered = false;
+    const request = http.request(
+      {
+        port,
+        host: "127.0.0.1",
+        path,
+        method: "POST",
+        headers: { "content-type": contentType, "content-length": body.length },
+      },
+      (response) => {
+        answered = true;
+        let text = "";
+        response.on("data", (chunk) => (text += chunk));
+        const done = () => resolve({ status: response.statusCode ?? 0, body: text });
+        response.on("end", done);
+        // A reset after the response arrived closes it without "end".
+        response.on("close", done);
+      },
+    );
 
-  return { status: response.status, body: await response.text() };
+    request.on("error", (error) => {
+      if (!answered) reject(error);
+    });
+    // The reset can also surface on the socket after the request is done.
+    request.on("socket", (socket) => socket.on("error", () => {}));
+
+    request.end(body);
+  });
 }
 
 /** A body sent in chunks with no `content-length`. */
