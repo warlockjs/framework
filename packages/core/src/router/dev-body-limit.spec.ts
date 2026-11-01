@@ -37,10 +37,11 @@ async function start(mode: Mode) {
 }
 
 /**
- * POST a body with `content-length`. The response is read as soon as it
- * arrives: a refused body gets its 413 while the upload is still running, and
- * the server then resets the connection (Windows reports ECONNRESET), which
- * must not hide the response already received.
+ * POST a body with `content-length`. The headers go first: a route that
+ * refuses the declared size answers 413 straight away, and the body is only
+ * sent if no answer came within a short wait. Uploading a refused body makes
+ * the server reset the connection, and on Windows that reset can discard the
+ * 413 before it is read.
  */
 function post(port: number, path: string, body: Buffer, contentType = "application/json") {
   return new Promise<{ status: number; body: string }>((resolve, reject) => {
@@ -55,9 +56,13 @@ function post(port: number, path: string, body: Buffer, contentType = "applicati
       },
       (response) => {
         answered = true;
+        clearTimeout(sendBody);
         let text = "";
         response.on("data", (chunk) => (text += chunk));
-        const done = () => resolve({ status: response.statusCode ?? 0, body: text });
+        const done = () => {
+          resolve({ status: response.statusCode ?? 0, body: text });
+          request.destroy();
+        };
         response.on("end", done);
         // A reset after the response arrived closes it without "end".
         response.on("close", done);
@@ -70,7 +75,8 @@ function post(port: number, path: string, body: Buffer, contentType = "applicati
     // The reset can also surface on the socket after the request is done.
     request.on("socket", (socket) => socket.on("error", () => {}));
 
-    request.end(body);
+    request.flushHeaders();
+    const sendBody = setTimeout(() => request.end(body), 200);
   });
 }
 
