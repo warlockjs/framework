@@ -336,6 +336,13 @@ export class TaggedCache implements TaggedCacheDriver {
   /**
    * {@inheritdoc}
    */
+  public async extend(key: CacheKey, ttl: CacheTtl): Promise<boolean> {
+    return this.driver.extend(key, ttl);
+  }
+
+  /**
+   * {@inheritdoc}
+   */
   public async decrement(key: CacheKey, value: number = 1): Promise<number> {
     return this.increment(key, -value);
   }

@@ -192,6 +192,13 @@ export class TaggedScopedCache implements TaggedScopedCacheContract {
   }
 
   /**
+   * Reset the expiry of the scoped key to `ttl` from now. Tags are untouched.
+   */
+  public extend(key: CacheKey, ttl: CacheTtl): Promise<boolean> {
+    return this.scope.extend(key, ttl);
+  }
+
+  /**
    * Atomic counter decrement on the scoped key. See {@link increment}.
    */
   public decrement(key: CacheKey, value?: number): Promise<number> {

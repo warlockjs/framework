@@ -255,6 +255,14 @@ export class ScopedCache implements ScopedCacheContract {
   }
 
   /**
+   * Reset the expiry of the scoped key to `ttl` from now. Resolves to `false`
+   * when the key is missing. See `CacheDriver.extend`.
+   */
+  public extend(key: CacheKey, ttl: CacheTtl): Promise<boolean> {
+    return this.source.extend(this.scopedKey(key), ttl);
+  }
+
+  /**
    * Atomic counter decrement on the scoped key. See {@link increment} for
    * TTL semantics.
    */

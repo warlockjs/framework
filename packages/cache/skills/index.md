@@ -14,7 +14,9 @@ The `cache` singleton (a `CacheManager`) fronts one active driver. Everything, f
 4. Invalidate in groups: `use-cache-tags.md` or `use-cache-namespace.md`.
 5. Stampede protection and freshness: `use-swr.md`, `use-cache-lock.md`.
 6. TTL constants, key parsing and vector helpers: `use-cache-utils.md`.
-7. Test with the mock driver: `test-cache-code.md`; errors and metrics: `handle-cache-errors.md`, `observe-cache.md`.
+7. Keep sessions alive and run work once: `use-cache-extend.md` (sliding expiry), `use-cache-idempotent.md` (payments, webhooks, retried jobs).
+8. Probabilistic structures (Bloom, cuckoo, unique counter, frequency): `use-cache-structures.md`.
+9. Test with the mock driver: `test-cache-code.md`; errors and metrics: `handle-cache-errors.md`, `observe-cache.md`.
 
 ## Conventions and pitfalls
 

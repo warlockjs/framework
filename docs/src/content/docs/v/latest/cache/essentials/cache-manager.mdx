@@ -150,6 +150,32 @@ const profile = await cache.remember(`users.${userId}.profile`, "1d", () =>
 Always prefer `remember()` for expensive operations (database queries, API calls, computations). See [Cache Stampede Prevention](/v/latest/cache/stampede-prevention/).
 :::
 
+### Extend
+
+Keep an entry and make it expire `ttl` from now (a sliding expiry). It resets the deadline; it does not add `ttl` to the time left. Resolves to `false` when the key is missing:
+
+```ts
+await cache.extend(`session.${sessionId}`, "30m");
+```
+
+Laravel calls this `Cache::touch`. See [Sliding Expiry](/v/latest/cache/extend/).
+
+### Idempotent
+
+Run a function once per key, and replay its result for repeat calls:
+
+```ts
+const charge = await cache.idempotent(`charge.${order.id}`, () => gateway.charge(order), {
+  ttl: "24h",
+});
+```
+
+Also exported as `idempotent` from `@warlock.js/cache`. See [Idempotent Calls](/v/latest/cache/idempotent/).
+
+### Structures
+
+`cache.structures` offers Bloom and cuckoo filters, unique counters and frequency tracking in a few kilobytes, on `redis` and the memory drivers. See [Probabilistic Structures](/v/latest/cache/structures/).
+
 ### Update
 
 Atomically read, transform, and write a cached value:

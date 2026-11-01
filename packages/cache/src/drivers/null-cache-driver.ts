@@ -121,6 +121,15 @@ export class NullCacheDriver
 
   /**
    * {@inheritdoc}
+   *
+   * The null driver stores nothing, so there is never an entry to extend.
+   */
+  public async extend(_key: CacheKey, _ttl: CacheTtl): Promise<boolean> {
+    return false;
+  }
+
+  /**
+   * {@inheritdoc}
    */
   public async remove(key: CacheKey) {
     log.info("cache", "removing", this.loggableKey(key));

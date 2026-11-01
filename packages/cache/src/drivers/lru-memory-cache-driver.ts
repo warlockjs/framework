@@ -12,6 +12,8 @@ import type {
 } from "../types";
 import { cosineSimilarity, parseTtl } from "../utils";
 import { BaseCacheDriver } from "./base-cache-driver";
+import { MemoryStructuresBackend } from "../structures/memory-structures-backend";
+import type { CacheStructuresBackend, StructuresCapable } from "../structures/types";
 import { InMemoryTagIndex } from "./in-memory-tag-index";
 
 class CacheNode {
@@ -51,7 +53,7 @@ class CacheNode {
  */
 export class LRUMemoryCacheDriver
   extends BaseCacheDriver<LRUMemoryCacheDriver, LRUMemoryCacheOptions>
-  implements CacheDriver<LRUMemoryCacheDriver, LRUMemoryCacheOptions>
+  implements CacheDriver<LRUMemoryCacheDriver, LRUMemoryCacheOptions>, StructuresCapable
 {
   /**
    * {@inheritdoc}
@@ -154,11 +156,14 @@ export class LRUMemoryCacheDriver
     this.tagIndex.removeNamespace(parsedNamespace);
 
     if (parsedNamespace === "") {
+      this.structureStore?.clear();
       for (const key of this.cache.keys()) {
         removed.push(key);
       }
     } else {
       const prefix = parsedNamespace + ".";
+
+      this.structureStore?.clearPrefix(prefix);
 
       for (const key of this.cache.keys()) {
         if (key === parsedNamespace || key.startsWith(prefix)) {
@@ -179,6 +184,20 @@ export class LRUMemoryCacheDriver
     this.log("cleared", parsedNamespace || "(all)");
 
     return removed;
+  }
+
+  /**
+   * Backing store of `cache.structures`, created on first use.
+   */
+  protected structureStore?: MemoryStructuresBackend;
+
+  /**
+   * {@inheritdoc}
+   */
+  public structuresBackend(): CacheStructuresBackend {
+    this.structureStore ??= new MemoryStructuresBackend((key) => this.parseKey(key));
+
+    return this.structureStore;
   }
 
   /**
@@ -395,6 +414,25 @@ export class LRUMemoryCacheDriver
   /**
    * {@inheritdoc}
    *
+   * The deadline moves in place, synchronously.
+   */
+  public async extend(key: CacheKey, ttl: CacheTtl): Promise<boolean> {
+    const seconds = this.resolveExtendTtl(ttl);
+    const node = this.liveNode(this.parseKey(key));
+
+    if (!node) {
+      return false;
+    }
+
+    node.expiresAt = Number.isFinite(seconds) ? Date.now() + seconds * 1000 : undefined;
+    this.moveHead(node);
+
+    return true;
+  }
+
+  /**
+   * {@inheritdoc}
+   *
    * Read and unlink run synchronously, so a value is handed out exactly once
    * even when concurrent callers pull the same key.
    */
@@ -546,6 +584,7 @@ export class LRUMemoryCacheDriver
     } else {
       this.cache.clear();
       this.tagIndex.clear();
+      this.structureStore?.clear();
       this.init();
     }
 

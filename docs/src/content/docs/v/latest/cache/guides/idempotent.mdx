@@ -1,0 +1,72 @@
+---
+title: "Idempotent Calls"
+slug: v/latest/cache/idempotent
+---
+
+`idempotent(key, fn, { ttl })` runs `fn` once per key. Calls that arrive while it runs share that single run, and calls that arrive within `ttl` afterwards get the stored result instead of running again. This is the Idempotency-Key pattern for payments, webhook deliveries and retried jobs.
+
+```ts
+import { idempotent } from "@warlock.js/cache";
+
+const charge = await idempotent(
+  `charge.${order.id}`,
+  () => gateway.charge(order),
+  { ttl: "24h" },
+);
+```
+
+If the client retries the request (a double click, a timeout and resend, a webhook delivered twice), the gateway is charged once and every call returns the same result.
+
+`cache.idempotent(...)` is the same function on the cache manager, and accepts the same arguments.
+
+## What each call does
+
+| Situation                                      | Result                                              |
+| ---------------------------------------------- | --------------------------------------------------- |
+| First call for a key                           | runs `fn`, stores the result for `ttl`, returns it  |
+| Another call while `fn` is running (same process) | waits for and returns the same run                 |
+| A call within `ttl` after a successful run     | returns the stored result, `fn` is not called       |
+| A call after `ttl` passed                      | runs `fn` again                                     |
+| `fn` throws                                    | nothing is stored; everyone sharing that run gets the error; the next call runs `fn` again |
+
+## Options
+
+| Option        | Meaning                                                                                       |
+| ------------- | --------------------------------------------------------------------------------------------- |
+| `ttl`         | How long a successful result is kept. Seconds or a duration string. **Required.** `0` means in-flight dedupe only. |
+| `distributed` | Make concurrent calls on different servers run `fn` once, using the cache lock. Default `false`. |
+| `lockTtl`     | With `distributed`: how long the lock is held and how long another server waits for the result. Default `"30s"`. |
+| `driver`      | Store results (and take the lock) on this driver instead of the current one.                  |
+
+## In-flight dedupe only: `ttl: 0`
+
+With `ttl: 0` nothing is written to the cache. Simultaneous calls with the same key share one run; once it finishes, the next call runs again.
+
+```ts
+// Ten identical prompts at the same instant cost one model call
+const answer = await idempotent(`ask.${hash(prompt)}`, () => model.generate(prompt), { ttl: 0 });
+```
+
+## Across servers
+
+The stored result lives in your cache store, so with a shared driver (Redis, Postgres) a result written by one server is returned by every other server for `ttl`.
+
+Sharing a **running** call is per process by default: two servers that receive the same key at the same instant would each run `fn`. When that matters (a payment), turn on `distributed`:
+
+```ts
+await idempotent(`charge.${order.id}`, () => gateway.charge(order), {
+  ttl: "24h",
+  distributed: true,
+  lockTtl: "2m", // longer than the slowest charge
+});
+```
+
+The first server takes a cache lock and runs `fn`; the others wait for its stored result. If the first run fails it stores nothing and releases the lock, and a waiting server takes over. A waiter that sees no result within `lockTtl` throws `CacheConcurrencyError`. `lockTtl` must be longer than the worst-case duration of `fn`: a lock that expires mid-run lets a second run start. See [Distributed Locks](/v/latest/cache/lock/).
+
+## Good to know
+
+- Results are stored under `idempotent.<key>`, so they never collide with your own keys. Results must be serializable for Redis, Postgres and file drivers (plain data, not class instances or functions).
+- `undefined`, `null`, `0`, `false` and `""` are valid results and are replayed like any other.
+- If writing the result to the store fails after `fn` succeeded, the result is still returned to the caller (the failure is logged), because failing the caller would invite a retry that repeats the work.
+- Pick a `key` that identifies the operation, not the user: `charge.${order.id}`, not `charge.${user.id}`.
+- It does not detect a different payload under the same key. If the same key may arrive with different bodies, include a hash of the body in the key.

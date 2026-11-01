@@ -49,3 +49,13 @@ describe("NullCacheDriver", () => {
     await expect(driver.removeNamespace("ns")).resolves.toBe(driver);
   });
 });
+
+describe("NullCacheDriver — extend", () => {
+  it("never has an entry to extend", async () => {
+    const driver = new NullCacheDriver();
+
+    await driver.set("k", "v", 10);
+
+    await expect(driver.extend("k", 60)).resolves.toBe(false);
+  });
+});

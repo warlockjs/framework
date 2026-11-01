@@ -314,3 +314,91 @@ describe("LRUMemoryCacheDriver", () => {
     vi.useRealTimers();
   });
 });
+
+describe("LRUMemoryCacheDriver — extend", () => {
+  let driver: LRUMemoryCacheDriver;
+
+  beforeEach(async () => {
+    vi.useFakeTimers();
+    driver = new LRUMemoryCacheDriver();
+    driver.setOptions({ capacity: 3 });
+    driver.setLoggingState(false);
+  });
+
+  afterEach(async () => {
+    await driver.disconnect();
+    vi.useRealTimers();
+  });
+
+  it("resets the expiry to ttl from now instead of adding to the time left", async () => {
+    await driver.set("k", "v", 10);
+    vi.advanceTimersByTime(6000);
+
+    await expect(driver.extend("k", 10)).resolves.toBe(true);
+
+    vi.advanceTimersByTime(9000); // 15s after the write: would be gone without extend
+    await expect(driver.get("k")).resolves.toBe("v");
+
+    vi.advanceTimersByTime(2000); // 11s after extend: past the new deadline, so it is not 10 + 4
+    await expect(driver.get("k")).resolves.toBeNull();
+  });
+
+  it("accepts duration strings", async () => {
+    await driver.set("k", "v", 5);
+
+    await expect(driver.extend("k", "1m")).resolves.toBe(true);
+
+    vi.advanceTimersByTime(59_000);
+    await expect(driver.get("k")).resolves.toBe("v");
+
+    vi.advanceTimersByTime(2000);
+    await expect(driver.get("k")).resolves.toBeNull();
+  });
+
+  it("returns false and creates nothing for a missing key", async () => {
+    await expect(driver.extend("missing", 60)).resolves.toBe(false);
+    await expect(driver.get("missing")).resolves.toBeNull();
+  });
+
+  it("returns false for an expired key", async () => {
+    await driver.set("k", "v", 1);
+    vi.advanceTimersByTime(2000);
+
+    await expect(driver.extend("k", 60)).resolves.toBe(false);
+    await expect(driver.get("k")).resolves.toBeNull();
+  });
+
+  it("removes the expiry when ttl is Infinity", async () => {
+    await driver.set("k", "v", 5);
+
+    await expect(driver.extend("k", Infinity)).resolves.toBe(true);
+
+    vi.advanceTimersByTime(3_600_000);
+    await expect(driver.get("k")).resolves.toBe("v");
+  });
+
+  it("keeps the stored value", async () => {
+    await driver.set("k", { nested: [1, 2, 3] }, 5);
+    await driver.extend("k", 60);
+
+    await expect(driver.get("k")).resolves.toEqual({ nested: [1, 2, 3] });
+  });
+
+  it("rejects a negative ttl", async () => {
+    await driver.set("k", "v", 5);
+
+    await expect(driver.extend("k", -1)).rejects.toThrow();
+  });
+
+  it("marks the entry as recently used", async () => {
+    await driver.set("a", 1);
+    await driver.set("b", 2);
+    await driver.set("c", 3);
+
+    await driver.extend("a", 60);
+    await driver.set("d", 4); // evicts the least recently used: b
+
+    await expect(driver.get("a")).resolves.toBe(1);
+    await expect(driver.get("b")).resolves.toBeNull();
+  });
+});

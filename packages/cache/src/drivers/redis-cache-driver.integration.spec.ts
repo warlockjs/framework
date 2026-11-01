@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { createClient } from "redis";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { createStructures } from "../structures";
 import { RedisCacheDriver } from "./redis-cache-driver";
 
 const enabled = process.env.WARLOCK_REDIS_INTEGRATION === "1";
@@ -79,5 +80,73 @@ describe.skipIf(!enabled)("real Redis expiring counters", () => {
     expect(await observer.pTTL(key)).toBe(-1);
     expect(await drivers[1]!.increment("window", 1, { ttl: "1m" })).toBe(2);
     expect(await observer.pTTL(key)).toBeGreaterThan(59_000);
+  });
+  it("extend resets the deadline to ttl from now and keeps the value", async () => {
+    const driver = drivers[0]!;
+    const key = driver.parseKey("session");
+
+    await driver.set("session", { user: 1 }, "10s");
+    await observer.pExpire(key, 2000);
+
+    expect(await drivers[1]!.extend("session", "5m")).toBe(true);
+
+    const remaining = await observer.pTTL(key);
+    expect(remaining).toBeGreaterThan(299_000);
+    expect(remaining).toBeLessThanOrEqual(300_000);
+    expect(await driver.get("session")).toEqual({ user: 1 });
+  });
+
+  it("extend reports false for a missing key and creates nothing", async () => {
+    const driver = drivers[0]!;
+
+    expect(await driver.extend("nothing", 60)).toBe(false);
+    expect(await observer.exists(driver.parseKey("nothing"))).toBe(0);
+  });
+
+  it("extend with Infinity removes the expiry", async () => {
+    const driver = drivers[0]!;
+    const key = driver.parseKey("persisted");
+
+    await driver.set("persisted", "v", 30);
+
+    expect(await driver.extend("persisted", Infinity)).toBe(true);
+    expect(await observer.pTTL(key)).toBe(-1);
+  });
+
+  it("structures share state between clients, whichever path the server supports", async () => {
+    const [first, second] = drivers as [RedisCacheDriver, RedisCacheDriver];
+    const build = (driver: RedisCacheDriver) =>
+      createStructures(() => driver.structuresBackend());
+    const a = build(first);
+    const b = build(second);
+
+    await a.bloom("names", { expectedItems: 1000, ttl: "1m" }).add("hasan");
+    expect(await b.bloom("names", { expectedItems: 1000 }).mightContain("hasan")).toBe(true);
+    expect(await b.bloom("names", { expectedItems: 1000 }).mightContain("nobody")).toBe(false);
+
+    const banned = a.cuckoo("banned", { expectedItems: 1000 });
+    await banned.add("u1");
+    await banned.remove("u1");
+    expect(await b.cuckoo("banned", { expectedItems: 1000 }).mightContain("u1")).toBe(false);
+
+    await a.uniqueCounter("dau.1").add("x", "y");
+    await b.uniqueCounter("dau.2").add("y", "z");
+    expect(await a.uniqueCounter.merge(["dau.1", "dau.2"]).count()).toBe(3);
+
+    const terms = a.frequency("terms", { topK: 2, ttl: "1m" });
+    await terms.add("laptop", 5);
+    await terms.add("phone", 2);
+    expect(await b.frequency("terms", { topK: 2 }).estimate("laptop")).toBeGreaterThanOrEqual(5);
+    expect((await b.frequency("terms", { topK: 2 }).top())[0]!.value).toBe("laptop");
+
+    const keys = await observer.keys(`${prefix}.structures.*`);
+    expect(keys.length).toBeGreaterThan(0);
+
+    for (const key of keys) {
+      const ttl = await observer.ttl(key);
+      if (key.includes("bloom") || key.includes("frequency")) {
+        expect(ttl).toBeGreaterThan(0);
+      }
+    }
   });
 });

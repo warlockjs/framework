@@ -50,6 +50,11 @@ durability, scale, and capabilities. This page helps you pick.
 driver today (serialized per key inside one process). Native Redis list
 commands (`LPUSH` / `LRANGE` / `LTRIM`) are planned.
 
+**`cache.structures`** (Bloom and cuckoo filters, unique counters, frequency
+tracking) runs on `redis` and the memory drivers (`memory`, `memoryExtended`,
+`lru`); every other driver throws `CacheUnsupportedError`. See
+[Probabilistic Structures](/v/latest/cache/structures/).
+
 **Counters, `pull()` and `update()` across servers (5.20):** atomic on `redis`
 and `pg`; per-process on the in-memory drivers and `file`. See
 [Atomic operations](/v/latest/cache/guides/atomic-operations/).
