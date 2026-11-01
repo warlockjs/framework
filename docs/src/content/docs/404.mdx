@@ -1,0 +1,35 @@
+---
+title: Page not found
+description: This page does not exist. Start from Getting started, the package list or the changelog.
+template: splash
+pagefind: false
+editUrl: false
+lastUpdated: false
+---
+
+import { Card, CardGrid, LinkCard } from "@astrojs/starlight/components";
+import NotFoundSuggestions from "../../components/NotFoundSuggestions.astro";
+
+We could not find that page. It may have moved, or the link may have a typo.
+
+<NotFoundSuggestions />
+
+<CardGrid>
+  <LinkCard
+    title="Getting started"
+    href="/v/latest/core/getting-started/introduction/"
+    description="Install Warlock.js and build your first route."
+  />
+  <LinkCard
+    title="Packages"
+    href="/packages/"
+    description="Every package, grouped by what it helps you build."
+  />
+  <LinkCard
+    title="Changelog"
+    href="/changelog/"
+    description="What shipped in each release."
+  />
+</CardGrid>
+
+Press the search button in the header to search the docs.

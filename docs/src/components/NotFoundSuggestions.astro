@@ -1,0 +1,67 @@
+---
+/**
+ * "Did you mean" for the 404 page: turns the missing URL's last segments into
+ * a search over the built Pagefind index and lists the best matches. It does
+ * nothing (renders nothing) when the index is missing, as in `astro dev`.
+ */
+---
+
+<div class="nf-suggest" data-nf-suggest hidden>
+  <p class="nf-suggest-title">Did you mean</p>
+  <ul class="nf-suggest-list" data-nf-list></ul>
+</div>
+
+<script>
+  async function suggest() {
+    const root = document.querySelector<HTMLElement>("[data-nf-suggest]");
+    const list = root?.querySelector<HTMLElement>("[data-nf-list]");
+    if (!root || !list) return;
+
+    const terms = location.pathname
+      .split("/")
+      .filter((part) => part && part !== "v" && part !== "latest")
+      .slice(-2)
+      .join(" ")
+      .replace(/[-_.]+/g, " ")
+      .trim();
+    if (!terms) return;
+
+    try {
+      const url = "/pagefind/pagefind.js";
+      const pagefind = await import(/* @vite-ignore */ url);
+      const search = await pagefind.search(terms);
+      const results = await Promise.all(search.results.slice(0, 12).map((r: { data: () => Promise<{ url: string; meta: { title?: string } }> }) => r.data()));
+      if (!results.length) return;
+
+      const seen = new Set<string>();
+      for (const page of results) {
+        const target = page.url.split("#")[0];
+        // Frozen versions repeat the same titles; skip those and repeated chunks.
+        const key = page.meta.title || target;
+        if (target.startsWith("/v/v") || seen.has(key) || seen.size >= 4) continue;
+        seen.add(key);
+        const item = document.createElement("li");
+        const link = document.createElement("a");
+        link.href = target;
+        link.textContent = page.meta.title || page.url;
+        item.append(link);
+        list.append(item);
+      }
+      root.hidden = false;
+    } catch {
+      // No search index available: the static links below still work.
+    }
+  }
+
+  suggest();
+</script>
+
+<style>
+  .nf-suggest { margin: 1.5rem 0; }
+  .nf-suggest-title {
+    margin: 0 0 0.4rem;
+    font-weight: 600;
+    color: var(--sl-color-white);
+  }
+  .nf-suggest-list { margin: 0; padding-inline-start: 1.2rem; line-height: 1.8; }
+</style>
