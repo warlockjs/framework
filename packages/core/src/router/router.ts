@@ -6,6 +6,7 @@ import { ltrim, merge, toCamelCase, trim } from "@mongez/reinforcements";
 import { isEmpty } from "@mongez/supportive-is";
 import { log } from "@warlock.js/logger";
 import type { FastifyReply, FastifyRequest } from "fastify";
+import type { Readable } from "node:stream";
 import { container } from "../container";
 import { registerLazyStatic } from "../http/lazy-static";
 import { buildCorsOptions } from "../http/build-cors-options";
@@ -29,6 +30,11 @@ import { RouteBuilder } from "./route-builder";
 import { resolveRouteRateLimit, resolveStaticRateLimit } from "./resolve-route-rate-limit";
 import { RouteNameTakenError } from "./route-name-taken-error";
 import { DEV_DISPATCH_METHODS, buildNotFoundBody, createDevRateLimiter } from "./dev-dispatch";
+import {
+  DEV_BODY_LIMIT_CEILING,
+  createDevBodyLimitHook,
+  describeUnsupportedServerOptions,
+} from "./dev-body-limit";
 import { RouteRegistry } from "./route-registry";
 import { REFUSAL_STATUS, requestAcceptsHtml, setRefusalDispatcher } from "../http/refusal-dispatch";
 import { routeNameMethodSuffix } from "./route-name-method-suffix";
@@ -62,10 +68,9 @@ type RouteLifecycleHook = (
  * The pre-handler phases the dev server forwards from a route's `serverOptions`.
  *
  * These are the admission-control phases and they share the `(request, reply)`
- * signature. `preParsing` is deliberately absent — it must return the payload
- * stream, so forwarding it generically would corrupt the body rather than
- * guard it. `bodyLimit` cannot be forwarded at all; Fastify reads it at
- * registration time and no hook can bound a body already being parsed.
+ * signature. `preParsing` and `bodyLimit` are emulated separately by
+ * `createDevBodyLimitHook`: `preParsing` must return the payload stream, and
+ * the body limit is enforced while the stream is counted.
  */
 const FORWARDED_ROUTE_PHASES = ["onRequest", "preValidation", "preHandler"] as const;
 
@@ -1186,6 +1191,18 @@ export class Router {
 
     let routeRegistry: RouteRegistry | undefined;
     let registryVersion = -1;
+    const warnedServerOptions = new Set<string>();
+
+    // One line per route and key the dev server cannot honour, logged once
+    // each, at boot and again for routes a hot reload adds.
+    const warnUnsupportedServerOptions = () => {
+      for (const { key, message } of describeUnsupportedServerOptions(this.routes)) {
+        if (warnedServerOptions.has(key)) continue;
+
+        warnedServerOptions.add(key);
+        log.warn("router", "dev-dispatch", message);
+      }
+    };
 
     const applyDevRateLimit = createDevRateLimiter(
       server,
@@ -1208,8 +1225,30 @@ export class Router {
 
       registryVersion = this.routesVersion;
 
+      warnUnsupportedServerOptions();
+
       return routeRegistry;
     };
+
+    warnUnsupportedServerOptions();
+
+    // The wildcard cannot be re-registered on a hot reload, so Fastify's own
+    // limit is a ceiling and this hook holds each request to its matched
+    // route's `serverOptions.bodyLimit` (or the global limit), and runs the
+    // route's `preParsing` hooks. See `createDevBodyLimitHook`.
+    const holdToRouteBodyLimit = createDevBodyLimitHook(
+      (request) => (request as DevDispatchRequest).matchedDevRoute?.route,
+      (request) => request.server.initialConfig.bodyLimit ?? 1024 * 1024,
+    );
+
+    server.addHook(
+      "preParsing",
+      async (request: FastifyRequest, reply: FastifyReply, payload: Readable) =>
+        // A plugin's own route keeps its registered limit.
+        request.routeOptions.url === "*"
+          ? holdToRouteBodyLimit(request, reply, payload)
+          : undefined,
+    );
 
     // Matching happens here, in Fastify's own onRequest phase, so a route's
     // `serverOptions.onRequest` still runs BEFORE body parsing. Production
@@ -1317,6 +1356,7 @@ export class Router {
         // `createDevRateLimiter`), so the plugin must not limit the wildcard:
         // that would count exempt routes and unmatched URLs too.
         config: { rateLimit: false },
+        bodyLimit: DEV_BODY_LIMIT_CEILING,
         handler: wildcardHandler,
       });
     }

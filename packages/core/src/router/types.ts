@@ -232,28 +232,36 @@ export interface RouteOptions {
   /**
    * Fastify route options, forwarded to the route's registration.
    *
-   * **Dev server caveat.** The dev server registers wildcard routes and
-   * dispatches per request, so it has no per-route registration slot. It
-   * forwards the pre-handler hook phases — `onRequest`, `preValidation` and
-   * `preHandler` — by matching in Fastify's own `onRequest` phase and running
-   * the matched route's hooks there, which keeps `onRequest` running before the
-   * body is parsed, as it does in production.
+   * **Dev server.** The dev server registers one wildcard route and
+   * dispatches per request, so there is no per-route registration slot. It
+   * matches in Fastify's own `onRequest` phase and then reproduces what
+   * production does for these options:
+   * - `onRequest`, `preValidation` and `preHandler` run for the matched route;
+   * - `preParsing` runs for the matched route, and may replace the payload
+   *   stream;
+   * - `bodyLimit` is enforced per route. The wildcard is registered with a
+   *   2 GiB ceiling (a hot reload cannot re-register it), and each request is
+   *   held to its route's `bodyLimit`, or the global `http.bodyLimit`
+   *   (1 MB by default): a declared `content-length` above it is refused
+   *   before any byte is read, and a chunked body is counted as it streams
+   *   and refused as soon as it passes the limit. The refusal is Fastify's
+   *   `413` / `FST_ERR_CTP_BODY_TOO_LARGE`, like production. Changing a
+   *   route's `bodyLimit` takes effect on the next reload, without a restart.
+   *   Multipart uploads are bounded by `http.fileUploadLimit`, not by
+   *   `bodyLimit`, in both modes.
    *
-   * **Two things are NOT forwarded in dev, and cannot be:**
-   * - `bodyLimit` — Fastify reads it at registration time; no hook can bound a
-   *   body that is already being parsed.
-   * - `preParsing` — it must return the payload stream, so forwarding it
-   *   generically would corrupt the body rather than guard it.
-   *
-   * A route that relies on either of those behaves differently in dev than in
-   * production. For a pre-parse guarantee that holds in both modes, register a
-   * server-level hook through `router.beforeScanning((_router, server) =>
-   * server.addHook("onRequest", ...))` — it lands on the Fastify instance
-   * rather than in per-route options. That hook fires for **every** request, so
-   * it must discriminate on `request.method` and `request.url` itself, and it
-   * must be **idempotent per request**: `beforeScanning` runs once per scan and
-   * restarting the HTTP connector builds a new server, so the callback can run
-   * more than once against different instances.
+   * **Not applied in dev:** `schema`, `attachValidation`, `validatorCompiler`,
+   * `serializerCompiler`, `errorHandler`, `constraints`, `preSerialization`,
+   * `onSend`, `onResponse`, `onError`, `onTimeout`, `onRequestAbort` and
+   * `handler`. The dev server logs one warning per route and key at boot (and
+   * for routes added by a reload), so the difference is visible. For a hook
+   * that must run in both modes, register a server-level hook through
+   * `router.beforeScanning((_router, server) => server.addHook(...))`. That
+   * hook fires for **every** request, so it must discriminate on
+   * `request.method` and `request.url` itself, and it must be **idempotent per
+   * request**: `beforeScanning` runs once per scan and restarting the HTTP
+   * connector builds a new server, so the callback can run more than once
+   * against different instances.
    */
   serverOptions?: RouteShorthandOptions;
   /**

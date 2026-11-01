@@ -267,6 +267,16 @@ dispatcher honours both exactly as production does:
 router.get("/webhooks/status", webhookStatusController, { rateLimit: false });
 ```
 
+### Per-route body limit
+
+`serverOptions: { bodyLimit: 21 * 1024 * 1024 }` raises the JSON body limit for one route
+(the global `http.bodyLimit` defaults to 1 MB). Over the limit the answer is Fastify's 413
+(`FST_ERR_CTP_BODY_TOO_LARGE`). `warlock dev` and `startHttpTestServer()` enforce it per
+route like production (declared `Content-Length` refused before reading, chunked bodies
+counted as they stream), and run the route's `preParsing` hooks. Keys the dev wildcard cannot
+honour (`schema`, `errorHandler`, `onSend`, `onResponse`, ...) log one boot warning naming the
+route and key. Multipart uploads use `http.fileUploadLimit`, not `bodyLimit`.
+
 ## Gotchas
 
 - **Never import `routes.ts`.** The framework auto-loads it. Importing causes a double-registration error.

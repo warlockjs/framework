@@ -96,6 +96,22 @@ The full surface:
 | `rateLimit`            | Per-route rate limit override                                                     |
 | `serverOptions`        | Fastify route-shorthand options for very low-level tuning                         |
 
+### Raising the body limit for one route
+
+JSON bodies are held to `http.bodyLimit` (Fastify's 1 MB unless you change it). A route that legitimately receives more, such as several photos in one JSON body, raises its own limit with `serverOptions.bodyLimit`:
+
+```ts
+router.post("/listings", createListing, {
+  serverOptions: { bodyLimit: 21 * 1024 * 1024 },
+});
+```
+
+A body over the route's limit gets Fastify's `413` (`FST_ERR_CTP_BODY_TOO_LARGE`); every other route keeps the global limit. Multipart uploads are bounded by `http.fileUploadLimit`, not by `bodyLimit`.
+
+`warlock dev` and the HTTP test server give the same results as a production build. The dev server registers one wildcard route, so it enforces each matched route's limit itself: a declared `Content-Length` above the limit is refused before any byte is read, and a chunked body is counted as it streams and refused as soon as it passes the limit. Changing a route's `bodyLimit` applies on the next hot reload, without a restart. The route's `preParsing` hooks run in dev too.
+
+Some `serverOptions` keys are read only when a route is registered and cannot be honoured by the dev wildcard: `schema`, `attachValidation`, `validatorCompiler`, `serializerCompiler`, `errorHandler`, `constraints`, `preSerialization`, `onSend`, `onResponse`, `onError`, `onTimeout`, `onRequestAbort` and `handler`. The dev server logs one warning per route and key when it boots, so the difference with production is visible.
+
 ## The `RouteBuilder` chain
 
 `router.route(path)` returns a `RouteBuilder` — a chainable builder that registers multiple verbs against the same path:

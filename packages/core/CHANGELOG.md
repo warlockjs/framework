@@ -18,6 +18,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Changed
 
 - Apps that do not set `http.securityHeaders` now send the headers above. Pages that frame your own site need `frameAncestors: "self"`; embedded third-party frames that use the camera, microphone or geolocation need to be listed in `permissionsPolicy`. Opt out with `http.securityHeaders: false`.
+### Fixed
+
+- **A route's `serverOptions.bodyLimit` now works under `warlock dev` and the HTTP test server.** Both used to answer 413 for every body above the global limit, so the option only took effect in a production build. The dev dispatcher now holds each request to its matched route's `bodyLimit` (the global `http.bodyLimit` otherwise): a declared `Content-Length` above the limit is refused before the body is read, and a chunked body is counted as it streams and refused as soon as it passes the limit, with the same 413 `FST_ERR_CTP_BODY_TOO_LARGE` as production. Changing a limit applies on the next hot reload. Multipart uploads stay bounded by `http.fileUploadLimit`.
+- **A route's `serverOptions.preParsing` hooks now run in the dev server**, and may replace the payload stream, as in production.
+- **The dev server warns about `serverOptions` it cannot apply.** One boot warning per route and key for `schema`, `errorHandler`, `onSend`, `onResponse` and the other registration-time options, so a dev/production difference is no longer silent.
 
 ## 5.41.0 - 2026-10-29
 
