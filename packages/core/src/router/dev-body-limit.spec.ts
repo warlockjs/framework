@@ -20,7 +20,7 @@ const json = (bytes: number) =>
 type Mode = "dev" | "production";
 
 async function start(mode: Mode) {
-  const server = Fastify();
+  const server = Fastify({ forceCloseConnections: true });
 
   // The same upload plugin and limits the framework registers.
   await server.register(fastifyMultipart, {
@@ -232,7 +232,7 @@ describe("describeUnsupportedServerOptions", () => {
     router.get("/x", () => undefined, {
       serverOptions: { onSend: (_r: any, _p: any, payload: any) => payload } as any,
     });
-    const server = Fastify();
+    const server = Fastify({ forceCloseConnections: true });
 
     router.scanDevServer(server);
     await server.ready();
