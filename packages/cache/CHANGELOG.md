@@ -12,6 +12,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `idempotent(key, fn, { ttl })`, also `cache.idempotent(...)`: concurrent calls with one key share a single run, and repeat calls within `ttl` return the stored result (the Idempotency-Key pattern for payments, webhooks and retried jobs). `ttl: 0` is pure in-flight dedupe that never touches the store; a failed run is never stored; `distributed: true` uses the cache lock so servers sharing a driver run `fn` once.
 - `cache.structures` offers `bloom`, `cuckoo`, `uniqueCounter` (HyperLogLog, with `uniqueCounter.merge(keys)`) and `frequency` (Count-Min plus Top-K) in a few kilobytes. They run on Redis (RedisBloom when the server has it, bitmaps, hashes, native HyperLogLog and sorted sets otherwise) and on the `memory`, `memoryExtended` and `lru` drivers; other drivers throw `CacheUnsupportedError`. A custom driver opts in by implementing `structuresBackend()`.
 
+### Upgrade notes
+
+- `extend()` is a new required method of the `CacheDriver` interface. Drivers that extend `BaseCacheDriver` inherit a working default; a custom driver that implements `CacheDriver` directly must add `extend(key, ttl)` (return `false` for a missing key).
+
 ## 5.34.3 - 2026-10-20
 
 ### Changed
