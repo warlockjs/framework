@@ -7,6 +7,8 @@ description: 'Wire agent middleware — ai.middleware.budget (token / USD caps +
 
 Cross-cutting concerns wrapped around an agent run at three agent-level granularities (`execute`, `trip`, `tool`), plus a `supervisor` level that wraps a whole supervisor run (see below). One middleware = one object. Ships with `budget`, `guardrail`, and `semanticCache` built-ins.
 
+`ai.middleware.dedupe({ name?, key? })` makes identical model calls in flight at the same moment (same agent, model, messages, `modelOptions`) share one provider call; waiters get the response with zero usage and make their own call if the first fails. In-process only, nothing kept after the call (use `semanticCache` for that), and `agent.stream()` runs are never deduplicated. List it after `semanticCache`.
+
 ## Install order at a glance
 
 ```ts

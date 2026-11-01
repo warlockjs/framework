@@ -91,6 +91,10 @@ const supportBot = ai.supervisor({
 
 The result is a plain `AgentContract` — usable standalone or as `router`. Hand-writing the agent (above) still works; `ai.router()` is the shortcut.
 
+#### `ai.semanticRouter()` — embedding router with a model fallback
+
+`router: ai.semanticRouter({ name, embedder, intents, examples, confidence: { min, margin }, fallback: ai.router({ model, intents }), store?, learn? })` routes the first iteration by similarity to example phrases per intent and sends unsure messages (below `min`, or closer than `margin` to the runner-up) and every later iteration to `fallback`. `examples` keys must be intents; an intent without examples is reachable only through the fallback. Vectors are embedded once and stored (default process memory, re-embedded on each process start; pass a `@warlock.js/cache` driver such as Redis or pg to share). Snapshots and `supervisor.router.decided` carry `routedBy: "semantic" | "fallback"`, `score`, `runnerUp`. `learn: true | { maxPerIntent, minScore }` stores agreeing fallback decisions as examples. `router.warm()` embeds ahead of time.
+
 #### `ai.fanOut()` — voting / self-consistency
 
 `ai.fanOut(unit, n)` spreads one agent/workflow into `n` distinctly-keyed intent entries (`writer1..writerN`) so the supervisor can dispatch them in parallel and a downstream intent can pick the best/majority answer. Spread it into `intents`:

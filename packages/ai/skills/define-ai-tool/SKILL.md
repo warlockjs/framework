@@ -75,6 +75,10 @@ Whatever your `execute` resolves with is `JSON.stringify`'d and sent back as the
 
 When the model requests several tools in one turn, the agent runs them **concurrently** (default `toolDispatch: "concurrent"`, at most `maxConcurrentTools` — default 4 — at a time) and continues once all settled; results reach the model in request order. A tool that shares mutable state with another (or must see its side effects) needs `ai.agent({ toolDispatch: "sequential" })` or per-call `execute(input, { toolDispatch: "sequential" })`. `ctx.signal` carries the run's cancellation into each call.
 
+## `memoize` — reuse results of read-only tools
+
+`memoize: true | { scope: "run" | "session", ttl? }` on a tool reuses the result of an identical call (arguments compared with sorted keys). `true` is `"run"`: shared inside one agent run, including identical calls in one parallel trip. `"session"` shares across runs with the same `sessionId` for `ttl` ms (default 5 minutes, process memory; without a `sessionId` it acts as `"run"`). Failed calls are never kept. A hit is marked `memoized: true` on the `ToolCall` record and the `agent.tool.called` event; tool middleware still runs. Read-only tools only: a repeat call never reaches `execute()`.
+
 ## `mode` — feedback vs silent
 
 Default `"feedback"`.

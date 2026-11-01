@@ -3,6 +3,9 @@ import type { IterationSnapshot } from "../contracts/supervisor/iteration-snapsh
 import type { SupervisorInput } from "../contracts/supervisor/supervisor-input.type";
 import type { ResolvedIntentEntry } from "./entries";
 
+/** Label of the last section of the router message; `semanticRouter` reads the input after it. */
+export const ROUTER_INPUT_LABEL = "Original input: ";
+
 /**
  * Build the per-turn user message the supervisor feeds to the router
  * agent. Carries everything the LLM needs to make a routing decision:
@@ -105,7 +108,7 @@ export function buildRouterContextMessage(params: {
 
   const renderedInput = typeof input === "string" ? input : safeStringify(input);
 
-  sections.push("", `Original input: ${renderedInput}`);
+  sections.push("", `${ROUTER_INPUT_LABEL}${renderedInput}`);
 
   return sections.join("\n");
 }

@@ -39,6 +39,7 @@ import type {
   AckSnapshot,
   AgentBranchSnapshot,
   IterationSnapshot,
+  RouterDecisionMeta,
 } from "../contracts/supervisor/iteration-snapshot.type";
 import type { RouteContext } from "../contracts/supervisor/route-context.type";
 import type { SupervisorConfig } from "../contracts/supervisor/supervisor-config.type";
@@ -665,6 +666,7 @@ export class SupervisorExecution<TOutput> {
         next: decision.raw,
         reasoning: decision.reasoning,
         durationMs: decision.durationMs,
+        ...routerMeta(decision),
       },
       evaluateVerdict,
       state: { ...this.state },
@@ -861,6 +863,7 @@ export class SupervisorExecution<TOutput> {
       next: decision.raw,
       reasoning: decision.reasoning,
       durationMs: decision.durationMs,
+      ...routerMeta(decision),
     });
 
     return decision;
@@ -3101,6 +3104,7 @@ export class SupervisorExecution<TOutput> {
         next: decision.raw,
         reasoning: decision.reasoning,
         durationMs: decision.durationMs,
+        ...routerMeta(decision),
       },
       state: { ...this.state },
       artifacts: this.capturedIterationArtifacts,
@@ -3378,4 +3382,13 @@ async function validateOutput<TOutput>(
   }
 
   return validation.value;
+}
+
+/** The semantic-router fields of a decision, only those that are set. */
+function routerMeta(decision: RouterDecisionMeta): RouterDecisionMeta {
+  return {
+    ...(decision.routedBy ? { routedBy: decision.routedBy } : {}),
+    ...(decision.score !== undefined ? { score: decision.score } : {}),
+    ...(decision.runnerUp ? { runnerUp: decision.runnerUp } : {}),
+  };
 }

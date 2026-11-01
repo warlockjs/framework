@@ -250,6 +250,14 @@ ai.middleware.semanticCache({
 
 > Keep the semantic cache **outermost** in the middleware chain so a hit short-circuits before any inner middleware runs, and so a guardrail rejection in `trip.after` keeps a bad response out of the store. `0.95` is a solid starting threshold for question-answering; move it only with hit-quality data, never to chase a hit-rate number. See the [RAG with cache similarity recipe](/v/latest/ai/recipes/rag-with-cache-similarity/) for the full one-driver setup.
 
+## Skip calls that repeat — route, memoize and dedupe
+
+Three smaller savings stack with the cache:
+
+- **Route by embedding.** `ai.semanticRouter()` sends clear-cut requests to the right intent with one embedding call instead of a router-model call; the model router handles only the unsure ones. See [Run supervisor](/v/latest/ai/orchestration/run-supervisor/).
+- **Memoize read-only tools.** `memoize: true` on a tool reuses the result of an identical call in the run (or session). See [Define tools](/v/latest/ai/tools/define-tools/).
+- **Deduplicate simultaneous prompts.** `ai.middleware.dedupe()` makes identical in-flight model calls share one provider call. See [Attach middleware](/v/latest/ai/reliability/attach-middleware/).
+
 ## Bound the context — don't let token cost grow with conversation length
 
 A multi-turn session has a quiet failure mode: every turn resends the whole transcript, so turn 20 costs far more than turn 1 for the same quality of answer. Two orchestrator knobs cap that. `historyWindow` limits how much of the running transcript each agent actually sees per turn; `summarize` compacts old turns into a short summary once the conversation gets long, so the token bill plateaus instead of climbing linearly.

@@ -50,6 +50,7 @@ import { notifyObservers } from "../observe/resolve-observers";
 import { skills } from "../skills";
 import type { SkillsContract } from "../skills/contracts/skills.contract";
 import { resolveCatalogueCall } from "../tool/catalogue";
+import { invokeMemoized, resolveToolMemoize, type MemoEntry } from "../tool/memoize";
 import { normalizeAgentTools } from "../tool/executable-as-tool";
 import { isProviderTool } from "../tool/provider-tool";
 import type { ToolContract, ToolInvokeResult } from "../tool/tool";
@@ -586,6 +587,8 @@ class Execution<TOutput> {
   private readonly compactions: AgentCompactionRecord[] = [];
   private readonly toolCalls: ToolCall[] = [];
   private readonly silentToolCalls = new Set<string>();
+  /** Results of `memoize` tools in this run, keyed by tool + arguments. */
+  private readonly toolMemo = new Map<string, MemoEntry>();
   private readonly usage: Usage = { input: 0, output: 0, total: 0 };
   private readonly messages: Message[] = [];
   private inputMessageIndex: number | undefined;
@@ -760,6 +763,7 @@ class Execution<TOutput> {
       options: this.options as AgentExecuteOptions<unknown> | undefined,
       state: this.middlewareState,
       signal: this.options?.signal,
+      streaming: !!this.streamController,
     };
   }
 
@@ -2078,14 +2082,35 @@ class Execution<TOutput> {
       : this.options?.toolCtx;
 
     let invokeResult: ToolInvokeResult<unknown>;
+    let memoHit = false;
     const dispatchTool = registeredTool;
 
     try {
+      const memoize = resolveToolMemoize(dispatchTool.memoize);
+
       invokeResult = (await runPipeline(
         this.middleware,
         "tool",
         toolContext,
-        () => dispatchTool.invoke(toolCallRequest.input, dispatchToolCtx),
+        async () => {
+          if (!memoize) {
+            return dispatchTool.invoke(toolCallRequest.input, dispatchToolCtx);
+          }
+
+          const memoized = await invokeMemoized({
+            toolName: dispatchTool.name,
+            version: dispatchTool.version,
+            input: toolCallRequest.input,
+            option: memoize,
+            runMemo: this.toolMemo,
+            sessionId: this.options?.sessionId,
+            invoke: () => dispatchTool.invoke(toolCallRequest.input, dispatchToolCtx),
+          });
+
+          memoHit = memoized.hit;
+
+          return memoized.result;
+        },
         this.logger,
       )) as ToolInvokeResult<unknown>;
     } catch (thrown) {
@@ -2145,6 +2170,7 @@ class Execution<TOutput> {
       output: invokeResult.data,
       error: invokeResult.error,
       ...(toolCallRequest.recoveredFrom ? { recoveredFrom: toolCallRequest.recoveredFrom } : {}),
+      ...(memoHit ? { memoized: true as const } : {}),
     };
 
     // Roll child usage into the agent's accumulator. Leaf tools

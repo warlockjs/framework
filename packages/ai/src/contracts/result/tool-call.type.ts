@@ -49,4 +49,6 @@ export type ToolCall = Omit<BaseReport, "type"> & {
    * per-model leak rate.
    */
   recoveredFrom?: "stream-text";
+  /** `true` when the result was reused from an earlier identical call (`memoize` on the tool). */
+  memoized?: true;
 };

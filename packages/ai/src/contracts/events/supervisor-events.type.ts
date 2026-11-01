@@ -21,6 +21,12 @@ export type SupervisorRouterDecidedPayload = {
   next: Next;
   reasoning?: string;
   durationMs: number;
+  /** Set when `ai.semanticRouter` made the decision. */
+  routedBy?: "semantic" | "fallback";
+  /** Similarity of the best-matching intent (semantic router only). */
+  score?: number;
+  /** The second-best intent and its similarity (semantic router only). */
+  runnerUp?: { intent: string; score: number };
 };
 
 /** A dispatched agent/workflow is about to start this iteration. */

@@ -174,6 +174,16 @@ export type ToolRequestContext = {
   remoteAddress?: string;
 };
 
+/** Value of {@link ToolConfig.memoize}. */
+export type ToolMemoizeOption =
+  | boolean
+  | {
+      /** `"run"` (default) or `"session"`. */
+      scope?: "run" | "session";
+      /** Lifetime of a result in milliseconds. Default: the run, or 5 minutes for a session. */
+      ttl?: number;
+    };
+
 /**
  * Per-call rule for {@link ToolConfig.endsTurn}. Declared with method
  * syntax so tools with different input/output types stay assignable to
@@ -253,6 +263,23 @@ export interface ToolConfig<TInput = unknown, TOutput = unknown> {
    * tool({ name: "park", endsTurn: ({ output }) => output.parked, execute: park });
    */
   endsTurn?: boolean | EndsTurnRule<TInput, TOutput>;
+  /**
+   * Reuse the result when the same tool is called again with the same
+   * arguments (compared after sorting object keys). Opt in for read-only
+   * tools only: a repeat call never reaches `execute()`, so a tool with side
+   * effects would silently skip them. A failed call is never kept.
+   *
+   * `true` is `{ scope: "run" }`. `"run"` shares results inside one agent
+   * run; `"session"` shares them across runs with the same `sessionId`, for
+   * `ttl` milliseconds (default 5 minutes) in this process's memory. A
+   * memoized hit costs nothing and is marked `memoized: true` on its
+   * `ToolCall` record.
+   *
+   * @example
+   * tool({ name: "get_order", memoize: true, execute: ({ id }) => orders.find(id) });
+   * tool({ name: "get_plans", memoize: { scope: "session", ttl: 60_000 }, execute: listPlans });
+   */
+  memoize?: ToolMemoizeOption;
   /**
    * Development-time schema check of this definition (see
    * `describeToolSchema`). `ai.tool()` logs one warning per definition when
