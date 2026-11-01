@@ -40,6 +40,10 @@ export function Scripts(props: ScriptsProps): ReactElement {
   // (root.tsx:119) and must keep working unchanged. Only an absent prop falls
   // back to the framework's nonce slot (document-context.ts).
   const resolvedNonce = props.nonce ?? nonce;
+  // Browsers hide a nonce from the DOM (`getAttribute("nonce")` reads "") whenever the
+  // response carries a Content-Security-Policy header, which the default security headers
+  // always send. Hydration would then report every nonced script as a mismatch.
+  const nonceAttributes = { nonce: resolvedNonce, suppressHydrationWarning: true };
 
   return createElement(
     Fragment,
@@ -56,7 +60,7 @@ export function Scripts(props: ScriptsProps): ReactElement {
       // carries Date/Map/Set/BigInt/undefined/cyclic references JSON alone
       // cannot represent.
       type: "application/json",
-      nonce: resolvedNonce,
+      ...nonceAttributes,
       dangerouslySetInnerHTML: { __html: escapePayload(stringify(documentPayload)) },
     }),
     namedApiRoutes === undefined
@@ -64,13 +68,13 @@ export function Scripts(props: ScriptsProps): ReactElement {
       : createElement("script", {
           id: NAMED_API_ROUTES_SCRIPT_ID,
           type: "application/json",
-          nonce: resolvedNonce,
+          ...nonceAttributes,
           dangerouslySetInnerHTML: { __html: escapePayload(stringify(namedApiRoutes)) },
         }),
     hydrationClientModuleUrl !== undefined
       ? createElement("script", {
           type: "module",
-          nonce: resolvedNonce,
+          ...nonceAttributes,
           src: hydrationClientModuleUrl,
           ...(siteKey === undefined ? {} : { "data-warlock-site": siteKey }),
         })

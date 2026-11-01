@@ -2,6 +2,12 @@
 
 All notable changes to `@warlock.js/web` are documented here.
 
+## 5.42.0 - 2026-11-01
+
+### Fixed
+
+- Pages no longer log a React hydration mismatch on the nonced `<script>` tags when the response carries a Content-Security-Policy header (which the default security headers now always send, and `http.csp` sent before). Browsers hide a nonce's value from the DOM under a CSP, so the framework's payload, route-table and client-entry scripts now suppress that one expected difference.
+
 ## 5.41.0 - 2026-10-29
 
 ### Added
