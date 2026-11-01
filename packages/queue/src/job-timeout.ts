@@ -22,7 +22,9 @@ export function resolveTimeout(value: Duration | string, label = "timeout"): num
 /** Throw unless `failOnTimeout` is a boolean (or unset). */
 export function assertFailOnTimeout(value: unknown, label = "failOnTimeout"): void {
   if (value !== undefined && typeof value !== "boolean") {
-    throw new InvalidJobDefinitionError(`\`${label}\` must be a boolean, got ${JSON.stringify(value)}.`);
+    throw new InvalidJobDefinitionError(
+      `\`${label}\` must be a boolean, got ${JSON.stringify(value)}.`,
+    );
   }
 }
 

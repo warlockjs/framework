@@ -8,11 +8,7 @@ slug: v/latest/cache/idempotent
 ```ts
 import { idempotent } from "@warlock.js/cache";
 
-const charge = await idempotent(
-  `charge.${order.id}`,
-  () => gateway.charge(order),
-  { ttl: "24h" },
-);
+const charge = await idempotent(`charge.${order.id}`, () => gateway.charge(order), { ttl: "24h" });
 ```
 
 If the client retries the request (a double click, a timeout and resend, a webhook delivered twice), the gateway is charged once and every call returns the same result.
@@ -21,22 +17,22 @@ If the client retries the request (a double click, a timeout and resend, a webho
 
 ## What each call does
 
-| Situation                                      | Result                                              |
-| ---------------------------------------------- | --------------------------------------------------- |
-| First call for a key                           | runs `fn`, stores the result for `ttl`, returns it  |
-| Another call while `fn` is running (same process) | waits for and returns the same run                 |
-| A call within `ttl` after a successful run     | returns the stored result, `fn` is not called       |
-| A call after `ttl` passed                      | runs `fn` again                                     |
-| `fn` throws                                    | nothing is stored; everyone sharing that run gets the error; the next call runs `fn` again |
+| Situation                                         | Result                                                                                     |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| First call for a key                              | runs `fn`, stores the result for `ttl`, returns it                                         |
+| Another call while `fn` is running (same process) | waits for and returns the same run                                                         |
+| A call within `ttl` after a successful run        | returns the stored result, `fn` is not called                                              |
+| A call after `ttl` passed                         | runs `fn` again                                                                            |
+| `fn` throws                                       | nothing is stored; everyone sharing that run gets the error; the next call runs `fn` again |
 
 ## Options
 
-| Option        | Meaning                                                                                       |
-| ------------- | --------------------------------------------------------------------------------------------- |
+| Option        | Meaning                                                                                                            |
+| ------------- | ------------------------------------------------------------------------------------------------------------------ |
 | `ttl`         | How long a successful result is kept. Seconds or a duration string. **Required.** `0` means in-flight dedupe only. |
-| `distributed` | Make concurrent calls on different servers run `fn` once, using the cache lock. Default `false`. |
-| `lockTtl`     | With `distributed`: how long the lock is held and how long another server waits for the result. Default `"30s"`. |
-| `driver`      | Store results (and take the lock) on this driver instead of the current one.                  |
+| `distributed` | Make concurrent calls on different servers run `fn` once, using the cache lock. Default `false`.                   |
+| `lockTtl`     | With `distributed`: how long the lock is held and how long another server waits for the result. Default `"30s"`.   |
+| `driver`      | Store results (and take the lock) on this driver instead of the current one.                                       |
 
 ## In-flight dedupe only: `ttl: 0`
 

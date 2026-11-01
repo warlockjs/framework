@@ -87,7 +87,13 @@ describe("idempotent()", () => {
   });
 
   it("stores falsy and undefined results", async () => {
-    for (const [key, value] of [["zero", 0], ["no", false], ["empty", ""], ["none", null], ["undef", undefined]] as const) {
+    for (const [key, value] of [
+      ["zero", 0],
+      ["no", false],
+      ["empty", ""],
+      ["none", null],
+      ["undef", undefined],
+    ] as const) {
       const fn = vi.fn(async () => value);
 
       expect(await cache.idempotent(key, fn, { ttl: 60 })).toBe(value);

@@ -48,7 +48,10 @@ beforeEach(() => clearToolMemo());
 describe("tool memoize", () => {
   it("runs a plain tool every time", async () => {
     const { lookup, calls } = lookupTool(undefined);
-    const model = scripted(toolTrip({ id: "1", input: { id: 1 } }), toolTrip({ id: "2", input: { id: 1 } }));
+    const model = scripted(
+      toolTrip({ id: "1", input: { id: 1 } }),
+      toolTrip({ id: "2", input: { id: 1 } }),
+    );
 
     await agent({ model, tools: [lookup] }).execute("go");
 
@@ -86,7 +89,9 @@ describe("tool memoize", () => {
   it("does not carry a run memo into the next run", async () => {
     const { lookup, calls } = lookupTool(true);
     const run = () =>
-      agent({ model: scripted(toolTrip({ id: "1", input: { id: 1 } })), tools: [lookup] }).execute("go");
+      agent({ model: scripted(toolTrip({ id: "1", input: { id: 1 } })), tools: [lookup] }).execute(
+        "go",
+      );
 
     await run();
     await run();
@@ -131,7 +136,10 @@ describe("tool memoize", () => {
 
   it("does not memoize an error", async () => {
     const { lookup, calls } = lookupTool(true, true);
-    const model = scripted(toolTrip({ id: "1", input: { id: 1 } }), toolTrip({ id: "2", input: { id: 1 } }));
+    const model = scripted(
+      toolTrip({ id: "1", input: { id: 1 } }),
+      toolTrip({ id: "2", input: { id: 1 } }),
+    );
 
     const result = await agent({ model, tools: [lookup] }).execute("go");
     const records = result.report.children.filter((child) => child.type === "tool") as Array<{
@@ -147,13 +155,18 @@ describe("tool memoize", () => {
 
   it("emits the memoized flag on the tool-called event", async () => {
     const { lookup } = lookupTool(true);
-    const model = scripted(toolTrip({ id: "1", input: { id: 1 } }), toolTrip({ id: "2", input: { id: 1 } }));
+    const model = scripted(
+      toolTrip({ id: "1", input: { id: 1 } }),
+      toolTrip({ id: "2", input: { id: 1 } }),
+    );
     const flags: Array<true | undefined> = [];
 
     await agent({
       model,
       tools: [lookup],
-      on: { "agent.tool.called": (payload) => flags.push((payload as { memoized?: true }).memoized) },
+      on: {
+        "agent.tool.called": (payload) => flags.push((payload as { memoized?: true }).memoized),
+      },
     }).execute("go");
 
     expect(flags).toEqual([undefined, true]);

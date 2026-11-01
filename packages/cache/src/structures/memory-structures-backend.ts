@@ -1,9 +1,5 @@
 import { HyperLogLog } from "./hyperloglog";
-import type {
-  CacheStructuresBackend,
-  RankedEntry,
-  StructureWrite,
-} from "./types";
+import type { CacheStructuresBackend, RankedEntry, StructureWrite } from "./types";
 
 type Slot =
   | { type: "bits"; value: Uint8Array; expiresAt?: number }

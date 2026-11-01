@@ -8,19 +8,31 @@ description: 'Probabilistic structures on the cache manager — cache.structures
 Small structures that trade a known error for tiny memory. Supported on `redis` (RedisBloom when present, plain Redis otherwise) and `memory` / `memoryExtended` / `lru`. All other drivers throw `CacheUnsupportedError`. Every structure takes `ttl`, applied when it is first written and never pushed back.
 
 ```ts
-const names = cache.structures.bloom("users.usernames", { expectedItems: 1_000_000, errorRate: 0.01 });
+const names = cache.structures.bloom("users.usernames", {
+  expectedItems: 1_000_000,
+  errorRate: 0.01,
+});
 await names.add("hasan");
 await names.mightContain(input); // false = definitely free
 
 const banned = cache.structures.cuckoo("users.banned", { expectedItems: 100_000 });
-await banned.add(id); await banned.remove(id); // only remove what was added
+await banned.add(id);
+await banned.remove(id); // only remove what was added
 
 const dau = cache.structures.uniqueCounter(`stats.dau.${today}`, { ttl: "40d" });
-await dau.add(userId); await dau.count();
+await dau.add(userId);
+await dau.count();
 await cache.structures.uniqueCounter.merge(lastSevenDaysKeys).count();
 
-const terms = cache.structures.frequency("search.terms", { width: 2000, depth: 5, topK: 100, ttl: "1h" });
-await terms.add(term); await terms.estimate("laptop"); await terms.top(10); // [{ value, count }]
+const terms = cache.structures.frequency("search.terms", {
+  width: 2000,
+  depth: 5,
+  topK: 100,
+  ttl: "1h",
+});
+await terms.add(term);
+await terms.estimate("laptop");
+await terms.top(10); // [{ value, count }]
 ```
 
 ## Facts

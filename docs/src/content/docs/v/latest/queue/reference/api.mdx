@@ -109,15 +109,15 @@ for (const job of registeredJobs()) {
 
 ### `DispatchOptions`
 
-| Field       | Type         | Notes                                                          |
-| ----------- | ------------ | -------------------------------------------------------------- |
-| `delay?`    | `Duration`   | `number` (ms) or `` `${number}${"ms"\|"s"\|"m"\|"h"\|"d"}` ``  |
-| `priority?` | `number`     | `1` is highest; omitted runs ahead of any prioritized job      |
-| `jobId?`    | `string`     | Dispatching again with a still-live id is a no-op — idempotent |
-| `attempts?` | `number`     | Overrides `defineJob` for this dispatch                        |
-| `backoff?`  | `JobBackoff` | Overrides `defineJob` for this dispatch                        |
-| `timeout?`  | `Duration`   | Overrides `defineJob` for this dispatch                        |
-| `failOnTimeout?` | `boolean` | Overrides `defineJob` for this dispatch                      |
+| Field            | Type         | Notes                                                          |
+| ---------------- | ------------ | -------------------------------------------------------------- |
+| `delay?`         | `Duration`   | `number` (ms) or `` `${number}${"ms"\|"s"\|"m"\|"h"\|"d"}` ``  |
+| `priority?`      | `number`     | `1` is highest; omitted runs ahead of any prioritized job      |
+| `jobId?`         | `string`     | Dispatching again with a still-live id is a no-op — idempotent |
+| `attempts?`      | `number`     | Overrides `defineJob` for this dispatch                        |
+| `backoff?`       | `JobBackoff` | Overrides `defineJob` for this dispatch                        |
+| `timeout?`       | `Duration`   | Overrides `defineJob` for this dispatch                        |
+| `failOnTimeout?` | `boolean`    | Overrides `defineJob` for this dispatch                        |
 
 Precedence: dispatch options > `defineJob` > `queue.defaultJobOptions`.
 
@@ -321,11 +321,11 @@ and `@warlock.js/notifications`'s own API reference.
 
 ## Errors
 
-| Error                           | Thrown when                                                                             |
-| ------------------------------- | --------------------------------------------------------------------------------------- |
-| `QueueNotConfiguredError`       | The queue is used before `setQueueConfig()` (or the connector) supplied a `QueueConfig` |
+| Error                           | Thrown when                                                                              |
+| ------------------------------- | ---------------------------------------------------------------------------------------- |
+| `QueueNotConfiguredError`       | The queue is used before `setQueueConfig()` (or the connector) supplied a `QueueConfig`  |
 | `JobTimeoutError`               | An attempt outlived its `timeout`; carries `jobName`, `timeout` (ms) and `failOnTimeout` |
-| `InvalidDurationError`          | A malformed `Duration` string, e.g. `"10 minutes"`                                      |
-| `InvalidJobDefinitionError`     | `defineJob` called with an empty name, no `handle`, or a bad `attempts`                 |
-| `FailedJobNotFoundError`        | `retryFailedJob(id)` finds no FAILED job with that id                                   |
-| `QueueDashboardDependencyError` | `queueDashboard()` called without `@bull-board/api` / `@bull-board/fastify` installed   |
+| `InvalidDurationError`          | A malformed `Duration` string, e.g. `"10 minutes"`                                       |
+| `InvalidJobDefinitionError`     | `defineJob` called with an empty name, no `handle`, or a bad `attempts`                  |
+| `FailedJobNotFoundError`        | `retryFailedJob(id)` finds no FAILED job with that id                                    |
+| `QueueDashboardDependencyError` | `queueDashboard()` called without `@bull-board/api` / `@bull-board/fastify` installed    |

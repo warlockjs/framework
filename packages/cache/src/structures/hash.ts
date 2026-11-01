@@ -73,7 +73,7 @@ export function hashPair(item: string): [number, number] {
 export function probe(hashes: [number, number], index: number, size: number): number {
   const [first, second] = hashes;
 
-  return (first + index * second + index * index) % size >>> 0;
+  return ((first + index * second + index * index) % size) >>> 0;
 }
 
 /**

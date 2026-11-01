@@ -116,7 +116,9 @@ class FakeServer {
       case "ZREVRANGE": {
         const descending = [...(this.zsets.get(key) ?? [])].sort((a, b) => b[1] - a[1]);
 
-        return descending.slice(Number(rest[0]), Number(rest[1]) + 1).flatMap(([m, s]) => [m, String(s)]);
+        return descending
+          .slice(Number(rest[0]), Number(rest[1]) + 1)
+          .flatMap(([m, s]) => [m, String(s)]);
       }
       case "TTL":
         return this.ttls.get(key) ?? -2;
@@ -284,7 +286,11 @@ describe("RedisStructuresBackend", () => {
 
       const merges = server.log.filter((args) => args[0] === "PFCOUNT");
       const merge = merges[merges.length - 1]!;
-      expect(merge).toEqual(["PFCOUNT", "app.structures.unique.dau.mon", "app.structures.unique.dau.tue"]);
+      expect(merge).toEqual([
+        "PFCOUNT",
+        "app.structures.unique.dau.mon",
+        "app.structures.unique.dau.tue",
+      ]);
     });
 
     it("tracks frequencies in a hash grid and the top list in a sorted set", async () => {
@@ -341,7 +347,14 @@ describe("RedisStructuresBackend", () => {
 
       const insert = server.log.find((args) => args[0] === "BF.INSERT")!;
       expect(insert).toEqual([
-        "BF.INSERT", "app.structures.bloom.names", "CAPACITY", "5000", "ERROR", "0.001", "ITEMS", "hasan",
+        "BF.INSERT",
+        "app.structures.bloom.names",
+        "CAPACITY",
+        "5000",
+        "ERROR",
+        "0.001",
+        "ITEMS",
+        "hasan",
       ]);
       expect(server.count("SETBIT")).toBe(0);
     });
@@ -368,7 +381,10 @@ describe("RedisStructuresBackend", () => {
       expect(server.count("CMS.INITBYDIM")).toBe(1);
       expect(server.count("TOPK.RESERVE")).toBe(1);
       expect(server.log.find((args) => args[0] === "CMS.INITBYDIM")).toEqual([
-        "CMS.INITBYDIM", "app.structures.frequency.terms.cms", "500", "4",
+        "CMS.INITBYDIM",
+        "app.structures.frequency.terms.cms",
+        "500",
+        "4",
       ]);
       expect(await tracker.estimate("laptop")).toBe(4);
       expect(await tracker.top(1)).toEqual([{ value: "laptop", count: 4 }]);

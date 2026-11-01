@@ -17,8 +17,7 @@ export function resolveJobOptions(
 ): ResolvedJobOptions {
   const defaults = getQueueConfig().defaultJobOptions ?? {};
   const timeout = options.timeout ?? definition.timeout ?? defaults.timeout;
-  const failOnTimeout =
-    options.failOnTimeout ?? definition.failOnTimeout ?? defaults.failOnTimeout;
+  const failOnTimeout = options.failOnTimeout ?? definition.failOnTimeout ?? defaults.failOnTimeout;
   assertFailOnTimeout(failOnTimeout);
 
   return {

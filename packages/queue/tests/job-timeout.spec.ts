@@ -54,7 +54,10 @@ describe("timeout option resolution", () => {
       failOnTimeout: true,
     });
     expect(
-      resolveJobOptions({ timeout: "2m", failOnTimeout: true }, { timeout: 500, failOnTimeout: false }),
+      resolveJobOptions(
+        { timeout: "2m", failOnTimeout: true },
+        { timeout: 500, failOnTimeout: false },
+      ),
     ).toMatchObject({ timeout: 500, failOnTimeout: false });
   });
 

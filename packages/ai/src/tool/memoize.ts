@@ -18,7 +18,9 @@ const MAX_ENTRIES_PER_SCOPE = 500;
 const sessions = new Map<string, Map<string, MemoEntry>>();
 
 /** Normalize `memoize: true | { scope?, ttl? }`; `undefined` when memoization is off. */
-export function resolveToolMemoize(option: ToolMemoizeOption | undefined): ResolvedMemoize | undefined {
+export function resolveToolMemoize(
+  option: ToolMemoizeOption | undefined,
+): ResolvedMemoize | undefined {
   if (!option) {
     return undefined;
   }

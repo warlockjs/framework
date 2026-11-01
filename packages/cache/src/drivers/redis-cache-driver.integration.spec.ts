@@ -115,8 +115,7 @@ describe.skipIf(!enabled)("real Redis expiring counters", () => {
 
   it("structures share state between clients, whichever path the server supports", async () => {
     const [first, second] = drivers as [RedisCacheDriver, RedisCacheDriver];
-    const build = (driver: RedisCacheDriver) =>
-      createStructures(() => driver.structuresBackend());
+    const build = (driver: RedisCacheDriver) => createStructures(() => driver.structuresBackend());
     const a = build(first);
     const b = build(second);
 

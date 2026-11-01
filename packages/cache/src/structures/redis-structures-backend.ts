@@ -46,7 +46,9 @@ export class RedisStructuresBackend implements CacheStructuresBackend {
 
   public async bitSet(key: string, offsets: number[], options?: StructureWrite) {
     const parsed = this.parseKey(key);
-    const previous = await Promise.all(offsets.map((offset) => this.send(["SETBIT", parsed, offset, 1])));
+    const previous = await Promise.all(
+      offsets.map((offset) => this.send(["SETBIT", parsed, offset, 1])),
+    );
 
     await this.applyTtl(parsed, options);
 
@@ -171,7 +173,14 @@ export class RedisStructuresBackend implements CacheStructuresBackend {
       bloomAdd: async (key, item, { capacity, errorRate, ttl }) => {
         const parsed = this.parseKey(key);
         const reply = await this.send([
-          "BF.INSERT", parsed, "CAPACITY", capacity, "ERROR", errorRate, "ITEMS", item,
+          "BF.INSERT",
+          parsed,
+          "CAPACITY",
+          capacity,
+          "ERROR",
+          errorRate,
+          "ITEMS",
+          item,
         ]);
 
         await this.applyTtl(parsed, { ttl });

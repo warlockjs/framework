@@ -256,10 +256,7 @@ function withoutProcessNotes(/** @type {string} */ summary) {
  * older entry with only a `summary` paragraph still renders through
  * `summaryHtml`.
  */
-export function releaseEntryFields(
-  /** @type {ReleaseMeta} */ meta,
-  /** @type {string} */ version,
-) {
+export function releaseEntryFields(/** @type {ReleaseMeta} */ meta, /** @type {string} */ version) {
   const headline = typeof meta.headline === "string" && meta.headline.trim() ? meta.headline : null;
   return {
     headlineHtml: headline ? renderInline(headline) : null,

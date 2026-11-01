@@ -76,18 +76,20 @@ export type RouterDecisionMeta = {
  * question "why did this iteration run these agents?" without
  * replaying the router agent.
  */
-export type IterationDecision = Readonly<{
-  source: DecisionSource;
-  /** The raw routing value — string, string[], or END sentinel. */
-  next: Next;
-  /**
-   * Router agents may include a `reasoning` field alongside `next`
-   * in their output schema; when present it's preserved here.
-   */
-  reasoning?: string;
-  /** Wall-clock time spent deciding (router call or callback). */
-  durationMs: number;
-} & RouterDecisionMeta>;
+export type IterationDecision = Readonly<
+  {
+    source: DecisionSource;
+    /** The raw routing value — string, string[], or END sentinel. */
+    next: Next;
+    /**
+     * Router agents may include a `reasoning` field alongside `next`
+     * in their output schema; when present it's preserved here.
+     */
+    reasoning?: string;
+    /** Wall-clock time spent deciding (router call or callback). */
+    durationMs: number;
+  } & RouterDecisionMeta
+>;
 
 /**
  * One full iteration's forensic record, written after the iteration

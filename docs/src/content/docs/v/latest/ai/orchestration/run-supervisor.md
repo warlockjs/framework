@@ -115,18 +115,18 @@ const support = ai.supervisor({
 
 It plugs in wherever `router` goes. It decides the **first** iteration of a run (the user's message); later iterations, where the router reads what the agents produced, always go to the fallback.
 
-| Option | Meaning |
-| --- | --- |
-| `name` | The supervisor's name; part of every stored vector's key. |
-| `embedder` | Any embedder, the same contract `semanticCache` and RAG use. |
-| `intents` | The `intents` object you give `ai.supervisor()`. A key in `examples` that is not an intent throws at construction. |
-| `examples` | Phrases per intent. An intent without examples is reachable only through `fallback`. |
-| `confidence.min` | Lowest similarity of the best intent that skips the fallback. |
-| `confidence.margin` | Lowest gap to the runner-up (default `0`). Two close intents go to the fallback instead of a coin flip. |
-| `fallback` | The model router for everything else. |
-| `store` | Where example vectors live. Default: process memory. Any `@warlock.js/cache` driver works (Redis, pg). |
-| `learn` | `true` or `{ maxPerIntent, minScore }`, see below. |
-| `messageCache` | `{ max, ttlMs }` for the exact-text embedding cache (default 256 texts, 60 s). |
+| Option              | Meaning                                                                                                            |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `name`              | The supervisor's name; part of every stored vector's key.                                                          |
+| `embedder`          | Any embedder, the same contract `semanticCache` and RAG use.                                                       |
+| `intents`           | The `intents` object you give `ai.supervisor()`. A key in `examples` that is not an intent throws at construction. |
+| `examples`          | Phrases per intent. An intent without examples is reachable only through `fallback`.                               |
+| `confidence.min`    | Lowest similarity of the best intent that skips the fallback.                                                      |
+| `confidence.margin` | Lowest gap to the runner-up (default `0`). Two close intents go to the fallback instead of a coin flip.            |
+| `fallback`          | The model router for everything else.                                                                              |
+| `store`             | Where example vectors live. Default: process memory. Any `@warlock.js/cache` driver works (Redis, pg).             |
+| `learn`             | `true` or `{ maxPerIntent, minScore }`, see below.                                                                 |
+| `messageCache`      | `{ max, ttlMs }` for the exact-text embedding cache (default 256 texts, 60 s).                                     |
 
 **Vectors are embedded once.** Each example is stored under supervisor name, embedder model, intent and a hash of the phrase. Edit one phrase, or switch embedder, and only the changed vectors are recomputed; entries no longer used are removed. Each process scores against an in-memory copy, so a message costs one embedding call and no store read. `await router.warm()` embeds ahead of the first message.
 

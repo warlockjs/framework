@@ -36,12 +36,12 @@ Laravel calls this `Cache::touch`.
 
 The same forms `set` accepts:
 
-| `ttl`                       | Result                                  |
-| --------------------------- | --------------------------------------- |
-| `1800` (number)             | 1800 seconds from now                   |
-| `"30m"`, `"2h"`, `"7d"`     | the duration from now                   |
+| `ttl`                       | Result                                   |
+| --------------------------- | ---------------------------------------- |
+| `1800` (number)             | 1800 seconds from now                    |
+| `"30m"`, `"2h"`, `"7d"`     | the duration from now                    |
 | `Infinity` or `0`           | the entry never expires (expiry removed) |
-| negative, `NaN`, bad string | throws `CacheConfigurationError`        |
+| negative, `NaN`, bad string | throws `CacheConfigurationError`         |
 
 ## Works everywhere keys do
 
@@ -55,13 +55,13 @@ await users.extend("user.1", "10m"); // tags are left untouched
 
 ## Driver behaviour
 
-| Driver                                        | How                                                                   |
-| --------------------------------------------- | --------------------------------------------------------------------- |
-| `redis`                                       | one atomic `PEXPIRE` (or `PERSIST` for no expiry); also moves the `swr` freshness marker |
-| `pg`                                          | one atomic `UPDATE … RETURNING` on a live row                         |
-| `memory`, `memoryExtended`, `lru`, `mock`     | in place, synchronous, atomic within the process                      |
-| `file` and custom drivers on `BaseCacheDriver` | read the value and write it back with the new `ttl`, serialized per key in the process |
-| `null`                                        | always `false`                                                        |
+| Driver                                         | How                                                                                      |
+| ---------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `redis`                                        | one atomic `PEXPIRE` (or `PERSIST` for no expiry); also moves the `swr` freshness marker |
+| `pg`                                           | one atomic `UPDATE … RETURNING` on a live row                                            |
+| `memory`, `memoryExtended`, `lru`, `mock`      | in place, synchronous, atomic within the process                                         |
+| `file` and custom drivers on `BaseCacheDriver` | read the value and write it back with the new `ttl`, serialized per key in the process   |
+| `null`                                         | always `false`                                                                           |
 
 On `memoryExtended`, later reads slide the deadline by the new `ttl`, not the one the entry was written with.
 

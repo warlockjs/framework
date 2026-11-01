@@ -8,7 +8,10 @@ slug: v/latest/cache/structures
 ```ts
 import { cache } from "@warlock.js/cache";
 
-const usernames = cache.structures.bloom("users.usernames", { expectedItems: 1_000_000, errorRate: 0.01 });
+const usernames = cache.structures.bloom("users.usernames", {
+  expectedItems: 1_000_000,
+  errorRate: 0.01,
+});
 await usernames.add("hasan");
 
 if (!(await usernames.mightContain(input))) {
@@ -106,12 +109,12 @@ Not for: rare values. A value seen a handful of times can be swamped by the over
 
 ## What runs where
 
-| Backend | Bloom, frequency, cuckoo | Unique counter |
-| ------- | ------------------------ | -------------- |
-| Redis with RedisBloom | native `BF.*`, `CF.*`, `CMS.*`, `TOPK.*` | native HyperLogLog |
-| Redis without it | bitmaps, hashes and a sorted set | native HyperLogLog |
-| `memory`, `memoryExtended`, `lru` | in process | in process |
-| `file`, `pg`, `null`, `mock`, custom | `CacheUnsupportedError` | `CacheUnsupportedError` |
+| Backend                              | Bloom, frequency, cuckoo                 | Unique counter          |
+| ------------------------------------ | ---------------------------------------- | ----------------------- |
+| Redis with RedisBloom                | native `BF.*`, `CF.*`, `CMS.*`, `TOPK.*` | native HyperLogLog      |
+| Redis without it                     | bitmaps, hashes and a sorted set         | native HyperLogLog      |
+| `memory`, `memoryExtended`, `lru`    | in process                               | in process              |
+| `file`, `pg`, `null`, `mock`, custom | `CacheUnsupportedError`                  | `CacheUnsupportedError` |
 
 Redis checks once for RedisBloom (with `MODULE LIST`) and remembers the answer; if the command is refused it uses the portable path. Switching between the two on an existing key is not supported: they store data differently. In-memory structures are per process, follow `flush()` and `removeNamespace()`, and vanish on restart.
 

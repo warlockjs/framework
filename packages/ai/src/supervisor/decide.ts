@@ -33,8 +33,8 @@ export type DispatchDecision =
       usage?: { input: number; output: number; total: number };
       /** Full router-agent report when this decision came from a router. */
       routerReport?: BaseReport;
-    } & RouterDecisionMeta
-  | {
+    } & RouterDecisionMeta)
+  | ({
       kind: "dispatch";
       intents: string[];
       source: "route" | "router" | "initialAgent" | "classifier";

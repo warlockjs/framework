@@ -145,7 +145,9 @@ describe("cache.structures on the memory driver", () => {
     it("keeps separate keys apart", async () => {
       await cache.structures.bloom("a", { expectedItems: 100 }).add("x");
 
-      expect(await cache.structures.bloom("b", { expectedItems: 100 }).mightContain("x")).toBe(false);
+      expect(await cache.structures.bloom("b", { expectedItems: 100 }).mightContain("x")).toBe(
+        false,
+      );
     });
 
     it("expires with its ttl, counted from the first write", async () => {
@@ -282,7 +284,13 @@ describe("cache.structures on the memory driver", () => {
 
     it("lists the most frequent values, highest first", async () => {
       const tracker = cache.structures.frequency("terms", { topK: 3 });
-      const plan: Record<string, number> = { laptop: 50, phone: 30, tablet: 20, cable: 5, mouse: 2 };
+      const plan: Record<string, number> = {
+        laptop: 50,
+        phone: 30,
+        tablet: 20,
+        cable: 5,
+        mouse: 2,
+      };
 
       for (const [term, count] of Object.entries(plan)) {
         for (let index = 0; index < count; index++) {

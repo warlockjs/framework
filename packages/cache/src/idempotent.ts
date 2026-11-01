@@ -71,7 +71,11 @@ async function store(
   } catch (error) {
     // The work already happened: hand the result back instead of failing the
     // caller into a retry that would repeat it.
-    log.error("cache", "idempotent", maskEmailsInText(`Could not store the result of ${storeKey}: ${String(error)}`));
+    log.error(
+      "cache",
+      "idempotent",
+      maskEmailsInText(`Could not store the result of ${storeKey}: ${String(error)}`),
+    );
   }
 }
 

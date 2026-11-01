@@ -34,9 +34,7 @@ export type CacheStructures = {
  * Resolve the backend of a driver, or throw {@link CacheUnsupportedError} when
  * the driver does not opt in.
  */
-export function structuresBackendOf(driver: {
-  name: string;
-}): CacheStructuresBackend {
+export function structuresBackendOf(driver: { name: string }): CacheStructuresBackend {
   if (!isStructuresCapable(driver)) {
     throw new CacheUnsupportedError(
       `'${driver.name}' driver does not support cache.structures. Use the 'redis' driver or a memory driver ('memory', 'memoryExtended', 'lru').`,
