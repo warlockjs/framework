@@ -74,7 +74,7 @@ describe("tool memoize", () => {
 
     expect(calls).toHaveLength(2);
     expect(records.map((record) => record.memoized)).toEqual([undefined, true, undefined]);
-    expect(records[1].output).toEqual(records[0].output);
+    expect(records[1]?.output).toEqual(records[0]?.output);
   });
 
   it("shares one execution between identical calls of the same trip", async () => {
@@ -148,9 +148,9 @@ describe("tool memoize", () => {
     }>;
 
     expect(calls).toHaveLength(2);
-    expect(records[0].error).toBeDefined();
-    expect(records[1].memoized).toBeUndefined();
-    expect(records[1].error).toBeUndefined();
+    expect(records[0]?.error).toBeDefined();
+    expect(records[1]?.memoized).toBeUndefined();
+    expect(records[1]?.error).toBeUndefined();
   });
 
   it("emits the memoized flag on the tool-called event", async () => {

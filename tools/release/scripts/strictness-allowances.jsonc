@@ -18,7 +18,7 @@
   // `core` fell 119 -> 47 and `web` rose 186 -> 187; every other package's
   // count was unchanged. Ratchet applied both directions per policy.
   "access": 0,
-  "ai": 453,
+  "ai": 451,
   "ai-anthropic": 19,
   "ai-bedrock": 27,
   "ai-cli": 0,

@@ -31,7 +31,7 @@ describe("dedupe", () => {
       ai.execute("same question"),
     ]);
 
-    expect(mock.callCount).toBe(1);
+    expect(mock?.callCount).toBe(1);
     expect([first.text, second.text, third.text]).toEqual([
       "shared answer",
       "shared answer",
@@ -48,7 +48,7 @@ describe("dedupe", () => {
 
     await Promise.all([ai.execute("question one"), ai.execute("question two")]);
 
-    expect(mock.callCount).toBe(2);
+    expect(mock?.callCount).toBe(2);
   });
 
   it("keeps nothing after the call finishes", async () => {
@@ -58,7 +58,7 @@ describe("dedupe", () => {
     await ai.execute("same question");
     const again = await ai.execute("same question");
 
-    expect(mock.callCount).toBe(2);
+    expect(mock?.callCount).toBe(2);
     expect(again.text).toBe("second answer");
   });
 
@@ -77,7 +77,7 @@ describe("dedupe", () => {
 
     expect(first.error).toBeDefined();
     expect(second.text).toBe("recovered");
-    expect(mock.callCount).toBe(2);
+    expect(mock?.callCount).toBe(2);
   });
 
   it("does not deduplicate streaming runs", async () => {
@@ -87,7 +87,7 @@ describe("dedupe", () => {
     const streams = [ai.stream("same question"), ai.stream("same question")];
     await Promise.all(streams.map((stream) => stream.result));
 
-    expect(mock.callCount).toBe(2);
+    expect(mock?.callCount).toBe(2);
   });
 
   it("honors a custom key and leaves calls it returns undefined for alone", async () => {
@@ -101,9 +101,9 @@ describe("dedupe", () => {
     });
 
     await Promise.all([ai.execute("a"), ai.execute("b")]);
-    expect(mock.callCount).toBe(1);
+    expect(mock?.callCount).toBe(1);
 
     await Promise.all([ai.execute("skip 1"), ai.execute("skip 1")]);
-    expect(mock.callCount).toBe(3);
+    expect(mock?.callCount).toBe(3);
   });
 });

@@ -156,7 +156,7 @@ describe("ai.semanticRouter — routing", () => {
     expect(result.data?.score).toBeGreaterThan(0.8);
     expect(result.data?.runnerUp?.intent).toBe("billing");
     expect(result.usage.total).toBe(0);
-    expect(sdk.models[0].callCount).toBe(0);
+    expect(sdk.models[0]?.callCount).toBe(0);
   });
 
   it("falls back when the best score is below confidence.min", async () => {
@@ -173,7 +173,7 @@ describe("ai.semanticRouter — routing", () => {
     const result = await semantic.execute("hello there");
 
     expect(result.data).toMatchObject({ next: "smalltalk", routedBy: "fallback" });
-    expect(sdk.models[0].callCount).toBe(1);
+    expect(sdk.models[0]?.callCount).toBe(1);
   });
 
   it("falls back when the top two intents are closer than the margin", async () => {
@@ -191,7 +191,7 @@ describe("ai.semanticRouter — routing", () => {
 
     expect(result.data).toMatchObject({ routedBy: "fallback" });
     expect(result.data?.runnerUp).toBeDefined();
-    expect(sdk.models[0].callCount).toBe(1);
+    expect(sdk.models[0]?.callCount).toBe(1);
   });
 
   it("only reaches an intent without examples through the fallback", async () => {
@@ -226,7 +226,7 @@ describe("ai.semanticRouter — routing", () => {
     const result = await semantic.execute("Iteration: 2 / 5\n\nOriginal input: where is my parcel");
 
     expect(result.data).toMatchObject({ next: END, routedBy: "fallback" });
-    expect(sdk.models[0].callCount).toBe(1);
+    expect(sdk.models[0]?.callCount).toBe(1);
   });
 
   it("reads the whole input on the first iteration, even when it repeats the input label", async () => {
@@ -499,14 +499,14 @@ describe("ai.semanticRouter — supervisor integration", () => {
 
     const [first, second] = result.report.snapshots;
 
-    expect(first.decision).toMatchObject({
+    expect(first?.decision).toMatchObject({
       source: "router",
       next: "orders",
       routedBy: "semantic",
     });
-    expect(first.decision.score).toBeGreaterThan(0.8);
-    expect(first.result.orders).toBeDefined();
-    expect(second.decision).toMatchObject({ next: END, routedBy: "fallback" });
-    expect(sdk.models[0].callCount).toBe(1);
+    expect(first?.decision.score).toBeGreaterThan(0.8);
+    expect(first?.result.orders).toBeDefined();
+    expect(second?.decision).toMatchObject({ next: END, routedBy: "fallback" });
+    expect(sdk.models[0]?.callCount).toBe(1);
   });
 });
