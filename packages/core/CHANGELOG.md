@@ -6,6 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 > ⚠ **Versioning: `@warlock.js/*` does not follow SemVer strictly — breaking changes may ship in a minor.** This is a deliberate decision, not an oversight: the framework is pre-adoption and the cost of a major per behaviour fix currently outweighs the benefit. **Pin an exact version or a tilde range (`~4.13.0`) if you need to opt into changes rather than receive them.** Every breaking change is marked **BREAKING** in its entry and summarised in an _Upgrading_ section at the top of the release. **This policy will change once the framework has consumers beyond its author.**
 
+## 5.42.0 - 2026-11-01
+
+### Added
+
+- `http.securityHeaders`: security response headers on every response, on by default. They are set in the server's first `onRequest` hook on the Node response, so routed handlers, static files, 404s, early refusals (CORS, 413, 429, 405, malformed URLs, the page host's refusals), SSR pages and handlers that call `reply.raw.writeHead()` all carry them, in production, `warlock dev` and `createTestHttpServer`. Defaults: CSP `frame-ancestors 'none'` with `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, a `Permissions-Policy` that keeps camera, microphone and geolocation to the app's own pages and turns accelerometer, gyroscope, magnetometer and usb off, and, in production only, `Strict-Transport-Security: max-age=31536000; includeSubDomains` (`preload` is opt-in). Each header is configurable or `false`; `http.securityHeaders: false` disables all.
+- A route can override or opt out with the `securityHeaders` route option, for example an embeddable widget with its own `frameAncestors`.
+- With `http.csp` on, the response carries one `Content-Security-Policy` header with `frame-ancestors` once; a `frame-ancestors` in `http.csp.directives` wins over `securityHeaders.frameAncestors`.
+- Exported `buildSecurityHeaders`, `mergeSecurityHeadersConfig`, `resolveSecurityHeadersConfig`, `applySecurityHeadersToRaw`, `applyRouteSecurityHeaders`, `registerSecurityHeaders`, `serializePermissionsPolicy`, `frameOptionsFor`, `frameAncestorSources`, `effectiveFrameAncestors`, `DEFAULT_PERMISSIONS_POLICY`, `DEFAULT_REFERRER_POLICY`, `DEFAULT_HSTS_MAX_AGE`, `SECURITY_HEADER_NAMES` and the types `SecurityHeadersConfig`, `HstsConfig`, `FrameAncestorsPolicy`, `RouteSecurityHeaders`.
+
+### Changed
+
+- Apps that do not set `http.securityHeaders` now send the headers above. Pages that frame your own site need `frameAncestors: "self"`; embedded third-party frames that use the camera, microphone or geolocation need to be listed in `permissionsPolicy`. Opt out with `http.securityHeaders: false`.
+
 ## 5.41.0 - 2026-10-29
 
 ### Added

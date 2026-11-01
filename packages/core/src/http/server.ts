@@ -14,6 +14,7 @@ import { normalizeRequestPath } from "../router/normalize-request-path";
 import { dispatchRefusal } from "./refusal-dispatch";
 import { registerErrorResponseFormatter } from "./error-response";
 import { registerReloadGate } from "./reload-gate";
+import { applySecurityHeadersToRaw, registerSecurityHeaders } from "./security-headers";
 import type { HttpServerOptions } from "./types";
 
 export type FastifyInstance = ReturnType<typeof Fastify>;
@@ -105,6 +106,9 @@ export function startHttpServer(options?: HttpServerOptions): FastifyInstance {
     // page host answers a document request with its page; everything else keeps
     // Fastify's own error response.
     frameworkErrors(error, request, reply) {
+      // Hooks have not run for these refusals (bad URL, unparsable request).
+      applySecurityHeadersToRaw(reply.raw);
+
       const status = (error as { statusCode?: number }).statusCode ?? 400;
 
       void dispatchRefusal(request as never, reply as never, status).then((handled) => {
@@ -124,6 +128,9 @@ export function startHttpServer(options?: HttpServerOptions): FastifyInstance {
     },
   });
 
+  // First onRequest hook: every later hook (CORS, rate limit, reload gate) and
+  // every refusal they send already carries the headers.
+  registerSecurityHeaders(server);
   registerErrorResponseFormatter(server);
   registerReloadGate(server);
 

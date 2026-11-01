@@ -1,6 +1,7 @@
 import type { GenericObject } from "@mongez/reinforcements";
 import type { ObjectValidator, ValidationResult } from "@warlock.js/seal";
 import type { RouteShorthandOptions } from "fastify";
+import type { RouteSecurityHeaders } from "../http/security-headers";
 import type { Request, Response, ReturnedResponse } from "../http";
 import type { RequestLoggingOptions } from "../http/request-log-snapshot";
 import type { ResponseSchema } from "../resource/types";
@@ -315,6 +316,18 @@ export interface RouteOptions {
    * router.post("/oauth/callback", handler, { csrf: false });
    */
   csrf?: false;
+  /**
+   * Override `http.securityHeaders` for this route. An object is merged over
+   * the app-wide config key by key; `false` sends none of the security
+   * headers on this route's responses.
+   *
+   * @example
+   * // An embeddable widget that partners may frame
+   * router.get("/widget", widget, {
+   *   securityHeaders: { frameAncestors: ["https://partner.example.com"] },
+   * });
+   */
+  securityHeaders?: RouteSecurityHeaders;
   /**
    * Route-level validation, merged over the handler's own `validation`
    * (keys set here win). Lets one handler serve several routes with different

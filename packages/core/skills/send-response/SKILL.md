@@ -278,6 +278,11 @@ These mutate the response in place; chain or call before the final `return respo
 
 ### `Content-Security-Policy` (5.12.0)
 
+Security headers (`http.securityHeaders`, on by default, see the `configure-app`
+topic) are set on the Node response before routing, so every response has them;
+a route can override with the `securityHeaders` route option (`{ frameAncestors: [...] }`
+or `false`).
+
 Opt in via `http.csp.enabled` in `src/config/http.ts` (see
 the `configure-app` topic for the full shape).
 When enabled, every response through the shared request funnel

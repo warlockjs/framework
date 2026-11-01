@@ -13,6 +13,7 @@ import config from "@mongez/config";
 import { environment } from "../../utils";
 import { requestContext as requestContextInstance } from "../context/request-context";
 import { applyCspHeader } from "../csp";
+import { applyRouteSecurityHeaders } from "../security-headers";
 import { runDefaultCsrfGuard } from "../csrf-default-guard";
 import { setResponseAppError } from "../error-response";
 import { mapRequestError } from "../error-mapper";
@@ -58,6 +59,12 @@ export function createRequestStore(
   // `request.nonce` for its `<script>` tags: `request.nonce` caches on first
   // read, and this is deliberately the first read. A no-op when the app
   // hasn't opted into `http.csp` (see `csp.ts`).
+  // A route's own `securityHeaders` re-stamps the app-wide pass (which ran in
+  // the server's `onRequest` hook) before the CSP merge reads it.
+  if (request.route?.securityHeaders !== undefined) {
+    applyRouteSecurityHeaders(response.baseResponse.raw, request.route.securityHeaders);
+  }
+
   applyCspHeader(request, response);
 
   // Build all context stores using the immutable API

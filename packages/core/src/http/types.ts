@@ -8,6 +8,7 @@ import type { Middleware } from "../router";
 import type { HttpRateLimitConfig } from "./build-rate-limit-options";
 import type { StreamQueueOptions } from "./bounded-stream-queue";
 import type { CspConfig } from "./csp";
+import type { SecurityHeadersConfig } from "./security-headers";
 import type { HttpErrorMapper } from "./error-mapper";
 import type { HttpErrorResponseFormatter } from "./error-response";
 import type { HttpLoggingConfig } from "./request-log-snapshot";
@@ -368,6 +369,16 @@ export interface HttpConfigurations {
    * the `configure-app` / `send-response` skills for usage.
    */
   csp?: CspConfig;
+  /**
+   * Security response headers on every response (routed handlers, static
+   * files, 404s, early refusals): `X-Frame-Options` and CSP
+   * `frame-ancestors`, `X-Content-Type-Options`, `Referrer-Policy`,
+   * `Permissions-Policy` and `Strict-Transport-Security` (production only).
+   *
+   * On by default. `false` disables all; set a key to `false` to drop one
+   * header. See `security-headers.ts` for the defaults.
+   */
+  securityHeaders?: SecurityHeadersConfig | boolean;
   /**
    * Rate limit
    */
