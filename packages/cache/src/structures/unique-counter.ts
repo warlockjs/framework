@@ -24,7 +24,7 @@ export class UniqueCounter {
   /**
    * Approximate number of distinct values counted so far.
    */
-  public count(): Promise<number> {
+  public async count(): Promise<number> {
     return this.context.backend().uniqueCount([this.key]);
   }
 }
@@ -41,7 +41,7 @@ export class UniqueCounterGroup {
   /**
    * Approximate number of distinct values across every counter in the group.
    */
-  public count(): Promise<number> {
+  public async count(): Promise<number> {
     return this.context.backend().uniqueCount(this.keys);
   }
 }

@@ -108,7 +108,9 @@ describe("MemoryExtendedCacheDriver — extend", () => {
     vi.useRealTimers();
   });
 
-  it("resets the expiry to ttl from now instead of adding to the time left", async () => {
+  // This driver slides the ttl on every live read, so each case reads only once,
+  // at the end, instead of probing the entry in between.
+  it("keeps the entry alive until ttl from the extend, not from the write", async () => {
     await driver.set("k", "v", 10);
     vi.advanceTimersByTime(6000);
 
@@ -116,8 +118,15 @@ describe("MemoryExtendedCacheDriver — extend", () => {
 
     vi.advanceTimersByTime(9000); // 15s after the write: would be gone without extend
     await expect(driver.get("k")).resolves.toBe("v");
+  });
 
-    vi.advanceTimersByTime(2000); // 11s after extend: past the new deadline, so it is not 10 + 4
+  it("resets the expiry to ttl from now instead of adding to the time left", async () => {
+    await driver.set("k", "v", 10);
+    vi.advanceTimersByTime(6000);
+
+    await expect(driver.extend("k", 10)).resolves.toBe(true);
+
+    vi.advanceTimersByTime(11_000); // past the new deadline, so it is not 10 + 4
     await expect(driver.get("k")).resolves.toBeNull();
   });
 
@@ -128,8 +137,14 @@ describe("MemoryExtendedCacheDriver — extend", () => {
 
     vi.advanceTimersByTime(59_000);
     await expect(driver.get("k")).resolves.toBe("v");
+  });
 
-    vi.advanceTimersByTime(2000);
+  it("expires after the extended duration string elapses", async () => {
+    await driver.set("k", "v", 5);
+
+    await expect(driver.extend("k", "1m")).resolves.toBe(true);
+
+    vi.advanceTimersByTime(61_000);
     await expect(driver.get("k")).resolves.toBeNull();
   });
 

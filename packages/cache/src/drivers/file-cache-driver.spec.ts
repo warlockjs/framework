@@ -420,6 +420,7 @@ describe("FileCacheDriver", () => {
 
 describe("FileCacheDriver — extend", () => {
   let driver: FileCacheDriver;
+  let directory: string;
 
   beforeEach(async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
