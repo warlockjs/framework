@@ -225,7 +225,9 @@ description: 'Evolve an existing table with `Migration.alter(Model, schema, opti
 
 Use `Migration.alter` to evolve an existing table — adding or dropping columns, renaming them, changing their type, and managing every variety of index or constraint. It's the declarative counterpart to `Migration.create` and inherits the table name and data source straight from the model.
 
-> **Key difference from `Migration.create`:** `alter` does **not** auto-infer rollbacks. You must supply a `down()` function in options whenever you need to be able to roll back.
+> **Key difference from `Migration.create`:** `alter` does **not** auto-infer rollbacks, with one exception: an alter that only has `add` (and no custom `up`/`down`) gets a derived `down()`. Anything else needs a `down()` in options when you want to roll back.
+>
+> **SQL and document stores are not symmetric.** On SQL an added column exists only because of `up()`, so dropping it on rollback is safe. On MongoDB `add` changes no documents, but dropping a field unsets it on **every** document and erases what the app stored since. See [Rolling back on MongoDB](#rolling-back-on-mongodb).
 
 ---
 
@@ -242,11 +244,8 @@ export default Migration.alter(
       phone: text().nullable(),
     },
   },
-  {
-    down() {
-      this.dropColumn("phone");
-    },
-  },
+  // No down(): an add-only alter derives one. SQL drops `phone`; MongoDB only
+  // removes the ledger row, because `up()` changed no documents.
 );
 ```
 
@@ -287,14 +286,7 @@ export default Migration.alter(
       organization_id: uuid().references(Organization.table).onDelete("cascade").notNullable(),
     },
   },
-  {
-    down() {
-      this.dropColumn("phone");
-      this.dropColumn("login_attempts");
-      this.dropColumn("is_verified");
-      this.dropColumn("organization_id");
-    },
-  },
+  // Add-only: down() is derived (drops the four columns on SQL, ledger-only on MongoDB).
 );
 ```
 
@@ -648,7 +640,8 @@ export default Migration.alter(
   },
   {
     down() {
-      this.dropColumn("full_name");
+      // SQL only: on MongoDB this would erase full_name everywhere.
+      if (!this.isDocumentStore) this.dropColumn("full_name");
     },
   },
 );
@@ -667,11 +660,12 @@ raw: [
 
 ## Writing `down()` — the rollback function
 
-`Migration.alter` **never** auto-infers rollback. Supply `down()` in options whenever you want `cascade migrate:rollback` to work. Inside `down()`, `this` is a full `Migration` instance — every class-form builder is available:
+`Migration.alter` infers a rollback only for an add-only alter. For every other alter, supply `down()` in options whenever you want `cascade migrate:rollback` to work. Inside `down()`, `this` is a full `Migration` instance — every class-form builder is available:
 
 | Operation                       | Class-form call in `down()`                                 |
 | ------------------------------- | ----------------------------------------------------------- |
-| Drop an added column            | `this.dropColumn("name")`                                   |
+| Drop an added column (SQL)      | `if (!this.isDocumentStore) this.dropColumn("name")`        |
+| Unset a field on MongoDB        | `this.dropColumn("name", { destructive: true })`            |
 | Re-add a dropped column         | `this.text("name").nullable()`                              |
 | Undo a rename                   | `this.renameColumn("new", "old")`                           |
 | Undo a column modify            | `this.text("col").notNullable()`                            |
@@ -687,6 +681,31 @@ raw: [
 | Drop vector index               | `this.dropVectorIndex("column")`                            |
 | Drop TTL index                  | `this.dropTTLIndex("column")`                               |
 | Raw SQL                         | `this.raw("SQL statement")`                                 |
+
+### Rolling back on MongoDB
+
+`addColumn` is a no-op on MongoDB: an `add` writes nothing to any document. `dropColumn` is not a no-op, it runs `$unset` on every document. So the conventional `down()` that mirrors `add` with `dropColumn` erases every value stored in that field since the migration shipped.
+
+Cascade handles this in three ways:
+
+- **Add-only alters need no `down()`.** The derived rollback is ledger-only on MongoDB and drops the columns on SQL.
+- **A plain `dropColumn()` / `dropColumns()` inside `down()` is skipped on MongoDB** with a warning; the rollback only updates the ledger. Forward drops (in `up()` or `drop: [...]`) still run.
+- **To really unset a field, say so:** `this.dropColumn("name", { destructive: true })`. Use it when the field was cleaned up by hand or the data is disposable.
+
+`migrate:rollback`, `migrate --fresh` and `warlock migrate --rollback` print a summary of every collection or table dropped and field or column unset (with document counts on MongoDB) before running. Outside development they ask for confirmation; pass `--yes` (or `--force`) in scripts. Without a terminal and without the flag they refuse.
+
+```ts
+export default Migration.alter(
+  User,
+  { add: { legacy_flag: bool().nullable() } },
+  {
+    down() {
+      // Only because the data is disposable. Runs `$unset` on every document.
+      this.dropColumn("legacy_flag", { destructive: true });
+    },
+  },
+);
+```
 
 If a migration is genuinely irreversible, throw inside `down()` so accidental rollbacks fail loudly:
 
@@ -724,7 +743,9 @@ export default Migration.alter(
       this.raw(`UPDATE users SET verified_at = updated_at WHERE status = 'confirmed'`);
     },
     down() {
-      this.dropColumn("verified_at");
+      // A custom up() disables the derived down(). SQL only: on MongoDB this
+      // would erase verified_at everywhere.
+      if (!this.isDocumentStore) this.dropColumn("verified_at");
     },
   },
 );
@@ -754,7 +775,7 @@ export default Migration.alter(
     down() {
       this.dropForeign("team_id", Team.table);
       this.dropIndex("team_id");
-      this.dropColumn("team_id");
+      if (!this.isDocumentStore) this.dropColumn("team_id");
     },
   },
 );
@@ -816,7 +837,7 @@ export default Migration.alter(
       this.dropIndex("idx_cat_status");
       this.renameColumn("price_cents", "price");
       this.text("old_code").nullable();
-      this.dropColumn("sku");
+      if (!this.isDocumentStore) this.dropColumn("sku");
     },
   },
 );
@@ -827,7 +848,8 @@ export default Migration.alter(
 ## Things NOT to do
 
 - **Don't edit a shipped migration.** If it's already run in any environment, add a new migration on top.
-- **Don't skip `down()` for reversible changes.** Without it, `cascade migrate:rollback` is a no-op on your migration.
+- **Don't skip `down()` for reversible changes** other than an add-only alter. Without it, `cascade migrate:rollback` is a no-op on your migration.
+- **Don't mirror `add` with `dropColumn` on MongoDB.** It unsets the field on every document. Omit `down()` for add-only alters, or opt in with `{ destructive: true }`.
 - **Don't put large backfills and schema changes together.** Schema change first (nullable column or default), backfill second — in its own migration or a background job. This keeps rollback safe.
 - **Don't use `raw` for something the declarative API already covers.** Use `addIndex`, `addUnique`, etc. — raw SQL bypasses Cascade's driver abstraction and breaks on non-Postgres sources.
 - **Don't declare `id`, `createdAt`, or `updatedAt`** — they're managed by the framework.
@@ -1196,6 +1218,7 @@ Quick reference:
 | ---------------------- | ------------------------- |
 | 1–2 specific fields    | `user.set(k, v).save()`   |
 | Bulk from an object    | `user.merge(data).save()` |
+| Replace object columns | `user.set(data).save()`   |
 | After spread mutations | `user.save()`             |
 
 ## Remove a field — `.unset(field)`
@@ -1270,13 +1293,29 @@ export class User extends Model<UserSchema> {
 
 `static hidden: string[]` names top-level fields `toJSON()` (and therefore `JSON.stringify(user)` / `res.json(user)`) can **never** emit — stripped whether the model falls back to the raw-document default, uses `toJsonColumns`, or goes through `resource` (hidden wins over all three). Defaults to `[]`, so declaring it is opt-in and nothing changes on an existing model until you add fields — but because that default fails open, cascade logs a one-time `console.warn` per model whose schema declares a credential-shaped column (`password`, `passwordHash`, `secret`, `token`, `apiKey`/`api_key`, case-insensitive) that isn't covered by `hidden`, `resource`, or `toJsonColumns`. Treat that warning as "add this field to `hidden`," not noise to suppress. Prefer `hidden` over remembering to exclude the field from every `toJsonColumns` list by hand — it's enforced regardless of which shaping strategy a given model (or a future refactor) picks.
 
+## Typed reads, snapshots and server-set fields
+
+Type the model with `ModelData<typeof schema>` (the schema's output type) and `get()` / `set()` are checked against it: `get("publishedAt")` is `Date | null`, `get("views")` is `number` when the column has a `.default()`, `get("tilte")` and `set("views", "10")` are type errors. Cascade's system columns need no declaration: `get("id")` is `number`, `get("_id")` is `unknown`, `created_at` / `updated_at` are `Date`, `deleted_at` is `Date | null` (camelCase spellings too); a column the schema declares wins, so a renamed timestamp or a string `id` goes in the schema. A wrong `set()` value reports on the value; to set a column named at runtime, type the key `K extends ModelKey<Schema>` and call `set(key, value)` (a plain `string` key is rejected; `merge({ [key]: value })` is unchecked). A model without a schema type stays loose. Dot paths (`"profile.city"`) are accepted for any column and return `any`; pass a type argument for a precise type.
+
+```ts
+export type PostSchema = ModelData<typeof postSchema>;
+post.toDataSnapshot(); // ModelDataSnapshot<PostSchema>: typed, read-only, `hidden` columns removed
+```
+
+`post.title` is `undefined`: read columns with `get()`. `warlock check` flags it as `WL9021` (`--fix` rewrites it) and, outside production, Cascade warns once per model and column.
+
+Mark a column the server alone sets with `.internal()` (`authorId: v.int().required().internal()`). `Model.create()` and `get()` / `set()` treat it as any column; `Post.requestSchema()` returns the schema without internal fields, and `.pick()`, `.without()` and `.partial()` on it keep their types. The controller passes the value itself: `Post.create({ ...request.validated(), authorId: request.locals.user.id })`.
+
 ## Things NOT to do
 
 - Don't `new User()` to create a record — `User.create({...})` validates, persists, fires events.
 - Don't `.set("relation_name", instance)` for a relation slot. Use `setRelation("name", instance)`.
 - Don't return the raw model from an HTTP route without shaping output. Add `toJsonColumns` or `resource`.
 - Don't rely on `toJsonColumns`/`resource` alone to keep a password or token out of responses — declare it in `static hidden` too; that's the one path enforced no matter which shaping strategy is used, and the only one that survives someone adding a second `resource` later.
+- Don't read a column as a property (`post.title`); use `post.get("title")`.
+- Don't redeclare server-set fields on a request schema; mark them `.internal()` on the model schema and use `Model.requestSchema()`.
 - Don't `await user.save()` and forget the `await` — your changes live only on the instance and never reach the DB.
+- Don't `.merge()` an object column when the value is the complete new one: nested plain objects are deep-merged, so omitted keys stay stored. Use `.set({ column })` or `.set("column", value)` (`warlock check` warns with `WL9025`).
 - Don't expect schema defaults to apply on `.merge()` — defaults fire on `.create()` only.
 
 ## See also
@@ -1737,6 +1776,10 @@ Postgres has no such requirement — transactions work out of the box.
 
 A throw anywhere inside unwinds the **whole** outer transaction — Postgres aborts a transaction on the first error, so there is no automatic per-block savepoint. For independent partial rollback of an inner block, drop to the manual API (`driver.beginTransaction()`) and use savepoints explicitly.
 
+### Manual `beginTransaction()`
+
+`const tx = await driver.beginTransaction()` binds the transaction to the calling async flow: every query that flow runs afterwards (driver calls, models, query builders) uses the session until `tx.commit()` / `tx.rollback()`, then runs with no session, outside any transaction. Concurrent requests, timers and jobs never see it. `tx.context` is the MongoDB session or PostgreSQL client for direct use. Because it attaches to the calling async flow, call it inside the async function that runs the transactional work, and always commit or roll back (`try` / `finally`); prefer `transaction(fn)` unless you need this control.
+
 ## Explicit rollback
 
 The callback receives a transaction context; call `ctx.rollback()` to roll back without throwing:
@@ -1888,8 +1931,13 @@ Product.events().onSaved(() => afterCommit(() => regenerateSitemap()));
 - **Outside a transaction:** runs on the next microtask (the caller does not await it).
 - **Errors** are logged and never change the transaction result or stop the remaining callbacks.
 - Callbacks run after the transaction context has exited, so DB work inside them is **not** part of the finished transaction.
+- `afterCommit()` called from work that runs after the transaction ended (a timer armed inside it) runs on the next microtask.
 
 Use the outbox pattern above instead when the side effect must survive a crash between COMMIT and the callback — `afterCommit` is in-memory.
+
+## Work scheduled inside a transaction (timers, queues, fire-and-forget)
+
+A `setTimeout`, queue push or un-awaited promise started inside `transaction(async () => { ... })` runs after the transaction ended. It runs **outside the transaction, with no session**: its queries are ordinary non-transactional queries, a `transaction()` it starts opens a fresh transaction, and it is **not** rolled back if the transaction rolls back. When it must run only after a successful COMMIT, queue it with `afterCommit(fn)` instead. Do transactional reads and writes before the callback returns.
 
 ## Things NOT to do
 
@@ -2429,7 +2477,10 @@ cascade migrate:export-sql      # write .up.sql / .down.sql instead of executing
 Flags:
 
 - `migrate` — `-f/--fresh` (drop everything and re-run), `-s/--sql` (export SQL instead of executing), `--pending-only`, `-c/--compact`, `-p/--path <glob>`
-- `migrate:rollback` — `-a/--all` (roll back everything), `--batches N`, `-p/--path <glob>`
+- `migrate:rollback` — `-a/--all` (roll back everything), `--batches N`, `-p/--path <glob>`, `-y/--yes` / `--force` (confirm without a prompt)
+
+`migrate:rollback` and `migrate -f` print what they will drop or unset (with document or row counts) first. Outside development they ask for confirmation; in CI pass `--yes`, because without a terminal and without the flag they refuse. Programmatic equivalent: `confirmRollback({ all, batches, yes })` before `rollbackMigrations()`. On MongoDB a plain `dropColumn()` in `down()` is skipped; see the `alter-migration` topic.
+
 - `migrate:export-sql` — `--pending-only`, `-c/--compact`, `-p/--path <glob>`
 
 There is **no** `seed`, `db:create`, or `db:drop-tables` in the standalone binary — those need project context; use the warlock CLI when you have a Warlock app.
@@ -2517,6 +2568,7 @@ Reach for these when you need migrations inside test setup (`beforeAll(async () 
 | Drop everything and re-run     | `cascade migrate -f`                   |
 | Roll back the last batch       | `cascade migrate:rollback`             |
 | Roll back everything           | `cascade migrate:rollback --all`       |
+| Roll back in CI                | `cascade migrate:rollback --yes`       |
 | Generate SQL without executing | `cascade migrate --sql`                |
 | Generate SQL for pending only  | `cascade migrate --sql --pending-only` |
 | See what's been executed       | `cascade migrate:list`                 |
@@ -2935,6 +2987,23 @@ conversation.merge({ lastOutboundAt: new Date() });
 conversation.getDirtyColumns(); // ["lastOutboundAt"]
 ```
 
+### Removed keys survive a merge
+
+Because plain objects merge key-by-key, **omitting a key from a nested object does not remove it**: `model.merge({ filters: { status: "closed" } })` keeps every other stored key of `filters`, and `save()` writes nothing for the missing ones. When the object you pass is the complete new value of the column (an update service where an absent key means "cleared"), replace the column instead:
+
+```ts
+// stored: { filters: { status: "open", owner: "ada" } }
+model.set({ filters: { status: "closed" } }); // many columns, each replaced whole
+model.set("filters", { status: "closed" }); // one column
+model.getDirtyColumns(); // ["filters"]
+
+// a dot path writes only that leaf; siblings survive
+model.set({ "filters.status": "closed" });
+```
+
+`set` always replaces: a top-level key stores the value whole (objects and arrays too), a dot-path key replaces one leaf, and `merge` is the only method that deep-merges. Keys that overlap in one call (`"filters"` with `"filters.status"`) throw before anything is written.
+`set({ ... })` strips identity columns on a persisted model just like `merge()`. `warlock check` flags `merge()` on an object, record or array-of-objects schema column with `WL9025` (a warning, no autofix, since the two methods behave differently).
+
 :::note[Fixed in 4.9.1]
 Before 4.9.1 a `Date` merged over a column that **already held a `Date`** was silently dropped: the merge treated it as a mergeable container and recursed into it, and a `Date` has no own enumerable properties, so nothing was copied. The column never went dirty and `save()` returned `{ success: true, modifiedCount: 0 }` with no `UPDATE` issued. Writing into an empty column always worked, so only overwrites were affected. If you are on 4.9.0 or earlier, upgrade.
 :::
@@ -3072,12 +3141,14 @@ export default class BackfillStatuses extends Migration {
   }
 
   public down(): void {
-    this.dropColumn("status");
+    // SQL only: on MongoDB a plain dropColumn() in down() is skipped, because
+    // it would unset `status` on every document.
+    if (!this.isDocumentStore) this.dropColumn("status");
   }
 }
 ```
 
-Class-form builders include `createTable()` / `createTableIfNotExists()`, `dropTable()` / `dropTableIfExists()`, `dropColumn(name)`, `renameTableTo(name)`, `timestamps()`, `index(...)`, `primaryUuid()`, and `raw(sql)` for a raw statement.
+Class-form builders include `createTable()` / `createTableIfNotExists()`, `dropTable()` / `dropTableIfExists()`, `dropColumn(name, { destructive? })`, `renameTableTo(name)`, `timestamps()`, `index(...)`, `primaryUuid()`, and `raw(sql)` for a raw statement.
 
 ### Foreign-key columns that match the app's PK type — `this.foreignId`
 
@@ -3101,7 +3172,7 @@ export default class AddUserToPosts extends Migration {
   }
 
   public down(): void {
-    this.dropColumn("user_id");
+    if (!this.isDocumentStore) this.dropColumn("user_id");
   }
 }
 ```
@@ -3131,6 +3202,16 @@ public down(): void {
   throw new Error("This migration is irreversible — restore from backup if you need to undo it.");
 }
 ```
+
+### Rollback is not symmetric on MongoDB
+
+On SQL, dropping a column you added undoes `up()`. On MongoDB `up()` added nothing to any document, while `dropColumn` unsets the field on every document and erases what the app stored since. Because of that:
+
+- `Migration.alter(Model, { add: {...} })` with no custom `up`/`down` gets a derived `down()`: SQL drops the columns, MongoDB records the rollback in the ledger only. Do not write a `down()` for it.
+- Inside `down()` on MongoDB, a plain `dropColumn()` / `dropColumns()` is skipped with a warning. Pass `this.dropColumn("field", { destructive: true })` to unset it for real.
+- `migrate:rollback` and `migrate --fresh` print the collections and fields they will drop or unset, with document counts, and outside development ask for confirmation (`--yes` / `--force` for scripts; no terminal and no flag means refusal).
+
+See the `alter-migration` topic for the full rules.
 
 ## Data-source-aware migrations
 

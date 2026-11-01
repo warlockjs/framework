@@ -18,7 +18,7 @@
     "test:mdx-guard": "node --test scripts/check-tab-code-fences.test.mjs",
     "predev": "node scripts/generate-changelog.mjs && node scripts/generate-skills.mjs",
     "prestart": "node scripts/generate-changelog.mjs && node scripts/generate-skills.mjs",
-    "prebuild": "node scripts/check-mdx-in-md.mjs && node scripts/check-tab-code-fences.mjs && node scripts/generate-changelog.mjs && node scripts/check-changelog-freshness.mjs && node scripts/generate-skills.mjs",
+    "prebuild": "node scripts/check-mdx-in-md.mjs && node scripts/check-tab-code-fences.mjs && node scripts/generate-changelog.mjs && node scripts/check-changelog-freshness.mjs && node scripts/generate-skills.mjs && node scripts/generate-site-llms.mjs",
     "dev": "astro dev",
     "start": "astro dev",
     "build": "astro build && node scripts/check-mdx-gfm.mjs",
