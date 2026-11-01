@@ -30,8 +30,6 @@ await cache.extend("session.1", "10m"); // now expires in 10 minutes, not 14
 
 Calling it with a shorter `ttl` than the time left shortens the entry. If you only ever want to lengthen, compare first, or keep the `ttl` you pass at least as long as the original.
 
-Laravel calls this `Cache::touch`.
-
 ## Accepted `ttl` values
 
 The same forms `set` accepts:

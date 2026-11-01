@@ -34,7 +34,7 @@ const PROJECT_ROOT = path.resolve(DOCS_ROOT, "..", "..");
 
 // Sections used to be hardcoded to the five Diátaxis names. Now we
 // auto-discover any directory under `domains/<pkg>/docs/` so packages
-// can choose their own structure (Diátaxis or Laravel-style domains
+// can choose their own structure (Diátaxis or domain sections
 // per the blueprint).
 
 const pkg = process.argv[2];

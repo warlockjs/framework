@@ -69,7 +69,7 @@ The sweet spot is **backend-shaped validation**:
 - Form payload validation on the server, with the same schema reused on the client through Standard Schema.
 - Config-file parsing, where `.catch(fallback)` rescues bad values without crashing boot.
 
-If you need Laravel-style cross-field rules out of the box (`requiredIf`, `requiredWith`, `sameAs`, `presentIfNotIn`, …) or built-in translation hooks for error messages, seal is comfortable there. If you're building a frontend SPA where bundle size dominates, the lighter options below are worth considering.
+If you need declarative cross-field rules out of the box (`requiredIf`, `requiredWith`, `sameAs`, `presentIfNotIn`, …) or built-in translation hooks for error messages, seal is comfortable there. If you're building a frontend SPA where bundle size dominates, the lighter options below are worth considering.
 
 ## Comparison frame
 
@@ -80,9 +80,9 @@ A quick honest read on where seal sits next to the obvious alternatives.
 Zod is the default for many TypeScript projects, and the comparison is the one most readers reach for first.
 
 - **Where Zod wins.** Type inference precision (Zod carries `.optional()` / `.default()` brands more aggressively into the output type), ecosystem depth, smaller idiomatic bundle, larger community of recipes.
-- **Where seal wins.** Cross-field rules at Laravel scale (60+ conditional methods with explicit `sibling` / `global` scoping), built-in i18n via `configureSeal({ translateRule, translateAttribute })`, broader JSON Schema dialect support including a dedicated `openai-strict` target, immutable-by-default chains so shared schemas can't be mutated by accident.
+- **Where seal wins.** Declarative cross-field rules (60+ conditional methods with explicit `sibling` / `global` scoping), built-in i18n via `configureSeal({ translateRule, translateAttribute })`, broader JSON Schema dialect support including a dedicated `openai-strict` target, immutable-by-default chains so shared schemas can't be mutated by accident.
 
-If you live and breathe Zod, seal will read as familiar but Laravel-flavoured. The `.email()` / `.min(3)` / `.optional()` chain shape is identical; the conditional-required surface and translation hooks are where the design diverges.
+If you live and breathe Zod, seal will read as familiar. The `.email()` / `.min(3)` / `.optional()` chain shape is identical; the conditional-required surface and translation hooks are where the design diverges.
 
 ### vs Valibot
 

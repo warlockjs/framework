@@ -4,7 +4,7 @@
     "matrix": "none",
     "headline": "Sliding cache expiry, idempotent runs, probabilistic cache structures, job timeouts, and fewer AI model calls.",
     "highlights": [
-      "`cache.extend(key, ttl)` keeps a value and resets its expiry to `ttl` from now, on every driver (Laravel's `Cache::touch`).",
+      "`cache.extend(key, ttl)` keeps a value and resets its expiry to `ttl` from now, on every driver.",
       "`idempotent(key, fn, { ttl })` runs concurrent calls with one key once and replays the stored result within `ttl`: the Idempotency-Key pattern for payments, webhooks and retried jobs.",
       "`cache.structures` adds Bloom and Cuckoo filters, a HyperLogLog unique counter and a Count-Min frequency tracker with Top-K, on Redis and the memory drivers.",
       "Jobs take `timeout` and `failOnTimeout`: an attempt that runs too long fails with `JobTimeoutError`, and handlers get `ctx.signal` to stop work.",

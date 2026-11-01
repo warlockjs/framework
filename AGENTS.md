@@ -20,6 +20,9 @@ agent-kit derives each agent's guide (CLAUDE.md, etc.) from this file.
 - Every code change ships with its tests, docs and a `CHANGELOG.md` entry in the
   same change.
 - No `.js` extensions in import paths. Use `type`, never `kind`, for discriminators.
+- Never present Warlock.js as following another framework. Public text (docs,
+  changelogs, skills, release notes, code comments) describes our APIs on their
+  own terms: no "Laravel calls this …", "Laravel-style", or "matches Rails".
 
 ## Skills
 

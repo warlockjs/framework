@@ -6,7 +6,7 @@ sidebar:
   label: "Background work"
 ---
 
-Let's be honest up front: **`@warlock.js/core` does not ship a distributed job queue.** There is no `dispatch(job)`, no worker process, no Redis-backed retry table, no "jobs" directory. If you came here looking for Laravel queues or BullMQ baked into core, it isn't here — and pretending otherwise would set you up for a bad time.
+Let's be honest up front: **`@warlock.js/core` does not ship a distributed job queue.** There is no `dispatch(job)`, no worker process, no Redis-backed retry table, no "jobs" directory. If you came here looking for a job queue baked into core, it isn't here — and pretending otherwise would set you up for a bad time.
 
 What core _does_ give you are two small, honest primitives for moving work off the critical path **inside a single process**, plus a clear pointer to the packages that own real background infrastructure. This page draws those boundaries so nobody ships a "background job" that silently dies on the next deploy.
 

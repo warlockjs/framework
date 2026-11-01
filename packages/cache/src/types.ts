@@ -962,7 +962,7 @@ export interface CacheDriver<ClientType, Options> {
    * The deadline is RESET to `ttl` from the moment of the call; `ttl` is not
    * added to the time the entry had left. Resolves to `false` when the key is
    * missing or already expired (nothing is created). `0` or `Infinity` removes
-   * the expiry. Equivalent to Laravel's `Cache::touch`.
+   * the expiry.
    *
    * @param key The cache key
    * @param ttl Seconds, or a duration string such as `"30m"`

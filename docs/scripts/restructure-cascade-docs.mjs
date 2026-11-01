@@ -2,7 +2,7 @@
 /**
  * Restructures `domains/cascade/docs/` from Diátaxis layout
  * (getting-started / essentials / guides / recipes / reference) into
- * Laravel-style domain sections (getting-started / architecture-concepts
+ * domain sections (getting-started / architecture-concepts
  * / the-basics / digging-deeper / cli / recipes / reference).
  *
  * Same pattern as `restructure-core-docs.mjs`. Idempotent.

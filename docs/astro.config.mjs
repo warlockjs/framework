@@ -112,9 +112,8 @@ const sitemapSections = [
   { label: "Reference", dir: "reference", collapsed: true },
 ];
 
-// Laravel-style domain section list for "broad" packages (Core, Cascade,
-// AI). Inspired by Laravel's `Getting Started / Architecture Concepts /
-// The Basics / Digging Deeper / …` structure.
+// Domain section list for "broad" packages (Core, Cascade, AI):
+// `Getting Started / Architecture Concepts / The Basics / Digging Deeper / …`.
 const coreSections = [
   { label: "Getting Started", dir: "getting-started", collapsed: false },
   { label: "Architecture Concepts", dir: "architecture-concepts", collapsed: true },
@@ -240,7 +239,7 @@ const webSections = [
   { label: "Guides", dir: "guides", collapsed: true },
 ];
 
-// AI uses domain sections instead of the Laravel-style Basics/Deeper
+// AI uses domain sections instead of the Basics/Deeper
 // split — the package outgrew it (restructured 2026-07-04, see
 // scripts/restructure-ai-docs.mjs; old URLs live on via `redirects`
 // below). Each dir autogenerates one sidebar group; page order within a

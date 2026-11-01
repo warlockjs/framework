@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Restructures `domains/core/docs/` from Diátaxis layout
- * (getting-started / essentials / guides / recipes) into Laravel-style
+ * (getting-started / essentials / guides / recipes) into domain
  * domain sections (getting-started / architecture-concepts / the-basics
  * / digging-deeper / cli / testing / recipes).
  *

@@ -142,7 +142,7 @@
       "isUnreleased": false,
       "headlineHtml": "Sliding cache expiry, idempotent runs, probabilistic cache structures, job timeouts, and fewer AI model calls.",
       "highlights": [
-        "<code>cache.extend(key, ttl)</code> keeps a value and resets its expiry to <code>ttl</code> from now, on every driver (Laravel's <code>Cache::touch</code>).",
+        "<code>cache.extend(key, ttl)</code> keeps a value and resets its expiry to <code>ttl</code> from now, on every driver.",
         "<code>idempotent(key, fn, { ttl })</code> runs concurrent calls with one key once and replays the stored result within <code>ttl</code>: the Idempotency-Key pattern for payments, webhooks and retried jobs.",
         "<code>cache.structures</code> adds Bloom and Cuckoo filters, a HyperLogLog unique counter and a Count-Min frequency tracker with Top-K, on Redis and the memory drivers.",
         "Jobs take <code>timeout</code> and <code>failOnTimeout</code>: an attempt that runs too long fails with <code>JobTimeoutError</code>, and handlers get <code>ctx.signal</code> to stop work.",
@@ -197,7 +197,7 @@
           "items": [
             {
               "type": "Added",
-              "html": "<code>cache.extend(key, ttl)</code> keeps a cached value and resets its expiry to <code>ttl</code> from now (a sliding expiry such as \"keep the session another 30 minutes\"). It does not add <code>ttl</code> to the time left, resolves to <code>false</code> for a missing or expired key, and accepts the same seconds and duration strings as <code>set</code> (<code>0</code> or <code>Infinity</code> removes the expiry). It is implemented on every driver (Redis <code>PEXPIRE</code>, Postgres <code>UPDATE</code>, in-place on the memory family and mock, read-and-rewrite on <code>file</code> and on custom <code>BaseCacheDriver</code> subclasses) and forwarded by namespaces and tagged caches. Laravel calls this <code>Cache::touch</code>."
+              "html": "<code>cache.extend(key, ttl)</code> keeps a cached value and resets its expiry to <code>ttl</code> from now (a sliding expiry such as \"keep the session another 30 minutes\"). It does not add <code>ttl</code> to the time left, resolves to <code>false</code> for a missing or expired key, and accepts the same seconds and duration strings as <code>set</code> (<code>0</code> or <code>Infinity</code> removes the expiry). It is implemented on every driver (Redis <code>PEXPIRE</code>, Postgres <code>UPDATE</code>, in-place on the memory family and mock, read-and-rewrite on <code>file</code> and on custom <code>BaseCacheDriver</code> subclasses) and forwarded by namespaces and tagged caches."
             },
             {
               "type": "Added",

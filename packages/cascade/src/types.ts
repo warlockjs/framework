@@ -449,8 +449,8 @@ export type RelationDefaults = {
    * Ordering rule used to derive the default pivot-table name for
    * `@BelongsToMany` relations when no explicit `pivot` is given.
    *
-   * - `"alphabetical"` — snake names sorted alphabetically (Laravel/Rails
-   *   default). `Post` + `Tag` → `post_tag`. Same result regardless of
+   * - `"alphabetical"` — snake names sorted alphabetically (the common
+   *   ORM default). `Post` + `Tag` → `post_tag`. Same result regardless of
    *   which side declares the relation.
    * - `"owner_first"` — owner's snake name first, related's snake name
    *   second. `Post` declares `@BelongsToMany("Tag")` → `post_tag`;

@@ -89,7 +89,7 @@ function keyName(input: string, options?: KeyConventionOptions): string {
  *
  * The FK lives on THIS model (the owner of the `belongsTo` def) and is
  * named after the *role* the relation plays — not the target model class.
- * Matches Laravel/Rails convention: `Post.author_id` (not `Post.user_id`)
+ * The common ORM convention: `Post.author_id` (not `Post.user_id`)
  * because the relation is named "author".
  *
  * @param relationName - The relation key as declared in `static relations`
@@ -143,7 +143,7 @@ export function inferPivotKey(modelName: string, options?: KeyConventionOptions)
 /**
  * Default pivot-table name for a many-to-many relation when none is
  * explicitly configured. Joins the two model snake-names alphabetically
- * with an underscore — matches Laravel/Rails convention.
+ * with an underscore, the common ORM convention.
  *
  * Alphabetical ordering means the same pivot name resolves regardless of
  * which side of the relation declares the `@BelongsToMany`, so

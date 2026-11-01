@@ -242,7 +242,7 @@ The trick: don't try to recursively `.with("parent.parent.parent...")` for unbou
 
 ## Polymorphic relations — not first-class, but doable
 
-Cascade doesn't ship dedicated polymorphic helpers (the Laravel-style `morphTo` / `morphMany`). The standalone way to model "a Comment that can belong to a Post or a Video" is to store the type discriminator and id explicitly:
+Cascade doesn't ship dedicated polymorphic helpers (`morphTo` / `morphMany`). The standalone way to model "a Comment that can belong to a Post or a Video" is to store the type discriminator and id explicitly:
 
 ```ts
 // Comment has commentable_type ("Post" | "Video") and commentable_id
