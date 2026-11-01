@@ -81,11 +81,12 @@ await sendInvoice.dispatch(
     jobId: "invoice:43", // dispatching again with a still-live id is a no-op — idempotent dispatch
     attempts: 3, // overrides defineJob's attempts for this call only
     backoff: { type: "fixed", delay: 500 },
+    timeout: "30s", // overrides defineJob's per-attempt time limit — see Retry and failed jobs
   },
 );
 ```
 
-Option precedence for `attempts` / `backoff`: dispatch options >
+Option precedence for `attempts` / `backoff` / `timeout`: dispatch options >
 `defineJob` > `queue.defaultJobOptions`.
 
 ## Read a job

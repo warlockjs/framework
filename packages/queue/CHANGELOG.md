@@ -4,6 +4,13 @@ All notable changes to `@warlock.js/queue` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.43.0
+
+### Added
+
+- Job timeouts: `defineJob({ timeout: "2m", failOnTimeout?: boolean })`, also accepted per dispatch and in `queue.defaultJobOptions` (dispatch > `defineJob` > defaults). An attempt that outlives its limit fails with the new exported `JobTimeoutError` (job name, limit in `timeout`, `failOnTimeout`), so failed jobs and events show a clear reason, and normal `attempts` and `backoff` apply. `failOnTimeout: true` fails the job without retrying (BullMQ `UnrecoverableError` on Redis). Enforced in the shared processing path, so BullMQ, `local` and `memory` behave the same. A zero, negative or unparsable timeout throws.
+- `ctx.signal` is now passed to handlers on every driver whenever the job has a `timeout`, and aborts with the `JobTimeoutError`. A handler that ignores the signal keeps running in the background after its attempt fails, so pass the signal to `fetch` and database calls.
+
 ## 5.34.3 - 2026-10-20
 
 ### Changed

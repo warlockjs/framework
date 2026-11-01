@@ -4,6 +4,7 @@ import { getQueueContext, wrapPayload } from "./queue-context";
 import { queueOf, registerJob, type RegisteredJob } from "./job-registry";
 import { getQueueDriver } from "./queue-driver";
 import { resolveJobOptions } from "./job-options";
+import { assertFailOnTimeout, resolveTimeout } from "./job-timeout";
 import type { JobDefinition, JobSnapshot, QueueJob } from "./types";
 
 /**
@@ -93,4 +94,16 @@ function assertValidDefinition(definition: JobDefinition<unknown, unknown>): voi
       `defineJob("${definition.name}"): \`attempts\` must be an integer >= 1, got ${definition.attempts}.`,
     );
   }
+
+  if (definition.timeout !== undefined) {
+    try {
+      resolveTimeout(definition.timeout);
+    } catch (error) {
+      throw new InvalidJobDefinitionError(
+        `defineJob("${definition.name}"): ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  assertFailOnTimeout(definition.failOnTimeout);
 }

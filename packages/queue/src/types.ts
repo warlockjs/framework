@@ -42,6 +42,17 @@ export type JobOptions = {
   removeOnComplete?: JobRetention;
   /** Retention for failed jobs. Default keeps them, so `failedJobs()` can list them. */
   removeOnFail?: JobRetention;
+  /**
+   * Longest one attempt may run: milliseconds or a string like `"2m"`. An
+   * attempt that exceeds it fails with `JobTimeoutError` and `ctx.signal`
+   * aborts. Must be greater than zero. Default: no limit.
+   */
+  timeout?: Duration;
+  /**
+   * Fail the job for good when it times out instead of retrying it.
+   * Default `false`: a timeout is an ordinary failed attempt.
+   */
+  failOnTimeout?: boolean;
 };
 
 /**
@@ -136,7 +147,11 @@ export type JobContext = {
   log(line: string): Promise<void>;
   /** State captured at dispatch by the registered queue context, if any. */
   context: unknown;
-  /** Aborted when a local/memory worker loses its lease or shutdown times out. */
+  /**
+   * Aborted when the attempt times out and, on local/memory workers, when
+   * the worker loses its lease or shutdown times out. Present whenever the
+   * job has a `timeout`.
+   */
   signal?: AbortSignal;
 };
 
@@ -174,6 +189,10 @@ export type DispatchOptions = {
   attempts?: number;
   /** Override the job's backoff for this dispatch. */
   backoff?: JobBackoff;
+  /** Override the job's timeout for this dispatch. */
+  timeout?: Duration;
+  /** Override the job's `failOnTimeout` for this dispatch. */
+  failOnTimeout?: boolean;
 };
 
 /** What `dispatch` resolves with. */

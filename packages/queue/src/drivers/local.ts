@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { log } from "@warlock.js/logger";
 import type { DriverDispatch, QueueDriver } from "../driver";
-import { FailedJobNotFoundError, UnrecoverableJobError } from "../errors";
+import { FailedJobNotFoundError, JobTimeoutError, UnrecoverableJobError } from "../errors";
+import { createJobAbort } from "../job-timeout";
 import { findRegisteredJob } from "../job-registry";
 import { getQueueContext, unwrapPayload } from "../queue-context";
 import type { DispatchedJob, FailedJob, JobContext, JobSnapshot, QueueConfig } from "../types";
@@ -228,6 +229,7 @@ export class LocalDriver implements QueueDriver {
 
   private async execute(entry: ActiveJob): Promise<void> {
     const { job, token, controller } = entry;
+    const abort = createJobAbort(job.name, job.options, controller.signal);
     try {
       const definition = findRegisteredJob(job.name);
       if (!definition)
@@ -242,7 +244,7 @@ export class LocalDriver implements QueueDriver {
         attempt: job.attemptsMade + 1,
         maxAttempts: job.options.attempts ?? 1,
         context: captured,
-        signal: controller.signal,
+        signal: abort.signal,
         progress: async (value) => {
           if (
             !this.mutate(job, token, (current) => {
@@ -263,9 +265,9 @@ export class LocalDriver implements QueueDriver {
       const run = async () => definition.handle(payload, context);
       const queueContext = getQueueContext();
       const result = jsonCopy(
-        captured !== undefined && queueContext
-          ? await queueContext.restore(captured, run)
-          : await run(),
+        await abort.guard(async () =>
+          captured !== undefined && queueContext ? queueContext.restore(captured, run) : run(),
+        ),
       );
       this.mutate(
         job,
@@ -294,6 +296,7 @@ export class LocalDriver implements QueueDriver {
           delete current.token;
           if (
             error instanceof UnrecoverableJobError ||
+            (error instanceof JobTimeoutError && error.failOnTimeout) ||
             current.attemptsMade >= (current.options.attempts ?? 1)
           ) {
             current.state = "failed";
@@ -311,6 +314,8 @@ export class LocalDriver implements QueueDriver {
         },
         true,
       );
+    } finally {
+      abort.dispose();
     }
   }
 
@@ -379,6 +384,8 @@ function validateOptions({ options }: DriverDispatch): void {
     (!Number.isInteger(options.priority) || options.priority < 0 || options.priority > 2_097_152)
   )
     throw new Error("priority must be an integer between 0 and 2097152.");
+  if (options.timeout !== undefined && !(Number.isFinite(options.timeout) && options.timeout > 0))
+    throw new Error("timeout must be a positive finite number of milliseconds.");
   const backoff = options.backoff;
   const delay = typeof backoff === "number" ? backoff : (backoff?.delay ?? 0);
   if (

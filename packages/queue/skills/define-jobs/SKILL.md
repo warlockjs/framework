@@ -1,6 +1,6 @@
 ---
 name: define-jobs
-description: 'Define and dispatch background jobs with `@warlock.js/queue`: `defineJob({ name, queue?, attempts?, backoff?, removeOnComplete?, removeOnFail?, handle(payload, ctx) })` returns a typed job; `job.dispatch(payload, { delay, priority, jobId, attempts, backoff })`; the handler context (`id`, `attempt`, `maxAttempts`, `progress()`, `log()`); reading a job with `job.find(id)`. Triggers: `setDispatchInterceptor`, `queueFake`, `defineJob`, `.dispatch(`, `ctx.progress`, `JobContext`, `DispatchOptions`, `backoff`, `attempts`, `priority`, `jobId`; "run this in the background", "retry with backoff", "delay a job", "job progress", "idempotent dispatch". Skip: config and workers — the `configure-queue` topic; failed jobs — the `manage-failed-jobs` topic.'
+description: 'Define and dispatch background jobs with `@warlock.js/queue`: `defineJob({ name, queue?, attempts?, backoff?, timeout?, failOnTimeout?, removeOnComplete?, removeOnFail?, handle(payload, ctx) })` returns a typed job; `job.dispatch(payload, { delay, priority, jobId, attempts, backoff, timeout, failOnTimeout })`; the handler context (`id`, `attempt`, `maxAttempts`, `progress()`, `log()`); reading a job with `job.find(id)`. Triggers: `setDispatchInterceptor`, `queueFake`, `defineJob`, `.dispatch(`, `ctx.progress`, `JobContext`, `DispatchOptions`, `backoff`, `attempts`, `priority`, `jobId`; "run this in the background", "retry with backoff", "delay a job", "job progress", "idempotent dispatch". Skip: config and workers — the `configure-queue` topic; failed jobs — the `manage-failed-jobs` topic.'
 ---
 
 # Define and dispatch jobs
@@ -37,6 +37,10 @@ await sendInvoice.dispatch(
   },
 );
 ```
+
+## Timeouts
+
+`timeout: "2m"` (ms or duration string, must be > 0) fails an attempt that runs too long with `JobTimeoutError`; `attempts`/`backoff` still apply. `failOnTimeout: true` fails the job without retrying. Works on all drivers; set in `defineJob`, dispatch options or `queue.defaultJobOptions`. `ctx.signal` aborts on timeout: pass it to `fetch`/db calls. A handler that ignores it keeps running in the background (JS cannot kill it).
 
 Option precedence: dispatch options > `defineJob` > `queue.defaultJobOptions`.
 

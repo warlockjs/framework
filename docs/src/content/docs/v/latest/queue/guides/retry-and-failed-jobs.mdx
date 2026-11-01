@@ -34,6 +34,48 @@ before each retry. Attempts and backoff can also be set app-wide in
 An unrecoverable failure — no handler registered for the job's name —
 skips retries entirely and fails on the first attempt.
 
+## Timeouts
+
+Give a job a `timeout` so one stuck attempt cannot hold a worker forever:
+
+```ts
+export const renderReport = defineJob({
+  name: "reports.render",
+  attempts: 3,
+  backoff: 5000,
+  timeout: "2m", // milliseconds, or "500ms" | "30s" | "2m" | "1h" | "1d"
+  async handle(payload: { reportId: string }, ctx) {
+    // Pass the signal on so the work really stops when the time is up.
+    const response = await fetch(reportUrl(payload.reportId), { signal: ctx.signal });
+    return response.json();
+  },
+});
+```
+
+When an attempt runs past the limit it fails with a `JobTimeoutError`
+(`Job "reports.render" timed out after 120000ms.`), which is the failed
+reason you see in `failedJobs()` and the dashboard. It is an ordinary failed
+attempt, so `attempts` and `backoff` apply and the job retries. Set
+`failOnTimeout: true` to fail the job immediately instead, with no further
+attempts — use it when running again would only time out again.
+
+`timeout` and `failOnTimeout` can be set in `defineJob`, per dispatch, and
+app-wide in `queue.defaultJobOptions`, with the usual precedence: dispatch
+options > `defineJob` > `queue.defaultJobOptions`. A timeout that is zero,
+negative or not a valid duration throws instead of being ignored.
+
+The limit works the same on the BullMQ, `local` and `memory` drivers.
+BullMQ has no job timeout of its own, so Warlock enforces it in the worker.
+
+:::caution
+JavaScript cannot kill a running promise. On timeout the attempt is marked
+failed and `ctx.signal` aborts, but a handler that ignores the signal keeps
+running in the background until it finishes by itself, possibly while the
+retry starts. Pass `ctx.signal` to `fetch`, database clients and other
+cancellable calls (or check `ctx.signal?.throwIfAborted()` between steps), and
+keep side effects idempotent.
+:::
+
 ## Listing failed jobs
 
 ```ts

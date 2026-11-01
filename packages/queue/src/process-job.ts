@@ -1,5 +1,6 @@
 import { type Job, UnrecoverableError } from "bullmq";
-import { UnrecoverableJobError } from "./errors";
+import { JobTimeoutError, UnrecoverableJobError } from "./errors";
+import { createJobAbort, type JobTimeoutSettings } from "./job-timeout";
 import { findRegisteredJob } from "./job-registry";
 import { getQueueContext, unwrapPayload } from "./queue-context";
 import type { JobContext } from "./types";
@@ -24,6 +25,8 @@ export async function processJob(job: Job): Promise<unknown> {
 
   const { payload, context: captured } = unwrapPayload(job.data);
 
+  const abort = createJobAbort(job.name, job.opts as unknown as JobTimeoutSettings);
+
   const context: JobContext = {
     id: String(job.id),
     name: job.name,
@@ -35,20 +38,28 @@ export async function processJob(job: Job): Promise<unknown> {
       await job.log(line);
     },
     context: captured,
+    signal: abort.signal,
   };
 
   const run = async () => definition.handle(payload, context);
   const queueContext = getQueueContext();
 
   try {
-    return captured !== undefined && queueContext
-      ? await queueContext.restore(captured, run)
-      : await run();
+    return await abort.guard(async () =>
+      captured !== undefined && queueContext ? queueContext.restore(captured, run) : run(),
+    );
   } catch (error) {
     if (error instanceof UnrecoverableJobError) {
       throw new UnrecoverableError(error.message);
     }
 
+    // Unlike a plain timeout, this one must not burn the remaining attempts.
+    if (error instanceof JobTimeoutError && error.failOnTimeout) {
+      throw new UnrecoverableError(error.message);
+    }
+
     throw error;
+  } finally {
+    abort.dispose();
   }
 }

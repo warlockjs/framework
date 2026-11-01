@@ -71,3 +71,22 @@ export class UnrecoverableJobError extends Error {
     this.name = "UnrecoverableJobError";
   }
 }
+
+/**
+ * The failure recorded when a job attempt outlives its `timeout`. It appears
+ * as the failed reason of the attempt and as the abort reason of
+ * `ctx.signal`. With `failOnTimeout` the job is not retried.
+ */
+export class JobTimeoutError extends Error {
+  public constructor(
+    /** The job name. */
+    public readonly jobName: string,
+    /** The limit that was exceeded, in milliseconds. */
+    public readonly timeout: number,
+    /** Whether the job fails without retrying. */
+    public readonly failOnTimeout = false,
+  ) {
+    super(`Job "${jobName}" timed out after ${timeout}ms.`);
+    this.name = "JobTimeoutError";
+  }
+}
