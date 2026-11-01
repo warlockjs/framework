@@ -22,7 +22,9 @@ The `cache` singleton (a `CacheManager`) fronts one active driver. Everything, f
 4. Invalidate in groups: `use-cache-tags.md` or `use-cache-namespace.md`.
 5. Stampede protection and freshness: `use-swr.md`, `use-cache-lock.md`.
 6. TTL constants, key parsing and vector helpers: `use-cache-utils.md`.
-7. Test with the mock driver: `test-cache-code.md`; errors and metrics: `handle-cache-errors.md`, `observe-cache.md`.
+7. Keep sessions alive and run work once: `use-cache-extend.md` (sliding expiry), `use-cache-idempotent.md` (payments, webhooks, retried jobs).
+8. Probabilistic structures (Bloom, cuckoo, unique counter, frequency): `use-cache-structures.md`.
+9. Test with the mock driver: `test-cache-code.md`; errors and metrics: `handle-cache-errors.md`, `observe-cache.md`.
 
 ## Conventions and pitfalls
 
@@ -1213,6 +1215,63 @@ returned promise rejects.
 - The `use-cache-tags` topic — invalidate a batch by tag
 
 
+## use-cache-extend  `@warlock.js/cache/skills/use-cache-extend/SKILL.md`
+
+---
+name: use-cache-extend
+description: 'Sliding expiry via cache.extend(key, ttl) — keeps the value and resets expiry to ttl from now (not added to time left); false when the key is missing. Triggers: `cache.extend`, "keep the session alive", "sliding expiration", "touch a cache key", Laravel `Cache::touch`. Skip: refresh the value — `cache.set`; slide on every read — `memoryExtended` driver in `pick-cache-driver`.'
+---
+
+# `cache.extend(key, ttl)` — sliding expiry
+
+Keeps the cached value and makes it expire `ttl` from now. Resolves to `true` when extended, `false` when the key is missing or already expired (nothing is created).
+
+```ts
+const alive = await cache.extend(`session.${id}`, "30m");
+```
+
+## Rules
+
+- It RESETS the deadline to `ttl` from the call. It does not add `ttl` to the time left: a 10-minute entry with 4 minutes left, extended by `"10m"`, expires in 10 minutes, not 14. A shorter `ttl` shortens the entry.
+- `ttl` takes the same forms as `set`: seconds or a duration string. `0` or `Infinity` removes the expiry. Negative, `NaN` or an unparseable string throws `CacheConfigurationError`.
+- Works on `cache`, `cache.namespace(...)` (key is prefixed) and `cache.tags(...)` (tags untouched).
+- Redis uses one atomic `PEXPIRE`; `pg` one `UPDATE`; memory drivers update in place; `file` and custom `BaseCacheDriver` subclasses read and rewrite the value. `null` always returns `false`.
+- Laravel calls this `Cache::touch`.
+
+Docs: `/v/latest/cache/extend/`.
+
+
+## use-cache-idempotent  `@warlock.js/cache/skills/use-cache-idempotent/SKILL.md`
+
+---
+name: use-cache-idempotent
+description: 'Run-once-per-key via idempotent(key, fn, {ttl}) or cache.idempotent — concurrent calls share one run, repeats within ttl replay the stored result, ttl 0 is in-flight dedupe only, failures are never stored. Triggers: `idempotent`, "Idempotency-Key", "dedupe payment", "webhook delivered twice", "retried job". Skip: skip-if-busy lock — `use-cache-lock`; HTTP header middleware — core `idempotency` middleware.'
+---
+
+# `idempotent(key, fn, { ttl })`
+
+```ts
+import { idempotent } from "@warlock.js/cache";
+
+const charge = await idempotent(`charge.${order.id}`, () => gateway.charge(order), { ttl: "24h" });
+```
+
+`cache.idempotent(...)` is the same call on the manager.
+
+## Behaviour
+
+- Concurrent calls with one key share a single run (per process).
+- Repeat calls within `ttl` return the stored result without calling `fn`. Falsy, `null` and `undefined` results are stored too.
+- `ttl: 0` is pure in-flight dedupe: nothing is read from or written to the cache.
+- A run that throws stores nothing; all callers sharing it get the error; the next call runs `fn` again.
+- Results live in the cache store under `idempotent.<key>`, so with Redis or Postgres a result is shared across servers.
+- Two servers at the same instant each run `fn` unless `distributed: true`, which takes the cache lock (`lockTtl`, default `"30s"`, must exceed `fn`'s duration); waiters read the stored result, take over if the holder fails, and throw `CacheConcurrencyError` after `lockTtl`.
+- If storing the result fails, the result is still returned and the failure is logged.
+- Options: `ttl` (required), `distributed`, `lockTtl`, `driver`.
+
+Docs: `/v/latest/cache/idempotent/`.
+
+
 ## use-cache-list  `@warlock.js/cache/skills/use-cache-list/SKILL.md`
 
 ---
@@ -1599,6 +1658,57 @@ See the `configure-pg-cache` topic.
 - Don't mix vector dimensions in the same driver — re-embed when models change.
 - Don't expect `similar()` to surface a missing vector (`set` without the `vector` option). Plain KV entries stay out of the similarity index.
 - Don't use `topK: 0` or negative — `pg` rejects with `CacheConfigurationError`; memory drivers return `[]` but it's a code smell.
+
+
+## use-cache-structures  `@warlock.js/cache/skills/use-cache-structures/SKILL.md`
+
+---
+name: use-cache-structures
+description: 'Probabilistic structures on the cache manager — cache.structures.bloom, cuckoo, uniqueCounter (HyperLogLog, .merge), frequency (Count-Min + Top-K) on redis and memory drivers. Triggers: `cache.structures`, "username taken check", "daily active users", "top search terms", "bloom filter"; other drivers throw `CacheUnsupportedError`. Skip: exact sets — `cache.list`; exact counters — `use-cache-atomic`.'
+---
+
+# `cache.structures`
+
+Small structures that trade a known error for tiny memory. Supported on `redis` (RedisBloom when present, plain Redis otherwise) and `memory` / `memoryExtended` / `lru`. All other drivers throw `CacheUnsupportedError`. Every structure takes `ttl`, applied when it is first written and never pushed back.
+
+```ts
+const names = cache.structures.bloom("users.usernames", {
+  expectedItems: 1_000_000,
+  errorRate: 0.01,
+});
+await names.add("hasan");
+await names.mightContain(input); // false = definitely free
+
+const banned = cache.structures.cuckoo("users.banned", { expectedItems: 100_000 });
+await banned.add(id);
+await banned.remove(id); // only remove what was added
+
+const dau = cache.structures.uniqueCounter(`stats.dau.${today}`, { ttl: "40d" });
+await dau.add(userId);
+await dau.count();
+await cache.structures.uniqueCounter.merge(lastSevenDaysKeys).count();
+
+const terms = cache.structures.frequency("search.terms", {
+  width: 2000,
+  depth: 5,
+  topK: 100,
+  ttl: "1h",
+});
+await terms.add(term);
+await terms.estimate("laptop");
+await terms.top(10); // [{ value, count }]
+```
+
+## Facts
+
+- Bloom: 1M items at 1% is about 1.2 MB, 7 hashes. No removal, no listing. Not for exact "yes" decisions.
+- Cuckoo: real filter on RedisBloom; a counting Bloom filter elsewhere. Removing a never-added item corrupts it.
+- Unique counter: 12 KB, standard error 0.81%. Cannot answer "was X counted". Not for billing.
+- Frequency: 2000 x 5 is about 40 KB. Estimates are never below the true count. Not for rare values.
+- Keys follow the driver prefix and are stored as `structures.<kind>.<key>`.
+- A custom driver opts in with `structuresBackend(): CacheStructuresBackend`.
+
+Docs: `/v/latest/cache/structures/`.
 
 
 ## use-cache-tags  `@warlock.js/cache/skills/use-cache-tags/SKILL.md`
