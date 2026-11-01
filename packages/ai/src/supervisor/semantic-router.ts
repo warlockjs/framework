@@ -70,8 +70,11 @@ export type SemanticRouterConfig = {
   namespace?: string;
 };
 
+/** The decision a semantic router returns: the router output plus how it was reached. */
+export type SemanticRouterOutput = RouterOutput & RouterDecisionMeta;
+
 /** An `ai.supervisor({ router })` compatible agent that routes by embedding similarity. */
-export type SemanticRouter = AgentContract<RouterOutput> & {
+export type SemanticRouter = AgentContract<SemanticRouterOutput> & {
   /** Embed and index the examples now (otherwise this happens on the first message). */
   warm(): Promise<void>;
 };
@@ -82,7 +85,10 @@ type StoredVector = { intent: string; phrase: string; vector: number[] };
 
 type Manifest = { keys: string[] };
 
-type LearnedDoc = { embedder: string; items: Array<{ intent: string; phrase: string; vector?: number[]; at: number }> };
+type LearnedDoc = {
+  embedder: string;
+  items: Array<{ intent: string; phrase: string; vector?: number[]; at: number }>;
+};
 
 const DEFAULT_NAMESPACE = "ai.router";
 const DEFAULT_MAX_PER_INTENT = 20;
@@ -326,7 +332,7 @@ export function semanticRouter(config: SemanticRouterConfig): SemanticRouter {
       addToIndex(item.intent, item.phrase, item.vector as number[]);
     }
 
-    if (needVectors.length > 0 || valid.length !== doc?.items.length) {
+    if (needVectors.length > 0 || valid.length !== (doc?.items.length ?? 0)) {
       await persistLearned();
     }
   };
@@ -393,7 +399,11 @@ export function semanticRouter(config: SemanticRouterConfig): SemanticRouter {
     chosen: string,
     topScore: number,
   ): Promise<void> => {
-    if (!learnOptions || text.length > MAX_LEARNED_PHRASE_LENGTH || topScore < learnOptions.minScore) {
+    if (
+      !learnOptions ||
+      text.length > MAX_LEARNED_PHRASE_LENGTH ||
+      topScore < learnOptions.minScore
+    ) {
       return;
     }
 

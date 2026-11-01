@@ -12,6 +12,7 @@ export {
   type SemanticRouterConfig,
   type SemanticRouterLearnOptions,
   type SemanticRouterMessageCache,
+  type SemanticRouterOutput,
   type SemanticRouterStore,
 } from "./semantic-router";
 export { buildRouterContextMessage } from "./router-prompt";

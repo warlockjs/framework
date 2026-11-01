@@ -6,7 +6,12 @@ import { dedupe } from "./dedupe";
 function setup(delay = 20) {
   const sdk = MockSDK({
     responses: [
-      { content: "shared answer", finishReason: "stop", usage: { input: 5, output: 5, total: 10 }, delay },
+      {
+        content: "shared answer",
+        finishReason: "stop",
+        usage: { input: 5, output: 5, total: 10 },
+        delay,
+      },
       { content: "second answer", finishReason: "stop", delay },
     ],
   });
@@ -60,7 +65,7 @@ describe("dedupe", () => {
   it("lets waiting runs make their own call when the first one fails", async () => {
     const sdk = MockSDK({
       responses: [
-        { error: new Error("provider down"), delay: 20 },
+        { content: "", error: new Error("provider down"), delay: 20 },
         { content: "recovered", finishReason: "stop", delay: 5 },
       ],
     });
@@ -90,7 +95,9 @@ describe("dedupe", () => {
     const ai = agent({
       name: "qa",
       model,
-      middleware: [dedupe({ key: (context) => (context.input.startsWith("skip") ? undefined : "one") })],
+      middleware: [
+        dedupe({ key: (context) => (context.input.startsWith("skip") ? undefined : "one") }),
+      ],
     });
 
     await Promise.all([ai.execute("a"), ai.execute("b")]);

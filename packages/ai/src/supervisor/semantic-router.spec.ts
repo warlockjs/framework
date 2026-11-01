@@ -8,7 +8,11 @@ import { END } from "../contracts/end.type";
 import { MockSDK } from "../mock/mock-sdk";
 import { buildScriptedAgent, routerDecision } from "./_test-helpers";
 import { router } from "./router-factory";
-import { semanticRouter, type SemanticRouterStore } from "./semantic-router";
+import {
+  semanticRouter,
+  type SemanticRouterOutput,
+  type SemanticRouterStore,
+} from "./semantic-router";
 import { supervisor } from "./supervisor";
 
 const KEYWORDS = ["invoice", "parcel", "refund", "hello"];
@@ -149,8 +153,8 @@ describe("ai.semanticRouter — routing", () => {
     const result = await semantic.execute("any news on my parcel?");
 
     expect(result.data).toMatchObject({ next: "orders", routedBy: "semantic" });
-    expect((result.data as { score: number }).score).toBeGreaterThan(0.8);
-    expect((result.data as { runnerUp: { intent: string } }).runnerUp.intent).toBe("billing");
+    expect(result.data?.score).toBeGreaterThan(0.8);
+    expect(result.data?.runnerUp?.intent).toBe("billing");
     expect(result.usage.total).toBe(0);
     expect(sdk.models[0].callCount).toBe(0);
   });
@@ -186,7 +190,7 @@ describe("ai.semanticRouter — routing", () => {
     const result = await semantic.execute("invoice and parcel");
 
     expect(result.data).toMatchObject({ routedBy: "fallback" });
-    expect((result.data as { runnerUp?: unknown }).runnerUp).toBeDefined();
+    expect(result.data?.runnerUp).toBeDefined();
     expect(sdk.models[0].callCount).toBe(1);
   });
 
@@ -202,7 +206,7 @@ describe("ai.semanticRouter — routing", () => {
     });
 
     const result = await semantic.execute("hello hello");
-    const data = result.data as { routedBy: string; runnerUp?: { intent: string } };
+    const data = result.data as SemanticRouterOutput;
 
     expect(data.routedBy).toBe("fallback");
     expect(data.runnerUp?.intent).not.toBe("smalltalk");
@@ -430,11 +434,7 @@ describe("ai.semanticRouter — message embedding cache", () => {
 describe("ai.semanticRouter — learn", () => {
   it("stores an agreeing fallback decision as a new example, capped per intent", async () => {
     const { data, store } = recordingStore();
-    const { fallback } = makeFallback(
-      ["orders", "a"],
-      ["orders", "b"],
-      ["orders", "c"],
-    );
+    const { fallback } = makeFallback(["orders", "a"], ["orders", "b"], ["orders", "c"]);
     const semantic = semanticRouter({
       name: "support",
       embedder: new KeywordEmbedder(),
@@ -499,7 +499,11 @@ describe("ai.semanticRouter — supervisor integration", () => {
 
     const [first, second] = result.report.snapshots;
 
-    expect(first.decision).toMatchObject({ source: "router", next: "orders", routedBy: "semantic" });
+    expect(first.decision).toMatchObject({
+      source: "router",
+      next: "orders",
+      routedBy: "semantic",
+    });
     expect(first.decision.score).toBeGreaterThan(0.8);
     expect(first.result.orders).toBeDefined();
     expect(second.decision).toMatchObject({ next: END, routedBy: "fallback" });
