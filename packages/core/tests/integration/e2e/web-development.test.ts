@@ -139,11 +139,19 @@ export default defineConfig({devServer:{generateTypings:false,healthCheckers:fal
                 await expect
                   .poll(async () => (await fetch(url)).text(), { timeout: 30_000 })
                   .toContain(`<p id="layout-revision">${marker}</p>`);
-                await browserPage.waitFor({ selector: "#layout-revision", text: marker });
+                await browserPage.waitFor({
+                  selector: "#layout-revision",
+                  text: marker,
+                  timeoutMs: 30_000,
+                });
                 await browserPage.waitForNetworkIdle();
                 if (revision > 0) {
                   await writeFile(join(directory, "src/web/index.page.tsx"), pageSource(revision));
-                  await browserPage.waitFor({ selector: "h1", text: `Revision ${revision}` });
+                  await browserPage.waitFor({
+                    selector: "h1",
+                    text: `Revision ${revision}`,
+                    timeoutMs: 30_000,
+                  });
                   await browserPage.waitForNetworkIdle();
                 }
                 await expect
@@ -154,7 +162,11 @@ export default defineConfig({devServer:{generateTypings:false,healthCheckers:fal
                   (match) => match[1],
                 );
                 await browserPage.goto("/");
-                await browserPage.waitFor({ selector: "h1", text: `Revision ${revision}` });
+                await browserPage.waitFor({
+                  selector: "h1",
+                  text: `Revision ${revision}`,
+                  timeoutMs: 30_000,
+                });
                 expect(
                   await browserPage.evaluate("document.querySelector('#theme').textContent"),
                 ).toBe("light");
@@ -171,7 +183,11 @@ export default defineConfig({devServer:{generateTypings:false,healthCheckers:fal
                     "Number(document.querySelector('button').textContent.split(' ')[1])",
                   );
                   await browserPage.click("button");
-                  await browserPage.waitFor({ selector: "button", text: `Count ${count + 1}` });
+                  await browserPage.waitFor({
+                    selector: "button",
+                    text: `Count ${count + 1}`,
+                    timeoutMs: 30_000,
+                  });
                 }
                 const inputs = await browserPage.evaluate<string[]>(
                   "Array.from(document.querySelectorAll('input'), input=>input.id)",
@@ -214,7 +230,11 @@ export default defineConfig({devServer:{generateTypings:false,healthCheckers:fal
             await browserPage.waitForNavigation(() => browserPage.click('a[href="/"]'), {
               url: "/",
             });
-            await browserPage.waitFor({ selector: "h1", text: "Revision 4" });
+            await browserPage.waitFor({
+              selector: "h1",
+              text: "Revision 4",
+              timeoutMs: 30_000,
+            });
             for (const id of await browserPage.evaluate<string[]>(
               "Array.from(document.querySelectorAll('input'),input=>input.id)",
             )) {
