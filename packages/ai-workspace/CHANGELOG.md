@@ -9,13 +9,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 
 - `resolveShell()` reports which PowerShell it found: `ResolvedShell` gains `edition` (`"desktop"` for Windows PowerShell 5.1, `"core"` for PowerShell 7+; exported type `PowerShellEdition`) and `version` (`"5.1"` for Windows PowerShell; for `pwsh` when `ShellHost.powershellVersion` is supplied). Windows PowerShell 5.1 gets the label `Windows PowerShell 5.1 (powershell)` and its own `"powershell5"` dialect, whose parser refuses `&&` and `||` with "Windows PowerShell 5.1 cannot run &&; use ; or run each command in its own call instead.". `run_shell`'s description for that dialect no longer promises chaining.
+- `onAsk` decisions: `remember` accepts one pattern or an array, so a line that asks about several commands can approve them all. `workspace.shell.remembered()` lists the remembered patterns and `workspace.shell.forget(pattern)` removes one. A configured deny still beats them.
+- `onAsk` decisions: `reason?: string` is appended to the `run_shell` refusal the model reads, cut at 500 characters with a `[truncated]` marker.
+- A flat `spilledTo?: string[]` on every `run_shell`, `shell_output`, `read_file`, `grep` and `glob` result that spilled output to disk, and a spilled head-and-tail text now ends with a `[full output saved to …]` line. The `use-a-workspace` skill documents each tool's result shape.
 
 ### Changed
 
 - On Windows, `interpreter: "auto"` now picks `pwsh` (PowerShell 7+), then Git Bash, then Windows PowerShell 5.1, then `cmd.exe`, so a machine with Git for Windows and only PowerShell 5.1 runs `&&` lines under bash instead of failing in PowerShell.
-- `onAsk` decisions: `remember` accepts one pattern or an array, so a line that asks about several commands can approve them all. `workspace.shell.remembered()` lists the remembered patterns and `workspace.shell.forget(pattern)` removes one. A configured deny still beats them.
-- `onAsk` decisions: `reason?: string` is appended to the `run_shell` refusal the model reads, cut at 500 characters with a `[truncated]` marker.
-- A flat `spilledTo?: string[]` on every `run_shell`, `shell_output`, `read_file`, `grep` and `glob` result that spilled output to disk, and a spilled head-and-tail text now ends with a `[full output saved to …]` line. The `use-a-workspace` skill documents each tool's result shape.
 
 ## 5.44.0 - 2026-11-05
 
