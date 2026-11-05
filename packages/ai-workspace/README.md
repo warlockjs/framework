@@ -126,7 +126,12 @@ for (const file of await ws.glob("src/models/**/*.ts")) {
 - **argv by default, shell on request** — commands run as one argv without a shell;
   a refusal names the operator and suggests the split. `shell.interpreter: "sh"`
   opts in to pipes, `&&` and redirections, with every command in the line checked
-  and redirections kept inside the jail.
+  and redirections kept inside the jail. `"bash"`, `"powershell"`, `"cmd"` and `"auto"`
+  pick a specific shell, each read by its own parser (`interpreterPath` overrides where
+  the shell lives).
+- **Allow / ask / deny rules** — `shell.rules` plus `shell.onAsk` put commands to the
+  host for approval (`remember` stores a session allow); `ws.shell.classify(line)` lists
+  the commands a line would run.
 - **Backends** — `local` (default; `@warlock.js/fs` + `node:child_process`) and
   `mock` (in-memory, for hermetic disk-free tests).
 - **Tools** under `ws.tools.*` — `read_file`, `edit_file`, `multi_edit`, `apply_patch`, `write_file`,

@@ -87,11 +87,29 @@ export interface MakeRunTestsToolOptions {
    * double quotes for cmd.exe.
    */
   interpreter?: WorkspaceShellInterpreter;
+  /**
+   * The grammar of the shell the line runs in; with `interpreter` it picks
+   * the quoting: single quotes (doubled inside) for PowerShell.
+   */
+  dialect?: "posix" | "cmd" | "powershell";
+  /** The platform quoting is chosen for. Default: the running one. */
+  platform?: NodeJS.Platform;
 }
 
 /** Quote the test pattern as one literal argument for the line's interpreter. */
-function quotePattern(pattern: string, interpreter: WorkspaceShellInterpreter): string {
-  if (interpreter === "sh" && process.platform !== "win32") {
+export function quotePattern(
+  pattern: string,
+  interpreter: WorkspaceShellInterpreter,
+  dialect?: "posix" | "cmd" | "powershell",
+  platform: NodeJS.Platform = process.platform,
+): string {
+  if (dialect === "powershell" || interpreter === "powershell") {
+    // PowerShell also reads the typographic single quotes as quotes; each is
+    // doubled to stay literal.
+    return `'${pattern.replace(/['\u2018\u2019\u201A\u201B]/g, "$&$&")}'`;
+  }
+
+  if (interpreter === "bash" || (interpreter === "sh" && platform !== "win32")) {
     return `'${pattern.replace(/'/g, "'\\''")}'`;
   }
 
@@ -143,7 +161,7 @@ export function makeRunTestsTool(
       // backticks stay literal), so it reaches the runner as a single argv
       // element and can never smuggle in additional commands or arguments.
       const command = input.pattern
-        ? `${baseCommand} ${quotePattern(input.pattern, options?.interpreter ?? "none")}`
+        ? `${baseCommand} ${quotePattern(input.pattern, options?.interpreter ?? "none", options?.dialect, options?.platform)}`
         : baseCommand;
 
       return ops.exec(command, ctx?.signal ? { signal: ctx.signal } : undefined);

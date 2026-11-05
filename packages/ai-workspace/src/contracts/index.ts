@@ -54,6 +54,16 @@ export type {
   WorkspaceBackendStat,
   WorkspaceOutputStream,
 } from "./workspace-backend.contract";
+export type {
+  WorkspaceCommandDecision,
+  WorkspaceCommandRule,
+  WorkspaceShellAsk,
+  WorkspaceShellAskDecision,
+  WorkspaceShellAskReason,
+  WorkspaceShellAskRequest,
+  WorkspaceShellClassification,
+  WorkspaceShellOnAsk,
+} from "./shell-approval.type";
 export type { WorkspaceOps } from "./workspace-ops.contract";
 export type {
   WorkspaceAllowCommand,

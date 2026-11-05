@@ -20,6 +20,7 @@ import type {
   WorkspaceTodoInput,
   WorkspaceToolName,
 } from "./tool-io.type";
+import type { WorkspaceShellClassification } from "./shell-approval.type";
 import type { WorkspacePolicy } from "./workspace-policy.type";
 
 /**
@@ -99,6 +100,17 @@ export interface Workspace {
 
   /** Agent-facing tool factories. */
   readonly tools: WorkspaceTools;
+
+  /** Shell-policy helpers. */
+  readonly shell: {
+    /**
+     * The simple commands a line would run (pipelines, `&&` / `||` / `;`,
+     * subshells and substitutions included), read with the workspace's shell
+     * dialect and without running or checking anything. A line the parser
+     * cannot read with confidence returns `opaque` (why) and no commands.
+     */
+    classify(line: string): WorkspaceShellClassification;
+  };
 
   /**
    * Read a jailed file. `offset`/`limit` select a 1-based line window and

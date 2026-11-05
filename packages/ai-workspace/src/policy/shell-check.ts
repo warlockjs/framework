@@ -2,11 +2,27 @@ import path from "node:path";
 import type { WorkspaceShellRefusalReason } from "../errors";
 import type {
   WorkspaceCommandPattern,
+  WorkspaceCommandRule,
   WorkspacePolicy,
+  WorkspaceShellAsk,
+  WorkspaceShellClassification,
   WorkspaceShellInterpreter,
   WorkspaceShellPolicy,
 } from "../contracts";
 import { isInsideJailLexically } from "./jail";
+import {
+  canonicalPowerShellArgv,
+  normalizePowerShellCd,
+  POWERSHELL_CD_NAMES,
+  POWERSHELL_DIRECTORY_STACK,
+} from "./powershell-aliases";
+import {
+  currentShellHost,
+  resolveShell,
+  type ResolvedShell,
+  type ResolvedShellInterpreter,
+  type ShellHost,
+} from "./shell-interpreter";
 import {
   parseShellLine,
   type ShellDialect,
@@ -44,6 +60,12 @@ export interface WorkspaceShellCheck {
   executable?: string;
   /** The redirection target or `cd` directory a `"path-escape"` refusal is about. */
   path?: string;
+  /**
+   * Commands that need a decision from `shell.onAsk` before the line may run.
+   * When non-empty, `allowed` is `false` with reason `"approval-required"`;
+   * the ops layer asks, and refuses with `"approval-denied"` if the answer is no.
+   */
+  asks: WorkspaceShellAsk[];
   /** The argv of every simple command checked, in order (wrapped commands included). */
   commands: string[][];
   /** Shell mode: every redirection target and `cd` directory, for the jail recheck. */
@@ -101,6 +123,27 @@ const OPAQUE_RUNNERS = new Set([
   "tmux",
   "stdbuf",
   "flock",
+]);
+
+/**
+ * PowerShell cmdlets and aliases that run code or commands the policy cannot
+ * see, or change what later names mean (lowercase).
+ */
+const POWERSHELL_OPAQUE = new Set([
+  "iex",
+  "invoke-expression",
+  "invoke-command",
+  "icm",
+  "start-process",
+  "saps",
+  "start",
+  "add-type",
+  "set-alias",
+  "sal",
+  "new-alias",
+  "nal",
+  "invoke-item",
+  "ii",
 ]);
 
 /** POSIX shell builtins that evaluate code or change how later names resolve. */
@@ -194,7 +237,7 @@ const MAX_CD_CANDIDATES = 32;
 /** Longest command shown verbatim in a refusal before it is abbreviated. */
 const MAX_SHOWN_COMMAND = 48;
 
-/** The dialect shell mode parses on this platform. */
+/** The dialect `interpreter: "sh"` parses on this platform. */
 export function shellDialect(): ShellDialect {
   return process.platform === "win32" ? "cmd" : "posix";
 }
@@ -206,9 +249,12 @@ export function shellDialect(): ShellDialect {
  * stripped). The cmd dialect splits Windows paths too.
  */
 export function executableBasename(firstToken: string, dialect: ShellDialect = "posix"): string {
-  const base = dialect === "cmd" ? path.win32.basename(firstToken) : path.basename(firstToken);
+  const base =
+    dialect === "cmd" || dialect === "powershell"
+      ? path.win32.basename(firstToken)
+      : path.basename(firstToken);
 
-  return base.replace(/\.(exe|cmd|bat|com)$/i, "");
+  return base.replace(dialect === "powershell" ? /\.(exe|cmd|bat|com|ps1)$/i : /\.(exe|cmd|bat|com)$/i, "");
 }
 
 /** Show a command in a refusal, abbreviated at a word boundary when long. */
@@ -283,11 +329,29 @@ class Refusal extends Error {
   }
 }
 
+/** Options a check takes beyond the policy and the line. */
+export interface ShellCheckOptions {
+  /** Patterns a host approved earlier with `remember`; they allow what would ask, never what is denied. */
+  remembered?: readonly WorkspaceCommandPattern[];
+  /** The host the `"auto"` interpreter is resolved against (tests inject one). */
+  host?: ShellHost;
+  /** The already-resolved shell, to skip resolving it again. */
+  resolved?: ResolvedShell;
+}
+
+/** A compiled `shell.rules` entry. */
+interface CompiledRule {
+  rule: WorkspaceCommandRule;
+  pattern: CompiledPattern;
+}
+
 /** Per-line checker state. */
 class LineChecker {
   public readonly commands: string[][] = [];
 
   public readonly paths: WorkspaceShellPath[] = [];
+
+  public readonly asks: WorkspaceShellAsk[] = [];
 
   private readonly deny: Set<string>;
 
@@ -295,22 +359,34 @@ class LineChecker {
 
   private readonly patterns: CompiledPattern[];
 
+  private readonly rules: CompiledRule[];
+
+  private readonly remembered: CompiledPattern[];
+
   private readonly hasCommandRules: boolean;
 
-  private readonly interpreter: WorkspaceShellInterpreter;
+  /** Whether `shell.onAsk` is set: unmatched, unreadable and opaque commands ask. */
+  public readonly askMode: boolean;
 
   public constructor(
     private readonly policy: WorkspacePolicy,
     private readonly shell: WorkspaceShellPolicy,
     private readonly line: string,
     private readonly dialect: ShellDialect,
+    private readonly interpreter: ResolvedShellInterpreter,
+    remembered: readonly WorkspaceCommandPattern[] = [],
   ) {
     this.deny = new Set((shell.deny ?? []).map((name) => name.toLowerCase()));
     this.allow = shell.allow ?? [];
     this.patterns = (shell.denyPatterns ?? []).map(compilePattern);
-    this.interpreter = shell.interpreter ?? "none";
+    this.rules = (shell.rules ?? []).map((rule) => ({ rule, pattern: compilePattern(rule.match) }));
+    this.remembered = remembered.map(compilePattern);
+    this.askMode = shell.onAsk !== undefined;
     this.hasCommandRules =
-      this.deny.size > 0 || this.patterns.length > 0 || shell.allowCommand !== undefined;
+      this.deny.size > 0 ||
+      this.patterns.length > 0 ||
+      this.rules.length > 0 ||
+      shell.allowCommand !== undefined;
   }
 
   /** Whether argument hooks (`denyPatterns` / `allowCommand`) need literal argv. */
@@ -319,7 +395,88 @@ class LineChecker {
   }
 
   private get shellMode(): boolean {
-    return this.interpreter === "sh";
+    return this.interpreter !== "none";
+  }
+
+  /** The last rule that matches `argv` (later rules win). */
+  private matchRule(argv: string[]): WorkspaceCommandRule | undefined {
+    for (let index = this.rules.length - 1; index >= 0; index--) {
+      const compiled = this.rules[index] as CompiledRule;
+
+      if (compiled.pattern.test(argv, this.dialect)) {
+        return compiled.rule;
+      }
+    }
+
+    return undefined;
+  }
+
+  private isRemembered(argv: string[]): boolean {
+    return this.remembered.some((pattern) => pattern.test(argv, this.dialect));
+  }
+
+  /** Record a command that needs a decision (once per argv and reason). */
+  public addAsk(argv: string[], reason: WorkspaceShellAsk["reason"], rule?: WorkspaceCommandRule): void {
+    const key = `${reason}\u0000${argv.join("\u0000")}`;
+
+    if (this.asks.some((ask) => `${ask.reason}\u0000${ask.argv.join("\u0000")}` === key)) {
+      return;
+    }
+
+    this.asks.push({ argv: [...argv], reason, ...(rule !== undefined ? { rule } : {}) });
+  }
+
+  /** Refuse when the matching rule denies. */
+  private assertNotDenied(argv: string[], rule: WorkspaceCommandRule | undefined): void {
+    if (rule?.effect !== "deny") {
+      return;
+    }
+
+    const explanation = rule.reason !== undefined && rule.reason.trim() !== "" ? ` ${rule.reason.trim()}` : "";
+
+    throw new Refusal(
+      "denied-pattern",
+      `${show(argv.join(" "))} is denied by a workspace shell rule.${explanation}`,
+      executableBasename(argv[0] ?? "", this.dialect),
+    );
+  }
+
+  /**
+   * Check the canonical form of a PowerShell alias (`Remove-Item -Recurse
+   * -Force x` as `rm -rf x`): deny, `denyPatterns`, `allowCommand` and the
+   * rules, but not the `allow` list (which names the spelling that was written).
+   */
+  public checkCanonical(argv: string[]): void {
+    const key = executableBasename(argv[0] ?? "", this.dialect).toLowerCase();
+
+    if (this.deny.has(key)) {
+      throw new Refusal(
+        "denied-executable",
+        `\`${key}\` is denied by the workspace shell policy (in ${show(argv.join(" "))}).`,
+        key,
+      );
+    }
+
+    this.checkHooks(argv, true);
+
+    const rule = this.matchRule(argv);
+
+    this.assertNotDenied(argv, rule);
+
+    if (rule?.effect === "ask" && !this.isRemembered(argv)) {
+      this.addAsk(argv, "rule", rule);
+    }
+  }
+
+  /** Refuse a denied executable (used for `cd` spellings). */
+  public assertExecutableNotDenied(key: string, argv: string[]): void {
+    if (this.deny.has(key)) {
+      throw new Refusal(
+        "denied-executable",
+        `\`${key}\` is denied by the workspace shell policy (in ${show(argv.join(" "))}).`,
+        key,
+      );
+    }
   }
 
   /** Run `denyPatterns` and `allowCommand` on one argv. */
@@ -422,13 +579,31 @@ class LineChecker {
     }
 
     this.checkHooks(argv, depth > 0);
+
+    const rule = this.matchRule(argv);
+
+    this.assertNotDenied(argv, rule);
     this.commands.push([...argv]);
+
+    const remembered = this.isRemembered(argv);
+    const approved = rule?.effect === "allow" || remembered || this.explicitlyAllowed(executable);
 
     if (
       OPAQUE_RUNNERS.has(key) ||
       (this.shellMode && this.dialect === "posix" && SHELL_OPAQUE_BUILTINS.has(key)) ||
-      (this.shellMode && this.dialect === "cmd" && CMD_OPAQUE_BUILTINS.has(key))
+      (this.shellMode && this.dialect === "cmd" && CMD_OPAQUE_BUILTINS.has(key)) ||
+      (this.shellMode && this.dialect === "powershell" && POWERSHELL_OPAQUE.has(key))
     ) {
+      if (approved) {
+        return;
+      }
+
+      if (this.askMode || rule?.effect === "ask") {
+        this.addAsk(argv, "nested", rule);
+
+        return;
+      }
+
       this.checkOpaque(executable, argv);
 
       return;
@@ -440,11 +615,29 @@ class LineChecker {
 
     const ranges = this.unwrap(key, argv);
 
+    // A command no rule or allow list covers asks — except a wrapper, which
+    // asks through the command it runs.
+    if (!approved && ranges === undefined) {
+      if (rule?.effect === "ask") {
+        this.addAsk(argv, "rule", rule);
+      } else if (rule === undefined && this.askMode && this.allow.length === 0) {
+        this.addAsk(argv, "rule");
+      }
+    } else if (!approved && rule?.effect === "ask") {
+      this.addAsk(argv, "rule", rule);
+    }
+
     if (ranges === undefined) {
       return;
     }
 
     if (ranges === null || depth >= MAX_WRAPPER_DEPTH) {
+      if (this.askMode) {
+        this.addAsk(argv, "nested", rule);
+
+        return;
+      }
+
       throw new Refusal(
         "nested-command",
         `\`${executable}\` is used with options the workspace shell policy cannot read (in ${show(argv.join(" "))}). Run the inner command directly instead.`,
@@ -576,6 +769,10 @@ class LineChecker {
 
   /** Check a redirection target from every possible cwd. */
   public checkRedirectTarget(word: ShellWord, access: "read" | "write", cwds: string[]): void {
+    if (this.dialect === "powershell" && !word.quoted && word.value.toLowerCase() === "$null") {
+      return;
+    }
+
     if (word.dynamic) {
       throw new Refusal(
         "unsupported-syntax",
@@ -970,7 +1167,7 @@ function argvModeRefusal(command: string): Refusal {
   );
 }
 
-/** Check a shell-mode (`interpreter: "sh"`) line. */
+/** Check a shell-mode line. */
 function checkShellLine(
   checker: LineChecker,
   policy: WorkspacePolicy,
@@ -984,6 +1181,12 @@ function checkShellLine(
   const parsed = parseShellLine(command, dialect);
 
   if (!parsed.ok) {
+    if (checker.askMode) {
+      checker.addAsk([command], "unparsed");
+
+      return;
+    }
+
     throw new Refusal(
       parsed.reason,
       `${parsed.message} The workspace shell policy only runs lines it can check.`,
@@ -1034,43 +1237,92 @@ function checkSimpleCommand(
     return cwds;
   }
 
-  if (!first.dynamic && first.value.includes("=")) {
-    throw new Refusal(
-      "unsupported-syntax",
-      `\`${first.raw}\` is not a plain command name or \`NAME=value\` assignment.`,
-    );
-  }
-
-  if (/^[-+]/.test(first.value)) {
-    throw new Refusal("unsupported-syntax", `\`${first.raw}\` is not a command name.`);
-  }
-
-  if (checker.hasArgumentHooks) {
-    const dynamic = simple.words.find((word) => word.dynamic);
-
-    if (dynamic !== undefined) {
-      throw new Refusal(
-        "unsupported-syntax",
-        `\`${dynamic.raw}\` is decided when the line runs, so it cannot be checked against the workspace shell policy's command rules. Write the value literally (quote globs).`,
-      );
-    }
-  }
-
   const executable = first.dynamic ? "" : executableBasename(first.value, dialect).toLowerCase();
+  const powershell = dialect === "powershell";
 
-  if (executable === "cd") {
+  if (executable === "cd" || (powershell && POWERSHELL_CD_NAMES.has(executable))) {
+    // A `cd` the policy cannot follow would let later targets escape the jail:
+    // it is refused outright, never turned into an ask.
+    checker.assertExecutableNotDenied(executable, simple.words.map((word) => word.value));
+
+    if (powershell) {
+      const words = normalizePowerShellCd(simple.words);
+
+      if (words === null) {
+        throw new Refusal(
+          "unsupported-syntax",
+          "`Set-Location` is supported with one directory (`-Path` / `-LiteralPath` or positional) only.",
+          "cd",
+        );
+      }
+
+      return checker.checkCd(words, cwds);
+    }
+
     return checker.checkCd(simple.words, cwds);
   }
 
-  if (dialect === "posix" && (executable === "pushd" || executable === "popd")) {
-    throw new Refusal("unsupported-syntax", `\`${executable}\` is not supported; use \`cd\`.`);
-  }
+  try {
+    if (!first.dynamic && first.value.includes("=")) {
+      throw new Refusal(
+        "unsupported-syntax",
+        `\`${first.raw}\` is not a plain command name or \`NAME=value\` assignment.`,
+      );
+    }
 
-  checker.checkArgv(
-    simple.words.map((word) => (word.dynamic ? word.raw : word.value)),
-    simple.words.map((word) => word.dynamic),
-    0,
-  );
+    if (/^[-+]/.test(first.value)) {
+      throw new Refusal("unsupported-syntax", `\`${first.raw}\` is not a command name.`);
+    }
+
+    if (checker.hasArgumentHooks) {
+      const dynamic = simple.words.find((word) => word.dynamic);
+
+      if (dynamic !== undefined) {
+        throw new Refusal(
+          "unsupported-syntax",
+          `\`${dynamic.raw}\` is decided when the line runs, so it cannot be checked against the workspace shell policy's command rules. Write the value literally (quote globs).`,
+        );
+      }
+    }
+
+    if (
+      (dialect === "posix" && (executable === "pushd" || executable === "popd")) ||
+      (powershell && POWERSHELL_DIRECTORY_STACK.has(executable))
+    ) {
+      throw new Refusal(
+        "unsupported-syntax",
+        `\`${executable}\` is not supported; use \`${powershell ? "Set-Location" : "cd"}\`.`,
+      );
+    }
+
+    const argv = simple.words.map((word) => (word.dynamic ? word.raw : word.value));
+
+    checker.checkArgv(
+      argv,
+      simple.words.map((word) => word.dynamic),
+      0,
+    );
+
+    if (powershell) {
+      const canonical = canonicalPowerShellArgv(argv);
+
+      if (canonical !== undefined && canonical.join("\u0000") !== argv.join("\u0000")) {
+        checker.checkCanonical(canonical);
+      }
+    }
+  } catch (error) {
+    // A command the policy cannot read is put to the host instead of refused.
+    if (error instanceof Refusal && error.reason === "unsupported-syntax" && checker.askMode) {
+      checker.addAsk(
+        simple.words.map((word) => (word.dynamic ? word.raw : word.value)),
+        "unparsed",
+      );
+
+      return cwds;
+    }
+
+    throw error;
+  }
 
   return cwds;
 }
@@ -1100,19 +1352,38 @@ function checkSimpleCommand(
  * checkShellCommand({ cwd, shell: { allow: ["git"] } }, "git add -A && git commit -m wip");
  * // { allowed: false, reason: "metacharacter", message: "`&&` is not supported in argv mode: run `git add -A`, then `git commit -m wip`, …" }
  */
-export function checkShellCommand(policy: WorkspacePolicy, command: string): WorkspaceShellCheck {
-  return checkShellCommandInDialect(policy, command, shellDialect());
+export function checkShellCommand(
+  policy: WorkspacePolicy,
+  command: string,
+  options?: ShellCheckOptions,
+): WorkspaceShellCheck {
+  const resolved = options?.resolved ?? resolveShell(policy.shell, options?.host ?? currentShellHost());
+
+  return runCheck(policy, command, resolved.interpreter, resolved.dialect, options?.remembered);
 }
 
 /**
  * {@link checkShellCommand} with the shell-mode dialect chosen explicitly
- * instead of from the platform (used to test the cmd.exe rules anywhere).
- * Argv mode ignores `dialect`.
+ * instead of from the interpreter (used to test the cmd.exe and PowerShell
+ * rules anywhere). Argv mode ignores `dialect`.
  */
 export function checkShellCommandInDialect(
   policy: WorkspacePolicy,
   command: string,
   dialect: ShellDialect,
+  options?: ShellCheckOptions,
+): WorkspaceShellCheck {
+  const resolved = options?.resolved ?? resolveShell(policy.shell, options?.host ?? currentShellHost());
+
+  return runCheck(policy, command, resolved.interpreter, dialect, options?.remembered);
+}
+
+function runCheck(
+  policy: WorkspacePolicy,
+  command: string,
+  interpreter: ResolvedShellInterpreter,
+  dialect: ShellDialect,
+  remembered?: readonly WorkspaceCommandPattern[],
 ): WorkspaceShellCheck {
   const shell = policy.shell;
 
@@ -1121,20 +1392,28 @@ export function checkShellCommandInDialect(
       allowed: false,
       reason: "not-allowed",
       message: "The workspace has no shell policy, so no command may run.",
+      asks: [],
       commands: [],
       paths: [],
     };
   }
 
-  const interpreter = shell.interpreter ?? "none";
-  const checker = new LineChecker(policy, shell, command, interpreter === "sh" ? dialect : "posix");
+  const shellMode = interpreter !== "none";
+  const checker = new LineChecker(
+    policy,
+    shell,
+    command,
+    shellMode ? dialect : "posix",
+    interpreter,
+    remembered,
+  );
 
   try {
     if (command.trim() === "") {
       throw new Refusal("not-allowed", "The command is empty.");
     }
 
-    if (interpreter === "sh") {
+    if (shellMode) {
       checkShellLine(checker, policy, command, dialect);
     } else {
       const argv = tokenizeCommand(command);
@@ -1150,7 +1429,22 @@ export function checkShellCommandInDialect(
       );
     }
 
-    return { allowed: true, commands: checker.commands, paths: checker.paths };
+    if (checker.asks.length > 0) {
+      const first = checker.asks[0] as WorkspaceShellAsk;
+      const shown = show(first.argv.join(" "));
+      const why = first.rule?.reason !== undefined ? ` ${first.rule.reason}` : "";
+
+      return {
+        allowed: false,
+        reason: "approval-required",
+        message: `${shown} needs approval, and the workspace shell policy has no approval handler (shell.onAsk).${why}`,
+        asks: checker.asks,
+        commands: checker.commands,
+        paths: checker.paths,
+      };
+    }
+
+    return { allowed: true, asks: [], commands: checker.commands, paths: checker.paths };
   } catch (error) {
     if (!(error instanceof Refusal)) {
       throw error;
@@ -1162,8 +1456,41 @@ export function checkShellCommandInDialect(
       message: error.message,
       ...(error.executable !== undefined ? { executable: error.executable } : {}),
       ...(error.refusedPath !== undefined ? { path: error.refusedPath } : {}),
+      asks: [],
       commands: checker.commands,
       paths: checker.paths,
     };
   }
+}
+
+/**
+ * The simple commands a line would run (pipeline members, `&&` / `||` / `;`
+ * parts, subshells and substitutions included), without checking anything.
+ * A line the parser cannot read with confidence comes back with `opaque`
+ * set to the reason and no commands.
+ *
+ * The line is read with the policy's shell dialect when its `interpreter`
+ * is a shell, and with the platform's default shell otherwise.
+ *
+ * @example
+ * classifyShellCommand("a | b"); // { commands: [["a"], ["b"]] }
+ */
+export function classifyShellCommand(
+  command: string,
+  policy?: Pick<WorkspacePolicy, "shell">,
+  host?: ShellHost,
+): WorkspaceShellClassification {
+  const resolved = resolveShell(policy?.shell, host ?? currentShellHost());
+  const dialect = resolved.interpreter === "none" ? shellDialect() : resolved.dialect;
+  const parsed = parseShellLine(command, dialect);
+
+  if (!parsed.ok) {
+    return { commands: [], opaque: parsed.message };
+  }
+
+  return {
+    commands: parsed.commands
+      .filter((simple) => simple.words.length > 0)
+      .map((simple) => simple.words.map((word) => (word.dynamic ? word.raw : word.value))),
+  };
 }

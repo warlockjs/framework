@@ -1,3 +1,8 @@
+import type {
+  WorkspaceCommandRule,
+  WorkspaceShellOnAsk,
+} from "./shell-approval.type";
+
 /**
  * The executor a workspace runs on. `"local"` uses `@warlock.js/fs` +
  * `node:child_process` against the real filesystem under `cwd`;
@@ -15,6 +20,13 @@ export type WorkspaceBackendType = "local" | "mock";
  *   (quotes respected, no shell semantics) and spawned without a shell. Any
  *   unquoted shell operator is refused with a message that says how to split
  *   the line.
+ * - `"bash"` / `"powershell"` / `"cmd"` — shell mode through that specific
+ *   shell (`bash -c`; `powershell -NoLogo -NoProfile -NonInteractive -Command`,
+ *   preferring `pwsh`; `cmd.exe /d /v:off /s /c`). Each is parsed with its own
+ *   conservative grammar and every command in it goes through the same checks.
+ * - `"auto"` — shell mode through the best shell found on the host: `pwsh`,
+ *   then Windows PowerShell, then `cmd.exe` on Windows; `bash`, then `sh`
+ *   elsewhere. `run_shell`'s description names the shell it resolved to.
  * - `"sh"` — **shell mode** (explicit opt-in): the line runs through
  *   `/bin/sh -c` (`cmd.exe /d /v:off /s /c` on Windows). Before it runs, the
  *   line is parsed and every simple command in it — inside `;`, `&&`, `||`,
@@ -23,7 +35,7 @@ export type WorkspaceBackendType = "local" | "mock";
  *   redirection target and `cd` directory against the path jail. Syntax the
  *   parser cannot read with confidence is refused, never guessed at.
  */
-export type WorkspaceShellInterpreter = "none" | "sh";
+export type WorkspaceShellInterpreter = "none" | "sh" | "bash" | "powershell" | "cmd" | "auto";
 
 /**
  * A command pattern in `shell.denyPatterns`.
@@ -133,6 +145,27 @@ export interface WorkspaceShellPolicy {
    * {@link WorkspaceShellInterpreter}).
    */
   interpreter?: WorkspaceShellInterpreter;
+  /**
+   * Absolute path of the shell executable for a shell-mode interpreter,
+   * instead of the one found on the host's `PATH` (for example a `pwsh`
+   * installed outside `PATH`). Ignored for `"none"`.
+   */
+  interpreterPath?: string;
+  /**
+   * Ordered allow / ask / deny rules (see {@link WorkspaceCommandRule}). For
+   * one command the LAST matching rule wins; a `deny` anywhere in a line
+   * refuses the whole line. They add to `allow`, `deny` and `denyPatterns`
+   * and never relax them. A command no rule matches asks when `onAsk` is
+   * set, and otherwise behaves as before.
+   */
+  rules?: WorkspaceCommandRule[];
+  /**
+   * Called once per line with every command that needs approval: `ask`
+   * rules, unmatched commands, syntax the policy cannot read and runners it
+   * cannot see into. Absent ⇒ a command matching an `ask` rule is refused
+   * with reason `"approval-required"`.
+   */
+  onAsk?: WorkspaceShellOnAsk;
   /** Per-command wall-clock cap; on expiry the process is SIGKILLed. */
   timeoutMs?: number;
   /**

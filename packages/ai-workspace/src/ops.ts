@@ -4,6 +4,7 @@ import { WorkspaceEditError, WorkspacePolicyError } from "./errors";
 import { globToRegExp, isInside, matchesAnyGlob } from "./policy/jail";
 import { buildCommandEnv, resolveInJail } from "./policy/policy";
 import { checkShellCommand } from "./policy/shell-check";
+import { resolveShell, type ResolvedShell } from "./policy/shell-interpreter";
 import { DEFAULT_MAX_BACKGROUND_JOBS, ShellJobs } from "./shell-jobs";
 import { executePatch } from "./patch/execute-patch";
 import type {
@@ -28,8 +29,11 @@ import type {
   ShellOutputResult,
   StartShellOptions,
   WorkspaceBackend,
+  WorkspaceCommandPattern,
   WorkspaceOps,
   WorkspacePolicy,
+  WorkspaceShellAsk,
+  WorkspaceShellOnAsk,
 } from "./contracts";
 
 /** Default line window a read returns when the policy sets no `defaultLines`. */
@@ -194,6 +198,8 @@ function isSafeGrepPattern(pattern: string): boolean {
 export interface OpsRuntime {
   /** The workspace's background commands. */
   jobs: ShellJobs;
+  /** Patterns the host approved with `remember`, shared by every view of the workspace. */
+  approvals?: WorkspaceCommandPattern[];
 }
 
 class Ops implements WorkspaceOps {
@@ -206,11 +212,20 @@ class Ops implements WorkspaceOps {
    */
   private readonly pathLocks = new Map<string, Promise<void>>();
 
+  /** The shell `policy.shell.interpreter` resolves to on this host, resolved once. */
+  private readonly resolvedShell: ResolvedShell;
+
+  /** Patterns approved with `remember` (shared through the runtime). */
+  private readonly approvals: WorkspaceCommandPattern[];
+
   public constructor(
     private readonly backend: WorkspaceBackend,
     private readonly policy: WorkspacePolicy,
     private readonly runtime: OpsRuntime,
-  ) {}
+  ) {
+    this.resolvedShell = resolveShell(policy.shell);
+    this.approvals = runtime.approvals ?? [];
+  }
 
   /** Run `task` after every earlier mutation of `absolutePath` has settled. */
   private async withPathLock<T>(absolutePath: string, task: () => Promise<T>): Promise<T> {
@@ -453,10 +468,16 @@ class Ops implements WorkspaceOps {
    * (argv or shell mode), then — shell mode — every redirection target and
    * `cd` directory against the jail with symlinks resolved.
    */
-  private async assertCommandAllowed(command: string): Promise<void> {
-    const verdict = checkShellCommand(this.policy, command);
+  private async assertCommandAllowed(command: string, signal?: AbortSignal): Promise<void> {
+    const verdict = checkShellCommand(this.policy, command, {
+      remembered: this.approvals,
+      resolved: this.resolvedShell,
+    });
+    const onAsk = this.policy.shell?.onAsk;
+    const needsApproval =
+      !verdict.allowed && verdict.reason === "approval-required" && verdict.asks.length > 0;
 
-    if (!verdict.allowed) {
+    if (!verdict.allowed && !(needsApproval && onAsk !== undefined)) {
       throw new WorkspacePolicyError(
         verdict.message ?? `Command is not permitted by the workspace shell policy: ${command}`,
         {
@@ -492,10 +513,41 @@ class Ops implements WorkspaceOps {
         { type: "denied-command", reason: "not-allowed", command },
       );
     }
+
+    if (needsApproval && onAsk !== undefined) {
+      await this.askForApproval(command, verdict.asks, onAsk, signal);
+    }
+  }
+
+  /** Put the commands that need approval to `shell.onAsk`; refuse the line unless it says yes. */
+  private async askForApproval(
+    command: string,
+    asks: WorkspaceShellAsk[],
+    onAsk: WorkspaceShellOnAsk,
+    signal: AbortSignal | undefined,
+  ): Promise<void> {
+    let decision: Awaited<ReturnType<WorkspaceShellOnAsk>> | undefined;
+
+    try {
+      decision = await onAsk({ command, asks, ...(signal ? { signal } : {}) });
+    } catch {
+      decision = undefined;
+    }
+
+    if (decision?.allow !== true) {
+      throw new WorkspacePolicyError(
+        `Running ${asks.map((ask) => `\`${ask.argv.join(" ")}\``).join(", ")} was not approved.`,
+        { type: "denied-command", reason: "approval-denied", command },
+      );
+    }
+
+    if (decision.remember !== undefined && !this.approvals.includes(decision.remember)) {
+      this.approvals.push(decision.remember);
+    }
   }
 
   public async exec(command: string, opts?: ExecOptions): Promise<RunShellResult> {
-    await this.assertCommandAllowed(command);
+    await this.assertCommandAllowed(command, opts?.signal);
 
     const signal = opts?.signal;
 
@@ -515,7 +567,7 @@ class Ops implements WorkspaceOps {
     const shell = this.policy.shell;
     const timeoutMs = opts?.timeoutMs ?? shell?.timeoutMs;
     const maxOutputBytes = shell?.maxOutputBytes ?? DEFAULT_MAX_OUTPUT_BYTES;
-    const interpreter = shell?.interpreter ?? "none";
+    const interpreter = this.resolvedShell.interpreter;
 
     const result = await this.backend.exec(command, {
       cwd: this.policy.cwd,
@@ -523,6 +575,9 @@ class Ops implements WorkspaceOps {
       env: buildCommandEnv(this.policy),
       ...(signal ? { signal } : {}),
       ...(interpreter !== "none" ? { interpreter } : {}),
+      ...(interpreter !== "none" && this.resolvedShell.file !== undefined
+        ? { interpreterPath: this.resolvedShell.file }
+        : {}),
     });
 
     const stdout = capOutput(result.stdout, maxOutputBytes);
@@ -562,7 +617,8 @@ class Ops implements WorkspaceOps {
     }
 
     const shell = this.policy.shell;
-    const interpreter = shell?.interpreter ?? "none";
+    const interpreter = this.resolvedShell.interpreter;
+    const interpreterPath = interpreter !== "none" ? this.resolvedShell.file : undefined;
     const timeoutMs = lowerOf(background.timeoutMs, opts?.timeoutMs);
     const env = buildCommandEnv(this.policy);
 
@@ -576,6 +632,7 @@ class Ops implements WorkspaceOps {
           cwd: this.policy.cwd,
           env,
           ...(interpreter !== "none" ? { interpreter } : {}),
+          ...(interpreterPath !== undefined ? { interpreterPath } : {}),
           onOutput,
         }),
     });

@@ -4,6 +4,16 @@ All notable changes to `@warlock.js/ai-workspace` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.44.0 - Unreleased
+
+### Added
+
+- Command rules: `shell.rules` is an ordered list of `{ match, effect: "allow" | "ask" | "deny", reason? }` (the last matching rule wins, a deny anywhere in a line refuses it) and `shell.onAsk({ command, asks, signal })` decides on commands that need approval. With `onAsk` set, commands no rule matches, syntax the parser cannot read (`reason: "unparsed"`) and runners the policy cannot see into (`"nested"`) ask too; `{ allow: true, remember: pattern }` allows later matching commands for the workspace's life (shared with `readonly()` and `scope()`, never over a deny). New refusal reasons `"approval-required"` (an ask rule and no `onAsk`) and `"approval-denied"`.
+- `workspace.shell.classify(line)` and `classifyShellCommand(line, policy?)` return the simple commands a line would run, or `opaque` with the reason when it cannot be read. `checkShellCommand` takes an options argument (`remembered`, `host`, `resolved`) and its result gains `asks`.
+- `shell.interpreter` accepts `"bash"`, `"powershell"`, `"cmd"` and `"auto"`, plus `shell.interpreterPath`. Each shell has its own parser feeding the same deny / allow / `denyPatterns` / `allowCommand` / rule and path-jail checks. PowerShell runs with `-NoLogo -NoProfile -NonInteractive -Command`; its dialect covers `;`, `&&`, `||`, pipelines, `$( )`, the call operator and the usual redirections, refuses script blocks, splatting, here-strings, `--%`, statements and dot-sourcing, treats `Invoke-Expression`, `Invoke-Command`, `Start-Process`, `Add-Type`, `Set-Alias` and `-EncodedCommand` as nested execution, keeps `Set-Location` / `cd` inside the jail, and checks `Remove-Item`, `Copy-Item`, `Move-Item`, `Get-ChildItem`, `Get-Content`, `Invoke-WebRequest`, `Stop-Process` and their aliases in a canonical `rm -rf`-style form as well. `"auto"` picks `bash` then `sh` on POSIX and `pwsh`, `powershell`, Git Bash, `cmd.exe` on Windows. `resolveShell()` is exported.
+- `run_shell`'s description names the resolved shell and its syntax rules; `run_tests` quotes its pattern for each shell.
+- New types `WorkspaceCommandRule`, `WorkspaceCommandDecision`, `WorkspaceShellOnAsk`, `WorkspaceShellAskRequest`, `WorkspaceShellAskDecision`, `WorkspaceShellAsk`, `WorkspaceShellAskReason` and `WorkspaceShellClassification`.
+
 ## 5.40.0 - 2026-10-29
 
 ### Added

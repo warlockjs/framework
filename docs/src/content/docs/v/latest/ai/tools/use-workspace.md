@@ -38,7 +38,9 @@ This is least-privilege guardrails for a **trusted** agent — not a sandbox aro
 | `denyPaths`                                         | Globs (`*`, `**`, `?`) blocked **even inside `cwd`** — e.g. `[".git/**", ".env*"]`. A bare dir name (`"node_modules"`) also blocks its contents.                                                                                      |
 | `shell.allow` / `shell.deny`                        | Executable **basenames** matched against every command's argv (after tokenizing — see below). **Deny wins** and matches case-insensitively. An `allow` list is exhaustive (fail-closed); no `shell` block at all ⇒ nothing may run.   |
 | `shell.denyPatterns` / `shell.allowCommand`         | Argument-level rules checked on every command: patterns such as `"git push --force"` or `/^rm -rf \//`, and a host predicate `(argv, ctx) => boolean \| string`. See [Argument rules](#argument-rules-denypatterns-and-allowcommand). |
-| `shell.interpreter`                                 | `"none"` (default — argv, no shell) or `"sh"` (explicit opt-in to pipes, `&&`, redirections, still checked per command). See [Shell mode](#shell-mode-interpreter-sh).                                                                |
+| `shell.interpreter`                                 | `"none"` (default — argv, no shell), `"sh"`, `"bash"`, `"powershell"`, `"cmd"` or `"auto"` (explicit opt-in to pipes, `&&`, redirections, still checked per command). See [Shell mode](#shell-mode-interpreter-sh) and [Choosing the shell](#choosing-the-shell). |
+| `shell.interpreterPath`                             | Absolute path of the shell executable (for example a `pwsh` outside `PATH`).                                                                                                                                                  |
+| `shell.rules` / `shell.onAsk`                       | Ordered allow / ask / deny command rules and the host callback that decides on asks. See [Command rules](#command-rules-allow-ask-deny).                                                                                      |
 | `shell.background`                                  | Enables background commands (`run_shell({ background: true })`) with `{ maxJobs?, timeoutMs? }`. Absent ⇒ refused. See [Background commands](#background-commands).                                                                   |
 | `shell.inheritEnv`                                  | Opt-in `process.env` keys to pass through (e.g. `["PATH"]`). **Nothing leaks in otherwise** — a command can't find `node`/`npm` without `PATH`.                                                                                       |
 | `shell.env`                                         | Explicit env vars injected into every spawned process (override inherited on collision).                                                                                                                                              |
@@ -157,8 +159,55 @@ Every shell refusal is a `WorkspacePolicyError` with `type: "denied-command"` an
 | `"nested-command"`     | a command runner the policy can't see into, while deny rules are in force                            |
 | `"unsupported-syntax"` | shell mode: syntax the parser does not read with confidence                                          |
 | `"path-escape"`        | shell mode: a redirection target or `cd` directory outside the jail (`error.path` names it)          |
+| `"approval-required"`  | a command matches an `ask` rule and the policy has no `shell.onAsk`                                  |
+| `"approval-denied"`    | `shell.onAsk` said no (or threw)                                                                     |
 
-`checkShellCommand(policy, command)` returns the same verdict without running anything: `{ allowed, reason?, message?, executable?, path?, commands, paths }`.
+`checkShellCommand(policy, command)` returns the same verdict without running anything: `{ allowed, reason?, message?, executable?, path?, asks, commands, paths }`.
+
+## Choosing the shell
+
+`shell.interpreter` takes more than `"sh"`. Each shell is read by its own conservative parser, and every command it finds goes through the same `deny` / `allow` / `denyPatterns` / `allowCommand` / rule checks as `"sh"`, with redirection targets and directory changes held to the jail.
+
+| `interpreter`  | Runs the line with                                                                          | Grammar        |
+| -------------- | ------------------------------------------------------------------------------------------- | -------------- |
+| `"sh"`         | `/bin/sh -c` (`cmd.exe` on Windows) — unchanged                                             | POSIX / cmd    |
+| `"bash"`       | `bash -c` (found on `PATH`, or `interpreterPath`)                                           | POSIX          |
+| `"powershell"` | `pwsh` (else `powershell`) with `-NoLogo -NoProfile -NonInteractive -Command`               | PowerShell     |
+| `"cmd"`        | `cmd.exe /d /v:off /s /c`                                                                   | cmd.exe        |
+| `"auto"`       | POSIX: `bash` if on `PATH`, else `sh`. Windows: `pwsh`, `powershell`, Git Bash (next to `git` on `PATH`), then `cmd.exe` | the resolved one |
+
+`run_shell`'s description names the resolved shell ("Commands run on Windows using PowerShell 7 (pwsh).") and its syntax rules, so the model writes the right dialect. `run_tests` quotes its `pattern` for the shell too (single quotes for POSIX shells and PowerShell, double quotes for cmd.exe and argv mode).
+
+**PowerShell** lines support `;`, line breaks, `&&` and `||`, pipelines, `$( )` subexpressions (their commands are checked), the call operator `&` before a command, single and double quotes, `$name` / `$env:NAME` (dynamic words), and the redirections `>`, `>>`, `2>`, `2>>`, `*>` and `2>&1` (`$null` is always fine). It refuses, as `"unsupported-syntax"`: script blocks and braces, bare parentheses, `@( )` / `@{ }` / splatting / here-strings, `--%`, `<`, comments, the comma operator, statements (`if`, `foreach`, `function`, `try`, …), dot-sourcing, `&` as a background job, and `Push-Location` / `pushd` / `popd`. `Invoke-Expression` / `iex`, `Invoke-Command`, `Start-Process`, `Add-Type`, `Set-Alias`, `Invoke-Item`, and `powershell` / `pwsh` themselves (`-Command`, `-EncodedCommand`) run code the policy cannot see, so they are refused as `"nested-command"` while deny rules exist. `Set-Location` / `sl` / `cd` / `chdir` take one directory (`-Path`, `-LiteralPath` or positional) and must stay in the jail.
+
+PowerShell names the same command many ways, so each command is checked as written **and** in a canonical form: `Remove-Item` / `ri` / `rm` / `del` / `erase` / `rd` / `rmdir` become `rm` with `-Recurse` / `-Force` (and their unambiguous prefixes) turned into `-rf`; `Copy-Item`, `Move-Item`, `Get-ChildItem`, `Get-Content`, `Invoke-WebRequest` and `Stop-Process` map to `cp`, `mv`, `ls`, `cat`, `curl` and `kill` the same way. A `denyPatterns` entry of `"rm -rf"` therefore stops `Remove-Item -Recurse -Force x`. The canonical form skips the `allow` list (which names the spelling you wrote) but runs `deny`, `denyPatterns`, `allowCommand` and the rules.
+
+## Command rules (allow / ask / deny)
+
+`shell.rules` is an ordered list of `{ match, effect, reason? }`. `match` is a string prefix on the argv or a RegExp on the joined argv (same as `denyPatterns`); `effect` is `"allow"`, `"ask"` or `"deny"`. For one command the **last** matching rule wins; a `deny` anywhere in a line refuses the whole line, and `allow` / `deny` / `denyPatterns` / `allowCommand` keep working as before.
+
+```ts
+const ws = ai.workspace({
+  cwd,
+  shell: {
+    interpreter: "sh",
+    rules: [
+      { match: "git status", effect: "allow" },
+      { match: "git push", effect: "ask", reason: "Pushing publishes work." },
+      { match: /^rm -[a-z]*r/, effect: "deny", reason: "Recursive deletes are not allowed." },
+    ],
+    onAsk: async ({ command, asks, signal }) => {
+      const approved = await confirm(`Run ${command}?`, { signal });
+
+      return { allow: approved, remember: approved ? "git push" : undefined };
+    },
+  },
+});
+```
+
+`onAsk` is called once per line with every command that needs a decision (`asks[i].reason` is `"rule"` for an ask rule or an unmatched command, `"unparsed"` for syntax the parser cannot read, `"nested"` for a runner such as `bash -c` or `iex`). With `onAsk` set, a command no rule matches also asks; without it, behaviour is as before and an `ask` rule is refused with `"approval-required"`. `{ allow: false }`, a throw or a rejection refuses the line with `"approval-denied"`. `remember` adds a session allow for that pattern, shared with `readonly()` and `scope()` views: it skips later asks for matching commands but never overrides a deny.
+
+`ws.shell.classify(line)` (and the standalone `classifyShellCommand(line, policy?)`) returns `{ commands: string[][], opaque? }`: the simple commands a line would run, read with the workspace's dialect, without running or checking anything. `opaque` carries the reason when the line cannot be read.
 
 ## `grep` is ReDoS-bounded
 

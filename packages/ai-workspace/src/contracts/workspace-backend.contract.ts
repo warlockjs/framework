@@ -48,12 +48,20 @@ export interface WorkspaceBackendExecOptions {
   /**
    * How to run `command`: `"none"` (default) tokenizes it into an argv and
    * spawns it without a shell; `"sh"` hands the whole line to `/bin/sh -c`
-   * (`cmd.exe /d /v:off /s /c` on Windows). The ops layer has already
+   * (`cmd.exe /d /v:off /s /c` on Windows); `"bash"`, `"powershell"` and
+   * `"cmd"` hand it to that shell (`-c`, `-NoLogo -NoProfile -NonInteractive
+   * -Command`, `/d /v:off /s /c`). The ops layer has already
    * checked every command in the line against the policy; a backend that
    * does not support `"sh"` must refuse the command rather than run it
    * another way.
    */
   interpreter?: WorkspaceShellInterpreter;
+  /**
+   * The shell executable to run `"bash"`, `"powershell"` and `"sh"` lines
+   * with (resolved by the ops layer from `shell.interpreterPath` or the
+   * host's `PATH`); absent ⇒ the backend uses the shell's usual name.
+   */
+  interpreterPath?: string;
 }
 
 /** Which stream a background command's output chunk came from. */
@@ -67,6 +75,8 @@ export interface WorkspaceBackendStartOptions {
   env?: Record<string, string>;
   /** See {@link WorkspaceBackendExecOptions.interpreter}. */
   interpreter?: WorkspaceShellInterpreter;
+  /** See {@link WorkspaceBackendExecOptions.interpreterPath}. */
+  interpreterPath?: string;
   /**
    * Receives output as it arrives, decoded as UTF-8 and never split inside a
    * character. Called synchronously or later — never after `done` settles.

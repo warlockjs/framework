@@ -46,13 +46,21 @@ export type {
   WorkspaceBackendType,
   WorkspaceBackgroundPolicy,
   WorkspaceCommandCheckContext,
+  WorkspaceCommandDecision,
   WorkspaceCommandPattern,
+  WorkspaceCommandRule,
   WorkspaceListPolicy,
   WorkspaceOps,
   WorkspaceOutputStream,
   WorkspacePolicy,
   WorkspaceReadPolicy,
+  WorkspaceShellAsk,
+  WorkspaceShellAskDecision,
+  WorkspaceShellAskReason,
+  WorkspaceShellAskRequest,
+  WorkspaceShellClassification,
   WorkspaceShellInterpreter,
+  WorkspaceShellOnAsk,
   WorkspaceShellPolicy,
   WorkspaceTodo,
   WorkspaceTodoInput,
@@ -78,7 +86,9 @@ export type {
 // Policy engine seam
 export { buildEnv, isCommandAllowed, resolveInJail } from "./policy/policy";
 export type { ResolvedPath } from "./policy/policy";
-export { checkShellCommand } from "./policy/shell-check";
+export { checkShellCommand, classifyShellCommand } from "./policy/shell-check";
+export { resolveShell } from "./policy/shell-interpreter";
+export type { ResolvedShell, ResolvedShellInterpreter, ShellHost } from "./policy/shell-interpreter";
 export type {
   WorkspaceShellCheck,
   WorkspaceShellPath,

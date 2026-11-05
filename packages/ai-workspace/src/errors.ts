@@ -39,6 +39,9 @@ export type WorkspacePolicyViolation = "path-escape" | "denied-command" | "unsaf
  *   so the line is refused rather than guessed at.
  * - `"path-escape"` — shell mode: a redirection target or `cd` directory
  *   resolves outside the workspace jail or hits `denyPaths`.
+ * - `"approval-required"` — a command matches an `ask` rule in
+ *   `shell.rules` and the policy has no `shell.onAsk` to decide on it.
+ * - `"approval-denied"` — `shell.onAsk` refused the command (or threw).
  */
 export type WorkspaceShellRefusalReason =
   | "metacharacter"
@@ -48,7 +51,9 @@ export type WorkspaceShellRefusalReason =
   | "denied-pattern"
   | "nested-command"
   | "unsupported-syntax"
-  | "path-escape";
+  | "path-escape"
+  | "approval-required"
+  | "approval-denied";
 
 /**
  * Options for {@link WorkspacePolicyError} — the structured `type`

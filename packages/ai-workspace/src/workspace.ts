@@ -4,6 +4,8 @@ import { createLocalBackend } from "./backends/local";
 import { createMockBackend } from "./backends/mock";
 import { WorkspacePolicyError } from "./errors";
 import { createOps } from "./ops";
+import { classifyShellCommand } from "./policy/shell-check";
+import { resolveShell, type ResolvedShell } from "./policy/shell-interpreter";
 import { ShellJobs } from "./shell-jobs";
 import { TodoStore } from "./todos";
 import { applyPatchWithOps } from "./patch/apply-patch-generic";
@@ -40,7 +42,9 @@ import type {
   TodoListResult,
   Workspace,
   WorkspaceBackend,
+  WorkspaceCommandPattern,
   WorkspaceOps,
+  WorkspaceShellClassification,
   WorkspacePolicy,
   WorkspaceTodoInput,
   WorkspaceToolName,
@@ -94,6 +98,8 @@ const BACKGROUND_TOOL_NAMES: ReadonlySet<WorkspaceToolName> = new Set(["shellOut
 interface WorkspaceState {
   jobs: ShellJobs;
   todos: TodoStore;
+  /** Command patterns the host approved with `remember`. */
+  approvals: WorkspaceCommandPattern[];
 }
 
 /**
@@ -134,6 +140,11 @@ class WorkspaceImpl implements Workspace {
 
   public readonly tools: WorkspaceTools;
 
+  public readonly shell: { classify(line: string): WorkspaceShellClassification };
+
+  /** The shell the policy's interpreter resolves to on this host. */
+  private readonly resolvedShell: ResolvedShell;
+
   /** Background commands + todo list, shared with projections. */
   private readonly state: WorkspaceState;
 
@@ -144,10 +155,15 @@ class WorkspaceImpl implements Workspace {
   ) {
     this.policy = policy;
     this.allowedTools = new Set(allowedTools);
-    this.state = state ?? { jobs: new ShellJobs(), todos: new TodoStore() };
+    this.state = state ?? { jobs: new ShellJobs(), todos: new TodoStore(), approvals: [] };
+    this.resolvedShell = resolveShell(policy.shell);
+    this.shell = { classify: (line) => classifyShellCommand(line, policy) };
 
     const backend = selectBackend(policy);
-    this.ops = createOps(backend, policy, { jobs: this.state.jobs });
+    this.ops = createOps(backend, policy, {
+      jobs: this.state.jobs,
+      approvals: this.state.approvals,
+    });
     this.tools = this.buildTools();
   }
 
@@ -172,7 +188,7 @@ class WorkspaceImpl implements Workspace {
 
     const shell = this.policy.shell;
     const background = shell?.background !== undefined;
-    const interpreter = shell?.interpreter ?? "none";
+    const resolvedShell = this.resolvedShell;
 
     const factories: Record<
       WorkspaceToolName,
@@ -190,11 +206,13 @@ class WorkspaceImpl implements Workspace {
             ...(opts?.name !== undefined ? { name: opts.name } : {}),
             ...(shell?.timeoutMs !== undefined ? { maxTimeoutMs: shell.timeoutMs } : {}),
             background,
+            ...(resolvedShell.interpreter !== "none" ? { shellLabel: resolvedShell.label } : {}),
+            shellDialect: resolvedShell.interpreter === "none" ? "none" : resolvedShell.dialect,
           }),
         ),
       shellOutput: (opts) => erase(makeShellOutputTool(this.ops, opts)),
       shellKill: (opts) => erase(makeShellKillTool(this.ops, opts)),
-      runTests: (opts) => erase(makeRunTestsTool(this.ops, { ...opts, interpreter })),
+      runTests: (opts) => erase(makeRunTestsTool(this.ops, { ...opts, interpreter: resolvedShell.interpreter, dialect: resolvedShell.dialect })),
       grep: (opts) => erase(makeGrepTool(this.ops, opts)),
       glob: (opts) => erase(makeGlobTool(this.ops, opts)),
       todoWrite: (opts) => erase(makeTodoWriteTool(this.state.todos, opts)),

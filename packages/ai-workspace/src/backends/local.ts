@@ -124,7 +124,7 @@ function toWin32CmdInvocation(argv: string[]): { file: string; args: string[] } 
 const POSIX_SHELL = "/bin/sh";
 
 /** How to spawn a command line, or why it cannot be spawned. */
-type SpawnPlan =
+export type SpawnPlan =
   | { file: string; args: string[]; windowsVerbatimArguments: boolean }
   | { refused: string };
 
@@ -138,17 +138,42 @@ type SpawnPlan =
  *   `/s` keeps the line verbatim inside the outer quotes). The ops layer has
  *   already checked every command in the line.
  */
-function planSpawn(command: string, interpreter: WorkspaceShellInterpreter): SpawnPlan {
-  if (interpreter === "sh") {
-    if (platform === "win32") {
-      return {
-        file: process.env.ComSpec ?? "cmd.exe",
-        args: ["/d", "/v:off", "/s", "/c", `"${command}"`],
-        windowsVerbatimArguments: true,
-      };
-    }
+export function planSpawn(
+  command: string,
+  interpreter: WorkspaceShellInterpreter,
+  interpreterPath?: string,
+  hostPlatform: NodeJS.Platform = platform,
+): SpawnPlan {
+  if (interpreter === "powershell") {
+    return {
+      file: interpreterPath ?? (hostPlatform === "win32" ? "powershell.exe" : "pwsh"),
+      args: ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", command],
+      windowsVerbatimArguments: false,
+    };
+  }
 
-    return { file: POSIX_SHELL, args: ["-c", command], windowsVerbatimArguments: false };
+  if (interpreter === "bash") {
+    return {
+      file: interpreterPath ?? "bash",
+      args: ["-c", command],
+      windowsVerbatimArguments: false,
+    };
+  }
+
+  if (interpreter === "cmd" || (interpreter === "sh" && hostPlatform === "win32")) {
+    return {
+      file: interpreterPath ?? process.env.ComSpec ?? "cmd.exe",
+      args: ["/d", "/v:off", "/s", "/c", `"${command}"`],
+      windowsVerbatimArguments: true,
+    };
+  }
+
+  if (interpreter === "sh") {
+    return {
+      file: interpreterPath ?? POSIX_SHELL,
+      args: ["-c", command],
+      windowsVerbatimArguments: false,
+    };
   }
 
   const argv = tokenizeCommand(command);
@@ -350,7 +375,7 @@ class LocalBackend implements WorkspaceBackend {
         return;
       }
 
-      const plan = planSpawn(command, opts.interpreter ?? "none");
+      const plan = planSpawn(command, opts.interpreter ?? "none", opts.interpreterPath);
 
       if ("refused" in plan) {
         refuse(plan.refused);
@@ -480,7 +505,7 @@ class LocalBackend implements WorkspaceBackend {
    * still-running tree is also killed when the Node process exits.
    */
   public start(command: string, opts: WorkspaceBackendStartOptions): WorkspaceBackendProcess {
-    const plan = planSpawn(command, opts.interpreter ?? "none");
+    const plan = planSpawn(command, opts.interpreter ?? "none", opts.interpreterPath);
 
     if ("refused" in plan) {
       opts.onOutput("stderr", plan.refused);

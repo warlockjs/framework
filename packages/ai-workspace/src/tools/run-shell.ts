@@ -89,6 +89,53 @@ export interface MakeRunShellToolOptions {
    * `false`: a background request is refused.
    */
   background?: boolean;
+  /**
+   * The name of the shell lines run in (for example `bash` or
+   * `PowerShell 7 (pwsh)`). When set, the description tells the model which
+   * shell and syntax rules apply. Absent ⇒ argv mode, no shell.
+   */
+  shellLabel?: string;
+  /** The grammar of that shell; selects the syntax rules in the description. */
+  shellDialect?: "posix" | "cmd" | "powershell" | "none";
+  /** The operating system named in the description. Default: the running one. */
+  platform?: NodeJS.Platform;
+}
+
+const DIALECT_RULES: Record<"posix" | "cmd" | "powershell", string> = {
+  posix:
+    "Use POSIX shell syntax: `;`, `&&`, `||`, pipes, quotes, `$( )` and redirections are supported, " +
+    "and every command in the line is checked. Compound statements (`if`, `for`), brace expansion, " +
+    "arithmetic and `&` are not.",
+  cmd:
+    "Use cmd.exe syntax: `&&`, `||`, `&`, `|` and simple redirections are supported, and every command " +
+    "in the line is checked. `%` and `!` expansion, `^`, parentheses and `if` / `for` are not.",
+  powershell:
+    "Use PowerShell syntax: `;`, `&&`, `||`, pipes, `$( )`, the call operator `&` and the redirections " +
+    "`>`, `>>`, `2>` and `2>&1` are supported, and every command in the line is checked (aliases such as " +
+    "`rm` and `Remove-Item` are treated alike). Script blocks, `Invoke-Expression`, here-strings, " +
+    "splatting and `if` / `foreach` are not.",
+};
+
+const PLATFORM_NAMES: Partial<Record<NodeJS.Platform, string>> = {
+  win32: "Windows",
+  darwin: "macOS",
+  linux: "Linux",
+};
+
+/** The sentence that names the shell and its syntax, or `""` in argv mode. */
+function shellSentence(options: MakeRunShellToolOptions | undefined): string {
+  const dialect = options?.shellDialect;
+
+  if (options?.shellLabel === undefined || dialect === undefined || dialect === "none") {
+    return "";
+  }
+
+  const platform = options.platform ?? process.platform;
+
+  return (
+    ` Commands run on ${PLATFORM_NAMES[platform] ?? platform} using ${options.shellLabel}. ` +
+    DIALECT_RULES[dialect]
+  );
 }
 
 /** The lower of the model's timeout and the cap (either may be absent). */
@@ -153,6 +200,7 @@ export function makeRunShellTool(
       "permitted by the shell policy; a refusal explains how to fix the " +
       "command. Output is byte-capped and the run is time-limited. A " +
       "non-zero exit code is returned as data, not an error." +
+      shellSentence(options) +
       (background
         ? " Pass background: true for a long-running command (dev server, " +
           "watcher): it returns an id at once; read its output with " +

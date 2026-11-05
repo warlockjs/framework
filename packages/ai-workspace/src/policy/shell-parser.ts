@@ -1,3 +1,5 @@
+import { parsePowerShellLine } from "./powershell-parser";
+
 /**
  * A deliberately conservative parser for the command lines `run_shell`
  * hands to a shell when the policy opts in to `interpreter: "sh"`.
@@ -11,7 +13,7 @@
  * (bash-only syntax such as `<<<`, `&>`, `$'…'`, brace expansion, `[[`,
  * arithmetic) are refused as well.
  *
- * Two dialects:
+ * Three dialects:
  * - `"posix"` — what `/bin/sh -c` reads: `;`, `&&`, `||`, `|`, `&`,
  *   newlines, comments, `( … )` subshells, `$( … )` and backtick command
  *   substitution (parsed recursively), `$name` / `${name…}` parameter
@@ -21,10 +23,12 @@
  *   subset whose meaning is unambiguous: `&&`, `||`, `|`, `&` (sequential
  *   in cmd), double quotes and simple redirections. `%`, `!`, `^`,
  *   parentheses, `;` and `,` are refused.
+ * - `"powershell"` — what `powershell -Command` / `pwsh -Command` reads, restricted
+ *   the same way (see `powershell-parser.ts`).
  */
 
 /** Which shell grammar to parse. */
-export type ShellDialect = "posix" | "cmd";
+export type ShellDialect = "posix" | "cmd" | "powershell";
 
 /** One word of a simple command, after quote removal. */
 export interface ShellWord {
@@ -1408,6 +1412,10 @@ class CmdParser {
  */
 export function parseShellLine(line: string, dialect: ShellDialect): ShellParseResult {
   const segments: ShellSegment[] = [];
+
+  if (dialect === "powershell") {
+    return parsePowerShellLine(line);
+  }
 
   try {
     if (dialect === "cmd") {

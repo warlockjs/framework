@@ -206,8 +206,8 @@ export function buildEnv(policy: WorkspacePolicy): Record<string, string> {
 }
 
 /**
- * Variables removed from the environment of a shell-mode (`interpreter:
- * "sh"`) command: each changes how the shell itself starts, parses or
+ * Variables removed from the environment of a shell-mode (`interpreter`
+ * other than `"none"`) command: each changes how the shell itself starts, parses or
  * resolves the line (`ENV`/`BASH_ENV` run a startup file, `SHELLOPTS` +
  * `PS4` can run command substitutions, `BASH_FUNC_*` imports functions that
  * shadow commands, `CDPATH` moves `cd`, `IFS` re-splits words).
@@ -231,7 +231,7 @@ const SHELL_STARTUP_VARIABLES = new Set([
 export function buildCommandEnv(policy: WorkspacePolicy): Record<string, string> {
   const env = buildEnv(policy);
 
-  if ((policy.shell?.interpreter ?? "none") !== "sh") {
+  if ((policy.shell?.interpreter ?? "none") === "none") {
     return env;
   }
 
