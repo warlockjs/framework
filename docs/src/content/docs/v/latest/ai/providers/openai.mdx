@@ -164,7 +164,8 @@ and `billed` (`false` for 401 / 402 / 403, otherwise `"unknown"`).
 `openai.model({ name, promptCacheKey, promptCacheRetention })` sends
 `prompt_cache_key` and `prompt_cache_retention`, and
 `cacheControl.breakpoints` adds explicit `prompt_cache_breakpoint`
-markers. Wrapper SDKs reuse this transport: xAI and Mistral receive
+markers. A per-call `cacheControl: { key }` is sent as `prompt_cache_key`
+and takes precedence over `promptCacheKey`. Wrapper SDKs reuse this transport: xAI and Mistral receive
 `prompt_cache_key` (both document it), but never the OpenAI-only
 retention or breakpoint fields; Groq and DeepSeek cache automatically
 and receive no hint; a custom `provider` label receives none of them.

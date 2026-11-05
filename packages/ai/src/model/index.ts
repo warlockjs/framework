@@ -1,5 +1,7 @@
 // Main API
 export { fallbackModel } from "./fallback-model";
+export { retryModel } from "./retry-model";
+export type { RetryBudgetKind, RetryEvent, RetryPolicy } from "../contracts/retry-policy.contract";
 
 // Types — the fallback-model contract surface.
 export type {

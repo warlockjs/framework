@@ -1,3 +1,4 @@
+import type { ModelCallOptions } from "@warlock.js/ai";
 import type { OpenAIModelConfig } from "../config.type";
 
 /** The prompt-cache request fields common to Chat Completions and Responses. */
@@ -27,16 +28,20 @@ const PROMPT_CACHE_KEY_PROVIDERS: ReadonlySet<string> = new Set(["openai", "xai"
  * ({@link PROMPT_CACHE_KEY_PROVIDERS}); `prompt_cache_retention` is
  * OpenAI-only. Any other provider label — including a custom label on a
  * wrapper SDK — gets neither, since an unknown endpoint may reject them.
+ * A per-call `options.cacheControl.key` takes precedence over
+ * `config.promptCacheKey`.
  */
 export function buildPromptCacheParams(
   provider: string,
   config: Pick<OpenAIModelConfig, "promptCacheKey" | "promptCacheRetention">,
+  options?: Pick<ModelCallOptions, "cacheControl">,
 ): PromptCacheParams {
   const sendsKey = PROMPT_CACHE_KEY_PROVIDERS.has(provider);
+  const key = options?.cacheControl?.key ?? config.promptCacheKey;
 
   return {
-    ...(sendsKey && config.promptCacheKey !== undefined
-      ? { prompt_cache_key: config.promptCacheKey }
+    ...(sendsKey && key !== undefined
+      ? { prompt_cache_key: key }
       : {}),
     ...(provider === "openai" && config.promptCacheRetention !== undefined
       ? { prompt_cache_retention: config.promptCacheRetention }

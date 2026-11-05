@@ -123,6 +123,13 @@ export type ModelCallOptions = {
      * others ignore it. Overrides any adapter-level TTL for this call.
      */
     ttl?: "5m" | "1h";
+    /**
+     * Routing key that groups calls sharing a prompt prefix so the provider
+     * serves them from the same cache. Adapters whose provider takes such a
+     * key (OpenAI-compatible `prompt_cache_key`) forward it, and it wins
+     * over any adapter-level default; others ignore it.
+     */
+    key?: string;
   };
   /**
    * Vendor-neutral context editing hint. Adapters whose

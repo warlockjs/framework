@@ -140,6 +140,14 @@ export type AgentConfig<TOutput = unknown> = {
    * Prevents infinite tool-call loops. Defaults to 10.
    */
   maxTrips?: number;
+  /**
+   * Opt-in run diagnostics. `cacheFingerprint: true` hashes the system
+   * prompt, tools and message prefix of every trip (report
+   * `promptFingerprint`) and emits `agent.trip.cache-miss-cause` when a
+   * trip loses the cache the previous one built and the request changed.
+   * Hashes only; off by default.
+   */
+  diagnostics?: { cacheFingerprint?: boolean };
   /** Opt-in history compaction before model trips; disabled when omitted. */
   compaction?: AgentCompactionConfig;
   /**

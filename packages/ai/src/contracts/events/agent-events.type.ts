@@ -1,6 +1,7 @@
 import type { AIError } from "../../errors/ai-error";
 import type { AgentResult } from "../result/agent-result.type";
 import type { LLMTrip } from "../result/llm-trip.type";
+import type { CacheMissSegment } from "../result/prompt-fingerprint.type";
 import type { ToolCall } from "../result/tool-call.type";
 import type { Usage } from "../result/usage.type";
 
@@ -64,6 +65,21 @@ export type AgentToolStreamingPayload = {
  * `agent.trip.completed`.
  */
 export type AgentTripUsagePayload = { usage: Usage; tripIndex: number };
+
+/**
+ * A trip lost the prompt cache the previous trip had built, and the request
+ * changed. Emitted only with `diagnostics: { cacheFingerprint: true }`.
+ * `segments` names what changed (`"system"`, `"tools"`, `"messages"`,
+ * `"options"`); no text is included.
+ */
+export type AgentCacheMissCausePayload = {
+  tripIndex: number;
+  segments: CacheMissSegment[];
+  /** Tokens served from cache on this trip. */
+  cachedTokens: number;
+  /** Tokens the previous trip read or wrote into the cache. */
+  expectedCachedTokens: number;
+};
 
 /** LLM has requested a tool call */
 export type AgentToolCallingPayload = {

@@ -535,6 +535,16 @@ describe("OpenAIResponsesModel prompt cache passthrough", () => {
     expect(firstParams(calls).prompt_cache_retention).toBe("24h");
   });
 
+  it("lets cacheControl.key override the configured promptCacheKey", async () => {
+    const { client, calls } = makeFakeClient({ response: makeResponse() });
+    await new OpenAIResponsesModel(client, { name: "gpt-5.6", promptCacheKey: "tenant-7" }).complete(
+      userHi,
+      { cacheControl: { key: "agent-a" } },
+    );
+
+    expect(firstParams(calls).prompt_cache_key).toBe("agent-a");
+  });
+
   it("omits them when not configured", async () => {
     const { client, calls } = makeFakeClient({ response: makeResponse() });
     await new OpenAIResponsesModel(client, { name: "gpt-5.6" }).complete(userHi);

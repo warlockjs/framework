@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 
 - `openai.model({ name, contextWindow })` sets `capabilities.contextWindow`; without it the window comes from a table of OpenAI models, and unknown models stay unset so window-relative `compaction.afterTokens` triggers do not fire.
+- `ModelCallOptions.cacheControl.key` is sent as `prompt_cache_key` on Chat Completions and Responses requests for the providers that accept it (OpenAI, xAI, Mistral), and takes precedence over the model's `promptCacheKey`. Groq, DeepSeek and custom provider labels still receive no cache key.
 
 ## 5.40.0 - 2026-10-29
 
