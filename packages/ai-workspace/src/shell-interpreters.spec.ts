@@ -311,7 +311,7 @@ describe("Windows PowerShell 5.1 dialect", () => {
 
       expect(parsed).toMatchObject({ ok: false, reason: "unsupported-syntax" });
       expect(parsed.ok === false && parsed.message).toContain(
-        `Windows PowerShell 5.1 cannot run ${operator}; use ; or if ($?) { ... }`,
+        `Windows PowerShell 5.1 cannot run ${operator}; use ; or run each command in its own call`,
       );
     }
 

@@ -174,7 +174,7 @@ class PowerShellParser {
 
     if (!this.chaining && ((char === "&" && this.peek(1) === "&") || (char === "|" && this.peek(1) === "|"))) {
       throw unsupported(
-        `Windows PowerShell 5.1 cannot run ${char}${char}; use ; or if ($?) { ... } instead.`,
+        `Windows PowerShell 5.1 cannot run ${char}${char}; use ; or run each command in its own call instead.`,
       );
     }
 

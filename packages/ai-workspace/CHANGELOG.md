@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
-- `resolveShell()` reports which PowerShell it found: `ResolvedShell` gains `edition` (`"desktop"` for Windows PowerShell 5.1, `"core"` for PowerShell 7+; exported type `PowerShellEdition`) and `version` (`"5.1"` for Windows PowerShell; for `pwsh` when `ShellHost.powershellVersion` is supplied). Windows PowerShell 5.1 gets the label `Windows PowerShell 5.1 (powershell)` and its own `"powershell5"` dialect, whose parser refuses `&&` and `||` with "Windows PowerShell 5.1 cannot run &&; use ; or if ($?) { ... } instead.". `run_shell`'s description for that dialect no longer promises chaining.
+- `resolveShell()` reports which PowerShell it found: `ResolvedShell` gains `edition` (`"desktop"` for Windows PowerShell 5.1, `"core"` for PowerShell 7+; exported type `PowerShellEdition`) and `version` (`"5.1"` for Windows PowerShell; for `pwsh` when `ShellHost.powershellVersion` is supplied). Windows PowerShell 5.1 gets the label `Windows PowerShell 5.1 (powershell)` and its own `"powershell5"` dialect, whose parser refuses `&&` and `||` with "Windows PowerShell 5.1 cannot run &&; use ; or run each command in its own call instead.". `run_shell`'s description for that dialect no longer promises chaining.
 
 ### Changed
 
