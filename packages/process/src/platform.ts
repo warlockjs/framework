@@ -26,6 +26,13 @@ export function defaultPollIntervalMs(platform: string): number {
 export function defaultObservationTimeoutMs(platform: string): number {
   return platform === "win32" || platform === "darwin" ? 15_000 : 2000;
 }
+/**
+ * Longest wait for a launched child to reach the resource setup gate. Linux answers
+ * from /proc; Windows and macOS answer through the guardian and helpers under load.
+ */
+export function defaultSetupTimeoutMs(platform: string): number {
+  return platform === "linux" ? 5000 : 30_000;
+}
 
 export class UnsupportedProcessPlatformError extends Error {
   constructor(public readonly platform: string) {

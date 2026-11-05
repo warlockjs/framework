@@ -76,7 +76,7 @@ it as `type`. It has no role in ownership or process selection.
 
 | API                                                                                                             | Behavior                                                                                                                                                                                                                            |
 | --------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `supervisor({ owner, registry, defaults?, pollIntervalMs?, observationTimeoutMs?, stopGraceMs?, cgroupRoot? })` | Creates a lazy supervisor; first operation opens the registry. Poll interval and observation timeout default per platform (see below); stop grace is 1000 ms.                                                                       |
+| `supervisor({ owner, registry, defaults?, pollIntervalMs?, observationTimeoutMs?, setupTimeoutMs?, pidWaitMs?, stopGraceMs?, cgroupRoot? })` | Creates a lazy supervisor; first operation opens the registry. Poll interval, observation timeout and setup timeout default per platform (see below); stop grace is 1000 ms.                                                                       |
 | `await spawn({ kind, command, args?, cwd?, env?, labels?, limits? })`                                           | Returns `{ pid, stdin, stdout, stderr, exited, stop() }`. Per-launch limits override defaults.                                                                                                                                      |
 | `await handle.exited`                                                                                           | Resolves to `{ reason, code, signal, peakMemoryBytes }`. Reasons: `exit`, `timeout`, `memory-cap`, `stopped`. Registry persistence or supervision observation errors reject it; a rejected promise does not prove the child exited. |
 | `await handle.stop()`                                                                                           | Stops its verified POSIX group or Windows PID tree; repeated calls after exit are harmless.                                                                                                                                         |
@@ -160,8 +160,11 @@ on Windows; `pollIntervalMs` is a minimum interval and slow samples do not overl
 | ---------------------- | ------ | ------ | ------- |
 | `pollIntervalMs`       | 100 ms | 500 ms | 1500 ms |
 | `observationTimeoutMs` | 2 s    | 15 s   | 15 s    |
+| `setupTimeoutMs`       | 5 s    | 30 s   | 30 s    |
 
-Explicit options always win. `observationTimeoutMs` bounds how long the ownership
+Explicit options always win. `setupTimeoutMs` bounds how long a launched child has
+to reach its resource setup gate; a child that exits first or misses the deadline
+rejects the launch with `ProcessStartupError` (`reason` `exited` or `setup-timeout`). `observationTimeoutMs` bounds how long the ownership
 check waits for a guardian's reply and, on Windows, for the process helper's answer;
 the timeout error names the option, so raise it on a heavily loaded machine.
 
@@ -229,6 +232,11 @@ terminal.resize(120, 40);
 await terminal.stop();
 await processes.stopAll();
 ```
+
+ConPTY can report pid 0 for a moment after spawn. The supervisor waits up to
+`pidWaitMs` (default 10 s) for a real pid and never supervises pid 0. If none arrives,
+it stops the terminal on a best-effort basis and rejects with `ProcessStartupError`
+(`reason` `no-pid`).
 
 PTY stdout combines terminal output; stderr is an empty stream. PTY signal
 metadata follows node-pty and may be numeric text. PTY limits and ownership use

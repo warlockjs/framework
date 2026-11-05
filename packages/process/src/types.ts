@@ -25,6 +25,18 @@ export type SupervisorOptions = {
    */
   observationTimeoutMs?: number;
   stopGraceMs?: number;
+  /**
+   * Longest wait, in milliseconds, for a real process ID when a terminal reports pid 0 or
+   * no pid right after spawn (ConPTY does this for a moment on Windows). Defaults to 10000.
+   * If no pid arrives in time the launch fails with `ProcessStartupError`; pid 0 is never supervised.
+   */
+  pidWaitMs?: number;
+  /**
+   * Longest wait, in milliseconds, for a launched child to reach its resource setup gate.
+   * Defaults to 5000 on Linux and 30000 on Windows and macOS, where the guardian and helpers
+   * are slower under load.
+   */
+  setupTimeoutMs?: number;
   /** Linux delegated cgroup v2 directory; defaults to this process's cgroup. */
   cgroupRoot?: string;
 };

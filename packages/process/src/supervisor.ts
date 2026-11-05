@@ -8,6 +8,7 @@ import { guardianProof, launchCommand } from "./guardian";
 import {
   defaultObservationTimeoutMs,
   defaultPollIntervalMs,
+  defaultSetupTimeoutMs,
   supported,
   taskkillCommand,
 } from "./platform";
@@ -32,8 +33,20 @@ import type {
   SupervisorOptions,
 } from "./types";
 
+/** The launch failed before the child could be supervised. */
+export class ProcessStartupError extends Error {
+  /** `no-pid`: a terminal never reported a process ID. `exited`: the child exited before its gate. `setup-timeout`: the gate was not reached in time. */
+  constructor(
+    public readonly reason: "no-pid" | "exited" | "setup-timeout",
+    message: string,
+  ) {
+    super(message);
+    this.name = "ProcessStartupError";
+  }
+}
 type Pty = {
   pid: number;
+  kill?(signal?: string): void;
   onData(listener: (data: string) => void): { dispose(): void };
   onExit(listener: (event: { exitCode: number; signal?: number }) => void): { dispose(): void };
   write(data: string): void;
@@ -63,6 +76,21 @@ type Active = {
   adopted: boolean;
   fail(error: unknown): void;
 };
+
+/**
+ * ConPTY reports pid 0 until the child has started. Wait for a real pid so the
+ * supervisor never tracks pid 0; give up after `waitMs` with a typed error.
+ */
+export async function terminalPid(terminal: Pty, waitMs: number): Promise<number> {
+  const deadline = Date.now() + waitMs;
+  while (!terminal.pid && Date.now() < deadline) await delay(10);
+  if (!terminal.pid)
+    throw new ProcessStartupError(
+      "no-pid",
+      `Terminal did not report a process ID within ${waitMs} ms`,
+    );
+  return terminal.pid;
+}
 
 function info(entry: RegistryEntry): ProcessInfo {
   const { token: _token, start: _start, cgroup: _cgroup, gated: _gated, ...visible } = entry;
@@ -112,6 +140,12 @@ export function supervisor(options: SupervisorOptions): ProcessSupervisor {
     options.observationTimeoutMs ?? defaultObservationTimeoutMs(process.platform);
   if (!Number.isSafeInteger(observationMs) || observationMs < 100)
     throw new Error("Invalid observationTimeoutMs: expected an integer of at least 100");
+  const pidWaitMs = options.pidWaitMs ?? 10_000;
+  if (!Number.isSafeInteger(pidWaitMs) || pidWaitMs < 0)
+    throw new Error("Invalid pidWaitMs: expected a nonnegative integer");
+  const setupMs = options.setupTimeoutMs ?? defaultSetupTimeoutMs(process.platform);
+  if (!Number.isSafeInteger(setupMs) || setupMs < 100)
+    throw new Error("Invalid setupTimeoutMs: expected an integer of at least 100");
   // One helper per supervisor, created on first use and closed by stopAll().
   let helper: WindowsProcessHelper | undefined;
   function observe(): Observation {
@@ -451,7 +485,16 @@ export function supervisor(options: SupervisorOptions): ProcessSupervisor {
         rows: input.rows ?? 24,
         name: "xterm-256color",
       });
-      pid = terminalProcess.pid;
+      try {
+        pid = await terminalPid(terminalProcess, pidWaitMs);
+      } catch (error) {
+        try {
+          terminalProcess.kill?.();
+        } catch {
+          /* Best effort: the child has no reported pid to verify. */
+        }
+        throw error;
+      }
       const output = new PassThrough();
       const errors = new PassThrough();
       const instance = terminalProcess;
@@ -491,7 +534,7 @@ export function supervisor(options: SupervisorOptions): ProcessSupervisor {
     }
     let entry: RegistryEntry | undefined;
     try {
-      const deadline = Date.now() + 5000;
+      const deadline = Date.now() + setupMs;
       // Off Linux an identity read costs a helper query, so poll the guardian's
       // pipe (cheap) until it reports the gate, and read the identity once.
       const portable = process.platform !== "linux";
@@ -505,8 +548,16 @@ export function supervisor(options: SupervisorOptions): ProcessSupervisor {
       let current = await gate();
       while (!current?.state.startsWith("T") || current.token !== token) {
         if (spawnError) throw spawnError;
-        if (exit || Date.now() >= deadline)
-          throw new Error("Child failed to reach the resource setup gate");
+        if (exit)
+          throw new ProcessStartupError(
+            "exited",
+            "Child failed to reach the resource setup gate",
+          );
+        if (Date.now() >= deadline)
+          throw new ProcessStartupError(
+            "setup-timeout",
+            "Child failed to reach the resource setup gate",
+          );
         await delay(10);
         current = await gate();
       }

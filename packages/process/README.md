@@ -45,7 +45,7 @@ On these platforms the handle PID belongs to a small Node guardian that launches
 the workload after registry persistence. It proves its inherited environment
 token through a live local socket/named pipe; polling includes guardian overhead
 and descendants. Recovery uses the same PID/start-time/token verification.
-Windows needs Windows PowerShell with CIM available. `pollIntervalMs` defaults to 100 ms on Linux, 500 on macOS and 1500 on Windows; `observationTimeoutMs` to 2 s on Linux and 15 s elsewhere. `cpuSeconds` is POSIX-only;
+Windows needs Windows PowerShell with CIM available. `pollIntervalMs` defaults to 100 ms on Linux, 500 on macOS and 1500 on Windows; `observationTimeoutMs` to 2 s on Linux and 15 s elsewhere; `setupTimeoutMs` (setup gate) to 5 s on Linux and 30 s elsewhere; `pidWaitMs` (terminal pid wait) to 10 s. `cpuSeconds` is POSIX-only;
 `virtualMemoryBytes` is Linux-only. Timeouts work on all three platforms.
 Windows stops force the entire PID tree immediately; Job Objects are a future
 improvement for hard containment and memory caps.

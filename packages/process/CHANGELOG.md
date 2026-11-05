@@ -1,5 +1,22 @@
 # Changelog — @warlock.js/process
 
+## 5.45.0
+
+### Added
+
+- `pidWaitMs` supervisor option: how long a terminal may take to report a real process ID after `spawnPty()`. Defaults to 10 s. ConPTY reports pid 0 for a moment after spawn on Windows; the supervisor now waits for the real pid instead of supervising pid 0.
+- `setupTimeoutMs` supervisor option: how long a launched child has to reach its resource setup gate. Defaults to 5 s on Linux and 30 s on Windows and macOS. Explicit values win.
+- `ProcessStartupError`, thrown when a launch cannot be supervised. Its `reason` is `no-pid` (no real pid arrived within `pidWaitMs`), `exited` (the child exited before its gate) or `setup-timeout` (the gate was not reached within `setupTimeoutMs`).
+
+### Changed
+
+- The setup gate deadline is 30 s on Windows and macOS (it was 5 s on every platform). Linux keeps 5 s.
+- A launch that fails at its setup gate now rejects with `ProcessStartupError`; the message is unchanged.
+
+### Fixed
+
+- A terminal that reported pid 0 right after `spawnPty()` could be supervised under pid 0. The launch now waits for a real pid, and a terminal that never reports one is stopped on a best-effort basis and rejected with `ProcessStartupError`.
+
 ## 5.40.0 - 2026-10-29
 
 ### Fixed
