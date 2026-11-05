@@ -7,6 +7,9 @@ describe("inferContextWindow (openai)", () => {
     expect(inferContextWindow("gpt-5-mini")).toBe(400_000);
     expect(inferContextWindow("gpt-5-chat-latest")).toBe(128_000);
     expect(inferContextWindow("gpt-4o-mini")).toBe(128_000);
+    expect(inferContextWindow("o1")).toBe(200_000);
+    expect(inferContextWindow("o1-mini")).toBe(128_000);
+    expect(inferContextWindow("o1-preview-2024-09-12")).toBe(128_000);
   });
 
   it("leaves unknown ids unset", () => {

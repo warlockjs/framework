@@ -12,6 +12,8 @@ const PREFIX_WINDOWS: ReadonlyArray<readonly [prefix: string, window: number]> =
   ["o4-mini", 200_000],
   ["o3", 200_000],
   ["o1", 200_000],
+  ["o1-mini", 128_000],
+  ["o1-preview", 128_000],
 ];
 
 /**
