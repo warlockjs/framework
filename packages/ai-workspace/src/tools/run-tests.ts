@@ -91,7 +91,7 @@ export interface MakeRunTestsToolOptions {
    * The grammar of the shell the line runs in; with `interpreter` it picks
    * the quoting: single quotes (doubled inside) for PowerShell.
    */
-  dialect?: "posix" | "cmd" | "powershell";
+  dialect?: "posix" | "cmd" | "powershell" | "powershell5";
   /** The platform quoting is chosen for. Default: the running one. */
   platform?: NodeJS.Platform;
 }
@@ -100,10 +100,10 @@ export interface MakeRunTestsToolOptions {
 export function quotePattern(
   pattern: string,
   interpreter: WorkspaceShellInterpreter,
-  dialect?: "posix" | "cmd" | "powershell",
+  dialect?: "posix" | "cmd" | "powershell" | "powershell5",
   platform: NodeJS.Platform = process.platform,
 ): string {
-  if (dialect === "powershell" || interpreter === "powershell") {
+  if (dialect === "powershell" || dialect === "powershell5" || interpreter === "powershell") {
     // PowerShell also reads the typographic single quotes as quotes; each is
     // doubled to stay literal.
     return `'${pattern.replace(/['\u2018\u2019\u201A\u201B]/g, "$&$&")}'`;

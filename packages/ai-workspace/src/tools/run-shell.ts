@@ -96,12 +96,12 @@ export interface MakeRunShellToolOptions {
    */
   shellLabel?: string;
   /** The grammar of that shell; selects the syntax rules in the description. */
-  shellDialect?: "posix" | "cmd" | "powershell" | "none";
+  shellDialect?: "posix" | "cmd" | "powershell" | "powershell5" | "none";
   /** The operating system named in the description. Default: the running one. */
   platform?: NodeJS.Platform;
 }
 
-const DIALECT_RULES: Record<"posix" | "cmd" | "powershell", string> = {
+const DIALECT_RULES: Record<"posix" | "cmd" | "powershell" | "powershell5", string> = {
   posix:
     "Use POSIX shell syntax: `;`, `&&`, `||`, pipes, quotes, `$( )` and redirections are supported, " +
     "and every command in the line is checked. Compound statements (`if`, `for`), brace expansion, " +
@@ -114,6 +114,12 @@ const DIALECT_RULES: Record<"posix" | "cmd" | "powershell", string> = {
     "`>`, `>>`, `2>` and `2>&1` are supported, and every command in the line is checked (aliases such as " +
     "`rm` and `Remove-Item` are treated alike). Script blocks, `Invoke-Expression`, here-strings, " +
     "splatting and `if` / `foreach` are not.",
+  powershell5:
+    "Use Windows PowerShell 5.1 syntax: `;`, pipes, `$( )`, the call operator `&` and the redirections " +
+    "`>`, `>>`, `2>` and `2>&1` are supported, and every command in the line is checked (aliases such as " +
+    "`rm` and `Remove-Item` are treated alike). This version cannot chain with `&&` or `||`: put one " +
+    "command per call, or join with `;` (which runs the next command whatever the exit code). Script " +
+    "blocks, `Invoke-Expression`, here-strings, splatting and `if` / `foreach` are not supported.",
 };
 
 const PLATFORM_NAMES: Partial<Record<NodeJS.Platform, string>> = {

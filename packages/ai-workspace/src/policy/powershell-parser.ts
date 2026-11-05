@@ -94,6 +94,7 @@ class PowerShellParser {
     private readonly src: string,
     public readonly commands: ShellSimpleCommand[] = [],
     private readonly depth = 0,
+    private readonly chaining = true,
   ) {}
 
   private atEnd(): boolean {
@@ -170,6 +171,12 @@ class PowerShellParser {
 
   private readListOperator(): string | null {
     const char = this.peek();
+
+    if (!this.chaining && ((char === "&" && this.peek(1) === "&") || (char === "|" && this.peek(1) === "|"))) {
+      throw unsupported(
+        `Windows PowerShell 5.1 cannot run ${char}${char}; use ; or if ($?) { ... } instead.`,
+      );
+    }
 
     if (char === "&" && this.peek(1) === "&") {
       this.pos += 2;
@@ -609,7 +616,7 @@ class PowerShellParser {
 
     const inner = this.src.slice(open + 1, index);
 
-    new PowerShellParser(inner, this.commands, this.depth + 1).parseProgram([]);
+    new PowerShellParser(inner, this.commands, this.depth + 1, this.chaining).parseProgram([]);
     this.pos = index + 1;
   }
 
@@ -646,9 +653,12 @@ class PowerShellParser {
 }
 
 /** Parse a PowerShell command line for the shell policy. Never throws. */
-export function parsePowerShellLine(line: string): ShellParseResult {
+export function parsePowerShellLine(
+  line: string,
+  options?: { chaining?: boolean },
+): ShellParseResult {
   const segments: ShellSegment[] = [];
-  const parser = new PowerShellParser(line);
+  const parser = new PowerShellParser(line, [], 0, options?.chaining !== false);
 
   try {
     parser.parseProgram(segments);

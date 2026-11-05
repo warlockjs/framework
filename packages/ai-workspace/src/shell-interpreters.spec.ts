@@ -55,13 +55,31 @@ describe("resolveShell", () => {
       file: pwsh,
       label: "PowerShell 7 (pwsh)",
     });
-    expect(resolveShell({ interpreter: "auto" }, host("win32", [windowsPowerShell])).label).toBe(
-      "PowerShell",
-    );
+    expect(resolveShell({ interpreter: "auto" }, host("win32", [windowsPowerShell]))).toMatchObject({
+      interpreter: "powershell",
+      dialect: "powershell5",
+      edition: "desktop",
+      version: "5.1",
+      label: "Windows PowerShell 5.1 (powershell)",
+    });
+    expect(resolveShell({ interpreter: "auto" }, host("win32", [pwsh]))).toMatchObject({
+      dialect: "powershell",
+      edition: "core",
+    });
     expect(resolveShell({ interpreter: "auto" }, host("win32", [git, gitBash]))).toMatchObject({
       interpreter: "bash",
       file: gitBash,
     });
+    // Git Bash wins over Windows PowerShell 5.1.
+    expect(
+      resolveShell({ interpreter: "auto" }, host("win32", [windowsPowerShell, git, gitBash])),
+    ).toMatchObject({ interpreter: "bash", file: gitBash });
+    expect(
+      resolveShell(
+        { interpreter: "auto" },
+        { ...host("win32", [pwsh]), powershellVersion: () => "7.4.6" },
+      ).version,
+    ).toBe("7.4.6");
     expect(resolveShell({ interpreter: "auto" }, host("win32", [])).interpreter).toBe("cmd");
   });
 
@@ -283,6 +301,42 @@ describe("PowerShell dialect", () => {
     expect(check(ps({ allowCommand: () => true }), "echo $env:HOME").reason).toBe(
       "unsupported-syntax",
     );
+  });
+});
+
+describe("Windows PowerShell 5.1 dialect", () => {
+  it("refuses && and || with a clear message but keeps ;", () => {
+    for (const operator of ["&&", "||"]) {
+      const parsed = parseShellLine(`git add . ${operator} git commit`, "powershell5");
+
+      expect(parsed).toMatchObject({ ok: false, reason: "unsupported-syntax" });
+      expect(parsed.ok === false && parsed.message).toContain(
+        `Windows PowerShell 5.1 cannot run ${operator}; use ; or if ($?) { ... }`,
+      );
+    }
+
+    expect(parseShellLine("git add . ; git commit", "powershell5").ok).toBe(true);
+    expect(parseShellLine("echo $(a && b)", "powershell5").ok).toBe(false);
+    expect(parseShellLine("a && b", "powershell").ok).toBe(true);
+  });
+
+  it("is checked like PowerShell otherwise", () => {
+    const policy = ps({ deny: ["git"] });
+
+    expect(checkShellCommandInDialect(policy, "git status", "powershell5").allowed).toBe(false);
+    expect(checkShellCommandInDialect(policy, "git a && ls", "powershell5").allowed).toBe(false);
+  });
+
+  it("does not promise chaining in the run_shell description", () => {
+    const tool = makeRunShellTool({} as never, {
+      shellLabel: "Windows PowerShell 5.1 (powershell)",
+      shellDialect: "powershell5",
+      platform: "win32",
+    });
+
+    expect(tool.description).toContain("using Windows PowerShell 5.1 (powershell).");
+    expect(tool.description).toContain("cannot chain with `&&` or `||`");
+    expect(tool.description).not.toContain("`;`, `&&`");
   });
 });
 

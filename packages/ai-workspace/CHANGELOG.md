@@ -4,6 +4,16 @@ All notable changes to `@warlock.js/ai-workspace` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.45.0
+
+### Added
+
+- `resolveShell()` reports which PowerShell it found: `ResolvedShell` gains `edition` (`"desktop"` for Windows PowerShell 5.1, `"core"` for PowerShell 7+; exported type `PowerShellEdition`) and `version` (`"5.1"` for Windows PowerShell; for `pwsh` when `ShellHost.powershellVersion` is supplied). Windows PowerShell 5.1 gets the label `Windows PowerShell 5.1 (powershell)` and its own `"powershell5"` dialect, whose parser refuses `&&` and `||` with "Windows PowerShell 5.1 cannot run &&; use ; or if ($?) { ... } instead.". `run_shell`'s description for that dialect no longer promises chaining.
+
+### Changed
+
+- On Windows, `interpreter: "auto"` now picks `pwsh` (PowerShell 7+), then Git Bash, then Windows PowerShell 5.1, then `cmd.exe`, so a machine with Git for Windows and only PowerShell 5.1 runs `&&` lines under bash instead of failing in PowerShell.
+
 ## 5.44.0 - 2026-11-05
 
 ### Added

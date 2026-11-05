@@ -101,6 +101,7 @@ export { resolveShell } from "./policy/shell-interpreter";
 export type {
   ResolvedShell,
   ResolvedShellInterpreter,
+  PowerShellEdition,
   ShellHost,
 } from "./policy/shell-interpreter";
 export type {
