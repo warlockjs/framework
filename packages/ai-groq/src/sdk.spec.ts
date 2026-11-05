@@ -161,9 +161,10 @@ describe("GroqSDK context window", () => {
     const sdk = new GroqSDK({ apiKey: "test-key" });
 
     expect(sdk.model({ name: "llama-3.3-70b-versatile" }).capabilities?.contextWindow).toBe(131072);
-    expect(sdk.model({ name: "llama-3.3-70b-versatile", contextWindow: 64_000 }).capabilities?.contextWindow).toBe(
-      64_000,
-    );
+    expect(
+      sdk.model({ name: "llama-3.3-70b-versatile", contextWindow: 64_000 }).capabilities
+        ?.contextWindow,
+    ).toBe(64_000);
     expect(sdk.model({ name: "unlisted-model" }).capabilities).not.toHaveProperty("contextWindow");
   });
 });

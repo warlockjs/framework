@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { agent } from "../agent/agent";
 import { MockSDK } from "../mock/mock-sdk";
-import { isToolResultContent, toolResultText, TOOL_RESULT_IMAGE_PLACEHOLDER } from "./tool-result-content";
+import {
+  isToolResultContent,
+  toolResultText,
+  TOOL_RESULT_IMAGE_PLACEHOLDER,
+} from "./tool-result-content";
 import { tool } from "./tool";
 import type { StandardSchemaV1 } from "@standard-schema/spec";
 
@@ -26,7 +30,9 @@ describe("isToolResultContent", () => {
     expect(isToolResultContent({ content: [] })).toBe(false);
     expect(isToolResultContent({ content: [{ type: "text" }] })).toBe(false);
     expect(
-      isToolResultContent({ content: [{ type: "image", source: { base64: "A", mediaType: "image/bmp" } }] }),
+      isToolResultContent({
+        content: [{ type: "image", source: { base64: "A", mediaType: "image/bmp" } }],
+      }),
     ).toBe(false);
     expect(isToolResultContent([png])).toBe(false);
     expect(isToolResultContent(null)).toBe(false);

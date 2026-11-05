@@ -157,9 +157,9 @@ describe("DeepSeekSDK context window", () => {
     const sdk = new DeepSeekSDK({ apiKey: "test-key" });
 
     expect(sdk.model({ name: "deepseek-chat" }).capabilities?.contextWindow).toBe(128000);
-    expect(sdk.model({ name: "deepseek-chat", contextWindow: 64_000 }).capabilities?.contextWindow).toBe(
-      64_000,
-    );
+    expect(
+      sdk.model({ name: "deepseek-chat", contextWindow: 64_000 }).capabilities?.contextWindow,
+    ).toBe(64_000);
     expect(sdk.model({ name: "unlisted-model" }).capabilities).not.toHaveProperty("contextWindow");
   });
 });

@@ -148,9 +148,10 @@ describe("MistralSDK context window", () => {
     const sdk = new MistralSDK({ apiKey: "test-key" });
 
     expect(sdk.model({ name: "mistral-large-latest" }).capabilities?.contextWindow).toBe(128000);
-    expect(sdk.model({ name: "mistral-large-latest", contextWindow: 64_000 }).capabilities?.contextWindow).toBe(
-      64_000,
-    );
+    expect(
+      sdk.model({ name: "mistral-large-latest", contextWindow: 64_000 }).capabilities
+        ?.contextWindow,
+    ).toBe(64_000);
     expect(sdk.model({ name: "unlisted-model" }).capabilities).not.toHaveProperty("contextWindow");
   });
 });

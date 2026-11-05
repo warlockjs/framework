@@ -41,4 +41,8 @@ export type {
   ToolSchemaTarget,
 } from "./tool-schema-lint";
 
-export { isToolResultContent, toolResultText, TOOL_RESULT_IMAGE_PLACEHOLDER } from "./tool-result-content";
+export {
+  isToolResultContent,
+  toolResultText,
+  TOOL_RESULT_IMAGE_PLACEHOLDER,
+} from "./tool-result-content";

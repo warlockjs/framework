@@ -1,4 +1,9 @@
-import { InvalidRequestError, toolResultText, type ContentPart, type Message } from "@warlock.js/ai";
+import {
+  InvalidRequestError,
+  toolResultText,
+  type ContentPart,
+  type Message,
+} from "@warlock.js/ai";
 import type OpenAI from "openai";
 
 /**

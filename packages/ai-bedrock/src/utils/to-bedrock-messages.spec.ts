@@ -382,7 +382,14 @@ describe("toBedrockMessages", () => {
 
   it("maps image parts in a tool result to a toolResult image block", () => {
     const messages: Message[] = [
-      { role: "tool", toolCallId: "tu_1", content: [{ type: "text", text: "shot" }, { type: "image", source: { base64: "AAAA", mediaType: "image/png" } }] },
+      {
+        role: "tool",
+        toolCallId: "tu_1",
+        content: [
+          { type: "text", text: "shot" },
+          { type: "image", source: { base64: "AAAA", mediaType: "image/png" } },
+        ],
+      },
     ];
 
     expect(toBedrockMessages(messages).messages).toEqual([

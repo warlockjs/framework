@@ -1,4 +1,9 @@
-import { TOOL_RESULT_IMAGE_PLACEHOLDER, type ContentPart, type Message, type ModelToolCallRequest } from "@warlock.js/ai";
+import {
+  TOOL_RESULT_IMAGE_PLACEHOLDER,
+  type ContentPart,
+  type Message,
+  type ModelToolCallRequest,
+} from "@warlock.js/ai";
 import type Anthropic from "@anthropic-ai/sdk";
 import { fromProviderBlocks } from "./provider-blocks";
 

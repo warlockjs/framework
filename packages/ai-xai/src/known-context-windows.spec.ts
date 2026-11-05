@@ -2,7 +2,16 @@ import { describe, expect, it } from "vitest";
 import { inferContextWindow } from "./known-context-windows";
 
 describe("known chat models (xai)", () => {
-  it.each(["grok-4", "grok-4-fast-reasoning", "grok-4-1-fast", "grok-code-fast-1", "grok-3", "grok-3-mini", "grok-2", "grok-2-vision"])("reports a positive window for %s", (name) => {
+  it.each([
+    "grok-4",
+    "grok-4-fast-reasoning",
+    "grok-4-1-fast",
+    "grok-code-fast-1",
+    "grok-3",
+    "grok-3-mini",
+    "grok-2",
+    "grok-2-vision",
+  ])("reports a positive window for %s", (name) => {
     expect(inferContextWindow(name)).toBeGreaterThan(0);
   });
 

@@ -1,4 +1,9 @@
-import { InvalidRequestError, toolResultText, type ContentPart, type Message } from "@warlock.js/ai";
+import {
+  InvalidRequestError,
+  toolResultText,
+  type ContentPart,
+  type Message,
+} from "@warlock.js/ai";
 import type OpenAI from "openai";
 import { stringifyContent, toImageUrl } from "./to-openai-messages";
 import { readReasoningReplay, toReplayReasoningItem } from "./reasoning-replay";
@@ -131,7 +136,11 @@ function toToolOutput(
 
     if (part.type === "image") {
       return [
-        { type: "input_image" as const, image_url: toImageUrl(part.source), detail: "auto" as const },
+        {
+          type: "input_image" as const,
+          image_url: toImageUrl(part.source),
+          detail: "auto" as const,
+        },
       ];
     }
 

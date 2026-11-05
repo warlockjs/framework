@@ -258,7 +258,14 @@ describe("toOpenAIMessages", () => {
 
   it("replaces image parts in a tool message with the placeholder text", () => {
     const messages: Message[] = [
-      { role: "tool", toolCallId: "c1", content: [{ type: "text", text: "shot" }, { type: "image", source: { base64: "AAAA", mediaType: "image/png" } }] },
+      {
+        role: "tool",
+        toolCallId: "c1",
+        content: [
+          { type: "text", text: "shot" },
+          { type: "image", source: { base64: "AAAA", mediaType: "image/png" } },
+        ],
+      },
     ];
 
     expect(toOpenAIMessages(messages)).toEqual([
