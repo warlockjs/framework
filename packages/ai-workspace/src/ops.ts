@@ -6,6 +6,7 @@ import { runAfterEdit } from "./hooks/after-edit";
 import { OutputSpiller, splitLines } from "./output/spill";
 import { globToRegExp, isInside, matchesAnyGlob } from "./policy/jail";
 import { buildCommandEnv, resolveInJail } from "./policy/policy";
+import { refusalReason, samePattern } from "./policy/approval-helpers";
 import { checkShellCommand } from "./policy/shell-check";
 import { resolveShell, type ResolvedShell } from "./policy/shell-interpreter";
 import { DEFAULT_MAX_BACKGROUND_JOBS, ShellJobs } from "./shell-jobs";
@@ -372,6 +373,7 @@ class Ops implements WorkspaceOps {
     return {
       content: spilled?.content ?? content,
       ...(spilled !== undefined ? { truncation: spilled.truncation } : {}),
+      ...(spilled?.truncation.path !== undefined ? { spilledTo: [spilled.truncation.path] } : {}),
       startLine: offset,
       endLine,
       totalLines,
@@ -623,14 +625,22 @@ class Ops implements WorkspaceOps {
     }
 
     if (decision?.allow !== true) {
+      const reason = refusalReason(decision?.reason);
+
       throw new WorkspacePolicyError(
-        `Running ${asks.map((ask) => `\`${ask.argv.join(" ")}\``).join(", ")} was not approved.`,
+        `Running ${asks.map((ask) => `\`${ask.argv.join(" ")}\``).join(", ")} was not approved${reason}`,
         { type: "denied-command", reason: "approval-denied", command },
       );
     }
 
-    if (decision.remember !== undefined && !this.approvals.includes(decision.remember)) {
-      this.approvals.push(decision.remember);
+    if (decision.remember !== undefined) {
+      const patterns = Array.isArray(decision.remember) ? decision.remember : [decision.remember];
+
+      for (const pattern of patterns as WorkspaceCommandPattern[]) {
+        if (!this.approvals.some((entry) => samePattern(entry, pattern))) {
+          this.approvals.push(pattern);
+        }
+      }
     }
   }
 
@@ -681,6 +691,7 @@ class Ops implements WorkspaceOps {
       timedOut: result.timedOut && !cancelled,
       cancelled,
       ...(truncation !== undefined ? { truncation } : {}),
+      ...spilledField(truncation),
     };
   }
 
@@ -741,7 +752,14 @@ class Ops implements WorkspaceOps {
 
     return truncation === undefined
       ? result
-      : { ...result, stdout: stdout.value, stderr: stderr.value, truncated: true, truncation };
+      : {
+          ...result,
+          stdout: stdout.value,
+          stderr: stderr.value,
+          truncated: true,
+          truncation,
+          ...spilledField(truncation),
+        };
   }
 
   /**
@@ -987,6 +1005,7 @@ class Ops implements WorkspaceOps {
           total: matches.length,
           truncated: true,
           truncation: fitted.truncation,
+          ...spilledField({ stdout: fitted.truncation }),
         };
   }
 
@@ -996,7 +1015,12 @@ class Ops implements WorkspaceOps {
 
     return fitted.truncation === undefined
       ? { paths: all }
-      : { paths: fitted.items, truncated: true, truncation: fitted.truncation };
+      : {
+          paths: fitted.items,
+          truncated: true,
+          truncation: fitted.truncation,
+          ...spilledField({ stdout: fitted.truncation }),
+        };
   }
 
   public async glob(pattern: string): Promise<string[]> {
@@ -1047,6 +1071,17 @@ class Ops implements WorkspaceOps {
       denyPaths !== undefined && denyPaths.length > 0 && matchesAnyGlob(relativePath, denyPaths)
     );
   }
+}
+
+/** `{ spilledTo }` for every spill file named in the truncation metadata, or nothing. */
+function spilledField(
+  truncation: { stdout?: WorkspaceTruncation; stderr?: WorkspaceTruncation } | undefined,
+): { spilledTo?: string[] } {
+  const paths = [truncation?.stdout?.path, truncation?.stderr?.path].filter(
+    (file): file is string => file !== undefined,
+  );
+
+  return paths.length > 0 ? { spilledTo: paths } : {};
 }
 
 /** Combine per-stream truncation metadata; `undefined` when neither stream was clipped. */

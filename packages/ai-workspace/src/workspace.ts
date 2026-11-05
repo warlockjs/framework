@@ -4,6 +4,7 @@ import { createLocalBackend } from "./backends/local";
 import { createMockBackend } from "./backends/mock";
 import { WorkspacePolicyError } from "./errors";
 import { createOps } from "./ops";
+import { samePattern } from "./policy/approval-helpers";
 import { classifyShellCommand } from "./policy/shell-check";
 import { resolveShell, type ResolvedShell } from "./policy/shell-interpreter";
 import { ShellJobs } from "./shell-jobs";
@@ -140,7 +141,11 @@ class WorkspaceImpl implements Workspace {
 
   public readonly tools: WorkspaceTools;
 
-  public readonly shell: { classify(line: string): WorkspaceShellClassification };
+  public readonly shell: {
+    classify(line: string): WorkspaceShellClassification;
+    remembered(): readonly WorkspaceCommandPattern[];
+    forget(pattern: WorkspaceCommandPattern): boolean;
+  };
 
   /** The shell the policy's interpreter resolves to on this host. */
   private readonly resolvedShell: ResolvedShell;
@@ -157,7 +162,23 @@ class WorkspaceImpl implements Workspace {
     this.allowedTools = new Set(allowedTools);
     this.state = state ?? { jobs: new ShellJobs(), todos: new TodoStore(), approvals: [] };
     this.resolvedShell = resolveShell(policy.shell);
-    this.shell = { classify: (line) => classifyShellCommand(line, policy) };
+    const approvals = this.state.approvals;
+
+    this.shell = {
+      classify: (line) => classifyShellCommand(line, policy),
+      remembered: () => [...approvals],
+      forget: (pattern) => {
+        const index = approvals.findIndex((entry) => samePattern(entry, pattern));
+
+        if (index === -1) {
+          return false;
+        }
+
+        approvals.splice(index, 1);
+
+        return true;
+      },
+    };
 
     const backend = selectBackend(policy);
     this.ops = createOps(backend, policy, {

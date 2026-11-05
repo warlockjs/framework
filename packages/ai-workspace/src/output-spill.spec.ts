@@ -138,6 +138,31 @@ describe("output spill", () => {
     expect(glob?.truncation?.total.lines).toBe(30);
   });
 
+  it("lists spill files flat in spilledTo and ends the text with the file", async () => {
+    const spillDir = path.join(jailRoot, ".spill");
+    const { ops } = setup(
+      { output: { spillDir, maxBytes: 4096, maxLines: 50 } },
+      { commands: { big: { stdout: BIG } } },
+    );
+    const result = await ops.exec("big");
+    const file = result.truncation?.stdout?.path as string;
+
+    expect(result.spilledTo).toEqual([file]);
+    expect(result.stdout.endsWith(`[full output saved to ${file}]`)).toBe(true);
+  });
+
+  it("lists the spill file of a spilled read in spilledTo", async () => {
+    const content = Array.from({ length: 200 }, (_, index) => `row ${index}`).join("\n");
+    const { ops } = setup(
+      { read: { maxBytes: 300 }, output: { spillDir: path.join(jailRoot, ".spill") } },
+      { files: { [path.join(jailRoot, "big.txt")]: content } },
+    );
+    const result = await ops.readFile("big.txt");
+
+    expect(result.spilledTo).toEqual([result.truncation?.path]);
+    expect(result.content.endsWith(`full output saved to ${result.truncation?.path}]`)).toBe(true);
+  });
+
   it("spills a read that read.maxBytes cut", async () => {
     const content = Array.from({ length: 200 }, (_, index) => `row ${index}`).join("\n");
     const { backend, ops } = setup(

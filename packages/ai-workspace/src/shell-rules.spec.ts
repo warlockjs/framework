@@ -129,6 +129,55 @@ describe("shell rules (allow / ask / deny)", () => {
     expect(onAsk).toHaveBeenCalledTimes(1);
   });
 
+  it("remembers several patterns from one approval, lists and forgets them", async () => {
+    const onAsk = vi.fn<WorkspaceShellOnAsk>(async () => ({
+      allow: true,
+      remember: ["git push", "npm test"],
+    }));
+    const ws = build({
+      rules: [
+        { match: "git push", effect: "ask" },
+        { match: "npm test", effect: "ask" },
+      ],
+      denyPatterns: ["git push --force"],
+      onAsk,
+    });
+
+    await ws.exec("git push origin a && npm test");
+    expect(ws.shell.remembered()).toEqual(["git push", "npm test"]);
+
+    await ws.exec("git push origin b");
+    await ws.exec("npm test");
+    expect(onAsk).toHaveBeenCalledTimes(1);
+    await expect(ws.exec("git push --force")).rejects.toMatchObject({ reason: "denied-pattern" });
+
+    expect(ws.shell.forget("git push")).toBe(true);
+    expect(ws.shell.forget("git push")).toBe(false);
+    expect(ws.shell.remembered()).toEqual(["npm test"]);
+    expect(ws.readonly().shell.remembered()).toEqual(["npm test"]);
+
+    await ws.exec("npm test");
+    expect(onAsk).toHaveBeenCalledTimes(1);
+    await ws.exec("git push origin c");
+    expect(onAsk).toHaveBeenCalledTimes(2);
+  });
+
+  it("passes the owner's refusal reason to the model, bounded", async () => {
+    const ws = build({
+      rules,
+      onAsk: async () => ({ allow: false, reason: "use staging" }),
+    });
+    const { error } = await ws.tools.runShell().invoke({ command: "git push" });
+
+    expect(String(error?.message ?? error)).toContain("use staging");
+
+    const long = build({ rules, onAsk: async () => ({ allow: false, reason: "x".repeat(900) }) });
+    const refused = await long.exec("git push").catch((caught: Error) => caught.message);
+
+    expect(refused).toContain("[truncated]");
+    expect(String(refused).length).toBeLessThan(700);
+  });
+
   it("refuses with approval-denied when the host says no or throws", async () => {
     const no = build({ rules, onAsk: async () => ({ allow: false }) });
     const boom = build({

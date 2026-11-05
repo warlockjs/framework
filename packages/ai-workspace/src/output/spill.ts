@@ -290,6 +290,11 @@ export class OutputSpiller {
 
     if (tail.length > 0) {
       parts.push(tail.join("\n"));
+
+      // The marker sits between head and tail; end the text with the file too.
+      if (file !== undefined) {
+        parts.push(`[full output saved to ${file}]`);
+      }
     }
 
     return {

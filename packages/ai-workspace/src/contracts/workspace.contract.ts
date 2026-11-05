@@ -20,6 +20,7 @@ import type {
   WorkspaceTodoInput,
   WorkspaceToolName,
 } from "./tool-io.type";
+import type { WorkspaceCommandPattern } from "./workspace-policy.type";
 import type { WorkspaceShellClassification } from "./shell-approval.type";
 import type { WorkspacePolicy } from "./workspace-policy.type";
 
@@ -110,6 +111,17 @@ export interface Workspace {
      * cannot read with confidence returns `opaque` (why) and no commands.
      */
     classify(line: string): WorkspaceShellClassification;
+    /**
+     * The command patterns approved so far with `onAsk`'s `remember`, shared
+     * by every view of the workspace (`readonly()`, `scope()`).
+     */
+    remembered(): readonly WorkspaceCommandPattern[];
+    /**
+     * Remove a remembered pattern (a string by value, a RegExp by source and
+     * flags). Returns whether one was removed. A configured deny is
+     * unaffected either way.
+     */
+    forget(pattern: WorkspaceCommandPattern): boolean;
   };
 
   /**
