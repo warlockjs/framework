@@ -81,6 +81,7 @@ import { logAgentEvent } from "./agent-log-event";
 import { createAgentStream, type StreamController } from "./agent-stream";
 import { agentEventToStreamEvent } from "./agent-to-stream-event";
 import { JsonStreamGuard } from "./json-stream-guard";
+import { PromptFingerprintTracker } from "./prompt-fingerprint";
 import { computeAgentSignature } from "./signature";
 import { AgentTraceRecorder, resolveTraceOptions } from "../trace/agent-trace-recorder";
 import {
@@ -585,6 +586,8 @@ type InstanceHandlerMap = Map<keyof AgentEventMap, Set<AgentEventHandler<keyof A
 class Execution<TOutput> {
   private readonly trips: LLMTrip[] = [];
   private readonly compactions: AgentCompactionRecord[] = [];
+  /** Present only with `diagnostics.cacheFingerprint`. */
+  private cacheTracker?: PromptFingerprintTracker;
   private readonly toolCalls: ToolCall[] = [];
   private readonly silentToolCalls = new Set<string>();
   /** Results of `memoize` tools in this run, keyed by tool + arguments. */
@@ -1118,6 +1121,12 @@ class Execution<TOutput> {
     // without joining from elsewhere. Awaited but errors swallowed.
     await this.fireUsageHook(tripIndex, response.usage);
 
+    const fingerprinted = this.cacheTracker?.finish(response.usage);
+
+    if (fingerprinted?.cacheMiss) {
+      this.emit("agent.trip.cache-miss-cause", { tripIndex, ...fingerprinted.cacheMiss });
+    }
+
     // A response cut off by the output cap or the context window has no
     // complete answer. Any tool call it carries may have truncated input,
     // so it is never dispatched.
@@ -1173,6 +1182,7 @@ class Execution<TOutput> {
       endedAt: new Date().toISOString(),
       duration: performance.now() - tripStart,
       usage: response.usage,
+      ...(fingerprinted ? { promptFingerprint: fingerprinted.fingerprint } : {}),
       ...(response.providerMetadata ? { providerMetadata: response.providerMetadata } : {}),
       toolCalls: tripToolCalls.length > 0 ? tripToolCalls : undefined,
       ...(truncatedToolCalls ? { truncatedToolCalls } : {}),
@@ -1724,6 +1734,11 @@ class Execution<TOutput> {
    */
   private async getModelResponse(tripIndex: number): Promise<ModelResponse> {
     const baseOptions = this.buildModelCallOptions();
+
+    if (this.config.diagnostics?.cacheFingerprint) {
+      this.cacheTracker ??= new PromptFingerprintTracker(this.config.model.name);
+      this.cacheTracker.begin(this.messages, baseOptions);
+    }
 
     if (!this.streamController) {
       return this.config.model.complete(this.messages, baseOptions);
@@ -2410,6 +2425,9 @@ class Execution<TOutput> {
         provider: this.config.model.provider,
       },
       trips: this.trips,
+      ...(this.trips.at(-1)?.promptFingerprint
+        ? { promptFingerprint: this.trips.at(-1)!.promptFingerprint }
+        : {}),
       ...(this.compactions.length ? { compactions: this.compactions } : {}),
       systemPrompt: this.systemPrompt,
       // Prompt-version linkage. When the agent resolved a *named* prompt (one

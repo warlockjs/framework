@@ -4,6 +4,12 @@ All notable changes to `@warlock.js/ai-openai` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.44.0
+
+### Added
+
+- `ModelCallOptions.cacheControl.key` is sent as `prompt_cache_key` on Chat Completions and Responses requests for the providers that accept it (OpenAI, xAI, Mistral), and takes precedence over the model's `promptCacheKey`. Groq, DeepSeek and custom provider labels still receive no cache key.
+
 ## 5.40.0 - 2026-10-29
 
 ### Added

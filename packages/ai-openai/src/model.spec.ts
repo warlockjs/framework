@@ -498,6 +498,31 @@ describe("OpenAIModel.complete()", () => {
     ]);
   });
 
+  it("lets cacheControl.key override promptCacheKey, per call", async () => {
+    const { client, calls } = makeFakeClient({ completion: baseCompletion });
+    const model = new OpenAIModel(client, { name: "gpt-5.6", promptCacheKey: "tenant:42" });
+
+    await model.complete([{ role: "user", content: "hi" }], { cacheControl: { key: "agent:a" } });
+    await model.complete([{ role: "user", content: "hi" }]);
+
+    expect(calls[0]!.params.prompt_cache_key).toBe("agent:a");
+    expect(calls[1]!.params.prompt_cache_key).toBe("tenant:42");
+  });
+
+  it("sends cacheControl.key without any configured promptCacheKey, and not for groq", async () => {
+    const { client, calls } = makeFakeClient({ completion: baseCompletion });
+
+    await new OpenAIModel(client, { name: "gpt-5.6" }).complete([{ role: "user", content: "hi" }], {
+      cacheControl: { key: "k1" },
+    });
+    await new OpenAIModel(client, { name: "m" }, "groq").complete([{ role: "user", content: "hi" }], {
+      cacheControl: { key: "k1" },
+    });
+
+    expect(calls[0]!.params.prompt_cache_key).toBe("k1");
+    expect(calls[1]!.params).not.toHaveProperty("prompt_cache_key");
+  });
+
   it.each(["deepseek", "groq", "custom-gateway"])(
     "omits every cache field for the %s provider",
     async (provider) => {

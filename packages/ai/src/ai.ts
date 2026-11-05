@@ -28,7 +28,7 @@ import { dedupe } from "./middleware/builtins/dedupe";
 import { semanticCache } from "./middleware/builtins/semantic-cache";
 import { composeMiddleware, forTool } from "./middleware/helpers";
 import { mockRouter } from "./mock";
-import { fallbackModel } from "./model";
+import { fallbackModel, retryModel } from "./model";
 import { orchestrator } from "./orchestrator";
 import { planner } from "./planner";
 import { defaultPromptsManager } from "./prompts/prompts-manager";
@@ -154,6 +154,7 @@ export interface Ai {
   /** Resolve the audio media type from a filename's extension. */
   audioMediaTypeForFilename: typeof audioMediaTypeForFilename;
   fallbackModel: typeof fallbackModel;
+  retryModel: typeof retryModel;
   eval: typeof evalScorers;
   dataset: typeof dataset;
   prompt: typeof prompt;
@@ -243,6 +244,7 @@ export interface Ai {
  * - `ai.semanticRouter(...)` — route by embedding similarity to example phrases; a model router handles the unsure cases.
  * - `ai.fanOut(unit, count)` — spread one agent/workflow into N intent entries for voting / self-consistency.
  * - `ai.batch(executable, items, opts?)` — run any executable over a dataset with bounded concurrency + per-item retry.
+ * - `ai.retryModel(model, policy?)` — retry transient failures on the same model with backoff, jitter, `retryAfter` and an optional offline budget.
  * - `ai.fallbackModel(models, opts?)` — wrap an ordered model list that fails over to the next on transient provider errors.
  * - `ai.eval.{exact,contains,predicate,judge}(...)` — built-in scorer factories for `agent.eval(...)`.
  * - `ai.mockRouter(decisions, opts?)` — deterministic supervisor `route` callback for tests.
@@ -323,6 +325,7 @@ export const ai = {
   audioFromBuffer,
   audioMediaTypeForFilename,
   fallbackModel,
+  retryModel,
   eval: evalScorers,
   dataset,
   prompt,

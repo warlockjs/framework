@@ -11,6 +11,7 @@ import type {
   AgentTripCompletedPayload,
   AgentTripStartedPayload,
   AgentTripUsagePayload,
+  AgentCacheMissCausePayload,
 } from "./agent-events.type";
 import type { EventIdentity } from "./event-identity.type";
 import type {
@@ -71,6 +72,7 @@ export type AgentEventMap = WithIdentity<{
   "agent.trip.streaming": AgentStreamingPayload;
   "agent.trip.reasoning": AgentReasoningPayload;
   "agent.trip.usage": AgentTripUsagePayload;
+  "agent.trip.cache-miss-cause": AgentCacheMissCausePayload;
   "agent.trip.completed": AgentTripCompletedPayload;
   "agent.tool.streaming": AgentToolStreamingPayload;
   "agent.tool.calling": AgentToolCallingPayload;

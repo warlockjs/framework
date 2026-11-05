@@ -4,6 +4,14 @@ All notable changes to `@warlock.js/ai` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.44.0
+
+### Added
+
+- `ai.retryModel(model, policy?)` (`retryModel`) retries transient failures on the same model before they reach the caller. `RetryPolicy`: `attempts` (default 3), `baseMs` (500), `backoff`, `maxDelayMs` (30000), `jitter` (largest random multiplier, for example `1.2`), `retryOn` (codes or predicate; default rate-limit, overloaded, timeout and provider errors), `honorRetryAfter` (`true`, `false` or `{ maxMs }`; waits at least the provider's `retryAfter`, up to 15 minutes by default), `offline: { budgetMs, maxDelayMs }` (keeps retrying `ENOTFOUND`, `EAI_AGAIN`, `ENETUNREACH`, `EHOSTUNREACH` and `ENETDOWN` failures on a separate budget that does not use `attempts`; `ECONNREFUSED` is not offline), `maxTimeouts`, and `onRetry({ attempt, delayMs, cause, budget })` with `budget: "general" | "offline"`. An `x-should-retry` header on the error's `context.headers` overrides the decision. `stream()` retries only before the first content chunk. Without the wrapper nothing changes.
+- `ModelCallOptions.cacheControl.key` is a routing key for prompt caching. Adapters whose provider takes one (OpenAI-compatible `prompt_cache_key`) send it in place of the adapter-level default; others ignore it.
+- `agent({ diagnostics: { cacheFingerprint: true } })` hashes the system prompt, the tool definitions and the message prefix of every trip. `LLMTrip.promptFingerprint` holds each trip's hashes and `AgentReport.promptFingerprint` the last trip's (`{ system, tools, messagesPrefix }`). When a trip reads far fewer cached tokens than the previous trip read or wrote and the request changed, the agent emits `agent.trip.cache-miss-cause` with the changed `segments` (`"system"`, `"tools"`, `"messages"`, `"options"`), never on a cold first trip. Only hashes are kept.
+
 ## 5.43.0 - 2026-11-01
 
 ### Added

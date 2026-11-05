@@ -2,6 +2,7 @@ import type { AIError } from "../../errors/ai-error";
 import type { FinishReason } from "../finish-reason.type";
 import type { ModelToolCallRequest } from "../model-tool-call-request.type";
 import type { ProviderContentBlock } from "../provider-content-block.type";
+import type { PromptFingerprint } from "./prompt-fingerprint.type";
 import type { ToolCall } from "./tool-call.type";
 import type { Usage } from "./usage.type";
 
@@ -21,6 +22,8 @@ import type { Usage } from "./usage.type";
  * };
  */
 export type LLMTrip = {
+  /** Request fingerprint for this trip; present with `diagnostics.cacheFingerprint`. */
+  promptFingerprint?: PromptFingerprint;
   /** Raw grounding / hosted output supplied by the adapter. */
   providerMetadata?: Record<string, unknown>;
   /** 0-indexed position of this trip in the execution sequence */

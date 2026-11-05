@@ -78,6 +78,18 @@ for (const item of result.items) {
 
 **Isolation.** Items are independent — one item's failure (after its retries) never cancels a sibling, and **the batch never rejects as a whole** (`result.error` stays undefined). Failures live on each `BatchItemResult` (`status: "completed" | "failed" | "cancelled"`, `error`, `attempts`). `result.data` is the positional array of successful items' `.data` with `undefined` in failed/cancelled slots. Usage rolls up bottom-up (batch has zero own cost); each item's report attaches under `report.children[]` in original order. An `onItem` throw is swallowed — a progress hook never breaks the batch.
 
+## `ai.retryModel(model, policy?)` — retry in place
+
+Wraps one model and retries transient failures with backoff before the error surfaces. `RetryPolicy`: `attempts` (3), `baseMs` (500), `backoff`, `maxDelayMs` (30000), `jitter` (max multiplier), `retryOn` (codes or predicate), `honorRetryAfter` (`true` | `false` | `{ maxMs }`), `offline: { budgetMs, maxDelayMs }` (DNS/unreachable failures on a separate budget), `maxTimeouts`, `onRetry({ attempt, delayMs, cause, budget })`. Streams retry only before the first content chunk. Put it first in an `ai.fallbackModel` chain.
+
+```ts
+const model = ai.retryModel(openai.model({ name: "gpt-5.6" }), { attempts: 5, jitter: 1.2 });
+```
+
+## `agent({ diagnostics: { cacheFingerprint: true } })` — why did the cache miss
+
+Hashes the system prompt, tools and message prefix per trip (`trip.promptFingerprint`, `report.promptFingerprint`) and emits `agent.trip.cache-miss-cause` `{ tripIndex, segments, cachedTokens, expectedCachedTokens }` when a trip loses the cache the previous trip built and the request changed. `segments` is a list of `"system" | "tools" | "messages" | "options"`. Never fires on the first trip; hashes only.
+
 ## `ai.fallbackModel(models, options?)` — ordered model failover
 
 A drop-in `ModelContract` that wraps an ordered list and advances to the next model only on a **transient** provider error.

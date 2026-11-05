@@ -168,6 +168,36 @@ const greedy = ai.fallbackModel(
 
 > `fallbackModel` advances _instantly_ with no backoff of its own — it owns "try a different provider," not "wait and retry this one." For a rate-limit you usually want both: a backoff (retry the same provider after `error.retryAfter`) layered around the agent, and a fallback for when the provider stays down. And a _quality_ complaint ("answers are weak") is never a fallback problem — the backup only fires on transient failures, so fix the primary model or prompt instead. See the [provider-fallback recipe](/v/latest/ai/recipes/cost-provider-fallback/) for narrowing `retryOn` and the streaming caveat (failover only before the first chunk).
 
+## Retry a model call in place with `ai.retryModel`
+
+`ai.retryModel(model, policy?)` retries a transient provider failure on the same model, so a 429 or a dropped connection never reaches the agent. Put it first in an `ai.fallbackModel` chain to retry, then fail over.
+
+```ts
+const model = ai.retryModel(openai.model({ name: "gpt-5.6" }), {
+  attempts: 10,
+  baseMs: 2000,
+  maxDelayMs: 10_000,
+  jitter: 1.2,
+  honorRetryAfter: { maxMs: 15 * 60_000 },
+  offline: { budgetMs: 60 * 60_000, maxDelayMs: 30_000 },
+  maxTimeouts: 3,
+  onRetry: ({ attempt, delayMs, budget }) => log.warn(`${budget} retry ${attempt} in ${delayMs}ms`),
+});
+```
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `attempts` | `3` | Total calls including the first; offline retries are not counted. |
+| `baseMs`, `backoff`, `maxDelayMs` | `500`, `"exponential"`, `30000` | Wait before retry `n` is `baseMs * 2^(n-1)` (or `n * baseMs` for `"linear"`), capped at `maxDelayMs`. |
+| `jitter` | off | Largest random multiplier: `1.2` waits between 1x and 1.2x. |
+| `retryOn` | rate limit, overloaded, timeout, provider error | Error codes or a `(error, attempt) => boolean`. A cancelled call is never retried. An `x-should-retry` header on `error.context.headers` overrides it. |
+| `honorRetryAfter` | `true` | Wait at least the provider's `retryAfter`, up to 15 minutes (`{ maxMs }` sets the cap, `false` ignores it). It is not limited by `maxDelayMs`. |
+| `offline` | `false` | DNS and unreachable-network failures (`ENOTFOUND`, `EAI_AGAIN`, `ENETUNREACH`, `EHOSTUNREACH`, `ENETDOWN`) retry on their own budget of waiting time, past `attempts`. `ECONNREFUSED` is not offline. |
+| `maxTimeouts` | unlimited | Stop after this many timeout failures. |
+| `onRetry` | none | Called before each wait with `{ attempt, delayMs, cause, budget }`; `budget` is `"general"` or `"offline"`. |
+
+`stream()` retries only until the first content chunk. Provider SDK clients also retry internally (`maxRetries`, default 2 on the OpenAI and Anthropic clients); set `maxRetries: 0` on the SDK when `retryModel` should be the only retry layer.
+
 ## Retry transient step failures with backoff — keep the predicate narrow
 
 The OCR call is flaky: an occasional `ETIMEDOUT` or `ECONNRESET` that succeeds on the next try. Failing the whole run on the first network blip is the wrong reflex. A workflow step's `retry` block retries with bounded backoff, and `retryOn` keeps the retries pointed at _transient_ failures only — a permanent 4xx-style error should fail immediately instead of burning every attempt waiting out a backoff that can't help.

@@ -4,6 +4,7 @@ import type { ModelToolCallRequest } from "../model-tool-call-request.type";
 import type { ProviderContentBlock } from "../provider-content-block.type";
 import type { BaseReport, ReportStatus } from "./base-report.type";
 import type { LLMTrip } from "./llm-trip.type";
+import type { PromptFingerprint } from "./prompt-fingerprint.type";
 
 /**
  * One normalized turn of an agent's assembled conversation, captured
@@ -73,6 +74,12 @@ export type AgentReport = BaseReport & {
   model: { name: string; provider: string };
   /** Every LLM round-trip that happened during execution. */
   trips: LLMTrip[];
+  /**
+   * Hashes of the last trip's system prompt, tools and message prefix, for
+   * cache-stability checks (each trip carries its own on `trips[].promptFingerprint`).
+   * Present only with `diagnostics: { cacheFingerprint: true }`.
+   */
+  promptFingerprint?: PromptFingerprint;
   /** Compaction decisions and counter failures; absent when no decision was made. */
   compactions?: AgentCompactionRecord[];
   /**

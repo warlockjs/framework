@@ -12,6 +12,7 @@ export type {
   ExecutionStatus,
 } from "./execution-report.type";
 export type { LLMTrip } from "./llm-trip.type";
+export type { CacheMissSegment, PromptFingerprint } from "./prompt-fingerprint.type";
 export type {
   CompactionResult,
   OrchestratorAwaitingStatus,

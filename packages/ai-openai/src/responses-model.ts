@@ -451,7 +451,7 @@ export class OpenAIResponsesModel implements ModelContract {
         ...(toolChoice !== undefined ? { tool_choice: toolChoice } : {}),
         ...this.buildTextFormat(options?.responseSchema),
         ...this.buildReasoningParams(options?.reasoning),
-        ...buildPromptCacheParams(this.provider, this.config),
+        ...buildPromptCacheParams(this.provider, this.config, options),
       },
       options,
     );
