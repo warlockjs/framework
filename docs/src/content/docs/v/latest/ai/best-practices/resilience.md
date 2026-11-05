@@ -185,16 +185,16 @@ const model = ai.retryModel(openai.model({ name: "gpt-5.6" }), {
 });
 ```
 
-| Option | Default | Meaning |
-| --- | --- | --- |
-| `attempts` | `3` | Total calls including the first; offline retries are not counted. |
-| `baseMs`, `backoff`, `maxDelayMs` | `500`, `"exponential"`, `30000` | Wait before retry `n` is `baseMs * 2^(n-1)` (or `n * baseMs` for `"linear"`), capped at `maxDelayMs`. |
-| `jitter` | off | Largest random multiplier: `1.2` waits between 1x and 1.2x. |
-| `retryOn` | rate limit, overloaded, timeout, provider error | Error codes or a `(error, attempt) => boolean`. A cancelled call is never retried. An `x-should-retry` header on `error.context.headers` overrides it. |
-| `honorRetryAfter` | `true` | Wait at least the provider's `retryAfter`, up to 15 minutes (`{ maxMs }` sets the cap, `false` ignores it). It is not limited by `maxDelayMs`. |
-| `offline` | `false` | DNS and unreachable-network failures (`ENOTFOUND`, `EAI_AGAIN`, `ENETUNREACH`, `EHOSTUNREACH`, `ENETDOWN`) retry on their own budget of waiting time, past `attempts`. `ECONNREFUSED` is not offline. |
-| `maxTimeouts` | unlimited | Stop after this many timeout failures. |
-| `onRetry` | none | Called before each wait with `{ attempt, delayMs, cause, budget }`; `budget` is `"general"` or `"offline"`. |
+| Option                            | Default                                         | Meaning                                                                                                                                                                                               |
+| --------------------------------- | ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `attempts`                        | `3`                                             | Total calls including the first; offline retries are not counted.                                                                                                                                     |
+| `baseMs`, `backoff`, `maxDelayMs` | `500`, `"exponential"`, `30000`                 | Wait before retry `n` is `baseMs * 2^(n-1)` (or `n * baseMs` for `"linear"`), capped at `maxDelayMs`.                                                                                                 |
+| `jitter`                          | off                                             | Largest random multiplier: `1.2` waits between 1x and 1.2x.                                                                                                                                           |
+| `retryOn`                         | rate limit, overloaded, timeout, provider error | Error codes or a `(error, attempt) => boolean`. A cancelled call is never retried. An `x-should-retry` header on `error.context.headers` overrides it.                                                |
+| `honorRetryAfter`                 | `true`                                          | Wait at least the provider's `retryAfter`, up to 15 minutes (`{ maxMs }` sets the cap, `false` ignores it). It is not limited by `maxDelayMs`.                                                        |
+| `offline`                         | `false`                                         | DNS and unreachable-network failures (`ENOTFOUND`, `EAI_AGAIN`, `ENETUNREACH`, `EHOSTUNREACH`, `ENETDOWN`) retry on their own budget of waiting time, past `attempts`. `ECONNREFUSED` is not offline. |
+| `maxTimeouts`                     | unlimited                                       | Stop after this many timeout failures.                                                                                                                                                                |
+| `onRetry`                         | none                                            | Called before each wait with `{ attempt, delayMs, cause, budget }`; `budget` is `"general"` or `"offline"`.                                                                                           |
 
 `stream()` retries only until the first content chunk. Provider SDK clients also retry internally (`maxRetries`, default 2 on the OpenAI and Anthropic clients); set `maxRetries: 0` on the SDK when `retryModel` should be the only retry layer.
 

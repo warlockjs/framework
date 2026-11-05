@@ -21318,7 +21318,9 @@ The `cache` singleton (a `CacheManager`) fronts one active driver. Everything, f
 4. Invalidate in groups: `use-cache-tags.md` or `use-cache-namespace.md`.
 5. Stampede protection and freshness: `use-swr.md`, `use-cache-lock.md`.
 6. TTL constants, key parsing and vector helpers: `use-cache-utils.md`.
-7. Test with the mock driver: `test-cache-code.md`; errors and metrics: `handle-cache-errors.md`, `observe-cache.md`.
+7. Keep sessions alive and run work once: `use-cache-extend.md` (sliding expiry), `use-cache-idempotent.md` (payments, webhooks, retried jobs).
+8. Probabilistic structures (Bloom, cuckoo, unique counter, frequency): `use-cache-structures.md`.
+9. Test with the mock driver: `test-cache-code.md`; errors and metrics: `handle-cache-errors.md`, `observe-cache.md`.
 
 ## Conventions and pitfalls
 
@@ -22509,6 +22511,62 @@ returned promise rejects.
 - The `use-cache-tags` topic — invalidate a batch by tag
 
 
+## use-cache-extend  `@warlock.js/cache/skills/use-cache-extend/SKILL.md`
+
+---
+name: use-cache-extend
+description: 'Sliding expiry via cache.extend(key, ttl) — keeps the value and resets expiry to ttl from now (not added to time left); false when the key is missing. Triggers: `cache.extend`, "keep the session alive", "sliding expiration", "touch a cache key". Skip: refresh the value — `cache.set`; slide on every read — `memoryExtended` driver in `pick-cache-driver`.'
+---
+
+# `cache.extend(key, ttl)` — sliding expiry
+
+Keeps the cached value and makes it expire `ttl` from now. Resolves to `true` when extended, `false` when the key is missing or already expired (nothing is created).
+
+```ts
+const alive = await cache.extend(`session.${id}`, "30m");
+```
+
+## Rules
+
+- It RESETS the deadline to `ttl` from the call. It does not add `ttl` to the time left: a 10-minute entry with 4 minutes left, extended by `"10m"`, expires in 10 minutes, not 14. A shorter `ttl` shortens the entry.
+- `ttl` takes the same forms as `set`: seconds or a duration string. `0` or `Infinity` removes the expiry. Negative, `NaN` or an unparseable string throws `CacheConfigurationError`.
+- Works on `cache`, `cache.namespace(...)` (key is prefixed) and `cache.tags(...)` (tags untouched).
+- Redis uses one atomic `PEXPIRE`; `pg` one `UPDATE`; memory drivers update in place; `file` and custom `BaseCacheDriver` subclasses read and rewrite the value. `null` always returns `false`.
+
+Docs: `/v/latest/cache/extend/`.
+
+
+## use-cache-idempotent  `@warlock.js/cache/skills/use-cache-idempotent/SKILL.md`
+
+---
+name: use-cache-idempotent
+description: 'Run-once-per-key via idempotent(key, fn, {ttl}) or cache.idempotent — concurrent calls share one run, repeats within ttl replay the stored result, ttl 0 is in-flight dedupe only, failures are never stored. Triggers: `idempotent`, "Idempotency-Key", "dedupe payment", "webhook delivered twice", "retried job". Skip: skip-if-busy lock — `use-cache-lock`; HTTP header middleware — core `idempotency` middleware.'
+---
+
+# `idempotent(key, fn, { ttl })`
+
+```ts
+import { idempotent } from "@warlock.js/cache";
+
+const charge = await idempotent(`charge.${order.id}`, () => gateway.charge(order), { ttl: "24h" });
+```
+
+`cache.idempotent(...)` is the same call on the manager.
+
+## Behaviour
+
+- Concurrent calls with one key share a single run (per process).
+- Repeat calls within `ttl` return the stored result without calling `fn`. Falsy, `null` and `undefined` results are stored too.
+- `ttl: 0` is pure in-flight dedupe: nothing is read from or written to the cache.
+- A run that throws stores nothing; all callers sharing it get the error; the next call runs `fn` again.
+- Results live in the cache store under `idempotent.<key>`, so with Redis or Postgres a result is shared across servers.
+- Two servers at the same instant each run `fn` unless `distributed: true`, which takes the cache lock (`lockTtl`, default `"30s"`, must exceed `fn`'s duration); waiters read the stored result, take over if the holder fails, and throw `CacheConcurrencyError` after `lockTtl`.
+- If storing the result fails, the result is still returned and the failure is logged.
+- Options: `ttl` (required), `distributed`, `lockTtl`, `driver`.
+
+Docs: `/v/latest/cache/idempotent/`.
+
+
 ## use-cache-list  `@warlock.js/cache/skills/use-cache-list/SKILL.md`
 
 ---
@@ -22895,6 +22953,58 @@ See the `configure-pg-cache` topic.
 - Don't mix vector dimensions in the same driver — re-embed when models change.
 - Don't expect `similar()` to surface a missing vector (`set` without the `vector` option). Plain KV entries stay out of the similarity index.
 - Don't use `topK: 0` or negative — `pg` rejects with `CacheConfigurationError`; memory drivers return `[]` but it's a code smell.
+
+
+## use-cache-structures  `@warlock.js/cache/skills/use-cache-structures/SKILL.md`
+
+---
+name: use-cache-structures
+description: 'Probabilistic structures on the cache manager — cache.structures.bloom, cuckoo, uniqueCounter (HyperLogLog, .merge), frequency (Count-Min + Top-K) on redis and memory drivers. Triggers: `cache.structures`, "username taken check", "daily active users", "top search terms", "bloom filter"; other drivers throw `CacheUnsupportedError`. Skip: exact sets — `cache.list`; exact counters — `use-cache-atomic`.'
+---
+
+# `cache.structures`
+
+Small structures that trade a known error for tiny memory. Supported on `redis` (RedisBloom when present, plain Redis otherwise) and `memory` / `memoryExtended` / `lru`. All other drivers throw `CacheUnsupportedError`. Every structure takes `ttl`, applied when it is first written and never pushed back.
+
+```ts
+const names = cache.structures.bloom("users.usernames", {
+  expectedItems: 1_000_000,
+  errorRate: 0.01,
+});
+await names.add("hasan");
+await names.mightContain(input); // false = definitely free
+
+const banned = cache.structures.cuckoo("users.banned", { expectedItems: 100_000 });
+await banned.add(id);
+await banned.remove(id); // only remove what was added
+
+const dau = cache.structures.uniqueCounter(`stats.dau.${today}`, { ttl: "40d" });
+await dau.add(userId);
+await dau.count();
+await cache.structures.uniqueCounter.merge(lastSevenDaysKeys).count();
+
+const terms = cache.structures.frequency("search.terms", {
+  width: 2000,
+  depth: 5,
+  topK: 100,
+  ttl: "1h",
+});
+await terms.add(term);
+await terms.estimate("laptop");
+await terms.top(10); // [{ value, count }]
+```
+
+## Facts
+
+- Bloom: 1M items at 1% is about 1.2 MB, 7 hashes. No removal, no listing. Not for exact "yes" decisions.
+- Cuckoo: real filter on RedisBloom; a counting Bloom filter elsewhere. Removing a never-added item corrupts it.
+- Unique counter: 12 KB, standard error 0.81%. Cannot answer "was X counted". Not for billing.
+- Frequency: 2000 x 5 is about 40 KB. Estimates are never below the true count. Not for rare values.
+- Keys follow the driver prefix and are stored as `structures.<kind>.<key>`.
+- A custom driver opts in with `structuresBackend(): CacheStructuresBackend` (the `StructuresCapable` shape; `isStructuresCapable(driver)` checks it). It can return a built-in backend instead of writing its own: `new MemoryStructuresBackend((key) => this.parseKey(key))`, created once and reused, or `new RedisStructuresBackend(() => client, (key) => this.parseKey(key))` for a driver that wraps a Redis client.
+- Handle types for annotations: `BloomFilter`, `CuckooFilter`, `UniqueCounter`, `UniqueCounterGroup` (from `uniqueCounter.merge`), `FrequencyTracker`. Create them through `cache.structures`, never with `new`.
+
+Docs: `/v/latest/cache/structures/`.
 
 
 ## use-cache-tags  `@warlock.js/cache/skills/use-cache-tags/SKILL.md`
@@ -26909,7 +27019,7 @@ Every process must use the same `prefix`, or they will not see each other's jobs
 
 ---
 name: define-jobs
-description: 'Define and dispatch background jobs with `@warlock.js/queue`: `defineJob({ name, queue?, attempts?, backoff?, removeOnComplete?, removeOnFail?, handle(payload, ctx) })` returns a typed job; `job.dispatch(payload, { delay, priority, jobId, attempts, backoff })`; the handler context (`id`, `attempt`, `maxAttempts`, `progress()`, `log()`); reading a job with `job.find(id)`. Triggers: `setDispatchInterceptor`, `queueFake`, `defineJob`, `.dispatch(`, `ctx.progress`, `JobContext`, `DispatchOptions`, `backoff`, `attempts`, `priority`, `jobId`; "run this in the background", "retry with backoff", "delay a job", "job progress", "idempotent dispatch". Skip: config and workers — the `configure-queue` topic; failed jobs — the `manage-failed-jobs` topic.'
+description: 'Define and dispatch background jobs with `@warlock.js/queue`: `defineJob({ name, queue?, attempts?, backoff?, timeout?, failOnTimeout?, removeOnComplete?, removeOnFail?, handle(payload, ctx) })` returns a typed job; `job.dispatch(payload, { delay, priority, jobId, attempts, backoff, timeout, failOnTimeout })`; the handler context (`id`, `attempt`, `maxAttempts`, `progress()`, `log()`); reading a job with `job.find(id)`. Triggers: `setDispatchInterceptor`, `queueFake`, `defineJob`, `.dispatch(`, `ctx.progress`, `JobContext`, `DispatchOptions`, `backoff`, `attempts`, `priority`, `jobId`; "run this in the background", "retry with backoff", "delay a job", "job progress", "idempotent dispatch". Skip: config and workers — the `configure-queue` topic; failed jobs — the `manage-failed-jobs` topic.'
 ---
 
 # Define and dispatch jobs
@@ -26946,6 +27056,10 @@ await sendInvoice.dispatch(
   },
 );
 ```
+
+## Timeouts
+
+`timeout: "2m"` (ms or duration string, must be > 0) fails an attempt that runs too long with `JobTimeoutError`; `attempts`/`backoff` still apply. `failOnTimeout: true` fails the job without retrying. Works on all drivers; set in `defineJob`, dispatch options or `queue.defaultJobOptions`. `ctx.signal` aborts on timeout: pass it to `fetch`/db calls. A handler that ignores it keeps running in the background (JS cannot kill it).
 
 Option precedence: dispatch options > `defineJob` > `queue.defaultJobOptions`.
 
@@ -38970,6 +39084,18 @@ for (const item of result.items) {
 
 **Isolation.** Items are independent — one item's failure (after its retries) never cancels a sibling, and **the batch never rejects as a whole** (`result.error` stays undefined). Failures live on each `BatchItemResult` (`status: "completed" | "failed" | "cancelled"`, `error`, `attempts`). `result.data` is the positional array of successful items' `.data` with `undefined` in failed/cancelled slots. Usage rolls up bottom-up (batch has zero own cost); each item's report attaches under `report.children[]` in original order. An `onItem` throw is swallowed — a progress hook never breaks the batch.
 
+## `ai.retryModel(model, policy?)` — retry in place
+
+Wraps one model and retries transient failures with backoff before the error surfaces. `RetryPolicy`: `attempts` (3), `baseMs` (500), `backoff`, `maxDelayMs` (30000), `jitter` (max multiplier), `retryOn` (codes or predicate), `honorRetryAfter` (`true` | `false` | `{ maxMs }`), `offline: { budgetMs, maxDelayMs }` (DNS/unreachable failures on a separate budget), `maxTimeouts`, `onRetry({ attempt, delayMs, cause, budget })`. Streams retry only before the first content chunk. Put it first in an `ai.fallbackModel` chain.
+
+```ts
+const model = ai.retryModel(openai.model({ name: "gpt-5.6" }), { attempts: 5, jitter: 1.2 });
+```
+
+## `agent({ diagnostics: { cacheFingerprint: true } })` — why did the cache miss
+
+Hashes the system prompt, tools and message prefix per trip (`trip.promptFingerprint`, `report.promptFingerprint`) and emits `agent.trip.cache-miss-cause` `{ tripIndex, segments, cachedTokens, expectedCachedTokens }` when a trip loses the cache the previous trip built and the request changed. `segments` is a list of `"system" | "tools" | "messages" | "options"`. Never fires on the first trip; hashes only.
+
 ## `ai.fallbackModel(models, options?)` — ordered model failover
 
 A drop-in `ModelContract` that wraps an ordered list and advances to the next model only on a **transient** provider error.
@@ -39347,6 +39473,8 @@ description: 'Wire agent middleware — ai.middleware.budget (token / USD caps +
 # Middleware — agent-level pipeline
 
 Cross-cutting concerns wrapped around an agent run at three agent-level granularities (`execute`, `trip`, `tool`), plus a `supervisor` level that wraps a whole supervisor run (see below). One middleware = one object. Ships with `budget`, `guardrail`, and `semanticCache` built-ins.
+
+`ai.middleware.dedupe({ name?, key? })` makes identical model calls in flight at the same moment (same agent, model, messages, `modelOptions`) share one provider call; waiters get the response with zero usage and make their own call if the first fails. In-process only, nothing kept after the call (use `semanticCache` for that), and `agent.stream()` runs are never deduplicated. List it after `semanticCache`.
 
 ## Install order at a glance
 
@@ -39771,6 +39899,10 @@ Whatever your `execute` resolves with is `JSON.stringify`'d and sent back as the
 ## Parallel calls — tools run concurrently
 
 When the model requests several tools in one turn, the agent runs them **concurrently** (default `toolDispatch: "concurrent"`, at most `maxConcurrentTools` — default 4 — at a time) and continues once all settled; results reach the model in request order. A tool that shares mutable state with another (or must see its side effects) needs `ai.agent({ toolDispatch: "sequential" })` or per-call `execute(input, { toolDispatch: "sequential" })`. `ctx.signal` carries the run's cancellation into each call.
+
+## `memoize` — reuse results of read-only tools
+
+`memoize: true | { scope: "run" | "session", ttl? }` on a tool reuses the result of an identical call (arguments compared with sorted keys). `true` is `"run"`: shared inside one agent run, including identical calls in one parallel trip. `"session"` shares across runs with the same `sessionId` for `ttl` ms (default 5 minutes, process memory; without a `sessionId` it acts as `"run"`). Failed calls are never kept. A hit is marked `memoized: true` on the `ToolCall` record and the `agent.tool.called` event; tool middleware still runs. Read-only tools only: a repeat call never reaches `execute()`.
 
 ## `mode` — feedback vs silent
 
@@ -43755,10 +43887,16 @@ call/result pairing stays intact. A model with
 
 ## Automatic compaction inside an agent run
 
-Compaction is disabled by default. Set `compaction.afterTokens` to an explicit
-input threshold; the agent never infers a provider's context-window size. Before
-each model trip (including streamed and repair trips), it checks the current
-conversation and tools against that threshold.
+Compaction is disabled by default. Set `compaction.afterTokens` to a token count
+or a window-relative `{ share, reserve?, max? }` (threshold =
+`min(floor(window * share), window - reserve, max)`, at least 1, resolved against
+`model.capabilities.contextWindow`; unknown window: no compaction, one
+`unknown-window` skip record). Before each model trip (including streamed and
+repair trips), the agent checks the current conversation and tools against it.
+`ai.compaction.summarize` also takes `input: { maxInputTokens, clipToolOutputChars,
+dropToolOutputsOlderThan, shrinkOnContextError }`, `requireHeadings` and the
+`DEFAULT_COMPACTION_TEMPLATE` / `DEFAULT_COMPACTION_HEADINGS` constants; records
+carry `summarizerInputTokens` and `attempts`.
 
 ```ts
 const worker = ai.agent({
@@ -44949,6 +45087,10 @@ const supportBot = ai.supervisor({
 ```
 
 The result is a plain `AgentContract` — usable standalone or as `router`. Hand-writing the agent (above) still works; `ai.router()` is the shortcut.
+
+#### `ai.semanticRouter()` — embedding router with a model fallback
+
+`router: ai.semanticRouter({ name, embedder, intents, examples, confidence: { min, margin }, fallback: ai.router({ model, intents }), store?, learn? })` routes the first iteration by similarity to example phrases per intent and sends unsure messages (below `min`, or closer than `margin` to the runner-up) and every later iteration to `fallback`. `examples` keys must be intents; an intent without examples is reachable only through the fallback. Vectors are embedded once and stored (default process memory, re-embedded on each process start; pass a `@warlock.js/cache` driver such as Redis or pg to share). Snapshots and `supervisor.router.decided` carry `routedBy: "semantic" | "fallback"`, `score`, `runnerUp`. `learn: true | { maxPerIntent, minScore }` stores agreeing fallback decisions as examples. `router.warm()` embeds ahead of time.
 
 #### `ai.fanOut()` — voting / self-consistency
 
@@ -46228,7 +46370,7 @@ const model = openai.model({
 });
 ```
 
-`promptCacheKey` improves matching for related requests. `promptCacheRetention` is OpenAI's maximum policy (`"in_memory" | "24h"`). `cacheControl.breakpoints` maps to `prompt_cache_breakpoint: { mode: "explicit" }` on the final user content parts (up to OpenAI's four-request limit); use it when you need to pin a reusable prefix rather than rely only on OpenAI's implicit breakpoint.
+`promptCacheKey` improves matching for related requests. A per-call `cacheControl: { key }` is sent as `prompt_cache_key` instead and wins over the model value, so one model can serve several cache groups (for example one key per agent). `promptCacheRetention` is OpenAI's maximum policy (`"in_memory" | "24h"`). `cacheControl.breakpoints` maps to `prompt_cache_breakpoint: { mode: "explicit" }` on the final user content parts (up to OpenAI's four-request limit); use it when you need to pin a reusable prefix rather than rely only on OpenAI's implicit breakpoint.
 
 Which fields reach the wire depends on the SDK provider label:
 
@@ -49413,7 +49555,7 @@ The construction `options` are the **rails** — they bound what the model may d
 | Factory                         | Name           | Model input                                                    | Returns                                          |
 | ------------------------------- | -------------- | -------------------------------------------------------------- | ------------------------------------------------ |
 | `ai.tools.webSearch(options)`   | `web_search`   | `{ query, maxResults? }`                                       | `{ results: { title, url, snippet, score? }[] }` |
-| `ai.tools.fetchUrl(options?)`   | `fetch_url`    | `{ url }`                                                      | `{ url, status, content, truncated }`            |
+| `ai.tools.fetchUrl(options?)`   | `fetch_url`    | `{ url }`                                                      | `{ url, status, content, truncated, extractor? }` |
 | `ai.tools.http(options?)`       | `http_request` | `{ method?, url, headers?, body? }`                            | `{ status, headers, body, truncated }`           |
 | `ai.tools.calculator(options?)` | `calculator`   | `{ expression }`                                               | `{ result }`                                     |
 | `ai.tools.dateTime(options?)`   | `date_time`    | `{ op, iso?, from?, to?, amount?, unit?, timeZone?, format? }` | `{ value }`                                      |
@@ -49439,7 +49581,10 @@ ai.tools.fetchUrl({
 });
 ```
 
-- `extract`: `"text"` (default — readability-extracted main text), `"html"` (raw body), or `"markdown"`. **`"text"`/`"markdown"` lazily import the `@mozilla/readability` + `jsdom` optional peers** — a missing peer is a `WebToolError` of type `"missing-peer"` carrying the `npm install @mozilla/readability jsdom` string. `"html"` needs nothing.
+- `extract`: `"text"` (default — main text), `"html"` (raw body), or `"markdown"`.
+- `extractor` (for `"text"` / `"markdown"`): `"auto"` (default) uses readability when the `@mozilla/readability` + `jsdom` optional peers load and the article is at least 200 characters, otherwise a built-in dependency-free converter; `"readability"` requires the peers (a missing peer is a `WebToolError` of type `"missing-peer"` carrying the install string); `"simple"` always uses the built-in converter and needs no peers. The result's `extractor` field (`"readability"` or `"simple"`) names the converter used; it is absent for `"html"`.
+- `retryOnChallenge` (default `true`): when the first response carries a `cf-mitigated: challenge` header, retry exactly once with an alternate `User-Agent` through the same outbound policy. Set `false` to disable.
+- Truncation at `maxBytes` never splits a multi-byte UTF-8 character: a partial trailing character is dropped.
 - `allowHosts` (when set) rejects any other host **before the fetch** (an SSRF guardrail) → `"denied-host"`, and redirect targets are held to the same allowlist.
 - **Private-network deny by default.** Every request — and every redirect hop — now routes through `@warlock.js/ai`'s hardened `guardedFetch` outbound policy instead of a local host check. It refuses private / loopback / link-local / CGNAT / cloud-metadata addresses (`169.254.169.254`, RFC1918, `localhost`, …) by resolving the hostname via DNS and checking every returned address, failing closed on resolution failure — and re-validates every redirect `Location` (scheme, allowlist, private-IP deny) before following it. This applies even with no `allowHosts` set, so a bare `ai.tools.fetchUrl()` is no longer an SSRF primitive; blocks surface as `WebToolError` `type: "denied-host"`.
 - `allowPrivateNetwork` (default `false`) — set `true` to deliberately permit a private/internal target, e.g. a tool that must call a local dev server. Pair with `allowHosts` to scope it rather than opening the whole private range.
@@ -49743,7 +49888,8 @@ Paths are resolved against `cwd` with symlinks collapsed and accepted inside `cw
 | `denyPaths`                                         | Globs (`*`, `**`, `?`) blocked **even inside `cwd`** — e.g. `[".git/**", ".env*"]`. A bare dir name (`"node_modules"`) also blocks its contents.                                                                         |
 | `shell.allow` / `shell.deny`                        | Executable **basenames** matched against every command's argv (after tokenizing — see below). **Deny wins**, case-insensitively. An `allow` list is exhaustive (fail-closed); no `shell` block at all ⇒ nothing may run. |
 | `shell.denyPatterns` / `shell.allowCommand`         | Argument rules on every command: string prefix patterns (`"git push --force"`) or RegExps, and a predicate `(argv, ctx) => true \| false \| "why"`.                                                                      |
-| `shell.interpreter`                                 | `"none"` (default, argv) or `"sh"` (opt-in shell syntax, every command checked).                                                                                                                                         |
+| `shell.interpreter`                                 | `"none"` (default, argv), `"sh"`, `"bash"`, `"powershell"`, `"cmd"` or `"auto"` (opt-in shell syntax, every command checked); `shell.interpreterPath` sets the shell executable.                                        |
+| `shell.rules` / `shell.onAsk`                       | Ordered `{ match, effect: "allow" \| "ask" \| "deny", reason? }` rules (last match wins, a deny anywhere refuses the line); `onAsk({ command, asks, signal })` returns `{ allow, remember? }`. Refusals: `"approval-required"`, `"approval-denied"`. `ws.shell.classify(line)` lists a line's commands. |
 | `shell.background`                                  | `{ maxJobs?, timeoutMs? }` — enables background commands. Absent ⇒ refused.                                                                                                                                              |
 | `list.ignore` / `list.maxDepth` / `list.maxEntries` | `list_dir` bounds: hidden globs (default `node_modules`, `.git`), depth cap (5), entry cap (500).                                                                                                                        |
 | `shell.inheritEnv`                                  | Opt-in `process.env` keys to pass through (e.g. `["PATH"]`). **Nothing leaks in otherwise** — a command can't find `node`/`npm` without `PATH`.                                                                          |
@@ -49924,9 +50070,51 @@ A custom `WorkspaceBackend` receives the signal as `exec(command, { signal })` a
 
 ## Read-before-edit (the stale-hash guard)
 
-`readFile` returns a SHA-256 `hash` of the full file. Pass it to `editFile`'s `expectHash`; if the file changed since you read it, the edit is rejected as stale so you re-read before clobbering. `editFile` also requires the `oldString` to be **exact and unique** — pass `replaceAll: true` to replace every occurrence, or include more surrounding context to disambiguate.
+`readFile` returns a SHA-256 `hash` of the full file. Pass it to `editFile`'s `expectHash`; if the file changed since you read it, the edit is rejected as stale so you re-read before clobbering. `editFile` also requires the `oldString` to be **found uniquely** (see "Finding the text to edit") — pass `replaceAll: true` to replace every occurrence, or include more surrounding context to disambiguate.
 
 Writes, edits and removes of the same path run one after another, even when the agent dispatches tool calls concurrently: of two edits pinned to the same `expectHash`, the second is rejected as stale instead of silently overwriting the first. `read.maxBytes` bounds what a read returns, not memory — the whole file is still read and hashed.
+
+
+## Finding the text to edit — `edit.matching`
+
+By default an edit looks for `oldString` in tiers and uses the first tier that finds it: the exact text, then the text with line endings normalised (an LF `oldString` finds CRLF lines), then with look-alike punctuation folded (curly quotes, en/em dashes and non-breaking spaces match their plain forms), then line by line ignoring trailing whitespace. A result found by one of the last two tiers reports `matchTier: "unicode"` or `"whitespace"`; an exact find leaves it out. A loose find must be unique: with two candidates the edit fails with `not-unique` and writes nothing, even with `replaceAll`. Replacement text takes the file's dominant line ending, so a CRLF file stays CRLF.
+
+```ts
+ai.workspace({
+  cwd,
+  edit: { matching: "tiered", missHintLines: 12, lineEndings: "preserve" },
+});
+```
+
+- `matching: "exact"` accepts only the text byte for byte.
+- `lineEndings: "lf" | "crlf"` forces the ending of replacement text.
+- When the text is not found, the `WorkspaceEditError` (`type: "not-found"`) carries a `hint`: the closest file text (at most `missHintLines` lines, 12 by default, each at most 200 characters; `0` turns it off, and it never exceeds `read.maxBytes`) or a note that `newString` is already present. A file the jail refuses never gets a hint.
+
+## Diagnostics after an edit — `hooks.afterEdit`
+
+```ts
+ai.workspace({
+  cwd,
+  hooks: {
+    afterEdit: async ({ paths, tool }) => await typecheck(paths), // returns text or nothing
+    afterEditMaxChars: 4_000,
+    afterEditTimeoutMs: 10_000,
+  },
+});
+```
+
+After `write_file`, `edit_file`, `multi_edit` or `apply_patch` writes files, the hook runs once per call with the written paths (not on a patch `dryRun`, not for deleted files). Text it returns comes back on the result as `diagnostics`, between `[diagnostics]` and `[/diagnostics]` lines; output over `afterEditMaxChars` is cut with a marker. A hook that throws or does not answer within `afterEditTimeoutMs` yields `diagnostics unavailable` and never fails the edit.
+
+## Oversized output — `output`
+
+```ts
+ai.workspace({
+  cwd,
+  output: { spillDir: ".warlock/spill", maxLines: 2_000, maxBytes: 51_200, retentionMs: 604_800_000 },
+});
+```
+
+With `output.spillDir` set, output too large to return whole (`run_shell`, `shell_output`, `grep`, `glob`, and `read_file` when `read.maxBytes` cut the window) is saved in full to `spill-<time>-<random>-<label>.txt` there. The result keeps the start and end (`keep: "head+tail"`, the default for shell output; `"head"` for the rest, or set `keep` yourself) and carries a marker such as `[showing lines 1-25 and 99976-100000 of 100000; full output saved to FILE]`. The boolean `truncated` stays; `truncation` adds `{ shown: { lines }, total: { lines, bytes }, path? }` (per stream, `truncation.stdout` / `truncation.stderr`, for commands). `read_file` may open the spill directory even when it is outside the jail, so the model can page through the file with `startLine` / `limit`; nothing else outside the jail opens, and writes never reach it. Files older than `retentionMs` (7 days by default) are removed when a workspace is created, when a new file is written and on `dispose()`; `retentionMs: 0` removes the files this workspace wrote on `dispose()`. Only files named like spill files are ever removed. Without `spillDir`, output is cut at `shell.maxOutputBytes` / `read.maxBytes` as before, and `run_shell` results still report the sizes in `truncation`.
 
 ## Errors flow as data, not throws
 

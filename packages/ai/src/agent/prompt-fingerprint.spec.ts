@@ -163,7 +163,10 @@ describe("agent diagnostics.cacheFingerprint", () => {
           trip: {
             before(context) {
               if (context.tripIndex === 1) {
-                (context.messages as Message[]).splice(0, 1, { role: "user", content: "rewritten" });
+                (context.messages as Message[]).splice(0, 1, {
+                  role: "user",
+                  content: "rewritten",
+                });
               }
 
               return undefined;

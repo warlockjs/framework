@@ -35,7 +35,18 @@ describe("token trigger", () => {
   });
 
   it("validates shapes", () => {
-    for (const bad of [0, -1, 1.5, { share: 0 }, { share: 1.1 }, { share: 0.5, reserve: -1 }, { share: 0.5, max: 0 }, {}, null, "5"]) {
+    for (const bad of [
+      0,
+      -1,
+      1.5,
+      { share: 0 },
+      { share: 1.1 },
+      { share: 0.5, reserve: -1 },
+      { share: 0.5, max: 0 },
+      {},
+      null,
+      "5",
+    ]) {
       expect(isValidTokenTrigger(bad)).toBe(false);
       expect(() => assertTokenTrigger(bad, "x")).toThrow(AgentExecutionError);
     }

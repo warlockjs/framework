@@ -16,9 +16,9 @@ describe("inferContextWindow (anthropic)", () => {
   it("surfaces on capabilities, with the config value winning", () => {
     const client = {} as never;
 
-    expect(new AnthropicModel(client, { name: "claude-haiku-4-5" }).capabilities.contextWindow).toBe(
-      200_000,
-    );
+    expect(
+      new AnthropicModel(client, { name: "claude-haiku-4-5" }).capabilities.contextWindow,
+    ).toBe(200_000);
     expect(
       new AnthropicModel(client, { name: "claude-haiku-4-5", contextWindow: 500_000 }).capabilities
         .contextWindow,

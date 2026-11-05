@@ -210,7 +210,9 @@ export function canonicalPowerShellArgv(argv: readonly string[]): string[] | und
       continue;
     }
 
-    const match = family.params.find(([name]) => parsed.name !== "" && name.startsWith(parsed.name));
+    const match = family.params.find(
+      ([name]) => parsed.name !== "" && name.startsWith(parsed.name),
+    );
 
     if (match === undefined) {
       continue;
@@ -240,12 +242,7 @@ export function canonicalPowerShellArgv(argv: readonly string[]): string[] | und
   // Keep each flag once, in a stable order.
   const unique = [...FLAG_ORDER].filter((flag) => flags.includes(flag)).join("");
 
-  return [
-    family.canonical,
-    ...(unique !== "" ? [`-${unique}`] : []),
-    ...extras,
-    ...operands,
-  ];
+  return [family.canonical, ...(unique !== "" ? [`-${unique}`] : []), ...extras, ...operands];
 }
 
 /** The names PowerShell's `cd` goes by. */

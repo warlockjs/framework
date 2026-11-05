@@ -158,7 +158,7 @@ function findByLines(view: string, needle: string): EditRange[] {
 
   const ranges: EditRange[] = [];
 
-  for (let index = 0; index + wanted.length <= lines.length; ) {
+  for (let index = 0; index + wanted.length <= lines.length;) {
     let same = true;
 
     for (let k = 0; k < wanted.length; k++) {

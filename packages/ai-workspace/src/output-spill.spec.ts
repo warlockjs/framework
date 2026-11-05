@@ -130,9 +130,7 @@ describe("output spill", () => {
     expect(grep.total).toBe(30);
     expect(grep.matches).toHaveLength(5);
     expect(grep.truncated).toBe(true);
-    expect(
-      (await ops.readFile(grep.truncation?.path as string)).content,
-    ).toContain("file-");
+    expect((await ops.readFile(grep.truncation?.path as string)).content).toContain("file-");
 
     const glob = await ops.globResult?.("dir/*.txt");
 

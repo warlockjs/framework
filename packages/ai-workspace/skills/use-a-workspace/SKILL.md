@@ -30,22 +30,22 @@ Paths are resolved against `cwd` with symlinks collapsed and accepted inside `cw
 
 ## The policy surface
 
-| Field                                               | What it does                                                                                                                                                                                                             |
-| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `cwd`                                               | **Absolute** jail root. Every path resolves against it and must stay inside.                                                                                                                                             |
-| `allowPaths`                                        | Extra readable roots outside `cwd`.                                                                                                                                                                                      |
-| `denyPaths`                                         | Globs (`*`, `**`, `?`) blocked **even inside `cwd`** — e.g. `[".git/**", ".env*"]`. A bare dir name (`"node_modules"`) also blocks its contents.                                                                         |
-| `shell.allow` / `shell.deny`                        | Executable **basenames** matched against every command's argv (after tokenizing — see below). **Deny wins**, case-insensitively. An `allow` list is exhaustive (fail-closed); no `shell` block at all ⇒ nothing may run. |
-| `shell.denyPatterns` / `shell.allowCommand`         | Argument rules on every command: string prefix patterns (`"git push --force"`) or RegExps, and a predicate `(argv, ctx) => true \| false \| "why"`.                                                                      |
-| `shell.interpreter`                                 | `"none"` (default, argv), `"sh"`, `"bash"`, `"powershell"`, `"cmd"` or `"auto"` (opt-in shell syntax, every command checked); `shell.interpreterPath` sets the shell executable.                                        |
+| Field                                               | What it does                                                                                                                                                                                                                                                                                            |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `cwd`                                               | **Absolute** jail root. Every path resolves against it and must stay inside.                                                                                                                                                                                                                            |
+| `allowPaths`                                        | Extra readable roots outside `cwd`.                                                                                                                                                                                                                                                                     |
+| `denyPaths`                                         | Globs (`*`, `**`, `?`) blocked **even inside `cwd`** — e.g. `[".git/**", ".env*"]`. A bare dir name (`"node_modules"`) also blocks its contents.                                                                                                                                                        |
+| `shell.allow` / `shell.deny`                        | Executable **basenames** matched against every command's argv (after tokenizing — see below). **Deny wins**, case-insensitively. An `allow` list is exhaustive (fail-closed); no `shell` block at all ⇒ nothing may run.                                                                                |
+| `shell.denyPatterns` / `shell.allowCommand`         | Argument rules on every command: string prefix patterns (`"git push --force"`) or RegExps, and a predicate `(argv, ctx) => true \| false \| "why"`.                                                                                                                                                     |
+| `shell.interpreter`                                 | `"none"` (default, argv), `"sh"`, `"bash"`, `"powershell"`, `"cmd"` or `"auto"` (opt-in shell syntax, every command checked); `shell.interpreterPath` sets the shell executable.                                                                                                                        |
 | `shell.rules` / `shell.onAsk`                       | Ordered `{ match, effect: "allow" \| "ask" \| "deny", reason? }` rules (last match wins, a deny anywhere refuses the line); `onAsk({ command, asks, signal })` returns `{ allow, remember? }`. Refusals: `"approval-required"`, `"approval-denied"`. `ws.shell.classify(line)` lists a line's commands. |
-| `shell.background`                                  | `{ maxJobs?, timeoutMs? }` — enables background commands. Absent ⇒ refused.                                                                                                                                              |
-| `list.ignore` / `list.maxDepth` / `list.maxEntries` | `list_dir` bounds: hidden globs (default `node_modules`, `.git`), depth cap (5), entry cap (500).                                                                                                                        |
-| `shell.inheritEnv`                                  | Opt-in `process.env` keys to pass through (e.g. `["PATH"]`). **Nothing leaks in otherwise** — a command can't find `node`/`npm` without `PATH`.                                                                          |
-| `shell.env`                                         | Explicit env vars injected into every spawned process (override inherited on collision).                                                                                                                                 |
-| `shell.timeoutMs` / `shell.maxOutputBytes`          | Per-command wall-clock cap (process tree SIGKILLed on expiry) and stdout/stderr byte cap (clipped on a character boundary).                                                                                              |
-| `read.defaultLines` / `read.maxBytes`               | Default read window + a ceiling on the UTF-8 bytes of the returned `content` (line numbers included). See [Read windows and the byte ceiling](#read-windows-and-the-byte-ceiling).                                       |
-| `backend`                                           | `"local"` (default — real disk) or `"mock"` (in-memory, for tests).                                                                                                                                                      |
+| `shell.background`                                  | `{ maxJobs?, timeoutMs? }` — enables background commands. Absent ⇒ refused.                                                                                                                                                                                                                             |
+| `list.ignore` / `list.maxDepth` / `list.maxEntries` | `list_dir` bounds: hidden globs (default `node_modules`, `.git`), depth cap (5), entry cap (500).                                                                                                                                                                                                       |
+| `shell.inheritEnv`                                  | Opt-in `process.env` keys to pass through (e.g. `["PATH"]`). **Nothing leaks in otherwise** — a command can't find `node`/`npm` without `PATH`.                                                                                                                                                         |
+| `shell.env`                                         | Explicit env vars injected into every spawned process (override inherited on collision).                                                                                                                                                                                                                |
+| `shell.timeoutMs` / `shell.maxOutputBytes`          | Per-command wall-clock cap (process tree SIGKILLed on expiry) and stdout/stderr byte cap (clipped on a character boundary).                                                                                                                                                                             |
+| `read.defaultLines` / `read.maxBytes`               | Default read window + a ceiling on the UTF-8 bytes of the returned `content` (line numbers included). See [Read windows and the byte ceiling](#read-windows-and-the-byte-ceiling).                                                                                                                      |
+| `backend`                                           | `"local"` (default — real disk) or `"mock"` (in-memory, for tests).                                                                                                                                                                                                                                     |
 
 > **The most common gotcha:** `run_shell` fails to find `node`/`npm` because the env is empty. Add `shell: { allow: ["npm", "node"], inheritEnv: ["PATH"] }`.
 
@@ -98,7 +98,7 @@ export async function commitWork(cwd: string) {
 
 - Shell mode parses the line and checks every simple command — inside `;`, `&&`, `||`, pipes, `( )`, `$( )`, backticks, here-documents and `NAME=value cmd` prefixes. Redirection targets and `cd` directories must be literal paths inside the jail (`/dev/null` is fine), re-checked with symlinks resolved.
 - It refuses what it can't parse with confidence (`reason: "unsupported-syntax"`): compound commands, arithmetic, brace expansion, unusual `${…}` forms, bash-only redirections, a command name decided at run time, `&` in a line (use `background: true`), assignments to `IFS`/`PS4`/`CDPATH`/`BASH_ENV`…; it drops shell start-up variables (`ENV`, `BASH_ENV`, `SHELLOPTS`, `BASH_FUNC_*`, …) from the environment.
-- `reason` values: `"metacharacter"`, `"unbalanced-quotes"`, `"denied-executable"`, `"not-allowed"`, `"denied-pattern"`, `"nested-command"`, `"unsupported-syntax"`, `"path-escape"`. `checkShellCommand(policy, line)` returns the verdict without running anything.
+- `reason` values: `"metacharacter"`, `"unbalanced-quotes"`, `"denied-executable"`, `"not-allowed"`, `"denied-pattern"`, `"nested-command"`, `"unsupported-syntax"`, `"path-escape"`. `checkShellCommand(policy, line)` returns the verdict without running anything; `classifyShellCommand(line, policy?)` returns `{ commands, opaque? }` with the same parser a host approval gate can reuse; `resolveShell(policy.shell)` reports which interpreter and executable `"auto"` (or a named interpreter) resolves to on this host.
 - Pair shell mode with an exhaustive `allow`: `deny` alone is a best-effort filter.
 
 ## Two callers, one jail
@@ -223,7 +223,6 @@ A custom `WorkspaceBackend` receives the signal as `exec(command, { signal })` a
 
 Writes, edits and removes of the same path run one after another, even when the agent dispatches tool calls concurrently: of two edits pinned to the same `expectHash`, the second is rejected as stale instead of silently overwriting the first. `read.maxBytes` bounds what a read returns, not memory — the whole file is still read and hashed.
 
-
 ## Finding the text to edit — `edit.matching`
 
 By default an edit looks for `oldString` in tiers and uses the first tier that finds it: the exact text, then the text with line endings normalised (an LF `oldString` finds CRLF lines), then with look-alike punctuation folded (curly quotes, en/em dashes and non-breaking spaces match their plain forms), then line by line ignoring trailing whitespace. A result found by one of the last two tiers reports `matchTier: "unicode"` or `"whitespace"`; an exact find leaves it out. A loose find must be unique: with two candidates the edit fails with `not-unique` and writes nothing, even with `replaceAll`. Replacement text takes the file's dominant line ending, so a CRLF file stays CRLF.
@@ -259,7 +258,12 @@ After `write_file`, `edit_file`, `multi_edit` or `apply_patch` writes files, the
 ```ts
 ai.workspace({
   cwd,
-  output: { spillDir: ".warlock/spill", maxLines: 2_000, maxBytes: 51_200, retentionMs: 604_800_000 },
+  output: {
+    spillDir: ".warlock/spill",
+    maxLines: 2_000,
+    maxBytes: 51_200,
+    retentionMs: 604_800_000,
+  },
 });
 ```
 

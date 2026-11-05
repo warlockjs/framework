@@ -51,13 +51,13 @@ import {
 
 ## The five tools
 
-| Factory                         | LLM tool name  | Model input                                                    | Returns                                          |
-| ------------------------------- | -------------- | -------------------------------------------------------------- | ------------------------------------------------ |
-| `ai.tools.webSearch(options)`   | `web_search`   | `{ query, maxResults? }`                                       | `{ results: { title, url, snippet, score? }[] }` |
+| Factory                         | LLM tool name  | Model input                                                    | Returns                                           |
+| ------------------------------- | -------------- | -------------------------------------------------------------- | ------------------------------------------------- |
+| `ai.tools.webSearch(options)`   | `web_search`   | `{ query, maxResults? }`                                       | `{ results: { title, url, snippet, score? }[] }`  |
 | `ai.tools.fetchUrl(options?)`   | `fetch_url`    | `{ url }`                                                      | `{ url, status, content, truncated, extractor? }` |
-| `ai.tools.http(options?)`       | `http_request` | `{ method?, url, headers?, body? }`                            | `{ status, headers, body, truncated }`           |
-| `ai.tools.calculator(options?)` | `calculator`   | `{ expression }`                                               | `{ result }`                                     |
-| `ai.tools.dateTime(options?)`   | `date_time`    | `{ op, iso?, from?, to?, amount?, unit?, timeZone?, format? }` | `{ value }`                                      |
+| `ai.tools.http(options?)`       | `http_request` | `{ method?, url, headers?, body? }`                            | `{ status, headers, body, truncated }`            |
+| `ai.tools.calculator(options?)` | `calculator`   | `{ expression }`                                               | `{ result }`                                      |
+| `ai.tools.dateTime(options?)`   | `date_time`    | `{ op, iso?, from?, to?, amount?, unit?, timeZone?, format? }` | `{ value }`                                       |
 
 > **There is no `sql` tool — by design.** This belt is the network/utility belt; filesystem and shell access live in a separate, policy-jailed package ([Use a workspace](/v/latest/ai/tools/use-workspace/)). Database access is intentionally not vended as a generic tool — wire your own with `ai.tool(...)` so you own the query surface and its guardrails.
 

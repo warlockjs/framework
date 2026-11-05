@@ -82,7 +82,16 @@ describe("shell rules (allow / ask / deny)", () => {
 
   it("lets the last matching rule win", () => {
     const verdict = checkShellCommand(
-      { cwd, shell: { interpreter: "sh", rules: [{ match: "git", effect: "deny" }, { match: "git log", effect: "allow" }] } },
+      {
+        cwd,
+        shell: {
+          interpreter: "sh",
+          rules: [
+            { match: "git", effect: "deny" },
+            { match: "git log", effect: "allow" },
+          ],
+        },
+      },
       "git log",
     );
 
@@ -197,7 +206,12 @@ describe("shell rules (allow / ask / deny)", () => {
 
   it("classifies a line into its simple commands", () => {
     expect(classifyShellCommand("a | b")).toEqual({ commands: [["a"], ["b"]] });
-    expect(classifyShellCommand("a && b; c $(d e)").commands).toEqual([["a"], ["b"], ["d", "e"], ["c", "$(d e)"]]);
+    expect(classifyShellCommand("a && b; c $(d e)").commands).toEqual([
+      ["a"],
+      ["b"],
+      ["d", "e"],
+      ["c", "$(d e)"],
+    ]);
     expect(classifyShellCommand("if x; then y; fi").opaque).toBeTypeOf("string");
     expect(build({}).shell.classify("a | b")).toEqual({ commands: [["a"], ["b"]] });
   });

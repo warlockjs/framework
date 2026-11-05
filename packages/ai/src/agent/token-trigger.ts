@@ -58,7 +58,8 @@ export function resolveTokenTrigger(
 
   let threshold = Math.floor(contextWindow * trigger.share);
 
-  if (trigger.reserve !== undefined) threshold = Math.min(threshold, contextWindow - trigger.reserve);
+  if (trigger.reserve !== undefined)
+    threshold = Math.min(threshold, contextWindow - trigger.reserve);
   if (trigger.max !== undefined) threshold = Math.min(threshold, trigger.max);
 
   return Math.max(1, threshold);

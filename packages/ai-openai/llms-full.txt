@@ -225,7 +225,7 @@ const model = openai.model({
 });
 ```
 
-`promptCacheKey` improves matching for related requests. `promptCacheRetention` is OpenAI's maximum policy (`"in_memory" | "24h"`). `cacheControl.breakpoints` maps to `prompt_cache_breakpoint: { mode: "explicit" }` on the final user content parts (up to OpenAI's four-request limit); use it when you need to pin a reusable prefix rather than rely only on OpenAI's implicit breakpoint.
+`promptCacheKey` improves matching for related requests. A per-call `cacheControl: { key }` is sent as `prompt_cache_key` instead and wins over the model value, so one model can serve several cache groups (for example one key per agent). `promptCacheRetention` is OpenAI's maximum policy (`"in_memory" | "24h"`). `cacheControl.breakpoints` maps to `prompt_cache_breakpoint: { mode: "explicit" }` on the final user content parts (up to OpenAI's four-request limit); use it when you need to pin a reusable prefix rather than rely only on OpenAI's implicit breakpoint.
 
 Which fields reach the wire depends on the SDK provider label:
 

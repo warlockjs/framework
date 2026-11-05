@@ -24,7 +24,6 @@ import type {
   ListDirOptions,
   ListDirResult,
   MultiEditInput,
-  MultiEditOperation,
   MultiEditResult,
   ReadFileResult,
   RunShellResult,
@@ -245,7 +244,9 @@ class Ops implements WorkspaceOps {
       matching: edit?.matching ?? "tiered",
       missHintLines: edit?.missHintLines ?? 12,
       lineEndings: edit?.lineEndings ?? "preserve",
-      ...(this.policy.read?.maxBytes !== undefined ? { hintMaxBytes: this.policy.read.maxBytes } : {}),
+      ...(this.policy.read?.maxBytes !== undefined
+        ? { hintMaxBytes: this.policy.read.maxBytes }
+        : {}),
     };
   }
 

@@ -212,7 +212,14 @@ class WorkspaceImpl implements Workspace {
         ),
       shellOutput: (opts) => erase(makeShellOutputTool(this.ops, opts)),
       shellKill: (opts) => erase(makeShellKillTool(this.ops, opts)),
-      runTests: (opts) => erase(makeRunTestsTool(this.ops, { ...opts, interpreter: resolvedShell.interpreter, dialect: resolvedShell.dialect })),
+      runTests: (opts) =>
+        erase(
+          makeRunTestsTool(this.ops, {
+            ...opts,
+            interpreter: resolvedShell.interpreter,
+            dialect: resolvedShell.dialect,
+          }),
+        ),
       grep: (opts) => erase(makeGrepTool(this.ops, opts)),
       glob: (opts) => erase(makeGlobTool(this.ops, opts)),
       todoWrite: (opts) => erase(makeTodoWriteTool(this.state.todos, opts)),

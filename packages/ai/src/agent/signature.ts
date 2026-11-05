@@ -52,7 +52,12 @@ export function computeAgentSignature(config: {
     o: config.output ? 1 : 0,
     v: config.version ?? null,
     ...(config.compaction
-      ? { c: { afterTokens: normalizeTokenTrigger(config.compaction.afterTokens), keep: config.compaction.keep ?? 8 } }
+      ? {
+          c: {
+            afterTokens: normalizeTokenTrigger(config.compaction.afterTokens),
+            keep: config.compaction.keep ?? 8,
+          },
+        }
       : {}),
   };
 

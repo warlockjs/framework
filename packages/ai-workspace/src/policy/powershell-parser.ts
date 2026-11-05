@@ -124,7 +124,10 @@ class PowerShellParser {
           throw unsupported("The command is empty.");
         }
 
-        if (segments[segments.length - 1]?.operator === "&&" || segments[segments.length - 1]?.operator === "||") {
+        if (
+          segments[segments.length - 1]?.operator === "&&" ||
+          segments[segments.length - 1]?.operator === "||"
+        ) {
           throw unsupported("The line ends with an operator but no command follows it.");
         }
 
@@ -219,7 +222,7 @@ class PowerShellParser {
       return true;
     }
 
-    return (/[1-6*]/.test(char) && this.peek(1) === ">");
+    return /[1-6*]/.test(char) && this.peek(1) === ">";
   }
 
   private parseCommand(): void {
@@ -284,7 +287,9 @@ class PowerShellParser {
     }
 
     if (!word.quoted && word.value === ".") {
-      throw unsupported("Dot-sourcing (`. file`) runs a script in the current scope and is not supported.");
+      throw unsupported(
+        "Dot-sourcing (`. file`) runs a script in the current scope and is not supported.",
+      );
     }
 
     if (!word.quoted && POWERSHELL_KEYWORDS.has(word.value.toLowerCase())) {
@@ -432,7 +437,9 @@ class PowerShellParser {
               continue;
             }
 
-            throw unsupported("Only `\"`, `` ` `` and `$` can follow a backtick inside double quotes.");
+            throw unsupported(
+              'Only `"`, `` ` `` and `$` can follow a backtick inside double quotes.',
+            );
           }
 
           if (inner === "$") {
@@ -455,7 +462,9 @@ class PowerShellParser {
         const next = this.peek(1);
 
         if (next === "" || next === "\n" || next === "\r") {
-          throw unsupported("A backtick at the end of a line (line continuation) is not supported.");
+          throw unsupported(
+            "A backtick at the end of a line (line continuation) is not supported.",
+          );
         }
 
         value += next;
@@ -487,7 +496,13 @@ class PowerShellParser {
       if (char === "@" && this.pos === start) {
         const next = this.peek(1);
 
-        if (next === "(" || next === "{" || next === "'" || next === '"' || /[A-Za-z_$]/.test(next)) {
+        if (
+          next === "(" ||
+          next === "{" ||
+          next === "'" ||
+          next === '"' ||
+          /[A-Za-z_$]/.test(next)
+        ) {
           throw unsupported(
             "Arrays (`@( )`), hashtables, splatting (`@name`) and here-strings are not supported.",
           );
@@ -499,11 +514,15 @@ class PowerShellParser {
       }
 
       if (char === "(" || char === ")") {
-        throw unsupported("Parentheses (grouping and `$( )` subexpressions) are not supported; quote the text.");
+        throw unsupported(
+          "Parentheses (grouping and `$( )` subexpressions) are not supported; quote the text.",
+        );
       }
 
       if (char === ",") {
-        throw unsupported("The comma operator builds an array and is not supported; quote the text.");
+        throw unsupported(
+          "The comma operator builds an array and is not supported; quote the text.",
+        );
       }
 
       if (char === "#" && this.pos === start) {

@@ -6,7 +6,6 @@ import type {
   WorkspacePolicy,
   WorkspaceShellAsk,
   WorkspaceShellClassification,
-  WorkspaceShellInterpreter,
   WorkspaceShellPolicy,
 } from "../contracts";
 import { isInsideJailLexically } from "./jail";
@@ -254,7 +253,10 @@ export function executableBasename(firstToken: string, dialect: ShellDialect = "
       ? path.win32.basename(firstToken)
       : path.basename(firstToken);
 
-  return base.replace(dialect === "powershell" ? /\.(exe|cmd|bat|com|ps1)$/i : /\.(exe|cmd|bat|com)$/i, "");
+  return base.replace(
+    dialect === "powershell" ? /\.(exe|cmd|bat|com|ps1)$/i : /\.(exe|cmd|bat|com)$/i,
+    "",
+  );
 }
 
 /** Show a command in a refusal, abbreviated at a word boundary when long. */
@@ -416,7 +418,11 @@ class LineChecker {
   }
 
   /** Record a command that needs a decision (once per argv and reason). */
-  public addAsk(argv: string[], reason: WorkspaceShellAsk["reason"], rule?: WorkspaceCommandRule): void {
+  public addAsk(
+    argv: string[],
+    reason: WorkspaceShellAsk["reason"],
+    rule?: WorkspaceCommandRule,
+  ): void {
     const key = `${reason}\u0000${argv.join("\u0000")}`;
 
     if (this.asks.some((ask) => `${ask.reason}\u0000${ask.argv.join("\u0000")}` === key)) {
@@ -432,7 +438,8 @@ class LineChecker {
       return;
     }
 
-    const explanation = rule.reason !== undefined && rule.reason.trim() !== "" ? ` ${rule.reason.trim()}` : "";
+    const explanation =
+      rule.reason !== undefined && rule.reason.trim() !== "" ? ` ${rule.reason.trim()}` : "";
 
     throw new Refusal(
       "denied-pattern",
@@ -1243,7 +1250,10 @@ function checkSimpleCommand(
   if (executable === "cd" || (powershell && POWERSHELL_CD_NAMES.has(executable))) {
     // A `cd` the policy cannot follow would let later targets escape the jail:
     // it is refused outright, never turned into an ask.
-    checker.assertExecutableNotDenied(executable, simple.words.map((word) => word.value));
+    checker.assertExecutableNotDenied(
+      executable,
+      simple.words.map((word) => word.value),
+    );
 
     if (powershell) {
       const words = normalizePowerShellCd(simple.words);
@@ -1357,7 +1367,8 @@ export function checkShellCommand(
   command: string,
   options?: ShellCheckOptions,
 ): WorkspaceShellCheck {
-  const resolved = options?.resolved ?? resolveShell(policy.shell, options?.host ?? currentShellHost());
+  const resolved =
+    options?.resolved ?? resolveShell(policy.shell, options?.host ?? currentShellHost());
 
   return runCheck(policy, command, resolved.interpreter, resolved.dialect, options?.remembered);
 }
@@ -1373,7 +1384,8 @@ export function checkShellCommandInDialect(
   dialect: ShellDialect,
   options?: ShellCheckOptions,
 ): WorkspaceShellCheck {
-  const resolved = options?.resolved ?? resolveShell(policy.shell, options?.host ?? currentShellHost());
+  const resolved =
+    options?.resolved ?? resolveShell(policy.shell, options?.host ?? currentShellHost());
 
   return runCheck(policy, command, resolved.interpreter, dialect, options?.remembered);
 }

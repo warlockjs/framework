@@ -99,7 +99,10 @@ function findGitBash(host: ShellHost): string | undefined {
   const roots = [win.dirname(win.dirname(git)), win.dirname(win.dirname(win.dirname(git)))];
 
   for (const root of roots) {
-    for (const candidate of [win.join(root, "bin", "bash.exe"), win.join(root, "usr", "bin", "bash.exe")]) {
+    for (const candidate of [
+      win.join(root, "bin", "bash.exe"),
+      win.join(root, "usr", "bin", "bash.exe"),
+    ]) {
       if (host.isExecutable(candidate)) {
         return candidate;
       }
@@ -157,7 +160,8 @@ export function resolveShell(
       const powershell = findOnPath(powershellNames(host), host);
       const gitBash = powershell === undefined ? findGitBash(host) : undefined;
 
-      interpreter = powershell !== undefined ? "powershell" : gitBash !== undefined ? "bash" : "cmd";
+      interpreter =
+        powershell !== undefined ? "powershell" : gitBash !== undefined ? "bash" : "cmd";
       file = powershell ?? gitBash;
     } else {
       const bash = findOnPath(["bash"], host);
@@ -173,7 +177,8 @@ export function resolveShell(
     if (interpreter === "powershell") {
       file = findOnPath(powershellNames(host), host);
     } else if (interpreter === "bash") {
-      file = findOnPath(["bash"], host) ?? (host.platform === "win32" ? findGitBash(host) : undefined);
+      file =
+        findOnPath(["bash"], host) ?? (host.platform === "win32" ? findGitBash(host) : undefined);
     } else if (interpreter === "cmd" && host.platform === "win32") {
       file = process.env.ComSpec ?? "cmd.exe";
     }
@@ -187,5 +192,10 @@ export function resolveShell(
     powershell: powershellLabel(file),
   };
 
-  return { interpreter, dialect: dialectOf(interpreter, host.platform), ...(file !== undefined ? { file } : {}), label: labels[interpreter] };
+  return {
+    interpreter,
+    dialect: dialectOf(interpreter, host.platform),
+    ...(file !== undefined ? { file } : {}),
+    label: labels[interpreter],
+  };
 }

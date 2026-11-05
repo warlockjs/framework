@@ -40,9 +40,7 @@ export function buildPromptCacheParams(
   const key = options?.cacheControl?.key ?? config.promptCacheKey;
 
   return {
-    ...(sendsKey && key !== undefined
-      ? { prompt_cache_key: key }
-      : {}),
+    ...(sendsKey && key !== undefined ? { prompt_cache_key: key } : {}),
     ...(provider === "openai" && config.promptCacheRetention !== undefined
       ? { prompt_cache_retention: config.promptCacheRetention }
       : {}),

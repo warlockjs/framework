@@ -26,8 +26,7 @@ export function validateContextEditing(config: AgentContextEditingConfig | undef
     !config ||
     typeof config !== "object" ||
     (rule !== undefined &&
-      (
-        (rule.keep !== undefined && (!Number.isSafeInteger(rule.keep) || rule.keep < 0)) ||
+      ((rule.keep !== undefined && (!Number.isSafeInteger(rule.keep) || rule.keep < 0)) ||
         (rule.exclude !== undefined && !Array.isArray(rule.exclude)) ||
         (rule.countTokens !== undefined && typeof rule.countTokens !== "function")));
 
@@ -63,7 +62,9 @@ export function nativeContextEditingHint(
   if (!rule) return undefined;
 
   const afterTokens =
-    rule.afterTokens === undefined ? undefined : resolveTokenTrigger(rule.afterTokens, contextWindow);
+    rule.afterTokens === undefined
+      ? undefined
+      : resolveTokenTrigger(rule.afterTokens, contextWindow);
 
   // An unresolvable window-relative trigger must not turn into "clear always".
   if (rule.afterTokens !== undefined && afterTokens === undefined) return undefined;

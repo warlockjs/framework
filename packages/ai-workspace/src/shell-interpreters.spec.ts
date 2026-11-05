@@ -48,12 +48,16 @@ describe("resolveShell", () => {
     const git = "C:\\Git\\cmd\\git.exe";
     const gitBash = "C:\\Git\\bin\\bash.exe";
 
-    expect(resolveShell({ interpreter: "auto" }, host("win32", [pwsh, windowsPowerShell]))).toMatchObject({
+    expect(
+      resolveShell({ interpreter: "auto" }, host("win32", [pwsh, windowsPowerShell])),
+    ).toMatchObject({
       interpreter: "powershell",
       file: pwsh,
       label: "PowerShell 7 (pwsh)",
     });
-    expect(resolveShell({ interpreter: "auto" }, host("win32", [windowsPowerShell])).label).toBe("PowerShell");
+    expect(resolveShell({ interpreter: "auto" }, host("win32", [windowsPowerShell])).label).toBe(
+      "PowerShell",
+    );
     expect(resolveShell({ interpreter: "auto" }, host("win32", [git, gitBash]))).toMatchObject({
       interpreter: "bash",
       file: gitBash,
@@ -63,7 +67,10 @@ describe("resolveShell", () => {
 
   it("uses interpreterPath over the PATH lookup", () => {
     expect(
-      resolveShell({ interpreter: "powershell", interpreterPath: "D:\\ps\\pwsh.exe" }, host("win32", [])),
+      resolveShell(
+        { interpreter: "powershell", interpreterPath: "D:\\ps\\pwsh.exe" },
+        host("win32", []),
+      ),
     ).toMatchObject({ interpreter: "powershell", file: "D:\\ps\\pwsh.exe" });
   });
 });
@@ -77,8 +84,14 @@ describe("planSpawn per interpreter", () => {
   });
 
   it("spawns bash and sh with -c, and cmd with its switches", () => {
-    expect(planSpawn("ls", "bash", "/usr/bin/bash")).toMatchObject({ file: "/usr/bin/bash", args: ["-c", "ls"] });
-    expect(planSpawn("ls", "sh", undefined, "linux")).toMatchObject({ file: "/bin/sh", args: ["-c", "ls"] });
+    expect(planSpawn("ls", "bash", "/usr/bin/bash")).toMatchObject({
+      file: "/usr/bin/bash",
+      args: ["-c", "ls"],
+    });
+    expect(planSpawn("ls", "sh", undefined, "linux")).toMatchObject({
+      file: "/bin/sh",
+      args: ["-c", "ls"],
+    });
     expect(planSpawn("dir", "cmd", "cmd.exe")).toMatchObject({
       args: ["/d", "/v:off", "/s", "/c", '"dir"'],
     });
@@ -118,11 +131,16 @@ describe("PowerShell dialect", () => {
   it("runs the pipeline under a deny list", () => {
     const policy = ps({ deny: ["Remove-Item"] });
 
-    expect(check(policy, "Get-ChildItem -Recurse -Filter *.ts | Select-Object -First 3").allowed).toBe(true);
+    expect(
+      check(policy, "Get-ChildItem -Recurse -Filter *.ts | Select-Object -First 3").allowed,
+    ).toBe(true);
   });
 
   it("reads quotes, the call operator and subexpressions", () => {
-    const parsed = parseShellLine("& 'C:\\Program Files\\x\\tool.exe' \"a b\" 'it''s' $(Get-Date)", "powershell");
+    const parsed = parseShellLine(
+      "& 'C:\\Program Files\\x\\tool.exe' \"a b\" 'it''s' $(Get-Date)",
+      "powershell",
+    );
 
     expect(parsed.ok && parsed.commands.map((c) => c.words.map((w) => w.value))).toEqual([
       ["Get-Date"],
@@ -189,31 +207,45 @@ describe("PowerShell dialect", () => {
   });
 
   it("builds canonical argv for the other aliases", () => {
-    expect(canonicalPowerShellArgv(["Copy-Item", "-Recurse", "a", "b"])).toEqual(["cp", "-r", "a", "b"]);
-    expect(canonicalPowerShellArgv(["mi", "-Path", "a", "-Destination", "b"])).toEqual(["mv", "a", "b"]);
+    expect(canonicalPowerShellArgv(["Copy-Item", "-Recurse", "a", "b"])).toEqual([
+      "cp",
+      "-r",
+      "a",
+      "b",
+    ]);
+    expect(canonicalPowerShellArgv(["mi", "-Path", "a", "-Destination", "b"])).toEqual([
+      "mv",
+      "a",
+      "b",
+    ]);
     expect(canonicalPowerShellArgv(["gci", "-Recurse", "-Force"])).toEqual(["ls", "-Ra"]);
     expect(canonicalPowerShellArgv(["Get-Content", "-Path", "f"])).toEqual(["cat", "f"]);
-    expect(canonicalPowerShellArgv(["iwr", "-Uri", "http://x", "-OutFile", "o", "-Method", "Post"])).toEqual([
-      "curl",
-      "-o",
-      "o",
-      "-X",
-      "Post",
-      "http://x",
+    expect(
+      canonicalPowerShellArgv(["iwr", "-Uri", "http://x", "-OutFile", "o", "-Method", "Post"]),
+    ).toEqual(["curl", "-o", "o", "-X", "Post", "http://x"]);
+    expect(canonicalPowerShellArgv(["Stop-Process", "-Id", "5", "-Force"])).toEqual([
+      "kill",
+      "-9",
+      "5",
     ]);
-    expect(canonicalPowerShellArgv(["Stop-Process", "-Id", "5", "-Force"])).toEqual(["kill", "-9", "5"]);
     expect(canonicalPowerShellArgv(["git", "status"])).toBeUndefined();
   });
 
-  it.each(["iex 'rm x'", 'Invoke-Expression "x"', "Invoke-Command -ScriptBlock x", "Start-Process x", "Add-Type x", "Set-Alias a b", "powershell -EncodedCommand AAAA", "pwsh -Command x"])(
-    "refuses %s as a nested command under deny rules",
-    (line) => {
-      expect(check(ps({ deny: ["format-volume"] }), line)).toMatchObject({
-        allowed: false,
-        reason: "nested-command",
-      });
-    },
-  );
+  it.each([
+    "iex 'rm x'",
+    'Invoke-Expression "x"',
+    "Invoke-Command -ScriptBlock x",
+    "Start-Process x",
+    "Add-Type x",
+    "Set-Alias a b",
+    "powershell -EncodedCommand AAAA",
+    "pwsh -Command x",
+  ])("refuses %s as a nested command under deny rules", (line) => {
+    expect(check(ps({ deny: ["format-volume"] }), line)).toMatchObject({
+      allowed: false,
+      reason: "nested-command",
+    });
+  });
 
   it("allows them when there are no command rules", () => {
     expect(check(ps(), "iex 'Get-Date'").allowed).toBe(true);
@@ -236,17 +268,21 @@ describe("PowerShell dialect", () => {
 
     const outside = process.platform === "win32" ? "C:\\Windows\\x" : "/etc/x";
 
-    expect(
-      checkShellCommandInDialect(policy, `echo x > ${outside}`, "powershell").reason,
-    ).toBe("path-escape");
+    expect(checkShellCommandInDialect(policy, `echo x > ${outside}`, "powershell").reason).toBe(
+      "path-escape",
+    );
     expect(checkShellCommandInDialect(policy, "echo x > $null", "powershell").allowed).toBe(true);
     expect(checkShellCommandInDialect(policy, "git log 2>&1", "powershell").allowed).toBe(true);
-    expect(checkShellCommandInDialect(policy, "git log 2> err.txt", "powershell").paths).toHaveLength(1);
+    expect(
+      checkShellCommandInDialect(policy, "git log 2> err.txt", "powershell").paths,
+    ).toHaveLength(1);
     expect(check(ps(), "echo x > $out").reason).toBe("unsupported-syntax");
   });
 
   it("passes dynamic words to allowCommand only when literal", () => {
-    expect(check(ps({ allowCommand: () => true }), "echo $env:HOME").reason).toBe("unsupported-syntax");
+    expect(check(ps({ allowCommand: () => true }), "echo $env:HOME").reason).toBe(
+      "unsupported-syntax",
+    );
   });
 });
 
@@ -278,7 +314,11 @@ describe("run_shell description and run_tests quoting", () => {
   });
 
   it("describes the workspace's resolved shell", () => {
-    const ws = workspace({ cwd: path.resolve("."), backend: "mock", shell: { interpreter: "bash" } });
+    const ws = workspace({
+      cwd: path.resolve("."),
+      backend: "mock",
+      shell: { interpreter: "bash" },
+    });
     const description = ws.tools.runShell().description;
 
     expect(description).toContain("using bash");

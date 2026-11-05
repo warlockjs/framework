@@ -515,9 +515,12 @@ describe("OpenAIModel.complete()", () => {
     await new OpenAIModel(client, { name: "gpt-5.6" }).complete([{ role: "user", content: "hi" }], {
       cacheControl: { key: "k1" },
     });
-    await new OpenAIModel(client, { name: "m" }, "groq").complete([{ role: "user", content: "hi" }], {
-      cacheControl: { key: "k1" },
-    });
+    await new OpenAIModel(client, { name: "m" }, "groq").complete(
+      [{ role: "user", content: "hi" }],
+      {
+        cacheControl: { key: "k1" },
+      },
+    );
 
     expect(calls[0]!.params.prompt_cache_key).toBe("k1");
     expect(calls[1]!.params).not.toHaveProperty("prompt_cache_key");

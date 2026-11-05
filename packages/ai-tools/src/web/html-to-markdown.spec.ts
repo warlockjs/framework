@@ -31,7 +31,8 @@ describe("htmlToMarkdown", () => {
   });
 
   it("renders ordered and unordered lists, including nesting", () => {
-    const html = "<ul><li>a</li><li>b<ul><li>c</li></ul></li></ul><ol><li>one</li><li>two</li></ol>";
+    const html =
+      "<ul><li>a</li><li>b<ul><li>c</li></ul></li></ul><ol><li>one</li><li>two</li></ol>";
 
     expect(htmlToMarkdown(html)).toBe("- a\n- b\n  - c\n\n1. one\n2. two");
   });
@@ -43,7 +44,8 @@ describe("htmlToMarkdown", () => {
   });
 
   it("renders blockquotes and table rows", () => {
-    const html = "<blockquote><p>quoted</p></blockquote><table><tr><th>A</th><th>B</th></tr><tr><td>1</td><td>2</td></tr></table>";
+    const html =
+      "<blockquote><p>quoted</p></blockquote><table><tr><th>A</th><th>B</th></tr><tr><td>1</td><td>2</td></tr></table>";
 
     expect(htmlToMarkdown(html)).toBe("> quoted\n\nA | B\n1 | 2");
   });

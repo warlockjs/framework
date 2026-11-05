@@ -248,7 +248,10 @@ describe("ai.compaction.summarize structure and input budget", () => {
   });
 
   it("nudges exactly once for a missing heading, then accepts", async () => {
-    const { model, sent } = scripted(["<summary>## Goal\nx</summary>", structured(["Goal", "Next step"])]);
+    const { model, sent } = scripted([
+      "<summary>## Goal\nx</summary>",
+      structured(["Goal", "Next step"]),
+    ]);
     const result = await summarizeCompaction({ model, requireHeadings: ["goal", "Next step"] })(
       bulky(1),
     );
@@ -273,7 +276,9 @@ describe("ai.compaction.summarize structure and input budget", () => {
       { content: "<summary>cut</summary>", finishReason: "length" },
     ]);
 
-    await expect(summarizeCompaction({ model })(bulky(10))).rejects.toThrow(/finish reason "length"/);
+    await expect(summarizeCompaction({ model })(bulky(10))).rejects.toThrow(
+      /finish reason "length"/,
+    );
     expect(sent).toHaveLength(2);
     expect(text(sent[1]).length).toBeLessThan(text(sent[0]).length);
   });
@@ -284,9 +289,9 @@ describe("ai.compaction.summarize structure and input budget", () => {
     expect(() => summarizeCompaction({ model, input: { maxInputTokens: 0 } })).toThrow(
       AgentExecutionError,
     );
-    expect(() =>
-      summarizeCompaction({ model, input: { shrinkOnContextError: [1.2] } }),
-    ).toThrow(AgentExecutionError);
+    expect(() => summarizeCompaction({ model, input: { shrinkOnContextError: [1.2] } })).toThrow(
+      AgentExecutionError,
+    );
   });
 });
 

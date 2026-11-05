@@ -47,7 +47,7 @@ export const DEFAULT_COMPACTION_HEADINGS: readonly string[] = [
 export const DEFAULT_COMPACTION_TEMPLATE =
   DEFAULT_COMPACTION_INSTRUCTIONS +
   "\n\nWrite the summary inside the <summary></summary> tags using exactly these markdown headings, in this " +
-  "order, each followed by its content (write \"None\" when a section has nothing):\n" +
+  'order, each followed by its content (write "None" when a section has nothing):\n' +
   DEFAULT_COMPACTION_HEADINGS.map((heading) => `## ${heading}`).join("\n");
 
 const SYSTEM_PROMPT =

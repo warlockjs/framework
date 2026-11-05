@@ -106,7 +106,12 @@ describe("tiered edit matching", () => {
     const source = "go();  \nmid\ngo();\t\n";
     const { backend, ops } = setup({ "a.ts": source });
     const failure = await missOf(
-      ops.editFile({ path: "a.ts", oldString: "go();\n", newString: "stop();\n", replaceAll: true }),
+      ops.editFile({
+        path: "a.ts",
+        oldString: "go();\n",
+        newString: "stop();\n",
+        replaceAll: true,
+      }),
     );
 
     expect(failure).toBeInstanceOf(WorkspaceEditError);

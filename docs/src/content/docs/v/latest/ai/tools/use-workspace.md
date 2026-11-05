@@ -31,23 +31,23 @@ This is least-privilege guardrails for a **trusted** agent — not a sandbox aro
 
 ## The policy surface
 
-| Field                                               | What it does                                                                                                                                                                                                                          |
-| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `cwd`                                               | **Absolute** jail root. Every path resolves against it and must stay inside.                                                                                                                                                          |
-| `allowPaths`                                        | Extra readable roots outside `cwd`.                                                                                                                                                                                                   |
-| `denyPaths`                                         | Globs (`*`, `**`, `?`) blocked **even inside `cwd`** — e.g. `[".git/**", ".env*"]`. A bare dir name (`"node_modules"`) also blocks its contents.                                                                                      |
-| `shell.allow` / `shell.deny`                        | Executable **basenames** matched against every command's argv (after tokenizing — see below). **Deny wins** and matches case-insensitively. An `allow` list is exhaustive (fail-closed); no `shell` block at all ⇒ nothing may run.   |
-| `shell.denyPatterns` / `shell.allowCommand`         | Argument-level rules checked on every command: patterns such as `"git push --force"` or `/^rm -rf \//`, and a host predicate `(argv, ctx) => boolean \| string`. See [Argument rules](#argument-rules-denypatterns-and-allowcommand). |
+| Field                                               | What it does                                                                                                                                                                                                                                                      |
+| --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `cwd`                                               | **Absolute** jail root. Every path resolves against it and must stay inside.                                                                                                                                                                                      |
+| `allowPaths`                                        | Extra readable roots outside `cwd`.                                                                                                                                                                                                                               |
+| `denyPaths`                                         | Globs (`*`, `**`, `?`) blocked **even inside `cwd`** — e.g. `[".git/**", ".env*"]`. A bare dir name (`"node_modules"`) also blocks its contents.                                                                                                                  |
+| `shell.allow` / `shell.deny`                        | Executable **basenames** matched against every command's argv (after tokenizing — see below). **Deny wins** and matches case-insensitively. An `allow` list is exhaustive (fail-closed); no `shell` block at all ⇒ nothing may run.                               |
+| `shell.denyPatterns` / `shell.allowCommand`         | Argument-level rules checked on every command: patterns such as `"git push --force"` or `/^rm -rf \//`, and a host predicate `(argv, ctx) => boolean \| string`. See [Argument rules](#argument-rules-denypatterns-and-allowcommand).                             |
 | `shell.interpreter`                                 | `"none"` (default — argv, no shell), `"sh"`, `"bash"`, `"powershell"`, `"cmd"` or `"auto"` (explicit opt-in to pipes, `&&`, redirections, still checked per command). See [Shell mode](#shell-mode-interpreter-sh) and [Choosing the shell](#choosing-the-shell). |
-| `shell.interpreterPath`                             | Absolute path of the shell executable (for example a `pwsh` outside `PATH`).                                                                                                                                                  |
-| `shell.rules` / `shell.onAsk`                       | Ordered allow / ask / deny command rules and the host callback that decides on asks. See [Command rules](#command-rules-allow-ask-deny).                                                                                      |
-| `shell.background`                                  | Enables background commands (`run_shell({ background: true })`) with `{ maxJobs?, timeoutMs? }`. Absent ⇒ refused. See [Background commands](#background-commands).                                                                   |
-| `shell.inheritEnv`                                  | Opt-in `process.env` keys to pass through (e.g. `["PATH"]`). **Nothing leaks in otherwise** — a command can't find `node`/`npm` without `PATH`.                                                                                       |
-| `shell.env`                                         | Explicit env vars injected into every spawned process (override inherited on collision).                                                                                                                                              |
-| `shell.timeoutMs` / `shell.maxOutputBytes`          | Per-command wall-clock cap (process tree SIGKILLed on expiry; a model-supplied `timeoutMs` can only lower it) and stdout/stderr byte cap (clipped on a character boundary).                                                           |
-| `read.defaultLines` / `read.maxBytes`               | Default read window + a ceiling on the UTF-8 bytes of the returned `content` (line numbers included). See [Read windows and the byte ceiling](#read-windows-and-the-byte-ceiling).                                                    |
-| `list.ignore` / `list.maxDepth` / `list.maxEntries` | What `list_dir` leaves out (default `["node_modules", ".git"]`; `denyPaths` are always hidden) and how deep (default 5) and long (default 500 entries) a listing may be.                                                              |
-| `backend`                                           | `"local"` (default — real disk) or `"mock"` (in-memory, for tests).                                                                                                                                                                   |
+| `shell.interpreterPath`                             | Absolute path of the shell executable (for example a `pwsh` outside `PATH`).                                                                                                                                                                                      |
+| `shell.rules` / `shell.onAsk`                       | Ordered allow / ask / deny command rules and the host callback that decides on asks. See [Command rules](#command-rules-allow-ask-deny).                                                                                                                          |
+| `shell.background`                                  | Enables background commands (`run_shell({ background: true })`) with `{ maxJobs?, timeoutMs? }`. Absent ⇒ refused. See [Background commands](#background-commands).                                                                                               |
+| `shell.inheritEnv`                                  | Opt-in `process.env` keys to pass through (e.g. `["PATH"]`). **Nothing leaks in otherwise** — a command can't find `node`/`npm` without `PATH`.                                                                                                                   |
+| `shell.env`                                         | Explicit env vars injected into every spawned process (override inherited on collision).                                                                                                                                                                          |
+| `shell.timeoutMs` / `shell.maxOutputBytes`          | Per-command wall-clock cap (process tree SIGKILLed on expiry; a model-supplied `timeoutMs` can only lower it) and stdout/stderr byte cap (clipped on a character boundary).                                                                                       |
+| `read.defaultLines` / `read.maxBytes`               | Default read window + a ceiling on the UTF-8 bytes of the returned `content` (line numbers included). See [Read windows and the byte ceiling](#read-windows-and-the-byte-ceiling).                                                                                |
+| `list.ignore` / `list.maxDepth` / `list.maxEntries` | What `list_dir` leaves out (default `["node_modules", ".git"]`; `denyPaths` are always hidden) and how deep (default 5) and long (default 500 entries) a listing may be.                                                                                          |
+| `backend`                                           | `"local"` (default — real disk) or `"mock"` (in-memory, for tests).                                                                                                                                                                                               |
 
 The effective shell environment is `{ ...pick(process.env, inheritEnv), ...shell.env }` — `process.env` is never inherited wholesale.
 
@@ -168,12 +168,12 @@ Every shell refusal is a `WorkspacePolicyError` with `type: "denied-command"` an
 
 `shell.interpreter` takes more than `"sh"`. Each shell is read by its own conservative parser, and every command it finds goes through the same `deny` / `allow` / `denyPatterns` / `allowCommand` / rule checks as `"sh"`, with redirection targets and directory changes held to the jail.
 
-| `interpreter`  | Runs the line with                                                                          | Grammar        |
-| -------------- | ------------------------------------------------------------------------------------------- | -------------- |
-| `"sh"`         | `/bin/sh -c` (`cmd.exe` on Windows) — unchanged                                             | POSIX / cmd    |
-| `"bash"`       | `bash -c` (found on `PATH`, or `interpreterPath`)                                           | POSIX          |
-| `"powershell"` | `pwsh` (else `powershell`) with `-NoLogo -NoProfile -NonInteractive -Command`               | PowerShell     |
-| `"cmd"`        | `cmd.exe /d /v:off /s /c`                                                                   | cmd.exe        |
+| `interpreter`  | Runs the line with                                                                                                       | Grammar          |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------ | ---------------- |
+| `"sh"`         | `/bin/sh -c` (`cmd.exe` on Windows) — unchanged                                                                          | POSIX / cmd      |
+| `"bash"`       | `bash -c` (found on `PATH`, or `interpreterPath`)                                                                        | POSIX            |
+| `"powershell"` | `pwsh` (else `powershell`) with `-NoLogo -NoProfile -NonInteractive -Command`                                            | PowerShell       |
+| `"cmd"`        | `cmd.exe /d /v:off /s /c`                                                                                                | cmd.exe          |
 | `"auto"`       | POSIX: `bash` if on `PATH`, else `sh`. Windows: `pwsh`, `powershell`, Git Bash (next to `git` on `PATH`), then `cmd.exe` | the resolved one |
 
 `run_shell`'s description names the resolved shell ("Commands run on Windows using PowerShell 7 (pwsh).") and its syntax rules, so the model writes the right dialect. `run_tests` quotes its `pattern` for the shell too (single quotes for POSIX shells and PowerShell, double quotes for cmd.exe and argv mode).
@@ -355,7 +355,6 @@ A custom `WorkspaceBackend` receives the signal as `exec(command, { signal })` a
 
 Writes, edits and removes of the **same path** run one after another, even when the agent dispatches several tool calls at once. Two `edit_file` calls pinned to the same `expectHash` therefore cannot both succeed: the second re-reads after the first has written and is rejected as stale, instead of silently overwriting it. Without `expectHash`, the second edit applies on top of the first. Different paths are not held up.
 
-
 ## Finding the text to edit — `edit.matching`
 
 By default an edit looks for `oldString` in tiers and uses the first tier that finds it: the exact text, then the text with line endings normalised (an LF `oldString` finds CRLF lines), then with look-alike punctuation folded (curly quotes, en/em dashes and non-breaking spaces match their plain forms), then line by line ignoring trailing whitespace. A result found by one of the last two tiers reports `matchTier: "unicode"` or `"whitespace"`; an exact find leaves it out. A loose find must be unique: with two candidates the edit fails with `not-unique` and writes nothing, even with `replaceAll`. Replacement text takes the file's dominant line ending, so a CRLF file stays CRLF.
@@ -391,7 +390,12 @@ After `write_file`, `edit_file`, `multi_edit` or `apply_patch` writes files, the
 ```ts
 ai.workspace({
   cwd,
-  output: { spillDir: ".warlock/spill", maxLines: 2_000, maxBytes: 51_200, retentionMs: 604_800_000 },
+  output: {
+    spillDir: ".warlock/spill",
+    maxLines: 2_000,
+    maxBytes: 51_200,
+    retentionMs: 604_800_000,
+  },
 });
 ```
 

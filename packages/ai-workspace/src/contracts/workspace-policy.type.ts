@@ -1,7 +1,4 @@
-import type {
-  WorkspaceCommandRule,
-  WorkspaceShellOnAsk,
-} from "./shell-approval.type";
+import type { WorkspaceCommandRule, WorkspaceShellOnAsk } from "./shell-approval.type";
 import type { WorkspaceEditPolicy, WorkspaceHooks } from "./workspace-edit.type";
 import type { WorkspaceOutputPolicy } from "./workspace-output.type";
 

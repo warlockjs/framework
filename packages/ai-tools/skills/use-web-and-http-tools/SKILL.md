@@ -32,13 +32,13 @@ The construction `options` are the **rails** — they bound what the model may d
 
 ## The five tools
 
-| Factory                         | Name           | Model input                                                    | Returns                                          |
-| ------------------------------- | -------------- | -------------------------------------------------------------- | ------------------------------------------------ |
-| `ai.tools.webSearch(options)`   | `web_search`   | `{ query, maxResults? }`                                       | `{ results: { title, url, snippet, score? }[] }` |
+| Factory                         | Name           | Model input                                                    | Returns                                           |
+| ------------------------------- | -------------- | -------------------------------------------------------------- | ------------------------------------------------- |
+| `ai.tools.webSearch(options)`   | `web_search`   | `{ query, maxResults? }`                                       | `{ results: { title, url, snippet, score? }[] }`  |
 | `ai.tools.fetchUrl(options?)`   | `fetch_url`    | `{ url }`                                                      | `{ url, status, content, truncated, extractor? }` |
-| `ai.tools.http(options?)`       | `http_request` | `{ method?, url, headers?, body? }`                            | `{ status, headers, body, truncated }`           |
-| `ai.tools.calculator(options?)` | `calculator`   | `{ expression }`                                               | `{ result }`                                     |
-| `ai.tools.dateTime(options?)`   | `date_time`    | `{ op, iso?, from?, to?, amount?, unit?, timeZone?, format? }` | `{ value }`                                      |
+| `ai.tools.http(options?)`       | `http_request` | `{ method?, url, headers?, body? }`                            | `{ status, headers, body, truncated }`            |
+| `ai.tools.calculator(options?)` | `calculator`   | `{ expression }`                                               | `{ result }`                                      |
+| `ai.tools.dateTime(options?)`   | `date_time`    | `{ op, iso?, from?, to?, amount?, unit?, timeZone?, format? }` | `{ value }`                                       |
 
 ## `web_search` — pick a provider, supply a key
 
