@@ -1,6 +1,9 @@
 import path from "node:path";
 import { fs } from "@warlock.js/fs";
+import { applyReplacement, type AppliedReplacementOptions } from "./edit/apply-replacement";
 import { WorkspaceEditError, WorkspacePolicyError } from "./errors";
+import { runAfterEdit } from "./hooks/after-edit";
+import { OutputSpiller, splitLines } from "./output/spill";
 import { globToRegExp, isInside, matchesAnyGlob } from "./policy/jail";
 import { buildCommandEnv, resolveInJail } from "./policy/policy";
 import { checkShellCommand } from "./policy/shell-check";
@@ -14,6 +17,7 @@ import type {
   EditFileResult,
   ExecOptions,
   GrepMatch,
+  GlobResult,
   GrepResult,
   ListDirEntry,
   ListDirEntryType,
@@ -34,6 +38,8 @@ import type {
   WorkspacePolicy,
   WorkspaceShellAsk,
   WorkspaceShellOnAsk,
+  WorkspaceEditTool,
+  WorkspaceTruncation,
 } from "./contracts";
 
 /** Default line window a read returns when the policy sets no `defaultLines`. */
@@ -218,6 +224,9 @@ class Ops implements WorkspaceOps {
   /** Patterns approved with `remember` (shared through the runtime). */
   private readonly approvals: WorkspaceCommandPattern[];
 
+  /** Saves oversized output to files when `output.spillDir` is set. */
+  private readonly spiller: OutputSpiller;
+
   public constructor(
     private readonly backend: WorkspaceBackend,
     private readonly policy: WorkspacePolicy,
@@ -225,6 +234,27 @@ class Ops implements WorkspaceOps {
   ) {
     this.resolvedShell = resolveShell(policy.shell);
     this.approvals = runtime.approvals ?? [];
+    this.spiller = new OutputSpiller(backend, policy);
+  }
+
+  /** The edit-policy settings applied to every replacement. */
+  private editOptions(): AppliedReplacementOptions {
+    const edit = this.policy.edit;
+
+    return {
+      matching: edit?.matching ?? "tiered",
+      missHintLines: edit?.missHintLines ?? 12,
+      lineEndings: edit?.lineEndings ?? "preserve",
+      ...(this.policy.read?.maxBytes !== undefined ? { hintMaxBytes: this.policy.read.maxBytes } : {}),
+    };
+  }
+
+  /** Run `afterEdit` for a call that wrote `paths`; `undefined` when there is no output. */
+  private diagnosticsFor(
+    tool: WorkspaceEditTool,
+    paths: readonly string[],
+  ): Promise<string | undefined> {
+    return runAfterEdit(this.policy, { paths, tool });
   }
 
   /** Run `task` after every earlier mutation of `absolutePath` has settled. */
@@ -293,7 +323,7 @@ class Ops implements WorkspaceOps {
     inputPath: string,
     opts?: { offset?: number; limit?: number },
   ): Promise<ReadFileResult> {
-    const { absolutePath } = await resolveInJail(this.policy, inputPath);
+    const { absolutePath } = await resolveInJail(this.policy, inputPath, "read");
     const raw = await this.backend.readFile(absolutePath);
 
     // Hash the full content the backend returned (SHA-256 via
@@ -318,9 +348,29 @@ class Ops implements WorkspaceOps {
       maxBytes === undefined ? undefined : Math.max(0, Math.floor(maxBytes)),
     );
     const endLine = offset + returnedLines - 1;
+    const spillDir = this.spiller.spillDir;
+    let spilled: { content: string; truncation: WorkspaceTruncation } | undefined;
+
+    // A read of a spill file is never spilled again; it is already paged.
+    if (bytesCapped && spillDir !== undefined && !isInside(absolutePath, spillDir)) {
+      const full = numberWindow(window, offset, undefined).content;
+      const file = await this.spiller.save("read_file", full);
+
+      if (file !== undefined) {
+        spilled = {
+          content: `${content}\n[showing lines 1-${returnedLines} of ${window.length}; full output saved to ${file}]`,
+          truncation: {
+            shown: { lines: returnedLines },
+            total: { lines: window.length, bytes: Buffer.byteLength(full, "utf8") },
+            path: file,
+          },
+        };
+      }
+    }
 
     return {
-      content,
+      content: spilled?.content ?? content,
+      ...(spilled !== undefined ? { truncation: spilled.truncation } : {}),
       startLine: offset,
       endLine,
       totalLines,
@@ -334,10 +384,10 @@ class Ops implements WorkspaceOps {
   public async writeFile(
     inputPath: string,
     content: string,
-  ): Promise<{ hash: string; bytesWritten: number }> {
-    const { absolutePath } = await resolveInJail(this.policy, inputPath);
+  ): Promise<{ hash: string; bytesWritten: number; diagnostics?: string }> {
+    const { absolutePath, relativePath } = await resolveInJail(this.policy, inputPath);
 
-    return this.withPathLock(absolutePath, async () => {
+    const written = await this.withPathLock(absolutePath, async () => {
       // Ensure the parent directory exists before writing the leaf.
       const parent = path.dirname(absolutePath);
       await this.backend.mkdir(parent);
@@ -349,12 +399,20 @@ class Ops implements WorkspaceOps {
         bytesWritten: Buffer.byteLength(content, "utf8"),
       };
     });
+    const diagnostics = await this.diagnosticsFor("write_file", [relativePath || inputPath]);
+
+    return { ...written, ...(diagnostics !== undefined ? { diagnostics } : {}) };
   }
 
   public async editFile(input: EditFileInput): Promise<EditFileResult> {
     const { absolutePath, relativePath } = await resolveInJail(this.policy, input.path);
 
-    return this.withPathLock(absolutePath, () => this.applyEdit(input, absolutePath, relativePath));
+    const result = await this.withPathLock(absolutePath, () =>
+      this.applyEdit(input, absolutePath, relativePath),
+    );
+    const diagnostics = await this.diagnosticsFor("edit_file", [result.path]);
+
+    return diagnostics === undefined ? result : { ...result, diagnostics };
   }
 
   /** The read-check-replace-write of {@link editFile}, run under its path lock. */
@@ -380,11 +438,16 @@ class Ops implements WorkspaceOps {
       );
     }
 
-    const { content: updated, replacements } = applyReplacement(
+    const {
+      content: updated,
+      replacements,
+      matchTier,
+    } = applyReplacement(
       current,
       input,
       input.path,
       relativePath || input.path,
+      this.editOptions(),
     );
 
     await this.backend.writeFile(absolutePath, updated);
@@ -393,6 +456,7 @@ class Ops implements WorkspaceOps {
       path: relativePath || input.path,
       replacements,
       hash: fs.hash.string(updated),
+      ...(matchTier !== undefined ? { matchTier } : {}),
     };
   }
 
@@ -406,7 +470,7 @@ class Ops implements WorkspaceOps {
       );
     }
 
-    return this.withPathLock(absolutePath, async () => {
+    const result = await this.withPathLock(absolutePath, async () => {
       const current = await this.backend.readFile(absolutePath);
       const currentHash = fs.hash.string(current);
 
@@ -425,12 +489,18 @@ class Ops implements WorkspaceOps {
       // Apply every edit in memory first; one failure leaves the file untouched.
       let content = current;
       let replacements = 0;
+      let matchTier: MultiEditResult["matchTier"];
+      const options = this.editOptions();
 
       input.edits.forEach((edit, editIndex) => {
-        const applied = applyReplacement(content, edit, input.path, shownPath, editIndex);
+        const applied = applyReplacement(content, edit, input.path, shownPath, options, editIndex);
 
         content = applied.content;
         replacements += applied.replacements;
+
+        if (applied.matchTier === "whitespace" || matchTier === undefined) {
+          matchTier = applied.matchTier ?? matchTier;
+        }
       });
 
       await this.backend.writeFile(absolutePath, content);
@@ -440,11 +510,28 @@ class Ops implements WorkspaceOps {
         edits: input.edits.length,
         replacements,
         hash: fs.hash.string(content),
+        ...(matchTier !== undefined ? { matchTier } : {}),
       };
     });
+    const diagnostics = await this.diagnosticsFor("multi_edit", [shownPath]);
+
+    return diagnostics === undefined ? result : { ...result, diagnostics };
   }
 
   public async applyPatch(input: ApplyPatchInput): Promise<ApplyPatchResult> {
+    const result = await this.runPatch(input);
+
+    if (result.dryRun) {
+      return result;
+    }
+
+    const paths = result.files.filter((file) => file.action !== "deleted").map((file) => file.path);
+    const diagnostics = await this.diagnosticsFor("apply_patch", paths);
+
+    return diagnostics === undefined ? result : { ...result, diagnostics };
+  }
+
+  private runPatch(input: ApplyPatchInput): Promise<ApplyPatchResult> {
     return executePatch(input, {
       resolve: (inputPath) => resolveInJail(this.policy, inputPath),
       exists: (absolutePath) => this.backend.exists(absolutePath),
@@ -580,9 +667,10 @@ class Ops implements WorkspaceOps {
         : {}),
     });
 
-    const stdout = capOutput(result.stdout, maxOutputBytes);
-    const stderr = capOutput(result.stderr, maxOutputBytes);
+    const stdout = await this.fitStream("run_shell-stdout", result.stdout, maxOutputBytes);
+    const stderr = await this.fitStream("run_shell-stderr", result.stderr, maxOutputBytes);
     const cancelled = result.cancelled === true;
+    const truncation = streamTruncation(stdout.truncation, stderr.truncation);
 
     return {
       exitCode: result.exitCode,
@@ -591,6 +679,7 @@ class Ops implements WorkspaceOps {
       truncated: stdout.truncated || stderr.truncated,
       timedOut: result.timedOut && !cancelled,
       cancelled,
+      ...(truncation !== undefined ? { truncation } : {}),
     };
   }
 
@@ -638,8 +727,53 @@ class Ops implements WorkspaceOps {
     });
   }
 
-  public shellOutput(id: string, opts?: ShellOutputOptions): Promise<ShellOutputResult> {
-    return this.runtime.jobs.output(id, opts);
+  public async shellOutput(id: string, opts?: ShellOutputOptions): Promise<ShellOutputResult> {
+    const result = await this.runtime.jobs.output(id, opts);
+
+    if (!this.spiller.enabled) {
+      return result;
+    }
+
+    const stdout = await this.spiller.text(`shell_output-${id}-stdout`, result.stdout, "head+tail");
+    const stderr = await this.spiller.text(`shell_output-${id}-stderr`, result.stderr, "head+tail");
+    const truncation = streamTruncation(stdout.truncation, stderr.truncation);
+
+    return truncation === undefined
+      ? result
+      : { ...result, stdout: stdout.value, stderr: stderr.value, truncated: true, truncation };
+  }
+
+  /**
+   * Fit one captured stream to the limits: spilled to a file when
+   * `output.spillDir` is set, otherwise clipped at `maxBytes` as always.
+   */
+  private async fitStream(
+    label: string,
+    value: string,
+    maxBytes: number,
+  ): Promise<{ value: string; truncated: boolean; truncation?: WorkspaceTruncation }> {
+    if (this.spiller.enabled) {
+      const cap = this.policy.shell?.maxOutputBytes;
+      const spilled = await this.spiller.text(label, value, "head+tail", cap);
+
+      if (spilled.truncation !== undefined) {
+        return { value: spilled.value, truncated: true, truncation: spilled.truncation };
+      }
+    }
+
+    const capped = capOutput(value, maxBytes);
+
+    if (!capped.truncated) {
+      return capped;
+    }
+
+    return {
+      ...capped,
+      truncation: {
+        shown: { lines: splitLines(capped.value).length },
+        total: { lines: splitLines(value).length, bytes: Buffer.byteLength(value, "utf8") },
+      },
+    };
   }
 
   public shellKill(id: string): Promise<ShellJobInfo> {
@@ -650,8 +784,9 @@ class Ops implements WorkspaceOps {
     return this.runtime.jobs.list();
   }
 
-  public dispose(): Promise<void> {
-    return this.runtime.jobs.dispose();
+  public async dispose(): Promise<void> {
+    await this.runtime.jobs.dispose();
+    await this.spiller.dispose();
   }
 
   public async listDir(inputPath = ".", opts?: ListDirOptions): Promise<ListDirResult> {
@@ -826,13 +961,41 @@ class Ops implements WorkspaceOps {
           matches.push({ path: relativePath, line: index + 1, text: line });
 
           if (matches.length >= DEFAULT_MAX_GREP_MATCHES) {
-            return { matches, total: matches.length };
+            return this.fitMatches(matches);
           }
         }
       }
     }
 
-    return { matches, total: matches.length };
+    return this.fitMatches(matches);
+  }
+
+  /** Apply the `output` limits to a finished match list. */
+  private async fitMatches(matches: GrepMatch[]): Promise<GrepResult> {
+    const fitted = await this.spiller.list(
+      "grep",
+      matches,
+      (match) => `${match.path}:${match.line}:${match.text}`,
+      "head",
+    );
+
+    return fitted.truncation === undefined
+      ? { matches, total: matches.length }
+      : {
+          matches: fitted.items,
+          total: matches.length,
+          truncated: true,
+          truncation: fitted.truncation,
+        };
+  }
+
+  public async globResult(pattern: string): Promise<GlobResult> {
+    const all = await this.glob(pattern);
+    const fitted = await this.spiller.list("glob", all, (entry) => entry, "head");
+
+    return fitted.truncation === undefined
+      ? { paths: all }
+      : { paths: fitted.items, truncated: true, truncation: fitted.truncation };
   }
 
   public async glob(pattern: string): Promise<string[]> {
@@ -885,6 +1048,21 @@ class Ops implements WorkspaceOps {
   }
 }
 
+/** Combine per-stream truncation metadata; `undefined` when neither stream was clipped. */
+function streamTruncation(
+  stdout: WorkspaceTruncation | undefined,
+  stderr: WorkspaceTruncation | undefined,
+): { stdout?: WorkspaceTruncation; stderr?: WorkspaceTruncation } | undefined {
+  if (stdout === undefined && stderr === undefined) {
+    return undefined;
+  }
+
+  return {
+    ...(stdout !== undefined ? { stdout } : {}),
+    ...(stderr !== undefined ? { stderr } : {}),
+  };
+}
+
 /** The lower of two optional limits (either may be absent). */
 function lowerOf(
   policyLimit: number | undefined,
@@ -895,80 +1073,6 @@ function lowerOf(
   }
 
   return policyLimit === undefined ? requested : Math.min(policyLimit, requested);
-}
-
-/**
- * Apply one exact-string replacement to `content` under the edit rules:
- * `oldString` must occur, and exactly once unless `replaceAll`.
- */
-function applyReplacement(
-  content: string,
-  edit: MultiEditOperation,
-  inputPath: string,
-  shownPath: string,
-  editIndex?: number,
-): { content: string; replacements: number } {
-  const occurrences = countOccurrences(content, edit.oldString);
-  const which = editIndex === undefined ? "" : `Edit ${editIndex + 1}: `;
-  const nothingApplied = editIndex === undefined ? "" : " None of the edits were applied.";
-  const indexOption = editIndex === undefined ? {} : { editIndex };
-
-  if (occurrences === 0) {
-    throw new WorkspaceEditError(
-      `${which}The text to replace was not found in "${inputPath}".${nothingApplied}`,
-      { type: "not-found", path: shownPath, matches: 0, ...indexOption },
-    );
-  }
-
-  if (occurrences > 1 && !edit.replaceAll) {
-    throw new WorkspaceEditError(
-      `${which}The text to replace is not unique in "${inputPath}" (${occurrences} matches); ` +
-        `pass replaceAll or include more surrounding context.${nothingApplied}`,
-      { type: "not-unique", path: shownPath, matches: occurrences, ...indexOption },
-    );
-  }
-
-  return {
-    content: edit.replaceAll
-      ? content.split(edit.oldString).join(edit.newString)
-      : replaceFirst(content, edit.oldString, edit.newString),
-    replacements: edit.replaceAll ? occurrences : 1,
-  };
-}
-
-/** Count non-overlapping occurrences of `needle` in `haystack`. */
-function countOccurrences(haystack: string, needle: string): number {
-  if (needle === "") {
-    return 0;
-  }
-
-  let count = 0;
-  let from = 0;
-
-  // eslint-disable-next-line no-constant-condition
-  while (true) {
-    const index = haystack.indexOf(needle, from);
-
-    if (index === -1) {
-      break;
-    }
-
-    count++;
-    from = index + needle.length;
-  }
-
-  return count;
-}
-
-/** Replace the first occurrence of `needle` with `replacement`. */
-function replaceFirst(haystack: string, needle: string, replacement: string): string {
-  const index = haystack.indexOf(needle);
-
-  if (index === -1) {
-    return haystack;
-  }
-
-  return haystack.slice(0, index) + replacement + haystack.slice(index + needle.length);
 }
 
 /**

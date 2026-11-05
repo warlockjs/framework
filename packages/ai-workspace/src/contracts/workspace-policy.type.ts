@@ -2,6 +2,8 @@ import type {
   WorkspaceCommandRule,
   WorkspaceShellOnAsk,
 } from "./shell-approval.type";
+import type { WorkspaceEditPolicy, WorkspaceHooks } from "./workspace-edit.type";
+import type { WorkspaceOutputPolicy } from "./workspace-output.type";
 
 /**
  * The executor a workspace runs on. `"local"` uses `@warlock.js/fs` +
@@ -255,6 +257,12 @@ export interface WorkspacePolicy {
   read?: WorkspaceReadPolicy;
   /** Directory-listing sub-policy (ignore globs + bounds). */
   list?: WorkspaceListPolicy;
+  /** Edit sub-policy (matching tiers, miss hints, line endings). */
+  edit?: WorkspaceEditPolicy;
+  /** Host callbacks, such as `afterEdit` diagnostics. */
+  hooks?: WorkspaceHooks;
+  /** Output sub-policy (spill oversized output to a file). */
+  output?: WorkspaceOutputPolicy;
   /** Executor the workspace runs on. Defaults to `"local"`. */
   backend?: WorkspaceBackendType;
 }

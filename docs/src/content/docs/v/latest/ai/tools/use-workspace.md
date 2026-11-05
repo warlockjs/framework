@@ -351,9 +351,51 @@ A custom `WorkspaceBackend` receives the signal as `exec(command, { signal })` a
 
 ## Read-before-edit (the stale-hash guard)
 
-`readFile` returns a SHA-256 `hash` of the full file. Pass it to `editFile`'s `expectHash`; if the file changed since you read it, the edit is rejected as stale so you re-read before clobbering. `editFile` also requires the `oldString` to be **exact and unique** — pass `replaceAll: true` to replace every occurrence, or include more surrounding context to disambiguate.
+`readFile` returns a SHA-256 `hash` of the full file. Pass it to `editFile`'s `expectHash`; if the file changed since you read it, the edit is rejected as stale so you re-read before clobbering. `editFile` also requires the `oldString` to be **found uniquely** (see "Finding the text to edit") — pass `replaceAll: true` to replace every occurrence, or include more surrounding context to disambiguate.
 
 Writes, edits and removes of the **same path** run one after another, even when the agent dispatches several tool calls at once. Two `edit_file` calls pinned to the same `expectHash` therefore cannot both succeed: the second re-reads after the first has written and is rejected as stale, instead of silently overwriting it. Without `expectHash`, the second edit applies on top of the first. Different paths are not held up.
+
+
+## Finding the text to edit — `edit.matching`
+
+By default an edit looks for `oldString` in tiers and uses the first tier that finds it: the exact text, then the text with line endings normalised (an LF `oldString` finds CRLF lines), then with look-alike punctuation folded (curly quotes, en/em dashes and non-breaking spaces match their plain forms), then line by line ignoring trailing whitespace. A result found by one of the last two tiers reports `matchTier: "unicode"` or `"whitespace"`; an exact find leaves it out. A loose find must be unique: with two candidates the edit fails with `not-unique` and writes nothing, even with `replaceAll`. Replacement text takes the file's dominant line ending, so a CRLF file stays CRLF.
+
+```ts
+ai.workspace({
+  cwd,
+  edit: { matching: "tiered", missHintLines: 12, lineEndings: "preserve" },
+});
+```
+
+- `matching: "exact"` accepts only the text byte for byte.
+- `lineEndings: "lf" | "crlf"` forces the ending of replacement text.
+- When the text is not found, the `WorkspaceEditError` (`type: "not-found"`) carries a `hint`: the closest file text (at most `missHintLines` lines, 12 by default, each at most 200 characters; `0` turns it off, and it never exceeds `read.maxBytes`) or a note that `newString` is already present. A file the jail refuses never gets a hint.
+
+## Diagnostics after an edit — `hooks.afterEdit`
+
+```ts
+ai.workspace({
+  cwd,
+  hooks: {
+    afterEdit: async ({ paths, tool }) => await typecheck(paths), // returns text or nothing
+    afterEditMaxChars: 4_000,
+    afterEditTimeoutMs: 10_000,
+  },
+});
+```
+
+After `write_file`, `edit_file`, `multi_edit` or `apply_patch` writes files, the hook runs once per call with the written paths (not on a patch `dryRun`, not for deleted files). Text it returns comes back on the result as `diagnostics`, between `[diagnostics]` and `[/diagnostics]` lines; output over `afterEditMaxChars` is cut with a marker. A hook that throws or does not answer within `afterEditTimeoutMs` yields `diagnostics unavailable` and never fails the edit.
+
+## Oversized output — `output`
+
+```ts
+ai.workspace({
+  cwd,
+  output: { spillDir: ".warlock/spill", maxLines: 2_000, maxBytes: 51_200, retentionMs: 604_800_000 },
+});
+```
+
+With `output.spillDir` set, output too large to return whole (`run_shell`, `shell_output`, `grep`, `glob`, and `read_file` when `read.maxBytes` cut the window) is saved in full to `spill-<time>-<random>-<label>.txt` there. The result keeps the start and end (`keep: "head+tail"`, the default for shell output; `"head"` for the rest, or set `keep` yourself) and carries a marker such as `[showing lines 1-25 and 99976-100000 of 100000; full output saved to FILE]`. The boolean `truncated` stays; `truncation` adds `{ shown: { lines }, total: { lines, bytes }, path? }` (per stream, `truncation.stdout` / `truncation.stderr`, for commands). `read_file` may open the spill directory even when it is outside the jail, so the model can page through the file with `startLine` / `limit`; nothing else outside the jail opens, and writes never reach it. Files older than `retentionMs` (7 days by default) are removed when a workspace is created, when a new file is written and on `dispose()`; `retentionMs: 0` removes the files this workspace wrote on `dispose()`. Only files named like spill files are ever removed. Without `spillDir`, output is cut at `shell.maxOutputBytes` / `read.maxBytes` as before, and `run_shell` results still report the sizes in `truncation`.
 
 ## Errors flow as data, not throws
 

@@ -3,6 +3,7 @@ import { realpath } from "node:fs/promises";
 import { WorkspacePolicyError } from "../errors";
 import type { WorkspacePolicy } from "../contracts";
 import { isInside, matchesAnyGlob } from "./jail";
+import { resolveSpillDir } from "../output/spill-dir";
 import { checkShellCommand } from "./shell-check";
 
 /**
@@ -86,6 +87,8 @@ async function canonicalize(target: string): Promise<string> {
  *
  * @param policy - The bounding policy (its `cwd` is the jail root).
  * @param inputPath - A workspace-relative or absolute path to resolve.
+ * @param access - `"read"` also accepts the `output.spillDir` directory (only
+ *   `readFile` asks for it); `"write"` (default) never does.
  * @returns The canonical absolute path plus its `/`-separated relative form.
  * @throws {WorkspacePolicyError} When the path escapes the jail or hits a deny glob.
  *
@@ -95,6 +98,7 @@ async function canonicalize(target: string): Promise<string> {
 export async function resolveInJail(
   policy: WorkspacePolicy,
   inputPath: string,
+  access: "read" | "write" = "write",
 ): Promise<ResolvedPath> {
   const jailRoot = await canonicalize(policy.cwd);
   const requested = path.isAbsolute(inputPath) ? inputPath : path.join(policy.cwd, inputPath);
@@ -114,6 +118,12 @@ export async function resolveInJail(
         break;
       }
     }
+  }
+
+  const spillDir = access === "read" && !insideCwd ? resolveSpillDir(policy) : undefined;
+
+  if (spillDir !== undefined && isInside(absolutePath, await canonicalize(spillDir))) {
+    return { absolutePath, relativePath: "" };
   }
 
   if (!insideCwd && !insideAllow) {

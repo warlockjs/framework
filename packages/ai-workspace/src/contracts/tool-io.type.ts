@@ -1,3 +1,6 @@
+import type { WorkspaceEditMatchTier } from "../edit/match";
+import type { WorkspaceTruncation } from "./workspace-output.type";
+
 /**
  * Input/output shapes for the workspace tools and the direct
  * methods that back them. These are the wire contracts the agent sees
@@ -68,6 +71,8 @@ export interface ReadFileResult {
   truncated: boolean;
   /** True when `read.maxBytes` cut the window short. */
   bytesCapped: boolean;
+  /** Set when `output.spillDir` is on and `bytesCapped`: where the full window was saved. */
+  truncation?: WorkspaceTruncation;
   /** UTF-8 byte length of the full file. */
   totalBytes: number;
   /**
@@ -103,6 +108,10 @@ export interface EditFileResult {
   replacements: number;
   /** SHA-256 of the file content after the edit. */
   hash: string;
+  /** Set only when the text was found by a loose tier (`"unicode"`, `"whitespace"`). */
+  matchTier?: Exclude<WorkspaceEditMatchTier, "exact">;
+  /** Output of the policy's `hooks.afterEdit`, between `[diagnostics]` lines. */
+  diagnostics?: string;
 }
 
 /** One replacement inside a {@link MultiEditInput}. */
@@ -140,6 +149,10 @@ export interface MultiEditResult {
   replacements: number;
   /** SHA-256 of the file content after all edits. */
   hash: string;
+  /** The loosest tier any edit needed; set only when it was not exact. */
+  matchTier?: Exclude<WorkspaceEditMatchTier, "exact">;
+  /** Output of the policy's `hooks.afterEdit`, between `[diagnostics]` lines. */
+  diagnostics?: string;
 }
 
 /**
@@ -174,6 +187,8 @@ export interface ApplyPatchResult {
   files: ApplyPatchFileResult[];
   /** True when nothing was written because `dryRun` was set. */
   dryRun: boolean;
+  /** Output of the policy's `hooks.afterEdit` for the written files. */
+  diagnostics?: string;
 }
 
 /** Input to the `write_file` tool / `writeFile()` direct method. */
@@ -192,6 +207,8 @@ export interface WriteFileResult {
   bytesWritten: number;
   /** SHA-256 of the written content. */
   hash: string;
+  /** Output of the policy's `hooks.afterEdit`, between `[diagnostics]` lines. */
+  diagnostics?: string;
 }
 
 /** Options for the `exec()` direct method. */
@@ -306,8 +323,10 @@ export interface ShellOutputResult extends ShellJobInfo {
    * buffer holds the newest `shell.maxOutputBytes`).
    */
   droppedBytes: number;
-  /** True when `droppedBytes > 0`. */
+  /** True when `droppedBytes > 0` or `output` limits clipped a stream. */
   truncated: boolean;
+  /** What `output` limits left out of each stream; set only when it clipped one. */
+  truncation?: { stdout?: WorkspaceTruncation; stderr?: WorkspaceTruncation };
 }
 
 /** Input to the `shell_kill` tool. */
@@ -328,6 +347,8 @@ export interface RunShellResult {
   truncated: boolean;
   /** True when the command was SIGKILLed for exceeding its timeout. */
   timedOut: boolean;
+  /** What each clipped stream left out; set only for a stream that was clipped. */
+  truncation?: { stdout?: WorkspaceTruncation; stderr?: WorkspaceTruncation };
   /**
    * True when the invocation's `signal` aborted: before start (nothing ran)
    * or mid-run (the process tree was killed). Never true together with
@@ -372,6 +393,10 @@ export interface GrepResult {
   matches: GrepMatch[];
   /** Total number of matches (== `matches.length` unless capped). */
   total: number;
+  /** True when `output` limits cut `matches` short (the full list was saved). */
+  truncated?: boolean;
+  /** What was left out; set with `truncated`. */
+  truncation?: WorkspaceTruncation;
 }
 
 /** Input to the `list_dir` tool. */
@@ -427,6 +452,10 @@ export interface GlobInput {
 export interface GlobResult {
   /** Workspace-relative paths matching the pattern, sorted. */
   paths: string[];
+  /** True when `output` limits cut `paths` short (the full list was saved). */
+  truncated?: boolean;
+  /** What was left out; set with `truncated`. */
+  truncation?: WorkspaceTruncation;
 }
 
 /** State of one todo item. */

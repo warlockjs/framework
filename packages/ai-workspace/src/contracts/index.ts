@@ -78,3 +78,17 @@ export type {
   WorkspaceShellPolicy,
 } from "./workspace-policy.type";
 export type { Workspace, WorkspaceTools } from "./workspace.contract";
+export type {
+  WorkspaceAfterEditEvent,
+  WorkspaceEditLineEndings,
+  WorkspaceEditMatching,
+  WorkspaceEditMatchTier,
+  WorkspaceEditPolicy,
+  WorkspaceEditTool,
+  WorkspaceHooks,
+} from "./workspace-edit.type";
+export type {
+  WorkspaceOutputKeep,
+  WorkspaceOutputPolicy,
+  WorkspaceTruncation,
+} from "./workspace-output.type";

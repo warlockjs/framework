@@ -152,6 +152,14 @@ for (const file of await ws.glob("src/models/**/*.ts")) {
 - **Read-before-edit guard** — `read_file` returns a SHA-256 `hash`; `edit_file`
   requires an exact, unique `oldString` (or `replaceAll`) and rejects on an
   `expectHash` mismatch.
+- **Tiered edit matching** — `edit.matching` (default `"tiered"`) finds `oldString`
+  exactly, then with line endings normalised, Unicode punctuation folded and trailing
+  whitespace ignored; replacements keep the file's line endings, a loose match must be
+  unique, and a miss returns a `hint` with the closest text.
+- **`hooks.afterEdit`** — runs after a write and returns compiler or linter output as
+  `diagnostics` on the result; a throw or timeout never fails the edit.
+- **`output.spillDir`** — oversized `run_shell`, `shell_output`, `grep`, `glob` and
+  `read_file` output is saved to a file; the result keeps head and tail plus a pointer.
 - **Bounded reads** — `read.maxBytes` caps the UTF-8 bytes a read returns (line
   numbers included), cutting on a character boundary and flagging `bytesCapped`;
   the `hash` still covers the whole file.

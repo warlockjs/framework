@@ -58,6 +58,10 @@ export function makeGlobTool(
     action: (input) => `Finding files matching ${input.pattern}`,
     input: globInputSchema,
     async execute(input) {
+      if (ops.globResult !== undefined) {
+        return ops.globResult(input.pattern);
+      }
+
       const paths = await ops.glob(input.pattern);
 
       return { paths };

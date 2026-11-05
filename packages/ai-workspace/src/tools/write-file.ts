@@ -49,9 +49,14 @@ export function makeWriteFileTool(
       "atomic. Returns the bytes written and the new content hash.",
     input: inputSchema,
     async execute(input) {
-      const { hash, bytesWritten } = await ops.writeFile(input.path, input.content);
+      const { hash, bytesWritten, diagnostics } = await ops.writeFile(input.path, input.content);
 
-      return { path: input.path, bytesWritten, hash };
+      return {
+        path: input.path,
+        bytesWritten,
+        hash,
+        ...(diagnostics !== undefined ? { diagnostics } : {}),
+      };
     },
   });
 }
