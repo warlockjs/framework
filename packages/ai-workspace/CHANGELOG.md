@@ -4,6 +4,19 @@ All notable changes to `@warlock.js/ai-workspace` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.44.0
+
+### Added
+
+- Tiered edit matching. `edit_file` and `multi_edit` now find `oldString` exactly first, then with line endings normalised, then with look-alike Unicode punctuation folded (`matchTier: "unicode"`), then line by line ignoring trailing whitespace (`matchTier: "whitespace"`). A loose match must be unique, even with `replaceAll`. Replacement text takes the file's dominant line ending, so CRLF files stay CRLF. New `policy.edit`: `matching` (`"tiered"` default, `"exact"` for the old behaviour), `missHintLines` and `lineEndings`.
+- A `not-found` edit error carries a `hint`: the closest file text (at most 12 lines of 200 characters) or a note that `newString` is already present.
+- `policy.hooks.afterEdit`: runs once after `write_file`, `edit_file`, `multi_edit` and `apply_patch` write files and returns its text as `diagnostics` between `[diagnostics]` lines. A throw or a timeout reports "diagnostics unavailable" and never fails the edit. `afterEditMaxChars` (default 4000) and `afterEditTimeoutMs` (default 10 s) bound it.
+- `policy.output`: with `spillDir`, oversized `run_shell`, `shell_output`, `grep`, `glob` and `read_file` output is saved to a `spill-<time>-<random>-<label>.txt` file and the result keeps its head and tail plus a `[showing lines … of …; full output saved to …]` marker. Results gain a `truncation` object beside the boolean `truncated`. `read_file` may open the spill directory; `retentionMs` (7 days) and `dispose()` clean up files named like spill files. `globResult()` is an optional `WorkspaceOps` method returning the paths with truncation data.
+
+### Changed
+
+- `resolveInJail()` takes an optional `access` argument (`"read"` also accepts the spill directory).
+
 ## 5.40.0 - 2026-10-29
 
 ### Added

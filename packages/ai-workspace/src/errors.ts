@@ -164,6 +164,8 @@ export type WorkspaceEditErrorOptions = AIErrorOptions & {
   actualHash?: string;
   /** 0-based index of the failing edit, for a `multiEdit` rejection. */
   editIndex?: number;
+  /** For `"not-found"`: the nearby file text, or a note that `newString` is already present. */
+  hint?: string;
   /** 0-based index of the hunk that failed, for an `applyPatch` rejection. */
   hunkIndex?: number;
 };
@@ -199,6 +201,12 @@ export class WorkspaceEditError extends AIError {
    */
   public readonly editIndex?: number;
   /**
+   * For a `"not-found"` rejection, the file text closest to `oldString` (at
+   * most 12 lines of 200 characters) or a note that `newString` is already
+   * present. Absent when nothing is close.
+   */
+  public readonly hint?: string;
+  /**
    * For an `applyPatch` rejection, the 0-based index of the hunk that failed
    * within its file. Nothing was written.
    */
@@ -214,6 +222,7 @@ export class WorkspaceEditError extends AIError {
     this.expectedHash = options.expectedHash;
     this.actualHash = options.actualHash;
     this.editIndex = options.editIndex;
+    this.hint = options.hint;
     this.hunkIndex = options.hunkIndex;
   }
 }

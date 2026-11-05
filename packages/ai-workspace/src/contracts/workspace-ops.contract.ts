@@ -4,6 +4,7 @@ import type {
   EditFileInput,
   EditFileResult,
   ExecOptions,
+  GlobResult,
   GrepResult,
   ListDirOptions,
   ListDirResult,
@@ -46,7 +47,10 @@ export interface WorkspaceOps {
   readFile(path: string, opts?: { offset?: number; limit?: number }): Promise<ReadFileResult>;
 
   /** Atomically write full content to a jailed path, returning size + hash. */
-  writeFile(path: string, content: string): Promise<{ hash: string; bytesWritten: number }>;
+  writeFile(
+    path: string,
+    content: string,
+  ): Promise<{ hash: string; bytesWritten: number; diagnostics?: string }>;
 
   /**
    * Apply an exact-string edit under the read-before-edit guard:
@@ -107,6 +111,12 @@ export interface WorkspaceOps {
 
   /** Resolve a glob to matching workspace-relative paths within the jail. */
   glob(pattern: string): Promise<string[]>;
+
+  /**
+   * Like {@link WorkspaceOps.glob}, but returns the paths with the `output`
+   * truncation metadata. Optional: the `glob` tool falls back to `glob()`.
+   */
+  globResult?(pattern: string): Promise<GlobResult>;
 
   /** Whether a jailed path exists (file or directory). */
   exists(path: string): Promise<boolean>;
