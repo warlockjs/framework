@@ -40,6 +40,8 @@ const myAgent = ai.agent({
 
 ## `ai.middleware.budget(options)`
 
+`ai.middleware.budget(...).wrapModel(model)` returns a model whose `complete()` calls are metered by that budget (one running total per wrapper; `stream()` is not metered; the type is `BudgetMiddleware`). `wrapModelWithMiddleware(model, middleware, { name? })` is the general form for any middleware list. `ai.compaction.summarize({ model, middleware: [budget] })` meters the summary calls the same way.
+
 Cumulative token / USD cap across all trips of one execution.
 
 ```ts

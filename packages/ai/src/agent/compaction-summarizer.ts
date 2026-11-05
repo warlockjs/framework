@@ -3,7 +3,9 @@ import type { Message } from "../contracts/conversation-message.type";
 import type { ModelCallOptions, ModelContract } from "../contracts/model.contract";
 import type { CompactionResult } from "../contracts/result/orchestrator-result.type";
 import type { Usage } from "../contracts/result/usage.type";
+import type { AgentMiddleware } from "../contracts/middleware";
 import { AgentExecutionError } from "../errors";
+import { wrapModelWithMiddleware } from "../middleware/wrap-model";
 import { approximateTokenCount } from "../utils/token-count";
 import type { AgentCompactionContext } from "./compaction.type";
 
@@ -98,6 +100,25 @@ export type CompactionSummarizerOptions = {
   requireHeadings?: readonly string[];
   /** Output cap for the summary call. Omit for the model's default. */
   maxTokens?: number;
+  /**
+   * Middleware applied around every call the summarizer makes to `model`:
+   * the first attempt, the length retry, the shrink retries and the heading
+   * follow-up. Only the `trip` hooks run, once per call, with one
+   * middleware state per summary, so a `budget()` here counts all the calls
+   * of one summary. A middleware that throws (a budget refusal, for
+   * example) fails the summary like any summarizer error, and the agent
+   * keeps the conversation. Omit for direct calls.
+   */
+  middleware?: readonly AgentMiddleware[];
+  /** Aborts the summary calls. The agent's own signal, when it passes one, wins. */
+  signal?: AbortSignal;
+  /**
+   * What to do when the reply is cut off by the output cap. By default the
+   * request is retried once with 30% less input. `false` turns the retry
+   * off, so a cut-off reply fails the summary; `{ shrink }` sets the share
+   * of the input kept on the retry (between 0 and 1, default 0.7).
+   */
+  lengthRetry?: false | { shrink: number };
   /** Extra call options for the summary model (reasoning, provider options, ...). */
   modelOptions?: Omit<ModelCallOptions, "tools" | "responseSchema" | "signal">;
   /**
@@ -175,6 +196,19 @@ export function summarizeCompaction(options: CompactionSummarizerOptions): Compa
     );
   }
 
+  const lengthShrink = options.lengthRetry === false ? undefined : (options.lengthRetry?.shrink ?? 0.7);
+
+  if (
+    options.lengthRetry !== undefined &&
+    options.lengthRetry !== false &&
+    !(lengthShrink! > 0 && lengthShrink! < 1)
+  ) {
+    throw new AgentExecutionError(
+      "ai.compaction.summarize lengthRetry.shrink must be between 0 and 1.",
+      { context: { authoring: true } },
+    );
+  }
+
   const instructions = options.instructions?.trim() || DEFAULT_COMPACTION_INSTRUCTIONS;
   const required = (options.requireHeadings ?? []).filter((heading) => heading.trim().length > 0);
   const window = options.model.capabilities?.contextWindow;
@@ -184,10 +218,14 @@ export function summarizeCompaction(options: CompactionSummarizerOptions): Compa
   const shrinks = input?.shrinkOnContextError ?? [];
 
   return async (history, context) => {
+    const model = options.middleware?.length
+      ? wrapModelWithMiddleware(options.model, options.middleware, { name: "compaction-summarizer" })
+      : options.model;
+    const signal = context?.signal ?? options.signal;
     const callOptions: ModelCallOptions = {
       ...options.modelOptions,
       ...(options.maxTokens !== undefined ? { maxTokens: options.maxTokens } : {}),
-      ...(context?.signal ? { signal: context.signal } : {}),
+      ...(signal ? { signal } : {}),
     };
     const full = estimateTokens(renderRequest(history, instructions));
     let budget = configuredBudget;
@@ -205,11 +243,11 @@ export function summarizeCompaction(options: CompactionSummarizerOptions): Compa
       let response: Awaited<ReturnType<ModelContract["complete"]>>;
 
       try {
-        response = await options.model.complete(request, callOptions);
+        response = await model.complete(request, callOptions);
       } catch (error) {
         const share = shrinks[shrinkIndex];
 
-        if (share !== undefined && !context?.signal?.aborted && isInputTooLong(error)) {
+        if (share !== undefined && !signal?.aborted && isInputTooLong(error)) {
           shrinkIndex++;
           budget = Math.floor(full * share);
           followUp = [];
@@ -223,9 +261,9 @@ export function summarizeCompaction(options: CompactionSummarizerOptions): Compa
         await options.onUsage(response.usage, context);
       }
 
-      if (response.finishReason === "length" && !lengthRetried) {
+      if (response.finishReason === "length" && !lengthRetried && lengthShrink !== undefined) {
         lengthRetried = true;
-        budget = Math.max(1, Math.floor(Math.min(budget ?? full, inputTokens) * 0.7));
+        budget = Math.max(1, Math.floor(Math.min(budget ?? full, inputTokens) * lengthShrink));
         followUp = [];
         continue;
       }

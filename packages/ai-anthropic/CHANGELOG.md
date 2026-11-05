@@ -4,6 +4,12 @@ All notable changes to `@warlock.js/ai-anthropic` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.45.0
+
+### Added
+
+- The agent-level `contextEditing.clearToolResults.clearAtLeast` is mapped to `clear_at_least` on the native `clear_tool_uses` edit, next to the resolved `trigger`, `keep` and `exclude_tools`.
+
 ## 5.44.0 - 2026-11-05
 
 ### Added

@@ -25,6 +25,13 @@ export type ClearToolResultsConfig = {
   keep?: number;
   /** Tool names whose results are never cleared. */
   exclude?: string[];
+  /**
+   * Clear only when at least this many tokens would be freed; a smaller
+   * clear is skipped, so the prompt cache is not rewritten for little gain.
+   * Sent to Anthropic as `clear_at_least`; on the client the freed size is
+   * estimated from the cleared results.
+   */
+  clearAtLeast?: number;
   /** Text that replaces a cleared result. */
   placeholder?: string;
   /**
