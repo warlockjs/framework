@@ -131,21 +131,23 @@ function toToolOutput(
 
   if (!toolImages) return toolResultText(content);
 
-  return content.flatMap((part) => {
-    if (part.type === "text") return [{ type: "input_text" as const, text: part.text }];
+  return content.flatMap(
+    (part): Array<OpenAI.Responses.ResponseInputText | OpenAI.Responses.ResponseInputImage> => {
+      if (part.type === "text") return [{ type: "input_text" as const, text: part.text }];
 
-    if (part.type === "image") {
-      return [
-        {
-          type: "input_image" as const,
-          image_url: toImageUrl(part.source),
-          detail: "auto" as const,
-        },
-      ];
-    }
+      if (part.type === "image") {
+        return [
+          {
+            type: "input_image" as const,
+            image_url: toImageUrl(part.source),
+            detail: "auto" as const,
+          },
+        ];
+      }
 
-    return [];
-  });
+      return [];
+    },
+  );
 }
 
 /** Map a resolved `ContentPart` to a Responses input content part (text and images only). */

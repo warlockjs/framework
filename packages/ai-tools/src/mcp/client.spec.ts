@@ -244,6 +244,7 @@ describe("mcp() client — tools/call execution", () => {
     }));
 
     const [contract] = await mcp(transport).tools();
+    if (!contract) throw new Error("expected one tool");
     const result = await contract.invoke({ message: "hi" });
 
     expect(result.data).toEqual({
