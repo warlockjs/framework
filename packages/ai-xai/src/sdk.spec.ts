@@ -147,3 +147,15 @@ describe("XaiSDK pricing resolution (delegated)", () => {
     expect(sdk.model({ name: "grok-3" }).pricing).toBeUndefined();
   });
 });
+
+describe("XaiSDK context window", () => {
+  it("reports the known window, with the config value winning", () => {
+    const sdk = new XaiSDK({ apiKey: "test-key" });
+
+    expect(sdk.model({ name: "grok-4" }).capabilities?.contextWindow).toBe(256000);
+    expect(sdk.model({ name: "grok-4", contextWindow: 64_000 }).capabilities?.contextWindow).toBe(
+      64_000,
+    );
+    expect(sdk.model({ name: "unlisted-model" }).capabilities).not.toHaveProperty("contextWindow");
+  });
+});

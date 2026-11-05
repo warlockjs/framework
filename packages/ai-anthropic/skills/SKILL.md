@@ -503,3 +503,7 @@ and [fee reservations](https://warlock.js.org/v/latest/ai/recipes/cost-budgets-a
 ## List models
 
 `await anthropic.models()` returns `ModelInfo[]` from `GET /v1/models` (release date as `created`, `contextWindow` / `maxOutputTokens` when reported).
+
+## Context window
+
+Every known Claude release reports `capabilities.contextWindow` (1M for the 4.6 line and the Claude 5 families, 200K for earlier ones); `anthropic.model({ name, contextWindow })` wins and covers unlisted ids.

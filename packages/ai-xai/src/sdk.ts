@@ -15,6 +15,7 @@ import type {
   XaiModelConfig,
   XaiSDKConfig,
 } from "./config.type";
+import { inferContextWindow } from "./known-context-windows";
 import { inferReasoningCapability, inferVisionCapability } from "./known-models";
 
 /**
@@ -125,7 +126,9 @@ export class XaiSDK implements SDKAdapterContract {
    * xai.model({ name: "grok-3-mini" });   // reasoning auto-true, vision false
    */
   public model(config: XaiModelConfig): ModelContract {
-    const { api, ...modelConfig } = config;
+    const { api, ...rest } = config;
+    const window = config.contextWindow ?? inferContextWindow(config.name);
+    const modelConfig = { ...rest, ...(window !== undefined ? { contextWindow: window } : {}) };
     const model = this.openai.model({
       ...modelConfig,
       // xAI names don't match OpenAI's vision/reasoning prefixes, so we

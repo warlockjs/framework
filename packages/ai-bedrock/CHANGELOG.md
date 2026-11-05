@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 
 - Image parts in a tool result are sent as Converse `image` blocks inside the `toolResult`; the model reports `capabilities.toolResultImages: true`.
+- `bedrock.model({ name, contextWindow })` and `capabilities.contextWindow`, inferred from the model id for Claude, Nova, Llama, Mistral, Command R and Jamba models (region prefixes and version suffixes are fine). The config value wins; unlisted ids stay unset.
 
 ## 5.40.0 - 2026-10-29
 

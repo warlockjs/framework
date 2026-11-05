@@ -123,6 +123,8 @@ id the upstream serves.
 
 ## Capabilities
 
+**Context window.** `capabilities.contextWindow` is 128,000 for `deepseek-chat`, `deepseek-reasoner` and the `deepseek-v4-*` ids (a conservative figure for the V4 line). Pass `deepseek.model({ name, contextWindow })` to set or override it.
+
 The wrapper injects DeepSeek's own inference so the right flags are set even
 though the model names aren't OpenAI names:
 

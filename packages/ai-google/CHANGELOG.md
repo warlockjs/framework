@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 
 - Image parts in a tool result are replaced by the text `[image omitted: provider cannot read images in tool results]`; `capabilities.toolResultImages` is `false`.
+- `capabilities.contextWindow` is reported for Gemini 3.x (1,048,576) and Gemini 1.5 Pro (2,097,152), besides the families already covered.
 
 ## 5.44.0 - 2026-11-05
 

@@ -49,6 +49,42 @@ const EFFORT_TO_THINK_LEVEL: Record<Exclude<ReasoningEffort, "none">, "low" | "m
   max: "high",
 };
 
+/** A positive integer, or `undefined`. */
+function positiveInteger(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isInteger(value) && value > 0 ? value : undefined;
+}
+
+/**
+ * The context window an `/api/show` reply reports: a `num_ctx` line in the
+ * model's `parameters` (what the server runs with) first, then the
+ * architecture's `<arch>.context_length` from `model_info`.
+ */
+function windowFromShow(info: { parameters?: string; model_info?: unknown }): number | undefined {
+  const parameter = /^\s*num_ctx\s+(\d+)/m.exec(info.parameters ?? "");
+  const fromParameters = parameter ? positiveInteger(Number(parameter[1])) : undefined;
+
+  if (fromParameters !== undefined) {
+    return fromParameters;
+  }
+
+  const entries =
+    info.model_info instanceof Map
+      ? [...info.model_info.entries()]
+      : Object.entries((info.model_info ?? {}) as Record<string, unknown>);
+
+  for (const [key, value] of entries) {
+    if (String(key).endsWith(".context_length")) {
+      const window = positiveInteger(value);
+
+      if (window !== undefined) {
+        return window;
+      }
+    }
+  }
+
+  return undefined;
+}
+
 /**
  * Ollama-backed implementation of `ModelContract`.
  *
@@ -94,6 +130,7 @@ export class OllamaModel implements ModelContract {
   private readonly client: Ollama;
   private readonly config: OllamaModelConfig;
   private readonly logger: Logger = log;
+  private windowDiscovery?: Promise<void>;
 
   public constructor(client: Ollama, config: OllamaModelConfig, provider: string = "ollama") {
     this.client = client;
@@ -102,6 +139,9 @@ export class OllamaModel implements ModelContract {
     this.provider = provider;
     this.pricing = config.pricing;
     this.capabilities = {
+      // An explicit window is final; otherwise `discoverContextWindow` fills
+      // `contextWindow` in place on the first call.
+      ...(config.contextWindow !== undefined ? { contextWindow: config.contextWindow } : {}),
       structuredOutput: config.structuredOutput ?? true,
       vision: config.vision ?? inferVisionCapability(config.name),
       toolResultImages: false,
@@ -135,6 +175,8 @@ export class OllamaModel implements ModelContract {
     });
 
     let response: ChatResponse;
+
+    void this.discoverContextWindow(options?.signal);
 
     try {
       options?.signal?.throwIfAborted();
@@ -183,6 +225,8 @@ export class OllamaModel implements ModelContract {
     });
 
     let stream: AbortableAsyncIterator<ChatResponse>;
+
+    void this.discoverContextWindow(options?.signal);
 
     try {
       options?.signal?.throwIfAborted();
@@ -287,6 +331,40 @@ export class OllamaModel implements ModelContract {
       },
       options,
     );
+  }
+
+  /**
+   * Best-effort context-window discovery, started on the first call alongside
+   * the chat request and cancelled with it (model creation stays synchronous and the call never
+   * waits for it, so the window is known from the following call on). Skipped when the config sets
+   * `contextWindow`, which always wins. Asks the server (`/api/show`) for the
+   * window the model runs with: a `num_ctx` set in the model's own
+   * parameters, else the architecture's `<arch>.context_length`. Any failure
+   * leaves `capabilities.contextWindow` unset.
+   */
+  private discoverContextWindow(signal: AbortSignal | undefined): Promise<void> {
+    if (this.config.contextWindow !== undefined) {
+      return Promise.resolve();
+    }
+
+    this.windowDiscovery ??= (async () => {
+      try {
+        const info = await withCallSignal(signal, () => this.client.show({ model: this.name }));
+        const window = windowFromShow(info);
+
+        if (window !== undefined && this.capabilities.contextWindow === undefined) {
+          this.capabilities.contextWindow = window;
+        }
+      } catch {
+        // Discovery is optional; the window stays unset. A lookup cut short
+        // by the call being aborted is tried again on the next call.
+        if (signal?.aborted) {
+          this.windowDiscovery = undefined;
+        }
+      }
+    })();
+
+    return this.windowDiscovery;
   }
 
   /**

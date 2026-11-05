@@ -369,3 +369,7 @@ The Gemini API has no per-request search limit. `googleSearchBudget(max)` plus `
 ## List models
 
 `await google.models()` returns `ModelInfo[]` (id without `models/`, `label`, `kind` from `supportedActions`, `contextWindow`, `maxOutputTokens`, `description`; no `created`).
+
+## Context window
+
+Gemini 3.x, 2.5, 2.0 flash and 1.5 flash report a 1,048,576 `capabilities.contextWindow`, Gemini 1.5 Pro 2,097,152; `google.model({ name, contextWindow })` wins.

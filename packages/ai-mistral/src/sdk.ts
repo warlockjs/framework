@@ -9,6 +9,7 @@ import type {
 } from "@warlock.js/ai";
 import { OpenAISDK } from "@warlock.js/ai-openai";
 import type { MistralModelConfig, MistralSDKConfig } from "./config.type";
+import { inferContextWindow } from "./known-context-windows";
 import {
   inferReasoningCapability,
   inferVisionCapability,
@@ -112,8 +113,10 @@ export class MistralSDK implements SDKAdapterContract {
    * `undefined`.
    */
   public model(config: MistralModelConfig): ModelContract {
+    const window = config.contextWindow ?? inferContextWindow(config.name);
     const resolvedConfig: MistralModelConfig = {
       ...config,
+      ...(window !== undefined ? { contextWindow: window } : {}),
       vision: config.vision ?? inferVisionCapability(config.name),
       reasoning: config.reasoning ?? inferReasoningCapability(config.name),
     };

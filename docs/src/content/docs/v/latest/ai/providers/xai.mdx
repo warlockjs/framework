@@ -108,6 +108,8 @@ supervisor.
 
 ## Models and capabilities
 
+**Context window.** `capabilities.contextWindow` is filled by id prefix: 2,000,000 for `grok-4-fast` and `grok-4-1-fast`, 256,000 for `grok-4` and `grok-code-fast`, 131,072 for `grok-3` and `grok-2`, 32,768 for `grok-2-vision`. Pass `xai.model({ name, contextWindow })` to set or override it.
+
 This adapter ships xAI's own name lists — Grok ids don't match OpenAI's
 `gpt-*` / `o*` prefixes. Capabilities are injected per model before delegating;
 an explicit value always wins over inference.

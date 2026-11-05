@@ -8,6 +8,7 @@ import type {
 } from "@warlock.js/ai";
 import { OpenAISDK } from "@warlock.js/ai-openai";
 import type { GroqEmbedderConfig, GroqModelConfig, GroqSDKConfig } from "./config.type";
+import { inferContextWindow } from "./known-context-windows";
 import {
   GROQ_BASE_URL,
   GROQ_PROVIDER,
@@ -112,8 +113,11 @@ export class GroqSDK implements SDKAdapterContract {
     const resolvedPricing =
       config.pricing ?? this.pricing?.[config.name] ?? defaultPricingFor(config.name);
 
+    const window = config.contextWindow ?? inferContextWindow(config.name);
+
     return this.openai.model({
       ...config,
+      ...(window !== undefined ? { contextWindow: window } : {}),
       // Fill capability inference only when the caller didn't pin it —
       // explicit caller config always wins, then Groq inference, then
       // (inside OpenAISDK) the harmless OpenAI inference that won't match.

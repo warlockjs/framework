@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 
 - With `api: "responses"` on the OpenAI provider, image parts in a tool result are sent as `input_image` items in the `function_call_output` (`capabilities.toolResultImages: true`). Chat Completions and the OpenAI-compatible providers send the text `[image omitted: provider cannot read images in tool results]` and report `false`.
+- `capabilities.contextWindow` is reported for more direct-OpenAI ids: `gpt-5.x` and `gpt-6` (400K, the documented gpt-5 figure; set `contextWindow` for a larger window), `gpt-4`, `gpt-4-turbo`, `gpt-3.5-turbo`, `chatgpt-4o`, `o3-mini`, `o3-pro` and `o1-pro`.
 
 ## 5.44.0 - 2026-11-05
 

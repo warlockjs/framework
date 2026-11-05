@@ -943,6 +943,7 @@ describe("BedrockModel capabilities", () => {
     });
 
     expect(claude.capabilities).toEqual({
+      contextWindow: 200_000,
       structuredOutput: true,
       vision: true,
       toolResultImages: true,

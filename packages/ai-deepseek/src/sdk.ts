@@ -14,6 +14,7 @@ import type {
   DeepSeekModelConfig,
   DeepSeekSDKConfig,
 } from "./config.type";
+import { inferContextWindow } from "./known-context-windows";
 import { inferReasoningCapability, inferVisionCapability } from "./known-models";
 
 /**
@@ -140,8 +141,10 @@ export class DeepSeekSDK implements SDKAdapterContract {
    * `OpenAIModel`.
    */
   public model(config: DeepSeekModelConfig): ModelContract {
+    const window = config.contextWindow ?? inferContextWindow(config.name);
     const resolved: DeepSeekModelConfig = {
       ...config,
+      ...(window !== undefined ? { contextWindow: window } : {}),
       vision: config.vision ?? inferVisionCapability(config.name),
       reasoning: config.reasoning ?? inferReasoningCapability(config.name),
       pricing: config.pricing ?? this.pricing[config.name],

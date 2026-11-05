@@ -79,6 +79,8 @@ groq.model({ name: "deepseek-r1-distill-llama-70b" }); // reasoning auto-true
 
 ## Capabilities
 
+**Context window.** `capabilities.contextWindow` is 131,072 for the Llama, gpt-oss, Qwen3 and DeepSeek-R1 distill ids and 262,144 for Kimi K2. Pass `groq.model({ name, contextWindow })` to set or override it.
+
 The whole reason this wrapper exists: Groq's ids aren't OpenAI's, so the
 OpenAI adapter's prefix inference would never fire. `GroqSDK` carries its
 **own** name lists:

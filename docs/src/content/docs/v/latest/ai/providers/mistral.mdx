@@ -92,6 +92,8 @@ endpoint; the embedder delegates straight to the wrapped OpenAI embedder.
 
 ## Capabilities
 
+**Context window.** `capabilities.contextWindow` is 128,000 for the Large, Medium, Small, Ministral, Pixtral, Magistral and open-weight ids and 256,000 for Codestral. Newer generations document larger windows; pass `mistral.model({ name, contextWindow })` to set or override it.
+
 The wrapper injects **Mistral-aware** inference before delegating to the
 OpenAI adapter (the OpenAI prefix lists never match Mistral names):
 

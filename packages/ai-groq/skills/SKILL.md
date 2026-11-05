@@ -142,3 +142,7 @@ Models from this adapter have no native `countTokens` method. Check
 ## List models
 
 `await groq.models()` returns `ModelInfo[]` with `contextWindow`; inactive models are left out.
+
+## Context window
+
+Groq ids report `capabilities.contextWindow` (131,072 for Llama, gpt-oss, Qwen3 and DeepSeek-R1 distill, 262,144 for Kimi K2); `groq.model({ name, contextWindow })` wins.

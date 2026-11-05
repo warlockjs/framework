@@ -11,7 +11,7 @@ export type {
   AgentCompactionContext,
   AgentCompactionRecord,
 } from "./compaction.type";
-export type { TokenTrigger } from "./token-trigger";
+export { modelContextWindow, type TokenTrigger } from "./token-trigger";
 export { DEFAULT_CLEARED_TOOL_RESULT } from "./context-editing.type";
 export type {
   AgentContextEditingConfig,

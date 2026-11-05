@@ -142,3 +142,15 @@ describe("MistralSDK.count()", () => {
     expect(await sdk.count("Hello, world!")).toBe(4); // 13 chars / 4 → 4
   });
 });
+
+describe("MistralSDK context window", () => {
+  it("reports the known window, with the config value winning", () => {
+    const sdk = new MistralSDK({ apiKey: "test-key" });
+
+    expect(sdk.model({ name: "mistral-large-latest" }).capabilities?.contextWindow).toBe(128000);
+    expect(sdk.model({ name: "mistral-large-latest", contextWindow: 64_000 }).capabilities?.contextWindow).toBe(
+      64_000,
+    );
+    expect(sdk.model({ name: "unlisted-model" }).capabilities).not.toHaveProperty("contextWindow");
+  });
+});

@@ -142,3 +142,7 @@ Models from this adapter have no native `countTokens` method. Check
 ## List models
 
 `await deepseek.models()` returns `ModelInfo[]` from `GET /models`.
+
+## Context window
+
+`deepseek-chat`, `deepseek-reasoner` and `deepseek-v4-*` report a 128,000 `capabilities.contextWindow`; `deepseek.model({ name, contextWindow })` wins.

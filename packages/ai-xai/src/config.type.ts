@@ -53,6 +53,14 @@ export type XaiSDKConfig = OpenAISDKConfig;
  */
 export type XaiModelConfig = ModelConfig & {
   /**
+   * The model's context window in tokens (input + output). Surfaces as
+   * `capabilities.contextWindow`, which window-relative triggers
+   * (`compaction.afterTokens: { share }`) resolve against. When omitted it is
+   * taken from a table of known models; unknown models stay unset. An
+   * explicit value always wins.
+   */
+  contextWindow?: number;
+  /**
    * Override the auto-inferred vision capability. When omitted, the
    * adapter checks the model id against xAI's known vision families
    * (`grok-4`, `grok-2-vision`; see `known-models.ts`). Explicit

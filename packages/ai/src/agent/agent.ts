@@ -99,6 +99,7 @@ import {
   type ToolUseContractEvent,
 } from "./tool-use-contract";
 import { deleteAgentSnapshot, loadAgentSnapshotForResume, persistAgentSnapshot } from "./snapshot";
+import { modelContextWindow } from "./token-trigger";
 
 const LOG_MODULE = "ai.agent";
 
@@ -1621,7 +1622,7 @@ class Execution<TOutput> {
         this.messages,
         callOptions,
         tripIndex,
-        this.config.model.capabilities?.contextWindow,
+        modelContextWindow(this.config.model),
       );
 
       if (record) {
@@ -1640,7 +1641,7 @@ class Execution<TOutput> {
         callOptions,
         tripIndex,
         this.inputMessageIndex,
-        this.config.model.capabilities?.contextWindow,
+        modelContextWindow(this.config.model),
       );
       if (callOptions.signal?.aborted) throw this.makeCancelledError();
       // An unknown window repeats every trip; record it once per run.
@@ -1711,7 +1712,7 @@ class Execution<TOutput> {
       this.config.contextEditing && this.editsContextNatively()
         ? nativeContextEditingHint(
             this.config.contextEditing,
-            this.config.model.capabilities?.contextWindow,
+            modelContextWindow(this.config.model),
           )
         : undefined;
 

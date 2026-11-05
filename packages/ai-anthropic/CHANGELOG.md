@@ -10,6 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - The agent-level `contextEditing.clearToolResults.clearAtLeast` is mapped to `clear_at_least` on the native `clear_tool_uses` edit, next to the resolved `trigger`, `keep` and `exclude_tools`.
 - Image parts in a tool result are sent as `image` blocks inside the `tool_result`; the model reports `capabilities.toolResultImages: true`.
+- `capabilities.contextWindow` is reported for every known Claude release: 1M for Opus 4.6 to 5.5, Sonnet 4.6 to 5.5, Haiku 5.5, Fable and Mythos, and 200K for Opus 4 to 4.5, Sonnet 4 to 4.5, Haiku 4.5 and the Claude 3 line. `contextWindow` in the model config still wins.
 
 ## 5.44.0 - 2026-11-05
 
