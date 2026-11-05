@@ -161,3 +161,7 @@ Models from this adapter have no native `countTokens` method. Check
 ## List models
 
 `await xai.models()` returns `ModelInfo[]` from `GET /v1/models` (`id`, `label`, `provider`, `kind` classified from the id, `created`).
+
+## Context window
+
+Grok ids report `capabilities.contextWindow` by prefix (2M for grok-4-fast, 256K grok-4, 131,072 grok-3/2, 32,768 grok-2-vision); `xai.model({ name, contextWindow })` wins.

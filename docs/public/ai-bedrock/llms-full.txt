@@ -329,3 +329,7 @@ your own verified metering establishes the billing unit.
 ## List models
 
 `await bedrock.models()` returns `ModelInfo[]` from `ListFoundationModels` (needs `bedrock:ListFoundationModels`; legacy models left out; `kind` from output modalities).
+
+## Context window
+
+`bedrock.model({ name, contextWindow })` sets `capabilities.contextWindow`; when omitted it is inferred from the model id (Claude, Nova, Llama, Mistral, Command R, Jamba) and unlisted ids stay unset.
