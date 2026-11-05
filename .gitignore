@@ -36,3 +36,13 @@ Thumbs.db
 
 # Local agent coordination (Codex <-> Claude bridge) and scratch files
 .tmp/
+
+# Code map (scripts/code-map.sh): GRAPH_REPORT.md and FILE_INDEX.md are tracked, the rest is local
+tools/code-map/.venv/
+code-map/graph.json
+code-map/graph.html
+code-map/manifest.json
+code-map/cache/
+code-map/memory/
+code-map/.rebuild.lock
+code-map/.graphify_*

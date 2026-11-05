@@ -27,6 +27,7 @@
     "test:scripts": "node --test \"scripts/**/*.test.mjs\"",
     "format": "oxfmt --config .oxfmtrc.json --disable-nested-config --ignore-path .gitignore --ignore-path .oxfmtignore --write .",
     "format:check": "oxfmt --config .oxfmtrc.json --disable-nested-config --ignore-path .gitignore --ignore-path .oxfmtignore --check .",
+    "code-map": "bash scripts/code-map.sh",
     "docs:references": "node scripts/regenerate-llms.mjs"
   },
   "devDependencies": {

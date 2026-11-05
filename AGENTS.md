@@ -9,6 +9,9 @@ agent-kit derives each agent's guide (CLAUDE.md, etc.) from this file.
 - `docs/` — the documentation site (Astro + Starlight), deployed to warlock.js.org.
 - `tools/release/` — the release runner (npm-managed, outside the pnpm workspace).
 - `scripts/` — workspace-wide checks. `skills/` — playbooks for this repository.
+- `code-map/` — generated map of the code and docs (`FILE_INDEX.md`: which file holds what;
+  `GRAPH_REPORT.md`: overview). Read it before searching; refresh with `pnpm code-map`.
+  How to query it: `skills/navigate-the-code-map/SKILL.md`.
 
 ## Rules
 
