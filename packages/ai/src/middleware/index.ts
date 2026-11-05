@@ -6,6 +6,7 @@ export {
   type BudgetContractViolation,
   type BudgetContractViolationMode,
   type BudgetFallbackSignal,
+  type BudgetMiddleware,
   type BudgetOptions,
   type BudgetPricing,
   type BudgetSpend,
