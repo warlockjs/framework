@@ -4,6 +4,14 @@ All notable changes to `@warlock.js/ai-workspace` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.45.0
+
+### Added
+
+- `onAsk` decisions: `remember` accepts one pattern or an array, so a line that asks about several commands can approve them all. `workspace.shell.remembered()` lists the remembered patterns and `workspace.shell.forget(pattern)` removes one. A configured deny still beats them.
+- `onAsk` decisions: `reason?: string` is appended to the `run_shell` refusal the model reads, cut at 500 characters with a `[truncated]` marker.
+- A flat `spilledTo?: string[]` on every `run_shell`, `shell_output`, `read_file`, `grep` and `glob` result that spilled output to disk, and a spilled head-and-tail text now ends with a `[full output saved to …]` line. The `use-a-workspace` skill documents each tool's result shape.
+
 ## 5.44.0 - 2026-11-05
 
 ### Added

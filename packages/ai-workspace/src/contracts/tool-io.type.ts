@@ -73,6 +73,8 @@ export interface ReadFileResult {
   bytesCapped: boolean;
   /** Set when `output.spillDir` is on and `bytesCapped`: where the full window was saved. */
   truncation?: WorkspaceTruncation;
+  /** Set with `truncation.path`: the file holding the full window (absolute paths). */
+  spilledTo?: string[];
   /** UTF-8 byte length of the full file. */
   totalBytes: number;
   /**
@@ -327,6 +329,8 @@ export interface ShellOutputResult extends ShellJobInfo {
   truncated: boolean;
   /** What `output` limits left out of each stream; set only when it clipped one. */
   truncation?: { stdout?: WorkspaceTruncation; stderr?: WorkspaceTruncation };
+  /** Absolute paths of the files holding the complete output of each stream that spilled to disk. */
+  spilledTo?: string[];
 }
 
 /** Input to the `shell_kill` tool. */
@@ -349,6 +353,8 @@ export interface RunShellResult {
   timedOut: boolean;
   /** What each clipped stream left out; set only for a stream that was clipped. */
   truncation?: { stdout?: WorkspaceTruncation; stderr?: WorkspaceTruncation };
+  /** Absolute paths of the files holding the complete output of each stream that spilled to disk. */
+  spilledTo?: string[];
   /**
    * True when the invocation's `signal` aborted: before start (nothing ran)
    * or mid-run (the process tree was killed). Never true together with
@@ -397,6 +403,8 @@ export interface GrepResult {
   truncated?: boolean;
   /** What was left out; set with `truncated`. */
   truncation?: WorkspaceTruncation;
+  /** Absolute path of the file holding the complete output, when it spilled to disk. */
+  spilledTo?: string[];
 }
 
 /** Input to the `list_dir` tool. */
@@ -456,6 +464,8 @@ export interface GlobResult {
   truncated?: boolean;
   /** What was left out; set with `truncated`. */
   truncation?: WorkspaceTruncation;
+  /** Absolute path of the file holding the complete output, when it spilled to disk. */
+  spilledTo?: string[];
 }
 
 /** State of one todo item. */

@@ -59,7 +59,17 @@ export interface WorkspaceShellAskRequest {
  */
 export interface WorkspaceShellAskDecision {
   allow: boolean;
-  remember?: WorkspaceCommandPattern;
+  /**
+   * One pattern or several (a line such as `git status -s && npm test` asks
+   * about two commands). Each is added once; list them with
+   * `workspace.shell.remembered()` and remove one with `forget(pattern)`.
+   */
+  remember?: WorkspaceCommandPattern | readonly WorkspaceCommandPattern[];
+  /**
+   * Why the line was refused (used when `allow` is `false`). Appended to the
+   * refusal the model reads, cut at 500 characters with a `[truncated]` marker.
+   */
+  reason?: string;
 }
 
 /**
