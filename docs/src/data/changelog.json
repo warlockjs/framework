@@ -136,6 +136,252 @@
   ],
   "releases": [
     {
+      "version": "5.44.0",
+      "id": "v5-44-0",
+      "date": "November 5, 2026",
+      "isUnreleased": false,
+      "headlineHtml": "Window-relative compaction, model retries and cache diagnostics, plus workspace command rules, PowerShell support, forgiving edits and output spill.",
+      "highlights": [
+        "Compaction and tool-result clearing can trigger on a share of the model's context window (<code>afterTokens: { share, reserve?, max? }</code>); adapters report <code>contextWindow</code> for common models.",
+        "<code>ai.compaction.summarize({ input, requireHeadings })</code> limits what is sent to the summary model and checks the summary for the headings you need.",
+        "<code>ai.retryModel(model, policy)</code> retries transient failures with backoff, <code>retry-after</code> and a separate offline budget; <code>cacheControl.key</code> routes prompt caching, and opt-in fingerprints show why a cache stopped hitting.",
+        "Workspace <code>shell.rules</code> allow, ask or deny commands with an <code>onAsk</code> approval callback, and <code>shell.interpreter</code> runs bash, PowerShell, cmd or <code>\"auto\"</code> under the same checks.",
+        "Edits match in tiers with hints on a miss and keep line endings, <code>hooks.afterEdit</code> appends diagnostics, oversized output spills to a file, and <code>fetch_url</code> converts pages without optional peers."
+      ],
+      "upgradeNotes": [
+        "Workspace edit matching now defaults to <code>\"tiered\"</code>; set <code>edit.matching: \"exact\"</code> for the previous exact-only behaviour.",
+        "<code>fetch_url</code> text and markdown modes fall back to a built-in converter when the readability peers are missing (pass <code>extractor: \"readability\"</code> for the old error) and retry once on a <code>cf-mitigated: challenge</code> response (<code>retryOnChallenge: false</code> to disable)."
+      ],
+      "summaryHtml": null,
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/5.44.0-summary.md",
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/ai-workspace",
+          "slug": "ai-workspace",
+          "total": 10,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 9
+            },
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "Command rules: <code>shell.rules</code> is an ordered list of <code>{ match, effect: \"allow\" | \"ask\" | \"deny\", reason? }</code> (the last matching rule wins, a deny anywhere in a line refuses it) and <code>shell.onAsk({ command, asks, signal })</code> decides on commands that need approval. With <code>onAsk</code> set, commands no rule matches, syntax the parser cannot read (<code>reason: \"unparsed\"</code>) and runners the policy cannot see into (<code>\"nested\"</code>) ask too; <code>{ allow: true, remember: pattern }</code> allows later matching commands for the workspace's life (shared with <code>readonly()</code> and <code>scope()</code>, never over a deny). New refusal reasons <code>\"approval-required\"</code> (an ask rule and no <code>onAsk</code>) and <code>\"approval-denied\"</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<code>workspace.shell.classify(line)</code> and <code>classifyShellCommand(line, policy?)</code> return the simple commands a line would run, or <code>opaque</code> with the reason when it cannot be read. <code>checkShellCommand</code> takes an options argument (<code>remembered</code>, <code>host</code>, <code>resolved</code>) and its result gains <code>asks</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<code>shell.interpreter</code> accepts <code>\"bash\"</code>, <code>\"powershell\"</code>, <code>\"cmd\"</code> and <code>\"auto\"</code>, plus <code>shell.interpreterPath</code>. Each shell has its own parser feeding the same deny / allow / <code>denyPatterns</code> / <code>allowCommand</code> / rule and path-jail checks. PowerShell runs with <code>-NoLogo -NoProfile -NonInteractive -Command</code>; its dialect covers <code>;</code>, <code>&amp;&amp;</code>, <code>||</code>, pipelines, <code>$( )</code>, the call operator and the usual redirections, refuses script blocks, splatting, here-strings, <code>--%</code>, statements and dot-sourcing, treats <code>Invoke-Expression</code>, <code>Invoke-Command</code>, <code>Start-Process</code>, <code>Add-Type</code>, <code>Set-Alias</code> and <code>-EncodedCommand</code> as nested execution, keeps <code>Set-Location</code> / <code>cd</code> inside the jail, and checks <code>Remove-Item</code>, <code>Copy-Item</code>, <code>Move-Item</code>, <code>Get-ChildItem</code>, <code>Get-Content</code>, <code>Invoke-WebRequest</code>, <code>Stop-Process</code> and their aliases in a canonical <code>rm -rf</code>-style form as well. <code>\"auto\"</code> picks <code>bash</code> then <code>sh</code> on POSIX and <code>pwsh</code>, <code>powershell</code>, Git Bash, <code>cmd.exe</code> on Windows. <code>resolveShell()</code> is exported."
+            },
+            {
+              "type": "Added",
+              "html": "<code>run_shell</code>'s description names the resolved shell and its syntax rules; <code>run_tests</code> quotes its pattern for each shell."
+            },
+            {
+              "type": "Added",
+              "html": "New types <code>WorkspaceCommandRule</code>, <code>WorkspaceCommandDecision</code>, <code>WorkspaceShellOnAsk</code>, <code>WorkspaceShellAskRequest</code>, <code>WorkspaceShellAskDecision</code>, <code>WorkspaceShellAsk</code>, <code>WorkspaceShellAskReason</code> and <code>WorkspaceShellClassification</code>."
+            },
+            {
+              "type": "Added",
+              "html": "Tiered edit matching. <code>edit_file</code> and <code>multi_edit</code> now find <code>oldString</code> exactly first, then with line endings normalised, then with look-alike Unicode punctuation folded (<code>matchTier: \"unicode\"</code>), then line by line ignoring trailing whitespace (<code>matchTier: \"whitespace\"</code>). A loose match must be unique, even with <code>replaceAll</code>. Replacement text takes the file's dominant line ending, so CRLF files stay CRLF. New <code>policy.edit</code>: <code>matching</code> (<code>\"tiered\"</code> default, <code>\"exact\"</code> for the old behaviour), <code>missHintLines</code> and <code>lineEndings</code>."
+            },
+            {
+              "type": "Added",
+              "html": "A <code>not-found</code> edit error carries a <code>hint</code>: the closest file text (at most 12 lines of 200 characters) or a note that <code>newString</code> is already present."
+            },
+            {
+              "type": "Added",
+              "html": "<code>policy.hooks.afterEdit</code>: runs once after <code>write_file</code>, <code>edit_file</code>, <code>multi_edit</code> and <code>apply_patch</code> write files and returns its text as <code>diagnostics</code> between <code>[diagnostics]</code> lines. A throw or a timeout reports \"diagnostics unavailable\" and never fails the edit. <code>afterEditMaxChars</code> (default 4000) and <code>afterEditTimeoutMs</code> (default 10 s) bound it."
+            },
+            {
+              "type": "Added",
+              "html": "<code>policy.output</code>: with <code>spillDir</code>, oversized <code>run_shell</code>, <code>shell_output</code>, <code>grep</code>, <code>glob</code> and <code>read_file</code> output is saved to a <code>spill-&lt;time&gt;-&lt;random&gt;-&lt;label&gt;.txt</code> file and the result keeps its head and tail plus a <code>[showing lines … of …; full output saved to …]</code> marker. Results gain a <code>truncation</code> object beside the boolean <code>truncated</code>. <code>read_file</code> may open the spill directory; <code>retentionMs</code> (7 days) and <code>dispose()</code> clean up files named like spill files. <code>globResult()</code> is an optional <code>WorkspaceOps</code> method returning the paths with truncation data."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>resolveInJail()</code> takes an optional <code>access</code> argument (<code>\"read\"</code> also accepts the spill directory)."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai",
+          "slug": "ai",
+          "total": 9,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 8
+            },
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "Window-relative triggers. <code>compaction.afterTokens</code> and <code>contextEditing.clearToolResults.afterTokens</code> accept <code>{ share, reserve?, max? }</code> besides a number, resolved against the new <code>capabilities.contextWindow</code> of the model: the threshold is <code>min(floor(window * share), window - reserve, max)</code>, never below 1, and it also fires when <code>inputTokens + maxOutputTokens &gt; window - reserve</code>. A window-relative trigger on a model with an unknown window never fires; compaction records one skipped entry with <code>reason: \"unknown-window\"</code>. Numeric triggers behave as before. <code>TokenTrigger</code> is exported."
+            },
+            {
+              "type": "Added",
+              "html": "<code>ModelCapabilities.contextWindow</code> (tokens, input plus output) for adapters to fill."
+            },
+            {
+              "type": "Added",
+              "html": "<code>ai.compaction.summarize({ input })</code> shrinks what is sent to the summary model, never the live history: <code>maxInputTokens</code>, <code>clipToolOutputChars</code>, <code>dropToolOutputsOlderThan</code> and <code>shrinkOnContextError: [0.85, 0.7]</code> (retry shares after a context-length rejection). Steps run oldest first and never touch the newest exchange: tool outputs clipped, replaced by a placeholder, user text only, oldest messages omitted. A reply cut by the output cap is retried once with a smaller input, never at the same size."
+            },
+            {
+              "type": "Added",
+              "html": "<code>ai.compaction.summarize({ requireHeadings })</code> checks the summary for the headings and sends exactly one corrective follow-up before failing as a <code>callback-error</code> skip. <code>ai.compaction.DEFAULT_COMPACTION_TEMPLATE</code> and <code>DEFAULT_COMPACTION_HEADINGS</code> (Goal, Constraints, Decisions, Work state, Next step, Relevant files) are the ready structure."
+            },
+            {
+              "type": "Added",
+              "html": "Compaction records carry <code>summarizerInputTokens</code> and <code>attempts</code> when the summariser reports them."
+            },
+            {
+              "type": "Added",
+              "html": "<code>ai.retryModel(model, policy?)</code> (<code>retryModel</code>) retries transient failures on the same model before they reach the caller. <code>RetryPolicy</code>: <code>attempts</code> (default 3), <code>baseMs</code> (500), <code>backoff</code>, <code>maxDelayMs</code> (30000), <code>jitter</code> (largest random multiplier, for example <code>1.2</code>), <code>retryOn</code> (codes or predicate; default rate-limit, overloaded, timeout and provider errors), <code>honorRetryAfter</code> (<code>true</code>, <code>false</code> or <code>{ maxMs }</code>; waits at least the provider's <code>retryAfter</code>, up to 15 minutes by default), <code>offline: { budgetMs, maxDelayMs }</code> (keeps retrying <code>ENOTFOUND</code>, <code>EAI_AGAIN</code>, <code>ENETUNREACH</code>, <code>EHOSTUNREACH</code> and <code>ENETDOWN</code> failures on a separate budget that does not use <code>attempts</code>; <code>ECONNREFUSED</code> is not offline), <code>maxTimeouts</code>, and <code>onRetry({ attempt, delayMs, cause, budget })</code> with <code>budget: \"general\" | \"offline\"</code>. An <code>x-should-retry</code> header on the error's <code>context.headers</code> overrides the decision. <code>stream()</code> retries only before the first content chunk. Without the wrapper nothing changes."
+            },
+            {
+              "type": "Added",
+              "html": "<code>ModelCallOptions.cacheControl.key</code> is a routing key for prompt caching. Adapters whose provider takes one (OpenAI-compatible <code>prompt_cache_key</code>) send it in place of the adapter-level default; others ignore it."
+            },
+            {
+              "type": "Added",
+              "html": "<code>agent({ diagnostics: { cacheFingerprint: true } })</code> hashes the system prompt, the tool definitions and the message prefix of every trip. <code>LLMTrip.promptFingerprint</code> holds each trip's hashes and <code>AgentReport.promptFingerprint</code> the last trip's (<code>{ system, tools, messagesPrefix }</code>). When a trip reads far fewer cached tokens than the previous trip read or wrote and the request changed, the agent emits <code>agent.trip.cache-miss-cause</code> with the changed <code>segments</code> (<code>\"system\"</code>, <code>\"tools\"</code>, <code>\"messages\"</code>, <code>\"options\"</code>), never on a cold first trip. Only hashes are kept."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>contextEditing.clearToolResults</code> without <code>afterTokens</code> logs a one-time warning per run: it rewrites the history every trip, which defeats prompt caching on providers without native context editing."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-tools",
+          "slug": "ai-tools",
+          "total": 5,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 2
+            },
+            {
+              "type": "Changed",
+              "n": 2
+            },
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>fetch_url</code> takes <code>extractor: \"auto\" | \"readability\" | \"simple\"</code> for the <code>\"text\"</code> / <code>\"markdown\"</code> modes. <code>\"auto\"</code> (default) uses readability when its optional peers load and it yields at least 200 characters, otherwise a new dependency-free HTML converter; <code>\"simple\"</code> always uses that converter; <code>\"readability\"</code> keeps requiring the peers. The result carries <code>extractor</code> naming the converter used."
+            },
+            {
+              "type": "Added",
+              "html": "<code>fetch_url</code> takes <code>retryOnChallenge</code> to control the challenge retry described below."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>fetch_url</code> now retries once with an alternate <code>User-Agent</code>, through the same outbound policy, when the first response carries a <code>cf-mitigated: challenge</code> header (<code>retryOnChallenge</code>, default <code>true</code>; set <code>false</code> to disable). Previously there was no retry."
+            },
+            {
+              "type": "Changed",
+              "html": "With the readability peers absent, <code>fetch_url</code> in <code>\"text\"</code> / <code>\"markdown\"</code> mode now falls back to the built-in converter under the default <code>\"auto\"</code> extractor instead of failing with a <code>missing-peer</code> error. Pass <code>extractor: \"readability\"</code> to keep the strict behaviour."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>fetch_url</code> truncation at <code>maxBytes</code> no longer splits a multi-byte UTF-8 character into a replacement character."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-openai",
+          "slug": "ai-openai",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>openai.model({ name, contextWindow })</code> sets <code>capabilities.contextWindow</code>; without it the window comes from a table of OpenAI models, and unknown models stay unset so window-relative <code>compaction.afterTokens</code> triggers do not fire."
+            },
+            {
+              "type": "Added",
+              "html": "<code>ModelCallOptions.cacheControl.key</code> is sent as <code>prompt_cache_key</code> on Chat Completions and Responses requests for the providers that accept it (OpenAI, xAI, Mistral), and takes precedence over the model's <code>promptCacheKey</code>. Groq, DeepSeek and custom provider labels still receive no cache key."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-anthropic",
+          "slug": "ai-anthropic",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>anthropic.model({ name, contextWindow })</code> sets <code>capabilities.contextWindow</code>; without it the window comes from a table of 200K Claude models, and unknown models stay unset so window-relative <code>compaction.afterTokens</code> triggers do not fire."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-google",
+          "slug": "ai-google",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>google.model({ name, contextWindow })</code> sets <code>capabilities.contextWindow</code>; without it the window comes from the 1M Gemini families, and unknown models stay unset so window-relative <code>compaction.afterTokens</code> triggers do not fire."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>npx warlock release-notes</code> includes the 5.44.0 notes: window-relative compaction triggers and model context windows, compaction summariser input limits and required headings, <code>ai.retryModel</code>, per-call prompt cache keys and cache fingerprint diagnostics, workspace command rules with approval, bash/PowerShell/cmd interpreters, tiered edit matching, the <code>afterEdit</code> hook, spilled tool output, and the <code>fetch_url</code> built-in extractor."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "5.43.0",
       "id": "v5-43-0",
       "date": "November 1, 2026",
