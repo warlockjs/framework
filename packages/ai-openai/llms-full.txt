@@ -461,4 +461,8 @@ On the direct `"openai"` provider a call carrying the hosted `web_search` tool i
 
 `await openai.models()` returns `ModelInfo[]` from `GET /models` (also on compatible gateways, with the SDK's provider label); `kind` is classified from the id.
 
+## Context window
+
+The direct OpenAI provider reports `capabilities.contextWindow` for the gpt-3.5/4/4o/4.1/5.x/6 and o-series ids (400K for gpt-5.x and gpt-6, conservative); `openai.model({ name, contextWindow })` wins and is the only source for OpenAI-compatible endpoints.
+
 

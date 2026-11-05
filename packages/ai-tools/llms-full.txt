@@ -118,7 +118,7 @@ export async function triage(model: ModelContract): Promise<void> {
 For each remote tool:
 
 1. its JSON-Schema `inputSchema` is wrapped as a Standard Schema via `jsonSchemaToStandard` (Ajv-backed — `ajv` is an optional peer needed only for the client), which also exposes that schema (`~standard.jsonSchema`) so the model sees the server's real argument names;
-2. `execute` issues `tools/call` honoring `ctx.signal` (cooperative abort) and the configured `timeoutMs`, then unwraps the result content (a single JSON text block is parsed back into an object);
+2. `execute` issues `tools/call` honoring `ctx.signal` (cooperative abort) and the configured `timeoutMs`, then unwraps the result content (a single JSON text block is parsed back into an object; a result with an `image` block becomes `{ content: ToolResultPart[] }` so the model sees the picture on providers that read tool-result images);
 3. an MCP `isError` result is thrown so the surrounding `tool()` wraps it as a `ToolExecutionError` — the agent reads it as `{ error }` data and self-corrects.
 
 ### Selecting one discovered tool

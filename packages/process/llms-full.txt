@@ -89,6 +89,27 @@ await terminals.stopAll();
 ```
 
 PTY stdout combines terminal output; stderr is empty. `stdin` is writable too.
+ConPTY can report pid 0 right after spawn. The supervisor waits up to `pidWaitMs`
+(default 10 s) for a real pid and never supervises pid 0. If none arrives it stops
+the terminal on a best-effort basis and rejects with `ProcessStartupError`
+(`reason: "no-pid"`). Catch it by class, for example:
+
+```ts
+import { ProcessStartupError, supervisor } from "@warlock.js/process";
+
+const terminals = supervisor({
+  owner: "terminals",
+  registry: "storage/terminals.json",
+  pidWaitMs: 5000,
+  setupTimeoutMs: 30_000,
+});
+try {
+  await terminals.spawnPty({ kind: "terminal", command: "powershell.exe" });
+} catch (error) {
+  if (error instanceof ProcessStartupError) console.error(error.reason, error.message);
+  else throw error;
+}
+```
 
 ## Resource and lifecycle decisions
 
@@ -110,6 +131,9 @@ PTY stdout combines terminal output; stderr is empty. `stdin` is writable too.
   until registry persistence, and survives supervisor restarts for recovery.
   Memory includes the guardian and its descendants. No identity-helper setup
   or custom native compilation is needed.
+- Setup gate: `setupTimeoutMs` defaults to 5 s on Linux and 30 s on Windows and macOS.
+  A child that exits before its gate, or misses the deadline, rejects `spawn`/`spawnPty`
+  with `ProcessStartupError` (`reason`: `exited` or `setup-timeout`).
 - Defaults per platform: `pollIntervalMs` 100 ms Linux, 500 macOS, 1500 Windows;
   `observationTimeoutMs` (ownership check wait) 2 s Linux, 15 s macOS/Windows. Explicit
   options win. Raise `observationTimeoutMs` on a loaded machine; the timeout error names it.

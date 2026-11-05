@@ -197,4 +197,8 @@ model has no `countTokens` method. `sdk.count(text)` remains an offline estimate
 
 `await ollama.models()` returns `ModelInfo[]` from `GET /api/tags` (last-modified as `created`; `bert` families are `"embedding"`).
 
+## Context window
+
+`ollama.model({ name, contextWindow })` sets `capabilities.contextWindow`. Without it the first call starts an `/api/show` lookup (a `num_ctx` model parameter, else the architecture `context_length`), so the window is known from the second call on; a failed lookup leaves it unset and the config value always wins.
+
 
