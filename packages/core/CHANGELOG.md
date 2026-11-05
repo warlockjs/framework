@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 > ⚠ **Versioning: `@warlock.js/*` does not follow SemVer strictly — breaking changes may ship in a minor.** This is a deliberate decision, not an oversight: the framework is pre-adoption and the cost of a major per behaviour fix currently outweighs the benefit. **Pin an exact version or a tilde range (`~4.13.0`) if you need to opt into changes rather than receive them.** Every breaking change is marked **BREAKING** in its entry and summarised in an _Upgrading_ section at the top of the release. **This policy will change once the framework has consumers beyond its author.**
 
+## 5.44.0 - 2026-11-05
+
+### Added
+
+- `npx warlock release-notes` includes the 5.44.0 notes: window-relative compaction triggers and model context windows, compaction summariser input limits and required headings, `ai.retryModel`, per-call prompt cache keys and cache fingerprint diagnostics, workspace command rules with approval, bash/PowerShell/cmd interpreters, tiered edit matching, the `afterEdit` hook, spilled tool output, and the `fetch_url` built-in extractor.
+
 ## 5.43.0 - 2026-11-01
 
 ### Added
