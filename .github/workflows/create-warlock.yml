@@ -112,6 +112,13 @@ jobs:
         with:
           node-version: 22
 
+      # Node 22 bundles npm 10.9.x, whose peer-dependency resolver crashes on the
+      # scaffolded project's install with "Cannot read properties of null
+      # (reading 'edgesOut')". The scaffolder names this defect and recommends
+      # npm 11, so this job installs with what it recommends.
+      - name: Use npm 11
+        run: npm install --global npm@11.21.1 && npm --version
+
       - name: Set up pnpm
         uses: pnpm/action-setup@v6
         with:
