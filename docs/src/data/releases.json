@@ -1,4 +1,21 @@
 {
+  "5.45.0": {
+    "publishedAt": "2026-11-05T21:45:46.444Z",
+    "matrix": "none",
+    "headline": "Images in tool results, metered compaction summaries, a context window for every known model, and a safer workspace on Windows PowerShell 5.1.",
+    "highlights": [
+      "A tool can return `{ content: [...] }` with text and image parts; Anthropic, Bedrock and OpenAI's Responses API show the images to the model, other providers get a placeholder (`capabilities.toolResultImages`), and MCP image results are forwarded.",
+      "`ai.compaction.summarize({ middleware })` meters every summary call (retries included) with middleware such as `budget()`, `budget(...).wrapModel(model)` meters direct model calls, and `lengthRetry` turns off or tunes the summary's length retry.",
+      "`clearToolResults.clearAtLeast` skips clears that free too few tokens (Anthropic `clear_at_least`).",
+      "Every provider adapter reports `contextWindow` for its known chat models, Ollama reads it from the server, and `modelContextWindow(model)` returns it.",
+      "The workspace detects Windows PowerShell 5.1 and refuses `&&` / `||` there with an explanation, `onAsk` can remember several patterns and pass a refusal reason to the model, and spilled results list their files in `spilledTo`.",
+      "`supervisor({ pidWaitMs, setupTimeoutMs })` waits for a real process ID on Windows terminals and fails with `ProcessStartupError` instead of supervising pid 0."
+    ],
+    "upgradeNotes": [
+      "On Windows with Windows PowerShell 5.1 and Git Bash but no `pwsh`, the workspace's `interpreter: \"auto\"` now picks Git Bash; pass `interpreter: \"powershell\"` to keep PowerShell.",
+      "The process supervisor's setup gate waits 30 s on Windows and macOS (5 s on Linux); set `setupTimeoutMs` to choose."
+    ]
+  },
   "5.44.0": {
     "publishedAt": "2026-11-05T18:42:11.866Z",
     "matrix": "none",

@@ -136,6 +136,385 @@
   ],
   "releases": [
     {
+      "version": "5.45.0",
+      "id": "v5-45-0",
+      "date": "November 5, 2026",
+      "isUnreleased": false,
+      "headlineHtml": "Images in tool results, metered compaction summaries, a context window for every known model, and a safer workspace on Windows PowerShell 5.1.",
+      "highlights": [
+        "A tool can return <code>{ content: [...] }</code> with text and image parts; Anthropic, Bedrock and OpenAI's Responses API show the images to the model, other providers get a placeholder (<code>capabilities.toolResultImages</code>), and MCP image results are forwarded.",
+        "<code>ai.compaction.summarize({ middleware })</code> meters every summary call (retries included) with middleware such as <code>budget()</code>, <code>budget(...).wrapModel(model)</code> meters direct model calls, and <code>lengthRetry</code> turns off or tunes the summary's length retry.",
+        "<code>clearToolResults.clearAtLeast</code> skips clears that free too few tokens (Anthropic <code>clear_at_least</code>).",
+        "Every provider adapter reports <code>contextWindow</code> for its known chat models, Ollama reads it from the server, and <code>modelContextWindow(model)</code> returns it.",
+        "The workspace detects Windows PowerShell 5.1 and refuses <code>&amp;&amp;</code> / <code>||</code> there with an explanation, <code>onAsk</code> can remember several patterns and pass a refusal reason to the model, and spilled results list their files in <code>spilledTo</code>.",
+        "<code>supervisor({ pidWaitMs, setupTimeoutMs })</code> waits for a real process ID on Windows terminals and fails with <code>ProcessStartupError</code> instead of supervising pid 0."
+      ],
+      "upgradeNotes": [
+        "On Windows with Windows PowerShell 5.1 and Git Bash but no <code>pwsh</code>, the workspace's <code>interpreter: \"auto\"</code> now picks Git Bash; pass <code>interpreter: \"powershell\"</code> to keep PowerShell.",
+        "The process supervisor's setup gate waits 30 s on Windows and macOS (5 s on Linux); set <code>setupTimeoutMs</code> to choose."
+      ],
+      "summaryHtml": null,
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/5.45.0-summary.md",
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/ai",
+          "slug": "ai",
+          "total": 8,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 8
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>ai.compaction.summarize({ middleware })</code> runs middleware around every call the summarizer makes (first attempt, length retry, shrink retries, heading follow-up), so a <code>budget</code> can hold summary calls to a spend cap; a refusal fails the summary like any summarizer error. Also takes <code>signal</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<code>ai.middleware.budget(...).wrapModel(model)</code> returns a model whose <code>complete()</code> calls are metered by that budget. <code>budget()</code> now returns <code>BudgetMiddleware</code>, and <code>wrapModelWithMiddleware(model, middleware)</code> is the general form."
+            },
+            {
+              "type": "Added",
+              "html": "<code>ai.compaction.summarize({ lengthRetry })</code>: <code>false</code> turns off the retry after a reply cut by the output cap, <code>{ shrink }</code> sets the share of input kept on the retry (default 0.7)."
+            },
+            {
+              "type": "Added",
+              "html": "<code>contextEditing.clearToolResults.clearAtLeast</code>: a client-side clear is skipped when it would free fewer tokens than this; sent to native-editing models as <code>ModelCallOptions.contextEditing.clearToolResults.clearAtLeast</code>."
+            },
+            {
+              "type": "Added",
+              "html": "A tool's <code>execute</code> can return <code>{ content: ToolResultPart[] }</code> (text and image parts; <code>ToolResultPart</code>, <code>ToolResultContent</code>) so the model sees images, such as a screenshot. The agent carries the parts on the <code>tool</code> message instead of stringifying them. A return value is read as parts only when its sole key is <code>content</code> and every element is a valid part (<code>isToolResultContent</code>); every other value keeps its JSON serialisation."
+            },
+            {
+              "type": "Added",
+              "html": "<code>ModelCapabilities.toolResultImages</code> says whether an adapter shows tool-result images to the model. Adapters that cannot send the text <code>[image omitted: provider cannot read images in tool results]</code> (<code>TOOL_RESULT_IMAGE_PLACEHOLDER</code>, <code>toolResultText(content)</code>) in place of each image."
+            },
+            {
+              "type": "Added",
+              "html": "<code>contextEditing.clearToolResults</code> replaces an old image result with the cleared-result placeholder."
+            },
+            {
+              "type": "Added",
+              "html": "<code>ai.modelContextWindow(model)</code> (<code>modelContextWindow</code>) returns the context window a model reports through <code>capabilities.contextWindow</code>, or <code>undefined</code> when it reports none or an invalid value. Window-relative compaction and context-editing triggers read the window through it."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/process",
+          "slug": "process",
+          "total": 6,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 3
+            },
+            {
+              "type": "Changed",
+              "n": 2
+            },
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>pidWaitMs</code> supervisor option: how long a terminal may take to report a real process ID after <code>spawnPty()</code>. Defaults to 10 s. ConPTY reports pid 0 for a moment after spawn on Windows; the supervisor now waits for the real pid instead of supervising pid 0."
+            },
+            {
+              "type": "Added",
+              "html": "<code>setupTimeoutMs</code> supervisor option: how long a launched child has to reach its resource setup gate. Defaults to 5 s on Linux and 30 s on Windows and macOS. Explicit values win."
+            },
+            {
+              "type": "Added",
+              "html": "<code>ProcessStartupError</code>, thrown when a launch cannot be supervised. Its <code>reason</code> is <code>no-pid</code> (no real pid arrived within <code>pidWaitMs</code>), <code>exited</code> (the child exited before its gate) or <code>setup-timeout</code> (the gate was not reached within <code>setupTimeoutMs</code>)."
+            },
+            {
+              "type": "Changed",
+              "html": "The setup gate deadline is 30 s on Windows and macOS (it was 5 s on every platform). Linux keeps 5 s."
+            },
+            {
+              "type": "Changed",
+              "html": "A launch that fails at its setup gate now rejects with <code>ProcessStartupError</code>; the message is unchanged."
+            },
+            {
+              "type": "Fixed",
+              "html": "A terminal that reported pid 0 right after <code>spawnPty()</code> could be supervised under pid 0. The launch now waits for a real pid, and a terminal that never reports one is stopped on a best-effort basis and rejected with <code>ProcessStartupError</code>."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-workspace",
+          "slug": "ai-workspace",
+          "total": 5,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 4
+            },
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>resolveShell()</code> reports which PowerShell it found: <code>ResolvedShell</code> gains <code>edition</code> (<code>\"desktop\"</code> for Windows PowerShell 5.1, <code>\"core\"</code> for PowerShell 7+; exported type <code>PowerShellEdition</code>) and <code>version</code> (<code>\"5.1\"</code> for Windows PowerShell; for <code>pwsh</code> when <code>ShellHost.powershellVersion</code> is supplied). Windows PowerShell 5.1 gets the label <code>Windows PowerShell 5.1 (powershell)</code> and its own <code>\"powershell5\"</code> dialect, whose parser refuses <code>&amp;&amp;</code> and <code>||</code> with \"Windows PowerShell 5.1 cannot run &amp;&amp;; use ; or run each command in its own call instead.\". <code>run_shell</code>'s description for that dialect no longer promises chaining."
+            },
+            {
+              "type": "Added",
+              "html": "<code>onAsk</code> decisions: <code>remember</code> accepts one pattern or an array, so a line that asks about several commands can approve them all. <code>workspace.shell.remembered()</code> lists the remembered patterns and <code>workspace.shell.forget(pattern)</code> removes one. A configured deny still beats them."
+            },
+            {
+              "type": "Added",
+              "html": "<code>onAsk</code> decisions: <code>reason?: string</code> is appended to the <code>run_shell</code> refusal the model reads, cut at 500 characters with a <code>[truncated]</code> marker."
+            },
+            {
+              "type": "Added",
+              "html": "A flat <code>spilledTo?: string[]</code> on every <code>run_shell</code>, <code>shell_output</code>, <code>read_file</code>, <code>grep</code> and <code>glob</code> result that spilled output to disk, and a spilled head-and-tail text now ends with a <code>[full output saved to …]</code> line. The <code>use-a-workspace</code> skill documents each tool's result shape."
+            },
+            {
+              "type": "Changed",
+              "html": "On Windows, <code>interpreter: \"auto\"</code> now picks <code>pwsh</code> (PowerShell 7+), then Git Bash, then Windows PowerShell 5.1, then <code>cmd.exe</code>, so a machine with Git for Windows and only PowerShell 5.1 runs <code>&amp;&amp;</code> lines under bash instead of failing in PowerShell."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-anthropic",
+          "slug": "ai-anthropic",
+          "total": 3,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 3
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "The agent-level <code>contextEditing.clearToolResults.clearAtLeast</code> is mapped to <code>clear_at_least</code> on the native <code>clear_tool_uses</code> edit, next to the resolved <code>trigger</code>, <code>keep</code> and <code>exclude_tools</code>."
+            },
+            {
+              "type": "Added",
+              "html": "Image parts in a tool result are sent as <code>image</code> blocks inside the <code>tool_result</code>; the model reports <code>capabilities.toolResultImages: true</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<code>capabilities.contextWindow</code> is reported for every known Claude release: 1M for Opus 4.6 to 5.5, Sonnet 4.6 to 5.5, Haiku 5.5, Fable and Mythos, and 200K for Opus 4 to 4.5, Sonnet 4 to 4.5, Haiku 4.5 and the Claude 3 line. <code>contextWindow</code> in the model config still wins."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-bedrock",
+          "slug": "ai-bedrock",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "Image parts in a tool result are sent as Converse <code>image</code> blocks inside the <code>toolResult</code>; the model reports <code>capabilities.toolResultImages: true</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<code>bedrock.model({ name, contextWindow })</code> and <code>capabilities.contextWindow</code>, inferred from the model id for Claude, Nova, Llama, Mistral, Command R and Jamba models (region prefixes and version suffixes are fine). The config value wins; unlisted ids stay unset."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-google",
+          "slug": "ai-google",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "Image parts in a tool result are replaced by the text <code>[image omitted: provider cannot read images in tool results]</code>; <code>capabilities.toolResultImages</code> is <code>false</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<code>capabilities.contextWindow</code> is reported for Gemini 3.x (1,048,576) and Gemini 1.5 Pro (2,097,152), besides the families already covered."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-ollama",
+          "slug": "ai-ollama",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "Image parts in a tool result are replaced by the text <code>[image omitted: provider cannot read images in tool results]</code>; <code>capabilities.toolResultImages</code> is <code>false</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<code>contextWindow</code> option on <code>ollama.model</code> sets <code>capabilities.contextWindow</code>. Without it the adapter asks <code>/api/show</code> on the first call (a <code>num_ctx</code> model parameter wins over the architecture <code>context_length</code>), so the window is known from the second call on. Model creation stays synchronous, the call never waits for the lookup, a failed lookup leaves the window unset, and the config value always wins."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-openai",
+          "slug": "ai-openai",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "With <code>api: \"responses\"</code> on the OpenAI provider, image parts in a tool result are sent as <code>input_image</code> items in the <code>function_call_output</code> (<code>capabilities.toolResultImages: true</code>). Chat Completions and the OpenAI-compatible providers send the text <code>[image omitted: provider cannot read images in tool results]</code> and report <code>false</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<code>capabilities.contextWindow</code> is reported for more direct-OpenAI ids: <code>gpt-5.x</code> and <code>gpt-6</code> (400K, the documented gpt-5 figure; set <code>contextWindow</code> for a larger window), <code>gpt-4</code>, <code>gpt-4-turbo</code>, <code>gpt-3.5-turbo</code>, <code>chatgpt-4o</code>, <code>o3-mini</code>, <code>o3-pro</code> and <code>o1-pro</code>."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-cli",
+          "slug": "ai-cli",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>capabilities.toolResultImages</code> is <code>false</code>; tool-result images reach CLI agents as text only."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-deepseek",
+          "slug": "ai-deepseek",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>capabilities.contextWindow</code> is reported for <code>deepseek-chat</code>, <code>deepseek-reasoner</code> and <code>deepseek-v4-*</code> (128,000; a conservative figure for V4). New <code>contextWindow</code> option on <code>deepseek.model</code>."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-groq",
+          "slug": "ai-groq",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>capabilities.contextWindow</code> is reported for Groq-hosted Llama, gpt-oss, Qwen3 and DeepSeek-R1 distill ids (131,072) and Kimi K2 (262,144). New <code>contextWindow</code> option on <code>groq.model</code>."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-mistral",
+          "slug": "ai-mistral",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>capabilities.contextWindow</code> is reported for Mistral ids (128,000 for Large, Medium, Small, Ministral, Pixtral and Magistral; 256,000 for Codestral). Newer generations document larger windows; set <code>contextWindow</code> on <code>mistral.model</code> for those."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-tools",
+          "slug": "ai-tools",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "An MCP tool result that contains an <code>image</code> content block (base64 <code>data</code> in a PNG, JPEG, WebP or GIF <code>mimeType</code>) is returned as <code>{ content: ToolResultPart[] }</code>, so providers that read tool-result images show the picture to the model. Text blocks become text parts; results without images keep their shape."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-xai",
+          "slug": "ai-xai",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>capabilities.contextWindow</code> is reported for Grok ids (2,000,000 for <code>grok-4-fast</code>/<code>grok-4-1-fast</code>, 256,000 for <code>grok-4</code>/<code>grok-code-fast</code>, 131,072 for <code>grok-3</code>/<code>grok-2</code>, 32,768 for <code>grok-2-vision</code>). New <code>contextWindow</code> option on <code>xai.model</code>."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>npx warlock release-notes</code> includes the 5.45.0 notes: images in tool results, metered compaction summaries and length-retry control, <code>clearAtLeast</code> for tool-result clearing, context windows for every known model and <code>modelContextWindow</code>, Windows PowerShell 5.1 detection, several remembered shell approvals with refusal reasons, flat <code>spilledTo</code> on tool results, and the process supervisor's <code>pidWaitMs</code> / <code>setupTimeoutMs</code>."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "5.44.0",
       "id": "v5-44-0",
       "date": "November 5, 2026",
