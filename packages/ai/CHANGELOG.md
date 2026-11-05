@@ -4,6 +4,20 @@ All notable changes to `@warlock.js/ai` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.44.0
+
+### Added
+
+- Window-relative triggers. `compaction.afterTokens` and `contextEditing.clearToolResults.afterTokens` accept `{ share, reserve?, max? }` besides a number, resolved against the new `capabilities.contextWindow` of the model: the threshold is `min(floor(window * share), window - reserve, max)`, never below 1, and it also fires when `inputTokens + maxOutputTokens > window - reserve`. A window-relative trigger on a model with an unknown window never fires; compaction records one skipped entry with `reason: "unknown-window"`. Numeric triggers behave as before. `TokenTrigger` is exported.
+- `ModelCapabilities.contextWindow` (tokens, input plus output) for adapters to fill.
+- `ai.compaction.summarize({ input })` shrinks what is sent to the summary model, never the live history: `maxInputTokens`, `clipToolOutputChars`, `dropToolOutputsOlderThan` and `shrinkOnContextError: [0.85, 0.7]` (retry shares after a context-length rejection). Steps run oldest first and never touch the newest exchange: tool outputs clipped, replaced by a placeholder, user text only, oldest messages omitted. A reply cut by the output cap is retried once with a smaller input, never at the same size.
+- `ai.compaction.summarize({ requireHeadings })` checks the summary for the headings and sends exactly one corrective follow-up before failing as a `callback-error` skip. `ai.compaction.DEFAULT_COMPACTION_TEMPLATE` and `DEFAULT_COMPACTION_HEADINGS` (Goal, Constraints, Decisions, Work state, Next step, Relevant files) are the ready structure.
+- Compaction records carry `summarizerInputTokens` and `attempts` when the summariser reports them.
+
+### Changed
+
+- `contextEditing.clearToolResults` without `afterTokens` logs a one-time warning per run: it rewrites the history every trip, which defeats prompt caching on providers without native context editing.
+
 ## 5.43.0 - 2026-11-01
 
 ### Added

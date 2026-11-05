@@ -72,6 +72,18 @@ describe("clearOldToolResults", () => {
     ]);
   });
 
+  it("resolves a window-relative afterTokens against the context window", async () => {
+    const trigger = { share: 0.5 };
+
+    expect(await clearOldToolResults({ keep: 1, afterTokens: trigger }, history(5), {}, 0)).toBeUndefined();
+    expect(
+      await clearOldToolResults({ keep: 1, afterTokens: trigger }, history(5), {}, 0, 1_000_000),
+    ).toBeUndefined();
+    expect(
+      await clearOldToolResults({ keep: 1, afterTokens: trigger }, history(5), {}, 0, 400),
+    ).toMatchObject({ clearedResults: 4 });
+  });
+
   it("waits for afterTokens", async () => {
     const messages = history(5);
 

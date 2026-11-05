@@ -592,6 +592,7 @@ class Execution<TOutput> {
   private readonly usage: Usage = { input: 0, output: 0, total: 0 };
   private readonly messages: Message[] = [];
   private inputMessageIndex: number | undefined;
+  private warnedClearAlways = false;
   /** Resolved system-prompt text sent to the model, captured for the report. */
   private systemPrompt?: string;
   /**
@@ -1594,7 +1595,23 @@ class Execution<TOutput> {
 
     if (editing && editRule && !this.editsContextNatively()) {
       const callOptions = this.buildModelCallOptions();
-      const record = await clearOldToolResults(editRule, this.messages, callOptions, tripIndex);
+      if (editRule.afterTokens === undefined && !this.warnedClearAlways) {
+        this.warnedClearAlways = true;
+        this.logger.warn(
+          LOG_MODULE,
+          "context.edit.always",
+          "contextEditing.clearToolResults has no afterTokens, so it rewrites the history on every trip and defeats prompt caching; set afterTokens",
+          { runId: this.runId },
+        );
+      }
+
+      const record = await clearOldToolResults(
+        editRule,
+        this.messages,
+        callOptions,
+        tripIndex,
+        this.config.model.capabilities?.contextWindow,
+      );
 
       if (record) {
         this.logger.debug(LOG_MODULE, "context.edited", "cleared old tool results", {
@@ -1612,9 +1629,14 @@ class Execution<TOutput> {
         callOptions,
         tripIndex,
         this.inputMessageIndex,
+        this.config.model.capabilities?.contextWindow,
       );
       if (callOptions.signal?.aborted) throw this.makeCancelledError();
-      if (outcome.record) this.compactions.push(outcome.record);
+      // An unknown window repeats every trip; record it once per run.
+      const repeatedSkip =
+        outcome.record?.reason === "unknown-window" &&
+        this.compactions.some((entry) => entry.reason === "unknown-window");
+      if (outcome.record && !repeatedSkip) this.compactions.push(outcome.record);
       if (outcome.messages) {
         this.messages.splice(0, this.messages.length, ...outcome.messages);
         this.inputMessageIndex = outcome.inputMessageIndex;
@@ -1676,7 +1698,10 @@ class Execution<TOutput> {
     const runOptions = this.runModelOptions();
     const nativeEditing =
       this.config.contextEditing && this.editsContextNatively()
-        ? nativeContextEditingHint(this.config.contextEditing)
+        ? nativeContextEditingHint(
+            this.config.contextEditing,
+            this.config.model.capabilities?.contextWindow,
+          )
         : undefined;
 
     return {

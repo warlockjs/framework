@@ -1,5 +1,6 @@
 import { catalogueToolNames } from "../tool/catalogue";
 import type { AgentConfig } from "./agent-config.type";
+import { normalizeTokenTrigger } from "./token-trigger";
 
 /**
  * Deterministic structural fingerprint of an agent definition.
@@ -51,7 +52,7 @@ export function computeAgentSignature(config: {
     o: config.output ? 1 : 0,
     v: config.version ?? null,
     ...(config.compaction
-      ? { c: { afterTokens: config.compaction.afterTokens, keep: config.compaction.keep ?? 8 } }
+      ? { c: { afterTokens: normalizeTokenTrigger(config.compaction.afterTokens), keep: config.compaction.keep ?? 8 } }
       : {}),
   };
 

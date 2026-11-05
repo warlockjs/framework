@@ -38,7 +38,7 @@ const worker = ai.agent({
 
 Only the `content` of old `tool` messages changes. Every tool call still has its result, so the history stays valid for every provider, and the model still sees which tool ran with which arguments. Results are cleared in the agent's history, so they stay cleared on later trips (this also keeps provider prompt caches stable after the first edit) and in `report.messages` and durable snapshots.
 
-`afterTokens` is compared with an offline character estimate of messages and tool schemas. Pass `countTokens(messages, options)` for an exact count (`model.countTokens` when the model has one).
+`afterTokens` is a number or a window-relative `{ share, reserve?, max? }` (see [Automatic compaction](/v/latest/ai/agents/run-agent/#automatic-compaction-inside-an-agent-run) for the formula; an unknown window means no clearing). Leaving it out clears on every trip, which rewrites the prefix and defeats prompt caching on providers without native editing, so the agent logs a one-time warning. It is compared with an offline character estimate of messages and tool schemas. Pass `countTokens(messages, options)` for an exact count (`model.countTokens` when the model has one).
 
 ### Native providers
 

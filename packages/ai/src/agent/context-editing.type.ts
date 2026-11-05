@@ -1,5 +1,6 @@
 import type { Message } from "../contracts/conversation-message.type";
 import type { ModelCallOptions } from "../contracts/model.contract";
+import type { TokenTrigger } from "./token-trigger";
 
 /** Placeholder that replaces a cleared tool result. */
 export const DEFAULT_CLEARED_TOOL_RESULT = "[tool result cleared to save context]";
@@ -13,9 +14,13 @@ export const DEFAULT_CLEARED_TOOL_RESULT = "[tool result cleared to save context
 export type ClearToolResultsConfig = {
   /**
    * Start clearing once the history is estimated at this many input
-   * tokens. Omit to clear on every trip, whatever the size.
+   * tokens: an absolute count, or `{ share, reserve?, max? }` relative to
+   * the model's `capabilities.contextWindow` (an unknown window means no
+   * clearing). Omit to clear on every trip, whatever the size; that
+   * rewrites the prefix each trip and defeats prompt caching on providers
+   * without native editing, so the agent logs a one-time warning.
    */
-  afterTokens?: number;
+  afterTokens?: TokenTrigger;
   /** How many of the most recent tool results stay intact. Default 3. */
   keep?: number;
   /** Tool names whose results are never cleared. */

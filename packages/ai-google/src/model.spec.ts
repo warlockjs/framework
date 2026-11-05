@@ -58,6 +58,7 @@ describe("GoogleModel capabilities", () => {
     const model = new GoogleModel(ai, { name: "gemini-2.5-flash" });
 
     expect(model.capabilities).toEqual({
+      contextWindow: 1_048_576,
       structuredOutput: true,
       vision: true,
       reasoning: true,

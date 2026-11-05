@@ -4,19 +4,19 @@ import { AgentExecutionError } from "../errors";
 import { extractJsonSchema } from "../utils/json-schema";
 import { approximateTokenCount } from "../utils/token-count";
 import type { AgentCompactionConfig, AgentCompactionRecord } from "./compaction.type";
+import { assertTokenTrigger, isTokenTriggerReached } from "./token-trigger";
 
 export function validateCompaction(config: AgentCompactionConfig | undefined): void {
   if (config === undefined) return;
+  if (config) assertTokenTrigger(config.afterTokens, "compaction.afterTokens");
   if (
     !config ||
-    !Number.isSafeInteger(config.afterTokens) ||
-    config.afterTokens <= 0 ||
     (config.keep !== undefined && (!Number.isSafeInteger(config.keep) || config.keep < 1)) ||
     typeof config.summarize !== "function" ||
     (config.countTokens !== undefined && typeof config.countTokens !== "function")
   ) {
     throw new AgentExecutionError(
-      "compaction requires positive integer afterTokens, keep >= 1, a summarize callback and an optional countTokens callback.",
+      "compaction requires afterTokens, keep >= 1, a summarize callback and an optional countTokens callback.",
       { context: { authoring: true } },
     );
   }
@@ -112,6 +112,7 @@ export async function compactAgentMessages(
   options: ModelCallOptions,
   tripIndex: number,
   inputMessageIndex: number | undefined,
+  contextWindow?: number,
 ): Promise<{ record?: AgentCompactionRecord; messages?: Message[]; inputMessageIndex?: number }> {
   const counting = config.countTokens ? "custom" : "estimate";
   const record: AgentCompactionRecord = { type: "skipped", tripIndex, counting };
@@ -124,9 +125,15 @@ export async function compactAgentMessages(
     return tokens;
   };
   try {
+    if (typeof config.afterTokens !== "number" && !(contextWindow && contextWindow > 0))
+      return { record: { ...record, reason: "unknown-window" } };
     const before = await count(messages);
     record.inputTokens = before;
-    if (options.signal?.aborted || before < config.afterTokens) return {};
+    if (
+      options.signal?.aborted ||
+      !isTokenTriggerReached(config.afterTokens, before, contextWindow, options.maxTokens)
+    )
+      return {};
     // Without a trustworthy input position nothing can be protected, so
     // nothing is summarised.
     if (!isUserMessageIndex(messages, inputMessageIndex))
@@ -194,6 +201,12 @@ export async function compactAgentMessages(
         ...record,
         type: "applied",
         compaction: { summary, replacesFromIndex: range.start, replacesToIndex: range.end - 1 },
+        ...(typeof result.summarizerInputTokens === "number"
+          ? { summarizerInputTokens: result.summarizerInputTokens }
+          : {}),
+        ...(typeof result.summarizerAttempts === "number"
+          ? { attempts: result.summarizerAttempts }
+          : {}),
       },
     };
   } catch (error) {

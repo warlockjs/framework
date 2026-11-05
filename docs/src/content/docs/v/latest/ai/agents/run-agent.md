@@ -532,10 +532,26 @@ Clearing old tool results without a summary call is covered in [Manage context](
 
 ## Automatic compaction inside an agent run
 
-Compaction is disabled by default. Set `compaction.afterTokens` to an explicit
-input threshold; the agent never infers a provider's context-window size. Before
-each model trip (including streamed and repair trips), it checks the current
-conversation and tools against that threshold.
+Compaction is disabled by default. Set `compaction.afterTokens` to an input
+threshold. Before each model trip (including streamed and repair trips), the
+agent checks the current conversation and tools against it.
+
+`afterTokens` is either a number of tokens or a window-relative trigger,
+`{ share, reserve?, max? }`, resolved against the model's
+`capabilities.contextWindow` (the first-party adapters fill it from a
+`contextWindow` config value or a small table of known models):
+
+```
+threshold = max(1, min(floor(window * share), window - reserve, max))
+```
+
+`reserve` and `max` apply only when set. The trigger also fires when
+`inputTokens + maxOutputTokens > window - reserve`, so the reply always fits.
+For example `{ share: 0.85 }` fires at 170K on a 200K window and at 850K on 1M;
+`{ share: 0.85, reserve: 16_000 }` on a 128K window uses
+`min(108_800, 112_000)`. A window-relative trigger on a model with an unknown
+window never fires; the run records one skipped entry with
+`reason: "unknown-window"`. Numeric triggers behave as before.
 
 ```ts
 const worker = ai.agent({
@@ -596,10 +612,37 @@ const worker = ai.agent({
 });
 ```
 
-A reply that is truncated (`length`), refused or empty throws, so the agent
-records a `callback-error` skip and keeps the conversation as it was.
-`DEFAULT_COMPACTION_INSTRUCTIONS` and `renderTranscript` are exported if you
-write your own callback.
+A reply that is refused or empty throws, so the agent records a
+`callback-error` skip and keeps the conversation as it was. A reply cut by the
+output cap (`length`) is retried once with a smaller input, never at the same
+size. `DEFAULT_COMPACTION_INSTRUCTIONS` and `renderTranscript` are exported if
+you write your own callback.
+
+For a long slice, `input` shrinks what the summary model receives (the live
+history is never changed):
+
+```ts
+ai.compaction.summarize({
+  model: cheapModel,
+  input: {
+    maxInputTokens: 100_000, // default: the model's window minus maxTokens, when known
+    clipToolOutputChars: 1_000, // head and tail kept per tool output
+    dropToolOutputsOlderThan: 20, // older tool outputs become a placeholder
+    shrinkOnContextError: [0.85, 0.7], // retry shares after a context-length rejection
+  },
+  instructions: ai.compaction.DEFAULT_COMPACTION_TEMPLATE,
+  requireHeadings: ai.compaction.DEFAULT_COMPACTION_HEADINGS,
+});
+```
+
+While the request is over budget it degrades, oldest messages first and never
+the newest exchange: whole, tool outputs clipped, tool outputs replaced by a
+placeholder, user text only, oldest messages omitted. Without `input` the whole
+slice is sent. `DEFAULT_COMPACTION_TEMPLATE` asks for the headings Goal,
+Constraints, Decisions, Work state, Next step and Relevant files;
+`requireHeadings` checks the reply for them (a line of its own, case
+insensitive), sends exactly one corrective follow-up for missing ones, then
+fails as a `callback-error` skip.
 
 ### The callback contract
 
@@ -655,7 +698,9 @@ model's own reasoning.
 `report.compactions` records threshold-crossing decisions and counter failures as `type: "applied"`
 or `"skipped"`, with the trip index, counting method, input count and either the
 applied `CompactionResult` (indices in the live conversation before replacement)
-or a reason: `no-safe-range`, `not-smaller`, `callback-error`.
+or a reason: `no-safe-range`, `not-smaller`, `callback-error`, `unknown-window`.
+When the built-in summarizer ran, the record also has `summarizerInputTokens` (the
+estimated size of its request) and `attempts` (model calls it needed).
 The input count is absent when the counter failed before producing one.
 No field is added when compaction is disabled or the threshold is never reached.
 After an applied compaction, `result.blocks` is absent even for one generation

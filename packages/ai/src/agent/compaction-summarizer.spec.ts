@@ -2,7 +2,9 @@ import type { Message, ModelCallOptions, ModelContract, ModelResponse } from "..
 import { AgentExecutionError } from "../errors";
 import { describe, expect, it, vi } from "vitest";
 import {
+  DEFAULT_COMPACTION_HEADINGS,
   DEFAULT_COMPACTION_INSTRUCTIONS,
+  DEFAULT_COMPACTION_TEMPLATE,
   renderTranscript,
   summarizeCompaction,
 } from "./compaction-summarizer";
@@ -54,6 +56,8 @@ describe("ai.compaction.summarize", () => {
       summary: { role: "assistant", content: "memo" },
       replacesFromIndex: 0,
       replacesToIndex: 2,
+      summarizerInputTokens: expect.any(Number),
+      summarizerAttempts: 1,
     });
     expect(calls).toHaveLength(1);
     const [system, user] = calls[0]?.messages ?? [];
@@ -125,3 +129,167 @@ describe("ai.compaction.summarize", () => {
     expect(rendered).toContain("see image\n[image attachment]");
   });
 });
+
+describe("ai.compaction.summarize structure and input budget", () => {
+  const structured = (headings: readonly string[]) =>
+    `<summary>${headings.map((heading) => `## ${heading}\nx`).join("\n")}</summary>`;
+
+  function scripted(replies: Array<string | Error | Partial<ModelResponse>>) {
+    const sent: Message[][] = [];
+    const model: ModelContract = {
+      ...summaryModel({}).model,
+      complete: async (messages) => {
+        sent.push(messages);
+        const next = replies.shift() ?? "<summary>memo</summary>";
+        if (next instanceof Error) throw next;
+        return {
+          content: typeof next === "string" ? next : "",
+          finishReason: "stop",
+          usage: { input: 1, output: 1, total: 2 },
+          ...(typeof next === "string" ? {} : next),
+        };
+      },
+    };
+    return { model, sent };
+  }
+
+  const text = (messages: Message[] | undefined) => String(messages?.[1]?.content);
+  const bulky = (count: number): Message[] => [
+    ...Array.from({ length: count }, (_, index): Message[] => [
+      { role: "assistant", content: "", toolCalls: [{ id: `c${index}`, name: "read", input: {} }] },
+      { role: "tool", toolCallId: `c${index}`, content: `out-${index} ${"x".repeat(8_000)}` },
+    ]).flat(),
+    { role: "user", content: "newest question" },
+    { role: "assistant", content: "newest answer" },
+  ];
+
+  it("exposes a template with the default headings", () => {
+    expect(DEFAULT_COMPACTION_HEADINGS).toEqual([
+      "Goal",
+      "Constraints",
+      "Decisions",
+      "Work state",
+      "Next step",
+      "Relevant files",
+    ]);
+    expect(DEFAULT_COMPACTION_TEMPLATE).toContain("## Work state");
+  });
+
+  it("sends the whole slice when no input policy is set and reports one attempt", async () => {
+    const { model, sent } = scripted([structured(DEFAULT_COMPACTION_HEADINGS)]);
+    const result = await summarizeCompaction({
+      model,
+      instructions: DEFAULT_COMPACTION_TEMPLATE,
+      requireHeadings: DEFAULT_COMPACTION_HEADINGS,
+    })(bulky(2));
+
+    expect(text(sent[0])).toContain("x".repeat(8_000));
+    expect(result.summarizerAttempts).toBe(1);
+  });
+
+  it("keeps a 400K-token history under maxInputTokens with the newest exchange intact", async () => {
+    const history = bulky(200); // ~400K tokens
+    const before = structuredClone(history);
+    const { model, sent } = scripted([]);
+    const result = await summarizeCompaction({ model, input: { maxInputTokens: 100_000 } })(
+      history,
+    );
+
+    expect(approximate(text(sent[0]))).toBeLessThanOrEqual(100_000);
+    expect(text(sent[0])).toContain("newest question");
+    expect(text(sent[0])).toContain("newest answer");
+    expect(result.summarizerInputTokens).toBeLessThanOrEqual(100_000);
+    expect(history).toEqual(before);
+  });
+
+  it("clips old tool outputs before dropping anything", async () => {
+    const { model, sent } = scripted([]);
+    await summarizeCompaction({
+      model,
+      input: { maxInputTokens: 6_000, clipToolOutputChars: 400 },
+    })(bulky(4));
+
+    expect(text(sent[0])).toContain("characters omitted");
+    expect(text(sent[0])).toContain("out-0");
+  });
+
+  it("replaces tool outputs older than dropToolOutputsOlderThan with a placeholder", async () => {
+    const { model, sent } = scripted([]);
+    await summarizeCompaction({ model, input: { dropToolOutputsOlderThan: 4 } })(bulky(4));
+
+    expect(text(sent[0])).toContain("[tool output omitted]");
+    expect(text(sent[0])).not.toContain("out-0");
+    expect(text(sent[0])).toContain("out-3");
+  });
+
+  it("retries a context-length failure at 85% then 70% of the full request", async () => {
+    const tooLong = () => new Error("prompt is too long: 250000 tokens > 200000 maximum");
+    const { model, sent } = scripted([tooLong(), tooLong()]);
+    const result = await summarizeCompaction({
+      model,
+      input: { shrinkOnContextError: [0.85, 0.7] },
+    })(bulky(30));
+    const full = approximate(text(sent[0]));
+
+    expect(sent).toHaveLength(3);
+    expect(approximate(text(sent[1]))).toBeLessThanOrEqual(full * 0.85);
+    expect(approximate(text(sent[2]))).toBeLessThanOrEqual(full * 0.7);
+    expect(result.summarizerAttempts).toBe(3);
+  });
+
+  it("fails when every shrink step is rejected", async () => {
+    const tooLong = () => new Error("context_length_exceeded");
+    const { model, sent } = scripted([tooLong(), tooLong()]);
+
+    await expect(
+      summarizeCompaction({ model, input: { shrinkOnContextError: [0.85] } })(bulky(10)),
+    ).rejects.toThrow(/context_length/);
+    expect(sent).toHaveLength(2);
+  });
+
+  it("nudges exactly once for a missing heading, then accepts", async () => {
+    const { model, sent } = scripted(["<summary>## Goal\nx</summary>", structured(["Goal", "Next step"])]);
+    const result = await summarizeCompaction({ model, requireHeadings: ["goal", "Next step"] })(
+      bulky(1),
+    );
+
+    expect(sent).toHaveLength(2);
+    expect(sent[1]?.at(-1)?.content).toContain("Next step");
+    expect(result.summarizerAttempts).toBe(2);
+  });
+
+  it("throws after the single nudge when a heading is still missing", async () => {
+    const { model, sent } = scripted([]);
+
+    await expect(
+      summarizeCompaction({ model, requireHeadings: ["Progress"] })(bulky(1)),
+    ).rejects.toThrow(/missing required headings \(Progress\)/);
+    expect(sent).toHaveLength(2);
+  });
+
+  it("never accepts a truncated reply and retries once at a smaller input", async () => {
+    const { model, sent } = scripted([
+      { content: "<summary>cut", finishReason: "length" },
+      { content: "<summary>cut</summary>", finishReason: "length" },
+    ]);
+
+    await expect(summarizeCompaction({ model })(bulky(10))).rejects.toThrow(/finish reason "length"/);
+    expect(sent).toHaveLength(2);
+    expect(text(sent[1]).length).toBeLessThan(text(sent[0]).length);
+  });
+
+  it("rejects an invalid input policy", () => {
+    const { model } = summaryModel({});
+
+    expect(() => summarizeCompaction({ model, input: { maxInputTokens: 0 } })).toThrow(
+      AgentExecutionError,
+    );
+    expect(() =>
+      summarizeCompaction({ model, input: { shrinkOnContextError: [1.2] } }),
+    ).toThrow(AgentExecutionError);
+  });
+});
+
+function approximate(value: string): number {
+  return Math.ceil(value.length / 4);
+}

@@ -3,6 +3,7 @@ import type { ModelCallOptions } from "../contracts/model.contract";
 import { AgentExecutionError } from "../errors";
 import { extractJsonSchema } from "../utils/json-schema";
 import { approximateTokenCount } from "../utils/token-count";
+import { assertTokenTrigger, isTokenTriggerReached, resolveTokenTrigger } from "./token-trigger";
 import {
   DEFAULT_CLEARED_TOOL_RESULT,
   type AgentContextEditingConfig,
@@ -16,12 +17,16 @@ export function validateContextEditing(config: AgentContextEditingConfig | undef
   if (config === undefined) return;
 
   const rule = resolveRule(config);
+
+  if (rule?.afterTokens !== undefined) {
+    assertTokenTrigger(rule.afterTokens, "contextEditing.clearToolResults.afterTokens");
+  }
+
   const bad =
     !config ||
     typeof config !== "object" ||
     (rule !== undefined &&
-      ((rule.afterTokens !== undefined &&
-        (!Number.isSafeInteger(rule.afterTokens) || rule.afterTokens <= 0)) ||
+      (
         (rule.keep !== undefined && (!Number.isSafeInteger(rule.keep) || rule.keep < 0)) ||
         (rule.exclude !== undefined && !Array.isArray(rule.exclude)) ||
         (rule.countTokens !== undefined && typeof rule.countTokens !== "function")));
@@ -51,14 +56,21 @@ export function resolveRule(
  */
 export function nativeContextEditingHint(
   config: AgentContextEditingConfig,
+  contextWindow?: number,
 ): NonNullable<ModelCallOptions["contextEditing"]> | undefined {
   const rule = resolveRule(config);
 
   if (!rule) return undefined;
 
+  const afterTokens =
+    rule.afterTokens === undefined ? undefined : resolveTokenTrigger(rule.afterTokens, contextWindow);
+
+  // An unresolvable window-relative trigger must not turn into "clear always".
+  if (rule.afterTokens !== undefined && afterTokens === undefined) return undefined;
+
   return {
     clearToolResults: {
-      ...(rule.afterTokens !== undefined ? { afterTokens: rule.afterTokens } : {}),
+      ...(afterTokens !== undefined ? { afterTokens } : {}),
       keep: rule.keep ?? DEFAULT_KEEP,
       ...(rule.exclude?.length ? { exclude: [...rule.exclude] } : {}),
     },
@@ -89,6 +101,7 @@ export async function clearOldToolResults(
   messages: Message[],
   options: ModelCallOptions,
   tripIndex: number,
+  contextWindow?: number,
 ): Promise<ContextEditRecord | undefined> {
   const keep = rule.keep ?? DEFAULT_KEEP;
   const placeholder = rule.placeholder ?? DEFAULT_CLEARED_TOOL_RESULT;
@@ -117,6 +130,13 @@ export async function clearOldToolResults(
 
   if (candidates.length === 0) return undefined;
 
+  // A window-relative trigger with no known window never fires.
+  if (
+    rule.afterTokens !== undefined &&
+    resolveTokenTrigger(rule.afterTokens, contextWindow) === undefined
+  )
+    return undefined;
+
   const tokens = rule.countTokens
     ? await rule.countTokens(structuredClone(messages), options)
     : estimate(messages, options);
@@ -125,7 +145,11 @@ export async function clearOldToolResults(
     throw new Error("contextEditing countTokens must return a finite non-negative number.");
   }
 
-  if (rule.afterTokens !== undefined && tokens < rule.afterTokens) return undefined;
+  if (
+    rule.afterTokens !== undefined &&
+    !isTokenTriggerReached(rule.afterTokens, tokens, contextWindow, options.maxTokens)
+  )
+    return undefined;
 
   for (const index of candidates) {
     messages[index] = { ...messages[index]!, content: placeholder };

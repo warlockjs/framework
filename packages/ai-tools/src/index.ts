@@ -82,6 +82,7 @@ export type {
   DateTimeOptions,
   DateTimeResult,
   FetchUrlExtract,
+  FetchUrlExtractor,
   FetchUrlInput,
   FetchUrlOptions,
   FetchUrlResult,

@@ -31,6 +31,7 @@ import type {
   AnthropicNonStreamingRequest,
 } from "./request.type";
 import { anthropicPricingFor, withAnthropicCacheWriteRates } from "./known-pricing";
+import { inferContextWindow } from "./known-context-windows";
 import { inferMaxOutputTokens } from "./known-output-limits";
 import { inferVisionCapability } from "./known-vision-models";
 import {
@@ -253,6 +254,7 @@ export class AnthropicModel implements ModelContract {
       // reasoning channel so the agent forwards `reasoning` options;
       // explicit config override wins for proxied/legacy targets.
       reasoning: config.reasoning ?? true,
+      ...windowCapability(config.contextWindow ?? inferContextWindow(config.name)),
       // Anthropic prompt caching is caller-driven via `cache_control`
       // breakpoints. The adapter both places those breakpoints (tools
       // when `config.promptCaching`, system when
@@ -1543,4 +1545,8 @@ function resolveAnthropicOptions(options: ModelCallOptions | undefined): Anthrop
   const raw = options?.providerOptions?.anthropic;
 
   return typeof raw === "object" && raw !== null ? (raw as AnthropicCallOptions) : {};
+}
+
+function windowCapability(window: number | undefined): { contextWindow?: number } {
+  return window === undefined ? {} : { contextWindow: window };
 }

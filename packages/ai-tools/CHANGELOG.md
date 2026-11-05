@@ -4,6 +4,22 @@ All notable changes to `@warlock.js/ai-tools` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.44.0
+
+### Added
+
+- `fetch_url` takes `extractor: "auto" | "readability" | "simple"` for the `"text"` / `"markdown"` modes. `"auto"` (default) uses readability when its optional peers load and it yields at least 200 characters, otherwise a new dependency-free HTML converter; `"simple"` always uses that converter; `"readability"` keeps requiring the peers. The result carries `extractor` naming the converter used.
+- `fetch_url` takes `retryOnChallenge` to control the challenge retry described below.
+
+### Changed
+
+- `fetch_url` now retries once with an alternate `User-Agent`, through the same outbound policy, when the first response carries a `cf-mitigated: challenge` header (`retryOnChallenge`, default `true`; set `false` to disable). Previously there was no retry.
+- With the readability peers absent, `fetch_url` in `"text"` / `"markdown"` mode now falls back to the built-in converter under the default `"auto"` extractor instead of failing with a `missing-peer` error. Pass `extractor: "readability"` to keep the strict behaviour.
+
+### Fixed
+
+- `fetch_url` truncation at `maxBytes` no longer splits a multi-byte UTF-8 character into a replacement character.
+
 ## 5.40.0 - 2026-10-29
 
 ### Added

@@ -100,6 +100,14 @@ export type OpenAIApi = "chat" | "responses";
  */
 export type OpenAIModelConfig = ModelConfig & {
   /**
+   * The model's context window in tokens (input + output). Surfaces as
+   * `capabilities.contextWindow`, which window-relative triggers
+   * (`compaction.afterTokens: { share }`) resolve against. When omitted it is
+   * taken from a small table of known models; unknown models stay
+   * unset. An explicit value always wins.
+   */
+  contextWindow?: number;
+  /**
    * Wire API to use. Default `"chat"` (Chat Completions). `"responses"`
    * selects the stateless Responses adapter and is accepted only on the
    * direct `"openai"` provider label; see {@link OpenAIApi}.

@@ -53,7 +53,12 @@ import { spawnSubAgent } from "./agent/spawn-sub-agent";
 import { skills } from "./skills";
 import { prompt } from "./prompt";
 import { vcr } from "./vcr";
-import { summarizeCompaction } from "./agent/compaction-summarizer";
+import {
+  DEFAULT_COMPACTION_HEADINGS,
+  DEFAULT_COMPACTION_INSTRUCTIONS,
+  DEFAULT_COMPACTION_TEMPLATE,
+  summarizeCompaction,
+} from "./agent/compaction-summarizer";
 import { session } from "./session";
 import {
   snapshotFile,
@@ -197,6 +202,12 @@ export interface Ai {
   compaction: {
     /** A ready-made `compaction.summarize` callback backed by a (cheaper) model. */
     summarize: typeof summarizeCompaction;
+    /** The default summary instructions. */
+    DEFAULT_COMPACTION_INSTRUCTIONS: typeof DEFAULT_COMPACTION_INSTRUCTIONS;
+    /** The default instructions plus a fixed set of section headings. */
+    DEFAULT_COMPACTION_TEMPLATE: typeof DEFAULT_COMPACTION_TEMPLATE;
+    /** Headings of the default template, for `requireHeadings`. */
+    DEFAULT_COMPACTION_HEADINGS: typeof DEFAULT_COMPACTION_HEADINGS;
   };
   /**
    * Human-in-the-loop tool approval (interrupt / resume).
@@ -354,6 +365,9 @@ export const ai = {
   session,
   compaction: {
     summarize: summarizeCompaction,
+    DEFAULT_COMPACTION_INSTRUCTIONS,
+    DEFAULT_COMPACTION_TEMPLATE,
+    DEFAULT_COMPACTION_HEADINGS,
   },
   human,
   guardrail: guardrailSuite,

@@ -2,6 +2,7 @@ import type { Message } from "../contracts/conversation-message.type";
 import type { ModelCallOptions } from "../contracts/model.contract";
 import type { SummarizeCallback } from "../contracts/orchestrator/orchestrator-config.type";
 import type { CompactionResult } from "../contracts/result/orchestrator-result.type";
+import type { TokenTrigger } from "./token-trigger";
 
 export type AgentCompactionContext = {
   tripIndex: number;
@@ -12,8 +13,13 @@ export type AgentCompactionContext = {
 
 /** Optional automatic compaction of settled history before each model trip. */
 export type AgentCompactionConfig = {
-  /** Explicit input threshold; no provider context-window size is inferred. */
-  afterTokens: number;
+  /**
+   * Input size that triggers compaction: an absolute token count, or
+   * `{ share, reserve?, max? }` relative to the model's
+   * `capabilities.contextWindow`. A window-relative trigger on a model
+   * with an unknown window never fires; one `unknown-window` skip is recorded.
+   */
+  afterTokens: TokenTrigger;
   /** Minimum recent message count to preserve, expanded to keep complete tool groups. Default 8. */
   keep?: number;
   /**
@@ -40,6 +46,10 @@ export type AgentCompactionRecord = Omit<AgentCompactionContext, "signal" | "inp
   type: "applied" | "skipped";
   /** Original live-conversation indices of the replaced range. */
   compaction?: CompactionResult;
-  reason?: "no-safe-range" | "not-smaller" | "callback-error";
+  /** Estimated input tokens of the summariser request, when the callback reports it. */
+  summarizerInputTokens?: number;
+  /** Model calls the summariser needed, when the callback reports it. */
+  attempts?: number;
+  reason?: "no-safe-range" | "not-smaller" | "callback-error" | "unknown-window";
   error?: string;
 };

@@ -515,10 +515,16 @@ call/result pairing stays intact. A model with
 
 ## Automatic compaction inside an agent run
 
-Compaction is disabled by default. Set `compaction.afterTokens` to an explicit
-input threshold; the agent never infers a provider's context-window size. Before
-each model trip (including streamed and repair trips), it checks the current
-conversation and tools against that threshold.
+Compaction is disabled by default. Set `compaction.afterTokens` to a token count
+or a window-relative `{ share, reserve?, max? }` (threshold =
+`min(floor(window * share), window - reserve, max)`, at least 1, resolved against
+`model.capabilities.contextWindow`; unknown window: no compaction, one
+`unknown-window` skip record). Before each model trip (including streamed and
+repair trips), the agent checks the current conversation and tools against it.
+`ai.compaction.summarize` also takes `input: { maxInputTokens, clipToolOutputChars,
+dropToolOutputsOlderThan, shrinkOnContextError }`, `requireHeadings` and the
+`DEFAULT_COMPACTION_TEMPLATE` / `DEFAULT_COMPACTION_HEADINGS` constants; records
+carry `summarizerInputTokens` and `attempts`.
 
 ```ts
 const worker = ai.agent({

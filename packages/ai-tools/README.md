@@ -17,7 +17,7 @@ makes them available and statically typed.
 | Tool                            | LLM-visible name | What it does                                                                                       |
 | ------------------------------- | ---------------- | -------------------------------------------------------------------------------------------------- |
 | `ai.tools.webSearch(options)`   | `web_search`     | Web search via a chosen provider (`tavily` / `brave` / `serpapi`) — ranked title/URL/snippet hits. |
-| `ai.tools.fetchUrl(options?)`   | `fetch_url`      | Fetch a URL → readability `text` (default), raw `html`, or `markdown`; host allowlist + byte cap.  |
+| `ai.tools.fetchUrl(options?)`   | `fetch_url`      | Fetch a URL → `text` (default), raw `html`, or `markdown` (`extractor`: auto/readability/simple); host allowlist + byte cap.  |
 | `ai.tools.http(options?)`       | `http_request`   | A guarded HTTP/REST client — method + host allowlists, `baseUrl` join, byte/timeout caps.          |
 | `ai.tools.calculator(options?)` | `calculator`     | A SAFE arithmetic evaluator (shunting-yard; never `eval`/`Function`).                              |
 | `ai.tools.dateTime(options?)`   | `date_time`      | `now` / `add` / `diff` / `format` over ISO-8601 instants, IANA time zones.                         |

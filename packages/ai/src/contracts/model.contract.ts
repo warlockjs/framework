@@ -187,6 +187,13 @@ export type ReasoningEffort = "none" | "minimal" | "low" | "medium" | "high" | "
  */
 export type ModelCapabilities = {
   /**
+   * The model's context window in tokens (input + output). Optional: when
+   * unset, window-relative triggers (`compaction.afterTokens: { share }`,
+   * the same on `contextEditing`) do not fire. Adapters fill it from an
+   * explicit `contextWindow` config value or a small table of known models.
+   */
+  contextWindow?: number;
+  /**
    * True when the adapter forwards `ModelCallOptions.responseSchema` to
    * the provider's native structured-output mechanism and the provider
    * guarantees a matching response at the token level. When true, the

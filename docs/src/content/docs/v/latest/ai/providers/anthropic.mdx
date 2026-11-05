@@ -146,6 +146,9 @@ with `continueOnOutputLimit`. See
   `claude-3`, `claude-4`, `claude-opus-4`, `claude-sonnet-4`,
   `claude-haiku-4`); pre-3 families (`claude-2`, `claude-instant`) are
   text-only. Override either way with the `vision` flag.
+  `contextWindow` sets `capabilities.contextWindow` (used by window-relative
+  compaction triggers); it is filled for the documented 200K Claude models and
+  left unset for any other id.
 - **No embedder.** Anthropic ships no first-party embeddings API, so
   this adapter has no `embedder()`. Pair Claude with an embedding
   provider — [OpenAI](/v/latest/ai/providers/openai/),

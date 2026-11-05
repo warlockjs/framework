@@ -53,6 +53,13 @@ export type CompactionResult = {
   replacesFromIndex: number;
   /** Inclusive end index of the replaced range. */
   replacesToIndex: number;
+  /**
+   * Estimated input tokens of the request that produced the summary, after
+   * any degradation. Set by `ai.compaction.summarize`.
+   */
+  summarizerInputTokens?: number;
+  /** Model calls the summariser made (1 = first try succeeded). Set by `ai.compaction.summarize`. */
+  summarizerAttempts?: number;
 };
 
 /**

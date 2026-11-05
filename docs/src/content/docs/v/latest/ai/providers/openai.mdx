@@ -80,6 +80,10 @@ strict: true`); pass `responseFormat: "json_object"` or `"text"` on the
   hint instead.
 - **Vision** — auto-detected for `gpt-4o*`, `gpt-4-turbo*`, `gpt-4.1*`,
   `o1*`, `o3*`, `chatgpt-4o*`. Override with the `vision` flag.
+  `contextWindow` sets `capabilities.contextWindow` (used by window-relative
+  compaction triggers); on the direct `openai` provider it is filled for
+  `gpt-4.1*`, `gpt-4o*`, `gpt-5` and `gpt-5-*`, `o1*`, `o3*` and `o4-mini*`, and left unset
+  for any other id.
 - **Streaming** — token deltas, tool-call fragments, terminal `done`.
 - **Pricing** — built-in list prices for flat-priced OpenAI models, or a
   `pricing` map (USD per million tokens) for a cost breakdown on every

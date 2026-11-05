@@ -20,6 +20,7 @@ import { OpenAIResponsesModel } from "./responses-model";
 import type OpenAI from "openai";
 import { compatibleSearchParams, mergeProviderBody } from "./provider-options";
 import type { OpenAIModelConfig } from "./config.type";
+import { inferContextWindow } from "./known-context-windows";
 import { inferReasoningCapability } from "./known-reasoning-models";
 import { inferVisionCapability } from "./known-vision-models";
 import {
@@ -100,7 +101,11 @@ export class OpenAIModel implements ModelContract {
     this.name = config.name;
     this.provider = provider;
     this.pricing = config.pricing;
+    const window =
+      config.contextWindow ?? (provider === "openai" ? inferContextWindow(config.name) : undefined);
+
     this.capabilities = {
+      ...(window !== undefined ? { contextWindow: window } : {}),
       structuredOutput: config.structuredOutput ?? inferStructuredOutput(config.responseFormat),
       vision: config.vision ?? inferVisionCapability(config.name),
       // o-series + gpt-5 / gpt-6 models surface a reasoning channel and accept

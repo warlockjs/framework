@@ -51,6 +51,14 @@ export type AnthropicSDKConfig = ClientOptions & {
  */
 export type AnthropicModelConfig = ModelConfig & {
   /**
+   * The model's context window in tokens (input + output). Surfaces as
+   * `capabilities.contextWindow`, which window-relative triggers
+   * (`compaction.afterTokens: { share }`) resolve against. When omitted it is
+   * taken from a small table of known models; unknown models stay
+   * unset. An explicit value always wins.
+   */
+  contextWindow?: number;
+  /**
    * Override the auto-inferred vision capability. When omitted, the
    * adapter checks the model name against the known Claude vision
    * families (see `known-vision-models.ts`). Setting `true` or `false`

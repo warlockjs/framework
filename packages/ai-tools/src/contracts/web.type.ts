@@ -84,6 +84,17 @@ export interface WebSearchResult {
 export type FetchUrlExtract = "text" | "html" | "markdown";
 
 /**
+ * Which converter turns HTML into `"text"` / `"markdown"` content.
+ *
+ * - `"auto"` — readability when its optional peers load and it yields at
+ *   least 200 characters, otherwise the built-in converter.
+ * - `"readability"` — `@mozilla/readability` + `jsdom` only; a missing
+ *   peer is a `WebToolError` of type `"missing-peer"`.
+ * - `"simple"` — the built-in, dependency-free converter.
+ */
+export type FetchUrlExtractor = "auto" | "readability" | "simple";
+
+/**
  * Construction options for `ai.tools.fetchUrl`.
  */
 export interface FetchUrlOptions {
@@ -111,6 +122,21 @@ export interface FetchUrlOptions {
    * @default "text"
    */
   extract?: FetchUrlExtract;
+  /**
+   * Converter used for the `"text"` / `"markdown"` modes.
+   *
+   * @default "auto"
+   */
+  extractor?: FetchUrlExtractor;
+  /**
+   * Retry once with an alternate `User-Agent` (and browser-like headers)
+   * when the first response carries a `cf-mitigated: challenge` header.
+   * The retry goes through the same outbound policy. Set `false` to turn
+   * it off.
+   *
+   * @default true
+   */
+  retryOnChallenge?: boolean;
   /**
    * Host allowlist. When set, any request to a host not in this list is
    * rejected before the network call (an SSRF guardrail). Redirect
@@ -150,4 +176,9 @@ export interface FetchUrlResult {
   content: string;
   /** True when `content` was cut off at `maxBytes`. */
   truncated: boolean;
+  /**
+   * The converter that produced `content`. Present only for the
+   * `"text"` / `"markdown"` modes.
+   */
+  extractor?: "readability" | "simple";
 }

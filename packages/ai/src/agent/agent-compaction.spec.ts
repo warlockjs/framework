@@ -510,6 +510,39 @@ describe("agent automatic compaction", () => {
     },
   );
 
+  it("fires a window-relative trigger from the model's context window", async () => {
+    const { model } = modelFixture();
+    Object.assign(model, { capabilities: { contextWindow: 10_000 } });
+    const result = await agent({
+      model,
+      compaction: policy({ afterTokens: { share: 0.2 } }),
+    }).execute("go", { history });
+
+    expect(result.report.compactions?.[0]).toMatchObject({ type: "applied" });
+  });
+
+  it("does not fire a window-relative trigger without a window and records one skip", async () => {
+    const { model } = modelFixture();
+    const result = await agent({
+      model,
+      compaction: policy({ afterTokens: { share: 0.2 } }),
+    }).execute("go", { history });
+
+    expect(result.report.compactions).toEqual([
+      expect.objectContaining({ type: "skipped", reason: "unknown-window" }),
+    ]);
+  });
+
+  it("rejects a malformed window-relative trigger", () => {
+    const { model } = modelFixture();
+
+    for (const afterTokens of [{ share: 0 }, { share: 2 }, { share: 0.5, reserve: -1 }]) {
+      expect(() => agent({ model, compaction: policy({ afterTokens }) })).toThrow(
+        AgentExecutionError,
+      );
+    }
+  });
+
   it("rejects invalid policies at authoring time", () => {
     const { model } = modelFixture();
     for (const afterTokens of [0, -1, Infinity, Number.NaN, 0.5]) {

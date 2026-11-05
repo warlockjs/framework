@@ -27,6 +27,7 @@ import { isSearchDefinition, searchBudgetOf } from "./search-budget";
 import { applyGrounding, groundingMetadata } from "./utils/grounding";
 import { mergeProviderBody } from "./provider-options";
 import type { GoogleModelConfig } from "./config.type";
+import { inferContextWindow } from "./known-context-windows";
 import { inferVisionCapability } from "./known-vision-models";
 import {
   applyGoogleUsage,
@@ -109,7 +110,11 @@ export class GoogleModel implements ModelContract {
     this.pricing = config.pricing;
     const multimodal = config.vision ?? inferVisionCapability(config.name);
 
+    const window =
+      config.contextWindow ?? (provider === "google" ? inferContextWindow(config.name) : undefined);
+
     this.capabilities = {
+      ...(window !== undefined ? { contextWindow: window } : {}),
       structuredOutput: config.structuredOutput ?? true,
       vision: multimodal,
       // Every Gemini 2.5 model thinks; older families harmlessly ignore

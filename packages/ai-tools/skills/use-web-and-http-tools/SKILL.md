@@ -35,7 +35,7 @@ The construction `options` are the **rails** — they bound what the model may d
 | Factory                         | Name           | Model input                                                    | Returns                                          |
 | ------------------------------- | -------------- | -------------------------------------------------------------- | ------------------------------------------------ |
 | `ai.tools.webSearch(options)`   | `web_search`   | `{ query, maxResults? }`                                       | `{ results: { title, url, snippet, score? }[] }` |
-| `ai.tools.fetchUrl(options?)`   | `fetch_url`    | `{ url }`                                                      | `{ url, status, content, truncated }`            |
+| `ai.tools.fetchUrl(options?)`   | `fetch_url`    | `{ url }`                                                      | `{ url, status, content, truncated, extractor? }` |
 | `ai.tools.http(options?)`       | `http_request` | `{ method?, url, headers?, body? }`                            | `{ status, headers, body, truncated }`           |
 | `ai.tools.calculator(options?)` | `calculator`   | `{ expression }`                                               | `{ result }`                                     |
 | `ai.tools.dateTime(options?)`   | `date_time`    | `{ op, iso?, from?, to?, amount?, unit?, timeZone?, format? }` | `{ value }`                                      |
@@ -61,7 +61,10 @@ ai.tools.fetchUrl({
 });
 ```
 
-- `extract`: `"text"` (default — readability-extracted main text), `"html"` (raw body), or `"markdown"`. **`"text"`/`"markdown"` lazily import the `@mozilla/readability` + `jsdom` optional peers** — a missing peer is a `WebToolError` of type `"missing-peer"` carrying the `npm install @mozilla/readability jsdom` string. `"html"` needs nothing.
+- `extract`: `"text"` (default — main text), `"html"` (raw body), or `"markdown"`.
+- `extractor` (for `"text"` / `"markdown"`): `"auto"` (default) uses readability when the `@mozilla/readability` + `jsdom` optional peers load and the article is at least 200 characters, otherwise a built-in dependency-free converter; `"readability"` requires the peers (a missing peer is a `WebToolError` of type `"missing-peer"` carrying the install string); `"simple"` always uses the built-in converter and needs no peers. The result's `extractor` field (`"readability"` or `"simple"`) names the converter used; it is absent for `"html"`.
+- `retryOnChallenge` (default `true`): when the first response carries a `cf-mitigated: challenge` header, retry exactly once with an alternate `User-Agent` through the same outbound policy. Set `false` to disable.
+- Truncation at `maxBytes` never splits a multi-byte UTF-8 character: a partial trailing character is dropped.
 - `allowHosts` (when set) rejects any other host **before the fetch** (an SSRF guardrail) → `"denied-host"`, and redirect targets are held to the same allowlist.
 - **Private-network deny by default.** Every request — and every redirect hop — now routes through `@warlock.js/ai`'s hardened `guardedFetch` outbound policy instead of a local host check. It refuses private / loopback / link-local / CGNAT / cloud-metadata addresses (`169.254.169.254`, RFC1918, `localhost`, …) by resolving the hostname via DNS and checking every returned address, failing closed on resolution failure — and re-validates every redirect `Location` (scheme, allowlist, private-IP deny) before following it. This applies even with no `allowHosts` set, so a bare `ai.tools.fetchUrl()` is no longer an SSRF primitive; blocks surface as `WebToolError` `type: "denied-host"`.
 - `allowPrivateNetwork` (default `false`) — set `true` to deliberately permit a private/internal target, e.g. a tool that must call a local dev server. Pair with `allowHosts` to scope it rather than opening the whole private range.

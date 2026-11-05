@@ -1,6 +1,13 @@
 import { guardedFetch, OutboundPolicyError, tool, type ToolContract } from "@warlock.js/ai";
-import type { FetchUrlExtract, FetchUrlInput, FetchUrlOptions, FetchUrlResult } from "../contracts";
+import type {
+  FetchUrlExtract,
+  FetchUrlExtractor,
+  FetchUrlInput,
+  FetchUrlOptions,
+  FetchUrlResult,
+} from "../contracts";
 import { WebToolError } from "../errors";
+import { htmlToMarkdown } from "./html-to-markdown";
 import { objectSchema, stringField } from "./schema";
 
 /** Default tool name exposed to the LLM. */
@@ -14,6 +21,20 @@ const DEFAULT_TIMEOUT_MS = 15_000;
 
 /** Default rendering mode for the fetched document. */
 const DEFAULT_EXTRACT: FetchUrlExtract = "text";
+
+/** Default HTML extractor for the `"text"` / `"markdown"` modes. */
+const DEFAULT_EXTRACTOR: FetchUrlExtractor = "auto";
+
+/** In `"auto"` mode, readability output shorter than this falls back to the simple converter. */
+const MIN_READABILITY_CHARS = 200;
+
+/** Browser-like headers sent on the challenge retry. */
+const CHALLENGE_RETRY_HEADERS: Record<string, string> = {
+  "user-agent":
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+  accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+  "accept-language": "en-US,en;q=0.9",
+};
 
 /** Input schema: `{ url }`. */
 const inputSchema = objectSchema<FetchUrlInput>({
@@ -158,13 +179,13 @@ async function readBody(
   const stream = response.body;
 
   if (!stream) {
-    const text = await response.text();
+    const bytes = new TextEncoder().encode(await response.text());
 
-    if (text.length > maxBytes) {
-      return { body: text.slice(0, maxBytes), truncated: true };
+    if (bytes.byteLength > maxBytes) {
+      return { body: decodeUtf8Prefix(bytes, maxBytes), truncated: true };
     }
 
-    return { body: text, truncated: false };
+    return { body: new TextDecoder().decode(bytes), truncated: false };
   }
 
   const reader = stream.getReader();
@@ -199,52 +220,47 @@ async function readBody(
     offset += chunk.byteLength;
   }
 
-  const sliced = truncated ? merged.subarray(0, maxBytes) : merged;
-  const body = new TextDecoder().decode(sliced);
+  const body = truncated ? decodeUtf8Prefix(merged, maxBytes) : new TextDecoder().decode(merged);
 
   return { body, truncated };
 }
 
 /**
- * Render the fetched HTML into the configured `extract` mode. `"html"`
- * returns the raw body untouched; `"text"` and `"markdown"` run
- * `@mozilla/readability` over a `jsdom` document, throwing a curated
- * {@link WebToolError} when those optional peers are absent. `"markdown"`
- * applies a light heading/paragraph conversion over the extracted text.
+ * Decode the first `maxBytes` bytes as UTF-8 without splitting a
+ * multi-byte character: when the cut lands inside one, the partial
+ * character is dropped instead of decoding to U+FFFD.
  */
-async function render(html: string, url: string, extract: FetchUrlExtract): Promise<string> {
-  if (extract === "html") {
-    return html;
+function decodeUtf8Prefix(bytes: Uint8Array, maxBytes: number): string {
+  let end = Math.min(maxBytes, bytes.byteLength);
+
+  // A continuation byte (10xxxxxx) at the cut means the character started earlier.
+  if (end < bytes.byteLength) {
+    while (end > 0 && ((bytes[end] ?? 0) & 0xc0) === 0x80) {
+      end -= 1;
+    }
   }
 
-  await loadReadability();
+  return new TextDecoder().decode(bytes.subarray(0, end));
+}
 
-  if (!isReadabilityAvailable) {
-    throw new WebToolError(READABILITY_INSTALL_INSTRUCTIONS, { type: "missing-peer" });
-  }
-
-  const dom = new JsdomSdk.JSDOM(html, { url });
-  const article = new ReadabilitySdk.Readability(dom.window.document).parse();
-
-  if (extract === "markdown") {
-    return article?.content ? htmlToMarkdown(article.content) : (article?.textContent ?? "");
-  }
-
-  return article?.textContent ?? "";
+/** Outcome of {@link render}. */
+interface RenderOutcome {
+  content: string;
+  /** The extractor that produced `content`; absent for `"html"`. */
+  extractor?: Exclude<FetchUrlExtractor, "auto">;
 }
 
 /**
- * Minimal HTML→Markdown reduction for readability's extracted article
- * HTML — headings become `#` prefixes, paragraphs/line-breaks become
- * blank-line separated blocks, and remaining tags are stripped. This is a
- * pragmatic conversion, not a full CommonMark serializer.
+ * Minimal HTML to Markdown reduction for readability's extracted article
+ * HTML: headings become `#` prefixes, paragraphs and line breaks become
+ * blank-line separated blocks, and remaining tags are stripped.
  */
-function htmlToMarkdown(html: string): string {
+function readabilityToMarkdown(html: string): string {
   return html
     .replace(/<h([1-6])[^>]*>(.*?)<\/h\1>/gis, (_match, level: string, text: string) => {
       const hashes = "#".repeat(Number(level));
 
-      return `\n\n${hashes} ${stripTags(text).trim()}\n\n`;
+      return `\n\n${hashes} ${text.replace(/<[^>]+>/g, "").trim()}\n\n`;
     })
     .replace(/<\/(p|div|section|article|li)>/gi, "\n\n")
     .replace(/<br\s*\/?>/gi, "\n")
@@ -253,9 +269,87 @@ function htmlToMarkdown(html: string): string {
     .trim();
 }
 
-/** Strip any remaining HTML tags from a fragment. */
-function stripTags(html: string): string {
-  return html.replace(/<[^>]+>/g, "");
+/** Run readability over a jsdom document; `undefined` when it found no article. */
+function runReadability(
+  html: string,
+  url: string,
+  extract: "text" | "markdown",
+): string | undefined {
+  const dom = new JsdomSdk.JSDOM(html, { url });
+  const article = new ReadabilitySdk.Readability(dom.window.document).parse();
+
+  if (!article) {
+    return undefined;
+  }
+
+  if (extract === "markdown") {
+    return article.content ? readabilityToMarkdown(article.content) : (article.textContent ?? "");
+  }
+
+  return article.textContent ?? "";
+}
+
+/**
+ * Render the fetched HTML into the configured `extract` mode. `"html"`
+ * returns the raw body untouched. For `"text"` / `"markdown"` the
+ * `extractor` decides how: `"readability"` runs `@mozilla/readability`
+ * over `jsdom` (throwing a curated {@link WebToolError} when those
+ * optional peers are absent), `"simple"` uses the dependency-free
+ * converter, and `"auto"` prefers readability when its peers load and it
+ * yields at least {@link MIN_READABILITY_CHARS} characters, else falls
+ * back to the simple converter.
+ */
+async function render(
+  html: string,
+  url: string,
+  extract: FetchUrlExtract,
+  extractor: FetchUrlExtractor,
+): Promise<RenderOutcome> {
+  if (extract === "html") {
+    return { content: html };
+  }
+
+  const simple = (): RenderOutcome => ({
+    content: htmlToMarkdown(html, { plain: extract === "text" }),
+    extractor: "simple",
+  });
+
+  if (extractor === "simple") {
+    return simple();
+  }
+
+  await loadReadability();
+
+  if (!isReadabilityAvailable) {
+    if (extractor === "auto") {
+      return simple();
+    }
+
+    throw new WebToolError(READABILITY_INSTALL_INSTRUCTIONS, { type: "missing-peer" });
+  }
+
+  if (extractor === "readability") {
+    return { content: runReadability(html, url, extract) ?? "", extractor: "readability" };
+  }
+
+  let content: string | undefined;
+
+  try {
+    content = runReadability(html, url, extract);
+  } catch {
+    content = undefined;
+  }
+
+  if (content !== undefined && content.trim().length >= MIN_READABILITY_CHARS) {
+    return { content, extractor: "readability" };
+  }
+
+  return simple();
+}
+
+/** True for a response that carries a `cf-mitigated: challenge` header. */
+function isChallenge(response: Response): boolean {
+  return response.headers?.get("cf-mitigated")?.toLowerCase() === "challenge";
 }
 
 /**
@@ -279,9 +373,14 @@ function stripTags(html: string): string {
  *   result flags `truncated` when it was cut off (default
  *   {@link DEFAULT_MAX_BYTES}).
  * - **`extract`** — `"html"` returns the raw body; `"text"` (default) and
- *   `"markdown"` run `@mozilla/readability` over `jsdom`, lazily imported
- *   so they stay OPTIONAL peers — a missing peer throws the curated
- *   install string.
+ *   `"markdown"` render the page through the `extractor`: `"auto"`
+ *   (default) uses `@mozilla/readability` over `jsdom` (lazily imported
+ *   OPTIONAL peers) and falls back to a built-in converter when they are
+ *   absent or the article is short; `"readability"` requires the peers
+ *   (a missing peer throws the curated install string); `"simple"` always
+ *   uses the built-in converter.
+ * - **`retryOnChallenge`** — retries once with browser-like headers when
+ *   the first response carries a `cf-mitigated: challenge` header (on by default).
  *
  * **Errors flow as data.** Every guardrail rejection and network failure
  * throws a typed {@link WebToolError}; the `tool()` wrapper catches it and
@@ -305,11 +404,13 @@ export function fetchUrlTool(
   const extract = options?.extract ?? DEFAULT_EXTRACT;
   const allowHosts = options?.allowHosts;
   const allowPrivateNetwork = options?.allowPrivateNetwork ?? false;
+  const extractor = options?.extractor ?? DEFAULT_EXTRACTOR;
+  const retryOnChallenge = options?.retryOnChallenge ?? true;
 
   // Warm the readability peers non-blockingly when the configured mode
   // needs them, so the curated install string is ready (and logged at
   // first use) without delaying construction.
-  if (extract !== "html") {
+  if (extract !== "html" && extractor !== "simple") {
     void loadReadability();
   }
 
@@ -324,41 +425,54 @@ export function fetchUrlTool(
       const url = parseUrl(input.url);
       assertHostAllowed(url, allowHosts);
 
-      let response: Response;
+      const send = async (headers?: Record<string, string>): Promise<Response> => {
+        try {
+          // The shared hardened outbound path: private-IP deny by default,
+          // per-hop redirect re-validation, timeout — never a raw fetch.
+          return await guardedFetch(
+            url.toString(),
+            {
+              allowedSchemes: ["http", "https"],
+              hostAllowlist: allowHosts,
+              denyPrivateIPsAfterDNS: !allowPrivateNetwork,
+              timeoutMs,
+            },
+            headers ? { headers } : undefined,
+          );
+        } catch (cause) {
+          if (cause instanceof OutboundPolicyError) {
+            throw new WebToolError(`fetch_url blocked: ${cause.message}`, {
+              type: "denied-host",
+              cause,
+            });
+          }
 
-      try {
-        // The shared hardened outbound path: private-IP deny by default,
-        // per-hop redirect re-validation, timeout — never a raw fetch.
-        response = await guardedFetch(url.toString(), {
-          allowedSchemes: ["http", "https"],
-          hostAllowlist: allowHosts,
-          denyPrivateIPsAfterDNS: !allowPrivateNetwork,
-          timeoutMs,
-        });
-      } catch (cause) {
-        if (cause instanceof OutboundPolicyError) {
-          throw new WebToolError(`fetch_url blocked: ${cause.message}`, {
-            type: "denied-host",
+          const message = cause instanceof Error ? cause.message : String(cause);
+
+          throw new WebToolError(`fetch_url request failed: ${message}`, {
+            type: "request-failed",
             cause,
           });
         }
+      };
 
-        const message = cause instanceof Error ? cause.message : String(cause);
+      let response = await send();
 
-        throw new WebToolError(`fetch_url request failed: ${message}`, {
-          type: "request-failed",
-          cause,
-        });
+      if (retryOnChallenge && isChallenge(response)) {
+        // One retry with browser-like headers; the same guarded path and policy apply.
+        await response.body?.cancel().catch(() => undefined);
+        response = await send(CHALLENGE_RETRY_HEADERS);
       }
 
       const { body, truncated } = await readBody(response, maxBytes);
-      const content = await render(body, response.url || url.toString(), extract);
+      const rendered = await render(body, response.url || url.toString(), extract, extractor);
 
       return {
         url: response.url || url.toString(),
         status: response.status,
-        content,
+        content: rendered.content,
         truncated,
+        ...(rendered.extractor ? { extractor: rendered.extractor } : {}),
       };
     },
   });

@@ -19,6 +19,7 @@ import type OpenAI from "openai";
 import { hostedOutput } from "./utils/hosted-output";
 import { mergeProviderBody } from "./provider-options";
 import type { OpenAIModelConfig } from "./config.type";
+import { inferContextWindow } from "./known-context-windows";
 import { inferReasoningCapability } from "./known-reasoning-models";
 import { inferVisionCapability } from "./known-vision-models";
 import {
@@ -132,7 +133,11 @@ export class OpenAIResponsesModel implements ModelContract {
     this.name = config.name;
     this.provider = provider;
     this.pricing = config.pricing;
+    const window =
+      config.contextWindow ?? (provider === "openai" ? inferContextWindow(config.name) : undefined);
+
     this.capabilities = {
+      ...(window !== undefined ? { contextWindow: window } : {}),
       structuredOutput: config.structuredOutput ?? inferStructuredOutput(config.responseFormat),
       vision: config.vision ?? inferVisionCapability(config.name),
       reasoning: config.reasoning ?? inferReasoningCapability(config.name),
