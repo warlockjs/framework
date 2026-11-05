@@ -249,12 +249,13 @@ export function shellDialect(): ShellDialect {
  */
 export function executableBasename(firstToken: string, dialect: ShellDialect = "posix"): string {
   const base =
-    dialect === "cmd" || dialect === "powershell"
+    dialect === "cmd" || dialect === "powershell" || dialect === "powershell5"
       ? path.win32.basename(firstToken)
       : path.basename(firstToken);
 
   return base.replace(
-    dialect === "powershell" ? /\.(exe|cmd|bat|com|ps1)$/i : /\.(exe|cmd|bat|com)$/i,
+    dialect === "powershell" || dialect === "powershell5"
+      ? /\.(exe|cmd|bat|com|ps1)$/i : /\.(exe|cmd|bat|com)$/i,
     "",
   );
 }
@@ -599,7 +600,7 @@ class LineChecker {
       OPAQUE_RUNNERS.has(key) ||
       (this.shellMode && this.dialect === "posix" && SHELL_OPAQUE_BUILTINS.has(key)) ||
       (this.shellMode && this.dialect === "cmd" && CMD_OPAQUE_BUILTINS.has(key)) ||
-      (this.shellMode && this.dialect === "powershell" && POWERSHELL_OPAQUE.has(key))
+      (this.shellMode && (this.dialect === "powershell" || this.dialect === "powershell5") && POWERSHELL_OPAQUE.has(key))
     ) {
       if (approved) {
         return;
@@ -776,7 +777,7 @@ class LineChecker {
 
   /** Check a redirection target from every possible cwd. */
   public checkRedirectTarget(word: ShellWord, access: "read" | "write", cwds: string[]): void {
-    if (this.dialect === "powershell" && !word.quoted && word.value.toLowerCase() === "$null") {
+    if ((this.dialect === "powershell" || this.dialect === "powershell5") && !word.quoted && word.value.toLowerCase() === "$null") {
       return;
     }
 
@@ -1245,7 +1246,7 @@ function checkSimpleCommand(
   }
 
   const executable = first.dynamic ? "" : executableBasename(first.value, dialect).toLowerCase();
-  const powershell = dialect === "powershell";
+  const powershell = dialect === "powershell" || dialect === "powershell5";
 
   if (executable === "cd" || (powershell && POWERSHELL_CD_NAMES.has(executable))) {
     // A `cd` the policy cannot follow would let later targets escape the jail:

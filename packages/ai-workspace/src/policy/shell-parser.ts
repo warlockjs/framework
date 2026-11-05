@@ -25,10 +25,12 @@ import { parsePowerShellLine } from "./powershell-parser";
  *   parentheses, `;` and `,` are refused.
  * - `"powershell"` — what `powershell -Command` / `pwsh -Command` reads, restricted
  *   the same way (see `powershell-parser.ts`).
+ * - `"powershell5"` — Windows PowerShell 5.1: the `"powershell"` grammar
+ *   without `&&` and `||`, which 5.1 cannot run; a line using them is refused.
  */
 
 /** Which shell grammar to parse. */
-export type ShellDialect = "posix" | "cmd" | "powershell";
+export type ShellDialect = "posix" | "cmd" | "powershell" | "powershell5";
 
 /** One word of a simple command, after quote removal. */
 export interface ShellWord {
@@ -1413,8 +1415,8 @@ class CmdParser {
 export function parseShellLine(line: string, dialect: ShellDialect): ShellParseResult {
   const segments: ShellSegment[] = [];
 
-  if (dialect === "powershell") {
-    return parsePowerShellLine(line);
+  if (dialect === "powershell" || dialect === "powershell5") {
+    return parsePowerShellLine(line, { chaining: dialect === "powershell" });
   }
 
   try {

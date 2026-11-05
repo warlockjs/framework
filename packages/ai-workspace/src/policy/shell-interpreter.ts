@@ -14,7 +14,19 @@ export interface ShellHost {
   pathEnv: string | undefined;
   /** Whether `file` is an existing executable file. */
   isExecutable(file: string): boolean;
+  /**
+   * The version of the PowerShell at `file` (for example `"7.4.6"`), when the
+   * host can tell. Optional: the real host does not start the shell to ask, so
+   * `version` is then known only for Windows PowerShell (always `"5.1"`).
+   */
+  powershellVersion?(file: string): string | undefined;
 }
+
+/**
+ * Which PowerShell a `powershell` interpreter is: `"desktop"` is Windows
+ * PowerShell 5.1 (`powershell.exe`), `"core"` is PowerShell 7+ (`pwsh`).
+ */
+export type PowerShellEdition = "desktop" | "core";
 
 /** The shell a policy's `interpreter` resolves to on a host. */
 export interface ResolvedShell {
@@ -22,6 +34,10 @@ export interface ResolvedShell {
   interpreter: ResolvedShellInterpreter;
   /** The grammar its command lines are parsed with. */
   dialect: ShellDialect;
+  /** For `"powershell"`: which edition runs the lines. Absent when the executable was not found. */
+  edition?: PowerShellEdition;
+  /** For `"powershell"`: the shell's version, when known (`"5.1"` for Windows PowerShell). */
+  version?: string;
   /**
    * The executable to spawn: `interpreterPath`, or the shell found on `PATH`.
    * Absent when the shell was not found (the spawn then reports the failure)
@@ -53,9 +69,11 @@ export function currentShellHost(): ShellHost {
 export function dialectOf(
   interpreter: ResolvedShellInterpreter,
   platform: NodeJS.Platform = process.platform,
+  edition?: PowerShellEdition,
 ): ShellDialect {
   if (interpreter === "powershell") {
-    return "powershell";
+    // Windows PowerShell 5.1 has no `&&` / `||`, so it reads its own grammar.
+    return edition === "desktop" ? "powershell5" : "powershell";
   }
 
   if (interpreter === "cmd") {
@@ -117,16 +135,28 @@ function powershellNames(host: ShellHost): string[] {
   return host.platform === "win32" ? ["pwsh", "powershell"] : ["pwsh"];
 }
 
-function powershellLabel(file: string | undefined): string {
-  return file !== undefined && /pwsh(\.exe)?$/i.test(file) ? "PowerShell 7 (pwsh)" : "PowerShell";
+/** The edition of the PowerShell executable `file`: `powershell.exe` is Windows PowerShell, anything else (`pwsh`) is PowerShell 7+. */
+function editionOf(file: string): PowerShellEdition {
+  return /(^|[\\/])powershell(\.exe)?$/i.test(file) ? "desktop" : "core";
+}
+
+function powershellLabel(edition: PowerShellEdition | undefined): string {
+  if (edition === "desktop") {
+    return "Windows PowerShell 5.1 (powershell)";
+  }
+
+  return edition === "core" ? "PowerShell 7 (pwsh)" : "PowerShell";
 }
 
 /**
  * Resolve a shell policy's `interpreter` (and `interpreterPath`) to the
  * concrete shell that will run lines, and the grammar they are checked with.
  *
- * `"auto"` picks `pwsh`, then Windows PowerShell, then Git Bash (found next to
- * `git`), then `cmd.exe` on Windows and `bash`, then `sh` elsewhere. An explicit interpreter whose executable
+ * `"auto"` picks, on Windows, `pwsh` (PowerShell 7+), then Git Bash (found next
+ * to `git`), then Windows PowerShell 5.1, then `cmd.exe`; elsewhere `bash`,
+ * then `sh`. Windows PowerShell 5.1 gets its own dialect (`"powershell5"`)
+ * because it cannot run `&&` / `||`; `edition` and `version` say which one
+ * was found. An explicit interpreter whose executable
  * is not on `PATH` keeps its name and has no `file`, so the spawn reports the
  * missing shell instead of quietly running another one.
  *
@@ -157,12 +187,14 @@ export function resolveShell(
             ? "bash"
             : "sh";
     } else if (host.platform === "win32") {
-      const powershell = findOnPath(powershellNames(host), host);
-      const gitBash = powershell === undefined ? findGitBash(host) : undefined;
+      const core = findOnPath(["pwsh"], host);
+      const gitBash = core === undefined ? findGitBash(host) : undefined;
+      const desktop =
+        core === undefined && gitBash === undefined ? findOnPath(["powershell"], host) : undefined;
+      const found = core ?? gitBash ?? desktop;
 
-      interpreter =
-        powershell !== undefined ? "powershell" : gitBash !== undefined ? "bash" : "cmd";
-      file = powershell ?? gitBash;
+      interpreter = core !== undefined || desktop !== undefined ? "powershell" : gitBash !== undefined ? "bash" : "cmd";
+      file = found;
     } else {
       const bash = findOnPath(["bash"], host);
 
@@ -184,17 +216,28 @@ export function resolveShell(
     }
   }
 
+  const edition =
+    interpreter === "powershell" && file !== undefined ? editionOf(file) : undefined;
+  const version =
+    edition === "desktop"
+      ? "5.1"
+      : edition === "core" && file !== undefined
+        ? host.powershellVersion?.(file)
+        : undefined;
+
   const labels: Record<ResolvedShellInterpreter, string> = {
     none: "none",
     sh: host.platform === "win32" ? "cmd.exe" : "sh",
     bash: "bash",
     cmd: "cmd.exe",
-    powershell: powershellLabel(file),
+    powershell: powershellLabel(edition),
   };
 
   return {
     interpreter,
-    dialect: dialectOf(interpreter, host.platform),
+    dialect: dialectOf(interpreter, host.platform, edition),
+    ...(edition !== undefined ? { edition } : {}),
+    ...(version !== undefined ? { version } : {}),
     ...(file !== undefined ? { file } : {}),
     label: labels[interpreter],
   };
