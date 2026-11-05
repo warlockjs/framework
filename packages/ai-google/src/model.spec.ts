@@ -61,6 +61,7 @@ describe("GoogleModel capabilities", () => {
       contextWindow: 1_048_576,
       structuredOutput: true,
       vision: true,
+      toolResultImages: false,
       reasoning: true,
       promptCaching: true,
       audio: true,

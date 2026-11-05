@@ -55,6 +55,7 @@ import { normalizeAgentTools } from "../tool/executable-as-tool";
 import { isProviderTool } from "../tool/provider-tool";
 import type { ToolContract, ToolInvokeResult } from "../tool/tool";
 import { compactToolSchemas } from "../tool/tool-schemas";
+import { isToolResultContent } from "../tool/tool-result-content";
 import {
   captureChildReport,
   computeCost,
@@ -2225,7 +2226,9 @@ class Execution<TOutput> {
       toolCallId: toolCallRequest.id,
       content: invokeResult.error
         ? JSON.stringify({ error: invokeResult.error.message })
-        : JSON.stringify(invokeResult.data ?? null),
+        : isToolResultContent(invokeResult.data)
+          ? structuredClone(invokeResult.data.content)
+          : JSON.stringify(invokeResult.data ?? null),
     };
 
     if (invokeResult.error) {

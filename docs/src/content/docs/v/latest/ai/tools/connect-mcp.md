@@ -115,7 +115,7 @@ controller.abort(); // ends the run AND shuts the MCP server down
 `client.tools()` is lazy and cached: the **first** call runs the `initialize` handshake, sends `notifications/initialized`, then `tools/list`, and maps each descriptor into a `ToolContract`. Repeat calls return the cached array without re-handshaking. For each remote tool:
 
 1. its JSON-Schema `inputSchema` is wrapped as a Standard Schema via `jsonSchemaToStandard` (see below);
-2. `execute` issues `tools/call` honoring `ctx.signal` (cooperative abort) and the configured `timeoutMs`, then unwraps the result content (a single JSON text block is parsed back into an object);
+2. `execute` issues `tools/call` honoring `ctx.signal` (cooperative abort) and the configured `timeoutMs`, then unwraps the result content (a single JSON text block is parsed back into an object; a result with an `image` block becomes `{ content: ToolResultPart[] }` so the model sees the picture on providers that read tool-result images);
 3. an MCP `isError` result is thrown so the surrounding `tool()` wraps it as a `ToolExecutionError` — the agent reads it as `{ error }` data and self-corrects.
 
 ### Selecting one discovered tool

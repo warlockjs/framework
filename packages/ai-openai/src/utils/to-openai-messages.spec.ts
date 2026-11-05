@@ -255,4 +255,18 @@ describe("toOpenAIMessages", () => {
       },
     ]);
   });
+
+  it("replaces image parts in a tool message with the placeholder text", () => {
+    const messages: Message[] = [
+      { role: "tool", toolCallId: "c1", content: [{ type: "text", text: "shot" }, { type: "image", source: { base64: "AAAA", mediaType: "image/png" } }] },
+    ];
+
+    expect(toOpenAIMessages(messages)).toEqual([
+      {
+        role: "tool",
+        tool_call_id: "c1",
+        content: "shot\n[image omitted: provider cannot read images in tool results]",
+      },
+    ]);
+  });
 });

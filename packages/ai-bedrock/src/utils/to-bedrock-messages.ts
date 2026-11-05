@@ -1,9 +1,15 @@
-import { InvalidRequestError, type ContentPart, type Message } from "@warlock.js/ai";
+import {
+  InvalidRequestError,
+  TOOL_RESULT_IMAGE_PLACEHOLDER,
+  type ContentPart,
+  type Message,
+} from "@warlock.js/ai";
 import type {
   ContentBlock,
   ImageFormat,
   Message as BedrockMessage,
   SystemContentBlock,
+  ToolResultContentBlock,
 } from "@aws-sdk/client-bedrock-runtime";
 import { fromReasoningMetadata } from "./reasoning-blocks";
 
@@ -64,7 +70,7 @@ export function toBedrockMessages(messages: Message[]): BedrockMessages {
           {
             toolResult: {
               toolUseId: message.toolCallId ?? "",
-              content: [{ text: stringifyContent(message.content) }],
+              content: toToolResultBlocks(message.content),
             },
           },
         ],
@@ -174,6 +180,33 @@ function stringifyContent(content: string | ContentPart[]): string {
     .filter((part): part is { type: "text"; text: string } => part.type === "text")
     .map((part) => part.text)
     .join("");
+}
+
+/**
+ * A `toolResult` block's content: one text block for a plain string, or
+ * text and `image` blocks when the tool returned content parts.
+ */
+function toToolResultBlocks(content: string | ContentPart[]): ToolResultContentBlock[] {
+  if (typeof content === "string") return [{ text: content }];
+
+  // Text-only parts keep the single text block form.
+  if (!content.some((part) => part.type === "image")) return [{ text: stringifyContent(content) }];
+
+  return content.map((part): ToolResultContentBlock => {
+    if (part.type === "text") return { text: part.text };
+
+    if (part.type === "image" && "base64" in part.source) {
+      const format = MEDIA_TYPE_TO_FORMAT[part.source.mediaType];
+
+      if (format) {
+        return {
+          image: { format, source: { bytes: Buffer.from(part.source.base64, "base64") } },
+        } as ToolResultContentBlock;
+      }
+    }
+
+    return { text: TOOL_RESULT_IMAGE_PLACEHOLDER };
+  });
 }
 
 /**

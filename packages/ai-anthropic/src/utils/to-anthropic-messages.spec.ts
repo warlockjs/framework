@@ -326,4 +326,33 @@ describe("toAnthropicMessages", () => {
   it("returns empty messages and undefined system for an empty input", () => {
     expect(toAnthropicMessages([])).toEqual({ system: undefined, messages: [] });
   });
+
+  it("maps image parts in a tool result to a tool_result image block", () => {
+    const messages: Message[] = [
+      {
+        role: "tool",
+        toolCallId: "tu_1",
+        content: [
+          { type: "text", text: "shot" },
+          { type: "image", source: { base64: "AAAA", mediaType: "image/png" } },
+        ],
+      },
+    ];
+
+    expect(toAnthropicMessages(messages).messages).toEqual([
+      {
+        role: "user",
+        content: [
+          {
+            type: "tool_result",
+            tool_use_id: "tu_1",
+            content: [
+              { type: "text", text: "shot" },
+              { type: "image", source: { type: "base64", media_type: "image/png", data: "AAAA" } },
+            ],
+          },
+        ],
+      },
+    ]);
+  });
 });

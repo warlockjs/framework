@@ -34,6 +34,20 @@ function history(count: number): Message[] {
 }
 
 describe("clearOldToolResults", () => {
+  it("replaces an old image result with the placeholder", async () => {
+    const messages = history(3);
+
+    messages[2] = {
+      role: "tool",
+      toolCallId: "c0",
+      content: [{ type: "image", source: { base64: "AAAA", mediaType: "image/png" } }],
+    };
+
+    await clearOldToolResults({ keep: 1 }, messages, {}, 1);
+
+    expect(messages[2]?.content).toBe(DEFAULT_CLEARED_TOOL_RESULT);
+  });
+
   it("keeps the newest results and replaces older ones in place", async () => {
     const messages = history(5);
 

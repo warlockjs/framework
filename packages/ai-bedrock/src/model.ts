@@ -133,6 +133,8 @@ export class BedrockModel implements ModelContract {
     this.capabilities = {
       structuredOutput: config.structuredOutput ?? true,
       vision: config.vision ?? inferVisionCapability(config.name),
+      // Converse `toolResult` content accepts `image` blocks.
+      toolResultImages: true,
       reasoning: config.reasoning ?? inferReasoningCapability(config.name),
       promptCaching: config.promptCaching ?? inferPromptCachingCapability(config.name),
       pdf: config.pdf ?? inferPdfCapability(config.name),

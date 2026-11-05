@@ -71,6 +71,23 @@ The agent calls `input["~standard"].validate(rawArgs)` before invoking `execute`
 
 Whatever your `execute` resolves with is `JSON.stringify`'d and sent back as the next trip's `tool` message. Strings pass through unchanged. Throw (or return a rejected promise) to signal failure — the agent records the error on `ToolCall.error` and tells the model.
 
+## Images and text parts
+
+A tool can show the model a picture, such as a browser screenshot. Return an object whose only key is `content`, a non-empty array of text and image parts:
+
+```ts
+execute: async () => ({
+  content: [
+    { type: "text", text: "Screenshot of /pricing" },
+    { type: "image", source: { base64: png.toString("base64"), mediaType: "image/png" } },
+  ],
+});
+```
+
+Media types are `image/png`, `image/jpeg`, `image/webp` and `image/gif`. A return value counts as content parts only when it has exactly the one key `content` and every element is a valid part; any other value, including an object that has other keys next to `content`, is serialised as JSON as before. `isToolResultContent(value)`, exported from `@warlock.js/ai`, runs the same check; `toolResultText(content)` flattens parts to text with `TOOL_RESULT_IMAGE_PLACEHOLDER` for adapters of your own. The types are `ToolResultPart`, `ToolResultContent` and `ToolResultImageMediaType`.
+
+The parts travel on the `tool` message. Anthropic, Bedrock Converse and OpenAI with `api: "responses"` pass the images to the model (`capabilities.toolResultImages: true`). Every other adapter (OpenAI chat, Google, Ollama, the OpenAI-compatible wrappers, CLI agents) sends the text `[image omitted: provider cannot read images in tool results]` in place of each image and reports `toolResultImages: false`. Image bytes count toward request-size estimates like attachment images, and context editing replaces an old image result with the cleared-result placeholder. MCP tools that return `image` content blocks are forwarded as image parts.
+
 ## Parallel calls — tools run concurrently
 
 When the model requests several tools in one turn, the agent runs them **concurrently** (default `toolDispatch: "concurrent"`, at most `maxConcurrentTools` — default 4 — at a time) and continues once all settled; results reach the model in request order. A tool that shares mutable state with another (or must see its side effects) needs `ai.agent({ toolDispatch: "sequential" })` or per-call `execute(input, { toolDispatch: "sequential" })`. `ctx.signal` carries the run's cancellation into each call.

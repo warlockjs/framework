@@ -1,4 +1,4 @@
-import { InvalidRequestError, type ContentPart, type Message } from "@warlock.js/ai";
+import { InvalidRequestError, toolResultText, type ContentPart, type Message } from "@warlock.js/ai";
 import type { Message as OllamaMessage } from "ollama";
 
 /**
@@ -31,7 +31,7 @@ export function toOllamaMessages(messages: Message[]): OllamaMessage[] {
     if (message.role === "tool") {
       return {
         role: "tool",
-        content: stringifyContent(message.content),
+        content: toolResultText(message.content),
         tool_name: message.toolCallId ?? "",
       };
     }

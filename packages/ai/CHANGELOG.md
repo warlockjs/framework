@@ -4,6 +4,14 @@ All notable changes to `@warlock.js/ai` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.45.0
+
+### Added
+
+- A tool's `execute` can return `{ content: ToolResultPart[] }` (text and image parts; `ToolResultPart`, `ToolResultContent`) so the model sees images, such as a screenshot. The agent carries the parts on the `tool` message instead of stringifying them. A return value is read as parts only when its sole key is `content` and every element is a valid part (`isToolResultContent`); every other value keeps its JSON serialisation.
+- `ModelCapabilities.toolResultImages` says whether an adapter shows tool-result images to the model. Adapters that cannot send the text `[image omitted: provider cannot read images in tool results]` (`TOOL_RESULT_IMAGE_PLACEHOLDER`, `toolResultText(content)`) in place of each image.
+- `contextEditing.clearToolResults` replaces an old image result with the cleared-result placeholder.
+
 ## 5.44.0 - 2026-11-05
 
 ### Added

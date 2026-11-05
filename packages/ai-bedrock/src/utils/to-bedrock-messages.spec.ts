@@ -379,4 +379,27 @@ describe("toBedrockMessages", () => {
       { role: "assistant", content: [{ text: "Done." }] },
     ]);
   });
+
+  it("maps image parts in a tool result to a toolResult image block", () => {
+    const messages: Message[] = [
+      { role: "tool", toolCallId: "tu_1", content: [{ type: "text", text: "shot" }, { type: "image", source: { base64: "AAAA", mediaType: "image/png" } }] },
+    ];
+
+    expect(toBedrockMessages(messages).messages).toEqual([
+      {
+        role: "user",
+        content: [
+          {
+            toolResult: {
+              toolUseId: "tu_1",
+              content: [
+                { text: "shot" },
+                { image: { format: "png", source: { bytes: Buffer.from("AAAA", "base64") } } },
+              ],
+            },
+          },
+        ],
+      },
+    ]);
+  });
 });

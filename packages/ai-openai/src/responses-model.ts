@@ -140,6 +140,9 @@ export class OpenAIResponsesModel implements ModelContract {
       ...(window !== undefined ? { contextWindow: window } : {}),
       structuredOutput: config.structuredOutput ?? inferStructuredOutput(config.responseFormat),
       vision: config.vision ?? inferVisionCapability(config.name),
+      // `function_call_output` takes `input_image` items; compatible
+      // providers reusing this adapter are not assumed to.
+      toolResultImages: provider === "openai",
       reasoning: config.reasoning ?? inferReasoningCapability(config.name),
       // Read-side cache accounting (`cachedTokens`, `cacheWriteTokens`) works
       // and `prompt_cache_key` is forwarded. Explicit write breakpoints are not
@@ -419,7 +422,11 @@ export class OpenAIResponsesModel implements ModelContract {
     messages: Message[],
     options: ModelCallOptions | undefined,
   ): OpenAI.Responses.ResponseCreateParamsNonStreaming {
-    const { instructions, input } = toResponsesInput(messages, this.name);
+    const { instructions, input } = toResponsesInput(
+      messages,
+      this.name,
+      this.capabilities.toolResultImages === true,
+    );
     const tools = this.buildTools(options);
     const toolChoice = tools ? toResponsesToolChoice(options?.toolChoice) : undefined;
     const maxTokens = options?.maxTokens ?? this.config.maxTokens;

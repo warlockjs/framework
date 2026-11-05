@@ -108,6 +108,8 @@ export class OpenAIModel implements ModelContract {
       ...(window !== undefined ? { contextWindow: window } : {}),
       structuredOutput: config.structuredOutput ?? inferStructuredOutput(config.responseFormat),
       vision: config.vision ?? inferVisionCapability(config.name),
+      // Chat Completions tool messages carry text only.
+      toolResultImages: false,
       // o-series + gpt-5 / gpt-6 models surface a reasoning channel and accept
       // the `reasoning_effort` param. Explicit config wins over the
       // name-prefix inference.

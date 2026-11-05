@@ -249,6 +249,8 @@ export class AnthropicModel implements ModelContract {
     this.capabilities = {
       structuredOutput: config.structuredOutput ?? true,
       vision: config.vision ?? inferVisionCapability(config.name),
+      // Tool results carry `image` blocks.
+      toolResultImages: true,
       // Every modern Claude model accepts Anthropic extended thinking
       // (adaptive or `budget_tokens`, per `thinkingMode`). Advertise the
       // reasoning channel so the agent forwards `reasoning` options;

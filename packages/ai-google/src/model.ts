@@ -117,6 +117,8 @@ export class GoogleModel implements ModelContract {
       ...(window !== undefined ? { contextWindow: window } : {}),
       structuredOutput: config.structuredOutput ?? true,
       vision: multimodal,
+      // Function responses are JSON objects here; images fall back to text.
+      toolResultImages: false,
       // Every Gemini 2.5 model thinks; older families harmlessly ignore
       // an empty thinking budget. Defaulting `true` lets the agent
       // forward reasoning options; an explicit `false` opts a model out.

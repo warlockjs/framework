@@ -1,4 +1,4 @@
-import { InvalidRequestError, type ContentPart, type Message } from "@warlock.js/ai";
+import { InvalidRequestError, toolResultText, type ContentPart, type Message } from "@warlock.js/ai";
 import type OpenAI from "openai";
 import { stringifyContent, toImageUrl } from "./to-openai-messages";
 import { readReasoningReplay, toReplayReasoningItem } from "./reasoning-replay";
@@ -45,7 +45,11 @@ export type ResponsesInputPlan = {
  * ]);
  * // { instructions: "Be brief.", input: [{ role: "user", content: "Hi" }] }
  */
-export function toResponsesInput(messages: Message[], model?: string): ResponsesInputPlan {
+export function toResponsesInput(
+  messages: Message[],
+  model?: string,
+  toolImages = false,
+): ResponsesInputPlan {
   const input: ResponsesInputItem[] = [];
   let instructions: string | undefined;
   let instructionsTaken = false;
@@ -68,7 +72,7 @@ export function toResponsesInput(messages: Message[], model?: string): Responses
       input.push({
         type: "function_call_output",
         call_id: message.toolCallId ?? "",
-        output: stringifyContent(message.content),
+        output: toToolOutput(message.content, toolImages),
       });
       continue;
     }
@@ -107,6 +111,32 @@ export function toResponsesInput(messages: Message[], model?: string): Responses
   }
 
   return { ...(instructions !== undefined ? { instructions } : {}), input };
+}
+
+/**
+ * A `function_call_output` value: the string, or (when the model reads tool
+ * images) an array of `input_text` / `input_image` items. Otherwise images
+ * degrade to the placeholder text.
+ */
+function toToolOutput(
+  content: string | ContentPart[],
+  toolImages: boolean,
+): string | Array<OpenAI.Responses.ResponseInputText | OpenAI.Responses.ResponseInputImage> {
+  if (typeof content === "string") return content;
+
+  if (!toolImages) return toolResultText(content);
+
+  return content.flatMap((part) => {
+    if (part.type === "text") return [{ type: "input_text" as const, text: part.text }];
+
+    if (part.type === "image") {
+      return [
+        { type: "input_image" as const, image_url: toImageUrl(part.source), detail: "auto" as const },
+      ];
+    }
+
+    return [];
+  });
 }
 
 /** Map a resolved `ContentPart` to a Responses input content part (text and images only). */

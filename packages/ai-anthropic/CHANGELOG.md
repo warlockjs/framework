@@ -4,6 +4,12 @@ All notable changes to `@warlock.js/ai-anthropic` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.45.0
+
+### Added
+
+- Image parts in a tool result are sent as `image` blocks inside the `tool_result`; the model reports `capabilities.toolResultImages: true`.
+
 ## 5.44.0 - 2026-11-05
 
 ### Added

@@ -405,4 +405,12 @@ describe("toGoogleContents adjacent same-role turns", () => {
 
     expect(roles).toEqual(["user", "model", "user", "model", "user"]);
   });
+
+  it("replaces image parts in a tool result with the placeholder text", () => {
+    const messages: Message[] = [{ role: "tool", toolCallId: "shot", content: [{ type: "image", source: { base64: "AAAA", mediaType: "image/png" } }]}];
+    const serialized = JSON.stringify(toGoogleContents(messages).contents);
+
+    expect(serialized).toContain("[image omitted: provider cannot read images in tool results]");
+    expect(serialized).not.toContain("AAAA");
+  });
 });
