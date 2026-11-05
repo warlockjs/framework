@@ -28,11 +28,13 @@ export function validateContextEditing(config: AgentContextEditingConfig | undef
     (rule !== undefined &&
       ((rule.keep !== undefined && (!Number.isSafeInteger(rule.keep) || rule.keep < 0)) ||
         (rule.exclude !== undefined && !Array.isArray(rule.exclude)) ||
+        (rule.clearAtLeast !== undefined &&
+          (!Number.isSafeInteger(rule.clearAtLeast) || rule.clearAtLeast < 1)) ||
         (rule.countTokens !== undefined && typeof rule.countTokens !== "function")));
 
   if (bad) {
     throw new AgentExecutionError(
-      "contextEditing.clearToolResults requires afterTokens > 0, keep >= 0, an exclude array and an optional countTokens callback.",
+      "contextEditing.clearToolResults requires afterTokens > 0, keep >= 0, an exclude array, clearAtLeast >= 1 and an optional countTokens callback.",
       { context: { authoring: true } },
     );
   }
@@ -74,6 +76,7 @@ export function nativeContextEditingHint(
       ...(afterTokens !== undefined ? { afterTokens } : {}),
       keep: rule.keep ?? DEFAULT_KEEP,
       ...(rule.exclude?.length ? { exclude: [...rule.exclude] } : {}),
+      ...(rule.clearAtLeast !== undefined ? { clearAtLeast: rule.clearAtLeast } : {}),
     },
   };
 }
@@ -151,6 +154,18 @@ export async function clearOldToolResults(
     !isTokenTriggerReached(rule.afterTokens, tokens, contextWindow, options.maxTokens)
   )
     return undefined;
+
+  if (rule.clearAtLeast !== undefined) {
+    const placeholderTokens = approximateTokenCount(placeholder);
+    const freed = candidates.reduce((sum, index) => {
+      const { content } = messages[index]!;
+      const text = typeof content === "string" ? content : JSON.stringify(content);
+
+      return sum + Math.max(0, approximateTokenCount(text) - placeholderTokens);
+    }, 0);
+
+    if (freed < rule.clearAtLeast) return undefined;
+  }
 
   for (const index of candidates) {
     messages[index] = { ...messages[index]!, content: placeholder };

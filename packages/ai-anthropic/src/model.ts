@@ -1432,6 +1432,7 @@ function neutralClearToolUses(
     ...(rule.afterTokens !== undefined ? { trigger: { inputTokens: rule.afterTokens } } : {}),
     ...(rule.keep !== undefined ? { keep: rule.keep } : {}),
     ...(rule.exclude?.length ? { excludeTools: rule.exclude } : {}),
+    ...(rule.clearAtLeast !== undefined ? { clearAtLeast: rule.clearAtLeast } : {}),
   };
 }
 

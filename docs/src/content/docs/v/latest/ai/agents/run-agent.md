@@ -615,7 +615,9 @@ const worker = ai.agent({
 A reply that is refused or empty throws, so the agent records a
 `callback-error` skip and keeps the conversation as it was. A reply cut by the
 output cap (`length`) is retried once with a smaller input, never at the same
-size. `DEFAULT_COMPACTION_INSTRUCTIONS` and `renderTranscript` are exported if
+size: 70% of it by default. `lengthRetry: false` turns that retry off (a cut-off
+reply then fails the summary after one call), and `lengthRetry: { shrink: 0.5 }`
+keeps another share of the input on the retry. `DEFAULT_COMPACTION_INSTRUCTIONS` and `renderTranscript` are exported if
 you write your own callback.
 
 For a long slice, `input` shrinks what the summary model receives (the live
@@ -643,6 +645,25 @@ Constraints, Decisions, Work state, Next step and Relevant files;
 `requireHeadings` checks the reply for them (a line of its own, case
 insensitive), sends exactly one corrective follow-up for missing ones, then
 fails as a `callback-error` skip.
+
+#### Metering the summary calls
+
+`middleware` runs your middleware around every call the summarizer makes: the
+first attempt, the length retry, the shrink retries and the heading follow-up.
+Pass a `budget` to hold the summary calls to a spend cap; a refusal fails the
+summary like any summarizer error, so the agent keeps the conversation and
+records a `callback-error` skip. Only `trip` hooks run, and one middleware
+state covers all the calls of one summary. `signal` aborts the calls (the
+agent's own signal wins).
+
+```ts
+ai.compaction.summarize({
+  model: cheapModel,
+  middleware: [ai.middleware.budget({ maxCostUSD: 0.05, reserve: { outputTokens: 4_000 } })],
+  input: { maxInputTokens: 100_000 },
+  requireHeadings: ai.compaction.DEFAULT_COMPACTION_HEADINGS,
+});
+```
 
 ### The callback contract
 

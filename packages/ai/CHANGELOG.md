@@ -4,6 +4,15 @@ All notable changes to `@warlock.js/ai` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.45.0
+
+### Added
+
+- `ai.compaction.summarize({ middleware })` runs middleware around every call the summarizer makes (first attempt, length retry, shrink retries, heading follow-up), so a `budget` can hold summary calls to a spend cap; a refusal fails the summary like any summarizer error. Also takes `signal`.
+- `ai.middleware.budget(...).wrapModel(model)` returns a model whose `complete()` calls are metered by that budget. `budget()` now returns `BudgetMiddleware`, and `wrapModelWithMiddleware(model, middleware)` is the general form.
+- `ai.compaction.summarize({ lengthRetry })`: `false` turns off the retry after a reply cut by the output cap, `{ shrink }` sets the share of input kept on the retry (default 0.7).
+- `contextEditing.clearToolResults.clearAtLeast`: a client-side clear is skipped when it would free fewer tokens than this; sent to native-editing models as `ModelCallOptions.contextEditing.clearToolResults.clearAtLeast`.
+
 ## 5.44.0 - 2026-11-05
 
 ### Added

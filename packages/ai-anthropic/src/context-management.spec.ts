@@ -440,6 +440,22 @@ describe("vendor-neutral contextEditing", () => {
     });
   });
 
+  it("maps clearAtLeast to clear_at_least next to the resolved trigger", () => {
+    const built = model().buildRequest([{ role: "user", content: "hi" }], {
+      contextEditing: { clearToolResults: { afterTokens: 60_000, clearAtLeast: 8_000 } },
+    });
+
+    expect(built.body.context_management).toEqual({
+      edits: [
+        {
+          type: "clear_tool_uses_20250919",
+          trigger: { type: "input_tokens", value: 60_000 },
+          clear_at_least: { type: "input_tokens", value: 8_000 },
+        },
+      ],
+    });
+  });
+
   it("lets the typed Anthropic option win over the neutral hint", () => {
     const built = request(
       { contextManagement: { clearToolUses: { keep: 9 } } },

@@ -37,5 +37,6 @@ export {
 export { dedupe, type DedupeOptions } from "./builtins/dedupe";
 export { composeMiddleware, forTool } from "./helpers";
 export { runPipeline } from "./pipeline";
+export { wrapModelWithMiddleware, type WrapModelOptions } from "./wrap-model";
 export type { MiddlewareContextByLevel, MiddlewareLevel } from "./pipeline";
 export { extractUserText, namespacedState, type NamespacedStateAccessor } from "./utils";

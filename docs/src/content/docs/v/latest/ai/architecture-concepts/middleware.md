@@ -57,6 +57,8 @@ ai.middleware.budget({
 
 Breach surfaces `BudgetExceededError` with `unit`, `limit`, `actual`. Warn mode logs and continues — useful for measuring before enforcing. Add `reserve: { outputTokens }` to reserve each trip's worst case before the call (reserve-then-commit), so one trip cannot overrun the cap; add `scoped` for a ledger shared across runs.
 
+To meter a direct `model.complete()` call outside an agent (a summarizer, a one-off helper), use `ai.middleware.budget({...}).wrapModel(model)`: the returned model runs every `complete()` through the budget, with one running total for the wrapper's lifetime. `stream()` is not metered.
+
 ### `ai.middleware.guardrail`
 
 Pre / post content checks.

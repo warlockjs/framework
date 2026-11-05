@@ -5,7 +5,7 @@ import { AgentExecutionError } from "../errors";
 import { MockSDK } from "../mock/mock-sdk";
 import { tool } from "../tool/tool";
 import { agent } from "./agent";
-import { clearOldToolResults } from "./context-editing";
+import { clearOldToolResults, nativeContextEditingHint, validateContextEditing } from "./context-editing";
 import { DEFAULT_CLEARED_TOOL_RESULT } from "./context-editing.type";
 
 const anyInput: StandardSchemaV1<Record<string, unknown>> = {
@@ -50,6 +50,29 @@ describe("clearOldToolResults", () => {
     ]);
     // Every call still has its result, so pairing stays valid.
     expect(tools.map((message) => message.toolCallId)).toEqual(["c0", "c1", "c2", "c3", "c4"]);
+  });
+
+  it("skips a clear that would free fewer tokens than clearAtLeast", async () => {
+    const small = history(3);
+    const before = structuredClone(small);
+
+    expect(await clearOldToolResults({ keep: 1, clearAtLeast: 10_000 }, small, {}, 0)).toBeUndefined();
+    expect(small).toEqual(before);
+
+    const big = history(3);
+
+    expect(await clearOldToolResults({ keep: 1, clearAtLeast: 50 }, big, {}, 0)).toMatchObject({
+      clearedResults: 2,
+    });
+  });
+
+  it("forwards clearAtLeast in the native hint and validates it", () => {
+    expect(
+      nativeContextEditingHint({ clearToolResults: { keep: 2, clearAtLeast: 5_000 } }),
+    ).toEqual({ clearToolResults: { keep: 2, clearAtLeast: 5_000 } });
+    expect(() =>
+      validateContextEditing({ clearToolResults: { clearAtLeast: 0 } }),
+    ).toThrow(AgentExecutionError);
   });
 
   it("skips excluded tools and a custom placeholder applies", async () => {

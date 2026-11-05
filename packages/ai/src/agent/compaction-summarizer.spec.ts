@@ -1,5 +1,6 @@
 import type { Message, ModelCallOptions, ModelContract, ModelResponse } from "../contracts";
-import { AgentExecutionError } from "../errors";
+import { AgentExecutionError, BudgetExceededError } from "../errors";
+import { budget } from "../middleware/builtins/budget";
 import { describe, expect, it, vi } from "vitest";
 import {
   DEFAULT_COMPACTION_HEADINGS,
@@ -298,3 +299,115 @@ describe("ai.compaction.summarize structure and input budget", () => {
 function approximate(value: string): number {
   return Math.ceil(value.length / 4);
 }
+
+describe("ai.compaction.summarize middleware and lengthRetry", () => {
+  function scriptedModel(replies: Partial<ModelResponse>[]) {
+    const sent: Message[][] = [];
+    const model: ModelContract = {
+      ...summaryModel({}).model,
+      complete: async (messages) => {
+        sent.push(messages);
+        return {
+          content: "<summary>memo</summary>",
+          finishReason: "stop",
+          usage: { input: 10, output: 10, total: 20 },
+          ...replies.shift(),
+        };
+      },
+    };
+    return { model, sent };
+  }
+
+  const big: Message[] = [
+    { role: "user", content: "old question" },
+    { role: "assistant", content: "x".repeat(8_000) },
+    { role: "user", content: "newest question" },
+    { role: "assistant", content: "newest answer" },
+  ];
+  const manyOutputs: Message[] = [
+    ...Array.from({ length: 10 }, (_, index): Message[] => [
+      { role: "assistant", content: "", toolCalls: [{ id: `c${index}`, name: "read", input: {} }] },
+      { role: "tool", toolCallId: `c${index}`, content: `out-${index} ${"x".repeat(8_000)}` },
+    ]).flat(),
+    { role: "user", content: "newest question" },
+    { role: "assistant", content: "newest answer" },
+  ];
+  const sizeOf = (messages: Message[] | undefined) => String(messages?.[1]?.content).length;
+
+  it("refuses before calling the model when the budget cannot cover one call", async () => {
+    const { model, sent } = scriptedModel([]);
+    const guard = budget({ maxTokens: 100, reserve: { outputTokens: 500 } });
+
+    await expect(summarizeCompaction({ model, middleware: [guard] })(big)).rejects.toBeInstanceOf(
+      BudgetExceededError,
+    );
+    expect(sent).toHaveLength(0);
+  });
+
+  it("meters the length retry as a second call", async () => {
+    const { model, sent } = scriptedModel([{ finishReason: "length" }, {}]);
+    const spends: number[] = [];
+    const guard = budget({ maxTokens: 1_000, onSpend: (spend) => void spends.push(spend.usage.total) });
+
+    await summarizeCompaction({ model, middleware: [guard] })(big);
+
+    expect(sent).toHaveLength(2);
+    expect(spends).toEqual([20, 20]);
+  });
+
+  it("fails the summary when the budget is spent by the retry", async () => {
+    const { model, sent } = scriptedModel([{ finishReason: "length" }, {}]);
+    const guard = budget({ maxTokens: 30, reserve: { outputTokens: 1 } });
+
+    await expect(summarizeCompaction({ model, middleware: [guard] })(big)).rejects.toBeInstanceOf(
+      BudgetExceededError,
+    );
+    expect(sent.length).toBeLessThanOrEqual(2);
+  });
+
+  it("keeps input shrinking and required headings working through middleware", async () => {
+    const { model, sent } = scriptedModel([{}, { content: "<summary>## Goal\nx</summary>" }]);
+    const seen: number[] = [];
+    const tap = {
+      name: "tap",
+      trip: { before: (ctx: { tripIndex: number }) => void seen.push(ctx.tripIndex) },
+    };
+    const result = await summarizeCompaction({
+      model,
+      middleware: [tap],
+      input: { maxInputTokens: 500 },
+      requireHeadings: ["Goal"],
+    })(big);
+
+    expect(sent).toHaveLength(2);
+    expect(sizeOf(sent[0])).toBeLessThan(8_000);
+    expect(seen).toEqual([0, 1]);
+    expect(result.summarizerAttempts).toBe(2);
+  });
+
+  it("lengthRetry: false rejects a truncated reply after one call", async () => {
+    const { model, sent } = scriptedModel([{ finishReason: "length" }, {}]);
+
+    await expect(summarizeCompaction({ model, lengthRetry: false })(big)).rejects.toThrow(
+      /finish reason "length"/,
+    );
+    expect(sent).toHaveLength(1);
+  });
+
+  it("lengthRetry shrink sets the share of input kept on the retry", async () => {
+    const run = async (lengthRetry?: { shrink: number }) => {
+      const { model, sent } = scriptedModel([{ finishReason: "length" }, {}]);
+      await summarizeCompaction({ model, lengthRetry, input: { clipToolOutputChars: 2_000 } })(
+        manyOutputs,
+      );
+      return sizeOf(sent[1]);
+    };
+    const half = await run({ shrink: 0.1 });
+    const dflt = await run();
+
+    expect(half).toBeLessThan(dflt);
+    expect(() =>
+      summarizeCompaction({ model: scriptedModel([]).model, lengthRetry: { shrink: 1.5 } }),
+    ).toThrow(AgentExecutionError);
+  });
+});

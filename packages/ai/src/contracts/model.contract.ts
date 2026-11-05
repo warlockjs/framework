@@ -137,10 +137,16 @@ export type ModelCallOptions = {
    * provider's own feature (Anthropic `clear_tool_uses`); others ignore it.
    * The agent sets it from `AgentConfig.contextEditing`. `afterTokens` is
    * the input size that triggers clearing, `keep` how many of the newest
-   * tool results stay, `exclude` tool names that are never cleared.
+   * tool results stay, `exclude` tool names that are never cleared,
+   * `clearAtLeast` the tokens a clear must free to be worth its cache cost.
    */
   contextEditing?: {
-    clearToolResults?: { afterTokens?: number; keep?: number; exclude?: string[] };
+    clearToolResults?: {
+      afterTokens?: number;
+      keep?: number;
+      exclude?: string[];
+      clearAtLeast?: number;
+    };
   };
   /**
    * Provider-specific request options, keyed by the adapter's wire format

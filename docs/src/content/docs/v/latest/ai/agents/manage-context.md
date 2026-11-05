@@ -28,6 +28,7 @@ const worker = ai.agent({
       afterTokens: 60_000, // start once the history is estimated at this size; omit to clear every trip
       keep: 4, // newest tool results that stay intact (default 3)
       exclude: ["plan"], // tools whose results are never cleared
+      clearAtLeast: 8_000, // skip a clear that would free fewer tokens than this
       placeholder: "[cleared]", // default: "[tool result cleared to save context]"
     },
   },
@@ -36,13 +37,18 @@ const worker = ai.agent({
 
 `clearToolResults: true` uses the defaults (keep 3, no size threshold).
 
+`clearAtLeast` keeps a small clear from rewriting the prompt cache: when the
+results to clear would free fewer tokens than that, nothing is cleared on that
+trip. On the client the freed size is estimated from the cleared results; on
+Anthropic the provider applies it.
+
 Only the `content` of old `tool` messages changes. Every tool call still has its result, so the history stays valid for every provider, and the model still sees which tool ran with which arguments. Results are cleared in the agent's history, so they stay cleared on later trips (this also keeps provider prompt caches stable after the first edit) and in `report.messages` and durable snapshots.
 
 `afterTokens` is a number or a window-relative `{ share, reserve?, max? }` (see [Automatic compaction](/v/latest/ai/agents/run-agent/#automatic-compaction-inside-an-agent-run) for the formula; an unknown window means no clearing). Leaving it out clears on every trip, which rewrites the prefix and defeats prompt caching on providers without native editing, so the agent logs a one-time warning. It is compared with an offline character estimate of messages and tool schemas. Pass `countTokens(messages, options)` for an exact count (`model.countTokens` when the model has one).
 
 ### Native providers
 
-A model that sets `capabilities.nativeContextEditing` (the Anthropic adapter does) handles the edit server-side: the agent sends the rule as `ModelCallOptions.contextEditing` and leaves the history alone. The Anthropic adapter turns it into a `clear_tool_uses_20250919` edit (`afterTokens` is the input-token trigger, `keep` the number of tool uses kept, `exclude` becomes `exclude_tools`) and adds the context-management beta. An explicit `providerOptions.anthropic.contextManagement.clearToolUses` still wins over the neutral rule.
+A model that sets `capabilities.nativeContextEditing` (the Anthropic adapter does) handles the edit server-side: the agent sends the rule as `ModelCallOptions.contextEditing` and leaves the history alone. The Anthropic adapter turns it into a `clear_tool_uses_20250919` edit (`afterTokens` is the input-token trigger, `keep` the number of tool uses kept, `exclude` becomes `exclude_tools`, `clearAtLeast` becomes `clear_at_least`) and adds the context-management beta. An explicit `providerOptions.anthropic.contextManagement.clearToolUses` still wins over the neutral rule.
 
 Set `contextEditing.native: false` to edit on the client even on such a model. Other adapters ignore the hint, so the agent clears client-side for them.
 

@@ -3,6 +3,7 @@ import type {
   MiddlewareExecuteContext,
   MiddlewareTripContext,
 } from "../../contracts/middleware";
+import type { ModelContract } from "../../contracts/model.contract";
 import type { ModelPricing } from "../../contracts/result/model-pricing.type";
 import type { Usage } from "../../contracts/result/usage.type";
 import { BudgetExceededError, ScopedBudgetExceededError, type BudgetUnit } from "../../errors";
@@ -10,6 +11,7 @@ import { isPricingCatalogue, type PricingCatalogue } from "../../pricing/pricing
 import { computeCost, totalCost } from "../../utils/compute-cost";
 import { estimateInputTokens } from "../../utils/estimate-input-tokens";
 import { namespacedState } from "../utils";
+import { wrapModelWithMiddleware } from "../wrap-model";
 import type {
   BudgetContract,
   BudgetContractDimension,
@@ -287,6 +289,18 @@ const DIMENSION_UNIT: Record<BudgetContractDimension, BudgetUnit> = {
   tokens: "tokens",
   cost: "usd",
   latency: "requests",
+};
+
+/**
+ * The middleware `budget()` returns. Besides the agent hooks it carries
+ * `wrapModel`, which meters direct `model.complete()` calls the same way.
+ */
+export type BudgetMiddleware = AgentMiddleware & {
+  /**
+   * A model whose `complete()` calls are metered by this budget, with one
+   * running total for the wrapper's lifetime. `stream()` is not metered.
+   */
+  wrapModel(model: ModelContract): ModelContract;
 };
 
 function breach(limit: number, actual: number, unit: BudgetUnit, name: string): never {
@@ -603,7 +617,7 @@ export function readBudgetFallbackSignal(
  *   },
  * });
  */
-export function budget(options: BudgetOptions): AgentMiddleware {
+export function budget(options: BudgetOptions): BudgetMiddleware {
   const name = options.name ?? "budget";
   const searchReservation = options.reserve?.serverToolRequests;
   if (
@@ -624,7 +638,7 @@ export function budget(options: BudgetOptions): AgentMiddleware {
   const hasScopedCostCap = typeof options.scoped?.maxCostUSD === "number";
   const needsCost = hasCostCap || hasContractCostCap || hasScopedCostCap;
 
-  return {
+  const middleware: AgentMiddleware = {
     name,
     execute: {
       before(context) {
@@ -868,6 +882,11 @@ export function budget(options: BudgetOptions): AgentMiddleware {
         }
       },
     },
+  };
+
+  return {
+    ...middleware,
+    wrapModel: (model) => wrapModelWithMiddleware(model, [middleware], { name }),
   };
 }
 

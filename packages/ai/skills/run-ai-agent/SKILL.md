@@ -510,7 +510,8 @@ clear every trip; `countTokens` gives an exact count). No model call, and
 call/result pairing stays intact. A model with
 `capabilities.nativeContextEditing` (Anthropic) gets the rule as
 `ModelCallOptions.contextEditing` and maps it to `clear_tool_uses` instead;
-`native: false` forces client-side clearing. Runs before `compaction`
+`native: false` forces client-side clearing. `clearAtLeast` skips a clear that
+would free fewer tokens (Anthropic `clear_at_least`). Runs before `compaction`
 (summarizing); use both for long autonomous runs.
 
 ## Automatic compaction inside an agent run
@@ -522,7 +523,9 @@ or a window-relative `{ share, reserve?, max? }` (threshold =
 `unknown-window` skip record). Before each model trip (including streamed and
 repair trips), the agent checks the current conversation and tools against it.
 `ai.compaction.summarize` also takes `input: { maxInputTokens, clipToolOutputChars,
-dropToolOutputsOlderThan, shrinkOnContextError }`, `requireHeadings` and the
+dropToolOutputsOlderThan, shrinkOnContextError }`, `requireHeadings`,
+`middleware` (e.g. a `budget` around every summary call, retries included),
+`signal`, `lengthRetry: false | { shrink }` (default one retry at 0.7) and the
 `DEFAULT_COMPACTION_TEMPLATE` / `DEFAULT_COMPACTION_HEADINGS` constants; records
 carry `summarizerInputTokens` and `attempts`.
 
