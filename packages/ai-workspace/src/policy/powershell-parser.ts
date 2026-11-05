@@ -172,7 +172,10 @@ class PowerShellParser {
   private readListOperator(): string | null {
     const char = this.peek();
 
-    if (!this.chaining && ((char === "&" && this.peek(1) === "&") || (char === "|" && this.peek(1) === "|"))) {
+    if (
+      !this.chaining &&
+      ((char === "&" && this.peek(1) === "&") || (char === "|" && this.peek(1) === "|"))
+    ) {
       throw unsupported(
         `Windows PowerShell 5.1 cannot run ${char}${char}; use ; or run each command in its own call instead.`,
       );

@@ -55,13 +55,15 @@ describe("resolveShell", () => {
       file: pwsh,
       label: "PowerShell 7 (pwsh)",
     });
-    expect(resolveShell({ interpreter: "auto" }, host("win32", [windowsPowerShell]))).toMatchObject({
-      interpreter: "powershell",
-      dialect: "powershell5",
-      edition: "desktop",
-      version: "5.1",
-      label: "Windows PowerShell 5.1 (powershell)",
-    });
+    expect(resolveShell({ interpreter: "auto" }, host("win32", [windowsPowerShell]))).toMatchObject(
+      {
+        interpreter: "powershell",
+        dialect: "powershell5",
+        edition: "desktop",
+        version: "5.1",
+        label: "Windows PowerShell 5.1 (powershell)",
+      },
+    );
     expect(resolveShell({ interpreter: "auto" }, host("win32", [pwsh]))).toMatchObject({
       dialect: "powershell",
       edition: "core",

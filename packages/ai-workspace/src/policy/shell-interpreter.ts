@@ -193,7 +193,12 @@ export function resolveShell(
         core === undefined && gitBash === undefined ? findOnPath(["powershell"], host) : undefined;
       const found = core ?? gitBash ?? desktop;
 
-      interpreter = core !== undefined || desktop !== undefined ? "powershell" : gitBash !== undefined ? "bash" : "cmd";
+      interpreter =
+        core !== undefined || desktop !== undefined
+          ? "powershell"
+          : gitBash !== undefined
+            ? "bash"
+            : "cmd";
       file = found;
     } else {
       const bash = findOnPath(["bash"], host);
@@ -216,8 +221,7 @@ export function resolveShell(
     }
   }
 
-  const edition =
-    interpreter === "powershell" && file !== undefined ? editionOf(file) : undefined;
+  const edition = interpreter === "powershell" && file !== undefined ? editionOf(file) : undefined;
   const version =
     edition === "desktop"
       ? "5.1"

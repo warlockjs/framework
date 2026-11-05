@@ -196,7 +196,8 @@ export function summarizeCompaction(options: CompactionSummarizerOptions): Compa
     );
   }
 
-  const lengthShrink = options.lengthRetry === false ? undefined : (options.lengthRetry?.shrink ?? 0.7);
+  const lengthShrink =
+    options.lengthRetry === false ? undefined : (options.lengthRetry?.shrink ?? 0.7);
 
   if (
     options.lengthRetry !== undefined &&
@@ -219,7 +220,9 @@ export function summarizeCompaction(options: CompactionSummarizerOptions): Compa
 
   return async (history, context) => {
     const model = options.middleware?.length
-      ? wrapModelWithMiddleware(options.model, options.middleware, { name: "compaction-summarizer" })
+      ? wrapModelWithMiddleware(options.model, options.middleware, {
+          name: "compaction-summarizer",
+        })
       : options.model;
     const signal = context?.signal ?? options.signal;
     const callOptions: ModelCallOptions = {

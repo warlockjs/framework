@@ -255,7 +255,8 @@ export function executableBasename(firstToken: string, dialect: ShellDialect = "
 
   return base.replace(
     dialect === "powershell" || dialect === "powershell5"
-      ? /\.(exe|cmd|bat|com|ps1)$/i : /\.(exe|cmd|bat|com)$/i,
+      ? /\.(exe|cmd|bat|com|ps1)$/i
+      : /\.(exe|cmd|bat|com)$/i,
     "",
   );
 }
@@ -600,7 +601,9 @@ class LineChecker {
       OPAQUE_RUNNERS.has(key) ||
       (this.shellMode && this.dialect === "posix" && SHELL_OPAQUE_BUILTINS.has(key)) ||
       (this.shellMode && this.dialect === "cmd" && CMD_OPAQUE_BUILTINS.has(key)) ||
-      (this.shellMode && (this.dialect === "powershell" || this.dialect === "powershell5") && POWERSHELL_OPAQUE.has(key))
+      (this.shellMode &&
+        (this.dialect === "powershell" || this.dialect === "powershell5") &&
+        POWERSHELL_OPAQUE.has(key))
     ) {
       if (approved) {
         return;
@@ -777,7 +780,11 @@ class LineChecker {
 
   /** Check a redirection target from every possible cwd. */
   public checkRedirectTarget(word: ShellWord, access: "read" | "write", cwds: string[]): void {
-    if ((this.dialect === "powershell" || this.dialect === "powershell5") && !word.quoted && word.value.toLowerCase() === "$null") {
+    if (
+      (this.dialect === "powershell" || this.dialect === "powershell5") &&
+      !word.quoted &&
+      word.value.toLowerCase() === "$null"
+    ) {
       return;
     }
 

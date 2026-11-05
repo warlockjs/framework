@@ -66,11 +66,8 @@ export function wrapModelWithMiddleware(
         throw error;
       }
 
-      return runPipeline(
-        middleware,
-        "trip",
-        { ...base, tripIndex: tripIndex++, messages },
-        () => model.complete(messages, callOptions),
+      return runPipeline(middleware, "trip", { ...base, tripIndex: tripIndex++, messages }, () =>
+        model.complete(messages, callOptions),
       );
     },
   };

@@ -549,10 +549,7 @@ export function supervisor(options: SupervisorOptions): ProcessSupervisor {
       while (!current?.state.startsWith("T") || current.token !== token) {
         if (spawnError) throw spawnError;
         if (exit)
-          throw new ProcessStartupError(
-            "exited",
-            "Child failed to reach the resource setup gate",
-          );
+          throw new ProcessStartupError("exited", "Child failed to reach the resource setup gate");
         if (Date.now() >= deadline)
           throw new ProcessStartupError(
             "setup-timeout",

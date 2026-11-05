@@ -5,7 +5,11 @@ import { AgentExecutionError } from "../errors";
 import { MockSDK } from "../mock/mock-sdk";
 import { tool } from "../tool/tool";
 import { agent } from "./agent";
-import { clearOldToolResults, nativeContextEditingHint, validateContextEditing } from "./context-editing";
+import {
+  clearOldToolResults,
+  nativeContextEditingHint,
+  validateContextEditing,
+} from "./context-editing";
 import { DEFAULT_CLEARED_TOOL_RESULT } from "./context-editing.type";
 
 const anyInput: StandardSchemaV1<Record<string, unknown>> = {
@@ -56,7 +60,9 @@ describe("clearOldToolResults", () => {
     const small = history(3);
     const before = structuredClone(small);
 
-    expect(await clearOldToolResults({ keep: 1, clearAtLeast: 10_000 }, small, {}, 0)).toBeUndefined();
+    expect(
+      await clearOldToolResults({ keep: 1, clearAtLeast: 10_000 }, small, {}, 0),
+    ).toBeUndefined();
     expect(small).toEqual(before);
 
     const big = history(3);
@@ -70,9 +76,9 @@ describe("clearOldToolResults", () => {
     expect(
       nativeContextEditingHint({ clearToolResults: { keep: 2, clearAtLeast: 5_000 } }),
     ).toEqual({ clearToolResults: { keep: 2, clearAtLeast: 5_000 } });
-    expect(() =>
-      validateContextEditing({ clearToolResults: { clearAtLeast: 0 } }),
-    ).toThrow(AgentExecutionError);
+    expect(() => validateContextEditing({ clearToolResults: { clearAtLeast: 0 } })).toThrow(
+      AgentExecutionError,
+    );
   });
 
   it("skips excluded tools and a custom placeholder applies", async () => {

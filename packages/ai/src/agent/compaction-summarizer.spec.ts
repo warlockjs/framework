@@ -347,7 +347,10 @@ describe("ai.compaction.summarize middleware and lengthRetry", () => {
   it("meters the length retry as a second call", async () => {
     const { model, sent } = scriptedModel([{ finishReason: "length" }, {}]);
     const spends: number[] = [];
-    const guard = budget({ maxTokens: 1_000, onSpend: (spend) => void spends.push(spend.usage.total) });
+    const guard = budget({
+      maxTokens: 1_000,
+      onSpend: (spend) => void spends.push(spend.usage.total),
+    });
 
     await summarizeCompaction({ model, middleware: [guard] })(big);
 

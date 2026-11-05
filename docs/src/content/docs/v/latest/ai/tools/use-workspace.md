@@ -168,12 +168,12 @@ Every shell refusal is a `WorkspacePolicyError` with `type: "denied-command"` an
 
 `shell.interpreter` takes more than `"sh"`. Each shell is read by its own conservative parser, and every command it finds goes through the same `deny` / `allow` / `denyPatterns` / `allowCommand` / rule checks as `"sh"`, with redirection targets and directory changes held to the jail.
 
-| `interpreter`  | Runs the line with                                                                                                       | Grammar          |
-| -------------- | ------------------------------------------------------------------------------------------------------------------------ | ---------------- |
-| `"sh"`         | `/bin/sh -c` (`cmd.exe` on Windows) — unchanged                                                                          | POSIX / cmd      |
-| `"bash"`       | `bash -c` (found on `PATH`, or `interpreterPath`)                                                                        | POSIX            |
-| `"powershell"` | `pwsh` (else `powershell`, Windows PowerShell 5.1) with `-NoLogo -NoProfile -NonInteractive -Command`                                            | PowerShell       |
-| `"cmd"`        | `cmd.exe /d /v:off /s /c`                                                                                                | cmd.exe          |
+| `interpreter`  | Runs the line with                                                                                                                             | Grammar          |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ---------------- |
+| `"sh"`         | `/bin/sh -c` (`cmd.exe` on Windows) — unchanged                                                                                                | POSIX / cmd      |
+| `"bash"`       | `bash -c` (found on `PATH`, or `interpreterPath`)                                                                                              | POSIX            |
+| `"powershell"` | `pwsh` (else `powershell`, Windows PowerShell 5.1) with `-NoLogo -NoProfile -NonInteractive -Command`                                          | PowerShell       |
+| `"cmd"`        | `cmd.exe /d /v:off /s /c`                                                                                                                      | cmd.exe          |
 | `"auto"`       | POSIX: `bash` if on `PATH`, else `sh`. Windows: `pwsh` (PowerShell 7+), Git Bash (next to `git` on `PATH`), `powershell` (5.1), then `cmd.exe` | the resolved one |
 
 `run_shell`'s description names the resolved shell ("Commands run on Windows using PowerShell 7 (pwsh).") and its syntax rules, so the model writes the right dialect. `run_tests` quotes its `pattern` for the shell too (single quotes for POSIX shells and PowerShell, double quotes for cmd.exe and argv mode).
