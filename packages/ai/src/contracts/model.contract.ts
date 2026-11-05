@@ -257,6 +257,13 @@ export type ModelCapabilities = {
    * Google (Gemini `inlineData`) map PDF parts.
    */
   pdf?: boolean;
+  /**
+   * True when the adapter can show the model image parts that a tool
+   * returned (`{ content: ToolResultPart[] }`). When false/absent the
+   * adapter replaces each image part with the text
+   * `"[image omitted: provider cannot read images in tool results]"`.
+   */
+  toolResultImages?: boolean;
 };
 
 /**

@@ -1,4 +1,4 @@
-import { InvalidRequestError, type ContentPart, type Message } from "@warlock.js/ai";
+import { InvalidRequestError, toolResultText, type ContentPart, type Message } from "@warlock.js/ai";
 import type OpenAI from "openai";
 
 /**
@@ -33,7 +33,7 @@ export function toOpenAIMessages(
     if (m.role === "tool") {
       return {
         role: "tool",
-        content: stringifyContent(m.content),
+        content: toolResultText(m.content),
         tool_call_id: m.toolCallId ?? "",
       } satisfies OpenAI.Chat.Completions.ChatCompletionToolMessageParam;
     }

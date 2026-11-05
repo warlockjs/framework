@@ -1,4 +1,4 @@
-import type { ContentPart, Message, ModelToolCallRequest } from "@warlock.js/ai";
+import { TOOL_RESULT_IMAGE_PLACEHOLDER, type ContentPart, type Message, type ModelToolCallRequest } from "@warlock.js/ai";
 import type Anthropic from "@anthropic-ai/sdk";
 import { fromProviderBlocks } from "./provider-blocks";
 
@@ -89,7 +89,7 @@ export function toAnthropicMessages(
       const toolResult: Anthropic.ToolResultBlockParam = {
         type: "tool_result",
         tool_use_id: message.toolCallId ?? "",
-        content: stringifyContent(message.content),
+        content: toToolResultContent(message.content),
       };
       const previous = mapped[mapped.length - 1];
 
@@ -238,6 +238,41 @@ function stringifyContent(content: string | ContentPart[]): string {
     .filter((part): part is { type: "text"; text: string } => part.type === "text")
     .map((part) => part.text)
     .join("");
+}
+
+/**
+ * A tool result's `content`: the plain string, or text and `image` blocks
+ * when the tool returned content parts. A `url` image cannot appear here
+ * (tool images are inline base64) but degrades to the placeholder text.
+ */
+function toToolResultContent(
+  content: string | ContentPart[],
+): string | Array<Anthropic.TextBlockParam | Anthropic.ImageBlockParam> {
+  if (typeof content === "string") return content;
+
+  // Text-only parts keep the plain string form.
+  if (!content.some((part) => part.type === "image")) return stringifyContent(content);
+
+  const blocks: Array<Anthropic.TextBlockParam | Anthropic.ImageBlockParam> = [];
+
+  for (const part of content) {
+    if (part.type === "text") {
+      blocks.push({ type: "text", text: part.text });
+    } else if (part.type === "image" && "base64" in part.source) {
+      blocks.push({
+        type: "image",
+        source: {
+          type: "base64",
+          media_type: part.source.mediaType as AnthropicImageMediaType,
+          data: part.source.base64,
+        },
+      });
+    } else {
+      blocks.push({ type: "text", text: TOOL_RESULT_IMAGE_PLACEHOLDER });
+    }
+  }
+
+  return blocks;
 }
 
 /**

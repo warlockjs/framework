@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 
 - The agent-level `contextEditing.clearToolResults.clearAtLeast` is mapped to `clear_at_least` on the native `clear_tool_uses` edit, next to the resolved `trigger`, `keep` and `exclude_tools`.
+- Image parts in a tool result are sent as `image` blocks inside the `tool_result`; the model reports `capabilities.toolResultImages: true`.
 
 ## 5.44.0 - 2026-11-05
 

@@ -4,6 +4,12 @@ All notable changes to `@warlock.js/ai-openai` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.45.0
+
+### Added
+
+- With `api: "responses"` on the OpenAI provider, image parts in a tool result are sent as `input_image` items in the `function_call_output` (`capabilities.toolResultImages: true`). Chat Completions and the OpenAI-compatible providers send the text `[image omitted: provider cannot read images in tool results]` and report `false`.
+
 ## 5.44.0 - 2026-11-05
 
 ### Added

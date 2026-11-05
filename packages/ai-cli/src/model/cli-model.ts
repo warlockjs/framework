@@ -121,7 +121,10 @@ function abortError(message: string): Error {
  */
 export function cliModel(agent: CliAgent, config: CliModelConfig = {}): ModelContract {
   const { adapter } = agent;
-  const capabilities: ModelCapabilities = { reasoning: adapter.effort === true };
+  const capabilities: ModelCapabilities = {
+    reasoning: adapter.effort === true,
+    toolResultImages: false,
+  };
 
   const execute = async (
     messages: Message[],

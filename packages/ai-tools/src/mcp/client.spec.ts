@@ -230,6 +230,30 @@ describe("mcp() client — namePrefix + filter", () => {
 });
 
 describe("mcp() client — tools/call execution", () => {
+  it("forwards image content blocks as tool-result image parts", async () => {
+    const transport = scriptedTransport([ECHO_TOOL]);
+    transport.on("tools/call", (request) => ({
+      jsonrpc: "2.0",
+      id: request.id,
+      result: {
+        content: [
+          { type: "text", text: "shot" },
+          { type: "image", data: "AAAA", mimeType: "image/png" },
+        ],
+      },
+    }));
+
+    const [contract] = await mcp(transport).tools();
+    const result = await contract.invoke({ message: "hi" });
+
+    expect(result.data).toEqual({
+      content: [
+        { type: "text", text: "shot" },
+        { type: "image", source: { base64: "AAAA", mediaType: "image/png" } },
+      ],
+    });
+  });
+
   it("issues a tools/call and unwraps a JSON text result into an object", async () => {
     const transport = scriptedTransport([ECHO_TOOL]);
     transport.on("tools/call", (request) =>

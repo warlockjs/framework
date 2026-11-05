@@ -29,3 +29,4 @@ export * from "./stream";
 export * from "./streaming-tool-guard-config.type";
 export * from "./system-prompt.contract";
 export * from "./model-info.type";
+export * from "./tool-result-content.type";

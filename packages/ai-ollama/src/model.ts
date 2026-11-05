@@ -104,6 +104,7 @@ export class OllamaModel implements ModelContract {
     this.capabilities = {
       structuredOutput: config.structuredOutput ?? true,
       vision: config.vision ?? inferVisionCapability(config.name),
+      toolResultImages: false,
       // Thinking-capable families (deepseek-r1, qwq, qwen3, …) honor the
       // `think` request flag; plain instruct models do not. Explicit
       // config wins over the family-substring inference.

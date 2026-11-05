@@ -1,4 +1,4 @@
-import { tool, type ToolContract } from "@warlock.js/ai";
+import { tool, type ToolContract, type ToolResultPart } from "@warlock.js/ai";
 import type {
   McpClient,
   McpClientOptions,
@@ -250,9 +250,50 @@ function unwrapResult(content: McpContentBlock[] | undefined): unknown {
     return tryParseJson(text);
   }
 
+  // Any image block: hand the model the pictures themselves.
+  const parts = toResultParts(blocks);
+
+  if (parts) return { content: parts };
+
   // Multiple / mixed blocks: return a normalized array, each tagged by
   // `type` (never `kind`).
   return blocks.map((block) => normalizeBlock(block));
+}
+
+const IMAGE_MEDIA_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"] as const;
+
+/**
+ * Map MCP content blocks to tool-result parts when at least one is an
+ * `image` block with base64 `data` in a media type the model APIs accept:
+ * text blocks become text parts, images become image parts, any other block
+ * becomes its JSON as text. Returns `undefined` when there is no such image,
+ * so results without pictures keep their usual shape.
+ */
+function toResultParts(blocks: McpContentBlock[]): ToolResultPart[] | undefined {
+  const isImage = (block: McpContentBlock): boolean =>
+    block.type === "image" &&
+    typeof block.data === "string" &&
+    (IMAGE_MEDIA_TYPES as readonly unknown[]).includes(block.mimeType);
+
+  if (!blocks.some(isImage)) return undefined;
+
+  return blocks.map((block): ToolResultPart => {
+    if (isImage(block)) {
+      return {
+        type: "image",
+        source: {
+          base64: block.data as string,
+          mediaType: block.mimeType as (typeof IMAGE_MEDIA_TYPES)[number],
+        },
+      };
+    }
+
+    if (block.type === "text" && typeof block.text === "string") {
+      return { type: "text", text: block.text };
+    }
+
+    return { type: "text", text: JSON.stringify(normalizeBlock(block)) };
+  });
 }
 
 /**

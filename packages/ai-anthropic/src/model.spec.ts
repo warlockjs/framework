@@ -557,6 +557,7 @@ describe("AnthropicModel.complete()", () => {
     expect(model.capabilities).toEqual({
       structuredOutput: true,
       vision: true,
+      toolResultImages: true,
       reasoning: true,
       promptCaching: true,
       nativeContextEditing: true,

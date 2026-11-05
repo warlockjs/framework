@@ -4,6 +4,12 @@ All notable changes to `@warlock.js/ai-tools` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.45.0
+
+### Added
+
+- An MCP tool result that contains an `image` content block (base64 `data` in a PNG, JPEG, WebP or GIF `mimeType`) is returned as `{ content: ToolResultPart[] }`, so providers that read tool-result images show the picture to the model. Text blocks become text parts; results without images keep their shape.
+
 ## 5.44.0 - 2026-11-05
 
 ### Added

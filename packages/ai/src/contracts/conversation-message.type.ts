@@ -41,8 +41,9 @@ export type Message<User = Record<string, unknown>> = {
   role: "user" | "assistant" | "system" | "tool";
   /**
    * Message content. A plain string for text-only messages, or a
-   * `ContentPart[]` when the message includes attachments. Tool-result
-   * messages always use the string form (stringified JSON).
+   * `ContentPart[]` when the message includes attachments. A tool-result
+   * message is stringified JSON, or text and image parts when the tool
+   * returned `{ content: ToolResultPart[] }`.
    */
   content: string | ContentPart[];
   /** Provider-generated id — required when role is "tool", links to the assistant's tool_calls */

@@ -199,4 +199,16 @@ describe("toOllamaMessages", () => {
 
     expect(toOllamaMessages(messages)).toEqual([{ role: "user", content: "just text" }]);
   });
+
+  it("replaces image parts in a tool message with the placeholder text", () => {
+    const messages: Message[] = [{ role: "tool", toolCallId: "search", content: [{ type: "image", source: { base64: "AAAA", mediaType: "image/png" } }]}];
+
+    expect(toOllamaMessages(messages)).toEqual([
+      {
+        role: "tool",
+        tool_name: "search",
+        content: "[image omitted: provider cannot read images in tool results]",
+      },
+    ]);
+  });
 });

@@ -1,4 +1,10 @@
-import { InvalidRequestError, safeJsonParse, type ContentPart, type Message } from "@warlock.js/ai";
+import {
+  InvalidRequestError,
+  safeJsonParse,
+  toolResultText,
+  type ContentPart,
+  type Message,
+} from "@warlock.js/ai";
 import type { Content, Part } from "@google/genai";
 
 /**
@@ -63,7 +69,7 @@ export function toGoogleContents(messages: Message[]): GoogleContents {
             // an empty/synthetic id is rejected as an invalid argument.
             functionResponse: {
               name: message.toolCallId ?? "",
-              response: toResponseObject(stringifyContent(message.content)),
+              response: toResponseObject(toolResultText(message.content)),
             },
           },
         ],

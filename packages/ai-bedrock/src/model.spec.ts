@@ -945,6 +945,7 @@ describe("BedrockModel capabilities", () => {
     expect(claude.capabilities).toEqual({
       structuredOutput: true,
       vision: true,
+      toolResultImages: true,
       reasoning: true,
       promptCaching: true,
       pdf: true,
