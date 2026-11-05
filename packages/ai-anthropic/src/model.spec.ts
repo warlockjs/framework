@@ -555,6 +555,7 @@ describe("AnthropicModel.complete()", () => {
     expect(model.name).toBe("claude-sonnet-4-6");
     expect(model.provider).toBe("bedrock-anthropic");
     expect(model.capabilities).toEqual({
+      contextWindow: 1_000_000,
       structuredOutput: true,
       vision: true,
       reasoning: true,

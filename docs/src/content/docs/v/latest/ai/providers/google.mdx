@@ -153,8 +153,8 @@ google.embedder({ name: "gemini-embedding-001", dimensions: 768 });
   `gemini-pro-vision`); only the original text-only `gemini-1.0-pro` is
   excluded. Override either way with the `vision` flag.
   `contextWindow` sets `capabilities.contextWindow` (used by window-relative
-  compaction triggers); it is filled for the 1M Gemini families (2.5, 2.0
-  flash, 1.5 flash) and left unset for any other id.
+  compaction triggers); it is filled for the 1M Gemini families (3.x, 2.5, 2.0
+  flash, 1.5 flash) and the 2M Gemini 1.5 Pro, and left unset for any other id.
 - **Embeddings** — `gemini-embedding-001`, `text-embedding-004`, native
   batch (see above).
 

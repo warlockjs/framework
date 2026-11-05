@@ -156,6 +156,8 @@ bedrock.embedder({ name: "amazon.titan-embed-text-v2:0", dimensions: 256 });
 
 ## Capabilities
 
+**Context window.** `capabilities.contextWindow` is filled for the known Claude (1M for the 4.6 line and the Claude 5 families, 200K for earlier ones), Nova, Llama, Mistral, Command R and Jamba ids, matched on the id so region prefixes and version suffixes work. Set `bedrock.model({ name, contextWindow })` for any other id; the config value always wins. Window-relative compaction triggers use it.
+
 - **Tool calling** — vendor-neutral `ToolConfig`s map to Converse
   `toolUse` blocks; results round-trip back as `toolResult` blocks on a
   `user` turn.

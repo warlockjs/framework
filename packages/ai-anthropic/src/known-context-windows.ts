@@ -1,15 +1,33 @@
 import { matchesReleaseRoot } from "./thinking-mode";
 
 /*
- * Context windows (input + output tokens) of Claude models whose standard
- * window is documented as 200K. Models not listed here (including releases
- * with an optional larger window) resolve to `undefined`, so a window-relative
- * trigger stays inert until the window is set with
- * `anthropic.model({ name, contextWindow })`.
+ * Context windows (input + output tokens) of Claude chat models, from
+ * Anthropic's model overview. Releases from the 4.6 line on, and every
+ * Claude 5 family, document a 1M window; earlier releases a 200K standard
+ * window (the optional larger window of some of them is not assumed). Models
+ * not listed here resolve to `undefined`, so a window-relative trigger stays
+ * inert until the window is set with `anthropic.model({ name, contextWindow })`.
+ * More specific roots come before the roots they extend.
  */
 const RELEASE_CONTEXT_WINDOWS: ReadonlyArray<readonly [root: string, window: number]> = [
+  ["claude-fable-5-1", 1_000_000],
+  ["claude-fable-5", 1_000_000],
+  ["claude-mythos-5-1", 1_000_000],
+  ["claude-mythos-5", 1_000_000],
+  ["claude-opus-5-5", 1_000_000],
+  ["claude-opus-5", 1_000_000],
+  ["claude-opus-4-8", 1_000_000],
+  ["claude-opus-4-7", 1_000_000],
+  ["claude-opus-4-6", 1_000_000],
   ["claude-opus-4-5", 200_000],
+  ["claude-opus-4-1", 200_000],
+  ["claude-opus-4", 200_000],
+  ["claude-sonnet-5-5", 1_000_000],
+  ["claude-sonnet-5", 1_000_000],
+  ["claude-sonnet-4-6", 1_000_000],
   ["claude-sonnet-4-5", 200_000],
+  ["claude-sonnet-4", 200_000],
+  ["claude-haiku-5-5", 1_000_000],
   ["claude-haiku-4-5", 200_000],
   ["claude-3-7-sonnet", 200_000],
   ["claude-3-5-sonnet", 200_000],

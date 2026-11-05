@@ -4,6 +4,7 @@ import {
   assertTokenTrigger,
   isTokenTriggerReached,
   isValidTokenTrigger,
+  modelContextWindow,
   normalizeTokenTrigger,
   resolveTokenTrigger,
 } from "./token-trigger";
@@ -57,5 +58,18 @@ describe("token trigger", () => {
     expect(JSON.stringify(normalizeTokenTrigger({ max: 5, share: 0.5 }))).toBe(
       JSON.stringify({ share: 0.5, max: 5 }),
     );
+  });
+});
+
+describe("modelContextWindow", () => {
+  it("returns the reported window and ignores missing or invalid values", () => {
+    const model = (capabilities: unknown) => ({ capabilities }) as never;
+
+    expect(modelContextWindow(model({ contextWindow: 200_000 }))).toBe(200_000);
+    expect(modelContextWindow(model({}))).toBeUndefined();
+    expect(modelContextWindow(model(undefined))).toBeUndefined();
+    expect(modelContextWindow(model({ contextWindow: 0 }))).toBeUndefined();
+    expect(modelContextWindow(model({ contextWindow: Number.NaN }))).toBeUndefined();
+    expect(modelContextWindow(undefined)).toBeUndefined();
   });
 });

@@ -6,6 +6,7 @@ import type { Usage } from "../contracts/result/usage.type";
 import { AgentExecutionError } from "../errors";
 import { approximateTokenCount } from "../utils/token-count";
 import type { AgentCompactionContext } from "./compaction.type";
+import { modelContextWindow } from "./token-trigger";
 
 /**
  * Default summarization instructions. This is the client-side compaction
@@ -177,7 +178,7 @@ export function summarizeCompaction(options: CompactionSummarizerOptions): Compa
 
   const instructions = options.instructions?.trim() || DEFAULT_COMPACTION_INSTRUCTIONS;
   const required = (options.requireHeadings ?? []).filter((heading) => heading.trim().length > 0);
-  const window = options.model.capabilities?.contextWindow;
+  const window = modelContextWindow(options.model);
   const configuredBudget =
     input?.maxInputTokens ??
     (input && window ? Math.max(1, window - (options.maxTokens ?? 8_192)) : undefined);

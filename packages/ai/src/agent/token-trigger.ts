@@ -1,3 +1,4 @@
+import type { ModelContract } from "../contracts/model.contract";
 import { AgentExecutionError } from "../errors";
 
 /**
@@ -98,4 +99,22 @@ export function normalizeTokenTrigger(trigger: TokenTrigger): TokenTrigger {
     ...(trigger.reserve !== undefined ? { reserve: trigger.reserve } : {}),
     ...(trigger.max !== undefined ? { max: trigger.max } : {}),
   };
+}
+
+/**
+ * The context window (tokens, input plus output) a model reports through
+ * `capabilities.contextWindow`, or `undefined` when it reports none or a
+ * value that is not a positive finite number. This is the value
+ * window-relative triggers resolve against.
+ *
+ * @example
+ * modelContextWindow(anthropic.model({ name: "claude-sonnet-4-5" })); // → 200000
+ * modelContextWindow(customModel);                                    // → undefined
+ */
+export function modelContextWindow(
+  model: Pick<ModelContract, "capabilities"> | undefined,
+): number | undefined {
+  const window = model?.capabilities?.contextWindow;
+
+  return typeof window === "number" && Number.isFinite(window) && window > 0 ? window : undefined;
 }

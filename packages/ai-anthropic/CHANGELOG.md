@@ -4,6 +4,12 @@ All notable changes to `@warlock.js/ai-anthropic` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.45.0
+
+### Added
+
+- `capabilities.contextWindow` is reported for every known Claude release: 1M for Opus 4.6 to 5.5, Sonnet 4.6 to 5.5, Haiku 5.5, Fable and Mythos, and 200K for Opus 4 to 4.5, Sonnet 4 to 4.5, Haiku 4.5 and the Claude 3 line. `contextWindow` in the model config still wins.
+
 ## 5.44.0 - 2026-11-05
 
 ### Added

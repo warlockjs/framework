@@ -134,3 +134,7 @@ Models from this adapter have no native `countTokens` method. Check
 ## List models
 
 `await mistral.models()` returns `ModelInfo[]` (`contextWindow`, `description`, `kind: "other"` when `capabilities.completion_chat` is false).
+
+## Context window
+
+Mistral ids report `capabilities.contextWindow` (128,000 for the Large, Medium, Small, Ministral, Pixtral and Magistral families, 256,000 Codestral); `mistral.model({ name, contextWindow })` wins.

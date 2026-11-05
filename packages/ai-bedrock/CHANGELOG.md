@@ -4,6 +4,12 @@ All notable changes to `@warlock.js/ai-bedrock` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.45.0
+
+### Added
+
+- `bedrock.model({ name, contextWindow })` and `capabilities.contextWindow`, inferred from the model id for Claude, Nova, Llama, Mistral, Command R and Jamba models (region prefixes and version suffixes are fine). The config value wins; unlisted ids stay unset.
+
 ## 5.40.0 - 2026-10-29
 
 ### Added

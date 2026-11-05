@@ -4,6 +4,12 @@ All notable changes to `@warlock.js/ai-openai` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.45.0
+
+### Added
+
+- `capabilities.contextWindow` is reported for more direct-OpenAI ids: `gpt-5.x` and `gpt-6` (400K, the documented gpt-5 figure; set `contextWindow` for a larger window), `gpt-4`, `gpt-4-turbo`, `gpt-3.5-turbo`, `chatgpt-4o`, `o3-mini`, `o3-pro` and `o1-pro`.
+
 ## 5.44.0 - 2026-11-05
 
 ### Added

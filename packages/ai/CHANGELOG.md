@@ -4,6 +4,12 @@ All notable changes to `@warlock.js/ai` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.45.0
+
+### Added
+
+- `ai.modelContextWindow(model)` (`modelContextWindow`) returns the context window a model reports through `capabilities.contextWindow`, or `undefined` when it reports none or an invalid value. Window-relative compaction and context-editing triggers read the window through it.
+
 ## 5.44.0 - 2026-11-05
 
 ### Added

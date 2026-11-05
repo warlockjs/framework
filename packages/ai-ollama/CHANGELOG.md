@@ -4,6 +4,12 @@ All notable changes to `@warlock.js/ai-ollama` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.45.0
+
+### Added
+
+- `contextWindow` option on `ollama.model` sets `capabilities.contextWindow`. Without it the adapter asks `/api/show` on the first call (a `num_ctx` model parameter wins over the architecture `context_length`), so the window is known from the second call on. Model creation stays synchronous, the call never waits for the lookup, a failed lookup leaves the window unset, and the config value always wins.
+
 ## 5.40.0 - 2026-10-29
 
 ### Added

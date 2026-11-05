@@ -4,6 +4,12 @@ All notable changes to `@warlock.js/ai-groq` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.45.0
+
+### Added
+
+- `capabilities.contextWindow` is reported for Groq-hosted Llama, gpt-oss, Qwen3 and DeepSeek-R1 distill ids (131,072) and Kimi K2 (262,144). New `contextWindow` option on `groq.model`.
+
 ## 5.40.0 - 2026-10-29
 
 ### Added

@@ -151,3 +151,15 @@ describe("DeepSeekSDK pricing resolution", () => {
     expect(sdk.model({ name: "some-unlisted-model" }).pricing).toBeUndefined();
   });
 });
+
+describe("DeepSeekSDK context window", () => {
+  it("reports the known window, with the config value winning", () => {
+    const sdk = new DeepSeekSDK({ apiKey: "test-key" });
+
+    expect(sdk.model({ name: "deepseek-chat" }).capabilities?.contextWindow).toBe(128000);
+    expect(sdk.model({ name: "deepseek-chat", contextWindow: 64_000 }).capabilities?.contextWindow).toBe(
+      64_000,
+    );
+    expect(sdk.model({ name: "unlisted-model" }).capabilities).not.toHaveProperty("contextWindow");
+  });
+});

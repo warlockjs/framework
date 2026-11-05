@@ -131,6 +131,12 @@ ollama.embedder({ name: "nomic-embed-text", dimensions: 512 });
 
 ## Capabilities
 
+**Context window.** Set `contextWindow` in the model config, or leave it out and the adapter asks the server (`/api/show`) on the first call: a `num_ctx` set in the model's parameters wins, otherwise the architecture's `context_length`. `capabilities.contextWindow` is unset until that lookup has answered (from the second call on), and stays unset when it fails. The config value always wins and skips the lookup. It only reports the window; the window the server runs with is set with a `num_ctx` model parameter.
+
+```ts
+ollama.model({ name: "llama3.1", contextWindow: 32_768 });
+```
+
 - **Tool calling** — vendor-neutral `ToolConfig`s map to Ollama
   `tool_calls`. Ollama has no tool-call id concept, so the adapter
   synthesizes the neutral id from the tool name. One consequence:

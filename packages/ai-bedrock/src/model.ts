@@ -34,6 +34,7 @@ import {
   supportsOneHourCacheTtl,
   supportsToolCachePoint,
 } from "./known-capabilities";
+import { inferContextWindow } from "./known-context-windows";
 import { bedrockPricingFor, withClaudeCacheWriteRates } from "./known-pricing";
 import { inferVisionCapability } from "./known-vision-models";
 import { toReasoningMetadata, type BedrockReasoningBlock } from "./utils/reasoning-blocks";
@@ -130,7 +131,10 @@ export class BedrockModel implements ModelContract {
       config.name,
       config.pricing ?? bedrockPricingFor(config.name),
     );
+    const window = config.contextWindow ?? inferContextWindow(config.name);
+
     this.capabilities = {
+      ...(window !== undefined ? { contextWindow: window } : {}),
       structuredOutput: config.structuredOutput ?? true,
       vision: config.vision ?? inferVisionCapability(config.name),
       reasoning: config.reasoning ?? inferReasoningCapability(config.name),

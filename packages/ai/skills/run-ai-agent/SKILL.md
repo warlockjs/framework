@@ -518,7 +518,8 @@ call/result pairing stays intact. A model with
 Compaction is disabled by default. Set `compaction.afterTokens` to a token count
 or a window-relative `{ share, reserve?, max? }` (threshold =
 `min(floor(window * share), window - reserve, max)`, at least 1, resolved against
-`model.capabilities.contextWindow`; unknown window: no compaction, one
+`model.capabilities.contextWindow` (read it with `ai.modelContextWindow(model)`, which gives
+`undefined` for a missing or invalid value); unknown window: no compaction, one
 `unknown-window` skip record). Before each model trip (including streamed and
 repair trips), the agent checks the current conversation and tools against it.
 `ai.compaction.summarize` also takes `input: { maxInputTokens, clipToolOutputChars,

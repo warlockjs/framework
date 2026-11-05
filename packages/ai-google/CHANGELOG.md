@@ -4,6 +4,12 @@ All notable changes to `@warlock.js/ai-google` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.45.0
+
+### Added
+
+- `capabilities.contextWindow` is reported for Gemini 3.x (1,048,576) and Gemini 1.5 Pro (2,097,152), besides the families already covered.
+
 ## 5.44.0 - 2026-11-05
 
 ### Added

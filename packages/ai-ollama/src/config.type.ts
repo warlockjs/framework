@@ -50,6 +50,17 @@ export type OllamaSDKConfig = Partial<Config> & {
  */
 export type OllamaModelConfig = ModelConfig & {
   /**
+   * The model's context window in tokens (input + output). Surfaces as
+   * `capabilities.contextWindow`, which window-relative triggers
+   * (`compaction.afterTokens: { share }`) resolve against. When omitted, the
+   * adapter asks the server (`/api/show`) on the first call and reports the
+   * `num_ctx` the model is set to run with, else the architecture's
+   * `context_length`; a failed lookup leaves it unset. An explicit value
+   * always wins and skips the lookup. It only reports the window; set the
+   * window the server uses with a `num_ctx` model parameter.
+   */
+  contextWindow?: number;
+  /**
    * Override the auto-inferred vision capability. When omitted, the
    * adapter checks the model tag against the known multimodal Ollama
    * families (see `known-vision-models.ts`). Explicit `true`/`false`

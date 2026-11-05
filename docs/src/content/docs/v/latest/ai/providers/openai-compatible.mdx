@@ -139,3 +139,7 @@ carries a native `web_search` / `x_search` tool, or when the model is built with
 `api: "responses"`; see [xAI native search](/v/latest/ai/providers/xai/#native-web-search-and-x-search).
 Setting `api: "responses"` on a plain compatible `OpenAISDK` is still
 unsupported; only `XaiSDK` opts in to that transport.
+
+## Context window
+
+An OpenAI-compatible endpoint behind `openai.model({ name, baseURL })` has no known-model table: set `contextWindow` in the model config to fill `capabilities.contextWindow` for window-relative compaction triggers. The xAI, DeepSeek, Groq and Mistral adapters fill it for their known ids.
