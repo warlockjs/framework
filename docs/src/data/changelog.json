@@ -136,6 +136,253 @@
   ],
   "releases": [
     {
+      "version": "5.46.0",
+      "id": "v5-46-0",
+      "date": "November 6, 2026",
+      "isUnreleased": false,
+      "headlineHtml": "Notifications keyed by recipient type, PostgreSQL array and JSON column fixes, seeding that works after <code>migrate --fresh</code>, and clearer build and dev-server errors.",
+      "highlights": [
+        "Declare <code>columnMap.recipientType</code> and in-app notification reads filter by recipient type and id, so identities that share an id never see each other's notifications; new scaffolds declare it.",
+        "PostgreSQL saves number arrays to native array columns and JSON-encodes scalars in <code>json</code> / <code>jsonb</code> columns, and <code>orderBy</code> works on select aliases.",
+        "<code>Model.exists(filter)</code> and <code>whereNot(field, value)</code> / <code>whereNot(field, op, value)</code> on both drivers.",
+        "<code>migrate --fresh</code> clears the seed log, and <code>warlock seed</code> loads module <code>main.ts</code> files with the app's configured connectors.",
+        "tsconfig <code>paths</code> aliases resolve in Vite, one unsupported route no longer stops typings for every page, and <code>warlock dev</code> writes <code>.warlock/dev.pid</code>.",
+        "The test server boots with a cloud storage default, <code>responseSchema</code> takes <code>[{ ...shape }]</code>, and a fresh scaffold with the test feature installs with npm again."
+      ],
+      "upgradeNotes": [
+        "Several identity types receiving in-app notifications: add a nullable <code>recipient_type</code> column, backfill it, then declare <code>recipientType</code> in the notification model's <code>columnMap</code>.",
+        "<code>warlock migrate --fresh</code> now clears the seed log, so the next <code>warlock seed</code> runs every seeder again.",
+        "Apps scaffolded before 5.46.0 that share one R2 bucket: set <code>R2_PREFIX</code> per app."
+      ],
+      "summaryHtml": null,
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/5.46.0-summary.md",
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 13,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 6
+            },
+            {
+              "type": "Changed",
+              "n": 1
+            },
+            {
+              "type": "Fixed",
+              "n": 6
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>npx warlock release-notes</code> includes the 5.46.0 notes: secure notification recipient types, PostgreSQL array and JSON column fixes, <code>Model.exists</code> and <code>whereNot(field, value)</code>, <code>migrate --fresh</code> clearing the seed log, <code>warlock seed</code> loading module <code>main.ts</code> files, tsconfig path aliases in Vite, the <code>warlock dev</code> PID file, and stale-typings detection."
+            },
+            {
+              "type": "Added",
+              "html": "<code>CLICommandPreload.mainModules</code>: opt a command into importing every module's <code>main.ts</code> (no routes, events or locales) after its declared connectors and the app's configured early-phase connectors start. Off by default so other commands stay fast."
+            },
+            {
+              "type": "Added",
+              "html": "The <code>WL9022</code> message (a server-only file importing a <code>.client</code> module) now says that a value shared by browser and server code belongs in the module's <code>web/</code> folder."
+            },
+            {
+              "type": "Added",
+              "html": "<code>warlock typecheck</code> and <code>warlock check</code> report one <code>WL7103</code> warning, ahead of the errors, when the compiler finds errors and the generated typings in <code>.warlock/typings</code> are missing or older than the files in <code>src</code>. Run <code>warlock generate.typings</code> and typecheck again before fixing them. The warning does not change the exit code."
+            },
+            {
+              "type": "Added",
+              "html": "<code>warlock dev</code> writes <code>.warlock/dev.pid</code> with the PID of the process that actually serves, and removes it on exit. Stop the dev server with <code>kill \"$(cat .warlock/dev.pid)\"</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<code>responseSchema</code> accepts an array of plain objects as a one-element tuple: <code>items: [{ id: \"int\", label: \"string\" }]</code>. The element may be an object shape, a cast or a resource; <code>\"object[]\"</code> stays the cast for an untyped array of objects. Types and generated typings follow the element shape."
+            },
+            {
+              "type": "Changed",
+              "html": "The generated notifications scaffold declares <code>recipientType: \"recipient_type\"</code> in the notification model's <code>columnMap</code>, adds the column to its schema and migration, and passes <code>idType: \"integer\"</code> to match the scaffolded auth models, so identities that share an id never read each other's notifications. The generated controller spec fixture writes the recipient type on the rows it creates."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>warlock add test</code> pins <code>@vitest/coverage-v8</code> to the same exact version as <code>vitest</code> (5.0.5), instead of a caret range that resolved to 5.1.0 beside the starter's vitest 5.0.5. npm 10.9 and 11 crashed while installing a freshly scaffolded app with the test feature. A spec now fails when a feature adds a package that peers on a starter dependency at a version other than the starter's pin."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>warlock add web</code> pins <code>@mongez/react-localization</code> to 3.5.1, the version its exact peer on <code>@mongez/localization</code> requires, so the starter's localization pin cannot split from it when a newer patch ships."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>warlock migrate --fresh</code> now empties the seed log (<code>_seeds</code> and <code>_seed_records</code>) after rebuilding the schema. Before, the next <code>warlock seed</code> saw every <code>once</code> seeder as already executed and silently did nothing against an empty database. A <code>warlock seed</code> run that skips every seeder now prints a warning."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>warlock seed</code> imports every module's <code>main.ts</code> after its connectors start, together with the early-phase connectors listed in <code>warlock.config.ts &gt; connectors</code> (the queue, for example), so registries filled in <code>main.ts</code> are populated while seeding and a seed can import a <code>main.ts</code> that uses the queue."
+            },
+            {
+              "type": "Fixed",
+              "html": "The test server no longer fails at boot with \"Cloud storage requires the AWS S3 SDK packages\" when the default storage driver is a cloud driver and the storage fake is on. In the test environment the storage connector builds the configured default on first use instead of at boot; with the fake on, every driver is a local one."
+            },
+            {
+              "type": "Fixed",
+              "html": "The dev server and the test server find the app's modules when the project path contains glob characters such as <code>[</code>, <code>(</code> or <code>{</code>. File discovery now globs relative to the directory instead of prefixing the pattern with the absolute path."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/cascade",
+          "slug": "cascade",
+          "total": 5,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 2
+            },
+            {
+              "type": "Fixed",
+              "n": 3
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>Model.exists(filter?)</code> returns whether any record matches the filter (or whether the table has any record when no filter is given). It is the static shorthand for <code>where(filter).exists()</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<code>whereNot</code> and <code>orWhereNot</code> accept every shape <code>where</code> does, on both drivers: <code>whereNot(\"status\", \"archived\")</code>, <code>whereNot(\"age\", \"&lt;\", 18)</code>, <code>whereNot({ status: \"banned\" })</code>, besides the existing callback form."
+            },
+            {
+              "type": "Fixed",
+              "html": "PostgreSQL: a number array written to an <code>INTEGER[]</code> (or any native array) column is now bound as an array. Before, any all-number array was turned into a vector literal first, so Postgres rejected the insert with a malformed array literal."
+            },
+            {
+              "type": "Fixed",
+              "html": "PostgreSQL: a string, number or boolean written to a <code>json</code> / <code>jsonb</code> column is now JSON-encoded, so saving the string <code>\"hello\"</code> no longer fails with \"invalid input syntax for type json\". The driver learns which columns are <code>json</code> / <code>jsonb</code> from the same schema lookup it already runs on connect."
+            },
+            {
+              "type": "Fixed",
+              "html": "PostgreSQL: <code>orderBy</code> on a select alias, such as the <code>total</code> of <code>count(*) AS total</code>, now orders by that output name instead of failing with \"column does not exist\"."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/web",
+          "slug": "web",
+          "total": 5,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 2
+            },
+            {
+              "type": "Changed",
+              "n": 3
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "The <code>paths</code> in an app's <code>tsconfig.json</code> (such as <code>@shared/*</code>) are mirrored into Vite for <code>warlock dev</code> and the production client build, so an alias that typechecks also resolves. Aliases passed to the Web connector and the built-in <code>web/*</code> and <code>app/*</code> aliases still win."
+            },
+            {
+              "type": "Added",
+              "html": "Discovery warns, once per process, about a <code>layout.tsx</code> outside the routed page tree (no page beside or below it) and says to rename it if it is an ordinary component."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>warlock generate.typings</code> no longer stops when one page declares an unsupported route path: it prints the page and the rejected path, leaves that page out, and generates typings for the rest. The build still fails on such a page."
+            },
+            {
+              "type": "Changed",
+              "html": "The module-boundary error now names the module's <code>web/</code> folder as the place for a constant shared by browser and server setup code."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>ProjectionAmbiguityError</code> for a computed top-level initializer now suggests a literal value or a <code>*.client.ts</code> file (the message already carries the file and line)."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/notifications",
+          "slug": "notifications",
+          "total": 4,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 4
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>columnMap.recipientType</code>: stores the recipient's identity type next to its id. The <code>database</code> channel writes it from the recipient model (an auth model's <code>userType</code>, otherwise the table name), and <code>notificationColumns()</code> emits the column."
+            },
+            {
+              "type": "Added",
+              "html": "<code>inApp</code> read, count, mark-read, mark-unread, find and dismiss methods (and the matching repository methods) accept <code>{ type, id }</code> (<code>RecipientRef</code>) as well as a model or bare id, and filter by type and id when the column is declared."
+            },
+            {
+              "type": "Added",
+              "html": "<code>RecipientTypeRequiredError</code>, <code>recipientTypeOf()</code>, <code>RecipientRef</code>, <code>RecipientInput</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<code>notificationColumns(…, { recipientModel })</code> derives the id column type from the recipient model (<code>integer</code>, or <code>uuid</code> when it sets <code>autoGenerateId = false</code>). Without it the default stays UUID."
+            }
+          ]
+        },
+        {
+          "name": "create-warlock",
+          "slug": "create-warlock",
+          "total": 3,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            },
+            {
+              "type": "Fixed",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "The starter's <code>src/config/storage.ts</code> reads the storage driver from <code>STORAGE_DRIVER</code> (default <code>local</code>) and the R2 key prefix from <code>R2_PREFIX</code>, which defaults to the app's name (<code>APP_NAME</code>). The driver and prefix were fixed to <code>local</code> and <code>warlock.js</code>, so every scaffolded app sharing one R2 bucket wrote to the same prefix. <code>.env.example</code> documents both keys. Projects scaffolded before this release keep their hard-coded prefix until they set <code>R2_PREFIX=warlock.js</code>."
+            },
+            {
+              "type": "Fixed",
+              "html": "A fresh scaffold with the Testing feature no longer crashes npm install. The starter pins <code>vitest</code> 5.0.5, and the feature added <code>@vitest/coverage-v8</code> as a caret range that resolved to 5.1.0. The starter and the feature now pin the same exact version."
+            },
+            {
+              "type": "Fixed",
+              "html": "The starter pins <code>@mongez/localization</code> at 3.5.1 (was <code>^3.5.1</code>), the version the Web feature's <code>@mongez/react-localization</code> requires as an exact peer."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/seal",
+          "slug": "seal",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "<code>requiredWith</code>, <code>requiredWithout</code> and the rest of the unsuffixed <code>required*</code> rules now say, in their JSDoc and in the docs, that the other field is looked up from the root of the validated data. Inside a nested object such as <code>address: { en, ar }</code>, use the <code>Sibling</code> variant (<code>requiredWithoutSibling(\"ar\")</code>). Behaviour is unchanged."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "5.45.0",
       "id": "v5-45-0",
       "date": "November 5, 2026",

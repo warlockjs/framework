@@ -1,4 +1,22 @@
 {
+  "5.46.0": {
+    "publishedAt": "2026-11-06T12:29:59.186Z",
+    "matrix": "none",
+    "headline": "Notifications keyed by recipient type, PostgreSQL array and JSON column fixes, seeding that works after `migrate --fresh`, and clearer build and dev-server errors.",
+    "highlights": [
+      "Declare `columnMap.recipientType` and in-app notification reads filter by recipient type and id, so identities that share an id never see each other's notifications; new scaffolds declare it.",
+      "PostgreSQL saves number arrays to native array columns and JSON-encodes scalars in `json` / `jsonb` columns, and `orderBy` works on select aliases.",
+      "`Model.exists(filter)` and `whereNot(field, value)` / `whereNot(field, op, value)` on both drivers.",
+      "`migrate --fresh` clears the seed log, and `warlock seed` loads module `main.ts` files with the app's configured connectors.",
+      "tsconfig `paths` aliases resolve in Vite, one unsupported route no longer stops typings for every page, and `warlock dev` writes `.warlock/dev.pid`.",
+      "The test server boots with a cloud storage default, `responseSchema` takes `[{ ...shape }]`, and a fresh scaffold with the test feature installs with npm again."
+    ],
+    "upgradeNotes": [
+      "Several identity types receiving in-app notifications: add a nullable `recipient_type` column, backfill it, then declare `recipientType` in the notification model's `columnMap`.",
+      "`warlock migrate --fresh` now clears the seed log, so the next `warlock seed` runs every seeder again.",
+      "Apps scaffolded before 5.46.0 that share one R2 bucket: set `R2_PREFIX` per app."
+    ]
+  },
   "5.45.0": {
     "publishedAt": "2026-11-05T21:45:46.444Z",
     "matrix": "none",
