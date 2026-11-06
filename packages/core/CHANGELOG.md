@@ -8,6 +8,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## 5.46.0
 
+### Added
+
+- `npx warlock release-notes` includes the 5.46.0 notes: secure notification recipient types, PostgreSQL array and JSON column fixes, `Model.exists` and `whereNot(field, value)`, `migrate --fresh` clearing the seed log, `warlock seed` loading module `main.ts` files, tsconfig path aliases in Vite, the `warlock dev` PID file, and stale-typings detection.
+- `CLICommandPreload.mainModules`: opt a command into importing every module's `main.ts` (no routes, events or locales) after its declared connectors and the app's configured early-phase connectors start. Off by default so other commands stay fast.
+- The `WL9022` message (a server-only file importing a `.client` module) now says that a value shared by browser and server code belongs in the module's `web/` folder.
+- `warlock typecheck` and `warlock check` report one `WL7103` warning, ahead of the errors, when the compiler finds errors and the generated typings in `.warlock/typings` are missing or older than the files in `src`. Run `warlock generate.typings` and typecheck again before fixing them. The warning does not change the exit code.
+- `warlock dev` writes `.warlock/dev.pid` with the PID of the process that actually serves, and removes it on exit. Stop the dev server with `kill "$(cat .warlock/dev.pid)"`.
+- `responseSchema` accepts an array of plain objects as a one-element tuple: `items: [{ id: "int", label: "string" }]`. The element may be an object shape, a cast or a resource; `"object[]"` stays the cast for an untyped array of objects. Types and generated typings follow the element shape.
+
 ### Changed
 
 - The generated notifications scaffold declares `recipientType: "recipient_type"` in the notification model's `columnMap`, adds the column to its schema and migration, and passes `idType: "integer"` to match the scaffolded auth models, so identities that share an id never read each other's notifications. The generated controller spec fixture writes the recipient type on the rows it creates.
@@ -16,25 +25,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - `warlock add test` pins `@vitest/coverage-v8` to the same exact version as `vitest` (5.0.5), instead of a caret range that resolved to 5.1.0 beside the starter's vitest 5.0.5. npm 10.9 and 11 crashed while installing a freshly scaffolded app with the test feature. A spec now fails when a feature adds a package that peers on a starter dependency at a version other than the starter's pin.
 - `warlock add web` pins `@mongez/react-localization` to 3.5.1, the version its exact peer on `@mongez/localization` requires, so the starter's localization pin cannot split from it when a newer patch ships.
-
-### Fixed
-
 - `warlock migrate --fresh` now empties the seed log (`_seeds` and `_seed_records`) after rebuilding the schema. Before, the next `warlock seed` saw every `once` seeder as already executed and silently did nothing against an empty database. A `warlock seed` run that skips every seeder now prints a warning.
 - `warlock seed` imports every module's `main.ts` after its connectors start, together with the early-phase connectors listed in `warlock.config.ts > connectors` (the queue, for example), so registries filled in `main.ts` are populated while seeding and a seed can import a `main.ts` that uses the queue.
-
-### Added
-
-- `CLICommandPreload.mainModules`: opt a command into importing every module's `main.ts` (no routes, events or locales) after its declared connectors and the app's configured early-phase connectors start. Off by default so other commands stay fast.
-- The `WL9022` message (a server-only file importing a `.client` module) now says that a value shared by browser and server code belongs in the module's `web/` folder.
-
-### Added
-
-- `warlock typecheck` and `warlock check` report one `WL7103` warning, ahead of the errors, when the compiler finds errors and the generated typings in `.warlock/typings` are missing or older than the files in `src`. Run `warlock generate.typings` and typecheck again before fixing them. The warning does not change the exit code.
-- `warlock dev` writes `.warlock/dev.pid` with the PID of the process that actually serves, and removes it on exit. Stop the dev server with `kill "$(cat .warlock/dev.pid)"`.
-- `responseSchema` accepts an array of plain objects as a one-element tuple: `items: [{ id: "int", label: "string" }]`. The element may be an object shape, a cast or a resource; `"object[]"` stays the cast for an untyped array of objects. Types and generated typings follow the element shape.
-
-### Fixed
-
 - The test server no longer fails at boot with "Cloud storage requires the AWS S3 SDK packages" when the default storage driver is a cloud driver and the storage fake is on. The storage connector skips building the configured default in that case; the fake replaces every driver, and a real default is built on first use otherwise.
 - `warlock dev` forwards `SIGINT` from the supervisor to the server, as it already did for `SIGTERM` and `SIGHUP`, so stopping the supervisor's PID stops the server. The server ignores a repeated signal while it shuts down.
 - The dev server and the test server find the app's modules when the project path contains glob characters such as `[`, `(` or `{`. File discovery now globs relative to the directory instead of prefixing the pattern with the absolute path.
