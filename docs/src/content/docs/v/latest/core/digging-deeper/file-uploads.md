@@ -135,6 +135,8 @@ export type UploadSchema = { files: UploadedFile[] };
 
 Five files, 50 MB each, allowed types declared once.
 
+A single file sent under an array field (a part named `files`, without `[]`) is wrapped into a one-element array, so `v.array(v.file())` accepts it and `request.files("files")` returns `[file]`. Only uploaded files are wrapped; a string still fails the array rule.
+
 ## The `UploadedFile` API
 
 The `UploadedFile` surface is split into properties, type-checks, transforms, and save operations.

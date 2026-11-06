@@ -1291,7 +1291,11 @@ export class Request<RequestValidation = any> {
    * If the given name is not present in the request, return an empty array
    */
   public files(name: string): UploadedFile[] {
-    return this.input(name) || [];
+    const value = this.input(name);
+
+    if (!value) return [];
+
+    return Array.isArray(value) ? value : [value];
   }
 
   /**
