@@ -55,7 +55,7 @@ warlock dev --skip-typings           # skip background type generation
 warlock dev --skip-health            # skip health checkers
 ```
 
-The process that serves is not the one you started: `warlock dev` starts a supervisor that spawns the server. The server writes its own PID to `.warlock/dev.pid` and removes the file when it exits, so a script can stop it with `kill "$(cat .warlock/dev.pid)"`. A `SIGINT`, `SIGTERM` or `SIGHUP` sent to the supervisor is forwarded to the server.
+The process that serves is not the one you started: `warlock dev` starts a supervisor that spawns the server. The server writes its own PID to `.warlock/dev.pid` and removes the file when it exits, so a script can stop it with `kill "$(cat .warlock/dev.pid)"`. A `SIGTERM` or `SIGHUP` sent to the supervisor is forwarded to the server, and `Ctrl+C` reaches both through the terminal.
 
 `dev` runs on Node.js only. Started on Bun or Deno it exits `1` with an error that names the runtime and points at the production start commands instead — see [Supported runtimes](../digging-deeper/supported-runtimes.md).
 

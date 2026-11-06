@@ -63,7 +63,7 @@ describe("add command feature registry", () => {
     expect(featuresMap.web.dependencies).toMatchObject({
       "@mongez/http": "^3.5.0",
       "@mongez/react-form": "^4.0.0",
-      "@mongez/react-localization": "^3.4.7",
+      "@mongez/react-localization": "3.5.1",
     });
     expect(featuresMap.web.dependencies).not.toHaveProperty("@mongez/react-atom");
     expect(featuresMap.web.dependencies).not.toHaveProperty("@mongez/atomic-query");

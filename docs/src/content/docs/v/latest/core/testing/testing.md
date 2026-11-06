@@ -313,7 +313,7 @@ A matcher is a predicate or an object of fields that must all match (`{ to, subj
 
 Jobs are recorded, not run — call the job's handler directly to test what it does. The clock and ids fakes replace only the framework's `clock` and `ids`; `Date`, `setTimeout` and drivers keep real time, so nothing stalls. Read the time through `clock.now()` / `clock.timestamp()` and generate identifiers through `ids.uuid()` / `ids.token()` where a test needs to control them.
 
-**The storage fake replaces the configured default driver too.** A `default: "r2"` (or `s3`, `spaces`) in `src/config/storage.ts` does not need the cloud SDK packages in a test run: while the storage fake is on, the connector does not build the configured default, and every driver is a local one under the temp root.
+**The storage fake replaces the configured default driver too.** A `default: "r2"` (or `s3`, `spaces`) in `src/config/storage.ts` does not need the cloud SDK packages in a test run: in the test environment the connector builds the configured default on first use rather than at boot, and while the storage fake is on every driver is a local one under the temp root.
 
 **A fake records in the process that runs the code.** Mail sent while the shared HTTP server (Vitest's main process) handles a request is captured there, not in the test worker that sent the request. To assert on what a request did, serve it in the worker with [`createTestHttpServer()`](#in-process-server-with-the-production-plugins). The storage fake is the exception: its temp root is shared with the workers, so a file an HTTP request stored is visible to the test.
 

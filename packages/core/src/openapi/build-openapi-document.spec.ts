@@ -501,7 +501,10 @@ describe("buildOpenApiDocument — responses from responseSchema", () => {
       "get",
     );
 
-    expect(op.responses["200"].content["application/json"].schema.properties.items).toEqual({
+    expect(
+      (jsonSchemaOf(responseOf(op, "200").content) as { properties: { items: unknown } }).properties
+        .items,
+    ).toEqual({
       type: "array",
       items: {
         type: "object",

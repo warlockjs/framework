@@ -90,7 +90,7 @@ function registerShutdownHandlers(devServer: DevelopmentServer): void {
   let signalled = false;
 
   const onSignal = (signal: NodeJS.Signals) => async () => {
-    // The supervisor forwards a signal the terminal may also have delivered.
+    // Shut down once, even when a second signal arrives while draining.
     if (signalled) return;
 
     signalled = true;

@@ -34,13 +34,8 @@ export const BOOT_PRECONDITION_EXIT_CODE = 78;
  */
 export const QUIT_EXIT_CODE = 79;
 
-/**
- * Signals the supervisor must hand to the worker rather than act on itself.
- * `SIGINT` is included for a `kill -INT` sent to the supervisor's PID, which
- * the terminal's process group would never deliver to the worker; when the
- * terminal sent it, the worker has already seen it and ignores the repeat.
- */
-const FORWARDED_SIGNALS: NodeJS.Signals[] = ["SIGINT", "SIGTERM", "SIGHUP"];
+/** Signals the supervisor must hand to the worker rather than act on itself. */
+const FORWARDED_SIGNALS: NodeJS.Signals[] = ["SIGTERM", "SIGHUP"];
 
 /**
  * How long a worker must survive before an abnormal exit counts as a crash
@@ -199,9 +194,13 @@ export function superviseDevServer(now: () => number = Date.now): Promise<never>
     return true;
   }
 
-  // The supervisor never exits on a signal itself — that would orphan a server
-  // that is still draining. It notes that the next worker exit is final and
-  // hands the signal on, so stopping the supervisor's PID stops the server too.
+  // SIGINT reaches the worker directly from the terminal (same process group),
+  // so the supervisor must NOT act on it — exiting here would orphan a server
+  // that is still draining. It only notes that the next exit is final.
+  process.on("SIGINT", () => {
+    shuttingDown = true;
+  });
+
   for (const signal of FORWARDED_SIGNALS) {
     process.on(signal, () => {
       shuttingDown = true;
