@@ -123,7 +123,7 @@ describe("v.array(v.file()) — a single uploaded file", () => {
     const result = await v.validate(v.object({ files: v.array(v.file()) }), { files: file });
 
     expect(result.isValid).toBe(true);
-    expect(result.data.files).toEqual([file]);
+    expect(result.data?.files).toEqual([file]);
   });
 
   it("leaves an already-sent list unchanged", async () => {
@@ -131,7 +131,7 @@ describe("v.array(v.file()) — a single uploaded file", () => {
     const result = await v.validate(v.object({ files: v.array(v.file()) }), { files });
 
     expect(result.isValid).toBe(true);
-    expect(result.data.files).toHaveLength(2);
+    expect(result.data?.files).toHaveLength(2);
   });
 
   it("still rejects a single string", async () => {
