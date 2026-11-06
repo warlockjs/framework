@@ -11,6 +11,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Fixed
 
 - **A single upload under an array field validates** — `v.array(v.file())` now accepts one file sent without `[]`, and `request.files(name)` returns it as a one-element array. `UploadedFile` carries a registered brand so validators can recognise it.
+- `createTestHttpServer({ loadAppModules: true })` served an empty application: module discovery read the project files but never classified them, so no `routes.ts` or `main.ts` was imported and the router and `main.ts` registries stayed empty. Files are now classified after they are read.
+- `loadAppModules: true` now throws, naming the project root and file counts, when the project has route or `main.ts` files on disk and none were loaded, instead of silently serving no routes.
+- Modules loaded for one project root are no longer reused when a worker moves to another root.
+- The boot manifest path (`.warlock/manifest.json`) is resolved from the current directory on each use, not once when the framework is imported, so a process that changes directory never reads or writes another project's manifest.
 
 ## 5.46.0 - 2026-11-06
 

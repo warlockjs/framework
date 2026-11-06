@@ -1,7 +1,15 @@
 import { warlockPath } from "../utils";
 import { warlockConfigManager } from "../warlock-config/warlock-config.manager";
 
-export const MANIFEST_PATH = warlockPath("manifest.json");
+/**
+ * Where the boot manifest lives. Resolved on every call, from the current
+ * working directory: a process that imports the framework before it moves into
+ * the project (a test worker, a script) must not read or write another
+ * directory's manifest.
+ */
+export function manifestPath(): string {
+  return warlockPath("manifest.json");
+}
 
 /**
  * Number of files to process in parallel per batch

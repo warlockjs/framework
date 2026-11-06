@@ -393,6 +393,8 @@ it("mails the support inbox", async () => {
 
 It returns `url`, `port`, the Fastify `server`, the request helpers (`request`, `get`, `post`, `put`, `patch`, `delete`), `actingAs(user)` bound to it, and `close()`. Pass `routes: (router) => …` instead of (or as well as) `loadAppModules` to register routes for one test; `close()` removes them. App modules load once per process.
 
+The modules are found from the project at the current working directory (`src/app/*/routes.ts`, `main.ts`, events, locales), so run the tests from the project root. That works for a project inside a dot-directory such as a git worktree under `.claude/worktrees/`. If the project has route or `main.ts` files on disk and the load finds none, `createTestHttpServer()` throws an error naming the project root and the file counts, instead of serving an empty application. A worker that moves to another project root loads that project's modules again.
+
 ### Ephemeral ports
 
 `startHttpTestServer({ port: 0 })` lets the OS pick a free port and publishes the bound one to the workers, so the suite never collides with `warlock dev` or another suite. `warlock add test` generates `src/test-global-setup.ts` with it. `createTestHttpServer()` always uses an OS-assigned port.

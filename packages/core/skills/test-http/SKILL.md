@@ -179,7 +179,7 @@ it("answers through the real plugins and lets the fakes see the handler", async 
 });
 ```
 
-- `loadAppModules: true` (with `importModule: (file) => import(file)`, as `setupTest()` takes it) serves every app route; modules load once per process. Needs `setupTest()` to have run in the worker.
+- `loadAppModules: true` (with `importModule: (file) => import(file)`, as `setupTest()` takes it) serves every app route; modules load once per process. Needs `setupTest()` to have run in the worker. Modules are discovered from the current working directory (run from the project root; dot-directory worktrees work). A project with route or `main.ts` files on disk where none load makes the call throw, naming the root and counts.
 - `routes: (router) => …` registers routes for this server only; `close()` removes them.
 - It returns `url`, `port`, `server` (Fastify, for `inject()`), the request helpers, `actingAs(user)` bound to it, and `close()`.
 - `createTestRequestClient(baseUrl)` gives the same helpers bound to any URL.

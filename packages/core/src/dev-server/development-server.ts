@@ -11,7 +11,7 @@ import { buildDevelopmentOpenApiDocument } from "./build-development-openapi-doc
 import { DevAgentTooling, resolveDevMcpOptions } from "./dev-agent-tooling";
 import { devLogInfo, devLogSection, devLogWarn, devServeLog } from "./dev-logger";
 import { filesOrchestrator } from "./files-orchestrator";
-import { MANIFEST_PATH } from "./flags";
+import { manifestPath } from "./flags";
 import type { IncomingReloadTimings } from "./layer-executor";
 import { LayerExecutor } from "./layer-executor";
 import { printReadyBlock } from "./ready-block";
@@ -63,8 +63,8 @@ export class DevelopmentServer {
 
       // --fresh deletes the manifest so reconciliation re-parses every file
       // from disk. Transpile caching is owned by the loader hook (in-memory).
-      if (this.options.fresh && (await fileExistsAsync(MANIFEST_PATH))) {
-        await unlinkAsync(MANIFEST_PATH);
+      if (this.options.fresh && (await fileExistsAsync(manifestPath()))) {
+        await unlinkAsync(manifestPath());
         devServeLog(colors.cyanBright("Cleared manifest (--fresh)"));
       }
 
