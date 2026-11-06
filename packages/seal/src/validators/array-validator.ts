@@ -15,6 +15,24 @@ import { applyNullable, getRuleOptions } from "../standard-schema/json-schema";
 import type { JsonSchemaResult, JsonSchemaTarget } from "../standard-schema/json-schema";
 
 /**
+ * Brand carried by uploaded file objects (see core's `UploadedFile`). Seal does
+ * not depend on core, so it recognises an upload by this registered symbol.
+ */
+const UPLOADED_FILE_BRAND = Symbol.for("warlock.uploadedFile");
+
+/**
+ * A multipart request with one part named `files` (no `[]`) delivers a single
+ * uploaded file, because browsers cannot express a one-element list otherwise.
+ * Only uploaded files are wrapped — strings and other scalars stay as they are
+ * so they still fail the array rule.
+ */
+function wrapSingleUpload(value: any) {
+  return value !== null && typeof value === "object" && value[UPLOADED_FILE_BRAND] === true
+    ? [value]
+    : value;
+}
+
+/**
  * Array validator class
  */
 export class ArrayValidator extends BaseValidator {
@@ -140,7 +158,9 @@ export class ArrayValidator extends BaseValidator {
    * so the parent ObjectValidator can omit the key. Without this, optional array
    * fields would silently materialise as `[]` in the validated output.
    */
-  public async validate(data: any, context: SchemaContext): Promise<ValidationResult> {
+  public async validate(input: any, context: SchemaContext): Promise<ValidationResult> {
+    const data = wrapSingleUpload(input);
+
     // Apply default when absent, then mutate. Mirrors BaseValidator's
     // `valueForRules = data ?? this.getDefaultValue()` so `.default([...])`
     // works on arrays too.

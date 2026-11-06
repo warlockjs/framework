@@ -71,7 +71,7 @@ export const uploadController: RequestHandler = async ({ request, response }) =>
 
 `request.file(key)` returns `UploadedFile | undefined`. With a schema attached, `request.validated()` is typed via `Infer<typeof schema>` so the file field comes out as `UploadedFile` directly.
 
-For multi-file uploads, use an array schema (`v.array(v.file())`) — the validated value is `UploadedFile[]`.
+For multi-file uploads, use an array schema (`v.array(v.file())`) — the validated value is `UploadedFile[]`. A single file sent without `[]` is wrapped into a one-element array (uploads only, never strings).
 
 ## The `UploadedFile` API
 

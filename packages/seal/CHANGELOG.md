@@ -4,6 +4,12 @@ All notable changes to `@warlock.js/seal` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.47.0
+
+### Fixed
+
+- **`v.array()` accepts one uploaded file** — a lone uploaded file (a multipart part sent without `[]`) is wrapped into a one-element array before validation, and the validated output carries the array. Strings and other scalars are not wrapped and still fail the array rule.
+
 ## 5.46.0 - 2026-11-06
 
 ### Changed

@@ -98,6 +98,14 @@ export type FileValidationOptions = {
  */
 export class UploadedFile {
   /**
+   * Brand that lets validators (which don't depend on core) recognise an upload
+   * @internal
+   */
+  public get [Symbol.for("warlock.uploadedFile")]() {
+    return true;
+  }
+
+  /**
    * File buffered content
    * @internal
    */
