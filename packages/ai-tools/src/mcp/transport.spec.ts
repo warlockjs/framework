@@ -234,6 +234,74 @@ describe("HTTP transport — Streamable HTTP over fetch", () => {
     await expect(client.call("ping")).rejects.toBeInstanceOf(McpTransportError);
   });
 
+  it("uses an injected fetch instead of the global one", async () => {
+    const globalCalls = stubFetch(() => new Response("{}", { status: 200 }));
+    const injected = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ jsonrpc: "2.0", id: 1, result: { ok: true } }), {
+          status: 200,
+        }),
+    );
+
+    const client = createJsonRpcClient({ type: "http", url: "https://srv.test/mcp", fetch: injected });
+
+    await expect(client.call("ping")).resolves.toEqual({ ok: true });
+    expect(injected).toHaveBeenCalledTimes(1);
+    expect(globalCalls).toHaveLength(0);
+  });
+
+  it("maps an undici headers timeout to a timeout error naming the cause", async () => {
+    const failing = vi.fn(async () => {
+      throw Object.assign(new TypeError("fetch failed"), {
+        cause: Object.assign(new Error("Headers Timeout Error"), {
+          code: "UND_ERR_HEADERS_TIMEOUT",
+        }),
+      });
+    });
+
+    const client = createJsonRpcClient({ type: "http", url: "https://srv.test/mcp", fetch: failing });
+
+    await expect(client.call("slow", undefined, { timeoutMs: 400_000 })).rejects.toMatchObject({
+      type: "timeout",
+      message: expect.stringContaining("UND_ERR_HEADERS_TIMEOUT"),
+    });
+  });
+
+  it("maps an undici body timeout while reading the response to a timeout error", async () => {
+    const body = {
+      ok: true,
+      headers: new Headers({ "content-type": "application/json" }),
+      text: async () => {
+        throw Object.assign(new TypeError("terminated"), {
+          cause: Object.assign(new Error("Body Timeout Error"), { code: "UND_ERR_BODY_TIMEOUT" }),
+        });
+      },
+    } as unknown as Response;
+
+    const client = createJsonRpcClient({
+      type: "http",
+      url: "https://srv.test/mcp",
+      fetch: vi.fn(async () => body),
+    });
+
+    await expect(client.call("slow")).rejects.toMatchObject({ type: "timeout" });
+  });
+
+  it("reports a slow server as a timeout once timeoutMs elapses", async () => {
+    const slow = vi.fn(
+      (_url: unknown, init?: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener("abort", () => reject(new Error("aborted")));
+        }),
+    );
+
+    const client = createJsonRpcClient({ type: "http", url: "https://srv.test/mcp", fetch: slow });
+
+    await expect(client.call("slow", undefined, { timeoutMs: 20 })).rejects.toMatchObject({
+      type: "timeout",
+    });
+  });
+
   it("close() is a no-op for the stateless HTTP transport", async () => {
     stubFetch(
       () => new Response(JSON.stringify({ jsonrpc: "2.0", id: 1, result: {} }), { status: 200 }),

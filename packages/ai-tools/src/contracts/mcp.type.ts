@@ -41,6 +41,14 @@ export type McpTransport =
       url: string;
       /** Static headers sent with every request (e.g. auth). */
       headers?: Record<string, string>;
+      /**
+       * A `fetch` implementation used for every request. Node's built-in
+       * `fetch` abandons a request whose response headers take longer than
+       * 300 seconds, whatever `timeoutMs` says; pass a `fetch` backed by a
+       * dispatcher with longer `headersTimeout` / `bodyTimeout` for calls
+       * that run longer. Defaults to the global `fetch`.
+       */
+      fetch?: typeof globalThis.fetch;
     };
 
 /**
