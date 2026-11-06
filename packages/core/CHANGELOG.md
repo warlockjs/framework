@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 > ⚠ **Versioning: `@warlock.js/*` does not follow SemVer strictly — breaking changes may ship in a minor.** This is a deliberate decision, not an oversight: the framework is pre-adoption and the cost of a major per behaviour fix currently outweighs the benefit. **Pin an exact version or a tilde range (`~4.13.0`) if you need to opt into changes rather than receive them.** Every breaking change is marked **BREAKING** in its entry and summarised in an _Upgrading_ section at the top of the release. **This policy will change once the framework has consumers beyond its author.**
 
+## 5.46.0
+
+### Fixed
+
+- `warlock add test` pins `@vitest/coverage-v8` to the same exact version as `vitest` (5.0.5), instead of a caret range that resolved to 5.1.0 beside the starter's vitest 5.0.5. npm 10.9 and 11 crashed while installing a freshly scaffolded app with the test feature. A spec now fails when a feature adds a package that peers on a starter dependency at a version other than the starter's pin.
+- `warlock add web` pins `@mongez/react-localization` to 3.5.1, the version its exact peer on `@mongez/localization` requires, so the starter's localization pin cannot split from it when a newer patch ships.
+
 ## 5.45.0 - 2026-11-05
 
 ### Added

@@ -196,7 +196,7 @@ export const webFeature: FeatureDefinition = {
     "@warlock.js/web": INSTALLED_WARLOCK_VERSION,
     "@mongez/http": "^3.5.0",
     "@mongez/react-form": "^4.0.0",
-    "@mongez/react-localization": "^3.4.7",
+    "@mongez/react-localization": "3.5.1",
     react: "^19.2.3",
     "react-dom": "^19.2.3",
   },

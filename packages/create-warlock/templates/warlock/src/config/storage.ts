@@ -5,8 +5,12 @@ import {
   type StorageConfigurations,
 } from "@warlock.js/core";
 
+/**
+ * Driver is chosen per environment: leave STORAGE_DRIVER unset in development
+ * (local files) and set it to `r2` or `aws` in production.
+ */
 const storageOptions: StorageConfigurations = {
-  default: "local",
+  default: env("STORAGE_DRIVER", "local"),
   drivers: {
     local: storageConfigurations.local({
       root: uploadsPath(),
@@ -26,7 +30,9 @@ const storageOptions: StorageConfigurations = {
       accountId: env("R2_ACCOUNT_ID"),
       region: env("R2_REGION", "auto"),
       publicDomain: env("R2_BASE_URL"),
-      prefix: "warlock.js",
+      // Keys live under the app name by default, so apps sharing one bucket
+      // do not overwrite each other's files. Set R2_PREFIX to choose another.
+      prefix: env("R2_PREFIX", env("APP_NAME", "warlock.js")),
     }),
   },
 };

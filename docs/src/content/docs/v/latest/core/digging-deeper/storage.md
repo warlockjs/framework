@@ -110,6 +110,8 @@ const storageOptions: StorageConfigurations = {
 
 Set `STORAGE_DRIVER=r2` in production, leave unset in dev — the same `storage.put(...)` writes to local files in dev and to R2 in prod.
 
+A scaffolded app already has this split. Its `src/config/storage.ts` reads `STORAGE_DRIVER` (default `local`), and its R2 driver takes the key prefix from `R2_PREFIX`, which defaults to the app's `APP_NAME`. Two apps that share one R2 bucket therefore keep their keys apart without any code change. Projects scaffolded before 5.46.0 have `prefix: "warlock.js"` written in the file; set `R2_PREFIX=warlock.js` to keep the keys they already wrote.
+
 ## The shape
 
 ```ts

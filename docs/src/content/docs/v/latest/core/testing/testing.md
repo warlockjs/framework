@@ -430,7 +430,7 @@ Default to unit tests — they're faster and easier to reason about. Promote to 
 - **`src/test-setup.ts`** — vitest `setupFiles`, calls `setupTest` before each integration file.
 - **`vite.config.ts`** — separates unit and integration projects; see the runtime guide below.
 
-It also installs `vitest`, `@vitest/coverage-v8`, `vite`, and `@mongez/vite` (which is what makes TypeScript imports + the framework's module layout work under vitest).
+It also installs `vitest`, `@vitest/coverage-v8`, `vite`, and `@mongez/vite` (which is what makes TypeScript imports + the framework's module layout work under vitest). `vitest` and `@vitest/coverage-v8` are pinned to the same exact version: coverage-v8 peers on vitest at one version, so a range would let npm resolve two copies.
 
 Tests live colocated with the module they exercise:
 

@@ -53,11 +53,11 @@ describe("add test — generated src/test-runner.ts", () => {
     expect(runner).not.toContain("vitest/runners");
   });
 
-  it("declares vite 8 and vitest 5 for the app", () => {
+  it("pins coverage-v8 to the exact vitest release the template pins", () => {
     expect(testFeature.devDependencies).toMatchObject({
       vite: "^8.3.3",
-      vitest: "^5.0.3",
-      "@vitest/coverage-v8": "^5.0.3",
+      vitest: "5.0.5",
+      "@vitest/coverage-v8": "5.0.5",
     });
   });
 });
