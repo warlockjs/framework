@@ -43,6 +43,20 @@ export interface WorkspaceAfterEditEvent {
   signal?: AbortSignal;
 }
 
+/** One piece of live `run_shell` output, as reported to {@link WorkspaceHooks.onShellOutput}. */
+export interface WorkspaceShellOutputEvent {
+  /** The caller's id for a foreground call, when `exec` was given one. */
+  callId?: string;
+  /** The background job the output belongs to; absent for a foreground command. */
+  jobId?: string;
+  /** The command line that produced the output. */
+  command: string;
+  /** Which stream the text came from. */
+  stream: "stdout" | "stderr";
+  /** Decoded text, made of whole lines (the last piece of a stream may end without a newline). */
+  chunk: string;
+}
+
 /**
  * Host callbacks around workspace changes.
  *
@@ -66,4 +80,21 @@ export interface WorkspaceHooks {
   afterEditMaxChars?: number;
   /** How long to wait for `afterEdit`, in ms. Default `10000`. */
   afterEditTimeoutMs?: number;
+  /**
+   * Live output of `run_shell`, foreground and background, for hosts that
+   * show a session to a person. Called with decoded text in order per
+   * stream, at most about 20 times a second (faster output is merged), and
+   * only with whole lines until a command ends. The result the agent gets
+   * (truncation, spilling) is unchanged, and a throw from the hook is
+   * ignored. The workspace redacts nothing in results, so the text is raw
+   * unless `redactShellOutput` is set.
+   */
+  onShellOutput?: (event: WorkspaceShellOutputEvent) => void;
+  /**
+   * Masks secrets in text before it reaches `onShellOutput`. It always sees
+   * a complete line (never half of one), so a secret split across two reads
+   * of the process is still found. Values in `shell.env` of eight or more
+   * characters are masked as `[redacted]` before this runs.
+   */
+  redactShellOutput?: (text: string) => string;
 }

@@ -98,6 +98,7 @@ export async function commitWork(cwd: string) {
 
 - Shell mode parses the line and checks every simple command — inside `;`, `&&`, `||`, pipes, `( )`, `$( )`, backticks, here-documents and `NAME=value cmd` prefixes. Redirection targets and `cd` directories must be literal paths inside the jail (`/dev/null` is fine), re-checked with symlinks resolved.
 - It refuses what it can't parse with confidence (`reason: "unsupported-syntax"`): compound commands, arithmetic, brace expansion, unusual `${…}` forms, bash-only redirections, a command name decided at run time, `&` in a line (use `background: true`), assignments to `IFS`/`PS4`/`CDPATH`/`BASH_ENV`…; it drops shell start-up variables (`ENV`, `BASH_ENV`, `SHELLOPTS`, `BASH_FUNC_*`, …) from the environment.
+- Bash on Windows reads an unquoted backslash as an escape: a line like `cd ab\x\y` is refused (`"unsupported-syntax"`) with the forward-slash form (`ab/x/y`) in the message, and `run_shell`'s description says to write paths with forward slashes. Quoted paths and `a\ b` pass; Linux and macOS are unchanged.
 - `reason` values: `"metacharacter"`, `"unbalanced-quotes"`, `"denied-executable"`, `"not-allowed"`, `"denied-pattern"`, `"nested-command"`, `"unsupported-syntax"`, `"path-escape"`. `checkShellCommand(policy, line)` returns the verdict without running anything; `classifyShellCommand(line, policy?)` returns `{ commands, opaque? }` with the same parser a host approval gate can reuse; `resolveShell(policy.shell)` reports which interpreter and executable `"auto"` (or a named interpreter) resolves to on this host, plus the PowerShell `edition` (`"desktop"` = Windows PowerShell 5.1, `"core"` = 7+) and `version`; the 5.1 dialect (`"powershell5"`) refuses `&&` / `||`, and on Windows `"auto"` prefers `pwsh`, then Git Bash, then 5.1, then `cmd`. The `PowerShellEdition` type is exported.
 - Pair shell mode with an exhaustive `allow`: `deny` alone is a best-effort filter.
 
@@ -258,6 +259,23 @@ ai.workspace({
 ```
 
 After `write_file`, `edit_file`, `multi_edit` or `apply_patch` writes files, the hook runs once per call with the written paths (not on a patch `dryRun`, not for deleted files). Text it returns comes back on the result as `diagnostics`, between `[diagnostics]` and `[/diagnostics]` lines; output over `afterEditMaxChars` is cut with a marker. A hook that throws or does not answer within `afterEditTimeoutMs` yields `diagnostics unavailable` and never fails the edit.
+
+## Live shell output — `hooks.onShellOutput`
+
+```ts
+workspace({
+  cwd,
+  shell: { allow: ["npm"], env: { API_KEY: process.env.API_KEY! } },
+  hooks: {
+    onShellOutput: ({ command, stream, chunk, jobId, callId }) => ui.append(chunk),
+    redactShellOutput: (text) => text.replace(/sk-[a-z0-9]+/g, "[redacted]"),
+  },
+});
+```
+
+`run_shell` returns its output when the command ends; `onShellOutput` (event type `WorkspaceShellOutputEvent`) lets a host that shows the session to a person see it while the command runs. It fires for foreground commands and for background jobs (`jobId` is set; it keeps firing after `run_shell` has returned). Text is decoded, in order per stream, delivered at most about 20 times a second (faster output is merged), and never changes the result the agent gets (truncation and spilling are as before). A hook that throws is ignored. Pass `callId` to `ws.exec(command, { callId })` to have it echoed on a foreground command's events. A backend that cannot stream delivers the whole capture once, when the command ends.
+
+The workspace redacts nothing in results, so live text is raw unless you mask it. Redaction needs a secret in one piece but a process writes in arbitrary pieces, so output is buffered to line boundaries first and then redacted: a secret split across two reads is whole by the time `redactShellOutput(text)` sees it. The unfinished last line is held until its newline arrives or the command ends (a line over 16 KB is cut, keeping its last 512 characters back). Values in `shell.env` of eight or more characters are masked as `[redacted]` before `redactShellOutput` runs. If the redactor throws, that text is dropped, never delivered unmasked. A secret that contains a newline cannot be matched this way.
 
 ## Oversized output — `output`
 

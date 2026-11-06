@@ -341,6 +341,75 @@ export interface ShellCheckOptions {
   host?: ShellHost;
   /** The already-resolved shell, to skip resolving it again. */
   resolved?: ResolvedShell;
+  /** The platform the lines run on. Default: `host.platform`, else the running one. */
+  platform?: NodeJS.Platform;
+}
+
+/**
+ * The first word of `command` that has an unquoted backslash before a
+ * letter, digit or dot inside it (a Windows-style path bash reads as
+ * escapes), with the same word spelled with forward slashes. Quoted text
+ * and `\ ` style escapes (a backslash before a space, quote, `$` and the
+ * like) are left alone.
+ */
+export function findWindowsStylePath(command: string): { word: string; suggestion: string } | null {
+  let quote: "'" | '"' | null = null;
+  let start = 0;
+  let found = false;
+  let suggestion = "";
+
+  const finish = (end: number): { word: string; suggestion: string } | null =>
+    found ? { word: command.slice(start, end), suggestion } : null;
+
+  for (let index = 0; index < command.length; index++) {
+    const char = command[index] as string;
+
+    if (quote === null && /[\s;&|<>()]/.test(char)) {
+      const hit = finish(index);
+
+      if (hit !== null) {
+        return hit;
+      }
+
+      start = index + 1;
+      found = false;
+      suggestion = "";
+
+      continue;
+    }
+
+    if (quote === "'") {
+      suggestion += char;
+      quote = char === "'" ? null : quote;
+
+      continue;
+    }
+
+    if (char === "\\") {
+      const next = command[index + 1] ?? "";
+
+      if (quote === null && index > start && /[A-Za-z0-9.]/.test(next)) {
+        found = true;
+        suggestion += "/";
+
+        continue;
+      }
+
+      // Any other escape keeps its backslash and swallows the next character.
+      suggestion += char + next;
+      index++;
+
+      continue;
+    }
+
+    if (char === '"' || char === "'") {
+      quote = quote === null ? char : quote === char ? null : quote;
+    }
+
+    suggestion += char;
+  }
+
+  return finish(command.length);
 }
 
 /** A compiled `shell.rules` entry. */
@@ -1378,7 +1447,14 @@ export function checkShellCommand(
   const resolved =
     options?.resolved ?? resolveShell(policy.shell, options?.host ?? currentShellHost());
 
-  return runCheck(policy, command, resolved.interpreter, resolved.dialect, options?.remembered);
+  return runCheck(
+    policy,
+    command,
+    resolved.interpreter,
+    resolved.dialect,
+    options?.remembered,
+    options?.platform ?? options?.host?.platform ?? process.platform,
+  );
 }
 
 /**
@@ -1395,7 +1471,27 @@ export function checkShellCommandInDialect(
   const resolved =
     options?.resolved ?? resolveShell(policy.shell, options?.host ?? currentShellHost());
 
-  return runCheck(policy, command, resolved.interpreter, dialect, options?.remembered);
+  return runCheck(
+    policy,
+    command,
+    resolved.interpreter,
+    dialect,
+    options?.remembered,
+    options?.platform ?? options?.host?.platform ?? process.platform,
+  );
+}
+
+/** Bash on Windows reads `ab\\x` as an escape, not a path: refuse and show the forward-slash form. */
+function refuseWindowsStylePath(command: string): void {
+  const hit = findWindowsStylePath(command);
+
+  if (hit !== null) {
+    throw new Refusal(
+      "unsupported-syntax",
+      `\`${hit.word}\` uses Windows-style backslashes, which bash reads as escapes and so runs a different path. ` +
+        `Write the path with forward slashes: \`${hit.suggestion}\` (or quote it).`,
+    );
+  }
 }
 
 function runCheck(
@@ -1404,6 +1500,7 @@ function runCheck(
   interpreter: ResolvedShellInterpreter,
   dialect: ShellDialect,
   remembered?: readonly WorkspaceCommandPattern[],
+  platform: NodeJS.Platform = process.platform,
 ): WorkspaceShellCheck {
   const shell = policy.shell;
 
@@ -1434,6 +1531,10 @@ function runCheck(
     }
 
     if (shellMode) {
+      if (interpreter === "bash" && platform === "win32") {
+        refuseWindowsStylePath(command);
+      }
+
       checkShellLine(checker, policy, command, dialect);
     } else {
       const argv = tokenizeCommand(command);

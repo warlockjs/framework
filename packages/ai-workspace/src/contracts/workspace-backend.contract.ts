@@ -62,6 +62,13 @@ export interface WorkspaceBackendExecOptions {
    * host's `PATH`); absent ⇒ the backend uses the shell's usual name.
    */
   interpreterPath?: string;
+  /**
+   * Optional live output: called with decoded text (never split inside a
+   * character) while the command runs, never after `exec` settles. The
+   * resolved result still carries the whole capture. A backend that cannot
+   * stream may ignore it.
+   */
+  onOutput?(stream: WorkspaceOutputStream, chunk: string): void;
 }
 
 /** Which stream a background command's output chunk came from. */

@@ -40,7 +40,10 @@ export interface ShellJobSpec {
   /** Wall-clock cap, if any. */
   timeoutMs?: number;
   /** Start the process; output must be delivered through `onOutput`. */
-  launch(onOutput: (stream: WorkspaceOutputStream, chunk: string) => void): WorkspaceBackendProcess;
+  launch(
+    onOutput: (stream: WorkspaceOutputStream, chunk: string) => void,
+    jobId: string,
+  ): WorkspaceBackendProcess;
 }
 
 /** Resolve after `ms`, without keeping the event loop alive. */
@@ -302,7 +305,7 @@ export class ShellJobs {
 
     this.jobs.set(job.id, job);
 
-    const handle = spec.launch((stream, chunk) => job.append(stream, chunk));
+    const handle = spec.launch((stream, chunk) => job.append(stream, chunk), job.id);
 
     job.process = handle;
 

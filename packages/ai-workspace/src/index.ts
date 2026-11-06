@@ -37,6 +37,7 @@ export type {
   TodoWriteInput,
   Workspace,
   WorkspaceAfterEditEvent,
+  WorkspaceShellOutputEvent,
   WorkspaceAllowCommand,
   WorkspaceBackend,
   WorkspaceBackendExecOptions,

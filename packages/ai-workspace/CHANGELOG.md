@@ -4,6 +4,16 @@ All notable changes to `@warlock.js/ai-workspace` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.47.0
+
+### Added
+
+- `hooks.onShellOutput({ callId?, jobId?, command, stream, chunk })` streams `run_shell` output while the command runs, for foreground commands and background jobs (a job's events carry its `jobId` and continue after `run_shell` returns). Chunks are decoded, ordered per stream and delivered at most about 20 times a second; a throwing hook is ignored and the tool result (truncation, spilling) is unchanged. `hooks.redactShellOutput(text)` masks secrets: output is buffered to whole lines before it is redacted so a secret split across reads is found, and `shell.env` values of eight or more characters are masked automatically. `ExecOptions.callId` is echoed on a foreground command's events, `WorkspaceBackendExecOptions.onOutput` lets a backend stream (the local backend does; others deliver the whole capture at the end), and the new type `WorkspaceShellOutputEvent` is exported.
+
+### Changed
+
+- Under bash on Windows, a command line with an unquoted backslash before a letter, digit or dot inside a word (`cd ab\terra4\client`) is refused with `reason: "unsupported-syntax"` and a message showing the forward-slash form (`ab/terra4/client`), because bash reads the backslashes as escapes and runs a different path. Quoted paths and escaped spaces pass; bash on Linux and macOS is unchanged. `run_shell`'s description states the forward-slash rule for bash on Windows. `checkShellCommand` takes an optional `platform` option.
+
 ## 5.45.0 - 2026-11-05
 
 ### Added
