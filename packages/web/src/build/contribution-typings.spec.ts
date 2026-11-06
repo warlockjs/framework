@@ -78,7 +78,7 @@ describe("web build contribution — typings hook", () => {
     const bad = path.join(appRoot, "src/web/mixed.page.tsx");
     fs.writeFileSync(
       bad,
-      'export const config = { route: "/:type-for-:purpose" };\nexport default function Page() { return null; }\n',
+      'export const config = { route: "/:type:purpose" };\nexport default function Page() { return null; }\n',
     );
     const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
 
@@ -88,7 +88,7 @@ describe("web build contribution — typings hook", () => {
     warn.mockRestore();
 
     expect(warned).toContain("mixed.page.tsx");
-    expect(warned).toContain("/:type-for-:purpose");
+    expect(warned).toContain("/:type:purpose");
     expect(fs.readFileSync(path.join(appRoot, TYPES), "utf-8")).toContain("/site/page");
   });
 });

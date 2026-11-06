@@ -64,8 +64,12 @@ function uniqueSorted(
   );
 }
 
-function paramsType(path: string): string {
-  const parsed = parseRoutePathParameters(path);
+/**
+ * `isPage` turns on the precise page-route shapes (mixed segments, named
+ * wildcard); API routes keep the broad type for anything beyond whole-segment params.
+ */
+function paramsType(path: string, isPage: boolean): string {
+  const parsed = parseRoutePathParameters(path, { mixedSegments: isPage });
   if (parsed.type === "broad") return "Record<string, RouteParamValue>";
   if (parsed.parameters.length === 0) return "{}";
 
@@ -103,7 +107,7 @@ function emitRegistry(
   for (const snapshot of snapshots) {
     const fields = [
       `path: ${quote(snapshot.path)}`,
-      `params: ${paramsType(snapshot.path)}`,
+      `params: ${paramsType(snapshot.path, interfaceName === "PageRouteRegistry")}`,
       ...(includesMethod ? [`method: ${quote(snapshot.method.toUpperCase())}`] : []),
       ...(snapshot.actions && snapshot.actions.length > 0
         ? [`actions: ${[...new Set(snapshot.actions)].sort().map(quote).join(" | ")}`]

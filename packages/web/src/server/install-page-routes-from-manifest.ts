@@ -34,6 +34,7 @@ import { resolvePageRouteIdentity } from "../routing/route-identity";
 import { routeIdentityKey } from "../routing/route-identity-key";
 import { publishRouteTable, registerSiteRoutes } from "../routing/route-table";
 import { publishLocaleRouting } from "../routing/locale-routing";
+import { routerPathOf } from "../routing/mixed-route-segment";
 import { config, type Router } from "@warlock.js/core";
 import path from "node:path";
 import { buildRouteLocaleManifest } from "../build/build-route-locale-manifest";
@@ -729,7 +730,7 @@ export function installPageRoutesFromManifest(
       { pageFile: page.sourceFile, renderNotFound },
     )) {
       router.get(
-        registration.path,
+        routerPathOf(registration.path),
         registration.handler,
         // `isPage` marks this route as SSR-served. Pages and API routes
         // share one router and one route-name namespace, so the router's
@@ -746,7 +747,7 @@ export function installPageRoutesFromManifest(
         localeRouting,
         { pageFile: page.sourceFile, renderNotFound },
       )) {
-        router.post(registration.path, registration.handler, { isPage: true });
+        router.post(routerPathOf(registration.path), registration.handler, { isPage: true });
       }
     }
 

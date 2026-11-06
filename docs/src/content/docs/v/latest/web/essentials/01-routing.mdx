@@ -127,18 +127,73 @@ manually.
 
 ## Page-route grammar
 
-Page routes support static segments, whole-segment parameters, the exact `*`
-wildcard, and a terminal wildcard such as `/docs/*`.
+Page routes support static segments, parameters, the exact `*` wildcard, a
+terminal wildcard such as `/docs/*`, and segments that mix several parameters
+and static text.
 
-They do not support regex parameters, optional parameters, multiple parameters
-inside one segment, parameters mixed with text, doubled or trailing slashes,
-or a non-terminal wildcard. Write two pages for an optional segment and
-validate constrained values in the loader.
+They do not support regex parameters, optional parameters, two parameters with
+no text between them, doubled or trailing slashes, or a non-terminal wildcard.
+Write two pages for an optional segment and validate constrained values in the
+loader.
 
 An unsupported declared path fails at boot with
 `PageRoutePathNotSupportedError`; Warlock does not normalize it or register
 it literally. Rejected examples include `/users/:id?`,
-`/users/:id(\\d+)`, `/near/:lat-:lng`, `/a//b`, and `/users/`.
+`/users/:id(\\d+)`, `/:a:b`, `/a//b`, and `/users/`.
+
+### Mixed segments
+
+One segment may hold several parameters with static text around or between
+them. Static text may use letters, digits and `. _ ~ -`, and two parameters are
+always separated by text. This is how readable, SEO-friendly URLs are declared:
+
+```ts title="src/web/listing.setup.ts"
+export const config = {
+  route: { path: "/:type-for-:purpose", name: "listing" }, // /house-for-sale
+} as const satisfies PageConfig;
+```
+
+```ts title="src/web/near.setup.ts"
+export const config = {
+  route: { path: "/near/:lat-:lng", name: "near" }, // /near/30.04-31.23
+} as const satisfies PageConfig;
+```
+
+Each parameter keeps its own name in `params`, in the loader, and in the typed
+`href()` call (`href("listing", { type: "house", purpose: "sale" })`). `href()`
+encodes each value on its own and leaves the static text as written.
+
+**How a segment splits.** The split is greedy: every parameter except the last
+takes as much as it can while the text after it still matches. Against
+`/:type-for-:purpose`, `a-for-b-for-c` gives `type = "a-for-b"` and
+`purpose = "c"`. A parameter may be empty (`/house-for-` gives
+`purpose = ""`) and never spans a `/`. Server and browser split every URL the
+same way. Because a value that contains the separator moves the split, keep
+the separator out of the values (slugify them) or pick text that cannot occur
+in them.
+
+**Which route wins.** At each segment, left to right: a static segment beats a
+mixed one, a mixed one beats a plain `:param`, and a plain `:param` beats the
+catch-all. A route that does not match the whole URL is skipped, so
+`/:id` still answers `/abc` when `/:type-for-:purpose` is also declared and
+`/house-for-sale` goes to the mixed route. Between two mixed segments, the one
+with the longer leading text wins, then the longer trailing text, then more
+static text overall (`/x-for-:b` beats `/:a-for-:b`). Two mixed segments that
+tie on all three and can match the same URL are ambiguous; do not declare such
+a pair. Two routes with the same shape (`/:a-for-:b` and `/:x-for-:y`) are a
+duplicate and fail at boot.
+
+A parameter name may be used only once in a path that has a mixed segment or a
+named wildcard. API routes keep their existing, broader parameter typing.
+
+### Named wildcard
+
+A terminal wildcard may carry a name: `/files/*rest`. Its value is available
+under that name (`params.rest`, `href("files", { rest: "a/b" })`) and, as
+before, under `params["*"]`. The bare `*` and `/docs/*` forms are unchanged.
+
+Filesystem routing has no file name for these shapes; declare them with
+`config.route.path` as above.
 
 `warlock generate.typings` is the exception to stopping: it prints the page file
 and the rejected path, leaves that one page out of the route typings, and keeps

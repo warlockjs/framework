@@ -2,6 +2,12 @@
 
 All notable changes to `@warlock.js/web` are documented here.
 
+## 5.47.0
+
+### Added
+
+- Page routes accept several params and static text in one segment, such as `/:type-for-:purpose` or `/near/:lat-:lng`, and a named terminal wildcard such as `/files/*rest`. The generated page typings and `href()` name every param (`href("listing", { type: "house", purpose: "sale" })`), encode each value on its own and keep the static text. A named wildcard's value is under its name and under `params["*"]`. A segment splits greedily like the server's router (`a-for-b-for-c` against `:x-for-:y` gives `x = "a-for-b"`), and the server, the browser matcher and the fallback matcher choose the same route: static, then mixed, then plain `:param`, then catch-all. Existing page routes, API route typings, `href()` and `apiHref()` are unchanged; file names have no form for these shapes, so declare them with `config.route.path`. `/:a:b` (two params with no text between) and a repeated param name in these shapes are rejected at boot.
+
 ## 5.46.0 - 2026-11-06
 
 ### Added

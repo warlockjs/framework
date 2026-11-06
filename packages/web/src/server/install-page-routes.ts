@@ -47,6 +47,7 @@ import {
 import { pageSetupFileFor } from "../build/page-setup-file";
 import { readModuleConfig } from "../build/read-module-config";
 import { readPageGuard } from "../build/read-page-guard";
+import { routerPathOf } from "../routing/mixed-route-segment";
 import { composeRoutePath } from "../routing/compose-route-path";
 import { duplicateRoutePathMessage } from "../routing/duplicate-route-path";
 import { deriveFilesystemRoutePath } from "../routing/filesystem-route";
@@ -980,7 +981,7 @@ async function installDiscoveredPageRoutes(
         { pageFile, renderNotFound },
       )) {
         router.get(
-          registration.path,
+          routerPathOf(registration.path),
           registration.handler,
           // `isPage` marks this route as SSR-served. Pages and API routes
           // share one router and one route-name namespace, so the router's
@@ -998,7 +999,7 @@ async function installDiscoveredPageRoutes(
         localeRouting,
         { pageFile, renderNotFound },
       )) {
-        router.post(registration.path, registration.handler, { isPage: true });
+        router.post(routerPathOf(registration.path), registration.handler, { isPage: true });
       }
     });
 

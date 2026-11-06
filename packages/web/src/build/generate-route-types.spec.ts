@@ -136,3 +136,43 @@ describe("generateRouteTypes page guards", () => {
     expect(source).toContain('"x.api": { path: "/api/x"; params: {}; method: "GET" };');
   });
 });
+
+describe("generateRouteTypes — mixed segments", () => {
+  it("names every param of a page route's mixed segments and named wildcard precisely", () => {
+    const source = generateRouteTypes({
+      pages: [
+        { name: "listing", path: "/:type-for-:purpose", method: "GET" },
+        { name: "near", path: "/near/:lat-:lng", method: "GET" },
+        { name: "files", path: "/files/*rest", method: "GET" },
+      ],
+      apiRoutes: [],
+    });
+
+    expect(source).toContain(
+      '"listing": { path: "/:type-for-:purpose"; params: { "type": RouteParamValue; "purpose": RouteParamValue } };',
+    );
+    expect(source).toContain(
+      '"near": { path: "/near/:lat-:lng"; params: { "lat": RouteParamValue; "lng": RouteParamValue } };',
+    );
+    expect(source).toContain(
+      '"files": { path: "/files/*rest"; params: { "rest": RouteParamValue } };',
+    );
+  });
+
+  it("keeps API routes with the same shapes as broad as before", () => {
+    const source = generateRouteTypes({
+      pages: [],
+      apiRoutes: [
+        { name: "near", path: "/api/near/:lat-:lng", method: "GET" },
+        { name: "files", path: "/api/files/*rest", method: "GET" },
+      ],
+    });
+
+    expect(source).toContain(
+      '"near": { path: "/api/near/:lat-:lng"; params: Record<string, RouteParamValue>; method: "GET" };',
+    );
+    expect(source).toContain(
+      '"files": { path: "/api/files/*rest"; params: Record<string, RouteParamValue>; method: "GET" };',
+    );
+  });
+});

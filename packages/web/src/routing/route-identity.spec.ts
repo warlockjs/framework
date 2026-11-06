@@ -71,7 +71,7 @@ describe("canonicalizeRouteExport", () => {
     const cases: string[] = [
       "/users/:id?",
       "/users/:id(\\d+)",
-      "/near/:lat-:lng",
+      "/near/:lat:lng",
       "/a//b",
       "/users/",
     ];

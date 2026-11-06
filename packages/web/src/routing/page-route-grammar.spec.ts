@@ -53,6 +53,24 @@ describe("classifyPageRoutePath — allowed shapes", () => {
     expect(classifyPageRoutePath("*")).toEqual({ type: "allowed" });
   });
 
+  it("allows mixed segments with several params and static text", () => {
+    for (const path of [
+      "/:type-for-:purpose",
+      "/near/:lat-:lng",
+      "/file/:name.png",
+      "/pre-:id",
+      "/:a-x-:b-y-:c/details",
+      "/:a.:b",
+    ]) {
+      expect(classifyPageRoutePath(path), path).toEqual({ type: "allowed" });
+    }
+  });
+
+  it("allows a named terminal wildcard `/files/*rest` and `/*rest`", () => {
+    expect(classifyPageRoutePath("/files/*rest")).toEqual({ type: "allowed" });
+    expect(classifyPageRoutePath("/*rest")).toEqual({ type: "allowed" });
+  });
+
   // Probe cases: slash-star-root, slash-star-tail,
   // slash-star-tail-trailing-slash (pattern `/*`).
   it("allows `/*`", () => {
@@ -88,23 +106,23 @@ describe("classifyPageRoutePath — rejected shapes", () => {
     expect(reason).toMatch(/two pages/i);
   });
 
-  it("rejects multiple params in one segment `/near/:lat-:lng`, naming the split fix", () => {
-    const reason = reasonFor("/near/:lat-:lng");
-    expect(reason).toContain(":lat-:lng");
-    expect(reason).toMatch(/more than one param/i);
-    expect(reason).toContain(":lat/:lng");
+  it("rejects two params with no text between them `/:a:b`, naming the separator fix", () => {
+    const reason = reasonFor("/:a:b");
+    expect(reason).toContain(":a:b");
+    expect(reason).toMatch(/text between/i);
   });
 
-  it("rejects a static-suffix param `/file/:name.png`, naming the whole-segment fix", () => {
-    const reason = reasonFor("/file/:name.png");
-    expect(reason).toContain(":name.png");
-    expect(reason).toMatch(/whole segment/i);
+  it("rejects a bare colon and characters outside the supported static text", () => {
+    expect(reasonFor("/a/:")).toMatch(/param name/i);
+    expect(reasonFor("/:a%2D:b")).toContain("%");
+    expect(reasonFor("/:a(x)-:b")).toMatch(/regex/i);
+    expect(reasonFor("/:a-:b?")).toMatch(/optional/i);
   });
 
-  it("rejects a static-prefix param `/pre:id`", () => {
-    const reason = reasonFor("/pre:id");
-    expect(reason).toContain("pre:id");
-    expect(reason).toMatch(/whole segment/i);
+  it("rejects a param name used twice in a mixed or named-wildcard path", () => {
+    expect(reasonFor("/:a-for-:a")).toMatch(/more than once/i);
+    expect(reasonFor("/:id/:id-x")).toContain('"id"');
+    expect(reasonFor("/:rest/*rest")).toContain('"rest"');
   });
 
   it("rejects an escaped colon `/path/\\:literal`", () => {
@@ -120,6 +138,10 @@ describe("classifyPageRoutePath — rejected shapes", () => {
     const reason = reasonFor("/a/prefix*");
     expect(reason).toContain("prefix*");
     expect(reason).toContain('"/prefix/*"');
+  });
+
+  it("rejects a named wildcard that is not the final segment", () => {
+    expect(reasonFor("/files/*rest/x")).toMatch(/final segment/i);
   });
 
   it("rejects a broad suffix wildcard `/files/report*`", () => {

@@ -409,6 +409,7 @@ export function href(name: string, paramsOrOptions?: object, positionalQuery?: R
       : Object.fromEntries(Object.entries(params).filter(([parameter]) => parameter !== "$host"));
 
   const path = `${interpolateRoutePath(routePath, pathParams, {
+    mixedSegments: true,
     rejectUnknownParameters: true,
     onMissingParameter: (parameterName) => {
       throw new MissingRouteParameterError(name, parameterName, routePath);
