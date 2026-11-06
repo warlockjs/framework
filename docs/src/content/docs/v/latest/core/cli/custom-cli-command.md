@@ -110,6 +110,8 @@ The fields, in the order you'll reach for them:
 | `config: ["x"]`     | Loads only `src/config/x.ts`.                                                                                              |
 | `connectors: true`  | Starts the early-phase built-in connectors (DB, cache, storage, logger, mailer).                                           |
 | `connectors: ["x"]` | Starts only the named connectors. Bypasses phase splitting — you're saying "I know exactly what I want."                   |
+| `configuredConnectors: true` | Also starts the early-phase connectors your app lists in `warlock.config.ts > connectors` (the queue, for example), with or without `connectors`. Imports no module code. Needed when the action dispatches a queue job. |
+| `mainModules: true` | Imports every module's `main.ts` after the connectors, and implies `configuredConnectors`.                                 |
 | `bootstrap: true`   | Runs the full bootstrap flow (env + bootstrap script + all auto-loaded files). Slowest; reaches the closest to "real app." |
 | `prestart: true`    | Runs `src/app/prestart.ts` after bootstrap + config (if it exists).                                                        |
 | `runtimeStrategy`   | Forces `"production"` or `"development"` mode (default: detected from `NODE_ENV`).                                         |

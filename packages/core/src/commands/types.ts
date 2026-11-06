@@ -134,6 +134,18 @@ export type CLICommandPreload = {
   connectors?: ConnectorName[] | true;
 
   /**
+   * Also start the Early-phase connectors the app lists in
+   * `warlock.config.ts > connectors` (the queue, for example), without
+   * importing any module's `main.ts`. Use it when the command's action needs a
+   * connector the app registers itself, such as dispatching a queue job.
+   *
+   * Works with or without `connectors`: the declared built-ins start along
+   * with the configured ones. Late-phase connectors (http, socket, web) stay
+   * off. `mainModules: true` implies this flag.
+   */
+  configuredConnectors?: boolean;
+
+  /**
    * Import every module's `main.ts` after the connectors have started, the
    * same way the HTTP server does, so registries a module fills in `main.ts`
    * are populated when the command runs. The Early-phase connectors the app

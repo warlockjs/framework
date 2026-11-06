@@ -804,7 +804,9 @@ export class CLICommandsManager {
     // connectors (http, socket) start after the command's action loads
     // app code. Explicit lists bypass phase splitting (caller knows
     // exactly which connectors they want).
-    if (preloaders.connectors) {
+    const startsConfigured = Boolean(preloaders.configuredConnectors);
+
+    if (preloaders.connectors || startsConfigured) {
       // REGISTER before starting — the non-bundled counterpart of section 2.5
       // of the generated production entry, and the "dev preloader" path
       // `register-configured-connectors.ts` documents.
@@ -842,7 +844,7 @@ export class CLICommandsManager {
       // Only when this boot will actually start http: a scoped list without
       // "http" (seed, migrate, …) never binds the port, so probing it would
       // collide with a running dev server on a port it never uses (f9ace89e).
-      if (shouldPreflightHttpPort(preloaders.connectors)) {
+      if (preloaders.connectors && shouldPreflightHttpPort(preloaders.connectors)) {
         await preflightConfiguredHttpPort();
       }
 
@@ -850,9 +852,9 @@ export class CLICommandsManager {
         await connectorsManager.startPhase(ConnectorLifecyclePhase.Early);
       } else {
         await connectorsManager.start(
-          preloaders.mainModules
-            ? [...preloaders.connectors, ...configuredEarlyConnectorNames()]
-            : preloaders.connectors,
+          startsConfigured || preloaders.mainModules
+            ? [...(preloaders.connectors || []), ...configuredEarlyConnectorNames()]
+            : preloaders.connectors || [],
         );
       }
     }

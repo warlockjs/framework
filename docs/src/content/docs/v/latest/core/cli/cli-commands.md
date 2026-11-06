@@ -862,6 +862,8 @@ preload: {
   config: ["database", "log"],            // load these src/config/*.ts files (or `true` for all)
   bootstrap: true,                        // full bootstrap (env + app + prestart hooks)
   connectors: ["database", "cache"],      // start these connectors (or `true` for all early-phase)
+  configuredConnectors: true,             // also start the app's early-phase `warlock.config.ts > connectors` (e.g. queue), no module imports
+  mainModules: true,                      // import every module's main.ts after the connectors (implies configuredConnectors)
   prestart: true,                         // run src/app/prestart.ts after config
   warlockConfig: true,                    // load warlock.config.ts
   runtimeStrategy: "production",          // force-set
@@ -870,6 +872,8 @@ preload: {
 ```
 
 Connector names: `"logger"`, `"mailer"`, `"http"`, `"database"`, `"herald"`, `"cache"`, `"storage"`, `"socket"`, `"notifications"`, `"access"`. Pass `connectors: true` to start every Early-phase connector. The `http` and `socket` connectors are Late phase and stay off unless you explicitly list them.
+
+An app's own command that needs a connector registered in `warlock.config.ts > connectors` (for example one that dispatches a queue job) sets `configuredConnectors: true`. It starts the app's early-phase configured connectors next to the ones in `connectors`, without importing any module's `main.ts`. `mainModules: true` implies it. Commands that set neither start only what they declare.
 
 Picking the right preload matters: `migrate` only needs database and logger; `seed` needs the full bootstrap because seeds use app models. Inspect the built-in commands' source on GitHub for canonical pairings.
 

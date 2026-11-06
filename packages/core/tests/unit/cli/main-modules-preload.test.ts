@@ -97,4 +97,27 @@ describe("mainModules preload", () => {
     expect(started[0]).toEqual(["database"]);
     expect(calls).not.toContain("mains");
   });
+
+  it("starts configured early connectors for configuredConnectors without loading mains", async () => {
+    await new PreloadManager().preload(commandWith({ configuredConnectors: true }));
+
+    expect(started[0]).toEqual(["queue"]);
+    expect(calls).toEqual(["registerConfigured", "connectors"]);
+  });
+
+  it("adds configured early connectors to a declared list", async () => {
+    await new PreloadManager().preload(
+      commandWith({ connectors: ["database"], configuredConnectors: true }),
+    );
+
+    expect(started[0]).toEqual(["database", "queue"]);
+    expect(calls).not.toContain("mains");
+  });
+
+  it("starts no connector for a command that does not opt in", async () => {
+    await new PreloadManager().preload(commandWith({ config: ["app"] }));
+
+    expect(started).toEqual([]);
+    expect(calls).toEqual([]);
+  });
 });
