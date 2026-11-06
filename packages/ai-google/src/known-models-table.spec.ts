@@ -47,18 +47,30 @@ describe("Google model tables", () => {
   it("doubles gemini-4-argon on 2026-12-01", () => {
     const pricing = googlePricingFor("gemini-4-argon");
 
-    expect(computeCost(usage(1_000_000, 1_000_000), pricing, { at: "2026-11-30" })?.input).toBeCloseTo(2);
-    expect(computeCost(usage(1_000_000, 1_000_000), pricing, { at: "2026-11-30" })?.output).toBeCloseTo(10);
-    expect(computeCost(usage(1_000_000, 1_000_000), pricing, { at: "2026-12-01" })?.input).toBeCloseTo(4);
-    expect(computeCost(usage(1_000_000, 1_000_000), pricing, { at: "2026-12-01" })?.output).toBeCloseTo(20);
+    expect(
+      computeCost(usage(1_000_000, 1_000_000), pricing, { at: "2026-11-30" })?.input,
+    ).toBeCloseTo(2);
+    expect(
+      computeCost(usage(1_000_000, 1_000_000), pricing, { at: "2026-11-30" })?.output,
+    ).toBeCloseTo(10);
+    expect(
+      computeCost(usage(1_000_000, 1_000_000), pricing, { at: "2026-12-01" })?.input,
+    ).toBeCloseTo(4);
+    expect(
+      computeCost(usage(1_000_000, 1_000_000), pricing, { at: "2026-12-01" })?.output,
+    ).toBeCloseTo(20);
   });
 
   it("doubles the 3.6 and 3.8 Flash models on 2027-01-01", () => {
     for (const id of ["gemini-3.6-flash", "gemini-3.8-flash"]) {
       const pricing = googlePricingFor(id);
 
-      expect(computeCost(usage(1_000_000, 0), pricing, { at: "2026-12-31" })?.input).toBeCloseTo(0.75);
-      expect(computeCost(usage(1_000_000, 0), pricing, { at: "2027-01-01" })?.input).toBeCloseTo(1.5);
+      expect(computeCost(usage(1_000_000, 0), pricing, { at: "2026-12-31" })?.input).toBeCloseTo(
+        0.75,
+      );
+      expect(computeCost(usage(1_000_000, 0), pricing, { at: "2027-01-01" })?.input).toBeCloseTo(
+        1.5,
+      );
     }
   });
 

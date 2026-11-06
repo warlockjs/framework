@@ -84,7 +84,7 @@ xAI does **not** currently expose a public embeddings endpoint. `embedder()` is 
 
 ## Pricing — per-model registry
 
-https://docs.x.ai/docs/models (as of `XAI_MODEL_PRICING_AS_OF`, 2026-11-06) lists `grok-4.7`, `grok-4.6`, `grok-4.5`, `grok-4.3`, `grok-4.20-0309-reasoning`, `grok-4.20-0309-non-reasoning`, `grok-4.20-multi-agent-0309` and `grok-build-0.1`; their rates are built in as `XAI_MODEL_PRICING` (lookup: `xaiPricingFor(name)`). Each entry carries `tiers`: a prompt of 200k tokens or more bills every token of the request at the higher long-context rates. The Grok 4, 3 and 2 families have no listed price, so they stay unpriced unless you pass `pricing`. Resolution: per-model `pricing` > SDK registry > built-in table > `undefined` (no cost computed). `XAI_MODEL_LIFECYCLE` (`xaiLifecycleFor(name)`) marks the listed models `current`; xAI lists no retirement for any language model.
+https://docs.x.ai/docs/models (as of `XAI_MODEL_PRICING_AS_OF`, 2026-11-06) lists `grok-4.7`, `grok-4.6`, `grok-4.5`, `grok-4.3`, `grok-4.20-0309-reasoning`, `grok-4.20-0309-non-reasoning`, `grok-4.20-multi-agent-0309` and `grok-build-0.1`; their rates are built in as `XAI_MODEL_PRICING` (lookup: `xaiPricingFor(name)`). Each entry carries `tiers`: a prompt of 200k tokens or more bills every token of the request at the higher long-context rates. The Grok 4, 3 and 2 families have no listed price, so they stay unpriced unless you pass `pricing`. Resolution: per-model `pricing` > SDK registry > built-in table > `undefined` (no cost computed). `XAI_MODEL_LIFECYCLE` (`xaiLifecycleFor(name)`, checked `XAI_MODEL_LIFECYCLE_AS_OF`) marks the listed models `current`; xAI lists no retirement for any language model.
 
 ```ts
 import { ai, totalCost } from "@warlock.js/ai";

@@ -13,7 +13,9 @@ const ROOT = "/srv/app";
 /** A mock-backed ops whose backend records every directory it is asked to list. */
 function spiedOps(files: Record<string, string>, policy: Partial<WorkspacePolicy> = {}) {
   const mock = createMockBackend(
-    Object.fromEntries(Object.entries(files).map(([name, content]) => [`${ROOT}/${name}`, content])),
+    Object.fromEntries(
+      Object.entries(files).map(([name, content]) => [`${ROOT}/${name}`, content]),
+    ),
   );
   const listed: string[] = [];
   const backend: WorkspaceBackend = {
@@ -32,7 +34,7 @@ function spiedOps(files: Record<string, string>, policy: Partial<WorkspacePolicy
     stat: (absPath) => mock.stat!(absPath),
   };
 
-  return { ops: createOps(backend, { cwd: ROOT, ...policy }, {}), listed };
+  return { ops: createOps(backend, { cwd: ROOT, ...policy }), listed };
 }
 
 describe("staticGlobPrefix", () => {
@@ -114,7 +116,9 @@ describe("glob and grep walk", () => {
       "src/real.ts",
       "sub/root-only.ts",
     ]);
-    expect((await spiedOps(files, { search: { gitignore: false } }).ops.glob("**")).length).toBe(10);
+    expect((await spiedOps(files, { search: { gitignore: false } }).ops.glob("**")).length).toBe(
+      10,
+    );
   });
 
   it("applies a parent .gitignore when the search starts in a subfolder", async () => {
@@ -171,7 +175,10 @@ describe("glob and grep walk", () => {
   });
 
   it("works over a backend with no stat and no typed listing", async () => {
-    const mock = createMockBackend({ [`${ROOT}/src/a.ts`]: "a", [`${ROOT}/node_modules/p/i.ts`]: "i" });
+    const mock = createMockBackend({
+      [`${ROOT}/src/a.ts`]: "a",
+      [`${ROOT}/node_modules/p/i.ts`]: "i",
+    });
     const bare: WorkspaceBackend = {
       readFile: (p) => mock.readFile(p),
       writeFile: (p, c) => mock.writeFile(p, c),
@@ -182,7 +189,7 @@ describe("glob and grep walk", () => {
       realpath: (p) => mock.realpath(p),
       exec: (c, o) => mock.exec(c, o),
     };
-    const ops = createOps(bare, { cwd: ROOT }, {});
+    const ops = createOps(bare, { cwd: ROOT });
 
     expect(await ops.glob("**/*.ts")).toEqual(["src/a.ts"]);
   });
@@ -214,7 +221,7 @@ describe("glob and grep on the local backend", () => {
     await symlink(path.join(outside, "leak.ts"), path.join(jail, "src", "leak.ts"));
     await symlink(path.join(jail, "src", "a.ts"), path.join(jail, "src", "inner.ts"));
 
-    const ops = createOps(createLocalBackend(), { cwd: jail }, {});
+    const ops = createOps(createLocalBackend(), { cwd: jail });
 
     expect(await ops.glob("**/*.ts")).toEqual(["src/a.ts", "src/inner.ts"]);
     expect((await ops.grep("needle")).matches.map((match) => match.path)).toEqual([

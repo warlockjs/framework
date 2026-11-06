@@ -53,7 +53,6 @@ export type {
   WorkspaceBackendStartOptions,
   WorkspaceBackendDirEntry,
   WorkspaceBackendStat,
-  WorkspaceSearchPolicy,
   WorkspaceOutputStream,
 } from "./workspace-backend.contract";
 export type {
@@ -76,6 +75,7 @@ export type {
   WorkspaceListPolicy,
   WorkspacePolicy,
   WorkspaceReadPolicy,
+  WorkspaceSearchPolicy,
   WorkspaceShellInterpreter,
   WorkspaceShellPolicy,
 } from "./workspace-policy.type";

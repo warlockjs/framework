@@ -27,7 +27,6 @@ import {
   actingAs,
 } from "./authenticated-test-client";
 import { forgetOpenTestServer, trackOpenTestServer } from "./open-test-servers";
-import { timeTestStep } from "./test-runtime-scope";
 import { type TestRequestClient, createTestRequestClient } from "./test-helpers";
 
 export type CreateTestHttpServerOptions = {

@@ -35,12 +35,12 @@ Returns a `ModelContract` you pass straight into `ai.agent({ model })`.
 
 ## Models
 
-| Model               | Notes                                                                              |
-| ------------------- | ---------------------------------------------------------------------------------- |
-| `deepseek-flash` | Fast tier (served by DeepSeek-V4.1-Flash), 1M context. Reasoning **off** by default. |
-| `deepseek-v4-pro`   | Newer quality tier. Reasoning **on** by default.                                   |
+| Model             | Notes                                                                                |
+| ----------------- | ------------------------------------------------------------------------------------ |
+| `deepseek-flash`  | Fast tier (served by DeepSeek-V4.1-Flash), 1M context. Reasoning **off** by default. |
+| `deepseek-v4-pro` | Newer quality tier. Reasoning **on** by default.                                     |
 
-`deepseek-chat` and `deepseek-reasoner` were retired on 2026-07-24, and `deepseek-v4-flash` is a retired name that DeepSeek still accepts and serves with `deepseek-flash`, billed at the Flash price. Their status, dates and replacements are in `DEEPSEEK_MODEL_LIFECYCLE` (lookup: `deepseekLifecycleFor(name)`, checked `DEEPSEEK_MODEL_LIFECYCLE_AS_OF`); the capability inference still understands every name. `deepseek.model({ name })` accepts any id the upstream serves.
+`deepseek-chat` and `deepseek-reasoner` were retired on 2026-07-24, and `deepseek-v4-flash` is a retired name that DeepSeek still accepts and serves with `deepseek-flash`, billed at the Flash price. Their status, dates and replacements are in `DEEPSEEK_MODEL_LIFECYCLE` (lookup: `deepseekLifecycleFor(name)`, checked `DEEPSEEK_MODEL_LIFECYCLE_AS_OF`; the price table's check date is `DEEPSEEK_DEFAULT_PRICING_AS_OF`); the capability inference still understands every name. `deepseek.model({ name })` accepts any id the upstream serves.
 
 ## Capabilities — what's auto-set
 

@@ -680,7 +680,7 @@ USD pricing resolves from the `pricing[modelName]` entry, else the model's own `
 
 ### Prices, spend hook and per-session caps
 
-`pricing` takes a record or an `ai.pricing({ tables })` catalogue (provider tables such as `ANTHROPIC_MODEL_PRICING`, later tables win, `.set(model, price)` overrides, dated snapshot ids resolve to their alias; `.costUSD(usage, model)` prices a `Usage`). `onSpend(spend)` runs after every model call, before the caps are compared (so the breaching call is recorded), with `{ model, provider, sessionId, tripIndex, usage, costUSD, run, scopedKey }`; persist it there (errors are swallowed). `scoped: { window: "all" }` is a ledger that never resets: with `key: (ctx) => ctx.options?.sessionId` it is a per-session cap, with a user id a per-caller one. Add `reserve` to refuse a call _before_ it is made.
+`pricing` takes a record or an `ai.pricing({ tables })` catalogue (provider tables such as `ANTHROPIC_MODEL_PRICING`, later tables win, `.set(model, price)` overrides, dated snapshot ids resolve to their alias; `.costUSD(usage, model)` prices a `Usage`). A `ModelPricing` can carry `tiers` (`PricingTier[]`: rates for prompts longer than `abovePromptTokens`, cache reads and writes counted) and `schedule` (`PricingChange[]`: rates from an ISO date, UTC); `computeCost(usage, pricing, { at? })` and `resolvePricing(pricing, { promptTokens?, at? })` apply them, and the provider packages export `*_MODEL_LIFECYCLE` tables of `ModelLifecycle` (`status`: `current` / `retiring` / `retired`, `retiresOn?`, `replacement?`) beside their price tables. `onSpend(spend)` runs after every model call, before the caps are compared (so the breaching call is recorded), with `{ model, provider, sessionId, tripIndex, usage, costUSD, run, scopedKey }`; persist it there (errors are swallowed). `scoped: { window: "all" }` is a ledger that never resets: with `key: (ctx) => ctx.options?.sessionId` it is a per-session cap, with a user id a per-caller one. Add `reserve` to refuse a call _before_ it is made.
 
 ### Reserve-then-commit — `budget({ reserve })`
 
@@ -2958,7 +2958,7 @@ What `send(input, options)` does, under a per-session lock:
 2. Run `agent.execute(input, { ...options, history, captureMessages: true, sessionId: id })`.
 3. On success, store the run's messages (without the agent's system prompt) plus the final reply with its `blocks`; on a failed / cancelled run keep the old history. Clear `pending`.
 
-Stored turns keep every assistant tool-call turn and tool result, provider blocks (signed thinking, server compaction) and attachment parts, so a replayed thinking block sees exactly the history it was signed against.
+Stored turns keep every assistant tool-call turn and tool result, provider blocks (signed thinking, server compaction) and attachment parts, so a replayed thinking block sees exactly the history it was signed against. Tool results that returned `{ content: ToolResultPart[] }` (images) are stored as parts, not JSON text; older records saved as JSON text are restored on load. `AgentReport.messages[].contentParts` carries the parts beside the flat `content` string.
 
 ## The rest of the API
 
@@ -3028,6 +3028,10 @@ On Claude, `providerOptions.anthropic.serverCompaction` is the server-side alter
 - Don't edit stored messages in place: replayed thinking is valid only while every earlier message is unchanged. Truncate (drop from the end) or fork instead. To recover an edited Claude conversation, send `providerOptions.anthropic.thinkingBlockBinding: "drop_block"` through the agent's `modelOptions`.
 - The agent's system prompt is not stored; changing it changes the next turn's `system`, which also invalidates Claude's preserved thinking from earlier turns.
 - Without `durable` on the agent, `resume()` throws; the next `send` replaces the pending mark.
+
+## Token estimates for media parts
+
+Offline estimates (context-editing `clearAtLeast`, compaction triggers) count each image, PDF or audio part as `MEDIA_PART_TOKENS` (1,000) instead of by its base64 length; `approximateJsonTokens(value)` applies that rule to any stored message content.
 
 
 ## log-ai-calls  `@warlock.js/ai/skills/log-ai-calls/SKILL.md`

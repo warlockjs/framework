@@ -6,26 +6,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## 5.47.0
 
-### Changed
-
-- `glob` and `grep` no longer search `node_modules`, `.git` or gitignored paths by default. Set `search.skipDirs: [".git"]` to search `node_modules` again and `search.gitignore: false` to search ignored files; a pattern that names a skipped folder in its static prefix (`node_modules/pkg/*.json`) still searches it.
-
-### Fixed
-
-- `glob` and `grep` timed out on large workspaces because they listed every folder (including `node_modules` and `.git`) before matching, listed each entry a second time to tell files from folders, read all folders at once and ignored the run's `signal`. They now start at the pattern's static folder prefix (and at `grep`'s `glob` folder), drop `denyPaths`, skipped and gitignored folders before listing them, read folders with their types in one call, read 16 folders at a time and stop when the signal aborts. The jail, `denyPaths` and symlink rules are unchanged (symlinked folders are never followed).
-
 ### Added
 
 - `policy.search`: `skipDirs` (default `[".git", "node_modules"]`), `gitignore` (default `true`), `maxFiles` (default `50000`; the search stops there and the result carries `truncated: true` and `maxFilesReached: true`) and `concurrency` (default `16`). New type `WorkspaceSearchPolicy`.
 - `ws.glob(pattern, { signal })`, `ws.grep(pattern, { signal })`; the `glob` and `grep` tools pass the run's signal.
 - Optional `WorkspaceBackend.listTyped(absDir)` returning `{ path, type }` entries (type `WorkspaceBackendDirEntry`); the local backend implements it. Backends without it keep working through `list` plus `stat`.
-### Added
 
 - `hooks.onShellOutput({ callId?, jobId?, command, stream, chunk })` streams `run_shell` output while the command runs, for foreground commands and background jobs (a job's events carry its `jobId` and continue after `run_shell` returns). Chunks are decoded, ordered per stream and delivered at most about 20 times a second; a throwing hook is ignored and the tool result (truncation, spilling) is unchanged. `hooks.redactShellOutput(text)` masks secrets: output is buffered to whole lines before it is redacted so a secret split across reads is found, and `shell.env` values of eight or more characters are masked automatically. `ExecOptions.callId` is echoed on a foreground command's events, `WorkspaceBackendExecOptions.onOutput` lets a backend stream (the local backend does; others deliver the whole capture at the end), and the new type `WorkspaceShellOutputEvent` is exported.
 
 ### Changed
 
+- `glob` and `grep` no longer search `node_modules`, `.git` or gitignored paths by default. Set `search.skipDirs: [".git"]` to search `node_modules` again and `search.gitignore: false` to search ignored files; a pattern that names a skipped folder in its static prefix (`node_modules/pkg/*.json`) still searches it.
+
 - Under bash on Windows, a command line with an unquoted backslash before a letter, digit or dot inside a word (`cd ab\terra4\client`) is refused with `reason: "unsupported-syntax"` and a message showing the forward-slash form (`ab/terra4/client`), because bash reads the backslashes as escapes and runs a different path. Quoted paths and escaped spaces pass; bash on Linux and macOS is unchanged. `run_shell`'s description states the forward-slash rule for bash on Windows. `checkShellCommand` takes an optional `platform` option.
+
+### Fixed
+
+- `glob` and `grep` timed out on large workspaces because they listed every folder (including `node_modules` and `.git`) before matching, listed each entry a second time to tell files from folders, read all folders at once and ignored the run's `signal`. They now start at the pattern's static folder prefix (and at `grep`'s `glob` folder), drop `denyPaths`, skipped and gitignored folders before listing them, read folders with their types in one call, read 16 folders at a time and stop when the signal aborts. The jail, `denyPaths` and symlink rules are unchanged (symlinked folders are never followed).
 
 ## 5.45.0 - 2026-11-05
 

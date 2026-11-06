@@ -100,3 +100,7 @@ On Claude, `providerOptions.anthropic.serverCompaction` is the server-side alter
 - Don't edit stored messages in place: replayed thinking is valid only while every earlier message is unchanged. Truncate (drop from the end) or fork instead. To recover an edited Claude conversation, send `providerOptions.anthropic.thinkingBlockBinding: "drop_block"` through the agent's `modelOptions`.
 - The agent's system prompt is not stored; changing it changes the next turn's `system`, which also invalidates Claude's preserved thinking from earlier turns.
 - Without `durable` on the agent, `resume()` throws; the next `send` replaces the pending mark.
+
+## Token estimates for media parts
+
+Offline estimates (context-editing `clearAtLeast`, compaction triggers) count each image, PDF or audio part as `MEDIA_PART_TOKENS` (1,000) instead of by its base64 length; `approximateJsonTokens(value)` applies that rule to any stored message content.

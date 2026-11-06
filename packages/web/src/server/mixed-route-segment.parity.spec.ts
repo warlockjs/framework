@@ -83,19 +83,55 @@ const CASES: Array<[routes: readonly string[], urls: readonly string[]]> = [
   [["/:a-x-:b-y-:c"], ["/1-x-2-y-3", "/1-x-2-x-3-y-4-y-5"]],
   [["/pre-:id"], ["/pre-5", "/pre-1-2", "/other-5"]],
   [["/:name.png"], ["/logo.png", "/a.b.png", "/logo.jpg"]],
-  [["/:id", "/:type-for-:purpose"], ["/house-for-sale", "/abc"]],
-  [["/house-for-sale", "/:type-for-:purpose", "/:id"], ["/house-for-sale", "/flat-for-rent", "/abc"]],
-  [["/p-:a", "/:a-for-:b"], ["/p-for-b", "/p-1", "/q-for-z"]],
-  [["/x-for-:b", "/:a-for-:b"], ["/x-for-z", "/q-for-z"]],
-  [["/:a-for-z", "/:a-for-:b"], ["/x-for-z", "/x-for-q"]],
-  [["/:a-for-:b", "/:a"], ["/a-for-b", "/a", "/a-for-b/c"]],
-  [["/:a-for-:b", "/*"], ["/a-for-b", "/zz", "/a/b"]],
-  [["/a-:x/b", "/:y/c"], ["/a-1/b", "/a-1/c"]],
-  [["/p-:a/x", "/:a-for-:b/y"], ["/p-q-for-b/y", "/p-q/x", "/p-q/y"]],
+  [
+    ["/:id", "/:type-for-:purpose"],
+    ["/house-for-sale", "/abc"],
+  ],
+  [
+    ["/house-for-sale", "/:type-for-:purpose", "/:id"],
+    ["/house-for-sale", "/flat-for-rent", "/abc"],
+  ],
+  [
+    ["/p-:a", "/:a-for-:b"],
+    ["/p-for-b", "/p-1", "/q-for-z"],
+  ],
+  [
+    ["/x-for-:b", "/:a-for-:b"],
+    ["/x-for-z", "/q-for-z"],
+  ],
+  [
+    ["/:a-for-z", "/:a-for-:b"],
+    ["/x-for-z", "/x-for-q"],
+  ],
+  [
+    ["/:a-for-:b", "/:a"],
+    ["/a-for-b", "/a", "/a-for-b/c"],
+  ],
+  [
+    ["/:a-for-:b", "/*"],
+    ["/a-for-b", "/zz", "/a/b"],
+  ],
+  [
+    ["/a-:x/b", "/:y/c"],
+    ["/a-1/b", "/a-1/c"],
+  ],
+  [
+    ["/p-:a/x", "/:a-for-:b/y"],
+    ["/p-q-for-b/y", "/p-q/x", "/p-q/y"],
+  ],
   [["/files/*rest"], ["/files/a", "/files/a/b/c", "/files/a%20b/c"]],
-  [["/files/*rest", "/files/:id"], ["/files/a", "/files/a/b"]],
-  [["/files/*", "/files/:id"], ["/files/a", "/files/a/b"]],
-  [["/blog/:slug-:id", "/blog/*rest"], ["/blog/hello-5", "/blog/hello", "/blog/a/b"]],
+  [
+    ["/files/*rest", "/files/:id"],
+    ["/files/a", "/files/a/b"],
+  ],
+  [
+    ["/files/*", "/files/:id"],
+    ["/files/a", "/files/a/b"],
+  ],
+  [
+    ["/blog/:slug-:id", "/blog/*rest"],
+    ["/blog/hello-5", "/blog/hello", "/blog/a/b"],
+  ],
 ];
 
 describe("mixed and named-wildcard page routes pick the router's route with the router's params", () => {

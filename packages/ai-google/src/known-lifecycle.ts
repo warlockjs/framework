@@ -24,7 +24,11 @@ export const GOOGLE_MODEL_LIFECYCLE: Readonly<Record<string, ModelLifecycle>> = 
     retiresOn: "2027-05-07",
     replacement: "gemini-3.5-flash-lite",
   },
-  "gemini-2.5-pro": { status: "retiring", retiresOn: "2026-12-01", replacement: "gemini-3.8-flash" },
+  "gemini-2.5-pro": {
+    status: "retiring",
+    retiresOn: "2026-12-01",
+    replacement: "gemini-3.8-flash",
+  },
   "gemini-2.5-flash": {
     status: "retiring",
     retiresOn: "2026-12-01",
@@ -37,7 +41,11 @@ export const GOOGLE_MODEL_LIFECYCLE: Readonly<Record<string, ModelLifecycle>> = 
     retiresOn: "2026-03-09",
     replacement: "gemini-3.1-pro-preview",
   },
-  "gemini-2.0-flash": { status: "retired", retiresOn: "2026-06-01", replacement: "gemini-3.6-flash" },
+  "gemini-2.0-flash": {
+    status: "retired",
+    retiresOn: "2026-06-01",
+    replacement: "gemini-3.6-flash",
+  },
   "gemini-2.0-flash-lite": {
     status: "retired",
     retiresOn: "2026-06-01",

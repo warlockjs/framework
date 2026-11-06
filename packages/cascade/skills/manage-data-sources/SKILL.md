@@ -173,6 +173,8 @@ the data). Pick another zone with `clientOptions: { timezone: "Africa/Cairo" }`
 An app-supplied `-c TimeZone=…` in `clientOptions.options` or the connection
 string wins. MongoDB date helpers already default to UTC.
 
+`resolvePostgresStartupOptions(config)` returns the `options` startup string the driver sends (the merged `-c TimeZone=…` and any app options), for checking what a configuration resolves to.
+
 ## Things NOT to do
 
 - Don't call `dataSourceRegistry.register("name", config)` — `register` takes a single `DataSourceOptions` object (`{ name, driver, isDefault }`, `driver` being a built `DriverContract`); for the common case use `connectToDatabase({ name, ... })`.

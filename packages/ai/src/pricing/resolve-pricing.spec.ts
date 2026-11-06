@@ -134,7 +134,13 @@ describe("computeCost with tiers and tariffs", () => {
       cachedInput: 0.01,
       cacheWrite: 0.125,
       tiers: [
-        { abovePromptTokens: 100_000, input: 0.5, output: 2.5, cachedInput: 0.05, cacheWrite: 0.625 },
+        {
+          abovePromptTokens: 100_000,
+          input: 0.5,
+          output: 2.5,
+          cachedInput: 0.05,
+          cacheWrite: 0.625,
+        },
       ],
     };
 

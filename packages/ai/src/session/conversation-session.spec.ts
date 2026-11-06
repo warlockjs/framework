@@ -337,7 +337,10 @@ describe("ai.session", () => {
       await chat.send("look");
       const stored = await chat.history();
 
-      expect(stored[2]).toMatchObject({ role: "tool", content: [{ type: "text", text: "page" }, image] });
+      expect(stored[2]).toMatchObject({
+        role: "tool",
+        content: [{ type: "text", text: "page" }, image],
+      });
 
       await chat.send("again");
 

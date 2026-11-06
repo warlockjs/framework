@@ -2,7 +2,11 @@ import { computeCost, totalCost } from "@warlock.js/ai";
 import { describe, expect, it } from "vitest";
 import { inferContextWindow } from "./known-context-windows";
 import { OPENAI_MODEL_LIFECYCLE, openAILifecycleFor } from "./known-lifecycle";
-import { OPENAI_MODEL_PRICING, OPENAI_MODEL_PRICING_AS_OF, openAIPricingFor } from "./known-pricing";
+import {
+  OPENAI_MODEL_PRICING,
+  OPENAI_MODEL_PRICING_AS_OF,
+  openAIPricingFor,
+} from "./known-pricing";
 
 // Plain ids OpenAI documents only through dated snapshots or variants, so no status is claimed.
 const WITHOUT_STATUS = ["gpt-5.2", "gpt-4o", "gpt-4o-mini"];
@@ -19,16 +23,19 @@ describe("OpenAI model tables", () => {
     },
   );
 
-  it.each(Object.entries(OPENAI_MODEL_LIFECYCLE))("%s has a consistent lifecycle", (id, lifecycle) => {
-    expect(OPENAI_MODEL_PRICING[id]).toBeDefined();
+  it.each(Object.entries(OPENAI_MODEL_LIFECYCLE))(
+    "%s has a consistent lifecycle",
+    (id, lifecycle) => {
+      expect(OPENAI_MODEL_PRICING[id]).toBeDefined();
 
-    if (lifecycle.status === "current") {
-      expect(lifecycle.retiresOn).toBeUndefined();
-    } else {
-      expect(lifecycle.retiresOn).toMatch(/^\d{4}-\d{2}-\d{2}$/);
-      expect(lifecycle.replacement).toBeTruthy();
-    }
-  });
+      if (lifecycle.status === "current") {
+        expect(lifecycle.retiresOn).toBeUndefined();
+      } else {
+        expect(lifecycle.retiresOn).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+        expect(lifecycle.replacement).toBeTruthy();
+      }
+    },
+  );
 
   it("marks past shutdown dates retired and later ones retiring", () => {
     for (const lifecycle of Object.values(OPENAI_MODEL_LIFECYCLE)) {

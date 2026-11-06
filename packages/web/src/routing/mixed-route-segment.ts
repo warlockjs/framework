@@ -135,9 +135,7 @@ function escapeText(value: string): string {
 export function mixedSegmentSource(parts: readonly MixedSegmentPart[]): string {
   return parts
     .map((part) =>
-      part.type === "text"
-        ? escapeText(part.value)
-        : `([^/]{0,${MIXED_PARAMETER_MAX_LENGTH}})`,
+      part.type === "text" ? escapeText(part.value) : `([^/]{0,${MIXED_PARAMETER_MAX_LENGTH}})`,
     )
     .join("");
 }

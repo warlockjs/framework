@@ -10,6 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - `ai.session` stores a tool result that returned `{ content: ToolResultPart[] }` as parts, so later turns send the image as an image. It was saved as JSON text, and every following request paid for the base64 as text tokens. Records saved that way by earlier versions are restored as parts when loaded. `CapturedMessage.contentParts` carries the parts beside the flat `content` string on `AgentReport.messages`.
 - Client-side token estimates (`contextEditing.clearToolResults.clearAtLeast` and its trigger, compaction triggers) count each image, PDF or audio part as a fixed 1,000 tokens (`MEDIA_PART_TOKENS`, `approximateJsonTokens`) instead of by base64 length.
+
 ### Added
 
 - `ModelPricing` takes `tiers` (rates for requests whose prompt is longer than `abovePromptTokens`) and `schedule` (rates that take over from an ISO date). `computeCost` applies them, counting cache reads and writes in the prompt length; `computeCost(usage, pricing, { at })` costs at a given date. New `resolvePricing(pricing, { promptTokens, at })` returns the flat rates for one request, and the types `PricingTier`, `PricingChange` and `PricingRates` are exported.

@@ -1052,9 +1052,7 @@ class Ops implements WorkspaceOps {
   private async fitMatches(matches: GrepMatch[], maxFilesReached: boolean): Promise<GrepResult> {
     const result = await this.fitMatchesWithin(matches);
 
-    return maxFilesReached
-      ? { ...result, truncated: true, maxFilesReached: true }
-      : result;
+    return maxFilesReached ? { ...result, truncated: true, maxFilesReached: true } : result;
   }
 
   private async fitMatchesWithin(matches: GrepMatch[]): Promise<GrepResult> {

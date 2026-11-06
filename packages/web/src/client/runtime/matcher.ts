@@ -120,7 +120,9 @@ function decodeParameter(value: string): string {
 
 /** Whether a segment holding `:` could be a mixed segment rather than a malformed param. */
 function isMixedCandidate(segment: string): boolean {
-  return !segment.includes("*") && !segment.includes("%") && parseMixedSegment(segment).type === "mixed";
+  return (
+    !segment.includes("*") && !segment.includes("%") && parseMixedSegment(segment).type === "mixed"
+  );
 }
 
 function parsePattern(entry: ClientPageEntry): CompiledRoute {
@@ -155,7 +157,10 @@ function parsePattern(entry: ClientPageEntry): CompiledRoute {
       continue;
     }
 
-    if (segment.startsWith(":") && (PARAMETER_NAME.test(segment.slice(1)) || !isMixedCandidate(segment))) {
+    if (
+      segment.startsWith(":") &&
+      (PARAMETER_NAME.test(segment.slice(1)) || !isMixedCandidate(segment))
+    ) {
       const name = segment.slice(1);
       if (!PARAMETER_NAME.test(name)) {
         throw new Error(`Client route pattern '${original}' has an unsupported parameter segment`);
@@ -268,7 +273,8 @@ function compileRoutes(entries: readonly ClientPageEntry[]): readonly CompiledRo
     collisions.set(route.collisionKey, entry);
     if (hasMixedSegment(entry.path)) {
       const tied = entries.find(
-        (other) => other !== entry && hasMixedSegment(other.path) && mixedRoutesTie(other.path, entry.path),
+        (other) =>
+          other !== entry && hasMixedSegment(other.path) && mixedRoutesTie(other.path, entry.path),
       );
       if (tied) {
         throw new Error(

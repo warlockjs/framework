@@ -158,7 +158,9 @@ export async function clearOldToolResults(
     const freed = candidates.reduce((sum, index) => {
       const { content } = messages[index]!;
       const tokens =
-        typeof content === "string" ? approximateTokenCount(content) : approximateJsonTokens(content);
+        typeof content === "string"
+          ? approximateTokenCount(content)
+          : approximateJsonTokens(content);
 
       return sum + Math.max(0, tokens - placeholderTokens);
     }, 0);

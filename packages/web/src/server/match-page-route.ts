@@ -59,7 +59,8 @@ export function matchPath(pattern: string, pathname: string): Record<string, str
   }
 
   const params: Record<string, string> = {};
-  const fixedCount = wildcardName === undefined ? patternSegments.length : patternSegments.length - 1;
+  const fixedCount =
+    wildcardName === undefined ? patternSegments.length : patternSegments.length - 1;
 
   if (wildcardName !== undefined) {
     const rest = pathSegments.slice(fixedCount).map(decodeURIComponent).join("/");
@@ -89,7 +90,8 @@ export function matchPath(pattern: string, pathname: string): Record<string, str
 
     if (patternSegment.includes(":")) {
       const mixed = parseMixedSegment(patternSegment);
-      const values = mixed.type === "mixed" ? matchMixedSegment(mixed.parts, pathSegment) : undefined;
+      const values =
+        mixed.type === "mixed" ? matchMixedSegment(mixed.parts, pathSegment) : undefined;
       if (values === undefined) return undefined;
       Object.assign(params, values);
       continue;

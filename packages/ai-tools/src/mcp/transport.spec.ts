@@ -243,7 +243,11 @@ describe("HTTP transport — Streamable HTTP over fetch", () => {
         }),
     );
 
-    const client = createJsonRpcClient({ type: "http", url: "https://srv.test/mcp", fetch: injected });
+    const client = createJsonRpcClient({
+      type: "http",
+      url: "https://srv.test/mcp",
+      fetch: injected,
+    });
 
     await expect(client.call("ping")).resolves.toEqual({ ok: true });
     expect(injected).toHaveBeenCalledTimes(1);
@@ -259,7 +263,11 @@ describe("HTTP transport — Streamable HTTP over fetch", () => {
       });
     });
 
-    const client = createJsonRpcClient({ type: "http", url: "https://srv.test/mcp", fetch: failing });
+    const client = createJsonRpcClient({
+      type: "http",
+      url: "https://srv.test/mcp",
+      fetch: failing,
+    });
 
     await expect(client.call("slow", undefined, { timeoutMs: 400_000 })).rejects.toMatchObject({
       type: "timeout",

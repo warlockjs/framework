@@ -37,7 +37,8 @@ export async function loadTestAppModules(
 
     const collector = filesOrchestrator.specialFilesCollector;
     const onDisk = await appModuleEntriesOnDisk();
-    const found = collector.getFilesByType("route").length + collector.getFilesByType("main").length;
+    const found =
+      collector.getFilesByType("route").length + collector.getFilesByType("main").length;
 
     if (onDisk.length > 0 && found === 0) {
       throw new Error(

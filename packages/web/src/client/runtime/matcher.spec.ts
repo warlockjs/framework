@@ -401,7 +401,10 @@ describe("matchClientRoute — mixed segments and named wildcard", () => {
     const prefixed = entry("prefixed", "/x-for-:b");
     const suffixed = entry("suffixed", "/:a-for-z");
 
-    for (const order of [[generic, prefixed, suffixed], [suffixed, prefixed, generic]]) {
+    for (const order of [
+      [generic, prefixed, suffixed],
+      [suffixed, prefixed, generic],
+    ]) {
       expect(matchClientRoute(order, "/x-for-z")?.entry.name).toBe("prefixed");
       expect(matchClientRoute(order, "/q-for-z")?.entry.name).toBe("suffixed");
       expect(matchClientRoute(order, "/q-for-r")?.entry.name).toBe("generic");
@@ -435,8 +438,9 @@ describe("matchClientRoute — mixed segments and named wildcard", () => {
     expect(() =>
       matchClientRoute([entry("a", "/:a-for-:b"), entry("b", "/:x-for-:y")], "/q-for-r"),
     ).toThrow(/collide/);
-    expect(() => matchClientRoute([entry("a", "/files/*"), entry("b", "/files/*rest")], "/files/q"))
-      .toThrow(/collide/);
+    expect(() =>
+      matchClientRoute([entry("a", "/files/*"), entry("b", "/files/*rest")], "/files/q"),
+    ).toThrow(/collide/);
     expect(() => matchClientRoute([entry("a", "/:a-for-:a")], "/q-for-r")).toThrow(/repeats/);
   });
 });

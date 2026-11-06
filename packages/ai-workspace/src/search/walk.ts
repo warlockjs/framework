@@ -116,7 +116,12 @@ function parseGitignore(content: string, base: string): IgnoreRule[] {
 }
 
 /** Whether the ordered rules (last match wins) ignore the entry at `rel`. */
-function isIgnored(rel: string, name: string, isDir: boolean, rules: readonly IgnoreRule[]): boolean {
+function isIgnored(
+  rel: string,
+  name: string,
+  isDir: boolean,
+  rules: readonly IgnoreRule[],
+): boolean {
   let ignored = false;
 
   for (const rule of rules) {
@@ -269,7 +274,9 @@ export async function walkFiles(options: WalkOptions): Promise<WalkResult> {
 
     if (
       options.gitignore &&
-      entries.some((entry) => path.basename(entry.path) === ".gitignore" && entry.type !== "directory")
+      entries.some(
+        (entry) => path.basename(entry.path) === ".gitignore" && entry.type !== "directory",
+      )
     ) {
       rules = rules.concat(await readGitignore(backend, dir.abs, dir.rel));
     }
@@ -338,13 +345,14 @@ export async function walkFiles(options: WalkOptions): Promise<WalkResult> {
     for (let index = 0; index < level.length && !truncated; index += options.concurrency) {
       signal?.throwIfAborted();
 
-      await Promise.all(level.slice(index, index + options.concurrency).map((dir) => readDir(dir, next)));
+      await Promise.all(
+        level.slice(index, index + options.concurrency).map((dir) => readDir(dir, next)),
+      );
     }
 
     signal?.throwIfAborted();
     level = next;
   }
-
 
   return { files, truncated };
 }
