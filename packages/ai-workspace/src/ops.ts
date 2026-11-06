@@ -11,6 +11,14 @@ import { checkShellCommand } from "./policy/shell-check";
 import { resolveShell, type ResolvedShell } from "./policy/shell-interpreter";
 import { DEFAULT_MAX_BACKGROUND_JOBS, ShellJobs } from "./shell-jobs";
 import { executePatch } from "./patch/execute-patch";
+import {
+  DEFAULT_SEARCH_CONCURRENCY,
+  DEFAULT_SEARCH_MAX_FILES,
+  DEFAULT_SEARCH_SKIP_DIRS,
+  staticGlobPrefix,
+  walkFiles,
+  type WalkResult,
+} from "./search/walk";
 import type {
   ApplyPatchInput,
   ApplyPatchResult,
@@ -284,30 +292,43 @@ class Ops implements WorkspaceOps {
   }
 
   /**
-   * Recursively collect every file under `absDir` as absolute paths,
-   * via the backend's `list` (so it works over disk or the in-memory
-   * mock). Directories are descended; files are accumulated.
+   * Collect the files a `glob` or `grep` should look at, starting at the
+   * folder the pattern is anchored to (see {@link staticGlobPrefix}).
+   * `denyPaths`, `search.skipDirs` and `.gitignore` are applied before a
+   * directory is listed.
    */
-  private async walkFiles(absDir: string): Promise<string[]> {
-    const found: string[] = [];
-    const entries = await this.backend.list(absDir);
+  private async searchFiles(
+    jailRoot: string,
+    pattern: string | undefined,
+    signal: AbortSignal | undefined,
+  ): Promise<WalkResult> {
+    const prefix = pattern === undefined ? "" : staticGlobPrefix(pattern);
+    const search = this.policy.search;
+    let startDir = jailRoot;
 
-    await Promise.all(
-      entries.map(async (entry) => {
-        // A child is a directory iff listing it succeeds; the backend
-        // throws/returns for a file. Probe via `exists` + a list guard.
-        const isDir = await this.isDirectory(entry);
-
-        if (isDir) {
-          const nested = await this.walkFiles(entry);
-          found.push(...nested);
-        } else {
-          found.push(entry);
+    if (prefix !== "") {
+      try {
+        startDir = (await resolveInJail(this.policy, prefix)).absolutePath;
+      } catch (error) {
+        if (error instanceof WorkspacePolicyError) {
+          return { files: [], truncated: false };
         }
-      }),
-    );
 
-    return found;
+        throw error;
+      }
+    }
+
+    return walkFiles({
+      backend: this.backend,
+      jailRoot,
+      startDir,
+      denyPaths: this.policy.denyPaths ?? [],
+      skipDirs: search?.skipDirs ?? DEFAULT_SEARCH_SKIP_DIRS,
+      gitignore: search?.gitignore ?? true,
+      maxFiles: search?.maxFiles ?? DEFAULT_SEARCH_MAX_FILES,
+      concurrency: Math.max(1, search?.concurrency ?? DEFAULT_SEARCH_CONCURRENCY),
+      ...(signal ? { signal } : {}),
+    });
   }
 
   /** Whether an absolute path is a directory, by attempting to list it. */
@@ -925,7 +946,7 @@ class Ops implements WorkspaceOps {
 
   public async grep(
     pattern: string,
-    opts?: { glob?: string; ignoreCase?: boolean },
+    opts?: { glob?: string; ignoreCase?: boolean; signal?: AbortSignal },
   ): Promise<GrepResult> {
     if (!isSafeGrepPattern(pattern)) {
       throw new WorkspacePolicyError(
@@ -939,10 +960,13 @@ class Ops implements WorkspaceOps {
     const regex = new RegExp(pattern, flags);
     const globRegex = opts?.glob ? globToRegExp(opts.glob) : undefined;
 
-    const files = await this.walkFiles(jailRoot);
+    const walked = await this.searchFiles(jailRoot, opts?.glob, opts?.signal);
+    const files = walked.files.sort();
     const matches: GrepMatch[] = [];
 
     for (const absFile of files) {
+      opts?.signal?.throwIfAborted();
+
       const relativePath = path.relative(jailRoot, absFile).split(path.sep).join("/");
 
       if (globRegex && !globRegex.test(relativePath)) {
@@ -980,17 +1004,25 @@ class Ops implements WorkspaceOps {
           matches.push({ path: relativePath, line: index + 1, text: line });
 
           if (matches.length >= DEFAULT_MAX_GREP_MATCHES) {
-            return this.fitMatches(matches);
+            return this.fitMatches(matches, walked.truncated);
           }
         }
       }
     }
 
-    return this.fitMatches(matches);
+    return this.fitMatches(matches, walked.truncated);
   }
 
   /** Apply the `output` limits to a finished match list. */
-  private async fitMatches(matches: GrepMatch[]): Promise<GrepResult> {
+  private async fitMatches(matches: GrepMatch[], maxFilesReached: boolean): Promise<GrepResult> {
+    const result = await this.fitMatchesWithin(matches);
+
+    return maxFilesReached
+      ? { ...result, truncated: true, maxFilesReached: true }
+      : result;
+  }
+
+  private async fitMatchesWithin(matches: GrepMatch[]): Promise<GrepResult> {
     const fitted = await this.spiller.list(
       "grep",
       matches,
@@ -1009,28 +1041,37 @@ class Ops implements WorkspaceOps {
         };
   }
 
-  public async globResult(pattern: string): Promise<GlobResult> {
-    const all = await this.glob(pattern);
+  public async globResult(pattern: string, opts?: { signal?: AbortSignal }): Promise<GlobResult> {
+    const { paths: all, maxFilesReached } = await this.globWalk(pattern, opts?.signal);
     const fitted = await this.spiller.list("glob", all, (entry) => entry, "head");
+    const reached = maxFilesReached ? { truncated: true, maxFilesReached: true } : {};
 
     return fitted.truncation === undefined
-      ? { paths: all }
+      ? { paths: all, ...reached }
       : {
           paths: fitted.items,
           truncated: true,
           truncation: fitted.truncation,
           ...spilledField({ stdout: fitted.truncation }),
+          ...reached,
         };
   }
 
-  public async glob(pattern: string): Promise<string[]> {
+  public async glob(pattern: string, opts?: { signal?: AbortSignal }): Promise<string[]> {
+    return (await this.globWalk(pattern, opts?.signal)).paths;
+  }
+
+  /** Match `pattern` against the walked files; sorted, with whether the walk hit `maxFiles`. */
+  private async globWalk(
+    pattern: string,
+    signal: AbortSignal | undefined,
+  ): Promise<{ paths: string[]; maxFilesReached: boolean }> {
     const { absolutePath: jailRoot } = await resolveInJail(this.policy, ".");
     const regex = globToRegExp(pattern);
-
-    const files = await this.walkFiles(jailRoot);
+    const walked = await this.searchFiles(jailRoot, pattern, signal);
     const matched: string[] = [];
 
-    for (const absFile of files) {
+    for (const absFile of walked.files) {
       const relativePath = path.relative(jailRoot, absFile).split(path.sep).join("/");
 
       if (this.isDenied(relativePath)) {
@@ -1042,7 +1083,7 @@ class Ops implements WorkspaceOps {
       }
     }
 
-    return matched.sort();
+    return { paths: matched.sort(), maxFilesReached: walked.truncated };
   }
 
   public async exists(inputPath: string): Promise<boolean> {

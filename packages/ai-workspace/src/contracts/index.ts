@@ -51,7 +51,9 @@ export type {
   WorkspaceBackendExecResult,
   WorkspaceBackendProcess,
   WorkspaceBackendStartOptions,
+  WorkspaceBackendDirEntry,
   WorkspaceBackendStat,
+  WorkspaceSearchPolicy,
   WorkspaceOutputStream,
 } from "./workspace-backend.contract";
 export type {

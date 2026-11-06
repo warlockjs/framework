@@ -59,10 +59,11 @@ export function makeGrepTool(
       "and 1-based line number.",
     action: (input) => `Searching for /${input.pattern}/`,
     input: grepInputSchema,
-    async execute(input) {
+    async execute(input, ctx) {
       return ops.grep(input.pattern, {
         glob: input.glob,
         ignoreCase: input.ignoreCase,
+        ...(ctx?.signal ? { signal: ctx.signal } : {}),
       });
     },
   });

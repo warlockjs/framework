@@ -223,6 +223,28 @@ export interface WorkspaceListPolicy {
 }
 
 /**
+ * Search sub-policy for `glob` and `grep`. Both start at the pattern's
+ * static folder prefix and never read a denied, skipped or gitignored
+ * directory. The jail and `denyPaths` apply regardless of these settings.
+ */
+export interface WorkspaceSearchPolicy {
+  /**
+   * Directory names or globs (`*`, `**`, `?`; a name without a slash matches
+   * at any depth) that are never descended into. Default `[".git",
+   * "node_modules"]`; setting it replaces the default. A pattern whose
+   * static prefix names a skipped folder (`node_modules/pkg/*.json`) still
+   * searches it.
+   */
+  skipDirs?: string[];
+  /** Honour `.gitignore` files met on the way down. Default `true`. */
+  gitignore?: boolean;
+  /** Most files one search looks at before it stops and reports `truncated`. Default `50000`. */
+  maxFiles?: number;
+  /** Directories read at once. Default `16`. */
+  concurrency?: number;
+}
+
+/**
  * The full policy that bounds a workspace — the single source of truth
  * the policy engine enforces for both `.tools.*` and the direct methods.
  *
@@ -254,6 +276,8 @@ export interface WorkspacePolicy {
   read?: WorkspaceReadPolicy;
   /** Directory-listing sub-policy (ignore globs + bounds). */
   list?: WorkspaceListPolicy;
+  /** Search sub-policy for `glob` and `grep` (skipped folders, `.gitignore`, bounds). */
+  search?: WorkspaceSearchPolicy;
   /** Edit sub-policy (matching tiers, miss hints, line endings). */
   edit?: WorkspaceEditPolicy;
   /** Host callbacks, such as `afterEdit` diagnostics. */

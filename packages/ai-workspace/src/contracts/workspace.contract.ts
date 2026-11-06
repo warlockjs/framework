@@ -185,10 +185,13 @@ export interface Workspace {
   dispose(): Promise<void>;
 
   /** Search jailed file contents for a regex pattern. */
-  grep(pattern: string, opts?: { glob?: string; ignoreCase?: boolean }): Promise<GrepResult>;
+  grep(
+    pattern: string,
+    opts?: { glob?: string; ignoreCase?: boolean; signal?: AbortSignal },
+  ): Promise<GrepResult>;
 
   /** Resolve a glob to matching workspace-relative paths within the jail. */
-  glob(pattern: string): Promise<string[]>;
+  glob(pattern: string, opts?: { signal?: AbortSignal }): Promise<string[]>;
 
   /** Whether a jailed path exists (file or directory). */
   exists(path: string): Promise<boolean>;

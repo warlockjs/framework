@@ -54,15 +54,18 @@ export function makeGlobTool(
     description:
       "Find files in the workspace whose path matches a glob pattern " +
       "(supports `*`, `**`, and `?`). Returns the matching " +
-      "workspace-relative paths, sorted.",
+      "workspace-relative paths, sorted. Skips node_modules, .git and " +
+      "gitignored folders; start the pattern with a folder (`src/**/*.ts`) to search faster.",
     action: (input) => `Finding files matching ${input.pattern}`,
     input: globInputSchema,
-    async execute(input) {
+    async execute(input, ctx) {
+      const opts = ctx?.signal ? { signal: ctx.signal } : undefined;
+
       if (ops.globResult !== undefined) {
-        return ops.globResult(input.pattern);
+        return ops.globResult(input.pattern, opts);
       }
 
-      const paths = await ops.glob(input.pattern);
+      const paths = await ops.glob(input.pattern, opts);
 
       return { paths };
     },

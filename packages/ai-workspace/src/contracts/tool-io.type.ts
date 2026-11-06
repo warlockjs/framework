@@ -405,6 +405,8 @@ export interface GrepResult {
   truncation?: WorkspaceTruncation;
   /** Absolute path of the file holding the complete output, when it spilled to disk. */
   spilledTo?: string[];
+  /** True when the search stopped at `search.maxFiles` before it had looked at every file. */
+  maxFilesReached?: boolean;
 }
 
 /** Input to the `list_dir` tool. */
@@ -466,6 +468,8 @@ export interface GlobResult {
   truncation?: WorkspaceTruncation;
   /** Absolute path of the file holding the complete output, when it spilled to disk. */
   spilledTo?: string[];
+  /** True when the search stopped at `search.maxFiles` before it had looked at every file. */
+  maxFilesReached?: boolean;
 }
 
 /** State of one todo item. */

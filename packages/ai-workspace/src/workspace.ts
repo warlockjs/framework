@@ -370,13 +370,13 @@ class WorkspaceImpl implements Workspace {
 
   public grep(
     pattern: string,
-    opts?: { glob?: string; ignoreCase?: boolean },
+    opts?: { glob?: string; ignoreCase?: boolean; signal?: AbortSignal },
   ): Promise<GrepResult> {
     return this.ops.grep(pattern, opts);
   }
 
-  public glob(pattern: string): Promise<string[]> {
-    return this.ops.glob(pattern);
+  public glob(pattern: string, opts?: { signal?: AbortSignal }): Promise<string[]> {
+    return this.ops.glob(pattern, opts);
   }
 
   public exists(filePath: string): Promise<boolean> {
