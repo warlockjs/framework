@@ -223,6 +223,8 @@ export interface ExecOptions {
    * `cancelled: true`. The tools pass the agent run's signal here.
    */
   signal?: AbortSignal;
+  /** Echoed as `callId` on `hooks.onShellOutput` events for this command. */
+  callId?: string;
 }
 
 /** Input to the `run_shell` tool / `exec()` direct method. */

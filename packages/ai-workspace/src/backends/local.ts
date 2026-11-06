@@ -471,6 +471,14 @@ class LocalBackend implements WorkspaceBackend {
 
         signal?.removeEventListener("abort", onAbort);
 
+        for (const stream of ["stdout", "stderr"] as const) {
+          const tail = liveDecoders[stream].end();
+
+          if (tail !== "") {
+            opts.onOutput?.(stream, tail);
+          }
+        }
+
         resolve({
           exitCode,
           stdout: Buffer.concat(stdoutChunks).toString("utf8"),
@@ -480,12 +488,31 @@ class LocalBackend implements WorkspaceBackend {
         });
       };
 
+      const liveDecoders = {
+        stdout: new StringDecoder("utf8"),
+        stderr: new StringDecoder("utf8"),
+      };
+
+      const live = (stream: "stdout" | "stderr", chunk: Buffer): void => {
+        if (opts.onOutput === undefined || settled) {
+          return;
+        }
+
+        const text = liveDecoders[stream].write(chunk);
+
+        if (text !== "") {
+          opts.onOutput(stream, text);
+        }
+      };
+
       child.stdout?.on("data", (chunk: Buffer) => {
         stdoutBytes = pushCapped(stdoutChunks, stdoutBytes, chunk);
+        live("stdout", chunk);
       });
 
       child.stderr?.on("data", (chunk: Buffer) => {
         stderrBytes = pushCapped(stderrChunks, stderrBytes, chunk);
+        live("stderr", chunk);
       });
 
       // A spawn failure (e.g. the executable cannot be found) surfaces as

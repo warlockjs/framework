@@ -87,6 +87,7 @@ export type {
   WorkspaceEditMatchTier,
   WorkspaceEditPolicy,
   WorkspaceEditTool,
+  WorkspaceShellOutputEvent,
   WorkspaceHooks,
 } from "./workspace-edit.type";
 export type {

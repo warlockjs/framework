@@ -122,6 +122,10 @@ const DIALECT_RULES: Record<"posix" | "cmd" | "powershell" | "powershell5", stri
     "blocks, `Invoke-Expression`, here-strings, splatting and `if` / `foreach` are not supported.",
 };
 
+const WINDOWS_BASH_PATH_RULE =
+  " Write paths with forward slashes (`cd ab/terra4/client`, `C:/work/app`): bash reads an unquoted " +
+  "backslash as an escape, so a line with `ab\\terra4` is refused.";
+
 const PLATFORM_NAMES: Partial<Record<NodeJS.Platform, string>> = {
   win32: "Windows",
   darwin: "macOS",
@@ -140,7 +144,8 @@ function shellSentence(options: MakeRunShellToolOptions | undefined): string {
 
   return (
     ` Commands run on ${PLATFORM_NAMES[platform] ?? platform} using ${options.shellLabel}. ` +
-    DIALECT_RULES[dialect]
+    DIALECT_RULES[dialect] +
+    (platform === "win32" && options.shellLabel === "bash" ? WINDOWS_BASH_PATH_RULE : "")
   );
 }
 

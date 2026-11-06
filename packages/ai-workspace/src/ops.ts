@@ -3,6 +3,7 @@ import { fs } from "@warlock.js/fs";
 import { applyReplacement, type AppliedReplacementOptions } from "./edit/apply-replacement";
 import { WorkspaceEditError, WorkspacePolicyError } from "./errors";
 import { runAfterEdit } from "./hooks/after-edit";
+import { ShellOutputStreamer } from "./hooks/shell-output";
 import { OutputSpiller, splitLines } from "./output/spill";
 import { globToRegExp, isInside, matchesAnyGlob } from "./policy/jail";
 import { buildCommandEnv, resolveInJail } from "./policy/policy";
@@ -25,6 +26,7 @@ import type {
   EditFileInput,
   EditFileResult,
   ExecOptions,
+  WorkspaceBackendExecResult,
   GrepMatch,
   GlobResult,
   GrepResult,
@@ -688,16 +690,36 @@ class Ops implements WorkspaceOps {
     const maxOutputBytes = shell?.maxOutputBytes ?? DEFAULT_MAX_OUTPUT_BYTES;
     const interpreter = this.resolvedShell.interpreter;
 
-    const result = await this.backend.exec(command, {
-      cwd: this.policy.cwd,
-      timeoutMs,
-      env: buildCommandEnv(this.policy),
-      ...(signal ? { signal } : {}),
-      ...(interpreter !== "none" ? { interpreter } : {}),
-      ...(interpreter !== "none" && this.resolvedShell.file !== undefined
-        ? { interpreterPath: this.resolvedShell.file }
-        : {}),
-    });
+    const env = buildCommandEnv(this.policy);
+    const live = ShellOutputStreamer.create(
+      this.policy.hooks,
+      { command, ...(opts?.callId !== undefined ? { callId: opts.callId } : {}) },
+      this.policy.shell?.env,
+    );
+
+    let result: WorkspaceBackendExecResult;
+
+    try {
+      result = await this.backend.exec(command, {
+        cwd: this.policy.cwd,
+        timeoutMs,
+        env,
+        ...(live ? { onOutput: (stream, chunk) => live.push(stream, chunk) } : {}),
+        ...(signal ? { signal } : {}),
+        ...(interpreter !== "none" ? { interpreter } : {}),
+        ...(interpreter !== "none" && this.resolvedShell.file !== undefined
+          ? { interpreterPath: this.resolvedShell.file }
+          : {}),
+      });
+
+      // A backend that cannot stream hands over its capture at the end.
+      if (live !== undefined && !live.received) {
+        live.push("stdout", result.stdout);
+        live.push("stderr", result.stderr);
+      }
+    } finally {
+      live?.end();
+    }
 
     const stdout = await this.fitStream("run_shell-stdout", result.stdout, maxOutputBytes);
     const stderr = await this.fitStream("run_shell-stderr", result.stderr, maxOutputBytes);
@@ -749,14 +771,27 @@ class Ops implements WorkspaceOps {
       retainBytes: shell?.maxOutputBytes ?? DEFAULT_MAX_OUTPUT_BYTES,
       maxJobs: background.maxJobs ?? DEFAULT_MAX_BACKGROUND_JOBS,
       ...(timeoutMs !== undefined ? { timeoutMs } : {}),
-      launch: (onOutput) =>
-        start(command, {
+      launch: (onOutput, jobId) => {
+        const live = ShellOutputStreamer.create(
+          this.policy.hooks,
+          { command, jobId },
+          this.policy.shell?.env,
+        );
+        const handle = start(command, {
           cwd: this.policy.cwd,
           env,
           ...(interpreter !== "none" ? { interpreter } : {}),
           ...(interpreterPath !== undefined ? { interpreterPath } : {}),
-          onOutput,
-        }),
+          onOutput: (stream, chunk) => {
+            onOutput(stream, chunk);
+            live?.push(stream, chunk);
+          },
+        });
+
+        void handle.done.then(() => live?.end());
+
+        return handle;
+      },
     });
   }
 

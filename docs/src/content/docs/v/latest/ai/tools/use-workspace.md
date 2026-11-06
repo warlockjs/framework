@@ -181,6 +181,8 @@ Every shell refusal is a `WorkspacePolicyError` with `type: "denied-command"` an
 
 **PowerShell** lines support `;`, line breaks, `&&` and `||`, pipelines, `$( )` subexpressions (their commands are checked), the call operator `&` before a command, single and double quotes, `$name` / `$env:NAME` (dynamic words), and the redirections `>`, `>>`, `2>`, `2>>`, `*>` and `2>&1` (`$null` is always fine). It refuses, as `"unsupported-syntax"`: script blocks and braces, bare parentheses, `@( )` / `@{ }` / splatting / here-strings, `--%`, `<`, comments, the comma operator, statements (`if`, `foreach`, `function`, `try`, …), dot-sourcing, `&` as a background job, and `Push-Location` / `pushd` / `popd`. `Invoke-Expression` / `iex`, `Invoke-Command`, `Start-Process`, `Add-Type`, `Set-Alias`, `Invoke-Item`, and `powershell` / `pwsh` themselves (`-Command`, `-EncodedCommand`) run code the policy cannot see, so they are refused as `"nested-command"` while deny rules exist. `Set-Location` / `sl` / `cd` / `chdir` take one directory (`-Path`, `-LiteralPath` or positional) and must stay in the jail.
 
+**Bash on Windows (Git Bash)** reads an unquoted backslash as an escape, so `cd ab\terra4\client` would run a different path. A line with an unquoted backslash before a letter, digit or dot inside a word is refused (`reason: "unsupported-syntax"`) with the forward-slash form in the message (`ab/terra4/client`), and `run_shell`'s description tells the model to write paths with forward slashes. Quoted paths (`"ab\x"`) and escaped spaces (`a\ b`) are unaffected, and bash on Linux and macOS is unchanged.
+
 **Windows PowerShell 5.1** (`powershell.exe`) has no `&&` or `||`, so it reads the same grammar without them: a line that uses either is refused as `"unsupported-syntax"` with "Windows PowerShell 5.1 cannot run &&; use ; or run each command in its own call instead.", and `run_shell`'s description tells the model not to chain. `resolveShell()` reports `edition` (`"desktop"` for 5.1, `"core"` for PowerShell 7+) and `version` (`"5.1"` for Windows PowerShell; for `pwsh` only when the host supplies it through `ShellHost.powershellVersion`). The edition comes from the executable that was found, and the dialect is `"powershell5"` for 5.1 and `"powershell"` for 7+. Install `pwsh` or pick `interpreter: "bash"` (Git Bash) when the agent needs `&&`.
 
 PowerShell names the same command many ways, so each command is checked as written **and** in a canonical form: `Remove-Item` / `ri` / `rm` / `del` / `erase` / `rd` / `rmdir` become `rm` with `-Recurse` / `-Force` (and their unambiguous prefixes) turned into `-rf`; `Copy-Item`, `Move-Item`, `Get-ChildItem`, `Get-Content`, `Invoke-WebRequest` and `Stop-Process` map to `cp`, `mv`, `ls`, `cat`, `curl` and `kill` the same way. A `denyPatterns` entry of `"rm -rf"` therefore stops `Remove-Item -Recurse -Force x`. The canonical form skips the `allow` list (which names the spelling you wrote) but runs `deny`, `denyPatterns`, `allowCommand` and the rules.
@@ -404,6 +406,23 @@ ai.workspace({
 ```
 
 After `write_file`, `edit_file`, `multi_edit` or `apply_patch` writes files, the hook runs once per call with the written paths (not on a patch `dryRun`, not for deleted files). Text it returns comes back on the result as `diagnostics`, between `[diagnostics]` and `[/diagnostics]` lines; output over `afterEditMaxChars` is cut with a marker. A hook that throws or does not answer within `afterEditTimeoutMs` yields `diagnostics unavailable` and never fails the edit.
+
+## Live shell output — `hooks.onShellOutput`
+
+```ts
+workspace({
+  cwd,
+  shell: { allow: ["npm"], env: { API_KEY: process.env.API_KEY! } },
+  hooks: {
+    onShellOutput: ({ command, stream, chunk, jobId, callId }) => ui.append(chunk),
+    redactShellOutput: (text) => text.replace(/sk-[a-z0-9]+/g, "[redacted]"),
+  },
+});
+```
+
+`run_shell` returns its output when the command ends; `onShellOutput` (event type `WorkspaceShellOutputEvent`) lets a host that shows the session to a person see it while the command runs. It fires for foreground commands and for background jobs (`jobId` is set; it keeps firing after `run_shell` has returned). Text is decoded, in order per stream, delivered at most about 20 times a second (faster output is merged), and never changes the result the agent gets (truncation and spilling are as before). A hook that throws is ignored. Pass `callId` to `ws.exec(command, { callId })` to have it echoed on a foreground command's events. A backend that cannot stream delivers the whole capture once, when the command ends.
+
+The workspace redacts nothing in results, so live text is raw unless you mask it. Redaction needs a secret in one piece but a process writes in arbitrary pieces, so output is buffered to line boundaries first and then redacted: a secret split across two reads is whole by the time `redactShellOutput(text)` sees it. The unfinished last line is held until its newline arrives or the command ends (a line over 16 KB is cut, keeping its last 512 characters back). Values in `shell.env` of eight or more characters are masked as `[redacted]` before `redactShellOutput` runs. If the redactor throws, that text is dropped, never delivered unmasked. A secret that contains a newline cannot be matched this way.
 
 ## Oversized output — `output`
 

@@ -158,6 +158,8 @@ for (const file of await ws.glob("src/models/**/*.ts")) {
   unique, and a miss returns a `hint` with the closest text.
 - **`hooks.afterEdit`** — runs after a write and returns compiler or linter output as
   `diagnostics` on the result; a throw or timeout never fails the edit.
+- **`hooks.onShellOutput`** — live `run_shell` output (foreground and background), throttled,
+  line-buffered so `hooks.redactShellOutput` sees whole lines; never changes the result.
 - **`output.spillDir`** — oversized `run_shell`, `shell_output`, `grep`, `glob` and
   `read_file` output is saved to a file; the result keeps head and tail plus a pointer.
 - **Bounded reads** — `read.maxBytes` caps the UTF-8 bytes a read returns (line
