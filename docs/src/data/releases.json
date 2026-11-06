@@ -1,4 +1,23 @@
 {
+  "5.47.0": {
+    "publishedAt": "2026-11-06T17:37:21.608Z",
+    "matrix": "none",
+    "headline": "Image tool results that stay images across session turns, workspace search that skips dependency folders, PostgreSQL date helpers in UTC, and SEO-style page route segments.",
+    "highlights": [
+      "`ai.session` stores image tool results as parts, so later turns send images instead of paying for base64 as text; records saved by 5.45 and 5.46 are repaired on load.",
+      "Workspace `glob` and `grep` start at the pattern's folder, skip `node_modules`, `.git` and gitignored paths, honour the run's signal and stop at `search.maxFiles`; `hooks.onShellOutput` streams `run_shell` output live.",
+      "PostgreSQL connections run in UTC by default (`timezone` option), so `groupByDate` and `whereDate*` match how dates are stored.",
+      "Model `saved` / `updated` listeners receive the save's changes (`changes`, `getLastSaveChanges()`), `model.isFilled(field)` checks for null or missing values, and every `pg` pool option is forwarded.",
+      "Page routes accept `/:type-for-:purpose`, `/near/:lat-:lng` and `/files/*rest`, with the same matching on server and browser.",
+      "Model lifecycle tables, prompt-length pricing tiers and dated tariffs, with refreshed models and context windows across the provider adapters.",
+      "MCP http calls take a custom `fetch` for long calls and report stalls as timeouts; `v.array(v.file())` accepts a single file; the test server loads app modules again."
+    ],
+    "upgradeNotes": [
+      "PostgreSQL sessions now start in UTC; set `timezone` in the connection options (or `false`) if raw SQL relied on the server's zone.",
+      "Workspace `glob` and `grep` skip `node_modules`, `.git` and gitignored paths by default; set `search.skipDirs: [\".git\"]` or `search.gitignore: false` to search them.",
+      "Under bash on Windows, unquoted backslash paths are refused with the forward-slash form."
+    ]
+  },
   "5.46.0": {
     "publishedAt": "2026-11-06T12:29:59.186Z",
     "matrix": "none",

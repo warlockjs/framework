@@ -136,6 +136,438 @@
   ],
   "releases": [
     {
+      "version": "5.47.0",
+      "id": "v5-47-0",
+      "date": "November 6, 2026",
+      "isUnreleased": false,
+      "headlineHtml": "Image tool results that stay images across session turns, workspace search that skips dependency folders, PostgreSQL date helpers in UTC, and SEO-style page route segments.",
+      "highlights": [
+        "<code>ai.session</code> stores image tool results as parts, so later turns send images instead of paying for base64 as text; records saved by 5.45 and 5.46 are repaired on load.",
+        "Workspace <code>glob</code> and <code>grep</code> start at the pattern's folder, skip <code>node_modules</code>, <code>.git</code> and gitignored paths, honour the run's signal and stop at <code>search.maxFiles</code>; <code>hooks.onShellOutput</code> streams <code>run_shell</code> output live.",
+        "PostgreSQL connections run in UTC by default (<code>timezone</code> option), so <code>groupByDate</code> and <code>whereDate*</code> match how dates are stored.",
+        "Model <code>saved</code> / <code>updated</code> listeners receive the save's changes (<code>changes</code>, <code>getLastSaveChanges()</code>), <code>model.isFilled(field)</code> checks for null or missing values, and every <code>pg</code> pool option is forwarded.",
+        "Page routes accept <code>/:type-for-:purpose</code>, <code>/near/:lat-:lng</code> and <code>/files/*rest</code>, with the same matching on server and browser.",
+        "Model lifecycle tables, prompt-length pricing tiers and dated tariffs, with refreshed models and context windows across the provider adapters.",
+        "MCP http calls take a custom <code>fetch</code> for long calls and report stalls as timeouts; <code>v.array(v.file())</code> accepts a single file; the test server loads app modules again."
+      ],
+      "upgradeNotes": [
+        "PostgreSQL sessions now start in UTC; set <code>timezone</code> in the connection options (or <code>false</code>) if raw SQL relied on the server's zone.",
+        "Workspace <code>glob</code> and <code>grep</code> skip <code>node_modules</code>, <code>.git</code> and gitignored paths by default; set <code>search.skipDirs: [\".git\"]</code> or <code>search.gitignore: false</code> to search them.",
+        "Under bash on Windows, unquoted backslash paths are refused with the forward-slash form."
+      ],
+      "summaryHtml": null,
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/5.47.0-summary.md",
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/ai-workspace",
+          "slug": "ai-workspace",
+          "total": 7,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 4
+            },
+            {
+              "type": "Changed",
+              "n": 2
+            },
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>policy.search</code>: <code>skipDirs</code> (default <code>[\".git\", \"node_modules\"]</code>), <code>gitignore</code> (default <code>true</code>), <code>maxFiles</code> (default <code>50000</code>; the search stops there and the result carries <code>truncated: true</code> and <code>maxFilesReached: true</code>) and <code>concurrency</code> (default <code>16</code>). New type <code>WorkspaceSearchPolicy</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<code>ws.glob(pattern, { signal })</code>, <code>ws.grep(pattern, { signal })</code>; the <code>glob</code> and <code>grep</code> tools pass the run's signal."
+            },
+            {
+              "type": "Added",
+              "html": "Optional <code>WorkspaceBackend.listTyped(absDir)</code> returning <code>{ path, type }</code> entries (type <code>WorkspaceBackendDirEntry</code>); the local backend implements it. Backends without it keep working through <code>list</code> plus <code>stat</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<code>hooks.onShellOutput({ callId?, jobId?, command, stream, chunk })</code> streams <code>run_shell</code> output while the command runs, for foreground commands and background jobs (a job's events carry its <code>jobId</code> and continue after <code>run_shell</code> returns). Chunks are decoded, ordered per stream and delivered at most about 20 times a second; a throwing hook is ignored and the tool result (truncation, spilling) is unchanged. <code>hooks.redactShellOutput(text)</code> masks secrets: output is buffered to whole lines before it is redacted so a secret split across reads is found, and <code>shell.env</code> values of eight or more characters are masked automatically. <code>ExecOptions.callId</code> is echoed on a foreground command's events, <code>WorkspaceBackendExecOptions.onOutput</code> lets a backend stream (the local backend does; others deliver the whole capture at the end), and the new type <code>WorkspaceShellOutputEvent</code> is exported."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>glob</code> and <code>grep</code> no longer search <code>node_modules</code>, <code>.git</code> or gitignored paths by default. Set <code>search.skipDirs: [\".git\"]</code> to search <code>node_modules</code> again and <code>search.gitignore: false</code> to search ignored files; a pattern that names a skipped folder in its static prefix (<code>node_modules/pkg/*.json</code>) still searches it."
+            },
+            {
+              "type": "Changed",
+              "html": "Under bash on Windows, a command line with an unquoted backslash before a letter, digit or dot inside a word (<code>cd ab\\terra4\\client</code>) is refused with <code>reason: \"unsupported-syntax\"</code> and a message showing the forward-slash form (<code>ab/terra4/client</code>), because bash reads the backslashes as escapes and runs a different path. Quoted paths and escaped spaces pass; bash on Linux and macOS is unchanged. <code>run_shell</code>'s description states the forward-slash rule for bash on Windows. <code>checkShellCommand</code> takes an optional <code>platform</code> option."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>glob</code> and <code>grep</code> timed out on large workspaces because they listed every folder (including <code>node_modules</code> and <code>.git</code>) before matching, listed each entry a second time to tell files from folders, read all folders at once and ignored the run's <code>signal</code>. They now start at the pattern's static folder prefix (and at <code>grep</code>'s <code>glob</code> folder), drop <code>denyPaths</code>, skipped and gitignored folders before listing them, read folders with their types in one call, read 16 folders at a time and stop when the signal aborts. The jail, <code>denyPaths</code> and symlink rules are unchanged (symlinked folders are never followed)."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/cascade",
+          "slug": "cascade",
+          "total": 6,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 4
+            },
+            {
+              "type": "Changed",
+              "n": 1
+            },
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "PostgreSQL pool config accepts <code>options</code> (the <code>options</code> startup parameter) and <code>timezone</code>. MongoDB date helpers were checked: they run in UTC by default and are unaffected."
+            },
+            {
+              "type": "Added",
+              "html": "<code>model.isFilled(field)</code>: <code>true</code> when the field exists and is neither <code>null</code> nor <code>undefined</code>. A column that was never set reads back as <code>null</code> on PostgreSQL (and is absent on MongoDB), so <code>=== undefined</code> checks pass for it; <code>has()</code> is also <code>true</code> for a <code>null</code> column. <code>isFilled()</code> treats both the same way."
+            },
+            {
+              "type": "Added",
+              "html": "<code>saved</code>, <code>created</code> and <code>updated</code> listeners now receive the change diff in their context (<code>changes</code>: each changed column with its <code>oldValue</code> / <code>newValue</code>, <code>changedColumns</code>, plus <code>isInsert</code>, <code>options</code> and <code>mode</code>). Before, the dirty tracker had already reset when these events fired, so a listener could not tell which fields changed. The tracker still resets before the events, so a listener that saves again sees fresh state."
+            },
+            {
+              "type": "Added",
+              "html": "<code>model.getLastSaveChanges()</code> returns the diff of the last successful <code>save()</code>, during the post-save events and afterwards. It is empty for an insert."
+            },
+            {
+              "type": "Changed",
+              "html": "Behaviour change, PostgreSQL: every connection now starts with its session time zone pinned to <code>UTC</code> (sent as the <code>options</code> startup parameter, so pooled connections need no extra round trip). Before, the session followed the database server's zone, which shifted <code>groupByDate</code> buckets and <code>whereDate</code> / <code>whereDateBetween</code> results for rows near a day or month boundary whenever that zone was not UTC. Raw SQL such as <code>now()::date</code> also runs in UTC now. To choose another zone set <code>timezone</code> (e.g. <code>clientOptions: { timezone: \"Africa/Cairo\" }</code>); to keep the server's zone set <code>timezone: false</code>. An explicit <code>-c TimeZone=…</code> in <code>options</code> or in the connection string still wins."
+            },
+            {
+              "type": "Fixed",
+              "html": "PostgreSQL pool config forwards every <code>clientOptions</code> key <code>pg</code> accepts (<code>statement_timeout</code>, <code>query_timeout</code>, <code>lock_timeout</code>, <code>idle_in_transaction_session_timeout</code>, <code>keepAliveInitialDelayMillis</code>, <code>allowExitOnIdle</code>, <code>client_encoding</code>, <code>types</code>, …) instead of dropping the ones it did not list. Only Cascade's own keys (<code>naming</code>, <code>timezone</code>, <code>nativeArrayColumns</code>, <code>logging</code>) are kept out; Cascade's pool defaults still apply."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 6,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            },
+            {
+              "type": "Fixed",
+              "n": 5
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>npx warlock release-notes</code> includes the 5.47.0 notes: image tool results stored as parts, workspace search that skips dependency folders and a live shell output hook, PostgreSQL sessions in UTC, the save's changes in <code>saved</code> / <code>updated</code> listeners, mixed page-route segments, model lifecycle and tiered pricing tables, long MCP calls, single-file array uploads, and the test server loading app modules again."
+            },
+            {
+              "type": "Fixed",
+              "html": "<strong>A single upload under an array field validates</strong> — <code>v.array(v.file())</code> now accepts one file sent without <code>[]</code>, and <code>request.files(name)</code> returns it as a one-element array. <code>UploadedFile</code> carries a registered brand so validators can recognise it."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>createTestHttpServer({ loadAppModules: true })</code> served an empty application: module discovery read the project files but never classified them, so no <code>routes.ts</code> or <code>main.ts</code> was imported and the router and <code>main.ts</code> registries stayed empty. Files are now classified after they are read."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>loadAppModules: true</code> now throws, naming the project root and file counts, when the project has route or <code>main.ts</code> files on disk and none were loaded, instead of silently serving no routes."
+            },
+            {
+              "type": "Fixed",
+              "html": "Modules loaded for one project root are no longer reused when a worker moves to another root."
+            },
+            {
+              "type": "Fixed",
+              "html": "The boot manifest path (<code>.warlock/manifest.json</code>) is resolved from the current directory on each use, not once when the framework is imported, so a process that changes directory never reads or writes another project's manifest."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai",
+          "slug": "ai",
+          "total": 4,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 2
+            },
+            {
+              "type": "Fixed",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>ModelPricing</code> takes <code>tiers</code> (rates for requests whose prompt is longer than <code>abovePromptTokens</code>) and <code>schedule</code> (rates that take over from an ISO date). <code>computeCost</code> applies them, counting cache reads and writes in the prompt length; <code>computeCost(usage, pricing, { at })</code> costs at a given date. New <code>resolvePricing(pricing, { promptTokens, at })</code> returns the flat rates for one request, and the types <code>PricingTier</code>, <code>PricingChange</code> and <code>PricingRates</code> are exported."
+            },
+            {
+              "type": "Added",
+              "html": "<code>ModelLifecycle</code> and <code>ModelLifecycleStatus</code> (<code>current</code>, <code>retiring</code>, <code>retired</code>, with <code>retiresOn</code> and <code>replacement</code>) are the types of the provider packages' model lifecycle tables."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>ai.session</code> stores a tool result that returned <code>{ content: ToolResultPart[] }</code> as parts, so later turns send the image as an image. It was saved as JSON text, and every following request paid for the base64 as text tokens. Records saved that way by earlier versions are restored as parts when loaded. <code>CapturedMessage.contentParts</code> carries the parts beside the flat <code>content</code> string on <code>AgentReport.messages</code>."
+            },
+            {
+              "type": "Fixed",
+              "html": "Client-side token estimates (<code>contextEditing.clearToolResults.clearAtLeast</code> and its trigger, compaction triggers) count each image, PDF or audio part as a fixed 1,000 tokens (<code>MEDIA_PART_TOKENS</code>, <code>approximateJsonTokens</code>) instead of by base64 length."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-deepseek",
+          "slug": "ai-deepseek",
+          "total": 3,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 2
+            },
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>deepseek-flash</code> is in <code>DEEPSEEK_CHAT_MODELS</code> and reports a 1,000,000-token <code>capabilities.contextWindow</code>, as do the <code>deepseek-v4-*</code> ids (previously 128,000)."
+            },
+            {
+              "type": "Added",
+              "html": "<code>DEEPSEEK_MODEL_LIFECYCLE</code> and <code>deepseekLifecycleFor(name)</code> give each model a status; <code>DEEPSEEK_DEFAULT_PRICING_AS_OF</code> dates the price table."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>DEEPSEEK_CHAT_MODELS</code> no longer lists <code>deepseek-chat</code> and <code>deepseek-reasoner</code> (retired 2026-07-24) or <code>deepseek-v4-flash</code>; they are <code>retired</code> in <code>DEEPSEEK_MODEL_LIFECYCLE</code>, and <code>deepseek.model({ name })</code> still accepts them."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-google",
+          "slug": "ai-google",
+          "total": 3,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 3
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>GOOGLE_MODEL_PRICING</code> lists <code>gemini-4-argon</code>, <code>gemini-3.8-flash</code>, <code>gemini-3.6-flash</code> and <code>gemini-3.1-pro-preview</code> besides <code>gemini-3.5-flash-lite</code>. Scheduled prices are in <code>schedule</code> (<code>gemini-4-argon</code> doubles on 2026-12-01, the 3.6 and 3.8 Flash models on 2027-01-01) and <code>gemini-3.1-pro-preview</code> carries <code>tiers</code> for prompts above 200k tokens. <code>GOOGLE_MODEL_PRICING_AS_OF</code> dates the table."
+            },
+            {
+              "type": "Added",
+              "html": "<code>GOOGLE_MODEL_LIFECYCLE</code> and <code>googleLifecycleFor(name)</code> give each model a status: <code>gemini-2.5-pro</code> and <code>gemini-2.5-flash</code> are <code>retiring</code> on 2026-12-01, <code>gemini-3.1-flash-lite</code> on 2027-05-07, and <code>gemini-3.5-flash</code> and the 2.0 Flash models are <code>retired</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<code>gemini-4-argon</code> reports a 1,048,576-token <code>capabilities.contextWindow</code>."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-groq",
+          "slug": "ai-groq",
+          "total": 3,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 2
+            },
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>qwen/qwen3.8-27b</code> is in <code>GROQ_KNOWN_MODELS</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<code>GROQ_MODEL_LIFECYCLE</code> and <code>groqLifecycleFor(name)</code> give each model a status; <code>GROQ_DEFAULT_PRICING_AS_OF</code> dates the price table."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>GROQ_KNOWN_MODELS</code> no longer lists <code>llama-3.3-70b-versatile</code>, <code>llama-3.1-8b-instant</code> (shut down 2026-08-16) and <code>deepseek-r1-distill-llama-70b</code> (shut down 2025-10-02). They are <code>retired</code> in <code>GROQ_MODEL_LIFECYCLE</code>, and <code>groq.model({ name })</code> still accepts them."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-openai",
+          "slug": "ai-openai",
+          "total": 3,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 2
+            },
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>OPENAI_MODEL_PRICING</code> lists <code>gpt-6.1-terra</code>, <code>gpt-6-cyber</code>, <code>gpt-6-astra</code>, <code>gpt-6-luna</code>, <code>gpt-5.6-terra</code>, <code>gpt-5.6-luna</code>, <code>gpt-5.5</code> and <code>gpt-5.4</code>; the models billed by prompt length carry <code>tiers</code> for prompts above 272K tokens. <code>OPENAI_MODEL_PRICING_AS_OF</code> dates the table."
+            },
+            {
+              "type": "Added",
+              "html": "<code>OPENAI_MODEL_LIFECYCLE</code> and <code>openAILifecycleFor(name)</code> give each priced model a status: <code>o1</code>, <code>o3-mini</code>, <code>o4-mini</code> and <code>gpt-4.1-nano</code> are <code>retired</code>, <code>gpt-5</code>, <code>gpt-5-mini</code>, <code>gpt-5-nano</code> and <code>o3</code> are <code>retiring</code> on 2026-12-11, <code>gpt-5.1</code> and <code>gpt-5.4-nano</code> on 2027-04-01, <code>gpt-4.1</code> and <code>gpt-4.1-mini</code> on 2027-01-14."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>gpt-6</code> models report a 1,050,000-token <code>capabilities.contextWindow</code> instead of 400,000."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-xai",
+          "slug": "ai-xai",
+          "total": 3,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 3
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>XAI_MODEL_PRICING</code> and <code>xaiPricingFor(name)</code> price <code>grok-4.7</code>, <code>grok-4.6</code>, <code>grok-4.5</code>, <code>grok-4.3</code>, <code>grok-4.20-0309-reasoning</code>, <code>grok-4.20-0309-non-reasoning</code>, <code>grok-4.20-multi-agent-0309</code> and <code>grok-build-0.1</code>, with <code>tiers</code> for prompts of 200k tokens or more. <code>xai.model()</code> uses them when no <code>pricing</code> is passed."
+            },
+            {
+              "type": "Added",
+              "html": "<code>XAI_MODEL_LIFECYCLE</code> and <code>xaiLifecycleFor(name)</code> give those models a status; <code>XAI_MODEL_PRICING_AS_OF</code> dates the price table."
+            },
+            {
+              "type": "Added",
+              "html": "<code>capabilities.contextWindow</code> is reported for <code>grok-4.3</code> and <code>grok-4.20-*</code> (1,000,000), <code>grok-4.5</code> to <code>grok-4.7</code> (500,000) and <code>grok-build-0.1</code> (256,000). <code>XAI_CHAT_MODELS</code> lists the new ids."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-anthropic",
+          "slug": "ai-anthropic",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>ANTHROPIC_MODEL_PRICING</code> prices <code>claude-haiku-5-5</code>, with <code>tiers</code> for prompts above 100,000 tokens (cache reads and writes counted). <code>ANTHROPIC_MODEL_PRICING_AS_OF</code> dates the table."
+            },
+            {
+              "type": "Added",
+              "html": "<code>ANTHROPIC_MODEL_LIFECYCLE</code> and <code>anthropicLifecycleFor(name)</code> (alias or dated snapshot) give each model a status, for example <code>claude-sonnet-4-5</code> is <code>retiring</code> on 2026-11-30 and <code>claude-opus-4-1</code> is <code>retired</code>."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-mistral",
+          "slug": "ai-mistral",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>MISTRAL_MODEL_LIFECYCLE</code> and <code>mistralLifecycleFor(name)</code> give the ids Mistral documents a status: <code>zai-glm-5-2</code> is <code>retired</code>, <code>mistral-medium-3-5</code> and <code>mistral-large-2512</code> are <code>retiring</code> on 2027-04-30."
+            },
+            {
+              "type": "Added",
+              "html": "<code>zai-glm-5-3</code> reports a 1,000,000-token <code>capabilities.contextWindow</code>."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-tools",
+          "slug": "ai-tools",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            },
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>ai.mcp({ type: \"http\", url, fetch })</code> takes an injectable <code>fetch</code>, used for every request. Node's built-in <code>fetch</code> drops a request whose response headers take over 300 seconds regardless of <code>timeoutMs</code>; pass a <code>fetch</code> backed by a dispatcher with longer <code>headersTimeout</code> / <code>bodyTimeout</code> for longer MCP tool calls."
+            },
+            {
+              "type": "Fixed",
+              "html": "An MCP http call that the HTTP client abandons because headers or body stalled (<code>UND_ERR_HEADERS_TIMEOUT</code>, <code>UND_ERR_BODY_TIMEOUT</code>, <code>UND_ERR_CONNECT_TIMEOUT</code>) is now reported as <code>McpTransportError</code> with <code>type: \"timeout\"</code> and the real cause code in the message, instead of a generic <code>\"connect\"</code> \"fetch failed\"."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/seal",
+          "slug": "seal",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "<strong><code>v.array()</code> accepts one uploaded file</strong> — a lone uploaded file (a multipart part sent without <code>[]</code>) is wrapped into a one-element array before validation, and the validated output carries the array. Strings and other scalars are not wrapped and still fail the array rule."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/web",
+          "slug": "web",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "Page routes accept several params and static text in one segment, such as <code>/:type-for-:purpose</code> or <code>/near/:lat-:lng</code>, and a named terminal wildcard such as <code>/files/*rest</code>. The generated page typings and <code>href()</code> name every param (<code>href(\"listing\", { type: \"house\", purpose: \"sale\" })</code>), encode each value on its own and keep the static text. A named wildcard's value is under its name and under <code>params[\"*\"]</code>. A segment splits greedily like the server's router (<code>a-for-b-for-c</code> against <code>:x-for-:y</code> gives <code>x = \"a-for-b\"</code>), and the server, the browser matcher and the fallback matcher choose the same route: static, then mixed, then plain <code>:param</code>, then catch-all. Existing page routes, API route typings, <code>href()</code> and <code>apiHref()</code> are unchanged; file names have no form for these shapes, so declare them with <code>config.route.path</code>. <code>/:a:b</code> (two params with no text between) and a repeated param name in these shapes are rejected at boot. So are two pages whose mixed segments tie on leading, trailing and total static text at the same position with the same segment count (such as <code>/:a-for-:b</code> and <code>/:x-for-:y</code>): the server's router would choose between them by registration order, so the error names both pages and asks for more static text in one of them."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "5.46.0",
       "id": "v5-46-0",
       "date": "November 6, 2026",
