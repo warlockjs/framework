@@ -116,7 +116,7 @@ Without a declared entry, the configured failure status (`validation.response.st
 - A cast string: `string` and `localized` are `string`; `url`, `uploadsUrl` and `storageUrl` are `string` with `format: uri`; `number` and `float` are `number`; `int` is `integer`; `boolean`, `object` and `array` map directly; `date` is the default date object (`iso`, `format`, `timestamp`, `humanTime`).
 - Suffixes: `x[]` is an array and `x?` is `type: [T, "null"]` (OpenAPI 3.1 style).
 - A resource becomes an entry in `components.schemas`, named after its export (`ProductResource`), and every use is a `$ref`. Nested, lazy and `"self"` fields point at the same entry, so recursive resources do not unroll. A resource that is not exported from a `*.resource.ts(x)` file gets a generic name.
-- `[Resource]` is an array of that `$ref`. A nested plain object is an object schema.
+- `[Resource]` is an array of that `$ref`. `[{ ...shape }]` is an array of that object schema. A nested plain object is an object schema.
 - Every listed key is marked `required`.
 
 ```json

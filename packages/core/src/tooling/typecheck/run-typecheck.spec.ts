@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -129,4 +129,35 @@ it("invalidates native incremental state after edits and follows changed-file al
   ).toEqual(["src/use.ts"]);
   write("src/use.ts", 'import { double } from "app/math";\nexport const result = double(2);\n');
   expect(runTypecheck({ cwd: root, files: ["src/math.ts"] }).problems).toEqual([]);
+});
+
+describe("runTypecheck — stale generated typings", () => {
+  it("warns once, ahead of the errors, when a Warlock app has no generated typings", () => {
+    write("src/config/app.ts", "export default {};\n");
+
+    const result = runTypecheck({ cwd: root });
+
+    expect(result.problems[0]?.code).toBe("WL7103");
+    expect(result.problems[0]?.severity).toBe("warning");
+    expect(result.problems.filter((problem) => problem.code === "WL7103")).toHaveLength(1);
+    expect(result.ok).toBe(false);
+  });
+
+  it("stays quiet when the typings are newer than the sources", () => {
+    write("src/config/app.ts", "export default {};\n");
+    write(".warlock/typings/translations.d.ts", "export {};\n");
+    const future = new Date(Date.now() + 60_000);
+
+    utimesSync(path.join(root, ".warlock/typings/translations.d.ts"), future, future);
+
+    const result = runTypecheck({ cwd: root });
+
+    expect(result.problems.some((problem) => problem.code === "WL7103")).toBe(false);
+  });
+
+  it("does not judge a project that is not a Warlock app", () => {
+    const result = runTypecheck({ cwd: root });
+
+    expect(result.problems.some((problem) => problem.code === "WL7103")).toBe(false);
+  });
 });

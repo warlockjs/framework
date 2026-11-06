@@ -16,7 +16,11 @@ export async function ensureWarlockDirectory() {
  * normalised absolute paths.
  */
 export async function getFilesFromDirectory(directoryPath = srcPath(), pattern = "**/*.{ts,tsx}") {
-  const files = await glob(`${Path.normalize(directoryPath)}/${pattern}`, { absolute: true });
+  // Glob relative to the directory instead of prefixing the pattern with its
+  // absolute path: the prefix is then never parsed as glob syntax, so a project
+  // path with dot-directories or glob characters (`[`, `(`, `{`) cannot change
+  // what matches.
+  const files = await glob(pattern, { cwd: Path.normalize(directoryPath), absolute: true });
   return files.map((file) => Path.normalize(file));
 }
 

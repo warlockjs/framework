@@ -4,6 +4,12 @@ All notable changes to `@warlock.js/seal` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.46.0
+
+### Changed
+
+- `requiredWith`, `requiredWithout` and the rest of the unsuffixed `required*` rules now say, in their JSDoc and in the docs, that the other field is looked up from the root of the validated data. Inside a nested object such as `address: { en, ar }`, use the `Sibling` variant (`requiredWithoutSibling("ar")`). Behaviour is unchanged.
+
 ## 5.40.0 - 2026-10-29
 
 ### Changed

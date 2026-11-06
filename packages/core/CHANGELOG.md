@@ -6,6 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 > ⚠ **Versioning: `@warlock.js/*` does not follow SemVer strictly — breaking changes may ship in a minor.** This is a deliberate decision, not an oversight: the framework is pre-adoption and the cost of a major per behaviour fix currently outweighs the benefit. **Pin an exact version or a tilde range (`~4.13.0`) if you need to opt into changes rather than receive them.** Every breaking change is marked **BREAKING** in its entry and summarised in an _Upgrading_ section at the top of the release. **This policy will change once the framework has consumers beyond its author.**
 
+## 5.46.0
+
+### Added
+
+- `warlock typecheck` and `warlock check` report one `WL7103` warning, ahead of the errors, when the compiler finds errors and the generated typings in `.warlock/typings` are missing or older than the files in `src`. Run `warlock generate.typings` and typecheck again before fixing them. The warning does not change the exit code.
+- `warlock dev` writes `.warlock/dev.pid` with the PID of the process that actually serves, and removes it on exit. Stop the dev server with `kill "$(cat .warlock/dev.pid)"`.
+- `responseSchema` accepts an array of plain objects as a one-element tuple: `items: [{ id: "int", label: "string" }]`. The element may be an object shape, a cast or a resource; `"object[]"` stays the cast for an untyped array of objects. Types and generated typings follow the element shape.
+
+### Fixed
+
+- The test server no longer fails at boot with "Cloud storage requires the AWS S3 SDK packages" when the default storage driver is a cloud driver and the storage fake is on. The storage connector skips building the configured default in that case; the fake replaces every driver, and a real default is built on first use otherwise.
+- `warlock dev` forwards `SIGINT` from the supervisor to the server, as it already did for `SIGTERM` and `SIGHUP`, so stopping the supervisor's PID stops the server. The server ignores a repeated signal while it shuts down.
+- The dev server and the test server find the app's modules when the project path contains glob characters such as `[`, `(` or `{`. File discovery now globs relative to the directory instead of prefixing the pattern with the absolute path.
+
 ## 5.45.0 - 2026-11-05
 
 ### Added

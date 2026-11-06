@@ -282,6 +282,7 @@ createProductController.responseSchema = {
 | a cast string, with the resource suffixes | `"string"`, `"number?"`, `"string[]"`, `"date[]?"`. `?` means the key is always present and the value may be `null`. |
 | a resource                                | One object shaped like the resource's output.                                                                        |
 | `[Resource]`                              | An array of that resource.                                                                                           |
+| `[{ ...shape }]`                          | An array of plain objects, each shaped like the object: `items: [{ id: "int", label: "string" }]`. A one-element tuple also wraps a cast (`["string"]`) or a resource. For an untyped array of objects use the cast `"object[]"`; `["object"]` is not a valid tuple. |
 | a nested plain object                     | Recursed, with any of the values above.                                                                              |
 
 ```ts title="src/app/auth/controllers/login.controller.ts"

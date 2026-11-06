@@ -418,6 +418,14 @@ export const ERROR_CODES = {
     fix: "Fix tsconfig.json at the project root; the message names the problem.",
     skill: "warlock-check",
   },
+  WL7103: {
+    code: "WL7103",
+    area: "cli",
+    category: "code",
+    title: "Generated typings may be stale",
+    fix: "Run `warlock generate.typings`, then typecheck again; the type errors it reports may disappear.",
+    skill: "warlock-check",
+  },
   WL7201: {
     code: "WL7201",
     area: "cli",

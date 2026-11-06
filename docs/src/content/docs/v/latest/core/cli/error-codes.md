@@ -326,6 +326,12 @@ Category: your code · skill: `warlock-check`
 
 Category: your code · skill: `warlock-check`
 
+### WL7103
+
+**Generated typings may be stale.** Run `warlock generate.typings`, then typecheck again; the type errors it reports may disappear.
+
+Category: your code · skill: `warlock-check`
+
 ### WL7201
 
 **The linter reports an error.** Fix the lint error at the reported position; the rule id is in `rule`.

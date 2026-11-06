@@ -53,6 +53,7 @@ jq -r '.problems[] | "\(.file // "-"):\(.line // 0) \(.code) \(.message)\n  → 
 | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `WL7101`            | type error (`rule` = `TS2322`, …)                                                                                                                     |
 | `WL7102`            | tsconfig missing/invalid                                                                                                                              |
+| `WL7103`            | warning: generated typings missing or older than `src`; run `warlock generate.typings`, then typecheck again                                           |
 | `WL7201` / `WL7202` | lint error / warning (`rule` = the rule id)                                                                                                           |
 | `WL7301` / `WL7302` | a test failed / a test file failed to load                                                                                                            |
 | `WL9001`            | imports an auto-loaded file (`routes.ts`, `main.ts`, `worker.ts`, `events/*`)                                                                         |

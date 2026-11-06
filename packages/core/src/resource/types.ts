@@ -102,6 +102,9 @@ export type ResourceFieldBuilderDateOutputOptions =
  *   (e.g. "string", "number?", "string[]", "date[]?")
  * - ResourceConstructor for a single nested resource object
  * - [ResourceConstructor] (tuple) for an array of a nested resource
+ * - [{ ...shape }] (tuple) for an array of plain objects, e.g. `[{ id: "number", name: "string" }]`;
+ *   the same one-element tuple also wraps a cast (`["string"]`) or any other body value.
+ *   An untyped array of objects is the cast `"object[]"`.
  * - nullable(ResourceConstructor) for a nested resource that is `null` when the value is missing
  * - A nested plain object of any of the above
  */
@@ -109,6 +112,7 @@ export type ResponseBodyValue =
   | ResourceCastType
   | ResourceConstructor
   | [ResourceConstructor]
+  | [ResponseBodyValue]
   | NullableResource<ResourceConstructor<any>>
   | { [key: string]: ResponseBodyValue };
 
@@ -240,7 +244,7 @@ export type ResourceOutput<R> = R extends new (...args: any[]) => { toJSON(): in
 export type ResponseBodyOutput<B> = B extends string
   ? CastOutput<B>
   : B extends readonly [infer R]
-    ? ResourceOutput<R>[]
+    ? ResponseBodyOutput<R>[]
     : B extends new (...args: any[]) => unknown
       ? ResourceOutput<B>
       : B extends NullableResource<infer R>

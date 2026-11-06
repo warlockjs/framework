@@ -39,7 +39,7 @@ export class StorageConnector extends BaseConnector {
    */
   public async start(): Promise<void> {
     await loadS3();
-    await storage.init();
+    await storage.init({ deferDefaultDriver: await this.storageIsFaked() });
 
     const warning = localStorageWarning(
       config.get("storage.default", "local"),
@@ -50,6 +50,22 @@ export class StorageConnector extends BaseConnector {
     if (warning) log.warn("storage", "single-server", warning);
 
     this.active = true;
+  }
+
+  /**
+   * Whether the test kit's storage fake will replace every driver once the
+   * connectors are up. The configured default driver is then not built here.
+   */
+  protected async storageIsFaked(): Promise<boolean> {
+    if (environment() !== "test") return false;
+
+    try {
+      const { resolveTestFakes } = await import("../tests/fakes/test-fakes");
+
+      return resolveTestFakes().includes("storage");
+    } catch {
+      return false;
+    }
   }
 
   /**

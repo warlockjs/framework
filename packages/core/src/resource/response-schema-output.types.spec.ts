@@ -120,3 +120,30 @@ describe("ResponseSchemaOutput", () => {
     expectTypeOf<Output[200]["id"]>().toEqualTypeOf<number>();
   });
 });
+
+describe("arrays of plain objects in a response body", () => {
+  it("accepts a one-element tuple holding an object shape", () => {
+    const schema = {
+      200: {
+        body: {
+          items: [{ id: "number", tags: ["string"], owner: UserResource }],
+          flags: ["boolean"],
+        },
+      },
+    } satisfies ResponseSchema;
+
+    expect(schema[200].body.items).toHaveLength(1);
+  });
+
+  it("resolves the element shape into the output", () => {
+    type Output = ResponseBodyOutput<{
+      items: [{ id: "number"; owner: typeof UserResource }];
+      flags: ["boolean"];
+    }>;
+
+    expectTypeOf<Output>().toEqualTypeOf<{
+      items: { id: number; owner: UserJson }[];
+      flags: boolean[];
+    }>();
+  });
+});

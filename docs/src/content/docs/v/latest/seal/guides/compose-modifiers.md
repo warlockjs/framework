@@ -109,8 +109,8 @@ The conditional variants:
 
 ```ts
 .requiredIf(field, value)        // required when sibling === value
-.requiredWith(field)             // required when sibling is present
-.requiredWithout(field)          // required when sibling is absent
+.requiredWith(field)             // required when the field is present (looked up from the root)
+.requiredWithout(field)          // required when the field is absent (looked up from the root)
 .requiredUnless(field, value)
 .requiredWhen(callback)          // arbitrary predicate
 .presentIf(field, value)         // key must be present (may be empty)
@@ -119,7 +119,7 @@ The conditional variants:
 .forbiddenIf(field, value)
 ```
 
-All resolve siblings against the parent `v.object`. On a standalone scalar validator (no parent), sibling lookup silently passes — the rule has nothing to check against.
+Each of these looks the named field up from the **root** of the validated data. Inside a nested object (`address: { en, ar }`) the root has no `ar`, so use the `Sibling` variant — `.requiredWithoutSibling("ar")`, `.requiredIfSibling(...)`, and so on — which looks beside the field. On a standalone scalar validator (no parent), sibling lookup silently passes — the rule has nothing to check against.
 
 For cross-field equality:
 
