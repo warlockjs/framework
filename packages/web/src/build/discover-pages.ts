@@ -50,6 +50,7 @@ import {
 } from "../server/not-found-page";
 import { NestedLayoutsNotSupportedError, selectPageLayout } from "../routing/layout-policy";
 import { deriveFilesystemRoutePath } from "../routing/filesystem-route";
+import { PageRoutePathNotSupportedError } from "../routing/page-route-grammar";
 import { canonicalizeRouteExport, resolvePageRouteIdentity } from "../routing/route-identity";
 import { routeIdentityKey } from "../routing/route-identity-key";
 import { assertPageHasDefaultExport } from "./page-default-export";
@@ -76,6 +77,13 @@ export type DiscoverPagesOptions = {
    * behaviour, unchanged.
    */
   sites?: SitesConfig;
+  /**
+   * Called for a page whose declared `route.path` is outside the page route
+   * grammar. When supplied, that page is left out of the result and discovery
+   * carries on with the rest; when absent, the error is thrown. Typings
+   * generation uses it so one bad route does not stop typings for every page.
+   */
+  onUnsupportedRoute?: (error: PageRoutePathNotSupportedError) => void;
 };
 
 export type DiscoveredRoutablePage = {
@@ -458,6 +466,42 @@ function warnIgnoredAppWebFiles(files: readonly IgnoredAppWebFile[], appRoot: st
   console.warn(sections.map((section) => `[warlock:web] ${section}`).join("\n\n"));
 }
 
+/** Stray layouts already reported this process, so a dev reload does not repeat the warning. */
+const warnedStrayLayouts = new Set<string>();
+
+/**
+ * Warns about a `layout.tsx` that sits outside the routed page tree: no page
+ * lives in its directory or below it, so it can never wrap anything. A file
+ * with that name there is usually an ordinary component (a theme's layout
+ * component, say) that the framework would otherwise treat as a route layout.
+ */
+function warnStrayLayouts(
+  layoutFiles: readonly string[],
+  pageFiles: readonly string[],
+  appRoot: string,
+): void {
+  const stray = layoutFiles.filter(
+    (layout) =>
+      !warnedStrayLayouts.has(layout) &&
+      !pageFiles.some((page) => page.startsWith(path.dirname(layout) + path.sep)),
+  );
+
+  if (stray.length === 0) return;
+
+  for (const layout of stray) warnedStrayLayouts.add(layout);
+
+  console.warn(
+    `[warlock:web] ${stray.length} file${stray.length === 1 ? "" : "s"} named layout.tsx ` +
+      `sit${stray.length === 1 ? "s" : ""} outside the routed page tree — no page lives in ` +
+      `${stray.length === 1 ? "its" : "their"} directory or below, so ` +
+      `${stray.length === 1 ? "it wraps" : "they wrap"} no route:\n` +
+      `${stray.map((file) => namedFile(file, appRoot)).join("\n")}\n` +
+      `The name layout.tsx is reserved for route layouts. If ${stray.length === 1 ? "it is" : "these are"} ` +
+      `ordinary components, rename ${stray.length === 1 ? "it" : "them"} (for example ` +
+      `site-layout.tsx).`,
+  );
+}
+
 export type DiscoveredPageFile = {
   /** Absolute path to the `*.page.tsx` file. */
   pageFile: string;
@@ -519,6 +563,7 @@ export function discoverPageFileGraph(srcRoot: string): DiscoveredPageFileGraph 
         );
       }
     }
+    warnStrayLayouts(found.layoutFiles, found.pageFiles, path.dirname(srcRoot));
     pages.push(...found.pageFiles.map((pageFile) => ({ pageFile, webRoot })));
     localeFiles.push(...found.localeFiles.map((sourceFile) => ({ sourceFile, webRoot })));
   }
@@ -552,6 +597,7 @@ type PageGraphFiles = {
   pageFiles: string[];
   localeFiles: string[];
   setupFiles: string[];
+  layoutFiles: string[];
 };
 
 /**
@@ -563,17 +609,21 @@ function walkPageGraphFiles(dir: string): PageGraphFiles {
   const pageFiles: string[] = [];
   const localeFiles: string[] = [];
   const setupFiles: string[] = [];
+  const layoutFiles: string[] = [];
 
   for (const entry of fs.readdirSync(dir, { withFileTypes: true }).sort(byName)) {
     const full = path.join(dir, entry.name);
 
     if (entry.isDirectory()) {
       const nested = walkPageGraphFiles(full);
+      layoutFiles.push(...nested.layoutFiles);
       pageFiles.push(...nested.pageFiles);
       localeFiles.push(...nested.localeFiles);
       setupFiles.push(...nested.setupFiles);
     } else if (entry.isFile() && entry.name.endsWith(".page.tsx")) {
       pageFiles.push(full);
+    } else if (entry.isFile() && entry.name === "layout.tsx") {
+      layoutFiles.push(full);
     } else if (entry.isFile() && entry.name === "locales.json") {
       localeFiles.push(full);
     } else if (entry.isFile() && entry.name.endsWith(".setup.ts")) {
@@ -581,7 +631,7 @@ function walkPageGraphFiles(dir: string): PageGraphFiles {
     }
   }
 
-  return { pageFiles, localeFiles, setupFiles };
+  return { pageFiles, localeFiles, setupFiles, layoutFiles };
 }
 
 /**
@@ -1171,8 +1221,19 @@ export function discoverPageGraph(options: DiscoverPagesOptions): DiscoveredPage
     // (below) also validating: even if that field were reordered, made
     // conditional, or removed, an unsupported declared path still cannot
     // reach `effectiveRoutePath` unvalidated.
-    const canonicalRoute =
-      !isNotFoundPage && route ? canonicalizeRouteExport(route, relativePageFile) : undefined;
+    let canonicalRoute: ReturnType<typeof canonicalizeRouteExport> | undefined;
+
+    try {
+      canonicalRoute =
+        !isNotFoundPage && route ? canonicalizeRouteExport(route, relativePageFile) : undefined;
+    } catch (error) {
+      if (options.onUnsupportedRoute === undefined || !(error instanceof PageRoutePathNotSupportedError)) {
+        throw error;
+      }
+
+      options.onUnsupportedRoute(error);
+      continue;
+    }
 
     const siteLocalRoutePath = isNotFoundPage
       ? NOT_FOUND_ROUTE_PATH

@@ -44,6 +44,7 @@ import type {
   DiscoveredForbiddenPage,
   DiscoveredPage,
   DiscoveredRoutablePage,
+  DiscoverPagesOptions,
 } from "./discover-pages";
 import {
   analyzeClientApiRoutes,
@@ -637,7 +638,8 @@ function buildPageRoutes(
  * empty table {@link generatePagesBarrel} records.
  */
 export function discoverPageRoutes(
-  options: Pick<GeneratePagesBarrelOptions, "appRoot" | "srcDir" | "sites">,
+  options: Pick<GeneratePagesBarrelOptions, "appRoot" | "srcDir" | "sites"> &
+    Pick<DiscoverPagesOptions, "onUnsupportedRoute">,
 ): PageRoutesManifest {
   const graph = discoverPageGraph(options);
 

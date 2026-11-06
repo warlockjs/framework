@@ -5,6 +5,7 @@ import type { Alias, HttpServer, InlineConfig, PluginOption } from "vite";
 import type { DevelopmentAppModules, DevelopmentModelModules } from "@warlock.js/core";
 import type { SitesConfig } from "../sites/site-config.types";
 import { appConventionAliases } from "./app-convention-aliases";
+import { tsconfigPathAliases } from "./tsconfig-path-aliases";
 import { cssModulesConfig } from "./css-modules-config";
 import { coreAppModules } from "./core-app-modules";
 import { coreModelModules } from "./core-model-modules";
@@ -510,6 +511,9 @@ export async function createWebConnectorViteConfig(
         // dev resolved `web/*` while the production client build died on the
         // first page. Do not inline them back here.
         ...appConventionAliases(options.appSrcRoot),
+        // The application's other tsconfig `paths` (e.g. `@shared/*`), after the
+        // explicit aliases above so explicit configuration wins.
+        ...tsconfigPathAliases(options.appRoot),
       ],
     },
   };

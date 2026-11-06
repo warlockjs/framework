@@ -13,6 +13,11 @@ prefix, middleware, metadata, and a loader to pages below its directory. See
 
 ## Layout composition
 
+The name `layout.tsx` is reserved for route layouts. A `layout.tsx` in a
+directory with no page beside it or below it (a theme's layout component, for
+example) wraps no route; discovery prints a warning naming it. Rename an
+ordinary component such as that to something like `site-layout.tsx`.
+
 Every `layout.tsx` from the Web root down to the page contributes outermost
 first:
 

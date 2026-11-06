@@ -882,7 +882,7 @@ export function projectModule(code: string, filePath: string): ProjectionResult 
       statementSnippet(code, local.stmt),
       local.stmt.loc.start.line,
       `a top-level declaration read only by the server exports being removed, but whose initializer executes code rather than just defining a value — projection can't tell whether that work is server-only or a side effect the client depends on`,
-      `move universal static declarations and their imports into export function register(), move a server-only initializer inside the export that reads it, or split it into an explicit .server/.client file`,
+      `replace the computed initializer with a literal value, move it into a *.client.ts file the page imports, move a server-only initializer inside the export that reads it, or move universal static declarations into export function register()`,
     );
   }
 

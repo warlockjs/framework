@@ -17,6 +17,14 @@ browser-safe `register()` code and its dependencies to the client. UI files
 contain components and browser-safe imports. Use type-only imports from setup
 to retain loader and action inference.
 
+## Path aliases from tsconfig
+
+The `paths` in your `tsconfig.json` (for example `"@shared/*": ["src/shared/*"]`)
+resolve in `warlock dev` and in the production client build as well as in the
+typechecker, with `extends` followed. Aliases you pass to `webConnector`
+(`resolveAlias`, `build.aliases`) and the built-in `web/*` and `app/*` aliases
+take precedence over a tsconfig entry of the same name.
+
 ## What the build refuses
 
 The client build enforces the boundary at four points:
@@ -108,6 +116,10 @@ client build reaches from a page, may import only these files from it:
 | `*.types.ts`, `*.d.ts`, or anything in a `types/` folder | Types only                              |
 | The module's `web/` folder                               | Web code that lives beside the module   |
 | JSON, CSS and other non-code files                       | They carry no behavior                  |
+
+A constant that browser code and server setup code both need has one legal home:
+the module's `web/` folder. Server setup files may not import `*.client.ts`
+files, but both sides may import from `web/`, and the boundary error names it.
 
 Anything else fails the build with the import chain:
 

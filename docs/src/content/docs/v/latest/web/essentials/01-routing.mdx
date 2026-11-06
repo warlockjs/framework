@@ -140,6 +140,10 @@ An unsupported declared path fails at boot with
 it literally. Rejected examples include `/users/:id?`,
 `/users/:id(\\d+)`, `/near/:lat-:lng`, `/a//b`, and `/users/`.
 
+`warlock generate.typings` is the exception to stopping: it prints the page file
+and the rejected path, leaves that one page out of the route typings, and keeps
+generating typings for every other page.
+
 ## Catch-all filenames are not supported
 
 :::danger[`[...slug]` fails page discovery]
