@@ -278,8 +278,12 @@ describe("PostgresDriver serialize() — declared column type decides the encodi
     driver: PostgresDriver,
     rows: { table_name: string; column_name: string; data_type: string }[],
   ) => {
-    const spy = vi.spyOn(driver, "query").mockResolvedValue({ rows, rowCount: rows.length } as never);
-    await (driver as unknown as { loadNativeArrayColumns(): Promise<void> }).loadNativeArrayColumns();
+    const spy = vi
+      .spyOn(driver, "query")
+      .mockResolvedValue({ rows, rowCount: rows.length } as never);
+    await (
+      driver as unknown as { loadNativeArrayColumns(): Promise<void> }
+    ).loadNativeArrayColumns();
     spy.mockRestore();
   };
 

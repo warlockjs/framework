@@ -12,7 +12,11 @@ import { importAppModule } from "../loader/app-module-importer";
 import { ModuleLoader } from "./module-loader";
 
 function file(name: string) {
-  return { absolutePath: `/app/${name}/main.ts`, relativePath: `src/app/${name}/main.ts`, addCleanup() {} };
+  return {
+    absolutePath: `/app/${name}/main.ts`,
+    relativePath: `src/app/${name}/main.ts`,
+    addCleanup() {},
+  };
 }
 
 function loaderWith(mains: ReturnType<typeof file>[]) {
@@ -35,9 +39,9 @@ describe("ModuleLoader.loadMainModules", () => {
   it("attempts every main file and reports the failures together", async () => {
     vi.mocked(importAppModule).mockClear();
 
-    await expect(
-      loaderWith([file("broken"), file("posts")]).loadMainModules(),
-    ).rejects.toThrow(/failed to load/);
+    await expect(loaderWith([file("broken"), file("posts")]).loadMainModules()).rejects.toThrow(
+      /failed to load/,
+    );
     expect(importAppModule).toHaveBeenCalledTimes(2);
   });
 });

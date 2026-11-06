@@ -24,9 +24,10 @@ export type Id = string | number;
 /**
  * A recipient named without its model: the identity `type` (an auth model's
  * `userType`, otherwise its table name) plus its `id`. Use it where only the
- * id is at hand but the notifications table keys recipients by type.
+ * id is at hand but the notifications table keys recipients by type. A ref
+ * without `type` is treated like a bare id.
  */
-export type RecipientRef = { type: string; id: Id };
+export type RecipientRef = { type?: string; id: Id };
 
 // ─── Per-channel payloads — Phase 1 ────────────────────────────────────────
 

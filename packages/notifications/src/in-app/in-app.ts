@@ -54,7 +54,6 @@ export type ConfigureOptions =
   | { model: NotificationModelClass; repository?: never }
   | { repository: BaseNotificationsRepository; model?: never };
 
-
 class InApp {
   private repo?: BaseNotificationsRepository;
 
@@ -87,7 +86,11 @@ class InApp {
 
   /** Unread-only list — common case for badges + dashboards. */
   public listUnread(recipient: RecipientInput, options?: NotificationsListOptions) {
-    return this.repository.list({ ...options, ...this.repository.scopeOf(recipient), unread: true });
+    return this.repository.list({
+      ...options,
+      ...this.repository.scopeOf(recipient),
+      unread: true,
+    });
   }
 
   /**

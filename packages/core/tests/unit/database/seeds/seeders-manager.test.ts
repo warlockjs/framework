@@ -308,7 +308,10 @@ describe("SeedersManager.run — all skipped", () => {
     await manager.run();
     await manager.run();
 
-    const output = vi.mocked(console.log).mock.calls.map((call) => String(call[0])).join("\n");
+    const output = vi
+      .mocked(console.log)
+      .mock.calls.map((call) => String(call[0]))
+      .join("\n");
 
     expect(output).toContain("Every seeder was skipped");
   });

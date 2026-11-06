@@ -1,12 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { confirmRollback, rollbackMigrations, freshMigrate, getFiles, resetSeedLedger } = vi.hoisted(() => ({
-  resetSeedLedger: vi.fn(),
-  confirmRollback: vi.fn(),
-  rollbackMigrations: vi.fn(),
-  freshMigrate: vi.fn(),
-  getFiles: vi.fn(),
-}));
+const { confirmRollback, rollbackMigrations, freshMigrate, getFiles, resetSeedLedger } = vi.hoisted(
+  () => ({
+    resetSeedLedger: vi.fn(),
+    confirmRollback: vi.fn(),
+    rollbackMigrations: vi.fn(),
+    freshMigrate: vi.fn(),
+    getFiles: vi.fn(),
+  }),
+);
 
 vi.mock("@warlock.js/cascade", () => ({
   Migration: class {},

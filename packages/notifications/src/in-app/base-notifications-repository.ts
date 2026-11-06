@@ -263,7 +263,7 @@ export class BaseNotificationsRepository<
    * send path yet.
    */
   public createManyFor(
-    recipients: Array<Exclude<RecipientInput, object> | { id: Id; type?: string }>,
+    recipients: RecipientInput[],
     input: DatabasePayload,
     tenantId?: Id,
   ): Promise<TModel[]> {
@@ -291,7 +291,11 @@ export class BaseNotificationsRepository<
     }
 
     return this.updateMany(
-      this.toRow({ ...this.scopeOf(recipient), ...unreadScope, ...(id !== undefined ? { id } : {}) }),
+      this.toRow({
+        ...this.scopeOf(recipient),
+        ...unreadScope,
+        ...(id !== undefined ? { id } : {}),
+      }),
       this.toRow(data),
     );
   }

@@ -79,7 +79,10 @@ describe("typed recipients", () => {
 
   it("idempotent lookup is typed too", async () => {
     const h = makeRepo(typed);
-    await h.repo.createFor({ id: 5, type: "staff" }, { type: "x", title: "t", idempotencyKey: "k" });
+    await h.repo.createFor(
+      { id: 5, type: "staff" },
+      { type: "x", title: "t", idempotencyKey: "k" },
+    );
     expect(h.first).toHaveBeenCalledWith({
       recipientId: 5,
       recipientType: "staff",
@@ -122,9 +125,9 @@ describe("notificationColumns recipient type + id default", () => {
 
   it("keeps uuid without a recipient model, derives integer or uuid from one", () => {
     expect(notificationColumns().user_id.getDefinition().type).toBe("uuid");
-    expect(
-      notificationColumns({ recipientModel: {} }).user_id.getDefinition().type,
-    ).toBe("integer");
+    expect(notificationColumns({ recipientModel: {} }).user_id.getDefinition().type).toBe(
+      "integer",
+    );
     expect(
       notificationColumns({ recipientModel: { autoGenerateId: false } }).user_id.getDefinition()
         .type,

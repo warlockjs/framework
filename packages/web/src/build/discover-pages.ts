@@ -1227,7 +1227,10 @@ export function discoverPageGraph(options: DiscoverPagesOptions): DiscoveredPage
       canonicalRoute =
         !isNotFoundPage && route ? canonicalizeRouteExport(route, relativePageFile) : undefined;
     } catch (error) {
-      if (options.onUnsupportedRoute === undefined || !(error instanceof PageRoutePathNotSupportedError)) {
+      if (
+        options.onUnsupportedRoute === undefined ||
+        !(error instanceof PageRoutePathNotSupportedError)
+      ) {
         throw error;
       }
 

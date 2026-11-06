@@ -72,8 +72,7 @@ export function notificationColumns(
 ): ColumnMap {
   const model = isNotificationColumnsOptions(modelOrOptions) ? undefined : modelOrOptions;
   const resolvedOptions = isNotificationColumnsOptions(modelOrOptions) ? modelOrOptions : options;
-  const idType =
-    resolvedOptions?.idType ?? deriveIdType(resolvedOptions?.recipientModel);
+  const idType = resolvedOptions?.idType ?? deriveIdType(resolvedOptions?.recipientModel);
   const { recipient, recipientType, tenant, readAt, isRead } = resolveColumnMap(model?.columnMap);
   const idColumn = getIdColumn(idType);
 

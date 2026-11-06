@@ -51,9 +51,10 @@ describe("feature dependencies against the starter template pins", () => {
         const pin = templatePin(peerOf);
 
         expect(pin, `template does not pin ${peerOf} (needed by ${featureName})`).toBeDefined();
-        expect(range, `${featureName} adds ${name} at ${range}, template pins ${peerOf} at ${pin}`).toBe(
-          pin,
-        );
+        expect(
+          range,
+          `${featureName} adds ${name} at ${range}, template pins ${peerOf} at ${pin}`,
+        ).toBe(pin);
 
         checked.push(`${featureName}:${name}`);
       }

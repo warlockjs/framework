@@ -19,7 +19,7 @@ export function recipientTypeOf(notifiable: Notifiable): string {
     return userType;
   }
 
-  return (notifiable.constructor as { table: string }).table;
+  return (notifiable.constructor as unknown as { table: string }).table;
 }
 
 /** Normalize any accepted recipient form to `{ id, type? }` (`type` absent for bare ids). */

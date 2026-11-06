@@ -1801,12 +1801,13 @@ loginController.responseSchema = {
 
 A body is an object whose values are one of:
 
-| Value                                     | Meaning                                                                                     |
-| ----------------------------------------- | ------------------------------------------------------------------------------------------- |
-| a cast string, with the resource suffixes | `"string"`, `"number?"`, `"string[]"`, `"date[]?"` (`?` is `T \| null`, key always present) |
-| a resource                                | one `ResourceOutput` object                                                                 |
-| `[Resource]`                              | an array of that resource                                                                   |
-| a nested plain object of any of the above | recursed                                                                                    |
+| Value                                     | Meaning                                                                                                                   |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| a cast string, with the resource suffixes | `"string"`, `"number?"`, `"string[]"`, `"date[]?"` (`?` is `T \| null`, key always present)                               |
+| a resource                                | one `ResourceOutput` object                                                                                               |
+| `[Resource]`                              | an array of that resource                                                                                                 |
+| `[{ ...shape }]`                          | an array of plain objects: `items: [{ id: "int", label: "string" }]`; untyped arrays of objects are the cast `"object[]"` |
+| a nested plain object of any of the above | recursed                                                                                                                  |
 
 The output types follow the same rules as `defineResource` (`ResponseBodyOutput<B>` and `ResponseSchemaOutput<S>` are exported if you need the type of a body or of the whole schema).
 
@@ -7687,15 +7688,15 @@ description: 'The test fakes Warlock installs by default in the test environment
 
 In the test environment seven fakes are installed for you: `setupTest()` installs them in every test file once its connectors are up, `startHttpTestServer()` installs them in the shared server, and teardown restores them. Nothing is delivered, pushed to Redis, uploaded to a bucket, and time and ids are deterministic.
 
-| Fake          | Replaces                                                              |
-| ------------- | --------------------------------------------------------------------- |
-| `mailFake`    | Mail delivery: `sendMail()` / `Mail` sends are captured               |
-| `queueFake`   | `@warlock.js/queue` dispatch: jobs are recorded, not pushed           |
-| `cacheFake`   | The cache's current driver: a fresh in-memory driver                  |
-| `storageFake` | Every storage driver (local, S3, R2, Spaces): a temp directory        |
-| `clockFake`   | `clock` from `@warlock.js/core`: frozen at 2026-01-01T00:00:00Z       |
-| `idsFake`     | `ids` from `@warlock.js/core`: numbered UUIDs and tokens              |
-| `secretsFake` | The `secrets` facade: namespace-aware memory, no OS/environment/files |
+| Fake          | Replaces                                                                                                        |
+| ------------- | --------------------------------------------------------------------------------------------------------------- |
+| `mailFake`    | Mail delivery: `sendMail()` / `Mail` sends are captured                                                         |
+| `queueFake`   | `@warlock.js/queue` dispatch: jobs are recorded, not pushed                                                     |
+| `cacheFake`   | The cache's current driver: a fresh in-memory driver                                                            |
+| `storageFake` | Every storage driver (local, S3, R2, Spaces): a temp directory; a cloud `default` is never built while it is on |
+| `clockFake`   | `clock` from `@warlock.js/core`: frozen at 2026-01-01T00:00:00Z                                                 |
+| `idsFake`     | `ids` from `@warlock.js/core`: numbered UUIDs and tokens                                                        |
+| `secretsFake` | The `secrets` facade: namespace-aware memory, no OS/environment/files                                           |
 
 ## Assert what your code did
 
@@ -12812,6 +12813,7 @@ jq -r '.problems[] | "\(.file // "-"):\(.line // 0) \(.code) \(.message)\n  → 
 | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `WL7101`            | type error (`rule` = `TS2322`, …)                                                                                                                     |
 | `WL7102`            | tsconfig missing/invalid                                                                                                                              |
+| `WL7103`            | warning: generated typings missing or older than `src`; run `warlock generate.typings`, then typecheck again                                          |
 | `WL7201` / `WL7202` | lint error / warning (`rule` = the rule id)                                                                                                           |
 | `WL7301` / `WL7302` | a test failed / a test file failed to load                                                                                                            |
 | `WL9001`            | imports an auto-loaded file (`routes.ts`, `main.ts`, `worker.ts`, `events/*`)                                                                         |
@@ -14408,10 +14410,13 @@ preload: {
   connectors: ["database", "cache"],      // start these connectors (or `true` for all early-phase)
   prestart: true,                         // run src/app/prestart.ts after config
   warlockConfig: true,                    // load warlock.config.ts
+  mainModules: true,                      // after connectors, import every module's main.ts (what `seed` does); also starts the app's early-phase `warlock.config.ts > connectors` (e.g. queue)
   runtimeStrategy: "production",          // force-set
   environemnt: "production",              // force-set (note: original typo preserved)
 }
 ```
+
+`mainModules: true` imports only the `main.ts` files (no routes, events or locales), so registries a module fills there are populated and the connectors they use are running. Leave it off for commands that do not need app code: it scans `src/app`.
 
 Connector names: `"logger"`, `"mailer"`, `"http"`, `"database"`, `"cache"`, `"storage"`, `"communicator"` (herald), `"socket"`. Pass `connectors: true` to start every `Early`-phase connector — `http` and `socket` are `Late` phase and stay off unless you list them explicitly.
 
@@ -14967,7 +14972,7 @@ npx warlock seed --drop                     # undo every tracked record, reset t
 npx warlock seed --drop=default-roles       # undo just one seeder's records
 ```
 
-`--fresh` truncates **every** table in the DB (`datasource.driver.truncateTable(table, { cascade: true })`), including the `seeds` tracking table. After `--fresh`, `once: true` seeds will run again.
+`--fresh` truncates **every** table in the DB (`datasource.driver.truncateTable(table, { cascade: true })`), including the `seeds` tracking table. After `--fresh`, `once: true` seeds will run again. `warlock migrate --fresh` clears the seed log too, so the next `warlock seed` runs everything; if every seeder is skipped as already executed, the run warns.
 
 `--drop` is the surgical alternative: it deletes only the rows a seeder **tracked**, in reverse run-order, then resets the matching `seeds`-log rows so `once: true` seeds re-run. See [Undo — `seed_records` + `--drop`](#undo--seed_records----drop).
 

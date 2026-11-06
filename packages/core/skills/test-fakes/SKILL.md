@@ -7,15 +7,15 @@ description: 'The test fakes Warlock installs by default in the test environment
 
 In the test environment seven fakes are installed for you: `setupTest()` installs them in every test file once its connectors are up, `startHttpTestServer()` installs them in the shared server, and teardown restores them. Nothing is delivered, pushed to Redis, uploaded to a bucket, and time and ids are deterministic.
 
-| Fake          | Replaces                                                              |
-| ------------- | --------------------------------------------------------------------- |
-| `mailFake`    | Mail delivery: `sendMail()` / `Mail` sends are captured               |
-| `queueFake`   | `@warlock.js/queue` dispatch: jobs are recorded, not pushed           |
-| `cacheFake`   | The cache's current driver: a fresh in-memory driver                  |
+| Fake          | Replaces                                                                                                        |
+| ------------- | --------------------------------------------------------------------------------------------------------------- |
+| `mailFake`    | Mail delivery: `sendMail()` / `Mail` sends are captured                                                         |
+| `queueFake`   | `@warlock.js/queue` dispatch: jobs are recorded, not pushed                                                     |
+| `cacheFake`   | The cache's current driver: a fresh in-memory driver                                                            |
 | `storageFake` | Every storage driver (local, S3, R2, Spaces): a temp directory; a cloud `default` is never built while it is on |
-| `clockFake`   | `clock` from `@warlock.js/core`: frozen at 2026-01-01T00:00:00Z       |
-| `idsFake`     | `ids` from `@warlock.js/core`: numbered UUIDs and tokens              |
-| `secretsFake` | The `secrets` facade: namespace-aware memory, no OS/environment/files |
+| `clockFake`   | `clock` from `@warlock.js/core`: frozen at 2026-01-01T00:00:00Z                                                 |
+| `idsFake`     | `ids` from `@warlock.js/core`: numbered UUIDs and tokens                                                        |
+| `secretsFake` | The `secrets` facade: namespace-aware memory, no OS/environment/files                                           |
 
 ## Assert what your code did
 

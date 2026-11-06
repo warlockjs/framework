@@ -255,7 +255,9 @@ orWhereNot(...): this // same four shapes
 await User.query().whereNot("status", "archived").get();
 await User.query().whereNot("age", "<", 18).get();
 await User.query().whereNot({ status: "banned", role: "user" }).get();
-await User.query().whereNot((q) => q.where("status", "banned")).get();
+await User.query()
+  .whereNot((q) => q.where("status", "banned"))
+  .get();
 ```
 
 On PostgreSQL the negation is SQL `NOT (...)`, so rows where the column is `NULL` are not returned; add `.orWhereNull(field)` when you want them.

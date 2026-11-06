@@ -93,7 +93,7 @@ class BaseNotificationsRepository extends RepositoryManager {
 
 ### Recipient types — identities that share an id
 
-Recipients are keyed by `(type, id)`. Declare `recipientType: "recipient_type"` in `columnMap` and every `inApp` read / count / mark / dismiss filters on both, so staff `5` and customer `5` never see each other's rows. The type is the recipient model's `userType` (auth models) or its table name; the `database` channel stores it. Also accepted: `{ type, id }` (`RecipientRef`). With the column declared a **bare id throws `RecipientTypeRequiredError`**; without it ids are the only key (single-identity apps, tables created before 5.46.0). Upgrading: add a nullable `recipient_type` column, backfill it (unbackfilled rows match no typed read), then declare it in `columnMap`. Full steps in the docs page "The in-app store".
+Recipients are keyed by `(type, id)`. Declare `recipientType: "recipient_type"` in `columnMap` and every `inApp` read / count / mark / dismiss filters on both, so staff `5` and customer `5` never see each other's rows. The type is the recipient model's `userType` (auth models) or its table name; the `database` channel stores it. Also accepted: `{ type, id }` (`RecipientRef`). `recipientTypeOf(model)` returns the type a model is stored under, and `toRecipientRef(recipient)` turns a model or ref into `{ type, id }`. With the column declared a **bare id throws `RecipientTypeRequiredError`**; without it ids are the only key (single-identity apps, tables created before 5.46.0). Upgrading: add a nullable `recipient_type` column, backfill it (unbackfilled rows match no typed read), then declare it in `columnMap`. Full steps in the docs page "The in-app store".
 
 ### `columnMap` — map logical roles → your columns
 

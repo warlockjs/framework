@@ -26,7 +26,7 @@ matching columns:
 | -------------------------------------------------- | --------------------------------------------------------------------------- |
 | _(none / default)_                                 | `user_id`, `type`, `title`, `body`, `payload`, `read_at`, `idempotency_key` |
 | `{ tenant: "organization_id", readAt: "read_at" }` | adds `organization_id`; read_at-only                                        |
-| `{ recipientType: "recipient_type" }`            | adds `recipient_type` (the identity type that owns the row)                 |
+| `{ recipientType: "recipient_type" }`              | adds `recipient_type` (the identity type that owns the row)                 |
 | `{ isRead: "is_read" }`                            | swaps `read_at` for `is_read` (indexed boolean)                             |
 | `{ isRead: "is_read", readAt: "read_at" }`         | both read-state columns                                                     |
 
