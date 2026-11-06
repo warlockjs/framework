@@ -53,6 +53,27 @@ The `server` argument is discriminated by `type`:
 { type: "http", url: "https://mcp.example.com/rpc", headers: { authorization: "Bearer …" } }
 ```
 
+### Long-running calls over http
+
+Node's built-in `fetch` drops a request whose response headers have not arrived within 300 seconds, whatever `timeoutMs` says. That failure is reported as `McpTransportError` with `type: "timeout"` and the underlying code (`UND_ERR_HEADERS_TIMEOUT` / `UND_ERR_BODY_TIMEOUT`) in the message. For tool calls that legitimately run longer, inject a `fetch` backed by a dispatcher with longer timeouts (this needs `undici` in your own app; the package does not depend on it):
+
+```ts
+import { Agent, fetch as undiciFetch } from "undici";
+
+const dispatcher = new Agent({ headersTimeout: 0, bodyTimeout: 0 });
+
+ai.mcp(
+  {
+    type: "http",
+    url: "https://mcp.example.com/rpc",
+    fetch: (input, init) => undiciFetch(input as any, { ...init, dispatcher } as any) as any,
+  },
+  { timeoutMs: 900_000 },
+);
+```
+
+`timeoutMs` still bounds the call.
+
 ### stdio environment
 
 stdio servers receive a deliberately small inherited environment so the executable and

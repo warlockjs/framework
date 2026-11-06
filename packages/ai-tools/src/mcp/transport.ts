@@ -298,6 +298,30 @@ class StdioTransport implements McpTransportClient {
   }
 }
 
+/** undici error codes raised when the response headers or body stall. */
+const UNDICI_TIMEOUT_CODES = new Set([
+  "UND_ERR_HEADERS_TIMEOUT",
+  "UND_ERR_BODY_TIMEOUT",
+  "UND_ERR_CONNECT_TIMEOUT",
+]);
+
+/** Find an undici timeout code on an error or anywhere down its `cause` chain. */
+function findTimeoutCode(error: unknown): string | undefined {
+  let current: unknown = error;
+
+  for (let depth = 0; depth < 5 && current; depth++) {
+    const code = (current as { code?: unknown }).code;
+
+    if (typeof code === "string" && UNDICI_TIMEOUT_CODES.has(code)) {
+      return code;
+    }
+
+    current = (current as { cause?: unknown }).cause;
+  }
+
+  return undefined;
+}
+
 /**
  * The Streamable HTTP transport — POSTs each JSON-RPC request to the
  * server endpoint over the global `fetch` (Node 18+) and reads the single
@@ -313,11 +337,16 @@ class HttpTransport implements McpTransportClient {
   /** Static headers merged into every request (auth, etc.). */
   private readonly headers: Record<string, string>;
 
+  /** The `fetch` used for every request (injectable). */
+  private readonly fetchImpl: typeof globalThis.fetch;
+
   /** Monotonic id source for outbound requests. */
   private nextId = 1;
 
   public constructor(transport: Extract<McpTransport, { type: "http" }>) {
     this.url = transport.url;
+    // Resolved per call when not injected, so a replaced global still applies.
+    this.fetchImpl = transport.fetch ?? ((input, init) => globalThis.fetch(input, init));
     this.headers = {
       "content-type": "application/json",
       accept: "application/json, text/event-stream",
@@ -347,7 +376,7 @@ class HttpTransport implements McpTransportClient {
     let response: Response;
 
     try {
-      response = await fetch(this.url, {
+      response = await this.fetchImpl(this.url, {
         method: "POST",
         headers: this.headers,
         body: JSON.stringify(request),
@@ -356,6 +385,14 @@ class HttpTransport implements McpTransportClient {
     } catch (cause) {
       const aborted = controller.signal.aborted;
       const message = cause instanceof Error ? cause.message : String(cause);
+      const timeoutCode = findTimeoutCode(cause);
+
+      if (timeoutCode && !aborted) {
+        throw new McpTransportError(
+          `MCP http transport request "${request.method}" timed out (${timeoutCode}): ${message}. The HTTP client gave up waiting for the server; for long calls pass a "fetch" with a longer headers timeout.`,
+          { type: "timeout", method: request.method, cause },
+        );
+      }
 
       throw new McpTransportError(
         aborted
@@ -378,7 +415,20 @@ class HttpTransport implements McpTransportClient {
       );
     }
 
-    return this.parseBody<TResult>(response, request.method);
+    try {
+      return await this.parseBody<TResult>(response, request.method);
+    } catch (cause) {
+      const timeoutCode = findTimeoutCode(cause);
+
+      if (timeoutCode) {
+        throw new McpTransportError(
+          `MCP http transport response for "${request.method}" timed out (${timeoutCode}) while reading the body.`,
+          { type: "timeout", method: request.method, cause },
+        );
+      }
+
+      throw cause;
+    }
   }
 
   /**
@@ -421,7 +471,7 @@ class HttpTransport implements McpTransportClient {
     // A notification expects no response; fire-and-forget but surface a
     // connect failure so a dead endpoint is not silently ignored.
     try {
-      await fetch(this.url, {
+      await this.fetchImpl(this.url, {
         method: "POST",
         headers: this.headers,
         body: JSON.stringify(notification),

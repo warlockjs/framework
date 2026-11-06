@@ -4,6 +4,16 @@ All notable changes to `@warlock.js/ai-tools` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.47.0
+
+### Added
+
+- `ai.mcp({ type: "http", url, fetch })` takes an injectable `fetch`, used for every request. Node's built-in `fetch` drops a request whose response headers take over 300 seconds regardless of `timeoutMs`; pass a `fetch` backed by a dispatcher with longer `headersTimeout` / `bodyTimeout` for longer MCP tool calls.
+
+### Fixed
+
+- An MCP http call that the HTTP client abandons because headers or body stalled (`UND_ERR_HEADERS_TIMEOUT`, `UND_ERR_BODY_TIMEOUT`, `UND_ERR_CONNECT_TIMEOUT`) is now reported as `McpTransportError` with `type: "timeout"` and the real cause code in the message, instead of a generic `"connect"` "fetch failed".
+
 ## 5.45.0 - 2026-11-05
 
 ### Added
