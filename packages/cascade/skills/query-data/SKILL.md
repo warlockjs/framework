@@ -115,6 +115,7 @@ const activeCount = await User.count({ status: "active" });
 const adminCount = await User.where("role", "admin").count();
 
 const hasAdmin = await User.where("role", "admin").exists(); // boolean, short-circuits
+const taken = await User.exists({ email }); // static shorthand for where(filter).exists()
 const noneBlocked = await User.where("status", "blocked").notExists();
 ```
 
@@ -138,6 +139,7 @@ Cascade's query builder has around 60 methods. Reach for these as the need arise
 | Reach for                                                                              | When                                                        |
 | -------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
 | `.whereIn(field, values)` / `.whereNotIn(field, values)`                               | Match against / exclude a list                              |
+| `.whereNot(field, value)` / `.whereNot(field, op, value)` / `.whereNot({ ... })` / `.whereNot(cb)` (+ `orWhereNot`) | Negate a condition or a group                               |
 | `.whereNull(field)` / `.whereNotNull(field)`                                           | Nullability checks                                          |
 | `.whereBetween(field, [a, b])`                                                         | Inclusive range                                             |
 | `.whereDate(field, value)`, `.whereDateBetween`, `.whereDateBefore`, `.whereDateAfter` | Date helpers                                                |

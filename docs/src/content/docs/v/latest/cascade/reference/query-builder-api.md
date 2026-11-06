@@ -239,18 +239,26 @@ textSearch(query: string, filters?: WhereObject): this
 await Post.whereFullText(["title", "body"], "cascade orm").get();
 ```
 
-### `whereNot(callback)` / `orWhereNot(callback)`
+### `whereNot(...)` / `orWhereNot(...)`
 
 ```ts
+whereNot(field: string, value: unknown): this
+whereNot(field: string, operator: WhereOperator, value: unknown): this
+whereNot(conditions: WhereObject): this
 whereNot(callback: WhereCallback<T>): this
-orWhereNot(callback: WhereCallback<T>): this
+orWhereNot(...): this // same four shapes
 ```
 
-**What it does:** negate a nested predicate block.
+**What it does:** negate a single condition or a nested predicate block. It accepts every shape `where` does, on both drivers.
 
 ```ts
-await User.whereNot((q) => q.where("status", "banned")).get();
+await User.query().whereNot("status", "archived").get();
+await User.query().whereNot("age", "<", 18).get();
+await User.query().whereNot({ status: "banned", role: "user" }).get();
+await User.query().whereNot((q) => q.where("status", "banned")).get();
 ```
+
+On PostgreSQL the negation is SQL `NOT (...)`, so rows where the column is `NULL` are not returned; add `.orWhereNull(field)` when you want them.
 
 ### `whereExists(...)` / `whereNotExists(...)`
 

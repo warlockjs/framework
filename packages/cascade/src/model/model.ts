@@ -1814,6 +1814,22 @@ export abstract class Model<out TSchema extends ModelSchema = ModelSchema> {
   }
 
   /**
+   * Check whether any record matches the filter (or any record exists when no
+   * filter is given).
+   * @param filter - The filter to apply to the query
+   */
+  public static exists<TModel extends Model = Model>(
+    this: ChildModel<TModel>,
+    filter?: WhereObject,
+  ): Promise<boolean> {
+    const query = this.query();
+    if (filter) {
+      query.where(filter);
+    }
+    return query.exists();
+  }
+
+  /**
    * Find record by id
    */
   public static async find<TModel extends Model = Model>(

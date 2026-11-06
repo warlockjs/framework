@@ -4,6 +4,19 @@ All notable changes to `@warlock.js/cascade` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.46.0
+
+### Added
+
+- `Model.exists(filter?)` returns whether any record matches the filter (or whether the table has any record when no filter is given). It is the static shorthand for `where(filter).exists()`.
+- `whereNot` and `orWhereNot` accept every shape `where` does, on both drivers: `whereNot("status", "archived")`, `whereNot("age", "<", 18)`, `whereNot({ status: "banned" })`, besides the existing callback form.
+
+### Fixed
+
+- PostgreSQL: a number array written to an `INTEGER[]` (or any native array) column is now bound as an array. Before, any all-number array was turned into a vector literal first, so Postgres rejected the insert with a malformed array literal.
+- PostgreSQL: a string, number or boolean written to a `json` / `jsonb` column is now JSON-encoded, so saving the string `"hello"` no longer fails with "invalid input syntax for type json". The driver learns which columns are `json` / `jsonb` from the same schema lookup it already runs on connect.
+- PostgreSQL: `orderBy` on a select alias, such as the `total` of `count(*) AS total`, now orders by that output name instead of failing with "column does not exist".
+
 ## 5.40.0 - 2026-10-29
 
 ### Fixed

@@ -648,9 +648,23 @@ export interface QueryBuilderContract<T = unknown> {
   whereNot(callback: WhereCallback<T>): this;
 
   /**
+   * Negate a single condition (same shapes as `where`).
+   *
+   * @example
+   * query.whereNot('status', 'archived')
+   * query.whereNot('age', '<', 18)
+   */
+  whereNot(field: string, value: unknown): this;
+  whereNot(field: string, operator: WhereOperator, value: unknown): this;
+  whereNot(conditions: WhereObject): this;
+
+  /**
    * Negate a nested callback block with OR logic.
    */
   orWhereNot(callback: WhereCallback<T>): this;
+  orWhereNot(field: string, value: unknown): this;
+  orWhereNot(field: string, operator: WhereOperator, value: unknown): this;
+  orWhereNot(conditions: WhereObject): this;
 
   /**
    * Apply a nested existence check.

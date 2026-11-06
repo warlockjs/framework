@@ -275,6 +275,8 @@ const topCategories = await Order.query()
 // each row: { category, total, count }
 ```
 
+`orderBy` accepts the alias of an aggregate (`total` above) as well as a real column; on PostgreSQL it is emitted as the bare output name rather than a table column.
+
 One query, both drivers. The chain reads in execution order: filter rows, group, aggregate, filter groups, sort, limit.
 
 ## Pitfalls

@@ -262,3 +262,34 @@ describe("PostgresQueryParser", () => {
     });
   });
 });
+
+describe("PostgresQueryParser orderBy on select aliases", () => {
+  it("orders by an aggregate alias without a table qualifier", () => {
+    const { query } = parse([
+      { type: "selectRaw", data: { expression: "count(*) AS total" } },
+      { type: "groupBy", data: { fields: ["status"] } },
+      { type: "orderBy", data: { field: "total", direction: "desc" } },
+    ]);
+
+    expect(query).toContain(`ORDER BY "total" DESC`);
+  });
+
+  it("recognises aliases declared after the orderBy and via select maps", () => {
+    const early = parse([
+      { type: "orderBy", data: { field: "n", direction: "asc" } },
+      { type: "selectRaw", data: { expression: { n: "count(*)" } } },
+    ]);
+    expect(early.query).toContain(`ORDER BY "n" ASC`);
+
+    const mapped = parse([
+      { type: "select", data: { fields: { name: "label" } } },
+      { type: "orderBy", data: { field: "label", direction: "asc" } },
+    ]);
+    expect(mapped.query).toContain(`ORDER BY "label" ASC`);
+  });
+
+  it("still qualifies ordinary columns", () => {
+    const { query } = parse([{ type: "orderBy", data: { field: "name", direction: "asc" } }]);
+    expect(query).toContain(`ORDER BY "users"."name" ASC`);
+  });
+});

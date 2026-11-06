@@ -887,22 +887,43 @@ export class QueryBuilder<T = unknown> {
   }
 
   /**
-   * AND NOT wrapper — negate a nested group.
+   * AND NOT wrapper — negate a condition or a nested group. Accepts the same
+   * shapes as `where`.
+   * @example q.whereNot("status", "archived")
+   * @example q.whereNot("age", "<", 18)
+   * @example q.whereNot({ status: "banned", role: "user" })
    * @example q.whereNot(q => q.where("status", "banned").where("role", "user"))
    */
-  public whereNot(callback: WhereCallback<T>): this {
-    const sub = this.subQuery();
-    callback(sub as any);
-    this.addOperation("whereNot", { nested: sub.operations });
+  public whereNot(field: string, value: unknown): this;
+  public whereNot(field: string, operator: WhereOperator, value: unknown): this;
+  public whereNot(conditions: WhereObject): this;
+  public whereNot(callback: WhereCallback<T>): this;
+  public whereNot(...args: unknown[]): this {
+    this.addOperation("whereNot", { nested: this.negatedOperations(args) });
     return this;
   }
 
-  /** OR NOT wrapper. */
-  public orWhereNot(callback: WhereCallback<T>): this {
-    const sub = this.subQuery();
-    callback(sub as any);
-    this.addOperation("orWhereNot", { nested: sub.operations });
+  /** OR NOT wrapper. Accepts the same shapes as `whereNot`. */
+  public orWhereNot(field: string, value: unknown): this;
+  public orWhereNot(field: string, operator: WhereOperator, value: unknown): this;
+  public orWhereNot(conditions: WhereObject): this;
+  public orWhereNot(callback: WhereCallback<T>): this;
+  public orWhereNot(...args: unknown[]): this {
+    this.addOperation("orWhereNot", { nested: this.negatedOperations(args) });
     return this;
+  }
+
+  /** Operations of the group a `whereNot` call negates. */
+  private negatedOperations(args: unknown[]): Op[] {
+    const sub = this.subQuery();
+
+    if (args.length === 1 && typeof args[0] === "function") {
+      (args[0] as (q: unknown) => void)(sub);
+    } else {
+      (sub.where as (...a: unknown[]) => unknown)(...args);
+    }
+
+    return sub.operations;
   }
 
   // ════════════════════════════════════════════════════════

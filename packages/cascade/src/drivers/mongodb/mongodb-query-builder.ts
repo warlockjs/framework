@@ -622,21 +622,44 @@ export class MongoQueryBuilder<T = unknown>
   }
 
   /**
-   * Negates a set of conditions using a callback.
-   * @param callback - Callback function defining conditions to negate
+   * Negates a condition or a set of conditions. Accepts the same shapes as
+   * `where`.
+   * @example query.whereNot("status", "archived")
+   * @example query.whereNot(q => q.where("status", "banned"))
    */
-  public whereNot(callback: WhereCallback<T>): this {
-    this.operationsHelper.addMatchOperation("where:not", { callback });
+  public whereNot(field: string, value: unknown): this;
+  public whereNot(field: string, operator: WhereOperator, value: unknown): this;
+  public whereNot(conditions: WhereObject): this;
+  public whereNot(callback: WhereCallback<T>): this;
+  public whereNot(...args: unknown[]): this {
+    this.operationsHelper.addMatchOperation("where:not", { callback: this.negatedCallback(args) });
     return this;
   }
 
   /**
-   * Negates a set of conditions with OR logic.
-   * @param callback - Callback function defining conditions to negate
+   * Negates a condition or a set of conditions with OR logic. Accepts the same
+   * shapes as `whereNot`.
    */
-  public orWhereNot(callback: WhereCallback<T>): this {
-    this.operationsHelper.addMatchOperation("orWhere:not", { callback });
+  public orWhereNot(field: string, value: unknown): this;
+  public orWhereNot(field: string, operator: WhereOperator, value: unknown): this;
+  public orWhereNot(conditions: WhereObject): this;
+  public orWhereNot(callback: WhereCallback<T>): this;
+  public orWhereNot(...args: unknown[]): this {
+    this.operationsHelper.addMatchOperation("orWhere:not", {
+      callback: this.negatedCallback(args),
+    });
     return this;
+  }
+
+  /** The callback a `whereNot` call negates, built from any `where` shape. */
+  private negatedCallback(args: unknown[]): WhereCallback<T> {
+    if (args.length === 1 && typeof args[0] === "function") {
+      return args[0] as WhereCallback<T>;
+    }
+
+    return ((q: { where: (...a: unknown[]) => unknown }) => {
+      q.where(...args);
+    }) as unknown as WhereCallback<T>;
   }
 
   // ============================================================================

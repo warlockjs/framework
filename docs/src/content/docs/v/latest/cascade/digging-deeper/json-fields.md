@@ -23,6 +23,10 @@ await User.query().orderBy("profile.lastLogin", "desc").get();
 
 The helpers in this guide earn their place by doing JSON-specific operations — array containment, key existence, length, type checks. For everything else, the regular query vocabulary already covers it.
 
+## Writing scalars to `json` / `jsonb` columns
+
+On PostgreSQL, a string, number or boolean saved into a `json` / `jsonb` column is stored as that JSON value (`"hello"` becomes the JSON string `"hello"`), the same way objects and arrays already are. The driver reads the column types from the database when it connects, so nothing needs configuring. Likewise, an `INTEGER[]` (or any native array) column receives your number array as a real array, not as a vector literal.
+
 ## Path syntax
 
 Dot-notation paths walk the structure:

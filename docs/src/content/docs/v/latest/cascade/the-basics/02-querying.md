@@ -135,6 +135,8 @@ const hasAdmin = await User.where("role", "admin").exists();
 const noneBlocked = await User.where("status", "blocked").notExists();
 ```
 
+`Model.exists(filter?)` is the static shorthand: `await User.exists({ email })` is the same as `User.where({ email }).exists()`, and `await User.exists()` asks whether the table has any record.
+
 `.exists()` returns a boolean and short-circuits on the first matching record. `.notExists()` is its inverse. No hydration, no field reads — cheaper than `count() > 0` when all you want is "does at least one match exist?"
 
 :::caution — don't use `.count() > 0`

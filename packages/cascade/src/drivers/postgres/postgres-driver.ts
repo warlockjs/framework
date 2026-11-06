@@ -315,6 +315,13 @@ export class PostgresDriver implements DriverContract {
   private _introspectedArrayColumns: ReadonlyMap<string, ReadonlySet<string>> = new Map();
 
   /**
+   * `json` / `jsonb` columns discovered by the same introspection, keyed
+   * `table → { column, … }`. Any non-null scalar written to one is encoded as
+   * JSON text.
+   */
+  private _introspectedJsonColumns: ReadonlyMap<string, ReadonlySet<string>> = new Map();
+
+  /**
    * Create a new PostgreSQL driver instance.
    *
    * @param config - PostgreSQL connection configuration
@@ -502,6 +509,9 @@ export class PostgresDriver implements DriverContract {
    * Encoding rules (in order):
    * - `Date` → ISO string.
    * - `bigint` → decimal string (node-pg has no native bigint binding).
+   * - native-array column (introspected or configured) → the raw array, even
+   *   when every element is a number (an `INTEGER[]` value `[1]` must reach
+   *   node-pg as an array, not as the text `"[1]"`).
    * - all-number array → pgvector literal `'[n1,n2,...]'`. node-pg would
    *   otherwise emit a `{n1,n2,...}` array literal, which the `vector` type
    *   rejects. This branch is preserved exactly.
@@ -515,6 +525,9 @@ export class PostgresDriver implements DriverContract {
    *   `JSONB[]` / `TEXT[]` column needs.
    * - plain object → `JSON.stringify`. Equivalent to node-pg's own object
    *   handling, made explicit so both write paths agree.
+   * - string, number or boolean bound to an introspected `json` / `jsonb`
+   *   column → `JSON.stringify`, so `"hello"` is stored as the JSON string
+   *   `"hello"` rather than rejected as invalid JSON.
    * - everything else (scalars: string, number, boolean, null) → untouched.
    *
    * Distinguishing native-array from `json` / `jsonb` columns: a value alone
@@ -541,15 +554,17 @@ export class PostgresDriver implements DriverContract {
     }
 
     if (Array.isArray(value)) {
+      // Genuine native PostgreSQL array columns (JSONB[], TEXT[], INTEGER[], …)
+      // must keep their raw array so node-pg emits a '{...}' array literal.
+      // Checked before the vector shape: the column's declared type decides,
+      // not the value's.
+      if (this.isNativeArrayColumn(table, key)) {
+        return value;
+      }
+
       if (value.length > 0 && value.every((v) => typeof v === "number")) {
         // pgvector columns expect the literal '[n1,n2,...]' format.
         return `[${value.join(",")}]`;
-      }
-
-      // Genuine native PostgreSQL array columns (JSONB[], TEXT[], …) must
-      // keep their raw array so node-pg emits a '{...}' array literal.
-      if (this.isNativeArrayColumn(table, key)) {
-        return value;
       }
 
       // json / jsonb columns: bind as JSON text. Covers object-arrays,
@@ -564,7 +579,20 @@ export class PostgresDriver implements DriverContract {
       return JSON.stringify(value);
     }
 
+    if (
+      (typeof value === "string" || typeof value === "number" || typeof value === "boolean") &&
+      this.isJsonColumn(table, key)
+    ) {
+      // A bare scalar is not valid JSON text; encode it so json / jsonb accept it.
+      return JSON.stringify(value);
+    }
+
     return value;
+  }
+
+  /** Whether `column` on `table` was introspected as a `json` / `jsonb` column. */
+  private isJsonColumn(table: string | undefined, column: string): boolean {
+    return Boolean(table && this._introspectedJsonColumns.get(table)?.has(column));
   }
 
   /**
@@ -611,16 +639,22 @@ export class PostgresDriver implements DriverContract {
    */
   private async loadNativeArrayColumns(): Promise<void> {
     try {
-      const result = await this.query<{ table_name: string; column_name: string }>(
-        `SELECT table_name, column_name
+      const result = await this.query<{
+        table_name: string;
+        column_name: string;
+        data_type?: string;
+      }>(
+        `SELECT table_name, column_name, data_type
          FROM information_schema.columns
          WHERE table_schema = ANY (current_schemas(false))
-           AND data_type = 'ARRAY'`,
+           AND data_type IN ('ARRAY', 'json', 'jsonb')`,
       );
 
-      const map = new Map<string, Set<string>>();
+      const arrays = new Map<string, Set<string>>();
+      const jsons = new Map<string, Set<string>>();
 
-      for (const { table_name, column_name } of result.rows) {
+      for (const { table_name, column_name, data_type } of result.rows) {
+        const map = data_type === "json" || data_type === "jsonb" ? jsons : arrays;
         let columns = map.get(table_name);
 
         if (!columns) {
@@ -631,7 +665,8 @@ export class PostgresDriver implements DriverContract {
         columns.add(column_name);
       }
 
-      this._introspectedArrayColumns = map;
+      this._introspectedArrayColumns = arrays;
+      this._introspectedJsonColumns = jsons;
     } catch {
       // Introspection is an optimization, never a hard dependency — fall back
       // to the `nativeArrayColumns` config so a locked-down catalog or an

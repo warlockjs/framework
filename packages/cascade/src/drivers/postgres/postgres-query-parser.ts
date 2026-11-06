@@ -190,6 +190,13 @@ export class PostgresQueryParser {
   private selectRaw: string[] = [];
 
   /**
+   * Output names declared in the SELECT list (`select({ a: "alias" })` or
+   * `... AS alias` in a raw projection). `orderBy` on one of these emits the
+   * bare alias instead of a table-qualified column.
+   */
+  private selectAliases = new Set<string>();
+
+  /**
    * WHERE clauses.
    */
   public whereClauses: string[] = [];
@@ -284,6 +291,7 @@ export class PostgresQueryParser {
     ]);
 
     this.hasJoins = false;
+    this.selectAliases = this.collectSelectAliases();
 
     // First pass: locate all joins and populate joinedTables for accurate JSON path detection
     for (const operation of this.operations) {
@@ -307,6 +315,38 @@ export class PostgresQueryParser {
     const query = this.buildSql();
 
     return { query, bindings: this.params };
+  }
+
+  /**
+   * Collect the output aliases declared by select / selectRaw operations.
+   */
+  private collectSelectAliases(): Set<string> {
+    const aliases = new Set<string>();
+
+    for (const operation of this.operations) {
+      const data = operation.data as Record<string, unknown>;
+
+      if (operation.type === "select" && data.fields && !Array.isArray(data.fields)) {
+        for (const alias of Object.values(data.fields as Record<string, string>)) {
+          aliases.add(alias);
+        }
+      } else if (operation.type === "selectRaw") {
+        const expression = data.expression;
+
+        if (typeof expression === "string") {
+          const match = /\bAS\s+(?:"([^"]+)"|([A-Za-z_]\w*))\s*$/i.exec(expression.trim());
+          const alias = match?.[1] ?? match?.[2];
+
+          if (alias) aliases.add(alias);
+        } else if (expression && typeof expression === "object") {
+          for (const alias of Object.keys(expression)) {
+            aliases.add(alias);
+          }
+        }
+      }
+    }
+
+    return aliases;
   }
 
   /**
@@ -1378,7 +1418,11 @@ export class PostgresQueryParser {
 
     const direction = rawDirection.replace(/\s+/g, " ").toUpperCase();
 
-    const quotedField = this.parseColumnIdentifier(field, this.table, this.alias);
+    // A select alias (e.g. `count(*) AS total`) is not a column of the table:
+    // emit it bare so Postgres resolves it from the SELECT list.
+    const quotedField = this.selectAliases.has(field)
+      ? this.dialect.quoteIdentifier(field)
+      : this.parseColumnIdentifier(field, this.table, this.alias);
     this.orderClauses.push(`${quotedField} ${direction}`);
   }
 

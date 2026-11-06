@@ -65,13 +65,13 @@ describe("PostgresDriver serialize() — json/jsonb encoding (B1)", () => {
       expect(Array.isArray(result.history)).toBe(true);
     });
 
-    it("still vector-encodes an all-number native-array column (vector wins)", () => {
-      // An all-number array is always the pgvector form regardless of the
-      // native-array hint, since the vector branch is checked first.
+    it("keeps an all-number array raw for a configured native-array column", () => {
+      // The column's declared type decides: a native array column receives the
+      // raw array even when every element is a number.
       const driver = makeDriver(["embedding"]);
       const result = driver.serialize({ embedding: [1, 2, 3] });
 
-      expect(result.embedding).toBe("[1,2,3]");
+      expect(result.embedding).toEqual([1, 2, 3]);
     });
   });
 
@@ -270,5 +270,41 @@ describe("PostgresDriver UPDATE $set — json/jsonb encoding (B1)", () => {
 
     expect(params).toContain("Alice");
     expect(params).toContain(30);
+  });
+});
+
+describe("PostgresDriver serialize() — declared column type decides the encoding", () => {
+  const introspectRows = async (
+    driver: PostgresDriver,
+    rows: { table_name: string; column_name: string; data_type: string }[],
+  ) => {
+    const spy = vi.spyOn(driver, "query").mockResolvedValue({ rows, rowCount: rows.length } as never);
+    await (driver as unknown as { loadNativeArrayColumns(): Promise<void> }).loadNativeArrayColumns();
+    spy.mockRestore();
+  };
+
+  it("keeps a numeric array raw for an INTEGER[] column instead of a vector literal", async () => {
+    const driver = new PostgresDriver({ database: "test" });
+    await introspectRows(driver, [{ table_name: "t", column_name: "ids", data_type: "ARRAY" }]);
+
+    expect(driver.serialize({ ids: [1] }, "t").ids).toEqual([1]);
+    // Other columns keep the vector literal.
+    expect(driver.serialize({ embedding: [1, 2] }, "t").embedding).toBe("[1,2]");
+  });
+
+  it("JSON-encodes string, number and boolean values for json / jsonb columns", async () => {
+    const driver = new PostgresDriver({ database: "test" });
+    await introspectRows(driver, [
+      { table_name: "t", column_name: "meta", data_type: "jsonb" },
+      { table_name: "t", column_name: "raw", data_type: "json" },
+    ]);
+
+    expect(driver.serialize({ meta: "hello" }, "t").meta).toBe('"hello"');
+    expect(driver.serialize({ raw: 5 }, "t").raw).toBe("5");
+    expect(driver.serialize({ raw: false }, "t").raw).toBe("false");
+    expect(driver.serialize({ meta: null }, "t").meta).toBeNull();
+    // Non-json columns and unknown tables are untouched.
+    expect(driver.serialize({ name: "x" }, "t").name).toBe("x");
+    expect(driver.serialize({ meta: "hello" }, "other").meta).toBe("hello");
   });
 });
