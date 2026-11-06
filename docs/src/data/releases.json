@@ -1,4 +1,16 @@
 {
+  "5.47.1": {
+    "publishedAt": "2026-11-06T22:42:39.658Z",
+    "matrix": "none",
+    "headline": "How to check whether a model field holds a value: `isFilled()` or `== null`, with `get()` and `has()` documented for null columns.",
+    "highlights": [
+      "On PostgreSQL an unset column reads back as `null`; test for a value with `model.isFilled(field)` or `== null`, not `=== undefined`.",
+      "`model.has(field)` checks that the key exists, so it is `true` for a `null` column; defaults in `get(field, fallback)` apply only to missing keys (use `?? fallback` to cover `null`)."
+    ],
+    "upgradeNotes": [
+      "No runtime changes. If code checks optional columns with `=== undefined` or `has()`, switch to `isFilled()` or `== null`."
+    ]
+  },
   "5.47.0": {
     "publishedAt": "2026-11-06T17:37:21.608Z",
     "matrix": "none",

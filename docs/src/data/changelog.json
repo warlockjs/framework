@@ -136,6 +136,49 @@
   ],
   "releases": [
     {
+      "version": "5.47.1",
+      "id": "v5-47-1",
+      "date": "November 6, 2026",
+      "isUnreleased": false,
+      "headlineHtml": "How to check whether a model field holds a value: <code>isFilled()</code> or <code>== null</code>, with <code>get()</code> and <code>has()</code> documented for null columns.",
+      "highlights": [
+        "On PostgreSQL an unset column reads back as <code>null</code>; test for a value with <code>model.isFilled(field)</code> or <code>== null</code>, not <code>=== undefined</code>.",
+        "<code>model.has(field)</code> checks that the key exists, so it is <code>true</code> for a <code>null</code> column; defaults in <code>get(field, fallback)</code> apply only to missing keys (use <code>?? fallback</code> to cover <code>null</code>)."
+      ],
+      "upgradeNotes": [
+        "No runtime changes. If code checks optional columns with <code>=== undefined</code> or <code>has()</code>, switch to <code>isFilled()</code> or <code>== null</code>."
+      ],
+      "summaryHtml": null,
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/5.47.1-summary.md",
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>npx warlock release-notes</code> includes the 5.47.1 notes: how to check whether a model field holds a value (<code>isFilled()</code> or <code>== null</code>; <code>has()</code> is true for a <code>null</code> column; defaults apply only to missing keys)."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/cascade",
+          "slug": "cascade",
+          "total": 0,
+          "counts": [],
+          "items": []
+        }
+      ]
+    },
+    {
       "version": "5.47.0",
       "id": "v5-47-0",
       "date": "November 6, 2026",
