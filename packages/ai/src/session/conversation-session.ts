@@ -12,6 +12,7 @@ import type { CapturedMessage } from "../contracts/result/execution-report.type"
 import type { StreamContract } from "../contracts/stream/stream.contract";
 import { AgentExecutionError } from "../errors";
 import { inProcessSessionLock, noopSessionLock } from "../orchestrator/session-lock";
+import { isToolResultContent } from "../tool/tool-result-content";
 import { generateRunId } from "../utils/generate-run-id";
 import type {
   ConversationSendOptions,
@@ -87,7 +88,7 @@ class Session<TOutput> implements ConversationSession<TOutput> {
   }
 
   public async history(): Promise<Message[]> {
-    return structuredClone((await this.load())?.messages ?? []);
+    return restoreToolResultParts((await this.load())?.messages ?? []);
   }
 
   public load(): Promise<ConversationSessionRecord | undefined> {
@@ -207,7 +208,7 @@ class Session<TOutput> implements ConversationSession<TOutput> {
           result = await run({
             ...options,
             runId,
-            history: structuredClone(record.messages),
+            history: restoreToolResultParts(record.messages),
             captureMessages: true,
             sessionId: options?.sessionId ?? this.id,
           });
@@ -341,6 +342,16 @@ function restoreContent(
   multipart: Map<string, ContentPart[]>,
   attachmentsInput: string | undefined,
 ): string | ContentPart[] {
+  if (captured.contentParts !== undefined) {
+    return structuredClone(captured.contentParts);
+  }
+
+  // Tool results saved before parts were captured hold their image parts as
+  // a JSON string; restore it when it parses to a valid part array.
+  if (captured.role === "tool") {
+    return restoreToolParts(captured.content);
+  }
+
   if (captured.role !== "user" || !captured.content.startsWith("[")) {
     return captured.content;
   }
@@ -366,6 +377,31 @@ function restoreContent(
   }
 
   return captured.content;
+}
+
+/** A copy of stored messages with tool results saved as JSON text turned back into parts. */
+function restoreToolResultParts(messages: Message[]): Message[] {
+  return structuredClone(messages).map((message) =>
+    message.role === "tool" && typeof message.content === "string"
+      ? { ...message, content: restoreToolParts(message.content) }
+      : message,
+  );
+}
+
+function restoreToolParts(content: string): string | ContentPart[] {
+  if (!content.startsWith("[")) return content;
+
+  try {
+    const parsed: unknown = JSON.parse(content);
+
+    if (Array.isArray(parsed) && isToolResultContent({ content: parsed })) {
+      return parsed as ContentPart[];
+    }
+  } catch {
+    // A plain-text result that happens to start with "[".
+  }
+
+  return content;
 }
 
 /** The agent builds an attachment turn as the input text part followed by the attachments. */

@@ -2,7 +2,7 @@ import type { Message } from "../contracts/conversation-message.type";
 import type { ModelCallOptions } from "../contracts/model.contract";
 import { AgentExecutionError } from "../errors";
 import { extractJsonSchema } from "../utils/json-schema";
-import { approximateTokenCount } from "../utils/token-count";
+import { approximateJsonTokens } from "../utils/token-count";
 import type { AgentCompactionConfig, AgentCompactionRecord } from "./compaction.type";
 import { assertTokenTrigger, isTokenTriggerReached } from "./token-trigger";
 
@@ -24,17 +24,15 @@ export function validateCompaction(config: AgentCompactionConfig | undefined): v
 
 /** An offline estimate including text, multimodal metadata, tool schemas and output schema. */
 function estimateInput(messages: Message[], options: ModelCallOptions): number {
-  return approximateTokenCount(
-    JSON.stringify({
-      messages,
-      tools: options.tools?.map((tool) => ({
-        name: tool.name,
-        description: tool.description,
-        schema: tool.input ? extractJsonSchema(tool.input) : undefined,
-      })),
-      responseSchema: options.responseSchema,
-    }),
-  );
+  return approximateJsonTokens({
+    messages,
+    tools: options.tools?.map((tool) => ({
+      name: tool.name,
+      description: tool.description,
+      schema: tool.input ? extractJsonSchema(tool.input) : undefined,
+    })),
+    responseSchema: options.responseSchema,
+  });
 }
 
 /**

@@ -22,4 +22,4 @@ export {
 } from "./run-context";
 export { safeJsonParse } from "./safe-json-parse";
 export { type LineageStamp, stampReportLineage } from "./stamp-report-lineage";
-export { approximateTokenCount } from "./token-count";
+export { approximateJsonTokens, approximateTokenCount, MEDIA_PART_TOKENS } from "./token-count";

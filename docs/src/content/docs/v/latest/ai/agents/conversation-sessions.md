@@ -44,7 +44,7 @@ type ConversationSessionRecord = {
 };
 ```
 
-`messages` never holds the agent's system prompt: the agent adds it on every run, so a changed prompt applies to the next turn. A user turn sent with attachments is stored with its resolved parts, so the next request sends the same bytes. A failed or cancelled run leaves `messages` unchanged.
+`messages` never holds the agent's system prompt: the agent adds it on every run, so a changed prompt applies to the next turn. A user turn sent with attachments is stored with its resolved parts, so the next request sends the same bytes. A tool result that returned `{ content: ToolResultPart[] }` (a screenshot, say) is stored as parts too, so the next request sends the image as an image and not its base64 as text. Conversations stored by earlier versions, where such a result was saved as JSON text, are read back as parts. A failed or cancelled run leaves `messages` unchanged.
 
 Read it back with `chat.history()` (a copy of `messages`) or `chat.load()` (the record).
 

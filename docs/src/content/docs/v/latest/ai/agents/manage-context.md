@@ -37,6 +37,8 @@ const worker = ai.agent({
 
 `clearToolResults: true` uses the defaults (keep 3, no size threshold).
 
+Token estimates (this rule's, and compaction's) count each image, PDF or audio part as a fixed 1,000 tokens, not by its base64 length.
+
 `clearAtLeast` keeps a small clear from rewriting the prompt cache: when the
 results to clear would free fewer tokens than that, nothing is cleared on that
 trip. On the client the freed size is estimated from the cleared results; on

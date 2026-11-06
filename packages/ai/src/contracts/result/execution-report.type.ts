@@ -1,4 +1,5 @@
 import type { AgentCompactionRecord } from "../../agent/compaction.type";
+import type { ContentPart } from "../content-part.type";
 import type { MessageCompactionMarker } from "../conversation-message.type";
 import type { ModelToolCallRequest } from "../model-tool-call-request.type";
 import type { ProviderContentBlock } from "../provider-content-block.type";
@@ -13,15 +14,21 @@ import type { PromptFingerprint } from "./prompt-fingerprint.type";
  * A faithful, JSON-safe projection of the runtime `Message`: the `tool`
  * role returns a tool's output; an `assistant` turn that requested tools
  * carries `toolCalls`; a `tool` turn carries the `toolCallId` it answers.
- * `content` is always a string here (the runtime stringifies tool
- * results and flattens text), so the captured array survives JSON
- * serialization and downstream exporters forward it verbatim.
+ * `content` is always a string here (parts are flattened to JSON; the
+ * original parts ride beside it in `contentParts`), so the captured array
+ * survives JSON serialization and downstream exporters forward it verbatim.
  */
 export type CapturedMessage = {
   /** Who produced this turn. */
   role: "system" | "user" | "assistant" | "tool";
   /** The turn's text content (tool results are stringified JSON). */
   content: string;
+  /**
+   * The turn's content parts — present only when the runtime content was an
+   * array (attachments, image tool results). `content` keeps the flat JSON
+   * string; replay the parts, not the string, to keep media as media.
+   */
+  contentParts?: ContentPart[];
   /** Tool calls the assistant requested — present only on assistant turns that triggered tools. */
   toolCalls?: ModelToolCallRequest[];
   /** Provider tool-call id this turn answers — present only on tool-result turns. */
