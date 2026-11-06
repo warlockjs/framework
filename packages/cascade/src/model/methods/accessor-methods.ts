@@ -25,6 +25,12 @@ export function hasField(model: Model, field: string): boolean {
   return get(model.data, field, MISSING_VALUE as any) !== MISSING_VALUE;
 }
 
+export function isFieldFilled(model: Model, field: string): boolean {
+  const value = get(model.data, field);
+
+  return value !== undefined && value !== null;
+}
+
 export function incrementField(model: Model, field: string, amount?: number): Model {
   const value = getFieldValue(model, field, 0) as number;
   const incrementedValue = value + (amount ?? 1);

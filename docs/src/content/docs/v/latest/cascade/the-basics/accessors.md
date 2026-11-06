@@ -140,6 +140,28 @@ if (user.has("profile.avatar")) { ... }
 
 Returns `true` if the field exists at the path, including when the value is `null` or an empty string. Distinguishes "the field is missing entirely" from "the field is set but falsy" — useful for soft-deleted, partially-loaded, or sparsely-populated documents.
 
+### `isFilled(field)` — does it hold a value?
+
+```ts
+if (user.isFilled("profile.avatar")) { ... }
+```
+
+Returns `true` when the field exists and is neither `null` nor `undefined`. An empty string, `0` and `false` count as filled.
+
+### The null contract: an unset column is `null`, not `undefined`
+
+A column that was never set reads back as **`null`** from the SQL drivers (PostgreSQL): the column exists in the row, its value is SQL `NULL`. On MongoDB the same field is simply **absent**, so `get()` returns `undefined`. Cascade returns what the database stored and does not convert between the two.
+
+That makes `value === undefined` an unreliable "was this set" test: on PostgreSQL it is `false` for an unset column, so the code treats it as set. Use one of these instead:
+
+```ts
+user.isFilled("avatar"); // false for null and for missing
+user.get("avatar") == null; // same test, inline
+user.has("avatar"); // NOT this: true for a null column on PostgreSQL
+```
+
+Note that `.optional()` in a schema types the key as `T | undefined`, while a PostgreSQL row holds `null` for it. Check optional columns with `isFilled()` or `== null`, never with `=== undefined`.
+
 ## Writing — `set(field, value)`
 
 ```ts

@@ -56,6 +56,8 @@ user.get<number>("age"); // TypeScript generic for typed reads
 
 Use the direct `.id` property; use `.get("field")` for everything else. Add a typed getter on the model class when the same field is read in many places — turns N typed-cast call sites into one named accessor.
 
+**Null contract.** A column never set reads back as `null` on PostgreSQL (the key exists, value SQL `NULL`) and is absent (`undefined`) on MongoDB; Cascade returns what the database stored. Never test "was this set" with `=== undefined`: on PostgreSQL it passes for an unset column. Use `model.isFilled("field")` (false for `null` and missing; `""`, `0`, `false` count as filled) or `model.get("field") == null`. `model.has("field")` is true for a `null` column. A schema `.optional()` types the key as `T | undefined`, though a PostgreSQL row holds `null`.
+
 ### `.id` vs `.uuid` — a TypeScript convenience, same value
 
 Both getters return the model's primary id (`this.get("id")`); the only difference is the **static type**:

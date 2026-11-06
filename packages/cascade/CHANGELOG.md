@@ -4,6 +4,16 @@ All notable changes to `@warlock.js/cascade` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.47.1
+
+### Added
+
+- `model.isFilled(field)`: `true` when the field exists and is neither `null` nor `undefined`. A column that was never set reads back as `null` on PostgreSQL (and is absent on MongoDB), so `=== undefined` checks pass for it; `has()` is also `true` for a `null` column. `isFilled()` treats both the same way.
+
+### Documentation
+
+- The accessors page and the `define-model` / `query-data` skills now state the null contract: an unset column is `null` on PostgreSQL and missing on MongoDB, with the recommended checks.
+
 ## 5.47.0 - 2026-11-06
 
 ### Changed

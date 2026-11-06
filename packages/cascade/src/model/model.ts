@@ -44,6 +44,7 @@ import {
   getStringField,
   hasField,
   incrementField,
+  isFieldFilled,
   mergeFields,
   setFieldValue,
   setFields,
@@ -1049,6 +1050,28 @@ export abstract class Model<out TSchema extends ModelSchema = ModelSchema> {
   public has(field: string): boolean;
   public has(field: string): boolean {
     return hasField(this, field);
+  }
+
+  /**
+   * Checks whether a field holds a value: it exists and is neither `null` nor
+   * `undefined`.
+   *
+   * A column that was never set reads back as `null` from SQL drivers (the
+   * key exists, so {@link Model.has} is `true`) and is absent on MongoDB.
+   * `isFilled` treats both the same, so it is the safe test for "was this set".
+   * An empty string, `0` and `false` count as filled.
+   *
+   * @param field - The field name or dot-notation path
+   *
+   * @example
+   * ```typescript
+   * user.isFilled("avatar"); // false when avatar is null or missing
+   * ```
+   */
+  public isFilled<TKey extends keyof TSchema & string>(field: TKey): boolean;
+  public isFilled(field: string): boolean;
+  public isFilled(field: string): boolean {
+    return isFieldFilled(this, field);
   }
 
   /**

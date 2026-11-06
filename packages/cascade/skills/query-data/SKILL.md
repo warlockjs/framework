@@ -195,6 +195,7 @@ const activeUsers = await User.query().scope("active").get();
 
 ## Things NOT to do
 
+- Don't test an unset column with `=== undefined`: PostgreSQL returns `null` for it (MongoDB omits the field). Use `model.isFilled("field")` or `== null`. Same for lean rows.
 - Don't `.count() > 0` for existence — use `.exists()`.
 - Don't `Model.all()` without a filter on a production table — use pagination or chunking.
 - Don't `!` away the null from `.find()` / `.first()` — handle the missing case explicitly or use `.firstOrFail()` when absence is a real error.
