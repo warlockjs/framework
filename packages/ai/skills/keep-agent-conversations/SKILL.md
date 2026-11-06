@@ -30,7 +30,7 @@ What `send(input, options)` does, under a per-session lock:
 2. Run `agent.execute(input, { ...options, history, captureMessages: true, sessionId: id })`.
 3. On success, store the run's messages (without the agent's system prompt) plus the final reply with its `blocks`; on a failed / cancelled run keep the old history. Clear `pending`.
 
-Stored turns keep every assistant tool-call turn and tool result, provider blocks (signed thinking, server compaction) and attachment parts, so a replayed thinking block sees exactly the history it was signed against.
+Stored turns keep every assistant tool-call turn and tool result, provider blocks (signed thinking, server compaction) and attachment parts, so a replayed thinking block sees exactly the history it was signed against. Tool results that returned `{ content: ToolResultPart[] }` (images) are stored as parts, not JSON text; older records saved as JSON text are restored on load. `AgentReport.messages[].contentParts` carries the parts beside the flat `content` string.
 
 ## The rest of the API
 

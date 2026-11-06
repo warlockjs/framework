@@ -313,4 +313,80 @@ describe("ai.session", () => {
       session({ id: "x", store: {} as SnapshotStore<ConversationSessionRecord>, agent: assistant }),
     ).toThrow(/snapshot store/);
   });
+
+  describe("tool results with images", () => {
+    const image = { type: "image", source: { base64: "AAAA".repeat(100), mediaType: "image/png" } };
+    const shot = tool({
+      name: "shot",
+      description: "screenshot",
+      execute: async () => ({ content: [{ type: "text", text: "page" }, image] }),
+    });
+    const toolRound = [
+      {
+        content: "",
+        finishReason: "tool_calls" as const,
+        toolCalls: [{ id: "call_1", name: "shot", input: {} }],
+      },
+      { content: "Seen." },
+    ];
+
+    it("stores the parts and replays them as an image block on the next turn", async () => {
+      const { model, calls } = scriptedModel(toolRound);
+      const chat = session({ id: "shots", store, agent: agent({ model, tools: [shot] }) });
+
+      await chat.send("look");
+      const stored = await chat.history();
+
+      expect(stored[2]).toMatchObject({ role: "tool", content: [{ type: "text", text: "page" }, image] });
+
+      await chat.send("again");
+
+      const replayed = calls[2]?.find((message) => message.role === "tool");
+
+      expect(replayed?.content).toEqual([{ type: "text", text: "page" }, image]);
+    });
+
+    it("restores a tool result an older version stored as a JSON string", async () => {
+      const { model, calls } = scriptedModel();
+      const chat = session({ id: "old", store, agent: agent({ model }) });
+      const parts = [{ type: "text", text: "page" }, image];
+
+      await chat.send("seed");
+      const record = (await chat.load())!;
+
+      await store.save({
+        ...record,
+        messages: [
+          { role: "user", content: "look" },
+          {
+            role: "assistant",
+            content: "",
+            toolCalls: [{ id: "call_1", name: "shot", input: {} }],
+          },
+          { role: "tool", content: JSON.stringify(parts), toolCallId: "call_1" },
+          { role: "assistant", content: "Seen." },
+        ],
+      });
+
+      await chat.send("next");
+
+      expect(calls.at(-1)?.find((message) => message.role === "tool")?.content).toEqual(parts);
+    });
+
+    it("keeps a plain-string tool result, even one that looks like JSON, unchanged", async () => {
+      const { model } = scriptedModel([
+        {
+          content: "",
+          finishReason: "tool_calls",
+          toolCalls: [{ id: "call_1", name: "lookup", input: {} }],
+        },
+      ]);
+      const listing = tool({ name: "lookup", description: "x", execute: async () => [1, 2, 3] });
+      const chat = session({ id: "plain", store, agent: agent({ model, tools: [listing] }) });
+
+      await chat.send("go");
+
+      expect((await chat.history())[2]).toMatchObject({ role: "tool", content: "[1,2,3]" });
+    });
+  });
 });

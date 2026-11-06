@@ -2635,6 +2635,10 @@ class Execution<TOutput> {
           typeof message.content === "string" ? message.content : JSON.stringify(message.content),
       };
 
+      if (typeof message.content !== "string") {
+        captured.contentParts = message.content;
+      }
+
       if (message.toolCalls !== undefined) {
         captured.toolCalls = message.toolCalls;
       }

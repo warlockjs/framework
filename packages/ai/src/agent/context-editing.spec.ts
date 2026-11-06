@@ -4,6 +4,7 @@ import type { Message } from "../contracts/conversation-message.type";
 import { AgentExecutionError } from "../errors";
 import { MockSDK } from "../mock/mock-sdk";
 import { tool } from "../tool/tool";
+import { approximateJsonTokens, MEDIA_PART_TOKENS } from "../utils/token-count";
 import { agent } from "./agent";
 import {
   clearOldToolResults,
@@ -270,5 +271,25 @@ describe("agent contextEditing", () => {
     expect(() => agent({ model, contextEditing: { clearToolResults: { keep: -1 } } })).toThrow(
       AgentExecutionError,
     );
+  });
+
+  it("estimates an image part at a fixed size, not by its base64 length", async () => {
+    const messages: Message[] = [
+      { role: "user", content: "go" },
+      {
+        role: "tool",
+        toolCallId: "c0",
+        content: [
+          { type: "image", source: { base64: "A".repeat(100_000), mediaType: "image/png" } },
+        ],
+      },
+      { role: "tool", toolCallId: "c1", content: "latest" },
+    ];
+
+    const record = await clearOldToolResults({ keep: 1, clearAtLeast: 20_000 }, messages, {}, 0);
+
+    expect(record).toBeUndefined();
+    expect(approximateJsonTokens(messages)).toBeLessThan(1_100);
+    expect(approximateJsonTokens(messages)).toBeGreaterThanOrEqual(MEDIA_PART_TOKENS);
   });
 });

@@ -2,7 +2,7 @@ import type { Message } from "../contracts/conversation-message.type";
 import type { ModelCallOptions } from "../contracts/model.contract";
 import { AgentExecutionError } from "../errors";
 import { extractJsonSchema } from "../utils/json-schema";
-import { approximateTokenCount } from "../utils/token-count";
+import { approximateJsonTokens, approximateTokenCount } from "../utils/token-count";
 import { assertTokenTrigger, isTokenTriggerReached, resolveTokenTrigger } from "./token-trigger";
 import {
   DEFAULT_CLEARED_TOOL_RESULT,
@@ -82,16 +82,14 @@ export function nativeContextEditingHint(
 }
 
 function estimate(messages: Message[], options: ModelCallOptions): number {
-  return approximateTokenCount(
-    JSON.stringify({
-      messages,
-      tools: options.tools?.map((tool) => ({
-        name: tool.name,
-        description: tool.description,
-        schema: tool.input ? extractJsonSchema(tool.input) : undefined,
-      })),
-    }),
-  );
+  return approximateJsonTokens({
+    messages,
+    tools: options.tools?.map((tool) => ({
+      name: tool.name,
+      description: tool.description,
+      schema: tool.input ? extractJsonSchema(tool.input) : undefined,
+    })),
+  });
 }
 
 /**
@@ -159,9 +157,10 @@ export async function clearOldToolResults(
     const placeholderTokens = approximateTokenCount(placeholder);
     const freed = candidates.reduce((sum, index) => {
       const { content } = messages[index]!;
-      const text = typeof content === "string" ? content : JSON.stringify(content);
+      const tokens =
+        typeof content === "string" ? approximateTokenCount(content) : approximateJsonTokens(content);
 
-      return sum + Math.max(0, approximateTokenCount(text) - placeholderTokens);
+      return sum + Math.max(0, tokens - placeholderTokens);
     }, 0);
 
     if (freed < rule.clearAtLeast) return undefined;
