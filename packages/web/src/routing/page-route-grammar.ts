@@ -15,15 +15,19 @@
  * ALLOWED — and ONLY these shapes; anything else is rejected by default:
  * the root path `/`; static segments (`/users/settings`); whole-segment
  * `:param` segments where the param occupies its entire segment
- * (`/users/:id`); the exact root wildcard `*` (the one path allowed without
- * a leading slash — distinct from `/*`); and slash-led paths whose FINAL
- * segment is exactly `*` (`/*`, `/prefix/*`, `/a/b/*`).
+ * (`/users/:id`); mixed segments that hold several params and/or static
+ * text (`/:type-for-:purpose`, `/near/:lat-:lng`, `/file/:name.png`, with
+ * static text limited to letters, digits and `. _ ~ -`, and two params always
+ * separated by text); the exact root wildcard `*` (the one path allowed
+ * without a leading slash — distinct from `/*`); and slash-led paths whose
+ * FINAL segment is `*` or a named wildcard `*name` (`/*`, `/prefix/*`,
+ * `/a/b/*rest`). A param name may appear only once in a path that uses a
+ * mixed segment or a named wildcard.
  *
  * REJECTED — each with a reason naming the offending construct and, where
  * one exists, the supported alternative: regex-constrained params
- * (`/users/:id(\d+)`), optional params (`/users/:id?`), multiple params in
- * one segment (`/near/:lat-:lng`), params mixed with static text
- * (`/file/:name.png`, `/pre:id`), backslash-escaped colons
+ * (`/users/:id(\d+)`), optional params (`/users/:id?`), two params with no
+ * text between them (`/:a:b`), backslash-escaped colons
  * (`/path/\:literal`), a `*` that does not occupy a whole terminal segment
  * (`/a/prefix*`, or a wildcard before the final segment), paths missing
  * their leading slash, empty
@@ -37,6 +41,8 @@
  * identity. Callers decide only WHEN to raise it and supply that context;
  * none of them wraps the rejection in a category or wording of its own.
  */
+
+import { namedWildcardOfSegment, parseMixedSegment } from "./mixed-route-segment";
 
 /**
  * The predicate's verdict for one declared page route path:
@@ -77,7 +83,7 @@ function classifySegment(segment: string, path: string, isFinal: boolean): PageR
     );
   }
 
-  if (segment === "*") {
+  if (segment === "*" || (isFinal && namedWildcardOfSegment(segment) !== undefined)) {
     if (isFinal) {
       return allowed;
     }
@@ -106,7 +112,7 @@ function classifySegment(segment: string, path: string, isFinal: boolean): PageR
   if (segment.includes("\\:")) {
     return rejected(
       `Segment "${segment}" of "${path}" escapes a colon with a backslash, which page routes do ` +
-        `not support — page routes treat ":" only as a whole-segment param marker, so a literal ` +
+        `not support — page routes treat ":" only as a param marker, so a literal ` +
         `colon cannot be declared; rename the segment to avoid the colon.`,
     );
   }
@@ -134,19 +140,29 @@ function classifySegment(segment: string, path: string, isFinal: boolean): PageR
     );
   }
 
-  if (segment.split(":").length - 1 > 1) {
+  const parsed = parseMixedSegment(segment);
+
+  if (parsed.type === "invalid") {
     return rejected(
-      `Segment "${segment}" of "${path}" declares more than one param, and page routes require a ` +
-        `param to occupy its whole segment — split the params into separate segments, as in ` +
-        `":lat/:lng".`,
+      `Segment "${segment}" of "${path}" is not a supported mixed segment: ${parsed.reason}.`,
     );
   }
 
-  return rejected(
-    `Segment "${segment}" of "${path}" mixes a ":" param with other text, and page routes ` +
-      `require a param to occupy its whole segment — use a plain whole-segment param such as ` +
-      `":id" instead.`,
-  );
+  return allowed;
+}
+
+/** The param names a segment declares, for the duplicate check; whole-segment params are not counted. */
+function mixedParameterNames(segment: string): string[] {
+  const wildcard = namedWildcardOfSegment(segment);
+
+  if (wildcard !== undefined) return [wildcard];
+  if (!segment.includes(":") || wholeSegmentParamPattern.test(segment)) return [];
+
+  const parsed = parseMixedSegment(segment);
+
+  return parsed.type === "mixed"
+    ? parsed.parts.flatMap((part) => (part.type === "param" ? [part.name] : []))
+    : [];
 }
 
 /**
@@ -186,6 +202,25 @@ export function classifyPageRoutePath(path: string): PageRoutePathVerdict {
     }
   }
 
+  // Whole-segment params keep their long-standing behavior; only the newer
+  // shapes are checked for a name used twice, since a repeat would leave one
+  // of the values unreachable.
+  const names = new Set<string>();
+  const wholeNames = segments.flatMap((segment) =>
+    wholeSegmentParamPattern.test(segment) ? [segment.slice(1)] : [],
+  );
+
+  for (const segment of segments) {
+    for (const name of mixedParameterNames(segment)) {
+      if (names.has(name) || wholeNames.includes(name)) {
+        return rejected(
+          `Path "${path}" uses the param name "${name}" more than once — give each param its own name.`,
+        );
+      }
+      names.add(name);
+    }
+  }
+
   return allowed;
 }
 
@@ -206,8 +241,9 @@ export class PageRoutePathNotSupportedError extends Error {
     super(
       `"${pageFile}" declares the page route path "${routePath}", which is not supported: ` +
         `${reason} Page routes support a narrower grammar than API routes — a page path may be ` +
-        `"/", static segments, whole-segment ":param" segments, the exact root wildcard "*", or ` +
-        `a path whose final segment is exactly "*" (such as "/prefix/*").`,
+        `"/", static segments, ":param" segments (optionally mixed with static text or other ` +
+        `params, such as ":type-for-:purpose"), the exact root wildcard "*", or a path whose ` +
+        `final segment is "*" or a named wildcard "*name" (such as "/prefix/*" or "/prefix/*rest").`,
     );
     this.name = "PageRoutePathNotSupportedError";
   }

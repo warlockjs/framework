@@ -1,10 +1,20 @@
+import {
+  compareMixedSegments,
+  hasMixedSegment,
+  mixedRoutesTie,
+  mixedSegmentSource,
+  namedWildcardOfSegment,
+  parseMixedSegment,
+  type MixedSegmentPart,
+} from "../../routing/mixed-route-segment";
 import { isPrefixedLocale, readLocaleRouting } from "../../routing/locale-routing";
 import type { ClientPageEntry, ClientRouteMatch } from "./types";
 
 type RouteToken =
   | { readonly type: "static"; readonly value: string }
   | { readonly type: "parameter"; readonly name: string }
-  | { readonly type: "catch-all" };
+  | { readonly type: "mixed"; readonly parts: readonly MixedSegmentPart[] }
+  | { readonly type: "catch-all"; readonly name: string };
 
 type CompiledRoute = {
   readonly entry: ClientPageEntry;
@@ -12,6 +22,8 @@ type CompiledRoute = {
   readonly parameterNames: readonly string[];
   readonly expression: RegExp;
   readonly collisionKey: string;
+  /** The terminal wildcard's own name, when it has one besides `"*"`; its value is also kept under `"*"`. */
+  readonly wildcardAlias: string | undefined;
 };
 
 type SanitizedPath = {
@@ -106,6 +118,11 @@ function decodeParameter(value: string): string {
   return decoded;
 }
 
+/** Whether a segment holding `:` could be a mixed segment rather than a malformed param. */
+function isMixedCandidate(segment: string): boolean {
+  return !segment.includes("*") && !segment.includes("%") && parseMixedSegment(segment).type === "mixed";
+}
+
 function parsePattern(entry: ClientPageEntry): CompiledRoute {
   const original = entry.path;
   const isExactRootCatchAll = original === "*";
@@ -124,16 +141,21 @@ function parsePattern(entry: ClientPageEntry): CompiledRoute {
       throw new Error(`Client route pattern '${original}' contains an empty segment`);
     }
 
-    if (segment === "*") {
+    const wildcardName = segment === "*" ? "*" : namedWildcardOfSegment(segment);
+
+    if (wildcardName !== undefined) {
       if (index !== segments.length - 1) {
         throw new Error(`Client route pattern '${original}' has a non-terminal catch-all`);
       }
-      tokens.push({ type: "catch-all" });
-      parameterNames.push("*");
+      if (parameterNames.includes(wildcardName)) {
+        throw new Error(`Client route pattern '${original}' repeats parameter '${wildcardName}'`);
+      }
+      tokens.push({ type: "catch-all", name: wildcardName });
+      parameterNames.push(wildcardName);
       continue;
     }
 
-    if (segment.startsWith(":")) {
+    if (segment.startsWith(":") && (PARAMETER_NAME.test(segment.slice(1)) || !isMixedCandidate(segment))) {
       const name = segment.slice(1);
       if (!PARAMETER_NAME.test(name)) {
         throw new Error(`Client route pattern '${original}' has an unsupported parameter segment`);
@@ -144,6 +166,22 @@ function parsePattern(entry: ClientPageEntry): CompiledRoute {
       tokens.push({ type: "parameter", name });
       parameterNames.push(name);
       continue;
+    }
+
+    if (segment.includes(":") && !segment.includes("*") && !segment.includes("%")) {
+      const parsed = parseMixedSegment(segment);
+
+      if (parsed.type === "mixed") {
+        for (const part of parsed.parts) {
+          if (part.type !== "param") continue;
+          if (parameterNames.includes(part.name)) {
+            throw new Error(`Client route pattern '${original}' repeats parameter '${part.name}'`);
+          }
+          parameterNames.push(part.name);
+        }
+        tokens.push({ type: "mixed", parts: parsed.parts });
+        continue;
+      }
     }
 
     if (
@@ -162,6 +200,7 @@ function parsePattern(entry: ClientPageEntry): CompiledRoute {
     const token = tokens[index];
     if (token.type === "static") source += `/${escapeRegExp(token.value)}`;
     if (token.type === "parameter") source += "/([^/]{1,100})";
+    if (token.type === "mixed") source += `/${mixedSegmentSource(token.parts)}`;
     if (token.type === "catch-all") {
       source += isExactRootCatchAll ? "(.*)" : index === 0 ? "/(.*)" : "/(.+)";
     }
@@ -173,6 +212,9 @@ function parsePattern(entry: ClientPageEntry): CompiledRoute {
     .map((token) => {
       if (token.type === "static") return `s:${token.value}`;
       if (token.type === "parameter") return "p";
+      if (token.type === "mixed") {
+        return `m:${token.parts.map((part) => (part.type === "text" ? part.value : "p")).join("")}`;
+      }
       return "w";
     })
     .join("/");
@@ -183,20 +225,32 @@ function parsePattern(entry: ClientPageEntry): CompiledRoute {
     parameterNames,
     expression: new RegExp(source),
     collisionKey,
+    wildcardAlias: tokens.some((token) => token.type === "catch-all" && token.name !== "*")
+      ? "*"
+      : undefined,
   };
 }
 
 function compareSpecificity(left: CompiledRoute, right: CompiledRoute): number {
+  // Static text beats a mixed segment, which beats a whole-segment param,
+  // which beats the catch-all — the order the server's router applies.
   const rank = (token: RouteToken | undefined): number => {
-    if (!token || token.type === "static") return 3;
+    if (!token || token.type === "static") return 4;
+    if (token.type === "mixed") return 3;
     if (token.type === "parameter") return 2;
     return 1;
   };
 
   const length = Math.max(left.tokens.length, right.tokens.length);
   for (let index = 0; index < length; index++) {
-    const difference = rank(right.tokens[index]) - rank(left.tokens[index]);
+    const leftToken = left.tokens[index];
+    const rightToken = right.tokens[index];
+    const difference = rank(rightToken) - rank(leftToken);
     if (difference !== 0) return difference;
+    if (leftToken?.type === "mixed" && rightToken?.type === "mixed") {
+      const mixedDifference = compareMixedSegments(leftToken.parts, rightToken.parts);
+      if (mixedDifference !== 0) return mixedDifference;
+    }
   }
   return 0;
 }
@@ -212,6 +266,16 @@ function compileRoutes(entries: readonly ClientPageEntry[]): readonly CompiledRo
       );
     }
     collisions.set(route.collisionKey, entry);
+    if (hasMixedSegment(entry.path)) {
+      const tied = entries.find(
+        (other) => other !== entry && hasMixedSegment(other.path) && mixedRoutesTie(other.path, entry.path),
+      );
+      if (tied) {
+        throw new Error(
+          `Client route patterns '${tied.path}' and '${entry.path}' collide under server matching`,
+        );
+      }
+    }
     return route;
   });
 
@@ -284,6 +348,10 @@ export function matchClientRoute(
       params[route.parameterNames[index]] = sanitized.shouldDecodeParameters
         ? decodeParameter(value)
         : value;
+    }
+    if (route.wildcardAlias !== undefined) {
+      const wildcardName = route.parameterNames[route.parameterNames.length - 1];
+      if (wildcardName !== undefined) params[route.wildcardAlias] = params[wildcardName] ?? "";
     }
     return locale === undefined
       ? { entry: route.entry, params }

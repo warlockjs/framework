@@ -42,6 +42,7 @@ import { isCrawlerRequest } from "./detect-crawler";
 import { registerModules, type RegisterableModuleNamespace } from "../register-modules";
 import { applyResponseCacheFloor } from "./response-cache-floor";
 import type { PageCacheOptIn } from "../routing/route-identity";
+import { withNamedWildcardParam } from "../routing/mixed-route-segment";
 import type { RequestStylesheetUrlResolver } from "./document-stylesheet-urls";
 import { resolveAuthCookieName } from "./auth-cookie-name";
 import { frameworkDefaultNotFoundDocument } from "./not-found-page";
@@ -645,7 +646,10 @@ export function createPageRouteHandler(options: PageRouteHandlerOptions): PageRo
       // through makes core the sole matcher on the live path. The catch-all
       // page deliberately has no wildcard param: its virtual path is the
       // missed URL itself, so it remains the named `not-found` route with `{}`.
-      const params = matchPath === undefined ? (request.params as Record<string, string>) : {};
+      const params =
+        matchPath === undefined
+          ? withNamedWildcardParam(path, request.params as Record<string, string>)
+          : {};
 
       // The cache lookup runs AFTER the modules load so a HIT can be gated by
       // the app, layout and page middleware first (the cache sits behind them).

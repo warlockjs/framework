@@ -1,3 +1,4 @@
+import { parseMixedSegment, namedWildcardOfSegment } from "./mixed-route-segment";
 import { parseRoutePathParameters } from "./route-path-parameters";
 
 /** Values accepted by the runtime route interpolator. */
@@ -12,8 +13,16 @@ export type RoutePathInterpolationOptions = {
   readonly onUnknownParameters?: (names: readonly string[]) => never;
   readonly rejectUnknownParameters?: boolean;
   readonly isMissing?: (value: unknown) => boolean;
+  /**
+   * Interpolate page-route shapes precisely: segments that mix params with
+   * static text (`/:type-for-:purpose`, each param encoded, text kept) and a
+   * named terminal wildcard (`/files/*rest`). Page links turn it on; form and
+   * API targets leave it off.
+   */
+  readonly mixedSegments?: boolean;
 };
 
+const PLAIN_PARAMETER = /^:[A-Za-z0-9_]+$/;
 const LEGACY_PARAMETER_PATTERN = /:([A-Za-z0-9_]+)|\*/g;
 
 /** A wildcard spans segments, so its `/` separators stay literal. */
@@ -77,7 +86,8 @@ export function interpolateRoutePath(
   options: RoutePathInterpolationOptions,
 ): string {
   const isMissing = options.isMissing ?? ((value: unknown) => value === undefined);
-  const parsed = parseRoutePathParameters(path);
+  const mixed = options.mixedSegments === true;
+  const parsed = parseRoutePathParameters(path, { mixedSegments: mixed });
 
   if (parsed.type === "broad") return interpolateLegacyPath(path, parameters, options, isMissing);
 
@@ -90,6 +100,32 @@ export function interpolateRoutePath(
 
   const segments = path.split("/");
   const interpolated = segments.flatMap((segment) => {
+    if (mixed) {
+      const wildcard = namedWildcardOfSegment(segment);
+
+      if (wildcard !== undefined) {
+        const value = parameters?.[wildcard];
+        if (isMissing(value)) return options.onMissingParameter(wildcard);
+        // A named wildcard spans segments just as a bare `*` does.
+        return [String(value).split("/").map(encodeURIComponent).join("/")];
+      }
+
+      const parts = segment.includes(":") ? parseMixedSegment(segment) : undefined;
+
+      if (parts?.type === "mixed" && !PLAIN_PARAMETER.test(segment)) {
+        return [
+          parts.parts
+            .map((part) => {
+              if (part.type === "text") return part.value;
+              const value = parameters?.[part.name];
+              if (isMissing(value)) return options.onMissingParameter(part.name);
+              return encodeURIComponent(String(value));
+            })
+            .join(""),
+        ];
+      }
+    }
+
     const parameter = parsed.parameters.find(
       (candidate) =>
         segment ===

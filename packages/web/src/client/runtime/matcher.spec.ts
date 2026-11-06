@@ -262,7 +262,7 @@ describe("matchClientRoute", () => {
     "/users/prefix*",
     "/users/:",
     "/users/:id?",
-    "/files/:name.:extension",
+    "/files/:name:extension",
     "/orders/:id(^\\d+)",
   ])("rejects malformed or unsupported pattern %s", (path) => {
     expect(() => matchClientRoute([entry("invalid", path)], "/users/42")).toThrow();
@@ -361,5 +361,82 @@ describe("matchClientRoute — [locale] folder routing (design note §C)", () =>
     const client = matchClientRoute([localePage], "/ar/posts");
 
     expectExactMatch(client, server);
+  });
+});
+
+describe("matchClientRoute — mixed segments and named wildcard", () => {
+  it("splits a mixed segment greedily and exposes every param", () => {
+    const listing = entry("listing", "/:type-for-:purpose");
+
+    expect(matchClientRoute([listing], "/house-for-sale")?.params).toEqual({
+      type: "house",
+      purpose: "sale",
+    });
+    expect(matchClientRoute([listing], "/a-for-b-for-c")?.params).toEqual({
+      type: "a-for-b",
+      purpose: "c",
+    });
+    expect(matchClientRoute([listing], "/nothing")).toBeNull();
+    expect(matchClientRoute([listing], "/a-for-b/c")).toBeNull();
+  });
+
+  it("ranks static over mixed over param over catch-all, in any registration order", () => {
+    const routes = [
+      entry("static", "/house-for-sale"),
+      entry("mixed", "/:type-for-:purpose"),
+      entry("param", "/:id"),
+      entry("catch", "/*"),
+    ];
+
+    for (const order of [routes, [...routes].reverse()]) {
+      expect(matchClientRoute(order, "/house-for-sale")?.entry.name).toBe("static");
+      expect(matchClientRoute(order, "/flat-for-rent")?.entry.name).toBe("mixed");
+      expect(matchClientRoute(order, "/flat")?.entry.name).toBe("param");
+      expect(matchClientRoute(order, "/a/b")?.entry.name).toBe("catch");
+    }
+  });
+
+  it("prefers the mixed segment with more leading, then trailing, then total static text", () => {
+    const generic = entry("generic", "/:a-for-:b");
+    const prefixed = entry("prefixed", "/x-for-:b");
+    const suffixed = entry("suffixed", "/:a-for-z");
+
+    for (const order of [[generic, prefixed, suffixed], [suffixed, prefixed, generic]]) {
+      expect(matchClientRoute(order, "/x-for-z")?.entry.name).toBe("prefixed");
+      expect(matchClientRoute(order, "/q-for-z")?.entry.name).toBe("suffixed");
+      expect(matchClientRoute(order, "/q-for-r")?.entry.name).toBe("generic");
+    }
+  });
+
+  it("gives a named wildcard its value under its name and under `*`", () => {
+    const files = entry("files", "/files/*rest");
+
+    expect(matchClientRoute([files], "/files/a/b")?.params).toEqual({ rest: "a/b", "*": "a/b" });
+    expect(matchClientRoute([files], "/files")).toBeNull();
+  });
+
+  it("refuses two mixed segments that tie on every precedence measure, in both orders", () => {
+    const one = entry("one", "/:a-for-:b/z");
+    const shorter = entry("shorter", "/:a-in-:b/z");
+    const same = entry("same", "/:a-and-:b/z");
+    expect(() => matchClientRoute([one, shorter], "/x")).not.toThrow();
+    expect(() => matchClientRoute([one, same], "/x")).toThrow(/collide/);
+
+    const x = entry("x", "/:a-:b");
+    const y = entry("y", "/:c-:d");
+    expect(() => matchClientRoute([x, y], "/q")).toThrow(/collide/);
+    expect(() => matchClientRoute([y, x], "/q")).toThrow(/collide/);
+    expect(() =>
+      matchClientRoute([entry("p", "/s/:a-:b"), entry("q", "/s/:c.:d")], "/s/q"),
+    ).toThrow(/collide/);
+  });
+
+  it("refuses two patterns of the same shape and a repeated param name", () => {
+    expect(() =>
+      matchClientRoute([entry("a", "/:a-for-:b"), entry("b", "/:x-for-:y")], "/q-for-r"),
+    ).toThrow(/collide/);
+    expect(() => matchClientRoute([entry("a", "/files/*"), entry("b", "/files/*rest")], "/files/q"))
+      .toThrow(/collide/);
+    expect(() => matchClientRoute([entry("a", "/:a-for-:a")], "/q-for-r")).toThrow(/repeats/);
   });
 });
