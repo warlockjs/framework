@@ -107,16 +107,19 @@ export interface WorkspaceOps {
   listDir(path?: string, opts?: ListDirOptions): Promise<ListDirResult>;
 
   /** Search jailed file contents for a regex pattern. */
-  grep(pattern: string, opts?: { glob?: string; ignoreCase?: boolean }): Promise<GrepResult>;
+  grep(
+    pattern: string,
+    opts?: { glob?: string; ignoreCase?: boolean; signal?: AbortSignal },
+  ): Promise<GrepResult>;
 
   /** Resolve a glob to matching workspace-relative paths within the jail. */
-  glob(pattern: string): Promise<string[]>;
+  glob(pattern: string, opts?: { signal?: AbortSignal }): Promise<string[]>;
 
   /**
    * Like {@link WorkspaceOps.glob}, but returns the paths with the `output`
    * truncation metadata. Optional: the `glob` tool falls back to `glob()`.
    */
-  globResult?(pattern: string): Promise<GlobResult>;
+  globResult?(pattern: string, opts?: { signal?: AbortSignal }): Promise<GlobResult>;
 
   /** Whether a jailed path exists (file or directory). */
   exists(path: string): Promise<boolean>;

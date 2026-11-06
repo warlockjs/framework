@@ -4,6 +4,22 @@ All notable changes to `@warlock.js/ai-workspace` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.47.0
+
+### Changed
+
+- `glob` and `grep` no longer search `node_modules`, `.git` or gitignored paths by default. Set `search.skipDirs: [".git"]` to search `node_modules` again and `search.gitignore: false` to search ignored files; a pattern that names a skipped folder in its static prefix (`node_modules/pkg/*.json`) still searches it.
+
+### Fixed
+
+- `glob` and `grep` timed out on large workspaces because they listed every folder (including `node_modules` and `.git`) before matching, listed each entry a second time to tell files from folders, read all folders at once and ignored the run's `signal`. They now start at the pattern's static folder prefix (and at `grep`'s `glob` folder), drop `denyPaths`, skipped and gitignored folders before listing them, read folders with their types in one call, read 16 folders at a time and stop when the signal aborts. The jail, `denyPaths` and symlink rules are unchanged (symlinked folders are never followed).
+
+### Added
+
+- `policy.search`: `skipDirs` (default `[".git", "node_modules"]`), `gitignore` (default `true`), `maxFiles` (default `50000`; the search stops there and the result carries `truncated: true` and `maxFilesReached: true`) and `concurrency` (default `16`). New type `WorkspaceSearchPolicy`.
+- `ws.glob(pattern, { signal })`, `ws.grep(pattern, { signal })`; the `glob` and `grep` tools pass the run's signal.
+- Optional `WorkspaceBackend.listTyped(absDir)` returning `{ path, type }` entries (type `WorkspaceBackendDirEntry`); the local backend implements it. Backends without it keep working through `list` plus `stat`.
+
 ## 5.45.0 - 2026-11-05
 
 ### Added

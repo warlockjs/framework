@@ -47,6 +47,7 @@ This is least-privilege guardrails for a **trusted** agent — not a sandbox aro
 | `shell.timeoutMs` / `shell.maxOutputBytes`          | Per-command wall-clock cap (process tree SIGKILLed on expiry; a model-supplied `timeoutMs` can only lower it) and stdout/stderr byte cap (clipped on a character boundary).                                                                                       |
 | `read.defaultLines` / `read.maxBytes`               | Default read window + a ceiling on the UTF-8 bytes of the returned `content` (line numbers included). See [Read windows and the byte ceiling](#read-windows-and-the-byte-ceiling).                                                                                |
 | `list.ignore` / `list.maxDepth` / `list.maxEntries` | What `list_dir` leaves out (default `["node_modules", ".git"]`; `denyPaths` are always hidden) and how deep (default 5) and long (default 500 entries) a listing may be.                                                                                          |
+| `search.skipDirs` / `search.gitignore` / `search.maxFiles` / `search.concurrency` | What `glob` and `grep` walk: folders never entered (default `[".git", "node_modules"]`, matched by name at any depth or by path glob), whether `.gitignore` files are honoured (default `true`), the most files one search looks at before it stops and sets `truncated` + `maxFilesReached` (default 50000), and how many folders are read at once (default 16). `denyPaths` and the jail apply regardless. A pattern whose leading folder is skipped (`node_modules/pkg/*.json`) still searches it. |
 | `backend`                                           | `"local"` (default — real disk) or `"mock"` (in-memory, for tests).                                                                                                                                                                                               |
 
 The effective shell environment is `{ ...pick(process.env, inheritEnv), ...shell.env }` — `process.env` is never inherited wholesale.
@@ -254,6 +255,7 @@ await ws.editFile({ path: "src/index.ts", oldString: "old", newString: "new", ex
 const { exitCode, stdout, stderr, timedOut, cancelled, truncated } = await ws.exec("npm test");
 const { matches } = await ws.grep("TODO", { glob: "src/**/*.ts", ignoreCase: true });
 const paths = await ws.glob("src/models/**/*.ts");
+// Both accept { signal } to stop a long walk.
 await ws.exists("package.json");
 await ws.mkdir("src/generated");
 await ws.remove("dist");
@@ -270,6 +272,22 @@ await ws.dispose(); // kills background commands; refuses new commands
 ## List a directory — `list_dir`
 
 `list_dir({ path?, depth?, ignore? })` returns `{ path, entries, truncated }`: entries breadth-first, each level sorted by name, with `type` (`"file"`, `"directory"`, `"symlink"`, `"other"`), `size` for files and `depth` (1 = direct child). It is bounded — `depth` is capped by `list.maxDepth` (default 5) and the listing by `list.maxEntries` (default 500, then `truncated: true`) — and jailed: `denyPaths` are always left out, as are the `list.ignore` globs (default `node_modules`, `.git`) and any `ignore` globs the model passes. Ignored paths are hidden, not blocked: listing `node_modules` directly still works. Symlinks are reported, never followed.
+
+## Find files and text — `glob` and `grep`
+
+`glob` and `grep` start at the pattern's static folder prefix (`src/api/**/*.ts`, or `grep`'s `glob: "src/api/**"`, reads only `src/api`) and decide before listing a folder whether to enter it: `denyPaths` folders, the `search.skipDirs` (default `[".git", "node_modules"]`, matched by name at any depth) and anything a `.gitignore` on the way down ignores are never read. The jail and `denyPaths` guarantees are unchanged, and symlinks are not followed (a symlink to a file is found only when its target is inside the jail).
+
+```ts
+workspace({
+  cwd,
+  search: { skipDirs: [".git"], gitignore: false, maxFiles: 100_000, concurrency: 32 },
+});
+```
+
+- **Behaviour change:** `node_modules`, `.git` and gitignored paths are no longer searched by default. `skipDirs: [".git"]` brings `node_modules` back and `gitignore: false` brings ignored files back; a pattern that names a skipped folder in its prefix (`node_modules/pkg/*.json`) searches it anyway.
+- A search stops after `search.maxFiles` files (default 50000) and returns what it found with `truncated: true` and `maxFilesReached: true`.
+- `ws.glob(pattern, { signal })` and `ws.grep(pattern, { signal })` reject when the signal aborts; the agent tools pass the run's signal.
+- A custom backend may implement `listTyped(absDir)` (children with their kinds) to avoid one `stat` per entry; without it `list` plus `stat` is used.
 
 ## Patch several files — `apply_patch`
 

@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
-import { lstat, realpath } from "node:fs/promises";
+import { lstat, readdir, realpath } from "node:fs/promises";
+import path from "node:path";
 import { platform } from "node:process";
 import { StringDecoder } from "node:string_decoder";
 import { fs } from "@warlock.js/fs";
@@ -11,6 +12,7 @@ import type {
   WorkspaceBackendExecResult,
   WorkspaceBackendProcess,
   WorkspaceBackendStartOptions,
+  WorkspaceBackendDirEntry,
   WorkspaceBackendStat,
 } from "../contracts/workspace-backend.contract";
 
@@ -299,6 +301,22 @@ class LocalBackend implements WorkspaceBackend {
   /** List immediate children of an absolute directory as absolute paths. */
   public async list(absDir: string): Promise<string[]> {
     return fs.dirs.list(absDir);
+  }
+
+  /** List children with their kinds from one directory read (symlinks not followed). */
+  public async listTyped(absDir: string): Promise<WorkspaceBackendDirEntry[]> {
+    const entries = await readdir(absDir, { withFileTypes: true });
+
+    return entries.map((entry) => ({
+      path: path.join(absDir, entry.name),
+      type: entry.isSymbolicLink()
+        ? "symlink"
+        : entry.isDirectory()
+          ? "directory"
+          : entry.isFile()
+            ? "file"
+            : "other",
+    }));
   }
 
   /**

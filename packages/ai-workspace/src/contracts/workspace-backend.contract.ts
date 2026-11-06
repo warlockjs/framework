@@ -105,6 +105,14 @@ export interface WorkspaceBackendStat {
   size: number;
 }
 
+/** One child of a directory, as {@link WorkspaceBackend.listTyped} reports it. */
+export interface WorkspaceBackendDirEntry {
+  /** Absolute path of the child. */
+  path: string;
+  /** Entry kind; a symlink is reported as `"symlink"`, never followed. */
+  type: WorkspaceBackendStat["type"];
+}
+
 /**
  * The swappable executor a workspace runs on — the thin, **policy-agnostic**
  * IO seam the ops layer calls. A backend takes **already-resolved absolute
@@ -136,6 +144,12 @@ export interface WorkspaceBackend {
   remove(absPath: string): Promise<void>;
   /** List immediate children of an absolute directory as absolute paths. */
   list(absDir: string): Promise<string[]>;
+  /**
+   * List the children of an absolute directory with their kinds, in one
+   * call. Optional: `glob` and `grep` fall back to `list` plus `stat`
+   * (or, without `stat`, a second `list` per entry).
+   */
+  listTyped?(absDir: string): Promise<WorkspaceBackendDirEntry[]>;
   /** Resolve symlinks/`..` to a canonical absolute path (jail enforcement). */
   realpath(absPath: string): Promise<string>;
   /** Run a command and capture its outcome. */
