@@ -4,6 +4,20 @@ All notable changes to `@warlock.js/notifications` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.46.0
+
+### Upgrading
+
+- **Security: different identity types could read each other's notifications.** Recipients were keyed by a bare id, so with several auth models (staff, customers, platform users) that each count ids from 1, staff `5` and customer `5` shared one inbox. Add a recipient type column and declare it: create a nullable `recipient_type` column, backfill existing rows with the type that owned them, then set `columnMap = { recipientType: "recipient_type", … }` on the notification model. Until you declare it, behavior is unchanged (ids are the only key), which is only safe for an app with a single identity type. See "Recipient types" in the in-app store guide.
+- Once `recipientType` is declared, rows with no type match no read until backfilled, and a bare id passed to an `inApp` method or repository method throws `RecipientTypeRequiredError`; pass the model or `{ type, id }`.
+
+### Added
+
+- `columnMap.recipientType`: stores the recipient's identity type next to its id. The `database` channel writes it from the recipient model (an auth model's `userType`, otherwise the table name), and `notificationColumns()` emits the column.
+- `inApp` read, count, mark-read, mark-unread, find and dismiss methods (and the matching repository methods) accept `{ type, id }` (`RecipientRef`) as well as a model or bare id, and filter by type and id when the column is declared.
+- `RecipientTypeRequiredError`, `recipientTypeOf()`, `RecipientRef`, `RecipientInput`.
+- `notificationColumns(…, { recipientModel })` derives the id column type from the recipient model (`integer`, or `uuid` when it sets `autoGenerateId = false`). Without it the default stays UUID.
+
 ## 5.34.3 - 2026-10-20
 
 ### Changed

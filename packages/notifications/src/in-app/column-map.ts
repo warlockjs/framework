@@ -35,6 +35,13 @@
 export type NotificationColumnMap = {
   /** Recipient FK column. Default: `"user_id"`. */
   recipient?: string;
+  /**
+   * Recipient TYPE column (e.g. `"recipient_type"`). Declare it to key every
+   * notification by `(type, id)` so identities of different types that share an
+   * id (staff 5 vs customer 5) never read each other's rows. Omit → ids are
+   * the only key (single-identity apps, tables created before the column).
+   */
+  recipientType?: string;
   /** Multi-tenant scope column, written from the recipient. Omit → single-tenant. */
   tenant?: string;
   /** Read-timestamp column. Present → read-state records "when". */
@@ -50,6 +57,7 @@ export type NotificationColumnMap = {
  */
 export type ResolvedNotificationColumnMap = {
   recipient: string;
+  recipientType?: string;
   tenant?: string;
   readAt?: string;
   isRead?: string;
@@ -74,13 +82,15 @@ export function resolveColumnMap(
 ): ResolvedNotificationColumnMap {
   const recipient = map?.recipient ?? DEFAULT_RECIPIENT_COLUMN;
   const tenant = map?.tenant;
+  const recipientType = map?.recipientType;
 
   if (!map?.readAt && !map?.isRead) {
-    return { recipient, tenant, readAt: DEFAULT_READ_AT_COLUMN };
+    return { recipient, recipientType, tenant, readAt: DEFAULT_READ_AT_COLUMN };
   }
 
   return {
     recipient,
+    recipientType,
     tenant,
     readAt: map.readAt,
     isRead: map.isRead,

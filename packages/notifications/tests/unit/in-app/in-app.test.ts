@@ -19,6 +19,9 @@ class FakeRepo {
   public markUnread = vi.fn().mockResolvedValue(1);
   public findFor = vi.fn().mockResolvedValue(null);
   public deleteFor = vi.fn().mockResolvedValue(1);
+  public scopeOf = (recipient: any) => ({
+    recipientId: typeof recipient === "object" ? recipient.id : recipient,
+  });
 }
 
 describe("inApp facade", () => {
@@ -71,28 +74,28 @@ describe("inApp facade", () => {
     const repo = new FakeRepo();
     inApp.configure({ repository: repo as any });
     await inApp.find(makeNotifiable({ id: "u42" }), "ntf_9");
-    expect(repo.findFor).toHaveBeenCalledWith("u42", "ntf_9");
+    expect(repo.findFor).toHaveBeenCalledWith(expect.objectContaining({ id: "u42" }), "ntf_9");
   });
 
   it("`markAsRead(user)` delegates with no id (all unread)", async () => {
     const repo = new FakeRepo();
     inApp.configure({ repository: repo as any });
     await inApp.markAsRead(makeNotifiable({ id: "u42" }));
-    expect(repo.markRead).toHaveBeenCalledWith("u42", undefined);
+    expect(repo.markRead).toHaveBeenCalledWith(expect.objectContaining({ id: "u42" }), undefined);
   });
 
   it("`markAsRead(user, id)` scopes to one row within the recipient", async () => {
     const repo = new FakeRepo();
     inApp.configure({ repository: repo as any });
     await inApp.markAsRead(makeNotifiable({ id: "u42" }), "ntf_9");
-    expect(repo.markRead).toHaveBeenCalledWith("u42", "ntf_9");
+    expect(repo.markRead).toHaveBeenCalledWith(expect.objectContaining({ id: "u42" }), "ntf_9");
   });
 
   it("`markAsUnread(user, id)` delegates to repo.markUnread", async () => {
     const repo = new FakeRepo();
     inApp.configure({ repository: repo as any });
     await inApp.markAsUnread(makeNotifiable({ id: "u42" }), "ntf_9");
-    expect(repo.markUnread).toHaveBeenCalledWith("u42", "ntf_9");
+    expect(repo.markUnread).toHaveBeenCalledWith(expect.objectContaining({ id: "u42" }), "ntf_9");
   });
 
   it("`dismiss(user)` clears all for the recipient; `dismiss(user, id)` clears one", async () => {
@@ -100,10 +103,10 @@ describe("inApp facade", () => {
     inApp.configure({ repository: repo as any });
 
     await inApp.dismiss(makeNotifiable({ id: "u42" }));
-    expect(repo.deleteFor).toHaveBeenCalledWith("u42", undefined);
+    expect(repo.deleteFor).toHaveBeenCalledWith(expect.objectContaining({ id: "u42" }), undefined);
 
     await inApp.dismiss(makeNotifiable({ id: "u42" }), "ntf_9");
-    expect(repo.deleteFor).toHaveBeenCalledWith("u42", "ntf_9");
+    expect(repo.deleteFor).toHaveBeenCalledWith(expect.objectContaining({ id: "u42" }), "ntf_9");
   });
 
   it("accepts a raw id in place of a model", async () => {

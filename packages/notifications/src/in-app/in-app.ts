@@ -30,12 +30,13 @@
 import type { TypedRepositoryOptionsWithPages } from "@warlock.js/core";
 import { databaseChannel } from "../channels/database-channel";
 import type { Channel } from "../contracts";
-import type { DatabasePayload, Id, Notifiable } from "../types";
+import type { DatabasePayload, Id } from "../types";
 import {
   BaseNotificationsRepository,
   type NotificationModelClass,
   type NotificationsFilter,
 } from "./base-notifications-repository";
+import type { RecipientInput } from "./recipient";
 
 /**
  * List options for the read methods — the repository's paginated options
@@ -53,8 +54,6 @@ export type ConfigureOptions =
   | { model: NotificationModelClass; repository?: never }
   | { repository: BaseNotificationsRepository; model?: never };
 
-const idOf = (recipient: Notifiable | Id): Id =>
-  typeof recipient === "object" ? recipient.id : recipient;
 
 class InApp {
   private repo?: BaseNotificationsRepository;
@@ -82,41 +81,41 @@ class InApp {
   }
 
   /** General list — scoped to recipient; pass `options` for paging + filters. */
-  public list(recipient: Notifiable | Id, options?: NotificationsListOptions) {
-    return this.repository.list({ ...options, recipientId: idOf(recipient) });
+  public list(recipient: RecipientInput, options?: NotificationsListOptions) {
+    return this.repository.list({ ...options, ...this.repository.scopeOf(recipient) });
   }
 
   /** Unread-only list — common case for badges + dashboards. */
-  public listUnread(recipient: Notifiable | Id, options?: NotificationsListOptions) {
-    return this.repository.list({ ...options, recipientId: idOf(recipient), unread: true });
+  public listUnread(recipient: RecipientInput, options?: NotificationsListOptions) {
+    return this.repository.list({ ...options, ...this.repository.scopeOf(recipient), unread: true });
   }
 
   /**
    * Cached unread count — backs the badge. Auto-invalidated by the repo's
    * model create/update events (`RepositoryManager.registerEvents`).
    */
-  public countUnread(recipient: Notifiable | Id) {
-    return this.repository.countCached({ recipientId: idOf(recipient), unread: true });
+  public countUnread(recipient: RecipientInput) {
+    return this.repository.countCached({ ...this.repository.scopeOf(recipient), unread: true });
   }
 
   /** Find one notification for a recipient — for a detail view. */
-  public find(recipient: Notifiable | Id, id: Id) {
-    return this.repository.findFor(idOf(recipient), id);
+  public find(recipient: RecipientInput, id: Id) {
+    return this.repository.findFor(recipient, id);
   }
 
   /** Mark read — `id` omitted = all unread for this recipient. */
-  public markAsRead(recipient: Notifiable | Id, id?: Id) {
-    return this.repository.markRead(idOf(recipient), id);
+  public markAsRead(recipient: RecipientInput, id?: Id) {
+    return this.repository.markRead(recipient, id);
   }
 
   /** Mark unread — same recipient-scoping. */
-  public markAsUnread(recipient: Notifiable | Id, id?: Id) {
-    return this.repository.markUnread(idOf(recipient), id);
+  public markAsUnread(recipient: RecipientInput, id?: Id) {
+    return this.repository.markUnread(recipient, id);
   }
 
   /** Delete/dismiss — `id` omitted = clear all for this recipient. */
-  public dismiss(recipient: Notifiable | Id, id?: Id) {
-    return this.repository.deleteFor(idOf(recipient), id);
+  public dismiss(recipient: RecipientInput, id?: Id) {
+    return this.repository.deleteFor(recipient, id);
   }
 }
 

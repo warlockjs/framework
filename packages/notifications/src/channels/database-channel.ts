@@ -6,8 +6,9 @@
  * write side (this channel's `send`) share ONE repository instance, which
  * means cache invalidation just works.
  *
- * Route is `{ id: notifiable.id }` — the recipient's id, used to set the
- * recipient column on the persisted row.
+ * Route is `{ id, type }` — the recipient's id and identity type, used to set
+ * the recipient columns on the persisted row (the type is stored only when the
+ * model declares `columnMap.recipientType`).
  *
  * Multi-tenant: when the model declares a `tenant` column, this channel reads
  * the tenant value off the recipient model (`notifiable.get(tenantColumn)`)
@@ -23,6 +24,7 @@ import type { Channel } from "../contracts";
 import { defineChannel } from "../dispatch/define-channel";
 // Type-only import to avoid a runtime cycle with `in-app/in-app.ts`.
 import type { BaseNotificationsRepository } from "../in-app/base-notifications-repository";
+import { recipientTypeOf } from "../in-app/recipient";
 import type { DatabasePayload, Id } from "../types";
 
 export function databaseChannel<TModel extends NotificationContract = NotificationContract>(
@@ -30,15 +32,16 @@ export function databaseChannel<TModel extends NotificationContract = Notificati
 ): Channel<DatabasePayload> {
   return defineChannel<DatabasePayload>({
     name: "database",
-    route: (notifiable) => ({ id: notifiable.id }),
+    route: (notifiable) => ({ id: notifiable.id, type: recipientTypeOf(notifiable) }),
     async send({ payload, route, notifiable }) {
       const id: Id = typeof route === "object" ? route.id : route;
+      const type = typeof route === "object" ? route.type : undefined;
 
       const { tenantColumn } = repo;
       const tenantId =
         tenantColumn && notifiable ? (notifiable.get(tenantColumn) as Id) : undefined;
 
-      await repo.createFor(id, payload, tenantId);
+      await repo.createFor({ id, type }, payload, tenantId);
     },
   });
 }

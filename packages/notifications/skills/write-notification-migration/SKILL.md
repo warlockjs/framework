@@ -1,6 +1,6 @@
 ---
 name: write-notification-migration
-description: 'Create the notifications table with the `notificationColumns(Notification)` factory + cascade `Migration.create`. Column NAMES come from the model''s `columnMap` (recipient / tenant / readAt / isRead); the fixed columns are `type` / `title` / `body` / `payload` / `idempotency_key`. Set `{ idType: "bigint" }` for integer-key apps; UUID remains the default. Read-state follows columnMap presence: `readAt` → nullable timestamp, `isRead` → indexed boolean, both → both. Defaults to `user_id` + `read_at` when no columnMap. Spread + extend for extras (FK references, composite indexes). Triggers: `notificationColumns`, `Migration.create` for notifications, "create the notifications table", "notification migration", "add organization_id to notifications", `is_read` column, `read_at` column, `idempotency_key` column; typical import `import { Migration } from "@warlock.js/cascade"; import { notificationColumns } from "@warlock.js/notifications"`. Skip: generic cascade migration writing — the `write-migration` topic of the `warlock-js-cascade` skill; the model itself — the `use-in-app` topic.'
+description: 'Create the notifications table with the `notificationColumns(Notification)` factory + cascade `Migration.create`. Column NAMES come from the model''s `columnMap` (recipient / tenant / readAt / isRead); the fixed columns are `type` / `title` / `body` / `payload` / `idempotency_key`. Id columns default to UUID; pass `{ recipientModel: User }` to derive them (integer, or UUID when the model has `autoGenerateId = false`) or `{ idType }` to set them. `columnMap.recipientType` adds a `recipient_type` string column. Read-state follows columnMap presence: `readAt` → nullable timestamp, `isRead` → indexed boolean, both → both. Defaults to `user_id` + `read_at` when no columnMap. Spread + extend for extras (FK references, composite indexes). Triggers: `notificationColumns`, `Migration.create` for notifications, "create the notifications table", "notification migration", "add organization_id to notifications", `is_read` column, `read_at` column, `idempotency_key` column; typical import `import { Migration } from "@warlock.js/cascade"; import { notificationColumns } from "@warlock.js/notifications"`. Skip: generic cascade migration writing — the `write-migration` topic of the `warlock-js-cascade` skill; the model itself — the `use-in-app` topic.'
 ---
 
 # Write the notifications migration
@@ -26,6 +26,7 @@ matching columns:
 | -------------------------------------------------- | --------------------------------------------------------------------------- |
 | _(none / default)_                                 | `user_id`, `type`, `title`, `body`, `payload`, `read_at`, `idempotency_key` |
 | `{ tenant: "organization_id", readAt: "read_at" }` | adds `organization_id`; read_at-only                                        |
+| `{ recipientType: "recipient_type" }`            | adds `recipient_type` (the identity type that owns the row)                 |
 | `{ isRead: "is_read" }`                            | swaps `read_at` for `is_read` (indexed boolean)                             |
 | `{ isRead: "is_read", readAt: "read_at" }`         | both read-state columns                                                     |
 
@@ -33,10 +34,11 @@ The recipient / tenant / read-state column NAMES come from `columnMap`; `type` /
 `title` / `body` / `payload` / `idempotency_key` are fixed. `id` / `createdAt` /
 `updatedAt` are added automatically by cascade.
 
+Declare `recipientType` so different identity types sharing an id cannot read each other's notifications (see the `use-in-app` topic). For a table that already exists, add the column with `Migration.alter` and backfill it.
+
 ## Match your app's identifier type
 
-Recipient and tenant columns default to UUID. For applications whose primary keys
-are `bigint`, `integer`, or strings, pass `idType`; it is applied to every
+Recipient and tenant columns default to UUID. For integer-id apps pass `recipientModel: User` (auto-generated ids give `integer`; `autoGenerateId = false` keeps UUID) or set `idType` (`"uuid"`, `"bigint"`, `"integer"`, `"string"`) explicitly; it is applied to every
 identifier column the factory creates:
 
 ```ts

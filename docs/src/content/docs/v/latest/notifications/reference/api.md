@@ -40,7 +40,7 @@ Identity helper that types a custom channel's `send` against payload `P`.
 - `markAsRead(recipient, id?)` / `markAsUnread(recipient, id?)`
 - `dismiss(recipient, id?)`
 
-`recipient` is a `Notifiable | Id`. All methods are recipient-scoped.
+`recipient` is a `Notifiable | RecipientRef | Id` (`RecipientRef` = `{ type, id }`). All methods are recipient-scoped; when the model declares `columnMap.recipientType` they filter by type and id and a bare `Id` throws `RecipientTypeRequiredError`. `recipientTypeOf(model)` returns the type (`userType` for auth models, else the table name).
 
 ### `DatabaseNotification`
 
@@ -48,9 +48,9 @@ Abstract base model implementing `NotificationContract` (`recipientId` / `type` 
 
 ### `BaseNotificationsRepository<TModel>`
 
-Concrete repo. Resolves the model's `columnMap` in its constructor and derives BOTH the read filter (`filterBy`) and the write/update/delete mapping from it — one source, reads and writes can't disagree. Methods: `createFor(recipientId, input, tenantId?)`, `createManyFor`, `markRead`, `markUnread`, `findFor`, `deleteFor`. Subclass only for EXTRA query methods; column names come from the model's `columnMap`.
+Concrete repo. Resolves the model's `columnMap` in its constructor and derives BOTH the read filter (`filterBy`) and the write/update/delete mapping from it — one source, reads and writes can't disagree. Methods: `createFor(recipient, input, tenantId?)`, `createManyFor`, `markRead`, `markUnread`, `findFor`, `deleteFor`. Subclass only for EXTRA query methods; column names come from the model's `columnMap`.
 
-`createFor` / `createManyFor` (since 4.15.0) strip server-owned keys — `id`, `recipientId`, `tenant`, `readAt`, `isRead`, and their resolved `columnMap` physical column names — off `input` before merging in the trusted `recipientId` argument, so an untyped `input` can't redirect the write to another recipient.
+`createFor` / `createManyFor` (since 4.15.0) strip server-owned keys — `id`, `recipientId`, `recipientType`, `tenant`, `readAt`, `isRead`, and their resolved `columnMap` physical column names — off `input` before merging in the trusted `recipientId` argument, so an untyped `input` can't redirect the write to another recipient.
 
 ## Migration
 

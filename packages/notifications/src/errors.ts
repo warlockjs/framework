@@ -75,3 +75,20 @@ export class UnresolvableRouteError extends Error {
     captureStack(this, UnresolvableRouteError);
   }
 }
+
+/**
+ * Thrown when the notification table keys recipients by type and a read or
+ * write names the recipient by a bare id. A bare id cannot say which identity
+ * type it belongs to, so serving it would let types sharing that id read each
+ * other's notifications. Pass the recipient model, or `{ type, id }`.
+ */
+export class RecipientTypeRequiredError extends Error {
+  public constructor(recipientId?: unknown) {
+    super(
+      `The notifications table stores a recipient type, so recipient ${recipientId ?? "(unknown)"} ` +
+        "must be given as the model or as `{ type, id }`, not as a bare id.",
+    );
+    this.name = "RecipientTypeRequiredError";
+    captureStack(this, RecipientTypeRequiredError);
+  }
+}

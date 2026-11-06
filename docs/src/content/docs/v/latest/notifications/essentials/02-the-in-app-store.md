@@ -29,7 +29,50 @@ Every method forces the recipient id into the query. `markAsRead(user, id)` with
 
 ### The write side is IDOR-safe too (since 4.15.0)
 
-`createFor(recipientId, input, tenantId?)` treats `recipientId` as the trusted argument and applies it **after** `input` — server-owned keys (`id`, `recipientId`, `tenant`, `readAt`, `isRead`, and their resolved `columnMap` physical column names) are stripped from `input` before the row is built. Before this fix, an `input` payload assembled from untyped data (request JSON, a channel's `send` args) that happened to carry a `recipientId` key — or the model's physical recipient column name — could redirect the write into another recipient's inbox. `createManyFor` inherits the same protection. `type` / `title` / `body` / `payload` / `idempotencyKey` pass through unchanged — you don't need to sanitize `input` yourself.
+`createFor(recipientId, input, tenantId?)` treats `recipientId` as the trusted argument and applies it **after** `input` — server-owned keys (`id`, `recipientId`, `recipientType`, `tenant`, `readAt`, `isRead`, and their resolved `columnMap` physical column names) are stripped from `input` before the row is built. Before this fix, an `input` payload assembled from untyped data (request JSON, a channel's `send` args) that happened to carry a `recipientId` key — or the model's physical recipient column name — could redirect the write into another recipient's inbox. `createManyFor` inherits the same protection. `type` / `title` / `body` / `payload` / `idempotencyKey` pass through unchanged — you don't need to sanitize `input` yourself.
+
+## Recipient types — identities that share an id
+
+A notification belongs to a recipient **type and id**, not an id alone. With several identity models (staff, customers, platform users) that each count ids from 1, staff `5` and customer `5` are different recipients and must never read each other's notifications.
+
+Declare the type column in the model's `columnMap` and every read, count, mark-read, mark-unread, and delete filters on type **and** id:
+
+```ts
+public static columnMap: NotificationColumnMap = {
+  recipientType: "recipient_type",
+  readAt: "read_at",
+};
+```
+
+The type comes from the recipient model: an auth model's `userType` (the same name used in the auth config), otherwise the model's table name. The `database` channel writes it for you.
+
+```ts
+await inApp.listUnread(staffUser); // type "staff", id 5
+await inApp.listUnread({ type: "customer", id: 5 }); // by reference, when you only have the id
+await inApp.listUnread(5); // throws RecipientTypeRequiredError
+```
+
+When the table stores a type, a **bare id is rejected** with `RecipientTypeRequiredError` rather than guessed: an id alone cannot say which identity it belongs to. Pass the model or `{ type, id }`.
+
+Without `recipientType` in the `columnMap`, nothing changes: ids are the only key and bare ids are accepted. That is correct only for an app with a single identity type, so any app with more than one should declare the column.
+
+### Upgrading an existing table
+
+1. Add the column in a migration (nullable first, so existing rows survive):
+
+   ```ts
+   import { Migration, string } from "@warlock.js/cascade";
+   import { Notification } from "../notification.model";
+
+   export default Migration.alter(Notification, {
+     add: { recipient_type: string().index().nullable() },
+   });
+   ```
+
+2. Backfill existing rows with the type that owned them, for example `UPDATE notifications SET recipient_type = 'staff'`. With several identity types the old rows are already ambiguous: assign them from whatever you know about each row, or delete the ones you cannot attribute.
+3. Add `recipientType: "recipient_type"` to the model's `columnMap` (and `recipient_type` to the model `schema`).
+
+Rows whose type is still empty match no typed read, so they stop appearing until backfilled; this is deliberate, since showing them would reintroduce the cross-type leak. New tables get the column from `notificationColumns(Notification)` once the `columnMap` declares it.
 
 ## The model
 
@@ -66,6 +109,7 @@ export class Notification extends DatabaseNotification {
 ```ts
 type NotificationColumnMap = {
   recipient?: string; // recipient FK. Default "user_id"
+  recipientType?: string; // recipient identity type column. Omit → ids are the only key
   tenant?: string; // multi-tenant scope, written from the recipient. Omit → single-tenant
   readAt?: string; // read-timestamp column
   isRead?: string; // read-flag column (indexed)

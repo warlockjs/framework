@@ -89,13 +89,18 @@ class BaseNotificationsRepository extends RepositoryManager {
 
 ### `createFor` write side — no IDOR either (since 4.15.0)
 
-`recipientId` is always the trusted argument, applied **after** the payload — `createFor`/`createManyFor` strip server-owned keys (`id`, `recipientId`, `tenant`, `readAt`, `isRead`, and their resolved `columnMap` physical column names) off `input` before merging. Before this, a caller passing an untyped payload straight through (request JSON, a channel's `send` args) could smuggle its own `recipientId` — or the raw physical column name — and write the notification into someone else's inbox. `type` / `title` / `body` / `payload` / `idempotencyKey` are untouched; you don't need to sanitize `input` yourself.
+`recipientId` (and `recipientType`) are always the trusted arguments, applied **after** the payload — `createFor`/`createManyFor` strip server-owned keys (`id`, `recipientId`, `recipientType`, `tenant`, `readAt`, `isRead`, and their resolved `columnMap` physical column names) off `input` before merging. Before this, a caller passing an untyped payload straight through (request JSON, a channel's `send` args) could smuggle its own `recipientId` — or the raw physical column name — and write the notification into someone else's inbox. `type` / `title` / `body` / `payload` / `idempotencyKey` are untouched; you don't need to sanitize `input` yourself.
+
+### Recipient types — identities that share an id
+
+Recipients are keyed by `(type, id)`. Declare `recipientType: "recipient_type"` in `columnMap` and every `inApp` read / count / mark / dismiss filters on both, so staff `5` and customer `5` never see each other's rows. The type is the recipient model's `userType` (auth models) or its table name; the `database` channel stores it. Also accepted: `{ type, id }` (`RecipientRef`). With the column declared a **bare id throws `RecipientTypeRequiredError`**; without it ids are the only key (single-identity apps, tables created before 5.46.0). Upgrading: add a nullable `recipient_type` column, backfill it (unbackfilled rows match no typed read), then declare it in `columnMap`. Full steps in the docs page "The in-app store".
 
 ### `columnMap` — map logical roles → your columns
 
 ```ts
 export type NotificationColumnMap = {
   recipient?: string; // recipient FK. Default "user_id"
+  recipientType?: string; // recipient identity type column. Omit → ids are the only key
   tenant?: string; // multi-tenant scope, written from the recipient. Omit → single-tenant
   readAt?: string; // read-timestamp column
   isRead?: string; // read-flag column (indexed)
