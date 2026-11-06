@@ -14,10 +14,10 @@ export interface Channel<P> {
 
   /**
    * Resolve the per-recipient address this channel ships to. String for
-   * external transports (`"user@example.com"`); `{ id }` for the database
+   * external transports (`"user@example.com"`); `{ id, type? }` for the database
    * channel and any internal storage.
    */
-  route?(notifiable: Notifiable): string | { id: Id } | undefined;
+  route?(notifiable: Notifiable): string | { id: Id; type?: string } | undefined;
 
   /**
    * Dispatch one already-rendered payload to one resolved route.
@@ -25,7 +25,7 @@ export interface Channel<P> {
    */
   send(ctx: {
     payload: P;
-    route: string | { id: Id };
+    route: string | { id: Id; type?: string };
     notifiable?: Notifiable;
     options: SendOptions;
   }): Promise<void>;

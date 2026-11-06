@@ -21,6 +21,13 @@ export type Notifiable = Model;
 /** An identifier — string (uuid / objectId) or number (auto-increment). */
 export type Id = string | number;
 
+/**
+ * A recipient named without its model: the identity `type` (an auth model's
+ * `userType`, otherwise its table name) plus its `id`. Use it where only the
+ * id is at hand but the notifications table keys recipients by type.
+ */
+export type RecipientRef = { type: string; id: Id };
+
 // ─── Per-channel payloads — Phase 1 ────────────────────────────────────────
 
 /** What the `mail` channel renders to and `core.sendMail` consumes. */
@@ -34,6 +41,8 @@ export type MailPayload = {
 /** Normalized in-app record shape written through the database channel. */
 export type NotificationInput = {
   recipientId: Id;
+  /** Identity type of the recipient — set by the channel from the recipient model. */
+  recipientType?: string;
   type: string;
   title: string;
   body?: string;
@@ -46,7 +55,7 @@ export type NotificationInput = {
  * Database payload as seen by RENDERERS — `recipientId` is set by the channel
  * from the resolved route, not by the render closure.
  */
-export type DatabasePayload = Omit<NotificationInput, "recipientId">;
+export type DatabasePayload = Omit<NotificationInput, "recipientId" | "recipientType">;
 
 // ─── Channel REGISTRY ──────────────────────────────────────────────────────
 

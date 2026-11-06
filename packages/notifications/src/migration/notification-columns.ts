@@ -5,6 +5,10 @@
  * agree by construction. The stable lexical columns (`type`, `title`, `body`,
  * `payload`, `idempotency_key`) keep fixed names.
  *
+ * `columnMap.recipientType` adds the recipient-type string column (see
+ * `NotificationColumnMap`). For a table created earlier, add that column with a
+ * migration instead of re-creating the table.
+ *
  * Read-state follows the map's presence rules (see `NotificationColumnMap`):
  * `readAt` → a nullable timestamp, `isRead` → an indexed boolean, both → both.
  *
@@ -39,8 +43,18 @@ import { type NotificationColumnMapHost, resolveColumnMap } from "../in-app/colu
 export type NotificationIdType = "uuid" | "bigint" | "integer" | "string";
 
 export type NotificationColumnsOptions = {
-  /** The type used for recipient and tenant identifiers. Defaults to UUID. */
+  /**
+   * The type used for recipient and tenant identifiers. Defaults to the id
+   * type of `recipientModel` when given, otherwise `"integer"` — the id type
+   * cascade and auth models generate unless they opt out of auto-generated ids.
+   */
   idType?: NotificationIdType;
+  /**
+   * The recipient model (a `User`, `Customer`, …). Its `autoGenerateId = false`
+   * means it brings its own non-numeric ids, so the id columns default to UUID
+   * instead of integer.
+   */
+  recipientModel?: { autoGenerateId?: boolean };
 };
 
 /**
@@ -58,9 +72,11 @@ export function notificationColumns(
   options?: NotificationColumnsOptions,
 ): ColumnMap {
   const model = isNotificationColumnsOptions(modelOrOptions) ? undefined : modelOrOptions;
+  const resolvedOptions = isNotificationColumnsOptions(modelOrOptions) ? modelOrOptions : options;
   const idType =
-    (isNotificationColumnsOptions(modelOrOptions) ? modelOrOptions : options)?.idType ?? "uuid";
-  const { recipient, tenant, readAt, isRead } = resolveColumnMap(model?.columnMap);
+    resolvedOptions?.idType ??
+    (resolvedOptions?.recipientModel?.autoGenerateId === false ? "uuid" : "integer");
+  const { recipient, recipientType, tenant, readAt, isRead } = resolveColumnMap(model?.columnMap);
   const idColumn = getIdColumn(idType);
 
   const columns: ColumnMap = {
@@ -70,6 +86,11 @@ export function notificationColumns(
     body: text().nullable(),
     payload: json().nullable(),
   };
+
+  if (recipientType) {
+    // Indexed together with the recipient id by the app's own composite index when needed.
+    columns[recipientType] = string().index().notNullable();
+  }
 
   if (readAt) {
     columns[readAt] = timestamp().nullable();
@@ -94,7 +115,7 @@ export function notificationColumns(
 function isNotificationColumnsOptions(
   value: NotificationColumnMapHost | NotificationColumnsOptions | undefined,
 ): value is NotificationColumnsOptions {
-  return "idType" in (value ?? {});
+  return "idType" in (value ?? {}) || "recipientModel" in (value ?? {});
 }
 
 function getIdColumn(idType: NotificationIdType) {

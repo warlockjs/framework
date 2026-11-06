@@ -16,10 +16,11 @@ describe("notificationColumns", () => {
     expect(cols.organization_id.getDefinition().type).toBe("bigInteger");
   });
 
-  it("keeps uuid as the default for recipient and tenant columns", () => {
-    const cols = notificationColumns({
-      columnMap: { recipient: "account_id", tenant: "organization_id" },
-    });
+  it("keeps uuid when requested for recipient and tenant columns", () => {
+    const cols = notificationColumns(
+      { columnMap: { recipient: "account_id", tenant: "organization_id" } },
+      { idType: "uuid" },
+    );
 
     expect(cols.account_id.getDefinition().type).toBe("uuid");
     expect(cols.organization_id.getDefinition().type).toBe("uuid");

@@ -29,6 +29,7 @@
  */
 import { type FilterRules, RepositoryManager } from "@warlock.js/core";
 import type { NotificationContract } from "../contracts";
+import { RecipientTypeRequiredError } from "../errors";
 import type { DatabasePayload, Id } from "../types";
 import {
   type NotificationColumnMapHost,
@@ -36,6 +37,7 @@ import {
   resolveColumnMap,
 } from "./column-map";
 import type { DatabaseNotification } from "./database-notification";
+import { type RecipientInput, toRecipientRef } from "./recipient";
 
 /**
  * Filter shape — logical keys the repo understands. `filterBy` maps each to a
@@ -47,6 +49,8 @@ export type NotificationsFilter = {
   /** Mode-agnostic unread filter — resolves to the model's read-state column. */
   unread?: boolean;
   recipientId?: Id;
+  /** Recipient identity type — only filterable when the model declares `columnMap.recipientType`. */
+  recipientType?: string;
   idempotencyKey?: string;
 };
 
@@ -84,7 +88,7 @@ export class BaseNotificationsRepository<
    * direct filtering only when the model declares those columns.
    */
   private buildFilterBy(): FilterRules {
-    const { recipient, tenant, readAt, isRead } = this.columns;
+    const { recipient, recipientType, tenant, readAt, isRead } = this.columns;
 
     const rules: FilterRules = {
       id: "=",
@@ -104,6 +108,10 @@ export class BaseNotificationsRepository<
       },
     };
 
+    if (recipientType) {
+      rules.recipientType = ["=", recipientType];
+    }
+
     if (isRead) {
       rules.isRead = ["=", isRead];
     }
@@ -117,6 +125,27 @@ export class BaseNotificationsRepository<
     }
 
     return rules;
+  }
+
+  /**
+   * Resolve a recipient into the logical filter keys that scope a query to it.
+   * When the model stores a recipient type the scope is `(recipientType,
+   * recipientId)`; a bare id then throws, since an id alone can't say which
+   * identity type it belongs to. Without a type column the scope is the id
+   * alone and any type on the recipient is ignored.
+   */
+  public scopeOf(recipient: RecipientInput): { recipientId: Id; recipientType?: string } {
+    const { id, type } = toRecipientRef(recipient);
+
+    if (!this.columns.recipientType) {
+      return { recipientId: id };
+    }
+
+    if (!type) {
+      throw new RecipientTypeRequiredError(id);
+    }
+
+    return { recipientId: id, recipientType: type };
   }
 
   /**
@@ -151,10 +180,12 @@ export class BaseNotificationsRepository<
    * the recipient column directly.
    */
   private stripServerOwnedKeys(input: DatabasePayload): Record<string, unknown> {
-    const { recipient, tenant, readAt, isRead } = this.columns;
+    const { recipient, recipientType, tenant, readAt, isRead } = this.columns;
     const serverOwned = new Set<string | undefined>([
       "id",
       "recipientId",
+      "recipientType",
+      recipientType,
       "tenant",
       "readAt",
       "isRead",
@@ -186,17 +217,22 @@ export class BaseNotificationsRepository<
    * the existing row instead of inserting a duplicate. A unique index on the
    * key is the backstop for the rare insert race (we re-fetch on conflict).
    */
-  public async createFor(recipientId: Id, input: DatabasePayload, tenantId?: Id): Promise<TModel> {
+  public async createFor(
+    recipient: RecipientInput,
+    input: DatabasePayload,
+    tenantId?: Id,
+  ): Promise<TModel> {
     const { idempotencyKey } = input;
+    const scope = this.scopeOf(recipient);
 
     if (idempotencyKey) {
-      const existing = await this.firstByIdempotencyKey(recipientId, idempotencyKey);
+      const existing = await this.firstByIdempotencyKey(scope, idempotencyKey);
       if (existing) {
         return existing;
       }
     }
 
-    const row: Record<string, unknown> = { ...this.stripServerOwnedKeys(input), recipientId };
+    const row: Record<string, unknown> = { ...this.stripServerOwnedKeys(input), ...scope };
 
     if (this.columns.isRead) {
       row.isRead = false;
@@ -211,7 +247,7 @@ export class BaseNotificationsRepository<
     } catch (error) {
       // Lost the insert race to a concurrent send with the same key → re-fetch.
       if (idempotencyKey) {
-        const existing = await this.firstByIdempotencyKey(recipientId, idempotencyKey);
+        const existing = await this.firstByIdempotencyKey(scope, idempotencyKey);
         if (existing) {
           return existing;
         }
@@ -227,13 +263,11 @@ export class BaseNotificationsRepository<
    * send path yet.
    */
   public createManyFor(
-    recipientIds: Id[],
+    recipients: Array<Exclude<RecipientInput, object> | { id: Id; type?: string }>,
     input: DatabasePayload,
     tenantId?: Id,
   ): Promise<TModel[]> {
-    return Promise.all(
-      recipientIds.map((recipientId) => this.createFor(recipientId, input, tenantId)),
-    );
+    return Promise.all(recipients.map((recipient) => this.createFor(recipient, input, tenantId)));
   }
 
   /**
@@ -242,7 +276,7 @@ export class BaseNotificationsRepository<
    * to unread so a re-mark never overwrites an earlier `read_at` timestamp.
    * Sets whichever read-state column(s) the model declares.
    */
-  public markRead(recipientId: Id, id?: Id): Promise<number> {
+  public markRead(recipient: RecipientInput, id?: Id): Promise<number> {
     const { isRead, readAt } = this.columns;
     const unreadScope = isRead ? { isRead: false } : { readAt: null };
 
@@ -257,7 +291,7 @@ export class BaseNotificationsRepository<
     }
 
     return this.updateMany(
-      this.toRow({ recipientId, ...unreadScope, ...(id !== undefined ? { id } : {}) }),
+      this.toRow({ ...this.scopeOf(recipient), ...unreadScope, ...(id !== undefined ? { id } : {}) }),
       this.toRow(data),
     );
   }
@@ -266,7 +300,7 @@ export class BaseNotificationsRepository<
    * Inverse of `markRead`, same recipient-scoping. No unread scope needed —
    * clearing the read-state of an already-unread row is a no-op.
    */
-  public markUnread(recipientId: Id, id?: Id): Promise<number> {
+  public markUnread(recipient: RecipientInput, id?: Id): Promise<number> {
     const { isRead, readAt } = this.columns;
     const data: Record<string, unknown> = {};
 
@@ -279,26 +313,31 @@ export class BaseNotificationsRepository<
     }
 
     return this.updateMany(
-      this.toRow({ recipientId, ...(id !== undefined ? { id } : {}) }),
+      this.toRow({ ...this.scopeOf(recipient), ...(id !== undefined ? { id } : {}) }),
       this.toRow(data),
     );
   }
 
   /** Find one row for a recipient (read path — `filterBy` maps the keys). */
-  public findFor(recipientId: Id, id: Id): Promise<TModel | null> {
-    return this.first({ recipientId, id } as NotificationsFilter);
+  public findFor(recipient: RecipientInput, id: Id): Promise<TModel | null> {
+    return this.first({ ...this.scopeOf(recipient), id } as NotificationsFilter);
   }
 
   /**
    * Delete rows — recipient-scoped. `id` omitted → clear all for the
    * recipient; `id` given → that one row.
    */
-  public deleteFor(recipientId: Id, id?: Id): Promise<number> {
-    return this.deleteMany(this.toRow({ recipientId, ...(id !== undefined ? { id } : {}) }));
+  public deleteFor(recipient: RecipientInput, id?: Id): Promise<number> {
+    return this.deleteMany(
+      this.toRow({ ...this.scopeOf(recipient), ...(id !== undefined ? { id } : {}) }),
+    );
   }
 
-  /** Read path — `filterBy` maps `recipientId`/`idempotencyKey` to columns. */
-  private firstByIdempotencyKey(recipientId: Id, idempotencyKey: string): Promise<TModel | null> {
-    return this.first({ recipientId, idempotencyKey } as NotificationsFilter);
+  /** Read path — `filterBy` maps `recipientId`/`recipientType`/`idempotencyKey` to columns. */
+  private firstByIdempotencyKey(
+    scope: { recipientId: Id; recipientType?: string },
+    idempotencyKey: string,
+  ): Promise<TModel | null> {
+    return this.first({ ...scope, idempotencyKey } as NotificationsFilter);
   }
 }
