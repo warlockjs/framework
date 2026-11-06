@@ -1,6 +1,7 @@
 import { colors } from "@mongez/copper";
 import {
   confirmRollback,
+  dataSourceRegistry,
   exportMigrationsSQL,
   freshMigrate,
   listExecutedMigrations,
@@ -19,6 +20,7 @@ import { srcPath } from "../utils";
 import { isTestFile } from "../utils/is-test-file";
 import { warlockConfigManager } from "../warlock-config/warlock-config.manager";
 import { environment } from "../utils/environment";
+import { resetSeedLedger } from "./seeds/reset-seed-ledger";
 import { exitCodeFor, PENDING_EXIT_CODE } from "./pending-exit-code";
 import { installMigrateInterruptHandlers, shutdownMigrateConnections } from "./migrate-shutdown";
 import {
@@ -230,6 +232,8 @@ async function runMigrateAction(options: CommandActionData) {
     if (!(await confirmDestructiveRollback(Boolean(yes || force)))) return;
 
     await freshMigrate();
+    // The schema is new, so "already seeded" no longer holds.
+    await resetSeedLedger(dataSourceRegistry.get());
     return;
   }
 

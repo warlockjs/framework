@@ -849,8 +849,41 @@ export class CLICommandsManager {
       if (preloaders.connectors === true) {
         await connectorsManager.startPhase(ConnectorLifecyclePhase.Early);
       } else {
-        await connectorsManager.start(preloaders.connectors);
+        await connectorsManager.start(
+          preloaders.mainModules
+            ? [...preloaders.connectors, ...configuredEarlyConnectorNames()]
+            : preloaders.connectors,
+        );
       }
     }
+
+    // After the connectors: a `main.ts` may use the queue, cache or database.
+    if (preloaders.mainModules) {
+      await filesOrchestrator.init();
+      await filesOrchestrator.initializeAll();
+      filesOrchestrator.specialFilesCollector.collect(filesOrchestrator.getFiles());
+      await filesOrchestrator.moduleLoader.loadMainModules();
+    }
   }
+}
+
+/**
+ * Names of the Early-phase connectors the app lists in `warlock.config.ts >
+ * connectors` (the queue, for example). A command that imports module `main.ts`
+ * files starts these with its declared built-ins, since a `main.ts` may use
+ * them. Late-phase ones (http, socket, web) stay off, as in every scoped list.
+ */
+function configuredEarlyConnectorNames(): string[] {
+  const configured = new Set(
+    (warlockConfigManager.get("connectors") ?? []).map((connector) => connector.name),
+  );
+
+  return connectorsManager
+    .list()
+    .filter(
+      (connector) =>
+        configured.has(connector.name) &&
+        connector.lifecyclePhase === ConnectorLifecyclePhase.Early,
+    )
+    .map((connector) => connector.name);
 }

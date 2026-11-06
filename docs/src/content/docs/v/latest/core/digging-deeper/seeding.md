@@ -157,7 +157,7 @@ pnpm warlock seed --drop                # undo every tracked record across all s
 pnpm warlock seed --drop=default-roles  # undo just one seeder's records
 ```
 
-Inside a single transaction, `--drop` deletes the tracked records in reverse run/insertion order, clears the refs, then resets the matching seeds-log rows so a `once: true` seed re-runs on the next `warlock seed`. Only **tracked** rows are deleted — a seed that never calls `track()` has nothing to undo. Contrast with `--fresh`, which truncates _every_ table; `--drop` is the surgical alternative.
+Inside a single transaction, `--drop` deletes the tracked records in reverse run/insertion order, clears the refs, then resets the matching seeds-log rows so a `once: true` seed re-runs on the next `warlock seed`. Only **tracked** rows are deleted — a seed that never calls `track()` has nothing to undo. `warlock migrate --fresh` also empties the seed log, so the next `warlock seed` after a fresh migrate runs every seeder. If a run skips every seeder, it prints a warning pointing at `--fresh` and `--drop`. Contrast with `--fresh`, which truncates _every_ table; `--drop` is the surgical alternative.
 
 ## Gotchas
 

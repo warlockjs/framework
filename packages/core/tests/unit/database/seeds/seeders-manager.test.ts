@@ -297,3 +297,19 @@ describe("SeedersManager.prepareSeeders — dependsOn (S5)", () => {
     expect(() => manager.prepareSeeders()).toThrow(UnknownSeederDependencyError);
   });
 });
+
+describe("SeedersManager.run — all skipped", () => {
+  it("warns when every seeder was already executed", async () => {
+    const memory = createInMemoryDriver();
+    const manager = makeManager(memory);
+
+    manager.register({ name: "users", once: true, async run() {} });
+
+    await manager.run();
+    await manager.run();
+
+    const output = vi.mocked(console.log).mock.calls.map((call) => String(call[0])).join("\n");
+
+    expect(output).toContain("Every seeder was skipped");
+  });
+});

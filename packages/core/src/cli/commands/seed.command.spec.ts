@@ -12,4 +12,8 @@ describe("seed command connectors", () => {
   it("preloads the storage connector so seeders can call storage.put()", () => {
     expect(seedCommand.commandPreload?.connectors).toContain("storage");
   });
+
+  it("imports module main files", () => {
+    expect(seedCommand.commandPreload?.mainModules).toBe(true);
+  });
 });

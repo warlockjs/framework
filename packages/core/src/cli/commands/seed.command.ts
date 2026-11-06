@@ -10,6 +10,7 @@ export const seedCommand = command({
     env: true,
     bootstrap: true,
     connectors: ["database", "cache", "logger", "storage"],
+    mainModules: true,
   },
   options: [
     {

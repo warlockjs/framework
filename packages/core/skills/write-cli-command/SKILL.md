@@ -84,10 +84,13 @@ preload: {
   connectors: ["database", "cache"],      // start these connectors (or `true` for all early-phase)
   prestart: true,                         // run src/app/prestart.ts after config
   warlockConfig: true,                    // load warlock.config.ts
+  mainModules: true,                      // after connectors, import every module's main.ts (what `seed` does); also starts the app's early-phase `warlock.config.ts > connectors` (e.g. queue)
   runtimeStrategy: "production",          // force-set
   environemnt: "production",              // force-set (note: original typo preserved)
 }
 ```
+
+`mainModules: true` imports only the `main.ts` files (no routes, events or locales), so registries a module fills there are populated and the connectors they use are running. Leave it off for commands that do not need app code: it scans `src/app`.
 
 Connector names: `"logger"`, `"mailer"`, `"http"`, `"database"`, `"cache"`, `"storage"`, `"communicator"` (herald), `"socket"`. Pass `connectors: true` to start every `Early`-phase connector — `http` and `socket` are `Late` phase and stay off unless you list them explicitly.
 
