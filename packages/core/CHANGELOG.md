@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 > ⚠ **Versioning: `@warlock.js/*` does not follow SemVer strictly — breaking changes may ship in a minor.** This is a deliberate decision, not an oversight: the framework is pre-adoption and the cost of a major per behaviour fix currently outweighs the benefit. **Pin an exact version or a tilde range (`~4.13.0`) if you need to opt into changes rather than receive them.** Every breaking change is marked **BREAKING** in its entry and summarised in an _Upgrading_ section at the top of the release. **This policy will change once the framework has consumers beyond its author.**
 
+## 5.47.0
+
+### Fixed
+
+- `createTestHttpServer({ loadAppModules: true })` served an empty application: module discovery read the project files but never classified them, so no `routes.ts` or `main.ts` was imported and the router and `main.ts` registries stayed empty. Files are now classified after they are read.
+- `loadAppModules: true` now throws, naming the project root and file counts, when the project has route or `main.ts` files on disk and none were loaded, instead of silently serving no routes.
+- Modules loaded for one project root are no longer reused when a worker moves to another root.
+- The boot manifest path (`.warlock/manifest.json`) is resolved from the current directory on each use, not once when the framework is imported, so a process that changes directory never reads or writes another project's manifest.
+
 ## 5.46.0 - 2026-11-06
 
 ### Added

@@ -18,7 +18,6 @@
 import { router } from "../router/router";
 import type { Router } from "../router/router";
 import type { AppModuleImporter } from "../loader/app-module-importer";
-import { setAppModuleImporter } from "../loader/app-module-importer";
 import { validateCspConfigAtBoot } from "../http/csp";
 import { registerHttpPlugins } from "../http/plugins";
 import { type FastifyInstance, startHttpServer } from "../http/server";
@@ -68,28 +67,29 @@ export type TestHttpServer = TestRequestClient & {
 
 const APP_MODULES_LOADED_KEY = Symbol.for("warlock.core.testAppModulesLoaded");
 
-type LoadedHolder = { [APP_MODULES_LOADED_KEY]?: Promise<void> };
+const APP_MODULES_ROOT_KEY = Symbol.for("warlock.core.testAppModulesRoot");
+
+type LoadedHolder = {
+  [APP_MODULES_LOADED_KEY]?: Promise<void>;
+  [APP_MODULES_ROOT_KEY]?: string;
+};
 
 let serverCounter = 0;
 
 async function loadAppModulesOnce(importModule: AppModuleImporter | undefined): Promise<void> {
   const holder = globalThis as LoadedHolder;
+  const root = process.cwd();
 
+  // Modules loaded for another project root say nothing about this one.
+  if (holder[APP_MODULES_ROOT_KEY] !== root) {
+    holder[APP_MODULES_LOADED_KEY] = undefined;
+  }
+
+  holder[APP_MODULES_ROOT_KEY] = root;
   holder[APP_MODULES_LOADED_KEY] ??= (async () => {
-    const { filesOrchestrator } = await import("../dev-server/files-orchestrator");
+    const { loadTestAppModules } = await import("./load-test-app-modules");
 
-    setAppModuleImporter(importModule);
-
-    try {
-      await filesOrchestrator.init();
-      await filesOrchestrator.initializeAll();
-      await timeTestStep("appModules", () => filesOrchestrator.moduleLoader.loadAll());
-      // The application's own routes are now part of the state a worker-scoped
-      // runtime returns to between files.
-      router.captureBootSnapshot();
-    } finally {
-      setAppModuleImporter(undefined);
-    }
+    await loadTestAppModules(importModule);
   })().catch((error: unknown) => {
     // A failed load may be retried by the next server.
     holder[APP_MODULES_LOADED_KEY] = undefined;
