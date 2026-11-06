@@ -1810,12 +1810,13 @@ loginController.responseSchema = {
 
 A body is an object whose values are one of:
 
-| Value                                     | Meaning                                                                                     |
-| ----------------------------------------- | ------------------------------------------------------------------------------------------- |
-| a cast string, with the resource suffixes | `"string"`, `"number?"`, `"string[]"`, `"date[]?"` (`?` is `T \| null`, key always present) |
-| a resource                                | one `ResourceOutput` object                                                                 |
-| `[Resource]`                              | an array of that resource                                                                   |
-| a nested plain object of any of the above | recursed                                                                                    |
+| Value                                     | Meaning                                                                                                                   |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| a cast string, with the resource suffixes | `"string"`, `"number?"`, `"string[]"`, `"date[]?"` (`?` is `T \| null`, key always present)                               |
+| a resource                                | one `ResourceOutput` object                                                                                               |
+| `[Resource]`                              | an array of that resource                                                                                                 |
+| `[{ ...shape }]`                          | an array of plain objects: `items: [{ id: "int", label: "string" }]`; untyped arrays of objects are the cast `"object[]"` |
+| a nested plain object of any of the above | recursed                                                                                                                  |
 
 The output types follow the same rules as `defineResource` (`ResponseBodyOutput<B>` and `ResponseSchemaOutput<S>` are exported if you need the type of a body or of the whole schema).
 
@@ -7696,15 +7697,15 @@ description: 'The test fakes Warlock installs by default in the test environment
 
 In the test environment seven fakes are installed for you: `setupTest()` installs them in every test file once its connectors are up, `startHttpTestServer()` installs them in the shared server, and teardown restores them. Nothing is delivered, pushed to Redis, uploaded to a bucket, and time and ids are deterministic.
 
-| Fake          | Replaces                                                              |
-| ------------- | --------------------------------------------------------------------- |
-| `mailFake`    | Mail delivery: `sendMail()` / `Mail` sends are captured               |
-| `queueFake`   | `@warlock.js/queue` dispatch: jobs are recorded, not pushed           |
-| `cacheFake`   | The cache's current driver: a fresh in-memory driver                  |
-| `storageFake` | Every storage driver (local, S3, R2, Spaces): a temp directory        |
-| `clockFake`   | `clock` from `@warlock.js/core`: frozen at 2026-01-01T00:00:00Z       |
-| `idsFake`     | `ids` from `@warlock.js/core`: numbered UUIDs and tokens              |
-| `secretsFake` | The `secrets` facade: namespace-aware memory, no OS/environment/files |
+| Fake          | Replaces                                                                                                        |
+| ------------- | --------------------------------------------------------------------------------------------------------------- |
+| `mailFake`    | Mail delivery: `sendMail()` / `Mail` sends are captured                                                         |
+| `queueFake`   | `@warlock.js/queue` dispatch: jobs are recorded, not pushed                                                     |
+| `cacheFake`   | The cache's current driver: a fresh in-memory driver                                                            |
+| `storageFake` | Every storage driver (local, S3, R2, Spaces): a temp directory; a cloud `default` is never built while it is on |
+| `clockFake`   | `clock` from `@warlock.js/core`: frozen at 2026-01-01T00:00:00Z                                                 |
+| `idsFake`     | `ids` from `@warlock.js/core`: numbered UUIDs and tokens                                                        |
+| `secretsFake` | The `secrets` facade: namespace-aware memory, no OS/environment/files                                           |
 
 ## Assert what your code did
 
@@ -12821,6 +12822,7 @@ jq -r '.problems[] | "\(.file // "-"):\(.line // 0) \(.code) \(.message)\n  → 
 | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `WL7101`            | type error (`rule` = `TS2322`, …)                                                                                                                     |
 | `WL7102`            | tsconfig missing/invalid                                                                                                                              |
+| `WL7103`            | warning: generated typings missing or older than `src`; run `warlock generate.typings`, then typecheck again                                          |
 | `WL7201` / `WL7202` | lint error / warning (`rule` = the rule id)                                                                                                           |
 | `WL7301` / `WL7302` | a test failed / a test file failed to load                                                                                                            |
 | `WL9001`            | imports an auto-loaded file (`routes.ts`, `main.ts`, `worker.ts`, `events/*`)                                                                         |
@@ -14417,10 +14419,13 @@ preload: {
   connectors: ["database", "cache"],      // start these connectors (or `true` for all early-phase)
   prestart: true,                         // run src/app/prestart.ts after config
   warlockConfig: true,                    // load warlock.config.ts
+  mainModules: true,                      // after connectors, import every module's main.ts (what `seed` does); also starts the app's early-phase `warlock.config.ts > connectors` (e.g. queue)
   runtimeStrategy: "production",          // force-set
   environemnt: "production",              // force-set (note: original typo preserved)
 }
 ```
+
+`mainModules: true` imports only the `main.ts` files (no routes, events or locales), so registries a module fills there are populated and the connectors they use are running. Leave it off for commands that do not need app code: it scans `src/app`.
 
 Connector names: `"logger"`, `"mailer"`, `"http"`, `"database"`, `"cache"`, `"storage"`, `"communicator"` (herald), `"socket"`. Pass `connectors: true` to start every `Early`-phase connector — `http` and `socket` are `Late` phase and stay off unless you list them explicitly.
 
@@ -14976,7 +14981,7 @@ npx warlock seed --drop                     # undo every tracked record, reset t
 npx warlock seed --drop=default-roles       # undo just one seeder's records
 ```
 
-`--fresh` truncates **every** table in the DB (`datasource.driver.truncateTable(table, { cascade: true })`), including the `seeds` tracking table. After `--fresh`, `once: true` seeds will run again.
+`--fresh` truncates **every** table in the DB (`datasource.driver.truncateTable(table, { cascade: true })`), including the `seeds` tracking table. After `--fresh`, `once: true` seeds will run again. `warlock migrate --fresh` clears the seed log too, so the next `warlock seed` runs everything; if every seeder is skipped as already executed, the run warns.
 
 `--drop` is the surgical alternative: it deletes only the rows a seeder **tracked**, in reverse run-order, then resets the matching `seeds`-log rows so `once: true` seeds re-run. See [Undo — `seed_records` + `--drop`](#undo--seed_records----drop).
 
@@ -18001,6 +18006,7 @@ const activeCount = await User.count({ status: "active" });
 const adminCount = await User.where("role", "admin").count();
 
 const hasAdmin = await User.where("role", "admin").exists(); // boolean, short-circuits
+const taken = await User.exists({ email }); // static shorthand for where(filter).exists()
 const noneBlocked = await User.where("status", "blocked").notExists();
 ```
 
@@ -18021,19 +18027,20 @@ const activeUsers = await User.all({ status: "active" });
 
 Cascade's query builder has around 60 methods. Reach for these as the need arises:
 
-| Reach for                                                                              | When                                                        |
-| -------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
-| `.whereIn(field, values)` / `.whereNotIn(field, values)`                               | Match against / exclude a list                              |
-| `.whereNull(field)` / `.whereNotNull(field)`                                           | Nullability checks                                          |
-| `.whereBetween(field, [a, b])`                                                         | Inclusive range                                             |
-| `.whereDate(field, value)`, `.whereDateBetween`, `.whereDateBefore`, `.whereDateAfter` | Date helpers                                                |
-| `.whereLike(field, pattern)` / `.whereStartsWith` / `.whereEndsWith` / `.whereSearch`  | Pattern matching — see below for literal-vs-regex semantics |
-| `.whereHas(relation, callback)`                                                        | Filter by conditions on a related model                     |
-| `.sum(field)` / `.avg(field)` / `.min(field)` / `.max(field)`                          | Aggregates — the `aggregate-data` topic                     |
-| `.distinct(field)` / `.pluck(field)`                                                   | Single-field reads (distinct values, flat list)             |
-| `.chunk(size, callback)`                                                               | Stream a large table in batches                             |
-| `.cursorPaginate({ limit, cursor })`                                                   | Cursor pagination — the `paginate-results` topic            |
-| `.similarTo(column, embedding)`                                                        | Vector similarity — the `search-by-vector` topic            |
+| Reach for                                                                                                           | When                                                        |
+| ------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| `.whereIn(field, values)` / `.whereNotIn(field, values)`                                                            | Match against / exclude a list                              |
+| `.whereNot(field, value)` / `.whereNot(field, op, value)` / `.whereNot({ ... })` / `.whereNot(cb)` (+ `orWhereNot`) | Negate a condition or a group                               |
+| `.whereNull(field)` / `.whereNotNull(field)`                                                                        | Nullability checks                                          |
+| `.whereBetween(field, [a, b])`                                                                                      | Inclusive range                                             |
+| `.whereDate(field, value)`, `.whereDateBetween`, `.whereDateBefore`, `.whereDateAfter`                              | Date helpers                                                |
+| `.whereLike(field, pattern)` / `.whereStartsWith` / `.whereEndsWith` / `.whereSearch`                               | Pattern matching — see below for literal-vs-regex semantics |
+| `.whereHas(relation, callback)`                                                                                     | Filter by conditions on a related model                     |
+| `.sum(field)` / `.avg(field)` / `.min(field)` / `.max(field)`                                                       | Aggregates — the `aggregate-data` topic                     |
+| `.distinct(field)` / `.pluck(field)`                                                                                | Single-field reads (distinct values, flat list)             |
+| `.chunk(size, callback)`                                                                                            | Stream a large table in batches                             |
+| `.cursorPaginate({ limit, cursor })`                                                                                | Cursor pagination — the `paginate-results` topic            |
+| `.similarTo(column, embedding)`                                                                                     | Vector similarity — the `search-by-vector` topic            |
 
 Each chains off `User.where(...)` or `User.query()` and ends with the appropriate terminator. (`where`, `with`, `joinWith`, `first`, `count`, `find`, `all`, `paginate` are static shortcuts on the model; the rest live on the query builder, so reach them via `User.query()` or by chaining off a static `where`.)
 
@@ -19202,7 +19209,7 @@ The `{ isOptional: true }` brand survives chaining (`.optional().min(3)` is stil
 
 - It's not needed for conditional rules — `.requiredIf(field, value)` and friends _replace_ the default required-condition slot, so they work standalone.
 
-Conditional variants (run inside `v.object` only):
+Conditional variants (run inside `v.object` only). Without the `Sibling` suffix, the named field is looked up from the ROOT of the validated data; inside a nested object (`address: { en, ar }`) use the `Sibling` variant (`.requiredWithoutSibling("ar")`), or the pair is checked against `ar` at the root:
 
 - `.requiredIf(field, value)` / `.requiredIfSibling(field, value)`
 - `.requiredWith(field)` / `.requiredWithSibling(field)`
@@ -32198,13 +32205,18 @@ class BaseNotificationsRepository extends RepositoryManager {
 
 ### `createFor` write side — no IDOR either (since 4.15.0)
 
-`recipientId` is always the trusted argument, applied **after** the payload — `createFor`/`createManyFor` strip server-owned keys (`id`, `recipientId`, `tenant`, `readAt`, `isRead`, and their resolved `columnMap` physical column names) off `input` before merging. Before this, a caller passing an untyped payload straight through (request JSON, a channel's `send` args) could smuggle its own `recipientId` — or the raw physical column name — and write the notification into someone else's inbox. `type` / `title` / `body` / `payload` / `idempotencyKey` are untouched; you don't need to sanitize `input` yourself.
+`recipientId` (and `recipientType`) are always the trusted arguments, applied **after** the payload — `createFor`/`createManyFor` strip server-owned keys (`id`, `recipientId`, `recipientType`, `tenant`, `readAt`, `isRead`, and their resolved `columnMap` physical column names) off `input` before merging. Before this, a caller passing an untyped payload straight through (request JSON, a channel's `send` args) could smuggle its own `recipientId` — or the raw physical column name — and write the notification into someone else's inbox. `type` / `title` / `body` / `payload` / `idempotencyKey` are untouched; you don't need to sanitize `input` yourself.
+
+### Recipient types — identities that share an id
+
+Recipients are keyed by `(type, id)`. Declare `recipientType: "recipient_type"` in `columnMap` and every `inApp` read / count / mark / dismiss filters on both, so staff `5` and customer `5` never see each other's rows. The type is the recipient model's `userType` (auth models) or its table name; the `database` channel stores it. Also accepted: `{ type, id }` (`RecipientRef`). `recipientTypeOf(model)` returns the type a model is stored under, and `toRecipientRef(recipient)` turns a model or ref into `{ type, id }`. With the column declared a **bare id throws `RecipientTypeRequiredError`**; without it ids are the only key (single-identity apps, tables created before 5.46.0). Upgrading: add a nullable `recipient_type` column, backfill it (unbackfilled rows match no typed read), then declare it in `columnMap`. Full steps in the docs page "The in-app store".
 
 ### `columnMap` — map logical roles → your columns
 
 ```ts
 export type NotificationColumnMap = {
   recipient?: string; // recipient FK. Default "user_id"
+  recipientType?: string; // recipient identity type column. Omit → ids are the only key
   tenant?: string; // multi-tenant scope, written from the recipient. Omit → single-tenant
   readAt?: string; // read-timestamp column
   isRead?: string; // read-flag column (indexed)
@@ -32287,7 +32299,7 @@ database: inApp.configure({ repository: notificationsRepository }),
 
 ---
 name: write-notification-migration
-description: 'Create the notifications table with the `notificationColumns(Notification)` factory + cascade `Migration.create`. Column NAMES come from the model''s `columnMap` (recipient / tenant / readAt / isRead); the fixed columns are `type` / `title` / `body` / `payload` / `idempotency_key`. Set `{ idType: "bigint" }` for integer-key apps; UUID remains the default. Read-state follows columnMap presence: `readAt` → nullable timestamp, `isRead` → indexed boolean, both → both. Defaults to `user_id` + `read_at` when no columnMap. Spread + extend for extras (FK references, composite indexes). Triggers: `notificationColumns`, `Migration.create` for notifications, "create the notifications table", "notification migration", "add organization_id to notifications", `is_read` column, `read_at` column, `idempotency_key` column; typical import `import { Migration } from "@warlock.js/cascade"; import { notificationColumns } from "@warlock.js/notifications"`. Skip: generic cascade migration writing — the `write-migration` topic of the `warlock-js-cascade` skill; the model itself — the `use-in-app` topic.'
+description: 'Create the notifications table with the `notificationColumns(Notification)` factory + cascade `Migration.create`. Column NAMES come from the model''s `columnMap` (recipient / tenant / readAt / isRead); the fixed columns are `type` / `title` / `body` / `payload` / `idempotency_key`. Id columns default to UUID; pass `{ recipientModel: User }` to derive them (integer, or UUID when the model has `autoGenerateId = false`) or `{ idType }` to set them. `columnMap.recipientType` adds a `recipient_type` string column. Read-state follows columnMap presence: `readAt` → nullable timestamp, `isRead` → indexed boolean, both → both. Defaults to `user_id` + `read_at` when no columnMap. Spread + extend for extras (FK references, composite indexes). Triggers: `notificationColumns`, `Migration.create` for notifications, "create the notifications table", "notification migration", "add organization_id to notifications", `is_read` column, `read_at` column, `idempotency_key` column; typical import `import { Migration } from "@warlock.js/cascade"; import { notificationColumns } from "@warlock.js/notifications"`. Skip: generic cascade migration writing — the `write-migration` topic of the `warlock-js-cascade` skill; the model itself — the `use-in-app` topic.'
 ---
 
 # Write the notifications migration
@@ -32313,6 +32325,7 @@ matching columns:
 | -------------------------------------------------- | --------------------------------------------------------------------------- |
 | _(none / default)_                                 | `user_id`, `type`, `title`, `body`, `payload`, `read_at`, `idempotency_key` |
 | `{ tenant: "organization_id", readAt: "read_at" }` | adds `organization_id`; read_at-only                                        |
+| `{ recipientType: "recipient_type" }`              | adds `recipient_type` (the identity type that owns the row)                 |
 | `{ isRead: "is_read" }`                            | swaps `read_at` for `is_read` (indexed boolean)                             |
 | `{ isRead: "is_read", readAt: "read_at" }`         | both read-state columns                                                     |
 
@@ -32320,10 +32333,11 @@ The recipient / tenant / read-state column NAMES come from `columnMap`; `type` /
 `title` / `body` / `payload` / `idempotency_key` are fixed. `id` / `createdAt` /
 `updatedAt` are added automatically by cascade.
 
+Declare `recipientType` so different identity types sharing an id cannot read each other's notifications (see the `use-in-app` topic). For a table that already exists, add the column with `Migration.alter` and backfill it.
+
 ## Match your app's identifier type
 
-Recipient and tenant columns default to UUID. For applications whose primary keys
-are `bigint`, `integer`, or strings, pass `idType`; it is applied to every
+Recipient and tenant columns default to UUID. For integer-id apps pass `recipientModel: User` (auto-generated ids give `integer`; `autoGenerateId = false` keeps UUID) or set `idType` (`"uuid"`, `"bigint"`, `"integer"`, `"string"`) explicitly; it is applied to every
 identifier column the factory creates:
 
 ```ts

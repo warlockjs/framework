@@ -313,7 +313,7 @@ The `{ isOptional: true }` brand survives chaining (`.optional().min(3)` is stil
 
 - It's not needed for conditional rules — `.requiredIf(field, value)` and friends _replace_ the default required-condition slot, so they work standalone.
 
-Conditional variants (run inside `v.object` only):
+Conditional variants (run inside `v.object` only). Without the `Sibling` suffix, the named field is looked up from the ROOT of the validated data; inside a nested object (`address: { en, ar }`) use the `Sibling` variant (`.requiredWithoutSibling("ar")`), or the pair is checked against `ar` at the root:
 
 - `.requiredIf(field, value)` / `.requiredIfSibling(field, value)`
 - `.requiredWith(field)` / `.requiredWithSibling(field)`

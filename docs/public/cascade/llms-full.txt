@@ -2360,6 +2360,7 @@ const activeCount = await User.count({ status: "active" });
 const adminCount = await User.where("role", "admin").count();
 
 const hasAdmin = await User.where("role", "admin").exists(); // boolean, short-circuits
+const taken = await User.exists({ email }); // static shorthand for where(filter).exists()
 const noneBlocked = await User.where("status", "blocked").notExists();
 ```
 
@@ -2380,19 +2381,20 @@ const activeUsers = await User.all({ status: "active" });
 
 Cascade's query builder has around 60 methods. Reach for these as the need arises:
 
-| Reach for                                                                              | When                                                        |
-| -------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
-| `.whereIn(field, values)` / `.whereNotIn(field, values)`                               | Match against / exclude a list                              |
-| `.whereNull(field)` / `.whereNotNull(field)`                                           | Nullability checks                                          |
-| `.whereBetween(field, [a, b])`                                                         | Inclusive range                                             |
-| `.whereDate(field, value)`, `.whereDateBetween`, `.whereDateBefore`, `.whereDateAfter` | Date helpers                                                |
-| `.whereLike(field, pattern)` / `.whereStartsWith` / `.whereEndsWith` / `.whereSearch`  | Pattern matching — see below for literal-vs-regex semantics |
-| `.whereHas(relation, callback)`                                                        | Filter by conditions on a related model                     |
-| `.sum(field)` / `.avg(field)` / `.min(field)` / `.max(field)`                          | Aggregates — the `aggregate-data` topic                     |
-| `.distinct(field)` / `.pluck(field)`                                                   | Single-field reads (distinct values, flat list)             |
-| `.chunk(size, callback)`                                                               | Stream a large table in batches                             |
-| `.cursorPaginate({ limit, cursor })`                                                   | Cursor pagination — the `paginate-results` topic            |
-| `.similarTo(column, embedding)`                                                        | Vector similarity — the `search-by-vector` topic            |
+| Reach for                                                                                                           | When                                                        |
+| ------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| `.whereIn(field, values)` / `.whereNotIn(field, values)`                                                            | Match against / exclude a list                              |
+| `.whereNot(field, value)` / `.whereNot(field, op, value)` / `.whereNot({ ... })` / `.whereNot(cb)` (+ `orWhereNot`) | Negate a condition or a group                               |
+| `.whereNull(field)` / `.whereNotNull(field)`                                                                        | Nullability checks                                          |
+| `.whereBetween(field, [a, b])`                                                                                      | Inclusive range                                             |
+| `.whereDate(field, value)`, `.whereDateBetween`, `.whereDateBefore`, `.whereDateAfter`                              | Date helpers                                                |
+| `.whereLike(field, pattern)` / `.whereStartsWith` / `.whereEndsWith` / `.whereSearch`                               | Pattern matching — see below for literal-vs-regex semantics |
+| `.whereHas(relation, callback)`                                                                                     | Filter by conditions on a related model                     |
+| `.sum(field)` / `.avg(field)` / `.min(field)` / `.max(field)`                                                       | Aggregates — the `aggregate-data` topic                     |
+| `.distinct(field)` / `.pluck(field)`                                                                                | Single-field reads (distinct values, flat list)             |
+| `.chunk(size, callback)`                                                                                            | Stream a large table in batches                             |
+| `.cursorPaginate({ limit, cursor })`                                                                                | Cursor pagination — the `paginate-results` topic            |
+| `.similarTo(column, embedding)`                                                                                     | Vector similarity — the `search-by-vector` topic            |
 
 Each chains off `User.where(...)` or `User.query()` and ends with the appropriate terminator. (`where`, `with`, `joinWith`, `first`, `count`, `find`, `all`, `paginate` are static shortcuts on the model; the rest live on the query builder, so reach them via `User.query()` or by chaining off a static `where`.)
 
