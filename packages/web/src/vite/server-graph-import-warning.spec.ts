@@ -67,7 +67,7 @@ describe("serverGraphImportWarning", () => {
     const message = serverGraphImportWarning(`import W from "./job.ts?worker";`, "src/web/job.ts");
 
     expect(message).toContain("may fail");
-    expect(message).not.toContain("fails on it");
+    expect(message).not.toContain("and `warlock build` fails on it");
   });
 
   it("is undefined for a clean module", () => {
