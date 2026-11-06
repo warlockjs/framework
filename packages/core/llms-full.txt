@@ -9075,8 +9075,12 @@ description: 'Keep a project current with `warlock update` — bump every `@warl
 Before upgrading, run `npx warlock release-notes --from <current>` (the version in
 `package.json`, e.g. `5.36`). It prints the summary of every release after it, oldest
 first, led by a combined list of breaking changes, from files shipped in the installed
-`@warlock.js/core`. It needs no network and no booted app; `--json` prints the same as
-data. Read it, then run `warlock update` or `warlock upgrade`. Both end with a
+`@warlock.js/core`. It also checks warlock.js.org for releases newer than the installed one
+(without `--to` the range runs to the latest release; `--offline` skips the check, and a
+failed check only adds one warning line). It needs no booted app; `--json` prints the same as
+data, with `installedVersion`, `latestVersion` and per release `installed` and `source`.
+Run `npx warlock release-notes --json` before upgrading and before reporting a framework
+bug: a newer release may already have fixed it. Read it, then run `warlock update` or `warlock upgrade`. Both end with a
 `What's new:` line naming the command.
 
 ## `warlock update` vs `warlock upgrade`

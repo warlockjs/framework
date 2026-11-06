@@ -25,13 +25,13 @@ warlock release-notes --from 5.36 --json  # data for a script or an agent
 warlock release-notes --offline           # bundled summaries only, no network
 ```
 
-| Flag         | Description                                                                                                                                 |
-| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| `--from`     | Print every release after this version (the version itself is not included), oldest first. Accepts `5.36` or `5.36.0`.                      |
-| `--to`       | With `--from`: the last release to include. Default: the latest release, or the installed one with `--offline` or when the online check fails. |
-| `--offline`  | Skip the online check. Only the summaries shipped in the installed package are read.                                                        |
-| `--version`  | Print the summary of this one version.                                                                                                      |
-| `--list`     | List the versions that have a summary, with their release dates.                                                                            |
+| Flag         | Description                                                                                                                                                                                                                                                                                                |
+| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--from`     | Print every release after this version (the version itself is not included), oldest first. Accepts `5.36` or `5.36.0`.                                                                                                                                                                                     |
+| `--to`       | With `--from`: the last release to include. Default: the latest release, or the installed one with `--offline` or when the online check fails.                                                                                                                                                             |
+| `--offline`  | Skip the online check. Only the summaries shipped in the installed package are read.                                                                                                                                                                                                                       |
+| `--version`  | Print the summary of this one version.                                                                                                                                                                                                                                                                     |
+| `--list`     | List the versions that have a summary, with their release dates.                                                                                                                                                                                                                                           |
 | `--json, -j` | Print `{ installedVersion, latestVersion, versions: [{ version, date, breaking, markdown, installed, source }] }`. `breaking` has one line per breaking change; `markdown` is the full summary; `installed` is `true` when the installed core includes the release; `source` is `"bundled"` or `"remote"`. |
 
 With `--from`, the output starts with a combined **Breaking changes** list taken from each

@@ -9075,8 +9075,12 @@ description: 'Keep a project current with `warlock update` — bump every `@warl
 Before upgrading, run `npx warlock release-notes --from <current>` (the version in
 `package.json`, e.g. `5.36`). It prints the summary of every release after it, oldest
 first, led by a combined list of breaking changes, from files shipped in the installed
-`@warlock.js/core`. It needs no network and no booted app; `--json` prints the same as
-data. Read it, then run `warlock update` or `warlock upgrade`. Both end with a
+`@warlock.js/core`. It also checks warlock.js.org for releases newer than the installed one
+(without `--to` the range runs to the latest release; `--offline` skips the check, and a
+failed check only adds one warning line). It needs no booted app; `--json` prints the same as
+data, with `installedVersion`, `latestVersion` and per release `installed` and `source`.
+Run `npx warlock release-notes --json` before upgrading and before reporting a framework
+bug: a newer release may already have fixed it. Read it, then run `warlock update` or `warlock upgrade`. Both end with a
 `What's new:` line naming the command.
 
 ## `warlock update` vs `warlock upgrade`
@@ -12809,28 +12813,29 @@ jq -r '.problems[] | "\(.file // "-"):\(.line // 0) \(.code) \(.message)\n  → 
 [ "$code" = 2 ] && echo "environment problem — fix the machine, not the code"
 ```
 
-| Code                | Problem                                                                                                                                               |
-| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `WL7101`            | type error (`rule` = `TS2322`, …)                                                                                                                     |
-| `WL7102`            | tsconfig missing/invalid                                                                                                                              |
-| `WL7103`            | warning: generated typings missing or older than `src`; run `warlock generate.typings`, then typecheck again                                          |
-| `WL7201` / `WL7202` | lint error / warning (`rule` = the rule id)                                                                                                           |
-| `WL7301` / `WL7302` | a test failed / a test file failed to load                                                                                                            |
-| `WL9001`            | imports an auto-loaded file (`routes.ts`, `main.ts`, `worker.ts`, `events/*`)                                                                         |
-| `WL9002`            | relative import ends in `.js`                                                                                                                         |
-| `WL9003`            | relative import into another `src/app/<module>` — use `app/<module>/...`                                                                              |
-| `WL9004`            | `experimentalDecorators: true` in tsconfig                                                                                                            |
-| `WL9005`            | `request.all()` passed to a query, a service or `inApp()` — use `request.validated()`                                                                 |
-| `WL9006`            | POST/PUT/PATCH/DELETE route with no auth middleware and no `public: true`                                                                             |
-| `WL9007`            | redirect / `navigateTo()` / `<Link to>` target from request input without `safeRedirect()`                                                            |
-| `WL9008`            | raw email, credential or request body in a log call                                                                                                   |
-| `WL9009`            | regex with `*` / `+` / `{n,}` run on request input                                                                                                    |
-| `WL9010`–`WL9012`   | warnings: `await log.*()`, a second controller in a file, a `kind` discriminator                                                                      |
-| `WL9022`            | server-only code (controller, service, repository, model, route, connector, `*.server.*`) imports a `*.client.*` module — the message names the chain |
-| `WL9023`            | an app-module `index.ts` that only re-exports; **off by default** (`rules.WL9023` in `.warlock-check.json`)                                           |
-| `WL9105`            | a key of `utils/locales.json` or `utils/locales/<feature>.json` lacks a configured locale (`app.localeCodes`)                                         |
-| `WL8001`–`WL8007`   | this machine: Node version, missing tool, unreachable service, busy port, esbuild binary, git, tool crash/OOM                                         |
-| `WL8010`            | installed `@warlock.js/*` packages on different versions — run `warlock update`                                                                       |
+| Code                | Problem                                                                                                                                                                                                                                    |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `WL7101`            | type error (`rule` = `TS2322`, …)                                                                                                                                                                                                          |
+| `WL7102`            | tsconfig missing/invalid                                                                                                                                                                                                                   |
+| `WL7103`            | warning: generated typings missing or older than `src`; run `warlock generate.typings`, then typecheck again                                                                                                                               |
+| `WL7201` / `WL7202` | lint error / warning (`rule` = the rule id)                                                                                                                                                                                                |
+| `WL7301` / `WL7302` | a test failed / a test file failed to load                                                                                                                                                                                                 |
+| `WL9001`            | imports an auto-loaded file (`routes.ts`, `main.ts`, `worker.ts`, `events/*`)                                                                                                                                                              |
+| `WL9002`            | relative import ends in `.js`                                                                                                                                                                                                              |
+| `WL9003`            | relative import into another `src/app/<module>` — use `app/<module>/...`                                                                                                                                                                   |
+| `WL9004`            | `experimentalDecorators: true` in tsconfig                                                                                                                                                                                                 |
+| `WL9005`            | `request.all()` passed to a query, a service or `inApp()` — use `request.validated()`                                                                                                                                                      |
+| `WL9006`            | POST/PUT/PATCH/DELETE route with no auth middleware and no `public: true`                                                                                                                                                                  |
+| `WL9007`            | redirect / `navigateTo()` / `<Link to>` target from request input without `safeRedirect()`                                                                                                                                                 |
+| `WL9008`            | raw email, credential or request body in a log call                                                                                                                                                                                        |
+| `WL9009`            | regex with `*` / `+` / `{n,}` run on request input                                                                                                                                                                                         |
+| `WL9010`–`WL9012`   | warnings: `await log.*()`, a second controller in a file, a `kind` discriminator                                                                                                                                                           |
+| `WL9022`            | server-only code (controller, service, repository, model, route, connector, `*.server.*`) imports a `*.client.*` module — the message names the chain                                                                                      |
+| `WL9027`            | a file the production server bundle compiles (under `src/web`, or imported by it) imports a static asset or a `?raw`/`?url` query, or a bare `?worker` query that may fail (warning) — move the file to `public/`; `warlock dev` warns too |
+| `WL9023`            | an app-module `index.ts` that only re-exports; **off by default** (`rules.WL9023` in `.warlock-check.json`)                                                                                                                                |
+| `WL9105`            | a key of `utils/locales.json` or `utils/locales/<feature>.json` lacks a configured locale (`app.localeCodes`)                                                                                                                              |
+| `WL8001`–`WL8007`   | this machine: Node version, missing tool, unreachable service, busy port, esbuild binary, git, tool crash/OOM                                                                                                                              |
+| `WL8010`            | installed `@warlock.js/*` packages on different versions — run `warlock update`                                                                                                                                                            |
 
 ## `warlock typecheck`
 
@@ -14410,6 +14415,7 @@ preload: {
   connectors: ["database", "cache"],      // start these connectors (or `true` for all early-phase)
   prestart: true,                         // run src/app/prestart.ts after config
   warlockConfig: true,                    // load warlock.config.ts
+  configuredConnectors: true,            // also start the app's early-phase `warlock.config.ts > connectors` (e.g. queue), without importing module code
   mainModules: true,                      // after connectors, import every module's main.ts (what `seed` does); also starts the app's early-phase `warlock.config.ts > connectors` (e.g. queue)
   runtimeStrategy: "production",          // force-set
   environemnt: "production",              // force-set (note: original typo preserved)
@@ -14417,6 +14423,8 @@ preload: {
 ```
 
 `mainModules: true` imports only the `main.ts` files (no routes, events or locales), so registries a module fills there are populated and the connectors they use are running. Leave it off for commands that do not need app code: it scans `src/app`.
+
+`configuredConnectors: true` is the lighter opt-in: it starts the app's early-phase `warlock.config.ts > connectors` (the queue, for example) alongside any `connectors` list, with no app code imported. Use it for a command whose action dispatches a queue job; without it, that dispatch fails with "@warlock.js/queue is not configured". `mainModules: true` implies it.
 
 Connector names: `"logger"`, `"mailer"`, `"http"`, `"database"`, `"cache"`, `"storage"`, `"communicator"` (herald), `"socket"`. Pass `connectors: true` to start every `Early`-phase connector — `http` and `socket` are `Late` phase and stay off unless you list them explicitly.
 

@@ -12,7 +12,11 @@ test("builds the notes JSON from summary files, oldest first", async () => {
     writeFileSync(join(dir, "5.9.0-summary.md"), "﻿# nine\n");
     writeFileSync(join(dir, "notes.md"), "ignored");
 
-    const data = await buildReleaseNotes(dir, { "5.10.0": { publishedAt: "2026-11-01T00:00:00.000Z" } }, "now");
+    const data = await buildReleaseNotes(
+      dir,
+      { "5.10.0": { publishedAt: "2026-11-01T00:00:00.000Z" } },
+      "now",
+    );
 
     assert.equal(data.generatedAt, "now");
     assert.equal(data.latest, "5.10.0");

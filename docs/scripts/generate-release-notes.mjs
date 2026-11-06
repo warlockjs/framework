@@ -29,7 +29,11 @@ const SUMMARY_FILE = /^(\d+)\.(\d+)\.(\d+)-summary\.md$/;
  * @param {Record<string, { publishedAt?: string }>} meta release metadata by version
  * @param {string} [generatedAt]
  */
-export async function buildReleaseNotes(releasesDir, meta = {}, generatedAt = new Date().toISOString()) {
+export async function buildReleaseNotes(
+  releasesDir,
+  meta = {},
+  generatedAt = new Date().toISOString(),
+) {
   const names = (await readdir(releasesDir))
     .map((name) => ({ name, match: SUMMARY_FILE.exec(name) }))
     .filter((entry) => entry.match)
