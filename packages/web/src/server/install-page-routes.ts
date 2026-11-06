@@ -47,9 +47,12 @@ import {
 import { pageSetupFileFor } from "../build/page-setup-file";
 import { readModuleConfig } from "../build/read-module-config";
 import { readPageGuard } from "../build/read-page-guard";
-import { routerPathOf } from "../routing/mixed-route-segment";
+import { hasMixedSegment, mixedRoutesTie, routerPathOf } from "../routing/mixed-route-segment";
 import { composeRoutePath } from "../routing/compose-route-path";
-import { duplicateRoutePathMessage } from "../routing/duplicate-route-path";
+import {
+  ambiguousMixedRoutePathMessage,
+  duplicateRoutePathMessage,
+} from "../routing/duplicate-route-path";
 import { deriveFilesystemRoutePath } from "../routing/filesystem-route";
 import { resolveLayoutLevel as resolveComposedLayoutLevel } from "../routing/layout-level";
 import { routeIdentityKey } from "../routing/route-identity-key";
@@ -833,6 +836,7 @@ async function installDiscoveredPageRoutes(
 
   const installed: InstalledPageRoute[] = [];
   const fileByPath = new Map<string, string>();
+  const mixedFileByPath = new Map<string, string>();
 
   for (const { pageFile, webRoot } of pageFiles) {
     let rawPageModule: unknown;
@@ -893,6 +897,21 @@ async function installDiscoveredPageRoutes(
           composition: { layoutPrefix, routePath },
         }),
       );
+    }
+
+    if (hasMixedSegment(effectivePath)) {
+      for (const [existingPath, tiedFile] of mixedFileByPath) {
+        if (!mixedRoutesTie(existingPath, effectivePath)) continue;
+        throw new Error(
+          ambiguousMixedRoutePathMessage({
+            effectivePath,
+            existingPath,
+            existingFile: tiedFile,
+            newFile: pageFile,
+          }),
+        );
+      }
+      mixedFileByPath.set(effectivePath, pageFile);
     }
 
     fileByPath.set(identityKey, pageFile);

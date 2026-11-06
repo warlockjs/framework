@@ -178,10 +178,14 @@ catch-all. A route that does not match the whole URL is skipped, so
 `/:id` still answers `/abc` when `/:type-for-:purpose` is also declared and
 `/house-for-sale` goes to the mixed route. Between two mixed segments, the one
 with the longer leading text wins, then the longer trailing text, then more
-static text overall (`/x-for-:b` beats `/:a-for-:b`). Two mixed segments that
-tie on all three and can match the same URL are ambiguous; do not declare such
-a pair. Two routes with the same shape (`/:a-for-:b` and `/:x-for-:y`) are a
-duplicate and fail at boot.
+static text overall (`/x-for-:b` beats `/:a-for-:b`). Two pages whose mixed
+segments tie on all three at the same position, with the same number of
+segments, are refused at boot with a collision error naming both pages, because
+the server's router would pick between them by registration order. The check is
+conservative: `/:a-:b` and `/:c.:d` are refused although no URL contains both
+separators. Disambiguate by giving one more static text (a different separator
+or a longer one). Two routes with the same shape (`/:a-for-:b` and
+`/:x-for-:y`) are refused the same way.
 
 A parameter name may be used only once in a path that has a mixed segment or a
 named wildcard. API routes keep their existing, broader parameter typing.

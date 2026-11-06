@@ -390,7 +390,7 @@ Page routes deliberately accept less than API routes:
 
 Write two pages for an optional segment. Validate a constrained parameter in the page instead of putting a regex in its path.
 
-A mixed segment splits greedily, as the router does: against `/:type-for-:purpose`, `a-for-b-for-c` is `type = "a-for-b"`, `purpose = "c"`; a param may be empty and never spans `/`. Precedence per segment: static, then mixed, then plain `:param`, then catch-all; a route that does not match the whole URL is skipped. Between mixed segments the longer leading text wins, then trailing text, then total static text; equal pairs that can match the same URL are ambiguous, and identical shapes (`/:a-for-:b`, `/:x-for-:y`) fail at boot. `href("listing", { type: "house", purpose: "sale" })` encodes each value and keeps the text. Each param name may appear once.
+A mixed segment splits greedily, as the router does: against `/:type-for-:purpose`, `a-for-b-for-c` is `type = "a-for-b"`, `purpose = "c"`; a param may be empty and never spans `/`. Precedence per segment: static, then mixed, then plain `:param`, then catch-all; a route that does not match the whole URL is skipped. Between mixed segments the longer leading text wins, then trailing text, then total static text; pages that tie on all three at the same position with the same segment count (including identical shapes such as `/:a-for-:b` and `/:x-for-:y`) are refused at boot with a collision error naming both pages; give one more static text. `href("listing", { type: "house", purpose: "sale" })` encodes each value and keeps the text. Each param name may appear once.
 
 An unsupported declared path is a boot-time
 `PageRoutePathNotSupportedError`, never a literal or normalized route.

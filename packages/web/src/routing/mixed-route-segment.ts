@@ -169,3 +169,60 @@ export function compareMixedSegments(
     textLength(right, "all") - textLength(left, "all")
   );
 }
+
+type SegmentShape =
+  | { readonly type: "static"; readonly value: string }
+  | { readonly type: "param" }
+  | { readonly type: "wildcard" }
+  | { readonly type: "mixed"; readonly parts: readonly MixedSegmentPart[] };
+
+function shapeOfSegment(segment: string): SegmentShape {
+  if (segment === "*" || namedWildcardOfSegment(segment) !== undefined) return { type: "wildcard" };
+  if (!segment.includes(":")) return { type: "static", value: segment };
+
+  const parsed = parseMixedSegment(segment);
+
+  if (parsed.type !== "mixed") return { type: "static", value: segment };
+  if (parsed.parts.every((part) => part.type === "param")) return { type: "param" };
+
+  return { type: "mixed", parts: parsed.parts };
+}
+
+/** Whether a page route path has a segment that mixes params with static text. */
+export function hasMixedSegment(path: string): boolean {
+  return path.split("/").some((segment) => shapeOfSegment(segment).type === "mixed");
+}
+
+/**
+ * Whether two page route paths could match the same URL AND the router's
+ * choice between them would be a tie: same number of segments, every pair of
+ * segments the same kind (or a static segment against itself), and at least one
+ * pair of mixed segments that tie on leading, trailing and total static text.
+ * The check is deliberately conservative — it may refuse a pair whose mixed
+ * segments could never match one URL — because the server's router picks
+ * between such a pair by registration order, which the browser cannot mirror.
+ */
+export function mixedRoutesTie(left: string, right: string): boolean {
+  const leftSegments = left.split("/");
+  const rightSegments = right.split("/");
+
+  if (leftSegments.length !== rightSegments.length) return false;
+
+  let tied = false;
+
+  for (const [index, leftSegment] of leftSegments.entries()) {
+    const leftShape = shapeOfSegment(leftSegment);
+    const rightShape = shapeOfSegment(rightSegments[index] ?? "");
+
+    if (leftShape.type !== rightShape.type) return false;
+    if (leftShape.type === "static" && leftShape.value !== (rightShape as typeof leftShape).value) {
+      return false;
+    }
+    if (leftShape.type === "mixed" && rightShape.type === "mixed") {
+      if (compareMixedSegments(leftShape.parts, rightShape.parts) !== 0) return false;
+      tied = true;
+    }
+  }
+
+  return tied;
+}

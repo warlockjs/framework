@@ -29,3 +29,24 @@ export function duplicateRoutePathMessage(input: {
     `"${existingFile}" and "${newFile}". Every page's composed route path must be unique.`
   );
 }
+
+/**
+ * The refusal for two pages whose mixed segments (`/:a-for-:b`) tie on every
+ * precedence measure and could match the same URL: the server's router would
+ * choose between them by registration order, which the browser cannot mirror.
+ */
+export function ambiguousMixedRoutePathMessage(input: {
+  effectivePath: string;
+  existingPath: string;
+  existingFile: string;
+  newFile: string;
+}): string {
+  const { effectivePath, existingPath, existingFile, newFile } = input;
+
+  return (
+    `composed route paths "${existingPath}" ("${existingFile}") and "${effectivePath}" ("${newFile}") ` +
+    `collide: their mixed segments tie on leading, trailing and total static text, so they can match ` +
+    `the same URL and the router would pick one by registration order. Give one of them more static ` +
+    `text around its params (such as a different separator), or merge the two pages.`
+  );
+}

@@ -1,5 +1,7 @@
 import {
   compareMixedSegments,
+  hasMixedSegment,
+  mixedRoutesTie,
   mixedSegmentSource,
   namedWildcardOfSegment,
   parseMixedSegment,
@@ -264,6 +266,16 @@ function compileRoutes(entries: readonly ClientPageEntry[]): readonly CompiledRo
       );
     }
     collisions.set(route.collisionKey, entry);
+    if (hasMixedSegment(entry.path)) {
+      const tied = entries.find(
+        (other) => other !== entry && hasMixedSegment(other.path) && mixedRoutesTie(other.path, entry.path),
+      );
+      if (tied) {
+        throw new Error(
+          `Client route patterns '${tied.path}' and '${entry.path}' collide under server matching`,
+        );
+      }
+    }
     return route;
   });
 

@@ -415,6 +415,22 @@ describe("matchClientRoute — mixed segments and named wildcard", () => {
     expect(matchClientRoute([files], "/files")).toBeNull();
   });
 
+  it("refuses two mixed segments that tie on every precedence measure, in both orders", () => {
+    const one = entry("one", "/:a-for-:b/z");
+    const shorter = entry("shorter", "/:a-in-:b/z");
+    const same = entry("same", "/:a-and-:b/z");
+    expect(() => matchClientRoute([one, shorter], "/x")).not.toThrow();
+    expect(() => matchClientRoute([one, same], "/x")).toThrow(/collide/);
+
+    const x = entry("x", "/:a-:b");
+    const y = entry("y", "/:c-:d");
+    expect(() => matchClientRoute([x, y], "/q")).toThrow(/collide/);
+    expect(() => matchClientRoute([y, x], "/q")).toThrow(/collide/);
+    expect(() =>
+      matchClientRoute([entry("p", "/s/:a-:b"), entry("q", "/s/:c.:d")], "/s/q"),
+    ).toThrow(/collide/);
+  });
+
   it("refuses two patterns of the same shape and a repeated param name", () => {
     expect(() =>
       matchClientRoute([entry("a", "/:a-for-:b"), entry("b", "/:x-for-:y")], "/q-for-r"),

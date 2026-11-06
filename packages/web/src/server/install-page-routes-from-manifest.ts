@@ -26,7 +26,10 @@
  * handler is a lookup over the same table, not an evaluation step.
  */
 import { composeRoutePath } from "../routing/compose-route-path";
-import { duplicateRoutePathMessage } from "../routing/duplicate-route-path";
+import {
+  ambiguousMixedRoutePathMessage,
+  duplicateRoutePathMessage,
+} from "../routing/duplicate-route-path";
 import { ErrorPageDeclaresRouteError } from "../routing/error-page-declares-route-error";
 import { deriveFilesystemRoutePath } from "../routing/filesystem-route";
 import { resolveLayoutLevel } from "../routing/layout-level";
@@ -34,7 +37,7 @@ import { resolvePageRouteIdentity } from "../routing/route-identity";
 import { routeIdentityKey } from "../routing/route-identity-key";
 import { publishRouteTable, registerSiteRoutes } from "../routing/route-table";
 import { publishLocaleRouting } from "../routing/locale-routing";
-import { routerPathOf } from "../routing/mixed-route-segment";
+import { hasMixedSegment, mixedRoutesTie, routerPathOf } from "../routing/mixed-route-segment";
 import { config, type Router } from "@warlock.js/core";
 import path from "node:path";
 import { buildRouteLocaleManifest } from "../build/build-route-locale-manifest";
@@ -618,6 +621,7 @@ export function installPageRoutesFromManifest(
 
   const installed: InstalledManifestPageRoute[] = [];
   const fileByPath = new Map<string, string>();
+  const mixedFileByPath = new Map<string, string>();
 
   for (const page of pages) {
     const { host: layout, prefix: layoutPrefix } = layoutLevelOf(page);
@@ -657,6 +661,21 @@ export function installPageRoutesFromManifest(
           composition: { layoutPrefix, routePath },
         }),
       );
+    }
+
+    if (hasMixedSegment(effectivePath)) {
+      for (const [existingPath, tiedFile] of mixedFileByPath) {
+        if (!mixedRoutesTie(existingPath, effectivePath)) continue;
+        throw new Error(
+          ambiguousMixedRoutePathMessage({
+            effectivePath,
+            existingPath,
+            existingFile: tiedFile,
+            newFile: page.sourceFile,
+          }),
+        );
+      }
+      mixedFileByPath.set(effectivePath, page.sourceFile);
     }
 
     fileByPath.set(identityKey, page.sourceFile);

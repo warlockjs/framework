@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   compareMixedSegments,
+  hasMixedSegment,
+  mixedRoutesTie,
   namedWildcardOfPath,
   parseMixedSegment,
   routerPathOf,
@@ -53,5 +55,29 @@ describe("compareMixedSegments", () => {
     expect(compareMixedSegments(parts(":a-for-z"), parts(":a-for-:b"))).toBeLessThan(0);
     expect(compareMixedSegments(parts(":c-for-:d"), parts(":a-:b"))).toBeLessThan(0);
     expect(compareMixedSegments(parts(":a-:b"), parts(":c-:d"))).toBe(0);
+  });
+});
+
+describe("mixedRoutesTie", () => {
+  it("flags mixed segments that tie, in both orders, and different names of one shape", () => {
+    for (const [left, right] of [
+      ["/:c-for-:d", "/:a-:b-x"],
+      ["/:a-for-:b", "/:x-for-:y"],
+      ["/blog/:a-:b", "/blog/:c-:d"],
+    ] as const) {
+      const tied = mixedRoutesTie(left, right);
+      expect(tied, `${left} ${right}`).toBe(left === "/:c-for-:d" ? false : true);
+      expect(mixedRoutesTie(right, left)).toBe(tied);
+    }
+  });
+
+  it("does not flag routes the precedence rule already orders", () => {
+    expect(mixedRoutesTie("/x-for-:b", "/:a-for-:b")).toBe(false);
+    expect(mixedRoutesTie("/:a-for-:b", "/:a")).toBe(false);
+    expect(mixedRoutesTie("/a/:a-:b", "/b/:a-:b")).toBe(false);
+    expect(mixedRoutesTie("/:a-:b", "/:a-:b/x")).toBe(false);
+    expect(mixedRoutesTie("/users/:id", "/users/:slug")).toBe(false);
+    expect(hasMixedSegment("/users/:id")).toBe(false);
+    expect(hasMixedSegment("/near/:lat-:lng")).toBe(true);
   });
 });

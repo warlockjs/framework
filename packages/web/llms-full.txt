@@ -736,15 +736,17 @@ export const config = {
 
 Page routes deliberately accept less than API routes:
 
-- Supported: `/`, static segments, whole-segment params such as `/products/:id`, the exact wildcard `*`, and a terminal wildcard such as `/docs/*`.
-- Not supported: regex params, optional params, multiple params in one segment, params mixed with text, doubled or trailing slashes, non-terminal wildcards, and catch-all/rest segments (`[...slug]`).
+- Supported: `/`, static segments, params such as `/products/:id`, the exact wildcard `*`, a terminal wildcard such as `/docs/*` or a named one such as `/files/*rest` (value under `params.rest` and `params["*"]`), and mixed segments with several params and static text such as `/:type-for-:purpose` or `/near/:lat-:lng` (static text: letters, digits, `. _ ~ -`; two params always need text between them).
+- Not supported: regex params, optional params, two params with no text between them (`/:a:b`), doubled or trailing slashes, non-terminal wildcards, and catch-all/rest segments in file names (`[...slug]`). Mixed segments and named wildcards are declared with `config.route.path`; there is no file name for them.
 
 Write two pages for an optional segment. Validate a constrained parameter in the page instead of putting a regex in its path.
+
+A mixed segment splits greedily, as the router does: against `/:type-for-:purpose`, `a-for-b-for-c` is `type = "a-for-b"`, `purpose = "c"`; a param may be empty and never spans `/`. Precedence per segment: static, then mixed, then plain `:param`, then catch-all; a route that does not match the whole URL is skipped. Between mixed segments the longer leading text wins, then trailing text, then total static text; pages that tie on all three at the same position with the same segment count (including identical shapes such as `/:a-for-:b` and `/:x-for-:y`) are refused at boot with a collision error naming both pages; give one more static text. `href("listing", { type: "house", purpose: "sale" })` encodes each value and keeps the text. Each param name may appear once.
 
 An unsupported declared path is a boot-time
 `PageRoutePathNotSupportedError`, never a literal or normalized route.
 Examples that fail include `/users/:id?`, `/users/:id(\\d+)`,
-`/near/:lat-:lng`, `/a//b`, and `/users/`.
+`/:a:b`, `/a//b`, and `/users/`.
 
 ## Metadata
 
