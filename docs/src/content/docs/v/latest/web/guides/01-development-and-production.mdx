@@ -221,6 +221,34 @@ the connector's initialization. Dev SSR now always imports those packages
 from the instance the app booted, as production does, and drops an app alias
 that would re-inline an SSR-external package.
 
+## Dev dependency cache
+
+`warlock dev` keeps Vite's optimized dependencies in
+`node_modules/.vite/warlock-dev-<hash>`, where `<hash>` comes from the resolved
+project root. Checkouts of one app that share a `node_modules` (git worktrees)
+therefore each get a directory of their own, and one dev server re-optimizing
+dependencies no longer answers another with `504 Outdated Optimize Dep`. A
+project keeps the same directory across runs. Set `cacheDir` on the connector to
+choose the directory yourself (a relative path is resolved against the app root):
+
+```ts title="warlock.config.ts"
+webConnector({ cacheDir: ".cache/vite-dev" });
+```
+
+A directory left behind by a checkout that moved or was deleted is only a cache;
+remove it with `node_modules` or by hand.
+
+## Imports the production build rejects
+
+Pages are compiled into the server bundle, which supports plain code imports
+only. Static assets and `?raw` or `?url` queries (for example
+`some-pkg/dist/worker.mjs?worker&url`) work in `warlock dev` but fail
+`warlock build`. A bare `?worker` query may fail in the server bundle too, so the
+warning covers it with softer wording. `warlock dev` warns once per file when the server render
+evaluates one, and `warlock check` reports them as
+[`WL9027`](/v/latest/core/cli/error-codes/#wl9027), both with the build error's
+advice: put the file in `public/` and reference its root URL.
+
 ## Failed page requests are logged
 
 A page request that fails outside the page pipeline itself — a cache

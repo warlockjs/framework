@@ -2,7 +2,7 @@
  * Development warning for an import the production build rejects.
  *
  * Pages are compiled into the server bundle, which takes plain code imports
- * only: static assets and `?raw` / `?url` / `?worker` queries fail the build.
+ * only: static assets and `?raw` / `?url` queries fail the build (a `?worker` query may too).
  * Vite resolves all of them in development, so the failure used to show up
  * only at `warlock build`. This plugin reads each module the dev server
  * evaluates for SSR (the server graph) and names such an import the first time
@@ -22,6 +22,15 @@ export function serverGraphImportWarning(code: string, file: string): string | u
   const [first] = serverGraphImportHazards(code);
 
   if (!first) return undefined;
+
+  if (!first.build) {
+    return [
+      `[warlock:web] "${file}" ${first.reason} (${first.specifier}).`,
+      ``,
+      `Cause: pages are compiled into the production server bundle, which supports plain code imports only. This works in development and may fail in the server bundle.`,
+      `Fix: if \`warlock build\` fails on it, move the import into code that only the browser loads, or copy the file into the application's public/ directory and reference its root URL.`,
+    ].join("\n");
+  }
 
   return [
     `[warlock:web] "${file}" ${first.reason} (${first.specifier}).`,

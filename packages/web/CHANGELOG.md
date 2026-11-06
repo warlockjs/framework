@@ -2,6 +2,17 @@
 
 All notable changes to `@warlock.js/web` are documented here.
 
+## 5.47.2
+
+### Added
+
+- `webConnector({ cacheDir })` sets the directory of Vite's dependency cache in `warlock dev`. A relative path is resolved against the app root.
+- `warlock dev` warns, once per file, when the server render evaluates a module that imports a static asset or a `?raw`, `?url` or `?worker` query (such as `some-pkg/dist/worker.mjs?worker&url`). These imports work in development and fail `warlock build`, because pages are compiled into the server bundle; the warning gives the build error's advice; a bare `?worker` query gets softer wording because the build does not reject it. `warlock check` reports the same imports as `WL9027`.
+
+### Changed
+
+- `warlock dev` keeps Vite's optimized dependencies in `node_modules/.vite/warlock-dev-<hash>`, where the hash comes from the resolved project root. Checkouts of one app that share a `node_modules` (git worktrees) no longer share one cache, so one dev server re-optimizing no longer makes the others answer `504 Outdated Optimize Dep`. The directory is stable for a project across runs; folders left by moved or deleted checkouts can be removed by hand.
+
 ## 5.47.0 - 2026-11-06
 
 ### Added

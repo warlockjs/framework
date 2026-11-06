@@ -12,7 +12,7 @@ import { positionOf } from "./source-ast";
 const REMEDY =
   "move the static file into the application's public/ directory and reference " +
   "it by its root URL instead (for example, public/logo.svg becomes /logo.svg). " +
-  "The production server build does not compile static-asset imports, ?raw/?url/?worker " +
+  "The production server build does not compile static-asset imports, ?raw/?url " +
   "queries, or import.meta.url in the page graph in 5.2";
 
 const ASSET_EXTENSIONS = [
@@ -36,6 +36,8 @@ const TEST_FILE = /\.(?:test|spec)\.[cm]?[jt]sx?$/i;
 const SOURCE_FILE = /\.(?:ts|tsx)$/;
 const SKIPPED_DIRECTORIES = new Set(["node_modules", "__tests__", "__mocks__"]);
 
+const WORKER_REASON = "uses a `?worker` import query";
+
 /** Why the production server bundle rejects `specifier`, or `undefined` when it accepts it. */
 export function serverBundleImportHazard(specifier: string): string | undefined {
   const [base = "", query] = specifier.split("?", 2);
@@ -45,8 +47,12 @@ export function serverBundleImportHazard(specifier: string): string | undefined 
     return "imports a static asset";
   }
 
-  if (query !== undefined && /(^|&)(raw|url|worker)(&|=|$)/.test(query)) {
+  if (query !== undefined && /(^|&)(raw|url)(&|=|$)/.test(query)) {
     return "uses a bundler-specific import query";
+  }
+
+  if (query !== undefined && /(^|&)worker(&|=|$)/.test(query)) {
+    return WORKER_REASON;
   }
 
   return undefined;
@@ -160,7 +166,10 @@ export function serverGraphImportProblems(
       code: "WL9027",
       source: "convention",
       severity: "warning",
-      message: `"${relativePath}" ${reason} (${specifier}). Pages are compiled into the server bundle, which supports plain code imports only; this works in \`warlock dev\` and \`warlock build\` fails on it. To fix: ${REMEDY}.`,
+      message:
+        reason === WORKER_REASON
+          ? `"${relativePath}" ${reason} (${specifier}). Pages are compiled into the server bundle, which supports plain code imports only; this works in \`warlock dev\` and may fail in the server bundle. If \`warlock build\` fails on it, move the import into code that only the browser loads, or copy the file into the application's public/ directory and reference its root URL.`
+          : `"${relativePath}" ${reason} (${specifier}). Pages are compiled into the server bundle, which supports plain code imports only; this works in \`warlock dev\` and \`warlock build\` fails on it. To fix: ${REMEDY}.`,
       file: relativePath,
       ...positionOf(sourceFile, node),
     }),

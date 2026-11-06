@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import fs from "node:fs";
 import { webFontsPlugin } from "./fonts-plugin";
 import path from "node:path";
@@ -10,6 +11,7 @@ import { cssModulesConfig } from "./css-modules-config";
 import { coreAppModules } from "./core-app-modules";
 import { coreModelModules } from "./core-model-modules";
 import { clientModuleSsrWarningPlugin } from "./client-module-ssr-warning";
+import { serverGraphImportWarningPlugin } from "./server-graph-import-warning";
 import { warlockClientBoundary } from "./index";
 import { resolveReactFastRefreshPlugins } from "./react-refresh-preamble";
 import { createSsrBoundaryState, isClientBoundModule } from "./ssr-client-view";
@@ -192,11 +194,28 @@ function withRealPath(directory: string): string[] {
 
 /**
  * Where `warlock dev`'s Vite server keeps its optimized dependencies:
- * `<appRoot>/node_modules/.vite/warlock-dev`, a sibling of (never the same as)
- * the default `node_modules/.vite` that vitest and other Vite processes use.
+ * `<appRoot>/node_modules/.vite/warlock-dev-<hash>`, a sibling of (never the
+ * same as) the default `node_modules/.vite` that vitest and other Vite
+ * processes use.
+ *
+ * The hash is taken from the resolved project root, so several checkouts of one
+ * app that share a `node_modules` (git worktrees) each get a directory of their
+ * own instead of re-optimizing under each other. It is stable for a given path,
+ * so one project keeps its cache across runs. A folder left by a project that
+ * moved or was deleted stays in `node_modules/.vite` until `node_modules` is
+ * cleaned; it is safe to remove.
+ *
+ * An explicit `cacheDir` (the web connector option) wins; a relative one is
+ * resolved against the app root.
  */
-export function webDevServerCacheDir(appRoot: string): string {
-  return path.join(path.resolve(appRoot), "node_modules", ".vite", "warlock-dev");
+export function webDevServerCacheDir(appRoot: string, cacheDir?: string): string {
+  const root = path.resolve(appRoot);
+
+  if (cacheDir !== undefined && cacheDir !== "") return path.resolve(root, cacheDir);
+
+  const hash = createHash("sha1").update(root).digest("hex").slice(0, 8);
+
+  return path.join(root, "node_modules", ".vite", `warlock-dev-${hash}`);
 }
 
 export type WebConnectorViteConfigOptions = {
@@ -204,6 +223,8 @@ export type WebConnectorViteConfigOptions = {
   appSrcRoot: string;
   webRoot: string;
   workspaceRoot: string;
+  /** Vite's dependency cache directory; see {@link webDevServerCacheDir} for the default. */
+  cacheDir?: string;
   /** The raw node server Vite's HMR websocket shares with the rest of the app. */
   hmrServer: HttpServer;
   /** `web.sites`: each per-site hydration entry then imports only its own site's page registry. */
@@ -269,7 +290,7 @@ export async function createWebConnectorViteConfig(
      * until the dev server restarts. A directory of its own keeps the two
      * processes from ever touching each other's files.
      */
-    cacheDir: webDevServerCacheDir(options.appRoot),
+    cacheDir: webDevServerCacheDir(options.appRoot, options.cacheDir),
     css: cssModulesConfig(options.appRoot),
     plugins: [
       // FIRST, and dev-only by construction: this method is reachable only
@@ -293,6 +314,9 @@ export async function createWebConnectorViteConfig(
       // Dev SSR only: names a top-level browser-global read in a `.client.*`
       // module that the server render evaluates.
       clientModuleSsrWarningPlugin(),
+      // Dev SSR only: names a static-asset or `?raw`/`?url`/`?worker` import
+      // that the production server bundle would reject.
+      serverGraphImportWarningPlugin(options.appRoot),
       // Dev SSR only; see the plugin header. `enforce: "pre"` and a `load` hook,
       // so it is ordered by enforce bucket and not by this position.
       coreAppModules({

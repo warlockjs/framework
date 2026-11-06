@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 > ⚠ **Versioning: `@warlock.js/*` does not follow SemVer strictly — breaking changes may ship in a minor.** This is a deliberate decision, not an oversight: the framework is pre-adoption and the cost of a major per behaviour fix currently outweighs the benefit. **Pin an exact version or a tilde range (`~4.13.0`) if you need to opt into changes rather than receive them.** Every breaking change is marked **BREAKING** in its entry and summarised in an _Upgrading_ section at the top of the release. **This policy will change once the framework has consumers beyond its author.**
 
+## 5.47.2
+
+### Added
+
+- `warlock check` reports `WL9027` (a warning) when a file the production server bundle compiles, meaning any non-test source file under `src/web` and the project files they import, imports a static asset or a `?raw` or `?url` query, or a bare `?worker` query (worded as "may fail"). `warlock dev` accepts these imports and `warlock build` fails on them; the message names the file, the import and the build error's advice (move the file to `public/` and reference its root URL). Files only the browser build reads are not reported.
+
 ## 5.47.1 - 2026-11-07
 
 ### Added

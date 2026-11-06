@@ -54,6 +54,17 @@ describe("WL9027 server bundle imports", () => {
     expect(found[0]?.message).toContain("public/ directory");
   });
 
+  it("words a bare ?worker query as something that may fail", () => {
+    const source = 'import Worker from "./job.ts?worker";\nexport { Worker };\n';
+
+    write("src/web/main/job.client.ts", source);
+
+    const [found] = problems("src/web/main/job.client.ts", source);
+
+    expect(found?.severity).toBe("warning");
+    expect(found?.message).toContain("may fail");
+  });
+
   it("flags a file outside src/web that a src/web file imports", () => {
     expect(problems("src/app/shared/chart.ts", WORKER)).toHaveLength(1);
   });

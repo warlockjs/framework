@@ -9,7 +9,7 @@ import { parse } from "@babel/parser";
 export const SERVER_GRAPH_IMPORT_REMEDY =
   "move the static file into the application's public/ directory and reference " +
   "it by its root URL instead (for example, public/logo.svg becomes /logo.svg). " +
-  "The production server build does not compile static-asset imports, ?raw/?url/?worker " +
+  "The production server build does not compile static-asset imports, ?raw/?url " +
   "queries, or import.meta.url in the page graph in 5.2";
 
 const ASSET_EXTENSIONS = [
@@ -118,23 +118,39 @@ export function hazardFor(specifier: string): string | undefined {
     return "imports a static asset";
   }
 
-  if (query !== undefined && /(^|&)(raw|url|worker)(&|=|$)/.test(query)) {
+  if (query !== undefined && /(^|&)(raw|url)(&|=|$)/.test(query)) {
     return "uses a bundler-specific import query";
   }
 
   return undefined;
 }
 
-/** Every server-bundle import hazard found in one source file, in source order. */
+/**
+ * A `?worker` query the build does not reject itself but the server bundle may
+ * fail on. Warned about in `warlock dev` and `warlock check` only.
+ */
+export function isWorkerQuery(specifier: string): boolean {
+  const query = specifier.split("?", 2)[1];
+
+  return query !== undefined && /(^|&)worker(&|=|$)/.test(query);
+}
+
+/**
+ * Every server-bundle import hazard found in one source file, in source order.
+ * `build: true` means the production build rejects it; otherwise it only may fail.
+ */
 export function serverGraphImportHazards(
   source: string,
-): { specifier: string; reason: string }[] {
-  const found: { specifier: string; reason: string }[] = [];
+): { specifier: string; reason: string; build: boolean }[] {
+  const found: { specifier: string; reason: string; build: boolean }[] = [];
 
   for (const specifier of collectSpecifiers(withoutComments(source))) {
     const reason = hazardFor(specifier);
 
-    if (reason !== undefined) found.push({ specifier, reason });
+    if (reason !== undefined) found.push({ specifier, reason, build: true });
+    else if (isWorkerQuery(specifier)) {
+      found.push({ specifier, reason: "uses a `?worker` import query", build: false });
+    }
   }
 
   return found;

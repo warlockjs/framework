@@ -67,6 +67,7 @@ jq -r '.problems[] | "\(.file // "-"):\(.line // 0) \(.code) \(.message)\n  → 
 | `WL9009`            | regex with `*` / `+` / `{n,}` run on request input                                                                                                    |
 | `WL9010`–`WL9012`   | warnings: `await log.*()`, a second controller in a file, a `kind` discriminator                                                                      |
 | `WL9022`            | server-only code (controller, service, repository, model, route, connector, `*.server.*`) imports a `*.client.*` module — the message names the chain |
+| `WL9027`            | a file the production server bundle compiles (under `src/web`, or imported by it) imports a static asset or a `?raw`/`?url` query, or a bare `?worker` query that may fail (warning) — move the file to `public/`; `warlock dev` warns too |
 | `WL9023`            | an app-module `index.ts` that only re-exports; **off by default** (`rules.WL9023` in `.warlock-check.json`)                                           |
 | `WL9105`            | a key of `utils/locales.json` or `utils/locales/<feature>.json` lacks a configured locale (`app.localeCodes`)                                         |
 | `WL8001`–`WL8007`   | this machine: Node version, missing tool, unreachable service, busy port, esbuild binary, git, tool crash/OOM                                         |

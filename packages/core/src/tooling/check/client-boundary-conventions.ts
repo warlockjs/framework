@@ -52,7 +52,7 @@ function toPosix(file: string): string {
 }
 
 /** Resolve a relative or `app/...` / `web/...` specifier to a project-relative source file. */
-function resolveLocal(specifier: string, importer: string, cwd: string): string | undefined {
+export function resolveLocal(specifier: string, importer: string, cwd: string): string | undefined {
   let base: string;
 
   if (specifier.startsWith(".")) {
@@ -144,7 +144,7 @@ function importsOfFile(
   return imports;
 }
 
-function valueImports(
+export function valueImports(
   relativePath: string,
   source: string | ast.SourceFile,
 ): { specifier: string; node: ast.Node }[] {

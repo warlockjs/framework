@@ -63,6 +63,13 @@ describe("serverGraphImportWarning", () => {
     expect(message).toContain("public/");
   });
 
+  it("words a bare ?worker query as something that may fail", () => {
+    const message = serverGraphImportWarning(`import W from "./job.ts?worker";`, "src/web/job.ts");
+
+    expect(message).toContain("may fail");
+    expect(message).not.toContain("fails on it");
+  });
+
   it("is undefined for a clean module", () => {
     expect(serverGraphImportWarning(`import a from "./a";`, "x.ts")).toBeUndefined();
   });

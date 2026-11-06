@@ -385,6 +385,11 @@ describe("the Vite-switch tripwire", () => {
     ["an asset", 'import logo from "../logo.svg";\n', "../logo.svg"],
     ["a ?raw query", 'import readme from "./readme.md?raw";\n', "./readme.md?raw"],
     ["a ?url query", 'import href from "./doc.pdf?url";\n', "./doc.pdf?url"],
+    [
+      "a ?worker&url query",
+      'import worker from "some-pkg/dist/worker.mjs?worker&url";\n',
+      "some-pkg/dist/worker.mjs?worker&url",
+    ],
   ];
 
   for (const [label, source, specifier] of cases) {

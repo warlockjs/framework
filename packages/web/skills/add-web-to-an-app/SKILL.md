@@ -44,7 +44,7 @@ Every added `@warlock.js/*` package is saved at the exact version of the Core CL
 
 The command adds `webConnector()` to `warlock.config.ts`. If the config cannot be patched safely, add the same wiring yourself:
 
-For development-only connector tuning, `webConnector({ ssrFetchTimeoutMs })` sets the Vite SSR module-fetch bound; `WARLOCK_SSR_FETCH_TIMEOUT_MS` overrides it.
+For development-only connector tuning, `webConnector({ ssrFetchTimeoutMs })` sets the Vite SSR module-fetch bound; `WARLOCK_SSR_FETCH_TIMEOUT_MS` overrides it. `webConnector({ cacheDir })` sets the directory of Vite's dependency cache in dev; by default it is `node_modules/.vite/warlock-dev-<hash of the app root>`, so checkouts sharing one `node_modules` do not share a cache.
 
 ```ts title="warlock.config.ts"
 import { defineConfig } from "@warlock.js/core";

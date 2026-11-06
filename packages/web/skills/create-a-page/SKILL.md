@@ -580,7 +580,7 @@ Creating a page, deleting one, or editing `config.route` is route-table churn ra
 - **A page with no `config.route` is not unreachable.** It derives a real URL from its file location — see [Filesystem routing](#filesystem-routing).
 - **A page with no default export IS refused.** Named exports alone fail the build naming the file, instead of serving a blank 200.
 - **`.client.tsx` does not skip SSR.** It keeps server-only code from importing the module, but a page that imports it still evaluates it on the server. Use `<ClientOnly>` (the `render-client-only` topic).
-- **Imported static assets do not build.** Put them in `public/` and reference their root URL; CSS imports remain supported.
+- **Imported static assets and `?raw` / `?url` queries do not build (a bare `?worker` may not either).** Put the file in `public/` and reference its root URL; CSS imports remain supported. `warlock dev` warns about these imports once per file and `warlock check` reports `WL9027`.
 - **`import.meta.url` fails the build in page-graph code.** Spec/test files, `__tests__` / `__mocks__` folders and the paths in `webConnector({ build: { testOnly } })` are skipped by that scan.
 - **`[...slug]` is not a catch-all.** It fails boot with
   `PageFileSegmentNotSupportedError`; use an explicit terminal `*` route

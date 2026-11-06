@@ -658,6 +658,14 @@ A convention rule of `warlock check` used more than its time budget over the run
 npx warlock explain WL9026
 ```
 
+### WL9027
+
+A file that the production server bundle compiles imports a static asset (`./logo.svg`) or a `?raw` or `?url` query (`some-pkg/dist/worker.mjs?worker&url`); a bare `?worker` query is reported too, with wording that says it may fail. `warlock dev` accepts these imports, but pages are compiled into the server bundle, which supports plain code imports only, so `warlock build` fails on them. The files that count are every non-test source file under `src/web` and every project file they import by value; a file only the browser build reads is not reported. The message names the file, the import and the fix: move the static file into the application's `public/` directory and reference it by its root URL (`public/logo.svg` becomes `/logo.svg`). `warlock dev` prints the same warning, once per file, when the server render evaluates it. Defaults to a warning; configure severity in `.warlock-check.json`.
+
+```bash
+npx warlock explain WL9027
+```
+
 ### WL9105
 
 A translation key in a module's `locales.json` or `locales/<feature>.json` is missing one of the configured locales. The configured locales are `localeCodes` in `src/config/app.ts` or in `.warlock-check.json`; the rule is skipped when neither is set. Defaults to an error; configure severity in `.warlock-check.json`.
