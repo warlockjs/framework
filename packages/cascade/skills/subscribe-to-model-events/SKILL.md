@@ -100,8 +100,8 @@ User.off("saved", handler);
 ### Audit log (combined with dirty tracking)
 
 ```ts
-Model.on("updated", async (instance) => {
-  const changes = instance.getDirtyColumnsWithValues();
+Model.on("updated", async (instance, context) => {
+  const changes = context.changes; // same as instance.getLastSaveChanges()
   if (Object.keys(changes).length === 0) {
     return;
   }
@@ -115,7 +115,7 @@ Model.on("updated", async (instance) => {
 });
 ```
 
-Use `updated` (not `saved`) when you only want change diffs — `getDirtyColumnsWithValues()` is still populated in the post-write events because the tracker resets _after_ they fire.
+Use `updated` (not `saved`) when you only want change diffs. The dirty tracker resets right after the write and _before_ `saved` / `created` / `updated` fire, so `getDirtyColumnsWithValues()` is empty there. Read the diff from `context.changes` (`{ column: { oldValue, newValue } }`, plus `context.changedColumns`) or from `instance.getLastSaveChanges()`, which stays available after `save()` returns. An insert has an empty diff. A listener that saves the model again gets its own fresh diff; the outer event keeps its own. `restored`, `deleted`, bulk query writes and atomic ops have no per-field diff.
 
 ### Cache invalidation
 

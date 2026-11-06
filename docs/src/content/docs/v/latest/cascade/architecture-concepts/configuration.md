@@ -196,6 +196,8 @@ await connectToDatabase({
 });
 ```
 
+On Postgres every key you pass in `clientOptions` is forwarded to `pg.Pool` (and on to each `pg.Client`): `statement_timeout`, `query_timeout`, `lock_timeout`, `idle_in_transaction_session_timeout`, `keepAliveInitialDelayMillis`, `allowExitOnIdle`, `client_encoding`, `types` and anything else `pg` accepts. Only Cascade's own keys (`naming`, `timezone`, `nativeArrayColumns`, `logging`) are kept out of the pool config; Cascade's pool defaults (`max`, `idleTimeoutMillis`, `connectionTimeoutMillis`, `keepAlive`, `application_name`) still apply when you don't set them.
+
 When in doubt about which option is Cascade's vs the native library's: Cascade-side options are documented in the `MongoDriverOptions` / Postgres types; everything else is the native library. The split keeps the API portable — same Cascade options on every driver, native escape hatch when you specifically need it.
 
 ## Model defaults — `modelOptions`

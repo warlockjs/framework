@@ -146,7 +146,19 @@ export function buildPostgresPoolConfig(config: PostgresPoolConfig): PgPoolConfi
   const asString = (value: unknown): string | undefined =>
     typeof value === "number" ? String(value) : (value as string | undefined);
 
+  // Keys cascade owns: they configure cascade itself, not the pg pool.
+  const {
+    naming: _naming,
+    timezone: _timezone,
+    nativeArrayColumns: _nativeArrayColumns,
+    logging: _logging,
+    ...passthrough
+  } = config;
+
   return {
+    // Every other key the app passed (statement_timeout, query_timeout,
+    // lock_timeout, allowExitOnIdle, client_encoding, types, …) reaches pg.
+    ...passthrough,
     host: asString(config.host) ?? "localhost",
     port: config.port ?? 5432,
     database: asString(config.database),

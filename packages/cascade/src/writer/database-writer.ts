@@ -147,13 +147,31 @@ export class DatabaseWriter implements WriterContract {
 
     // 5. Reset dirty tracker and update isNew flag
     const changedFields = isInsert ? [] : this.model.getDirtyColumns();
+
+    // Snapshot the diff first: the reset below clears it, and `saved` /
+    // `updated` listeners (and code after the save) still need to see it.
+    const changes = isInsert ? {} : this.model.getDirtyColumnsWithValues();
+    this.model.setLastSaveChanges(changes);
     this.model.dirtyTracker.reset();
     this.model.isNew = false;
 
     // 6. Emit post-save events
     if (!options.skipEvents) {
-      await this.model.emitEvent("saved");
-      await this.model.emitEvent(isInsert ? "created" : "updated");
+      const context = {
+        isInsert,
+        options,
+        mode: isInsert ? "insert" : "update",
+        changes,
+        changedColumns: changedFields,
+      };
+
+      await this.model.emitEvent("saved", context);
+
+      // A `saved` listener may save again, which replaces the model's last
+      // changes; put this save's back before the next event.
+      this.model.setLastSaveChanges(changes);
+      await this.model.emitEvent(isInsert ? "created" : "updated", context);
+      this.model.setLastSaveChanges(changes);
     }
 
     // 7. Trigger sync operations after COMMIT (inside a transaction they are
