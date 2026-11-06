@@ -16,6 +16,7 @@ import type {
   XaiSDKConfig,
 } from "./config.type";
 import { inferContextWindow } from "./known-context-windows";
+import { xaiPricingFor } from "./known-pricing";
 import { inferReasoningCapability, inferVisionCapability } from "./known-models";
 
 /**
@@ -128,7 +129,12 @@ export class XaiSDK implements SDKAdapterContract {
   public model(config: XaiModelConfig): ModelContract {
     const { api, ...rest } = config;
     const window = config.contextWindow ?? inferContextWindow(config.name);
-    const modelConfig = { ...rest, ...(window !== undefined ? { contextWindow: window } : {}) };
+    const pricing = config.pricing ?? this.pricing?.[config.name] ?? xaiPricingFor(config.name);
+    const modelConfig = {
+      ...rest,
+      ...(window !== undefined ? { contextWindow: window } : {}),
+      ...(pricing ? { pricing } : {}),
+    };
     const model = this.openai.model({
       ...modelConfig,
       // xAI names don't match OpenAI's vision/reasoning prefixes, so we

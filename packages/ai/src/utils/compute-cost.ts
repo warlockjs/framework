@@ -1,5 +1,6 @@
 import type { ModelCost, ModelPricing } from "../contracts/result/model-pricing.type";
 import type { Usage } from "../contracts/result/usage.type";
+import { resolvePricing } from "../pricing/resolve-pricing";
 
 /**
  * Compute a per-channel USD cost breakdown for a single `Usage` against
@@ -26,6 +27,11 @@ import type { Usage } from "../contracts/result/usage.type";
  *   `input - cachedTokens - cacheWriteTokens`; when it is `false`
  *   (Anthropic / Bedrock), `input` already is the fresh remainder.
  *
+ * **Tiers and dated tariffs.** A pricing with `tiers` bills a request whose
+ * prompt is longer than a tier's threshold at that tier's rates; one with
+ * `schedule` uses the latest tariff in effect at `options.at` (default now).
+ * See {@link resolvePricing}.
+ *
  * **Reasoning.** When `pricing.reasoning` is set, `usage.reasoningTokens`
  * move out of `output` into a `reasoning` channel at that rate; otherwise
  * they stay in `output` (the common case).
@@ -50,14 +56,21 @@ import type { Usage } from "../contracts/result/usage.type";
  */
 export function computeCost(
   usage: Usage,
-  pricing: ModelPricing | undefined,
+  fullPricing: ModelPricing | undefined,
+  options: { at?: Date | number | string } = {},
 ): ModelCost | undefined {
-  if (!pricing) {
+  if (!fullPricing) {
     return undefined;
   }
 
   const cachedInput = Math.max(0, usage.cachedTokens ?? 0);
   const cacheWrites = Math.max(0, usage.cacheWriteTokens ?? 0);
+  // A request's prompt length counts every input token, cache reads and writes included.
+  const promptTokens =
+    usage.inputIncludesCache === false
+      ? Math.max(0, usage.input) + cachedInput + cacheWrites
+      : Math.max(0, usage.input);
+  const pricing = resolvePricing(fullPricing, { promptTokens, at: options.at });
   const cacheWrites1h = Math.min(cacheWrites, Math.max(0, usage.cacheWrite1hTokens ?? 0));
   const cacheWritesDefault = cacheWrites - cacheWrites1h;
   const freshInput =

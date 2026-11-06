@@ -60,8 +60,31 @@ type ModelPricing = {
   reasoning?: number; // only when reasoning tokens are priced apart from output
   /** @deprecated use cacheWrite */
   cachedOutput?: number;
+  tiers?: PricingTier[]; // rates for prompts longer than a threshold
+  schedule?: PricingChange[]; // rates that take over on a date
 };
 ```
+
+**Prompt-length tiers and dated tariffs.** Some models bill every token of a request at a higher rate once its prompt passes a length, and some vendors announce a price change for a date. Both are plain fields of `ModelPricing`, so the built-in provider tables use them and `computeCost` applies them:
+
+```ts
+import { computeCost, resolvePricing, type ModelPricing } from "@warlock.js/ai";
+
+const pricing: ModelPricing = {
+  input: 2,
+  output: 10,
+  cachedInput: 0.1,
+  // A prompt over 200K tokens bills the whole request at these rates.
+  tiers: [{ abovePromptTokens: 200_000, input: 4, output: 15, cachedInput: 0.2 }],
+  // From 2026-12-01 (UTC) these rates replace the base ones.
+  schedule: [{ from: "2026-12-01", input: 4, output: 20, cachedInput: 0.2 }],
+};
+
+resolvePricing(pricing, { promptTokens: 250_000, at: "2026-11-01" }); // { input: 4, output: 15, cachedInput: 0.2, … }
+computeCost(usage, pricing, { at: new Date() }); // `at` defaults to now
+```
+
+A tier's fields override the base rate field by field. The prompt length counts every input token of the request, cache reads and writes included. When both apply, the tariff in effect on the date is chosen first and its tiers (or the base tiers) are applied to it. `Usage.cost` is computed when the call happens, so a stored report keeps the rates it was costed with.
 
 `usage.cost` has the same shape, in USD per channel:
 

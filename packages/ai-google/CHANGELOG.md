@@ -4,6 +4,14 @@ All notable changes to `@warlock.js/ai-google` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.47.0
+
+### Added
+
+- `GOOGLE_MODEL_PRICING` lists `gemini-4-argon`, `gemini-3.8-flash`, `gemini-3.6-flash` and `gemini-3.1-pro-preview` besides `gemini-3.5-flash-lite`. Scheduled prices are in `schedule` (`gemini-4-argon` doubles on 2026-12-01, the 3.6 and 3.8 Flash models on 2027-01-01) and `gemini-3.1-pro-preview` carries `tiers` for prompts above 200k tokens. `GOOGLE_MODEL_PRICING_AS_OF` dates the table.
+- `GOOGLE_MODEL_LIFECYCLE` and `googleLifecycleFor(name)` give each model a status: `gemini-2.5-pro` and `gemini-2.5-flash` are `retiring` on 2026-12-01, `gemini-3.1-flash-lite` on 2027-05-07, and `gemini-3.5-flash` and the 2.0 Flash models are `retired`.
+- `gemini-4-argon` reports a 1,048,576-token `capabilities.contextWindow`.
+
 ## 5.45.0 - 2026-11-05
 
 ### Added

@@ -4,6 +4,8 @@ import {
   inferReasoningCapability,
   inferVisionCapability,
 } from "./known-models";
+import { deepseekLifecycleFor } from "./known-lifecycle";
+import { DEEPSEEK_DEFAULT_PRICING, DEEPSEEK_DEFAULT_PRICING_AS_OF } from "./sdk";
 
 describe("inferReasoningCapability", () => {
   it("recognizes the dedicated thinking surface", () => {
@@ -39,8 +41,37 @@ describe("inferVisionCapability", () => {
 });
 
 describe("DEEPSEEK_CHAT_MODELS", () => {
-  it("lists the documented chat surfaces", () => {
-    expect(DEEPSEEK_CHAT_MODELS).toContain("deepseek-chat");
-    expect(DEEPSEEK_CHAT_MODELS).toContain("deepseek-reasoner");
+  it("lists the current chat surfaces and none of the retired names", () => {
+    expect(DEEPSEEK_CHAT_MODELS).toContain("deepseek-flash");
+    expect(DEEPSEEK_CHAT_MODELS).toContain("deepseek-v4-pro");
+    expect(DEEPSEEK_CHAT_MODELS).not.toContain("deepseek-chat");
+    expect(DEEPSEEK_CHAT_MODELS).not.toContain("deepseek-reasoner");
+  });
+
+  it("gives every listed model a status", () => {
+    for (const id of DEEPSEEK_CHAT_MODELS) {
+      expect(deepseekLifecycleFor(id)?.status).toBe("current");
+    }
+  });
+
+  it("records the retired names", () => {
+    expect(deepseekLifecycleFor("deepseek-chat")).toEqual({
+      status: "retired",
+      retiresOn: "2026-07-24",
+      replacement: "deepseek-v4-flash",
+    });
+    expect(deepseekLifecycleFor("deepseek-reasoner")?.status).toBe("retired");
+    expect(deepseekLifecycleFor("deepseek-v4-flash")?.replacement).toBe("deepseek-flash");
+    expect(deepseekLifecycleFor("nope")).toBeUndefined();
+  });
+});
+
+describe("DeepSeek priced models", () => {
+  it("dates the table and gives every priced model a status", () => {
+    expect(DEEPSEEK_DEFAULT_PRICING_AS_OF).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+
+    for (const id of Object.keys(DEEPSEEK_DEFAULT_PRICING)) {
+      expect(deepseekLifecycleFor(id)).toBeDefined();
+    }
   });
 });

@@ -4,6 +4,17 @@ All notable changes to `@warlock.js/ai-groq` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.47.0
+
+### Added
+
+- `qwen/qwen3.8-27b` is in `GROQ_KNOWN_MODELS`.
+- `GROQ_MODEL_LIFECYCLE` and `groqLifecycleFor(name)` give each model a status; `GROQ_DEFAULT_PRICING_AS_OF` dates the price table.
+
+### Changed
+
+- `GROQ_KNOWN_MODELS` no longer lists `llama-3.3-70b-versatile`, `llama-3.1-8b-instant` (shut down 2026-08-16) and `deepseek-r1-distill-llama-70b` (shut down 2025-10-02). They are `retired` in `GROQ_MODEL_LIFECYCLE`, and `groq.model({ name })` still accepts them.
+
 ## 5.45.0 - 2026-11-05
 
 ### Added

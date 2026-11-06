@@ -72,6 +72,10 @@ As of mid-2026 Groq exposes **no** OpenAI-compatible embeddings endpoint. `groq.
 
 There is also no image-generation API on Groq, so `GroqSDK` intentionally does **not** define `image()` — `ai.groq.image(...)` is a compile-time error (structural capability guard, like Anthropic / Bedrock / Ollama).
 
+## Model lifecycle
+
+`GROQ_KNOWN_MODELS` holds the current ids (`openai/gpt-oss-120b`, `openai/gpt-oss-20b`, `qwen/qwen3.8-27b`). `GROQ_MODEL_LIFECYCLE` / `groqLifecycleFor(name)` (checked `GROQ_MODEL_LIFECYCLE_AS_OF`, source https://console.groq.com/docs/deprecations) gives `{ status: "current" | "retiring" | "retired", retiresOn?, replacement? }`. `llama-3.3-70b-versatile` and `llama-3.1-8b-instant` (2026-08-16), `deepseek-r1-distill-llama-70b` (2025-10-02), `qwen/qwen3.6-27b`, `qwen/qwen3-32b` and the Llama 4 / Kimi K2 ids are `retired`. Some shutdowns apply to free and developer-tier usage only; `groq.model({ name })` still accepts any id. Token rates in `GROQ_DEFAULT_PRICING` are as of `GROQ_DEFAULT_PRICING_AS_OF`.
+
 ## Pricing — per-model registry + built-in defaults
 
 `pricing` is a registry keyed by model name, rates in **USD per 1,000,000 tokens** (`ModelPricing`: `input`, `output`, optional `cachedInput`). The adapter ships **built-in default rates** (`GROQ_DEFAULT_PRICING`) as the final fallback.

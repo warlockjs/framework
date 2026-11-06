@@ -1,6 +1,7 @@
 /*
  * Context windows of Grok chat models, from xAI's model documentation:
- * the Grok 4 fast and 4.1 fast releases document 2,000,000 tokens, Grok 4 and
+ * the Grok 4 fast and 4.1 fast releases document 2,000,000 tokens, Grok 4.3
+ * and 4.20 1,000,000, Grok 4.5 to 4.7 500,000, Grok 4, Grok Build and
  * Grok Code Fast 256,000, Grok 3 and Grok 2 131,072, and Grok 2 Vision 32,768.
  * The longest matching prefix wins; ids that match nothing resolve to `undefined`, so a
  * window-relative trigger stays inert until the window is set with
@@ -11,6 +12,12 @@ const KNOWN_WINDOWS: ReadonlyArray<readonly [prefix: string, window: number]> = 
   ["grok-4-1-fast", 2_000_000],
   ["grok-4.1-fast", 2_000_000],
   ["grok-4", 256_000],
+  ["grok-4.20", 1_000_000],
+  ["grok-4.3", 1_000_000],
+  ["grok-4.5", 500_000],
+  ["grok-4.6", 500_000],
+  ["grok-4.7", 500_000],
+  ["grok-build", 256_000],
   ["grok-code-fast", 256_000],
   ["grok-3", 131_072],
   ["grok-2", 131_072],

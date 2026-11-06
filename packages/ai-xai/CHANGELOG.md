@@ -4,6 +4,14 @@ All notable changes to `@warlock.js/ai-xai` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.47.0
+
+### Added
+
+- `XAI_MODEL_PRICING` and `xaiPricingFor(name)` price `grok-4.7`, `grok-4.6`, `grok-4.5`, `grok-4.3`, `grok-4.20-0309-reasoning`, `grok-4.20-0309-non-reasoning`, `grok-4.20-multi-agent-0309` and `grok-build-0.1`, with `tiers` for prompts of 200k tokens or more. `xai.model()` uses them when no `pricing` is passed.
+- `XAI_MODEL_LIFECYCLE` and `xaiLifecycleFor(name)` give those models a status; `XAI_MODEL_PRICING_AS_OF` dates the price table.
+- `capabilities.contextWindow` is reported for `grok-4.3` and `grok-4.20-*` (1,000,000), `grok-4.5` to `grok-4.7` (500,000) and `grok-build-0.1` (256,000). `XAI_CHAT_MODELS` lists the new ids.
+
 ## 5.45.0 - 2026-11-05
 
 ### Added

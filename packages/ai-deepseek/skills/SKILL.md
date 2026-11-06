@@ -37,12 +37,10 @@ Returns a `ModelContract` you pass straight into `ai.agent({ model })`.
 
 | Model               | Notes                                                                              |
 | ------------------- | ---------------------------------------------------------------------------------- |
-| `deepseek-chat`     | Non-thinking surface (V3 lineage). Fast, cheap, broad coverage. Reasoning **off**. |
-| `deepseek-reasoner` | Thinking surface (R1 lineage). Emits a reasoning channel. Reasoning **on**.        |
-| `deepseek-v4-flash` | Newer flash tier. Reasoning **off** by default.                                    |
+| `deepseek-flash` | Fast tier (served by DeepSeek-V4.1-Flash), 1M context. Reasoning **off** by default. |
 | `deepseek-v4-pro`   | Newer quality tier. Reasoning **on** by default.                                   |
 
-DeepSeek announced the legacy `deepseek-chat` / `deepseek-reasoner` names retire 2026/07/24 in favor of the `deepseek-v4-*` family; both name sets are understood by the capability inference. `deepseek.model({ name })` accepts any id the upstream serves.
+`deepseek-chat` and `deepseek-reasoner` were retired on 2026-07-24, and `deepseek-v4-flash` is a retired name that DeepSeek still accepts and serves with `deepseek-flash`, billed at the Flash price. Their status, dates and replacements are in `DEEPSEEK_MODEL_LIFECYCLE` (lookup: `deepseekLifecycleFor(name)`, checked `DEEPSEEK_MODEL_LIFECYCLE_AS_OF`); the capability inference still understands every name. `deepseek.model({ name })` accepts any id the upstream serves.
 
 ## Capabilities — what's auto-set
 
@@ -106,7 +104,7 @@ console.log(usage.cachedTokens, totalCost(usage.cost));
 Resolution at `model()` time: per-model `pricing` > SDK `pricing` registry > built-in DeepSeek default > `undefined`.
 
 - **Source.** https://api-docs.deepseek.com/quick_start/pricing, fetched 2026-10-17. Covered: `deepseek-flash`, `deepseek-v4-flash` (its legacy name, same rate) and `deepseek-v4-pro`.
-- **Unpriced:** `deepseek-chat` / `deepseek-reasoner` are gone from the price list (announced for discontinuation on 2026-07-24) — pass `pricing` if a gateway still serves them.
+- **Unpriced:** `deepseek-chat` / `deepseek-reasoner` are gone from the price list (retired 2026-07-24) — pass `pricing` if a gateway still serves them.
 - **Usage semantics.** DeepSeek's `prompt_tokens` equals cache hits + misses and `prompt_tokens_details.cached_tokens` mirrors `prompt_cache_hit_tokens`, so the usage is `inputIncludesCache: true` and hits bill at `cachedInput`. DeepSeek caches automatically on disk and takes no request hint, so `promptCacheKey` is never sent.
 
 ## Errors
@@ -145,4 +143,4 @@ Models from this adapter have no native `countTokens` method. Check
 
 ## Context window
 
-`deepseek-chat`, `deepseek-reasoner` and `deepseek-v4-*` report a 128,000 `capabilities.contextWindow`; `deepseek.model({ name, contextWindow })` wins.
+`deepseek-flash` and `deepseek-v4-*` report a 1,000,000 `capabilities.contextWindow` (the retired `deepseek-chat` / `deepseek-reasoner` 128,000); `deepseek.model({ name, contextWindow })` wins.

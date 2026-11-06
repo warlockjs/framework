@@ -4,6 +4,13 @@ All notable changes to `@warlock.js/ai` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.47.0
+
+### Added
+
+- `ModelPricing` takes `tiers` (rates for requests whose prompt is longer than `abovePromptTokens`) and `schedule` (rates that take over from an ISO date). `computeCost` applies them, counting cache reads and writes in the prompt length; `computeCost(usage, pricing, { at })` costs at a given date. New `resolvePricing(pricing, { promptTokens, at })` returns the flat rates for one request, and the types `PricingTier`, `PricingChange` and `PricingRates` are exported.
+- `ModelLifecycle` and `ModelLifecycleStatus` (`current`, `retiring`, `retired`, with `retiresOn` and `replacement`) are the types of the provider packages' model lifecycle tables.
+
 ## 5.45.0 - 2026-11-05
 
 ### Added

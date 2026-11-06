@@ -4,6 +4,17 @@ All notable changes to `@warlock.js/ai-openai` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.47.0
+
+### Added
+
+- `OPENAI_MODEL_PRICING` lists `gpt-6.1-terra`, `gpt-6-cyber`, `gpt-6-astra`, `gpt-6-luna`, `gpt-5.6-terra`, `gpt-5.6-luna`, `gpt-5.5` and `gpt-5.4`; the models billed by prompt length carry `tiers` for prompts above 272K tokens. `OPENAI_MODEL_PRICING_AS_OF` dates the table.
+- `OPENAI_MODEL_LIFECYCLE` and `openAILifecycleFor(name)` give each priced model a status: `o1`, `o3-mini`, `o4-mini` and `gpt-4.1-nano` are `retired`, `gpt-5`, `gpt-5-mini`, `gpt-5-nano` and `o3` are `retiring` on 2026-12-11, `gpt-5.1` and `gpt-5.4-nano` on 2027-04-01, `gpt-4.1` and `gpt-4.1-mini` on 2027-01-14.
+
+### Fixed
+
+- `gpt-6` models report a 1,050,000-token `capabilities.contextWindow` instead of 400,000.
+
 ## 5.45.0 - 2026-11-05
 
 ### Added

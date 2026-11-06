@@ -4,6 +4,17 @@ All notable changes to `@warlock.js/ai-deepseek` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.47.0
+
+### Added
+
+- `deepseek-flash` is in `DEEPSEEK_CHAT_MODELS` and reports a 1,000,000-token `capabilities.contextWindow`, as do the `deepseek-v4-*` ids (previously 128,000).
+- `DEEPSEEK_MODEL_LIFECYCLE` and `deepseekLifecycleFor(name)` give each model a status; `DEEPSEEK_DEFAULT_PRICING_AS_OF` dates the price table.
+
+### Changed
+
+- `DEEPSEEK_CHAT_MODELS` no longer lists `deepseek-chat` and `deepseek-reasoner` (retired 2026-07-24) or `deepseek-v4-flash`; they are `retired` in `DEEPSEEK_MODEL_LIFECYCLE`, and `deepseek.model({ name })` still accepts them.
+
 ## 5.45.0 - 2026-11-05
 
 ### Added

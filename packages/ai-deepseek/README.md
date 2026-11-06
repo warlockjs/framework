@@ -53,12 +53,10 @@ DeepSeekModelConfig {
 
 | Model               | Notes                                                                       |
 | ------------------- | --------------------------------------------------------------------------- |
-| `deepseek-chat`     | Non-thinking surface (V3 lineage). Fast, cheap. Reasoning **off**.          |
-| `deepseek-reasoner` | Thinking surface (R1 lineage). Emits a reasoning channel. Reasoning **on**. |
-| `deepseek-v4-flash` | Newer flash tier. Reasoning **off** by default.                             |
+| `deepseek-flash` | Fast tier (served by DeepSeek-V4.1-Flash), 1M context. Reasoning **off** by default. |
 | `deepseek-v4-pro`   | Newer quality tier. Reasoning **on** by default.                            |
 
-DeepSeek announced the legacy `deepseek-chat` / `deepseek-reasoner` names retire 2026/07/24 in favor of the `deepseek-v4-*` family; both name sets are understood by the capability inference. `deepseek.model({ name })` accepts any id the upstream serves. `DEEPSEEK_CHAT_MODELS` exports the informational list.
+`deepseek-chat` and `deepseek-reasoner` were retired on 2026-07-24, and `deepseek-v4-flash` is a retired name that DeepSeek still accepts and serves with `deepseek-flash`, billed at the Flash price. Their status, dates and replacements are in `DEEPSEEK_MODEL_LIFECYCLE` (lookup: `deepseekLifecycleFor(name)`, checked `DEEPSEEK_MODEL_LIFECYCLE_AS_OF`); the capability inference still understands every name. `deepseek.model({ name })` accepts any id the upstream serves. `DEEPSEEK_CHAT_MODELS` exports the informational list.
 
 ## Capabilities
 

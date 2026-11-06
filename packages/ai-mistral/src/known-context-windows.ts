@@ -2,7 +2,7 @@
  * Context windows of Mistral chat models. The Large, Medium, Small,
  * Ministral, Pixtral and Magistral families use the 128K figure documented
  * for their long-standing releases (newer generations document more; set it
- * per model). Codestral documents 256K.
+ * per model). Codestral documents 256K, Z.ai GLM 5.3 1M.
  * The longest matching fragment wins; ids that match nothing resolve to `undefined`, so a
  * window-relative trigger stays inert until the window is set with
  * `mistral.model({ name, contextWindow })`.
@@ -16,6 +16,7 @@ const KNOWN_WINDOWS: ReadonlyArray<readonly [fragment: string, window: number]> 
   ["magistral", 128_000],
   ["open-mistral", 128_000],
   ["codestral", 256_000],
+  ["zai-glm-5-3", 1_000_000],
 ];
 
 /**

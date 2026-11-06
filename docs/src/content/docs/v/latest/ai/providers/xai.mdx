@@ -108,7 +108,7 @@ supervisor.
 
 ## Models and capabilities
 
-**Context window.** `capabilities.contextWindow` is filled by id prefix: 2,000,000 for `grok-4-fast` and `grok-4-1-fast`, 256,000 for `grok-4` and `grok-code-fast`, 131,072 for `grok-3` and `grok-2`, 32,768 for `grok-2-vision`. Pass `xai.model({ name, contextWindow })` to set or override it.
+**Context window.** `capabilities.contextWindow` is filled by id prefix: 2,000,000 for `grok-4-fast` and `grok-4-1-fast`, 1,000,000 for `grok-4.3` and `grok-4.20-*`, 500,000 for `grok-4.5`, `grok-4.6` and `grok-4.7`, 256,000 for `grok-4`, `grok-build` and `grok-code-fast`, 131,072 for `grok-3` and `grok-2`, 32,768 for `grok-2-vision`. Pass `xai.model({ name, contextWindow })` to set or override it.
 
 This adapter ships xAI's own name lists — Grok ids don't match OpenAI's
 `gpt-*` / `o*` prefixes. Capabilities are injected per model before delegating;
@@ -176,14 +176,7 @@ Every response reports token `usage` (`input`, `output`, `total`,
 too. `prompt_tokens` contains the cached tokens
 (`inputIncludesCache: true`).
 
-xAI has **no built-in price table**: every model on
-[xAI's pricing page](https://docs.x.ai/developers/pricing) (checked
-2026-10-17) bills all tokens at a higher long-context rate once the
-prompt reaches 200k tokens, which a flat rate cannot express. Attach a
-`pricing` registry — keyed by model name, in USD per million tokens
-(`input`, `output`, optional `cachedInput`; xAI has no cache-write
-charge). Resolution: per-model `pricing` > SDK registry > `undefined`
-(no cost computed).
+[xAI's pricing page](https://docs.x.ai/docs/models) (as of `XAI_MODEL_PRICING_AS_OF`, 2026-11-06) lists `grok-4.7`, `grok-4.6`, `grok-4.5`, `grok-4.3`, `grok-4.20-0309-reasoning`, `grok-4.20-0309-non-reasoning`, `grok-4.20-multi-agent-0309` and `grok-build-0.1`; their rates are built in as `XAI_MODEL_PRICING` (lookup: `xaiPricingFor(name)`). Each entry carries `tiers`: a prompt of 200k tokens or more bills every token of the request at the higher long-context rates. The Grok 4, 3 and 2 families have no listed price, so they stay unpriced unless you pass `pricing`. Resolution: per-model `pricing` > SDK registry > built-in table > `undefined` (no cost computed). `XAI_MODEL_LIFECYCLE` (`xaiLifecycleFor(name)`) marks the listed models `current`; xAI lists no retirement for any language model.
 
 ```ts
 import { ai, totalCost } from "@warlock.js/ai";
@@ -192,7 +185,7 @@ import { XaiSDK } from "@warlock.js/ai-xai";
 const xai = new XaiSDK({
   apiKey: process.env.XAI_API_KEY ?? "",
   pricing: {
-    // Below-200k rates; long prompts cost more.
+    // Your own contract rates win over the built-in table.
     "grok-4.3": { input: 1.25, output: 2.5, cachedInput: 0.2 },
   },
 });

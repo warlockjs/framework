@@ -3,7 +3,15 @@ export type { AttemptEntry } from "./attempt-entry.type";
 export { REPORT_SCHEMA_VERSION } from "./base-report.type";
 export type { BaseReport, ReportStatus, ReportType } from "./base-report.type";
 export type { BaseResult } from "./base-result.type";
-export type { ModelCost, ModelPricing, ServerToolPricing } from "./model-pricing.type";
+export type {
+  ModelCost,
+  ModelPricing,
+  PricingChange,
+  PricingRates,
+  PricingTier,
+  ServerToolPricing,
+} from "./model-pricing.type";
+export type { ModelLifecycle, ModelLifecycleStatus } from "./model-lifecycle.type";
 export type { ExecuteResult } from "./execute-result.type";
 export type {
   AgentReport,

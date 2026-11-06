@@ -7,6 +7,23 @@ export type ServerToolPricing = {
   [counter: string]: number | undefined;
 };
 
+/** The rate fields of {@link ModelPricing}, without tiers and schedule. */
+export type PricingRates = Omit<ModelPricing, "tiers" | "schedule">;
+
+/**
+ * Rates that apply to prompts longer than `abovePromptTokens` tokens.
+ * Fields you leave out keep the base rate. The prompt length counts every
+ * input token of the request, cache reads and writes included.
+ */
+export type PricingTier = Partial<PricingRates> & { abovePromptTokens: number };
+
+/**
+ * Rates that take over from `from` (an ISO date such as `"2026-12-01"`,
+ * read as UTC midnight). Fields you leave out keep the base rate; `tiers`,
+ * when given, replace the base tiers.
+ */
+export type PricingChange = Partial<PricingRates> & { from: string; tiers?: PricingTier[] };
+
 /** Historical USD amounts, distinct from token and request pricing rates. */
 export type ModelCost = ModelPricing;
 
@@ -42,6 +59,32 @@ export type ModelCost = ModelPricing;
  * };
  */
 export type ModelPricing = {
+  /**
+   * Prompt-length tiers. A request whose prompt is longer than a tier's
+   * `abovePromptTokens` is billed at that tier's rates for every token of
+   * the request; the highest matching tier wins. The base rates apply to
+   * shorter prompts. Resolved by `computeCost` and {@link resolvePricing}.
+   *
+   * @example
+   * const pricing: ModelPricing = {
+   *   input: 1, output: 5, cachedInput: 0.05,
+   *   tiers: [{ abovePromptTokens: 272_000, input: 2, output: 7.5, cachedInput: 0.1 }],
+   * };
+   */
+  tiers?: PricingTier[];
+  /**
+   * Dated tariffs: rates that replace the base rates from a UTC date on.
+   * The latest entry whose `from` is not after the moment of costing
+   * applies. Costing uses the current time, so a stored `Usage.cost` keeps
+   * the rates it was computed with.
+   *
+   * @example
+   * const pricing: ModelPricing = {
+   *   input: 2, output: 10,
+   *   schedule: [{ from: "2026-12-01", input: 4, output: 20 }],
+   * };
+   */
+  schedule?: PricingChange[];
   /** USD per request in pricing; historical USD amounts per tool in Usage.cost. */
   serverTools?: ServerToolPricing;
   /** USD per 1M input tokens. */

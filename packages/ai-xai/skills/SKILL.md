@@ -84,7 +84,7 @@ xAI does **not** currently expose a public embeddings endpoint. `embedder()` is 
 
 ## Pricing — per-model registry
 
-xAI ships **no built-in price table**: every Grok model on https://docs.x.ai/developers/pricing (checked 2026-10-17) bills all tokens at a higher long-context rate once the prompt reaches 200k tokens, which a flat `ModelPricing` cannot express. Pass the rates you use (USD per 1,000,000 tokens; `ModelPricing`: `input`, `output`, optional `cachedInput`). xAI has no cache-write charge. Resolution: per-model `pricing` > SDK registry > `undefined` (no cost computed).
+https://docs.x.ai/docs/models (as of `XAI_MODEL_PRICING_AS_OF`, 2026-11-06) lists `grok-4.7`, `grok-4.6`, `grok-4.5`, `grok-4.3`, `grok-4.20-0309-reasoning`, `grok-4.20-0309-non-reasoning`, `grok-4.20-multi-agent-0309` and `grok-build-0.1`; their rates are built in as `XAI_MODEL_PRICING` (lookup: `xaiPricingFor(name)`). Each entry carries `tiers`: a prompt of 200k tokens or more bills every token of the request at the higher long-context rates. The Grok 4, 3 and 2 families have no listed price, so they stay unpriced unless you pass `pricing`. Resolution: per-model `pricing` > SDK registry > built-in table > `undefined` (no cost computed). `XAI_MODEL_LIFECYCLE` (`xaiLifecycleFor(name)`) marks the listed models `current`; xAI lists no retirement for any language model.
 
 ```ts
 import { ai, totalCost } from "@warlock.js/ai";
@@ -93,7 +93,7 @@ import { XaiSDK } from "@warlock.js/ai-xai";
 const xai = new XaiSDK({
   apiKey: process.env.XAI_API_KEY ?? "",
   pricing: {
-    // Below-200k rates from xAI's pricing page; long prompts cost more.
+    // Your own contract rates win over the built-in table.
     "grok-4.3": { input: 1.25, output: 2.5, cachedInput: 0.2 },
   },
 });
@@ -156,4 +156,4 @@ Models from this adapter have no native `countTokens` method. Check
 
 ## Context window
 
-Grok ids report `capabilities.contextWindow` by prefix (2M for grok-4-fast, 256K grok-4, 131,072 grok-3/2, 32,768 grok-2-vision); `xai.model({ name, contextWindow })` wins.
+Grok ids report `capabilities.contextWindow` by prefix (2M for grok-4-fast, 1M grok-4.3 / grok-4.20-*, 500K grok-4.5 to 4.7, 256K grok-4 / grok-build, 131,072 grok-3/2, 32,768 grok-2-vision); `xai.model({ name, contextWindow })` wins.

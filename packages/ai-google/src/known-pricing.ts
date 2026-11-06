@@ -6,20 +6,49 @@ import type { ModelPricing } from "@warlock.js/ai";
  * context-cache read rate; the hourly cache-storage charge is not a token
  * rate and is never included.
  *
- * Source: https://ai.google.dev/gemini-api/docs/pricing, fetched
- * 2026-10-17. Only models with one flat token price are listed. Left out
- * on purpose — pass `pricing` yourself for them:
+ * Source: https://ai.google.dev/gemini-api/docs/pricing, as of
+ * {@link GOOGLE_MODEL_PRICING_AS_OF}. Prices Google has already scheduled
+ * are in `schedule`, so a model costs the right amount on each day without
+ * a package update; models priced by prompt length carry `tiers`.
+ * Left out on purpose — pass `pricing` yourself for them:
  *
- * - Models priced by prompt length (the Pro models, split at 200k
- *   prompt tokens).
- * - Models with a higher audio-input rate (most Flash / Flash-Lite
- *   models): `Usage` does not split input by modality.
- * - Models with a scheduled price change (gemini-4-argon, the 3.8 / 3.6
- *   Flash models).
+ * - Models with a higher audio-input rate (`gemini-3.1-flash-lite`,
+ *   `gemini-3-flash-preview`): `Usage` does not split input by modality.
+ * - Models without a listed price.
+ *
+ * Models Google retired or reroutes stay out of the table; see
+ * {@link GOOGLE_MODEL_LIFECYCLE}.
  */
 export const GOOGLE_MODEL_PRICING: Readonly<Record<string, ModelPricing>> = {
+  "gemini-4-argon": {
+    input: 2,
+    output: 10,
+    cachedInput: 0.1,
+    schedule: [{ from: "2026-12-01", input: 4, output: 20, cachedInput: 0.2 }],
+  },
+  "gemini-3.8-flash": {
+    input: 0.75,
+    output: 3.75,
+    cachedInput: 0.075,
+    schedule: [{ from: "2027-01-01", input: 1.5, output: 7.5, cachedInput: 0.15 }],
+  },
+  "gemini-3.6-flash": {
+    input: 0.75,
+    output: 3.75,
+    cachedInput: 0.075,
+    schedule: [{ from: "2027-01-01", input: 1.5, output: 7.5, cachedInput: 0.15 }],
+  },
   "gemini-3.5-flash-lite": { input: 0.3, output: 2.5, cachedInput: 0.03 },
+  "gemini-3.1-pro-preview": {
+    input: 2,
+    output: 12,
+    cachedInput: 0.2,
+    tiers: [{ abovePromptTokens: 200_000, input: 4, output: 18, cachedInput: 0.4 }],
+  },
 };
+
+/** The date the {@link GOOGLE_MODEL_PRICING} rates were last checked against Google's pricing page. */
+export const GOOGLE_MODEL_PRICING_AS_OF = "2026-11-06";
 
 /**
  * Look up the built-in list price for a Gemini model id (exact match),
@@ -27,7 +56,7 @@ export const GOOGLE_MODEL_PRICING: Readonly<Record<string, ModelPricing>> = {
  *
  * @example
  * googlePricingFor("gemini-3.5-flash-lite"); // { input: 0.3, output: 2.5, cachedInput: 0.03 }
- * googlePricingFor("gemini-2.5-pro"); // undefined — priced by prompt length
+ * googlePricingFor("gemini-2.5-pro"); // undefined — not in the table
  */
 export function googlePricingFor(modelName: string): ModelPricing | undefined {
   return GOOGLE_MODEL_PRICING[modelName];

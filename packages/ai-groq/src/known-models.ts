@@ -105,23 +105,19 @@ export function inferReasoningCapability(modelId: string): boolean {
 }
 
 /**
- * Curated list of current Groq production chat model ids (mid-2026),
- * for autocomplete, docs, and default selection. NOT exhaustive and NOT
- * a runtime allow-list — `groq.model({ name })` accepts any string, so
- * a newly launched id works the moment Groq ships it without a package
- * bump. Deprecated ids (e.g. several `llama-4` variants retired in 2026)
- * are intentionally excluded.
+ * Curated list of current Groq chat model ids, for autocomplete, docs, and
+ * default selection. NOT exhaustive and NOT a runtime allow-list —
+ * `groq.model({ name })` accepts any string, so a newly launched id works
+ * the moment Groq ships it without a package bump. Ids Groq has shut down
+ * are left out here and recorded as `retired` in
+ * {@link GROQ_MODEL_LIFECYCLE}.
  *
- * - `llama-3.3-70b-versatile` — flagship general-purpose text model.
- * - `llama-3.1-8b-instant` — fastest/cheapest small text model.
  * - `openai/gpt-oss-120b` / `openai/gpt-oss-20b` — OpenAI open-weight
  *   family; vision + reasoning capable.
- * - `deepseek-r1-distill-llama-70b` — DeepSeek-R1-style reasoning.
+ * - `qwen/qwen3.8-27b` — Qwen 3.8 (a preview model on Groq).
  */
 export const GROQ_KNOWN_MODELS = [
-  "llama-3.3-70b-versatile",
-  "llama-3.1-8b-instant",
   "openai/gpt-oss-120b",
   "openai/gpt-oss-20b",
-  "deepseek-r1-distill-llama-70b",
+  "qwen/qwen3.8-27b",
 ] as const;

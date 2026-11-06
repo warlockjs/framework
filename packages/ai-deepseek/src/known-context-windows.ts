@@ -1,7 +1,7 @@
 /*
- * Context windows of DeepSeek chat models. `deepseek-chat` and
- * `deepseek-reasoner` document 128K tokens. The `deepseek-v4-*` ids use the
- * same conservative 128K figure; a larger window is set per model.
+ * Context windows of DeepSeek chat models. `deepseek-flash` and the
+ * `deepseek-v4-*` ids document 1M tokens (DeepSeek's model table);
+ * the retired `deepseek-chat` and `deepseek-reasoner` documented 128K.
  * The longest matching prefix wins; ids that match nothing resolve to `undefined`, so a
  * window-relative trigger stays inert until the window is set with
  * `deepseek.model({ name, contextWindow })`.
@@ -9,7 +9,8 @@
 const KNOWN_WINDOWS: ReadonlyArray<readonly [prefix: string, window: number]> = [
   ["deepseek-chat", 128_000],
   ["deepseek-reasoner", 128_000],
-  ["deepseek-v4", 128_000],
+  ["deepseek-v4", 1_000_000],
+  ["deepseek-flash", 1_000_000],
 ];
 
 /**

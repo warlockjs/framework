@@ -1,9 +1,10 @@
 /*
- * Input context windows of Gemini families documented at 1,048,576 tokens (and 2,097,152 for 1.5 Pro).
+ * Input context windows of Gemini families documented at 1,048,576 tokens (and 2,097,152 for 1.5 Pro);
+ * Gemini 4 documents "1M tokens" and uses the same figure.
  * Other ids resolve to `undefined`; set them with
  * `google.model({ name, contextWindow })`.
  */
-const WINDOW_1M_PREFIXES = ["gemini-3", "gemini-2.5-", "gemini-2.0-flash", "gemini-1.5-flash"];
+const WINDOW_1M_PREFIXES = ["gemini-4", "gemini-3", "gemini-2.5-", "gemini-2.0-flash", "gemini-1.5-flash"];
 
 /** Gemini 1.5 Pro documents a 2,097,152-token input window. */
 const WINDOW_2M_PREFIXES = ["gemini-1.5-pro"];

@@ -53,10 +53,10 @@ A curated (not exhaustive, not an allow-list) set of current production ids is e
 
 | Model id                                     | Notes                                                  |
 | -------------------------------------------- | ------------------------------------------------------ |
-| `llama-3.3-70b-versatile`                    | Flagship general-purpose text                          |
-| `llama-3.1-8b-instant`                       | Fastest / cheapest small text                          |
 | `openai/gpt-oss-120b` / `openai/gpt-oss-20b` | OpenAI open-weight family — vision + reasoning capable |
-| `deepseek-r1-distill-llama-70b`              | DeepSeek-R1-style reasoning                            |
+| `qwen/qwen3.8-27b`                           | Qwen 3.8 (a preview model on Groq)                     |
+
+Ids Groq has shut down (`llama-3.3-70b-versatile`, `llama-3.1-8b-instant`, `deepseek-r1-distill-llama-70b`, …) are recorded as `retired`, with their date and replacement, in `GROQ_MODEL_LIFECYCLE` (`groqLifecycleFor(name)`).
 
 `name` is the upstream open-weight id (e.g. `openai/gpt-oss-120b`), NOT an OpenAI id. `groq.model()` accepts any string, so a newly launched Groq id works the moment Groq ships it.
 

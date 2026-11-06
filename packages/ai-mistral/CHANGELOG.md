@@ -4,6 +4,13 @@ All notable changes to `@warlock.js/ai-mistral` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.47.0
+
+### Added
+
+- `MISTRAL_MODEL_LIFECYCLE` and `mistralLifecycleFor(name)` give the ids Mistral documents a status: `zai-glm-5-2` is `retired`, `mistral-medium-3-5` and `mistral-large-2512` are `retiring` on 2027-04-30.
+- `zai-glm-5-3` reports a 1,000,000-token `capabilities.contextWindow`.
+
 ## 5.45.0 - 2026-11-05
 
 ### Added

@@ -9,35 +9,27 @@
  * wrapped `openai.model(...)` call (explicit config wins over OpenAI's
  * inference inside `OpenAIModel`).
  *
- * Verified against the official DeepSeek API docs (api-docs.deepseek.com,
- * mid-2026): base URL `https://api.deepseek.com`, OpenAI-compatible Chat
- * Completions. Two reasoning-capable surfaces exist — the legacy
- * `deepseek-reasoner` (thinking mode) and the `*-pro` tier — while
- * `deepseek-chat` is the non-thinking surface. No DeepSeek chat model
- * documents image (vision) input, so vision inference is conservatively
- * `false` for every id.
+ * Verified against the official DeepSeek API docs (api-docs.deepseek.com):
+ * base URL `https://api.deepseek.com`, OpenAI-compatible Chat Completions.
+ * The reasoning-capable surfaces are the `*-pro` tier and the retired
+ * `deepseek-reasoner` name. Vision inference is conservatively `false` for
+ * every id; opt in per model with `vision: true`.
  */
 
 /**
- * Default DeepSeek chat model ids, surfaced for discovery and docs.
+ * Current DeepSeek chat model ids, surfaced for discovery and docs.
  *
- * - `deepseek-chat` — the non-thinking surface (V3 lineage). Fast, cheap,
- *   broad production coverage. Not reasoning-capable.
- * - `deepseek-reasoner` — the thinking surface (R1 lineage). Emits a
- *   reasoning channel and accepts the reasoning-effort knob.
+ * - `deepseek-flash` — the fast tier (served by DeepSeek-V4.1-Flash; 1M
+ *   context, thinking on by default, accepts image input per DeepSeek).
+ * - `deepseek-v4-pro` — the quality tier; thinks by default.
  *
- * Both legacy names are scheduled for retirement (2026/07/24 per DeepSeek's
- * deprecation notice) in favor of the `deepseek-v4-*` family
- * (`deepseek-v4-flash`, `deepseek-v4-pro`), which this inference also
- * understands. The list is informational only — `deepseek.model({ name })`
- * accepts any id the upstream serves.
+ * The older names are retired and recorded in {@link DEEPSEEK_MODEL_LIFECYCLE}:
+ * `deepseek-chat` / `deepseek-reasoner` (retired 2026-07-24) and
+ * `deepseek-v4-flash`, which DeepSeek still accepts and bills at the
+ * `deepseek-flash` price. The list is informational only —
+ * `deepseek.model({ name })` accepts any id the upstream serves.
  */
-export const DEEPSEEK_CHAT_MODELS = [
-  "deepseek-chat",
-  "deepseek-reasoner",
-  "deepseek-v4-flash",
-  "deepseek-v4-pro",
-] as const;
+export const DEEPSEEK_CHAT_MODELS = ["deepseek-flash", "deepseek-v4-pro"] as const;
 
 /**
  * Substrings identifying DeepSeek model ids that expose a reasoning /

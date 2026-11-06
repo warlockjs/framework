@@ -26,12 +26,15 @@ const DEEPSEEK_BASE_URL = "https://api.deepseek.com";
 /** Default upstream label for models produced by this SDK. */
 const DEEPSEEK_PROVIDER = "deepseek";
 
+/** The date the {@link DEEPSEEK_DEFAULT_PRICING} rates were last checked against DeepSeek's pricing page. */
+export const DEEPSEEK_DEFAULT_PRICING_AS_OF = "2026-11-06";
+
 /**
  * Built-in DeepSeek pricing defaults, in USD per 1,000,000 tokens, keyed
  * by model name; `cachedInput` is the cache-hit input rate.
  *
- * Source: https://api-docs.deepseek.com/quick_start/pricing, fetched
- * 2026-10-17. DeepSeek bills by time of day: peak hours (01:00–04:00 and
+ * Source: https://api-docs.deepseek.com/quick_start/pricing, as of
+ * {@link DEEPSEEK_DEFAULT_PRICING_AS_OF}. DeepSeek bills by time of day: peak hours (01:00–04:00 and
  * 06:00–10:00 UTC, Monday to Friday) cost twice the off-peak rate. A flat
  * `ModelPricing` cannot follow the clock, so these are the **peak** rates —
  * an upper bound that keeps USD budgets safe; off-peak calls really cost
