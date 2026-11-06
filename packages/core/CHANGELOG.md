@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## 5.47.0
 
+### Added
+
+- `npx warlock release-notes` includes the 5.47.0 notes: image tool results stored as parts, workspace search that skips dependency folders and a live shell output hook, PostgreSQL sessions in UTC, mixed page-route segments, model lifecycle and tiered pricing tables, long MCP calls, single-file array uploads, and the test server loading app modules again.
+
 ### Fixed
 
 - **A single upload under an array field validates** — `v.array(v.file())` now accepts one file sent without `[]`, and `request.files(name)` returns it as a one-element array. `UploadedFile` carries a registered brand so validators can recognise it.
