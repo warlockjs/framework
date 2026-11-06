@@ -23,6 +23,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 
 - `CLICommandPreload.mainModules`: opt a command into importing every module's `main.ts` (no routes, events or locales) after its declared connectors and the app's configured early-phase connectors start. Off by default so other commands stay fast.
+- The `WL9022` message (a server-only file importing a `.client` module) now says that a value shared by browser and server code belongs in the module's `web/` folder.
 
 ## 5.45.0 - 2026-11-05
 

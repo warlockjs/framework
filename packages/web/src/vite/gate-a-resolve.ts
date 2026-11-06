@@ -682,7 +682,7 @@ function moduleBoundaryViolation(
   if (!surface || isBrowserSafeModuleFile(surface.inner)) return undefined;
   return {
     cause: `"app/${surface.module}/${surface.inner}" is a server file of module "${surface.module}" — browser code may import only a module's browser-safe files: *.client.ts(x), schema files (*.schema.ts or schema/), type files (*.types.ts or types/) and its web/ folder.`,
-    fix: `Use "import type" when only a type is needed, move the shared logic into ${surface.module}/schema/ or a *.client.ts file, or read the data through a page loader. Set web.moduleBoundary to "warn" to migrate gradually.`,
+    fix: `Use "import type" when only a type is needed, move the shared logic into ${surface.module}/schema/ or a *.client.ts file (a constant used by both browser and server setup code belongs in ${surface.module}/web/, which both sides may import), or read the data through a page loader. Set web.moduleBoundary to "warn" to migrate gradually.`,
   };
 }
 

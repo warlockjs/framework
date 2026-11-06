@@ -2,6 +2,19 @@
 
 All notable changes to `@warlock.js/web` are documented here.
 
+## 5.46.0
+
+### Added
+
+- The `paths` in an app's `tsconfig.json` (such as `@shared/*`) are mirrored into Vite for `warlock dev` and the production client build, so an alias that typechecks also resolves. Aliases passed to the Web connector and the built-in `web/*` and `app/*` aliases still win.
+- Discovery warns, once per process, about a `layout.tsx` outside the routed page tree (no page beside or below it) and says to rename it if it is an ordinary component.
+
+### Changed
+
+- `warlock generate.typings` no longer stops when one page declares an unsupported route path: it prints the page and the rejected path, leaves that page out, and generates typings for the rest. The build still fails on such a page.
+- The module-boundary error now names the module's `web/` folder as the place for a constant shared by browser and server setup code.
+- `ProjectionAmbiguityError` for a computed top-level initializer now suggests a literal value or a `*.client.ts` file (the message already carries the file and line).
+
 ## 5.42.0 - 2026-11-01
 
 ### Fixed

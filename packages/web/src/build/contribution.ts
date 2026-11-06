@@ -394,6 +394,13 @@ export function createWebBuildContribution(
         appRoot: context.appRoot,
         srcDir: options.srcDir,
         sites: options.sites ?? (await loadWebBuildConfig(context.appRoot)).sites,
+        // One page with an unsupported route path must not stop typings for the
+        // rest: name it, leave it out, and keep generating.
+        onUnsupportedRoute: (error) =>
+          console.warn(
+            `[warlock:web] Typings skip a page: ${error.message}\n` +
+              `Typings for every other page were still generated.`,
+          ),
       });
 
       await writeRouteTypes({
@@ -407,6 +414,7 @@ export function createWebBuildContribution(
       if (pageCount > 0) {
         const { buildWarlockHydrationClient } = await import("../vite");
         const { appConventionAliases } = await import("../vite/app-convention-aliases");
+        const { tsconfigPathAliases } = await import("../vite/tsconfig-path-aliases");
 
         // The app-tree convention (`web/*`, `app/*`) the dev server installs must
         // also reach the production build, from the SAME definition — see
@@ -429,6 +437,7 @@ export function createWebBuildContribution(
           resolveAliases: [
             ...callerAliases,
             ...appConventionAliases(path.join(context.appRoot, options.srcDir ?? "src")),
+            ...tsconfigPathAliases(context.appRoot),
           ],
           external: options.external,
           sites,

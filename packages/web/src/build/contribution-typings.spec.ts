@@ -72,4 +72,23 @@ describe("web build contribution — typings hook", () => {
 
     expect(fs.existsSync(path.join(appRoot, ".warlock", "production"))).toBe(false);
   });
+
+  it("names a page with an unsupported route path and still types every other page", async () => {
+    const appRoot = makeApp();
+    const bad = path.join(appRoot, "src/web/mixed.page.tsx");
+    fs.writeFileSync(
+      bad,
+      'export const config = { route: "/:type-for-:purpose" };\nexport default function Page() { return null; }\n',
+    );
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    await createWebBuildContribution().typings?.(context(appRoot));
+
+    const warned = warn.mock.calls.map((call) => String(call[0])).join("\n");
+    warn.mockRestore();
+
+    expect(warned).toContain("mixed.page.tsx");
+    expect(warned).toContain("/:type-for-:purpose");
+    expect(fs.readFileSync(path.join(appRoot, TYPES), "utf-8")).toContain("/site/page");
+  });
 });

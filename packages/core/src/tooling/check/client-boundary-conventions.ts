@@ -241,7 +241,7 @@ export function clientBoundaryProblems(
       createProblem({
         code: "WL9022",
         source: "convention",
-        message: `Server-only code imports a .client module. Import chain: ${chain.join(" -> ")}.`,
+        message: `Server-only code imports a .client module. Import chain: ${chain.join(" -> ")}. A value shared by browser and server code belongs in the module's web/ folder, which both sides may import.`,
         file: relativePath,
         ...positionOf(sourceFile, node),
       }),
