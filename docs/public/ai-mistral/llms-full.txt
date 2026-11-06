@@ -143,6 +143,8 @@ Models from this adapter have no native `countTokens` method. Check
 
 `await mistral.models()` returns `ModelInfo[]` (`contextWindow`, `description`, `kind: "other"` when `capabilities.completion_chat` is false).
 
-## Context window
+Mistral ids report
 
-Mistral ids report `capabilities.contextWindow` (128,000 for the Large, Medium, Small, Ministral, Pixtral and Magistral families, 256,000 Codestral); `mistral.model({ name, contextWindow })` wins.
+`MISTRAL_MODEL_LIFECYCLE` (lookup: `mistralLifecycleFor(name)`, checked `MISTRAL_MODEL_LIFECYCLE_AS_OF`) records the status of the ids Mistral documents with an API id: `zai-glm-5-2` is `retired` (2026-10-31, replacement `zai-glm-5-3`), `mistral-medium-3-5` and `mistral-large-2512` are `retiring` on 2027-04-30, and several older Medium, Small, Magistral and Devstral ids are `retired`. Source: Mistral's model overview page.
+
+Mistral ids report `capabilities.contextWindow` (128,000 for the Large, Medium, Small, Ministral, Pixtral and Magistral families, 256,000 Codestral, 1,000,000 `zai-glm-5-3`); `mistral.model({ name, contextWindow })` wins.

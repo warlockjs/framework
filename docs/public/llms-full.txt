@@ -7999,7 +7999,7 @@ it("answers through the real plugins and lets the fakes see the handler", async 
 });
 ```
 
-- `loadAppModules: true` (with `importModule: (file) => import(file)`, as `setupTest()` takes it) serves every app route; modules load once per process. Needs `setupTest()` to have run in the worker.
+- `loadAppModules: true` (with `importModule: (file) => import(file)`, as `setupTest()` takes it) serves every app route; modules load once per process. Needs `setupTest()` to have run in the worker. Modules are discovered from the current working directory (run from the project root; dot-directory worktrees work). A project with route or `main.ts` files on disk where none load makes the call throw, naming the root and counts.
 - `routes: (router) => …` registers routes for this server only; `close()` removes them.
 - It returns `url`, `port`, `server` (Fastify, for `inject()`), the request helpers, `actingAs(user)` bound to it, and `close()`.
 - `createTestRequestClient(baseUrl)` gives the same helpers bound to any URL.
@@ -10008,7 +10008,7 @@ export const uploadController: RequestHandler = async ({ request, response }) =>
 
 `request.file(key)` returns `UploadedFile | undefined`. With a schema attached, `request.validated()` is typed via `Infer<typeof schema>` so the file field comes out as `UploadedFile` directly.
 
-For multi-file uploads, use an array schema (`v.array(v.file())`) — the validated value is `UploadedFile[]`.
+For multi-file uploads, use an array schema (`v.array(v.file())`) — the validated value is `UploadedFile[]`. A single file sent without `[]` is wrapped into a one-element array (uploads only, never strings).
 
 ## The `UploadedFile` API
 
@@ -17332,6 +17332,17 @@ source.driver.off("query", onQuery);
 
 A throwing listener never fails the query. Mongo command monitoring is enabled
 unless `clientOptions.monitorCommands` is explicitly set.
+
+## Postgres session time zone
+
+Every Postgres connection starts with `TimeZone` pinned to `UTC` (timestamps
+are stored in UTC, so `groupByDate`, `whereDate*` and `now()::date` agree with
+the data). Pick another zone with `clientOptions: { timezone: "Africa/Cairo" }`
+(or `driverOptions.timezone`), or `timezone: false` to keep the server's zone.
+An app-supplied `-c TimeZone=…` in `clientOptions.options` or the connection
+string wins. MongoDB date helpers already default to UTC.
+
+`resolvePostgresStartupOptions(config)` returns the `options` startup string the driver sends (the merged `-c TimeZone=…` and any app options), for checking what a configuration resolves to.
 
 ## Things NOT to do
 
@@ -33126,15 +33137,17 @@ export const config = {
 
 Page routes deliberately accept less than API routes:
 
-- Supported: `/`, static segments, whole-segment params such as `/products/:id`, the exact wildcard `*`, and a terminal wildcard such as `/docs/*`.
-- Not supported: regex params, optional params, multiple params in one segment, params mixed with text, doubled or trailing slashes, non-terminal wildcards, and catch-all/rest segments (`[...slug]`).
+- Supported: `/`, static segments, params such as `/products/:id`, the exact wildcard `*`, a terminal wildcard such as `/docs/*` or a named one such as `/files/*rest` (value under `params.rest` and `params["*"]`), and mixed segments with several params and static text such as `/:type-for-:purpose` or `/near/:lat-:lng` (static text: letters, digits, `. _ ~ -`; two params always need text between them).
+- Not supported: regex params, optional params, two params with no text between them (`/:a:b`), doubled or trailing slashes, non-terminal wildcards, and catch-all/rest segments in file names (`[...slug]`). Mixed segments and named wildcards are declared with `config.route.path`; there is no file name for them.
 
 Write two pages for an optional segment. Validate a constrained parameter in the page instead of putting a regex in its path.
+
+A mixed segment splits greedily, as the router does: against `/:type-for-:purpose`, `a-for-b-for-c` is `type = "a-for-b"`, `purpose = "c"`; a param may be empty and never spans `/`. Precedence per segment: static, then mixed, then plain `:param`, then catch-all; a route that does not match the whole URL is skipped. Between mixed segments the longer leading text wins, then trailing text, then total static text; pages that tie on all three at the same position with the same segment count (including identical shapes such as `/:a-for-:b` and `/:x-for-:y`) are refused at boot with a collision error naming both pages; give one more static text. `href("listing", { type: "house", purpose: "sale" })` encodes each value and keeps the text. Each param name may appear once.
 
 An unsupported declared path is a boot-time
 `PageRoutePathNotSupportedError`, never a literal or normalized route.
 Examples that fail include `/users/:id?`, `/users/:id(\\d+)`,
-`/near/:lat-:lng`, `/a//b`, and `/users/`.
+`/:a:b`, `/a//b`, and `/users/`.
 
 ## Metadata
 
@@ -39565,7 +39578,7 @@ USD pricing resolves from the `pricing[modelName]` entry, else the model's own `
 
 ### Prices, spend hook and per-session caps
 
-`pricing` takes a record or an `ai.pricing({ tables })` catalogue (provider tables such as `ANTHROPIC_MODEL_PRICING`, later tables win, `.set(model, price)` overrides, dated snapshot ids resolve to their alias; `.costUSD(usage, model)` prices a `Usage`). `onSpend(spend)` runs after every model call, before the caps are compared (so the breaching call is recorded), with `{ model, provider, sessionId, tripIndex, usage, costUSD, run, scopedKey }`; persist it there (errors are swallowed). `scoped: { window: "all" }` is a ledger that never resets: with `key: (ctx) => ctx.options?.sessionId` it is a per-session cap, with a user id a per-caller one. Add `reserve` to refuse a call _before_ it is made.
+`pricing` takes a record or an `ai.pricing({ tables })` catalogue (provider tables such as `ANTHROPIC_MODEL_PRICING`, later tables win, `.set(model, price)` overrides, dated snapshot ids resolve to their alias; `.costUSD(usage, model)` prices a `Usage`). A `ModelPricing` can carry `tiers` (`PricingTier[]`: rates for prompts longer than `abovePromptTokens`, cache reads and writes counted) and `schedule` (`PricingChange[]`: rates from an ISO date, UTC); `computeCost(usage, pricing, { at? })` and `resolvePricing(pricing, { promptTokens?, at? })` apply them, and the provider packages export `*_MODEL_LIFECYCLE` tables of `ModelLifecycle` (`status`: `current` / `retiring` / `retired`, `retiresOn?`, `replacement?`) beside their price tables. `onSpend(spend)` runs after every model call, before the caps are compared (so the breaching call is recorded), with `{ model, provider, sessionId, tripIndex, usage, costUSD, run, scopedKey }`; persist it there (errors are swallowed). `scoped: { window: "all" }` is a ledger that never resets: with `key: (ctx) => ctx.options?.sessionId` it is a per-session cap, with a user id a per-caller one. Add `reserve` to refuse a call _before_ it is made.
 
 ### Reserve-then-commit — `budget({ reserve })`
 
@@ -41843,7 +41856,7 @@ What `send(input, options)` does, under a per-session lock:
 2. Run `agent.execute(input, { ...options, history, captureMessages: true, sessionId: id })`.
 3. On success, store the run's messages (without the agent's system prompt) plus the final reply with its `blocks`; on a failed / cancelled run keep the old history. Clear `pending`.
 
-Stored turns keep every assistant tool-call turn and tool result, provider blocks (signed thinking, server compaction) and attachment parts, so a replayed thinking block sees exactly the history it was signed against.
+Stored turns keep every assistant tool-call turn and tool result, provider blocks (signed thinking, server compaction) and attachment parts, so a replayed thinking block sees exactly the history it was signed against. Tool results that returned `{ content: ToolResultPart[] }` (images) are stored as parts, not JSON text; older records saved as JSON text are restored on load. `AgentReport.messages[].contentParts` carries the parts beside the flat `content` string.
 
 ## The rest of the API
 
@@ -41913,6 +41926,10 @@ On Claude, `providerOptions.anthropic.serverCompaction` is the server-side alter
 - Don't edit stored messages in place: replayed thinking is valid only while every earlier message is unchanged. Truncate (drop from the end) or fork instead. To recover an edited Claude conversation, send `providerOptions.anthropic.thinkingBlockBinding: "drop_block"` through the agent's `modelOptions`.
 - The agent's system prompt is not stored; changing it changes the next turn's `system`, which also invalidates Claude's preserved thinking from earlier turns.
 - Without `durable` on the agent, `resume()` throws; the next `send` replaces the pending mark.
+
+## Token estimates for media parts
+
+Offline estimates (context-editing `clearAtLeast`, compaction triggers) count each image, PDF or audio part as `MEDIA_PART_TOKENS` (1,000) instead of by its base64 length; `approximateJsonTokens(value)` applies that rule to any stored message content.
 
 
 ## log-ai-calls  `@warlock.js/ai/skills/log-ai-calls/SKILL.md`
@@ -46483,8 +46500,9 @@ const side = await openai
 console.log(totalCost(side.usage.cost));
 ```
 
-- **Source.** `OPENAI_MODEL_PRICING` comes from https://developers.openai.com/api/docs/pricing (the target of platform.openai.com/docs/pricing), Standard tier, fetched 2026-10-17. It covers the flat-priced models: `gpt-5.4-mini`, `gpt-5.4-nano`, `gpt-5.2`, `gpt-5.1`, `gpt-5`, `gpt-5-mini`, `gpt-5-nano`, `gpt-4.1` (+ `-mini` / `-nano`), `gpt-4o`, `gpt-4o-mini`, `o3`, `o4-mini`, `o3-mini`, `o1`. None of them charges for cache writes.
-- **Deliberately unpriced:** models priced by prompt length (a higher rate above 272K input tokens — the gpt-6, gpt-5.6, gpt-5.5 and gpt-5.4 families and the `-pro` models), dated snapshot ids, promotional / Batch / Flex / Priority pricing, and the regional data-residency uplift. Wrapper SDKs (`provider` other than `"openai"`) never fall back to this table.
+- **Source.** `OPENAI_MODEL_PRICING` comes from https://developers.openai.com/api/docs/pricing (the target of platform.openai.com/docs/pricing), Standard tier, as of `OPENAI_MODEL_PRICING_AS_OF` (2026-11-06). It covers `gpt-6.1-terra`, `gpt-6-cyber`, `gpt-6-astra`, `gpt-6-luna`, `gpt-5.6-terra`, `gpt-5.6-luna`, `gpt-5.5`, `gpt-5.4`, `gpt-5.4-mini`, `gpt-5.4-nano`, `gpt-5.2`, `gpt-5.1`, `gpt-5`, `gpt-5-mini`, `gpt-5-nano`, `gpt-4.1` (+ `-mini` / `-nano`), `gpt-4o`, `gpt-4o-mini`, `o3`, `o4-mini`, `o3-mini`, `o1`. None of them charges for cache writes. The gpt-6, gpt-5.6, gpt-5.5 and gpt-5.4 entries carry `tiers` (above 272K prompt tokens the whole request bills at the tier rates; `computeCost` and `resolvePricing` from `@warlock.js/ai` apply them).
+- **Lifecycle.** `OPENAI_MODEL_LIFECYCLE` / `openAILifecycleFor(name)` (checked `OPENAI_MODEL_LIFECYCLE_AS_OF`) gives `{ status: "current" | "retiring" | "retired", retiresOn?, replacement? }` per priced id from https://developers.openai.com/api/docs/deprecations: `o1`, `o3-mini`, `o4-mini`, `gpt-4.1-nano` retired 2026-10-23; `gpt-5`, `gpt-5-mini`, `gpt-5-nano`, `o3` retiring 2026-12-11; `gpt-4.1`, `gpt-4.1-mini` 2027-01-14; `gpt-5.1`, `gpt-5.4-nano` 2027-04-01. Retired ids stay priced so old reports keep their cost. `gpt-4o`, `gpt-4o-mini` and `gpt-5.2` have no status (OpenAI lists only their snapshots or variants).
+- **Deliberately unpriced:** the `-pro` models, `gpt-6-sol` / `gpt-5.6-sol` (promotional pricing until 2026-11-30), dated snapshot ids, Batch / Flex / Priority pricing, and the regional data-residency uplift. Wrapper SDKs (`provider` other than `"openai"`) never fall back to this table.
 
 ## Errors
 
@@ -46760,9 +46778,10 @@ withAnthropicCacheWriteRates({ input: 2, output: 10 }); // { input: 2, output: 1
 Object.keys(ANTHROPIC_MODEL_PRICING); // the priced ids
 ```
 
-- **Source.** `ANTHROPIC_MODEL_PRICING` holds the "Model pricing" table of https://platform.claude.com/docs/en/about-claude/pricing (fetched 2026-10-17): input, output, cache read (`cachedInput`), 5-minute write (`cacheWrite`) and 1-hour write (`cacheWrite1h`), USD per 1M tokens, standard global routing.
+- **Source.** `ANTHROPIC_MODEL_PRICING` holds the "Model pricing" table of https://platform.claude.com/docs/en/about-claude/pricing (as of `ANTHROPIC_MODEL_PRICING_AS_OF`, 2026-11-06): input, output, cache read (`cachedInput`), 5-minute write (`cacheWrite`) and 1-hour write (`cacheWrite1h`), USD per 1M tokens, standard global routing. Claude Haiku 5.5 carries `tiers`: a prompt over 100,000 tokens (cache reads and writes counted) bills at the higher rates, which `computeCost` / `resolvePricing` from `@warlock.js/ai` apply.
+- **Lifecycle.** `ANTHROPIC_MODEL_LIFECYCLE` / `anthropicLifecycleFor(name)` (alias or dated snapshot; checked `ANTHROPIC_MODEL_LIFECYCLE_AS_OF`) gives `{ status: "current" | "retiring" | "retired", retiresOn?, replacement? }` from https://platform.claude.com/docs/en/about-claude/model-deprecations. `claude-sonnet-4-5` is `retiring` on 2026-11-30 (replacement `claude-sonnet-5-5`); `claude-opus-4-1`, `claude-opus-4`, `claude-sonnet-4`, `claude-3-7-sonnet`, `claude-3-5-haiku` and `claude-3-haiku` are `retired`. Active models carry no `retiresOn` (Anthropic documents only a "not sooner than" date).
 - **Write rates are filled for you.** Anthropic charges 1.25x input for a 5-minute cache write and 2x for a 1-hour write on every Claude model, so any entry without `cacheWrite` / `cacheWrite1h` (your own `{ input, output }` included) gets them from those multipliers (`withAnthropicCacheWriteRates`, exported with `ANTHROPIC_CACHE_WRITE_MULTIPLIER` / `ANTHROPIC_CACHE_WRITE_1H_MULTIPLIER`). The read rate differs per model (0.1x, 0.05x on Opus 5.5 / Sonnet 5.5, 0.025x on Fable 5.1), so it is never derived — set `cachedInput` yourself when you supply pricing, or cache reads bill at the full input rate.
-- **Deliberately unpriced** (pass `pricing` yourself): Claude Haiku 5.5 (priced by prompt length — higher rates above 100,000 prompt tokens, which a flat rate cannot express), US-only inference (`inference_geo: "us"`, 1.1x), fast mode, the Batch API, limited-availability and retired models, and Claude on Bedrock / Vertex (partner-priced — see `@warlock.js/ai-bedrock`).
+- **Deliberately unpriced** (pass `pricing` yourself): US-only inference (`inference_geo: "us"`, 1.1x), fast mode, the Batch API, limited-availability and retired models, and Claude on Bedrock / Vertex (partner-priced — see `@warlock.js/ai-bedrock`).
 
 ## Tokens & usage accounting
 
@@ -47463,7 +47482,7 @@ const google = new GoogleSDK({
 
 google.model({ name: "gemini-2.5-flash" }); // → the registry entry
 google.model({ name: "gemini-3.5-flash-lite" }).pricing; // → built-in { input: 0.3, output: 2.5, cachedInput: 0.03 }
-google.model({ name: "gemini-2.5-pro" }).pricing; // → undefined (prompt-length tiers; pass pricing yourself)
+google.model({ name: "gemini-2.5-pro" }).pricing; // → undefined (not in the table; pass pricing yourself)
 googlePricingFor("gemini-3.5-flash-lite"); // the same built-in entry
 Object.keys(GOOGLE_MODEL_PRICING); // the priced ids
 
@@ -47473,7 +47492,7 @@ const { usage } = await google
 console.log(totalCost(usage.cost));
 ```
 
-`GOOGLE_MODEL_PRICING` comes from https://ai.google.dev/gemini-api/docs/pricing (paid tier, Standard), fetched 2026-10-17. Only models with a single flat token price are listed. Deliberately unpriced: the Pro models (priced by prompt length, split at 200k prompt tokens), models whose audio input bills higher than text (`Usage` does not split input by modality — price them with the text rate yourself only if you send no audio), and models with a scheduled price change. The hourly context-cache storage charge is not a per-token rate and is never included.
+`GOOGLE_MODEL_PRICING` comes from https://ai.google.dev/gemini-api/docs/pricing (paid tier, Standard), as of `GOOGLE_MODEL_PRICING_AS_OF` (2026-11-06): `gemini-4-argon`, `gemini-3.8-flash`, `gemini-3.6-flash`, `gemini-3.5-flash-lite`, `gemini-3.1-pro-preview`. Scheduled price changes are in each entry's `schedule` (`gemini-4-argon` doubles on 2026-12-01, the 3.6 / 3.8 Flash models on 2027-01-01); `gemini-3.1-pro-preview` carries `tiers` (prompt over 200k tokens). Deliberately unpriced: models whose audio input bills higher than text (`Usage` does not split input by modality — price them with the text rate yourself only if you send no audio). `GOOGLE_MODEL_LIFECYCLE` / `googleLifecycleFor(name)` (checked `GOOGLE_MODEL_LIFECYCLE_AS_OF`) gives `{ status: "current" | "retiring" | "retired", retiresOn?, replacement? }` from https://ai.google.dev/gemini-api/docs/deprecations (`gemini-2.5-pro` / `gemini-2.5-flash` retiring 2026-12-01). The hourly context-cache storage charge is not a per-token rate and is never included.
 
 ## Provider config options and input-token counts
 
@@ -47974,14 +47993,12 @@ Returns a `ModelContract` you pass straight into `ai.agent({ model })`.
 
 ## Models
 
-| Model               | Notes                                                                              |
-| ------------------- | ---------------------------------------------------------------------------------- |
-| `deepseek-chat`     | Non-thinking surface (V3 lineage). Fast, cheap, broad coverage. Reasoning **off**. |
-| `deepseek-reasoner` | Thinking surface (R1 lineage). Emits a reasoning channel. Reasoning **on**.        |
-| `deepseek-v4-flash` | Newer flash tier. Reasoning **off** by default.                                    |
-| `deepseek-v4-pro`   | Newer quality tier. Reasoning **on** by default.                                   |
+| Model             | Notes                                                                                |
+| ----------------- | ------------------------------------------------------------------------------------ |
+| `deepseek-flash`  | Fast tier (served by DeepSeek-V4.1-Flash), 1M context. Reasoning **off** by default. |
+| `deepseek-v4-pro` | Newer quality tier. Reasoning **on** by default.                                     |
 
-DeepSeek announced the legacy `deepseek-chat` / `deepseek-reasoner` names retire 2026/07/24 in favor of the `deepseek-v4-*` family; both name sets are understood by the capability inference. `deepseek.model({ name })` accepts any id the upstream serves.
+`deepseek-chat` and `deepseek-reasoner` were retired on 2026-07-24, and `deepseek-v4-flash` is a retired name that DeepSeek still accepts and serves with `deepseek-flash`, billed at the Flash price. Their status, dates and replacements are in `DEEPSEEK_MODEL_LIFECYCLE` (lookup: `deepseekLifecycleFor(name)`, checked `DEEPSEEK_MODEL_LIFECYCLE_AS_OF`; the price table's check date is `DEEPSEEK_DEFAULT_PRICING_AS_OF`); the capability inference still understands every name. `deepseek.model({ name })` accepts any id the upstream serves.
 
 ## Capabilities — what's auto-set
 
@@ -48045,7 +48062,7 @@ console.log(usage.cachedTokens, totalCost(usage.cost));
 Resolution at `model()` time: per-model `pricing` > SDK `pricing` registry > built-in DeepSeek default > `undefined`.
 
 - **Source.** https://api-docs.deepseek.com/quick_start/pricing, fetched 2026-10-17. Covered: `deepseek-flash`, `deepseek-v4-flash` (its legacy name, same rate) and `deepseek-v4-pro`.
-- **Unpriced:** `deepseek-chat` / `deepseek-reasoner` are gone from the price list (announced for discontinuation on 2026-07-24) — pass `pricing` if a gateway still serves them.
+- **Unpriced:** `deepseek-chat` / `deepseek-reasoner` are gone from the price list (retired 2026-07-24) — pass `pricing` if a gateway still serves them.
 - **Usage semantics.** DeepSeek's `prompt_tokens` equals cache hits + misses and `prompt_tokens_details.cached_tokens` mirrors `prompt_cache_hit_tokens`, so the usage is `inputIncludesCache: true` and hits bill at `cachedInput`. DeepSeek caches automatically on disk and takes no request hint, so `promptCacheKey` is never sent.
 
 ## Errors
@@ -48084,7 +48101,7 @@ Models from this adapter have no native `countTokens` method. Check
 
 ## Context window
 
-`deepseek-chat`, `deepseek-reasoner` and `deepseek-v4-*` report a 128,000 `capabilities.contextWindow`; `deepseek.model({ name, contextWindow })` wins.
+`deepseek-flash` and `deepseek-v4-*` report a 1,000,000 `capabilities.contextWindow` (the retired `deepseek-chat` / `deepseek-reasoner` 128,000); `deepseek.model({ name, contextWindow })` wins.
 
 
 ================================================================================
@@ -48172,6 +48189,10 @@ Inherited unchanged from `@warlock.js/ai-openai`: a `responseSchema` maps to `re
 As of mid-2026 Groq exposes **no** OpenAI-compatible embeddings endpoint. `groq.embedder({ name })` constructs (delegated to the inner adapter) but a live `.embed()` call fails at the provider. Use `@warlock.js/ai-openai` or `@warlock.js/ai-google` for retrieval embeddings.
 
 There is also no image-generation API on Groq, so `GroqSDK` intentionally does **not** define `image()` — `ai.groq.image(...)` is a compile-time error (structural capability guard, like Anthropic / Bedrock / Ollama).
+
+## Model lifecycle
+
+`GROQ_KNOWN_MODELS` holds the current ids (`openai/gpt-oss-120b`, `openai/gpt-oss-20b`, `qwen/qwen3.8-27b`). `GROQ_MODEL_LIFECYCLE` / `groqLifecycleFor(name)` (checked `GROQ_MODEL_LIFECYCLE_AS_OF`, source https://console.groq.com/docs/deprecations) gives `{ status: "current" | "retiring" | "retired", retiresOn?, replacement? }`. `llama-3.3-70b-versatile` and `llama-3.1-8b-instant` (2026-08-16), `deepseek-r1-distill-llama-70b` (2025-10-02), `qwen/qwen3.6-27b`, `qwen/qwen3-32b` and the Llama 4 / Kimi K2 ids are `retired`. Some shutdowns apply to free and developer-tier usage only; `groq.model({ name })` still accepts any id. Token rates in `GROQ_DEFAULT_PRICING` are as of `GROQ_DEFAULT_PRICING_AS_OF`.
 
 ## Pricing — per-model registry + built-in defaults
 
@@ -48398,9 +48419,11 @@ Models from this adapter have no native `countTokens` method. Check
 
 `await mistral.models()` returns `ModelInfo[]` (`contextWindow`, `description`, `kind: "other"` when `capabilities.completion_chat` is false).
 
-## Context window
+Mistral ids report
 
-Mistral ids report `capabilities.contextWindow` (128,000 for the Large, Medium, Small, Ministral, Pixtral and Magistral families, 256,000 Codestral); `mistral.model({ name, contextWindow })` wins.
+`MISTRAL_MODEL_LIFECYCLE` (lookup: `mistralLifecycleFor(name)`, checked `MISTRAL_MODEL_LIFECYCLE_AS_OF`) records the status of the ids Mistral documents with an API id: `zai-glm-5-2` is `retired` (2026-10-31, replacement `zai-glm-5-3`), `mistral-medium-3-5` and `mistral-large-2512` are `retiring` on 2027-04-30, and several older Medium, Small, Magistral and Devstral ids are `retired`. Source: Mistral's model overview page.
+
+Mistral ids report `capabilities.contextWindow` (128,000 for the Large, Medium, Small, Ministral, Pixtral and Magistral families, 256,000 Codestral, 1,000,000 `zai-glm-5-3`); `mistral.model({ name, contextWindow })` wins.
 
 
 ================================================================================
@@ -48501,7 +48524,7 @@ xAI does **not** currently expose a public embeddings endpoint. `embedder()` is 
 
 ## Pricing — per-model registry
 
-xAI ships **no built-in price table**: every Grok model on https://docs.x.ai/developers/pricing (checked 2026-10-17) bills all tokens at a higher long-context rate once the prompt reaches 200k tokens, which a flat `ModelPricing` cannot express. Pass the rates you use (USD per 1,000,000 tokens; `ModelPricing`: `input`, `output`, optional `cachedInput`). xAI has no cache-write charge. Resolution: per-model `pricing` > SDK registry > `undefined` (no cost computed).
+https://docs.x.ai/docs/models (as of `XAI_MODEL_PRICING_AS_OF`, 2026-11-06) lists `grok-4.7`, `grok-4.6`, `grok-4.5`, `grok-4.3`, `grok-4.20-0309-reasoning`, `grok-4.20-0309-non-reasoning`, `grok-4.20-multi-agent-0309` and `grok-build-0.1`; their rates are built in as `XAI_MODEL_PRICING` (lookup: `xaiPricingFor(name)`). Each entry carries `tiers`: a prompt of 200k tokens or more bills every token of the request at the higher long-context rates. The Grok 4, 3 and 2 families have no listed price, so they stay unpriced unless you pass `pricing`. Resolution: per-model `pricing` > SDK registry > built-in table > `undefined` (no cost computed). `XAI_MODEL_LIFECYCLE` (`xaiLifecycleFor(name)`, checked `XAI_MODEL_LIFECYCLE_AS_OF`) marks the listed models `current`; xAI lists no retirement for any language model.
 
 ```ts
 import { ai, totalCost } from "@warlock.js/ai";
@@ -48510,7 +48533,7 @@ import { XaiSDK } from "@warlock.js/ai-xai";
 const xai = new XaiSDK({
   apiKey: process.env.XAI_API_KEY ?? "",
   pricing: {
-    // Below-200k rates from xAI's pricing page; long prompts cost more.
+    // Your own contract rates win over the built-in table.
     "grok-4.3": { input: 1.25, output: 2.5, cachedInput: 0.2 },
   },
 });
@@ -48573,7 +48596,7 @@ Models from this adapter have no native `countTokens` method. Check
 
 ## Context window
 
-Grok ids report `capabilities.contextWindow` by prefix (2M for grok-4-fast, 256K grok-4, 131,072 grok-3/2, 32,768 grok-2-vision); `xai.model({ name, contextWindow })` wins.
+Grok ids report `capabilities.contextWindow` by prefix (2M for grok-4-fast, 1M grok-4.3 / grok-4.20-*, 500K grok-4.5 to 4.7, 256K grok-4 / grok-build, 131,072 grok-3/2, 32,768 grok-2-vision); `xai.model({ name, contextWindow })` wins.
 
 
 ================================================================================
@@ -49164,7 +49187,9 @@ MCP's wire vocabulary uses `kind` in some content/capability descriptors. The cl
 
 ## Errors
 
-Connection / handshake failures surface **at agent-construction time** because the example `await`s `github.tools()` — you see them then, not mid-run. A `tools/call` failure raised mid-run is wrapped by `tool()` and reaches the model as data. Branch on `McpTransportError.type`:
+Connection / handshake failures surface **at agent-construction time** because the example `await`s `github.tools()` — you see them then, not mid-run. A `tools/call` failure raised mid-run is wrapped by `tool()` and reaches the model as data. Branch on Over http, Node's built-in `fetch` abandons a request whose headers take over 300 s regardless of `timeoutMs`; that surfaces as `type: "timeout"` with `UND_ERR_HEADERS_TIMEOUT` in the message. For longer calls pass `{ type: "http", url, fetch }` with a `fetch` backed by an undici `Agent` (`headersTimeout`/`bodyTimeout`) from your own app.
+
+`McpTransportError.type`:
 
 ```ts
 import { McpTransportError } from "@warlock.js/ai-tools";
@@ -49978,22 +50003,23 @@ Paths are resolved against `cwd` with symlinks collapsed and accepted inside `cw
 
 ## The policy surface
 
-| Field                                               | What it does                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| --------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `cwd`                                               | **Absolute** jail root. Every path resolves against it and must stay inside.                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| `allowPaths`                                        | Extra readable roots outside `cwd`.                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| `denyPaths`                                         | Globs (`*`, `**`, `?`) blocked **even inside `cwd`** — e.g. `[".git/**", ".env*"]`. A bare dir name (`"node_modules"`) also blocks its contents.                                                                                                                                                                                                                                                                                                                                               |
-| `shell.allow` / `shell.deny`                        | Executable **basenames** matched against every command's argv (after tokenizing — see below). **Deny wins**, case-insensitively. An `allow` list is exhaustive (fail-closed); no `shell` block at all ⇒ nothing may run.                                                                                                                                                                                                                                                                       |
-| `shell.denyPatterns` / `shell.allowCommand`         | Argument rules on every command: string prefix patterns (`"git push --force"`) or RegExps, and a predicate `(argv, ctx) => true \| false \| "why"`.                                                                                                                                                                                                                                                                                                                                            |
-| `shell.interpreter`                                 | `"none"` (default, argv), `"sh"`, `"bash"`, `"powershell"`, `"cmd"` or `"auto"` (opt-in shell syntax, every command checked); `shell.interpreterPath` sets the shell executable.                                                                                                                                                                                                                                                                                                               |
-| `shell.rules` / `shell.onAsk`                       | Ordered `{ match, effect: "allow" \| "ask" \| "deny", reason? }` rules (last match wins, a deny anywhere refuses the line); `onAsk({ command, asks, signal })` returns `{ allow, remember? }`. Refusals: `"approval-required"`, `"approval-denied"`. `ws.shell.classify(line)` lists a line's commands. `remember` takes one pattern or an array and `reason` (≤ 500 chars) reaches the model in the refusal; `ws.shell.remembered()` / `forget(pattern)` list and remove remembered patterns. |
-| `shell.background`                                  | `{ maxJobs?, timeoutMs? }` — enables background commands. Absent ⇒ refused.                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| `list.ignore` / `list.maxDepth` / `list.maxEntries` | `list_dir` bounds: hidden globs (default `node_modules`, `.git`), depth cap (5), entry cap (500).                                                                                                                                                                                                                                                                                                                                                                                              |
-| `shell.inheritEnv`                                  | Opt-in `process.env` keys to pass through (e.g. `["PATH"]`). **Nothing leaks in otherwise** — a command can't find `node`/`npm` without `PATH`.                                                                                                                                                                                                                                                                                                                                                |
-| `shell.env`                                         | Explicit env vars injected into every spawned process (override inherited on collision).                                                                                                                                                                                                                                                                                                                                                                                                       |
-| `shell.timeoutMs` / `shell.maxOutputBytes`          | Per-command wall-clock cap (process tree SIGKILLed on expiry) and stdout/stderr byte cap (clipped on a character boundary).                                                                                                                                                                                                                                                                                                                                                                    |
-| `read.defaultLines` / `read.maxBytes`               | Default read window + a ceiling on the UTF-8 bytes of the returned `content` (line numbers included). See [Read windows and the byte ceiling](#read-windows-and-the-byte-ceiling).                                                                                                                                                                                                                                                                                                             |
-| `backend`                                           | `"local"` (default — real disk) or `"mock"` (in-memory, for tests).                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| Field                                                                             | What it does                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| --------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `cwd`                                                                             | **Absolute** jail root. Every path resolves against it and must stay inside.                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `allowPaths`                                                                      | Extra readable roots outside `cwd`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `denyPaths`                                                                       | Globs (`*`, `**`, `?`) blocked **even inside `cwd`** — e.g. `[".git/**", ".env*"]`. A bare dir name (`"node_modules"`) also blocks its contents.                                                                                                                                                                                                                                                                                                                                                      |
+| `shell.allow` / `shell.deny`                                                      | Executable **basenames** matched against every command's argv (after tokenizing — see below). **Deny wins**, case-insensitively. An `allow` list is exhaustive (fail-closed); no `shell` block at all ⇒ nothing may run.                                                                                                                                                                                                                                                                              |
+| `shell.denyPatterns` / `shell.allowCommand`                                       | Argument rules on every command: string prefix patterns (`"git push --force"`) or RegExps, and a predicate `(argv, ctx) => true \| false \| "why"`.                                                                                                                                                                                                                                                                                                                                                   |
+| `shell.interpreter`                                                               | `"none"` (default, argv), `"sh"`, `"bash"`, `"powershell"`, `"cmd"` or `"auto"` (opt-in shell syntax, every command checked); `shell.interpreterPath` sets the shell executable.                                                                                                                                                                                                                                                                                                                      |
+| `shell.rules` / `shell.onAsk`                                                     | Ordered `{ match, effect: "allow" \| "ask" \| "deny", reason? }` rules (last match wins, a deny anywhere refuses the line); `onAsk({ command, asks, signal })` returns `{ allow, remember? }`. Refusals: `"approval-required"`, `"approval-denied"`. `ws.shell.classify(line)` lists a line's commands. `remember` takes one pattern or an array and `reason` (≤ 500 chars) reaches the model in the refusal; `ws.shell.remembered()` / `forget(pattern)` list and remove remembered patterns.        |
+| `shell.background`                                                                | `{ maxJobs?, timeoutMs? }` — enables background commands. Absent ⇒ refused.                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `list.ignore` / `list.maxDepth` / `list.maxEntries`                               | `list_dir` bounds: hidden globs (default `node_modules`, `.git`), depth cap (5), entry cap (500).                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `search.skipDirs` / `search.gitignore` / `search.maxFiles` / `search.concurrency` | What `glob` and `grep` walk: folders never entered (default `[".git", "node_modules"]`, matched by name at any depth or by path glob), whether `.gitignore` files are honoured (default `true`), the most files one search looks at before it stops and sets `truncated` + `maxFilesReached` (default 50000), and how many folders are read at once (default 16). `denyPaths` and the jail apply regardless. A pattern whose leading folder is skipped (`node_modules/pkg/*.json`) still searches it. |
+| `shell.inheritEnv`                                                                | Opt-in `process.env` keys to pass through (e.g. `["PATH"]`). **Nothing leaks in otherwise** — a command can't find `node`/`npm` without `PATH`.                                                                                                                                                                                                                                                                                                                                                       |
+| `shell.env`                                                                       | Explicit env vars injected into every spawned process (override inherited on collision).                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `shell.timeoutMs` / `shell.maxOutputBytes`                                        | Per-command wall-clock cap (process tree SIGKILLed on expiry) and stdout/stderr byte cap (clipped on a character boundary).                                                                                                                                                                                                                                                                                                                                                                           |
+| `read.defaultLines` / `read.maxBytes`                                             | Default read window + a ceiling on the UTF-8 bytes of the returned `content` (line numbers included). See [Read windows and the byte ceiling](#read-windows-and-the-byte-ceiling).                                                                                                                                                                                                                                                                                                                    |
+| `backend`                                                                         | `"local"` (default — real disk) or `"mock"` (in-memory, for tests).                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 
 > **The most common gotcha:** `run_shell` fails to find `node`/`npm` because the env is empty. Add `shell: { allow: ["npm", "node"], inheritEnv: ["PATH"] }`.
 
@@ -50046,6 +50072,7 @@ export async function commitWork(cwd: string) {
 
 - Shell mode parses the line and checks every simple command — inside `;`, `&&`, `||`, pipes, `( )`, `$( )`, backticks, here-documents and `NAME=value cmd` prefixes. Redirection targets and `cd` directories must be literal paths inside the jail (`/dev/null` is fine), re-checked with symlinks resolved.
 - It refuses what it can't parse with confidence (`reason: "unsupported-syntax"`): compound commands, arithmetic, brace expansion, unusual `${…}` forms, bash-only redirections, a command name decided at run time, `&` in a line (use `background: true`), assignments to `IFS`/`PS4`/`CDPATH`/`BASH_ENV`…; it drops shell start-up variables (`ENV`, `BASH_ENV`, `SHELLOPTS`, `BASH_FUNC_*`, …) from the environment.
+- Bash on Windows reads an unquoted backslash as an escape: a line like `cd ab\x\y` is refused (`"unsupported-syntax"`) with the forward-slash form (`ab/x/y`) in the message, and `run_shell`'s description says to write paths with forward slashes. Quoted paths and `a\ b` pass; Linux and macOS are unchanged.
 - `reason` values: `"metacharacter"`, `"unbalanced-quotes"`, `"denied-executable"`, `"not-allowed"`, `"denied-pattern"`, `"nested-command"`, `"unsupported-syntax"`, `"path-escape"`. `checkShellCommand(policy, line)` returns the verdict without running anything; `classifyShellCommand(line, policy?)` returns `{ commands, opaque? }` with the same parser a host approval gate can reuse; `resolveShell(policy.shell)` reports which interpreter and executable `"auto"` (or a named interpreter) resolves to on this host, plus the PowerShell `edition` (`"desktop"` = Windows PowerShell 5.1, `"core"` = 7+) and `version`; the 5.1 dialect (`"powershell5"`) refuses `&&` / `||`, and on Windows `"auto"` prefers `pwsh`, then Git Bash, then 5.1, then `cmd`. The `PowerShellEdition` type is exported.
 - Pair shell mode with an exhaustive `allow`: `deny` alone is a best-effort filter.
 
@@ -50124,7 +50151,7 @@ export async function devLoop(cwd: string) {
   - `run_shell` → `{ exitCode, stdout, stderr, truncated, timedOut, cancelled, truncation?: { stdout?, stderr? }, spilledTo? }`; one path per spilled stream.
   - `shell_output` → the fields above under Background, plus `truncation?: { stdout?, stderr? }` and `spilledTo?`.
   - `read_file` → `{ content, ..., truncated, bytesCapped, truncation?, spilledTo? }`; spills only when `read.maxBytes` cut the window.
-  - `grep` → `{ matches, total, truncated?, truncation?, spilledTo? }`; `glob` → `{ paths, truncated?, truncation?, spilledTo? }`.
+  - `grep` → `{ matches, total, truncated?, truncation?, spilledTo? }`; `glob` → `{ paths, truncated?, truncation?, spilledTo?, maxFilesReached? }`. Both start at the pattern's static folder prefix (`src/api/**/*.ts` reads only `src/api`), never enter `node_modules`, `.git`, `denyPaths` folders or gitignored paths (see `search.*`), and take an optional `signal` that stops the walk.
   - `truncation` is `{ shown: { lines }, total: { lines, bytes }, path? }`; without `spillDir` there is no `path` and no `spilledTo`.
 - `list_dir({ path?, depth?, ignore? })` → `{ path, entries: [{ path, type, size?, depth }], truncated }`; `denyPaths` always hidden, `list.ignore` (default `node_modules`, `.git`) hidden from listings, symlinks reported but never followed.
 - `apply_patch({ patch, dryRun? })` → `{ files: [{ path, action, oldPath?, hunks, hash? }], dryRun }`; a unified diff that modifies, creates, deletes and renames files, all or none; paths jailed, hunks matched by context, line endings kept, binary files refused (`binary-file`); `dryRun` checks only. Not in `readonly()`.
@@ -50206,6 +50233,23 @@ ai.workspace({
 ```
 
 After `write_file`, `edit_file`, `multi_edit` or `apply_patch` writes files, the hook runs once per call with the written paths (not on a patch `dryRun`, not for deleted files). Text it returns comes back on the result as `diagnostics`, between `[diagnostics]` and `[/diagnostics]` lines; output over `afterEditMaxChars` is cut with a marker. A hook that throws or does not answer within `afterEditTimeoutMs` yields `diagnostics unavailable` and never fails the edit.
+
+## Live shell output — `hooks.onShellOutput`
+
+```ts
+workspace({
+  cwd,
+  shell: { allow: ["npm"], env: { API_KEY: process.env.API_KEY! } },
+  hooks: {
+    onShellOutput: ({ command, stream, chunk, jobId, callId }) => ui.append(chunk),
+    redactShellOutput: (text) => text.replace(/sk-[a-z0-9]+/g, "[redacted]"),
+  },
+});
+```
+
+`run_shell` returns its output when the command ends; `onShellOutput` (event type `WorkspaceShellOutputEvent`) lets a host that shows the session to a person see it while the command runs. It fires for foreground commands and for background jobs (`jobId` is set; it keeps firing after `run_shell` has returned). Text is decoded, in order per stream, delivered at most about 20 times a second (faster output is merged), and never changes the result the agent gets (truncation and spilling are as before). A hook that throws is ignored. Pass `callId` to `ws.exec(command, { callId })` to have it echoed on a foreground command's events. A backend that cannot stream delivers the whole capture once, when the command ends.
+
+The workspace redacts nothing in results, so live text is raw unless you mask it. Redaction needs a secret in one piece but a process writes in arbitrary pieces, so output is buffered to line boundaries first and then redacted: a secret split across two reads is whole by the time `redactShellOutput(text)` sees it. The unfinished last line is held until its newline arrives or the command ends (a line over 16 KB is cut, keeping its last 512 characters back). Values in `shell.env` of eight or more characters are masked as `[redacted]` before `redactShellOutput` runs. If the redactor throws, that text is dropped, never delivered unmasked. A secret that contains a newline cannot be matched this way.
 
 ## Oversized output — `output`
 

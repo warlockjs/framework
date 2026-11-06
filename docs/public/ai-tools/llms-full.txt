@@ -142,7 +142,9 @@ MCP's wire vocabulary uses `kind` in some content/capability descriptors. The cl
 
 ## Errors
 
-Connection / handshake failures surface **at agent-construction time** because the example `await`s `github.tools()` — you see them then, not mid-run. A `tools/call` failure raised mid-run is wrapped by `tool()` and reaches the model as data. Branch on `McpTransportError.type`:
+Connection / handshake failures surface **at agent-construction time** because the example `await`s `github.tools()` — you see them then, not mid-run. A `tools/call` failure raised mid-run is wrapped by `tool()` and reaches the model as data. Branch on Over http, Node's built-in `fetch` abandons a request whose headers take over 300 s regardless of `timeoutMs`; that surfaces as `type: "timeout"` with `UND_ERR_HEADERS_TIMEOUT` in the message. For longer calls pass `{ type: "http", url, fetch }` with a `fetch` backed by an undici `Agent` (`headersTimeout`/`bodyTimeout`) from your own app.
+
+`McpTransportError.type`:
 
 ```ts
 import { McpTransportError } from "@warlock.js/ai-tools";
