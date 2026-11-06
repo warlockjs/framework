@@ -942,14 +942,21 @@ export abstract class Model<out TSchema extends ModelSchema = ModelSchema> {
    *
    * Supports both top-level keys and dot-notation paths for nested access.
    *
+   * Returns what the database stored, unconverted: an unset column is `null`
+   * on PostgreSQL and `undefined` (absent) on MongoDB. To test whether a field
+   * holds a value, use {@link Model.isFilled} or `get(field) == null`, never
+   * `=== undefined`.
+   *
    * @param field - The field name or dot-notation path (e.g., "address.city")
-   * @param defaultValue - Value to return if the field is missing
+   * @param defaultValue - Value to return if the field is missing. It is not
+   *   used for a field that holds `null`.
    * @returns The field value or the default value if not found
    *
    * @example
    * ```typescript
    * user.get("name"); // "Alice"
    * user.get("address.city", "Unknown"); // "Unknown" if address.city is missing
+   * user.get("nickname", "none"); // null on PostgreSQL when the column is unset
    * ```
    */
   public get<TKey extends ModelKey<TSchema>>(field: TKey): ModelValue<TSchema, TKey>;
@@ -973,21 +980,24 @@ export abstract class Model<out TSchema extends ModelSchema = ModelSchema> {
   }
 
   /**
-   * Get a string value
+   * Get a string value. Like {@link Model.get}, it returns `null` for an unset
+   * PostgreSQL column, and the default applies only when the field is missing.
    */
   public string(key: string, defaultValue?: string): string | undefined {
     return getStringField(this, key, defaultValue);
   }
 
   /**
-   * Get a number value
+   * Get a number value. Like {@link Model.get}, it returns `null` for an unset
+   * PostgreSQL column, and the default applies only when the field is missing.
    */
   public number(key: string, defaultValue?: number): number | undefined {
     return getNumberField(this, key, defaultValue);
   }
 
   /**
-   * Get a boolean value
+   * Get a boolean value. Like {@link Model.get}, it returns `null` for an unset
+   * PostgreSQL column, and the default applies only when the field is missing.
    */
   public boolean(key: string, defaultValue?: boolean): boolean | undefined {
     return getBooleanField(this, key, defaultValue);
@@ -1039,6 +1049,10 @@ export abstract class Model<out TSchema extends ModelSchema = ModelSchema> {
    * Checks whether a field exists in the model's data.
    *
    * Supports both top-level keys and dot-notation paths.
+   *
+   * It checks that the key exists, not that it holds a value: an unset
+   * PostgreSQL column is loaded as `null`, so `has()` is `true` for it. To test
+   * for a value, use {@link Model.isFilled}.
    *
    * @param field - The field name or dot-notation path
    * @returns `true` if the field exists, `false` otherwise

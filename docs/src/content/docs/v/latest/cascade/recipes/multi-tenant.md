@@ -83,7 +83,7 @@ export function tenantScoped<TModel extends Model>(ModelClass: ChildModel<TModel
   });
 
   ModelClass.events().onCreating((model) => {
-    if (!model.has("tenantId")) {
+    if (!model.isFilled("tenantId")) {
       model.set("tenantId", requireTenant());
     }
   });

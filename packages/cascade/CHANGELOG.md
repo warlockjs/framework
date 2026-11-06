@@ -4,6 +4,12 @@ All notable changes to `@warlock.js/cascade` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.47.1
+
+### Documentation
+
+- `get()`, `has()`, `string()`, `number()` and `boolean()` say in their JSDoc that an unset PostgreSQL column reads back as `null`, that `has()` is `true` for it, and that a default applies only to a missing key. The accessors page shows `get(field) ?? fallback` for a fallback that also covers `null`, and the multi-tenant recipe checks `tenantId` with `isFilled()`.
+
 ## 5.47.0 - 2026-11-06
 
 ### Added

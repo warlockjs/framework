@@ -152,6 +152,8 @@ Returns `true` when the field exists and is neither `null` nor `undefined`. An e
 
 A column that was never set reads back as **`null`** from the SQL drivers (PostgreSQL): the column exists in the row, its value is SQL `NULL`. On MongoDB the same field is simply **absent**, so `get()` returns `undefined`. Cascade returns what the database stored and does not convert between the two.
 
+The default in `get(field, fallback)` (and in `string()`, `number()`, `boolean()`) applies only when the field is missing, not when it holds `null`: `user.get("nickname", "none")` is `null` for an unset PostgreSQL column. Use `user.get("nickname") ?? "none"` for a fallback that covers both.
+
 That makes `value === undefined` an unreliable "was this set" test: on PostgreSQL it is `false` for an unset column, so the code treats it as set. Use one of these instead:
 
 ```ts
