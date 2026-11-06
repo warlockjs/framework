@@ -4,25 +4,20 @@ All notable changes to `@warlock.js/cascade` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
-## 5.47.1
+## 5.47.0 - 2026-11-06
 
 ### Added
 
+- PostgreSQL pool config accepts `options` (the `options` startup parameter) and `timezone`. MongoDB date helpers were checked: they run in UTC by default and are unaffected.
 - `model.isFilled(field)`: `true` when the field exists and is neither `null` nor `undefined`. A column that was never set reads back as `null` on PostgreSQL (and is absent on MongoDB), so `=== undefined` checks pass for it; `has()` is also `true` for a `null` column. `isFilled()` treats both the same way.
-
-### Documentation
-
-- The accessors page and the `define-model` / `query-data` skills now state the null contract: an unset column is `null` on PostgreSQL and missing on MongoDB, with the recommended checks.
-
-## 5.47.0 - 2026-11-06
 
 ### Changed
 
 - Behaviour change, PostgreSQL: every connection now starts with its session time zone pinned to `UTC` (sent as the `options` startup parameter, so pooled connections need no extra round trip). Before, the session followed the database server's zone, which shifted `groupByDate` buckets and `whereDate` / `whereDateBetween` results for rows near a day or month boundary whenever that zone was not UTC. Raw SQL such as `now()::date` also runs in UTC now. To choose another zone set `timezone` (e.g. `clientOptions: { timezone: "Africa/Cairo" }`); to keep the server's zone set `timezone: false`. An explicit `-c TimeZone=…` in `options` or in the connection string still wins.
 
-### Added
+### Documentation
 
-- PostgreSQL pool config accepts `options` (the `options` startup parameter) and `timezone`. MongoDB date helpers were checked: they run in UTC by default and are unaffected.
+- The accessors page and the `define-model` / `query-data` skills now state the null contract: an unset column is `null` on PostgreSQL and missing on MongoDB, with the recommended checks.
 
 ## 5.46.0 - 2026-11-06
 
