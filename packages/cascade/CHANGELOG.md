@@ -10,21 +10,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - PostgreSQL pool config accepts `options` (the `options` startup parameter) and `timezone`. MongoDB date helpers were checked: they run in UTC by default and are unaffected.
 - `model.isFilled(field)`: `true` when the field exists and is neither `null` nor `undefined`. A column that was never set reads back as `null` on PostgreSQL (and is absent on MongoDB), so `=== undefined` checks pass for it; `has()` is also `true` for a `null` column. `isFilled()` treats both the same way.
+- `saved`, `created` and `updated` listeners now receive the change diff in their context (`changes`: each changed column with its `oldValue` / `newValue`, `changedColumns`, plus `isInsert`, `options` and `mode`). Before, the dirty tracker had already reset when these events fired, so a listener could not tell which fields changed. The tracker still resets before the events, so a listener that saves again sees fresh state.
+- `model.getLastSaveChanges()` returns the diff of the last successful `save()`, during the post-save events and afterwards. It is empty for an insert.
 
 ### Changed
 
 - Behaviour change, PostgreSQL: every connection now starts with its session time zone pinned to `UTC` (sent as the `options` startup parameter, so pooled connections need no extra round trip). Before, the session followed the database server's zone, which shifted `groupByDate` buckets and `whereDate` / `whereDateBetween` results for rows near a day or month boundary whenever that zone was not UTC. Raw SQL such as `now()::date` also runs in UTC now. To choose another zone set `timezone` (e.g. `clientOptions: { timezone: "Africa/Cairo" }`); to keep the server's zone set `timezone: false`. An explicit `-c TimeZone=…` in `options` or in the connection string still wins.
 
-### Documentation
-
-- The accessors page and the `define-model` / `query-data` skills now state the null contract: an unset column is `null` on PostgreSQL and missing on MongoDB, with the recommended checks.
-- `saved`, `created` and `updated` listeners now receive the change diff in their context (`changes`: each changed column with its `oldValue` / `newValue`, `changedColumns`, plus `isInsert`, `options` and `mode`). Before, the dirty tracker had already reset when these events fired, so a listener could not tell which fields changed. The tracker still resets before the events, so a listener that saves again sees fresh state.
-- `model.getLastSaveChanges()` returns the diff of the last successful `save()`, during the post-save events and afterwards. It is empty for an insert.
-- PostgreSQL pool config accepts `options` (the `options` startup parameter) and `timezone`. MongoDB date helpers were checked: they run in UTC by default and are unaffected.
-
 ### Fixed
 
 - PostgreSQL pool config forwards every `clientOptions` key `pg` accepts (`statement_timeout`, `query_timeout`, `lock_timeout`, `idle_in_transaction_session_timeout`, `keepAliveInitialDelayMillis`, `allowExitOnIdle`, `client_encoding`, `types`, …) instead of dropping the ones it did not list. Only Cascade's own keys (`naming`, `timezone`, `nativeArrayColumns`, `logging`) are kept out; Cascade's pool defaults still apply.
+
+### Documentation
+
+- The accessors page and the `define-model` / `query-data` skills now state the null contract: an unset column is `null` on PostgreSQL and missing on MongoDB, with the recommended checks.
 
 ## 5.46.0 - 2026-11-06
 

@@ -10,7 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
-- `npx warlock release-notes` includes the 5.47.0 notes: image tool results stored as parts, workspace search that skips dependency folders and a live shell output hook, PostgreSQL sessions in UTC, mixed page-route segments, model lifecycle and tiered pricing tables, long MCP calls, single-file array uploads, and the test server loading app modules again.
+- `npx warlock release-notes` includes the 5.47.0 notes: image tool results stored as parts, workspace search that skips dependency folders and a live shell output hook, PostgreSQL sessions in UTC, the save's changes in `saved` / `updated` listeners, mixed page-route segments, model lifecycle and tiered pricing tables, long MCP calls, single-file array uploads, and the test server loading app modules again.
 
 ### Fixed
 

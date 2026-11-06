@@ -187,13 +187,13 @@ Conditional on the delete strategy — soft deletes shouldn't cascade, permanent
 
 ## Reading what changed in `saved` / `updated`
 
-The dirty tracker resets as soon as the write succeeds, *before* `saved` and `created` / `updated` fire, so `getDirtyColumnsWithValues()` is already empty inside those listeners. The diff of the save that just ran is available two ways:
+The dirty tracker resets as soon as the write succeeds, _before_ `saved` and `created` / `updated` fire, so `getDirtyColumnsWithValues()` is already empty inside those listeners. The diff of the save that just ran is available two ways:
 
 ```ts
 Product.on("updated", async (product, context) => {
   // 1. In the event context
   const { price } = context.changes; // { oldValue, newValue } per changed column
-  context.changedColumns;            // ["price", "updatedAt"]
+  context.changedColumns; // ["price", "updatedAt"]
 
   // 2. On the model, during the event and after the save
   product.getLastSaveChanges();

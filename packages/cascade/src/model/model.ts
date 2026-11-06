@@ -1289,7 +1289,9 @@ export abstract class Model<out TSchema extends ModelSchema = ModelSchema> {
    *
    * @internal
    */
-  public setLastSaveChanges(changes: Record<string, { oldValue: unknown; newValue: unknown }>): void {
+  public setLastSaveChanges(
+    changes: Record<string, { oldValue: unknown; newValue: unknown }>,
+  ): void {
     this.lastSaveChanges = changes;
   }
 

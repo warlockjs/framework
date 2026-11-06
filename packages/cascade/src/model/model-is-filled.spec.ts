@@ -4,7 +4,12 @@ import { dataSourceRegistry } from "../data-source/data-source-registry";
 import { PostgresDialect } from "../drivers/postgres/postgres-dialect";
 import { Model } from "./model";
 
-class Profile extends Model<{ avatar?: string | null; bio?: string; visits?: number; nested?: unknown }> {
+class Profile extends Model<{
+  avatar?: string | null;
+  bio?: string;
+  visits?: number;
+  nested?: unknown;
+}> {
   public static table = "profiles";
 }
 
@@ -12,7 +17,9 @@ describe("Model.isFilled", () => {
   beforeEach(() => {
     dataSourceRegistry.clear();
 
-    const driver = { dialect: new PostgresDialect(), on: () => undefined,
+    const driver = {
+      dialect: new PostgresDialect(),
+      on: () => undefined,
       getDirtyTracker: () => ({}),
     };
     dataSourceRegistry.register(

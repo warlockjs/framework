@@ -1158,6 +1158,8 @@ user.get<number>("age"); // TypeScript generic for typed reads
 
 Use the direct `.id` property; use `.get("field")` for everything else. Add a typed getter on the model class when the same field is read in many places — turns N typed-cast call sites into one named accessor.
 
+**Null contract.** A column never set reads back as `null` on PostgreSQL (the key exists, value SQL `NULL`) and is absent (`undefined`) on MongoDB; Cascade returns what the database stored. Never test "was this set" with `=== undefined`: on PostgreSQL it passes for an unset column. Use `model.isFilled("field")` (false for `null` and missing; `""`, `0`, `false` count as filled) or `model.get("field") == null`. `model.has("field")` is true for a `null` column. A schema `.optional()` types the key as `T | undefined`, though a PostgreSQL row holds `null`.
+
 ### `.id` vs `.uuid` — a TypeScript convenience, same value
 
 Both getters return the model's primary id (`this.get("id")`); the only difference is the **static type**:
@@ -2451,6 +2453,7 @@ const activeUsers = await User.query().scope("active").get();
 
 ## Things NOT to do
 
+- Don't test an unset column with `=== undefined`: PostgreSQL returns `null` for it (MongoDB omits the field). Use `model.isFilled("field")` or `== null`. Same for lean rows.
 - Don't `.count() > 0` for existence — use `.exists()`.
 - Don't `Model.all()` without a filter on a production table — use pagination or chunking.
 - Don't `!` away the null from `.find()` / `.first()` — handle the missing case explicitly or use `.firstOrFail()` when absence is a real error.
@@ -2837,8 +2840,8 @@ User.off("saved", handler);
 ### Audit log (combined with dirty tracking)
 
 ```ts
-Model.on("updated", async (instance) => {
-  const changes = instance.getDirtyColumnsWithValues();
+Model.on("updated", async (instance, context) => {
+  const changes = context.changes; // same as instance.getLastSaveChanges()
   if (Object.keys(changes).length === 0) {
     return;
   }
@@ -2852,7 +2855,7 @@ Model.on("updated", async (instance) => {
 });
 ```
 
-Use `updated` (not `saved`) when you only want change diffs — `getDirtyColumnsWithValues()` is still populated in the post-write events because the tracker resets _after_ they fire.
+Use `updated` (not `saved`) when you only want change diffs. The dirty tracker resets right after the write and _before_ `saved` / `created` / `updated` fire, so `getDirtyColumnsWithValues()` is empty there. Read the diff from `context.changes` (`{ column: { oldValue, newValue } }`, plus `context.changedColumns`) or from `instance.getLastSaveChanges()`, which stays available after `save()` returns. An insert has an empty diff. A listener that saves the model again gets its own fresh diff; the outer event keeps its own. `restored`, `deleted`, bulk query writes and atomic ops have no per-field diff.
 
 ### Cache invalidation
 
@@ -2889,7 +2892,7 @@ For external side effects (queues, emails) that must only fire if a surrounding 
 
 ---
 name: track-changes
-description: 'Inspect a model''s pending changes — `hasChanges()` (any field dirty?), `isDirty(column)` (one column), `getDirtyColumns()` (changed field names), `getDirtyColumnsWithValues()` (old + new per field), `getRemovedColumns()` (unset fields). Triggers: `hasChanges`, `isDirty`, `getDirtyColumns`, `getDirtyColumnsWithValues`, `getRemovedColumns`; "only run if email changed", "diff for an audit log", "what fields are dirty", "compare old vs new value"; typical import `import { Model } from "@warlock.js/cascade"`. Skip: hooking into save — the `subscribe-to-model-events` topic; update idioms — the `define-model` topic; competing libs `mongoose` `isModified` / `modifiedPaths`, `typeorm` change detection.'
+description: 'Inspect a model''s pending changes — `hasChanges()` (any field dirty?), `isDirty(column)` (one column), `getDirtyColumns()` (changed field names), `getDirtyColumnsWithValues()` (old + new per field), `getRemovedColumns()` (unset fields), `getLastSaveChanges()` (the diff of the save that just ran). Triggers: `getLastSaveChanges`, `hasChanges`, `isDirty`, `getDirtyColumns`, `getDirtyColumnsWithValues`, `getRemovedColumns`; "only run if email changed", "diff for an audit log", "what fields are dirty", "compare old vs new value"; typical import `import { Model } from "@warlock.js/cascade"`. Skip: hooking into save — the `subscribe-to-model-events` topic; update idioms — the `define-model` topic; competing libs `mongoose` `isModified` / `modifiedPaths`, `typeorm` change detection.'
 ---
 
 # Track changes
@@ -3031,6 +3034,10 @@ Before 4.9.1 a `Date` merged over a column that **already held a `Date`** was si
 
 - The `subscribe-to-model-events` topic — combining with `saved` / `saving` for cross-cutting behavior
 - The `define-model` topic — the `.set` / `.merge` / `.save` idioms that stage changes
+
+## After the save
+
+The tracker resets once a save succeeds, so the methods above report nothing afterwards. `user.getLastSaveChanges()` returns the diff the last `save()` wrote (`{ column: { oldValue, newValue } }`, empty for an insert); `saved` / `updated` listeners also receive it as `context.changes`.
 
 
 ## write-migration  `@warlock.js/cascade/skills/write-migration/SKILL.md`
