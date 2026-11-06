@@ -1,4 +1,16 @@
 {
+  "5.47.2": {
+    "publishedAt": "2026-11-06T23:45:59.445Z",
+    "matrix": "none",
+    "headline": "Release notes that show newer releases, the queue in app CLI commands, a dev cache per project, and early warnings for imports the build rejects.",
+    "highlights": [
+      "`npx warlock release-notes` adds a \"Newer releases (not installed)\" section from the docs site; `--json` reports installed and latest versions; `--offline` keeps the bundled-only output.",
+      "`preload: { configuredConnectors: true }` starts the app's configured connectors, such as the queue, for a CLI command.",
+      "`warlock dev` keeps a dependency cache per project root (`webConnector({ cacheDir })` to choose), so checkouts sharing `node_modules` don't break each other.",
+      "`warlock dev` and `warlock check` (`WL9027`) warn about `?raw`, `?url`, `?worker` and static-asset imports in server-compiled code."
+    ],
+    "upgradeNotes": ["`node_modules/.vite/warlock-dev` is no longer used and can be deleted."]
+  },
   "5.47.1": {
     "publishedAt": "2026-11-06T22:42:39.658Z",
     "matrix": "none",

@@ -136,6 +136,89 @@
   ],
   "releases": [
     {
+      "version": "5.47.2",
+      "id": "v5-47-2",
+      "date": "November 6, 2026",
+      "isUnreleased": false,
+      "headlineHtml": "Release notes that show newer releases, the queue in app CLI commands, a dev cache per project, and early warnings for imports the build rejects.",
+      "highlights": [
+        "<code>npx warlock release-notes</code> adds a \"Newer releases (not installed)\" section from the docs site; <code>--json</code> reports installed and latest versions; <code>--offline</code> keeps the bundled-only output.",
+        "<code>preload: { configuredConnectors: true }</code> starts the app's configured connectors, such as the queue, for a CLI command.",
+        "<code>warlock dev</code> keeps a dependency cache per project root (<code>webConnector({ cacheDir })</code> to choose), so checkouts sharing <code>node_modules</code> don't break each other.",
+        "<code>warlock dev</code> and <code>warlock check</code> (<code>WL9027</code>) warn about <code>?raw</code>, <code>?url</code>, <code>?worker</code> and static-asset imports in server-compiled code."
+      ],
+      "upgradeNotes": [
+        "<code>node_modules/.vite/warlock-dev</code> is no longer used and can be deleted."
+      ],
+      "summaryHtml": null,
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/5.47.2-summary.md",
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 4,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 3
+            },
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>npx warlock release-notes</code> includes the 5.47.2 notes: release notes that show newer releases, <code>preload.configuredConnectors</code> for CLI commands, a per-project dev dependency cache, and early warnings for imports the production build rejects."
+            },
+            {
+              "type": "Added",
+              "html": "<code>preload.configuredConnectors</code> for CLI commands: starts the early-phase connectors the app lists in <code>warlock.config.ts &gt; connectors</code> (the queue, for example) without importing every module's <code>main.ts</code>, so an app's own command can dispatch queue jobs. It works with or without <code>connectors</code>; <code>mainModules: true</code> still implies it, and commands that set neither are unchanged."
+            },
+            {
+              "type": "Added",
+              "html": "<code>warlock check</code> reports <code>WL9027</code> (a warning) when a file the production server bundle compiles, meaning any non-test source file under <code>src/web</code> and the project files they import, imports a static asset or a <code>?raw</code> or <code>?url</code> query, or a bare <code>?worker</code> query (worded as \"may fail\"). <code>warlock dev</code> accepts these imports and <code>warlock build</code> fails on them; the message names the file, the import and the build error's advice (move the file to <code>public/</code> and reference its root URL). Files only the browser build reads are not reported."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>npx warlock release-notes</code> now checks <code>https://warlock.js.org/release-notes.json</code> for releases newer than the installed one. After the installed version's notes it prints a \"Newer releases (not installed)\" section with breaking changes first and the <code>npx warlock update</code> command; <code>--from</code> runs to the latest release unless <code>--to</code> caps it, <code>--version</code> can show a newer release and <code>--list</code> marks installed and newer versions. The check is fail-soft (5 second timeout, 2 MB cap, shape validated, HTTPS to warlock.js.org only): a failure prints the bundled notes plus one warning line and leaves the exit code unchanged. Pass <code>--offline</code> for the previous bundled-only behaviour. <code>--json</code> adds <code>installedVersion</code>, <code>latestVersion</code>, and per release <code>installed</code> and <code>source</code>."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/web",
+          "slug": "web",
+          "total": 3,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 2
+            },
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>webConnector({ cacheDir })</code> sets the directory of Vite's dependency cache in <code>warlock dev</code>. A relative path is resolved against the app root."
+            },
+            {
+              "type": "Added",
+              "html": "<code>warlock dev</code> warns, once per file, when the server render evaluates a module that imports a static asset or a <code>?raw</code>, <code>?url</code> or <code>?worker</code> query (such as <code>some-pkg/dist/worker.mjs?worker&amp;url</code>). These imports work in development and fail <code>warlock build</code>, because pages are compiled into the server bundle; the warning gives the build error's advice; a bare <code>?worker</code> query gets softer wording because the build does not reject it. <code>warlock check</code> reports the same imports as <code>WL9027</code>."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>warlock dev</code> keeps Vite's optimized dependencies in <code>node_modules/.vite/warlock-dev-&lt;hash&gt;</code>, where the hash comes from the resolved project root. Checkouts of one app that share a <code>node_modules</code> (git worktrees) no longer share one cache, so one dev server re-optimizing no longer makes the others answer <code>504 Outdated Optimize Dep</code>. The directory is stable for a project across runs; folders left by moved or deleted checkouts can be removed by hand."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "5.47.1",
       "id": "v5-47-1",
       "date": "November 6, 2026",
