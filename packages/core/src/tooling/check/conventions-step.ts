@@ -31,6 +31,11 @@ import {
   type ClientBoundaryCache,
 } from "./client-boundary-conventions";
 import {
+  createServerGraphCache,
+  serverGraphImportProblems,
+  type ServerGraphCache,
+} from "./server-graph-imports";
+import {
   createRuleBudget,
   DEFAULT_RULE_BUDGET_MS,
   withinBudget,
@@ -43,6 +48,7 @@ import { positionOf, type SourceFinding } from "./source-ast";
 const RULES = {
   imports: "WL9001-WL9003 imports",
   clientBoundary: "WL9022 client boundary",
+  serverGraphImports: "WL9027 server bundle imports",
   translations: "WL9104 translations",
   integrationSpec: "WL9024 integration specs",
   security: "WL9005-WL9009 security",
@@ -59,6 +65,8 @@ const RULES = {
 export type ConventionRun = {
   /** Import chains already walked by the `.client` boundary rule. */
   boundary?: ClientBoundaryCache;
+  /** The files the production server bundle compiles, found once by the `WL9027` rule. */
+  serverGraph?: ServerGraphCache;
   /** Time each rule has used so far; a rule over budget is skipped. */
   budget?: RuleBudget;
 };
@@ -244,6 +252,9 @@ function findingProblem(
  *   (see `integrationSpecProblems`).
  * - `WL9022` server-only code that imports a `.client.*` module, directly or
  *   through other files (see `clientBoundaryProblems`);
+ * - `WL9027` (warning) a file the production server bundle compiles imports a
+ *   static asset or a `?raw` / `?url` / `?worker` query (see
+ *   `serverGraphImportProblems`);
  * - `WL9023` an `index.ts` barrel in an app module, only when `rules.WL9023`
  *   in `.warlock-check.json` turns it on (see `barrelFindings`).
  *
@@ -271,6 +282,9 @@ export function checkFileConventions(
     ...timed(RULES.imports, noProblems, () => importProblems(sourceFile, relativePath, cwd)),
     ...timed(RULES.clientBoundary, noProblems, () =>
       clientBoundaryProblems(sourceFile, relativePath, cwd, run.boundary),
+    ),
+    ...timed(RULES.serverGraphImports, noProblems, () =>
+      serverGraphImportProblems(sourceFile, relativePath, cwd, run.serverGraph),
     ),
     ...timed(RULES.translations, noProblems, () => translationProblems(relativePath, source)),
     ...timed(RULES.integrationSpec, noProblems, () =>
@@ -400,7 +414,11 @@ export function runConventions(
 
   const routeFacts = apiRouteFacts ?? collectApiRouteFacts(cwd, files);
   const models = modelFacts ?? collectModelFacts(cwd, files);
-  const run: ConventionRun = { boundary: createClientBoundaryCache(), budget };
+  const run: ConventionRun = {
+    boundary: createClientBoundaryCache(),
+    serverGraph: createServerGraphCache(),
+    budget,
+  };
 
   onProgress?.(`conventions: checking ${files.length} file(s)`);
 

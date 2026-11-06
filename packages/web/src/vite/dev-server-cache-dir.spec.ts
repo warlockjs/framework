@@ -30,11 +30,41 @@ async function devConfig(appRoot: string) {
 }
 
 describe("dev server Vite config — its own cacheDir", () => {
-  it("uses <appRoot>/node_modules/.vite/warlock-dev", async () => {
+  it("uses <appRoot>/node_modules/.vite/warlock-dev-<hash of the app root>", async () => {
     const appRoot = path.resolve(WEB_ROOT, "..", "some-app");
     const config = await devConfig(appRoot);
 
-    expect(config.cacheDir).toBe(path.join(appRoot, "node_modules", ".vite", "warlock-dev"));
+    expect(path.dirname(config.cacheDir as string)).toBe(path.join(appRoot, "node_modules", ".vite"));
+    expect(path.basename(config.cacheDir as string)).toMatch(/^warlock-dev-[0-9a-f]{8}$/);
+  });
+
+  it("is stable for one project and differs between project roots", () => {
+    const first = path.resolve(WEB_ROOT, "..", "app-one");
+    const second = path.resolve(WEB_ROOT, "..", "app-two");
+
+    expect(webDevServerCacheDir(first)).toBe(webDevServerCacheDir(first));
+    expect(path.basename(webDevServerCacheDir(first))).not.toBe(
+      path.basename(webDevServerCacheDir(second)),
+    );
+  });
+
+  it("lets an explicit cacheDir win, resolving a relative one against the app root", async () => {
+    const appRoot = path.resolve(WEB_ROOT, "..", "some-app");
+
+    expect(webDevServerCacheDir(appRoot, "/tmp/vite-cache")).toBe(path.resolve("/tmp/vite-cache"));
+    expect(webDevServerCacheDir(appRoot, ".cache/vite")).toBe(path.join(appRoot, ".cache", "vite"));
+    expect(
+      (await createWebConnectorViteConfig({
+        appRoot,
+        appSrcRoot: path.join(appRoot, "src"),
+        webRoot: WEB_ROOT,
+        workspaceRoot: path.resolve(WEB_ROOT, ".."),
+        cacheDir: ".cache/vite",
+        hmrServer: createNodeServer(),
+        handlePageHotUpdate: async () => false,
+        leadingPlugins: [],
+      })).cacheDir,
+    ).toBe(path.join(appRoot, ".cache", "vite"));
   });
 
   it("is never Vite's shared default directory, which vitest and other Vite processes use", async () => {
@@ -45,7 +75,7 @@ describe("dev server Vite config — its own cacheDir", () => {
     expect(config.cacheDir).not.toBe(sharedDefault);
     // Nested under it, so one `.vite` stays the only artefact in node_modules,
     // but a different directory: neither side can wipe the other's files.
-    expect(path.relative(sharedDefault, config.cacheDir as string)).toBe("warlock-dev");
+    expect(path.relative(sharedDefault, config.cacheDir as string)).toMatch(/^warlock-dev-[0-9a-f]{8}$/);
   });
 
   it("resolves a relative appRoot to an absolute directory", () => {

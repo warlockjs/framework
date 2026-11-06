@@ -11,6 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 
 - `preload.configuredConnectors` for CLI commands: starts the early-phase connectors the app lists in `warlock.config.ts > connectors` (the queue, for example) without importing every module's `main.ts`, so an app's own command can dispatch queue jobs. It works with or without `connectors`; `mainModules: true` still implies it, and commands that set neither are unchanged.
+- `warlock check` reports `WL9027` (a warning) when a file the production server bundle compiles, meaning any non-test source file under `src/web` and the project files they import, imports a static asset or a `?raw` or `?url` query, or a bare `?worker` query (worded as "may fail"). `warlock dev` accepts these imports and `warlock build` fails on them; the message names the file, the import and the build error's advice (move the file to `public/` and reference its root URL). Files only the browser build reads are not reported.
 
 ## 5.47.1 - 2026-11-07
 

@@ -792,6 +792,14 @@ export const ERROR_CODES = {
     fix: 'The rule stopped for the rest of the run, so its findings are incomplete. Use `--changed` to check fewer files, raise `ruleBudgetMs` in .warlock-check.json (0 turns the budget off), or turn the rule off with `rules: { WLxxxx: "off" }`.',
     skill: "warlock-check",
   },
+  WL9027: {
+    code: "WL9027",
+    area: "convention",
+    category: "code",
+    title: "A page's server graph imports a static asset or a ?raw, ?url or ?worker query",
+    fix: "Move the static file into the application's public/ directory and reference it by its root URL (public/logo.svg becomes /logo.svg). `warlock dev` accepts these imports, but pages are compiled into the production server bundle, which supports plain code imports only, so `warlock build` fails on them.",
+    skill: "warlock-conventions",
+  },
   WL9101: {
     code: "WL9101",
     area: "convention",

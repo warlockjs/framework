@@ -304,6 +304,13 @@ export type WebConnectorOptions = {
   resolveAlias?: Alias[];
   /** Extra `ssr.external` entries, appended to {@link CORE_OPTIONAL_PEERS}. */
   ssrExternal?: string[];
+  /**
+   * Directory for Vite's optimized dependencies in `warlock dev`. Defaults to
+   * `node_modules/.vite/warlock-dev-<hash of the app root>`, so checkouts that
+   * share one `node_modules` do not share a cache. A relative path is resolved
+   * against the app root.
+   */
+  cacheDir?: string;
   /** Extra Vite plugins, appended after the client-boundary gates. */
   plugins?: PluginOption[];
   /** Milliseconds Vite's development SSR module fetch may take before failing. */
@@ -1116,6 +1123,7 @@ export class WebConnector extends BaseConnector {
         appSrcRoot: paths.appSrcRoot,
         webRoot: paths.webRoot,
         workspaceRoot,
+        cacheDir: this.options.cacheDir,
         hmrServer: fastify.server,
         sites: config.get("web", {}).sites,
         moduleBoundary: config.get("web", {}).moduleBoundary,
