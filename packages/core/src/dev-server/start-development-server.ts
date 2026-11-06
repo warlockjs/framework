@@ -1,11 +1,13 @@
 import { colors } from "@mongez/copper";
 import { isBootPreconditionError } from "./boot-precondition-error";
 import { devLogError, devServeLog } from "./dev-logger";
+import { writeDevPidFile } from "./dev-pid-file";
 import { DevelopmentServer } from "./development-server";
 import { registerDevShortcuts } from "./register-dev-shortcuts";
 import { BOOT_PRECONDITION_EXIT_CODE, QUIT_EXIT_CODE } from "./supervisor";
 
 let handlersRegistered = false;
+let removePidFile: (() => void) | undefined;
 
 /**
  * Options accepted by `startDevelopmentServer`. CLI flags translate to
@@ -48,6 +50,10 @@ export async function startDevelopmentServer(
 
   const devServer = new DevelopmentServer(options);
 
+  // This process is the server, even when `warlock dev` started it through a
+  // supervisor, so its PID is the one worth recording.
+  removePidFile ??= writeDevPidFile();
+
   registerShutdownHandlers(devServer);
 
   try {
@@ -81,9 +87,16 @@ function registerShutdownHandlers(devServer: DevelopmentServer): void {
   if (handlersRegistered) return;
   handlersRegistered = true;
 
+  let signalled = false;
+
   const onSignal = (signal: NodeJS.Signals) => async () => {
+    // The supervisor forwards a signal the terminal may also have delivered.
+    if (signalled) return;
+
+    signalled = true;
     devServeLog(colors.yellow(`📡 Received ${signal}`));
     const ok = await safeShutdown(devServer);
+    removePidFile?.();
     process.exit(ok ? 0 : QUIT_EXIT_CODE);
   };
 

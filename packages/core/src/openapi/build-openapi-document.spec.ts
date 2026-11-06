@@ -490,6 +490,27 @@ describe("buildOpenApiDocument — responses from responseSchema", () => {
     });
   });
 
+  it("documents an array of plain objects written as a one-element tuple", () => {
+    const op = operation(
+      [
+        route("GET", "/a", {
+          responseSchema: { 200: { body: { items: [{ id: "int", label: "string" }] } } },
+        }),
+      ],
+      "/a",
+      "get",
+    );
+
+    expect(op.responses["200"].content["application/json"].schema.properties.items).toEqual({
+      type: "array",
+      items: {
+        type: "object",
+        properties: { id: { type: "integer" }, label: { type: "string" } },
+        required: ["id", "label"],
+      },
+    });
+  });
+
   it("maps casts, nested objects and nullable / array suffixes", () => {
     const op = operation(
       [

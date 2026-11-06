@@ -122,7 +122,7 @@ export class Storage extends ScopedStorage implements StorageManagerContract {
    *
    * Called automatically on first driver access.
    */
-  public async init(): Promise<void> {
+  public async init(options?: { deferDefaultDriver?: boolean }): Promise<void> {
     if (this.initialized) return;
 
     // Mark as initialized FIRST to prevent infinite recursion
@@ -134,6 +134,11 @@ export class Storage extends ScopedStorage implements StorageManagerContract {
 
     this.defaultDriverName = defaultName as StorageDriverName;
     this.loadDriversFromConfig();
+
+    // The test kit replaces every driver with a local one right after the
+    // connectors start, so building the configured default (a cloud driver
+    // whose SDK may not be installed) here would only fail the boot.
+    if (options?.deferDefaultDriver) return;
 
     // Now set the actual driver
     this._driver = this.resolveDriver(this.defaultDriverName);
@@ -189,7 +194,12 @@ export class Storage extends ScopedStorage implements StorageManagerContract {
 
     if (contextDriver) return contextDriver;
 
-    if (!this._driver) throw new StorageNotInitializedError();
+    if (!this._driver) {
+      if (!this.initialized || !this.defaultDriverName) throw new StorageNotInitializedError();
+
+      // Initialized with the default driver deferred: build it on first use.
+      this._driver = this.resolveDriver(this.defaultDriverName);
+    }
 
     return this._driver;
   }

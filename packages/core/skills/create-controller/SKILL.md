@@ -168,6 +168,7 @@ A body is an object whose values are one of:
 | a cast string, with the resource suffixes | `"string"`, `"number?"`, `"string[]"`, `"date[]?"` (`?` is `T \| null`, key always present) |
 | a resource                                | one `ResourceOutput` object                                                                 |
 | `[Resource]`                              | an array of that resource                                                                   |
+| `[{ ...shape }]` | an array of plain objects: `items: [{ id: "int", label: "string" }]`; untyped arrays of objects are the cast `"object[]"` |
 | a nested plain object of any of the above | recursed                                                                                    |
 
 The output types follow the same rules as `defineResource` (`ResponseBodyOutput<B>` and `ResponseSchemaOutput<S>` are exported if you need the type of a body or of the whole schema).

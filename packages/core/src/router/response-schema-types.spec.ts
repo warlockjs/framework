@@ -53,6 +53,17 @@ describe("describeResponseSchemaTypes", () => {
     });
   });
 
+  it("serializes an array of plain objects", () => {
+    const described = describeResponseSchemaTypes(
+      { 200: { body: { items: [{ id: "int", owner: UserResource }] } } },
+      resolver(),
+    );
+
+    expect(described).toEqual({
+      "200": `{ "items": ({ "id": ${cast("int")}; "owner": ${USER} })[] }`,
+    });
+  });
+
   it("JSON-quotes keys that are not identifiers", () => {
     const described = describeResponseSchemaTypes(
       { 200: { body: { "x-total": "int", 'we"ird': "string" } } },

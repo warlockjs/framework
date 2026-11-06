@@ -60,8 +60,8 @@ Conditional variants (run inside `v.object` only — sibling resolution needs a 
 ```ts
 .requiredIf(field, value)       // required when sibling field === value
 .requiredIfSibling(field, value)
-.requiredWith(field)            // required when sibling field is present
-.requiredWithout(field)         // required when sibling field is absent
+.requiredWith(field)            // required when the field is present (looked up from the root)
+.requiredWithout(field)         // required when the field is absent (looked up from the root)
 .requiredUnless(field, value)
 .requiredWhen(callback)         // predicate
 .present()                      // key must be present (may be empty)

@@ -67,7 +67,10 @@ declare module "../base-validator" {
     nullish(): this & { isOptional: true; isNullable: true };
 
     /**
-     * Value is required if another field exists
+     * Value is required if another field exists.
+     *
+     * The other field is looked up from the ROOT of the validated data, not
+     * beside this field. Inside a nested object use `requiredWithSibling`.
      */
     requiredWith(field: string, errorMessage?: string): this;
 
@@ -77,7 +80,13 @@ declare module "../base-validator" {
     requiredWithSibling(field: string, errorMessage?: string): this;
 
     /**
-     * Value is required if another field is missing
+     * Value is required if another field is missing.
+     *
+     * The other field is looked up from the ROOT of the validated data, not
+     * beside this field: in `address: { en, ar }`, `ar` is read as `ar` at the
+     * root, so a value with only one locale is rejected. Inside a nested
+     * object use `requiredWithoutSibling`. The whole `required*`, `present*`
+     * and `forbidden*` family without the `Sibling` suffix shares this scope.
      */
     requiredWithout(field: string, errorMessage?: string): this;
 

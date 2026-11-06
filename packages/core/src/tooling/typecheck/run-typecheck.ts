@@ -7,6 +7,7 @@ import {
   runCompiler,
   type CompilerDiagnostic,
 } from "../typescript/compiler";
+import { detectStaleTypings } from "./stale-typings";
 
 export type TypecheckOptions = {
   cwd?: string;
@@ -146,6 +147,23 @@ export function runTypecheck(options: TypecheckOptions = {}): TypecheckResult {
           : "WL7101",
       ),
     );
+  // Type errors on top of out-of-date generated typings are usually the typings'
+  // fault; say so once, ahead of the error list.
+  const stale = problems.some((problem) => problem.severity === "error")
+    ? detectStaleTypings(cwd)
+    : undefined;
+
+  if (stale) {
+    problems.unshift(
+      createProblem({
+        code: "WL7103",
+        source: "typescript",
+        severity: "warning",
+        message: `Generated typings may be stale (${stale.reason}); run \`warlock generate.typings\` and typecheck again before fixing the errors below.`,
+      }),
+    );
+  }
+
   return result(problems, {
     files: wanted ? checked.map((file) => toPosix(path.relative(cwd, file))).sort() : null,
     checkedFiles: checked.length,

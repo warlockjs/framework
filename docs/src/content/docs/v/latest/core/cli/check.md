@@ -167,7 +167,9 @@ warlock typecheck --project tsconfig.app.json
 
 It runs the TypeScript compiler API with `incremental` and `noEmit`, keeping its state in `.warlock/cache/typecheck.tsbuildinfo`, so the second run only re-checks what changed. With `--changed` it collects diagnostics for changed files and their transitive importers. Compilation still runs incrementally across the program.
 
-Problems are `WL7101` (a type error; the TypeScript code is in `rule`) and `WL7102` (a missing or invalid tsconfig). Exit codes match `check`: 0, 1 for type errors, 2 when git is unavailable for `--changed`.
+Problems are `WL7101` (a type error; the TypeScript code is in `rule`) `WL7102` (a missing or invalid tsconfig) and `WL7103` (a warning). Exit codes match `check`: 0, 1 for type errors, 2 when git is unavailable for `--changed`.
+
+Route paths, translation keys and config types come from generated typings in `.warlock/typings`. When the typecheck finds errors and the typings are missing or older than the files in `src`, it reports one `WL7103` warning first: run `warlock generate.typings`, then typecheck again before fixing the errors below it. The warning never changes the exit code.
 
 ## In an agent loop or CI
 
