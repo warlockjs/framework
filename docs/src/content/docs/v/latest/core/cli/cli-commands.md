@@ -263,7 +263,7 @@ Run database migrations. Without flags, runs all pending migrations.
 
 ```bash
 warlock migrate
-warlock migrate --fresh                  # drop all tables, run from scratch
+warlock migrate --fresh                  # drop all tables, run from scratch (also clears the seed log)
 warlock migrate --rollback               # roll everything back
 warlock migrate --list                   # migration state: executed, then what's next
 warlock migrate --pending                # only what will run next, in execution order
@@ -370,7 +370,7 @@ warlock seed --transaction       # run inside a transaction (default: true)
 | `--list, -l`        | boolean |         | Print the seed execution order without running. |
 | `--transaction, -t` | boolean | `true`  | Run all seeds inside a single transaction.      |
 
-Full `bootstrap: true` — seeds touch app models, so the whole app initializes. Slower than `migrate`; that's the price for being able to use model classes in your seed files.
+Full `bootstrap: true` — seeds touch app models, so the whole app initializes. Every module's `main.ts` is imported too (after the connectors, including the `herald` broker when configured), so registries filled there are populated and a seed can import a `main.ts` safely. When every seeder is skipped as already executed, the run prints a warning. Slower than `migrate`; that's the price for being able to use model classes in your seed files.
 
 Authoring seed files — the `seeder()` factory, the `{ track, now, batchSize }` run context, `dependsOn` ordering, and undoing a seed — is covered in the [Seeding guide](../digging-deeper/seeding.md).
 

@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 > ⚠ **Versioning: `@warlock.js/*` does not follow SemVer strictly — breaking changes may ship in a minor.** This is a deliberate decision, not an oversight: the framework is pre-adoption and the cost of a major per behaviour fix currently outweighs the benefit. **Pin an exact version or a tilde range (`~4.13.0`) if you need to opt into changes rather than receive them.** Every breaking change is marked **BREAKING** in its entry and summarised in an _Upgrading_ section at the top of the release. **This policy will change once the framework has consumers beyond its author.**
 
+## 5.46.0
+
+### Fixed
+
+- `warlock migrate --fresh` now empties the seed log (`_seeds` and `_seed_records`) after rebuilding the schema. Before, the next `warlock seed` saw every `once` seeder as already executed and silently did nothing against an empty database. A `warlock seed` run that skips every seeder now prints a warning.
+- `warlock seed` imports every module's `main.ts` after its connectors start (and starts the `herald` connector when configured), so registries filled in `main.ts` are populated while seeding and a seed can import a `main.ts` that uses the queue.
+
+### Added
+
+- `CLICommandPreload.mainModules`: opt a command into importing every module's `main.ts` (no routes, events or locales) after its declared connectors start. Off by default so other commands stay fast.
+
 ## 5.45.0 - 2026-11-05
 
 ### Added

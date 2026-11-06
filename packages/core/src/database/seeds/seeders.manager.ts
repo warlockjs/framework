@@ -160,6 +160,14 @@ export class SeedersManager {
 
     if (skippedCount > 0) console.log(`⏭️  Skipped: ${skippedCount}`);
 
+    if (skippedCount > 0 && skippedCount === this.seeders.length) {
+      console.log(
+        colors.yellow(
+          "⚠️  Every seeder was skipped as already executed. If the database was emptied, run `warlock seed --fresh` or `warlock seed --drop` to reset the seed log.",
+        ),
+      );
+    }
+
     if (failedCount > 0) console.log(`❌ Failed: ${failedCount}`);
 
     console.log("=".repeat(50));

@@ -12,4 +12,9 @@ describe("seed command connectors", () => {
   it("preloads the storage connector so seeders can call storage.put()", () => {
     expect(seedCommand.commandPreload?.connectors).toContain("storage");
   });
+
+  it("boots module main files and the queue broker connector", () => {
+    expect(seedCommand.commandPreload?.mainModules).toBe(true);
+    expect(seedCommand.commandPreload?.connectors).toContain("herald");
+  });
 });

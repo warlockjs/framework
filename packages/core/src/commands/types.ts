@@ -132,6 +132,17 @@ export type CLICommandPreload = {
    * Available connectors: `"http"`, `"database"`, `"cache"`, `"storage"`
    */
   connectors?: ConnectorName[] | true;
+
+  /**
+   * Import every module's `main.ts` after the declared connectors have
+   * started, the same way the HTTP server does, so registries a module fills
+   * in `main.ts` are populated when the command runs.
+   *
+   * Off by default: it scans `src/app` and imports app code, which commands
+   * that only need config or a connection should not pay for. Routes, events
+   * and locales are not loaded.
+   */
+  mainModules?: boolean;
 };
 
 /**

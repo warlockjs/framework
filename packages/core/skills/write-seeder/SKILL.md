@@ -44,7 +44,7 @@ npx warlock seed --drop                     # undo every tracked record, reset t
 npx warlock seed --drop=default-roles       # undo just one seeder's records
 ```
 
-`--fresh` truncates **every** table in the DB (`datasource.driver.truncateTable(table, { cascade: true })`), including the `seeds` tracking table. After `--fresh`, `once: true` seeds will run again.
+`--fresh` truncates **every** table in the DB (`datasource.driver.truncateTable(table, { cascade: true })`), including the `seeds` tracking table. After `--fresh`, `once: true` seeds will run again. `warlock migrate --fresh` clears the seed log too, so the next `warlock seed` runs everything; if every seeder is skipped as already executed, the run warns.
 
 `--drop` is the surgical alternative: it deletes only the rows a seeder **tracked**, in reverse run-order, then resets the matching `seeds`-log rows so `once: true` seeds re-run. See [Undo — `seed_records` + `--drop`](#undo--seed_records----drop).
 

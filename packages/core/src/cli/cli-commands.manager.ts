@@ -852,5 +852,13 @@ export class CLICommandsManager {
         await connectorsManager.start(preloaders.connectors);
       }
     }
+
+    // After the connectors: a `main.ts` may use the queue, cache or database.
+    if (preloaders.mainModules) {
+      await filesOrchestrator.init();
+      await filesOrchestrator.initializeAll();
+      filesOrchestrator.specialFilesCollector.collect(filesOrchestrator.getFiles());
+      await filesOrchestrator.moduleLoader.loadMainModules();
+    }
   }
 }

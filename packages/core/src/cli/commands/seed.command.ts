@@ -9,7 +9,8 @@ export const seedCommand = command({
     config: true,
     env: true,
     bootstrap: true,
-    connectors: ["database", "cache", "logger", "storage"],
+    connectors: ["database", "cache", "logger", "storage", "herald"],
+    mainModules: true,
   },
   options: [
     {

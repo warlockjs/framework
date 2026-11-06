@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { confirmRollback, rollbackMigrations, freshMigrate, getFiles } = vi.hoisted(() => ({
+const { confirmRollback, rollbackMigrations, freshMigrate, getFiles, resetSeedLedger } = vi.hoisted(() => ({
+  resetSeedLedger: vi.fn(),
   confirmRollback: vi.fn(),
   rollbackMigrations: vi.fn(),
   freshMigrate: vi.fn(),
@@ -10,6 +11,7 @@ const { confirmRollback, rollbackMigrations, freshMigrate, getFiles } = vi.hoist
 vi.mock("@warlock.js/cascade", () => ({
   Migration: class {},
   confirmRollback,
+  dataSourceRegistry: { get: vi.fn(() => ({})) },
   exportMigrationsSQL: vi.fn(),
   freshMigrate,
   listExecutedMigrations: vi.fn(),
@@ -28,6 +30,7 @@ vi.mock("../utils/normalized-path", () => ({
 vi.mock("../warlock-config/warlock-config.manager", () => ({
   warlockConfigManager: { get: vi.fn(() => undefined) },
 }));
+vi.mock("./seeds/reset-seed-ledger", () => ({ resetSeedLedger }));
 vi.mock("./resolve-pending-migrations", () => ({ resolvePendingMigrations: vi.fn() }));
 
 import { migrateAction } from "./migrate-action";
@@ -56,6 +59,7 @@ describe("migrate --rollback / --fresh confirmation", () => {
 
     expect(confirmRollback).toHaveBeenCalledWith(expect.objectContaining({ yes: true }));
     expect(freshMigrate).toHaveBeenCalled();
+    expect(resetSeedLedger).toHaveBeenCalled();
   });
 
   it("does not roll back when declined", async () => {

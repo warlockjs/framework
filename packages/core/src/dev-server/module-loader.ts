@@ -104,6 +104,34 @@ export class ModuleLoader {
   }
 
   /**
+   * Import only the `main` files, in discovery order, for processes that need
+   * the registries modules fill at boot (CLI commands such as `seed`) but must
+   * not register routes, events or locales. Failures are aggregated like
+   * {@link loadAll}.
+   */
+  public async loadMainModules(): Promise<void> {
+    const failures: ModuleLoadError[] = [];
+
+    for (const file of this.specialFilesCollector.getFilesByType("main")) {
+      try {
+        await this.loadModule(file, "main");
+      } catch (error) {
+        failures.push(
+          error instanceof ModuleLoadError ? error : new ModuleLoadError("main", file, error),
+        );
+      }
+    }
+
+    if (failures.length > 0) {
+      throw new AggregateError(
+        failures,
+        `${failures.length} module main file(s) failed to load:\n` +
+          failures.map((failure) => `  - ${failure.message}`).join("\n"),
+      );
+    }
+  }
+
+  /**
    * Import a file through the loader hook. For routes, scopes the import in
    * `router.withSourceFile()` so the added routes carry their origin.
    */
