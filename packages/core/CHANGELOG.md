@@ -11,6 +11,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Changed
 
 - The generated notifications scaffold declares `recipientType: "recipient_type"` in the notification model's `columnMap`, adds the column to its schema and migration, and passes `idType: "integer"` to match the scaffolded auth models, so identities that share an id never read each other's notifications. The generated controller spec fixture writes the recipient type on the rows it creates.
+### Fixed
+
+- `warlock add test` pins `@vitest/coverage-v8` to the same exact version as `vitest` (5.0.5), instead of a caret range that resolved to 5.1.0 beside the starter's vitest 5.0.5. npm 10.9 and 11 crashed while installing a freshly scaffolded app with the test feature. A spec now fails when a feature adds a package that peers on a starter dependency at a version other than the starter's pin.
+- `warlock add web` pins `@mongez/react-localization` to 3.5.1, the version its exact peer on `@mongez/localization` requires, so the starter's localization pin cannot split from it when a newer patch ships.
 
 ## 5.45.0 - 2026-11-05
 

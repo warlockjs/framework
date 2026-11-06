@@ -4,6 +4,17 @@ All notable changes to `create-warlock` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.46.0
+
+### Changed
+
+- The starter's `src/config/storage.ts` reads the storage driver from `STORAGE_DRIVER` (default `local`) and the R2 key prefix from `R2_PREFIX`, which defaults to the app's name (`APP_NAME`). The driver and prefix were fixed to `local` and `warlock.js`, so every scaffolded app sharing one R2 bucket wrote to the same prefix. `.env.example` documents both keys. Projects scaffolded before this release keep their hard-coded prefix until they set `R2_PREFIX=warlock.js`.
+
+### Fixed
+
+- A fresh scaffold with the Testing feature no longer crashes npm install. The starter pins `vitest` 5.0.5, and the feature added `@vitest/coverage-v8` as a caret range that resolved to 5.1.0. The starter and the feature now pin the same exact version.
+- The starter pins `@mongez/localization` at 3.5.1 (was `^3.5.1`), the version the Web feature's `@mongez/react-localization` requires as an exact peer.
+
 ## 5.41.0 - 2026-10-29
 
 ### Added

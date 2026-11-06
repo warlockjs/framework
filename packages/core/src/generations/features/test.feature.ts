@@ -5,6 +5,15 @@ import { rootPath, srcPath } from "../../utils";
 import type { FeatureDefinition } from "./types";
 import { VITE_RANGE } from "./web.feature";
 
+/**
+ * The Vitest release the starter template pins. `@vitest/coverage-v8` peers on
+ * `vitest` at one exact version, so both packages get this same string: a caret
+ * range let coverage-v8 resolve past the template's vitest, and npm's installer
+ * crashed on the mismatch. The template's own package.json carries the same pin,
+ * and the template parity spec in this folder fails when the two differ.
+ */
+const VITEST_VERSION = "5.0.5";
+
 async function completeTestInstallation(options: CommandActionData) {
   // Create test-global-setup.ts (runs once before all tests)
   const testGlobalSetupPath = srcPath("test-global-setup.ts");
@@ -216,7 +225,7 @@ export const testFeature: FeatureDefinition = {
   devDependencies: {
     "@mongez/vite": "^2.0.4",
     vite: VITE_RANGE,
-    vitest: "^5.0.3",
-    "@vitest/coverage-v8": "^5.0.3",
+    vitest: VITEST_VERSION,
+    "@vitest/coverage-v8": VITEST_VERSION,
   },
 };
