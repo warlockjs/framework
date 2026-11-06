@@ -134,9 +134,11 @@ export type CLICommandPreload = {
   connectors?: ConnectorName[] | true;
 
   /**
-   * Import every module's `main.ts` after the declared connectors have
-   * started, the same way the HTTP server does, so registries a module fills
-   * in `main.ts` are populated when the command runs.
+   * Import every module's `main.ts` after the connectors have started, the
+   * same way the HTTP server does, so registries a module fills in `main.ts`
+   * are populated when the command runs. The Early-phase connectors the app
+   * lists in `warlock.config.ts > connectors` (the queue, for example) start
+   * along with the declared ones, because a `main.ts` may use them.
    *
    * Off by default: it scans `src/app` and imports app code, which commands
    * that only need config or a connection should not pay for. Routes, events

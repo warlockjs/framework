@@ -13,8 +13,7 @@ describe("seed command connectors", () => {
     expect(seedCommand.commandPreload?.connectors).toContain("storage");
   });
 
-  it("boots module main files and the queue broker connector", () => {
+  it("imports module main files", () => {
     expect(seedCommand.commandPreload?.mainModules).toBe(true);
-    expect(seedCommand.commandPreload?.connectors).toContain("herald");
   });
 });

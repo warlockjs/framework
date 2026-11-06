@@ -59,12 +59,12 @@ describe("migrateCommand definition", () => {
 });
 
 describe("seedCommand definition", () => {
-  it("plans a full bootstrap with database/cache/logger/storage/herald connectors and module mains", () => {
+  it("plans a full bootstrap with database/cache/logger/storage connectors and module mains", () => {
     expect(seedCommand.name).toBe("seed");
     expect(seedCommand.commandPreload).toMatchObject({
       bootstrap: true,
       config: true,
-      connectors: ["database", "cache", "logger", "storage", "herald"],
+      connectors: ["database", "cache", "logger", "storage"],
       mainModules: true,
     });
   });

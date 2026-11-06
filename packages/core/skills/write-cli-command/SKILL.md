@@ -84,7 +84,7 @@ preload: {
   connectors: ["database", "cache"],      // start these connectors (or `true` for all early-phase)
   prestart: true,                         // run src/app/prestart.ts after config
   warlockConfig: true,                    // load warlock.config.ts
-  mainModules: true,                      // after connectors, import every module's main.ts (what `seed` does)
+  mainModules: true,                      // after connectors, import every module's main.ts (what `seed` does); also starts the app's early-phase `warlock.config.ts > connectors` (e.g. queue)
   runtimeStrategy: "production",          // force-set
   environemnt: "production",              // force-set (note: original typo preserved)
 }
