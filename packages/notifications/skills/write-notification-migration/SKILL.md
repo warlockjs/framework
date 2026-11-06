@@ -1,6 +1,6 @@
 ---
 name: write-notification-migration
-description: 'Create the notifications table with the `notificationColumns(Notification)` factory + cascade `Migration.create`. Column NAMES come from the model''s `columnMap` (recipient / tenant / readAt / isRead); the fixed columns are `type` / `title` / `body` / `payload` / `idempotency_key`. Id columns default to integer (UUID when `recipientModel` has `autoGenerateId = false`); pass `{ idType }` to override. `columnMap.recipientType` adds a `recipient_type` string column. Read-state follows columnMap presence: `readAt` → nullable timestamp, `isRead` → indexed boolean, both → both. Defaults to `user_id` + `read_at` when no columnMap. Spread + extend for extras (FK references, composite indexes). Triggers: `notificationColumns`, `Migration.create` for notifications, "create the notifications table", "notification migration", "add organization_id to notifications", `is_read` column, `read_at` column, `idempotency_key` column; typical import `import { Migration } from "@warlock.js/cascade"; import { notificationColumns } from "@warlock.js/notifications"`. Skip: generic cascade migration writing — the `write-migration` topic of the `warlock-js-cascade` skill; the model itself — the `use-in-app` topic.'
+description: 'Create the notifications table with the `notificationColumns(Notification)` factory + cascade `Migration.create`. Column NAMES come from the model''s `columnMap` (recipient / tenant / readAt / isRead); the fixed columns are `type` / `title` / `body` / `payload` / `idempotency_key`. Id columns default to UUID; pass `{ recipientModel: User }` to derive them (integer, or UUID when the model has `autoGenerateId = false`) or `{ idType }` to set them. `columnMap.recipientType` adds a `recipient_type` string column. Read-state follows columnMap presence: `readAt` → nullable timestamp, `isRead` → indexed boolean, both → both. Defaults to `user_id` + `read_at` when no columnMap. Spread + extend for extras (FK references, composite indexes). Triggers: `notificationColumns`, `Migration.create` for notifications, "create the notifications table", "notification migration", "add organization_id to notifications", `is_read` column, `read_at` column, `idempotency_key` column; typical import `import { Migration } from "@warlock.js/cascade"; import { notificationColumns } from "@warlock.js/notifications"`. Skip: generic cascade migration writing — the `write-migration` topic of the `warlock-js-cascade` skill; the model itself — the `use-in-app` topic.'
 ---
 
 # Write the notifications migration
@@ -38,7 +38,7 @@ Declare `recipientType` so different identity types sharing an id cannot read ea
 
 ## Match your app's identifier type
 
-Recipient and tenant columns default to `integer`, the id type cascade and auth models generate, so they match a default app. Pass `recipientModel: User` (a model with `autoGenerateId = false` gets UUID columns) or set `idType` (`"uuid"`, `"bigint"`, `"integer"`, `"string"`) explicitly; it is applied to every
+Recipient and tenant columns default to UUID. For integer-id apps pass `recipientModel: User` (auto-generated ids give `integer`; `autoGenerateId = false` keeps UUID) or set `idType` (`"uuid"`, `"bigint"`, `"integer"`, `"string"`) explicitly; it is applied to every
 identifier column the factory creates:
 
 ```ts

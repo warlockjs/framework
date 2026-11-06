@@ -45,14 +45,13 @@ export type NotificationIdType = "uuid" | "bigint" | "integer" | "string";
 export type NotificationColumnsOptions = {
   /**
    * The type used for recipient and tenant identifiers. Defaults to the id
-   * type of `recipientModel` when given, otherwise `"integer"` — the id type
-   * cascade and auth models generate unless they opt out of auto-generated ids.
+   * type derived from `recipientModel` when given, otherwise UUID.
    */
   idType?: NotificationIdType;
   /**
-   * The recipient model (a `User`, `Customer`, …). Its `autoGenerateId = false`
-   * means it brings its own non-numeric ids, so the id columns default to UUID
-   * instead of integer.
+   * The recipient model (a `User`, `Customer`, …). Auto-generated ids are
+   * integers, so the id columns are `integer`; a model with
+   * `autoGenerateId = false` brings its own ids, so they are `uuid`.
    */
   recipientModel?: { autoGenerateId?: boolean };
 };
@@ -74,8 +73,7 @@ export function notificationColumns(
   const model = isNotificationColumnsOptions(modelOrOptions) ? undefined : modelOrOptions;
   const resolvedOptions = isNotificationColumnsOptions(modelOrOptions) ? modelOrOptions : options;
   const idType =
-    resolvedOptions?.idType ??
-    (resolvedOptions?.recipientModel?.autoGenerateId === false ? "uuid" : "integer");
+    resolvedOptions?.idType ?? deriveIdType(resolvedOptions?.recipientModel);
   const { recipient, recipientType, tenant, readAt, isRead } = resolveColumnMap(model?.columnMap);
   const idColumn = getIdColumn(idType);
 
@@ -129,4 +127,12 @@ function getIdColumn(idType: NotificationIdType) {
     default:
       return uuid;
   }
+}
+
+function deriveIdType(recipientModel?: { autoGenerateId?: boolean }): NotificationIdType {
+  if (!recipientModel || recipientModel.autoGenerateId === false) {
+    return "uuid";
+  }
+
+  return "integer";
 }

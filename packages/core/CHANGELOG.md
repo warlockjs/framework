@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 > ⚠ **Versioning: `@warlock.js/*` does not follow SemVer strictly — breaking changes may ship in a minor.** This is a deliberate decision, not an oversight: the framework is pre-adoption and the cost of a major per behaviour fix currently outweighs the benefit. **Pin an exact version or a tilde range (`~4.13.0`) if you need to opt into changes rather than receive them.** Every breaking change is marked **BREAKING** in its entry and summarised in an _Upgrading_ section at the top of the release. **This policy will change once the framework has consumers beyond its author.**
 
+## 5.46.0
+
+### Changed
+
+- The generated notifications scaffold declares `recipientType: "recipient_type"` in the notification model's `columnMap`, adds the column to its schema and migration, and passes `idType: "integer"` to match the scaffolded auth models, so identities that share an id never read each other's notifications. The generated controller spec fixture writes the recipient type on the rows it creates.
+
 ## 5.45.0 - 2026-11-05
 
 ### Added

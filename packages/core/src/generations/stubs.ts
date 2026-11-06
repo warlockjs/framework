@@ -425,9 +425,13 @@ import { NotificationResource } from "../../resources/notification.resource";
  * user_id accepts a string or an integer so it matches whichever id type your
  * users use (and the idType you pass to notificationColumns in the migration).
  * Narrow it to that one type.
+ *
+ * recipient_type is the identity type that owns the row (the recipient model's
+ * userType). Together with user_id it keeps identities that share an id apart.
  */
 const notificationSchema = v.object({
   user_id: v.union([v.string(), v.int()]),
+  recipient_type: v.string(),
   type: v.string(),
   title: v.string(),
   body: v.string().nullish(),
@@ -457,9 +461,14 @@ export class Notification extends DatabaseNotification {
    * single-tenant + read_at-only. Add tenant: "organization_id" for
    * multi-tenant; use isRead: "is_read" (instead of, or alongside, readAt) to
    * track a boolean read flag. The migration, the accessors and the resource
-   * all follow this map.
+   * all follow this map. recipientType stores which identity type owns each
+   * row, so two identities with the same id never read each other's
+   * notifications; keep it when you have more than one auth model.
    */
-  public static columnMap: NotificationColumnMap = { readAt: "read_at" };
+  public static columnMap: NotificationColumnMap = {
+    recipientType: "recipient_type",
+    readAt: "read_at",
+  };
 }
 `;
 
@@ -473,8 +482,10 @@ import { Notification } from "../notification.model";
  *
  * Columns come from notificationColumns(Notification) — the recipient / tenant
  * / read-state names follow the model's columnMap; type / title / body /
- * payload / idempotency_key are fixed. The recipient column is a UUID unless
- * you pass { idType: "integer" } (or "bigint" / "string") to match your users.
+ * payload / idempotency_key are fixed. recipient_type comes from the
+ * model's columnMap. The id columns are UUIDs unless you pass an idType; the
+ * scaffolded auth models use integer ids, so that is what this passes. Use
+ * { recipientModel: User } instead to derive it from your own model.
  * Spread it to add your own columns (and mirror them in the model schema):
  *
  *   import { uuid } from "@warlock.js/cascade";
@@ -484,7 +495,10 @@ import { Notification } from "../notification.model";
  *     // category_id: uuid().index().nullable(),
  *   });
  */
-export default Migration.create(Notification, notificationColumns(Notification));
+export default Migration.create(
+  Notification,
+  notificationColumns(Notification, { idType: "integer" }),
+);
 `;
 
 /** `src/app/notifications/resources/notification.resource.ts` — the output shape. */
@@ -743,9 +757,10 @@ export async function createNotificationTestFixture() {
     clients.push(client);
     return client;
   };
-  const createNotification = async (recipientId: string | number, title: string, readAt?: Date) => {
+  const createNotification = async (recipient: Auth, title: string, readAt?: Date) => {
     const row = await Notification.create({
-      user_id: recipientId,
+      user_id: recipient.id,
+      recipient_type: recipient.userType,
       type: "test",
       title,
       read_at: readAt,
@@ -759,10 +774,10 @@ export async function createNotificationTestFixture() {
     const otherUser = await createUser();
     const client = await signIn(user);
     const otherClient = await signIn(otherUser);
-    const own = await createNotification(user.id, "Own unread notification");
-    const alreadyRead = await createNotification(user.id, "Own read notification", new Date());
-    const foreign = await createNotification(otherUser.id, "Other user's notification");
-    await createNotification(otherUser.id, "Other user's second notification");
+    const own = await createNotification(user, "Own unread notification");
+    const alreadyRead = await createNotification(user, "Own read notification", new Date());
+    const foreign = await createNotification(otherUser, "Other user's notification");
+    await createNotification(otherUser, "Other user's second notification");
     return { user, otherUser, client, otherClient, own, alreadyRead, foreign, cleanup };
   } catch (error) {
     // Preserve the setup failure after attempting every owned resource's cleanup.

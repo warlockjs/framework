@@ -120,8 +120,11 @@ describe("notificationColumns recipient type + id default", () => {
     expect("recipient_type" in notificationColumns()).toBe(false);
   });
 
-  it("defaults ids to integer, or uuid for a model without generated ids", () => {
-    expect(notificationColumns().user_id.getDefinition().type).toBe("integer");
+  it("keeps uuid without a recipient model, derives integer or uuid from one", () => {
+    expect(notificationColumns().user_id.getDefinition().type).toBe("uuid");
+    expect(
+      notificationColumns({ recipientModel: {} }).user_id.getDefinition().type,
+    ).toBe("integer");
     expect(
       notificationColumns({ recipientModel: { autoGenerateId: false } }).user_id.getDefinition()
         .type,
