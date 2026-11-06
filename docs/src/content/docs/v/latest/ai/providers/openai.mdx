@@ -123,16 +123,32 @@ the per-channel USD breakdown; sum it with `totalCost(usage.cost)` from
 **Built-in list prices.** With the default `"openai"` provider label,
 flat-priced models are priced out of the box from `OPENAI_MODEL_PRICING`
 — taken from [OpenAI's pricing page](https://developers.openai.com/api/docs/pricing)
-(Standard tier), fetched 2026-10-17: `gpt-5.4-mini`, `gpt-5.4-nano`,
-`gpt-5.2`, `gpt-5.1`, `gpt-5`, `gpt-5-mini`, `gpt-5-nano`, the `gpt-4.1`
-family, `gpt-4o`, `gpt-4o-mini`, `o3`, `o4-mini`, `o3-mini` and `o1`. The
-lookup is by exact id (`openAIPricingFor(name)`).
+(Standard tier), as of `OPENAI_MODEL_PRICING_AS_OF` (2026-11-06):
+`gpt-6.1-terra`, `gpt-6-cyber`, `gpt-6-astra`, `gpt-6-luna`,
+`gpt-5.6-terra`, `gpt-5.6-luna`, `gpt-5.5`, `gpt-5.4`, `gpt-5.4-mini`,
+`gpt-5.4-nano`, `gpt-5.2`, `gpt-5.1`, `gpt-5`, `gpt-5-mini`, `gpt-5-nano`,
+the `gpt-4.1` family, `gpt-4o`, `gpt-4o-mini`, `o3`, `o4-mini`, `o3-mini`
+and `o1`. The lookup is by exact id (`openAIPricingFor(name)`).
 
-Left unpriced on purpose — pass `pricing` for them: models priced by
-prompt length (a higher rate above 272K input tokens: the gpt-6,
-gpt-5.6, gpt-5.5 and gpt-5.4 families and the `-pro` models), dated
-snapshot ids, promotional / Batch / Flex / Priority pricing, the
-data-residency uplift, and any SDK with a custom `provider` label.
+The `gpt-6`, `gpt-5.6`, `gpt-5.5` and `gpt-5.4` entries carry `tiers`:
+when a request's prompt is longer than 272K tokens, every token of that
+request bills at the tier's higher rates (`computeCost` picks the tier from
+the usage; `resolvePricing` from `@warlock.js/ai` does the same by hand).
+
+Left unpriced on purpose — pass `pricing` for them: the `-pro` models,
+`gpt-6-sol` and `gpt-5.6-sol` (promotional pricing until 2026-11-30), dated
+snapshot ids, Batch / Flex / Priority pricing, the data-residency uplift,
+and any SDK with a custom `provider` label.
+
+**Model lifecycle.** `OPENAI_MODEL_LIFECYCLE` (lookup:
+`openAILifecycleFor(name)`) records each priced model's status from
+[OpenAI's deprecation page](https://developers.openai.com/api/docs/deprecations):
+`o1`, `o3-mini`, `o4-mini` and `gpt-4.1-nano` are `retired` (2026-10-23),
+`gpt-5`, `gpt-5-mini`, `gpt-5-nano` and `o3` are `retiring` on 2026-12-11,
+`gpt-4.1` and `gpt-4.1-mini` on 2027-01-14, and `gpt-5.1` and
+`gpt-5.4-nano` on 2027-04-01. Each entry is
+`{ status: "current" | "retiring" | "retired", retiresOn?, replacement? }`.
+Retired ids stay in the price table so old reports keep their cost.
 
 Resolution: per-model `pricing` > SDK `pricing` registry > built-in
 table > unpriced (`Usage.cost` stays `undefined`).

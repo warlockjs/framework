@@ -254,7 +254,7 @@ const google = new GoogleSDK({
 
 google.model({ name: "gemini-2.5-flash" }); // → the registry entry
 google.model({ name: "gemini-3.5-flash-lite" }).pricing; // → built-in { input: 0.3, output: 2.5, cachedInput: 0.03 }
-google.model({ name: "gemini-2.5-pro" }).pricing; // → undefined (prompt-length tiers; pass pricing yourself)
+google.model({ name: "gemini-2.5-pro" }).pricing; // → undefined (not in the table; pass pricing yourself)
 googlePricingFor("gemini-3.5-flash-lite"); // the same built-in entry
 Object.keys(GOOGLE_MODEL_PRICING); // the priced ids
 
@@ -264,7 +264,7 @@ const { usage } = await google
 console.log(totalCost(usage.cost));
 ```
 
-`GOOGLE_MODEL_PRICING` comes from https://ai.google.dev/gemini-api/docs/pricing (paid tier, Standard), fetched 2026-10-17. Only models with a single flat token price are listed. Deliberately unpriced: the Pro models (priced by prompt length, split at 200k prompt tokens), models whose audio input bills higher than text (`Usage` does not split input by modality — price them with the text rate yourself only if you send no audio), and models with a scheduled price change. The hourly context-cache storage charge is not a per-token rate and is never included.
+`GOOGLE_MODEL_PRICING` comes from https://ai.google.dev/gemini-api/docs/pricing (paid tier, Standard), as of `GOOGLE_MODEL_PRICING_AS_OF` (2026-11-06): `gemini-4-argon`, `gemini-3.8-flash`, `gemini-3.6-flash`, `gemini-3.5-flash-lite`, `gemini-3.1-pro-preview`. Scheduled price changes are in each entry's `schedule` (`gemini-4-argon` doubles on 2026-12-01, the 3.6 / 3.8 Flash models on 2027-01-01); `gemini-3.1-pro-preview` carries `tiers` (prompt over 200k tokens). Deliberately unpriced: models whose audio input bills higher than text (`Usage` does not split input by modality — price them with the text rate yourself only if you send no audio). `GOOGLE_MODEL_LIFECYCLE` / `googleLifecycleFor(name)` (checked `GOOGLE_MODEL_LIFECYCLE_AS_OF`) gives `{ status: "current" | "retiring" | "retired", retiresOn?, replacement? }` from https://ai.google.dev/gemini-api/docs/deprecations (`gemini-2.5-pro` / `gemini-2.5-flash` retiring 2026-12-01). The hourly context-cache storage charge is not a per-token rate and is never included.
 
 ## Provider config options and input-token counts
 

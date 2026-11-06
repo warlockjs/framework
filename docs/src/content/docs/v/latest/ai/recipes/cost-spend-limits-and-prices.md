@@ -30,7 +30,7 @@ prices.costUSD(result.usage, "gpt-4o"); // total USD, or undefined for an unpric
 - Dated snapshot ids (`claude-haiku-4-5-20251001`) resolve to the alias entry.
 - An unlisted model returns `undefined`, never `0`.
 - `prices.toRecord()` gives a plain record to pass to an SDK's `pricing` option.
-- Models whose price depends on prompt length are not in the adapter tables, because one flat rate would be wrong. Add them with `.set()`.
+- Prices that depend on prompt length or on the date are plain `ModelPricing` entries with `tiers` and `schedule` (see [Cost tracking](./cost-tracking/)); the catalogue's `cost()` and `costUSD()` apply them. Models a table leaves out, such as the `-pro` models, are added with `.set()`.
 
 To update a price, change the entry in your catalogue; to track a provider's list, upgrade the adapter.
 

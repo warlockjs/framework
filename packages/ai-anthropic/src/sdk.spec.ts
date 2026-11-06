@@ -129,8 +129,10 @@ describe("AnthropicSDK", () => {
       cacheWrite1h: 6,
     });
     expect(sdk.model({ name: "claude-sonnet-4-5-20250929" }).pricing?.input).toBe(3);
-    // Prompt-length-tiered and unknown models stay unpriced.
-    expect(sdk.model({ name: "claude-haiku-5-5" }).pricing).toBeUndefined();
+    // Haiku 5.5 is priced by prompt length; unknown models stay unpriced.
+    expect(sdk.model({ name: "claude-haiku-5-5" }).pricing?.tiers?.[0]?.abovePromptTokens).toBe(
+      100_000,
+    );
     expect(sdk.model({ name: "my-proxy-model" }).pricing).toBeUndefined();
   });
 

@@ -136,13 +136,26 @@ come back as `"audio"`), `created` and `contextWindow` (`context_window`).
 Models Groq marks `active: false` are left out. Failures throw the usual
 provider errors, never an empty list. Pass `{ signal }` to cancel.
 
+## Model lifecycle
+
+`GROQ_KNOWN_MODELS` lists current ids (`openai/gpt-oss-120b`,
+`openai/gpt-oss-20b`, `qwen/qwen3.8-27b`). `GROQ_MODEL_LIFECYCLE` (lookup:
+`groqLifecycleFor(name)`) records the status of those and of the ids Groq
+has shut down, from [Groq's deprecation page](https://console.groq.com/docs/deprecations):
+`llama-3.3-70b-versatile` and `llama-3.1-8b-instant` (2026-08-16),
+`deepseek-r1-distill-llama-70b` (2025-10-02), `qwen/qwen3.6-27b`,
+`qwen/qwen3-32b` and the Llama 4 ids are `retired`, each with a
+`replacement`. Groq applies several shutdowns to free and developer-tier
+usage only, so an enterprise contract can still serve a retired id; the
+adapter keeps accepting any id you pass.
+
 ## Pricing and usage
 
 `pricing` is a registry keyed by model name, rates in **USD per 1,000,000
 tokens** (`input`, `output`, optional `cachedInput`). The adapter ships
 built-in default rates (`GROQ_DEFAULT_PRICING`) as the final fallback,
 taken from [Groq's model list](https://console.groq.com/docs/models),
-fetched 2026-10-17: `openai/gpt-oss-120b`, `openai/gpt-oss-20b`,
+as of `GROQ_DEFAULT_PRICING_AS_OF` (2026-11-06): `openai/gpt-oss-120b`, `openai/gpt-oss-20b`,
 `openai/gpt-oss-safeguard-20b` and `qwen/qwen3.8-27b`. Cached input is
 50% of the input rate on the gpt-oss models — the only ones Groq caches,
 automatically and with no write charge. The Llama models have no public

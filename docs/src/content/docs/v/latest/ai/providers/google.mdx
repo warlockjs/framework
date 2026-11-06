@@ -329,13 +329,23 @@ console.log(totalCost(usage.cost));
 **Built-in list prices.** `GOOGLE_MODEL_PRICING` (lookup:
 `googlePricingFor(name)`) comes from the
 [Gemini API pricing page](https://ai.google.dev/gemini-api/docs/pricing)
-(paid tier, Standard), fetched 2026-10-17. Only models with one flat
-token price are built in — today `gemini-3.5-flash-lite`
-(`{ input: 0.3, output: 2.5, cachedInput: 0.03 }`). Left out on purpose:
-the Pro models (priced by prompt length, split at 200k prompt tokens),
+(paid tier, Standard), as of `GOOGLE_MODEL_PRICING_AS_OF` (2026-11-06):
+`gemini-4-argon`, `gemini-3.8-flash`, `gemini-3.6-flash`,
+`gemini-3.5-flash-lite` and `gemini-3.1-pro-preview`. Prices Google has
+already scheduled sit in each entry's `schedule`: `gemini-4-argon` doubles
+on 2026-12-01 (`{ input: 2, output: 10 }` to `{ input: 4, output: 20 }`) and
+the 3.6 and 3.8 Flash models double on 2027-01-01, so `computeCost` bills
+the right rate on each day. `gemini-3.1-pro-preview` carries `tiers`: a
+prompt over 200k tokens bills at the higher rates. Left out on purpose:
 models whose audio input costs more than text (`Usage` does not split
-input by modality), and models with a scheduled price change. The hourly
-context-cache storage charge is not a token rate and is never included.
+input by modality). The hourly context-cache storage charge is not a token
+rate and is never included.
+
+`GOOGLE_MODEL_LIFECYCLE` (lookup: `googleLifecycleFor(name)`) records each
+model's status from Google's deprecation page: `gemini-2.5-pro` and
+`gemini-2.5-flash` are `retiring` on 2026-12-01, `gemini-3.1-flash-lite` on
+2027-05-07, and `gemini-3.5-flash`, `gemini-3-pro-preview` and
+`gemini-2.0-flash` are `retired`.
 
 Errors carry `status`, `retryable` and `billed`. Google states that a
 request failing with a 400 or 500 error is not charged

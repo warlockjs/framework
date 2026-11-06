@@ -17,11 +17,12 @@ export const ANTHROPIC_CACHE_WRITE_1H_MULTIPLIER = 2;
  * 5-minute write rate and `cacheWrite1h` the 1-hour write rate.
  *
  * Source: https://platform.claude.com/docs/en/about-claude/pricing,
- * "Model pricing" table, fetched 2026-10-17. Standard (global) routing,
- * non-batch. Not covered, so pass `pricing` yourself when you need them:
+ * "Model pricing" table, as of {@link ANTHROPIC_MODEL_PRICING_AS_OF}.
+ * Standard (global) routing, non-batch. Claude Haiku 5.5 carries `tiers`:
+ * a request whose prompt (cache reads and writes included) is over
+ * 100,000 tokens bills at the higher rates. Not covered, so pass `pricing`
+ * yourself when you need them:
  *
- * - Claude Haiku 5.5 — priced by prompt length (higher rates above
- *   100,000 prompt tokens), which a flat `ModelPricing` cannot express.
  * - US-only inference (`inference_geo: "us"`, 1.1x), fast mode, the Batch
  *   API, and Claude on Bedrock / Vertex AI (partner-priced).
  * - Limited-availability models (Mythos) and retired models.
@@ -30,6 +31,23 @@ export const ANTHROPIC_CACHE_WRITE_1H_MULTIPLIER = 2;
  * entry through {@link anthropicPricingFor}.
  */
 export const ANTHROPIC_MODEL_PRICING: Readonly<Record<string, ModelPricing>> = {
+  "claude-haiku-5-5": {
+    input: 0.1,
+    output: 0.5,
+    cachedInput: 0.01,
+    cacheWrite: 0.125,
+    cacheWrite1h: 0.2,
+    tiers: [
+      {
+        abovePromptTokens: 100_000,
+        input: 0.5,
+        output: 2.5,
+        cachedInput: 0.05,
+        cacheWrite: 0.625,
+        cacheWrite1h: 1,
+      },
+    ],
+  },
   "claude-fable-5-1": {
     input: 10,
     output: 50,
@@ -63,6 +81,9 @@ export const ANTHROPIC_MODEL_PRICING: Readonly<Record<string, ModelPricing>> = {
   "claude-haiku-4-5": { input: 1, output: 5, cachedInput: 0.1, cacheWrite: 1.25, cacheWrite1h: 2 },
 };
 
+/** The date the {@link ANTHROPIC_MODEL_PRICING} rates were last checked against Anthropic's pricing page. */
+export const ANTHROPIC_MODEL_PRICING_AS_OF = "2026-11-06";
+
 /** A trailing `-YYYYMMDD` snapshot date on a Claude model id. */
 const SNAPSHOT_SUFFIX = /-\d{8}$/;
 
@@ -74,7 +95,7 @@ const SNAPSHOT_SUFFIX = /-\d{8}$/;
  *
  * @example
  * anthropicPricingFor("claude-haiku-4-5-20251001"); // { input: 1, output: 5, … }
- * anthropicPricingFor("claude-haiku-5-5"); // undefined (prompt-length tiers)
+ * anthropicPricingFor("claude-haiku-5-5"); // { input: 0.1, output: 0.5, …, tiers: [...] }
  */
 export function anthropicPricingFor(modelName: string): ModelPricing | undefined {
   const exact = ANTHROPIC_MODEL_PRICING[modelName];

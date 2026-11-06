@@ -4,6 +4,9 @@ import { inferContextWindow } from "./known-context-windows";
 describe("known chat models (xai)", () => {
   it.each([
     "grok-4",
+    "grok-4.3",
+    "grok-4.7",
+    "grok-build-0.1",
     "grok-4-fast-reasoning",
     "grok-4-1-fast",
     "grok-code-fast-1",

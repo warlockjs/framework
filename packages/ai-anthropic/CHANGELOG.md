@@ -4,6 +4,13 @@ All notable changes to `@warlock.js/ai-anthropic` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.47.0
+
+### Added
+
+- `ANTHROPIC_MODEL_PRICING` prices `claude-haiku-5-5`, with `tiers` for prompts above 100,000 tokens (cache reads and writes counted). `ANTHROPIC_MODEL_PRICING_AS_OF` dates the table.
+- `ANTHROPIC_MODEL_LIFECYCLE` and `anthropicLifecycleFor(name)` (alias or dated snapshot) give each model a status, for example `claude-sonnet-4-5` is `retiring` on 2026-11-30 and `claude-opus-4-1` is `retired`.
+
 ## 5.45.0 - 2026-11-05
 
 ### Added

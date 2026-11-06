@@ -4,9 +4,15 @@ export {
   ANTHROPIC_CACHE_WRITE_1H_MULTIPLIER,
   ANTHROPIC_CACHE_WRITE_MULTIPLIER,
   ANTHROPIC_MODEL_PRICING,
+  ANTHROPIC_MODEL_PRICING_AS_OF,
   anthropicPricingFor,
   withAnthropicCacheWriteRates,
 } from "./known-pricing";
+export {
+  ANTHROPIC_MODEL_LIFECYCLE,
+  ANTHROPIC_MODEL_LIFECYCLE_AS_OF,
+  anthropicLifecycleFor,
+} from "./known-lifecycle";
 export type {
   AnthropicCallOptions,
   AnthropicClearThinking,

@@ -183,13 +183,16 @@ function defaultPricingFor(name: string): ModelPricing | undefined {
   return GROQ_DEFAULT_PRICING[name];
 }
 
+/** The date the {@link GROQ_DEFAULT_PRICING} token rates were last checked against Groq's model page. */
+export const GROQ_DEFAULT_PRICING_AS_OF = "2026-11-06";
+
 /**
  * Default per-million-token USD rates for Groq models.
  *
  * Source: https://console.groq.com/docs/models (groq.com/pricing now
- * redirects to the home page), fetched 2026-10-17. Cached input is 50%
+ * redirects to the home page), as of {@link GROQ_DEFAULT_PRICING_AS_OF}. Cached input is 50%
  * of the input rate for the gpt-oss models, the only ones Groq caches
- * (https://console.groq.com/docs/prompt-caching; no write charge). The
+ * (https://console.groq.com/docs/prompt-caching, checked 2026-10-17; no write charge). The
  * Llama models are listed as "Enterprise – Contact Sales" with no public
  * price, so they stay unpriced — pass `pricing` for them.
  */

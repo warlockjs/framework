@@ -92,7 +92,7 @@ endpoint; the embedder delegates straight to the wrapped OpenAI embedder.
 
 ## Capabilities
 
-**Context window.** `capabilities.contextWindow` is 128,000 for the Large, Medium, Small, Ministral, Pixtral, Magistral and open-weight ids and 256,000 for Codestral. Newer generations document larger windows; pass `mistral.model({ name, contextWindow })` to set or override it.
+**Context window.** `capabilities.contextWindow` is 128,000 for the Large, Medium, Small, Ministral, Pixtral, Magistral and open-weight ids 256,000 for Codestral and 1,000,000 for `zai-glm-5-3`. Newer generations document larger windows; pass `mistral.model({ name, contextWindow })` to set or override it.
 
 The wrapper injects **Mistral-aware** inference before delegating to the
 OpenAI adapter (the OpenAI prefix lists never match Mistral names):
@@ -131,6 +131,10 @@ and returns `ModelInfo[]`: `id` (pass it as `name`), `label` (the model `name`),
 `description`. A model that reports `capabilities.completion_chat: false`
 gets `kind: "other"`; the rest are classified from the id. Failures throw the
 usual provider errors, never an empty list. Pass `{ signal }` to cancel.
+
+## Model lifecycle
+
+`MISTRAL_MODEL_LIFECYCLE` (lookup: `mistralLifecycleFor(name)`, checked `MISTRAL_MODEL_LIFECYCLE_AS_OF`) records the status of the ids Mistral documents with an API id: `zai-glm-5-2` is `retired` (2026-10-31, replacement `zai-glm-5-3`), `mistral-medium-3-5` and `mistral-large-2512` are `retiring` on 2027-04-30, and several older Medium, Small, Magistral and Devstral ids are `retired`. Source: Mistral's model overview page.
 
 ## Pricing and usage
 

@@ -271,7 +271,7 @@ describe("OpenAISDK built-in pricing", () => {
       cachedInput: 0.075,
     });
     expect(sdk.model({ name: "gpt-4o-2024-05-13" }).pricing).toBeUndefined();
-    expect(sdk.model({ name: "gpt-5.5" }).pricing).toBeUndefined();
+    expect(sdk.model({ name: "gpt-5.5-pro" }).pricing).toBeUndefined();
   });
 
   it("lets SDK and per-model pricing win, and never prices other provider labels", () => {

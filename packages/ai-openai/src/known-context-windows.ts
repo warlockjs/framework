@@ -6,10 +6,10 @@
  */
 const PREFIX_WINDOWS: ReadonlyArray<readonly [prefix: string, window: number]> = [
   ["gpt-5-", 400_000],
-  // The gpt-5.x and gpt-6 releases use the 400K figure every gpt-5 model
-  // documents; a larger window on a later release is set with `contextWindow`.
+  // The gpt-5.x releases use the 400K figure every gpt-5 model documents;
+  // the gpt-6 models document 1.05M. A different window is set with `contextWindow`.
   ["gpt-5.", 400_000],
-  ["gpt-6", 400_000],
+  ["gpt-6", 1_050_000],
   ["gpt-4-turbo", 128_000],
   ["gpt-3.5-turbo", 16_385],
   ["chatgpt-4o", 128_000],

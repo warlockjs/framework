@@ -356,7 +356,13 @@ When Anthropic omits the per-lifetime breakdown, all writes count as
 **Built-in list prices.** Every known Claude id is priced out of the box
 from `ANTHROPIC_MODEL_PRICING` — the "Model pricing" table of
 [Anthropic's pricing page](https://platform.claude.com/docs/en/about-claude/pricing),
-fetched 2026-10-17 (standard global routing). Dated snapshot ids such as
+as of `ANTHROPIC_MODEL_PRICING_AS_OF` (2026-11-06; standard global routing).
+Claude Haiku 5.5 carries `tiers`: a request whose prompt (cache reads and
+writes included) is over 100,000 tokens bills at the higher rates.
+`ANTHROPIC_MODEL_LIFECYCLE` (lookup: `anthropicLifecycleFor(name)`) records
+each model's status from Anthropic's deprecation page, for example
+`claude-sonnet-4-5` is `retiring` on 2026-11-30 with `claude-sonnet-5-5` as
+the replacement and `claude-opus-4-1` is `retired`. Dated snapshot ids such as
 `claude-haiku-4-5-20251001` resolve to their alias. Resolution:
 per-model `pricing` > SDK `pricing` registry > built-in table >
 unpriced (`cost` stays `undefined`).
@@ -384,8 +390,7 @@ included — gets them from Anthropic's multipliers (1.25× input for a
 The cache-read rate differs per model, so set `cachedInput` yourself or
 reads bill at the full input rate.
 
-Not built in, so pass `pricing` for them: Claude Haiku 5.5 (priced by
-prompt length, with higher rates above 100,000 prompt tokens), US-only
+Not built in, so pass `pricing` for them: US-only
 inference (`inference_geo`), fast mode, the Batch API, and Claude on
 Bedrock or Vertex AI.
 
