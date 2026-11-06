@@ -560,6 +560,9 @@ export abstract class Model<out TSchema extends ModelSchema = ModelSchema> {
   /** Backing field for {@link isNew}. */
   private newRecord = true;
 
+  /** Backing field for {@link getLastSaveChanges}. */
+  private lastSaveChanges: Record<string, { oldValue: unknown; newValue: unknown }> = {};
+
   /**
    * The primary key value captured at the moment this instance became a
    * persisted record — the ONLY value an UPDATE/REPLACE filter may be built
@@ -1231,6 +1234,40 @@ export abstract class Model<out TSchema extends ModelSchema = ModelSchema> {
    */
   public getDirtyColumnsWithValues(): Record<string, { oldValue: unknown; newValue: unknown }> {
     return getDirtyColumnsWithValues(this);
+  }
+
+  /**
+   * The changes the last successful `save()` wrote: each changed column with its
+   * old and new value.
+   *
+   * The dirty tracker resets as soon as the write succeeds, so
+   * {@link getDirtyColumnsWithValues} is empty by the time `saved` / `updated`
+   * listeners run (and afterwards). Read this instead. It is also passed to those
+   * listeners as `context.changes`.
+   *
+   * Empty for an insert and before the first save. Each save replaces it.
+   *
+   * @returns A record mapping each changed column to its previous and new value
+   *
+   * @example
+   * ```typescript
+   * user.set("name", "Bob");
+   * await user.save();
+   * user.getLastSaveChanges();
+   * // { name: { oldValue: "Alice", newValue: "Bob" } }
+   * ```
+   */
+  public getLastSaveChanges(): Record<string, { oldValue: unknown; newValue: unknown }> {
+    return { ...this.lastSaveChanges };
+  }
+
+  /**
+   * Record the changes of the save that just completed. Called by the writer.
+   *
+   * @internal
+   */
+  public setLastSaveChanges(changes: Record<string, { oldValue: unknown; newValue: unknown }>): void {
+    this.lastSaveChanges = changes;
   }
 
   /**

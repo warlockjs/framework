@@ -185,6 +185,26 @@ Order.events().onDeleted(async (order, ctx) => {
 
 Conditional on the delete strategy — soft deletes shouldn't cascade, permanent deletes should. The `ctx.strategy` tells you which path ran.
 
+## Reading what changed in `saved` / `updated`
+
+The dirty tracker resets as soon as the write succeeds, *before* `saved` and `created` / `updated` fire, so `getDirtyColumnsWithValues()` is already empty inside those listeners. The diff of the save that just ran is available two ways:
+
+```ts
+Product.on("updated", async (product, context) => {
+  // 1. In the event context
+  const { price } = context.changes; // { oldValue, newValue } per changed column
+  context.changedColumns;            // ["price", "updatedAt"]
+
+  // 2. On the model, during the event and after the save
+  product.getLastSaveChanges();
+});
+```
+
+- `context` carries `{ isInsert, options, mode, changes, changedColumns }` for both `saved` and `created` / `updated`.
+- For an insert the diff is empty (`{}`): every field is new, so read the values from the model.
+- `getLastSaveChanges()` keeps the last save's diff after `save()` returns; the next save replaces it. If a listener saves the same model again, that nested save gets its own fresh diff and the outer events still see theirs in `context.changes`.
+- The diff comes from `save()` only. `restored`, `deleted` and bulk query writes (`Model.where(...).update(...)`, atomic operations) have no per-field diff.
+
 ## Instance listeners
 
 Sometimes you want a listener that fires only for _this_ instance, not every instance of the class:

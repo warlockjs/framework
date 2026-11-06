@@ -4,6 +4,17 @@ All notable changes to `@warlock.js/cascade` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.47.1
+
+### Added
+
+- `saved`, `created` and `updated` listeners now receive the change diff in their context (`changes`: each changed column with its `oldValue` / `newValue`, `changedColumns`, plus `isInsert`, `options` and `mode`). Before, the dirty tracker had already reset when these events fired, so a listener could not tell which fields changed. The tracker still resets before the events, so a listener that saves again sees fresh state.
+- `model.getLastSaveChanges()` returns the diff of the last successful `save()`, during the post-save events and afterwards. It is empty for an insert.
+
+### Fixed
+
+- PostgreSQL pool config forwards every `clientOptions` key `pg` accepts (`statement_timeout`, `query_timeout`, `lock_timeout`, `idle_in_transaction_session_timeout`, `keepAliveInitialDelayMillis`, `allowExitOnIdle`, `client_encoding`, `types`, …) instead of dropping the ones it did not list. Only Cascade's own keys (`naming`, `timezone`, `nativeArrayColumns`, `logging`) are kept out; Cascade's pool defaults still apply.
+
 ## 5.47.0 - 2026-11-06
 
 ### Changed

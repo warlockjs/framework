@@ -1,6 +1,6 @@
 ---
 name: track-changes
-description: 'Inspect a model''s pending changes — `hasChanges()` (any field dirty?), `isDirty(column)` (one column), `getDirtyColumns()` (changed field names), `getDirtyColumnsWithValues()` (old + new per field), `getRemovedColumns()` (unset fields). Triggers: `hasChanges`, `isDirty`, `getDirtyColumns`, `getDirtyColumnsWithValues`, `getRemovedColumns`; "only run if email changed", "diff for an audit log", "what fields are dirty", "compare old vs new value"; typical import `import { Model } from "@warlock.js/cascade"`. Skip: hooking into save — the `subscribe-to-model-events` topic; update idioms — the `define-model` topic; competing libs `mongoose` `isModified` / `modifiedPaths`, `typeorm` change detection.'
+description: 'Inspect a model''s pending changes — `hasChanges()` (any field dirty?), `isDirty(column)` (one column), `getDirtyColumns()` (changed field names), `getDirtyColumnsWithValues()` (old + new per field), `getRemovedColumns()` (unset fields), `getLastSaveChanges()` (the diff of the save that just ran). Triggers: `getLastSaveChanges`, `hasChanges`, `isDirty`, `getDirtyColumns`, `getDirtyColumnsWithValues`, `getRemovedColumns`; "only run if email changed", "diff for an audit log", "what fields are dirty", "compare old vs new value"; typical import `import { Model } from "@warlock.js/cascade"`. Skip: hooking into save — the `subscribe-to-model-events` topic; update idioms — the `define-model` topic; competing libs `mongoose` `isModified` / `modifiedPaths`, `typeorm` change detection.'
 ---
 
 # Track changes
@@ -142,3 +142,7 @@ Before 4.9.1 a `Date` merged over a column that **already held a `Date`** was si
 
 - The `subscribe-to-model-events` topic — combining with `saved` / `saving` for cross-cutting behavior
 - The `define-model` topic — the `.set` / `.merge` / `.save` idioms that stage changes
+
+## After the save
+
+The tracker resets once a save succeeds, so the methods above report nothing afterwards. `user.getLastSaveChanges()` returns the diff the last `save()` wrote (`{ column: { oldValue, newValue } }`, empty for an insert); `saved` / `updated` listeners also receive it as `context.changes`.
