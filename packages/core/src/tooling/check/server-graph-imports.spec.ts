@@ -18,12 +18,16 @@ function problems(file: string, source: string) {
   return checkFileConventions(file, source, root).filter((problem) => problem.code === "WL9027");
 }
 
-const WORKER = 'import workerUrl from "some-pkg/dist/worker.mjs?worker&url";\nexport { workerUrl };\n';
+const WORKER =
+  'import workerUrl from "some-pkg/dist/worker.mjs?worker&url";\nexport { workerUrl };\n';
 
 beforeEach(() => {
   root = mkdtempSync(path.join(os.tmpdir(), "warlock-server-graph-"));
-  write("src/web/main/home.page.tsx", 'import "../../app/shared/chart";\nexport default () => null;\n');
-  write("src/app/shared/chart.ts", 'export const chart = 1;\n');
+  write(
+    "src/web/main/home.page.tsx",
+    'import "../../app/shared/chart";\nexport default () => null;\n',
+  );
+  write("src/app/shared/chart.ts", "export const chart = 1;\n");
 });
 
 afterEach(() => {

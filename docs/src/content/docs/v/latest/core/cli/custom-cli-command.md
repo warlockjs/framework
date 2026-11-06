@@ -103,19 +103,19 @@ preload: {
 
 The fields, in the order you'll reach for them:
 
-| Field               | Effect                                                                                                                     |
-| ------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| `env: true`         | Loads `.env` / `.env.local`. Skip when `bootstrap: true`.                                                                  |
-| `config: true`      | Loads every file under `src/config/`.                                                                                      |
-| `config: ["x"]`     | Loads only `src/config/x.ts`.                                                                                              |
-| `connectors: true`  | Starts the early-phase built-in connectors (DB, cache, storage, logger, mailer).                                           |
-| `connectors: ["x"]` | Starts only the named connectors. Bypasses phase splitting — you're saying "I know exactly what I want."                   |
+| Field                        | Effect                                                                                                                                                                                                                   |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `env: true`                  | Loads `.env` / `.env.local`. Skip when `bootstrap: true`.                                                                                                                                                                |
+| `config: true`               | Loads every file under `src/config/`.                                                                                                                                                                                    |
+| `config: ["x"]`              | Loads only `src/config/x.ts`.                                                                                                                                                                                            |
+| `connectors: true`           | Starts the early-phase built-in connectors (DB, cache, storage, logger, mailer).                                                                                                                                         |
+| `connectors: ["x"]`          | Starts only the named connectors. Bypasses phase splitting — you're saying "I know exactly what I want."                                                                                                                 |
 | `configuredConnectors: true` | Also starts the early-phase connectors your app lists in `warlock.config.ts > connectors` (the queue, for example), with or without `connectors`. Imports no module code. Needed when the action dispatches a queue job. |
-| `mainModules: true` | Imports every module's `main.ts` after the connectors, and implies `configuredConnectors`.                                 |
-| `bootstrap: true`   | Runs the full bootstrap flow (env + bootstrap script + all auto-loaded files). Slowest; reaches the closest to "real app." |
-| `prestart: true`    | Runs `src/app/prestart.ts` after bootstrap + config (if it exists).                                                        |
-| `runtimeStrategy`   | Forces `"production"` or `"development"` mode (default: detected from `NODE_ENV`).                                         |
-| `environemnt`       | Overrides the environment (`"production"`, `"development"`, `"test"`).                                                     |
+| `mainModules: true`          | Imports every module's `main.ts` after the connectors, and implies `configuredConnectors`.                                                                                                                               |
+| `bootstrap: true`            | Runs the full bootstrap flow (env + bootstrap script + all auto-loaded files). Slowest; reaches the closest to "real app."                                                                                               |
+| `prestart: true`             | Runs `src/app/prestart.ts` after bootstrap + config (if it exists).                                                                                                                                                      |
+| `runtimeStrategy`            | Forces `"production"` or `"development"` mode (default: detected from `NODE_ENV`).                                                                                                                                       |
+| `environemnt`                | Overrides the environment (`"production"`, `"development"`, `"test"`).                                                                                                                                                   |
 
 For our report command, we need DB access and that's all — so `env`, the `database` config, and the `database` connector. We skip `bootstrap` because we don't need routes or HTTP.
 

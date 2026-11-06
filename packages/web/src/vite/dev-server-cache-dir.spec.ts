@@ -34,7 +34,9 @@ describe("dev server Vite config — its own cacheDir", () => {
     const appRoot = path.resolve(WEB_ROOT, "..", "some-app");
     const config = await devConfig(appRoot);
 
-    expect(path.dirname(config.cacheDir as string)).toBe(path.join(appRoot, "node_modules", ".vite"));
+    expect(path.dirname(config.cacheDir as string)).toBe(
+      path.join(appRoot, "node_modules", ".vite"),
+    );
     expect(path.basename(config.cacheDir as string)).toMatch(/^warlock-dev-[0-9a-f]{8}$/);
   });
 
@@ -54,16 +56,18 @@ describe("dev server Vite config — its own cacheDir", () => {
     expect(webDevServerCacheDir(appRoot, "/tmp/vite-cache")).toBe(path.resolve("/tmp/vite-cache"));
     expect(webDevServerCacheDir(appRoot, ".cache/vite")).toBe(path.join(appRoot, ".cache", "vite"));
     expect(
-      (await createWebConnectorViteConfig({
-        appRoot,
-        appSrcRoot: path.join(appRoot, "src"),
-        webRoot: WEB_ROOT,
-        workspaceRoot: path.resolve(WEB_ROOT, ".."),
-        cacheDir: ".cache/vite",
-        hmrServer: createNodeServer(),
-        handlePageHotUpdate: async () => false,
-        leadingPlugins: [],
-      })).cacheDir,
+      (
+        await createWebConnectorViteConfig({
+          appRoot,
+          appSrcRoot: path.join(appRoot, "src"),
+          webRoot: WEB_ROOT,
+          workspaceRoot: path.resolve(WEB_ROOT, ".."),
+          cacheDir: ".cache/vite",
+          hmrServer: createNodeServer(),
+          handlePageHotUpdate: async () => false,
+          leadingPlugins: [],
+        })
+      ).cacheDir,
     ).toBe(path.join(appRoot, ".cache", "vite"));
   });
 
@@ -75,7 +79,9 @@ describe("dev server Vite config — its own cacheDir", () => {
     expect(config.cacheDir).not.toBe(sharedDefault);
     // Nested under it, so one `.vite` stays the only artefact in node_modules,
     // but a different directory: neither side can wipe the other's files.
-    expect(path.relative(sharedDefault, config.cacheDir as string)).toMatch(/^warlock-dev-[0-9a-f]{8}$/);
+    expect(path.relative(sharedDefault, config.cacheDir as string)).toMatch(
+      /^warlock-dev-[0-9a-f]{8}$/,
+    );
   });
 
   it("resolves a relative appRoot to an absolute directory", () => {

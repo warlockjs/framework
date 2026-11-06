@@ -11,7 +11,10 @@
  */
 import path from "node:path";
 import type { Plugin } from "vite";
-import { serverGraphImportHazards, SERVER_GRAPH_IMPORT_REMEDY } from "../build/server-graph-imports";
+import {
+  serverGraphImportHazards,
+  SERVER_GRAPH_IMPORT_REMEDY,
+} from "../build/server-graph-imports";
 import { moduleKey } from "../shared/module-key";
 
 const CODE_MODULE = /\.([cm]?[jt]sx?)$/;
@@ -58,7 +61,10 @@ export function serverGraphImportWarningPlugin(appRoot: string): Plugin {
       if (file.includes("/node_modules/")) return null;
 
       warned.add(file);
-      const message = serverGraphImportWarning(code, path.relative(appRoot, file).split(path.sep).join("/"));
+      const message = serverGraphImportWarning(
+        code,
+        path.relative(appRoot, file).split(path.sep).join("/"),
+      );
       if (message) this.warn(message);
 
       return null;

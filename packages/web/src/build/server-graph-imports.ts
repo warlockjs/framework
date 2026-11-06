@@ -29,7 +29,6 @@ const ASSET_EXTENSIONS = [
   ".webm",
 ];
 
-
 const FROM_SPECIFIER = /\bfrom\s*["']([^"']+)["']/g;
 const BARE_IMPORT = /\bimport\s*["']([^"']+)["']/g;
 const DYNAMIC_IMPORT = /\bimport\s*\(\s*["']([^"']+)["']\s*\)/g;

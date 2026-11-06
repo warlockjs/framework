@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { serverGraphImportHazards } from "../build/server-graph-imports";
-import { serverGraphImportWarning, serverGraphImportWarningPlugin } from "./server-graph-import-warning";
+import {
+  serverGraphImportWarning,
+  serverGraphImportWarningPlugin,
+} from "./server-graph-import-warning";
 
 const APP = "/app";
 const FILE = "/app/src/web/chart.tsx";
