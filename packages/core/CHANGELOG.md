@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## 5.47.2
 
+### Changed
+
+- `npx warlock release-notes` now checks `https://warlock.js.org/release-notes.json` for releases newer than the installed one. After the installed version's notes it prints a "Newer releases (not installed)" section with breaking changes first and the `npx warlock update` command; `--from` runs to the latest release unless `--to` caps it, `--version` can show a newer release and `--list` marks installed and newer versions. The check is fail-soft (5 second timeout, 2 MB cap, shape validated, HTTPS to warlock.js.org only): a failure prints the bundled notes plus one warning line and leaves the exit code unchanged. Pass `--offline` for the previous bundled-only behaviour. `--json` adds `installedVersion`, `latestVersion`, and per release `installed` and `source`.
+
 ### Added
 
 - `preload.configuredConnectors` for CLI commands: starts the early-phase connectors the app lists in `warlock.config.ts > connectors` (the queue, for example) without importing every module's `main.ts`, so an app's own command can dispatch queue jobs. It works with or without `connectors`; `mainModules: true` still implies it, and commands that set neither are unchanged.
