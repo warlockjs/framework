@@ -476,8 +476,15 @@ export async function transaction<T = any>(
 }
 
 /** The Cascade-side Postgres driver options `driverOptions` may carry. */
-function pickPostgresDriverOptions(driverOptions: unknown): Pick<PostgresPoolConfig, "naming"> {
-  const naming = (driverOptions as { naming?: PostgresPoolConfig["naming"] } | undefined)?.naming;
+function pickPostgresDriverOptions(
+  driverOptions: unknown,
+): Pick<PostgresPoolConfig, "naming" | "timezone"> {
+  const { naming, timezone } = (driverOptions ?? {}) as Partial<
+    Pick<PostgresPoolConfig, "naming" | "timezone">
+  >;
 
-  return naming === undefined ? {} : { naming };
+  return {
+    ...(naming === undefined ? {} : { naming }),
+    ...(timezone === undefined ? {} : { timezone }),
+  };
 }

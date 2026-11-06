@@ -4,6 +4,16 @@ All notable changes to `@warlock.js/cascade` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.47.0
+
+### Changed
+
+- Behaviour change, PostgreSQL: every connection now starts with its session time zone pinned to `UTC` (sent as the `options` startup parameter, so pooled connections need no extra round trip). Before, the session followed the database server's zone, which shifted `groupByDate` buckets and `whereDate` / `whereDateBetween` results for rows near a day or month boundary whenever that zone was not UTC. Raw SQL such as `now()::date` also runs in UTC now. To choose another zone set `timezone` (e.g. `clientOptions: { timezone: "Africa/Cairo" }`); to keep the server's zone set `timezone: false`. An explicit `-c TimeZone=…` in `options` or in the connection string still wins.
+
+### Added
+
+- PostgreSQL pool config accepts `options` (the `options` startup parameter) and `timezone`. MongoDB date helpers were checked: they run in UTC by default and are unaffected.
+
 ## 5.46.0 - 2026-11-06
 
 ### Added

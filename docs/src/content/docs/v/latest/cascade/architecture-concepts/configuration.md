@@ -144,6 +144,20 @@ connectToDatabase({
 
 This is separate from [`namingConvention`](#namingconvention), which only names the columns Cascade generates for you (timestamps, foreign keys).
 
+**Session time zone.** Every Postgres connection starts with its session `TimeZone` pinned to `UTC`, because Cascade stores timestamps in UTC. Without this, date helpers (`groupByDate`, `whereDate`, `whereDateBetween`, `date_trunc`) and raw SQL such as `now()::date` follow the database server's own zone and can put rows near a month boundary in the wrong bucket. MongoDB's date helpers already default to UTC, so they need no option.
+
+Choose another zone with `clientOptions.timezone` (or `driverOptions.timezone`), or pass `false` to keep the server's zone:
+
+```ts
+connectToDatabase({
+  driver: "postgres",
+  database: "myapp",
+  clientOptions: { timezone: "Africa/Cairo" }, // IANA name; default "UTC"; false = server zone
+});
+```
+
+An explicit `-c TimeZone=…` in `clientOptions.options` (or in the connection string's `options` parameter) always wins over `timezone`; other `options` such as `-c statement_timeout=5000` are kept and the zone is appended.
+
 `bigint` / `int8` columns come back as numbers when they fit in a safe integer; larger values stay strings, so no precision is lost.
 
 ## Native client options — `clientOptions`

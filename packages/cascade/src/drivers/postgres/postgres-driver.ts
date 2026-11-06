@@ -111,6 +111,23 @@ function createPostgresTypes(types: PgTypes): NonNullable<PgPoolConfig["types"]>
 }
 
 /**
+ * Compose pg's `options` startup parameter: the app's own `options` plus the
+ * pinned session time zone (UTC unless `timezone` says otherwise). A
+ * `TimeZone` the app already set in `options` or the connection string wins.
+ */
+export function resolvePostgresStartupOptions(config: PostgresPoolConfig): string | undefined {
+  const userOptions = config.options?.trim();
+  const timezone = config.timezone === undefined ? "UTC" : config.timezone;
+  const alreadySet = /time_?zone/i.test(`${userOptions ?? ""} ${config.connectionString ?? ""}`);
+
+  if (!timezone || alreadySet) {
+    return userOptions || undefined;
+  }
+
+  return [userOptions, `-c TimeZone=${timezone}`].filter(Boolean).join(" ");
+}
+
+/**
  * Build pg's `PoolConfig` from cascade's `PostgresPoolConfig`, coercing the
  * string-typed connection fields.
  *
@@ -152,6 +169,9 @@ export function buildPostgresPoolConfig(config: PostgresPoolConfig): PgPoolConfi
     maxUses: config.maxUses,
     application_name: config.application_name ?? "cascade",
     ssl: config.ssl,
+    // Session time zone is sent as a startup parameter, so every pooled
+    // connection gets it without an extra round trip.
+    options: resolvePostgresStartupOptions(config),
   };
 }
 

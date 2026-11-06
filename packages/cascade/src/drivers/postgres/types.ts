@@ -64,6 +64,24 @@ export type PostgresPoolConfig = PostgresConnectionConfig & {
   /** Application name for connection identification */
   readonly application_name?: string;
   /**
+   * Session time zone every pooled connection starts with. Timestamps are
+   * stored in UTC, so date helpers (`groupByDate`, `whereDate*`,
+   * `date_trunc`, `now()::date`) only line up with the stored values when the
+   * session zone is UTC too. Pass an IANA name (e.g. `"Africa/Cairo"`) to
+   * choose another zone, or `false` to leave the server's own zone untouched.
+   *
+   * An explicit `-c TimeZone=…` in `options` (or in the connection string)
+   * always wins over this setting.
+   *
+   * @default "UTC"
+   */
+  readonly timezone?: string | false;
+  /**
+   * Extra command-line options sent to the server at connection start
+   * (pg's `options` startup parameter), e.g. `"-c statement_timeout=5000"`.
+   */
+  readonly options?: string;
+  /**
    * Column names whose values are native PostgreSQL arrays (e.g. `JSONB[]`,
    * `TEXT[]`, `INTEGER[]`) rather than scalar `json` / `jsonb` columns.
    *
