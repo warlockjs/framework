@@ -136,6 +136,148 @@
   ],
   "releases": [
     {
+      "version": "5.48.0",
+      "id": "v5-48-0",
+      "date": "November 7, 2026",
+      "isUnreleased": false,
+      "headlineHtml": "Ordered tool dispatch, shell commands that return at their deadline, shell_output that waits for a job to exit, and cloud storage URLs with the disk prefix.",
+      "highlights": [
+        "<code>toolDispatch: \"ordered\"</code> runs read-only calls together and every other call alone, in the order the model asked; <code>ai.tool({ readOnly: true })</code> marks read-only tools, and tools receive <code>ctx.callId</code>.",
+        "A timed-out or cancelled workspace command returns within about a second of its deadline, even when leftover processes hold its output.",
+        "<code>shell_output({ until: \"exit\" })</code> waits for a background job to stop; <code>grep</code> takes a <code>path</code>; <code>run_shell</code> output events carry the call id.",
+        "<code>agent.context.edited</code> reports tool-result clears, and the cache-miss cause names <code>messages</code>.",
+        "Cloud storage <code>url()</code> (S3, R2, DigitalOcean Spaces) includes the disk <code>prefix</code>; <code>warlock upgrade --check</code> works on pnpm projects and fails loudly when a step fails."
+      ],
+      "upgradeNotes": [
+        "If <code>urlPrefix</code> carries the disk prefix as a workaround, it keeps working; the prefix can now be dropped from <code>urlPrefix</code>."
+      ],
+      "summaryHtml": null,
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/5.48.0-summary.md",
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/ai-workspace",
+          "slug": "ai-workspace",
+          "total": 6,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 3
+            },
+            {
+              "type": "Changed",
+              "n": 2
+            },
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>shell_output</code> / <code>ws.shellOutput</code> take <code>until: \"output\" | \"exit\"</code> (default <code>\"output\"</code>, as before). With <code>\"exit\"</code> the call returns when the job stops or <code>waitMs</code> passes, with everything printed meanwhile; <code>waitMs</code> may then be up to 600 000 ms (30 000 otherwise)."
+            },
+            {
+              "type": "Added",
+              "html": "<code>grep</code> / <code>ws.grep</code> take <code>path</code>: a workspace-relative folder or single file to search under. It is jail- and deny-checked like other paths; <code>glob</code> still matches workspace-relative paths and applies on top of <code>path</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<code>run_shell</code> passes the model's tool-call id (<code>ctx.callId</code>) as <code>callId</code> on every <code>hooks.onShellOutput</code> event, foreground and background, so concurrent commands with the same text can be told apart. <code>ws.startShell(command, { callId })</code> takes the same option; a background job's events carry both <code>jobId</code> and <code>callId</code>."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>read_file</code>, <code>grep</code>, <code>glob</code>, <code>list_dir</code> and <code>shell_output</code> are declared <code>readOnly</code>, so <code>toolDispatch: \"ordered\"</code> runs them in parallel."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>grep</code> reads candidate files 16 at a time (results stay sorted) and skips binary files (a NUL byte in the first 8000 characters)."
+            },
+            {
+              "type": "Fixed",
+              "html": "A command that timed out or was cancelled could keep its call open for as long as any process outside the killed tree held its output pipes (on Windows with Git Bash, a <code>find / | head</code> with a 120 s timeout held a turn for 37 minutes). After the tree kill the call now settles within about a second with what was captured, and <code>timedOut</code> / <code>cancelled</code> set. Background jobs behave the same on <code>shell_kill</code>, the job timeout and <code>dispose()</code>."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 4,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            },
+            {
+              "type": "Fixed",
+              "n": 3
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>npx warlock release-notes</code> includes the 5.48.0 notes: ordered tool dispatch, shell commands that return at their deadline, <code>shell_output</code> waiting for a job to exit, a <code>grep</code> path option, tool-result clearing events, cloud storage URLs with the disk prefix, and <code>warlock upgrade --check</code> on pnpm."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>warlock upgrade --check</code> installs the scratch copy so the lockfile can update (<code>pnpm install --no-frozen-lockfile</code>, <code>yarn install --no-immutable</code> on Yarn 2+ or <code>--no-frozen-lockfile</code> on Yarn 1, plain <code>npm install</code> and <code>bun install</code>). Before, a pnpm project installed the new <code>package.json</code> against the old lockfile, every package failed and the later steps were skipped."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>warlock upgrade</code> (with or without <code>--check</code>) exits with code 1 and no longer prints \"completed successfully\" when the run failed or a rehearsal step failed. The check summary names the failing steps."
+            },
+            {
+              "type": "Fixed",
+              "html": "Cloud drivers (<code>s3</code>, <code>r2</code>, <code>do-spaces</code>) apply the disk <code>prefix</code> in <code>url()</code>, as writes already did: <code>storage.url(\"photos/x.jpg\")</code> with <code>prefix: \"acme\"</code> now points at <code>acme/photos/x.jpg</code> for <code>publicDomain</code>, <code>urlPrefix</code> and the default host, and a tenant prefix from the storage context wins. A <code>urlPrefix</code> that already ends with the prefix (the earlier workaround) keeps producing the same URL."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai",
+          "slug": "ai",
+          "total": 3,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 3
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>toolDispatch: \"ordered\"</code> and <code>ToolConfig.readOnly</code> (also readable on the <code>ToolContract</code>). Consecutive <code>readOnly</code> tool calls of a turn run together, up to <code>maxConcurrentTools</code>; any other call runs alone, after every earlier call of the turn finished and before any later one starts, so \"write the file, then run it\" keeps its order while reads stay parallel. A catalogue call counts as the tool it resolves to, an unregistered tool fails at once without delaying the others, and <code>tool</code> middleware <code>before</code> hooks start in request order. The default stays <code>\"concurrent\"</code>. <code>tool_search</code> from <code>ai.catalogue()</code> is <code>readOnly</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<code>ToolContext.callId</code>: the model's tool-call id, set on every tool call an agent dispatches (sub-agents and supervisors included), so a tool can tag live output with the call it belongs to."
+            },
+            {
+              "type": "Added",
+              "html": "<code>agent.context.edited</code> event <code>{ tripIndex, clearedResults, tokensBefore, tokensAfter }</code> (type <code>AgentContextEditedPayload</code>), emitted when <code>contextEditing.clearToolResults</code> clears results on the client, so the cache write that follows is explained. With <code>diagnostics.cacheFingerprint</code>, that trip's <code>agent.trip.cache-miss-cause</code> lists <code>messages</code>."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-tools",
+          "slug": "ai-tools",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>fetch_url</code>, <code>web_search</code>, <code>calculator</code> and <code>date_time</code> are declared <code>readOnly</code>, so <code>toolDispatch: \"ordered\"</code> runs them in parallel."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "5.47.2",
       "id": "v5-47-2",
       "date": "November 6, 2026",

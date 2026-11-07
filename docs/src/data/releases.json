@@ -1,4 +1,19 @@
 {
+  "5.48.0": {
+    "publishedAt": "2026-11-07T15:54:12.413Z",
+    "matrix": "none",
+    "headline": "Ordered tool dispatch, shell commands that return at their deadline, shell_output that waits for a job to exit, and cloud storage URLs with the disk prefix.",
+    "highlights": [
+      "`toolDispatch: \"ordered\"` runs read-only calls together and every other call alone, in the order the model asked; `ai.tool({ readOnly: true })` marks read-only tools, and tools receive `ctx.callId`.",
+      "A timed-out or cancelled workspace command returns within about a second of its deadline, even when leftover processes hold its output.",
+      "`shell_output({ until: \"exit\" })` waits for a background job to stop; `grep` takes a `path`; `run_shell` output events carry the call id.",
+      "`agent.context.edited` reports tool-result clears, and the cache-miss cause names `messages`.",
+      "Cloud storage `url()` (S3, R2, DigitalOcean Spaces) includes the disk `prefix`; `warlock upgrade --check` works on pnpm projects and fails loudly when a step fails."
+    ],
+    "upgradeNotes": [
+      "If `urlPrefix` carries the disk prefix as a workaround, it keeps working; the prefix can now be dropped from `urlPrefix`."
+    ]
+  },
   "5.47.2": {
     "publishedAt": "2026-11-06T23:45:59.445Z",
     "matrix": "none",
