@@ -4,7 +4,8 @@ import { MockSDK } from "../mock/mock-sdk";
 import { catalogue } from "../tool/catalogue";
 import { tool } from "../tool/tool";
 import { agent } from "./agent";
-import type { AgentMiddleware } from "./agent-middleware.type";
+import type { AgentMiddleware } from "../contracts/middleware/middleware.contract";
+import type { ToolCall } from "../contracts/result/tool-call.type";
 
 const stringSchema: StandardSchemaV1<string> = {
   "~standard": {
@@ -113,7 +114,7 @@ describe("toolDispatch: ordered", () => {
       toolDispatch: "ordered",
     }).execute("go");
 
-    expect(result.report.children.map((call) => call.callId)).toEqual(["1", "2"]);
+    expect(result.report.children.map((call) => (call as ToolCall).callId)).toEqual(["1", "2"]);
   });
 
   it("fails an unregistered tool at once without delaying the others", async () => {

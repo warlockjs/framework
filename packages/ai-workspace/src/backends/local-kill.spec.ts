@@ -95,7 +95,11 @@ describe("killed commands settle at the deadline", () => {
   }, 15_000);
 
   it("settles a background job after kill even when a grandchild holds the pipes", async () => {
-    const proc = createLocalBackend().start("node escapee.cjs", {
+    const backend = createLocalBackend();
+
+    if (backend.start === undefined) throw new Error("the local backend supports background jobs");
+
+    const proc = backend.start("node escapee.cjs", {
       cwd: root,
       env,
       onOutput: () => {},

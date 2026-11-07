@@ -184,10 +184,13 @@ export interface Workspace {
    */
   dispose(): Promise<void>;
 
-  /** Search jailed file contents for a regex pattern. */
+  /**
+   * Search jailed file contents for a regex pattern. `path` (a workspace-relative
+   * folder or file) limits the search; `glob` matches workspace-relative paths.
+   */
   grep(
     pattern: string,
-    opts?: { glob?: string; ignoreCase?: boolean; signal?: AbortSignal },
+    opts?: { glob?: string; ignoreCase?: boolean; path?: string; signal?: AbortSignal },
   ): Promise<GrepResult>;
 
   /** Resolve a glob to matching workspace-relative paths within the jail. */
