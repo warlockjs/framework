@@ -421,6 +421,7 @@ export function fetchUrlTool(
       "text (readability-extracted), raw HTML, or Markdown. Use to read a " +
       "specific page you already have the URL for.",
     input: inputSchema,
+    readOnly: true,
     async execute(input) {
       const url = parseUrl(input.url);
       assertHostAllowed(url, allowHosts);

@@ -124,6 +124,12 @@ const CONTINUE_AFTER_TOOL_CALL_PROMPT =
   "That tool call was discarded and did not run. Continue from where you stopped and issue the call again; " +
   "if its input is large, split the work across several smaller calls.";
 
+/** A model tool call matched to the tool that will run it (`undefined` when unregistered). */
+type ResolvedToolCall = {
+  tool: ToolContract | undefined;
+  request: ModelToolCallRequest;
+};
+
 /** One settled tool dispatch: its record plus the tool-result message for the next trip. */
 type DispatchedToolCall = {
   record: ToolCall;
@@ -1630,6 +1636,12 @@ class Execution<TOutput> {
           runId: this.runId,
           ...record,
         });
+        this.emit("agent.context.edited", {
+          tripIndex,
+          clearedResults: record.clearedResults,
+          tokensBefore: record.inputTokens,
+          tokensAfter: record.tokensAfter,
+        });
       }
     }
 
@@ -1932,6 +1944,11 @@ class Execution<TOutput> {
    * way the tool-result messages and `ToolCall` records are appended in
    * the order the model requested them, so adapters can group all results
    * of the turn into a single provider message.
+   *
+   * `toolDispatch: "ordered"` keeps parallel reads and still honours
+   * dependencies: consecutive `readOnly` tools run together, any other
+   * tool runs alone after every earlier call finished and before any
+   * later call starts.
    */
   private async dispatchToolCalls(
     requests: ModelToolCallRequest[],
@@ -1952,11 +1969,12 @@ class Execution<TOutput> {
       return records;
     }
 
-    const dispatched = await mapWithConcurrency(
-      requests,
-      this.resolveMaxConcurrentTools(),
-      (request) => this.dispatchToolCall(request, tripIndex),
-    );
+    const dispatched =
+      this.resolveToolDispatch() === "ordered"
+        ? await this.dispatchOrdered(requests, tripIndex)
+        : await mapWithConcurrency(requests, this.resolveMaxConcurrentTools(), (request) =>
+            this.dispatchToolCall(request, tripIndex),
+          );
 
     for (const { record, message } of dispatched) {
       this.toolCalls.push(record);
@@ -1965,6 +1983,100 @@ class Execution<TOutput> {
     }
 
     return dispatched.map(({ record }) => record);
+  }
+
+  /**
+   * `"ordered"` dispatch. Every call is resolved first, in request order
+   * (so catalogue calls are classified by the tool they resolve to and
+   * `tool` middleware starts in request order). Unregistered tools fail at
+   * once. The rest is split into segments: a run of consecutive `readOnly`
+   * calls (concurrent, capped by `maxConcurrentTools`) or one call that
+   * is not `readOnly`, executed alone. Results come back in request order.
+   */
+  private async dispatchOrdered(
+    requests: ModelToolCallRequest[],
+    tripIndex: number,
+  ): Promise<DispatchedToolCall[]> {
+    const resolvedCalls = await Promise.all(
+      requests.map((request) => this.resolveToolCall(request)),
+    );
+    const results = new Array<DispatchedToolCall>(requests.length);
+
+    type Segment = { readOnly: boolean; indexes: number[] };
+    const segments: Segment[] = [];
+
+    for (let index = 0; index < requests.length; index++) {
+      const resolved = resolvedCalls[index] as ResolvedToolCall;
+
+      if (!resolved.tool) {
+        results[index] = await this.dispatchToolCall(
+          requests[index] as ModelToolCallRequest,
+          tripIndex,
+          resolved,
+        );
+        continue;
+      }
+
+      const readOnly = resolved.tool.readOnly === true;
+      const last = segments[segments.length - 1];
+
+      if (readOnly && last?.readOnly) {
+        last.indexes.push(index);
+      } else {
+        segments.push({ readOnly, indexes: [index] });
+      }
+    }
+
+    for (const segment of segments) {
+      const settled = await mapWithConcurrency(
+        segment.indexes,
+        segment.readOnly ? this.resolveMaxConcurrentTools() : 1,
+        (index) =>
+          this.dispatchToolCall(
+            requests[index] as ModelToolCallRequest,
+            tripIndex,
+            resolvedCalls[index] as ResolvedToolCall,
+          ),
+      );
+
+      segment.indexes.forEach((index, position) => {
+        results[index] = settled[position] as DispatchedToolCall;
+      });
+    }
+
+    return results;
+  }
+
+  /**
+   * Look up the registered tool for a request; a catalogue call resolves
+   * to its target. A failed resolution yields a tool whose invoke throws,
+   * so the ordinary failure path reports it and no target ever runs.
+   */
+  private async resolveToolCall(request: ModelToolCallRequest): Promise<ResolvedToolCall> {
+    let registeredTool = this.effectiveTools.find((tool) => tool.name === request.name);
+
+    if (!registeredTool) return { tool: undefined, request };
+
+    try {
+      const resolved = await resolveCatalogueCall(registeredTool, request, this.options?.signal);
+
+      if (resolved) {
+        // Resolve identity before hooks: policy, HITL, budgets and tracing
+        // receive the actual target and its raw input, just as for a direct call.
+        return { tool: resolved.tool, request: resolved.request };
+      }
+    } catch (error) {
+      // Resolution failed before execution. Use the ordinary failure path;
+      // a loader failure or malformed meta-call must never execute a target.
+      registeredTool = {
+        ...registeredTool,
+        invoke: async () => {
+          throw error;
+        },
+      };
+    }
+
+    return { tool: registeredTool, request };
   }
 
   /**
@@ -1998,36 +2110,13 @@ class Execution<TOutput> {
    * order. Never throws.
    */
   private async dispatchToolCall(
-    toolCallRequest: ModelToolCallRequest,
+    initialRequest: ModelToolCallRequest,
     tripIndex: number,
+    preResolved?: ResolvedToolCall,
   ): Promise<DispatchedToolCall> {
-    this.silentToolCalls.delete(toolCallRequest.id);
-    let registeredTool = this.effectiveTools.find((tool) => tool.name === toolCallRequest.name);
-
-    if (registeredTool) {
-      try {
-        const resolved = await resolveCatalogueCall(
-          registeredTool,
-          toolCallRequest,
-          this.options?.signal,
-        );
-        if (resolved) {
-          // Resolve identity before hooks: policy, HITL, budgets and tracing
-          // receive the actual target and its raw input, just as for a direct call.
-          registeredTool = resolved.tool;
-          toolCallRequest = resolved.request;
-        }
-      } catch (error) {
-        // Resolution failed before execution. Use the ordinary failure path;
-        // a loader failure or malformed meta-call must never execute a target.
-        registeredTool = {
-          ...registeredTool,
-          invoke: async () => {
-            throw error;
-          },
-        };
-      }
-    }
+    this.silentToolCalls.delete(initialRequest.id);
+    const { tool: registeredTool, request: toolCallRequest } =
+      preResolved ?? (await this.resolveToolCall(initialRequest));
 
     if (!registeredTool) {
       const error = new AgentExecutionError(`Tool not registered: ${toolCallRequest.name}`, {
@@ -2108,20 +2197,18 @@ class Execution<TOutput> {
       request: toolCallRequest,
     };
 
-    // Thread the run's cancellation signal into the ctx handed to the
-    // tool's `invoke`, so composite tools (asTool-wrapped agent/workflow/
-    // supervisor) abort their nested run when the outer agent is cancelled
-    // (C2). The caller's `toolCtx` (artifacts bag, etc.) is preserved — we
-    // only add/override `signal`. With no signal configured we pass
-    // `toolCtx` through unchanged so behavior stays byte-identical.
+    // Thread the run's cancellation signal and the model's call id into the
+    // ctx handed to the tool's `invoke`: composite tools (asTool-wrapped
+    // agent/workflow/supervisor) abort their nested run when the outer agent
+    // is cancelled (C2), and a tool can tell concurrent calls apart. The
+    // caller's `toolCtx` (artifacts bag, etc.) is preserved.
     const runSignal = this.options?.signal;
-    const dispatchToolCtx: ToolContext | undefined = runSignal
-      ? {
-          artifacts: this.options?.toolCtx?.artifacts ?? {},
-          ...this.options?.toolCtx,
-          signal: runSignal,
-        }
-      : this.options?.toolCtx;
+    const dispatchToolCtx: ToolContext = {
+      artifacts: this.options?.toolCtx?.artifacts ?? {},
+      ...this.options?.toolCtx,
+      ...(runSignal ? { signal: runSignal } : {}),
+      callId: toolCallRequest.id,
+    };
 
     let invokeResult: ToolInvokeResult<unknown>;
     let memoHit = false;

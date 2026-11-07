@@ -281,13 +281,16 @@ export type AgentConfig<TOutput = unknown> = {
   /**
    * How the tool calls of one trip are dispatched: `"concurrent"`
    * (default — all calls of the trip run at once) or `"sequential"`
-   * (each awaited before the next). Results reach the model in request
+   * (each awaited before the next) or `"ordered"` (consecutive `readOnly`
+   * tools run together, any other tool runs alone, in request order).
+   * Results reach the model in request
    * order either way. Per-call `AgentExecuteOptions.toolDispatch` wins.
    */
   toolDispatch?: ToolDispatchMode;
   /**
    * Upper bound on how many tool calls of one trip run at the same time
-   * under `toolDispatch: "concurrent"`. Default `4`. A model (or a prompt
+   * under `toolDispatch: "concurrent"` (and per group of `readOnly` calls under
+   * `"ordered"`). Default `4`. A model (or a prompt
    * injected into its context) can request many calls in one turn; this
    * caps the processes, requests and memory they can claim at once.
    * Further calls start as earlier ones settle. Results reach the model in

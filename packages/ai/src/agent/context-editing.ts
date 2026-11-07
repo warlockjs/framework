@@ -172,5 +172,14 @@ export async function clearOldToolResults(
     messages[index] = { ...messages[index]!, content: placeholder };
   }
 
-  return { tripIndex, clearedResults: candidates.length, inputTokens: tokens };
+  const tokensAfter = rule.countTokens
+    ? await rule.countTokens(structuredClone(messages), options)
+    : estimate(messages, options);
+
+  return {
+    tripIndex,
+    clearedResults: candidates.length,
+    inputTokens: tokens,
+    tokensAfter: Number.isFinite(tokensAfter) && tokensAfter >= 0 ? tokensAfter : tokens,
+  };
 }

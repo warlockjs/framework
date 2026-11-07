@@ -221,6 +221,7 @@ export function dateTimeTool(
       'ISO-8601 strings; set format to "iso" (default), "date", "time", or ' +
       '"datetime", and timeZone as an IANA zone like "Africa/Cairo".',
     input: inputSchema,
+    readOnly: true,
     async execute(input) {
       const timeZone = input.timeZone ?? defaultTimeZone;
 

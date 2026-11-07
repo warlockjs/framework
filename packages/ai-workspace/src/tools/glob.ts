@@ -58,6 +58,7 @@ export function makeGlobTool(
       "gitignored folders; start the pattern with a folder (`src/**/*.ts`) to search faster.",
     action: (input) => `Finding files matching ${input.pattern}`,
     input: globInputSchema,
+    readOnly: true,
     async execute(input, ctx) {
       const opts = ctx?.signal ? { signal: ctx.signal } : undefined;
 

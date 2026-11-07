@@ -151,6 +151,13 @@ export type ToolContext<TArtifacts = Record<string, unknown>> = {
    * supervisor or a direct `tool.invoke()`.
    */
   request?: ToolRequestContext;
+  /**
+   * The model's id for this tool call, set on every agent dispatch. Lets a
+   * tool tag live output (a shell command's stream, a progress event) so
+   * the host can match it to the call. Absent for a direct `tool.invoke()`
+   * that does not pass one.
+   */
+  callId?: string;
 };
 
 /**
@@ -280,6 +287,17 @@ export interface ToolConfig<TInput = unknown, TOutput = unknown> {
    * tool({ name: "get_plans", memoize: { scope: "session", ttl: 60_000 }, execute: listPlans });
    */
   memoize?: ToolMemoizeOption;
+  /**
+   * Declare that the tool only reads: it changes nothing a sibling call of
+   * the same turn could observe. Default `false`. Under
+   * `toolDispatch: "ordered"`, consecutive `readOnly` calls run
+   * concurrently while any other call runs alone, in request order. Hosts
+   * and middleware can read it from the tool.
+   *
+   * @example
+   * tool({ name: "read_file", readOnly: true, execute: ({ path }) => readFile(path) });
+   */
+  readOnly?: boolean;
   /**
    * Development-time schema check of this definition (see
    * `describeToolSchema`). `ai.tool()` logs one warning per definition when

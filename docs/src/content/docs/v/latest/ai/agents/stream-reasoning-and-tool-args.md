@@ -43,6 +43,8 @@ assistant.stream("Refactor utils.ts").on({
 });
 ```
 
+`agent.tool.calling` is emitted, and its listeners are called, before the tool starts running, and the stream event is queued before the tool can produce anything. An async-iterator consumer reads its queue at its own pace, though, and a tool that reports live output through its own channel (for example a shell command's `hooks.onShellOutput`) is not ordered against that queue. Match early output to its call by `callId` instead of by arrival order: the tool receives the same id as `ctx.callId`, and `run_shell` passes it as `callId` on every `onShellOutput` event.
+
 The deltas of one `callId` concatenate to the raw argument string; it may be invalid JSON until the last piece. The parsed input still arrives on `agent.tool.calling`. The final usage is on `agent.trip.completed` as before.
 
 These events exist only for `agent.stream()`. `agent.execute()` makes non-streaming calls and never emits them. To turn them off for a streaming agent (to cut event volume), set `modelOptions.streamChunks`:

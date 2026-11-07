@@ -397,6 +397,7 @@ export function calculatorTool(
       "scientific-notation numbers. Does not support variables or " +
       'functions — pass a literal expression like "(3 + 4) * 2".',
     input: inputSchema,
+    readOnly: true,
     async execute(input) {
       const tokens = tokenize(input.expression);
 

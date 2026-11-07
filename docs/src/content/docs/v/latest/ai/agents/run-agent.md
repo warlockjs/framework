@@ -407,6 +407,7 @@ Names:
 - `agent.starting`, `agent.trip.started`, `agent.trip.streaming`, `agent.trip.completed`
 - `agent.trip.reasoning`, `agent.trip.usage`, `agent.tool.streaming` — `agent.stream()` only
 - `agent.tool.calling`, `agent.tool.called`, `agent.tool.failed`
+- `agent.context.edited` — old tool results were cleared by `contextEditing` before this trip
 - `agent.completed`, `agent.error`
 
 Three subscription tiers, fired in order:

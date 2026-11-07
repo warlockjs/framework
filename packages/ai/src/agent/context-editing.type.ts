@@ -70,5 +70,8 @@ export type AgentContextEditingConfig = {
 export type ContextEditRecord = {
   tripIndex: number;
   clearedResults: number;
+  /** Estimated (or `countTokens`) size of the request before the clear. */
   inputTokens: number;
+  /** The same measure after the clear. */
+  tokensAfter: number;
 };

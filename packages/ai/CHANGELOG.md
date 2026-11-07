@@ -4,6 +4,19 @@ All notable changes to `@warlock.js/ai` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.48.0
+
+### Added
+
+- `toolDispatch: "ordered"` and `ToolConfig.readOnly` (also readable on the `ToolContract`). Consecutive `readOnly` tool calls of a turn run together, up to `maxConcurrentTools`; any other call runs alone, after every earlier call of the turn finished and before any later one starts, so "write the file, then run it" keeps its order while reads stay parallel. A catalogue call counts as the tool it resolves to, an unregistered tool fails at once without delaying the others, and `tool` middleware `before` hooks start in request order. The default stays `"concurrent"`. `tool_search` from `ai.catalogue()` is `readOnly`.
+- `ToolContext.callId`: the model's tool-call id, set on every tool call an agent dispatches (sub-agents and supervisors included), so a tool can tag live output with the call it belongs to.
+- `agent.context.edited` event `{ tripIndex, clearedResults, tokensBefore, tokensAfter }` (type `AgentContextEditedPayload`), emitted when `contextEditing.clearToolResults` clears results on the client, so the cache write that follows is explained. With `diagnostics.cacheFingerprint`, that trip's `agent.trip.cache-miss-cause` lists `messages`.
+
+### Docs
+
+- `agent.tool.calling` is emitted before the tool starts; live output a tool reports on its own channel is matched to its call by `callId`.
+- `clearToolResults` rewrites the cached prefix: the cache trade-off is described under context management.
+
 ## 5.47.0 - 2026-11-06
 
 ### Fixed

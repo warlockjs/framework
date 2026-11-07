@@ -4,6 +4,13 @@ All notable changes to `@warlock.js/ai-workspace` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.48.0
+
+### Added
+
+- `run_shell` passes the model's tool-call id (`ctx.callId`) as `callId` on every `hooks.onShellOutput` event, foreground and background, so concurrent commands with the same text can be told apart. `ws.startShell(command, { callId })` takes the same option; a background job's events carry both `jobId` and `callId`.
+- `read_file`, `grep`, `glob`, `list_dir` and `shell_output` are declared `readOnly`, so `toolDispatch: "ordered"` runs them in parallel.
+
 ## 5.47.0 - 2026-11-06
 
 ### Added

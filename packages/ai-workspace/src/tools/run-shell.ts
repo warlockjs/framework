@@ -230,10 +230,10 @@ export function makeRunShellTool(
           );
         }
 
-        const job = await ops.startShell(
-          input.command,
-          input.timeoutMs !== undefined ? { timeoutMs: input.timeoutMs } : undefined,
-        );
+        const job = await ops.startShell(input.command, {
+          ...(input.timeoutMs !== undefined ? { timeoutMs: input.timeoutMs } : {}),
+          ...(ctx?.callId !== undefined ? { callId: ctx.callId } : {}),
+        });
 
         return { ...job, background: true };
       }
@@ -243,6 +243,7 @@ export function makeRunShellTool(
       return ops.exec(input.command, {
         ...(timeoutMs !== undefined ? { timeoutMs } : {}),
         ...(ctx?.signal ? { signal: ctx.signal } : {}),
+        ...(ctx?.callId !== undefined ? { callId: ctx.callId } : {}),
       });
     },
   });
