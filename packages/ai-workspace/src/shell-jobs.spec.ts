@@ -103,6 +103,58 @@ describe("ShellJobs", () => {
     expect(result.stdout).toBe("late\n");
   });
 
+  it("waits until the job exits with until: exit and returns everything printed", async () => {
+    const jobs = new ShellJobs();
+    const proc = controllable();
+
+    jobs.start(spec({ launch: proc.launch }));
+
+    for (let index = 1; index <= 5; index++) {
+      setTimeout(() => proc.emit("stdout", `line ${index}\n`), index * 40);
+    }
+
+    setTimeout(() => proc.exit(0), 260);
+
+    const result = await jobs.output("job-1", { waitMs: 5_000, until: "exit" });
+
+    expect(result.status).toBe("exited");
+    expect(result.stdout).toBe("line 1\nline 2\nline 3\nline 4\nline 5\n");
+  });
+
+  it("returns a running job when the until: exit wait runs out", async () => {
+    const jobs = new ShellJobs();
+    const proc = controllable();
+
+    jobs.start(spec({ launch: proc.launch }));
+    setTimeout(() => proc.emit("stdout", "tick\n"), 20);
+
+    const startedAt = Date.now();
+    const result = await jobs.output("job-1", { waitMs: 300, until: "exit" });
+
+    expect(result.status).toBe("running");
+    expect(result.stdout).toBe("tick\n");
+    expect(Date.now() - startedAt).toBeGreaterThanOrEqual(250);
+    proc.exit(0);
+  });
+
+  it("ends an until: exit wait when the signal aborts", async () => {
+    const jobs = new ShellJobs();
+    const proc = controllable();
+    const controller = new AbortController();
+
+    jobs.start(spec({ launch: proc.launch }));
+    setTimeout(() => controller.abort(), 50);
+
+    const result = await jobs.output("job-1", {
+      waitMs: 5_000,
+      until: "exit",
+      signal: controller.signal,
+    });
+
+    expect(result.status).toBe("running");
+    proc.exit(0);
+  });
+
   it("kills a job and marks it killed", async () => {
     const jobs = new ShellJobs();
     const proc = controllable();

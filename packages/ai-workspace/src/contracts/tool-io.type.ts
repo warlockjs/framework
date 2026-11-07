@@ -295,10 +295,17 @@ export interface ShellOutputInput {
    */
   since?: number;
   /**
-   * Wait up to this many ms (capped at 30 000) for new output or for the
-   * command to stop, when there is nothing new yet.
+   * Wait up to this many ms for new output or for the command to stop,
+   * when there is nothing new yet (see `until`). Capped at 30 000 for
+   * `until: "output"` and at 600 000 for `until: "exit"`.
    */
   waitMs?: number;
+  /**
+   * What ends the wait early. `"output"` (default) returns at the next
+   * output; `"exit"` keeps waiting until the command stops (or `waitMs`
+   * passes) and returns everything printed meanwhile.
+   */
+  until?: "output" | "exit";
 }
 
 /** Options for `shellOutput()`. */
@@ -307,6 +314,8 @@ export interface ShellOutputOptions {
   since?: number;
   /** See {@link ShellOutputInput.waitMs}. */
   waitMs?: number;
+  /** See {@link ShellOutputInput.until}. */
+  until?: "output" | "exit";
   /** Stops a `waitMs` wait early. */
   signal?: AbortSignal;
 }
@@ -381,6 +390,12 @@ export interface GrepInput {
   pattern: string;
   /** Glob narrowing which files are scanned (e.g. `"src/api/*.ts"`). */
   glob?: string;
+  /**
+   * Workspace-relative folder (or single file) to search under; the walk
+   * starts there. Default: the whole workspace. A `glob` still matches
+   * workspace-relative paths, so it applies on top of `path`.
+   */
+  path?: string;
   /** Case-insensitive matching when true. */
   ignoreCase?: boolean;
 }

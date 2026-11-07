@@ -178,12 +178,12 @@ export async function devLoop(cwd: string) {
   - `run_shell` → `{ exitCode, stdout, stderr, truncated, timedOut, cancelled, truncation?: { stdout?, stderr? }, spilledTo? }`; one path per spilled stream.
   - `shell_output` → the fields above under Background, plus `truncation?: { stdout?, stderr? }` and `spilledTo?`.
   - `read_file` → `{ content, ..., truncated, bytesCapped, truncation?, spilledTo? }`; spills only when `read.maxBytes` cut the window.
-  - `grep` → `{ matches, total, truncated?, truncation?, spilledTo? }`; `glob` → `{ paths, truncated?, truncation?, spilledTo?, maxFilesReached? }`. Both start at the pattern's static folder prefix (`src/api/**/*.ts` reads only `src/api`), never enter `node_modules`, `.git`, `denyPaths` folders or gitignored paths (see `search.*`), and take an optional `signal` that stops the walk.
+  - `grep` takes `{ pattern, glob?, path?, ignoreCase? }` — `path` is a workspace-relative folder or file to search under (jail/deny-checked; `glob` still matches workspace-relative paths); files are read 16 at a time and binary files (NUL in the first 8000 characters) are skipped → `{ matches, total, truncated?, truncation?, spilledTo? }`; `glob` → `{ paths, truncated?, truncation?, spilledTo?, maxFilesReached? }`. Both start at the pattern's static folder prefix (`src/api/**/*.ts` reads only `src/api`), never enter `node_modules`, `.git`, `denyPaths` folders or gitignored paths (see `search.*`), and take an optional `signal` that stops the walk.
   - `truncation` is `{ shown: { lines }, total: { lines, bytes }, path? }`; without `spillDir` there is no `path` and no `spilledTo`.
 - `list_dir({ path?, depth?, ignore? })` → `{ path, entries: [{ path, type, size?, depth }], truncated }`; `denyPaths` always hidden, `list.ignore` (default `node_modules`, `.git`) hidden from listings, symlinks reported but never followed.
 - `apply_patch({ patch, dryRun? })` → `{ files: [{ path, action, oldPath?, hunks, hash? }], dryRun }`; a unified diff that modifies, creates, deletes and renames files, all or none; paths jailed, hunks matched by context, line endings kept, binary files refused (`binary-file`); `dryRun` checks only. Not in `readonly()`.
 - `multi_edit({ path, edits, expectHash? })` → `{ path, edits, replacements, hash }`; same uniqueness rules as `edit_file`, at most 100 edits.
-- Background: `shell_output({ id, since?, waitMs? })` → `{ stdout, stderr, cursor, droppedBytes, truncated, status, exitCode }`; only the newest `shell.maxOutputBytes` per command are kept. States `"running"`, `"exited"`, `"killed"`, `"timed-out"`. Unknown id → `WorkspaceJobError`. Background commands outlive the agent run; `dispose()` (or process exit) kills them. Only processes the workspace spawned are ever signalled.
+- Background: `shell_output({ id, since?, waitMs?, until? })` (`until: "exit"` waits for the job to stop, `waitMs` up to 600000, instead of returning at the next output; default `"output"`, max 30000) → `{ stdout, stderr, cursor, droppedBytes, truncated, status, exitCode }`; only the newest `shell.maxOutputBytes` per command are kept. States `"running"`, `"exited"`, `"killed"`, `"timed-out"`. Unknown id → `WorkspaceJobError`. Background commands outlive the agent run; `dispose()` (or process exit) kills them. Only processes the workspace spawned are ever signalled.
 - Todos: one in-memory list per workspace, shared with `readonly()` / `scope()`; `todo_write` replaces the whole list (≤ 100 items, status `pending` / `in_progress` / `completed`).
 - `run_shell`'s model-supplied `timeoutMs` can only lower `shell.timeoutMs`.
 
@@ -213,6 +213,7 @@ if (page.bytesCapped) console.warn(`Only part of line ${page.endLine} fit in the
 
 - Already aborted ⇒ the command is **not started** (`exitCode: 130`).
 - Aborted mid-run ⇒ the whole process tree is SIGKILLed, as on a timeout.
+- A killed command (timeout, abort, `shell_kill`, `dispose()`) settles within about a second of the kill even when a process outside the killed tree still holds its output pipes open: it returns what was captured so far with `timedOut` / `cancelled` set.
 - Either way the result says `cancelled: true` — it resolves, it doesn't throw — and `cancelled` and `timedOut` are never both `true`. Branch on those flags, not on the exit code.
 - The signal belongs to that one call; the workspace never stores it, so one workspace can serve many runs. The abort listener is removed once the command settles.
 

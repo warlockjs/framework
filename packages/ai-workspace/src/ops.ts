@@ -54,6 +54,12 @@ import type {
 
 /** Default line window a read returns when the policy sets no `defaultLines`. */
 const DEFAULT_READ_LINES = 2000;
+/** Files `grep` reads at once. */
+const GREP_READ_CONCURRENCY = 16;
+
+/** Leading characters checked for a NUL byte; a file with one is treated as binary and skipped. */
+const GREP_BINARY_SNIFF_LENGTH = 8000;
+
 /** Hard ceiling on grep matches returned, so a broad pattern can't flood. */
 const DEFAULT_MAX_GREP_MATCHES = 1000;
 /** Default per-command output byte cap when the policy sets none. */
@@ -303,14 +309,21 @@ class Ops implements WorkspaceOps {
     jailRoot: string,
     pattern: string | undefined,
     signal: AbortSignal | undefined,
+    within?: string,
   ): Promise<WalkResult> {
     const prefix = pattern === undefined ? "" : staticGlobPrefix(pattern);
     const search = this.policy.search;
-    let startDir = jailRoot;
+    let startDir = within ?? jailRoot;
 
     if (prefix !== "") {
       try {
-        startDir = (await resolveInJail(this.policy, prefix)).absolutePath;
+        const prefixDir = (await resolveInJail(this.policy, prefix)).absolutePath;
+
+        // With a `path`, the walk starts at the deeper of the two folders; a
+        // glob anchored outside `path` can match nothing there anyway.
+        if (within === undefined || isInside(prefixDir, within)) {
+          startDir = prefixDir;
+        }
       } catch (error) {
         if (error instanceof WorkspacePolicyError) {
           return { files: [], truncated: false };
@@ -981,7 +994,7 @@ class Ops implements WorkspaceOps {
 
   public async grep(
     pattern: string,
-    opts?: { glob?: string; ignoreCase?: boolean; signal?: AbortSignal },
+    opts?: { glob?: string; ignoreCase?: boolean; path?: string; signal?: AbortSignal },
   ): Promise<GrepResult> {
     if (!isSafeGrepPattern(pattern)) {
       throw new WorkspacePolicyError(
@@ -995,13 +1008,28 @@ class Ops implements WorkspaceOps {
     const regex = new RegExp(pattern, flags);
     const globRegex = opts?.glob ? globToRegExp(opts.glob) : undefined;
 
-    const walked = await this.searchFiles(jailRoot, opts?.glob, opts?.signal);
+    let within: string | undefined;
+    let singleFile: string | undefined;
+
+    if (opts?.path !== undefined && opts.path !== "" && opts.path !== ".") {
+      // Jail- and deny-checked like every other path; a refusal throws.
+      const resolved = await resolveInJail(this.policy, opts.path, "read");
+
+      if (await this.isDirectory(resolved.absolutePath)) {
+        within = resolved.absolutePath;
+      } else {
+        singleFile = resolved.absolutePath;
+      }
+    }
+
+    const walked: WalkResult =
+      singleFile !== undefined
+        ? { files: [singleFile], truncated: false }
+        : await this.searchFiles(jailRoot, opts?.glob, opts?.signal, within);
     const files = walked.files.sort();
-    const matches: GrepMatch[] = [];
+    const candidates: { absFile: string; relativePath: string }[] = [];
 
     for (const absFile of files) {
-      opts?.signal?.throwIfAborted();
-
       const relativePath = path.relative(jailRoot, absFile).split(path.sep).join("/");
 
       if (globRegex && !globRegex.test(relativePath)) {
@@ -1013,33 +1041,54 @@ class Ops implements WorkspaceOps {
         continue;
       }
 
-      let content: string;
+      candidates.push({ absFile, relativePath });
+    }
 
-      try {
-        content = await this.backend.readFile(absFile);
-      } catch {
-        // Unreadable entry (vanished, binary handle) — skip, don't fail.
-        continue;
-      }
+    const matches: GrepMatch[] = [];
 
-      const lines = content.split("\n");
+    // Read in bounded-concurrency batches, then scan each batch in sorted
+    // order so the output order never depends on read timing.
+    for (let start = 0; start < candidates.length; start += GREP_READ_CONCURRENCY) {
+      opts?.signal?.throwIfAborted();
 
-      for (let index = 0; index < lines.length; index++) {
-        const line = lines[index] ?? "";
+      const batch = candidates.slice(start, start + GREP_READ_CONCURRENCY);
+      const contents = await Promise.all(
+        batch.map(async ({ absFile }) => {
+          try {
+            return await this.backend.readFile(absFile);
+          } catch {
+            // Unreadable entry (vanished, binary handle) — skip, don't fail.
+            return undefined;
+          }
+        }),
+      );
 
-        // Cap the input size a single `RegExp#test` call scans: backtracking
-        // cost is exponential in input length, so this bounds the worst-case
-        // time even a pathological (but length/shape-allowed) pattern can
-        // burn on any one line.
-        if (line.length > MAX_GREP_LINE_SCAN_LENGTH) {
+      for (const [offset, content] of contents.entries()) {
+        const relativePath = batch[offset]?.relativePath ?? "";
+
+        if (content === undefined || content.slice(0, GREP_BINARY_SNIFF_LENGTH).includes("\0")) {
           continue;
         }
 
-        if (regex.test(line)) {
-          matches.push({ path: relativePath, line: index + 1, text: line });
+        const lines = content.split("\n");
 
-          if (matches.length >= DEFAULT_MAX_GREP_MATCHES) {
-            return this.fitMatches(matches, walked.truncated);
+        for (let index = 0; index < lines.length; index++) {
+          const line = lines[index] ?? "";
+
+          // Cap the input size a single `RegExp#test` call scans: backtracking
+          // cost is exponential in input length, so this bounds the worst-case
+          // time even a pathological (but length/shape-allowed) pattern can
+          // burn on any one line.
+          if (line.length > MAX_GREP_LINE_SCAN_LENGTH) {
+            continue;
+          }
+
+          if (regex.test(line)) {
+            matches.push({ path: relativePath, line: index + 1, text: line });
+
+            if (matches.length >= DEFAULT_MAX_GREP_MATCHES) {
+              return this.fitMatches(matches, walked.truncated);
+            }
           }
         }
       }

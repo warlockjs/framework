@@ -89,6 +89,23 @@ function killTree(pid: number | undefined, child: { kill(signal: NodeJS.Signals)
 }
 
 /**
+ * How long after a tree kill a command or job may keep waiting for its pipes
+ * to close. A grandchild outside the killed tree (Windows Git Bash, a
+ * `setsid` escapee) can hold stdout open indefinitely; past this grace the
+ * call settles with what was captured and the streams are destroyed.
+ */
+const KILL_SETTLE_GRACE_MS = 750;
+
+/** Stop reading a child's pipes so a lingering holder cannot keep it referenced. */
+function destroyStreams(child: {
+  stdout?: { destroy(): unknown } | null;
+  stderr?: { destroy(): unknown } | null;
+}): void {
+  child.stdout?.destroy();
+  child.stderr?.destroy();
+}
+
+/**
  * Argument bytes `cmd.exe` cannot carry safely even inside double quotes:
  * an embedded quote breaks out of the quoted span, `%` triggers variable
  * expansion regardless of quoting, and newlines end the command line. An
@@ -435,6 +452,7 @@ class LocalBackend implements WorkspaceBackend {
 
               timedOut = true;
               killTree(child.pid, child);
+              forceSettle();
             }, opts.timeoutMs)
           : undefined;
 
@@ -451,6 +469,7 @@ class LocalBackend implements WorkspaceBackend {
         }
 
         killTree(child.pid, child);
+        forceSettle();
       };
 
       // Attached synchronously after `spawn`, so there is no window in which
@@ -458,12 +477,32 @@ class LocalBackend implements WorkspaceBackend {
       // shared across many commands does not accumulate listeners.
       signal?.addEventListener("abort", onAbort, { once: true });
 
+      let graceTimer: NodeJS.Timeout | undefined;
+
+      // After a kill, never wait longer than the grace period for 'close'.
+      const forceSettle = (): void => {
+        if (settled || graceTimer !== undefined) {
+          return;
+        }
+
+        graceTimer = setTimeout(() => {
+          settle(128 + 9);
+        }, KILL_SETTLE_GRACE_MS);
+        graceTimer.unref?.();
+      };
+
       const settle = (exitCode: number) => {
         if (settled) {
           return;
         }
 
         settled = true;
+
+        if (graceTimer !== undefined) {
+          clearTimeout(graceTimer);
+        }
+
+        destroyStreams(child);
 
         if (timer !== undefined) {
           clearTimeout(timer);
@@ -572,9 +611,21 @@ class LocalBackend implements WorkspaceBackend {
     const stderrDecoder = new StringDecoder("utf8");
     let finished = false;
 
+    let finishNow: ((exitCode: number) => void) | undefined;
+    let graceTimer: NodeJS.Timeout | undefined;
+
     const kill = (): void => {
-      if (!finished) {
-        killTree(child.pid, child);
+      if (finished) {
+        return;
+      }
+
+      killTree(child.pid, child);
+
+      // Pipes held by a process outside the killed tree must not keep the
+      // job running forever.
+      if (graceTimer === undefined) {
+        graceTimer = setTimeout(() => finishNow?.(128 + 9), KILL_SETTLE_GRACE_MS);
+        graceTimer.unref?.();
       }
     };
 
@@ -603,7 +654,13 @@ class LocalBackend implements WorkspaceBackend {
         }
 
         finished = true;
+
+        if (graceTimer !== undefined) {
+          clearTimeout(graceTimer);
+        }
+
         untrack();
+        destroyStreams(child);
 
         const stdoutTail = stdoutDecoder.end();
         const stderrTail = stderrDecoder.end();
@@ -618,6 +675,8 @@ class LocalBackend implements WorkspaceBackend {
 
         resolve({ exitCode });
       };
+
+      finishNow = finish;
 
       child.on("error", (error) => {
         opts.onOutput("stderr", `Command could not be started: ${error.message}`);

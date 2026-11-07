@@ -340,6 +340,70 @@ describe("createOps.grep", () => {
     expect(result.matches.some((m) => m.path === "readme.md")).toBe(false);
   });
 
+  it("limits the search to a folder with path", async () => {
+    backend.files.set(abs("src/deep/d.ts"), "const foo = 4\n");
+    const listed: string[] = [];
+    const list = backend.list.bind(backend);
+
+    backend.list = async (dir) => {
+      listed.push(dir);
+
+      return list(dir);
+    };
+
+    const ops = createOps(backend, policy());
+    const result = await ops.grep("foo", { path: "src/deep" });
+
+    expect(result.matches.map((m) => m.path)).toEqual(["src/deep/d.ts"]);
+    expect(listed.every((dir) => dir.startsWith(abs("src/deep")))).toBe(true);
+  });
+
+  it("searches a single file given as path", async () => {
+    const ops = createOps(backend, policy());
+    const result = await ops.grep("foo", { path: "src/a.ts" });
+
+    expect(result.matches.map((m) => m.path)).toEqual(["src/a.ts"]);
+  });
+
+  it("combines path and glob", async () => {
+    backend.files.set(abs("src/c.md"), "foo in md\n");
+    const ops = createOps(backend, policy());
+    const result = await ops.grep("foo", { path: "src", glob: "src/*.ts" });
+
+    expect(result.matches.map((m) => m.path)).toEqual(["src/a.ts", "src/b.ts"]);
+  });
+
+  it("refuses a path outside the workspace", async () => {
+    const ops = createOps(backend, policy());
+
+    await expect(ops.grep("foo", { path: "../outside" })).rejects.toBeInstanceOf(
+      WorkspacePolicyError,
+    );
+  });
+
+  it("refuses a denied path", async () => {
+    backend.files.set(abs("secret/s.txt"), "foo\n");
+    const ops = createOps(backend, policy({ denyPaths: ["secret/**"] }));
+
+    await expect(ops.grep("foo", { path: "secret/s.txt" })).rejects.toBeInstanceOf(WorkspacePolicyError);
+  });
+
+  it("skips binary files and keeps results sorted across many files", async () => {
+    backend.files.set(abs("bin/x.dat"), "foo\0binary\n");
+
+    for (let index = 0; index < 40; index++) {
+      backend.files.set(abs(`many/f${String(index).padStart(2, "0")}.txt`), "foo\n");
+    }
+
+    const ops = createOps(backend, policy());
+    const result = await ops.grep("foo", { path: "many" });
+    const paths = result.matches.map((m) => m.path);
+
+    expect(paths).toEqual([...paths].sort());
+    expect(paths).toHaveLength(40);
+    expect((await ops.grep("foo")).matches.some((m) => m.path === "bin/x.dat")).toBe(false);
+  });
+
   it("supports case-insensitive matching", async () => {
     backend.files.set(abs("src/c.ts"), "FOO upper\n");
     const ops = createOps(backend, policy());

@@ -12,6 +12,10 @@ const inputSchema = objectSchema<ShellOutputInput>(
     id: stringField(),
     since: optionalNumberField(),
     waitMs: optionalNumberField(),
+    until: (value, key) =>
+      value === undefined || value === "output" || value === "exit"
+        ? { value }
+        : { issues: [{ message: `"${key}" must be "output" or "exit" when provided`, path: [key] }] },
   },
   SHELL_OUTPUT_JSON_SCHEMA,
 );
@@ -24,8 +28,9 @@ const inputSchema = objectSchema<ShellOutputInput>(
  * Without `since` it returns everything produced since the previous read;
  * `cursor` in the result is the position to pass as `since` next time.
  * `waitMs` (at most 30 s) waits for new output or for the command to stop
- * when there is nothing new yet — the agent run's signal ends the wait
- * early. Only the newest `shell.maxOutputBytes` of a command's output are
+ * when there is nothing new yet; with `until: "exit"` it waits (at most
+ * 10 minutes) for the command to stop and returns everything printed
+ * meanwhile. The agent run's signal ends the wait early. Only the newest `shell.maxOutputBytes` of a command's output are
  * kept; `droppedBytes` says how much the reader missed.
  *
  * @param ops - The shared, policy-enforced operation layer.
@@ -44,7 +49,8 @@ export function makeShellOutputTool(
     description:
       "Read new output of a background command started with run_shell " +
       "(background: true) and see whether it is still running. Returns " +
-      "output since the last read; waitMs waits briefly for more.",
+      "output since the last read; waitMs waits briefly for more (until: " +
+      "\"exit\" waits up to 10 minutes for the command to stop, returning all output).",
     action: (input) =>
       `Reading output of ${typeof input.id === "string" ? input.id : "a background command"}`,
     input: inputSchema,
@@ -52,6 +58,7 @@ export function makeShellOutputTool(
       ops.shellOutput(input.id, {
         ...(input.since !== undefined ? { since: input.since } : {}),
         ...(input.waitMs !== undefined ? { waitMs: input.waitMs } : {}),
+        ...(input.until !== undefined ? { until: input.until } : {}),
         ...(ctx?.signal ? { signal: ctx.signal } : {}),
       }),
   });
