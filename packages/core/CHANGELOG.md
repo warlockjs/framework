@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## 5.48.0
 
+### Added
+
+- `npx warlock release-notes` includes the 5.48.0 notes: ordered tool dispatch, shell commands that return at their deadline, `shell_output` waiting for a job to exit, a `grep` path option, tool-result clearing events, cloud storage URLs with the disk prefix, and `warlock upgrade --check` on pnpm.
+
 ### Fixed
 
 - `warlock upgrade --check` installs the scratch copy so the lockfile can update (`pnpm install --no-frozen-lockfile`, `yarn install --no-immutable` on Yarn 2+ or `--no-frozen-lockfile` on Yarn 1, plain `npm install` and `bun install`). Before, a pnpm project installed the new `package.json` against the old lockfile, every package failed and the later steps were skipped.
