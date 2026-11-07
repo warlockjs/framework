@@ -292,7 +292,7 @@ export abstract class CloudDriver<
    *
    * When `urlBase` (the configured `urlPrefix`) already ends with the prefix,
    * the prefix is not added again, so a CDN base written as `<cdn>/<prefix>`
-   * keeps producing the same URL.
+   * keeps producing the same URL, also for an already-prefixed location.
    */
   protected publicUrlKey(location: string, urlBase?: string): string {
     const prefix = (storageDriverContext.getPrefix() || this.options.prefix || "")
@@ -302,7 +302,10 @@ export abstract class CloudDriver<
       const base = urlBase.replace(/\/+$/, "");
 
       if (base === prefix || base.endsWith(`/${prefix}`)) {
-        return location.replace(/^\/+/, "");
+        const key = location.replace(/^\/+/, "");
+
+        // A location that already carries the prefix (as `put()` results do) drops it here.
+        return key.startsWith(`${prefix}/`) ? key.slice(prefix.length + 1) : key;
       }
     }
 

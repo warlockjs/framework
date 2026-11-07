@@ -43,6 +43,8 @@ describe("cloud driver url() and the disk prefix", () => {
     expect(r2({ urlPrefix, prefix: "acme" }).url("x.jpg")).toBe("https://cdn.test/acme/x.jpg");
     expect(s3({ urlPrefix, prefix: "acme" }).url("x.jpg")).toBe("https://cdn.test/acme/x.jpg");
     expect(spaces({ urlPrefix, prefix: "acme" }).url("x.jpg")).toBe("https://cdn.test/acme/x.jpg");
+    // put() results pass the already-prefixed key.
+    expect(r2({ urlPrefix, prefix: "acme" }).url("acme/x.jpg")).toBe("https://cdn.test/acme/x.jpg");
   });
 
   it("covers S3 and DigitalOcean Spaces default hosts and urlPrefix", () => {
