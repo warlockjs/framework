@@ -787,7 +787,7 @@ class Ops implements WorkspaceOps {
       launch: (onOutput, jobId) => {
         const live = ShellOutputStreamer.create(
           this.policy.hooks,
-          { command, jobId },
+          { command, jobId, ...(opts?.callId !== undefined ? { callId: opts.callId } : {}) },
           this.policy.shell?.env,
         );
         const handle = start(command, {

@@ -18,6 +18,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Fixed
 
 - A command that timed out or was cancelled could keep its call open for as long as any process outside the killed tree held its output pipes (on Windows with Git Bash, a `find / | head` with a 120 s timeout held a turn for 37 minutes). After the tree kill the call now settles within about a second with what was captured, and `timedOut` / `cancelled` set. Background jobs behave the same on `shell_kill`, the job timeout and `dispose()`.
+- `run_shell` passes the model's tool-call id (`ctx.callId`) as `callId` on every `hooks.onShellOutput` event, foreground and background, so concurrent commands with the same text can be told apart. `ws.startShell(command, { callId })` takes the same option; a background job's events carry both `jobId` and `callId`.
+- `read_file`, `grep`, `glob`, `list_dir` and `shell_output` are declared `readOnly`, so `toolDispatch: "ordered"` runs them in parallel.
 
 ## 5.47.0 - 2026-11-06
 

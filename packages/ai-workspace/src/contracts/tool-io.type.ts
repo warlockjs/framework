@@ -283,6 +283,11 @@ export interface StartShellOptions {
    * value, or no cap.
    */
   timeoutMs?: number;
+  /**
+   * Echoed as `callId` on every `hooks.onShellOutput` event of this job,
+   * next to its `jobId`, so output can be tied to the call that started it.
+   */
+  callId?: string;
 }
 
 /** Input to the `shell_output` tool. */

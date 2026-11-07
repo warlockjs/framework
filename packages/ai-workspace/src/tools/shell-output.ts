@@ -54,6 +54,7 @@ export function makeShellOutputTool(
     action: (input) =>
       `Reading output of ${typeof input.id === "string" ? input.id : "a background command"}`,
     input: inputSchema,
+    readOnly: true,
     execute: (input, ctx) =>
       ops.shellOutput(input.id, {
         ...(input.since !== undefined ? { since: input.since } : {}),

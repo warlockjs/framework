@@ -4,6 +4,12 @@ All notable changes to `@warlock.js/ai-tools` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.48.0
+
+### Added
+
+- `fetch_url`, `web_search`, `calculator` and `date_time` are declared `readOnly`, so `toolDispatch: "ordered"` runs them in parallel.
+
 ## 5.47.0 - 2026-11-06
 
 ### Added

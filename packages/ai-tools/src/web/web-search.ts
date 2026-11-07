@@ -225,6 +225,7 @@ export function webSearchTool(
       "results (title, URL, and a short snippet). Use for facts that may have " +
       "changed since training, or anything you are unsure about.",
     input: inputSchema,
+    readOnly: true,
     async execute(input) {
       const apiKey = resolveApiKey(provider, options.apiKey);
       const limit = clampResults(input.maxResults, maxResults);

@@ -12,6 +12,7 @@ export type {
   AgentTripStartedPayload,
   AgentTripUsagePayload,
   AgentCacheMissCausePayload,
+  AgentContextEditedPayload,
   ToolEventMeta,
 } from "./agent-events.type";
 export type { AgentEventMap, SupervisorEventMap, WorkflowEventMap } from "./event-map.type";

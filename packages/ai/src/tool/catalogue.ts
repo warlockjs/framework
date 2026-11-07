@@ -181,6 +181,7 @@ export function catalogue(options: ToolCatalogueOptions): ToolCatalogue {
     name: searchName,
     description: `Find tools by name, description or tags. Returns at most ${limit} real input schemas. Use ${callName} to invoke a result.`,
     input: searchInput,
+    readOnly: true,
     execute: async ({ query }, ctx) => {
       ctx?.signal?.throwIfAborted();
       const normalized = query.trim().toLowerCase();

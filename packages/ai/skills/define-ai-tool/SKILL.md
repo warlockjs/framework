@@ -90,7 +90,7 @@ The parts travel on the `tool` message. Anthropic, Bedrock Converse and OpenAI w
 
 ## Parallel calls — tools run concurrently
 
-When the model requests several tools in one turn, the agent runs them **concurrently** (default `toolDispatch: "concurrent"`, at most `maxConcurrentTools` — default 4 — at a time) and continues once all settled; results reach the model in request order. A tool that shares mutable state with another (or must see its side effects) needs `ai.agent({ toolDispatch: "sequential" })` or per-call `execute(input, { toolDispatch: "sequential" })`. `ctx.signal` carries the run's cancellation into each call.
+When the model requests several tools in one turn, the agent runs them **concurrently** (default `toolDispatch: "concurrent"`, at most `maxConcurrentTools` — default 4 — at a time) and continues once all settled; results reach the model in request order. A tool that shares mutable state with another (or must see its side effects) needs `ai.agent({ toolDispatch: "sequential" })` or per-call `execute(input, { toolDispatch: "sequential" })`. For agents that mix reads and writes use `toolDispatch: "ordered"` with `readOnly: true` on tools that only read: consecutive read-only calls run together, any other call runs alone in request order. `ctx.callId` is the model's id for the call. `ctx.signal` carries the run's cancellation into each call.
 
 ## `memoize` — reuse results of read-only tools
 

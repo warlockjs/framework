@@ -262,6 +262,30 @@ const agent = ai.agent({ model, tools: [reserveSeat, chargeCard], toolDispatch: 
 await agent.execute(input, { toolDispatch: "sequential" });
 ```
 
+Models often put dependent calls in one turn, such as writing a file and then running it. Concurrent dispatch starts both at once, and sequential dispatch loses the parallel reads. `toolDispatch: "ordered"` keeps both: mark tools that only read with `readOnly: true`, and consecutive read-only calls run together (still capped by `maxConcurrentTools`) while any other call runs alone, after every earlier call of the turn has finished and before any later one starts:
+
+```ts
+const readFile = ai.tool({ name: "read_file", readOnly: true, input, execute });
+const agent = ai.agent({ model, tools: [readFile, writeFile, runShell], toolDispatch: "ordered" });
+```
+
+A call to a catalogue tool counts as the tool it resolves to, and a tool that is not registered fails at once without delaying the others. Results still reach the model in request order, and `tool` middleware `before` hooks start in request order. `readOnly` defaults to `false`; the workspace tools that only read (`read_file`, `grep`, `glob`, `list_dir`, `shell_output`) and the read-only `ai-tools` (`fetch_url`, `web_search`, `calculator`, `date_time`) declare it. Use `"ordered"` for agents with workspace tools. The default stays `"concurrent"`.
+
+## Knowing which call you are running
+
+Every tool call an agent dispatches gets the model's tool-call id on the context as `ctx.callId` (the same id as `callId` on `agent.tool.calling`, `agent.tool.called` and `agent.tool.failed`). A tool that reports live progress can tag it with that id so the host matches it to the call. It is absent when you call `tool.invoke()` yourself without passing one.
+
+```ts
+ai.tool({
+  name: "build",
+  input,
+  execute: async (input, ctx) => {
+    progress.emit({ callId: ctx?.callId, text: "started" });
+    return runBuild(input);
+  },
+});
+```
+
 ## `mode: "feedback"` vs `mode: "silent"`
 
 Default is `"feedback"`.

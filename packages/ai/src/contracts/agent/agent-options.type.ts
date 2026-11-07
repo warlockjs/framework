@@ -219,7 +219,14 @@ export type AgentResumeOptions<TOutput = unknown> = AgentExecuteOptions<TOutput>
  *   tool middleware sees earlier results of the same turn; use it for
  *   tools that share mutable state or must observe each other's side
  *   effects.
+ * - `"ordered"` — consecutive tools declared `readOnly: true` run
+ *   together (at most `maxConcurrentTools`); a tool that is not `readOnly`
+ *   runs alone, after every earlier call of the turn finished and before
+ *   any later call starts. Keeps parallel reads and still runs "write the
+ *   file, then run it" in order. A catalogue call counts as the tool it
+ *   resolves to; an unregistered tool fails at once without delaying the
+ *   others. Recommended for agents with workspace tools.
  *
  * Results always reach the model in the order the calls were requested.
  */
-export type ToolDispatchMode = "concurrent" | "sequential";
+export type ToolDispatchMode = "concurrent" | "sequential" | "ordered";

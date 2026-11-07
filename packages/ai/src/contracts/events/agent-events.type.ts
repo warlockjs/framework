@@ -81,6 +81,22 @@ export type AgentCacheMissCausePayload = {
   expectedCachedTokens: number;
 };
 
+/**
+ * Old tool results were replaced by `contextEditing.clearToolResults`
+ * before this trip's request. The clear rewrites the history the provider
+ * may have cached, so expect a cache write on this trip
+ * (`agent.trip.cache-miss-cause` names `messages`).
+ */
+export type AgentContextEditedPayload = {
+  tripIndex: number;
+  /** How many tool results were replaced with the placeholder. */
+  clearedResults: number;
+  /** Request size in tokens before the clear. */
+  tokensBefore: number;
+  /** Request size in tokens after the clear. */
+  tokensAfter: number;
+};
+
 /** LLM has requested a tool call */
 export type AgentToolCallingPayload = {
   tool: ToolEventMeta;

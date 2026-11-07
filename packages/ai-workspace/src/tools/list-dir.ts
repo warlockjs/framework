@@ -54,6 +54,7 @@ export function makeListDirTool(
       "folders are left out unless you list them directly.",
     action: (input) => `Listing ${typeof input.path === "string" ? input.path : "."}`,
     input: inputSchema,
+    readOnly: true,
     execute: (input) =>
       ops.listDir(input.path ?? ".", {
         ...(input.depth !== undefined ? { depth: input.depth } : {}),

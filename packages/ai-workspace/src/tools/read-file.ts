@@ -53,6 +53,7 @@ export function makeReadFileTool(
       "through large files. Output is byte-capped by the workspace policy; " +
       "when bytesCapped is true the last returned line may be cut short.",
     input: inputSchema,
+    readOnly: true,
     async execute(input) {
       // The ops layer owns the window and byte-cap arithmetic, so the tool
       // and the direct `readFile()` return identical results for the same

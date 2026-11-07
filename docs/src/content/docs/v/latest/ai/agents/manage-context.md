@@ -46,6 +46,16 @@ Anthropic the provider applies it.
 
 Only the `content` of old `tool` messages changes. Every tool call still has its result, so the history stays valid for every provider, and the model still sees which tool ran with which arguments. Results are cleared in the agent's history, so they stay cleared on later trips (this also keeps provider prompt caches stable after the first edit) and in `report.messages` and durable snapshots.
 
+A clear rewrites history the provider may already have cached, so the next request pays a cache write for the changed prefix instead of a cheap cache read. With cache reads priced at a small fraction of normal input, clearing pays off mainly when it frees a large share of the window near the context limit; a small clear on a warm cache usually costs more than it saves (`clearAtLeast` guards against that). Defaults are unchanged.
+
+Each client-side clear emits `agent.context.edited` with `{ tripIndex, clearedResults, tokensBefore, tokensAfter }`, so a cache write that follows is explained. The trip's prompt fingerprint is taken after clearing and compaction, so with `diagnostics: { cacheFingerprint: true }` that trip's `agent.trip.cache-miss-cause` lists `messages`. A provider-side (native) edit does not emit the event.
+
+```ts
+agent.on("agent.context.edited", ({ tripIndex, clearedResults, tokensBefore, tokensAfter }) => {
+  log.info(`trip ${tripIndex}: cleared ${clearedResults} results, ${tokensBefore} -> ${tokensAfter} tokens`);
+});
+```
+
 `afterTokens` is a number or a window-relative `{ share, reserve?, max? }` (see [Automatic compaction](/v/latest/ai/agents/run-agent/#automatic-compaction-inside-an-agent-run) for the formula; an unknown window means no clearing). Leaving it out clears on every trip, which rewrites the prefix and defeats prompt caching on providers without native editing, so the agent logs a one-time warning. It is compared with an offline character estimate of messages and tool schemas. Pass `countTokens(messages, options)` for an exact count (`model.countTokens` when the model has one).
 
 ### Native providers
