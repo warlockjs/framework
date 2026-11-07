@@ -277,6 +277,8 @@ await ws.dispose(); // kills background commands; refuses new commands
 
 ## Find files and text — `glob` and `grep`
 
+`grep` also takes `path` (a workspace-relative folder or single file; the walk starts there, and it is jail- and `denyPaths`-checked like any path); `glob` still matches workspace-relative paths, so `path: "packages/api", glob: "**/*.ts"` searches the `.ts` files under `packages/api`. Candidate files are read 16 at a time, results stay sorted, and files with a NUL byte in their first 8000 characters are skipped as binary.
+
 `glob` and `grep` start at the pattern's static folder prefix (`src/api/**/*.ts`, or `grep`'s `glob: "src/api/**"`, reads only `src/api`) and decide before listing a folder whether to enter it: `denyPaths` folders, the `search.skipDirs` (default `[".git", "node_modules"]`, matched by name at any depth) and anything a `.gitignore` on the way down ignores are never read. The jail and `denyPaths` guarantees are unchanged, and symlinks are not followed (a symlink to a file is found only when its target is inside the jail).
 
 ```ts
@@ -326,7 +328,7 @@ const dev = ai.agent({ model, tools: ws.tools.all() }); // includes shell_output
 ```
 
 - `run_shell({ command, background: true })` checks the command like any other, starts it and returns at once with `{ background: true, id: "job-1", status: "running", pid, … }`.
-- `shell_output({ id, since?, waitMs? })` returns `{ stdout, stderr, cursor, droppedBytes, truncated, status, exitCode, … }` — output produced since the previous read (or since `cursor` you pass as `since`). `waitMs` (max 30 s) waits for new output or for the command to stop. Only the newest `shell.maxOutputBytes` (default 1 MB) of each command's output is kept; `droppedBytes` says how much the reader missed.
+- `shell_output({ id, since?, waitMs?, until? })` returns `{ stdout, stderr, cursor, droppedBytes, truncated, status, exitCode, … }` — output produced since the previous read (or since `cursor` you pass as `since`). `waitMs` (max 30 s) waits for new output or for the command to stop; `until: "exit"` instead waits until the command stops (or `waitMs`, max 10 minutes, passes) and returns everything printed meanwhile, so a chatty build is read once instead of once per line. Only the newest `shell.maxOutputBytes` (default 1 MB) of each command's output is kept; `droppedBytes` says how much the reader missed.
 - `shell_kill({ id })` kills the command's **whole process tree** and reports its final state (`"killed"`). States: `"running"`, `"exited"`, `"killed"`, `"timed-out"`.
 - Background commands belong to the workspace, not to the agent run: cancelling the run does not stop them. **`ws.dispose()`** kills every one of them (whole trees) and makes the workspace refuse new commands; trees still running when the Node process exits are killed too. Call `dispose()` when the work is done.
 - `maxJobs` (default 4) bounds how many run at once; `timeoutMs` (default none) kills one after that long, and a model-supplied `timeoutMs` can only lower it. Without `shell.background`, a background request is refused with `reason: "not-allowed"`.
@@ -359,6 +361,7 @@ if (page.bytesCapped) console.warn(`Only part of line ${page.endLine} fit in the
 
 - Already aborted ⇒ the command is **not started** (`exitCode: 130`).
 - Aborted mid-run ⇒ the whole process tree is SIGKILLed, as on a timeout.
+- A killed command (timeout, abort, `shell_kill`, `dispose()`) settles within about a second of the kill even when a process outside the killed tree still holds its output pipes open: the call returns what was captured so far with `timedOut` / `cancelled` set, and a background job reports `killed` / `timed-out`.
 - Either way the result says `cancelled: true` — it resolves, it doesn't throw — and `cancelled` and `timedOut` are never both `true`. Branch on those flags, not on the exit code.
 - The signal belongs to that one call; the workspace never stores it, so one workspace can serve many runs. The abort listener is removed once the command settles.
 

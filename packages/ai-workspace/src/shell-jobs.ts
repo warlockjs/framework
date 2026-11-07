@@ -17,6 +17,9 @@ const MAX_FINISHED_JOBS = 16;
 /** Longest `waitMs` a `shellOutput` call may ask for. */
 export const MAX_OUTPUT_WAIT_MS = 30_000;
 
+/** Longest `waitMs` a `shellOutput` call may ask for with `until: "exit"`. */
+export const MAX_EXIT_WAIT_MS = 600_000;
+
 /** How long `kill()` / `dispose()` wait for a killed tree to report its exit. */
 const KILL_SETTLE_MS = 5_000;
 
@@ -354,9 +357,25 @@ export class ShellJobs {
   public async output(id: string, opts?: ShellOutputOptions): Promise<ShellOutputResult> {
     const job = this.get(id);
     const since = opts?.since ?? job.readCursor;
-    const waitMs = Math.min(Math.max(0, opts?.waitMs ?? 0), MAX_OUTPUT_WAIT_MS);
+    const untilExit = opts?.until === "exit";
+    const waitMs = Math.min(
+      Math.max(0, opts?.waitMs ?? 0),
+      untilExit ? MAX_EXIT_WAIT_MS : MAX_OUTPUT_WAIT_MS,
+    );
 
-    if (waitMs > 0 && job.status === "running" && job.produced <= since) {
+    if (untilExit) {
+      const deadline = Date.now() + waitMs;
+
+      while (job.status === "running" && !opts?.signal?.aborted) {
+        const remaining = deadline - Date.now();
+
+        if (remaining <= 0) {
+          break;
+        }
+
+        await job.waitForChange(remaining, opts?.signal);
+      }
+    } else if (waitMs > 0 && job.status === "running" && job.produced <= since) {
       await job.waitForChange(waitMs, opts?.signal);
     }
 

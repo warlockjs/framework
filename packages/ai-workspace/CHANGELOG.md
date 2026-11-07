@@ -4,6 +4,21 @@ All notable changes to `@warlock.js/ai-workspace` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.48.0
+
+### Added
+
+- `shell_output` / `ws.shellOutput` take `until: "output" | "exit"` (default `"output"`, as before). With `"exit"` the call returns when the job stops or `waitMs` passes, with everything printed meanwhile; `waitMs` may then be up to 600 000 ms (30 000 otherwise).
+- `grep` / `ws.grep` take `path`: a workspace-relative folder or single file to search under. It is jail- and deny-checked like other paths; `glob` still matches workspace-relative paths and applies on top of `path`.
+
+### Changed
+
+- `grep` reads candidate files 16 at a time (results stay sorted) and skips binary files (a NUL byte in the first 8000 characters).
+
+### Fixed
+
+- A command that timed out or was cancelled could keep its call open for as long as any process outside the killed tree held its output pipes (on Windows with Git Bash, a `find / | head` with a 120 s timeout held a turn for 37 minutes). After the tree kill the call now settles within about a second with what was captured, and `timedOut` / `cancelled` set. Background jobs behave the same on `shell_kill`, the job timeout and `dispose()`.
+
 ## 5.47.0 - 2026-11-06
 
 ### Added

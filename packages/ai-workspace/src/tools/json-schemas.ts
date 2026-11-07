@@ -118,7 +118,14 @@ export const SHELL_OUTPUT_JSON_SCHEMA: JsonSchemaObject = {
   properties: {
     id: string("Background command id from run_shell."),
     since: integer("A cursor from an earlier result; omit for output since the last read."),
-    waitMs: integer("Wait up to this long (max 30000) for new output."),
+    waitMs: integer(
+      'Wait up to this long for new output (max 30000), or with until "exit" for the command to stop (max 600000).',
+    ),
+    until: {
+      type: "string",
+      enum: ["output", "exit"],
+      description: '"output" (default) returns at the next output; "exit" waits until the command stops.',
+    },
   },
   required: ["id"],
 };
@@ -141,6 +148,7 @@ export const GREP_JSON_SCHEMA: JsonSchemaObject = {
   type: "object",
   properties: {
     pattern: string("Regular expression to search for."),
+    path: string("Workspace-relative folder or file to search under; default the whole workspace."),
     glob: string('Only search files matching this glob (e.g. "src/**/*.ts").'),
     ignoreCase: boolean("Case-insensitive match."),
   },

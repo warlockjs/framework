@@ -23,6 +23,7 @@ const grepInputSchema = objectSchema<GrepInput>(
   {
     pattern: stringField(),
     glob: optionalStringField(),
+    path: optionalStringField(),
     ignoreCase: optionalBooleanField(),
   },
   GREP_JSON_SCHEMA,
@@ -54,7 +55,8 @@ export function makeGrepTool(
     name: options?.name ?? "grep",
     description:
       "Search file contents across the workspace for a regular-expression " +
-      "pattern. Optionally narrow the scanned files with a glob and match " +
+      "pattern. Optionally narrow the search to a folder or file with path " +
+      "(workspace-relative), the scanned files with a glob, and match " +
       "case-insensitively. Returns every matching line with its file path " +
       "and 1-based line number.",
     action: (input) => `Searching for /${input.pattern}/`,
@@ -62,6 +64,7 @@ export function makeGrepTool(
     async execute(input, ctx) {
       return ops.grep(input.pattern, {
         glob: input.glob,
+        path: input.path,
         ignoreCase: input.ignoreCase,
         ...(ctx?.signal ? { signal: ctx.signal } : {}),
       });
