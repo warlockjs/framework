@@ -207,8 +207,9 @@ export async function runUpgradeCheck(options: UpgradeCheckOptions): Promise<Upg
     if (skipReason) {
       steps.push(skipped("install", `Install with ${detection.packageManager}`, skipReason));
     } else {
-      let [binary = "npm", ...installArgs] = installCommand.split(" ");
-      let installLabel = installCommand;
+      const lockfileFlags = rehearsalInstallFlags(detection.packageManager, scratch);
+      let [binary = "npm", ...installArgs] = [installCommand, ...lockfileFlags].join(" ").split(" ");
+      let installLabel = [installCommand, ...lockfileFlags].join(" ");
 
       if (detection.packageManager === "npm") {
         pruneScratchLockfile(scratch);
@@ -221,7 +222,7 @@ export async function runUpgradeCheck(options: UpgradeCheckOptions): Promise<Upg
         if (npmVersion && isNewerVersion(MIN_NPM_VERSION, npmVersion)) {
           binary = "npx";
           installArgs = ["-y", `npm@${MIN_NPM_VERSION}`, ...installArgs];
-          installLabel = `npx -y npm@${MIN_NPM_VERSION} ${installCommand.split(" ").slice(1).join(" ")}`;
+          installLabel = `npx -y npm@${MIN_NPM_VERSION} ${installLabel.split(" ").slice(1).join(" ")}`;
         }
       }
 
@@ -381,6 +382,36 @@ export function collectHits(upgrade: UpgradeResult): UpgradeCheckHit[] {
   }
 
   return hits;
+}
+
+/**
+ * Flags that let the install rewrite the lockfile. The copy's `package.json`
+ * names the target version while its lockfile still pins the old one, and CI
+ * environments make package managers refuse that mismatch by default.
+ */
+export function rehearsalInstallFlags(packageManager: PackageManager, scratch: string): string[] {
+  switch (packageManager) {
+    case "pnpm":
+      return ["--no-frozen-lockfile"];
+
+    case "yarn":
+      return isYarnBerry(scratch) ? ["--no-immutable"] : ["--no-frozen-lockfile"];
+
+    default:
+      // npm uses `install` (never `ci`) and bun's plain `install` already updates the lockfile.
+      return [];
+  }
+}
+
+/** Yarn 2+ writes `__metadata` into yarn.lock and uses `.yarnrc.yml`. */
+function isYarnBerry(scratch: string): boolean {
+  if (existsSync(path.join(scratch, ".yarnrc.yml"))) return true;
+
+  try {
+    return readFileSync(path.join(scratch, "yarn.lock"), "utf8").includes("__metadata:");
+  } catch {
+    return false;
+  }
 }
 
 function isInside(parent: string, child: string): boolean {

@@ -157,7 +157,43 @@ describe("warlock upgrade --check", () => {
     expect(result.packageManager).toBe("yarn");
     expect(result.packageManagerReason).toContain("yarn.lock");
     expect(recorded[0]?.command.command).toBe("yarn");
-    expect(recorded[0]?.command.args).toEqual(["install"]);
+    expect(recorded[0]?.command.args).toEqual(["install", "--no-frozen-lockfile"]);
+  });
+
+  it.each([
+    ["pnpm-lock.yaml", "lockfileVersion: '9.0'\n", "pnpm", ["install", "--no-frozen-lockfile"]],
+    ["yarn.lock", "", "yarn", ["install", "--no-frozen-lockfile"]],
+    ["yarn.lock", "__metadata:\n  version: 8\n", "yarn", ["install", "--no-immutable"]],
+    ["bun.lockb", "", "bun", ["install"]],
+  ])("lets the %s install update the lockfile", async (lockfile, content, manager, args) => {
+    const root = createApp();
+    rmSync(path.join(root, "package-lock.json"));
+    writeFileSync(path.join(root, lockfile), content);
+    const { recorded, run } = fakeRunner();
+
+    const result = await runUpgradeCheck({ root, to: "5.31", run });
+
+    expect(result.packageManager).toBe(manager);
+    expect(recorded[0]?.command.args).toEqual(args);
+  });
+
+  it("exits non-zero, names the failing step and prints no success line when the install fails", async () => {
+    const root = createApp();
+    const { run } = fakeRunner(() => ({ exitCode: 1, output: "ERR_PNPM_OUTDATED_LOCKFILE" }));
+    const logs: string[] = [];
+
+    const code = await runUpgradeCommand(
+      { to: "5.31", check: true },
+      { root, run },
+      { log: (message) => logs.push(message), error: (message) => logs.push(message) },
+    );
+
+    const text = logs.join("\n");
+
+    expect(code).toBe(1);
+    expect(process.exitCode).toBe(1);
+    expect(text).toContain("failed on the upgraded copy: Install with npm");
+    expect(text).not.toContain("Every step that ran passed");
   });
 
   it("installs with npm 11.6.2 through npx when the npm on PATH is older", async () => {

@@ -287,6 +287,32 @@ export abstract class CloudDriver<
   }
 
   /**
+   * The object key a public URL points at: the location with the disk prefix
+   * applied, the same way writes apply it.
+   *
+   * When `urlBase` (the configured `urlPrefix`) already ends with the prefix,
+   * the prefix is not added again, so a CDN base written as `<cdn>/<prefix>`
+   * keeps producing the same URL, also for an already-prefixed location.
+   */
+  protected publicUrlKey(location: string, urlBase?: string): string {
+    const prefix = (storageDriverContext.getPrefix() || this.options.prefix || "")
+      .replace(/^\/+|\/+$/g, "");
+
+    if (prefix && urlBase) {
+      const base = urlBase.replace(/\/+$/, "");
+
+      if (base === prefix || base.endsWith(`/${prefix}`)) {
+        const key = location.replace(/^\/+/, "");
+
+        // A location that already carries the prefix (as `put()` results do) drops it here.
+        return key.startsWith(`${prefix}/`) ? key.slice(prefix.length + 1) : key;
+      }
+    }
+
+    return this.applyPrefix(location).replace(/^\/+/, "");
+  }
+
+  /**
    * Normalize storage path (remove double slashes, sanitize)
    * @internal
    */

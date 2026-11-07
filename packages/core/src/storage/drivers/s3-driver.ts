@@ -1,4 +1,3 @@
-import { ltrim } from "@mongez/reinforcements";
 import type { CloudStorageDriverOptions } from "../types";
 import { CloudDriver } from "./cloud-driver";
 
@@ -36,10 +35,10 @@ export class S3Driver extends CloudDriver<CloudStorageDriverOptions> {
     // double-host URL like https://bucket.s3.../https://cdn.../key).
     if (this.options.urlPrefix) {
       const prefix = this.options.urlPrefix.replace(/\/+$/, "");
-      return `${prefix}/${ltrim(location, "/")}`;
+      return `${prefix}/${this.publicUrlKey(location, prefix)}`;
     }
 
     // 2. Default S3 URL
-    return `https://${this.options.bucket}.s3.${this.options.region}.amazonaws.com/${location}`;
+    return `https://${this.options.bucket}.s3.${this.options.region}.amazonaws.com/${this.publicUrlKey(location)}`;
   }
 }

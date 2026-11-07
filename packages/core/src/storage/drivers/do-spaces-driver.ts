@@ -1,4 +1,3 @@
-import { ltrim } from "@mongez/reinforcements";
 import type { CloudStorageDriverOptions } from "../types";
 import { CloudDriver } from "./cloud-driver";
 
@@ -61,10 +60,10 @@ export class DOSpacesDriver extends CloudDriver<CloudStorageDriverOptions> {
     // URL below is NOT appended (which would yield a double-host URL).
     if (this.options.urlPrefix) {
       const prefix = this.options.urlPrefix.replace(/\/+$/, "");
-      return `${prefix}/${ltrim(location, "/")}`;
+      return `${prefix}/${this.publicUrlKey(location, prefix)}`;
     }
 
     // 2. Default Spaces CDN URL
-    return `https://${this.options.bucket}.${this.options.region}.cdn.digitaloceanspaces.com/${location}`;
+    return `https://${this.options.bucket}.${this.options.region}.cdn.digitaloceanspaces.com/${this.publicUrlKey(location)}`;
   }
 }
