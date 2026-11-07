@@ -74,10 +74,12 @@ export function formatUpgradeCheckReport(result: UpgradeCheckResult): string {
 
   lines.push("");
 
+  const failedSteps = result.steps.filter((entry) => entry.status === "failed");
+
   lines.push(
     result.ok
       ? `${colors.green("✓")} Every step that ran passed.`
-      : `${colors.red("✖")} ${result.steps.filter((entry) => entry.status === "failed").length} step(s) failed on the upgraded copy.`,
+      : `${colors.red("✖")} ${failedSteps.length} step(s) failed on the upgraded copy: ${failedSteps.map((entry) => entry.title).join(", ")}.`,
   );
 
   if (result.steps.some((entry) => entry.status === "skipped")) {

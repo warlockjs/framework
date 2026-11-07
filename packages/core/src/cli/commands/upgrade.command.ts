@@ -1,4 +1,5 @@
 import { command } from "../../commands/cli-command";
+import { flushAndExit } from "../flush-and-exit";
 
 /**
  * `warlock upgrade --to <version>` — apply the mechanical edits for every
@@ -18,7 +19,10 @@ export const upgradeCommand = command({
   action: async (data) => {
     // Loaded here so ts-morph and the codemods never join another command's graph.
     const { runUpgradeCommand } = await import("../../upgrade/upgrade-command.action");
-    await runUpgradeCommand(data.options);
+    const code = await runUpgradeCommand(data.options);
+
+    // Exit here so the CLI's success banner and its exit 0 never follow a failed run.
+    if (code !== 0) await flushAndExit(code);
   },
   options: [
     {

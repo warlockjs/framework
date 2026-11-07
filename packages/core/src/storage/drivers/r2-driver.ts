@@ -1,4 +1,3 @@
-import { ltrim } from "@mongez/reinforcements";
 import type { R2StorageDriverOptions } from "../types";
 import { CloudDriver } from "./cloud-driver";
 
@@ -54,17 +53,17 @@ export class R2Driver extends CloudDriver<R2StorageDriverOptions> {
     // yield a double-host URL).
     if (this.options.urlPrefix) {
       const prefix = this.options.urlPrefix.replace(/\/+$/, "");
-      return `${prefix}/${ltrim(location, "/")}`;
+      return `${prefix}/${this.publicUrlKey(location, prefix)}`;
     }
 
     // 2. Use publicDomain if configured
     if (this.options.publicDomain) {
       const domain = this.options.publicDomain.replace(/\/+$/, "");
-      return `${domain}/${location}`;
+      return `${domain}/${this.publicUrlKey(location)}`;
     }
 
     // 3. Fallback to R2 public bucket URL
     // Note: Public access must be enabled on the bucket for this to work
-    return `https://pub-${this.options.accountId}.r2.dev/${location}`;
+    return `https://pub-${this.options.accountId}.r2.dev/${this.publicUrlKey(location)}`;
   }
 }

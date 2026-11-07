@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 > ⚠ **Versioning: `@warlock.js/*` does not follow SemVer strictly — breaking changes may ship in a minor.** This is a deliberate decision, not an oversight: the framework is pre-adoption and the cost of a major per behaviour fix currently outweighs the benefit. **Pin an exact version or a tilde range (`~4.13.0`) if you need to opt into changes rather than receive them.** Every breaking change is marked **BREAKING** in its entry and summarised in an _Upgrading_ section at the top of the release. **This policy will change once the framework has consumers beyond its author.**
 
+## 5.48.0
+
+### Fixed
+
+- `warlock upgrade --check` installs the scratch copy so the lockfile can update (`pnpm install --no-frozen-lockfile`, `yarn install --no-immutable` on Yarn 2+ or `--no-frozen-lockfile` on Yarn 1, plain `npm install` and `bun install`). Before, a pnpm project installed the new `package.json` against the old lockfile, every package failed and the later steps were skipped.
+- `warlock upgrade` (with or without `--check`) exits with code 1 and no longer prints "completed successfully" when the run failed or a rehearsal step failed. The check summary names the failing steps.
+- Cloud drivers (`s3`, `r2`, `do-spaces`) apply the disk `prefix` in `url()`, as writes already did: `storage.url("photos/x.jpg")` with `prefix: "acme"` now points at `acme/photos/x.jpg` for `publicDomain`, `urlPrefix` and the default host, and a tenant prefix from the storage context wins. A `urlPrefix` that already ends with the prefix (the earlier workaround) keeps producing the same URL.
+
 ## 5.47.2 - 2026-11-07
 
 ### Changed
