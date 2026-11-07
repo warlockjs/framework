@@ -52,7 +52,9 @@ Each client-side clear emits `agent.context.edited` with `{ tripIndex, clearedRe
 
 ```ts
 agent.on("agent.context.edited", ({ tripIndex, clearedResults, tokensBefore, tokensAfter }) => {
-  log.info(`trip ${tripIndex}: cleared ${clearedResults} results, ${tokensBefore} -> ${tokensAfter} tokens`);
+  log.info(
+    `trip ${tripIndex}: cleared ${clearedResults} results, ${tokensBefore} -> ${tokensAfter} tokens`,
+  );
 });
 ```
 

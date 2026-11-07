@@ -208,7 +208,9 @@ export async function runUpgradeCheck(options: UpgradeCheckOptions): Promise<Upg
       steps.push(skipped("install", `Install with ${detection.packageManager}`, skipReason));
     } else {
       const lockfileFlags = rehearsalInstallFlags(detection.packageManager, scratch);
-      let [binary = "npm", ...installArgs] = [installCommand, ...lockfileFlags].join(" ").split(" ");
+      let [binary = "npm", ...installArgs] = [installCommand, ...lockfileFlags]
+        .join(" ")
+        .split(" ");
       let installLabel = [installCommand, ...lockfileFlags].join(" ");
 
       if (detection.packageManager === "npm") {

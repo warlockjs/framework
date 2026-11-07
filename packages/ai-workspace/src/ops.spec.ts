@@ -385,7 +385,9 @@ describe("createOps.grep", () => {
     backend.files.set(abs("secret/s.txt"), "foo\n");
     const ops = createOps(backend, policy({ denyPaths: ["secret/**"] }));
 
-    await expect(ops.grep("foo", { path: "secret/s.txt" })).rejects.toBeInstanceOf(WorkspacePolicyError);
+    await expect(ops.grep("foo", { path: "secret/s.txt" })).rejects.toBeInstanceOf(
+      WorkspacePolicyError,
+    );
   });
 
   it("skips binary files and keeps results sorted across many files", async () => {

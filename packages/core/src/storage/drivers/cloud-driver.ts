@@ -295,8 +295,10 @@ export abstract class CloudDriver<
    * keeps producing the same URL, also for an already-prefixed location.
    */
   protected publicUrlKey(location: string, urlBase?: string): string {
-    const prefix = (storageDriverContext.getPrefix() || this.options.prefix || "")
-      .replace(/^\/+|\/+$/g, "");
+    const prefix = (storageDriverContext.getPrefix() || this.options.prefix || "").replace(
+      /^\/+|\/+$/g,
+      "",
+    );
 
     if (prefix && urlBase) {
       const base = urlBase.replace(/\/+$/, "");

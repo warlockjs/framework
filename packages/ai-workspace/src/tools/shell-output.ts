@@ -15,7 +15,9 @@ const inputSchema = objectSchema<ShellOutputInput>(
     until: (value, key) =>
       value === undefined || value === "output" || value === "exit"
         ? { value }
-        : { issues: [{ message: `"${key}" must be "output" or "exit" when provided`, path: [key] }] },
+        : {
+            issues: [{ message: `"${key}" must be "output" or "exit" when provided`, path: [key] }],
+          },
   },
   SHELL_OUTPUT_JSON_SCHEMA,
 );
@@ -50,7 +52,7 @@ export function makeShellOutputTool(
       "Read new output of a background command started with run_shell " +
       "(background: true) and see whether it is still running. Returns " +
       "output since the last read; waitMs waits briefly for more (until: " +
-      "\"exit\" waits up to 10 minutes for the command to stop, returning all output).",
+      '"exit" waits up to 10 minutes for the command to stop, returning all output).',
     action: (input) =>
       `Reading output of ${typeof input.id === "string" ? input.id : "a background command"}`,
     input: inputSchema,

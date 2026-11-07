@@ -124,7 +124,8 @@ export const SHELL_OUTPUT_JSON_SCHEMA: JsonSchemaObject = {
     until: {
       type: "string",
       enum: ["output", "exit"],
-      description: '"output" (default) returns at the next output; "exit" waits until the command stops.',
+      description:
+        '"output" (default) returns at the next output; "exit" waits until the command stops.',
     },
   },
   required: ["id"],
