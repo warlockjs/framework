@@ -129,8 +129,8 @@ the whole `@warlock.js` scope, not to a fixed list of packages).
 
 ## Repository history
 
-Issue reports used while preparing a release (`findings/`) are removed from the tree once the release
-ships. Earlier reports stay in git history: rewriting the public history would break every clone and
+Issue reports, briefs and handoff notes live in `findings/`, which is gitignored and stays local.
+Earlier reports stay in git history: rewriting the public history would break every clone and
 fork, so it is not done.
 
 ---

@@ -132,8 +132,9 @@ work; renew it before it expires. Setup steps: `tools/release/README.md`,
    job logs under `tools/release/release-logs/`. Exit 0 = green. Fix, push, wait
    for CI, repeat.
 4. **Publish run**: same command with `--publish`, with **no push to `main`**
-   between the green gate run and this dispatch. Announce the publish to the
-   owner first; it is outward-facing and cannot be undone.
+   between the green gate run and this dispatch. Patch and minor releases are
+   pre-approved: publish without waiting for the owner, then report. A major
+   release needs the owner's explicit go-ahead first. Publishing cannot be undone.
 5. **Confirm independently**: `npm view @warlock.js/<pkg>@<x.y.z> version` for
    every member (new packages included), `git ls-remote origin refs/tags/v<x.y.z>`
    (exactly one tag). If confirm timed out on npm lag, follow the recovery output;

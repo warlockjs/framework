@@ -37,6 +37,12 @@ Thumbs.db
 # Local agent coordination (Codex <-> Claude bridge) and scratch files
 .tmp/
 
+# Issue reports, briefs and handoff notes - local only
+findings/
+
+# Marketing content (articles, scripts, covers) - local only
+marketing/
+
 # Code map (scripts/code-map.sh): GRAPH_REPORT.md and FILE_INDEX.md are tracked, the rest is local
 tools/code-map/.venv/
 code-map/graph.json

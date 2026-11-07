@@ -27,6 +27,15 @@ agent-kit derives each agent's guide (CLAUDE.md, etc.) from this file.
   changelogs, skills, release notes, code comments) describes our APIs on their
   own terms: no "Laravel calls this …", "Laravel-style", or "matches Rails".
 
+## Releases
+
+- Patch and minor releases are pre-approved by the owner. When the owner has asked
+  you to work on a release, or another agent or app session has reported bugs for
+  you to fix, publish the patch or minor release yourself as soon as the full
+  verification and the release gate are green. Don't stop to ask for approval and
+  never hand the publish command back to the owner.
+- Major releases still need the owner's explicit go-ahead.
+
 ## Skills
 
 Reusable playbooks live in `skills/<slug>/SKILL.md` and are synced into every
