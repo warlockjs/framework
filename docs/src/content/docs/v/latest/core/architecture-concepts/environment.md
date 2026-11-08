@@ -157,6 +157,8 @@ You rarely set `NODE_ENV` by hand — the framework's entry points do it for you
 
 There is also a separate `Application.runtimeStrategy` (`"production" | "development"`) that describes _how_ the process was started (built bundle vs. dev server) — distinct from the _environment_. For most app code, `environment` / `isProduction` is the value you want; `runtimeStrategy` is an internal concern. See [Application](./application.md) for the full surface.
 
+`isMailProductionMode()`, `isMailDevelopmentMode()` and `isMailTestMode()` report the [mail mode](../digging-deeper/mail.md#mail-modes--production--development--test), which can differ from the environment (for example `mail.sendInDevelopment`). They are not environment checks; use `environment()` or the flags above for that.
+
 ## How config branches on the environment
 
 Config files are plain modules, so they can read `Application.isProduction` at the top level and bake environment-specific defaults into the exported object. The scaffolded HTTP config does exactly this for cookie security:

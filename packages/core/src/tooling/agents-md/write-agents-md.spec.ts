@@ -64,6 +64,50 @@ describe("writeAgentsMd", () => {
     expect(content).not.toContain("## one");
   });
 
+  it("keeps the Models list when a thinner report would drop it and keepExistingModels is set", () => {
+    const cwd = project();
+    const file = path.join(cwd, "AGENTS.md");
+    const full: InspectReport = {
+      ...report("shop"),
+      models: [
+        {
+          name: "Post",
+          table: "posts",
+          primaryKey: "id",
+          dataSource: null,
+          sourceFile: "src/app/posts/models/post/post.model.ts",
+          registered: true,
+          columns: [],
+          relations: [],
+          resource: null,
+          deleteStrategy: null,
+          createdAtColumn: null,
+          updatedAtColumn: null,
+          deletedAtColumn: null,
+        },
+      ],
+    };
+
+    writeAgentsMd({ cwd, report: full, skills: [] });
+    const withModels = readFileSync(file, "utf8");
+
+    expect(withModels).toContain("### Models");
+
+    // Without the option the thinner report replaces the section.
+    const guarded = writeAgentsMd({
+      cwd,
+      report: report("shop"),
+      skills: [],
+      keepExistingModels: true,
+    });
+
+    expect(guarded.status).toBe("unchanged");
+    expect(readFileSync(file, "utf8")).toBe(withModels);
+
+    expect(writeAgentsMd({ cwd, report: report("shop"), skills: [] }).status).toBe("updated");
+    expect(readFileSync(file, "utf8")).not.toContain("### Models");
+  });
+
   it("skips a missing file when create is false", () => {
     const cwd = project();
 

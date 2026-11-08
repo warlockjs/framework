@@ -11,6 +11,8 @@ export type AgentsMdRefresherOptions = {
   debounceMs?: number;
   /** Create AGENTS.md when it is missing. Default: `true`. */
   create?: boolean;
+  /** Keep the file as is when a refresh would drop the Models list it has. Default: `false`. */
+  keepExistingModels?: boolean;
   /** Called with each refresh's result. */
   onWrite?: (result: WriteAgentsMdResult) => void;
   /** Called when a refresh fails; the error never escapes the timer. */
@@ -49,7 +51,9 @@ export function createAgentsMdRefresher(options: AgentsMdRefresherOptions): Agen
   const refresh = async (): Promise<void> => {
     try {
       const report = await options.collect();
-      const result = writeAgentsMd({ cwd: options.cwd, report, create: options.create });
+      const result = writeAgentsMd({ cwd: options.cwd, report, create: options.create,
+        keepExistingModels: options.keepExistingModels,
+      });
 
       options.onWrite?.(result);
     } catch (error) {

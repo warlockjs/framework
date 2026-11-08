@@ -90,25 +90,49 @@ export function getMailMode(): MailMode {
 }
 
 /**
- * Check if in production mode
+ * Whether the resolved MAIL mode is `production` (mail is really sent).
+ *
+ * This is the mail mode, not the app environment: in a non-production
+ * environment it is still `production` when `mail.sendInDevelopment` is true.
+ * To check the app environment use `environment()`.
  */
-export function isProductionMode(): boolean {
+export function isMailProductionMode(): boolean {
   return getMailMode() === "production";
 }
 
 /**
- * Check if in development mode
+ * Whether the resolved MAIL mode is `development` (mail is logged, not sent).
+ * This is the mail mode, not the app environment; use `environment()` for that.
  */
-export function isDevelopmentMode(): boolean {
+export function isMailDevelopmentMode(): boolean {
   return getMailMode() === "development";
 }
 
 /**
- * Check if in test mode
+ * Whether the resolved MAIL mode is `test` (mail is captured, not sent).
+ * This is the mail mode, not the app environment; use `environment()` for that.
  */
-export function isTestMode(): boolean {
+export function isMailTestMode(): boolean {
   return getMailMode() === "test";
 }
+
+/**
+ * @deprecated Use `isMailProductionMode()`. This is the mail mode, not the
+ * app environment; use `environment()` to check the environment.
+ */
+export const isProductionMode = isMailProductionMode;
+
+/**
+ * @deprecated Use `isMailDevelopmentMode()`. This is the mail mode, not the
+ * app environment; use `environment()` to check the environment.
+ */
+export const isDevelopmentMode = isMailDevelopmentMode;
+
+/**
+ * @deprecated Use `isMailTestMode()`. This is the mail mode, not the
+ * app environment; use `environment()` to check the environment.
+ */
+export const isTestMode = isMailTestMode;
 
 /**
  * Set mail configurations

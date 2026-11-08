@@ -1,6 +1,12 @@
 import { afterEach, describe, expect, it } from "vitest";
 import {
   getMailMode,
+  isDevelopmentMode,
+  isMailDevelopmentMode,
+  isMailProductionMode,
+  isMailTestMode,
+  isProductionMode,
+  isTestMode,
   resetMailConfig,
   resolveMailConfig,
   setMailConfigurations,
@@ -51,5 +57,26 @@ describe("mail mode default", () => {
 
     setMailMode("test");
     expect(getMailMode()).toBe("test");
+  });
+});
+
+describe("mail mode predicates", () => {
+  afterEach(() => resetMailConfig());
+
+  it("reports the mail mode and keeps the deprecated names as aliases", () => {
+    setMailMode("test");
+    expect(isMailTestMode()).toBe(true);
+    expect(isMailProductionMode()).toBe(false);
+    expect(isMailDevelopmentMode()).toBe(false);
+
+    setMailMode("development");
+    expect(isMailDevelopmentMode()).toBe(true);
+
+    setMailMode("production");
+    expect(isMailProductionMode()).toBe(true);
+
+    expect(isProductionMode).toBe(isMailProductionMode);
+    expect(isDevelopmentMode).toBe(isMailDevelopmentMode);
+    expect(isTestMode).toBe(isMailTestMode);
   });
 });

@@ -278,10 +278,12 @@ describe("listChangedFiles", () => {
     expect(await listChangedFiles({ cwd: root, base: "main", git })).toEqual({
       files: ["src/app/posts/a.ts"],
     });
+    const exclude = ["--", ".", ":(exclude,glob)**/node_modules/**"];
+
     expect(calls).toEqual([
       ["merge-base", "main", "HEAD"],
-      ["diff", "--name-only", "--relative", "--diff-filter=ACMR", "abc123"],
-      ["ls-files", "--others", "--exclude-standard"],
+      ["diff", "--name-only", "--relative", "--diff-filter=ACMR", "abc123", ...exclude],
+      ["ls-files", "--others", "--exclude-standard", ...exclude],
     ]);
   });
 });

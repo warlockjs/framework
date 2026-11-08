@@ -165,7 +165,7 @@ Grouped by what they do:
 
 - `.nullable()` — column accepts NULL.
 - `.notNullable()` — column rejects NULL.
-- `.default(value)` — default applied when the column isn't set on insert (string, number, or boolean).
+- `.default(value)` — default applied when the column isn't set on insert (string, number, or boolean). The value is emitted as raw SQL, so `.default("text")` writes `text` unquoted and breaks the statement. Use `.defaultString("text")` for a text default; keep `.default()` for numbers, booleans and SQL expressions such as `.default("NOW()")`.
 
 **Single-column keys and constraints**
 

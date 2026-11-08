@@ -27,6 +27,9 @@ export const runGit: GitRunner = (args, cwd) =>
 /** Files `warlock check --changed` considers: JavaScript and TypeScript sources. */
 const SOURCE_FILE = /\.(?:[cm]?[jt]sx?)$/i;
 
+/** Git pathspec that leaves installed dependencies out of both listings. */
+const EXCLUDE_DEPENDENCIES = ["--", ".", ":(exclude,glob)**/node_modules/**"] as const;
+
 function lines(output: string): string[] {
   return output
     .split(/\r?\n/)
@@ -78,6 +81,7 @@ export async function listChangedFiles(options: {
       "--relative",
       options.includeDeleted ? "--diff-filter=ACMRD" : "--diff-filter=ACMR",
       ref,
+      ...EXCLUDE_DEPENDENCIES,
     ],
     options.cwd,
   );
@@ -90,7 +94,10 @@ export async function listChangedFiles(options: {
     };
   }
 
-  const untracked = await git(["ls-files", "--others", "--exclude-standard"], options.cwd);
+  const untracked = await git(
+    ["ls-files", "--others", "--exclude-standard", ...EXCLUDE_DEPENDENCIES],
+    options.cwd,
+  );
 
   if (untracked.code !== 0) {
     return {
@@ -105,6 +112,7 @@ export async function listChangedFiles(options: {
     .filter(
       (file) =>
         SOURCE_FILE.test(file) &&
+        !file.split("/").includes("node_modules") &&
         (options.includeDeleted || existsSync(path.join(options.cwd, file))),
     )
     .sort();

@@ -17,6 +17,8 @@ export type ConventionOptions = {
   localeCodes?: string[];
   /** Milliseconds one convention rule may use over a whole run; `0` turns the budget off. Default 30000. */
   ruleBudgetMs?: number;
+  /** Names of project helpers that wrap `guarded()`; routes inside their callbacks are not reported by WL9006. */
+  guardWrappers?: string[];
   rules?: Partial<
     Record<import("../../errors/error-codes").WarlockErrorCode, "off" | "warning" | "error">
   >;

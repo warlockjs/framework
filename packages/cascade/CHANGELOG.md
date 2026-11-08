@@ -4,6 +4,13 @@ All notable changes to `@warlock.js/cascade` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## Unreleased
+
+### Documentation
+
+- The migrations page says `.default("text")` emits the value as raw SQL and a text default needs `.defaultString("text")`.
+- The transactions page and the `transaction()` JSDoc no longer say a nested `transaction()` throws: it joins the outer transaction (flat, no savepoints), so code after it runs before the outer commit; use `afterCommit()` for work that must follow the commit.
+
 ## 5.47.1 - 2026-11-07
 
 ### Documentation

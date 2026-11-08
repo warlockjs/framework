@@ -318,6 +318,8 @@ setMailMode("test"); // capture to test mailbox, no send, return fake-success
 | `development` | Logs `subject` and `to` to the logger. Returns `{ success: true, ... }`. |
 | `test`        | Pushes a `CapturedMail` onto an in-memory mailbox. Returns success.      |
 
+The mode is not the app environment. Read it with `isMailProductionMode()`, `isMailDevelopmentMode()` and `isMailTestMode()` (the earlier `isProductionMode()`, `isDevelopmentMode()` and `isTestMode()` still work but are deprecated aliases). Without `setMailMode()`, a non-production environment resolves to the `development` mail mode unless `mail.sendInDevelopment` is `true`. To check the app environment use `environment()` or `Application.isProduction`.
+
 Test mode is the workhorse — it lets you write `expect(wasMailSentTo("u@e.com")).toBe(true)` against a service that calls `Mail.to(...).send()` without spinning up an SMTP fake.
 
 ## The test mailbox

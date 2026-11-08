@@ -1,7 +1,7 @@
 import { log, maskEmail, maskEmailsInText } from "@warlock.js/logger";
 import { readFile } from "node:fs/promises";
 import type { Options as NodemailerOptions } from "nodemailer/lib/mailer";
-import { isDevelopmentMode, isTestMode, resolveMailConfig } from "./config";
+import { isMailDevelopmentMode, isMailTestMode, resolveMailConfig } from "./config";
 import { MAIL_EVENTS, generateMailId, mailEvents } from "./events";
 import { getMailer } from "./mailer-pool";
 import { renderReactMail } from "./react-mail";
@@ -322,7 +322,7 @@ export async function sendMail(options: MailOptions): Promise<MailResult> {
   }
 
   // Test mode - capture without sending
-  if (isTestMode()) {
+  if (isMailTestMode()) {
     log.info(
       `mail.${driver}`,
       "test",
@@ -357,7 +357,7 @@ export async function sendMail(options: MailOptions): Promise<MailResult> {
   }
 
   // Development mode - log without sending
-  if (isDevelopmentMode()) {
+  if (isMailDevelopmentMode()) {
     log.info(
       `mail.${driver}`,
       "dev",

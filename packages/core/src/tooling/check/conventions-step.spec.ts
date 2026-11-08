@@ -154,6 +154,19 @@ describe("convention checks", () => {
     ]);
   });
 
+  it("treats routes inside a configured guardWrappers helper as guarded", () => {
+    const file = "src/app/posts/routes.ts";
+    const source = 'adminOnly(() => {\n  router.post("/posts", create);\n});';
+    const wl9006 = (options = {}) =>
+      checkFileConventions(file, source, root, options)
+        .map((problem) => problem.code)
+        .filter((code) => code === "WL9006");
+
+    expect(wl9006()).toEqual(["WL9006"]);
+    expect(wl9006({ guardWrappers: ["adminOnly"] })).toEqual([]);
+    expect(wl9006({ guardWrappers: ["other"] })).toEqual(["WL9006"]);
+  });
+
   it("parses .tsx files with JSX", () => {
     expect(
       codes(

@@ -393,6 +393,8 @@ it("mails the support inbox", async () => {
 
 It returns `url`, `port`, the Fastify `server`, the request helpers (`request`, `get`, `post`, `put`, `patch`, `delete`), `actingAs(user)` bound to it, and `close()`. Pass `routes: (router) => …` instead of (or as well as) `loadAppModules` to register routes for one test; `close()` removes them. App modules load once per process.
 
+Pass `importModule` whenever the test needs the app's modules to run. Without it nothing is imported in the test worker, so `Model.events().listeners` stays empty: model event listeners the app registers (in `events/` files or `main.ts`) never fire, and the routes and `main.ts` code are not loaded.
+
 The modules are found from the project at the current working directory (`src/app/*/routes.ts`, `main.ts`, events, locales), so run the tests from the project root. That works for a project inside a dot-directory such as a git worktree under `.claude/worktrees/`. If the project has route or `main.ts` files on disk and the load finds none, `createTestHttpServer()` throws an error naming the project root and the file counts, instead of serving an empty application. A worker that moves to another project root loads that project's modules again.
 
 ### Ephemeral ports

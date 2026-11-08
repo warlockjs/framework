@@ -6,6 +6,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 > ⚠ **Versioning: `@warlock.js/*` does not follow SemVer strictly — breaking changes may ship in a minor.** This is a deliberate decision, not an oversight: the framework is pre-adoption and the cost of a major per behaviour fix currently outweighs the benefit. **Pin an exact version or a tilde range (`~4.13.0`) if you need to opt into changes rather than receive them.** Every breaking change is marked **BREAKING** in its entry and summarised in an _Upgrading_ section at the top of the release. **This policy will change once the framework has consumers beyond its author.**
 
+## Unreleased
+
+### Added
+
+- `isMailProductionMode()`, `isMailDevelopmentMode()` and `isMailTestMode()` report the resolved mail mode under names that cannot be mistaken for an app-environment check. `isProductionMode()`, `isDevelopmentMode()` and `isTestMode()` stay as deprecated aliases whose JSDoc says they read the mail mode (use `environment()` for the environment). The mail and environment pages say the same.
+- `guardWrappers` in `.warlock-check.json` lists project helpers that wrap `guarded()`; `WL9006` no longer reports routes registered inside their callbacks.
+
+### Fixed
+
+- `warlock check --changed` leaves out every path with a `node_modules` segment, both through a git pathspec exclude and a path filter.
+- The dev server's `AGENTS.md` refresh no longer replaces the generated Models list with nothing: its in-process report has no model modules (only the boot pass behind `warlock agents-md --write` reads them), so the refresh now leaves the file as it is when it would drop a Models list that is there.
+
+### Documentation
+
+- The repository page says which writes do not clear the list cache (static atomic operations, `findAndUpdate`, `findOneAndUpdate`, raw SQL, migrations) and that `clearCache()` does.
+- The testing page says that omitting `importModule` leaves `Model.events().listeners` empty in the test worker.
+
 ## 5.48.0 - 2026-11-07
 
 ### Added

@@ -5,6 +5,9 @@ import { AGENTS_MD_FILE, upsertGeneratedSection } from "./agents-md-markers";
 import { type InstalledSkill, listInstalledSkills } from "./installed-skills";
 import { listAppModules, renderAgentsMdSection } from "./render-agents-md";
 
+/** The heading the renderer puts above the model list. */
+const MODELS_HEADING = "### Models";
+
 /** What {@link writeAgentsMd} did. */
 export type AgentsMdWriteStatus = "created" | "updated" | "unchanged" | "skipped";
 
@@ -20,6 +23,13 @@ export type WriteAgentsMdOptions = {
   skills?: readonly InstalledSkill[];
   /** Module folders. Default: `listAppModules(cwd)`. */
   modules?: readonly string[];
+  /**
+   * Leave the file alone when the new section has no models but the current
+   * one lists some. For callers whose report cannot see model modules (the
+   * dev server's in-process report), so a refresh never drops the Models list
+   * that `warlock agents-md --write` produced. Default: `false`.
+   */
+  keepExistingModels?: boolean;
 };
 
 /** The result of {@link writeAgentsMd}. */
@@ -54,6 +64,16 @@ export function writeAgentsMd(options: WriteAgentsMdOptions): WriteAgentsMdResul
   }
 
   const existing = exists ? readFileSync(file, "utf8") : undefined;
+
+  if (
+    options.keepExistingModels === true &&
+    existing !== undefined &&
+    !section.includes(MODELS_HEADING) &&
+    existing.includes(MODELS_HEADING)
+  ) {
+    return { file, status: "unchanged", section };
+  }
+
   const next = upsertGeneratedSection(existing, section);
 
   if (next === existing) {

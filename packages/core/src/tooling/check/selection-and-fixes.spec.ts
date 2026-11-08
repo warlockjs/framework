@@ -29,6 +29,27 @@ describe("changed selection", () => {
       files: ["src/a.ts", "src/new.ts"],
     });
   });
+  it("leaves out files under node_modules and passes a pathspec exclude to git", async () => {
+    write("src/a.ts", "export {};");
+    write("node_modules/pkg/index.ts", "export {};");
+    write("packages/x/node_modules/dep/index.js", "export {};");
+    const calls: string[][] = [];
+    const git: GitRunner = async (args) => {
+      calls.push([...args]);
+
+      return {
+        code: 0,
+        stderr: "",
+        stdout:
+          args[0] === "diff"
+            ? "src/a.ts\nnode_modules/pkg/index.ts\n"
+            : "packages/x/node_modules/dep/index.js\n",
+      };
+    };
+
+    expect(await listChangedFiles({ cwd: root, git })).toEqual({ files: ["src/a.ts"] });
+    for (const args of calls) expect(args).toContain(":(exclude,glob)**/node_modules/**");
+  });
   it("includes transitive importers, re-exports, tests and cycles, excluding unrelated files", async () => {
     write("src/a.ts", 'import "./c"; export const a = 1;');
     write("src/b.ts", 'export { a } from "./a";');

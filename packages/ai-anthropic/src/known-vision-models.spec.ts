@@ -20,6 +20,8 @@ describe("inferVisionCapability", () => {
     expect(inferVisionCapability("claude-opus-5-5")).toBe(true);
     expect(inferVisionCapability("claude-sonnet-5")).toBe(true);
     expect(inferVisionCapability("claude-sonnet-5-5")).toBe(true);
+    expect(inferVisionCapability("claude-haiku-5")).toBe(true);
+    expect(inferVisionCapability("claude-haiku-5-5")).toBe(true);
     expect(inferVisionCapability("claude-fable-5")).toBe(true);
     expect(inferVisionCapability("claude-fable-5-1")).toBe(true);
     expect(inferVisionCapability("claude-mythos-5-1")).toBe(true);

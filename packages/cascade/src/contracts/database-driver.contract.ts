@@ -445,7 +445,8 @@ export interface DriverContract {
    * - Returns the callback's return value
    *
    * **Limitations:**
-   * - Nested `transaction()` calls are not supported (use `beginTransaction()` with savepoints)
+   * - A nested `transaction()` joins the outer transaction (flat, no savepoints): nothing is
+   *   committed until the outer one commits, so use `afterCommit()` for work that must follow the commit
    * - MongoDB: Requires replica set configuration
    *
    * @param fn - Async function to execute within transaction

@@ -148,7 +148,7 @@ Within `schemaVersion: 1` fields are only added, never removed or retyped; ignor
 
 ## `--changed`
 
-The changed files are `git diff --name-only --relative <ref>` (added, copied, modified, renamed) plus `git ls-files --others --exclude-standard`, limited to JavaScript/TypeScript files that exist. `<ref>` is `HEAD`, or `git merge-base <base> HEAD` with `--base`. Then:
+The changed files are `git diff --name-only --relative <ref>` (added, copied, modified, renamed) plus `git ls-files --others --exclude-standard`, limited to JavaScript/TypeScript files that exist. Anything under a `node_modules` folder is left out (a git pathspec exclude plus a path filter), even when git lists it. `<ref>` is `HEAD`, or `git merge-base <base> HEAD` with `--base`. Then:
 
 - **typecheck** reports diagnostics for the changed files and the project files that import them directly;
 - **lint** and **conventions** read only the changed files;
@@ -317,6 +317,12 @@ Create `.warlock-check.json` in the project root:
     "WL9016": "off"
   }
 }
+```
+
+`guardWrappers` lists the names of your own helpers that wrap `guarded()`, so `WL9006` does not report routes registered inside their callbacks:
+
+```json
+{ "guardWrappers": ["adminOnly", "withTenantAuth"] }
 ```
 
 `rules` accepts `"off"`, `"warning"`, or `"error"` for convention codes, including

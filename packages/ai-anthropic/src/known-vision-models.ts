@@ -29,6 +29,7 @@ const VISION_CAPABLE_PREFIXES = [
   "claude-opus-4",
   "claude-sonnet-4",
   "claude-haiku-4",
+  "claude-haiku-5",
   "claude-opus-5",
   "claude-sonnet-5",
   "claude-fable-5",

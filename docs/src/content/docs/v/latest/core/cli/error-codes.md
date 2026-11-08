@@ -482,7 +482,7 @@ Category: your code · skill: `warlock-conventions`
 
 ### WL9006
 
-**A mutating route has no auth guard and is not marked public.** Register the POST/PUT/PATCH/DELETE route inside `guarded()` (or with auth middleware), or pass `{ public: true }` if it is meant to be open.
+**A mutating route has no auth guard and is not marked public.** Register the POST/PUT/PATCH/DELETE route inside `guarded()` (or with auth middleware), or pass `{ public: true }` if it is meant to be open. A route inside a helper of your own that wraps `guarded()` is reported unless you list the helper's name in `guardWrappers` in `.warlock-check.json`.
 
 Category: your code · skill: `warlock-conventions`
 

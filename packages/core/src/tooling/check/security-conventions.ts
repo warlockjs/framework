@@ -315,7 +315,7 @@ function optionsGuard(node: ast.Node | undefined): "guarded" | "unguarded" | "no
 }
 
 /** Whether an enclosing function is a guarded (or public) group callback. */
-function insideGuardedGroup(node: ast.Node): boolean {
+function insideGuardedGroup(node: ast.Node, guardWrappers: readonly string[] = []): boolean {
   for (const ancestor of ancestors(node)) {
     if (!ast.isArrowFunction(ancestor) && !ast.isFunctionExpression(ancestor)) continue;
 
@@ -326,7 +326,8 @@ function insideGuardedGroup(node: ast.Node): boolean {
 
     const name = calleeName(parent);
 
-    if (name !== undefined && GUARD_FUNCTIONS.has(name)) return true;
+    if (name !== undefined && (GUARD_FUNCTIONS.has(name) || guardWrappers.includes(name)))
+      return true;
 
     const callee = unwrap(ast.expressionOf(parent));
 
@@ -412,7 +413,11 @@ function unguardedRoute(node: ast.Node, route: string): SourceFinding {
   };
 }
 
-function checkRouteGuard(node: ast.Node, findings: SourceFinding[]): void {
+function checkRouteGuard(
+  node: ast.Node,
+  findings: SourceFinding[],
+  guardWrappers: readonly string[],
+): void {
   if (!ast.isCallExpression(node)) return;
 
   const callee = unwrap(ast.expressionOf(node));
@@ -424,7 +429,7 @@ function checkRouteGuard(node: ast.Node, findings: SourceFinding[]): void {
   if (!method) return;
 
   const guarded = (options: ast.Node | undefined) =>
-    optionsGuard(options) === "guarded" || insideGuardedGroup(node);
+    optionsGuard(options) === "guarded" || insideGuardedGroup(node, guardWrappers);
 
   if (isRouter(ast.expressionOf(callee))) {
     // router.post(path, handler, options)
@@ -471,7 +476,7 @@ function checkRouteGuard(node: ast.Node, findings: SourceFinding[]): void {
   if (!chain) return;
   if (optionsGuard(node.arguments[1]) === "guarded") return;
   if (chain.optionNodes.some((options) => optionsGuard(options) === "guarded")) return;
-  if (insideGuardedGroup(node)) return;
+  if (insideGuardedGroup(node, guardWrappers)) return;
 
   findings.push(unguardedRoute(node, `${method} ${chain.path}`));
 }
@@ -1002,14 +1007,17 @@ function checkUnboundedRegex(node: ast.Node, findings: SourceFinding[]): void {
  * - `WL9008` a raw email, credential or request body passed to a logger;
  * - `WL9009` a regex with an unbounded quantifier run on request input.
  */
-export function securityFindings(sourceFile: ast.SourceFile): SourceFinding[] {
+export function securityFindings(
+  sourceFile: ast.SourceFile,
+  guardWrappers: readonly string[] = [],
+): SourceFinding[] {
   const findings: SourceFinding[] = [];
 
   walk(
     sourceFile,
     (node) => {
       checkRequestAll(node, findings);
-      checkRouteGuard(node, findings);
+      checkRouteGuard(node, findings, guardWrappers);
       checkRedirect(node, findings);
       checkSensitiveLog(node, findings);
       checkUnboundedRegex(node, findings);

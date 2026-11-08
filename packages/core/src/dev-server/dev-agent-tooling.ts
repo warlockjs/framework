@@ -118,6 +118,9 @@ export class DevAgentTooling {
 
       this.refresher = createAgentsMdRefresher({
         cwd: this.cwd,
+        // The in-process report has no model modules (only the boot pass reads them), so
+        // never replace a Models list written by `warlock agents-md --write` with nothing.
+        keepExistingModels: true,
         collect: () => inspectApp({ sections: ["routes", "models", "packages"] }),
         onWrite: (result) => {
           if (result.status === "created" || result.status === "updated") {

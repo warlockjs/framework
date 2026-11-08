@@ -73,7 +73,7 @@ try {
 
 **Postgres just works.** No setup needed beyond a regular connection.
 
-**Nested transactions are not supported.** A `transaction()` inside another `transaction()` will throw. If you need nested-savepoint semantics, drop to the manual form (`beginTransaction`) and use the driver's native savepoint API. Most apps don't need this.
+**A nested `transaction()` joins the outer one.** A `transaction()` called inside another `transaction()` does not throw and does not open a savepoint: it runs flat in the outer transaction, and nothing is committed until the outer one commits. Code placed after the inner `transaction()` therefore still runs before the outer COMMIT. When something must run only after the data is committed (an email, a cache clear), queue it with [`afterCommit()`](#aftercommitfn). If you need savepoint semantics, drop to the manual form (`beginTransaction`) and use the driver's native savepoint API.
 
 ## The manual pattern (rare)
 

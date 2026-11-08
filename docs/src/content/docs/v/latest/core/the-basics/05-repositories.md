@@ -188,6 +188,8 @@ const { data, pagination } = await productsRepository.listCached({
 
 The cache key includes the options, so different filter combinations get different cache entries. The framework also wires automatic invalidation: when the model emits `created`, `updated`, or `deleted`, the repository's cache is cleared.
 
+Writes that emit none of those events do not clear the list cache: static atomic operations, `findAndUpdate`, `findOneAndUpdate`, raw SQL and migrations. After such a write, call `await productsRepository.clearCache()` (it removes every cached entry of that repository).
+
 For reads with high traffic and low write churn (product catalog, taxonomy, lookup tables), `listCached` is a one-character win over `list`.
 
 ## CRUD writes

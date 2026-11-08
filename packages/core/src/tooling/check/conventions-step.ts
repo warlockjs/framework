@@ -293,7 +293,7 @@ export function checkFileConventions(
       ),
     ),
     ...[
-      ...timed(RULES.security, noFindings, () => securityFindings(sourceFile)),
+      ...timed(RULES.security, noFindings, () => securityFindings(sourceFile, options.guardWrappers)),
       ...timed(RULES.codeStyle, noFindings, () => codeStyleFindings(sourceFile)),
       ...timed(RULES.web, noFindings, () => webFindings(sourceFile, options)),
       ...timed(RULES.responseSchema, noFindings, () => responseSchemaFindings(sourceFile)),
@@ -511,6 +511,12 @@ export function readConventionOptions(cwd: string): ConventionOptions {
     (typeof ruleBudgetMs !== "number" || !Number.isFinite(ruleBudgetMs) || ruleBudgetMs < 0)
   )
     throw new Error("ruleBudgetMs must be a number of milliseconds, 0 or more.");
+  const guardWrappers: unknown = Reflect.get(value, "guardWrappers");
+  if (
+    guardWrappers !== undefined &&
+    (!Array.isArray(guardWrappers) || !guardWrappers.every((name) => typeof name === "string"))
+  )
+    throw new Error("guardWrappers must be an array of function name strings.");
   const rules: unknown = Reflect.get(value, "rules");
   const overrides: NonNullable<ConventionOptions["rules"]> = {};
   if (rules !== undefined) {
@@ -529,6 +535,7 @@ export function readConventionOptions(cwd: string): ConventionOptions {
     ...(typeof limit === "number" ? { componentLineLimit: limit } : {}),
     ...(typeof ruleBudgetMs === "number" ? { ruleBudgetMs } : {}),
     ...(Array.isArray(localeCodes) ? { localeCodes: localeCodes as string[] } : {}),
+    ...(Array.isArray(guardWrappers) ? { guardWrappers: guardWrappers as string[] } : {}),
     rules: overrides,
   };
 }

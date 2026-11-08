@@ -106,6 +106,16 @@ describe("runConventions budget and progress", () => {
   });
 });
 
+describe("guardWrappers option", () => {
+  it("reads guardWrappers from .warlock-check.json and rejects a bad value", () => {
+    write(".warlock-check.json", JSON.stringify({ guardWrappers: ["adminOnly"] }));
+    expect(readConventionOptions(root).guardWrappers).toEqual(["adminOnly"]);
+
+    write(".warlock-check.json", JSON.stringify({ guardWrappers: "adminOnly" }));
+    expect(() => readConventionOptions(root)).toThrow("guardWrappers");
+  });
+});
+
 describe("runCheck progress", () => {
   it("prints a line when each step starts and ends", async () => {
     write("package.json", JSON.stringify({ name: "shop" }));
