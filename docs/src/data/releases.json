@@ -1,4 +1,16 @@
 {
+  "5.49.0": {
+    "publishedAt": "2026-11-08T21:16:45.137Z",
+    "matrix": "none",
+    "headline": "Haiku 5 image input, clearly named mail-mode checks, guard-wrapper support in warlock check, and docs corrections for transactions and defaults.",
+    "highlights": [
+      "`claude-haiku-5` and `claude-haiku-5-5` are recognised as vision-capable, so image attachments are no longer refused before the call.",
+      "`isMailProductionMode()`, `isMailDevelopmentMode()` and `isMailTestMode()` name the mail mode; the old `isProductionMode()` family stays as deprecated aliases.",
+      "`guardWrappers` in `.warlock-check.json` teaches `WL9006` your own helpers that wrap `guarded()`.",
+      "`warlock check --changed` skips `node_modules`, and the dev server no longer thins the generated Models list in `AGENTS.md`.",
+      "Docs: `.default(\"text\")` is raw SQL (use `.defaultString`), a nested `transaction()` joins the outer one (use `afterCommit()`), and which writes leave the list cache stale."
+    ]
+  },
   "5.48.0": {
     "publishedAt": "2026-11-07T15:54:12.413Z",
     "matrix": "none",

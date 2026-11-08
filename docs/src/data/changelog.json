@@ -136,6 +136,83 @@
   ],
   "releases": [
     {
+      "version": "5.49.0",
+      "id": "v5-49-0",
+      "date": "November 8, 2026",
+      "isUnreleased": false,
+      "headlineHtml": "Haiku 5 image input, clearly named mail-mode checks, guard-wrapper support in warlock check, and docs corrections for transactions and defaults.",
+      "highlights": [
+        "<code>claude-haiku-5</code> and <code>claude-haiku-5-5</code> are recognised as vision-capable, so image attachments are no longer refused before the call.",
+        "<code>isMailProductionMode()</code>, <code>isMailDevelopmentMode()</code> and <code>isMailTestMode()</code> name the mail mode; the old <code>isProductionMode()</code> family stays as deprecated aliases.",
+        "<code>guardWrappers</code> in <code>.warlock-check.json</code> teaches <code>WL9006</code> your own helpers that wrap <code>guarded()</code>.",
+        "<code>warlock check --changed</code> skips <code>node_modules</code>, and the dev server no longer thins the generated Models list in <code>AGENTS.md</code>.",
+        "Docs: <code>.default(\"text\")</code> is raw SQL (use <code>.defaultString</code>), a nested <code>transaction()</code> joins the outer one (use <code>afterCommit()</code>), and which writes leave the list cache stale."
+      ],
+      "upgradeNotes": [],
+      "summaryHtml": null,
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/5.49.0-summary.md",
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 4,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 2
+            },
+            {
+              "type": "Fixed",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>isMailProductionMode()</code>, <code>isMailDevelopmentMode()</code> and <code>isMailTestMode()</code> report the resolved mail mode under names that cannot be mistaken for an app-environment check. <code>isProductionMode()</code>, <code>isDevelopmentMode()</code> and <code>isTestMode()</code> stay as deprecated aliases whose JSDoc says they read the mail mode (use <code>environment()</code> for the environment). The mail and environment pages say the same."
+            },
+            {
+              "type": "Added",
+              "html": "<code>guardWrappers</code> in <code>.warlock-check.json</code> lists project helpers that wrap <code>guarded()</code>; <code>WL9006</code> no longer reports routes registered inside their callbacks."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>warlock check --changed</code> leaves out every path with a <code>node_modules</code> segment, both through a git pathspec exclude and a path filter."
+            },
+            {
+              "type": "Fixed",
+              "html": "The dev server's <code>AGENTS.md</code> refresh no longer replaces the generated Models list with nothing: its in-process report has no model modules (only the boot pass behind <code>warlock agents-md --write</code> reads them), so the refresh now leaves the file as it is when it would drop a Models list that is there."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-anthropic",
+          "slug": "ai-anthropic",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Haiku 5 models (<code>claude-haiku-5</code>, <code>claude-haiku-5-5</code>) are recognised as vision-capable, so image attachments are no longer refused before the call."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/cascade",
+          "slug": "cascade",
+          "total": 0,
+          "counts": [],
+          "items": []
+        }
+      ]
+    },
+    {
       "version": "5.48.0",
       "id": "v5-48-0",
       "date": "November 7, 2026",
