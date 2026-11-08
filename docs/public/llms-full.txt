@@ -6006,6 +6006,8 @@ setMailMode("development"); // log subject + recipient, no send
 setMailMode("test"); // capture to test mailbox, no send
 ```
 
+Read the resolved mode with `isMailProductionMode()`, `isMailDevelopmentMode()` and `isMailTestMode()`. They report the mail mode, not the app environment; use `environment()` for that.
+
 Production sends. Development logs and returns a fake-success `MailResult`. Test captures every call into an in-memory mailbox (cleared between tests) and returns success — handy for asserting "the welcome email got sent" without hitting SMTP.
 
 ## The fluent builder — `Mail`
