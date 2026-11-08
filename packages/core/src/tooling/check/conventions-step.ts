@@ -293,7 +293,9 @@ export function checkFileConventions(
       ),
     ),
     ...[
-      ...timed(RULES.security, noFindings, () => securityFindings(sourceFile, options.guardWrappers)),
+      ...timed(RULES.security, noFindings, () =>
+        securityFindings(sourceFile, options.guardWrappers),
+      ),
       ...timed(RULES.codeStyle, noFindings, () => codeStyleFindings(sourceFile)),
       ...timed(RULES.web, noFindings, () => webFindings(sourceFile, options)),
       ...timed(RULES.responseSchema, noFindings, () => responseSchemaFindings(sourceFile)),

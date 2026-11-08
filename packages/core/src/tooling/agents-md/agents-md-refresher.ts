@@ -51,7 +51,10 @@ export function createAgentsMdRefresher(options: AgentsMdRefresherOptions): Agen
   const refresh = async (): Promise<void> => {
     try {
       const report = await options.collect();
-      const result = writeAgentsMd({ cwd: options.cwd, report, create: options.create,
+      const result = writeAgentsMd({
+        cwd: options.cwd,
+        report,
+        create: options.create,
         keepExistingModels: options.keepExistingModels,
       });
 
