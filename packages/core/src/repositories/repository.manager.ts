@@ -1,4 +1,5 @@
 import { cache, type CacheKey, type CacheDriver } from "@warlock.js/cache";
+import { log } from "@warlock.js/logger";
 import { config } from "../config";
 import { CascadeAdapter } from "./adapters/cascade";
 import type {
@@ -65,7 +66,9 @@ export class RepositoryManager<T = unknown, F = Record<string, any>> {
   /**
    * Columns a client may sort by (`orderBy` / `sortBy` / `cursorColumn`) when the
    * options come from a request. `id` and the declared `filterBy` keys are always
-   * allowed; anything else is ignored.
+   * allowed; anything else is ignored. When a requested `orderBy` names a column
+   * that is not listed, the whole `orderBy` is dropped (never partially applied)
+   * and a warning names the column(s): add them here to allow sorting by them.
    * @protected
    */
   protected sortable: string[] = [];
@@ -818,8 +821,19 @@ export class RepositoryManager<T = unknown, F = Record<string, any>> {
           ? Object.keys(safe.orderBy)
           : [];
 
-      if (orderColumns.some((column) => !allowed.has(column))) {
+      const dropped = orderColumns.filter((column) => !allowed.has(column));
+
+      if (dropped.length > 0) {
         delete raw.orderBy;
+
+        const names = dropped.map((column) => `"${column}"`).join(", ");
+        const pronoun = dropped.length === 1 ? "it" : "them";
+
+        log.warn(
+          "repository",
+          "orderBy",
+          `orderBy was ignored because ${names} ${dropped.length === 1 ? "is" : "are"} not sortable. Add ${pronoun} to the repository's \`sortable\` list to allow client sorting on ${pronoun}.`,
+        );
       }
     }
 

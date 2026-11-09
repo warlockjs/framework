@@ -217,6 +217,57 @@ describe("doctor sites check", () => {
     expect(result?.detail).not.toContain("landing (GET");
   });
 
+  it("does not fail a site whose loader needs a data source, and says it was not rendered", async () => {
+    const body = PANEL.replace(
+      "TypeError: input.router.getNamedApiRoutes is not a function",
+      "MissingDataSourceError: No default data source registered.",
+    );
+    configure(
+      { landing: { hosts: ["landing.test"] }, client: { hosts: ["client.test"] } },
+      fakeServer({ "client.test": { statusCode: 500, body } }),
+    );
+
+    const result = await sitesCheck.run(context());
+
+    expect(result).toMatchObject({ name: "sites", status: "ok" });
+    expect(result?.detail).toContain("landing 200");
+    expect(result?.detail).toContain("not rendered (a page loader needs a database");
+    expect(result?.detail).toContain("client");
+  });
+
+  it("warns when every site needs a data source", async () => {
+    const body = PANEL.replace(
+      "TypeError: input.router.getNamedApiRoutes is not a function",
+      'MissingDataSourceError: Data source "main" is not registered.',
+    );
+    configure(
+      { client: { hosts: ["client.test"] } },
+      fakeServer({ "client.test": { statusCode: 500, body } }),
+    );
+
+    expect((await sitesCheck.run(context()))?.status).toBe("warn");
+  });
+
+  it("still fails a site with another 500 next to one that needs a data source", async () => {
+    const dataBody = PANEL.replace(
+      "TypeError: input.router.getNamedApiRoutes is not a function",
+      "MissingDataSourceError: x",
+    );
+    configure(
+      { a: { hosts: ["a.test"] }, b: { hosts: ["b.test"] } },
+      fakeServer({
+        "a.test": { statusCode: 500, body: dataBody },
+        "b.test": { statusCode: 500, body: PANEL },
+      }),
+    );
+
+    const result = await sitesCheck.run(context());
+
+    expect(result?.status).toBe("fail");
+    expect(result?.detail).toContain("1 of 2 site(s)");
+    expect(result?.detail).toContain("b (GET /");
+  });
+
   it("mentions dynamic sites it could not render", async () => {
     configure({ landing: { hosts: ["landing.test"] }, tenants: { dynamic: true } }, fakeServer({}));
 

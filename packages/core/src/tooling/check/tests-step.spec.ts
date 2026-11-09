@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   environmentCodeOf,
+  MAX_VITEST_ARGUMENT_CHARS,
   parseVitestReport,
+  runVitestBatches,
+  vitestArgumentBatches,
+  type VitestRun,
   vitestArguments,
   vitestRunFailure,
 } from "./tests-step";
@@ -89,5 +93,104 @@ describe("vitest report", () => {
       "--run",
       "--passWithNoTests",
     ]);
+  });
+});
+
+describe("batched vitest runs", () => {
+  const files = Array.from(
+    { length: 400 },
+    (_, index) => `src/app/area/file-${index}-${"x".repeat(80)}.ts`,
+  );
+  const length = (args: readonly string[]) => args.reduce((sum, item) => sum + item.length + 1, 0);
+
+  it("keeps a short list, and the whole suite, as one identical run", () => {
+    expect(vitestArgumentBatches(null)).toEqual([vitestArguments(null)]);
+    expect(vitestArgumentBatches(["src/a.ts", "src/b.ts"])).toEqual([
+      vitestArguments(["src/a.ts", "src/b.ts"]),
+    ]);
+    expect(vitestArgumentBatches([])).toEqual([vitestArguments([])]);
+  });
+
+  it("splits a long list so each command line stays under the limit and no file is lost", () => {
+    const batches = vitestArgumentBatches(files);
+
+    expect(batches.length).toBeGreaterThan(1);
+
+    for (const batch of batches) {
+      expect(length(batch)).toBeLessThanOrEqual(MAX_VITEST_ARGUMENT_CHARS);
+      expect(batch[0]).toBe("related");
+      expect(batch.slice(-2)).toEqual(["--run", "--passWithNoTests"]);
+    }
+
+    expect(batches.flatMap((batch) => batch.filter((item) => item.endsWith(".ts")))).toEqual(files);
+  });
+
+  it("gives a single over-long file its own batch", () => {
+    const batches = vitestArgumentBatches(
+      ["a.ts", `${"b".repeat(100)}.ts`, "c.ts"],
+      vitestArguments,
+      50,
+    );
+
+    expect(batches.map((batch) => batch.filter((item) => item.endsWith(".ts")).length)).toEqual([
+      1, 1, 1,
+    ]);
+  });
+
+  it("merges the reports of the batches and the first failing exit code", async () => {
+    const run = (name: string, code: number, tests: number): VitestRun => ({
+      code,
+      signal: null,
+      stdout: "",
+      stderr: "",
+      report: {
+        numTotalTests: tests,
+        numFailedTests: code === 0 ? 0 : 1,
+        success: code === 0,
+        testResults: [{ name, status: code === 0 ? "passed" : "failed" }],
+      },
+    });
+    const runs = [run("a", 0, 2), run("b", 1, 3)];
+    const seen: string[][] = [];
+    const merged = await runVitestBatches(
+      async (_binary, args) => (seen.push([...args]), runs[seen.length - 1] as VitestRun),
+      "vitest",
+      [
+        ["related", "a.ts"],
+        ["related", "b.ts"],
+      ],
+      "/app",
+    );
+
+    expect(seen).toHaveLength(2);
+    expect(merged.code).toBe(1);
+    expect(merged.report).toMatchObject({ numTotalTests: 5, numFailedTests: 1, success: false });
+    expect((merged.report as { testResults: unknown[] }).testResults).toHaveLength(2);
+  });
+
+  it("reports a batch that wrote no report instead of hiding the crash", async () => {
+    const crashed: VitestRun = {
+      code: 137,
+      signal: null,
+      stdout: "",
+      stderr: "boom",
+      report: undefined,
+    };
+    const ok: VitestRun = {
+      code: 0,
+      signal: null,
+      stdout: "",
+      stderr: "",
+      report: { testResults: [] },
+    };
+    const queue = [ok, crashed];
+    const merged = await runVitestBatches(
+      async () => queue.shift() as VitestRun,
+      "vitest",
+      [["a"], ["b"]],
+      "/app",
+    );
+
+    expect(merged).toBe(crashed);
   });
 });

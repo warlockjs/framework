@@ -84,6 +84,12 @@ export function useRequest<UserType extends Model = Model>() {
   return requestContext.getRequest() as Request<UserType>;
 }
 
+/**
+ * The authenticated user of the current request. Outside a request (scheduler
+ * jobs, seeds, queue workers) there is no request store and this returns
+ * `undefined`, even though the declared type is not narrowed to include it.
+ * `currentUser()` from `@warlock.js/auth` is the typed alternative.
+ */
 export function useCurrentUser<UserType extends Model = Model>() {
   // `getUser()` returns `unknown` — core has no type for `request.locals.user`
   // (that key belongs to `@warlock.js/auth`'s `RequestLocals` augmentation).

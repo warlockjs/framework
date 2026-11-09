@@ -123,7 +123,17 @@ export type SiteRenderOutcome = {
   status: number;
   /** Set for a 5xx, or when the request itself failed or timed out. */
   failure?: string;
+  /**
+   * Set when the 5xx is a page loader asking for a data source. Doctor boots
+   * connectors but never starts them, so no database is connected and the
+   * page cannot render here; that says nothing about the code.
+   */
+  needsDataSource?: true;
 };
+
+/** Failure text of a loader that queried the database while no data source is registered. */
+const MISSING_DATA_SOURCE =
+  /MissingDataSourceError|data source .* is not registered|No default data source registered/i;
 
 function describeFailure(status: number, body: string, contentType: unknown): string {
   const panel = parseDevErrorPanel(body);
@@ -175,16 +185,17 @@ export async function renderSiteRoot(
       }),
     ]);
 
+    const failure =
+      response.statusCode >= 500
+        ? describeFailure(response.statusCode, response.body, response.headers["content-type"])
+        : undefined;
+
     return {
       target,
       status: response.statusCode,
-      ...(response.statusCode >= 500 && {
-        failure: describeFailure(
-          response.statusCode,
-          response.body,
-          response.headers["content-type"],
-        ),
-      }),
+      ...(failure !== undefined && { failure }),
+      ...(failure !== undefined &&
+        MISSING_DATA_SOURCE.test(failure) && { needsDataSource: true as const }),
     };
   } catch (error) {
     return {
@@ -217,6 +228,9 @@ export async function renderSiteRoot(
  *   applicable, no line;
  * - any site answers 5xx, or does not answer → `fail`, naming the site, the
  *   status, and the phase and page file the page error record carries;
+ * - a site whose page loader queries the database is not rendered and is named
+ *   as such (doctor boots connectors but never starts them, so no data source
+ *   exists); when every site is in that case the verdict is `warn`;
  * - otherwise → `ok`. A 404 or a redirect is not a defect here.
  */
 export const sitesCheck: DoctorCheck = {
@@ -250,7 +264,10 @@ export const sitesCheck: DoctorCheck = {
     // One at a time: a page render is the heaviest thing doctor does.
     for (const target of targets) outcomes.push(await renderSiteRoot(server, target));
 
-    const failed = outcomes.filter((outcome) => outcome.failure !== undefined);
+    const failed = outcomes.filter(
+      (outcome) => outcome.failure !== undefined && outcome.needsDataSource !== true,
+    );
+    const needData = outcomes.filter((outcome) => outcome.needsDataSource === true);
 
     if (failed.length > 0) {
       return {
@@ -269,15 +286,20 @@ export const sitesCheck: DoctorCheck = {
     }
 
     const rendered = outcomes
+      .filter((outcome) => outcome.needsDataSource !== true)
       .map((outcome) => `${outcome.target.site} ${outcome.status}`)
       .join(", ");
+    const notRendered =
+      needData.length > 0
+        ? `; not rendered (a page loader needs a database, and doctor does not start connectors): ${needData.map((outcome) => outcome.target.site).join(", ")}`
+        : "";
     const skipped =
       dynamic.length > 0 ? `; not rendered (host resolved at runtime): ${dynamic.join(", ")}` : "";
 
     return {
       name: "sites",
-      status: "ok",
-      detail: `root page rendered without a 5xx — ${rendered}${skipped}`,
+      status: needData.length === outcomes.length ? "warn" : "ok",
+      detail: `root page rendered without a 5xx — ${rendered || "none"}${notRendered}${skipped}`,
     };
   },
 };

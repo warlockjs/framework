@@ -493,8 +493,15 @@ const REDIRECT_CALLS: ReadonlySet<string> = new Set([
 /** Components whose `to`/`href` prop navigates. */
 const LINK_COMPONENTS: ReadonlySet<string> = new Set(["Link", "NavLink"]);
 
-/** Helpers that return an allowed target (or a fallback) for any input. */
-const REDIRECT_SANITIZERS: ReadonlySet<string> = new Set(["safeRedirect", "safeRedirectTarget"]);
+/**
+ * Helpers that return an allowed target (or a fallback) for any input.
+ * `href()` builds the URL of a named route, which is always same-origin.
+ */
+const REDIRECT_SANITIZERS: ReadonlySet<string> = new Set([
+  "safeRedirect",
+  "safeRedirectTarget",
+  "href",
+]);
 
 /** Predicates that, used in an enclosing `if` or `? :`, prove the target was checked. */
 const REDIRECT_VALIDATORS: ReadonlySet<string> = new Set(["isSafeRedirect", "isSafeRedirectUrl"]);

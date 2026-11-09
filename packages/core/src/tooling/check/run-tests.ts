@@ -8,6 +8,8 @@ import {
   parseVitestReport,
   runVitest,
   type VitestRunner,
+  runVitestBatches,
+  vitestArgumentBatches,
   vitestArguments,
   vitestRunFailure,
 } from "./tests-step";
@@ -141,7 +143,12 @@ export async function runTests(options: RunTestsOptions = {}): Promise<TestRunRe
   }
 
   const args = testRunArguments(files);
-  const outcome = await (options.vitest ?? runVitest)(binary, args, cwd);
+  const outcome = await runVitestBatches(
+    options.vitest ?? runVitest,
+    binary,
+    vitestArgumentBatches(files, testRunArguments),
+    cwd,
+  );
   const problems =
     outcome.report === undefined
       ? vitestRunFailure(outcome)

@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { log } from "@warlock.js/logger";
+import { describe, expect, it, vi } from "vitest";
 import { RepositoryManager } from "./repository.manager";
 
 function makeRepo(extra: Record<string, any> = {}) {
@@ -55,6 +56,24 @@ describe("RepositoryManager client control options (B7)", () => {
 
     await repo.list({ orderBy: { name: "asc" } });
     expect(calls.sortBy).toHaveLength(1);
+  });
+
+  it("warns with the dropped column names and the `sortable` hint", async () => {
+    const warn = vi.spyOn(log, "warn").mockImplementation(() => undefined as never);
+    const { repo, calls } = makeRepo({ sortable: ["name"] });
+
+    await repo.list({ orderBy: { created_at: "desc" } });
+
+    expect(calls.sortBy).toBeUndefined();
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(String(warn.mock.calls[0]?.[2])).toContain('"created_at"');
+    expect(String(warn.mock.calls[0]?.[2])).toContain("`sortable`");
+
+    warn.mockClear();
+    await repo.list({ orderBy: { name: "asc" } });
+    expect(warn).not.toHaveBeenCalled();
+
+    warn.mockRestore();
   });
 
   it("ignores a client select unless whitelisted", async () => {

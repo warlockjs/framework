@@ -246,3 +246,105 @@ export function vitestRunFailure(run: VitestRun): ToolingProblem[] {
     }),
   ];
 }
+
+/** Characters one vitest command line may use for its file arguments (Windows allows about 32k in all). */
+export const MAX_VITEST_ARGUMENT_CHARS = 24_000;
+
+/**
+ * Split a file list into vitest argument sets whose command lines stay under
+ * `maxChars`, so a long `--changed` list does not overflow the operating
+ * system's command-line limit (`spawn ENAMETOOLONG` on Windows). A short list
+ * (or `null`, the whole suite) yields exactly one set, identical to
+ * `build(files)`. A single file longer than the limit gets its own set.
+ */
+export function vitestArgumentBatches(
+  files: readonly string[] | null,
+  build: (files: readonly string[] | null) => string[] = vitestArguments,
+  maxChars: number = MAX_VITEST_ARGUMENT_CHARS,
+): string[][] {
+  if (files === null) return [build(null)];
+
+  const overhead = build([]).reduce((sum, argument) => sum + argument.length + 1, 0);
+  const groups: string[][] = [];
+  let current: string[] = [];
+  let used = overhead;
+
+  for (const file of files) {
+    const cost = file.length + 1;
+
+    if (current.length > 0 && used + cost > maxChars) {
+      groups.push(current);
+      current = [];
+      used = overhead;
+    }
+
+    current.push(file);
+    used += cost;
+  }
+
+  if (current.length > 0 || groups.length === 0) groups.push(current);
+
+  return groups.map((group) => build(group));
+}
+
+function numberOf(report: unknown, key: string): number {
+  const value = isRecord(report) ? report[key] : undefined;
+
+  return typeof value === "number" ? value : 0;
+}
+
+/**
+ * Run each argument set with `runner` one after the other and merge the runs
+ * into one: reports are combined (test results joined, counters summed), the
+ * exit code is the first non-zero one, and a batch that wrote no report makes
+ * the whole run a report-less failure, so a crash is never hidden by the others.
+ * One batch is returned as it is.
+ */
+export async function runVitestBatches(
+  runner: VitestRunner,
+  binary: string,
+  batches: readonly (readonly string[])[],
+  cwd: string,
+): Promise<VitestRun> {
+  const runs: VitestRun[] = [];
+
+  for (const args of batches) runs.push(await runner(binary, args, cwd));
+
+  const [first] = runs;
+
+  if (runs.length === 1 && first) return first;
+
+  const failedWithoutReport = runs.find((run) => run.report === undefined);
+
+  if (failedWithoutReport) return failedWithoutReport;
+
+  const counters = [
+    "numTotalTests",
+    "numPassedTests",
+    "numFailedTests",
+    "numPendingTests",
+    "numTotalTestSuites",
+    "numPassedTestSuites",
+    "numFailedTestSuites",
+  ];
+  const report: Record<string, unknown> = { testResults: [] };
+
+  for (const key of counters) {
+    report[key] = runs.reduce((sum, run) => sum + numberOf(run.report, key), 0);
+  }
+
+  report.testResults = runs.flatMap((run) => {
+    const results = isRecord(run.report) ? run.report.testResults : undefined;
+
+    return Array.isArray(results) ? results : [];
+  });
+  report.success = runs.every((run) => !isRecord(run.report) || run.report.success !== false);
+
+  return {
+    code: runs.find((run) => run.code !== 0)?.code ?? 0,
+    signal: runs.find((run) => run.signal !== null)?.signal ?? null,
+    stdout: runs.map((run) => run.stdout).join(""),
+    stderr: runs.map((run) => run.stderr).join(""),
+    report,
+  };
+}

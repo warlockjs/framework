@@ -205,6 +205,8 @@ export type GuardedRequestHandler<RequestPayload = unknown> = RequestHandler<
 >;
 ```
 
+`useCurrentUser()` from `@warlock.js/core` reads the same value from the request context. It returns `undefined` outside a request (scheduler jobs, seeds, queue workers), although its declared type does not say so. `currentUser()` from `@warlock.js/auth` is the typed alternative.
+
 Then in a controller:
 
 ```ts title="src/app/auth/controllers/me.controller.ts"

@@ -142,11 +142,19 @@ describe("WL9007 redirect targets from request input", () => {
     "const back = isSafeRedirect(request.input('next')) ? response.redirect(request.input('next')) : null;",
     "router.redirect('/old', '/new');",
     "response.redirect(`/posts/${post.id}`);",
+    "response.redirect(href('posts.show', { id: request.input('id') }));",
+    "const element = <Link to={href('posts.show', { id: post.id })}>Post</Link>;",
     "const element = <Link to={`/posts/${post.id}`}>Post</Link>;",
     "const element = <Link to={safeRedirectTarget(useQueryString('next')) ?? '/'}>Back</Link>;",
     "const element = <a href={useQueryString('next')}>Back</a>;",
   ])("accepts %s", (source) => {
     expect(codes(source, "WL9007")).toEqual([]);
+  });
+
+  it("still reports raw request input next to an href() call", () => {
+    expect(codes("response.redirect(href('home') + request.input('next'));", "WL9007")).toEqual([
+      "href('home') + request.input('next')",
+    ]);
   });
 
   it("reports a server redirect and names safeRedirect() from core", () => {

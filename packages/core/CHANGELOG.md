@@ -6,6 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 > ⚠ **Versioning: `@warlock.js/*` does not follow SemVer strictly — breaking changes may ship in a minor.** This is a deliberate decision, not an oversight: the framework is pre-adoption and the cost of a major per behaviour fix currently outweighs the benefit. **Pin an exact version or a tilde range (`~4.13.0`) if you need to opt into changes rather than receive them.** Every breaking change is marked **BREAKING** in its entry and summarised in an _Upgrading_ section at the top of the release. **This policy will change once the framework has consumers beyond its author.**
 
+## 5.50.0 - 2026-11-09
+
+### Fixed
+
+- `RepositoryManager` warns when a client `orderBy` names a column outside `sortable`: the log names the dropped column(s) and says to add them to `sortable`. The whole `orderBy` is still dropped, so the allow-list behavior for client input is unchanged.
+- `warlock check --changed` and `warlock test --changed` split a long file list into several `vitest related` runs, each under about 24,000 characters of command line, and merge the reports. A long list no longer fails with `spawn ENAMETOOLONG` on Windows; a short list runs exactly as before.
+- `WL9007` no longer reports a redirect or link target built by `href()`: the URL of a named route is always same-origin.
+- `warlock doctor`'s `sites` check no longer fails a site whose page loader queries the database. Doctor boots connectors without starting them, so no data source exists; the site is listed as not rendered, and the verdict is a warning only when every site is in that case.
+
+### Documentation
+
+- The repository page and the `sortable` JSDoc state the rule for client `orderBy`: every column must be allowed or the whole `orderBy` is dropped.
+- `useCurrentUser()` is documented (JSDoc and the protected-routes recipe) as returning `undefined` outside a request (scheduler jobs, seeds, queue workers), with `currentUser()` from `@warlock.js/auth` as the typed alternative.
+
 ## 5.49.0 - 2026-11-08
 
 ### Added

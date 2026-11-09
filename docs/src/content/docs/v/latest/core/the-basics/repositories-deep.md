@@ -212,6 +212,14 @@ The interesting ones:
 
 > **Changed in 5.21:** `list(request.all())` no longer lets the client pick any sort or page size. A client-supplied sort or page size is honoured only when it is whitelisted by the repository; anything else falls back to the repository defaults. Options passed from application code (`list({ orderBy, limit })`) are unchanged.
 
+**Sortable columns.** A client-supplied `orderBy` is applied only when every column in it is allowed: `id`, the `filterBy` keys, and the columns listed in the repository's `sortable` array. If any requested column is not allowed, the whole `orderBy` is dropped (never partly applied) and a warning is logged that names the dropped column(s) and tells you to add them to `sortable`. To let clients sort by `created_at`, declare it:
+
+```ts
+class PostsRepository extends RepositoryManager<Post> {
+  protected sortable = ["created_at", "title"];
+}
+```
+
 `orderBy` has three forms:
 
 ```ts
