@@ -1,4 +1,17 @@
 {
+  "5.50.0": {
+    "publishedAt": "2026-11-09T12:23:27.556Z",
+    "matrix": "none",
+    "headline": "`schema.validate(data)` enforces conditional rules, a warning when a repository drops a client `orderBy`, long `warlock check --changed` lists on Windows, `href()` redirects in `WL9007`, and `warlock doctor` for sites that need a database.",
+    "highlights": [
+      "`schema.validate(data)` with one argument builds the same root context as `v.validate(schema, data)`, so `requiredIf`, `requiredWith` and their variants are enforced.",
+      "`RepositoryManager` logs a warning naming the column when a client `orderBy` is dropped because it is outside `sortable`.",
+      "`warlock check --changed` and `warlock test --changed` split a long file list into several `vitest related` runs, so a large change no longer fails with `spawn ENAMETOOLONG` on Windows.",
+      "`WL9007` no longer reports a redirect or link target built by `href()`.",
+      "`warlock doctor` lists a site whose page loader needs a database as not rendered instead of failing it.",
+      "Docs: map field keys to display names with `translateAttribute`, and `useCurrentUser()` returns `undefined` outside a request."
+    ]
+  },
   "5.49.0": {
     "publishedAt": "2026-11-08T21:16:45.137Z",
     "matrix": "none",

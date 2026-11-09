@@ -136,6 +136,73 @@
   ],
   "releases": [
     {
+      "version": "5.50.0",
+      "id": "v5-50-0",
+      "date": "November 9, 2026",
+      "isUnreleased": false,
+      "headlineHtml": "<code>schema.validate(data)</code> enforces conditional rules, a warning when a repository drops a client <code>orderBy</code>, long <code>warlock check --changed</code> lists on Windows, <code>href()</code> redirects in <code>WL9007</code>, and <code>warlock doctor</code> for sites that need a database.",
+      "highlights": [
+        "<code>schema.validate(data)</code> with one argument builds the same root context as <code>v.validate(schema, data)</code>, so <code>requiredIf</code>, <code>requiredWith</code> and their variants are enforced.",
+        "<code>RepositoryManager</code> logs a warning naming the column when a client <code>orderBy</code> is dropped because it is outside <code>sortable</code>.",
+        "<code>warlock check --changed</code> and <code>warlock test --changed</code> split a long file list into several <code>vitest related</code> runs, so a large change no longer fails with <code>spawn ENAMETOOLONG</code> on Windows.",
+        "<code>WL9007</code> no longer reports a redirect or link target built by <code>href()</code>.",
+        "<code>warlock doctor</code> lists a site whose page loader needs a database as not rendered instead of failing it.",
+        "Docs: map field keys to display names with <code>translateAttribute</code>, and <code>useCurrentUser()</code> returns <code>undefined</code> outside a request."
+      ],
+      "upgradeNotes": [],
+      "summaryHtml": null,
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/5.50.0-summary.md",
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 4,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 4
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "<code>RepositoryManager</code> warns when a client <code>orderBy</code> names a column outside <code>sortable</code>: the log names the dropped column(s) and says to add them to <code>sortable</code>. The whole <code>orderBy</code> is still dropped, so the allow-list behavior for client input is unchanged."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>warlock check --changed</code> and <code>warlock test --changed</code> split a long file list into several <code>vitest related</code> runs, each under about 24,000 characters of command line, and merge the reports. A long list no longer fails with <code>spawn ENAMETOOLONG</code> on Windows; a short list runs exactly as before."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>WL9007</code> no longer reports a redirect or link target built by <code>href()</code>: the URL of a named route is always same-origin."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>warlock doctor</code>'s <code>sites</code> check no longer fails a site whose page loader queries the database. Doctor boots connectors without starting them, so no data source exists; the site is listed as not rendered, and the verdict is a warning only when every site is in that case."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/seal",
+          "slug": "seal",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "<strong><code>schema.validate(data)</code> enforces conditional rules</strong> — calling a validator's <code>validate()</code> with one argument now builds the same root context as <code>v.validate(schema, data)</code> (<code>allValues</code>, <code>parent</code>, and the <code>configureSeal()</code> translators). Before, <code>requiredIf</code>, <code>requiredIfIn</code>, <code>requiredWith</code>, <code>requiredWithout</code> and their <code>Sibling</code> variants silently passed because no sibling values were available. Passing a context explicitly behaves as before."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "5.49.0",
       "id": "v5-49-0",
       "date": "November 8, 2026",
