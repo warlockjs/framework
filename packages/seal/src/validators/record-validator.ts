@@ -1,3 +1,4 @@
+import { createRootContext } from "../helpers/root-context";
 import { isPlainObject } from "@mongez/supportive-is";
 import { setKeyPath } from "../helpers";
 import { objectRule, plainObjectRule } from "../rules";
@@ -86,15 +87,7 @@ export class RecordValidator extends BaseValidator {
    */
   public async validate(
     data: any,
-    context: SchemaContext = {
-      allValues: data,
-      parent: null,
-      value: data,
-      key: "",
-      path: "",
-      translateRule: () => "",
-      translateAttribute: ({ attribute }) => attribute,
-    },
+    context: SchemaContext = createRootContext(data),
   ): Promise<ValidationResult> {
     // Apply default when absent, then mutate. Mirrors BaseValidator's
     // `valueForRules = data ?? this.getDefaultValue()` so `.default({...})`

@@ -4,6 +4,16 @@ All notable changes to `@warlock.js/seal` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.50.0
+
+### Fixed
+
+- **`schema.validate(data)` enforces conditional rules** — calling a validator's `validate()` with one argument now builds the same root context as `v.validate(schema, data)` (`allValues`, `parent`, and the `configureSeal()` translators). Before, `requiredIf`, `requiredIfIn`, `requiredWith`, `requiredWithout` and their `Sibling` variants silently passed because no sibling values were available. Passing a context explicitly behaves as before.
+
+### Documentation
+
+- Errors guide: map field keys to display names with one `translateAttribute` function, per call or through `configureSeal()`, in the browser and on the server. `.label()` still wins for a single field.
+
 ## 5.47.0 - 2026-11-06
 
 ### Fixed

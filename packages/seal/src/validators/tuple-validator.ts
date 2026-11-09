@@ -1,3 +1,4 @@
+import { createRootContext } from "../helpers/root-context";
 import { setKeyPath } from "../helpers";
 import { arrayRule } from "../rules";
 import type { SchemaContext, ValidationResult } from "../types";
@@ -53,7 +54,10 @@ export class TupleValidator extends BaseValidator {
    * fields would silently materialise as `[]` in the validated output and then
    * fail the length check.
    */
-  public async validate(data: any, context: SchemaContext): Promise<ValidationResult> {
+  public async validate(
+    data: any,
+    context: SchemaContext = createRootContext(data),
+  ): Promise<ValidationResult> {
     // Apply default when absent, then mutate. Mirrors BaseValidator's
     // `valueForRules = data ?? this.getDefaultValue()` so `.default([...])`
     // works on tuples too.

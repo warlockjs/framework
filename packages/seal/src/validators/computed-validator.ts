@@ -1,3 +1,4 @@
+import { createRootContext } from "../helpers/root-context";
 import type { SchemaContext, ValidationResult } from "../types";
 import { BaseValidator } from "./base-validator";
 import type { JsonSchemaResult, JsonSchemaTarget } from "../standard-schema/json-schema";
@@ -60,7 +61,10 @@ export class ComputedValidator<TResult = any> extends BaseValidator {
   /**
    * Execute the callback and optionally validate the result
    */
-  public async validate(data: any, context: SchemaContext): Promise<ValidationResult> {
+  public async validate(
+    data: any,
+    context: SchemaContext = createRootContext(data),
+  ): Promise<ValidationResult> {
     try {
       // Execute the callback with validated data
       const result = await this.callback(data, context);

@@ -1,3 +1,4 @@
+import { createRootContext } from "../helpers/root-context";
 import type { JsonSchemaResult, JsonSchemaTarget } from "../standard-schema/json-schema";
 import type { SchemaContext, ValidationResult } from "../types";
 import { BaseValidator } from "./base-validator";
@@ -65,7 +66,10 @@ export class LazyValidator<T extends BaseValidator = BaseValidator> extends Base
     return this.resolvedValidator;
   }
 
-  public override async validate(data: any, context: SchemaContext): Promise<ValidationResult> {
+  public override async validate(
+    data: any,
+    context: SchemaContext = createRootContext(data),
+  ): Promise<ValidationResult> {
     return this.refineResult(await this.resolve().validate(data, context), context);
   }
 

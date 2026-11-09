@@ -1,3 +1,4 @@
+import { createRootContext } from "../helpers/root-context";
 import { clone } from "@mongez/reinforcements";
 import { validate } from "../factory/validate";
 import { VALID_RULE, invalidRule } from "../helpers/validation-helpers";
@@ -730,7 +731,10 @@ export class BaseValidator<TInput = unknown, TOutput = TInput> {
   /**
    * Validate the data
    */
-  public async validate(data: any, context: SchemaContext): Promise<ValidationResult> {
+  public async validate(
+    data: any,
+    context: SchemaContext = createRootContext(data),
+  ): Promise<ValidationResult> {
     const result = await this.refineResult(await this.validateRules(data, context), context);
 
     if (!result.isValid && this.hasCatch) {

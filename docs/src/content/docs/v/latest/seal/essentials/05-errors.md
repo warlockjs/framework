@@ -142,6 +142,28 @@ v.object({
 
 (`.attributes({ ... })` is a different tool — it feeds named values to the translation layer and to cross-field rules such as `matches`, not a field's own `:input`.) Combine with `translateRule` / `translateAttribute` for full i18n.
 
+### One label map for every field — `translateAttribute`
+
+`translateAttribute` already maps field keys to display names, in the browser and on the server, so no separate label map is needed. It receives the key as `attribute`; return the label, or `""` to keep the default wording. Pass it per call or once through `configureSeal`:
+
+```ts
+const labels: Record<string, string> = {
+  subject_en: "Email subject",
+  body_en: "Email body",
+};
+
+const translateAttribute = ({ attribute }: { attribute: string }) => labels[attribute] ?? "";
+
+// per call
+await v.validate(schema, data, { translateAttribute });
+
+// or globally
+configureSeal({ translateAttribute });
+// → "The Email subject is required"
+```
+
+A field-level `.label()` still wins over the map for that field. Both entry points, `v.validate(schema, data)` and `schema.validate(data)`, use the same translators.
+
 ## When does seal throw?
 
 Seal never throws on **bad input** — bad input lands in `result.errors`. It does throw on **programming bugs**:
