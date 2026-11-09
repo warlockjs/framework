@@ -1,3 +1,4 @@
+import { createRootContext } from "../helpers/root-context";
 import { isPlainObject } from "@mongez/supportive-is";
 import type { JsonSchemaResult, JsonSchemaTarget } from "../standard-schema/json-schema";
 import { applyNullable, wrapNullableStrict } from "../standard-schema/json-schema";
@@ -113,7 +114,10 @@ export class DiscriminatedUnionValidator<
     return isPlainObject(value);
   }
 
-  public override async validate(data: any, context: SchemaContext): Promise<ValidationResult> {
+  public override async validate(
+    data: any,
+    context: SchemaContext = createRootContext(data),
+  ): Promise<ValidationResult> {
     if (data === null && this.isNullable) {
       return { isValid: true, errors: [], data: null };
     }

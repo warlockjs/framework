@@ -1,3 +1,4 @@
+import { createRootContext } from "../helpers/root-context";
 import { except } from "@mongez/reinforcements";
 import { isPlainObjectValue as isPlainObject } from "../helpers/plain-object";
 import { setKeyPath } from "../helpers/path-helpers";
@@ -422,7 +423,7 @@ export class ObjectValidator<out TSchema extends Schema = Schema> extends BaseVa
   /** Validate the data */
   public async validate(
     data: any,
-    context: SchemaContext = { path: "" } as SchemaContext,
+    context: SchemaContext = createRootContext(data),
   ): Promise<ValidationResult> {
     context.schema = this.schema;
     const mutatedData = await this.mutate(data, context);

@@ -1,3 +1,4 @@
+import { createRootContext } from "../helpers/root-context";
 import { setKeyPath } from "../helpers";
 import { flipArrayMutator, sortArrayMutator, uniqueArrayMutator } from "../mutators";
 import {
@@ -158,7 +159,10 @@ export class ArrayValidator extends BaseValidator {
    * so the parent ObjectValidator can omit the key. Without this, optional array
    * fields would silently materialise as `[]` in the validated output.
    */
-  public async validate(input: any, context: SchemaContext): Promise<ValidationResult> {
+  public async validate(
+    input: any,
+    context: SchemaContext = createRootContext(input),
+  ): Promise<ValidationResult> {
     const data = wrapSingleUpload(input);
 
     // Apply default when absent, then mutate. Mirrors BaseValidator's

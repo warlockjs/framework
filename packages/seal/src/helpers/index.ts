@@ -4,3 +4,4 @@ export * from "./get-field-value";
 export * from "./humanize-attribute";
 export * from "./path-helpers";
 export * from "./validation-helpers";
+export * from "./root-context";
