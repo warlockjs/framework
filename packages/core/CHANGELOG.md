@@ -6,6 +6,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 > ⚠ **Versioning: `@warlock.js/*` does not follow SemVer strictly — breaking changes may ship in a minor.** This is a deliberate decision, not an oversight: the framework is pre-adoption and the cost of a major per behaviour fix currently outweighs the benefit. **Pin an exact version or a tilde range (`~4.13.0`) if you need to opt into changes rather than receive them.** Every breaking change is marked **BREAKING** in its entry and summarised in an _Upgrading_ section at the top of the release. **This policy will change once the framework has consumers beyond its author.**
 
+## 5.51.0 - 2026-11-11
+
+### Added
+
+- `router.get/post/put/patch/delete/head/options/any` accept an array of paths and register one route per path, as `router.add` already did.
+- `request.originalUrl` (path and query string) and `request.originalPath` (pathname) return what the client sent, before the terminal-slash normalization and `rewriteUrl`. Use them to tell `/docs` from `/docs/`.
+- Core ships its own `http.errors.csrfOriginMismatch` translation (English and Arabic). The CSRF origin refusal uses the app's `auth.errors.csrfOriginMismatch` when defined, then core's key, then the English sentence, through the new `resolveCsrfMessage()`. An app without `@warlock.js/auth` no longer answers with the raw key.
+- `WL1010` (warning): a `locales.json` dictionary holds text for a locale that is not in `app.localeCodes`.
+
+### Changed
+
+- A locale dictionary with a locale code outside `app.localeCodes` no longer fails the build: that text is ignored and `WL1010` is reported once per file. Every configured locale is still required.
+- `WL9006` reports a route whose options object is only a spread (`{ ...opts }`) as a warning instead of trusting it; a spread next to `public: true` or a proven guard is still trusted. The unguarded message names `guardWrappers` and the guard-naming rule.
+- `WL9104` names the file, line and key text of the computed lookup, and says that `config.translations` only adds keys and does not lift the every-group fallback.
+
+### Fixed
+
+- The translation usage analyzer no longer treats a hook dependency list (`useMemo(() => t("a"), [t])`) as a translator that escapes, which made every page that used one ship all translation groups.
+
+### Documentation
+
+- The route, request, CSRF, `warlock check` (`WL9006`, `WL9104`), localization and error-code pages and the matching skills describe the changes above.
+
 ## 5.50.0 - 2026-11-09
 
 ### Fixed

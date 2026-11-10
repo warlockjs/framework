@@ -831,6 +831,16 @@ export async function generatePagesBarrel(
     options: options.translations,
   });
 
+  if (translations.dynamicSites.length > 0) {
+    console.warn(
+      [
+        "Translation lookups computed at runtime make the pages that render them ship every translation group:",
+        ...translations.dynamicSites.map((site) => `  ${site}`),
+        "A config.translations declaration only adds keys; remove the computed lookup (use a static prefix such as `statuses.${status}`) to prune.",
+      ].join("\n"),
+    );
+  }
+
   const contents = [
     ...BARREL_HEADER,
     ...importLines,

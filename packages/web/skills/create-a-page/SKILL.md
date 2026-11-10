@@ -575,6 +575,31 @@ are the exception and remain supported.
 
 Creating a page, deleting one, or editing `config.route` is route-table churn rather than a component-only edit. `warlock dev` re-registers affected routes atomically with no manual restart.
 
+## Avoiding a circular config type
+
+`config.metadata` takes its type from the loader (`satisfies PageConfig<typeof loader>`), so the loader's parameter types must not read `typeof config`. Typing the loader as `PageLoaderContext<typeof config.validation, typeof config.route>` while `config` is declared inline and uses `metadata` makes `config` refer to itself through the loader (TS7022 / TS2502). Hoist the validation into its own const and type the loader from that const:
+
+```ts title="src/web/products/[id].setup.ts"
+import { v } from "@warlock.js/seal";
+import type { PageConfig, PageLoaderContext } from "@warlock.js/web";
+
+const productValidation = { params: v.object({ id: v.string() }) };
+
+export const config = {
+  route: { path: "/products/:id", name: "products.show" },
+  validation: productValidation,
+  metadata: ({ data }) => ({ title: data.product.name }),
+} satisfies PageConfig<typeof loader>;
+
+export async function loader({ request }: PageLoaderContext<typeof productValidation>) {
+  const id = request.input("id");
+
+  return { product: { id, name: `Product ${id}` } };
+}
+```
+
+Keep `route` as a literal object inside `config`. Moving it into its own const also clears the type error, but `warlock generate.typings` then refuses the module with "the `config.route` export must be a directly exported object literal". On a guarded page, pass the route name as the third type argument instead of reading `typeof config.route`, for example `PageLoaderContext<typeof productValidation, undefined, "account.show">`, which keeps `session` non-null (see the `protect-a-page` topic).
+
 ## Gotchas
 
 - **A page with no `config.route` is not unreachable.** It derives a real URL from its file location — see [Filesystem routing](#filesystem-routing).

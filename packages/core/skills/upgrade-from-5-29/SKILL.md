@@ -582,10 +582,9 @@ per locale in a hashed, cached file that the page preloads. Nothing in a page's
 render changes: server output is the full dictionary, as before.
 
 Run `warlock build`, then `warlock check`. A `WL9104` warning marks a page that
-renders a translation key computed at runtime. Declare the keys it renders in
-the page's setup file, for example
-`export const config = { translations: ["statuses.*", "members.title"] }`, so the
-page ships only what it uses.
+renders a translation key computed at runtime. Rewrite the lookup with a literal
+key or a static-prefix template; `config.translations` in the setup file only adds
+keys, and one computed lookup anywhere in the page's graph still ships every group.
 
 In development, a warning names a key the page reads but its payload lacks, and
 resolves it from the full table so the page keeps working. In production the

@@ -102,6 +102,40 @@ describe("scanTranslationSource", () => {
     expect(usage.dynamic).toBe(true);
   });
 
+  it("does not treat a hook dependency list as an escape", () => {
+    const { usage } = scanTranslationSource(
+      "src/web/a.tsx",
+      `export function Page() {
+         const t = useTrans();
+         const label = useMemo(() => t("a.title"), [t]);
+         useEffect(() => { t("a.hello"); }, [t]);
+         return <p>{label}</p>;
+       }`,
+    );
+
+    expect(usage.dynamic).toBe(false);
+    expect(usage.keys).toEqual(expect.arrayContaining(["a.title", "a.hello"]));
+  });
+
+  it("keeps an array that is assigned or passed to a non-hook call dynamic", () => {
+    const assigned = scanTranslationSource(
+      "src/web/a.tsx",
+      "export function P() { const t = useTrans(); const list = [t]; return list; }",
+    );
+    const passed = scanTranslationSource(
+      "src/web/a.tsx",
+      "export function P() { const t = useTrans(); register([t]); return null; }",
+    );
+    const notLast = scanTranslationSource(
+      "src/web/a.tsx",
+      "export function P() { const t = useTrans(); useThing([t], 1); return null; }",
+    );
+
+    expect(assigned.usage.dynamic).toBe(true);
+    expect(passed.usage.dynamic).toBe(true);
+    expect(notLast.usage.dynamic).toBe(true);
+  });
+
   it("ignores inline translation objects, which carry their own text", () => {
     const { usage } = scanTranslationSource(
       "src/web/a.tsx",

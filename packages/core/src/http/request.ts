@@ -962,6 +962,27 @@ export class Request<RequestValidation = any> {
   }
 
   /**
+   * Path and query string exactly as the client sent them, before core's
+   * terminal-slash normalization and any configured `rewriteUrl`.
+   * `/docs/?page=2` stays `/docs/?page=2` here while `url` is `/docs?page=2`.
+   */
+  public get originalUrl(): string {
+    return this.baseRequest.originalUrl ?? this.baseRequest.url;
+  }
+
+  /**
+   * Pathname exactly as the client sent it (no query string, trailing slash
+   * kept). Use it to tell `/docs` from `/docs/`, for example when serving a
+   * directory index from a static site.
+   */
+  public get originalPath(): string {
+    const url = this.originalUrl;
+    const queryIndex = url.indexOf("?");
+
+    return queryIndex === -1 ? url : url.slice(0, queryIndex);
+  }
+
+  /**
    * Get full url
    */
   public get fullUrl() {

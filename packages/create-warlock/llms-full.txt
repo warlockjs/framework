@@ -127,8 +127,7 @@ guesses.
 
 The default flow and Customize both use the same database selector: MongoDB
 and PostgreSQL, with MySQL shown as disabled, then **None**. **None** is
-`--db=none` / `--no-db`: no driver
-feature is added and `src/config/database.ts` is removed. A supplied database
+`--db=none` / `--no-db`: no driver feature is added, `src/config/database.ts` is removed, and so is everything model-backed: the `users`, `auth` and `posts` example modules, `src/config/auth.ts`, the `@warlock.js/auth` dependency and typings augmentation, the `guarded` route helper, the migrate / seed / jwt scripts, and the `DB_*` entries in `.env`. JWT secret generation is skipped. Home, contact, locale, uploads and shared stay. A supplied database
 flag skips the default-flow selector.
 
 In Customize's AI multiselect, pressing Enter with no selection skips AI.
@@ -163,7 +162,7 @@ The template ships a working auth module (login / logout / logout-all / refresh 
 
 ## Setup steps the scaffolder runs
 
-1. Copy template → substitute name → wire `DB_DRIVER` / `DB_PORT` into `.env` (or, for `--db=none`, remove `src/config/database.ts`) → record non-default `--agents` targets into `package.json`'s `agentKit.targets`.
+1. Copy template → substitute name → wire `DB_DRIVER` / `DB_PORT` into `.env` (or, for `--db=none`, remove `src/config/database.ts` and the model-backed modules, see below) → record non-default `--agents` targets into `package.json`'s `agentKit.targets`.
 2. Install base dependencies (so the `warlock` binary exists).
 3. `warlock add <driver> <features...> <ai...> --no-install`, then one batched install. The `<driver>` is omitted for `--db=none`.
 4. `git init` (if `--git`).
@@ -175,7 +174,7 @@ Failures surface the error and halt; there is no rollback. After it finishes, `c
 ## Gotchas
 
 - **The target directory must not already exist** — the command exits rather than merge into it.
-- **`--db=none` / `--no-db` scaffolds without a database** — no driver, no driver package, and `src/config/database.ts` is deleted. The framework's database connector is gated on that file, so the app boots with no database. The `DB_*` lines stay in `.env` (harmless) as a template for adding one back later.
+- **`--db=none` / `--no-db` scaffolds without a database** — no driver, no driver package, `src/config/database.ts` is deleted, and the model-backed example modules (`users`, `auth`, `posts`) with `src/config/auth.ts`, `@warlock.js/auth`, the `guarded` route helper, the migrate / seed / jwt scripts and every `DB_*` line in `.env` are removed (JWT generation is skipped). The app boots with no database; add one later with `warlock add mongodb|postgres`.
 - **`--ai` never takes `ai` itself.** Pick a provider (`ai-openai`, …); the core `@warlock.js/ai` package is pulled in transitively.
 - **`mysql` is disabled** in the wizard; passing `--db=mysql` resolves the driver record but the driver is marked coming-soon.
 - **Versions are not the scaffolder's job.** If a feature installs the wrong version, the fix is in core's `warlock add` feature map, not here.

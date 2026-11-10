@@ -16,6 +16,8 @@ describe("translationProblems (WL9104)", () => {
       severity: "warning",
     });
     expect(problems[0]?.message).toContain("config.translations");
+    expect(problems[0]?.message).toContain("src/web/orders/page.tsx:2");
+    expect(problems[0]?.message).toContain("`status`");
   });
 
   it("is silent for literal and static-prefix keys", () => {

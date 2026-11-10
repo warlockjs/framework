@@ -279,18 +279,19 @@ function middlewareHasGuard(node: ast.Node): boolean {
 }
 
 /** `public: true`, a guard in `middleware`, or an options value the check cannot see into. */
-function optionsGuard(node: ast.Node | undefined): "guarded" | "unguarded" | "none" {
+function optionsGuard(node: ast.Node | undefined): "guarded" | "unguarded" | "spread" | "none" {
   if (!node) return "none";
 
   const value = unwrap(node);
 
   if (!ast.isObjectLiteralExpression(value)) return "guarded";
 
-  let verdict: "guarded" | "unguarded" = "unguarded";
+  // A spread may or may not carry a guard: reported as a warning, not trusted.
+  let verdict: "unguarded" | "spread" = "unguarded";
 
   for (const property of value.properties) {
     if (ast.isSpreadAssignment(property)) {
-      verdict = "guarded";
+      verdict = "spread";
       continue;
     }
 
@@ -405,11 +406,14 @@ function resourceIsReadOnly(node: ast.Node | undefined): boolean {
   return false;
 }
 
-function unguardedRoute(node: ast.Node, route: string): SourceFinding {
+function unguardedRoute(node: ast.Node, route: string, spread = false): SourceFinding {
   return {
     code: "WL9006",
     node,
-    message: `Mutating route \`${route}\` has no auth middleware. Add an auth guard (\`middleware: [authMiddleware()]\`, or register it inside a guarded group) or mark it intentionally open with \`public: true\`.`,
+    ...(spread ? { severity: "warning" as const } : {}),
+    message: spread
+      ? `Mutating route \`${route}\` takes spread options (\`{ ...options }\`) and the check cannot see whether they hold an auth guard. Write \`middleware: [...]\` or \`public: true\` in the object literal, or move the route into a guarded group.`
+      : `Mutating route \`${route}\` has no auth middleware. Add an auth guard (\`middleware: [authMiddleware()]\`, or register it inside a guarded group) or mark it intentionally open with \`public: true\`. A project helper that wraps \`guarded()\` can be listed in \`guardWrappers\` in \`.warlock-check.json\`; an imported guard needs a name containing \`auth\` or \`guard\`.`,
   };
 }
 
@@ -430,13 +434,18 @@ function checkRouteGuard(
 
   const guarded = (options: ast.Node | undefined) =>
     optionsGuard(options) === "guarded" || insideGuardedGroup(node, guardWrappers);
+  const spread = (options: ast.Node | undefined) => optionsGuard(options) === "spread";
 
   if (isRouter(ast.expressionOf(callee))) {
     // router.post(path, handler, options)
     if (MUTATING_ROUTER_METHODS.has(method)) {
       if (!guarded(node.arguments[2])) {
         findings.push(
-          unguardedRoute(node, `${method.toUpperCase()} ${pathText(node.arguments[0])}`),
+          unguardedRoute(
+            node,
+            `${method.toUpperCase()} ${pathText(node.arguments[0])}`,
+            spread(node.arguments[2]),
+          ),
         );
       }
 
@@ -450,7 +459,13 @@ function checkRouteGuard(
       if (!httpMethod || !isMutatingHttpMethod(httpMethod)) return;
 
       if (!guarded(node.arguments[3])) {
-        findings.push(unguardedRoute(node, `${httpMethod} ${pathText(node.arguments[1])}`));
+        findings.push(
+          unguardedRoute(
+            node,
+            `${httpMethod} ${pathText(node.arguments[1])}`,
+            spread(node.arguments[3]),
+          ),
+        );
       }
 
       return;
@@ -461,7 +476,13 @@ function checkRouteGuard(
       if (resourceIsReadOnly(node.arguments[2])) return;
 
       if (!guarded(node.arguments[2])) {
-        findings.push(unguardedRoute(node, `resource ${pathText(node.arguments[0])}`));
+        findings.push(
+          unguardedRoute(
+            node,
+            `resource ${pathText(node.arguments[0])}`,
+            spread(node.arguments[2]),
+          ),
+        );
       }
     }
 
@@ -478,7 +499,13 @@ function checkRouteGuard(
   if (chain.optionNodes.some((options) => optionsGuard(options) === "guarded")) return;
   if (insideGuardedGroup(node, guardWrappers)) return;
 
-  findings.push(unguardedRoute(node, `${method} ${chain.path}`));
+  findings.push(
+    unguardedRoute(
+      node,
+      `${method} ${chain.path}`,
+      spread(node.arguments[1]) || chain.optionNodes.some((options) => spread(options)),
+    ),
+  );
 }
 
 // ── WL9007: a redirect or link target from request input ────────────────────

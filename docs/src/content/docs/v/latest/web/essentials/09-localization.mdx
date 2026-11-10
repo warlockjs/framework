@@ -288,8 +288,11 @@ ships `cart.items_one` and not `cart.itemsTotal` or `cart.items_one.note`.
 ### Declare what static analysis cannot see
 
 A key computed at run time, with no static prefix and no literal anywhere in
-the graph to name it, makes the page fall back to every group. Declare the keys
-in the page's setup file instead:
+the graph to name it, makes the page fall back to every group. Prefer rewriting
+the lookup with a literal key or a static-prefix template. A setup-file
+declaration adds keys the analysis cannot see; it does not resolve the computed
+lookup, and one dynamic site anywhere in the page's graph (page, layouts, root,
+error pages) still ships every group:
 
 ```ts title="src/web/orders/index.setup.ts"
 export const config = {
@@ -301,8 +304,17 @@ export const config = {
 `"statuses.*"` declares every key under `statuses.`, `"members.title"` declares
 one key, and a plain group name declares the group with its subtree. A
 declaration may name a key the page reads only through a helper. `warlock check`
-reports each computed lookup in `src/web` as `WL9104` and points at this
-declaration.
+reports each computed lookup in `src/web` as `WL9104` with its file, line and key
+text, and the build log lists the same sites.
+
+Matching is by name: the result of `useTrans()` under any local name, plus `t`,
+`trans`, `transX` and `transFrom` (key in the second argument). A translator
+handed on as a value (returned, stored, passed to a non-hook call) is dynamic,
+but a hook dependency list such as `useMemo(..., [t])` is not. A hook should call
+`useTrans()` itself instead of receiving `t`. A bare string literal equal to a
+group or subtree name (`"orders"`) ships that whole group; use a longer key or a
+static-prefix template instead. The analysis does not read the locale files, so
+`warlock check` does not warn about such a literal.
 
 ### Global-registry apps
 

@@ -115,6 +115,29 @@ export default function HomePage() {
 }
 ```
 
+## Avoiding a circular config type
+
+When `config` uses `metadata` with `satisfies PageConfig<typeof loader>`, do
+not type the loader from `typeof config`. Hoist the validation into its own const
+and type the loader's context from that const, and keep `route` as a literal
+object inside `config`:
+
+```ts title="src/web/products/[id].setup.ts"
+const productValidation = { params: v.object({ id: v.string() }) };
+
+export const config = {
+  route: { path: "/products/:id", name: "products.show" },
+  validation: productValidation,
+  metadata: ({ data }) => ({ title: data.product.name }),
+} satisfies PageConfig<typeof loader>;
+
+export async function loader({ request }: PageLoaderContext<typeof productValidation>) {
+  /* ... */
+}
+```
+
+See [loaders and metadata](/v/latest/web/essentials/loaders-and-metadata/#avoiding-a-circular-config-type) for the failing pattern and the guarded-page form.
+
 ## Next steps
 
 - [Learn page setup files →](/v/latest/web/essentials/page-setup-files/)

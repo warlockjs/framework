@@ -60,11 +60,6 @@ describe("parseLocaleDictionary", () => {
     ["reserved key", '{"$group":"products","__proto__":{"en":"Title","ar":"العنوان"}}', /reserved/],
     ["nested group", '{"$group":"products","card":{"$group":"card"}}', /only allowed at the root/],
     ["empty nested object", '{"$group":"products","card":{}}', /cannot be empty/],
-    [
-      "unknown locale",
-      '{"$group":"products","title":{"en":"Title","fr":"Titre"}}',
-      /unknown locale code/,
-    ],
     ["missing locale", '{"$group":"products","title":{"en":"Title"}}', /missing locale/],
     [
       "mixed nesting",
@@ -86,6 +81,36 @@ describe("parseLocaleDictionary", () => {
     expect(() => parse(source)).toThrow(LocaleDictionaryError);
     expect(() => parse(source)).toThrow(message);
     expect(() => parse(source)).toThrow(sourceFile);
+  });
+});
+
+describe("parseLocaleDictionary with unconfigured locale codes", () => {
+  it("drops locale codes the app does not configure and reports a warning", () => {
+    const parsed = parseLocaleDictionary({
+      sourceFile,
+      source: '{"title":{"en":"Title","ar":"العنوان"},"card":{"add":{"en":"Add","ar":"أضف"}}}',
+      defaultNamespace: "products",
+      localeCodes: ["en"],
+    });
+
+    expect(parsed.entries).toEqual({
+      "products.title": { en: "Title" },
+      "products.card.add": { en: "Add" },
+    });
+    expect(parsed.warnings).toHaveLength(2);
+    expect(parsed.warnings?.[0]).toContain('Ignored locale "ar"');
+    expect(parsed.warnings?.[0]).toContain(sourceFile);
+  });
+
+  it("still requires every configured locale", () => {
+    expect(() =>
+      parseLocaleDictionary({
+        sourceFile,
+        source: '{"title":{"ar":"العنوان"}}',
+        defaultNamespace: "products",
+        localeCodes: ["en"],
+      }),
+    ).toThrow(/missing locale/);
   });
 });
 

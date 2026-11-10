@@ -40,11 +40,12 @@ router.options(path, handler, options?);
 router.any(path, handler, options?);     // matches ALL methods
 ```
 
-`post` and `delete` accept either a single path or an array of paths (the framework registers each one). The others take a single string:
+Every verb method (`get`, `post`, `put`, `patch`, `delete`, `head`, `options`, `any`) accepts either a single path or an array of paths; the framework registers each one with the same handler and options:
 
 ```ts
 router.post(["/products", "/items"], createHandler); // both routes hit the same handler
 router.delete(["/products/:id", "/items/:id"], deleteHandler);
+router.get(["/health", "/healthz"], healthHandler);
 ```
 
 `any` registers the same handler under all HTTP methods — useful for catch-all routes (a "not found" handler at the end of a prefix group, for instance).

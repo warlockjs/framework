@@ -568,6 +568,42 @@ Only put browser-safe data in `shared`: scalars, arrays, plain objects, or value
 - A loader must not write `shared`; a post-seal write throws.
 - Loader response mutations are buffered per level and settled deterministically, root to leaf.
 
+## Avoiding a circular config type
+
+When `config` uses `metadata` with `satisfies PageConfig<typeof loader>`, the loader's context type must not come from `config`. This fails with TS7022 / TS2502, because `config` then depends on the loader, which depends on `config`:
+
+```ts
+// Circular: the loader reads the config that is typed from the loader.
+export async function loader({
+  request,
+}: PageLoaderContext<typeof config.validation, typeof config.route>) {
+  /* ... */
+}
+```
+
+Hoist the validation into its own const and type the context from that const. A named `export async function loader(...)` keeps the return type for `PageProps<typeof loader>`:
+
+```ts title="src/web/products/[id].setup.ts"
+import { v } from "@warlock.js/seal";
+import type { PageConfig, PageLoaderContext } from "@warlock.js/web";
+
+const productValidation = { params: v.object({ id: v.string() }) };
+
+export const config = {
+  route: { path: "/products/:id", name: "products.show" },
+  validation: productValidation,
+  metadata: ({ data }) => ({ title: data.product.name }),
+} satisfies PageConfig<typeof loader>;
+
+export async function loader({ request }: PageLoaderContext<typeof productValidation>) {
+  const id = request.input("id");
+
+  return { product: { id, name: `Product ${id}` } };
+}
+```
+
+Keep `route` as a literal object inside `config`; `warlock generate.typings` refuses a `config.route` that is not a directly exported object literal. On a guarded page, pass the route name as the third type argument, such as `PageLoaderContext<typeof productValidation, undefined, "account.show">`, instead of reading `typeof config.route`.
+
 ## Gotchas
 
 - **Let the loader's return type be inferred.** Use `satisfies PageLoader<...>` on an arrow function or a typed named function; never `: PageLoader`, which erases the return type that `PageProps` needs.

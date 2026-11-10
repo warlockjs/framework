@@ -131,13 +131,18 @@ and `format:check`. Background checks run TypeScript and configured Oxlint.
 
 Not every app needs a database. Pick **None** in the wizard's database step — or pass `--db=none` (`--no-db` is a shorthand) — and the scaffold leaves the database out entirely: no driver is selected, no driver package is installed, and the template's `src/config/database.ts` is removed. Warlock's database connector is gated on that config file, so the app boots cleanly with no database wired.
 
+The starter's model-backed example modules go too, because they cannot run without a database. A no-database app contains:
+
+- **Removed:** `src/app/users`, `src/app/auth`, `src/app/posts`, `src/config/auth.ts`, the `@warlock.js/auth` dependency and its typings augmentation, the `guarded` helper in `src/app/shared/utils/router.ts`, the `migrate`, `migrate.fresh`, `migrate.list`, `seed`, `jwt`, `gen.m`, `gen.mig` and `gen.r` scripts, and all `DB_*` entries in `.env` and `.env.example`. `warlock.config.ts` no longer registers the auth commands or migrations, and JWT secret generation is skipped.
+- **Kept:** `home`, `uploads` and `shared`, plus `contact` and `locale` when you chose the web stack.
+
 ```bash
 # A database-free API in one command
 npm create warlock@latest my-api -- --yes --no-db --features=test
 ```
 
 :::note
-You can add a database back at any time by creating a `src/config/database.ts` (the `DB_*` variables are still present in `.env`) and installing the driver package.
+You can add a database back at any time by creating a `src/config/database.ts` (add the `DB_*` variables to `.env`) and installing the driver package.
 :::
 
 ## pnpm versions

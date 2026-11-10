@@ -109,13 +109,14 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `docs/README.md`
 - `docs/astro.config.mjs` - docsRoot, groupedSectionItems, pkgTopic, fullSections, sitemapSections, coreSections, cascadeSections, webSections
 
-## docs/scripts (5 test files not listed)
+## docs/scripts (6 test files not listed)
 
 - `docs/scripts/check-changelog-freshness.mjs` - FreshnessDataError, FreshnessUnreachableError, errorMessage, isValidSemver, here, DOCS_ROOT, DEFAULT_CHANGELOG_PATH, parseArgs
 - `docs/scripts/check-mdx-gfm.mjs` - findRawTables, htmlFiles
 - `docs/scripts/check-mdx-in-md.mjs` - here, DOCS_ROOT, CONTENT_DOCS, collectMarkdownFiles, stripFrontmatter, stripFencedCode, stripInlineCode, lineNumberAt
 - `docs/scripts/check-tab-code-fences.mjs` - findCollapsedTabItemFences, packageManagerCommands, findForeignPackageManagerCommands, collectMdxFiles, checkTabCodeFences
 - `docs/scripts/generate-changelog.mjs` - here, DOCS_ROOT, WORKSPACE_ROOT, PNPM_WORKSPACE, RELEASES_META, OUT_DIR, OUT_FILE, TYPE_ORDER
+- `docs/scripts/generate-release-notes.mjs` - here, DOCS_ROOT, RELEASES_DIR, RELEASES_META, OUT_FILE, buildReleaseNotes, main
 - `docs/scripts/generate-site-llms.mjs` - here, docsRoot, workspaceRoot, publicDir, PACKAGE_ORDER, readWorkspacePackagePaths, workspacePackages, packageDirs
 - `docs/scripts/generate-skills.mjs` - collectPackageSkills, generateSkills
 - `docs/scripts/import-core-docs.mjs` - __dirname, DOCS_ROOT, PROJECT_ROOT, SOURCE_ROOT, DEST_ROOT, SECTIONS, yamlEscape, transform
@@ -771,7 +772,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/access/src/utils/index.ts` - access/src/utils/index.ts
 - `packages/access/vitest.config.ts` - access/vitest.config.ts
 
-## packages/ai (223 test files not listed)
+## packages/ai (227 test files not listed)
 
 - `packages/ai/README.md`
 - `packages/ai/scripts/generate-llms.mjs` - ai/scripts/generate-llms.mjs, scriptDir, pkgRoot, skillsDir, llmsTxtPath, llmsFullPath, pkgJson, shortName
@@ -818,7 +819,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/ai/src/agent/agent-log-event.ts` - AgentLogContext, logAgentEvent
 - `packages/ai/src/agent/agent-stream.ts` - StreamController, PendingRead, createAgentStream
 - `packages/ai/src/agent/agent-to-stream-event.ts` - agentEventToStreamEvent
-- `packages/ai/src/agent/agent.ts` - DispatchedToolCall, ResolvedAgentConfig, JudgeAgentConfig, InstanceHandlerMap, Execution, isSkillsContract, isAbortLike, synthesizeAgentName
+- `packages/ai/src/agent/agent.ts` - ResolvedToolCall, DispatchedToolCall, ResolvedAgentConfig, JudgeAgentConfig, InstanceHandlerMap, Execution, isSkillsContract, isAbortLike
 - `packages/ai/src/agent/compaction-summarizer.ts` - CompactionSummarizerOptions, CompactionSummarizer, DEFAULT_COMPACTION_INSTRUCTIONS, DEFAULT_COMPACTION_HEADINGS, DEFAULT_COMPACTION_TEMPLATE, summarizeCompaction, renderRequest, estimateTokens
 - `packages/ai/src/agent/compaction.ts` - agent/compaction.ts, validateCompaction, estimateInput, isUserMessageIndex, selectRange, carriesReplay, compactAgentMessages
 - `packages/ai/src/agent/compaction.type.ts` - AgentCompactionContext, AgentCompactionConfig, AgentCompactionRecord
@@ -832,7 +833,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/ai/src/agent/snapshot.ts` - AgentDurableConfig, PersistAgentParams, PersistOutcome, agent/snapshot.ts, resolveSnapshotStore, persistAgentSnapshot, deleteAgentSnapshot, loadAgentSnapshotForResume
 - `packages/ai/src/agent/spawn-sub-agent.ts` - SpawnSubAgentSpec, spawnSubAgent, buildSubAgent
 - `packages/ai/src/agent/stop-turn.type.ts` - AgentStopContext, AgentStopWhen
-- `packages/ai/src/agent/token-trigger.ts` - TokenTrigger, isValidTokenTrigger, assertTokenTrigger, resolveTokenTrigger, isTokenTriggerReached, normalizeTokenTrigger
+- `packages/ai/src/agent/token-trigger.ts` - TokenTrigger, isValidTokenTrigger, assertTokenTrigger, resolveTokenTrigger, isTokenTriggerReached, normalizeTokenTrigger, modelContextWindow
 - `packages/ai/src/agent/tool-use-contract.ts` - IntentMatcher, ActWhenAskedHintContext, ActWhenAskedConfig, ToolRefusalHintContext, ToolRefusalConfig, ToolRefusalOption, BackstopPhase, BackstopTurn
 - `packages/ai/src/ai.ts` - AiToolsNamespace, Ai, ai
 - `packages/ai/src/batch/batch.ts` - BatchRun, batch
@@ -910,7 +911,8 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/ai/src/contracts/result/execution-report.type.ts` - CapturedMessage, ExecutionStatus, ExecutionReport, AgentReport
 - `packages/ai/src/contracts/result/index.ts` - result/index.ts
 - `packages/ai/src/contracts/result/llm-trip.type.ts` - LLMTrip
-- `packages/ai/src/contracts/result/model-pricing.type.ts` - ServerToolPricing, ModelCost, ModelPricing
+- `packages/ai/src/contracts/result/model-lifecycle.type.ts` - ModelLifecycleStatus, ModelLifecycle
+- `packages/ai/src/contracts/result/model-pricing.type.ts` - ServerToolPricing, PricingRates, PricingTier, PricingChange, ModelCost, ModelPricing
 - `packages/ai/src/contracts/result/orchestrator-result.type.ts` - OrchestratorReportType, OrchestratorAwaitingStatus, OrchestratorReportStatus, CompactionResult, TurnSnapshot, OrchestratorReport, OrchestratorResult
 - `packages/ai/src/contracts/result/prompt-fingerprint.type.ts` - PromptFingerprint, CacheMissSegment
 - `packages/ai/src/contracts/result/session-send-result.type.ts` - SessionSendResult
@@ -945,6 +947,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/ai/src/contracts/system-prompt.contract.ts` - SystemPromptBlockContract, PersonaContract, InstructionContract, SystemPromptMeta, SystemPromptMergeOptions, SystemPromptMergeSource, RefinedPromptStoreLike, RefinedSystemPromptOptions
 - `packages/ai/src/contracts/team/index.ts` - contracts/team/index.ts
 - `packages/ai/src/contracts/team/team-config.type.ts` - TeamMemberValue, TeamGate, TeamGateFn, TeamConfig
+- `packages/ai/src/contracts/tool-result-content.type.ts` - ToolResultImageMediaType, ToolResultPart, ToolResultContent
 - `packages/ai/src/contracts/tool.contract.ts` - ToolMeta, ToolMode, ToolSchemaMode, ToolActionResolver, ToolContext, ToolRequestContext, ToolMemoizeOption, EndsTurnRule
 - `packages/ai/src/contracts/transcription-model.contract.ts` - TranscriptionModelPricing, TranscriptionSegment, AudioInput, TranscribeOptions, TranscriptionResponse, TranscriptionModelContract, TranscriptionModelConfig
 - `packages/ai/src/contracts/workflow/human-step.contract.ts` - HumanStepContract
@@ -1074,6 +1077,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/ai/src/middleware/utils/extract-user-text.ts` - extractUserText
 - `packages/ai/src/middleware/utils/index.ts` - src/middleware/utils/index.ts
 - `packages/ai/src/middleware/utils/namespaced-state.ts` - NamespacedStateAccessor, namespacedState
+- `packages/ai/src/middleware/wrap-model.ts` - WrapModelOptions, wrapModelWithMiddleware
 - `packages/ai/src/mock/index.ts` - ai/src/mock/index.ts
 - `packages/ai/src/mock/mock-agent.ts` - mockAgent
 - `packages/ai/src/mock/mock-config.type.ts` - MockUsage, MockModelResponse, MockSDKConfig
@@ -1125,6 +1129,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/ai/src/planner/test-support/planner-fakes.ts` - FakeStepOutcome, ConcurrencyState, ZERO_USAGE, fakePlanningAgent, fakeCapability, concurrencyCapability, makeConcurrencyState
 - `packages/ai/src/pricing/index.ts` - pricing/index.ts
 - `packages/ai/src/pricing/pricing-catalogue.ts` - PricingCatalogue, BRAND, pricingCatalogue, find, isPricingCatalogue
+- `packages/ai/src/pricing/resolve-pricing.ts` - ResolvePricingOptions, resolvePricing, toTime, definedOnly
 - `packages/ai/src/prompt/errors.ts` - PromptNotFoundError, PromptValidationError, prompt/errors.ts
 - `packages/ai/src/prompt/index.ts` - prompt/index.ts
 - `packages/ai/src/prompt/prompt-langfuse-sync.ts` - PROMPT_LANGFUSE_INSTALL_INSTRUCTIONS, loadLangfuse, resolveClient, toEntry, warmLangfuse, syncLangfusePrompts
@@ -1247,6 +1252,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/ai/src/tool/memoize.ts` - MemoEntry, ResolvedMemoize, sessions, resolveToolMemoize, clearToolMemo, sessionEntries, asHit, invokeMemoized
 - `packages/ai/src/tool/provider-tool.ts` - ProviderToolOptions, ProviderTool, ProviderToolTarget, SelectedProviderTools, providerTool, isProviderTool, warnedSkips, selectProviderTools
 - `packages/ai/src/tool/tool-lint-warning.ts` - WARNED_SLOT, warned, warnOnToolSchema, resetToolLintWarnings
+- `packages/ai/src/tool/tool-result-content.ts` - IMAGE_MEDIA_TYPES, TOOL_RESULT_IMAGE_PLACEHOLDER, isToolResultPart, isToolResultContent, toolResultText
 - `packages/ai/src/tool/tool-schema-lint.ts` - ToolSchemaTarget, ToolSchemaSeverity, ToolSchemaIssueCode, ToolSchemaIssue, DescribeToolSchemaOptions, ToolSchemaReport, ToolSchemaSummary, SchemaNode
 - `packages/ai/src/tool/tool-schemas.ts` - MeasureToolsOptions, ToolTokenCount, ToolTokenMeasurement, compactToolSchemas, measureTools
 - `packages/ai/src/tool/tool.ts` - ToolInvokeResult, ToolContract, defaultToolContext, EMPTY_USAGE, compositeAsTool, tool
@@ -1273,7 +1279,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/ai/src/utils/run-context.ts` - RunFrame, runFrameStore, nestedStore, withRunFrame, withoutRunFrame, currentRunFrame, isNestedRun, captureChildReport
 - `packages/ai/src/utils/safe-json-parse.ts` - safeJsonParse
 - `packages/ai/src/utils/stamp-report-lineage.ts` - LineageStamp, stampReportLineage, walk
-- `packages/ai/src/utils/token-count.ts` - approximateTokenCount
+- `packages/ai/src/utils/token-count.ts` - approximateTokenCount, MEDIA_PART_TOKENS, approximateJsonTokens
 - `packages/ai/src/vcr/cassette-io.ts` - FsPromises, loadFs, emptyCassette, loadCassette, saveCassette
 - `packages/ai/src/vcr/errors.ts` - VcrCassetteMissErrorOptions, VcrCassetteMissError, vcr/errors.ts
 - `packages/ai/src/vcr/hash-request.ts` - DEFAULT_HASH_OPTIONS, fingerprintTool, schemaShape, pruneEmpty, pickProviderOptions, pickOptions, canonicalize, hashString
@@ -1305,8 +1311,9 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/ai-anthropic/src/config.type.ts` - AnthropicSDKConfig, AnthropicModelConfig, AnthropicClearToolUses, AnthropicClearThinking, AnthropicContextManagement, AnthropicServerCompaction, AnthropicCallOptions, ai-anthropic/src/config.type.ts
 - `packages/ai-anthropic/src/index.ts` - ai-anthropic/src/index.ts
 - `packages/ai-anthropic/src/known-context-windows.ts` - ai-anthropic/src/known-context-windows.ts, RELEASE_CONTEXT_WINDOWS, inferContextWindow
+- `packages/ai-anthropic/src/known-lifecycle.ts` - ai-anthropic/src/known-lifecycle.ts, ANTHROPIC_MODEL_LIFECYCLE, ANTHROPIC_MODEL_LIFECYCLE_AS_OF, anthropicLifecycleFor
 - `packages/ai-anthropic/src/known-output-limits.ts` - FAMILY_128K_PREFIXES, RELEASE_OUTPUT_LIMITS, inferMaxOutputTokens
-- `packages/ai-anthropic/src/known-pricing.ts` - ai-anthropic/src/known-pricing.ts, ANTHROPIC_CACHE_WRITE_MULTIPLIER, ANTHROPIC_CACHE_WRITE_1H_MULTIPLIER, ANTHROPIC_MODEL_PRICING, anthropicPricingFor, withAnthropicCacheWriteRates, ANTHROPIC_SERVER_TOOL_PRICING
+- `packages/ai-anthropic/src/known-pricing.ts` - ai-anthropic/src/known-pricing.ts, ANTHROPIC_CACHE_WRITE_MULTIPLIER, ANTHROPIC_CACHE_WRITE_1H_MULTIPLIER, ANTHROPIC_MODEL_PRICING, ANTHROPIC_MODEL_PRICING_AS_OF, anthropicPricingFor, withAnthropicCacheWriteRates, ANTHROPIC_SERVER_TOOL_PRICING
 - `packages/ai-anthropic/src/known-vision-models.ts` - ai-anthropic/src/known-vision-models.ts, VISION_CAPABLE_PREFIXES, inferVisionCapability
 - `packages/ai-anthropic/src/model.ts` - ThinkingEffort, AnthropicThinkingBlock, LooseCreate, StreamedBlock, ThinkingRequest, AnthropicModel, ContextEdit, IterationTotals
 - `packages/ai-anthropic/src/request.type.ts` - AnthropicRequest, AnthropicStreamingRequest, AnthropicNonStreamingRequest, AnthropicRequestOptions
@@ -1322,7 +1329,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/ai-anthropic/src/utils/wrap-anthropic-error.ts` - AnthropicErrorShape, HeaderBag, wrapAnthropicError, toShape, isTimeout, isClientStatus, buildContext, readRequestId
 - `packages/ai-anthropic/vitest.config.ts` - ai-anthropic/vitest.config.ts
 
-## packages/ai-bedrock (15 test files not listed)
+## packages/ai-bedrock (16 test files not listed)
 
 - `packages/ai-bedrock/scripts/generate-llms.mjs` - ai-bedrock/scripts/generate-llms.mjs, scriptDir, pkgRoot, skillsDir, llmsTxtPath, llmsFullPath, pkgJson, shortName
 - `packages/ai-bedrock/skills/SKILL.md` - warlock-js-ai-bedrock - Amazon Bedrock adapter for Warlock AI: `BedrockSDK`, `BedrockCallOptions`, `bedrockPricin…
@@ -1330,6 +1337,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/ai-bedrock/src/embedder.ts` - TitanEmbeddingResponse, BedrockEmbedder, ai-bedrock/src/embedder.ts
 - `packages/ai-bedrock/src/index.ts` - ai-bedrock/src/index.ts
 - `packages/ai-bedrock/src/known-capabilities.ts` - REASONING_CAPABLE_SUBSTRINGS, PROMPT_CACHING_CAPABLE_SUBSTRINGS, PDF_CAPABLE_SUBSTRINGS, matchesAny, inferReasoningCapability, inferPromptCachingCapability, inferPdfCapability, supportsToolCachePoint
+- `packages/ai-bedrock/src/known-context-windows.ts` - ai-bedrock/src/known-context-windows.ts, KNOWN_WINDOWS, inferContextWindow
 - `packages/ai-bedrock/src/known-pricing.ts` - ai-bedrock/src/known-pricing.ts, BEDROCK_GLOBAL_PRICING, BEDROCK_US_PRICING, bedrockPricingFor, withClaudeCacheWriteRates, claude, round
 - `packages/ai-bedrock/src/known-vision-models.ts` - ai-bedrock/src/known-vision-models.ts, VISION_CAPABLE_SUBSTRINGS, inferVisionCapability
 - `packages/ai-bedrock/src/model.ts` - BedrockCachePoint, BedrockModel, ai-bedrock/src/model.ts, EFFORT_THINKING_BUDGET
@@ -1338,7 +1346,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/ai-bedrock/src/utils/index.ts` - ai-bedrock/src/utils/index.ts
 - `packages/ai-bedrock/src/utils/map-stop-reason.ts` - ai-bedrock/src/utils/map-stop-reason.ts, stopReasonMap, mapStopReason
 - `packages/ai-bedrock/src/utils/reasoning-blocks.ts` - BedrockReasoningBlock, toReasoningMetadata, fromReasoningMetadata, isRecord, isBase64
-- `packages/ai-bedrock/src/utils/to-bedrock-messages.ts` - BedrockMessages, MEDIA_TYPE_TO_FORMAT, toBedrockMessages, mergeAdjacentTurns, getReasoningBlocks, isRecord, stringifyContent, toBedrockContentBlock
+- `packages/ai-bedrock/src/utils/to-bedrock-messages.ts` - BedrockMessages, MEDIA_TYPE_TO_FORMAT, toBedrockMessages, mergeAdjacentTurns, getReasoningBlocks, isRecord, stringifyContent, toToolResultBlocks
 - `packages/ai-bedrock/src/utils/to-bedrock-tools.ts` - toBedrockToolConfig, toJsonSchema
 - `packages/ai-bedrock/src/utils/wrap-bedrock-error.ts` - BedrockErrorShape, TIMEOUT_NAMES, wrapBedrockError, toShape, isTimeout, isClientStatus, buildContext
 - `packages/ai-bedrock/vitest.config.ts` - ai-bedrock/vitest.config.ts
@@ -1392,17 +1400,19 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/ai-cli/src/utils/toml.ts` - TomlValue, TomlTable, isTable, tomlKey, inlineValue, toToml
 - `packages/ai-cli/vitest.config.ts` - ai-cli/vitest.config.ts, here
 
-## packages/ai-deepseek (4 test files not listed)
+## packages/ai-deepseek (5 test files not listed)
 
 - `packages/ai-deepseek/README.md`
 - `packages/ai-deepseek/scripts/generate-llms.mjs` - ai-deepseek/scripts/generate-llms.mjs, scriptDir, pkgRoot, skillsDir, llmsTxtPath, llmsFullPath, pkgJson, shortName
 - `packages/ai-deepseek/skills/SKILL.md` - warlock-js-ai-deepseek - DeepSeek adapter for Warlock AI: `DeepSeekSDK`, `DEEPSEEK_CHAT_MODELS`, `DEEPSEEK_DEFAULT…
 - `packages/ai-deepseek/src/config.type.ts` - DeepSeekResponseFormat, DeepSeekSDKConfig, DeepSeekModelConfig, DeepSeekEmbedderConfig, DeepSeekImageConfig, ai-deepseek/src/config.type.ts
 - `packages/ai-deepseek/src/index.ts` - ai-deepseek/src/index.ts
+- `packages/ai-deepseek/src/known-context-windows.ts` - ai-deepseek/src/known-context-windows.ts, KNOWN_WINDOWS, inferContextWindow
+- `packages/ai-deepseek/src/known-lifecycle.ts` - ai-deepseek/src/known-lifecycle.ts, DEEPSEEK_MODEL_LIFECYCLE, DEEPSEEK_MODEL_LIFECYCLE_AS_OF, deepseekLifecycleFor
 - `packages/ai-deepseek/src/known-models.ts` - ai-deepseek/src/known-models.ts, DEEPSEEK_CHAT_MODELS, REASONING_CAPABLE_SUBSTRINGS, inferReasoningCapability, VISION_CAPABLE_SUBSTRINGS, inferVisionCapability
-- `packages/ai-deepseek/src/sdk.ts` - DeepSeekSDK, ai-deepseek/src/sdk.ts, DEEPSEEK_DEFAULT_PRICING, DEEPSEEK_OFF_PEAK_PRICING
+- `packages/ai-deepseek/src/sdk.ts` - DeepSeekSDK, ai-deepseek/src/sdk.ts, DEEPSEEK_DEFAULT_PRICING_AS_OF, DEEPSEEK_DEFAULT_PRICING, DEEPSEEK_OFF_PEAK_PRICING
 
-## packages/ai-google (19 test files not listed)
+## packages/ai-google (20 test files not listed)
 
 - `packages/ai-google/scripts/generate-llms.mjs` - ai-google/scripts/generate-llms.mjs, scriptDir, pkgRoot, skillsDir, llmsTxtPath, llmsFullPath, pkgJson, shortName
 - `packages/ai-google/skills/SKILL.md` - warlock-js-ai-google - Google Gemini and Imagen adapter for Warlock AI: `GoogleSDK`, `GeminiImageModel`, `Google…
@@ -1411,8 +1421,9 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/ai-google/src/gemini-image.ts` - GeminiImageModel, DEFAULT_RESPONSE_MODALITIES, FILTERED_FINISH_REASONS, collectParts, toGeneratedImages, collectText, excerpt
 - `packages/ai-google/src/image.ts` - GoogleImageModel, ai-google/src/image.ts, mediaTypeFor
 - `packages/ai-google/src/index.ts` - ai-google/src/index.ts
-- `packages/ai-google/src/known-context-windows.ts` - ai-google/src/known-context-windows.ts, WINDOW_1M_PREFIXES, inferContextWindow
-- `packages/ai-google/src/known-pricing.ts` - ai-google/src/known-pricing.ts, GOOGLE_MODEL_PRICING, googlePricingFor, GOOGLE_SERVER_TOOL_PRICING
+- `packages/ai-google/src/known-context-windows.ts` - ai-google/src/known-context-windows.ts, WINDOW_1M_PREFIXES, WINDOW_2M_PREFIXES, inferContextWindow
+- `packages/ai-google/src/known-lifecycle.ts` - ai-google/src/known-lifecycle.ts, GOOGLE_MODEL_LIFECYCLE, GOOGLE_MODEL_LIFECYCLE_AS_OF, googleLifecycleFor
+- `packages/ai-google/src/known-pricing.ts` - ai-google/src/known-pricing.ts, GOOGLE_MODEL_PRICING, GOOGLE_MODEL_PRICING_AS_OF, googlePricingFor, GOOGLE_SERVER_TOOL_PRICING
 - `packages/ai-google/src/known-vision-models.ts` - ai-google/src/known-vision-models.ts, VISION_CAPABLE_SUBSTRINGS, inferVisionCapability
 - `packages/ai-google/src/model.ts` - GoogleModel, ai-google/src/model.ts, EFFORT_THINKING_BUDGET
 - `packages/ai-google/src/provider-options.ts` - GoogleCallOptions, ai-google/src/provider-options.ts, RESERVED_FIELDS, mergeProviderBody, isPlainObject
@@ -1427,15 +1438,17 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/ai-google/src/utils/wrap-google-error.ts` - GoogleErrorShape, wrapGoogleError, toShape, isTimeout, isClientStatus, buildContext
 - `packages/ai-google/vitest.config.ts` - ai-google/vitest.config.ts
 
-## packages/ai-groq (3 test files not listed)
+## packages/ai-groq (5 test files not listed)
 
 - `packages/ai-groq/README.md`
 - `packages/ai-groq/scripts/generate-llms.mjs` - ai-groq/scripts/generate-llms.mjs, scriptDir, pkgRoot, skillsDir, llmsTxtPath, llmsFullPath, pkgJson, shortName
 - `packages/ai-groq/skills/SKILL.md` - warlock-js-ai-groq - Groq adapter for Warlock AI: `GroqSDK`, `GROQ_KNOWN_MODELS`, `GROQ_DEFAULT_PRICING`, `inf…
 - `packages/ai-groq/src/config.type.ts` - GroqSDKConfig, GroqModelConfig, GroqEmbedderConfig, ai-groq/src/config.type.ts
 - `packages/ai-groq/src/index.ts` - ai-groq/src/index.ts
+- `packages/ai-groq/src/known-context-windows.ts` - ai-groq/src/known-context-windows.ts, KNOWN_WINDOWS, inferContextWindow
+- `packages/ai-groq/src/known-lifecycle.ts` - ai-groq/src/known-lifecycle.ts, GROQ_MODEL_LIFECYCLE, GROQ_MODEL_LIFECYCLE_AS_OF, groqLifecycleFor
 - `packages/ai-groq/src/known-models.ts` - ai-groq/src/known-models.ts, GROQ_BASE_URL, GROQ_PROVIDER, VISION_CAPABLE_SUBSTRINGS, REASONING_CAPABLE_SUBSTRINGS, inferVisionCapability, inferReasoningCapability, GROQ_KNOWN_MODELS
-- `packages/ai-groq/src/sdk.ts` - GroqSDK, ai-groq/src/sdk.ts, defaultPricingFor, GROQ_DEFAULT_PRICING
+- `packages/ai-groq/src/sdk.ts` - GroqSDK, ai-groq/src/sdk.ts, defaultPricingFor, GROQ_DEFAULT_PRICING_AS_OF, GROQ_DEFAULT_PRICING
 - `packages/ai-groq/vitest.config.ts` - ai-groq/vitest.config.ts
 
 ## packages/ai-live (2 test files not listed)
@@ -1450,17 +1463,19 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/ai-live/src/realtime/realtime.ts` - realtime
 - `packages/ai-live/src/video/video.ts` - VideoParams, VideoData, VideoReport, VideoResult, video, computeVideoCost, toMessage
 
-## packages/ai-mistral (3 test files not listed)
+## packages/ai-mistral (5 test files not listed)
 
 - `packages/ai-mistral/README.md`
 - `packages/ai-mistral/scripts/generate-llms.mjs` - ai-mistral/scripts/generate-llms.mjs, scriptDir, pkgRoot, skillsDir, llmsTxtPath, llmsFullPath, pkgJson, shortName
 - `packages/ai-mistral/skills/SKILL.md` - warlock-js-ai-mistral - Mistral adapter for Warlock AI: `MistralSDK`, `MISTRAL_MODELS`, `MISTRAL_DEFAULT_PRICING`…
 - `packages/ai-mistral/src/config.type.ts` - MistralSDKConfig, MistralModelConfig, ai-mistral/src/config.type.ts
 - `packages/ai-mistral/src/index.ts` - ai-mistral/src/index.ts
+- `packages/ai-mistral/src/known-context-windows.ts` - ai-mistral/src/known-context-windows.ts, KNOWN_WINDOWS, inferContextWindow
+- `packages/ai-mistral/src/known-lifecycle.ts` - ai-mistral/src/known-lifecycle.ts, MISTRAL_MODEL_LIFECYCLE, MISTRAL_MODEL_LIFECYCLE_AS_OF, mistralLifecycleFor
 - `packages/ai-mistral/src/known-models.ts` - ai-mistral/src/known-models.ts, VISION_CAPABLE_SUBSTRINGS, REASONING_CAPABLE_SUBSTRINGS, inferVisionCapability, inferReasoningCapability, MISTRAL_MODELS, MISTRAL_DEFAULT_PRICING
 - `packages/ai-mistral/src/sdk.ts` - MistralSDK, ai-mistral/src/sdk.ts
 
-## packages/ai-ollama (15 test files not listed)
+## packages/ai-ollama (16 test files not listed)
 
 - `packages/ai-ollama/scripts/generate-llms.mjs` - ai-ollama/scripts/generate-llms.mjs, scriptDir, pkgRoot, skillsDir, llmsTxtPath, llmsFullPath, pkgJson, shortName
 - `packages/ai-ollama/skills/SKILL.md` - warlock-js-ai-ollama - Local Ollama models for Warlock AI: `OllamaSDK`, `OllamaCallOptions`, `OllamaModelConfig`…
@@ -1469,7 +1484,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/ai-ollama/src/index.ts` - ai-ollama/src/index.ts
 - `packages/ai-ollama/src/known-reasoning-models.ts` - ai-ollama/src/known-reasoning-models.ts, REASONING_CAPABLE_SUBSTRINGS, inferReasoningCapability
 - `packages/ai-ollama/src/known-vision-models.ts` - ai-ollama/src/known-vision-models.ts, VISION_CAPABLE_SUBSTRINGS, inferVisionCapability
-- `packages/ai-ollama/src/model.ts` - OllamaModel, ai-ollama/src/model.ts, EFFORT_TO_THINK_LEVEL
+- `packages/ai-ollama/src/model.ts` - OllamaModel, ai-ollama/src/model.ts, EFFORT_TO_THINK_LEVEL, positiveInteger, windowFromShow
 - `packages/ai-ollama/src/provider-options.ts` - OllamaCallOptions, ai-ollama/src/provider-options.ts, RESERVED_FIELDS, mergeProviderBody, isPlainObject
 - `packages/ai-ollama/src/sdk.ts` - OllamaSDK, ai-ollama/src/sdk.ts
 - `packages/ai-ollama/src/utils/call-signal.ts` - callSignal, withCallSignal, signalAwareFetch
@@ -1480,7 +1495,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/ai-ollama/src/utils/wrap-ollama-error.ts` - OllamaErrorShape, wrapOllamaError, toShape, isTimeout, isConnectionRefused, isClientStatus, buildContext
 - `packages/ai-ollama/vitest.config.ts` - ai-ollama/vitest.config.ts
 
-## packages/ai-openai (22 test files not listed)
+## packages/ai-openai (24 test files not listed)
 
 - `packages/ai-openai/README.md`
 - `packages/ai-openai/scripts/generate-llms.mjs` - ai-openai/scripts/generate-llms.mjs, scriptDir, pkgRoot, skillsDir, llmsTxtPath, llmsFullPath, pkgJson, shortName
@@ -1491,7 +1506,8 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/ai-openai/src/index.ts` - ai-openai/src/index.ts
 - `packages/ai-openai/src/kimi-tools.ts` - KimiToolOptions, KimiSearchToolOptions, KimiSearchResult, KimiSearchOutput, KimiFetchOutput, Counter, KIMI_SERVER_TOOL_PRICING, kimiSearchTool
 - `packages/ai-openai/src/known-context-windows.ts` - ai-openai/src/known-context-windows.ts, PREFIX_WINDOWS, inferContextWindow
-- `packages/ai-openai/src/known-pricing.ts` - ai-openai/src/known-pricing.ts, OPENAI_MODEL_PRICING, openAIPricingFor, OPENAI_SERVER_TOOL_PRICING
+- `packages/ai-openai/src/known-lifecycle.ts` - ai-openai/src/known-lifecycle.ts, OPENAI_MODEL_LIFECYCLE, OPENAI_MODEL_LIFECYCLE_AS_OF, openAILifecycleFor
+- `packages/ai-openai/src/known-pricing.ts` - ai-openai/src/known-pricing.ts, OPENAI_MODEL_PRICING, OPENAI_MODEL_PRICING_AS_OF, openAIPricingFor, OPENAI_SERVER_TOOL_PRICING
 - `packages/ai-openai/src/known-reasoning-models.ts` - ai-openai/src/known-reasoning-models.ts, REASONING_CAPABLE_PREFIXES, inferReasoningCapability
 - `packages/ai-openai/src/known-vision-models.ts` - ai-openai/src/known-vision-models.ts, VISION_CAPABLE_PREFIXES, inferVisionCapability
 - `packages/ai-openai/src/list-models.ts` - toModelInfo, kindOf, numberOf, secondsOf
@@ -1513,7 +1529,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/ai-openai/src/utils/structured-output.ts` - StructuredOutputPlan, inferStructuredOutput, planStructuredOutput, isStrictCompatible, isStrictSafeNode
 - `packages/ai-openai/src/utils/to-openai-messages.ts` - toOpenAIMessages, addPromptCacheBreakpoints, stringifyContent, toOpenAIContentPart, toImageUrl, toOpenAIAudioFormat
 - `packages/ai-openai/src/utils/to-openai-tools.ts` - toOpenAITools, toToolParameters
-- `packages/ai-openai/src/utils/to-responses-input.ts` - ResponsesInputItem, ResponsesInputPlan, toResponsesInput, toResponsesContentPart
+- `packages/ai-openai/src/utils/to-responses-input.ts` - ResponsesInputItem, ResponsesInputPlan, toResponsesInput, toToolOutput, toResponsesContentPart
 - `packages/ai-openai/src/utils/to-responses-tools.ts` - toResponsesTools, toResponsesToolChoice
 - `packages/ai-openai/src/utils/wrap-openai-error.ts` - OpenAIErrorShape, wrapOpenAIError, toShape, isTimeout, buildContext, readRequestId, parseRetryAfter
 - `packages/ai-openai/vitest.config.ts` - ai-openai/vitest.config.ts
@@ -1612,7 +1628,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/ai-tools/src/errors.ts` - CalculatorFailure, CalculatorErrorOptions, CalculatorError, DateTimeFailure, DateTimeErrorOptions, DateTimeError, McpTransportFailure, McpTransportErrorOptions
 - `packages/ai-tools/src/http/http-request.ts` - ALL_METHODS, BODYLESS_METHODS, httpRequestInputSchema, resolveUrl, readCappedBody, isJsonContentType, httpRequestTool
 - `packages/ai-tools/src/index.ts` - ai-tools/src/index.ts
-- `packages/ai-tools/src/mcp/client.ts` - ToolsListResult, McpClientImpl, combineSignals, unwrapResult, unwrapContent, normalizeBlock, tryParseJson, mcp
+- `packages/ai-tools/src/mcp/client.ts` - ToolsListResult, McpClientImpl, combineSignals, unwrapResult, IMAGE_MEDIA_TYPES, toResultParts, unwrapContent, normalizeBlock
 - `packages/ai-tools/src/mcp/error.ts` - McpError, isMcpError
 - `packages/ai-tools/src/mcp/index.ts` - McpFactory, src/mcp/index.ts, mcp
 - `packages/ai-tools/src/mcp/json-schema-to-standard.ts` - AjvValidateFunctionLike, AjvInstanceLike, AjvConstructorLike, AjvModuleLike, JsonSchemaStandard, AjvErrorObject, AJV_INSTALL_INSTRUCTIONS, loadAjv
@@ -1637,28 +1653,29 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/ai-tools/src/web/web-search.ts` - TavilyResponse, BraveResponse, SerpApiResponse, PROVIDER_ENV, inputSchema, resolveApiKey, clampResults, fetchJson
 - `packages/ai-tools/vitest.config.ts` - ai-tools/vitest.config.ts, here
 
-## packages/ai-workspace (28 test files not listed)
+## packages/ai-workspace (33 test files not listed)
 
 - `packages/ai-workspace/README.md`
 - `packages/ai-workspace/scripts/generate-llms.mjs` - ai-workspace/scripts/generate-llms.mjs, scriptDir, pkgRoot, skillsDir, llmsTxtPath, llmsFullPath, pkgJson, shortName
 - `packages/ai-workspace/skills/build-loop-agent/SKILL.md` - build-loop-agent - Wire a @warlock.js/ai-workspace into a coding agent that closes the read → edit → run-tes…
 - `packages/ai-workspace/skills/index.md`
 - `packages/ai-workspace/skills/use-a-workspace/SKILL.md` - use-a-workspace - Build and operate a policy-jailed filesystem + shell workspace with @warlock.js/ai-worksp…
-- `packages/ai-workspace/src/backends/local.ts` - SpawnPlan, LocalBackend, backends/local.ts, pushCapped, killTree, toWin32CmdInvocation, planSpawn, liveBackgroundKills
+- `packages/ai-workspace/src/backends/local.ts` - SpawnPlan, LocalBackend, backends/local.ts, pushCapped, killTree, destroyStreams, toWin32CmdInvocation, planSpawn
 - `packages/ai-workspace/src/backends/mock.ts` - MockExecResult, MockBackendSeed, MockBackend, canonicalize, ancestorsOf, createMockBackend, normalizeSeed, isMockBackendSeed
 - `packages/ai-workspace/src/contracts/index.ts` - ai-workspace/src/contracts/index.ts
 - `packages/ai-workspace/src/contracts/shell-approval.type.ts` - WorkspaceCommandDecision, WorkspaceCommandRule, WorkspaceShellAskReason, WorkspaceShellAsk, WorkspaceShellAskRequest, WorkspaceShellAskDecision, WorkspaceShellOnAsk, WorkspaceShellClassification
 - `packages/ai-workspace/src/contracts/tool-io.type.ts` - WorkspaceToolName, ReadFileInput, ReadFileResult, EditFileInput, EditFileResult, MultiEditOperation, MultiEditInput, MultiEditResult
-- `packages/ai-workspace/src/contracts/workspace-backend.contract.ts` - WorkspaceBackendExecResult, WorkspaceBackendExecOptions, WorkspaceOutputStream, WorkspaceBackendStartOptions, WorkspaceBackendProcess, WorkspaceBackendStat, WorkspaceBackend
-- `packages/ai-workspace/src/contracts/workspace-edit.type.ts` - WorkspaceEditLineEndings, WorkspaceEditPolicy, WorkspaceEditTool, WorkspaceAfterEditEvent, WorkspaceHooks
+- `packages/ai-workspace/src/contracts/workspace-backend.contract.ts` - WorkspaceBackendExecResult, WorkspaceBackendExecOptions, WorkspaceOutputStream, WorkspaceBackendStartOptions, WorkspaceBackendProcess, WorkspaceBackendStat, WorkspaceBackendDirEntry, WorkspaceBackend
+- `packages/ai-workspace/src/contracts/workspace-edit.type.ts` - WorkspaceEditLineEndings, WorkspaceEditPolicy, WorkspaceEditTool, WorkspaceAfterEditEvent, WorkspaceShellOutputEvent, WorkspaceHooks
 - `packages/ai-workspace/src/contracts/workspace-ops.contract.ts` - WorkspaceOps
 - `packages/ai-workspace/src/contracts/workspace-output.type.ts` - WorkspaceOutputKeep, WorkspaceOutputPolicy, WorkspaceTruncation
 - `packages/ai-workspace/src/contracts/workspace-policy.type.ts` - WorkspaceBackendType, WorkspaceShellInterpreter, WorkspaceCommandPattern, WorkspaceCommandCheckContext, WorkspaceAllowCommand, WorkspaceBackgroundPolicy, WorkspaceShellPolicy, WorkspaceReadPolicy
-- `packages/ai-workspace/src/contracts/workspace.contract.ts` - WorkspaceTools, Workspace, classify
+- `packages/ai-workspace/src/contracts/workspace.contract.ts` - WorkspaceTools, Workspace, classify, remembered, forget
 - `packages/ai-workspace/src/edit/apply-replacement.ts` - AppliedReplacement, AppliedReplacementOptions, applyReplacement
 - `packages/ai-workspace/src/edit/match.ts` - WorkspaceEditMatching, WorkspaceEditMatchTier, EditRange, EditLocation, MAX_HINT_LINES, MAX_HINT_LINE_CHARS, FOLD_MAP, foldUnicode
 - `packages/ai-workspace/src/errors.ts` - WorkspacePolicyViolation, WorkspaceShellRefusalReason, WorkspacePolicyErrorOptions, WorkspacePolicyError, WorkspaceEditFailure, WorkspaceEditErrorOptions, WorkspaceEditError, WorkspaceJobFailure
 - `packages/ai-workspace/src/hooks/after-edit.ts` - wrap, runAfterEdit
+- `packages/ai-workspace/src/hooks/shell-output.ts` - ShellOutputSource, ShellOutputStreamer, hooks/shell-output.ts
 - `packages/ai-workspace/src/index.ts` - ai-workspace/src/index.ts
 - `packages/ai-workspace/src/ops.ts` - OpsRuntime, Ops, DEFAULT_LIST_IGNORE, MAX_MULTI_EDITS, linePrefix, clipUtf8, numberWindow, capOutput
 - `packages/ai-workspace/src/output/spill-dir.ts` - resolveSpillDir
@@ -1667,15 +1684,17 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/ai-workspace/src/patch/apply-patch-generic.ts` - readRaw, applyPatchWithOps
 - `packages/ai-workspace/src/patch/execute-patch.ts` - PatchIO, executePatch
 - `packages/ai-workspace/src/patch/parse-patch.ts` - PatchLine, PatchHunk, FilePatchKind, FilePatch, MAX_PATCH_CHARS, MAX_PATCH_FILES, invalid, cleanPath
+- `packages/ai-workspace/src/policy/approval-helpers.ts` - MAX_REFUSAL_REASON, samePattern, refusalReason
 - `packages/ai-workspace/src/policy/jail.ts` - isInside, globToRegExp, matchesAnyGlob, isInsideJailLexically
 - `packages/ai-workspace/src/policy/policy.ts` - ResolvedPath, policy/policy.ts, canonicalize, resolveInJail, isCommandAllowed, buildEnv, SHELL_STARTUP_VARIABLES, buildCommandEnv
 - `packages/ai-workspace/src/policy/powershell-aliases.ts` - ParamRole, Family, FAMILIES, BY_NAME, aliasKey, parameter, canonicalPowerShellArgv, POWERSHELL_CD_NAMES
 - `packages/ai-workspace/src/policy/powershell-parser.ts` - PowerShellRefusal, PowerShellParser, POWERSHELL_KEYWORDS, inSet, unsupported, parsePowerShellLine
 - `packages/ai-workspace/src/policy/shell-check.ts` - WorkspaceShellPathAccess, WorkspaceShellPath, WorkspaceShellCheck, CompiledPattern, Refusal, ShellCheckOptions, CompiledRule, LineChecker
-- `packages/ai-workspace/src/policy/shell-interpreter.ts` - ResolvedShellInterpreter, ShellHost, ResolvedShell, currentShellHost, dialectOf, findOnPath, findGitBash, powershellNames
+- `packages/ai-workspace/src/policy/shell-interpreter.ts` - ResolvedShellInterpreter, ShellHost, PowerShellEdition, ResolvedShell, currentShellHost, dialectOf, findOnPath, findGitBash
 - `packages/ai-workspace/src/policy/shell-parser.ts` - ShellDialect, ShellWord, ShellRedirect, ShellSimpleCommand, ShellSegment, ShellParseResult, ShellSyntaxRefusal, SharedState
 - `packages/ai-workspace/src/policy/tokenize-command.ts` - ArgvAnalysis, UNQUOTED_METACHARACTERS, TWO_CHARACTER_OPERATORS, analyzeArgvCommand, tokenizeCommand
-- `packages/ai-workspace/src/shell-jobs.ts` - OutputChunk, ShellJobSpec, ShellJob, ShellJobs, DEFAULT_MAX_BACKGROUND_JOBS, MAX_OUTPUT_WAIT_MS, delay, tailUtf8
+- `packages/ai-workspace/src/search/walk.ts` - IgnoreRule, WalkOptions, WalkResult, PendingDir, DEFAULT_SEARCH_SKIP_DIRS, DEFAULT_SEARCH_MAX_FILES, DEFAULT_SEARCH_CONCURRENCY, staticGlobPrefix
+- `packages/ai-workspace/src/shell-jobs.ts` - OutputChunk, ShellJobSpec, ShellJob, ShellJobs, DEFAULT_MAX_BACKGROUND_JOBS, MAX_OUTPUT_WAIT_MS, MAX_EXIT_WAIT_MS, delay
 - `packages/ai-workspace/src/todos.ts` - TodoStore, MAX_TODOS, MAX_TODO_CONTENT_LENGTH, TODO_STATUSES, todoListProblems
 - `packages/ai-workspace/src/tools/apply-patch.ts` - inputSchema, makeApplyPatchTool
 - `packages/ai-workspace/src/tools/edit-file.ts` - inputSchema, makeEditFileTool
@@ -1689,21 +1708,24 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/ai-workspace/src/tools/run-tests.ts` - MakeRunTestsToolOptions, tools/run-tests.ts, runTestsInputSchema, quotePattern, makeRunTestsTool
 - `packages/ai-workspace/src/tools/schema.ts` - JsonSchemaObject, JsonStandardSchema, FieldValidator, ObjectShape, tools/schema.ts, withJsonSchema, stringField, optionalStringField
 - `packages/ai-workspace/src/tools/shell-kill.ts` - inputSchema, makeShellKillTool
-- `packages/ai-workspace/src/tools/shell-output.ts` - inputSchema, makeShellOutputTool
+- `packages/ai-workspace/src/tools/shell-output.ts` - tools/shell-output.ts, inputSchema, makeShellOutputTool
 - `packages/ai-workspace/src/tools/test-support.ts` - tools/test-support.ts, causeOf
 - `packages/ai-workspace/src/tools/todo.ts` - isTodoStatus, todoWriteSchema, todoReadSchema, makeTodoWriteTool, makeTodoReadTool
 - `packages/ai-workspace/src/tools/write-file.ts` - inputSchema, makeWriteFileTool
 - `packages/ai-workspace/src/workspace.ts` - WorkspaceState, WorkspaceImpl, Ai, ALL_TOOL_NAMES, READONLY_TOOL_NAMES, BACKGROUND_TOOL_NAMES, selectBackend, classify
 - `packages/ai-workspace/vitest.config.ts` - ai-workspace/vitest.config.ts, here
 
-## packages/ai-xai (3 test files not listed)
+## packages/ai-xai (5 test files not listed)
 
 - `packages/ai-xai/README.md`
 - `packages/ai-xai/scripts/generate-llms.mjs` - ai-xai/scripts/generate-llms.mjs, scriptDir, pkgRoot, skillsDir, llmsTxtPath, llmsFullPath, pkgJson, shortName
 - `packages/ai-xai/skills/SKILL.md` - warlock-js-ai-xai - xAI Grok adapter for Warlock AI: `XaiSDK`, `XAI_CHAT_MODELS`, `inferVisionCapability`, `i…
 - `packages/ai-xai/src/config.type.ts` - XaiSDKConfig, XaiModelConfig, XaiEmbedderConfig, XaiImageConfig, ai-xai/src/config.type.ts
 - `packages/ai-xai/src/index.ts` - ai-xai/src/index.ts
+- `packages/ai-xai/src/known-context-windows.ts` - ai-xai/src/known-context-windows.ts, KNOWN_WINDOWS, inferContextWindow
+- `packages/ai-xai/src/known-lifecycle.ts` - ai-xai/src/known-lifecycle.ts, XAI_MODEL_LIFECYCLE, XAI_MODEL_LIFECYCLE_AS_OF, xaiLifecycleFor
 - `packages/ai-xai/src/known-models.ts` - ai-xai/src/known-models.ts, XAI_VISION_MODEL_PREFIXES, XAI_REASONING_MODEL_PREFIXES, XAI_CHAT_MODELS, inferVisionCapability, inferReasoningCapability
+- `packages/ai-xai/src/known-pricing.ts` - ai-xai/src/known-pricing.ts, longPrompt, XAI_MODEL_PRICING, XAI_MODEL_PRICING_AS_OF, xaiPricingFor
 - `packages/ai-xai/src/sdk.ts` - XaiSDK, ai-xai/src/sdk.ts, requestsNativeSearch
 
 ## packages/auth (48 test files not listed)
@@ -1910,7 +1932,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/cache/src/utils.ts` - CACHE_FOR, cache/src/utils.ts, parseCacheKey, parseTtl, expiresAtToTtl, normalizeToOptions, normalizeToRememberOptions, resolveTtl
 - `packages/cache/vitest.config.ts` - cache/vitest.config.ts
 
-## packages/cascade (122 test files not listed)
+## packages/cascade (126 test files not listed)
 
 - `packages/cascade/README.md`
 - `packages/cascade/bin/cascade.js`
@@ -2036,7 +2058,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/cascade/src/migration/sql-serializer.ts` - SQLSerializer
 - `packages/cascade/src/migration/types.ts` - MigrationResult, MigrationStatus, PendingMigration, MigrationRecord, MigrationRunnerOptions, RunMigrationsOptions, RollbackOptions, SQLStatementType
 - `packages/cascade/src/model/generate-model-id.ts` - generateModelId
-- `packages/cascade/src/model/methods/accessor-methods.ts` - MISSING_VALUE, getFieldValue, setFieldValue, hasField, incrementField, decrementField, unsetFields, stripIdentityColumns
+- `packages/cascade/src/model/methods/accessor-methods.ts` - MISSING_VALUE, getFieldValue, setFieldValue, hasField, isFieldFilled, incrementField, decrementField, unsetFields
 - `packages/cascade/src/model/methods/column-read-guard.ts` - GuardedModelClass, columnReadGuardEnabled, guardedModels, warnedColumns, warnColumnRead, guardColumnPropertyReads, resetColumnReadWarnings
 - `packages/cascade/src/model/methods/delete-methods.ts` - destroyModel, deleteRecords, deleteAllRecords, deleteOneRecord
 - `packages/cascade/src/model/methods/dirty-methods.ts` - checkHasChanges, checkIsDirty, getDirtyColumnsWithValues, getRemovedColumns, getDirtyColumns
@@ -2136,7 +2158,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/context/src/index.ts` - context/src/index.ts
 - `packages/context/vitest.config.ts` - context/vitest.config.ts
 
-## packages/core (596 test files not listed)
+## packages/core (608 test files not listed)
 
 - `packages/core/README.md`
 - `packages/core/TODO.md`
@@ -2250,7 +2272,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/core/src/capabilities/index.ts` - capabilities/index.ts
 - `packages/core/src/cli/CLI2_REVIEW.md`
 - `packages/core/src/cli/README.md`
-- `packages/core/src/cli/cli-commands.manager.ts` - CommandRunVerdict, CLICommandsManager, exitAfterFlush, isRespawnedWorker
+- `packages/core/src/cli/cli-commands.manager.ts` - CommandRunVerdict, CLICommandsManager, exitAfterFlush, isRespawnedWorker, configuredEarlyConnectorNames
 - `packages/core/src/cli/cli-commands.utils.ts` - StartBannerOptions, ProductionReadyBannerOptions, HelpCommandInfo, isMatchingCommandName, displayWarlockVersionInTerminal, getTextColorMethod, displayStartupBanner, displayProductionReadyBanner
 - `packages/core/src/cli/commands-loader.ts` - CLICommandsLoader, commandFiles, cliCommandsLoader
 - `packages/core/src/cli/commands/add.command.ts` - addCommand
@@ -2418,6 +2440,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/core/src/database/resolve-pending-migrations.ts` - PendingMigrationsResult, resolvePendingMigrations, describeFailure
 - `packages/core/src/database/seed-command-action.ts` - SeedCommandOverrides, SeedRecordRow, clearAllTables, dropSeedRecords, seedCommandAction, listSeedsFiles, loadSeedFile
 - `packages/core/src/database/seeds/index.ts` - seeds/index.ts
+- `packages/core/src/database/seeds/reset-seed-ledger.ts` - resetSeedLedger
 - `packages/core/src/database/seeds/seed-records-table-migration.ts` - SeedRecordsTableMigration
 - `packages/core/src/database/seeds/seeder.errors.ts` - UnknownSeederDependencyError, SeederDependencyCycleError
 - `packages/core/src/database/seeds/seeder.ts` - Seeder, seeder
@@ -2437,6 +2460,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/core/src/dev-server/dependency-graph.ts` - DependencyGraph, classifyCycle
 - `packages/core/src/dev-server/dev-agent-tooling.ts` - DevMcpOptions, DevAgentTooling, resolveDevMcpOptions, errorMessage, dispose, schedule, close
 - `packages/core/src/dev-server/dev-logger.ts` - ReloadPhaseTimings, timestamp, devLog, devLogSuccess, formatErrorStack, devLogError, devLogWarn, devLogInfo
+- `packages/core/src/dev-server/dev-pid-file.ts` - DEV_PID_FILE, writeDevPidFile
 - `packages/core/src/dev-server/development-server.ts` - Batch, DevelopmentServer, isEnvPath
 - `packages/core/src/dev-server/events.ts` - dev-server/events.ts, DEV_SERVER_EVENTS
 - `packages/core/src/dev-server/extract-translation-keys.ts` - extractTranslationKeys, isGroupedTranslationsCall, collectFromCall, collectLeaves, isLeaf, getPropertyName
@@ -2445,7 +2469,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/core/src/dev-server/file-operations.ts` - FileOperations
 - `packages/core/src/dev-server/files-orchestrator.ts` - FilesOrchestrator, MODULE_LOCALES_JSON_GLOB, onCleanup, runInBatches, filesOrchestrator
 - `packages/core/src/dev-server/files-watcher.ts` - FileWatcherEvent, FileChangeCallback, FileDeleteCallback, FileAddCallback, FileErrorCallback, FileAddDirCallback, FileUnlinkDirCallback, OnFileEventCallback
-- `packages/core/src/dev-server/flags.ts` - MANIFEST_PATH, FILE_PROCESSING_BATCH_SIZE, isTimingsEnabled
+- `packages/core/src/dev-server/flags.ts` - manifestPath, FILE_PROCESSING_BATCH_SIZE, isTimingsEnabled
 - `packages/core/src/dev-server/health-checker/checkers/base-health-checker.ts` - CheckerFile, BaseHealthChecker
 - `packages/core/src/dev-server/health-checker/checkers/oxlint-health-checker.ts` - OxlintHealthChecker
 - `packages/core/src/dev-server/health-checker/checkers/typescript-health-checker.ts` - TypescriptHealthChecker
@@ -2584,7 +2608,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/core/src/http/context/request-memo.ts` - requestMemoStores, requestMemo
 - `packages/core/src/http/createHttpApplication.ts` - createHttpApplication, stopHttpApplication
 - `packages/core/src/http/csp.ts` - CspConfig, InvalidCspDirectiveError, DEFAULT_CSP_DIRECTIVES, validateCspDirectives, resolveCspConfig, validateCspConfigAtBoot, mergeCspDirectives, serializeCspDirectives
-- `packages/core/src/http/csrf-default-guard.ts` - UNSAFE_METHODS, parseCookieNamesStrict, carriesNonLocaleCookie, isCsrfExempt, requiresDefaultCsrfGuard, runDefaultCsrfGuard
+- `packages/core/src/http/csrf-default-guard.ts` - UNSAFE_METHODS, parseCookieNamesStrict, carriesNonLocaleCookie, isCsrfExempt, requiresDefaultCsrfGuard, resolveCsrfMessage, runDefaultCsrfGuard
 - `packages/core/src/http/csrf-origin-policy.ts` - CsrfOriginCheckReason, CsrfOriginVerdict, ownOrigin, originOf, normalizeOrigin, isAllowedCsrfOrigin, resolveCsrfOriginVerdict
 - `packages/core/src/http/database/RequestLog.ts` - RequestLogSchema, RequestLog, schema
 - `packages/core/src/http/error-codes.ts` - HttpErrorCodes, http/error-codes.ts, IdempotencyKeyConflict, IdempotencyKeyInvalid, RateLimitExceeded, ConcurrencyLimitReached, BodyTooLarge, IpForbidden
@@ -2689,6 +2713,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/core/src/loader/__fixtures__/singleton-fixture.ts` - moduleCopyId, getFixtureRuntime, fixtureCreations
 - `packages/core/src/loader/app-module-importer.ts` - AppModuleImporter, ImporterHolder, IMPORTER_KEY, setAppModuleImporter, importAppModule
 - `packages/core/src/loader/app-singleton.ts` - DisposeFn, Slot, SlotStore, ReloadFile, AppSingletonOptions, slotOf, store, appSingleton
+- `packages/core/src/localization/core-default-translations.ts` - CSRF_ORIGIN_MISMATCH_KEY, CSRF_ORIGIN_MISMATCH_FALLBACK, coreDefaultTranslations, registerCoreTranslations
 - `packages/core/src/localization/index.ts` - core/src/localization/index.ts
 - `packages/core/src/localization/lazy`
 - `packages/core/src/localization/module-locale-paths.ts` - MODULE_LOCALE_JSON_GLOBS, normalize, isModuleLocaleJsonPath, moduleOfLocaleJson, featureOfLocaleJson
@@ -2765,11 +2790,12 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/core/src/production/route-registration-snapshot.ts` - RouteRegistrationSnapshot, RouteRegistrationChildRequest, RouteRegistrationChildProcess, RouteRegistrationSnapshotOptions, collectRouteRegistrationSnapshot, validateSnapshot, isStringList, isResponseTypeRecord
 - `packages/core/src/production/routes`
 - `packages/core/src/production/single-bundle-resolve.ts` - SingleBundleReport, createSingleBundleReport, BUILD_TIME_ONLY_PACKAGES, BUILD_TIME_TOOL_PACKAGES, RUNTIME_EXCEPTIONS, isBuildTimeTool, buildTimeOnlyModule, LAZY_KINDS
-- `packages/core/src/production/tsconfig-path-aliases.ts` - WildcardPathAlias, collectWildcardPathAliases, substituteWildcard, tsconfigPathAliases
+- `packages/core/src/production/tsconfig-path-aliases.ts` - WildcardPathAlias, production/tsconfig-path-aliases.ts, collectWildcardPathAliases, substituteWildcard, tsconfigPathAliases
 - `packages/core/src/production/workers`
 - `packages/core/src/react/README.md`
 - `packages/core/src/react/index.ts` - ErrorWithCauseConstructor, react/index.ts, REACT_INSTALL_INSTRUCTIONS, ErrorWithCause, isModuleMissing, requireModule, resolveReactModules, renderReact
-- `packages/core/src/release-notes/release-notes-command.action.ts` - Output, Overrides, text, formatRange, runReleaseNotesCommand
+- `packages/core/src/release-notes/release-notes-command.action.ts` - Output, Overrides, Entry, text, formatRange, newerFooter, runReleaseNotesCommand
+- `packages/core/src/release-notes/release-notes-remote.ts` - RemoteReleaseNotes, RemoteReleaseNotesResult, FetchLike, FetchRemoteReleaseNotesOptions, RELEASE_NOTES_URL, RELEASE_NOTES_MAX_BYTES, isTrustedUrl, readCapped
 - `packages/core/src/release-notes/release-notes.ts` - ReleaseNote, releaseUrl, releasesDirectory, installedCoreVersion, plain, itemTitle, extractBreaking, parseReleaseNote
 - `packages/core/src/release/activate.ts` - PreflightCheck, ActivateOptions, ActivationResult, RollbackResult, runPreflight, restart, activateRelease, rollbackRelease
 - `packages/core/src/release/candidate.ts` - CandidateOptions, LOCKFILES, shellQuote, exists, git, createCandidate
@@ -2880,6 +2906,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/core/src/tests/fakes/storage-fake.ts` - TEST_STORAGE_ROOT_ENV_KEY, currentRoot, listFiles, storageFake
 - `packages/core/src/tests/fakes/test-fakes.ts` - TestFakeName, TestFakesSelection, TEST_FAKE_NAMES, fakes, active, readConfiguredFakes, validateSelection, resolveTestFakes
 - `packages/core/src/tests/index.ts` - tests/index.ts
+- `packages/core/src/tests/load-test-app-modules.ts` - appModuleEntriesOnDisk, loadTestAppModules
 - `packages/core/src/tests/load-unit-config.ts` - loadUnitConfig
 - `packages/core/src/tests/open-test-servers.ts` - openServers, trackOpenTestServer, forgetOpenTestServer, closeOpenTestHttpServers
 - `packages/core/src/tests/reset-test-database.ts` - ResetTestDatabaseOptions, resetTestDatabase, testWorkerId, workerDatabaseName
@@ -2890,7 +2917,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/core/src/tests/start-http-development-server.ts` - StartHttpTestServerOptions, startTestServerPhase, applyTestServerPort, publishEphemeralPort, startHttpTestServer, reportServerBootProfile, unwindPartialStartup, warnAboutConnectorsLeftActive
 - `packages/core/src/tests/test-connectors-selection.ts` - TestConnectorsSelection, RequestedTestConnectors, readRequestedConnectors, readConfiguredConnectors, resolveEffectiveConnectors, normalizeConnectorNames, isSameConnectorsSelection, describeConnectorsSelection
 - `packages/core/src/tests/test-helpers.ts` - TestRequestClient, tests/test-helpers.ts, getTestServerUrl, testRequest, sendRequest, jsonBody, createTestRequestClient, sharedServer
-- `packages/core/src/tests/test-http-server.ts` - CreateTestHttpServerOptions, TestHttpServer, LoadedHolder, APP_MODULES_LOADED_KEY, loadAppModulesOnce, boundPort, createTestHttpServer
+- `packages/core/src/tests/test-http-server.ts` - CreateTestHttpServerOptions, TestHttpServer, LoadedHolder, APP_MODULES_LOADED_KEY, APP_MODULES_ROOT_KEY, loadAppModulesOnce, boundPort, createTestHttpServer
 - `packages/core/src/tests/test-lifecycle-state.ts` - TestLifecycleState, TestSetupAttempt, TestLifecycleRegistry, TestLifecycleHost, TEST_LIFECYCLE_REGISTRY_KEY, getTestLifecycleRegistry
 - `packages/core/src/tests/test-locales.ts` - loadTestLocales
 - `packages/core/src/tests/test-runtime-scope.ts` - TestWorkerConfiguration, TestSetupProfile, RuntimeScope, TestServerBootProfile, KEY, testRuntimeScope, configureTestWorker, selectTestLifetime
@@ -2910,7 +2937,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/core/src/tooling/check/affected-files.ts` - affectedFiles
 - `packages/core/src/tooling/check/api-route-references.ts` - ApiRouteFacts, EMPTY_API_ROUTE_FACTS, ROUTE_CALLS, objectProperty, clientHiddenRouteNamesOf, declaresApiRoutesOf, staticNameOf, routeArgumentOf
 - `packages/core/src/tooling/check/barrel-conventions.ts` - barrelFindings
-- `packages/core/src/tooling/check/changed-files.ts` - GitResult, GitRunner, runGit, lines, gitProblem, listChangedFiles
+- `packages/core/src/tooling/check/changed-files.ts` - GitResult, GitRunner, runGit, EXCLUDE_DEPENDENCIES, lines, gitProblem, listChangedFiles
 - `packages/core/src/tooling/check/check-report.types.ts` - CheckStepName, CheckStepStatus, CheckStep, CheckExitCode, CheckReport, CHECK_STEPS, CHECK_EXIT_CODES, checkExitCode
 - `packages/core/src/tooling/check/client-boundary-conventions.ts` - ClientBoundaryCache, RESOLVE_EXTENSIONS, isClientModule, isServerOnlyFile, isWebFile, toPosix, resolveLocal, isTypeOnly
 - `packages/core/src/tooling/check/code-style-conventions.ts` - AWAITED_LOGGER_NAMES, SYNC_LOG_METHODS, checkAwaitLog, hasHandlerType, controllerIdentifiers, ordinal, checkOneControllerPerFile, isLiteralType
@@ -2928,6 +2955,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/core/src/tooling/check/run-check.ts` - TypecheckRunner, CheckOptions, StepOutcome, errorMessage, statusOf, runCheck
 - `packages/core/src/tooling/check/run-tests.ts` - RunTestsOptions, TestRunReport, check/run-tests.ts, testRunArguments, count, normalize, runTests
 - `packages/core/src/tooling/check/security-conventions.ts` - LogFinding, UNFILTERED_METHODS, IGNORED_RECEIVERS, displayCallee, isIgnoredReceiver, callReceiving, receivingCall, checkRequestAll
+- `packages/core/src/tooling/check/server-graph-imports.ts` - ServerGraphCache, ASSET_EXTENSIONS, SKIPPED_DIRECTORIES, serverBundleImportHazard, createServerGraphCache, webSources, serverGraph, serverGraphImportProblems
 - `packages/core/src/tooling/check/source-ast.ts` - SourceFinding, MemberAccess, Declaration, isMemberAccess, keyName, positionOf, unwrap, literalString
 - `packages/core/src/tooling/check/source-files.ts` - listSourceFiles, listTestFiles
 - `packages/core/src/tooling/check/tests-step.ts` - VitestRun, VitestRunner, findVitest, runVitest, vitestArguments, isRecord, ANSI_SEQUENCE, summarize
@@ -2974,6 +3002,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/core/src/tooling/trace/trace-request.ts` - TraceRequestOptions, TracedResponse, BuildTraceReportInput, TRACE_REQUEST_ID_HEADER, TRACE_BODY_LIMIT, REDACTED_HEADERS, isRecord, lowerCaseKeys
 - `packages/core/src/tooling/typecheck/index.ts` - typecheck/index.ts
 - `packages/core/src/tooling/typecheck/run-typecheck.ts` - TypecheckOptions, TypecheckResult, DEFAULT_TYPECHECK_BUILD_INFO, toPosix, isProjectFile, diagnosticToProblem, directImporters, runTypecheck
+- `packages/core/src/tooling/typecheck/stale-typings.ts` - StaleTypings, SKIPPED_DIRECTORIES, newestModification, detectStaleTypings
 - `packages/core/src/tooling/typescript/compiler.ts` - CompilerDiagnostic, SourceUpdate, CompilerSession, require, manifestPath, manifest, compilerBin, parseCompilerOutput
 - `packages/core/src/updater/package-manager.ts` - PackageManager, PackageManagerDetection, FoundLockfile, updater/package-manager.ts, LOCKFILES, INSTALL_MARKERS, detectPackageManagerDetails, detectPackageManager
 - `packages/core/src/updater/prune-npm-lockfile.ts` - LockEntry, NpmLockfile, MIN_NPM_VERSION, packageNameOfKey, pruneLegacyDependencies, pruneFamilyLockEntries, parseNpmVersion, oldNpmMessage
@@ -3137,7 +3166,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/core/tooling/index.ts` - core/tooling/index.ts
 - `packages/core/vitest.config.ts` - core/vitest.config.ts, workspaceSource
 
-## packages/create-warlock (36 test files not listed)
+## packages/create-warlock (38 test files not listed)
 
 - `packages/create-warlock/README.md`
 - `packages/create-warlock/bin/create-app.js` - bin/create-app.js
@@ -3555,7 +3584,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/logger/src/utils/safe-json-stringify.ts` - errorReplacer, safeJsonStringify
 - `packages/logger/vitest.config.ts` - logger/vitest.config.ts
 
-## packages/notifications (10 test files not listed)
+## packages/notifications (11 test files not listed)
 
 - `packages/notifications/README.md`
 - `packages/notifications/scripts/generate-llms.mjs` - notifications/scripts/generate-llms.mjs, scriptDir, pkgRoot, skillsDir, llmsTxtPath, llmsFullPath, pkgJson, shortName
@@ -3586,15 +3615,16 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/notifications/src/dispatch/index.ts` - dispatch/index.ts
 - `packages/notifications/src/dispatch/notifications-event-bus.ts` - EventName, Handler, handlers, notifications, emit
 - `packages/notifications/src/dispatch/notify.ts` - Notify, dispatch/notify.ts, notifyImpl, notify
-- `packages/notifications/src/errors.ts` - NotificationsNotConfiguredError, ChannelNotFoundError, NoQueueDispatcherError, MissingRendererError, UnresolvableRouteError, notifications/src/errors.ts, captureStack
+- `packages/notifications/src/errors.ts` - NotificationsNotConfiguredError, ChannelNotFoundError, NoQueueDispatcherError, MissingRendererError, UnresolvableRouteError, RecipientTypeRequiredError, notifications/src/errors.ts, captureStack
 - `packages/notifications/src/in-app/base-notifications-repository.ts` - NotificationsFilter, NotificationModelClass, BaseNotificationsRepository
 - `packages/notifications/src/in-app/column-map.ts` - NotificationColumnMap, ResolvedNotificationColumnMap, NotificationColumnMapHost, resolveColumnMap
 - `packages/notifications/src/in-app/database-notification.ts` - DatabaseNotification
-- `packages/notifications/src/in-app/in-app.ts` - NotificationsListOptions, ConfigureOptions, InApp, idOf, inApp
+- `packages/notifications/src/in-app/in-app.ts` - NotificationsListOptions, ConfigureOptions, InApp, inApp
 - `packages/notifications/src/in-app/index.ts` - in-app/index.ts
+- `packages/notifications/src/in-app/recipient.ts` - RecipientInput, recipientTypeOf, toRecipientRef
 - `packages/notifications/src/index.ts` - notifications/src/index.ts
 - `packages/notifications/src/migration/index.ts` - notifications/src/migration/index.ts
-- `packages/notifications/src/migration/notification-columns.ts` - NotificationIdType, NotificationColumnsOptions, notificationColumns, isNotificationColumnsOptions, getIdColumn
+- `packages/notifications/src/migration/notification-columns.ts` - NotificationIdType, NotificationColumnsOptions, notificationColumns, isNotificationColumnsOptions, getIdColumn, deriveIdType
 - `packages/notifications/src/queue/bullmq-queue.ts` - BullmqQueueOptions, NotificationJobPayload, NOTIFICATION_JOB_NAME, bullmqQueue, defineNotificationJob, notificationDelay, toMilliseconds
 - `packages/notifications/src/queue/herald-queue.ts` - HeraldQueueOptions, heraldQueue
 - `packages/notifications/src/queue/index.ts` - queue/index.ts
@@ -3602,10 +3632,10 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/notifications/src/queue/load-queue.ts` - QueuePackageLoader, defaultLoader, loadQueuePackage
 - `packages/notifications/src/queue/notifications-worker.ts` - NotificationJob, WorkerOptions, startNotificationsWorker
 - `packages/notifications/src/queue/queue-package-not-installed.error.ts` - QueuePackageNotInstalledError, captureStack
-- `packages/notifications/src/types.ts` - Notifiable, Id, MailPayload, NotificationInput, DatabasePayload, NotificationChannels, ChannelName, SendOptions
+- `packages/notifications/src/types.ts` - Notifiable, Id, RecipientRef, MailPayload, NotificationInput, DatabasePayload, NotificationChannels, ChannelName
 - `packages/notifications/vitest.config.ts` - notifications/vitest.config.ts
 
-## packages/process (8 test files not listed)
+## packages/process (9 test files not listed)
 
 - `packages/process/README.md`
 - `packages/process/scripts/generate-llms.mjs` - process/scripts/generate-llms.mjs, scriptDir, pkgRoot, skillsDir, llmsTxtPath, llmsFullPath, pkgJson, shortName
@@ -3616,7 +3646,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/process/src/platform.ts` - PortablePlatform, Command, Execute, OwnershipProof, ReadProof, Row, UnsupportedProcessPlatformError, RowSource
 - `packages/process/src/registry.ts` - RegistryEntry, Registry, record, strings, parseRegistry
 - `packages/process/src/resources.ts` - mountedCgroup, validateLimits, launcher, attachCgroup, cgroupMemory, recoveredCgroup, cleanCgroup
-- `packages/process/src/supervisor.ts` - Pty, PtyModule, Active, src/supervisor.ts, info, validateFilter, matches, supervisor
+- `packages/process/src/supervisor.ts` - ProcessStartupError, Pty, PtyModule, Active, src/supervisor.ts, terminalPid, info, validateFilter
 - `packages/process/src/types.ts` - ProcessLimits, SupervisorOptions, SpawnOptions, ProcessFilter, ProcessExit, ProcessInfo, ProcessHandle, PtyHandle
 - `packages/process/src/windows-helper.ts` - HelperChild, HelperSpawn, WindowsHelperOptions, Waiter, Batch, Flight, Snapshot, WindowsProcessHelper
 - `packages/process/vitest.config.ts` - process/vitest.config.ts
@@ -3685,7 +3715,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/scheduler/src/utils.ts` - scheduler/src/utils.ts, parseWeekDayNumber
 - `packages/scheduler/vitest.config.ts` - scheduler/vitest.config.ts
 
-## packages/seal (77 test files not listed)
+## packages/seal (79 test files not listed)
 
 - `packages/seal/README.md`
 - `packages/seal/domains/README.md`
@@ -3729,6 +3759,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/seal/src/helpers/is-empty-value.ts` - isEmptyValue
 - `packages/seal/src/helpers/path-helpers.ts` - setKeyPath
 - `packages/seal/src/helpers/plain-object.ts` - isPlainObjectValue
+- `packages/seal/src/helpers/root-context.ts` - createRootContext
 - `packages/seal/src/helpers/validation-helpers.ts` - VALID_RULE, resolveTranslation, invalidRule
 - `packages/seal/src/index.ts` - seal/src/index.ts
 - `packages/seal/src/mutators/array-mutators.ts` - flipArrayMutator, reverseArrayMutator, sortArrayMutator, uniqueArrayMutator, removeEmptyArrayElementsMutator
@@ -3818,7 +3849,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/seal/src/types/rule-types.ts` - RuleResult, AttributeValue, ValidationAttributesList, SchemaRuleOptions, SchemaRule, ContextualSchemaRule
 - `packages/seal/src/types/schema-types.ts` - Schema
 - `packages/seal/src/validators/any-validator.ts` - AnyValidator
-- `packages/seal/src/validators/array-validator.ts` - ArrayValidator
+- `packages/seal/src/validators/array-validator.ts` - ArrayValidator, UPLOADED_FILE_BRAND, wrapSingleUpload
 - `packages/seal/src/validators/base-validator.ts` - BaseValidator
 - `packages/seal/src/validators/boolean-validator.ts` - BooleanValidator
 - `packages/seal/src/validators/computed-validator.ts` - ComputedCallback, ComputedValidator
@@ -3874,7 +3905,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/sitemap/src/xml.ts` - XML_ESCAPES, escapeXml, XHTML_NAMESPACE_ATTR, IMAGE_NAMESPACE_ATTR, renderUrlBlock, buildSitemapXml
 - `packages/sitemap/vitest.config.ts` - sitemap/vitest.config.ts
 
-## packages/web (457 test files not listed)
+## packages/web (461 test files not listed)
 
 - `packages/web/README.md`
 - `packages/web/scripts/generate-llms.mjs` - web/scripts/generate-llms.mjs, scriptDir, pkgRoot, skillsDir, llmsTxtPath, llmsFullPath, pkgJson, shortName
@@ -4017,7 +4048,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/web/src/routing/compose-route-path.ts` - composeRoutePath
 - `packages/web/src/routing/current-locale.ts` - CurrentLocaleHost, CURRENT_LOCALE_SLOT, recordCurrentLocale, readCurrentLocale, resetCurrentLocale
 - `packages/web/src/routing/data-request.ts` - WARLOCK_DATA_REQUEST_HEADER, WARLOCK_DATA_REQUEST_VALUE, DATA_RESPONSE_CONTENT_TYPE, isDataRequest
-- `packages/web/src/routing/duplicate-route-path.ts` - duplicateRoutePathMessage
+- `packages/web/src/routing/duplicate-route-path.ts` - duplicateRoutePathMessage, ambiguousMixedRoutePathMessage
 - `packages/web/src/routing/error-page-declares-route-error.ts` - ErrorPageDeclaresRouteError
 - `packages/web/src/routing/filesystem-route.ts` - FilesystemRouteInput, isGroup, siteFolderDepth, routeSegment, prefixSegments, validatedPrefixSegments, pageParts, deriveFilesystemRoutePath
 - `packages/web/src/routing/href-by-name.ts` - hrefByName
@@ -4028,15 +4059,16 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/web/src/routing/locale-routing-meta-name.ts` - LOCALE_ROUTING_META_NAME
 - `packages/web/src/routing/locale-routing.ts` - LocaleRoutingStrategy, LocaleRouting, LocaleRoutingSlot, LocaleRoutingHost, LOCALE_ROUTING_SLOT, NO_LOCALE_ROUTING, publishLocaleRouting, readLocaleRouting
 - `packages/web/src/routing/localized-path.ts` - localizedPath
+- `packages/web/src/routing/mixed-route-segment.ts` - MixedSegmentPart, MixedSegmentParse, SegmentShape, parseMixedSegment, namedWildcardOfSegment, namedWildcardOfPath, routerPathOf, withNamedWildcardParam
 - `packages/web/src/routing/named-api-routes.ts` - NamedApiRouteMetadata, PublishedSlot, routing/named-api-routes.ts, PUBLISHED_KEY, slot, publishNamedApiRoutes, readNamedApiRoutes, missingRouteMessage
 - `packages/web/src/routing/navigator.ts` - Navigator, connectNavigator, currentNavigator
 - `packages/web/src/routing/page-file-segment.ts` - PageFileSegmentVerdict, PageFileSegmentNotSupportedError, allowed, rejected, classifyPageFileSegment
-- `packages/web/src/routing/page-route-grammar.ts` - PageRoutePathVerdict, PageRoutePathNotSupportedError, allowed, rejected, classifySegment, classifyPageRoutePath
+- `packages/web/src/routing/page-route-grammar.ts` - PageRoutePathVerdict, PageRoutePathNotSupportedError, allowed, rejected, classifySegment, mixedParameterNames, classifyPageRoutePath
 - `packages/web/src/routing/query-string.ts` - QueryStringLeaf, QueryStringNested, QueryStringValue, QueryStringObject, QueryStringInput, UnserializableQueryValueError, RepeatedKeyStrategy, QueryStringOptions
 - `packages/web/src/routing/route-identity-key.ts` - routeIdentityKey
 - `packages/web/src/routing/route-identity.ts` - PageCacheOptIn, PageCacheTagContext, DeclaredRouteExport, CanonicalRoute, InvalidPageCacheOptInError, resolvePageRouteCache, canonicalizeRouteExport, resolvePageRouteName
 - `packages/web/src/routing/route-path-interpolation.ts` - RoutePathInterpolationParameters, RoutePathInterpolationOptions, encodeParameterValue, legacyParameterNames, suppliedNames, rejectUnknown, interpolateLegacyPath, interpolateRoutePath
-- `packages/web/src/routing/route-path-parameters.ts` - RoutePathParameter, RoutePathParameterParse, parseRoutePathParameters
+- `packages/web/src/routing/route-path-parameters.ts` - RoutePathParameter, RoutePathParameterParse, RoutePathParameterParseOptions, parseRoutePathParameters
 - `packages/web/src/routing/route-table.ts` - RouteTableEntry, RegisteredSite, RegisteredSites, RouteParameters, RouteQuery, RouteTableSlot, RouteTableHost, RouteTableNotPublishedError
 - `packages/web/src/routing/route-types.ts` - RouteParamValue, PageRouteDefinition, ApiRouteDefinition, RuntimeRouteName, RegistryName, RegistryHasNames, RegistryEntry, EntryParams
 - `packages/web/src/routing/router-events.ts` - NavigationMode, RefreshReason, NavigationStartPayload, NavigationEndPayload, NavigationErrorPayload, RouterEventListener, RouterEventUnsubscribe, RouterEvents
@@ -4091,7 +4123,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/web/src/server/locale-routing/locale-prefixed-page-handler.ts` - localePrefixedPageHandler
 - `packages/web/src/server/locale-routing/locale-redirect-route-handler.ts` - splitPathAndQuery, sameOriginPath, withQueryString, stripDefaultLocalePrefix, defaultLocaleRedirectHandler, resolvedLocaleRedirectHandler
 - `packages/web/src/server/locale-routing/resolve-locale-routing.ts` - LocaleRoutingConfigError, LocaleRoutingConfig, STRATEGIES, isLocaleRoutingStrategy, resolveLocaleRouting, resolveClientLocaleRoutingFallback
-- `packages/web/src/server/match-page-route.ts` - splitSegments, matchPath, matchRoute
+- `packages/web/src/server/match-page-route.ts` - splitSegments, matchMixedSegment, matchPath, matchRoute
 - `packages/web/src/server/metadata-deferred-guard.ts` - DeferredKeyInMetadataError, guardMetadataAgainstDeferredKeys
 - `packages/web/src/server/named-api-routes.ts` - ResolveNamedApiRoutesOptions, RouteNamesFunction, CachedTables, server/named-api-routes.ts, matchesPattern, isUnderPrivatePrefix, readConfig, readRegistry
 - `packages/web/src/server/normalize-page-module.ts` - PageRoute, PageActionFunction, NormalizedActionConfig, NormalizedPageModule, InvalidPageModuleConfigError, MODULE_EXPORTS, CACHE_KEYS, ACTION_CONFIG_KEYS
@@ -4235,7 +4267,9 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/web/src/vite/page-registry-plugin.ts` - ClientPageRegistryPluginOptions, SkeletonCache, CLIENT_PAGE_REGISTRY_ID, RESOLVED_CLIENT_PAGE_REGISTRY_ID, siteRegistryId, resolvedSiteRegistryId, CLIENT_STRICT_MODE_EXPORT_NAME, invalidateClientPageRegistry
 - `packages/web/src/vite/projection.ts` - BabelTraverse, ProjectableModuleKind, ProjectionAmbiguityError, ProjectionResult, LocalDeclaration, ReexportEdit, VariableExportEdit, SERVER_EXPORT_NAMES
 - `packages/web/src/vite/react-refresh-preamble.ts` - ReactPluginFactory, normalizeModuleId, resolveReactFastRefreshPlugins
+- `packages/web/src/vite/server-graph-import-warning.ts` - serverGraphImportWarning, serverGraphImportWarningPlugin
 - `packages/web/src/vite/ssr-client-view.ts` - SsrBoundaryState, ServerReachedClientEdge, createSsrBoundaryState, isClientBoundModule, clientBoundaryKey, isStatelessClientSurface, collectImportSpecifiers, walk
+- `packages/web/src/vite/tsconfig-path-aliases.ts` - TsconfigShape, vite/tsconfig-path-aliases.ts, stripJsonc, readTsconfig, collectPaths, escapeRegExp, tsconfigPathAliases
 - `packages/web/tests/acceptance/published-react-gate.mjs` - gateFile, gateDir, workspaceRoot, defaultArtifactRoot, args, artifactRoot, state, passed
 - `packages/web/vite.config.ts` - entryFiles, peerPackages, isExternalDependency
 - `packages/web/vitest.config.ts` - web/vitest.config.ts, workspaceSource, exactAlias, alias

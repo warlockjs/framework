@@ -428,6 +428,9 @@ function escapesAsValue(parent: ast.Node, node: ast.Node): boolean {
   if (!VALUE_POSITIONS.has(parent.type)) return false;
 
   switch (parent.type) {
+    case "ArrayExpression":
+      // `useMemo(() => …, [t])`: a dependency list only watches the translator.
+      return !isHookDependencyList(parent);
     case "CallExpression":
     case "NewExpression":
       return parent.callee !== node;
@@ -442,6 +445,17 @@ function escapesAsValue(parent: ast.Node, node: ast.Node): boolean {
     default:
       return true;
   }
+}
+
+/** An array that is the last argument of a `use*` hook call. */
+function isHookDependencyList(array: ast.Node): boolean {
+  const call = ast.parentOf(array);
+
+  if (call === undefined || call.type !== "CallExpression") return false;
+  if (call.arguments[call.arguments.length - 1] !== array) return false;
+  if (call.callee.type !== "Identifier") return false;
+
+  return /^use[A-Z]/.test(call.callee.name);
 }
 
 function sourceText(text: string, node: ast.Node): string {

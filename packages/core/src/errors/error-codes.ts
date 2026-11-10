@@ -155,6 +155,14 @@ export const ERROR_CODES = {
     fix: "Give every connector in warlock.config.ts a unique name that is not a built-in connector name.",
     skill: "add-connector",
   },
+  WL1010: {
+    code: "WL1010",
+    area: "config",
+    category: "code",
+    title: "A locale dictionary has translations for a locale the app does not configure",
+    fix: "Add the locale to app.localeCodes in src/config/app.ts, or delete that locale's text from the locales.json file named in the warning. The text is ignored until then.",
+    skill: "use-localization",
+  },
 
   // ── WL2xxx boot ──────────────────────────────────────────────────────────
   WL2001: {
@@ -829,7 +837,7 @@ export const ERROR_CODES = {
     area: "convention",
     category: "code",
     title: "Translation key is computed at runtime, so the page cannot ship only the keys it uses",
-    fix: 'Declare the keys or prefixes the page renders in its setup file, for example `export const config = { translations: ["statuses.*", "members.title"] }`. Until then the page ships every translation group.',
+    fix: "Use a literal key or a static-prefix template such as `statuses.${status}` instead of a computed key. `config.translations` in the setup file only adds keys; one computed lookup anywhere in the page graph still ships every translation group.",
     skill: "use-localization",
   },
   WL9105: {

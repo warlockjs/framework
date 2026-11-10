@@ -3947,7 +3947,7 @@ router.patch(path, handler);
 router.delete(path, handler);
 ```
 
-`path` can be a string or a string array (multiple paths, one handler). Path params use `:name`: `router.get("/products/:id", getProductController)`.
+`path` (every verb, plus `head`, `options` and `any`) can be a string or a string array (multiple paths, one handler). Path params use `:name`: `router.get("/products/:id", getProductController)`.
 
 ## Prefix groups
 
@@ -4078,6 +4078,10 @@ The check reads source, not runtime markers: a guard counts when its name
 contains `auth` or `guard`, or when it is a constant initialised with
 `markAuthGuard()` in the same file. A differently-named guard imported from
 another file needs a `// warlock-check-ignore WL9006` comment on its route.
+Your own helpers that wrap `guarded()` go in `guardWrappers` in
+`.warlock-check.json`, so routes inside their callbacks are not reported. A route
+whose options are only a spread (`{ ...opts }`) is reported as a `WL9006` warning:
+put `middleware` or `public: true` in the object literal.
 
 ```ts
 import { markAuthGuard, router, type Middleware, type RequestHandler } from "@warlock.js/core";
@@ -4189,6 +4193,14 @@ route and key. Multipart uploads use `http.fileUploadLimit`, not `bodyLimit`.
 - **Route order matters for static-vs-param overlap.** `router.get("/products/featured", ...)` must register before `router.get("/products/:id", ...)` if you want `featured` to be a static match, not `:id = "featured"`. Easier: use distinct paths.
 - **`group` middleware runs in array order** before the controller; if you stack `[rateLimitMiddleware, authMiddleware]`, rate-limiting runs first.
 - **Don't put logic in `routes.ts`.** It's a registration file. If you want conditional registration (env-flagged endpoints), do it via the controller's logic, not by branching at registration time — branching breaks the dev-server's HMR diff.
+
+## Original path and trailing slash
+
+Core drops one terminal slash before routing, so `/a` and `/a/` match the same route and `request.path` is the same for both. Use `request.originalPath` (pathname, slash kept) or `request.originalUrl` (pathname plus query) to see what the client sent, for example to redirect `/docs` to `/docs/` or pick a directory index in a static site. The wildcard `*` param comes from the normalized path (`/docs/x/` gives `x`).
+
+## Cross-origin refusal text
+
+A cookie-carrying request from a disallowed origin is refused with `EC006`. The text comes from `resolveCsrfMessage(translate)`: the `auth.errors.csrfOriginMismatch` translation when defined, then core's `http.errors.csrfOriginMismatch` (English and Arabic built in), then "Request origin is not allowed.". Override either key in your locale files.
 
 ## See also
 
@@ -9831,10 +9843,9 @@ per locale in a hashed, cached file that the page preloads. Nothing in a page's
 render changes: server output is the full dictionary, as before.
 
 Run `warlock build`, then `warlock check`. A `WL9104` warning marks a page that
-renders a translation key computed at runtime. Declare the keys it renders in
-the page's setup file, for example
-`export const config = { translations: ["statuses.*", "members.title"] }`, so the
-page ships only what it uses.
+renders a translation key computed at runtime. Rewrite the lookup with a literal
+key or a static-prefix template; `config.translations` in the setup file only adds
+keys, and one computed lookup anywhere in the page's graph still ships every group.
 
 In development, a warning names a key the page reads but its payload lacks, and
 resolves it from the full table so the page keeps working. In production the
@@ -11030,7 +11041,7 @@ teardown. Module-owned timers/listeners must register their cleanup hooks.
 
 ## Translation keys in pages (5.36)
 
-`warlock check` reports `WL9104` when a page renders a translation key computed at runtime (`trans(key)` with no static prefix, or a translator passed on as a value). Such a page ships every translation group. Declare its keys in the page's setup file, `export const config = { translations: ["statuses.*", "members.title"] }`, to ship only what it uses. The `web` skill `localize-pages` covers the browser side.
+`warlock check` reports `WL9104` when a page renders a translation key computed at runtime (`trans(key)` with no static prefix, or a translator passed on as a value). Such a page ships every translation group. The report gives the file, line and key text of each site. `config.translations` only adds keys and does not lift the fallback: one dynamic site anywhere in the page's graph (page, layouts, root, error pages) still ships every group, so rewrite the lookup with a literal key or a static-prefix template (``trans(`statuses.${s}`)``). A bare string literal equal to a group name ships the whole group, and hooks should call `useTrans()` themselves rather than receive `t`. The `web` skill `localize-pages` covers the browser side.
 
 
 ## use-middleware  `@warlock.js/core/skills/use-middleware/SKILL.md`
@@ -12927,7 +12938,7 @@ They parse real TypeScript/JSX syntax with the same oxc-parser adapter as the ex
 | `WL9025` | `merge()` on an object column of a Cascade model keeps the keys the new value omits (warning)      | Use `model.set({ column: value })` or `model.set("column", value)`; there is no automatic fix.                                                                     |
 | `WL9026` | A convention rule used more than its time budget and was skipped for the rest of the run (warning) | Use `--changed`, raise `ruleBudgetMs` in `.warlock-check.json` (0 turns it off), or turn the rule off.                                                             |
 | `WL9024` | Integration spec imports nothing that needs the app (warning)                                      | Move it to the unit project: rename it to `<name>.unit.spec.ts` outside `tests/`.                                                                                  |
-| `WL9104` | Translation key computed at runtime in `src/web` (the page ships every group)                      | Declare the keys with `config.translations` in the page's setup file, for example `["statuses.*"]`.                                                                |
+| `WL9104` | Translation key computed at runtime in `src/web` (the page ships every group)                      | Use a literal key or a static-prefix template; `config.translations` only adds keys, it does not lift the fallback.                                                |
 
 Web rules apply to `src/web/**/*.tsx`. Components are top-level JSX-returning functions
 with a capitalized name (or an anonymous default export). Hook files and ordinary helpers
@@ -12940,6 +12951,7 @@ Create `.warlock-check.json` in the project root:
 ```json
 {
   "componentLineLimit": 180,
+  "guardWrappers": ["adminOnly", "withTenantAuth"],
   "rules": {
     "WL9013": "warning",
     "WL9015": "error",
@@ -12951,6 +12963,13 @@ Create `.warlock-check.json` in the project root:
 `rules` accepts `"off"`, `"warning"`, or `"error"` for convention codes, including
 existing codes. Per-line `// warlock-check-ignore WL9015 -- reason` works as before.
 Use `npx warlock explain WL9015` for the registry explanation.
+
+`guardWrappers` lists your own helpers that wrap `guarded()`, so `WL9006` does not
+report routes registered inside their callbacks. `WL9006` limits: a guard counts by
+name (`auth`/`guard`) or as a `markAuthGuard()` constant initialised in the same
+file; an imported guard with another name must be renamed or the route ignored. A
+route whose options object is only a spread (`{ ...opts }`) is a `WL9006` warning,
+not silently accepted; write `middleware` or `public: true` in the literal.
 
 ### Progress and the per-rule time budget
 

@@ -190,6 +190,23 @@ describe("buildTranslationManifest", () => {
     expect(JSON.parse(assets[0]?.body ?? "{}")).toEqual({ members: { title: expect.any(String) } });
   });
 
+  it("lists each dynamic lookup once with its file, line and key text", () => {
+    write(
+      "src/web/dyn/index.page.tsx",
+      `export default function P({ k }: { k: string }) {\n  return <p>{trans(k)}</p>;\n}`,
+    );
+    const base = input();
+    const { dynamicSites } = buildTranslationManifest({
+      ...base,
+      pages: [
+        routable(path.join(srcRoot, "web/dyn/index.page.tsx"), { routeName: "dyn" }),
+        routable(path.join(srcRoot, "web/dyn/index.page.tsx"), { routeName: "dyn-again" }),
+      ],
+    });
+
+    expect(dynamicSites).toEqual(["src/web/dyn/index.page.tsx:2  k"]);
+  });
+
   it("refuses a shared group that is not a plain group name", () => {
     expect(() => resolveSharedGroups(["bad group"])).toThrow(/must be one translation group name/);
   });

@@ -161,7 +161,7 @@ They parse real TypeScript/JSX syntax with the same oxc-parser adapter as the ex
 | `WL9025` | `merge()` on an object column of a Cascade model keeps the keys the new value omits (warning)      | Use `model.set({ column: value })` or `model.set("column", value)`; there is no automatic fix.                                                                     |
 | `WL9026` | A convention rule used more than its time budget and was skipped for the rest of the run (warning) | Use `--changed`, raise `ruleBudgetMs` in `.warlock-check.json` (0 turns it off), or turn the rule off.                                                             |
 | `WL9024` | Integration spec imports nothing that needs the app (warning)                                      | Move it to the unit project: rename it to `<name>.unit.spec.ts` outside `tests/`.                                                                                  |
-| `WL9104` | Translation key computed at runtime in `src/web` (the page ships every group)                      | Declare the keys with `config.translations` in the page's setup file, for example `["statuses.*"]`.                                                                |
+| `WL9104` | Translation key computed at runtime in `src/web` (the page ships every group)                      | Use a literal key or a static-prefix template; `config.translations` only adds keys, it does not lift the fallback.                                                |
 
 Web rules apply to `src/web/**/*.tsx`. Components are top-level JSX-returning functions
 with a capitalized name (or an anonymous default export). Hook files and ordinary helpers
@@ -174,6 +174,7 @@ Create `.warlock-check.json` in the project root:
 ```json
 {
   "componentLineLimit": 180,
+  "guardWrappers": ["adminOnly", "withTenantAuth"],
   "rules": {
     "WL9013": "warning",
     "WL9015": "error",
@@ -185,6 +186,13 @@ Create `.warlock-check.json` in the project root:
 `rules` accepts `"off"`, `"warning"`, or `"error"` for convention codes, including
 existing codes. Per-line `// warlock-check-ignore WL9015 -- reason` works as before.
 Use `npx warlock explain WL9015` for the registry explanation.
+
+`guardWrappers` lists your own helpers that wrap `guarded()`, so `WL9006` does not
+report routes registered inside their callbacks. `WL9006` limits: a guard counts by
+name (`auth`/`guard`) or as a `markAuthGuard()` constant initialised in the same
+file; an imported guard with another name must be renamed or the route ignored. A
+route whose options object is only a spread (`{ ...opts }`) is a `WL9006` warning,
+not silently accepted; write `middleware` or `public: true` in the literal.
 
 ### Progress and the per-rule time budget
 

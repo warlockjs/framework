@@ -73,8 +73,7 @@ of valid targets rather than silently falling back.
 The default interactive flow offers the same database choices as Customize:
 MongoDB and PostgreSQL, while MySQL remains shown as disabled, followed by
 **None**. Choosing **None** is the same as
-`--db=none` / `--no-db`: no database driver is installed and the generated
-`src/config/database.ts` is removed. A supplied `--db` or `--no-db` skips this
+`--db=none` / `--no-db`: no database driver is installed, `src/config/database.ts` is removed, and so is everything model-backed: the `users`, `auth` and `posts` example modules, `src/config/auth.ts`, the `@warlock.js/auth` dependency and typings augmentation, the `guarded` route helper, the migrate / seed / jwt scripts, and the `DB_*` entries in `.env`. JWT secret generation is skipped. Home, contact, locale, uploads and shared stay. A supplied `--db` or `--no-db` skips this
 prompt.
 
 Customize keeps AI optional. Pressing Enter with no AI selections skips it. Its

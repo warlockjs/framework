@@ -50,8 +50,10 @@ function reasonFrom(result: CommandResult | undefined): string {
 
 export async function createWarlockApp(application: App): Promise<ScaffoldOutcome> {
   const options = application.options;
-  const { useGit, useJWT, features, aiProviders, databaseDriver } = options;
+  const { useGit, features, aiProviders, databaseDriver } = options;
   const noDatabase = isNoDatabase(databaseDriver);
+  // JWT secrets belong to `@warlock.js/auth`, which a no-database app does not carry.
+  const useJWT = options.useJWT && !noDatabase;
   const problems: Problem[] = [];
 
   // Resolve the versions to pin BEFORE anything is written. The scaffolder's
@@ -70,6 +72,7 @@ export async function createWarlockApp(application: App): Promise<ScaffoldOutcom
     // strip the database config entirely so the app boots with no database.
     if (noDatabase) {
       application.removeDatabaseConfig();
+      application.removeDatabaseModules();
     } else {
       application.configureDatabaseEnv(databaseDriver);
       application.configureDatabaseConfig(databaseDriver);

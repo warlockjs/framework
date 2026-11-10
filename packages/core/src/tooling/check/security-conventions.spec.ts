@@ -2,7 +2,7 @@ import * as ast from "../syntax/ast";
 import { describe, expect, it } from "vitest";
 import { findUnboundedQuantifier, securityFindings } from "./security-conventions";
 
-type Found = { code: string; text: string; message: string };
+type Found = { code: string; text: string; message: string; severity?: string };
 
 /** Parse `source` as `fileName` and list what the security checks report. */
 function check(source: string, fileName = "src/app/posts/controllers/a.controller.tsx"): Found[] {
@@ -12,6 +12,7 @@ function check(source: string, fileName = "src/app/posts/controllers/a.controlle
     code: finding.code,
     text: ast.textOf(finding.node),
     message: finding.message,
+    severity: finding.severity,
   }));
 }
 
@@ -96,6 +97,24 @@ describe("WL9006 mutating routes need an auth guard or public: true", () => {
     expect(found).toMatchObject({ code: "WL9006", text: "router.post('/posts', createPost)" });
     expect(found?.message).toContain("Mutating route `POST /posts` has no auth middleware");
     expect(found?.message).toContain("`public: true`");
+  });
+
+  it("reports a spread-only options object as a warning", () => {
+    const [found] = check("router.post('/posts', createPost, { ...opts });");
+
+    expect(found).toMatchObject({ code: "WL9006", severity: "warning" });
+    expect(found?.message).toContain("spread options");
+  });
+
+  it("still trusts a spread next to a proven guard or public: true", () => {
+    expect(codes("router.post('/p', h, { ...opts, public: true });", "WL9006")).toEqual([]);
+    expect(
+      codes("router.post('/p', h, { ...opts, middleware: [authMiddleware()] });", "WL9006"),
+    ).toEqual([]);
+  });
+
+  it("mentions guardWrappers in the unguarded message", () => {
+    expect(check("router.post('/posts', createPost);")[0]?.message).toContain("guardWrappers");
   });
 
   it.each([

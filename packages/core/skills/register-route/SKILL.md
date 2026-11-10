@@ -41,7 +41,7 @@ router.patch(path, handler);
 router.delete(path, handler);
 ```
 
-`path` can be a string or a string array (multiple paths, one handler). Path params use `:name`: `router.get("/products/:id", getProductController)`.
+`path` (every verb, plus `head`, `options` and `any`) can be a string or a string array (multiple paths, one handler). Path params use `:name`: `router.get("/products/:id", getProductController)`.
 
 ## Prefix groups
 
@@ -172,6 +172,10 @@ The check reads source, not runtime markers: a guard counts when its name
 contains `auth` or `guard`, or when it is a constant initialised with
 `markAuthGuard()` in the same file. A differently-named guard imported from
 another file needs a `// warlock-check-ignore WL9006` comment on its route.
+Your own helpers that wrap `guarded()` go in `guardWrappers` in
+`.warlock-check.json`, so routes inside their callbacks are not reported. A route
+whose options are only a spread (`{ ...opts }`) is reported as a `WL9006` warning:
+put `middleware` or `public: true` in the object literal.
 
 ```ts
 import { markAuthGuard, router, type Middleware, type RequestHandler } from "@warlock.js/core";
@@ -283,6 +287,14 @@ route and key. Multipart uploads use `http.fileUploadLimit`, not `bodyLimit`.
 - **Route order matters for static-vs-param overlap.** `router.get("/products/featured", ...)` must register before `router.get("/products/:id", ...)` if you want `featured` to be a static match, not `:id = "featured"`. Easier: use distinct paths.
 - **`group` middleware runs in array order** before the controller; if you stack `[rateLimitMiddleware, authMiddleware]`, rate-limiting runs first.
 - **Don't put logic in `routes.ts`.** It's a registration file. If you want conditional registration (env-flagged endpoints), do it via the controller's logic, not by branching at registration time — branching breaks the dev-server's HMR diff.
+
+## Original path and trailing slash
+
+Core drops one terminal slash before routing, so `/a` and `/a/` match the same route and `request.path` is the same for both. Use `request.originalPath` (pathname, slash kept) or `request.originalUrl` (pathname plus query) to see what the client sent, for example to redirect `/docs` to `/docs/` or pick a directory index in a static site. The wildcard `*` param comes from the normalized path (`/docs/x/` gives `x`).
+
+## Cross-origin refusal text
+
+A cookie-carrying request from a disallowed origin is refused with `EC006`. The text comes from `resolveCsrfMessage(translate)`: the `auth.errors.csrfOriginMismatch` translation when defined, then core's `http.errors.csrfOriginMismatch` (English and Arabic built in), then "Request origin is not allowed.". Override either key in your locale files.
 
 ## See also
 

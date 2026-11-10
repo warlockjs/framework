@@ -298,6 +298,8 @@ Helpers for "who is this request":
 | `request.originDomain`         | `string \| null`      | origin's hostname (no `www.`)                              |
 | `request.method`               | `string`              | HTTP verb                                                  |
 | `request.path` / `.url`        | `string`              | URL path                                                   |
+| `request.originalUrl`          | `string`              | path + query exactly as the client sent it                 |
+| `request.originalPath`         | `string`              | pathname as sent, trailing slash kept                      |
 | `request.fullUrl`              | `string`              | scheme + host + path                                       |
 | `request.domain` / `.hostname` | `string`              | hostname (no `www.`)                                       |
 | `request.route`                | `Route`               | the matched route object                                   |
@@ -459,6 +461,30 @@ router.get("/orders/:id", getOrderController);
 // inside the controller
 const id = request.idParam; // typed number
 ```
+
+### Original path and the trailing slash
+
+Core drops one terminal slash from every incoming URL before routing, so `/docs` and `/docs/` reach the same route and `request.path` / `request.url` are the same for both. When a handler must tell them apart, read `request.originalPath` (pathname only) or `request.originalUrl` (pathname plus query string). Both show the URL as the client sent it, before the slash normalization and before any `rewriteUrl` you configured, in production and in the dev server.
+
+```ts
+// GET /docs/?page=2
+request.path; // "/docs"
+request.originalPath; // "/docs/"
+request.originalUrl; // "/docs/?page=2"
+```
+
+The typical use is a static site or directory index: serve `index.html` for `/docs/`, and redirect `/docs` to `/docs/` so relative links in the page resolve correctly.
+
+```ts
+router.get("/docs/*", (request, response) => {
+  if (!request.originalPath.endsWith("/") && isDirectory(request.path)) {
+    return response.redirect(request.originalPath + "/");
+  }
+  // serve the file or the directory index
+});
+```
+
+The wildcard `*` param is read from the normalized path, so `/docs/guide/` and `/docs/guide` both give `guide` (never `guide/`); use `originalPath` when the trailing slash matters.
 
 ## Gotchas
 

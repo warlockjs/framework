@@ -53,7 +53,12 @@ prop or an argument to a helper. A key used with `count` is stored as variants
 (`items_one`, `items_other`, ...) and the call names the base, `t("cart.items",
 { count })`; naming the base ships every variant. A key built at run time that
 no literal names falls back to every group, and `warlock check` reports it as
-`WL9104`. Declare such keys in the page's setup file:
+`WL9104` with the file, line and key text; the build log lists the same sites.
+`config.translations` only adds keys; it does not resolve a computed lookup. One
+dynamic site anywhere in the page's graph (page, layouts, root, error pages) still
+ships every group, so fix the site itself (a literal key or a static-prefix
+template). Use a declaration for keys the analysis cannot see, such as ones read
+from data:
 
 ```ts title="src/web/orders/index.setup.ts"
 export const config = {
@@ -61,6 +66,15 @@ export const config = {
   translations: ["statuses.*", "members.title"],
 };
 ```
+
+Matching is by name: the result of `useTrans()` under any local name, and the
+names `t`, `trans`, `transX` and `transFrom` (key in the second argument). A hook
+that receives `t` as a parameter is matched only by that name, so give hooks their
+own `useTrans()` call instead of passing `t` in; a translator handed on as a value
+(returned, stored, passed to a non-hook call) is dynamic, but a dependency list
+(`useMemo(..., [t])`, `useEffect(..., [t])`) is not. A bare string literal equal to
+a group or subtree name (`"orders"`) ships that whole group; prefer a longer key
+or a static-prefix template over a short literal that happens to name a group.
 
 The same applies to the global registry (`extend()` / `register()`, the
 starter's default). The shared groups are copied once, when the web connector

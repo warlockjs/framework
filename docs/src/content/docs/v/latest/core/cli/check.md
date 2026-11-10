@@ -90,7 +90,7 @@ The `conventions` step parses each file with the TypeScript compiler (no type in
 
 Warnings are reported and never change the exit code.
 
-The checks follow names, not types: the request is the identifier `request` or `req`, the router is `router`, and a middleware is an auth guard when its name contains `auth` or `guard` — the same rule the [dev-server warning](/v/latest/core/the-basics/routing/#public-mutating-routes) applies to registered routes — or when it is a constant initialised with `markAuthGuard()` in the same file. A wrapper such as `guarded(() => …)` guards the routes inside it, and an options value the check cannot see into (a variable, a spread) is trusted.
+The checks follow names, not types: the request is the identifier `request` or `req`, the router is `router`, and a middleware is an auth guard when its name contains `auth` or `guard` — the same rule the [dev-server warning](/v/latest/core/the-basics/routing/#public-mutating-routes) applies to registered routes — or when it is a constant initialised with `markAuthGuard()` in the same file; a guard imported from another file needs such a name (or a `warlock-check-ignore` comment). A wrapper such as `guarded(() => …)` guards the routes inside it (list your own wrappers in `guardWrappers`), and an options variable the check cannot see into is trusted. An options object literal that only spreads (`{ ...opts }`) is reported as a `WL9006` warning; add `middleware` or `public: true` to the literal.
 
 When a finding is deliberate, say so next to it. A `warlock-check-ignore` comment on the problem's line or the line above skips the codes it names, or every code when it names none:
 
@@ -275,7 +275,7 @@ They parse real TypeScript/JSX syntax with the same oxc-parser adapter as the ex
 | `WL9025` | `merge()` on an object column of a Cascade model keeps the keys the new value omits (warning)            | Use `model.set({ column: value })` or `model.set("column", value)`; there is no automatic fix.                                                                     |
 | `WL9026` | A convention rule used more than its time budget and was skipped for the rest of the run (warning)       | Use `--changed`, raise `ruleBudgetMs` in `.warlock-check.json` (0 turns it off), or turn the rule off.                                                             |
 | `WL9024` | An integration spec (not `*.unit.*`, or under `tests/`) imports nothing that needs the app (a warning)   | Move it to the unit project: rename it to `<name>.unit.spec.ts` outside `tests/`.                                                                                  |
-| `WL9104` | Translation key computed at runtime in `src/web` (a page then ships every group)                         | Declare the keys with `config.translations` in the page's setup file.                                                                                              |
+| `WL9104` | Translation key computed at runtime in `src/web` (a page then ships every group)                         | Use a literal key or a static-prefix template; `config.translations` only adds keys, it does not lift the fallback.                                                |
 
 ## Boundary, barrel and locale conventions
 

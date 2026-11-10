@@ -5,7 +5,7 @@
  * `authMiddleware("cookie:*")`) must be checked at this earliest core seam.
  */
 import { describe, expect, it, vi } from "vitest";
-import { runDefaultCsrfGuard } from "./csrf-default-guard";
+import { resolveCsrfMessage, runDefaultCsrfGuard } from "./csrf-default-guard";
 import { Request } from "./request";
 import { Response } from "./response";
 import type { Route } from "../router/types";
@@ -273,5 +273,35 @@ describe("runDefaultCsrfGuard — default core CSRF-Origin guard", () => {
 
     expect(result).toBeInstanceOf(Response);
     expect(forbidden).toHaveBeenCalledWith(expect.objectContaining({ errorCode: "EC006" }));
+  });
+});
+
+describe("resolveCsrfMessage", () => {
+  it("prefers an app/auth override of the auth key", () => {
+    const text = resolveCsrfMessage((key) =>
+      key === "auth.errors.csrfOriginMismatch" ? "App text." : key,
+    );
+
+    expect(text).toBe("App text.");
+  });
+
+  it("uses core's own key when the auth key does not resolve", () => {
+    const text = resolveCsrfMessage((key) =>
+      key === "http.errors.csrfOriginMismatch" ? "Core text." : key,
+    );
+
+    expect(text).toBe("Core text.");
+  });
+
+  it("never returns a raw key: falls back to the English sentence", () => {
+    expect(resolveCsrfMessage((key) => key)).toBe("Request origin is not allowed.");
+    expect(resolveCsrfMessage(() => "")).toBe("Request origin is not allowed.");
+  });
+
+  it("ships core defaults for en and ar", async () => {
+    const { coreDefaultTranslations } = await import("../localization/core-default-translations");
+
+    expect(coreDefaultTranslations.en.http).toBeDefined();
+    expect(coreDefaultTranslations.ar.http).toBeDefined();
   });
 });

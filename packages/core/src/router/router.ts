@@ -562,14 +562,14 @@ export class Router {
   /**
    * Add a request that accepts all methods
    */
-  public any(path: string, handler: RequestHandlerType, options: RouteOptions = {}) {
+  public any(path: string | string[], handler: RequestHandlerType, options: RouteOptions = {}) {
     return this.add("all" as Route["method"], path, handler, options);
   }
 
   /**
    * Add get request method
    */
-  public get(path: string, handler: RequestHandlerType, options: RouteOptions = {}) {
+  public get(path: string | string[], handler: RequestHandlerType, options: RouteOptions = {}) {
     return this.add("GET", path, handler, options);
   }
 
@@ -583,7 +583,7 @@ export class Router {
   /**
    * Add put request method
    */
-  public put(path: string, handler: RequestHandlerType, options: RouteOptions = {}) {
+  public put(path: string | string[], handler: RequestHandlerType, options: RouteOptions = {}) {
     return this.add("PUT", path, handler, options);
   }
 
@@ -597,21 +597,21 @@ export class Router {
   /**
    * Add patch request method
    */
-  public patch(path: string, handler: RequestHandlerType, options: RouteOptions = {}) {
+  public patch(path: string | string[], handler: RequestHandlerType, options: RouteOptions = {}) {
     return this.add("PATCH", path, handler, options);
   }
 
   /**
    * Add head request method
    */
-  public head(path: string, handler: RequestHandlerType, options: RouteOptions = {}) {
+  public head(path: string | string[], handler: RequestHandlerType, options: RouteOptions = {}) {
     return this.add("HEAD", path, handler, options);
   }
 
   /**
    * Add options request method
    */
-  public options(path: string, handler: RequestHandlerType, options: RouteOptions = {}) {
+  public options(path: string | string[], handler: RequestHandlerType, options: RouteOptions = {}) {
     return this.add("OPTIONS", path, handler, options);
   }
 

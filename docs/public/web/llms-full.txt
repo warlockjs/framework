@@ -926,6 +926,31 @@ are the exception and remain supported.
 
 Creating a page, deleting one, or editing `config.route` is route-table churn rather than a component-only edit. `warlock dev` re-registers affected routes atomically with no manual restart.
 
+## Avoiding a circular config type
+
+`config.metadata` takes its type from the loader (`satisfies PageConfig<typeof loader>`), so the loader's parameter types must not read `typeof config`. Typing the loader as `PageLoaderContext<typeof config.validation, typeof config.route>` while `config` is declared inline and uses `metadata` makes `config` refer to itself through the loader (TS7022 / TS2502). Hoist the validation into its own const and type the loader from that const:
+
+```ts title="src/web/products/[id].setup.ts"
+import { v } from "@warlock.js/seal";
+import type { PageConfig, PageLoaderContext } from "@warlock.js/web";
+
+const productValidation = { params: v.object({ id: v.string() }) };
+
+export const config = {
+  route: { path: "/products/:id", name: "products.show" },
+  validation: productValidation,
+  metadata: ({ data }) => ({ title: data.product.name }),
+} satisfies PageConfig<typeof loader>;
+
+export async function loader({ request }: PageLoaderContext<typeof productValidation>) {
+  const id = request.input("id");
+
+  return { product: { id, name: `Product ${id}` } };
+}
+```
+
+Keep `route` as a literal object inside `config`. Moving it into its own const also clears the type error, but `warlock generate.typings` then refuses the module with "the `config.route` export must be a directly exported object literal". On a guarded page, pass the route name as the third type argument instead of reading `typeof config.route`, for example `PageLoaderContext<typeof productValidation, undefined, "account.show">`, which keeps `session` non-null (see the `protect-a-page` topic).
+
 ## Gotchas
 
 - **A page with no `config.route` is not unreachable.** It derives a real URL from its file location — see [Filesystem routing](#filesystem-routing).
@@ -2049,6 +2074,42 @@ Only put browser-safe data in `shared`: scalars, arrays, plain objects, or value
 - A loader must not write `shared`; a post-seal write throws.
 - Loader response mutations are buffered per level and settled deterministically, root to leaf.
 
+## Avoiding a circular config type
+
+When `config` uses `metadata` with `satisfies PageConfig<typeof loader>`, the loader's context type must not come from `config`. This fails with TS7022 / TS2502, because `config` then depends on the loader, which depends on `config`:
+
+```ts
+// Circular: the loader reads the config that is typed from the loader.
+export async function loader({
+  request,
+}: PageLoaderContext<typeof config.validation, typeof config.route>) {
+  /* ... */
+}
+```
+
+Hoist the validation into its own const and type the context from that const. A named `export async function loader(...)` keeps the return type for `PageProps<typeof loader>`:
+
+```ts title="src/web/products/[id].setup.ts"
+import { v } from "@warlock.js/seal";
+import type { PageConfig, PageLoaderContext } from "@warlock.js/web";
+
+const productValidation = { params: v.object({ id: v.string() }) };
+
+export const config = {
+  route: { path: "/products/:id", name: "products.show" },
+  validation: productValidation,
+  metadata: ({ data }) => ({ title: data.product.name }),
+} satisfies PageConfig<typeof loader>;
+
+export async function loader({ request }: PageLoaderContext<typeof productValidation>) {
+  const id = request.input("id");
+
+  return { product: { id, name: `Product ${id}` } };
+}
+```
+
+Keep `route` as a literal object inside `config`; `warlock generate.typings` refuses a `config.route` that is not a directly exported object literal. On a guarded page, pass the route name as the third type argument, such as `PageLoaderContext<typeof productValidation, undefined, "account.show">`, instead of reading `typeof config.route`.
+
 ## Gotchas
 
 - **Let the loader's return type be inferred.** Use `satisfies PageLoader<...>` on an arrow function or a typed named function; never `: PageLoader`, which erases the return type that `PageProps` needs.
@@ -2139,7 +2200,12 @@ prop or an argument to a helper. A key used with `count` is stored as variants
 (`items_one`, `items_other`, ...) and the call names the base, `t("cart.items",
 { count })`; naming the base ships every variant. A key built at run time that
 no literal names falls back to every group, and `warlock check` reports it as
-`WL9104`. Declare such keys in the page's setup file:
+`WL9104` with the file, line and key text; the build log lists the same sites.
+`config.translations` only adds keys; it does not resolve a computed lookup. One
+dynamic site anywhere in the page's graph (page, layouts, root, error pages) still
+ships every group, so fix the site itself (a literal key or a static-prefix
+template). Use a declaration for keys the analysis cannot see, such as ones read
+from data:
 
 ```ts title="src/web/orders/index.setup.ts"
 export const config = {
@@ -2147,6 +2213,15 @@ export const config = {
   translations: ["statuses.*", "members.title"],
 };
 ```
+
+Matching is by name: the result of `useTrans()` under any local name, and the
+names `t`, `trans`, `transX` and `transFrom` (key in the second argument). A hook
+that receives `t` as a parameter is matched only by that name, so give hooks their
+own `useTrans()` call instead of passing `t` in; a translator handed on as a value
+(returned, stored, passed to a non-hook call) is dynamic, but a dependency list
+(`useMemo(..., [t])`, `useEffect(..., [t])`) is not. A bare string literal equal to
+a group or subtree name (`"orders"`) ships that whole group; prefer a longer key
+or a static-prefix template over a short literal that happens to name a group.
 
 The same applies to the global registry (`extend()` / `register()`, the
 starter's default). The shared groups are copied once, when the web connector
@@ -3697,7 +3772,7 @@ export default function AccountPage({ data }: PageProps<typeof loader>) {
 }
 ```
 
-- **Loader context.** `PageLoaderContext<Validation, typeof route>` (and `PageLoader`) type `session` as non-optional `{ user, model }` and `request.locals.user` as non-null for a guarded page. The route name comes from the third type argument as above, or from `typeof config.route` when `route` keeps a literal name: declare `config` `as const satisfies PageConfig`, because plain `satisfies` widens `name` to `string` and the loader then types `session` as optional. Layout and app loaders, page actions and unguarded pages are unchanged: there `session` is still optional and `user` may be `null`.
+- **Loader context.** `PageLoaderContext<Validation, undefined, "account.show">` (and `PageLoader`) type `session` as non-optional `{ user, model }` and `request.locals.user` as non-null for a guarded page. The route name comes from the third type argument as above. Reading it from `typeof config.route` makes `config` refer to itself through the loader once `config` uses `metadata` (TS7022); if you do, declare `config` `as const satisfies PageConfig`, because plain `satisfies` widens `name` to `string` and the loader then types `session` as optional. Layout and app loaders, page actions and unguarded pages are unchanged: there `session` is still optional and `user` may be `null`.
 - **`useUser(routeName)`** returns a non-null `SessionUser`; any name that is not a guarded page fails to compile. Passing the name also keeps the last signed-in user while that component stays mounted, so a sign-out that flips the store to a guest a frame before navigation completes does not hand `null` to a component reading `user.name`. Retention follows the last committed render: an abandoned suspended transition cannot replace the retained user. Plain `useUser()` is unchanged and still returns `null` for a guest.
 
 To guard a whole subtree at once, put `requireUser()` in a layout's `config.middleware` instead of repeating it per page; the `use-layouts` topic has a worked `/admin` example.

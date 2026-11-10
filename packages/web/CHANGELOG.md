@@ -2,6 +2,16 @@
 
 All notable changes to `@warlock.js/web` are documented here.
 
+## 5.51.0 - 2026-11-11
+
+### Added
+
+- The page build logs every translation lookup computed at runtime (file, line and key text), once each, and says that `config.translations` only adds keys: removing the computed lookup is what lets pages ship only the groups they use.
+
+### Documentation
+
+- The `create-a-page` and `load-page-data` topics and pages describe how to avoid a circular `config` type (hoist the validation into its own const, pass the route name as the third type argument), and the sessions page uses that form.
+
 ## 5.47.2 - 2026-11-07
 
 ### Added

@@ -63,6 +63,10 @@ export function registerLocaleDictionary(input: {
     ...input,
     localeCodes: Array.isArray(localeCodes) ? localeCodes : undefined,
   });
+  // Locale codes the app does not configure are dropped, not fatal: surface them once per file.
+  for (const warning of parsed.warnings ?? []) {
+    process.emitWarning(warning, { code: "WL1010" });
+  }
   const keys = Object.keys(parsed.entries);
   claim(input.sourceFile, "json", keys);
   groupedTranslations(parsed.entries);

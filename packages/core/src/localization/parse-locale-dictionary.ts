@@ -4,6 +4,12 @@ export type ParsedLocaleDictionary = {
   sourceFile: string;
   group: string;
   entries: LocaleDictionaryEntries;
+  /**
+   * Present only when something was dropped: locale codes the app does not
+   * configure (for example `ar` after `app.localeCodes` is narrowed to `["en"]`)
+   * are ignored instead of failing the build.
+   */
+  warnings?: string[];
 };
 
 type JsonValue = string | number | boolean | null | JsonObject | JsonValue[];
@@ -201,6 +207,7 @@ function readLeaf(
   key: string,
   value: JsonObject,
   localeCodes: readonly string[] | undefined,
+  warnings: string[],
 ): Record<string, string> {
   const locales = localeCodes === undefined ? undefined : new Set(localeCodes);
   const entry: Record<string, string> = Object.create(null) as Record<string, string>;
@@ -208,8 +215,12 @@ function readLeaf(
     if (!LOCALE_CODE.test(locale)) fail(sourceFile, `${key}.${locale}`, "invalid locale code");
     if (typeof translation !== "string")
       fail(sourceFile, `${key}.${locale}`, "locale values must be strings");
-    if (locales !== undefined && !locales.has(locale))
-      fail(sourceFile, `${key}.${locale}`, "unknown locale code");
+    if (locales !== undefined && !locales.has(locale)) {
+      warnings.push(
+        `Ignored locale "${locale}" at "${key}.${locale}" in "${sourceFile}": it is not listed in app.localeCodes.`,
+      );
+      continue;
+    }
     entry[locale] = translation;
   }
   if (localeCodes !== undefined)
@@ -225,6 +236,7 @@ function collectEntries(
   localeCodes: readonly string[] | undefined,
   entries: LocaleDictionaryEntries,
   nested: boolean,
+  warnings: string[],
 ): void {
   if (nested && object.size === 0) fail(sourceFile, group, "nested objects cannot be empty");
   for (const [segment, value] of object) {
@@ -240,13 +252,13 @@ function collectEntries(
     if (hasString) {
       if (!values.every((item) => typeof item === "string"))
         fail(sourceFile, key, "cannot mix locale values with nested entries");
-      entries[key] = readLeaf(sourceFile, key, value, localeCodes);
+      entries[key] = readLeaf(sourceFile, key, value, localeCodes, warnings);
       continue;
     }
     if (!allObjects) fail(sourceFile, key, "cannot mix locale values with nested entries");
     if (localeCodes !== undefined && [...value.keys()].some((child) => localeCodes.includes(child)))
       fail(sourceFile, key, "cannot mix locale codes with nested entries");
-    collectEntries(sourceFile, value, key, localeCodes, entries, true);
+    collectEntries(sourceFile, value, key, localeCodes, entries, true, warnings);
   }
 }
 
@@ -275,6 +287,9 @@ export function parseLocaleDictionary(input: {
   const entries: LocaleDictionaryEntries = Object.create(null) as LocaleDictionaryEntries;
   const rootEntries = new Map(parsed);
   rootEntries.delete("$group");
-  collectEntries(sourceFile, rootEntries, group, localeCodes, entries, false);
-  return { sourceFile, group, entries };
+  const warnings: string[] = [];
+  collectEntries(sourceFile, rootEntries, group, localeCodes, entries, false, warnings);
+  return warnings.length > 0
+    ? { sourceFile, group, entries, warnings }
+    : { sourceFile, group, entries };
 }

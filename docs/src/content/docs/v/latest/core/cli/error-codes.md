@@ -134,6 +134,12 @@ Category: your code · skill: `use-localization` · thrown as `UnknownLocaleErro
 
 Category: your code · skill: `add-connector`
 
+### WL1010
+
+**A locale dictionary has translations for a locale the app does not configure.** Add the locale to app.localeCodes in src/config/app.ts, or delete that locale's text from the locales.json file named in the warning. The text is ignored until then.
+
+Category: your code · skill: `use-localization`
+
 ## WL2xxx — boot
 
 ### WL2001
@@ -482,7 +488,7 @@ Category: your code · skill: `warlock-conventions`
 
 ### WL9006
 
-**A mutating route has no auth guard and is not marked public.** Register the POST/PUT/PATCH/DELETE route inside `guarded()` (or with auth middleware), or pass `{ public: true }` if it is meant to be open. A route inside a helper of your own that wraps `guarded()` is reported unless you list the helper's name in `guardWrappers` in `.warlock-check.json`.
+**A mutating route has no auth guard and is not marked public.** Register the POST/PUT/PATCH/DELETE route inside `guarded()` (or with auth middleware), or pass `{ public: true }` if it is meant to be open. A route inside a helper of your own that wraps `guarded()` is reported unless you list the helper's name in `guardWrappers` in `.warlock-check.json`. Limits: a guard is recognised by a name containing `auth` or `guard`, or as a constant initialised with `markAuthGuard()` in the same file (an imported guard with another name is not recognised: rename it or add a `warlock-check-ignore` comment). A route whose options object is only a spread (`{ ...opts }`) is reported as a warning, because the check cannot see the guard; write `middleware` or `public: true` in the literal.
 
 Category: your code · skill: `warlock-conventions`
 
@@ -542,7 +548,7 @@ Category: your code · skill: `warlock-doctor`
 
 ### WL9104
 
-**Translation key is computed at runtime, so the page cannot ship only the keys it uses.** Declare the keys or prefixes the page renders in its setup file, for example `export const config = { translations: ["statuses.*", "members.title"] }`. Until then the page ships every translation group. Reported as a warning on `src/web` files; the page falls back to the full groups.
+**Translation key is computed at runtime, so the page cannot ship only the keys it uses.** Use a literal key or a static-prefix template such as `statuses.${status}` instead of a computed key. `config.translations` in the setup file only adds keys; it does not resolve a computed lookup, so one dynamic site anywhere in the page's graph (page, layouts, root, error pages) still ships every translation group. Reported as a warning on `src/web` files with the file, line and key text; the build log lists the same sites.
 
 Category: your code · skill: `use-localization`
 

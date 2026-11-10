@@ -139,6 +139,8 @@ two files that define the same key fail at load and name both. Web's per-page
 translation tables are built from the same registry and include these keys. Only
 `utils/locales.json` and the files directly inside `utils/locales/` are loaded.
 
+A locale in a dictionary that `app.localeCodes` does not list (for example `ar` after you narrow the app to `["en"]`) is ignored with a process warning instead of failing the build. Every configured locale must still be present on each entry.
+
 ### Check that every key has every locale
 
 ```bash

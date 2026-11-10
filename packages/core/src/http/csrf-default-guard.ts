@@ -43,6 +43,11 @@
  * at all) never reaches the cookie check above and is entirely unaffected.
  */
 import { LOCALE_COOKIE_NAME, LOCALE_PREFERENCE_COOKIE_NAME } from "../config/locale-configuration";
+import {
+  CSRF_ORIGIN_MISMATCH_FALLBACK,
+  CSRF_ORIGIN_MISMATCH_KEY,
+  registerCoreTranslations,
+} from "../localization/core-default-translations";
 import { HttpErrorCodes } from "./error-codes";
 import { resolveCsrfOriginVerdict } from "./csrf-origin-policy";
 import type { Request } from "./request";
@@ -144,6 +149,24 @@ export function requiresDefaultCsrfGuard(request: Request): boolean {
 }
 
 /**
+ * Resolve the refusal text: an app (or `@warlock.js/auth`) override at
+ * `auth.errors.csrfOriginMismatch` wins, then core's own
+ * `http.errors.csrfOriginMismatch`, then the English sentence. A raw key is
+ * never returned.
+ */
+export function resolveCsrfMessage(translate: (key: string) => string): string {
+  registerCoreTranslations();
+
+  for (const key of ["auth.errors.csrfOriginMismatch", CSRF_ORIGIN_MISMATCH_KEY]) {
+    const text = translate(key);
+
+    if (typeof text === "string" && text !== "" && text !== key) return text;
+  }
+
+  return CSRF_ORIGIN_MISMATCH_FALLBACK;
+}
+
+/**
  * Run the default core CSRF-Origin guard for the current request.
  *
  * Returns `undefined` when the request is out of scope or passes the
@@ -154,7 +177,7 @@ export function requiresDefaultCsrfGuard(request: Request): boolean {
  *
  * Uses the SAME translated message and client-visible error code
  * `authMiddleware("cookie:*")`'s own CSRF-Origin check uses
- * (`auth.errors.csrfOriginMismatch`, `HttpErrorCodes.CsrfOriginMismatch` /
+ * (`auth.errors.csrfOriginMismatch`, falling back to core's `http.errors.csrfOriginMismatch`, `HttpErrorCodes.CsrfOriginMismatch` /
  * `AuthErrorCodes.CsrfOriginMismatch`, both `"EC006"`) — one message, one
  * error code, regardless of which seam caught the request. Logs exactly once
  * per rejection here; a route that also carries `authMiddleware("cookie:*")`
@@ -177,7 +200,7 @@ export async function runDefaultCsrfGuard(
   logRejection(verdict.reason);
 
   return response.forbidden({
-    error: translate("auth.errors.csrfOriginMismatch"),
+    error: resolveCsrfMessage(translate),
     errorCode: HttpErrorCodes.CsrfOriginMismatch,
   });
 }

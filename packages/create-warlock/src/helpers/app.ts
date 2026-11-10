@@ -381,6 +381,113 @@ export class App {
   }
 
   /**
+   * Strip everything model-backed for a "no database" scaffold.
+   *
+   * The template's `users`, `auth` and `posts` modules all sit on cascade models
+   * and migrations (the auth module also needs the `User` model for tokens and
+   * OTP storage), so a project without a database cannot keep them. This removes
+   * those modules and rewrites every file that referenced them, so the result
+   * has no dangling imports:
+   *
+   * - `src/app/{users,auth,posts}` and `src/config/auth.ts` are deleted;
+   * - `warlock.config.ts` drops the auth commands and migrations;
+   * - `src/app/shared/utils/router.ts` keeps `publicRoutes` only (`guarded`
+   *   needs `@warlock.js/auth`);
+   * - the `@warlock.js/auth` module augmentation leaves `src/typings.d.ts`;
+   * - `.env` / `.env.example` lose every `DB_*` line and the JWT secrets;
+   * - `package.json` drops `@warlock.js/auth` and the migrate / seed / jwt /
+   *   model-generator scripts.
+   *
+   * What stays: home, contact and locale (web only), uploads and shared.
+   */
+  public removeDatabaseModules() {
+    const remove = (relativePath: string) => {
+      const target = path.resolve(this.path, relativePath);
+      if (existsSync(target)) rmSync(target, { recursive: true, force: true });
+    };
+
+    for (const entry of ["src/app/users", "src/app/auth", "src/app/posts", "src/config/auth.ts"]) {
+      remove(entry);
+    }
+
+    const write = (relativePath: string, transform: (content: string) => string) => {
+      const target = path.resolve(this.path, relativePath);
+      if (!fileExists(target)) return;
+      const content = getFile(target) as string;
+      const next = transform(content);
+      if (next !== content) putFile(target, next);
+    };
+
+    putFile(
+      path.resolve(this.path, "warlock.config.ts"),
+      `import { defineConfig } from "@warlock.js/core";
+
+export default defineConfig({
+  build: { budgets: { page: { js: "150kb", css: "50kb" }, mode: "error" } },
+});
+`,
+    );
+
+    write("src/app/shared/utils/router.ts", (content) =>
+      content
+        .replace(/^import \{ authMiddleware \} from "@warlock\.js\/auth";\r?\n/m, "")
+        .replace(/\r?\n\/\*\*\r?\n \* Require an authenticated user[\s\S]*$/, "\n"),
+    );
+
+    write("src/typings.d.ts", (content) =>
+      content.replace(/declare module "@warlock\.js\/auth" \{[\s\S]*?\r?\n\}\r?\n\r?\n?/, ""),
+    );
+
+    for (const envFile of [".env", ".env.example"]) {
+      write(envFile, (content) =>
+        content
+          .replace(/^# Database Configurations\r?\n/m, "")
+          .replace(/^DB_[A-Z_]*=.*\r?\n?/gm, "")
+          .replace(/^JWT_[A-Z_]*=.*\r?\n?/gm, "")
+          .replace(/(\r?\n){3,}/g, "\n\n"),
+      );
+    }
+
+    const packageJsonPath = path.resolve(this.path, "package.json");
+    const packageJson = getJsonFile(packageJsonPath) as {
+      dependencies?: Record<string, string>;
+      scripts?: Record<string, string>;
+    };
+
+    if (packageJson.dependencies) delete packageJson.dependencies["@warlock.js/auth"];
+
+    for (const script of [
+      "seed",
+      "migrate",
+      "migrate.fresh",
+      "migrate.list",
+      "jwt",
+      "gen.m",
+      "gen.mig",
+      "gen.r",
+    ]) {
+      delete packageJson.scripts?.[script];
+    }
+
+    putJsonFile(packageJsonPath, packageJson);
+    delete this.jsonFiles[path.resolve(packageJsonPath)];
+
+    write("README.md", (content) =>
+      content
+        .replace(/^\| `npm run (migrate|migrate\.fresh|migrate\.list|seed|jwt)`.*\r?\n/gm, "")
+        .replace("(users, auth, posts, …)", "(home, contact, …)")
+        .replace(
+          /The example modules \(`users`, `auth`, `posts`\) are there to show the patterns —\r?\nkeep, change or delete them\./,
+          "This app was scaffolded without a database, so it has no model-backed example modules\n(`users`, `auth`, `posts`). Add a database later with `warlock add mongodb` or\n`warlock add postgres`.",
+        ),
+    );
+
+    write("AGENTS.md", (content) => content.replace(/^- `npm run (migrate|seed)[^\n]*\r?\n/gm, ""));
+
+    return this;
+  }
+
+  /**
    * Configure the web starter only when the web feature owns `/`.
    *
    * A dependency-free HTTP response is retained without web; otherwise the

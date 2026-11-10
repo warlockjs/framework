@@ -201,6 +201,8 @@ This closes the residual CSRF gap that `SameSite=Lax` alone leaves open for cook
 
 It reuses the exact same same-origin / `auth.csrf.allowedOrigins` comparison and the same `403` / `AuthErrorCodes.CsrfOriginMismatch` (`EC006`) response as the `authMiddleware` check above, so the two never disagree. A header-only API request (no `Cookie` header at all, e.g. `Authorization: Bearer …`) is completely unaffected, and a route already covered by `authMiddleware("cookie:*")` is not checked twice or logged twice — the earlier guard short-circuits the request before that middleware runs.
 
+The refusal text is the `auth.errors.csrfOriginMismatch` translation when your app (or `@warlock.js/auth`) defines it, otherwise core's own `http.errors.csrfOriginMismatch` (shipped in English and Arabic), and finally the English sentence "Request origin is not allowed." A raw key is never shown, so apps without `@warlock.js/auth` get readable text. Override either key in your locale files to change the message.
+
 ### Exempting a route — `{ csrf: false }`
 
 ⚠️ **Dangerous.** Only exempt a route that cannot present a same-origin `Origin`/`Referer` by construction and is safe without this check — a third-party callback the browser is redirected to directly, or a machine-to-machine route no browser ever calls with cookies. Never exempt a route an ordinary signed-in browser session writes to.

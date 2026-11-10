@@ -53,6 +53,8 @@ export type TranslationBuildResult = {
   readonly assets: readonly SharedTranslationAsset[];
   /** The parsed route-locale sources the tables derive from, for build-time payload estimates. */
   readonly sources: readonly TranslationSourceEntries[];
+  /** Every lookup the analyzer could not resolve, once each, as `file:line  text` lines for the build log. */
+  readonly dynamicSites: readonly string[];
 };
 
 export type TranslationBuildInput = {
@@ -120,7 +122,14 @@ export function buildTranslationManifest(input: TranslationBuildInput): Translat
   ]);
   const errorSetups = errorPages.flatMap((page) => definedOf([page.setupFile, page.appSetupFile]));
 
+  const dynamicSites = new Map<string, string>();
+
   const record = (pageFile: string, analyzed: TranslationUsage): void => {
+    for (const site of analyzed.dynamicSites) {
+      const where = `${input.relativeTo(site.file)}:${site.line}`;
+      dynamicSites.set(`${where}\0${site.text}`, `${where}  ${site.text}`);
+    }
+
     usage[input.relativeTo(pageFile)] = serializeUsage(analyzed);
   };
 
@@ -164,6 +173,7 @@ export function buildTranslationManifest(input: TranslationBuildInput): Translat
     manifest: { sharedGroups, prune, usage },
     assets: sharedTranslationAssets(sources, sharedGroups),
     sources,
+    dynamicSites: [...dynamicSites.values()],
   };
 }
 
