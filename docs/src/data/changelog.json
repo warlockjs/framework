@@ -136,6 +136,115 @@
   ],
   "releases": [
     {
+      "version": "5.51.0",
+      "id": "v5-51-0",
+      "date": "November 11, 2026",
+      "isUnreleased": false,
+      "headlineHtml": "Route path arrays on every verb, <code>request.originalPath</code>, a built-in CSRF refusal message, clearer <code>WL9006</code> and <code>WL9104</code> diagnostics, and a database-free <code>--no-db</code> scaffold.",
+      "highlights": [
+        "Every router verb accepts an array of paths and registers one route per path.",
+        "<code>request.originalUrl</code> and <code>request.originalPath</code> return what the client sent, before the terminal-slash normalization, so <code>/docs</code> and <code>/docs/</code> can be told apart.",
+        "The CSRF origin refusal ships its own English and Arabic message, so an app without <code>@warlock.js/auth</code> no longer answers with a raw translation key.",
+        "<code>WL9006</code> reports a spread-only options object as a warning and names <code>guardWrappers</code>; <code>WL9104</code> names the file, line and text of each computed translation lookup.",
+        "A hook dependency list such as <code>[t]</code> no longer makes a page ship every translation group, and the page build logs each computed lookup.",
+        "A locale dictionary with a locale outside <code>app.localeCodes</code> is ignored with <code>WL1010</code> instead of failing the build.",
+        "<code>create-warlock --no-db</code> no longer scaffolds the model-backed <code>users</code>, <code>auth</code> and <code>posts</code> modules, the auth dependency, or the <code>DB_*</code> and JWT entries."
+      ],
+      "upgradeNotes": [],
+      "summaryHtml": null,
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/5.51.0-summary.md",
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 8,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 4
+            },
+            {
+              "type": "Changed",
+              "n": 3
+            },
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>router.get/post/put/patch/delete/head/options/any</code> accept an array of paths and register one route per path, as <code>router.add</code> already did."
+            },
+            {
+              "type": "Added",
+              "html": "<code>request.originalUrl</code> (path and query string) and <code>request.originalPath</code> (pathname) return what the client sent, before the terminal-slash normalization and <code>rewriteUrl</code>. Use them to tell <code>/docs</code> from <code>/docs/</code>."
+            },
+            {
+              "type": "Added",
+              "html": "Core ships its own <code>http.errors.csrfOriginMismatch</code> translation (English and Arabic). The CSRF origin refusal uses the app's <code>auth.errors.csrfOriginMismatch</code> when defined, then core's key, then the English sentence, through the new <code>resolveCsrfMessage()</code>. An app without <code>@warlock.js/auth</code> no longer answers with the raw key."
+            },
+            {
+              "type": "Added",
+              "html": "<code>WL1010</code> (warning): a <code>locales.json</code> dictionary holds text for a locale that is not in <code>app.localeCodes</code>."
+            },
+            {
+              "type": "Changed",
+              "html": "A locale dictionary with a locale code outside <code>app.localeCodes</code> no longer fails the build: that text is ignored and <code>WL1010</code> is reported once per file. Every configured locale is still required."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>WL9006</code> reports a route whose options object is only a spread (<code>{ ...opts }</code>) as a warning instead of trusting it; a spread next to <code>public: true</code> or a proven guard is still trusted. The unguarded message names <code>guardWrappers</code> and the guard-naming rule."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>WL9104</code> names the file, line and key text of the computed lookup, and says that <code>config.translations</code> only adds keys and does not lift the every-group fallback."
+            },
+            {
+              "type": "Fixed",
+              "html": "The translation usage analyzer no longer treats a hook dependency list (<code>useMemo(() =&gt; t(\"a\"), [t])</code>) as a translator that escapes, which made every page that used one ship all translation groups."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/web",
+          "slug": "web",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "The page build logs every translation lookup computed at runtime (file, line and key text), once each, and says that <code>config.translations</code> only adds keys: removing the computed lookup is what lets pages ship only the groups they use."
+            }
+          ]
+        },
+        {
+          "name": "create-warlock",
+          "slug": "create-warlock",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "A \"no database\" scaffold no longer ships the model-backed <code>users</code>, <code>auth</code> and <code>posts</code> modules, <code>src/config/auth.ts</code>, the <code>@warlock.js/auth</code> dependency and typings augmentation, the <code>DB_*</code> and JWT entries in <code>.env</code> and <code>.env.example</code>, or the migrate, seed and JWT scripts. The generated app has no dangling imports and boots without a database."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "5.50.0",
       "id": "v5-50-0",
       "date": "November 9, 2026",

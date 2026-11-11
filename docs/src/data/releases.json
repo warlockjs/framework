@@ -1,4 +1,18 @@
 {
+  "5.51.0": {
+    "publishedAt": "2026-11-11T00:13:31.843Z",
+    "matrix": "none",
+    "headline": "Route path arrays on every verb, `request.originalPath`, a built-in CSRF refusal message, clearer `WL9006` and `WL9104` diagnostics, and a database-free `--no-db` scaffold.",
+    "highlights": [
+      "Every router verb accepts an array of paths and registers one route per path.",
+      "`request.originalUrl` and `request.originalPath` return what the client sent, before the terminal-slash normalization, so `/docs` and `/docs/` can be told apart.",
+      "The CSRF origin refusal ships its own English and Arabic message, so an app without `@warlock.js/auth` no longer answers with a raw translation key.",
+      "`WL9006` reports a spread-only options object as a warning and names `guardWrappers`; `WL9104` names the file, line and text of each computed translation lookup.",
+      "A hook dependency list such as `[t]` no longer makes a page ship every translation group, and the page build logs each computed lookup.",
+      "A locale dictionary with a locale outside `app.localeCodes` is ignored with `WL1010` instead of failing the build.",
+      "`create-warlock --no-db` no longer scaffolds the model-backed `users`, `auth` and `posts` modules, the auth dependency, or the `DB_*` and JWT entries."
+    ]
+  },
   "5.50.0": {
     "publishedAt": "2026-11-09T12:23:27.556Z",
     "matrix": "none",
