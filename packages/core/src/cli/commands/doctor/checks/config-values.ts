@@ -1,4 +1,7 @@
+import { existsSync } from "node:fs";
 import { createRequire } from "node:module";
+import path from "node:path";
+import type { DoctorCheck } from "../check.types";
 
 /**
  * @fileoverview Small readers shared by the deployment-settings checks
@@ -34,15 +37,50 @@ export function formatBytes(bytes: number): string {
 }
 
 /**
- * Whether a package resolves from the project's working directory, not from
- * core's own `node_modules`, so the answer reflects what the app installed.
- * Read at call time: the working directory is the app's.
+ * Whether a package is installed where the project's working directory would
+ * find it, not in core's own `node_modules`, so the answer reflects what the
+ * app installed. Read at call time: the working directory is the app's.
+ *
+ * Looks for the package's `package.json` in each `node_modules` directory a
+ * lookup from the project walks, instead of resolving the package itself: a
+ * package whose `exports` offer only an `import` condition (every
+ * `@warlock.js/*` package) cannot be resolved by `require`, though it is
+ * installed.
  */
 export function isInstalledInProject(packageName: string): boolean {
   try {
-    createRequire(`${process.cwd()}/package.json`).resolve(packageName);
-    return true;
+    const lookupPaths =
+      createRequire(`${process.cwd()}/package.json`).resolve.paths(packageName) ?? [];
+
+    return lookupPaths.some((directory) =>
+      existsSync(path.join(directory, packageName, "package.json")),
+    );
   } catch {
     return false;
   }
+}
+
+/**
+ * A deployment-settings check that cannot fail the command. The runner turns a
+ * thrown check into a `fail`, which exits non-zero; these checks only ever
+ * warn, so an error while reading the app's config (a getter that throws, a
+ * custom log channel that throws) becomes a `warn` naming the error instead.
+ */
+export function warnOnError(check: DoctorCheck): DoctorCheck {
+  return {
+    name: check.name,
+    run: async (context) => {
+      try {
+        return await check.run(context);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+
+        return {
+          name: check.name,
+          status: "warn",
+          detail: `could not read the setting this check reports on: ${message}`,
+        };
+      }
+    },
+  };
 }

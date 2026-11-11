@@ -1,6 +1,6 @@
 import { config } from "../../../../config/config-getter";
 import type { DoctorCheck } from "../check.types";
-import { isSet } from "./config-values";
+import { isSet, warnOnError } from "./config-values";
 
 /** The parts of a log channel this check reads. */
 type ChannelLike = {
@@ -33,8 +33,8 @@ function channelList(value: unknown): unknown[] {
 }
 
 /**
- * Warns when a console channel used in production has no minimum level, so
- * every `debug` entry is printed, including the per-phase lines each request
+ * Warns when a console channel used in production prints `debug` entries (no
+ * `minLevel` above `debug`, and no `levels` list leaving it out), including the per-phase lines each request
  * writes while `http.log` is on: a console write per line on every request.
  *
  * Reads the production channels the way the logger connector builds them:
@@ -46,17 +46,19 @@ function channelList(value: unknown): unknown[] {
  * config, production logging is disabled, or no console channel is used in
  * production.
  */
-export const productionLoggingCheck: DoctorCheck = {
+export const productionLoggingCheck: DoctorCheck = warnOnError({
   name: "production-logging",
   run: () => {
     if (!isSet(config.get("log"))) return undefined;
 
+    // As the logger reads it: the production flag, else the top-level flag,
+    // else on; any falsy value turns production logging off.
     const productionEnabled: unknown = config.get("log.production.enabled");
     const enabled: unknown = isSet(productionEnabled)
       ? productionEnabled
-      : config.get("log.enabled");
+      : (config.get("log.enabled") ?? true);
 
-    if (enabled === false) return undefined;
+    if (!enabled) return undefined;
 
     const shared = channelList(config.get("log.channels")).filter(isConsoleChannel);
     const production = channelList(config.get("log.production.channels")).filter(isConsoleChannel);
@@ -92,9 +94,9 @@ export const productionLoggingCheck: DoctorCheck = {
       name: "production-logging",
       status: "warn",
       detail:
-        `a console channel in production (${where}) has no minimum level, so it prints every ` +
-        "debug line, including the per-phase lines of each request. Create it with " +
-        'new ConsoleLog({ minLevel: "info" }) in src/config/log.ts.',
+        `a console channel in production (${where}) prints debug lines, including the ` +
+        "per-phase lines of each request: a console write per line on every request. Create it " +
+        'with new ConsoleLog({ minLevel: "info" }) in src/config/log.ts.',
     };
   },
-};
+});

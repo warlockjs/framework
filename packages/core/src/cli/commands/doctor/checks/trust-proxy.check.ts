@@ -1,6 +1,6 @@
 import { config } from "../../../../config/config-getter";
 import type { DoctorCheck } from "../check.types";
-import { isSet } from "./config-values";
+import { isSet, warnOnError } from "./config-values";
 
 /**
  * Warns when `http.trustProxy` is `true` and no `http.realIpHeader` is set.
@@ -12,14 +12,32 @@ import { isSet } from "./config-values";
  * the edge overwrites (`http.realIpHeader`) closes it.
  *
  * NEEDS NO BOOTED APP — it reads config only. Silent when the app trusts no
- * proxy (`false` or unset).
+ * proxy (`false` or unset), or when the value is a shape the server refuses
+ * at start (a number, an empty string or list).
  */
-export const trustProxyCheck: DoctorCheck = {
+export const trustProxyCheck: DoctorCheck = warnOnError({
   name: "trust-proxy",
   run: () => {
     const trustProxy: unknown = config.get("http.trustProxy");
 
     if (!isSet(trustProxy) || trustProxy === false) return undefined;
+
+    if (typeof trustProxy === "function") {
+      return {
+        name: "trust-proxy",
+        status: "ok",
+        detail: "a function in http.trustProxy decides which proxies report the client IP",
+      };
+    }
+
+    const isProxyList =
+      (typeof trustProxy === "string" && trustProxy.trim().length > 0) ||
+      (Array.isArray(trustProxy) &&
+        trustProxy.length > 0 &&
+        trustProxy.every((entry) => typeof entry === "string" && entry.trim().length > 0));
+
+    // Any other shape is refused by the server at start, with its own error.
+    if (trustProxy !== true && !isProxyList) return undefined;
 
     if (trustProxy !== true) {
       return {
@@ -49,4 +67,4 @@ export const trustProxyCheck: DoctorCheck = {
         'CIDR blocks, or set http.realIpHeader to the header your edge overwrites (for example "cf-connecting-ip").',
     };
   },
-};
+});

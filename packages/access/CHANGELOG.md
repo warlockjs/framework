@@ -4,6 +4,20 @@ All notable changes to `@warlock.js/access` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.53.0 - 2026-11-11
+
+### Upgrading
+
+- A role change made by another server (or written without `access.flush`) can take up to one second longer to show up on a user object that is already being checked; `access.flush` in the same process applies at once.
+
+### Security
+
+- `access.flush(user)` without a tenant also drops the set cached for the tenant your resolver's `resolveTenant(user)` returns (the one `can(user, …)` reads), as well as the no-tenant set. It used to drop only the no-tenant set, so in apps with an ambient tenant a revoked permission kept working until the cache expired (10 minutes by default).
+
+### Changed
+
+- Checks on the same user object share one resolved permission and role set for up to one second: stacked `gate()`s, `canAll` / `canAny` and repeated `can()` calls read the cache once per request instead of once per check. `access.flush` and a new configuration drop the shared sets at once.
+
 ## 5.40.0 - 2026-10-29
 
 ### Changed

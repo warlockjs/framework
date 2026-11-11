@@ -4,6 +4,29 @@ All notable changes to `@warlock.js/ai-tools` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.53.0 - 2026-11-11
+
+### Upgrading
+
+- **BREAKING** `http_request` with `baseUrl`: a model call with an absolute URL to another host is refused. List the extra hosts in `allowHosts` to permit them (`allowHosts: ["api.example.com", "files.example.com"]`).
+- `http_request`: custom static headers no longer follow a redirect to another origin. Send them from a tool whose `baseUrl` or `allowHosts` covers that origin.
+- `fetch_url`, `http_request`, `web_search`: a response that takes longer than `timeoutMs` in total, body included, fails. Raise `timeoutMs` for slow endpoints; `web_search` now has a 15-second default.
+- MCP servers that return results over 10 MiB fail the call. Raise the transport's `maxResponseBytes` for those servers.
+
+### Security
+
+- `http_request` no longer sends its static `headers` (an API key) to a host the model names. With `baseUrl` set, an absolute (`https://other.example/x`) or protocol-relative (`//other.example/x`) URL on another origin is refused with `HttpPolicyError` type `"host-not-allowed"` unless its host is listed in `allowHosts`, and redirects stay on the base host. Static headers go only to the origin of the first request: a redirect to another origin drops every static header, plus `authorization`, `cookie` and `proxy-authorization`.
+- `fetch_url` and `http_request`: `timeoutMs` bounds the whole call, reading the body included. A server that sends headers quickly and then drips its body used to hold the tool call open indefinitely; it now fails with a timeout error that names `timeoutMs` (`http_request`: new `HttpPolicyError` type `"timeout"`; `fetch_url`: `WebToolError` type `"request-failed"`). `fetch_url` also stops when the agent run is cancelled.
+- `web_search` has a new `timeoutMs` option (default `15_000`) covering the provider request and its response, and the run's abort signal cancels it. A slow or hung provider used to stall the agent run indefinitely; it now fails with `WebToolError` type `"request-failed"`.
+- The built-in HTML converter used by `fetch_url` (the `"simple"` extractor, and the `"auto"` fallback) is linear in page size. A page full of unterminated `<tag` or `<!--` openers used to block the Node process for minutes; such text is kept as text and never rescanned. Output for well-formed pages is unchanged.
+- The same converter caps list indentation and `> ` quote prefixes at 16 levels. A page of thousands of unclosed `<ul><li>` or `<blockquote>` tags used to make the output grow with the square of the page size (a 400 KB page produced gigabytes and exhausted memory).
+- The MCP HTTP client read response bodies without a size limit, and its timeout stopped applying once headers arrived, so a server could stream an endless or huge body. New transport option `maxResponseBytes` (number, default `10_485_760`, 10 MiB): a larger body rejects the call with `McpTransportError` type `"protocol"` without buffering the rest, and the call's `timeoutMs` also covers reading the body.
+- The MCP stdio client accepted stdout lines of any length. The same `maxResponseBytes` option caps one line; an oversized line is dropped, the calls in flight reject with type `"protocol"`, and the transport keeps serving later calls.
+
+### Changed
+
+- The HTML converter no longer re-reads its growing output on every tag and no longer backtracks over long runs of trailing spaces or tabs, so large pages convert in milliseconds instead of tens of seconds (a 1 MB page of paragraphs: 21 s to 0.14 s; of table cells: 24 s to 0.07 s).
+
 ## 5.48.0 - 2026-11-07
 
 ### Added

@@ -1,6 +1,6 @@
 import { config } from "../../../../config/config-getter";
 import type { DoctorCheck } from "../check.types";
-import { isSet } from "./config-values";
+import { isSet, warnOnError } from "./config-values";
 
 /**
  * Warns when the request timeout is turned off (`0`).
@@ -13,7 +13,7 @@ import { isSet } from "./config-values";
  * NEEDS NO BOOTED APP — it reads config only. Silent when the app has no
  * `http` config or sets neither key (the 5-minute default applies).
  */
-export const requestTimeoutCheck: DoctorCheck = {
+export const requestTimeoutCheck: DoctorCheck = warnOnError({
   name: "request-timeout",
   run: () => {
     if (!isSet(config.get("http"))) return undefined;
@@ -45,4 +45,4 @@ export const requestTimeoutCheck: DoctorCheck = {
       detail: `clients must send a request within ${timeout} ms (${key})`,
     };
   },
-};
+});

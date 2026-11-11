@@ -174,7 +174,9 @@ describe("tokenConsumeThrottleMiddleware", () => {
     await tokenConsumeThrottleMiddleware()(makeCtx({ request, response: ok }));
     await ok.fireSent();
 
-    expect(cacheRemove).toHaveBeenCalledWith(`auth.throttle.count.ip.${IP_KEY}`);
+    // A success resets the counter to 0 (not deleted) and clears the lock.
+    expect(cacheSet).toHaveBeenCalledWith(`auth.throttle.count.ip.${IP_KEY}`, 0, { ttl: "15m" });
+    expect(cacheRemove).toHaveBeenCalledWith(`auth.throttle.lock.ip.${IP_KEY}`);
   });
 });
 

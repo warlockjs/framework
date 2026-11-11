@@ -25,7 +25,7 @@ import { buildRequestLogSnapshot, type RequestLogSnapshot } from "./request-log-
 import { Response } from "./response";
 import { buildTracingContext, deriveTraceId, dispatchPhase, isTracingEnabled } from "./tracing";
 import { tagRequestError } from "./report-request-error";
-import { isTrustedProxyPeer } from "./trusted-proxy";
+import { resolveClientIp } from "./trusted-proxy";
 import type {
   DecodedAccessToken,
   HttpConfigurations,
@@ -1833,41 +1833,9 @@ export class Request<RequestValidation = any> {
    * balancer, CDN, reverse proxy, k8s ingress).
    */
   public detectIp() {
-    // Typed as `unknown`: config.get(key, fallback) infers the FALLBACK's type, so
-    // the literal `false` narrowed this to `false` and TypeScript called the
-    // comparison unreachable. The stored value is genuinely unconstrained at compile
-    // time - trustProxy accepts a boolean, a CIDR list or a predicate - so `unknown`
-    // is what it actually is.
-    const trustProxy: unknown = config.get("http.trustProxy", false);
-    const realIpHeader: unknown = config.get("http.realIpHeader");
-
-    // the header is only as trustworthy as the peer that sent it: a client
-    // that reaches the process directly could set it to anything
-    if (
-      typeof realIpHeader === "string" &&
-      realIpHeader.trim().length > 0 &&
-      isTrustedProxyPeer(this.baseRequest.socket?.remoteAddress, trustProxy)
-    ) {
-      const realIp = this.header(realIpHeader.trim());
-
-      if (realIp) {
-        // `split` always yields a first element, so `?? ""` changes nothing —
-        // and an empty address is already falsy, so it falls through to the
-        // next source exactly as a blank header does. This is the CLIENT IP
-        // used for rate limiting and logging; it must never become the string
-        // "undefined".
-        const address = (String(realIp).split(",")[0] ?? "").trim();
-
-        if (address) return address;
-      }
-    }
-
-    // Fastify resolved this against the configured `trustProxy` already:
-    // socket peer when trust is off, the correct hop of `X-Forwarded-For`
-    // when it is on. Re-parsing the header here would mean a second, weaker
-    // trust model that could disagree with `request.ip` and with the plugins
-    // (rate limit, proxy) that key on it.
-    return this.baseRequest.ip;
+    // Shared with the per-route and global rate limiters (see
+    // `resolveClientIp`), so every consumer agrees on the client address.
+    return resolveClientIp(this.baseRequest);
   }
 
   /**

@@ -55,7 +55,7 @@ router.post("/auth/reset-password", resetPasswordController, {
 ## How it behaves
 
 1. **Before the controller** — if the account or the IP is currently locked, it short-circuits with `429` and never touches the database or the bcrypt verify (this is also what neutralises the CPU-DoS angle of brute-forcing). The body carries `AuthErrorCodes.TooManyAttempts` (`EC004`). Otherwise it **counts the attempt right away** (fixed-window counter per identifier) and answers `429` once the count passes `max`, so a burst of concurrent requests cannot outrun the limit: at most `max` attempts per window reach the controller.
-2. **After the controller** — it inspects the outcome. A non-2xx response that used the last allowed attempt writes the lock key (the counter is rewritten with the lock's TTL so both end together), unless a success that finished meanwhile already reset the window. A 2xx response is a success: it **clears** the counter and lock for that identifier.
+2. **After the controller** — it inspects the outcome. A non-2xx response that used the last allowed attempt writes the lock key (the counter is rewritten with the lock's TTL so both end together), unless a success that finished meanwhile already reset the counter. A 2xx response is a success: it **resets** the counter to 0 and clears the lock for that identifier. If the counter cannot be read back (expired, evicted, a failed read), the failure locks: the check fails closed.
 
 Per-account tracking stops a password-spray against one user from many IPs; per-source tracking stops one IP from stuffing many accounts. A lock on **either** identifier rejects the request — defense-in-depth.
 

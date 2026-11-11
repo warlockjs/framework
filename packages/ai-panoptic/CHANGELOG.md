@@ -4,6 +4,29 @@ All notable changes to `@warlock.js/ai-panoptic` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.53.0 - 2026-11-11
+
+### Upgrading
+
+- `ai.config({ panoptic: { dashboard } })` without your own store keeps only the newest 1,000 traces. Set `panoptic.capacity: 0` to keep every trace, or a larger number.
+- `GET api/traces` returns at most 200 summaries without `root.children`, `input` or `output`. Code that reads the endpoint directly can add `?full=1` (and a `limit`) to get full traces, or fetch each trace from `api/traces/:id`.
+
+### Security
+
+- A malformed percent escape in a dashboard URL (`/api/traces/%E0%A4%A`, or the same on the evaluate route) threw an uncaught `URIError` from the request listener, which could stop the app in production. Such ids answer `400 { error: "bad_trace_id" }`, and any other handler failure answers `500 { error: "internal" }` instead of escaping the server.
+
+### Added
+
+- `panoptic.capacity` (number, default `1000`, `0` keeps every trace) for the store panoptic creates for the dashboard (in-memory, or cache-backed with `cache`). A store you pass in `exporters` is not affected.
+- `TraceSummary` and `TraceSpanSummary` types.
+
+### Changed
+
+- The dashboard's own store keeps the newest 1,000 traces instead of growing without limit.
+- `GET api/traces` returns the newest 200 trace summaries instead of every full trace: ids, timings, usage and the root span's name, type, status, attributes and error message, plus `spanCount` and `totalCost`, without the span tree or captured prompts and tool I/O. `?limit=` changes the count, `?startedBefore=` pages back, and `?full=1` returns full traces. The dashboard page polls the summaries and fetches the open trace's full tree from `GET api/traces/:id`, re-fetching it only when the trace changes.
+- The cache-backed trace store runs its cache writes one after another and writes the index once per burst of traces instead of once per trace, so an older index can no longer overwrite a newer one and drop traces from what a restart restores.
+- Trace queries parse each trace's start time once instead of twice per comparison while sorting.
+
 ## 5.34.3 - 2026-10-20
 
 ### Changed

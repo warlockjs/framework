@@ -1026,6 +1026,8 @@ await User.restoreAll(); // restore every deleted record for this model
 
 There is no instance `user.restore()` — call `User.restore(id)`. `restoreAll(options?)` restores all soft-deleted (or all trashed) records for the model's table.
 
+**Restore honours global scopes.** A record another tenant's scope hides throws "record not found" from `restore(id)`, and `restoreAll()` restores only the caller's records. Restore leaves out only filters whose column is exactly `deletedAtColumn` (your `notDeleted` scope): hiding deleted rows is what restore undoes. A scope that also filters other columns keeps those filters, and a column that merely contains the name (`deletedAtSource`) is never skipped. For a cross-tenant admin restore, run it where the tenant scope applies no filter.
+
 ## Trash strategy — a separate store
 
 ```ts
@@ -1202,6 +1204,8 @@ The everyday case. Service takes `Partial<UserSchema>` from a request body, merg
 
 **Safe against id-retargeting by design.** `model.merge(req.body); await model.save();` is the canonical update-my-profile shape — and `req.body` is attacker-controlled. On an already-persisted model, `merge()` drops identity columns (`id`, `_id`, the configured primary key) instead of applying them, so a body carrying `{ id: "<victim-id>", role: "admin" }` cannot redirect the write onto someone else's row: `update()`/`replace()`/`destroy()` build their filter from `model.trustedPrimaryKey` — the id captured when the instance became persisted (hydration, or right after an insert), never the current in-memory value. Identity columns are also excluded from the `$set`/`$unset` payload, so an explicit `.set("id", …)` on a loaded record doesn't rewrite the key of the row it's pinned to either. This only applies to an _existing_ record — `User.create({ id, ... })` with an explicit id is unchanged, since there's no row to retarget yet. If you deliberately need to change a primary key, do it through the atomic/raw APIs (see the `perform-atomic-ops` topic), not `merge()`.
 
+**Unknown and nested fields follow `static strictMode`.** On insert and update alike, a field the schema doesn't declare is dropped (`"strip"`, default), rejected (`"fail"`), or written (`"allow"`); this covers nested objects too (`merge({ permissions: { all: true } })` writes nothing under `"strip"`). A nested change is validated through its top-level field and only the changed leaves are written. A path segment `__proto__` / `constructor` / `prototype` in `set()` / `unset()`, or a `__proto__` key inside a `set()` / `merge()` value, throws before anything is written.
+
 ### `.save()` after manual mutation — when changes are spread
 
 ```ts
@@ -1222,6 +1226,8 @@ Quick reference:
 | Bulk from an object    | `user.merge(data).save()` |
 | Replace object columns | `user.set(data).save()`   |
 | After spread mutations | `user.save()`             |
+
+**Write-heavy MongoDB model?** `public static idReservationBlockSize = 100;` reserves 100 generated ids per counter round-trip instead of one per insert (default `1`). Ids stay unique but are not strictly increasing across processes, and unused ids in a block are lost on restart.
 
 ## Remove a field — `.unset(field)`
 
@@ -1447,6 +1453,8 @@ Multiple relations:
 await User.with("posts", "roles").get();
 ```
 
+Sibling relations load concurrently (one round-trip of latency, not one per relation); they still attach in the order named, and inside a `transaction()` they load one at a time.
+
 Nested relations via dot:
 
 ```ts
@@ -1464,7 +1472,7 @@ const usersWithPublishedPosts = await User.whereHas("posts", (query) => {
 }).get();
 ```
 
-`.whereHas(relation, callback)` runs the callback on a query builder scoped to the related model. Use when "find Xs that have at least one Y matching Z."
+`.whereHas(relation, callback)` runs the callback on a query builder scoped to the related model. Use when "find Xs that have at least one Y matching Z." The `has` family runs on PostgreSQL (the `has()` count is bound; its operator must be `=`, `!=`, `<>`, `>`, `>=`, `<`, `<=`); on MongoDB it throws `UnsupportedQueryOperationError` — filter by `whereIn("id", await Post.query().where(...).pluck("authorId"))` instead.
 
 ## Setting a relation on save — `setRelation`
 
@@ -1686,8 +1694,18 @@ source.driver.on("query", onQuery);
 source.driver.off("query", onQuery);
 ```
 
-A throwing listener never fails the query. Mongo command monitoring is enabled
-unless `clientOptions.monitorCommands` is explicitly set.
+A throwing listener never fails the query. The registry subscribes to each
+driver only while it has a `query` listener itself. MongoDB command monitoring
+(which decodes every reply twice) follows the `queryEvents` connection option:
+unset, it is on outside production and off when `NODE_ENV` is `production`;
+`queryEvents: true` (or `logging: true`) turns it on, and an explicit
+`clientOptions.monitorCommands` wins. Set `queryEvents: true` to keep MongoDB
+`query` events (request-log query capture, devtools) in production. A `query`
+listener attached while a MongoDB source has them off logs one warning per
+source naming `queryEvents: true`.
+
+`logging: true` never writes values: PostgreSQL logs the count and types of
+bound values, MongoDB logs the command, collection and field shape only.
 
 ## Postgres session time zone
 
@@ -1987,7 +2005,7 @@ page.data; // User[]
 page.pagination; // { total, page, limit, pages }
 ```
 
-`PaginationOptions` is `{ page?, limit? }` — there is no `filter` field; filter by chaining `.where()` before `.paginate()` (below).
+`PaginationOptions` is `{ page?, limit?, maxLimit? }` — there is no `filter` field; filter by chaining `.where()` before `.paginate()` (below). `limit` and `page` must be whole numbers (digit strings like `"20"` are accepted, `"abc"` throws `UnsafeFilterError`). The page size is capped at `maxLimit`, **1000** by default, so passing `request.input("limit")` cannot load a whole table; `pagination.limit` reports the size used. Raise it per call: `paginate({ limit: 5000, maxLimit: 10_000 })`. `cursorPaginate()` takes the same `maxLimit`.
 
 Chain off `.where()` for filtered pagination:
 
@@ -2031,7 +2049,7 @@ await User.where("status", "active").chunk(500, async (users) => {
 });
 ```
 
-`.chunk(size, fn)` streams the table 500 records at a time, calling `fn` per batch. Constant memory regardless of total row count.
+`.chunk(size, fn)` streams the table 500 records at a time, calling `fn` per batch. Constant memory regardless of total row count. When the query has no order, or is ordered only by the primary key (`_id` on MongoDB), chunks page by key (`where id > last`), so every chunk costs the same and rows the callback updates or deletes don't shift later chunks; any other order pages by offset.
 
 Return `false` from the callback to stop early:
 
@@ -2154,6 +2172,8 @@ await Post.atomic(
 - `atomic(filter, update, { upsert?, arrayFilters?, trustedFilter? })` → modified + upserted count.
 - `findOneAndUpdate(filter, update, { ...same, returnDocument?: "before" | "after" })`.
 - `findAndUpdate(filter, update, { upsert?, arrayFilters? })`. No `trustedFilter`, because it reads the rows back with `where(filter)`.
+
+**Global scopes pin every write static**, `Model.upsert(filter, data)` included: a visible match is updated by its primary key, and a match hidden by a scope (another tenant's row, a soft-deleted one) throws instead of being updated. When nothing matches, `upsert` inserts like `create()`, so put the tenant column in `data`. A model with no global scope sends the write straight to the driver (no id lookup first).
 
 **Postgres.** An upsert runs as `INSERT … ON CONFLICT (target) DO UPDATE … RETURNING *`. The target is the primary key, or a unique index, whose columns are ALL equality keys of the filter. Other filter conditions become `DO UPDATE … WHERE`. If the row exists and fails them, nothing is written and `findOneAndUpdate` returns `null`. The driver throws `UnsupportedUpdateOperationError` (`.operation`, `.driver`) for:
 
@@ -2303,7 +2323,7 @@ Equivalent to chained equalities. Useful when the filter comes from a dynamic so
 
 ### Filters are safe to build from request data — but only through this API
 
-`where(field, value)`, `where(field, "=", value)` and the object form all run the value through a `$`-prefixed-key check before it reaches the driver, so `User.first({ email: req.body.email, password: req.body.password })` throws `UnsafeFilterError` instead of compiling `{ password: { $ne: null } }` into a live MongoDB operator query (the classic NoSQL auth-bypass). This applies to every filter-accepting model static too — `first`, `findFirst`, `findAll`, `count`, `paginate`, `all`, `deleteMany`/`delete`, `deleteOne`, and the atomic/find-and-modify statics in the `perform-atomic-ops` topic. Explicit operator APIs (`where(field, operator, value)` for operators other than `=`, `whereIn`/`whereNull`/`whereBetween`/…, object-form `whereRaw({ ... })`) are intentionally not routed through this check — they already express an operator on purpose. Dotted paths (`"profile.name"`) and plain nested-object equality values remain valid; only literal `$`-prefixed keys are rejected. `sanitizeFilter` / `sanitizeFilterValue` are exported if you need the same check on a filter you forward to a driver-level API directly.
+`where(field, value)`, `where(field, "=", value)` and the object form all run the value through a `$`-prefixed-key check before it reaches the driver, so `User.first({ email: req.body.email, password: req.body.password })` throws `UnsafeFilterError` instead of compiling `{ password: { $ne: null } }` into a live MongoDB operator query (the classic NoSQL auth-bypass). This applies to every filter-accepting model static too — `first`, `findFirst`, `findAll`, `count`, `paginate`, `all`, `deleteMany`/`delete`, `deleteOne`, and the atomic/find-and-modify statics in the `perform-atomic-ops` topic. Explicit operator APIs (`where(field, operator, value)` for operators other than `=`, `whereIn`/`whereNull`/`whereBetween`/…, object-form `whereRaw({ ... })`) are intentionally not routed through this check — they already express an operator on purpose. Dotted paths (`"profile.name"`) and plain nested-object equality values remain valid; only literal `$`-prefixed keys are rejected. `sanitizeFilter` / `sanitizeFilterValue` are exported if you need the same check on a filter you forward to a driver-level API directly. On MongoDB the check also covers `whereArray*` / `whereJsonContains` values and `textSearch` filters; `whereDay`/`whereMonth`/`whereYear`/`whereJsonLength`/`whereArrayLength`/`whereSize` take a finite number and `whereTime` an `"HH:MM"` string; and a `$`-prefixed field name (`where("$where", …)`) throws in every `where*` helper. A filter MongoDB cannot translate throws `UnsupportedQueryOperationError` instead of being dropped.
 
 ```ts
 await User.first({ email, password }); // throws UnsafeFilterError if password is `{ $ne: null }`
@@ -2394,20 +2414,20 @@ const activeUsers = await User.all({ status: "active" });
 
 Cascade's query builder has around 60 methods. Reach for these as the need arises:
 
-| Reach for                                                                                                           | When                                                        |
-| ------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
-| `.whereIn(field, values)` / `.whereNotIn(field, values)`                                                            | Match against / exclude a list                              |
-| `.whereNot(field, value)` / `.whereNot(field, op, value)` / `.whereNot({ ... })` / `.whereNot(cb)` (+ `orWhereNot`) | Negate a condition or a group                               |
-| `.whereNull(field)` / `.whereNotNull(field)`                                                                        | Nullability checks                                          |
-| `.whereBetween(field, [a, b])`                                                                                      | Inclusive range                                             |
-| `.whereDate(field, value)`, `.whereDateBetween`, `.whereDateBefore`, `.whereDateAfter`                              | Date helpers                                                |
-| `.whereLike(field, pattern)` / `.whereStartsWith` / `.whereEndsWith` / `.whereSearch`                               | Pattern matching — see below for literal-vs-regex semantics |
-| `.whereHas(relation, callback)`                                                                                     | Filter by conditions on a related model                     |
-| `.sum(field)` / `.avg(field)` / `.min(field)` / `.max(field)`                                                       | Aggregates — the `aggregate-data` topic                     |
-| `.distinct(field)` / `.pluck(field)`                                                                                | Single-field reads (distinct values, flat list)             |
-| `.chunk(size, callback)`                                                                                            | Stream a large table in batches                             |
-| `.cursorPaginate({ limit, cursor })`                                                                                | Cursor pagination — the `paginate-results` topic            |
-| `.similarTo(column, embedding)`                                                                                     | Vector similarity — the `search-by-vector` topic            |
+| Reach for                                                                                                           | When                                                                                                                                   |
+| ------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `.whereIn(field, values)` / `.whereNotIn(field, values)`                                                            | Match against / exclude a list                                                                                                         |
+| `.whereNot(field, value)` / `.whereNot(field, op, value)` / `.whereNot({ ... })` / `.whereNot(cb)` (+ `orWhereNot`) | Negate a condition or a group                                                                                                          |
+| `.whereNull(field)` / `.whereNotNull(field)`                                                                        | Nullability checks                                                                                                                     |
+| `.whereBetween(field, [a, b])`                                                                                      | Inclusive range                                                                                                                        |
+| `.whereDate(field, value)`, `.whereDateBetween`, `.whereDateBefore`, `.whereDateAfter`                              | Date helpers                                                                                                                           |
+| `.whereLike(field, pattern)` / `.whereStartsWith` / `.whereEndsWith` / `.whereSearch`                               | Pattern matching — see below for literal-vs-regex semantics                                                                            |
+| `.whereHas(relation, callback)`                                                                                     | Filter by conditions on a related model (PostgreSQL; MongoDB throws `UnsupportedQueryOperationError` — use `whereIn` with related ids) |
+| `.sum(field)` / `.avg(field)` / `.min(field)` / `.max(field)`                                                       | Aggregates — the `aggregate-data` topic                                                                                                |
+| `.distinct(field)` / `.pluck(field)`                                                                                | Single-field reads (distinct values, flat list)                                                                                        |
+| `.chunk(size, callback)`                                                                                            | Stream a large table in batches                                                                                                        |
+| `.cursorPaginate({ limit, cursor })`                                                                                | Cursor pagination — the `paginate-results` topic                                                                                       |
+| `.similarTo(column, embedding)`                                                                                     | Vector similarity — the `search-by-vector` topic                                                                                       |
 
 Each chains off `User.where(...)` or `User.query()` and ends with the appropriate terminator. (`where`, `with`, `joinWith`, `first`, `count`, `find`, `all`, `paginate` are static shortcuts on the model; the rest live on the query builder, so reach them via `User.query()` or by chaining off a static `where`.)
 
@@ -2418,7 +2438,7 @@ await User.where(...).whereLike("email", "%@gmail.com").get();      // literal, 
 await User.query().whereSearch("name", req.query.q).get();          // safe with raw user input
 ```
 
-A **string** argument to `whereLike`/`whereNotLike`/`whereStartsWith`/`whereEndsWith` (and their `Not` variants) and the `$regex` form of `whereSearch` is escaped and matched as a **literal substring** — the SQL `LIKE` wildcard `%` still expands (to `.*`, runs of `%` collapse), but every other regex metacharacter (`.`, `*`, `+`, `^`, `$`, …) in the string is neutralized. This is what makes `whereSearch("name", req.query.q)` safe to wire directly to a search box: before this, a user-controlled string compiled straight into a MongoDB `$regex`, so `^.*$` matched everything, `^a`/`^b`/… probed a value back one character at a time, and a nested-quantifier pattern like `(a+)+$` triggered catastrophic backtracking (ReDoS) against every scanned document.
+A **string** argument to `whereLike`/`whereNotLike`/`whereStartsWith`/`whereEndsWith` (and their `Not` variants) and the `$regex` form of `whereSearch` is escaped and matched as a **literal substring** — the SQL `LIKE` wildcard `%` still expands (to `.*`, runs of `%` collapse), but every other regex metacharacter (`.`, `*`, `+`, `^`, `$`, …) in the string is neutralized. On MongoDB a string pattern may hold at most two `%` wildcards and 256 characters (enough for `%term%`, `prefix%`, `%suffix`); more throws `UnsafeFilterError`. Raise the caps with the data source's `driverOptions: { like: { maxWildcards, maxLength } }`. This is what makes `whereSearch("name", req.query.q)` safe to wire directly to a search box: before this, a user-controlled string compiled straight into a MongoDB `$regex`, so `^.*$` matched everything, `^a`/`^b`/… probed a value back one character at a time, and a nested-quantifier pattern like `(a+)+$` triggered catastrophic backtracking (ReDoS) against every scanned document.
 
 An explicit **`RegExp`** argument is still used as a pattern (verbatim, no escaping) — that's how you get real regex semantics — but a `RegExp` can't arrive as JSON, so it only reaches these calls when a developer constructs it in code. **Never build that `RegExp` from user input**; if you need dynamic pattern matching, escape the dynamic parts yourself with the exported `escapeRegex(value)` / `likePatternToRegexSource(pattern)` helpers.
 

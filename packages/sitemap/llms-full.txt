@@ -86,7 +86,10 @@ never `/posts/:id`. A pattern is not a URL.
 | `images`     | `{ loc }[]` — absolute HTTP(S) image URLs, including verified external CDNs.  |
 
 Invalid entries throw `InvalidSitemapEntryError` from `add()`. Paths are
-normalised to carry a leading slash, so `a` and `/a` are ONE entry.
+normalised to carry a leading slash, so `a` and `/a` are ONE entry, and are
+percent-encoded: spaces, non-ASCII text and control characters become `%XX`
+(an already-encoded path is unchanged), so a user-supplied slug can never make
+the file invalid XML. `escapeXml` also drops characters XML cannot carry.
 
 ## Duplicates: silent, but not hidden
 

@@ -268,6 +268,28 @@ function buildDefaultIdentifiers(
 type TrackedIdentifier = { key: string; max: number };
 
 /**
+ * Whether the counter now reads a number below `count`, i.e. a success reset
+ * it while this attempt ran. Fails closed: a missing value (expired, evicted,
+ * a driver that stores nothing), a non-numeric one or a failed read all answer
+ * `false`, so the caller locks.
+ */
+async function counterWasReset(identifier: string, count: number): Promise<boolean> {
+  let current: unknown;
+
+  try {
+    current = await cache.get(counterKey(identifier));
+  } catch (error) {
+    log.error("auth", "login-throttle", error);
+
+    return false;
+  }
+
+  if (typeof current === "string" && current.trim() !== "") current = Number(current);
+
+  return typeof current === "number" && Number.isFinite(current) && current < count;
+}
+
+/**
  * Failure-aware login throttle. Locks an identifier (account, IP, or both)
  * after too many failed login attempts within a window — without penalising
  * a user who eventually types the right password.
@@ -283,8 +305,9 @@ type TrackedIdentifier = { key: string; max: number };
  *    controller, however many arrive at once.
  * 2. **After the controller** — observe the outcome via `response.onSent`.
  *    On failure (non-2xx by default), set a lock key with `lockoutDuration`
- *    TTL once the attempt count has reached `max`. On success, clear both the
- *    counter and the lock for that identifier.
+ *    TTL once the attempt count has reached `max` (unless a success reset the
+ *    counter meanwhile). On success, reset the counter to 0 and clear the lock
+ *    for that identifier.
  *
  * Storage is `@warlock.js/cache` (a peer dependency of `@warlock.js/auth`,
  * transitively guaranteed via `@warlock.js/core`). Lockout state is shared
@@ -406,7 +429,9 @@ export function loginThrottleMiddleware(options: LoginThrottleOptions = {}): Mid
 
         if (!failed) {
           for (const identifier of identifiers) {
-            await cache.remove(counterKey(identifier.key));
+            // Reset to 0 rather than delete: a failure still in flight reads
+            // the 0 as proof that a success reset the window (see below).
+            await cache.set(counterKey(identifier.key), 0, { ttl: window });
             await cache.remove(lockKey(identifier.key));
           }
 
@@ -415,16 +440,14 @@ export function loginThrottleMiddleware(options: LoginThrottleOptions = {}): Mid
 
         // Already counted at entry; a failure that used the last allowed
         // attempt starts the lockout, unless a success that finished while it
-        // ran already reset the window (a correct login racing a mistyped one
-        // must not lock the account it just signed in to).
+        // ran reset the counter (a correct login racing a mistyped one must
+        // not lock the account it just signed in to).
         for (const identifier of identifiers) {
           const count = counts.get(identifier.key);
 
           if (count === undefined || count < identifier.max) continue;
 
-          const current = Number((await cache.get(counterKey(identifier.key))) ?? 0);
-
-          if (Number.isFinite(current) && current < count) continue;
+          if (await counterWasReset(identifier.key, count)) continue;
 
           await lock(identifier.key, count);
         }

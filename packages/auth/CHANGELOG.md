@@ -4,6 +4,46 @@ All notable changes to `@warlock.js/auth` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.53.0 - 2026-11-11
+
+### Upgrading
+
+- `requestPasswordReset` / `requestOtp` no longer throw when the email or SMS send fails; listen to the `password.resetDeliveryFailed` / `otp.deliveryFailed` auth events, or set `auth.passwordReset.awaitDelivery: true` / `auth.otp.awaitDelivery: true` to get the old behaviour.
+- **BREAKING** A first provider login whose email matches an existing account that has not verified that email fails with `ProviderAccountLinkBlockedError` (403, `EC012`) when your user schema declares the verification field (`emailVerifiedAt` by default). Set `auth.providers.linkExisting: "always"` to link as before.
+- **BREAKING** `Auth` models no longer serialize `password`. If your model sets its own `static hidden`, it replaces the default: keep `"password"` in it. Code that reads the hash from `toJSON()` output or from lean query rows must read it from the model (`user.get("password")`), or set `public static hidden: string[] = []` on the model to restore the old output.
+- Throttled routes count an attempt when it arrives: more than `max` simultaneous requests on one bucket (for example `max` concurrent refreshes from one IP) get `429` while the others are in flight. Raise `max` on that route if it legitimately receives such bursts.
+- Login with an unknown email takes as long as a wrong password (one password-hash check).
+- A token whose `id` / `userType` claims differ from its stored row is rejected, and a custom access-token payload can no longer override `id` / `userType`.
+- GitHub, Discord, LinkedIn, Apple, Facebook and X logins fail (`code-exchange-failed` / `profile-fetch-failed`) when the provider takes longer than 5 seconds to answer; raise `timeoutMs` in that provider's block if needed. A `timeoutMs` that is not a positive integer throws when the provider is built.
+- Expired or malformed tokens and CSRF Origin mismatches no longer appear in the error log; set the logger to `debug` to see them.
+- In production, a signing secret shorter than 32 bytes or an access-token lifetime over 30 days logs a one-time warning.
+- `AccessToken` / `RefreshToken` `findByToken`, `findForUser` and `deleteForUser` query `whereIn("token", [sha256(token), token])`. A model override that replaces these statics should match both forms if `hashTokensAtRest` is (or was) on.
+- The new opt-in settings change nothing until you set them. Setting `auth.accessToken.issuer` or `auth.accessToken.audience` refuses tokens signed before it, so every user signs in again once. With `hashTokensAtRest` on, a row loaded from the database (`activeSessions()`, event payloads) holds only the digest in `token`.
+
+### Security
+
+- Login, token-issue and OTP throttles count each attempt when it arrives, before the controller runs. A burst of concurrent requests used to read "not locked" all at once and reach the password check hundreds of times; now at most `max` attempts per window get through and the rest answer `429` (`EC004`). A lockout also restarts the counting window, so the identifier gets a fresh `max` once the lock ends.
+- `loginThrottleMiddleware` takes `emailLock: "pair" | "global"` (default `"global"`, unchanged). `"pair"` locks the (email, IP) pair instead of the email for everyone, so a stranger can no longer keep a known account locked out; the email alone keeps a wider bucket, `accountMax` (default `max * 10`), against guessing spread over many IPs.
+- Login with an unknown email runs the same password-hash check as a wrong password, so response timing no longer reveals which accounts exist.
+- `requestPasswordReset` and `requestOtp` send the email or code in the background, so a known account no longer answers slower than an unknown one. A failed send is logged and emitted as the new `password.resetDeliveryFailed` / `otp.deliveryFailed` auth events. `auth.passwordReset.awaitDelivery` / `auth.otp.awaitDelivery` (default `false`) wait for the send instead.
+- A provider login no longer links to an existing account that never verified its email (someone could pre-register a victim's address with a password and end up sharing the account). New `auth.providers.linkExisting: "verified" | "always" | "never"` (default `"verified"`); a refused link throws the new `ProviderAccountLinkBlockedError` (403, `EC012`). A user model whose schema has no verification field links as before.
+- New `auth.hashTokensAtRest` (default `false`): access and refresh token rows store only the SHA-256 digest of the token, so a copied table cannot be replayed. No migration is needed: the digest goes in the existing `token` column, lookups accept both forms, and switching it on or off signs no one out. A freshly issued row exposes its raw token as `row.plainToken`.
+- In production, a signing secret shorter than 32 bytes (`auth.accessToken.secret`, `auth.refreshToken.secret`) or an access-token lifetime over 30 days logs a one-time warning.
+- New `auth.passkeys.userVerification: "required" | "preferred"` (default `"preferred"`, unchanged). `"required"` refuses passkey assertions made without a PIN or biometric.
+- `auth.cleanup` removes spent one-time tokens (including anonymous passkey challenges) with two set-based deletes instead of loading every row into memory. The docs show a per-IP throttle on the passkey login-options route.
+- GitHub, Discord, LinkedIn, Apple, Facebook and X provider requests time out after `timeoutMs` (default `5000`, per provider block), as Google already did, instead of waiting forever on a hanging provider.
+- Expired or malformed tokens and CSRF Origin mismatches are logged at `debug` instead of `error`, so anonymous clients can no longer flood the error log.
+- The route gate refuses a token whose `id` / `userType` claims name a different user than its `access_tokens` row, and issued tokens always carry the issuing user's `id` / `userType`, even when a custom payload sets them.
+- New optional `auth.accessToken.issuer` / `auth.accessToken.audience`: stamped as `iss` / `aud` on every token the app signs and required on every token it accepts, so apps sharing a secret cannot accept each other's tokens. Unset (the default) changes nothing.
+- The `Auth` base model hides `password` from serialized output (`static hidden = ["password"]`): `response.json(user)`, lean rows and embedded copies no longer carry the hash. `user.get("password")` still reads it.
+- New `auth.cookie.hostPrefix` (default `false`): the auth cookies are written as `__Host-access_token` / `__Host-refresh_token` (Secure, `Path=/`, no Domain), so a subdomain or plain-HTTP page cannot plant or overwrite them. A cookie path other than `/` or a Domain throws naming the setting. The unprefixed cookie is still read while switching, and logout clears both.
+- The minimum `fast-jwt` version is 6.3.4.
+
+### Changed
+
+- The JWT verifier and signer are built once per settings and reused, instead of on every authenticated request.
+- `revokeAllTokens` (logout without a refresh token, password reset) ensures each token family once instead of once per rotated refresh row.
+
 ## 5.52.0 - 2026-11-11
 
 ### Added

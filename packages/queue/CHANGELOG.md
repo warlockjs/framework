@@ -4,6 +4,28 @@ All notable changes to `@warlock.js/queue` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.53.0 - 2026-11-11
+
+### Upgrading
+
+- Completed jobs are removed after 24 hours or past the newest 1,000 per queue, and failed jobs after 7 days or past the newest 5,000. `job.find(id)` returns `undefined` for a pruned job, and a `jobId` becomes free again once its job is pruned. To keep everything as before, set `defaultJobOptions: { removeOnComplete: false, removeOnFail: false }` in the queue config (or set them per job). Jobs queued before the upgrade keep the retention they were dispatched with.
+- Job data always carries the envelope `{ __warlock: { v: 2, context? }, payload }`, also for jobs with no captured context. `job.find()`, `failedJobs()` and handlers see the payload as before; tools that show raw job data (the bull-board dashboard, direct Redis reads) show the wrapper. Upgrade the workers before (or together with) the processes that dispatch: a worker still on 5.52 does not recognise the new envelope and hands the whole wrapper to the handler as its payload. Workers on 5.53 run jobs dispatched by 5.52 unchanged.
+
+### Security
+
+- A job payload shaped like the queue's internal context envelope was read as one when no context was captured at dispatch (for example a public route passing a request body to `dispatch()`), so the worker could run the handler inside a context chosen by the caller, such as another tenant. Every dispatch is now wrapped in an envelope, so such a payload reaches the handler as plain data and never sets the context. A job declared with `context: false` never runs inside a restored context. Jobs queued before the upgrade still restore their context.
+- The minimum `fastify` version is 5.12.6.
+
+### Added
+
+- `JobRetention` accepts `{ age?, count? }` (`age` is milliseconds or a duration string like `"12h"`) next to `true`, `false` and a number.
+
+### Changed
+
+- Finished jobs are no longer kept forever: `removeOnComplete` defaults to `{ age: "24h", count: 1000 }` and `removeOnFail` to `{ age: "7d", count: 5000 }`, so Redis and the local SQLite file stop growing with every job ever run.
+- The local SQLite driver prunes finished jobs with one `DELETE` statement instead of reading, decoding and sorting every finished job in JavaScript on each completion.
+- The memory driver no longer copies every stored job on each 100 ms poll or clones the whole store on each transaction: a poll copies only the job it picks, and a transaction records only what it changes. An idle worker's cost no longer grows with the number of finished jobs kept.
+
 ## 5.43.0 - 2026-11-01
 
 ### Added

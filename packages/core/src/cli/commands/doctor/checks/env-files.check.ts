@@ -3,6 +3,7 @@ import { readdirSync, statSync } from "node:fs";
 import path from "node:path";
 import { rootPath } from "../../../../utils/paths";
 import type { DoctorCheck } from "../check.types";
+import { warnOnError } from "./config-values";
 
 /** `.env` and `.env.<anything>` at the project root. */
 const ENV_FILE = /^\.env(\..+)?$/;
@@ -49,8 +50,11 @@ export function findCommittableEnvFiles(
 
   if (files.length === 0) return undefined;
 
-  const result = spawnSync("git", ["check-ignore", "--", ...files], {
+  // `--stdin -z`: the names go in and come back NUL-separated and unquoted, so
+  // a name with characters git would quote still matches the name asked about.
+  const result = spawnSync("git", ["check-ignore", "--stdin", "-z"], {
     cwd: root,
+    input: `${files.join("\0")}\0`,
     encoding: "utf8",
     timeout: 10_000,
   });
@@ -60,8 +64,7 @@ export function findCommittableEnvFiles(
 
   const ignored = new Set(
     String(result.stdout ?? "")
-      .split(/\r?\n/)
-      .map((line) => line.trim())
+      .split("\0")
       .filter(Boolean),
   );
 
@@ -81,7 +84,7 @@ export function findCommittableEnvFiles(
  * there are no env files besides templates (`.env.example`), or the project is
  * not in a git work tree.
  */
-export const envFilesCheck: DoctorCheck = {
+export const envFilesCheck: DoctorCheck = warnOnError({
   name: "env-files",
   run: () => {
     const found = findCommittableEnvFiles(rootPath());
@@ -106,4 +109,4 @@ export const envFilesCheck: DoctorCheck = {
         "for any env file already committed.",
     };
   },
-};
+});

@@ -1,5 +1,34 @@
-import type { RateLimitPluginOptions } from "@fastify/rate-limit";
+import { normalizeIP, type RateLimitPluginOptions } from "@fastify/rate-limit";
+import type { FastifyRequest } from "fastify";
 import { CacheRateLimitStore } from "./rate-limit-cache-store";
+import { resolveClientIp } from "./trusted-proxy";
+
+/** The plugin's own default IPv6 grouping. */
+const DEFAULT_IPV6_SUBNET = 64;
+
+/**
+ * The global limiter's default key: the client address `request.detectIp()`
+ * and `middleware.rateLimit()` use (the `http.realIpHeader` value from a
+ * trusted proxy, else `request.ip`), grouped like the plugin groups IPv6
+ * clients (the route's `rateLimit.ipv6Subnet`, else the global one). The
+ * plugin's own default reads `request.ip` only, which under
+ * `trustProxy: true` is the client-writable leftmost `X-Forwarded-For` entry.
+ */
+function clientKeyGenerator(globalIpv6Subnet: unknown) {
+  return (request: FastifyRequest): string => {
+    const routeSubnet = (
+      request.routeOptions?.config as { rateLimit?: { ipv6Subnet?: unknown } } | undefined
+    )?.rateLimit?.ipv6Subnet;
+
+    return normalizeIP(resolveClientIp(request), subnetOf(routeSubnet ?? globalIpv6Subnet));
+  };
+}
+
+function subnetOf(value: unknown): number {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 128
+    ? Math.trunc(value)
+    : DEFAULT_IPV6_SUBNET;
+}
 
 /**
  * `@fastify/rate-limit` options that `http.rateLimit` passes straight through.
@@ -114,6 +143,12 @@ export function buildRateLimitOptions(
     if (source[key] !== undefined) {
       options[key] = source[key];
     }
+  }
+
+  // The same client address every other consumer uses; an app's own
+  // `keyGenerator` (global or per route) still wins.
+  if (typeof options["keyGenerator"] !== "function") {
+    options["keyGenerator"] = clientKeyGenerator(source.ipv6Subnet);
   }
 
   if (source.store === "cache") {

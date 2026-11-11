@@ -141,8 +141,17 @@ export default {
     rotation: true,
     maxPerUser: 5,
   },
+  hashTokensAtRest: true, // store only SHA-256 digests of access/refresh tokens
 };
 ```
+
+### Hardening options (5.53)
+
+- `hashTokensAtRest: true` (default `false`) — `access_tokens.token` / `refresh_tokens.token` hold the SHA-256 digest, never the JWT, so a copied table cannot be replayed. No migration; lookups accept both forms, so switching it on or off signs no one out. A row loaded from the DB has no raw token any more; a freshly issued row exposes it as `row.plainToken`. Automatic cookie renewal parks the successor pair encrypted in the cache for the overlap window.
+- `accessToken.issuer` / `accessToken.audience` (default unset) — stamped as `iss` / `aud` on every token signed and required on every token accepted. Setting either signs everyone out once (old tokens lack the claim).
+- `cookie.hostPrefix: true` (default `false`) — auth cookies become `__Host-access_token` / `__Host-refresh_token` (Secure, `Path=/`, no Domain; a write with another path or a Domain throws naming the setting). The unprefixed cookie is still read during the switch, and both are cleared on logout.
+- In production a signing secret under 32 bytes, or an access-token lifetime over 30 days, logs a one-time warning.
+- `Auth` hides `password` from serialized output (`static hidden = ["password"]`); a model that sets its own `hidden` must keep `"password"` in it.
 
 ### Token lifetimes are validated — a bad one throws
 
@@ -311,16 +320,16 @@ Token lookups go by the unique `token` string (`findByToken`), which already uni
 
 Your subclass inherits and may override these statics — the service calls them, never raw queries:
 
-| Static                                         | Role                                                     |
-| ---------------------------------------------- | -------------------------------------------------------- |
-| `issue(user, token, …)`                        | persist a freshly-signed token (override to add columns) |
-| `findByToken(token)`                           | look a row up by its token string                        |
-| `findForUser(user, token)`                     | a user-scoped lookup (logout)                            |
-| `activeFor(user)`                              | active, unexpired sessions, newest-first                 |
-| `revokeAllFor(user)` / `revokeFamily(id)`      | revoke a set, returning the revoked rows                 |
-| `enforceMax(user, max)`                        | cap concurrent refresh tokens                            |
-| `purgeExpired()`                               | delete expired rows (CLI cleanup)                        |
-| `findNeverExpiring()` / `purgeNeverExpiring()` | find/delete rows that can never expire (CLI remediation) |
+| Static                                         | Role                                                                                                                               |
+| ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `issue(user, token, …)`                        | persist a freshly-signed token (override to add columns); `token` is the value to store — the digest under `auth.hashTokensAtRest` |
+| `findByToken(token)`                           | look a row up by its token string — must match the stored digest **or** the raw value (`whereIn("token", [sha256(token), token])`) |
+| `findForUser(user, token)`                     | a user-scoped lookup (logout), same two forms                                                                                      |
+| `activeFor(user)`                              | active, unexpired sessions, newest-first                                                                                           |
+| `revokeAllFor(user)` / `revokeFamily(id)`      | revoke a set, returning the revoked rows                                                                                           |
+| `enforceMax(user, max)`                        | cap concurrent refresh tokens                                                                                                      |
+| `purgeExpired()`                               | delete expired rows (CLI cleanup)                                                                                                  |
+| `findNeverExpiring()` / `purgeNeverExpiring()` | find/delete rows that can never expire (CLI remediation)                                                                           |
 
 Plus two instance getters, both of which the route gate consults on every request:
 
@@ -729,7 +738,7 @@ For cookie sessions read by `@warlock.js/web` pages, log in with `authService.lo
 
 ---
 name: login-with-providers
-description: 'Log in without a password — Google (OIDC code + PKCE + state + nonce, id_token verified with `jose`), GitHub, Discord, LinkedIn, Apple (`form_post` callback), Facebook and X, passkeys (WebAuthn via `@simplewebauthn/server`) and phone one-time codes (delivered through a `@warlock.js/notifications` channel). Every method ends in `authService.completeLogin(user)`, the same tokens, rows and events as password login. `startProviderLogin`, `completeProviderLogin`, `generatePasskeyRegistrationOptions`, `verifyPasskeyRegistration`, `generatePasskeyAuthenticationOptions`, `verifyPasskeyAuthentication`, `requestOtp`, `verifyOtp`, `otpRequestThrottleMiddleware`, `otpVerifyThrottleMiddleware`, `AuthProvider`. Triggers: "login with Google", "sign in with Google", "login with GitHub", "Sign in with Apple", "login with Discord", "login with LinkedIn", "login with Facebook", "login with X", `auth.providers.github`, "OAuth", "OIDC", "passkeys", "WebAuthn", "passwordless", "SMS code login", "WhatsApp OTP", "phone login", `warlock add auth-google`, `warlock add auth-passkeys`, `AuthProviderSdkMissingError`, `InvalidProviderCallbackError`, `ProviderEmailNotVerifiedError`, `InvalidPasskeyError`, `EC009`, `EC010`, `EC011`, `auth.providers`, `auth.passkeys`, `auth.otp`; typical import `import { completeProviderLogin, verifyOtp } from "@warlock.js/auth"`. Skip: password login — the `handle-login-and-logout` topic; email tokens — the `verify-email-and-reset-password` topic; defining an SMS channel — the `define-channel` topic of the `warlock-js-notifications` skill.'
+description: 'Log in without a password — Google (OIDC code + PKCE + state + nonce, id_token verified with `jose`), GitHub, Discord, LinkedIn, Apple (`form_post` callback), Facebook and X, passkeys (WebAuthn via `@simplewebauthn/server`) and phone one-time codes (delivered through a `@warlock.js/notifications` channel). Every method ends in `authService.completeLogin(user)`, the same tokens, rows and events as password login. `startProviderLogin`, `completeProviderLogin`, `generatePasskeyRegistrationOptions`, `verifyPasskeyRegistration`, `generatePasskeyAuthenticationOptions`, `verifyPasskeyAuthentication`, `requestOtp`, `verifyOtp`, `otpRequestThrottleMiddleware`, `otpVerifyThrottleMiddleware`, `AuthProvider`. Triggers: "login with Google", "sign in with Google", "login with GitHub", "Sign in with Apple", "login with Discord", "login with LinkedIn", "login with Facebook", "login with X", `auth.providers.github`, "OAuth", "OIDC", "passkeys", "WebAuthn", "passwordless", "SMS code login", "WhatsApp OTP", "phone login", `warlock add auth-google`, `warlock add auth-passkeys`, `AuthProviderSdkMissingError`, `InvalidProviderCallbackError`, `ProviderEmailNotVerifiedError`, `ProviderAccountLinkBlockedError`, `ProviderLinkExisting`, `InvalidPasskeyError`, `EC009`, `EC010`, `EC011`, `EC012`, `auth.providers`, `auth.passkeys`, `auth.otp`; typical import `import { completeProviderLogin, verifyOtp } from "@warlock.js/auth"`. Skip: password login — the `handle-login-and-logout` topic; email tokens — the `verify-email-and-reset-password` topic; defining an SMS channel — the `define-channel` topic of the `warlock-js-notifications` skill.'
 ---
 
 # Login with an OAuth provider, passkeys, or a phone code
@@ -792,6 +801,7 @@ Client side, the button is just a link. It must be a top-level navigation, not a
 - `state`, `nonce` and the PKCE verifier go into a signed, 10-minute, HttpOnly `auth_provider_state` cookie (SameSite=Lax, so it survives Google's redirect back). The callback clears the cookie, so a started login can complete only once.
 - The callback rejects, with `InvalidProviderCallbackError` (400, `EC009`): a missing, forged or expired cookie, a `state` mismatch, a `?error=` from Google, a failed code exchange, and an id_token with a bad signature, `iss`, `aud`, `exp` or `nonce`. `error.reason` says which. The response message is generic.
 - **Linking.** An existing `provider_accounts` row (provider plus Google `sub`) always decides the user. Without one, the Google email must be verified (`email_verified: true`), or the call throws `ProviderEmailNotVerifiedError` (403, `EC010`) and nothing is linked or created. A verified email links the matching user, or creates one with `{ email, name, emailVerifiedAt: now }`.
+- **Linking an existing account** follows `auth.providers.linkExisting` (type `ProviderLinkExisting`, default `"verified"`): the account found by email is linked only if it verified that address itself (`auth.verification.field` set); otherwise `ProviderAccountLinkBlockedError` (403, `EC012`) is thrown and nothing is linked — this stops a pre-registered account (attacker knows its password) from being merged with the real owner. A user model whose schema has no verification field links as before. `"always"` restores the old behaviour; `"never"` never links by email.
 - Other OIDC providers: implement `AuthProvider` (`authorizationUrl(state)`, `handleCallback({ query, expected })`) and register it under `auth.providers.custom.<name>`.
 
 ### Google request deadlines and controlled providers
@@ -831,6 +841,8 @@ The implementation uses the `jose` 6 `customFetch` and `timeoutDuration` options
 Same shape as Google: a config block under `auth.providers.<name>`, a GET
 route that redirects to `startProviderLogin(response, "<name>")`, and a GET
 callback that calls `completeProviderLogin(User, "<name>", request, response)`.
+Every provider (Apple, Facebook and X too) takes `timeoutMs` (positive integer,
+default `5000`): the deadline for each token, profile and key-set request.
 
 ```ts
 // src/config/auth.ts
@@ -956,8 +968,16 @@ router.get("/auth/x/callback", async ({ request, response }) => {
 ## Passkeys
 
 ```ts
-passkeys: { rpID: "example.com", rpName: "Example", origin: "https://example.com" },
+passkeys: {
+  rpID: "example.com",
+  rpName: "Example",
+  origin: "https://example.com",
+  userVerification: "preferred", // default; "required" refuses assertions without PIN/biometric
+},
 ```
+
+Throttle the anonymous `/auth/passkeys/login/options` route (each call stores
+a challenge row): `loginThrottleMiddleware({ by: ["ip"], isFailure: () => true, max: 30, window: "1m" })`.
 
 ```ts
 // Register (logged in)
@@ -1051,7 +1071,7 @@ router.post(
 - Codes have 6 digits and are stored in `one_time_tokens` (purpose `otp`) as a salted HMAC keyed from your access-token secret, never as plain SHA-256, which is trivially reversible for 6 digits. A new request invalidates the previous code.
 - Every verify counts an attempt atomically first. After `maxAttempts` the code is invalidated, even if the right code comes next, and even under concurrent guesses.
 - Delivery: `notify.channel(channel).send(phone, { body, code, expiresAt })`. Register that channel in `config/notifications.ts`, or set `auth.otp.send(phone, message, channel)`. `auth.otp.message(code)` changes the text.
-- **Anti-enumeration:** an unknown phone gets the same `requestOtp` result (nothing sent) and the same `InvalidOneTimeTokenError` (400, `EC008`) from `verifyOtp`.
+- **Anti-enumeration:** an unknown phone gets the same `requestOtp` result (nothing sent) and the same `InvalidOneTimeTokenError` (400, `EC008`) from `verifyOtp`. The code is delivered in the background (failures: log + `otp.deliveryFailed` event); `auth.otp.awaitDelivery: true` awaits it instead.
 - CSRF: `verifyOtp` is a POST. If the route uses cookie auth, the 5.12 Origin check applies. Otherwise there is no ambient credential to ride.
 
 ## Gotchas
@@ -1108,6 +1128,10 @@ const pair = await authService.createTokenPair(user, deviceInfo);
 ```
 
 `createTokenPair` is the typical issuance path. It respects `config.auth.refreshToken.enabled` — if disabled, returns only `accessToken`.
+
+A custom `payload` (`generateAccessToken(user, payload)` / `deviceInfo.payload`) may add claims, but `id` and `userType` are always stamped from `user`; the route gate also refuses a token whose claims name a different user than its row.
+
+With `auth.hashTokensAtRest: true` the token columns hold SHA-256 digests. `createTokenPair` / `login` still return the raw tokens; the row `createRefreshToken` returns exposes its raw token as `row.plainToken` (`row.get("token")` is the digest).
 
 ## Refresh with rotation — `refreshTokens`
 
@@ -1252,6 +1276,8 @@ If tokens minted before 4.12.0 may lack an `exp`, see `warlock auth.purge-never-
 
 `authService.generateAccessToken` / `createRefreshToken` read `config.auth.accessToken.expiresIn` / `config.auth.refreshToken.expiresIn`, validate them, and throw naming the key if the value is not a positive `ms` duration — before anything is signed, persisted, or capped.
 
+`config.auth.accessToken.issuer` / `audience` (optional) are stamped as `iss` / `aud` on every token `jwt.generate` / `generateRefreshToken` sign and **required** by `jwt.verify` / `verifyRefreshToken` — tokens signed before they were set are refused. The verifier and signer are prepared once per settings and reused (no per-request key parsing); passing your own extra options builds a fresh one.
+
 The package signs access and refresh tokens with independent secrets — `config.auth.accessToken.secret` and `config.auth.refreshToken.secret`. Setting a distinct `refresh.secret` is recommended: it prevents an access-token compromise from forging refresh tokens (and vice versa). The refresh secret is **optional** — when `config.auth.refreshToken.secret` is unset, refresh tokens fall back to the main `config.auth.accessToken.secret`, so refresh works out of the box without a second secret.
 
 ## Things NOT to do
@@ -1357,6 +1383,9 @@ A token passes three separate checks, in order — a token can fail any one of t
 1. **The JWT verifies** — signature, algorithm, `tokenType`, and (since 4.12.0) the presence of an `exp` claim that has not passed. A token with _no_ `exp` is rejected: there is no deadline to check, so it would otherwise verify indefinitely.
 2. **The access-token row still exists** — deleting it (logout) invalidates the token immediately, before its JWT expiry.
 3. **The row's own `expires_at` has not passed** (since 4.12.0). The database is the authority on the session: a row whose expiry has elapsed is rejected and deleted, even if the JWT itself is still within its lifetime. A row with a missing or unparseable `expires_at` is treated as expired, not as never-expiring.
+4. **The claims name the row's user** (since 5.53): the token's `id` (and `userType`, when present) must equal the row's `user_id` / `user_type`, or it is `InvalidAccessToken`.
+
+Expired or malformed tokens and CSRF Origin mismatches are logged at `debug`, not `error` — any anonymous client can produce them.
 
 Missing or invalid credentials return 401; an authenticated disallowed user type returns 403:
 
@@ -1558,6 +1587,8 @@ export default {
 ```
 
 The cookie name `setAuthCookie`/`clearAuthCookie` write **must match** the name a `cookie:<name>` token source reads — they are not linked automatically.
+
+`auth.cookie.hostPrefix: true` (default `false`) writes the auth cookies as `__Host-<name>` with `Secure`, so a subdomain or plain-HTTP page cannot plant or overwrite them. It requires `path: "/"` and no Domain (`cookie.cookieDomain`, `options.domain`, `http.cookies.options.domain`); a write that breaks this throws naming the setting. Reads (`cookie:<name>` sources, `pageSession`) try `__Host-<name>` first and fall back to `<name>`, and the clear helpers remove both, so switching it on signs no one out.
 
 ### CSRF: an automatic Origin check on cookie-authenticated writes
 
@@ -1940,14 +1971,14 @@ Register it the same way as the bundled commands — call the factory inside `de
 
 ---
 name: throttle-login-attempts
-description: 'Brute-force / credential-stuffing protection via `loginThrottleMiddleware` — a failure-aware route gate that counts only failed logins (resets on success), locks per-account and per-source after a threshold, and rejects pre-controller with 429 so the DB lookup and bcrypt verify are skipped. Cache-backed (shared across replicas), fixed-window, fails open on a cache outage. Triggers: `loginThrottleMiddleware`, `AuthErrorCodes.TooManyAttempts`, `EC004`, "rate limit login", "brute force protection", "lock account after failed logins", "throttle login attempts", "too many login attempts 429"; typical import `import { loginThrottleMiddleware } from "@warlock.js/auth"`. Skip: generic per-route request rate limiting that counts every request (use core `middleware.rateLimit`); gating a route by auth — the `protect-routes` topic; issuing tokens — the `handle-login-and-logout` topic.'
+description: 'Brute-force / credential-stuffing protection via `loginThrottleMiddleware` — a failure-aware route gate that counts each attempt as it arrives and resets on a successful login, locks per-account and per-source after a threshold, and rejects pre-controller with 429 so the DB lookup and bcrypt verify are skipped. Cache-backed (shared across replicas), fixed-window, fails open on a cache outage. Triggers: `loginThrottleMiddleware`, `AuthErrorCodes.TooManyAttempts`, `EC004`, "rate limit login", "brute force protection", "lock account after failed logins", "throttle login attempts", "too many login attempts 429"; typical import `import { loginThrottleMiddleware } from "@warlock.js/auth"`. Skip: generic per-route request rate limiting that counts every request (use core `middleware.rateLimit`); gating a route by auth — the `protect-routes` topic; issuing tokens — the `handle-login-and-logout` topic.'
 ---
 
 # Throttle login attempts with `loginThrottleMiddleware`
 
 `loginThrottleMiddleware(options?)` returns a Warlock middleware that defends the login (and refresh / password-reset) routes against brute-force and credential-stuffing — without punishing a user who fat-fingers a password then gets it right.
 
-The trick that makes it different from a plain rate limiter: it's **failure-aware**. It hooks the response _after_ your controller runs (`response.onSent`), counts only the attempts that actually failed, and **clears the counter the moment a login succeeds**. A generic request limiter can't do that — it runs before the controller and counts every hit, success or not.
+The trick that makes it different from a plain rate limiter: it's **failure-aware**. It counts each attempt before your controller runs (so concurrent bursts cannot outrun the limit), hooks the response _after_ the controller (`response.onSent`), locks only when a failure used the last allowed attempt, and **clears the counter the moment a login succeeds**. A generic request limiter can't do that — it counts every hit and never resets on success.
 
 ## The shortest version
 
@@ -1994,8 +2025,8 @@ router.post("/auth/reset-password", resetPasswordController, {
 
 ## How it behaves
 
-1. **Before the controller** — if the account or the IP is currently locked, it short-circuits with `429` and never touches the database or the bcrypt verify (this is also what neutralises the CPU-DoS angle of brute-forcing). The body carries `AuthErrorCodes.TooManyAttempts` (`EC004`).
-2. **After the controller** — it inspects the outcome. A non-2xx response is a failed login: it bumps a fixed-window counter for each tracked identifier, and once a counter reaches `max` it writes a lock key. A 2xx response is a success: it **clears** the counter and lock for that identifier.
+1. **Before the controller** — if the account or the IP is currently locked, it short-circuits with `429` and never touches the database or the bcrypt verify (this is also what neutralises the CPU-DoS angle of brute-forcing). The body carries `AuthErrorCodes.TooManyAttempts` (`EC004`). Otherwise it **counts the attempt right away** (fixed-window counter per identifier) and answers `429` once the count passes `max`, so a burst of concurrent requests cannot outrun the limit: at most `max` attempts per window reach the controller.
+2. **After the controller** — it inspects the outcome. A non-2xx response that used the last allowed attempt writes the lock key (the counter is rewritten with the lock's TTL so both end together), unless a success that finished meanwhile already reset the counter. A 2xx response is a success: it **resets** the counter to 0 and clears the lock for that identifier. If the counter cannot be read back (expired, evicted, a failed read), the failure locks: the check fails closed.
 
 Per-account tracking stops a password-spray against one user from many IPs; per-source tracking stops one IP from stuffing many accounts. A lock on **either** identifier rejects the request — defense-in-depth.
 
@@ -2024,16 +2055,22 @@ loginThrottleMiddleware({
 });
 ```
 
-| Option            | Default                            | Purpose                                   |
-| ----------------- | ---------------------------------- | ----------------------------------------- |
-| `max`             | `5`                                | Failures within the window before lockout |
-| `window`          | `"15m"`                            | Counting window (`ms`-string or seconds)  |
-| `lockoutDuration` | `"15m"`                            | Lock TTL once tripped                     |
-| `by`              | `["email", "ip"]`                  | Identifiers tracked independently         |
-| `identifierKey`   | `"email"`                          | Credential field used as the account key  |
-| `errorMessage`    | i18n `auth.errors.tooManyAttempts` | 429 message override                      |
-| `isFailure`       | `(res) => !res.isOk`               | What counts as a failed attempt           |
-| `identify`        | built-in email + ip extraction     | Custom identifier list                    |
+| Option            | Default                            | Purpose                                                               |
+| ----------------- | ---------------------------------- | --------------------------------------------------------------------- |
+| `max`             | `5`                                | Failures within the window before lockout                             |
+| `window`          | `"15m"`                            | Counting window (`ms`-string or seconds)                              |
+| `lockoutDuration` | `"15m"`                            | Lock TTL once tripped                                                 |
+| `by`              | `["email", "ip"]`                  | Identifiers tracked independently                                     |
+| `identifierKey`   | `"email"`                          | Credential field used as the account key                              |
+| `errorMessage`    | i18n `auth.errors.tooManyAttempts` | 429 message override                                                  |
+| `isFailure`       | `(res) => !res.isOk`               | What counts as a failed attempt                                       |
+| `identify`        | built-in email + ip extraction     | Custom identifier list                                                |
+| `emailLock`       | `"global"`                         | `"pair"` locks the (email, IP) pair instead of the email for everyone |
+| `accountMax`      | `max * 10`                         | Email-wide limit across all IPs when `emailLock: "pair"`              |
+
+`emailLock: "pair"` stops a stranger from locking a known account out: their `max` failures lock only their own (email, IP) pair, while the email-wide bucket (`accountMax`) still stops guessing spread over many IPs. It applies when `by` tracks both `"email"` and `"ip"` and no `identify` is set.
+
+Throttle the anonymous passkey options route the same way, counting every request: `loginThrottleMiddleware({ by: ["ip"], isFailure: () => true, max: 30, window: "1m" })`.
 
 ## The 429 response
 
@@ -2063,7 +2100,7 @@ router.post("/auth/forgot-password", forgotController, {
 
 |                              | `loginThrottleMiddleware` (auth)             | `middleware.rateLimit` (core) |
 | ---------------------------- | -------------------------------------------- | ----------------------------- |
-| Counts                       | only **failed** logins                       | **every** request             |
+| Counts                       | every attempt, until a login succeeds        | **every** request             |
 | Resets on a successful login | yes                                          | no                            |
 | Locks per account / per IP   | yes                                          | per key (default IP)          |
 | Storage                      | `@warlock.js/cache` (shared across replicas) | in-process map                |
@@ -2073,8 +2110,8 @@ They compose. For a hard ceiling on request volume _and_ failure-aware account l
 ## Gotchas
 
 - **Needs an initialised cache driver.** Storage is `@warlock.js/cache` (a peer dep, transitively present via core). If the driver isn't configured at runtime, the middleware **fails open** — it logs and lets the request through, because a throttle outage must never become an auth outage. That also means: no cache, no protection. Verify your cache config in production.
-- **Account lockout can be weaponised.** An attacker who knows a victim's email can lock them out by spamming failures. The per-IP counter mitigates this (the attacker's IP locks too), but for purely anonymous endpoints prefer `by: ["ip"]`. For high-value accounts, consider a CAPTCHA step instead of a hard lock.
-- **Counts are atomic and exact across servers (redis/pg).** Each failure does a create-only `cache.set(key, 0, { ttl: window })` (only the first failure opens the window and sets the TTL) followed by an atomic `cache.increment(key, 1, { ttl: window })`, so concurrent failures on different servers are never lost. Passing the TTL on the increment also expires a counter recreated after its seed expires, without extending an existing window. The memory cache driver is per-process — counts and locks are then per-process, so use redis/pg when running more than one instance.
+- **Account lockout can be weaponised.** With the default `emailLock: "global"`, an attacker who knows a victim's email can lock them out by spamming failures. Set `emailLock: "pair"` to lock the (email, IP) pair instead; for purely anonymous endpoints prefer `by: ["ip"]`. For high-value accounts, consider a CAPTCHA step instead of a hard lock.
+- **Counts are atomic and exact across servers (redis/pg).** Each attempt does a create-only `cache.set(key, 0, { ttl: window })` (only the first failure opens the window and sets the TTL) followed by an atomic `cache.increment(key, 1, { ttl: window })`, so concurrent failures on different servers are never lost. Passing the TTL on the increment also expires a counter recreated after its seed expires, without extending an existing window. The memory cache driver is per-process — counts and locks are then per-process, so use redis/pg when running more than one instance.
 - **Account and IP keys are hashed.** The built-in extractor keys both by an HMAC of the trimmed, lower-cased value (`email.<hmac>`, `ip.<hmac>`), keyed from `auth.accessToken.secret`, so cache logs never show the address or IP and a list of known emails cannot reverse the key. Without a configured secret it falls back to SHA-256. A custom `identify` is used as is — hash personal values yourself (`throttleIdentifierHash(kind, value)` is exported).
 - **Fixed window, not sliding.** The window is anchored at the first failure and does not extend on each subsequent one — predictable lockout timing. The lock key is independent and always lasts `lockoutDuration`: the lock stores its own deadline, so even a sliding-expiry driver (`memoryExtended`) cannot extend it.
 - **Needs a real cache driver.** The `null` driver stores nothing, so the throttle never locks; it warns once when that happens. On Redis, any version from 6 works.
@@ -2178,6 +2215,8 @@ router.post("/auth/reset-password", resetPasswordController, {
 });
 ```
 
+`requestPasswordReset` sends the notification **in the background**, so a known account answers as fast as an unknown one (no SMTP round trip on the response path). A failed send is logged and emitted as `password.resetDeliveryFailed` (`(user, error)`); set `auth.passwordReset.awaitDelivery: true` (default `false`) to await it and get its error instead.
+
 `resetPassword` writes the password, then calls `authService.revokeAllTokens(user)`: every refresh token is revoked and every access token deleted, which also kills cookie sessions (a cookie holds an access token). It emits `password.reset`; `requestPasswordReset` emits `password.resetRequested`.
 
 **Password hashing.** By default auth saves `hashPassword(plain)` and checks it with `verifyPassword`, the same check login uses. If your model hashes on save (`useHashedPassword()`), that first write gets hashed twice and fails the check, so auth saves the plaintext and lets your transformer hash it once. If neither write passes the check, it throws. Plaintext is never the first thing written. To write it yourself, set `auth.passwordReset.setPassword`.
@@ -2210,6 +2249,7 @@ const authConfigurations: AuthConfigurations = {
     setPassword: async (user, plain) => {
       /* optional */
     },
+    awaitDelivery: false, // default: send in the background (anti-enumeration timing)
   },
   oneTimeToken: { model: AppOneTimeToken }, // optional model override
 };

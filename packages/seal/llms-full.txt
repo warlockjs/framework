@@ -583,6 +583,26 @@ v.record(); // type: Record<string, any>
 
 Reach for `v.record` when keys are dynamic (user-provided, dictionary-style) but values share a schema. Use `v.record(keyValidator, valueValidator)` to constrain present keys, or `v.object` to require named keys.
 
+Bound the key count with `.maxKeys(n)` (JSON Schema `maxProperties`). Without it a record holds at most 10,000 keys (`configureSeal({ maxRecordKeys })`); `.maxKeys(Infinity)` lifts the cap. A `__proto__` key always fails with a `forbiddenKey` error.
+
+## Size limits
+
+Seal bounds what one payload can cost. Each limit is a `configureSeal()` option, can be passed per call to `validate(schema, data, { … })`, and fails with a normal validation error named after the rule:
+
+| Option          | Default | Applies to                                                       | Error type |
+| --------------- | ------- | ---------------------------------------------------------------- | ---------- |
+| `maxArrayItems` | 10,000  | `v.array` without `.maxLength`/`.length`/`.between`              | `maxItems` |
+| `maxRecordKeys` | 10,000  | `v.record` without `.maxKeys`                                    | `maxKeys`  |
+| `maxErrors`     | 100     | errors one array or record collects (items run 64 at a time)     | —          |
+| `maxDepth`      | 256     | nesting inside an object's output (`v.any()`, `.allowUnknown()`) | `maxDepth` |
+
+```ts
+configureSeal({ maxArrayItems: 50_000 }); // app-wide
+v.array(v.int()).maxLength(50_000); // one schema
+```
+
+Inside an object, `v.any()` values and `.allowUnknown()` extras are copied without `__proto__` keys, so input cannot set the output's prototype.
+
 ## `v.tuple` — positional types
 
 ```ts
@@ -727,6 +747,8 @@ The inner validator runs against each element. Failure on any element fails the 
 | `.length(n, msg?)`           | exact length           | `minItems=maxItems=n`      | `v.array(v.string()).length(3)`      |
 | `.between(a, b, msg?)`       | inclusive range        | `minItems: a, maxItems: b` | `v.array(v.string()).between(1, 10)` |
 | `.lengthBetween(a, b, msg?)` | alias for `.between()` | `minItems: a, maxItems: b` | —                                    |
+
+**Default item cap.** An array with no `.maxLength`/`.length`/`.between` holds at most 10,000 items (`configureSeal({ maxArrayItems })`); longer input fails with a `maxItems` error before any item runs. An explicit `.maxLength(n)` replaces the cap for that schema (`.maxLength(Infinity)` lifts it). Items run 64 at a time, and collection stops at `maxErrors` errors (100).
 
 **Note on `.min`/`.max`:** the array validator does not expose `.min`/`.max` directly — use `.minLength`/`.maxLength` (or `.between`/`.length`). This is intentional: `.min`/`.max` would conflict with primitive value-comparison semantics if they ever bled into here.
 
@@ -1628,7 +1650,7 @@ Both are **skipped** when their parent `v.object` generates JSON Schema — they
 | Need                                   | Reach for                                                            |
 | -------------------------------------- | -------------------------------------------------------------------- |
 | Email                                  | `v.string().email()` or `v.email()`                                  |
-| URL                                    | `v.string().url()`                                                   |
+| URL                                    | `v.string().url()` (`{ protocols: ["https"] }` to restrict schemes)  |
 | UUID                                   | `v.string().uuid()` (see [`string-methods.md`](./string-methods.md)) |
 | Number 0–100                           | `v.number().between(0, 100)`                                         |
 | Positive integer                       | `v.int().positive()`                                                 |
@@ -1955,6 +1977,8 @@ v.date().toEndOfDay().toDateOnly();
 
 All four share this surface. The picking guide (which factory to call) is in the `pick-seal-primitive` topic. For `.optional()` / `.in()` / `.oneOf()`, see the `compose-seal-modifiers` topic.
 
+Only finite numbers pass the type rule: `NaN`, `Infinity` and `-Infinity` are refused. The math mutators (`.abs()`, `.ceil()`, `.floor()`, `.round()`, `.toFixed()`) and `.coerce()` convert numbers and numeric strings only; `"abc"`, `true`, `[7]` and `{}` reach the type rule unchanged and fail it.
+
 ## Range — global value comparison
 
 | Method                  | Args                     | JSON Schema              | Example                    |
@@ -2112,20 +2136,21 @@ For the picking guide (`v.string` vs `v.scalar` vs `v.literal`), see the `pick-s
 
 ## Format
 
-| Method                           | Pattern                            | JSON Schema          | Example                          |
-| -------------------------------- | ---------------------------------- | -------------------- | -------------------------------- |
-| `.email(msg?)`                   | RFC-flavored regex                 | `format: "email"`    | `v.string().email()`             |
-| `.url(msg?)`                     | http/https URL                     | `format: "uri"`      | `v.string().url()`               |
-| `.pattern(re, msg?)`             | custom regex                       | `pattern: re.source` | `v.string().pattern(/^[A-Z]/)`   |
-| `.alpha(msg?)`                   | letters only                       | —                    | `v.string().alpha()`             |
-| `.alphanumeric(msg?)`            | letters + digits                   | —                    | `v.string().alphanumeric()`      |
-| `.numeric(msg?)`                 | digits only (string)               | —                    | `v.string().numeric()`           |
-| `.withoutWhitespace(msg?)`       | no spaces/tabs/newlines            | —                    | `v.string().withoutWhitespace()` |
-| `.creditCard(msg?)`              | credit-card-shaped                 | —                    | `v.string().creditCard()`        |
-| `.ip(msg?)`                      | IPv4 or IPv6                       | `format: "ipv4"`     | `v.string().ip()`                |
-| `.ip4(msg?)`                     | IPv4 only                          | `format: "ipv4"`     | `v.string().ip4()`               |
-| `.ip6(msg?)`                     | IPv6 only                          | `format: "ipv6"`     | `v.string().ip6()`               |
-| `.strongPassword(minLen?, msg?)` | 8+ chars, upper+lower+digit+symbol | —                    | `v.string().strongPassword(12)`  |
+| Method                           | Pattern                                                        | JSON Schema          | Example                                    |
+| -------------------------------- | -------------------------------------------------------------- | -------------------- | ------------------------------------------ |
+| `.email(msg?)`                   | RFC-flavored regex                                             | `format: "email"`    | `v.string().email()`                       |
+| `.url(msg?)`                     | URL; refuses `javascript:`, `data:`, `vbscript:`, `file:`      | `format: "uri"`      | `v.string().url()`                         |
+| `.url({ protocols }, msg?)`      | URL with only the listed schemes                               | `format: "uri"`      | `v.string().url({ protocols: ["https"] })` |
+| `.pattern(re, msg?)`             | custom regex (`g`/`y` flags are safe: every check starts at 0) | `pattern: re.source` | `v.string().pattern(/^[A-Z]/)`             |
+| `.alpha(msg?)`                   | letters only                                                   | —                    | `v.string().alpha()`                       |
+| `.alphanumeric(msg?)`            | letters + digits                                               | —                    | `v.string().alphanumeric()`                |
+| `.numeric(msg?)`                 | digits only (string)                                           | —                    | `v.string().numeric()`                     |
+| `.withoutWhitespace(msg?)`       | no spaces/tabs/newlines                                        | —                    | `v.string().withoutWhitespace()`           |
+| `.creditCard(msg?)`              | credit-card-shaped                                             | —                    | `v.string().creditCard()`                  |
+| `.ip(msg?)`                      | IPv4 or IPv6                                                   | `format: "ipv4"`     | `v.string().ip()`                          |
+| `.ip4(msg?)`                     | IPv4 only                                                      | `format: "ipv4"`     | `v.string().ip4()`                         |
+| `.ip6(msg?)`                     | IPv6 only                                                      | `format: "ipv6"`     | `v.string().ip6()`                         |
+| `.strongPassword(minLen?, msg?)` | 8+ chars, upper+lower+digit+symbol                             | —                    | `v.string().strongPassword(12)`            |
 
 ## ID formats
 
@@ -2220,14 +2245,14 @@ JSON Schema: `format: "color"` for `.hexColor()`; the others map to `format: "co
 
 ## Encoding mutators
 
-| Method            | Effect                            |
-| ----------------- | --------------------------------- |
-| `.base64Encode()` | utf8 → base64                     |
-| `.base64Decode()` | base64 → utf8                     |
-| `.urlEncode()`    | percent-encode                    |
-| `.urlDecode()`    | percent-decode                    |
-| `.slug()`         | "Hello World!" → "hello-world"    |
-| `.toString()`     | coerce non-string input to string |
+| Method            | Effect                                                  |
+| ----------------- | ------------------------------------------------------- |
+| `.base64Encode()` | utf8 → base64                                           |
+| `.base64Decode()` | base64 → utf8                                           |
+| `.urlEncode()`    | percent-encode                                          |
+| `.urlDecode()`    | percent-decode (a malformed escape keeps the raw value) |
+| `.slug()`         | "Hello World!" → "hello-world"                          |
+| `.toString()`     | coerce non-string input to string                       |
 
 ## Mutator vs transformer
 

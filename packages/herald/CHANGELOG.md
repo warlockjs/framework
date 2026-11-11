@@ -4,6 +4,29 @@ All notable changes to `@warlock.js/herald` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.53.0 - 2026-11-11
+
+### Upgrading
+
+- Invalid messages for a consumer with a `schema` are rejected instead of requeued; configure a dead-letter exchange on the queue to keep them for inspection.
+- An `x-retry-count` header that is not a non-negative integer counts as retries exhausted.
+- `channel.request()` ignores a caller-supplied `correlationId` (it used to overwrite the request's own, so the reply could never match) and no longer copies `delay`, `ttl` or `timeout` into the AMQP message properties.
+- `disconnect()` is final: it no longer triggers a reconnect, and it emits `disconnected` once (the connection's own close no longer emits a second one).
+
+### Security
+
+- A message that failed an `EventConsumer`'s `schema` was requeued at once and redelivered forever, pinning a CPU core and starving valid messages behind it. It is now rejected without requeue (the broker dead-letters it when the queue has a dead-letter exchange) and logged once as a warning with the validation errors.
+- The retry cap trusted the publisher's `x-retry-count` header: a non-numeric value such as `"x"` was concatenated instead of incremented, so the message was retried forever. A value that is not a non-negative integer now counts as retries exhausted, and a numeric string is read as a number.
+
+### Changed
+
+- `channel.request()` created a reply queue and a consumer per call and never removed them, also on timeout. Replies now come back over RabbitMQ's direct reply-to through one shared consumer per connection, and each pending request is removed on its reply or timeout. A reply that is not valid JSON rejects the request instead of throwing inside the consumer.
+
+### Fixed
+
+- `disconnect()` no longer triggers a reconnect and cancels a pending one, so a shutting-down process can exit.
+- After a broker restart the driver moves every channel obtained with `channel()` onto the new AMQP channel and re-attaches their active subscriptions, so publishes and consumers keep working instead of using the closed channel.
+
 ## 5.34.3 - 2026-10-20
 
 ### Changed

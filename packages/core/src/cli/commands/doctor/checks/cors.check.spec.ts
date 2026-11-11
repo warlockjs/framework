@@ -71,6 +71,29 @@ describe("doctor cors check", () => {
     expect(result?.detail).toContain("http.cors.origin is not set");
   });
 
+  it("warns when origin is present but empty, as an unset env var leaves it", async () => {
+    setConfig("http", { cors: { origin: undefined } } as never);
+
+    const result = await run();
+
+    expect(result?.status).toBe("warn");
+    expect(result?.detail).toContain("Invalid CORS origin option");
+    expect(result?.detail).not.toContain("default");
+  });
+
+  it("warns instead of failing when reading the config throws", async () => {
+    setConfig("http", {
+      get cors() {
+        throw new Error("boom");
+      },
+    } as never);
+
+    const result = await run();
+
+    expect(result?.status).toBe("warn");
+    expect(result?.detail).toContain("boom");
+  });
+
   it("is silent when there is no http config", async () => {
     expect(await run()).toBeUndefined();
   });

@@ -4,6 +4,21 @@ All notable changes to `@warlock.js/ai-cli` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.53.0 - 2026-11-11
+
+### Upgrading
+
+- Production apps that leave `inheritEnv` unset see a one-time warning on the first CLI run. Set `inheritEnv: "curated"` (recommended) or `inheritEnv: true` to silence it. The default stays `true` in this release.
+
+### Security
+
+- A CLI agent inherits the whole server environment by default (`inheritEnv: true`), so a model-driven coding CLI can read database URLs, signing keys and other providers' keys. New `inheritEnv: "curated"` passes only the minimal system set (PATH, home, temp, locale, proxy and TLS settings, Windows system variables) plus the adapter's own API key variables (`apiKeyEnv`); add anything else through `env`.
+- When `NODE_ENV` is `production` and `inheritEnv` is not set, the first run logs a one-time console warning that names the option. Set `inheritEnv: true` explicitly to keep the full environment and silence it.
+
+### Changed
+
+- The stdout line splitter no longer rescans and re-joins the whole pending buffer on every chunk. A very long stream-JSON line (a tool result with a whole file) costs linear time instead of quadratic; line, CRLF and overflow behaviour are unchanged.
+
 ## 5.45.0 - 2026-11-05
 
 ### Added

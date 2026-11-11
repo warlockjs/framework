@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -121,6 +121,33 @@ describe("doctor auth-tokens check", () => {
 
     try {
       expect(await run()).toBeUndefined();
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("doctor auth-tokens check, installed package shape", () => {
+  it("runs when the installed @warlock.js/auth exports only an import entry", async () => {
+    const root = mkdtempSync(path.join(tmpdir(), "warlock-auth-doctor-"));
+    const packageDir = path.join(root, "node_modules", "@warlock.js", "auth");
+
+    mkdirSync(packageDir, { recursive: true });
+    writeFileSync(path.join(root, "package.json"), JSON.stringify({ name: "app" }));
+    writeFileSync(
+      path.join(packageDir, "package.json"),
+      JSON.stringify({
+        name: "@warlock.js/auth",
+        type: "module",
+        exports: { ".": { import: "./esm/index.mjs" } },
+      }),
+    );
+
+    vi.spyOn(process, "cwd").mockReturnValue(root);
+    setConfig("auth", { userType: { user: class {} }, accessToken: { secret: "short" } } as never);
+
+    try {
+      expect((await run())?.status).toBe("warn");
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

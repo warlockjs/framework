@@ -4,6 +4,21 @@ All notable changes to `@warlock.js/devtools` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.53.0 - 2026-11-11
+
+### Upgrading
+
+- Opening devtools on a custom dev hostname (for example `app.test`) or through a local reverse proxy gets a 404. Add `allowedHosts: ["app.test"]` to `src/config/devtools.ts`, and `allowProxied: true` when a local proxy sits in front.
+
+### Security
+
+- The dashboard and its API answer only requests addressed to a loopback host (`localhost`, `*.localhost`, `127.0.0.1`, `[::1]`), refuse requests whose `Origin` is another site, and refuse requests carrying `X-Forwarded-For`, `X-Forwarded-Host`, `X-Real-IP` or `Forwarded`. A loopback socket used to be enough, so a website that pointed its domain at `127.0.0.1`, or anyone reaching the dev server through a tunnel, could read request history, SQL bindings, captured mail and AI prompts. A refused request gets an empty 404, and the terminal prints one warning per reason naming the option to change.
+- The minimum `fastify` version is 5.12.6.
+
+### Added
+
+- `allowedHosts` (default `[]`) and `allowProxied` (default `false`), read from the app's `src/config/devtools.ts` (a plain object, safe in production) or passed to `devtoolsConnector()`. `allowedHosts` names a custom dev hostname such as `"app.test"` (`".app.test"` also matches subdomains); `allowProxied` allows a local proxy nobody else can reach.
+
 ## 5.38.0 - 2026-10-25
 
 ### Added

@@ -42,6 +42,7 @@ import { buildSitemapXml, escapeXml } from "../src/xml";
 
 const baseUrl = "https://example.com";
 /** Characters XML 1.0 forbids in a document. */
+// oxlint-disable-next-line eslint/no-control-regex -- matching control characters is the point.
 const XML_ILLEGAL = /[\u0000-\u0008\u000B\u000C\u000E-\u001F￾￿]/;
 
 let workDir: string | undefined;

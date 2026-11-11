@@ -630,9 +630,18 @@ export const config = {
   for bytes that vary on something besides the host (a preview-theme cookie).
   It runs before the lookup — before any middleware — so read the request
   directly. A non-function is a boot-time `InvalidPageCacheOptInError`.
+- `query?: string[]` — the query parameters that change the page. Only these
+  enter the key (`?page=2&ref=x` and `?page=2&ref=y` share one entry); without
+  it every parameter except tracking ones (`utm_*`, `fbclid`, `gclid`, ...)
+  does. A request carrying a parameter the key leaves out may be served a
+  stored entry, but its own render is never stored.
+- `varyHeaders?: string[]` — request headers the page depends on, added to
+  `Vary` (e.g. the header `varyBy` reads).
 
-**Cache key**: the request `Host` (lower-cased, port kept), the normalised
-pathname (lower-cased, trailing slash stripped), the sorted query string, the
+**Cache key**: the request `Host` (lower-cased, port kept; in multi-site mode
+the host site selection chose), the normalised
+pathname (case kept, trailing slash stripped), the sorted query string
+(nested values such as `filter[status]` written out in full), the
 resolved `locale`, the representation — `html` for a document request, `json`
 for the `x-warlock-data` representation — and `varyBy`'s result. Two hosts
 (tenants) never share an entry. The stored document is the streamed one the
@@ -653,7 +662,13 @@ detected crawler request (a crawler may still read a HIT, it just never
 writes the crawler-specific render).
 
 **Response headers**: `x-warlock-cache: hit | miss | bypass`, alongside the
-usual `Cache-Control`.
+usual `Cache-Control`. A `cache` route's `Vary` lists `x-warlock-data`, then
+`Cookie, locale` unless the URL pinned the locale or the app has one locale,
+`User-Agent` when the page defers, and `cache.varyHeaders`.
+
+**Variant ceiling**: `pageCache.maxEntriesPerRoute` (default `1_000`, `false`
+removes it) caps the stored query variants per route and process; a new
+variant past it is served but not stored, with one warning per route.
 
 **Size ceiling**: `pageCache.maxEntryBytes` (config key, default `1_048_576`
 — 1 MiB) caps one stored entry; an oversized MISS is still served to the
@@ -1063,7 +1078,13 @@ The query helper above is application-owned: select eligible published rows.
 A plain `sitemap: productSitemap` function remains supported. The object form
 adds `invalidateOn` and static defaults, including `locales: false` for every
 supplied entry. Supplier functions return an Iterable or Promise of an Iterable;
-the Web adapter currently materializes entries in memory.
+the Web adapter currently materializes entries in memory. Up to four suppliers
+run at once; output keeps page order. A supplier receives a
+`SitemapSupplierContext` — `{ site, tenantKey, shared }`, empty in a single-site
+app. In multi-site mode a dynamic (tenant) site's supplier must filter by
+`tenantKey`: `entries: ({ tenantKey }) => listListings(tenantKey)`. Multi-site
+sitemaps are built per site on request and reused for `regenerateEvery`
+(5 minutes when unset), served with `ETag`/`Last-Modified` and 304s.
 
 Sitemap configuration and its exclusive model imports are projected out of the
 browser graph. Keep models in server modules and do not read them from the page
@@ -1246,7 +1267,7 @@ export default function Contact() {
 - Validation runs on the body only (files included); use `request.validated()`. Failure is a 422 `ActionState`, the action does not run.
 - Return `response.redirect(url)` (relative or `http(s)` only; other schemes throw), data, or a failure helper: `badRequest`, `unauthorized`, `forbidden`, `conflict`, `unprocessableEntity`, `tooManyRequests`, each with optional `{ message, errors }`.
 - Outcomes: no JS redirect is 303; JS redirect is 204 + `x-warlock-redirect`; failure is 422/4xx (page rendered at that status without JS, `actionData` body only with JS).
-- `values` is echoed on failure only, never files, and omits names in `web.forms.redactValues` (default `password`, `password_confirmation`, `*token*`, `*secret*`). `web.forms.redactValues` is a typed config key of `readonly string[]`; set it at boot to replace that list (patterns support `*`).
+- `values` is echoed on failure only, never files, and never secret-looking names: built-in `*password*`, `*passwd*`, `*passcode*`, `*token*`, `*secret*`, `*otp*`, `cvv`, `cvc`, `*card*number*`, `pin` (case-insensitive, `*` wildcard). `web.forms.redactValues` (`readonly string[]`) ADDS patterns to that list, never replaces it. `web.forms.echoValues: false` echoes nothing (default `true`).
 - Same-origin `Origin`/`Referer` is always required (403 otherwise); no opt-out.
 - Actions are never cached and always `private, no-store`; call `invalidatePageCache(tags)` to refresh other visitors' cached page.
 - Redirect after success: a no-JS action that returns data re-POSTs on reload.
@@ -1538,7 +1559,8 @@ export function bindLivePageData(socket: LivePageSocket) {
 `LivePageOptions` and structural `LivePageSocket` are exported from the web root.
 Reuse an existing socket if the app has one. No client dependency is required for
 polling: `configureLivePageData({})` removes the binding. `pollInterval` defaults
-to 30,000 ms and must be finite, between 1 and 2,147,483,647. Tags must be a
+to 30,000 ms and must be finite, between 1 and 2,147,483,647. Polling pauses in
+a hidden tab and refreshes once when it is visible again. Tags must be a
 non-empty string array; they describe dependencies of the whole loader pipeline,
 independent of response-cache policy.
 
@@ -1903,6 +1925,8 @@ A client navigation to the same URL still receives that same 400 status, with no
 ## Execution order
 
 Loaders run **sequentially, root to leaf, each one awaited before the next starts**: `root.setup.ts`'s `AppLoader`, then every matched `LayoutLoader` from outermost to innermost, then the page's `PageLoader`. The runtime has three top-level slots (`app`, `layout`, `page`), but the layout slot composes the full matched layout chain. A page may have only one _rendering_ layout; prefix-, middleware-, and loader-only layouts may still appear at multiple ancestry levels.
+
+`web.loaders: "parallel"` (default `"serial"`) starts the app, layout and page loaders together and settles them in that same order with the same rules below: the first level that throws or short-circuits wins and the levels under it commit nothing, but their loaders already started (their `signal` aborts). Use it only when no loader reads what a higher loader set on the request; keep auth gates in `middleware`, which always runs first. The layouts of one chain stay outermost-first in both modes.
 
 **The first core `Response` a loader returns is terminal.** Returning a `Response` object stops the pipeline immediately: no lower loader starts, `metadata` is not resolved, and that response is sent as-is. It is more terminal than a short-circuit — because the response is returned whole, the buffered header/cookie writes made at that same level are discarded along with everything below it. Use `response.redirect()` / `response.notFound()` (which produce a `LoaderShortCircuit`, committing that level's buffer inclusively) when you want your buffered writes to survive; return a raw `Response` only when you mean "this exact response, nothing else."
 
@@ -2837,9 +2861,9 @@ Upgrade: move each `src/web/(group)` site folder to `src/web/$sites/<key>` and d
 
 `resolveHost` receives a normalized `{ host, request }` and returns `{ site, key, indexable?, shared? } | null`. Its `site` must name a dynamic site. `null` is a 404; a throw is a 500. `key` partitions tenant state and cache identity, so use a durable tenant identifier rather than a display name.
 
-`resolveCache.ttl` is measured in seconds and caches by host only. It is disabled by default because a resolver that reads cookies or headers cannot be safely shared across visitors. Enable it only for host-only lookup results.
+`resolveCache.ttl` is measured in seconds and caches by host only. It is disabled by default because a resolver that reads cookies or headers cannot be safely shared across visitors. Enable it only for host-only lookup results. `resolveCache.maxEntries` (default `10_000`) bounds how many hosts are remembered (expired first, then least recently used); a host over 253 characters never reaches the resolver.
 
-`basePath` selects a site below a path prefix; the longest matching prefix wins. `unknownHost` is `"not-found"` by default, or may name a configured fallback site. During development use hosts such as `acme.localhost:2030`.
+`basePath` selects a site below a path prefix; the longest matching prefix wins. `unknownHost` is `"not-found"` by default, or may name a configured fallback site. During development use hosts such as `acme.localhost:2030`. `warlock dev` answers only `localhost`, `*.localhost`, IP addresses, fixed sites' `hosts` and `web.devAllowedHosts` (default none; `".tenant.test"` also matches subdomains) — list dynamic tenants' dev hosts there, or they get a 403 "Blocked request". `devAllowedHosts: true` disables the host check (DNS-rebinding exposure; avoid).
 
 `localeRouting` on a site replaces global `web.localeRouting`; omit it to inherit, and use `{}` to disable it for one site. Locale codes and the default locale still come from `app.localeCodes` and `app.localeCode`.
 
@@ -2868,7 +2892,7 @@ const originAndMount = siteUrl();
 
 `<Link to="platform.home">` and `navigateTo()` take the same names; a link to another site loads that site in full. `src/config/web.ts` may import the resolver from `app/...`: `warlock build` resolves the alias when it reads `web.sites`.
 
-With sitemap and robots enabled, `/sitemap.xml` and `/robots.txt` are selected per site. A dynamic site is indexable only when its resolver result says `indexable: true`; otherwise its sitemap is a 404 and robots disallows crawling. Set `web.tlsAsk` to expose Caddy's domain check endpoint; it requires `web.sites` and permits configured fixed hosts or domains claimed by `resolveHost`.
+With sitemap and robots enabled, `/sitemap.xml` and `/robots.txt` are selected per site. A dynamic site is indexable only when its resolver result says `indexable: true`; otherwise its sitemap is a 404 and robots disallows crawling. Set `web.tlsAsk` to expose Caddy's domain check endpoint; it requires `web.sites` and permits configured fixed hosts or domains claimed by `resolveHost`. It is public by default (`tlsAskAllow: "any"`); set `tlsAskAllow: "loopback"` when Caddy runs on the same machine, `"private"` for a private network, or a list of exact caller IPs — other callers get 403. Each site's sitemap is reused for `web.sitemap.regenerateEvery` (5 minutes when unset) with an `ETag`. Page sitemap suppliers receive `{ site, tenantKey, shared }`: a dynamic site's supplier must filter its rows by `tenantKey`, or every tenant's sitemap lists every tenant's URLs.
 
 ```caddyfile
 {
@@ -3103,7 +3127,7 @@ export function NavigationLinks() {
 - `params` and `query` apply only to route names.
 - `newTab` supplies `_blank` and `noopener noreferrer` unless you provide your own `target` or `rel`.
 
-`prefetch` fetches in-app page data on hover or keyboard focus. It is ignored for external, email, telephone, new-tab, and explicitly targeted links. Prefetch is best-effort and never delays the interaction.
+`prefetch` fetches in-app page data on hover (after the pointer rests 65 ms; leaving earlier sends nothing) or keyboard focus (at once). A click during an in-flight prefetch reuses that request, and the page chunk loads as soon as the prefetched data arrives. It is ignored for external, email, telephone, new-tab, and explicitly targeted links. Prefetch is best-effort and never delays the interaction.
 
 Modified clicks, middle clicks, downloads, another browsing context, or an earlier `preventDefault()` remain browser-owned.
 

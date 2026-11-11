@@ -4,6 +4,37 @@ All notable changes to `@warlock.js/ai-workspace` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.53.0 - 2026-11-11
+
+### Upgrading
+
+- **BREAKING** `grep` patterns with lookarounds (`(?=…)`, `(?!…)`, `(?<=…)`, `(?<!…)`) or backreferences (`\1`, `\k<name>`) are refused. Rewrite them without those constructs.
+- `grep` no longer searches files larger than 2 MB. Set `search: { maxFileBytes: 20_000_000 }` to search larger files.
+- **BREAKING** Shell policies with command rules or an `allow` list refuse lines that set `PATH`, `NODE_OPTIONS`, `GIT_*_COMMAND`, `EDITOR` and the other variables listed under Security. Add the names your commands need to `shell.allowAssignments` (`allowAssignments: ["NODE_OPTIONS"]`).
+- `run_tests` refuses a `pattern` that starts with `-`. Pass test paths or names; put runner options in the tool's `command` option instead.
+- A workspace can no longer `read_file` spill files written by another workspace that shares the same `output.spillDir` outside the jail, or by an earlier process.
+- While a workspace command runs, the workspace listens for `SIGTERM`, `SIGINT` and `SIGHUP`. An app without its own handler still stops on the signal as before; an app with its own handler keeps control of its shutdown.
+- Custom `WorkspaceBackend` implementations may accept the new optional `options.mode` argument of `writeFile` and `mkdir` (used for spill files); backends that ignore it keep working.
+
+### Security
+
+- `grep` patterns run on a matcher that never backtracks: one line costs at most pattern size × line length, so a model-supplied pattern such as `((a)+)+$`, `(a|a)+$` or `\d*\d*\d*x` can no longer hang the process. The previous guard only caught one nested-quantifier shape. Results are the same as `RegExp#test`. Lookarounds and backreferences need backtracking and are refused with `WorkspacePolicyError` type `"unsafe-pattern"` naming the construct, as are patterns that expand past 4000 states and a search that needs too much work per scanned character. A long scan yields to the event loop every few million matcher steps, so other requests keep being served and the run's abort signal stops it.
+- Glob matching (`glob`, `grep`'s `glob`, `list_dir`'s `ignore`, `denyPaths`, `search.skipDirs` and `.gitignore` lines) no longer compiles patterns into backtracking regular expressions. A wildcard-heavy glob from the model or from a cloned repository's `.gitignore` used to stall every search; matching is now linear. A model-supplied glob longer than 512 characters is refused as `"unsafe-pattern"`, and a `.gitignore` line longer than that is ignored.
+- `run_tests` refuses a `pattern` that starts with `-`. Quoting kept it one argument, but the runner still read it as an option (`npm test --node-options=--import=…` loads code), so a least-privilege agent without a shell or write tool could run code.
+- Shell policies that restrict which programs run (`allow`, `deny`, `denyPatterns`, `rules` or `allowCommand`) refuse setting a variable that makes an allowed program start another one or load code (`PATH`, `NODE_OPTIONS`, `GIT_SSH_COMMAND`, `GIT_EXTERNAL_DIFF`, `GIT_PAGER`, `PAGER`, `EDITOR`, `LD_PRELOAD`, `GIT_CONFIG_*`, `npm_config_*`, `*_COMMAND`, `*_ASKPASS` and similar) as a `NAME=value cmd` prefix, an `env NAME=value cmd` argument, an `export`, or through `read`, `printf -v` or `getopts`. Such a line is refused with reason `"nested-command"`, or asked about when `shell.onAsk` is set. New option `shell.allowAssignments: string[]` (default `[]`) permits named variables.
+- Spill files are created readable by the owner only (`0600`), and a spill directory the workspace creates is `0700`. When `output.spillDir` is outside the jail, `read_file` and `grep` open only the spill files this workspace (or its `readonly()` / `scope()` projections) wrote, so workspaces sharing one spill directory can no longer read each other's command output. `resolveInJail` takes an optional fourth argument with the readable spill file names.
+- Running `run_shell` commands and background jobs are killed when the host process receives `SIGTERM`, `SIGINT` or `SIGHUP` (POSIX), as well as on exit; foreground commands were never reaped before, and both kinds outlived a process-manager restart. The listeners exist only while a command runs, and the signal is raised again afterwards when the app has no handler of its own, so the host stops exactly as before.
+
+### Added
+
+- `search.maxFileBytes` (default `2_000_000` bytes): `grep` skips larger files without reading them when the backend has `stat` (the local backend does), and reports how many it skipped in the result's new `skippedFiles` field.
+
+### Changed
+
+- `grep` no longer reads a few large dumps or logs in the workspace whole, 16 at a time; files over `search.maxFileBytes` are skipped.
+- Glob patterns are compiled once and reused across every path of a walk instead of once per path checked.
+- The "closest text" hint after a failed `edit_file` / `multi_edit` compares only the lines that share a word with the missed text, considers at most 64 lines of `oldString` and stops after a fixed amount of work, so a huge `oldString` against a huge file no longer blocks for seconds (a 2,000-line text against a 20,000-line file: about 3.2 s to about 0.12 s). Hints for ordinary edits are unchanged.
+
 ## 5.48.0 - 2026-11-07
 
 ### Added

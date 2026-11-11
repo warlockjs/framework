@@ -4,6 +4,34 @@ All notable changes to `create-warlock` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.53.0 - 2026-11-11
+
+### Upgrading
+
+- These are template changes: apps created before this release keep their files. To adopt them, copy the settings from a freshly generated app: lower `fileUploadLimit`, set `cors.origin` from `CORS_ORIGINS`, switch `src/config/auth.ts` to `accessToken` / `refreshToken` with a finite `expiresIn` and `hashTokensAtRest: true`, set `http.multipart.routes`, add `.env.*` and `!.env.example` to `.gitignore`, and add an `agentKit.pick` list to `package.json`.
+- Apps generated from earlier templates should review their password-reset code: it generated codes with `Math.random`, stored them in plain text and never counted wrong attempts. They should also check that their example `users` and `posts` routes are not open to every signed-in user.
+- In a new app, frontends must renew access tokens through `POST /auth/refresh-token` before they expire after one hour.
+
+### Security
+
+- New apps cap one uploaded file at 10 MB (`fileUploadLimit: 10 * 1024 * 1024` in `src/config/http.ts`). The starter allowed 12 GB per file, and every file part is held in memory before route middleware (including auth) runs, so one large upload to any route could exhaust the server's memory. The config comment shows how to raise it.
+- New apps set `http.multipart.routes: "all"` explicitly in `src/config/http.ts`, so a production boot no longer warns that the option is unset. The comment explains how to switch to `"declared"` and mark the starter's upload routes with `uploads: true`; the template keeps `"all"` because page actions cannot declare `uploads` yet.
+- New apps allow cross-origin browser calls only from the origins listed in `CORS_ORIGINS` (comma-separated in `.env`; empty means same origin only) instead of `origin: "*"`.
+- New apps issue 1-hour access tokens and 7-day rotating refresh tokens (`accessToken` / `refreshToken` in `src/config/auth.ts`) instead of 100-year access tokens with refresh disabled, store only a SHA-256 digest of each token (`hashTokensAtRest: true`), and use the current config keys instead of the deprecated `auth.jwt` block (no more deprecation warning at boot). Login returns `tokens.refreshToken`; `POST /auth/refresh-token` renews the pair; `POST /auth/logout` accepts `refreshToken` and then ends only that session.
+- The starter's password reset is rebuilt: codes come from `node:crypto` (`randomInt`) instead of `Math.random`, only a keyed HMAC of the code is stored (column `codeHash`), every check counts an attempt atomically and the code stops working after 5 wrong tries, `POST /auth/reset-password` is throttled per email as well as per IP, and every rejected code (unknown email, wrong, expired, used, out of attempts) gets the same answer. `POST /auth/forgot-password` answers the same way, without waiting for the account lookup, for registered and unknown emails (the lookup, the code and its delivery run after the response; a failure there is logged), and creates a code for real accounts (it used to answer 404 for everyone because it looked users up through an "active" filter on a column the starter `User` model does not have). Delivery of the code is left to the app: wire it in `src/app/auth/services/forgot-password.service.ts`.
+- The example modules check access: `GET` / `POST /users` require a user whose new `role` field is `"admin"` (`adminMiddleware` in `src/app/auth/middleware/admin.middleware.ts`), and `PUT /posts/:id` is refused with 403 unless the signed-in user wrote the post or is an admin; the new image is stored only after that check, so a refused update leaves no file behind. Any signed-in user used to be able to list every account's email, create accounts and overwrite any post.
+- The generated `.gitignore` ignores every env file (`.env` and `.env.*`) except `.env.example`, so `.env.production`, `.env.shared` and the JWT secrets `warlock jwt.generate` may write there are not committed.
+- New apps sync coding-agent skills only from their own `@warlock.js/*` and `@mongez/*` dependencies: the scaffold writes an `agentKit.pick` allowlist into `package.json`. Every install used to copy the `skills/` folder of every package in `node_modules`, transitive ones included, into the agent's skills folder.
+- The scaffold's `pnpm-workspace.yaml` exclusion from the release-age cooldown (`minimumReleaseAgeExclude: ['@warlock.js/*']`) is removed once the scaffold's own installs finish, so later installs in the app wait out the cooldown for framework releases too.
+- The scaffolder runs the project's `warlock` binary with `npx --no`, and its printed hints do the same, so a missing local binary fails instead of downloading and running the unrelated `warlock` package from the registry.
+
+### Changed
+
+- New apps compress JSON and HTML responses (`compression: true` in `src/config/http.ts`; set `false` behind a compressing proxy).
+- New apps print one console line per request in production (`new ConsoleLog({ minLevel: "info" })` in `src/config/log.ts`) instead of every debug phase line.
+- New apps bound both in-memory caches at 10,000 entries (`maxSize: 10_000` in `src/config/cache.ts`), evicting the least recently used.
+- `create-warlock` no longer installs `rimraf` and `@mongez/reinforcements`, which it never used.
+
 ## 5.51.0 - 2026-11-11
 
 ### Fixed

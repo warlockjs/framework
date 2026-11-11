@@ -1,6 +1,6 @@
 import { config } from "../../../../config/config-getter";
 import type { DoctorCheck } from "../check.types";
-import { isInstalledInProject, isSet } from "./config-values";
+import { isInstalledInProject, isSet, warnOnError } from "./config-values";
 
 /** Signing secrets shorter than this can be guessed offline from one captured token. */
 const MIN_SECRET_BYTES = 32;
@@ -170,7 +170,7 @@ function lifetimeFinding(): string | undefined {
  * `@warlock.js/auth` not installed in the project. A missing secret is left to
  * the `jwt-secret` check.
  */
-export const authTokensCheck: DoctorCheck = {
+export const authTokensCheck: DoctorCheck = warnOnError({
   name: "auth-tokens",
   run: () => {
     const userType: unknown = config.get("auth.userType");
@@ -204,4 +204,4 @@ export const authTokensCheck: DoctorCheck = {
             findings.map((finding) => `  - ${finding}`).join("\n"),
     };
   },
-};
+});

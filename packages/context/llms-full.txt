@@ -285,7 +285,7 @@ app.use(async (req, res, next) => {
 
 `buildStores(payload)` calls each registered context's `buildStore(payload)` (the abstract method on `Context<TStore>` — see the `define-context` topic) and returns `{ [contextName]: store }`.
 
-`runAll(stores, fn)` nests every context's `run()` in registration order, then invokes `fn` at the innermost layer. All contexts are active inside `fn`.
+`runAll(stores, fn)` activates every context with its store (or `{}`) in one step, then invokes `fn`. All contexts are active inside `fn`. Every context keeps its store in one shared `AsyncLocalStorage` (one slot per context), so the per-promise cost of context tracking does not grow with the number of contexts; a context class that overrides `run()` is still run through it, nested inside the others.
 
 ## `enterAll()` — middleware without a callback
 
@@ -315,7 +315,7 @@ contextManager.clearAll(); // clear stores on every context
 
 ## Order matters
 
-`runAll` nests in **registration order**. The first-registered context is the outermost layer. If contexts have ordering constraints (database before tenant because tenant resolves via the db), register them in that order.
+Contexts with the built-in `run()` become active together; a context that overrides `run()` is nested in **registration order** (first registered = outermost). If contexts have ordering constraints (database before tenant because tenant resolves via the db), register them in that order.
 
 ```ts
 contextManager

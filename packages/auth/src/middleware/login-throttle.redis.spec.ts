@@ -118,7 +118,9 @@ describe.skipIf(!enabled)("real Redis login throttles", () => {
     await throttle(makeCtx({ request, response: success }));
     expect(success.tooManyRequests).not.toHaveBeenCalled();
     await success.fireSent();
-    expect(await observer.exists([counter, lock])).toBe(0);
+    // A success resets the counter to 0 (kept as proof of the reset) and drops the lock.
+    expect(await observer.exists(lock)).toBe(0);
+    expect(await observer.get(counter)).toBe("0");
   });
 
   it("keeps concurrent failure counts exact and does not extend the counting window", async () => {

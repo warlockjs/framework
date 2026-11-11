@@ -1,6 +1,6 @@
 import { config } from "../../../../config/config-getter";
 import type { CheckResult, DoctorCheck } from "../check.types";
-import { isSet } from "./config-values";
+import { isSet, warnOnError } from "./config-values";
 
 /** The fix every permissive verdict ends with. */
 const LIST_ORIGINS =
@@ -24,10 +24,14 @@ function ok(detail: string): CheckResult {
  * together with `credentials: true` lets any site send signed-in requests and
  * read the answers.
  *
+ * An `origin` key that is present but empty (`undefined`, `null`, `""`)
+ * replaces the default, and the CORS plugin then fails every request with a
+ * 500; that is reported too.
+ *
  * NEEDS NO BOOTED APP — it reads config only. Silent when the app has no
  * `http` config.
  */
-export const corsCheck: DoctorCheck = {
+export const corsCheck: DoctorCheck = warnOnError({
   name: "cors",
   run: () => {
     if (!isSet(config.get("http"))) return undefined;
@@ -35,6 +39,20 @@ export const corsCheck: DoctorCheck = {
     const cors: unknown = config.get("http.cors");
     const options =
       typeof cors === "object" && cors !== null ? (cors as Record<string, unknown>) : {};
+
+    // The app's `http.cors` is spread over the default, so an `origin` key that
+    // is present but empty (`undefined` from an unset env var, `null`, `""`)
+    // replaces `"*"`, and the CORS plugin then fails every request.
+    const hasOriginKey = Object.prototype.hasOwnProperty.call(options, "origin");
+
+    if (hasOriginKey && options.origin !== false && !options.origin) {
+      return warn(
+        `http.cors.origin is ${options.origin === "" ? '""' : String(options.origin)} — the CORS ` +
+          'plugin answers every request with a 500 "Invalid CORS origin option". Set ' +
+          "http.cors.origin to the list of browser origins allowed to call the API (an empty " +
+          "list allows same-origin calls only), or to false to send no CORS headers.",
+      );
+    }
 
     const configured = isSet(options.origin);
     const origin: unknown = configured ? options.origin : "*";
@@ -81,4 +99,4 @@ export const corsCheck: DoctorCheck = {
 
     return ok("cross-origin browser calls limited to the configured origin");
   },
-};
+});

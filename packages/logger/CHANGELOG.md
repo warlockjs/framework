@@ -4,6 +4,38 @@ All notable changes to `@warlock.js/logger` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.53.0 - 2026-11-11
+
+### Upgrading
+
+- `FileLog` writes line breaks and control characters in messages as `\n` / `\uXXXX`, one entry per line. Pass `escape: false` to keep line breaks raw.
+- `ConsoleLog` drops terminal escape sequences other than colours from messages. There is no switch; colours and line breaks are unchanged.
+- `FileLog` / `JSONFileLog` report write failures through `log.onChannelError(...)` (default: one stderr line) instead of `console.error("Failed to write log:", …)`.
+- **BREAKING** `FileLog`'s protected `onSave()`, `groupedMessages`, `prepareGroupedMessages()`, `content` and `writeGroupedMessagesToFile()` are gone; a subclass that overrode them now overrides `writeEntries(filePath, messages)` / `writeEntriesSync(filePath, messages)`. Subclasses that only push to `this.messages` and call `checkIfMessagesShouldBeWritten()` keep working.
+- A corrupt `.json` log file is kept as `<file>.json.corrupt-<epoch ms>` next to the new file instead of being overwritten.
+- A channel whose `init()` failed is marked initialized, so later writes retry and report their failure instead of buffering forever.
+
+### Security
+
+- `FileLog` and `JSONFileLog` no longer lose entries logged while a write is in flight. The buffer is handed to the write and replaced by an empty one, so entries that arrive meanwhile wait for the next write; entries of a failed write go back to the buffer. Under steady traffic most entries used to be dropped silently.
+- `FileLog` no longer crashes the process when its log file cannot be opened (directory removed or rotated away, no permission, out of file descriptors). Writes append with a promise that rejects; a missing directory is created again and the write retried once; other failures go to `log.onChannelError(...)`. A channel whose log directory cannot be created at startup reports it instead of raising an unhandled rejection.
+- `FileLog` and `JSONFileLog` take `maxBufferedMessages` (default `10000`): while writes keep failing, the oldest entries past the limit are dropped and one notice is reported, so a broken disk cannot grow memory without bound. `Infinity` keeps everything.
+- `FileLog` keeps each entry on one line: line breaks, tabs and control characters in the message are written as `\n`, `\t`, `\uXXXX`, and terminal escape sequences are removed, so text from a request cannot forge a log line or rewrite the terminal of whoever tails the file. An `Error`'s stack trace is written as is. New option `escape` (default `true`).
+- `ConsoleLog` removes terminal escape sequences other than colours from message text (cursor movement, screen clearing, window titles, clipboard writes, the "conceal" style) and shows other control characters as `\uXXXX`. Colour codes and line breaks are kept.
+- `JSONFileLog` never overwrites a log file it cannot parse: the file is renamed to `<file>.json.corrupt-<epoch ms>`, a new file is started and `onChannelError` is told where the old one went. It used to replace the whole file, deleting every earlier entry.
+
+### Added
+
+- `log.isEnabled(level)`: `false` when the logger `minLevel` or every channel's level settings drop that level (or there are no channels). Callers can check it before building an expensive log context.
+- `minLevel` option on `ConsoleLog`: the lowest severity that channel prints, for example `new ConsoleLog({ minLevel: "info" })` to hide debug lines on the terminal while file channels still record them. Not set by default.
+- `format: "jsonl"` option on `JSONFileLog` (type `JSONFileLogConfig`): one JSON object per line in a `.jsonl` file, written by appending only. The default `format: "json"` still rewrites the whole `{ "messages": [...] }` file on each write.
+- `LogChannel.acceptsLevel(level)` (checks `levels` by default), so custom channels can tell `log.isEnabled()` about their own level options.
+
+### Changed
+
+- `log.*` returns before redaction and fan-out when no channel would keep the entry.
+- Registered secrets (`registerLogSecret`) no longer make every log entry be deep-copied: entries are first checked read-only with one combined matcher, and copied and masked only when they hold a registered value or key.
+
 ## 5.39.1 - 2026-10-26
 
 ### Added

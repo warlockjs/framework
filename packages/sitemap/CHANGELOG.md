@@ -4,6 +4,20 @@ All notable changes to `@warlock.js/sitemap` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.53.0 - 2026-11-11
+
+### Upgrading
+
+- A path with spaces or non-ASCII characters is written encoded (`/posts/café` becomes `/posts/caf%C3%A9`), and `entries()` reports the encoded path; `/posts/café` and `/posts/caf%C3%A9` are now one entry.
+
+### Security
+
+- Sitemap paths are percent-encoded as the sitemap protocol requires: spaces, non-ASCII text (as UTF-8) and control characters become `%XX` escapes, and a `%` that does not start an escape becomes `%25`. A path built from user data (a slug with a control character) could make the whole file invalid XML. `escapeXml` also drops characters XML 1.0 cannot carry. Already-encoded paths and query strings are unchanged.
+
+### Changed
+
+- Shards are compressed off the main thread (`gzip: true` no longer blocks the event loop), and each URL block is rendered once instead of twice. The written files are byte-identical.
+
 ## 5.34.3 - 2026-10-20
 
 ### Changed

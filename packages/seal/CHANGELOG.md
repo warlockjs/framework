@@ -4,6 +4,42 @@ All notable changes to `@warlock.js/seal` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.53.0 - 2026-11-11
+
+### Upgrading
+
+- **BREAKING** Arrays longer than 10,000 items and records with more than 10,000 keys fail validation unless the schema sets its own bound. Set `.maxLength(n)` / `.maxKeys(n)` on the schema, or `configureSeal({ maxArrayItems: Infinity, maxRecordKeys: Infinity })` to restore the old behaviour app-wide. This also applies to model schemas that hold large embedded lists.
+- An array or record with more than 100 failing items reports the first 100 errors and stops validating the rest. `configureSeal({ maxErrors: Infinity })` restores the full list.
+- **BREAKING** `url()` refuses `javascript:`, `data:`, `vbscript:` and `file:` links. To accept one of them, list the schemes you want: `url({ protocols: ["https", "data"] })`.
+- `v.number()` refuses `NaN` and infinite values on optional fields too (required fields already refused them). There is no opt-out.
+- The number math mutators no longer turn non-numeric input into numbers: `v.number().abs()` given `"abc"`, `true` or `[7]` fails instead of producing `NaN`, `1` or `7`, and strings that are not numeric (`" 7 "`, `".5"`) fail too. Numeric strings such as `"-5"` still convert.
+- Objects nested more than 256 levels deep inside an object's output fail with `maxDepth`. `configureSeal({ maxDepth: n })` raises the limit.
+- A record with a `__proto__` key fails validation, and `__proto__` keys are dropped from `v.any()` and `.allowUnknown()` output.
+- `.urlDecode()` passes a value with a malformed escape sequence to the rules unchanged instead of throwing.
+- A custom container mutator that relied on running twice per validation now runs once.
+
+### Security
+
+- Arrays and records have a default size cap. An array whose schema sets no `.maxLength()` / `.max()`, `.length()` or `.between()` may hold at most 10,000 items (`maxArrayItems`), and a record without the new `.maxKeys(n)` at most 10,000 keys (`maxRecordKeys`). Larger input fails with a `maxItems` / `maxKeys` validation error before any item is validated. Both are `configureSeal()` options and can also be passed to a single `validate()` call.
+- Array items and record values are validated 64 at a time instead of all at once, and an array or record stops validating once it has collected `maxErrors` errors (default `100`); the error list is cut to that length. A body of many invalid items, or of items with database-backed rules, no longer costs work and response size in proportion to its length.
+- The unknown-keys error lists at most 10 keys, then "and N more".
+- A `__proto__` key in the input can no longer set the prototype of the validated output. Records refuse it with a `forbiddenKey` error; `v.any()` values and `.allowUnknown()` extras inside an object are copied without it; `.trim()` keeps it as a plain own key so a strict object still reports it as unknown; `.stripUnknown()` drops it.
+- `v.string().url()` refuses the script-capable schemes `javascript:`, `data:`, `vbscript:` and `file:`. Every other scheme (`https:`, `mailto:`, `ftp:`, custom app links) still passes.
+- The number rule refuses `NaN`, `Infinity` and `-Infinity` (an out-of-range JSON literal such as `1e999` parses to `Infinity`). `.abs()`, `.ceil()`, `.floor()`, `.round()`, `.toFixed()` and `.coerce()` convert only numbers and numeric strings, so `"abc"`, `true`, `[7]` and `{}` fail the type rule instead of being turned into `NaN` or a number.
+- `.urlDecode()` keeps a value with a malformed escape sequence as it was instead of throwing, which surfaced as a server error rather than a validation error.
+- Data nested more than `maxDepth` levels (default `256`) inside an object's output, for example under `v.any()`, fails with a `maxDepth` validation error instead of overflowing the call stack; `.trim()` stops descending at the same depth.
+- `pattern()` with a `g` or `y` regex gives the same result on every call; each check starts at index 0.
+
+### Added
+
+- `v.record(...).maxKeys(n, errorMessage?)`: caps the keys of one record (emitted as `maxProperties` in JSON Schema). `.maxKeys(Infinity)` lifts the default cap for that schema.
+- `url({ protocols: [...] }, errorMessage?)` accepts only the listed schemes.
+- `configureSeal()` options `maxArrayItems` (default `10000`), `maxRecordKeys` (default `10000`), `maxErrors` (default `100`) and `maxDepth` (default `256`), also accepted by a single `validate()` call.
+
+### Changed
+
+- Mutators on `v.object`, `v.array`, `v.record` and `v.tuple` (`.trim()`, `.stripUnknown()`, custom ones) run once per validation instead of twice.
+
 ## 5.50.0 - 2026-11-09
 
 ### Fixed

@@ -1,7 +1,7 @@
 import { config } from "../../../../config/config-getter";
 import { DEFAULT_MULTIPART_MAX_TOTAL_SIZE } from "../../../../http/multipart";
 import type { DoctorCheck } from "../check.types";
-import { formatBytes, isSet } from "./config-values";
+import { formatBytes, isSet, warnOnError } from "./config-values";
 
 /**
  * Above this, a multipart cap is far past what most apps accept. Every part of
@@ -37,7 +37,7 @@ function totalCap(value: unknown): number {
  * `http` config or sets neither key (the defaults, 10 MB per file and 25 MB per
  * request, apply).
  */
-export const uploadLimitsCheck: DoctorCheck = {
+export const uploadLimitsCheck: DoctorCheck = warnOnError({
   name: "upload-limits",
   run: () => {
     if (!isSet(config.get("http"))) return undefined;
@@ -84,4 +84,4 @@ export const uploadLimitsCheck: DoctorCheck = {
       detail: `uploads capped at ${formatBytes(effectiveFile)} per file and ${formatBytes(perRequest)} per request${heldBack}`,
     };
   },
-};
+});

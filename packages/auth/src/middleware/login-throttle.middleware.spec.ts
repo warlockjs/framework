@@ -188,7 +188,7 @@ describe("loginThrottleMiddleware", () => {
     expect(response.tooManyRequests).toHaveBeenCalledOnce();
   });
 
-  it("clears the counter and the lock on a successful response", async () => {
+  it("resets the counter to 0 and clears the lock on a successful response", async () => {
     cacheGet.mockResolvedValue(null);
 
     const middleware = loginThrottleMiddleware({ by: ["email"] });
@@ -198,10 +198,42 @@ describe("loginThrottleMiddleware", () => {
     await middleware(makeCtx({ request, response }));
     await response.fireSent();
 
-    expect(cacheRemove).toHaveBeenCalledWith(`auth.throttle.count.email.${SARA_KEY}`);
+    // 0, not deleted: a failure still in flight reads it as "a success reset the window"
+    expect(cacheSet).toHaveBeenCalledWith(`auth.throttle.count.email.${SARA_KEY}`, 0, {
+      ttl: "15m",
+    });
+    expect(cacheRemove).not.toHaveBeenCalledWith(`auth.throttle.count.email.${SARA_KEY}`);
     expect(cacheRemove).toHaveBeenCalledWith(`auth.throttle.lock.email.${SARA_KEY}`);
     // counted once when it arrived, never again after the response
     expect(cacheIncrement).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    ["comes back empty", async () => null],
+    ["holds something that is not a count", async () => "garbage"],
+    [
+      "fails",
+      async () => {
+        throw new Error("read timed out");
+      },
+    ],
+  ])("still locks at the limit when the counter re-read %s (fails closed)", async (_name, read) => {
+    cacheIncrement.mockResolvedValue(5);
+    cacheGet.mockImplementation(async (key: string) =>
+      key.startsWith("auth.throttle.lock.") ? null : read(),
+    );
+
+    const middleware = loginThrottleMiddleware({ max: 5, by: ["email"] });
+    const response = buildResponse(false);
+
+    await middleware(makeCtx({ request: buildRequest(), response }));
+    await response.fireSent();
+
+    expect(cacheSet).toHaveBeenCalledWith(
+      `auth.throttle.lock.email.${SARA_KEY}`,
+      expect.any(Number),
+      { ttl: "15m" },
+    );
   });
 
   it("no-ops when no identifier can be extracted (request lacks email and ip)", async () => {

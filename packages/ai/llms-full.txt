@@ -620,7 +620,7 @@ Only a _handler bug_ — a non-sentinel throw from your handler — propagates, 
 
 ---
 name: attach-ai-middleware
-description: 'Wire agent middleware — ai.middleware.budget (token / USD caps + SLO/cost contract w/ maxLatencyMs + onViolation fallback), ai.middleware.guardrail (pre / post content checks), ai.middleware.semanticCache (exact + vector cache), supervisor-level middleware, plus authoring custom hooks (execute / trip / tool). Triggers: `onSpend`, `BudgetSpend`, `window: "all"`, `ai.pricing`, `pricingCatalogue`, `PricingCatalogue`, `reserve`, `BudgetReserveOptions`, `estimateInputTokens`, `countInputTokens`, `ai.middleware.budget`, `ai.middleware.guardrail`, `ai.middleware.semanticCache`, `ai.middleware.compose`, `ai.middleware.forTool`, `AgentMiddleware`, `BudgetExceededError`, `GuardrailViolationError`, `BudgetContract`, `maxLatencyMs`, `onViolation`, `readBudgetFallbackSignal`, `supervisor middleware`, `SemanticCacheOptions`, `SemanticCacheScope`; ''cap token cost'', ''SLO budget'', ''block pii in prompts'', ''semantic cache before LLM'', ''supervisor-level middleware'', ''write custom hook'', ''isolate semantic cache per session/tenant''; typical import `import { ai } from "@warlock.js/ai"`. Skip: agent lifecycle — the `run-ai-agent` topic; cache drivers — the `persist-ai-data` topic; competing libs `langchain` callbacks.'
+description: 'Wire agent middleware — ai.middleware.budget (token / USD caps + SLO/cost contract w/ maxLatencyMs + onViolation fallback), ai.middleware.guardrail (pre / post content checks), ai.middleware.semanticCache (exact + vector cache), supervisor-level middleware, plus authoring custom hooks (execute / trip / tool). Triggers: `onSpend`, `BudgetSpend`, `window: "all"`, `ai.pricing`, `pricingCatalogue`, `PricingCatalogue`, `reserve`, `BudgetReserveOptions`, `estimateInputTokens`, `countInputTokens`, `ai.middleware.budget`, `ai.middleware.guardrail`, `ai.middleware.semanticCache`, `ai.middleware.compose`, `ai.middleware.forTool`, `AgentMiddleware`, `BudgetExceededError`, `GuardrailViolationError`, `BudgetContract`, `maxLatencyMs`, `onViolation`, `readBudgetFallbackSignal`, `supervisor middleware`, `SemanticCacheOptions`, `SemanticCacheScope`, `cacheToolRuns`; ''cap token cost'', ''SLO budget'', ''block pii in prompts'', ''semantic cache before LLM'', ''supervisor-level middleware'', ''write custom hook'', ''isolate semantic cache per session/tenant''; typical import `import { ai } from "@warlock.js/ai"`. Skip: agent lifecycle — the `run-ai-agent` topic; cache drivers — the `persist-ai-data` topic; competing libs `langchain` callbacks.'
 ---
 
 # Middleware — agent-level pipeline
@@ -800,6 +800,7 @@ ai.middleware.semanticCache({
   ttlMs: 60 * 60 * 1000,
   namespace: "support-faq",
   // scope: "session" (default) — see below
+  // cacheToolRuns: false (default) — answers of runs that called tools are not stored
 });
 ```
 
@@ -807,11 +808,13 @@ ai.middleware.semanticCache({
 
 **How it works.**
 
-- **Exact-match** — FNV hash over the message list. `store.get(hash)` returns an instant hit.
-- **Vector-match** — embeds the prompt, calls `store.similar(vector, { topK: 1, threshold })`. Driver uses its native ANN index.
+- **Exact-match** — SHA-256 over the message list. `store.get(hash)` returns an instant hit after re-checking the stored prompt hash, scope and context.
+- **Vector-match** — embeds the last user message, calls `store.similar(vector, { topK, threshold })`; a page filled by other scopes / conversations is widened. Driver uses its native ANN index.
+- **Same context only** — every entry records a fingerprint of the agent name, the conversation before the question (system prompt included) and the question's attached media; both paths require it to match. Two agents in one session, or the same "yes, go ahead" at two points of a conversation, never share an answer.
 - **Hits** return a synthetic `ModelResponse` with `usage: { input: 0, output: 0, total: 0 }`.
 - **Writes** happen at `trip.after` on miss.
 - **Trip-zero only** — only first-trip responses are cached. Tool-using loops never serve cached tool-call responses (would infinite-loop).
+- **`cacheToolRuns`** (default `false`) — when the first turn calls tools, the final answer (built from tool results) is not stored. Set `true` for public data, e.g. a KB-search agent.
 - **Never use memory drivers in production** — linear scan per query.
 
 ### Session-scoped by default — `scope` (4.15.0)
@@ -823,11 +826,11 @@ ai.middleware.semanticCache({ embedder, threshold: 0.95, scope: "shared" }); // 
 ai.middleware.semanticCache({ embedder, threshold: 0.95, scope: (ctx) => tenantIdFrom(ctx) }); // custom boundary
 ```
 
-- **`"session"`** (default) — isolated per `sessionId`; a run made _without_ a `sessionId` shares one unscoped pool (unchanged behavior for those calls). Thread `sessionId` through `agent.execute()` to get the isolation — composite primitives (supervisor, orchestrator) already forward their own.
+- **`"session"`** (default) — isolated per `sessionId`; a run made _without_ a `sessionId` skips the cache (no read, no write; warns once). Thread `sessionId` through `agent.execute()` — composite primitives (supervisor, orchestrator) already forward their own.
 - **`"shared"`** — one pool for every caller, regardless of session — the pre-4.15.0 behavior. The explicit opt-in for genuinely public Q&A (docs bot, FAQ) where cross-user hit rate is the point and no response can carry a caller's private context.
-- **`(context) => key | undefined`** — derive your own boundary, e.g. per tenant. Returning `undefined` falls back to the unscoped pool.
+- **`(context) => key | undefined`** — derive your own boundary, e.g. per tenant. Returning `undefined` (or `""`) skips the cache for that run; return a constant to pool such runs on purpose.
 
-Entries written before the upgrade are unscoped and are only read by unscoped (or `"shared"`) runs. The vector lookup overscans before filtering (mirroring the memory tiers) so a noisy foreign scope can't occupy the top-`k` and mask a caller's own hit.
+Entries written before 5.53 carry no context fingerprint and are no longer served (misses, refilled over time). The vector lookup overscans before filtering and widens the page when needed (mirroring the memory tiers), so a noisy foreign scope can't occupy the top-`k` and mask a caller's own hit.
 
 ## Writing your own middleware
 
@@ -1286,7 +1289,7 @@ extractJsonSchema(lookup.input, { compact: true });
 compactJsonSchema({ type: "string", description: "Order id", examples: ["A-1"] }); // { type: "string" }
 ```
 
-Compact mode drops `description` / `title` / `examples` / `example` / `default` / `$comment` / `deprecated` / `readOnly` / `writeOnly` / `$schema` at every level and collapses `anyOf` / `oneOf` of bare `const` branches into `enum` (`{ keepDescriptions: true }` keeps descriptions). Validation and property names are untouched; the tool's own `description` is always sent. Trade-off: no per-field guidance for the model — name fields clearly and keep must-know rules in the tool `description`. `compactToolSchemas(tools)` returns compact copies for direct `model.complete(messages, { tools })` calls.
+Compact mode drops `description` / `title` / `examples` / `example` / `default` / `$comment` / `deprecated` / `readOnly` / `writeOnly` / `$schema` at every level and collapses `anyOf` / `oneOf` of bare `const` branches into `enum` (`{ keepDescriptions: true }` keeps descriptions). Validation and property names are untouched; the tool's own `description` is always sent. Trade-off: no per-field guidance for the model — name fields clearly and keep must-know rules in the tool `description`. `compactToolSchemas(tools)` returns compact copies for direct `model.complete(messages, { tools })` calls. `extractJsonSchema` converts each schema once per target + `compact` setting and returns the same object afterwards — treat it as read-only (copy before changing).
 
 ## Schema lint — per-provider checks at definition time
 
@@ -1755,7 +1758,7 @@ if (outcome.type === "applied" && outcome.result) {
 }
 ```
 
-`ai.human.resume(interruptId, decision, options)` loads the `PendingInterrupt`, validates the decision shape, deletes the record, and — when an `agent` is supplied — re-executes the original prompt with the decision **pre-seeded** so the gated tool call resolves to the ruling instead of pausing again. The prompt comes from `request.context.originalInput`; pass `options.input` to override (e.g. to append the reviewer's note), and `options.executeOptions` to forward history / output schema / signal to the re-run.
+`ai.human.resume(interruptId, decision, options)` validates the decision shape, claims the `PendingInterrupt` (removes and returns it atomically), and — when an `agent` is supplied — re-executes the original prompt with the decision **pre-seeded** so the gated tool call resolves to the ruling instead of pausing again. The prompt comes from `request.context.originalInput`; pass `options.input` to override (e.g. to append the reviewer's note), and `options.executeOptions` to forward history / output schema / signal to the re-run.
 
 ### The ruling is bound to one exact call
 
@@ -1778,11 +1781,11 @@ type ResumeResult =
   | { type: "already-resolved"; interruptId: string };
 ```
 
-A second resume of an already-resolved (deleted) or never-raised interrupt returns `{ type: "already-resolved" }` — it never double-applies the decision or re-runs the turn. The record is deleted **before** the re-run, so even a re-run that itself raises a fresh interrupt can't collide with the one being resolved. A malformed decision (`reject` with no `reason`, `edit` with no `args`, an unknown `type`) throws a `TypeError` loudly rather than silently mis-driving the re-run.
+A second resume of an already-resolved (deleted) or never-raised interrupt returns `{ type: "already-resolved" }` — it never double-applies the decision or re-runs the turn. `resume` takes the record with the store's atomic `claim(interruptId)` (memory: synchronous take; pg: `DELETE ... AND status = 'pending' RETURNING`; redis: only the caller whose `DEL` removed the key wins), so two racing resumes of one interrupt apply it exactly once. A custom `InterruptStore` without `claim` falls back to `load` + `delete` with a one-time warning — add `claim` to make it race-safe. The seeded decision is scoped to the re-run's own `agent.execute(...)`: a concurrent run of the same agent, session and args never takes it. The record is claimed **before** the re-run, so even a re-run that itself raises a fresh interrupt can't collide with the one being resolved. A malformed decision (`reject` with no `reason`, `edit` with no `args`, an unknown `type`) throws a `TypeError` loudly rather than silently mis-driving the re-run.
 
 ## The `InterruptStore`
 
-`ai.human.interrupt.{memory,pg,redis}()` build the store. The contract mirrors `@warlock.js/ai`'s `CheckpointStore` / `SnapshotStore` — `save` / `load` / `delete` / optional `list(prefix?)` / `schema()` — so a consumer already running an orchestrator can reuse the **same** pool for the interrupt table.
+`ai.human.interrupt.{memory,pg,redis}()` build the store. The contract mirrors `@warlock.js/ai`'s `CheckpointStore` / `SnapshotStore` — `save` / `load` / `delete` / optional `claim(interruptId)` / optional `list(prefix?)` / `schema()` (all three built-in stores implement `claim`) — so a consumer already running an orchestrator can reuse the **same** pool for the interrupt table.
 
 | Factory                             | Backing                                                 | Deps                                     |
 | ----------------------------------- | ------------------------------------------------------- | ---------------------------------------- |
@@ -2502,7 +2505,7 @@ Scripting `[{ error: new ProviderRateLimitError("slow down") }]` drives the neve
 
 ---
 name: guard-input-output
-description: 'Build the composed guardrail middleware with @warlock.js/ai and wire it into an agent — `ai.guardrail({ input, output, tool, toolNames, escalation })`. Triggers: `ai.guardrail`, `guard`, `GuardOptions`, `GuardrailVerdict`, `GuardrailDetector`, `GuardrailPhase`, `GuardrailMatch`, `GuardrailViolationError`, `ai.guardrail.topic`, `ai.guardrail.injection`, `topicFilter`, `injectionDetector`, `toolNames`, `forTool`; ''add a guardrail to my agent'', ''block prompt injection'', ''filter banned topics'', ''guard agent input and output'', ''stop the model leaking data into a tool call'', ''scope a detector to one tool''; typical import `import { ai } from "@warlock.js/ai"` (`ai.guardrail` ships in core) or `import { guard } from "@warlock.js/ai"`. Skip: PII detection/redaction specifically — the `detect-and-redact-pii` topic; routing a block to a human — the `escalate-block-to-human` topic; the core middleware pipeline / hook contract — the `run-ai-agent` topic.'
+description: 'Build the composed guardrail middleware with @warlock.js/ai and wire it into an agent — `ai.guardrail({ input, output, tool, toolNames, escalation })`. Triggers: `ai.guardrail`, `guard`, `GuardOptions`, `GuardrailVerdict`, `GuardrailDetector`, `GuardrailPhase`, `GuardrailMatch`, `GuardrailViolationError`, `ai.guardrail.topic`, `ai.guardrail.injection`, `ai.guardrail.links`, `bufferStream`, `topicFilter`, `injectionDetector`, `toolNames`, `forTool`; ''add a guardrail to my agent'', ''block prompt injection'', ''filter banned topics'', ''guard agent input and output'', ''stop the model leaking data into a tool call'', ''scope a detector to one tool'', ''strip external images from model replies'', ''guardrails with streaming''; typical import `import { ai } from "@warlock.js/ai"` (`ai.guardrail` ships in core) or `import { guard } from "@warlock.js/ai"`. Skip: PII detection/redaction specifically — the `detect-and-redact-pii` topic; routing a block to a human — the `escalate-block-to-human` topic; the core middleware pipeline / hook contract — the `run-ai-agent` topic.'
 ---
 
 # Guard agent input, output, and tool args
@@ -2541,6 +2544,18 @@ const policy = guard({ input: [injection({ onMatch: "block" })] });
 
 Each phase array runs its detectors in **registration order**; the first non-`allow` verdict decides the action for that phase (short-circuit). A phase you don't configure is inert — a guard with no detectors is a no-op middleware.
 
+`input` detectors run **once per distinct user text per run**: later trips of a tool-using run with the same prompt skip them (one moderation call, not one per trip). A detector that faulted runs again next trip.
+
+## Streaming (`agent.stream()`, `ai.serve`)
+
+With `output` detectors, each trip's text is **held** until they approve it, then streamed as one `agent.trip.streaming` delta: redacted text streams redacted, a blocked trip streams no text, and reasoning deltas are not streamed. Latency cost only for agents with output detectors. Opt out (deltas stream before the check, which then only changes `result.text`):
+
+```ts
+ai.guardrail({ output: [ai.guardrail.pii()], stream: "unguarded" }); // default "buffered"
+```
+
+Same rule and option on `guardrail({ outputCheck, stream })`. A custom middleware that checks `response.content` in `trip.after` opts into the hold with `trip: { bufferStream: true, after(...) {...} }`.
+
 ## The verdict model
 
 A detector inspects text and returns a `GuardrailVerdict`, discriminated by `type` (never `kind`):
@@ -2565,11 +2580,12 @@ if (result.error instanceof ai.errors.GuardrailViolationError) {
 
 ## Built-in detectors
 
-Three zero-dependency detectors ship (a fourth, `moderation`, is an optional `openai` peer — see the `detect-and-redact-pii` topic):
+Four zero-dependency detectors ship (a fifth, `moderation`, is an optional `openai` peer — see the `detect-and-redact-pii` topic):
 
-- **`ai.guardrail.injection(options?)`** — jailbreak / prompt-injection marker phrases. Extra `markers` (string | RegExp); `onMatch` defaults to `"flag"`, callers commonly use `"block"` on input.
+- **`ai.guardrail.injection(options?)`** — jailbreak / prompt-injection marker phrases, matched on normalized text (case, NFKC forms, zero-width characters, and runs of whitespace / `_` / `-` / `.` folded, so `"Ignore  previous\ninstructions"` matches). Extra `markers` (string, normalized the same way | RegExp, run on the original text without `g` / `y`); `onMatch` defaults to `"flag"`, callers commonly use `"block"` on input. Heuristic only; it does not see tool results.
 - **`ai.guardrail.topic(options)`** — `deny` (string substring | RegExp) and/or `allow` (allow-list miss triggers `onMatch`). `onMatch` is `"block" | "flag"`, default `"block"`.
 - **`ai.guardrail.pii(options?)`** — PII regex + dictionary (its own skill).
+- **`ai.guardrail.links(options?)`** — `output` detector against exfiltration through rendered replies: strips Markdown images, reference definitions, `<img src|srcset>` and `<image src|href>` whose host is not on `allowHosts` (`"cdn.example.com"`, `"*.example.org"`); `links: true` also strips Markdown links, `<a href>` and `<https://…>` autolinks. Relative URLs stay; `data:` / `javascript:` / entity-encoded URLs are refused. `onMatch` default `"redact"` (keeps alt / link text), or `"block"` / `"flag"`. Not an HTML sanitizer.
 
 ```ts
 const policy = ai.guardrail({
@@ -2577,6 +2593,7 @@ const policy = ai.guardrail({
     ai.guardrail.injection({ onMatch: "block", markers: ["ignore previous instructions"] }),
     ai.guardrail.topic({ deny: ["competitor-name"], onMatch: "block" }),
   ],
+  output: [ai.guardrail.links({ allowHosts: ["cdn.example.com"] })], // or the named export `links(...)`
 });
 ```
 
@@ -3313,7 +3330,8 @@ Append-only from v1 — `save()` never overwrites a prior `turn_index`. `load(na
 Both stores: `load(...)`, `save(...)`, `delete(...)`, optional `list(...)`, `schema()`.
 
 - **`list(orchestratorName, prefix?)`** (checkpoint) / **`list(prefix?)`** (snapshot) — enumerate session/run ids for the production boot-drain loop. Optional: stores that can't enumerate omit it.
-- The orchestrator's **`keepSnapshots`** retention policy lives on the orchestrator config, NOT the store — the orchestrator calls the pg store's `prune()` after a successful `save` when `keepSnapshots` is a finite number; `"all"` skips pruning.
+- The orchestrator's **`keepSnapshots`** retention policy lives on the orchestrator config, NOT the store — the orchestrator calls the store's `prune(name, sessionId, keepBeforeTurnIndex)` after a successful `save` when `keepSnapshots` is a finite number; `"all"` skips pruning. The third argument is a turn index (`latest turn - keepSnapshots + 1`), not a row count: the memory, pg and redis stores delete every row below it, so exactly `keepSnapshots` turns stay. Implement a custom `prune()` the same way.
+- The redis checkpoint store keeps one key per turn plus a small session head, so `save` / `load` cost the same on turn 5 and turn 5,000. When the client has the set commands (`sAdd`/`sRem`/`sMembers` or `sadd`/`srem`/`smembers`), the `list()` index is a Redis set (no lost ids under concurrent new sessions); otherwise a JSON array. Sessions and indexes written by earlier releases are still read and are moved to the new layout on the next write.
 
 ## Boot-drain pattern
 
@@ -4183,7 +4201,7 @@ interface VectorStore {
 | Loader                          | Input                                         | Deps                            | Emits                                         |
 | ------------------------------- | --------------------------------------------- | ------------------------------- | --------------------------------------------- |
 | `ai.rag.loadText(input, opts?)` | `string` \| `{ id, text }` \| array of either | none                            | one doc per non-empty item                    |
-| `ai.rag.loadHtml(html, opts?)`  | raw HTML string                               | none (regex strip)              | one doc, `metadata.title` from `<title>`      |
+| `ai.rag.loadHtml(html, opts?)`  | raw HTML string                               | none (linear strip)             | one doc, `metadata.title` from `<title>`      |
 | `ai.rag.loadWeb(url, opts?)`    | absolute URL                                  | none (uses core `guardedFetch`) | one doc, SSRF-safe fetch                      |
 | `ai.rag.loadPdf(bytes, opts?)`  | `Buffer` \| `ArrayBuffer` \| `Uint8Array`     | lazy `pdf-parse` peer           | one doc, or one per page with `perPage: true` |
 
@@ -4221,7 +4239,7 @@ await kb.index(
 );
 ```
 
-HTML responses run through the same tag-strip pass as `loadHtml`; non-HTML text (`text/plain`, markdown) is used verbatim. `metadata.source` is the resolved URL, `metadata.contentType` the server-reported type. A non-OK response, a policy block, a timeout, or an over-cap body throws `OutboundPolicyError`.
+HTML responses run through the same tag-strip pass as `loadHtml`; non-HTML text (`text/plain`, markdown) is used verbatim. `metadata.source` is the resolved URL, `metadata.contentType` the server-reported type. A non-OK response, a policy block, a timeout (it covers the body download), or an over-cap body throws `OutboundPolicyError`. The strip pass is one linear scan — unclosed `<!--` / `<script>` / `<` cannot make it quadratic.
 
 **Redirects are re-validated per hop, not delegated to the platform (4.15.0).** A page a crawl reaches can `3xx` — `guardedFetch` re-runs each `Location` through the same scheme/host/private-IP checks before following it, capped at `policy.maxRedirects` (default `5`), and strips `authorization`/`cookie`/`proxy-authorization` on a cross-origin hop. So a redirect can never smuggle `loadWeb` into a private/metadata address the original URL couldn't have reached. Full guard detail (including `assertUrlAllowed`, `fetchTextWithPolicy`, and the other call sites sharing it): the `secure-outbound-requests` topic.
 
@@ -4871,6 +4889,8 @@ Model must declare `capabilities.vision`. OpenAI adapter auto-infers from name; 
 
 A URL _image_ attachment is passed to the provider as a URL — the provider fetches it, not the framework, so there's no server-side SSRF surface. A **remote `{ type: "text", source: <url> }` attachment IS fetched server-side** (the adapter needs the raw text inline) and is default-DENY: it throws unless `attachmentPolicy.allowRemoteFetch: true`, and when enabled runs through the shared `guardedFetch` / `OutboundPolicy` guard — see the `secure-outbound-requests` topic.
 
+Local files: `attachmentPolicy.allowedRoots` confines reads to absolute roots, following symbolic links first (a link inside a root pointing outside is refused; the resolved file is read). `attachmentPolicy.allowBareLocalPaths` — unset: a plain string that looks like a path is read from disk with a one-time warning; `false`: refused (use it whenever attachment strings come from users; the default in the next major); `true`: allowed, no warning.
+
 ## Pattern — streaming
 
 ```ts
@@ -4899,6 +4919,38 @@ for await (const event of myAgent.stream("Write utils.ts")) {
 ```
 
 The agent asks the model for these by setting `streamChunks: true` on streaming calls; `modelOptions: { streamChunks: false }` (or `{ reasoning: true }`, …) turns them down. `execute()` never emits them. Calling `model.stream()` yourself, the matching `reasoning` / `tool-args` / `usage` chunks are opt-in through the same `streamChunks` option, so existing chunk consumers see no change. Reasoning only streams when the provider is asked to show it (Anthropic `thinkingDisplay: "summarized"` on Claude 5 models, OpenAI Responses `reasoning.summary`, Gemini `includeThoughts`).
+
+With an output guardrail (`ai.guardrail({ output: [...] })`, `guardrail({ outputCheck })`, or any middleware with `trip.bufferStream: true`) each trip's text arrives as **one** `agent.trip.streaming` delta after the check approves (or redacts) it, a blocked trip streams no text, and reasoning is not streamed. `stream: "unguarded"` on the guardrail restores token-by-token deltas (the check then only changes `result.text`).
+
+## Pattern — serve over HTTP (`ai.serve`)
+
+```ts
+import { createServer } from "node:http";
+import { ai, ServeHttpError } from "@warlock.js/ai";
+
+createServer(
+  ai.serve(myAgent, {
+    authorize: async (req) => Boolean(await userFromSession(req)), // or authToken
+    session: {
+      createId: async (req) => (await sessionIdFor(req)) ?? throwUnauthorized(),
+      loadHistory: async ({ sessionId }) => historyStore.load(sessionId), // awaited
+    },
+    maxInputChars: 8_000, // optional; 413 input_too_large
+    maxConcurrent: 50, // optional; 503 busy
+  }),
+).listen(8787);
+
+function throwUnauthorized(): never {
+  throw new ServeHttpError(401, "unauthorized"); // → 401 { "error": "unauthorized" }
+}
+```
+
+- Default wire format is client-safe (`events: "safe"`): text deltas (`{ type, delta }`), completion markers, `agent.error` / `supervisor.error` as `{ type, error }`, and a `result` frame of `{ text, data, error }`. No system prompt, tool inputs/outputs, reasoning, usage or report. `events: "all"` + `toResult: (r) => r` restore the full trace for trusted consumers; `events: string[]` or `(event) => data | undefined` pick a custom set.
+- Errors on the wire are `{ code, message, reference }` (fixed message per error kind); the full error is logged as `ai.serve` / `run.failed` under `reference`.
+- Default `toInput` requires a string `body.input` (else `400 invalid_input`); map a structured body with `toInput`.
+- A throwing callback answers `500 internal_error` (or the `ServeHttpError` status) and never crashes the process.
+- No `authToken` / `authorize` and no `public: true` → one-time warning in production.
+- `streamToSSE(stream, { mapEvent, mapResult, mapError })` is the transport-agnostic building block; without options it is verbatim (trusted sinks only).
 
 ## Pattern — cancellation
 
@@ -5391,10 +5443,18 @@ Input is `{ query: string }`; output is the `RetrieveResult`. Default tool name 
 await kb.clear(); // drops every entry written under this rag's namespace
 ```
 
+`clear()` deletes by key prefix, so on a shared driver it also clears a nested namespace (`kb.acme` clears `kb.acme.private`) — give rags on one driver sibling names.
+
+## Namespace isolation (5.53)
+
+- Each chunk records its `namespace`; `retrieve()` matches it exactly, so `kb.acme` never reads `kb.acme.private`.
+- Chunks indexed before 5.53 (no `namespace` field) are read only when the key is `<namespace>.<docId>.<chunkIndex>` exactly; a dotted doc id needs a re-index.
+- When other namespaces fill the first `candidates` page, the store is queried again with a wider page (×4, up to 1,000).
+
 ## Advanced
 
 - `cacheVectorStore(driver)` + the `VectorStore` contract are exported for swapping in a custom store.
-- A stored chunk's namespaced key is `${namespace}.${sourceId}.${chunkIndex}`.
+- A stored chunk's namespaced key is `${namespace}.${sourceId}.${chunkIndex}`, with `.`, `:` and `%` in `sourceId` escaped (`%2E`, `%3A`, `%25`).
 
 ## See also
 
@@ -6573,7 +6633,7 @@ const escalationAgent = ai.agent({ model, tools: [supportTool] });
 
 ---
 name: secure-outbound-requests
-description: 'The shared SSRF / resource-exhaustion guard every server-side outbound HTTP request in the framework goes through — `guardedFetch(url, policy, init?)`, `OutboundPolicy`, `assertUrlAllowed`, `fetchTextWithPolicy`, `readTextCapped`. Scheme allowlist (https-only default), host allowlist, post-DNS private/loopback/link-local/metadata-address deny, byte cap, timeout, and (4.15.0) per-hop redirect revalidation with a `maxRedirects` cap and cross-origin credential stripping. Consumed by `ai.rag.loadWeb`, remote text attachments (`prepareAttachmentPart`), and the skills `urlSource` manifest fetch — never a raw `fetch()` on a caller-influenced URL. Triggers: `guardedFetch`, `OutboundPolicy`, `ResolvedOutboundPolicy`, `assertUrlAllowed`, `fetchTextWithPolicy`, `readTextCapped`, `resolveOutboundPolicy`, `OutboundPolicyError`, `maxRedirects`, `denyPrivateIPsAfterDNS`, `hostAllowlist`, `allowedSchemes`, `maxBytes`, `SSRF`, `redirect: "manual"`, `redirect: "error"`; ''SSRF-safe fetch'', ''block a redirect into a private IP'', ''fetch a URL an agent gave me'', ''cap outbound response size'', ''allowlist hosts for outbound requests'', ''strip auth headers on a cross-origin redirect''; typical import `import { guardedFetch, assertUrlAllowed } from "@warlock.js/ai"` (also re-exported per call site). Skip: the RAG loader that wraps this for `loadWeb` — the `rag-loaders-and-stores` topic; the skills manifest source that wraps this for `urlSource` — the `use-runtime-skills` topic; prompt-injection / content guardrails (a different trust boundary) — the `guard-input-output` topic (ai-guard package).'
+description: 'The shared SSRF / resource-exhaustion guard every server-side outbound HTTP request in the framework goes through — `guardedFetch(url, policy, init?)`, `OutboundPolicy`, `assertUrlAllowed`, `fetchTextWithPolicy`, `readTextCapped`. Scheme allowlist (https-only default), host allowlist, post-DNS private/loopback/link-local/metadata-address deny, byte cap, timeout, and (4.15.0) per-hop redirect revalidation with a `maxRedirects` cap and cross-origin credential stripping. Consumed by `ai.rag.loadWeb`, remote text attachments (`prepareAttachmentPart`), and the skills `urlSource` manifest fetch — never a raw `fetch()` on a caller-influenced URL. Triggers: `guardedFetch`, `OutboundPolicy`, `ResolvedOutboundPolicy`, `assertUrlAllowed`, `fetchTextWithPolicy`, `readTextCapped`, `resolveOutboundPolicy`, `OutboundPolicyError`, `maxRedirects`, `crossOriginHeaders`, `denyPrivateIPsAfterDNS`, `hostAllowlist`, `allowedSchemes`, `maxBytes`, `SSRF`, `redirect: "manual"`, `redirect: "error"`; ''SSRF-safe fetch'', ''block a redirect into a private IP'', ''fetch a URL an agent gave me'', ''cap outbound response size'', ''allowlist hosts for outbound requests'', ''strip auth headers on a cross-origin redirect''; typical import `import { guardedFetch, assertUrlAllowed } from "@warlock.js/ai"` (also re-exported per call site). Skip: the RAG loader that wraps this for `loadWeb` — the `rag-loaders-and-stores` topic; the skills manifest source that wraps this for `urlSource` — the `use-runtime-skills` topic; prompt-injection / content guardrails (a different trust boundary) — the `guard-input-output` topic (ai-guard package).'
 ---
 
 # Outbound request policy — the SSRF guard
@@ -6606,11 +6666,14 @@ Every field is optional; `resolveOutboundPolicy` fills safe defaults, so an untu
 | `denyPrivateIPsAfterDNS` | `true`              | **the SSRF guard itself** — resolves the host through DNS and rejects loopback / private / link-local / unique-local / cloud-metadata (`169.254.169.254`) addresses; a public hostname that resolves inward is caught |
 | `maxRedirects`           | `5`                 | a redirect chain used to bypass the checks above (4.15.0 — see below)                                                                                                                                                 |
 | `maxBytes`               | `5_242_880` (5 MiB) | unbounded response bodies                                                                                                                                                                                             |
-| `timeoutMs`              | `10_000`            | a hung/slow endpoint tying up the request                                                                                                                                                                             |
+| `timeoutMs`              | `10_000`            | a hung/slow endpoint tying up the request — one deadline for the request, every redirect hop and the body read (a drip-fed body rejects at the deadline)                                                              |
+| `crossOriginHeaders`     | `[]`                | header names still sent after a cross-origin redirect, on top of the non-credential set (`accept`, `accept-encoding`, `accept-language`, `cache-control`, `content-language`, `content-type`, `pragma`, `user-agent`) |
 | `signal`                 | unset               | caller-supplied `AbortSignal`, merged with the internal timeout                                                                                                                                                       |
 | `fetch`                  | global `fetch`      | inject a stub for tests, or a wrapper enforcing your own app-level rules                                                                                                                                              |
 
 Every violation throws `OutboundPolicyError` with `context` carrying the offending URL/host/address — never a silent fallback.
+
+**Address pinning (5.53).** With `denyPrivateIPsAfterDNS` on and the global `fetch`, every connection (first request and each redirect hop) resolves its host through a checked lookup and connects only to the addresses that passed — a DNS-rebinding host flipping to `127.0.0.1` / `169.254.169.254` after the pre-check is refused at connect time (`OutboundPolicyError`, message ends "when connecting"). TLS still verifies against the URL's host name. An injected `policy.fetch`, or an app-installed non-`Agent` global dispatcher (proxy, mock), keeps the pre-check only.
 
 ## Redirects are never delegated to the platform (4.15.0)
 
@@ -6619,7 +6682,7 @@ Before 4.15.0, `assertUrlAllowed` validated only the _initial_ URL, then handed 
 `guardedFetch` now issues **every hop** with `redirect: "manual"` and re-runs the `Location` header through the exact same `assertUrlAllowed` (scheme, host allowlist, post-DNS private-IP deny) before following it:
 
 - Capped at `policy.maxRedirects` (default `5`) — the `(maxRedirects + 1)`th hop throws `OutboundPolicyError`.
-- **Credential headers stripped cross-origin.** `authorization`, `cookie`, `proxy-authorization` are dropped the moment a hop's target origin differs from the current one — a redirect can't exfiltrate credentials meant for the original host.
+- **Only non-credential headers cross origins.** The moment a hop's target origin differs, every caller header is dropped except the non-credential set and `policy.crossOriginHeaders` — `authorization`, cookies and custom secrets (`x-api-key`, `x-auth-token`) never reach the other host.
 - **Method/body semantics match platform behavior.** `303` — and the legacy convention of `301`/`302` on a non-`GET`/`HEAD` method — re-issue the next hop as a bodyless `GET`.
 - Pass `init.redirect: "manual"` to get the raw 3xx response back (no following, no throw); `init.redirect: "error"` rejects on any redirect.
 - The net effect: a redirect can never reach a URL the original request could not have reached directly.
@@ -6666,7 +6729,7 @@ isPrivateOrReservedIp("93.184.216.34"); // false
 
 ## Testing
 
-Inject a stubbed `policy.fetch` (`(url, init) => Response`) instead of hitting the network — every consumer above accepts `policy.fetch` all the way through. Regression coverage lives in `src/security/outbound-policy.spec.ts` (redirect-to-metadata/loopback/private block, off-allowlist redirect block, hop cap, credential stripping, clean-redirect follow).
+Inject a stubbed `policy.fetch` (`(url, init) => Response`) instead of hitting the network — every consumer above accepts `policy.fetch` all the way through. Regression coverage lives in `src/security/outbound-policy.spec.ts` (redirect-to-metadata/loopback/private block, off-allowlist redirect block, hop cap, credential stripping, clean-redirect follow) and `src/security/outbound-policy-pinning.spec.ts` (DNS rebinding refused at connect time, body-read deadline, cross-origin header allowlist) — the latter mocks `node:dns/promises` and uses a local HTTP server.
 
 ## See also
 
@@ -6975,6 +7038,7 @@ await mem.recall("what is my email?"); // only the UNSCOPED pool
 - The match is **exact equality**, enforced inside every tier (`working` / `semantic` / `episodic` / `procedural`) before hits are scored, merged, or sliced — not something the caller filters afterward.
 - Omitting `scope` is **not** a wildcard: an unscoped recall reads only unscoped entries. There is no "all scopes" query.
 - Identical text under two scopes stays two independent entries (including the procedural tier's reinforcement counter).
+- A busy scope cannot starve another: when fewer than `k` of the driver's first candidate page belong to the recalling scope, recall re-queries with a wider page (×4, up to 1,000 candidates).
 - `ai.orchestrator({ memory })` sets this automatically from the turn's `sessionId` — see the `run-orchestrator` topic.
 - `clear(tier?)` is scope-agnostic: it drops the tier for every scope.
 
@@ -7069,7 +7133,7 @@ const lib = ai.skills({
 ### Sources — `SkillSource` (discriminated by `type`, never `kind`)
 
 - `{ type: "directory", path }` — reads `path/<folder>/SKILL.md` off disk (lazy `node:fs/promises`).
-- `{ type: "url", url, headers?, policy?, cacheTtlMs? }` — `urlSource(url, options)` fetches a JSON manifest of skills through the shared `guardedFetch` / `OutboundPolicy` guard (scheme/host allowlist, post-DNS private-IP deny, byte cap, timeout, per-hop redirect revalidation) — never a raw `fetch()`. A remote skill source is a prompt supply chain (bodies flow straight into model context), so every fetched record is also runtime-validated before it can be served. `policy` tunes the guard (e.g. `hostAllowlist`); see the `secure-outbound-requests` topic. The result is cached for the source's lifetime, or `cacheTtlMs` when set.
+- `{ type: "url", url, headers?, policy?, cacheTtlMs? }` — `urlSource(url, options)` fetches a JSON manifest of skills through the shared `guardedFetch` / `OutboundPolicy` guard (scheme/host allowlist, post-DNS private-IP deny, byte cap, timeout, per-hop redirect revalidation) — never a raw `fetch()`. A remote skill source is a prompt supply chain (bodies flow straight into model context), so every fetched record is also runtime-validated before it can be served. `policy` tunes the guard (e.g. `hostAllowlist`); see the `secure-outbound-requests` topic. The result is cached for the source's lifetime, or `cacheTtlMs` when set; a failed fetch is never cached (the next call retries). `headers` go to the manifest's origin only — a cross-origin redirect drops them unless named in `policy.crossOriginHeaders`.
 - `{ type: "store", store }` — any `SkillsStoreContract`, e.g. `MockSkillsStore`.
 
 Sources merge in order; a later source wins on a name collision.
@@ -7119,6 +7183,9 @@ Self-authoring is **gated and OFF unless a `review` gate is wired**:
 
 - Without `review`, the `saveSkill` tool is **never registered** — a candidate can never be written, let alone injected.
 - With `review: { approve, store }`, `saveSkill` writes an **INERT** `type: "candidate"` (`version: 0`), filtered out of every catalog/load until promoted.
+- Candidates are stored apart from live skills: a candidate saved under the name of a live skill never replaces or hides it. `runReviewGate` promotes with `store.promote(candidate.name, { description, body, tags })`, so only the content that was approved is promoted — the built-in stores throw when the stored candidate differs.
+- `saveSkill` refuses the name of a skill the library already serves unless `review.allowUpdates: true` (default `false`), and limits input: `name` 1–64 of `[A-Za-z0-9_-]`, `description` ≤ 500 chars, `body` ≤ 16,384 chars, ≤ 10 `tags` of ≤ 32 chars.
+- `proceduralSkillStore` lists and loads through a catalog index and per-skill keys (one cache read, no embedding call per run); skills from earlier releases are copied over once.
 - The `SkillReviewGate.approve(candidate)` is **default-DENY**: only `{ approve: true }` promotes the candidate to a new audited version (`promote` → `type: "promoted"`, `version + 1`). Anything else — `{ approve: false }`, a malformed result, or a **throw** (fail-closed) — keeps it inert. `runReviewGate(candidate, gate, emit?)` runs this and never throws (a throwing gate is a denial), emitting `promoted` / `denied` analytics events.
 
 The three interchangeable approve shapes — a policy fn, a validator agent, a human callback — all reduce to one `Promise<{ approve: boolean; reason? }>`.

@@ -808,6 +808,9 @@ router.restfulResource("/users", new UsersRestful(), {
 - `recordName` / `recordsListName` — response keys for `{ [recordName]: model }` and `{ [recordsListName]: [...] }`. Default `"record"` and `"records"`.
 - `returnOn` — after create/update/delete/patch, return the single record (default) or the full list (`"records"`).
 - `cache` — when `true` (default), `list()` and `get()` use the repository's cached variants (`listCached`/`getCached`).
+- `bulkDeleteLimit` — most ids one `bulkDelete` request may name; a longer list gets a 400. Default `1000`.
+- `bulkDeleteConcurrency` — records `bulkDelete` deletes at the same time. Default `10`.
+- `list()` forwards request input to the repository, so `?paginate=false` stays paginated (capped at `maxPerPage`) unless the repository sets `allowClientUnpaginated = true`.
 - `validation` — per-action schemas read by `router.restfulResource()`. Add `validation = { create?, update?, patch? }` as a public field on your subclass; the router consumes whichever entries exist. The field isn't declared on the base `Restful` class — it's duck-typed off the resource at registration time (see `router.ts > manageValidation`).
 
 ### Lifecycle hooks
@@ -1150,7 +1153,7 @@ Don't call `setBaseUrl` per request — it's process-global and races every othe
 
 ---
 name: configure-app
-description: 'Configure a Warlock app — the two layers (`warlock.config.ts` for framework-level wiring, `src/config/*.ts` for subsystems), `.env` + `env()`, the `config()` getter for runtime reads, and `app.publicUrl`/`PUBLIC_APP_URL` (the app''s public origin). Triggers: `defineConfig`, `config.get`, `config.key`, `env`, `ConfigRegistry`, `HttpConfigurations`, `AppConfigurations`, `publicUrl`, `PUBLIC_APP_URL`, `getPublicUrl`; "add a new config file", "warlock.config.ts vs src/config", "read env values", "runtime config lookup", "app public origin/URL"; typical import `import { defineConfig, config, env } from "@warlock.js/core"`. Skip: cache driver registration — the `cache-basics` topic of the `warlock-js-cache` skill; mail config — the `send-mail` topic; storage config — the `store-file` topic; sitemap refusal on a missing origin — the `generate-sitemap` topic of the `warlock-js-web` skill; competing libs `dotenv` direct, `convict`, `node-config`.'
+description: 'Configure a Warlock app — the two layers (`warlock.config.ts` for framework-level wiring, `src/config/*.ts` for subsystems), `.env` + `env()`, the `config()` getter for runtime reads, and `app.publicUrl`/`PUBLIC_APP_URL` (the app''s public origin). Triggers: `defineConfig`, `config.get`, `config.key`, `env`, `ConfigRegistry`, `HttpConfigurations`, `HttpCompressionConfig`, `http.compression`, `AppConfigurations`, `publicUrl`, `PUBLIC_APP_URL`, `getPublicUrl`; "add a new config file", "warlock.config.ts vs src/config", "read env values", "runtime config lookup", "app public origin/URL"; typical import `import { defineConfig, config, env } from "@warlock.js/core"`. Skip: cache driver registration — the `cache-basics` topic of the `warlock-js-cache` skill; mail config — the `send-mail` topic; storage config — the `store-file` topic; sitemap refusal on a missing origin — the `generate-sitemap` topic of the `warlock-js-web` skill; competing libs `dotenv` direct, `convict`, `node-config`.'
 ---
 
 # Warlock — configure the app
@@ -1192,13 +1195,17 @@ const httpConfigurations: HttpConfigurations = {
   port: env("HTTP_PORT", 3000),
   host: env("HTTP_HOST", "localhost"),
   log: true, // one info summary line per request; per-phase lines at debug (logPhases: "info" restores them)
-  fileUploadLimit: 12 * 1024 * 1024 * 1024,
+  fileUploadLimit: 10 * 1024 * 1024, // largest single file; parts are buffered in memory before middleware runs
+  multipart: { maxTotalSize: 25 * 1024 * 1024, routes: "declared" }, // whole-request cap; parse only on routes with `uploads`
+  requestTimeout: 300_000, // ms to send one request (default); 0 turns it off
+  // allowedHosts: ["example.com", ".example.com"], // opt-in: other Host values answer 400
+  // trustProxy: ["10.0.0.0/8"], realIpHeader: "cf-connecting-ip", // proxies you trust + the header your edge overwrites
   rateLimit: {
     max: 260,
     duration: 60 * 1000,
   },
   cors: {
-    origin: "*",
+    origin: String(env("CORS_ORIGINS", "")).split(",").filter(Boolean), // empty = same origin only
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
   },
   cookies: {
@@ -1238,6 +1245,26 @@ serverOptions: {
 Framework-owned settings (`trustProxy`, `bodyLimit`,
 `gracefulShutdown.forceCloseConnections`) have their own `http.*` keys;
 setting them in `serverOptions` as well overrides those keys.
+
+### `compression` — response compression (5.53.0)
+
+Off by default (new scaffolds turn it on). `compression: true` (type
+`HttpCompressionConfig`) compresses JSON, HTML (streamed pages included), XML,
+text and other text-like bodies with `br` or `gzip`, as `Accept-Encoding`
+allows; `{ threshold?: number /* bytes, default 1024 */, brotli?: boolean /*
+default true */ }` tunes it. Skipped: HEAD, 204/206/304, small bodies,
+responses that already set `Content-Encoding` (or `Cache-Control:
+no-transform`), binary types, `sse()`, `stream()` and NDJSON. `Vary` gains
+`Accept-Encoding` (merged into the one header), `Content-Length` is dropped and
+a strong `ETag` turns weak. Leave it off behind a proxy or CDN that already
+compresses. A response that mixes a secret (CSRF token) with reflected request
+input must not be compressed over HTTPS: there is no per-route option, so set
+`Cache-Control: no-transform` on that response.
+
+```ts
+compression: true,
+// compression: { threshold: 2048, brotli: false },
+```
 
 ### `securityHeaders` — security response headers (5.42.0)
 
@@ -1457,6 +1484,8 @@ Same shape — TS validates the union; runtime picks the `default` key.
 
 `http.errorMapper(error, request)` maps errors that are not an `HttpError` to `{ status, message?, payload? }` (return `undefined` to keep the default opaque `500`). A mapped 5xx keeps the opaque message unless the mapper sets one.
 
+Request input limits: `http.input.maxArrayIndex` (default 1000) drops keys naming a larger array index (`a[99999]`); `http.urlencoded.maxFields` (default 1000) answers 413 (`EC107`) past it. `http.cookies.secret` only signs cookies written with `{ signed: true }` (read with `request.signedCookie()`). `/ready` hides its check list in production unless `http.health.details: true`.
+
 `http.logging` controls what request log entries carry: `{ body?: boolean, query?: boolean, redactQueryParams?: string[] }` (body/query default `true`). A route's `logging` option overrides it — use `logging: { body: false, query: false }` on routes that accept secrets or arbitrary text. Entries carry `request.toLogSnapshot()`, never the `Request` object, with credential query values masked in the URL.
 
 ## Per-env knobs
@@ -1527,6 +1556,7 @@ Internal `@warlock.js/*` packages read from `config.get("<name>")` the same way 
 - **Don't mutate `config` at runtime.** It's read-only by convention. For dynamic overrides, fold into the call-site options (e.g. `cache.set(key, val, { driver: "redis" })`).
 - **`Application.isProduction` is preferred over `process.env.NODE_ENV` checks** in config files — same source, but it survives `setEnvironment(...)` and reads consistently.
 - **`warlock.config.ts` is the boot config; `src/config/` is the runtime config.** Putting runtime tuning into `warlock.config.ts` doesn't crash but won't be visible via `config.get(...)`.
+- **`warlock add` keeps `agentKit.pick` current.** When `package.json` limits `agent-kit sync` to an allowlist (`agentKit.pick`, written by `create-warlock`), `warlock add` adds the `@warlock.js/*` and `@mongez/*` packages it installs, so their skills reach the coding agent. No allowlist, no change.
 
 ## See also
 
@@ -2731,6 +2761,7 @@ const plainKey = decrypt(apiKey.get("key"));
 `decrypt()` throws on:
 
 - Invalid format (not three colon-separated parts).
+- An IV or auth tag that is not exactly 16 bytes (a truncated tag is refused).
 - Wrong key.
 - Tampered ciphertext (auth tag mismatch).
 - Wrong algorithm vs the one used to encrypt.
@@ -3126,7 +3157,9 @@ const valid = await verifyPassword("user-password-123", hashed);
 // → true / false
 ```
 
-Both are async because bcrypt is CPU-bound. The framework uses `bcryptjs` (pure JS — portable across every platform, no native build) under the hood.
+Both are async because bcrypt is CPU-bound. The framework uses `bcryptjs` (pure JS — portable across every platform, no native build) under the hood. When the app installs the native `bcrypt` package, both helpers use it automatically: hashing then runs on the libuv thread pool instead of the event loop (worth it on busy login endpoints; raise `UV_THREADPOOL_SIZE` for many concurrent logins). Hashes are the same `$2b$` format either way, so existing hashes keep verifying.
+
+bcrypt reads only the first 72 bytes (UTF-8) of a password. A longer one is hashed with a one-time warning; set `password.rejectLongPasswords: true` to make `hashPassword` throw instead, and cap password length in validation.
 
 ## Configuration — `src/config/encryption.ts`
 
@@ -3136,6 +3169,7 @@ import type { EncryptionConfigurations } from "@warlock.js/core";
 const encryptionConfig: EncryptionConfigurations = {
   password: {
     salt: 12, // bcrypt rounds — 10–12 is the standard band
+    rejectLongPasswords: true, // optional, default false: throw for passwords over 72 bytes
   },
   // ...other crypto config (key/hmacKey for encrypt/decrypt — see encrypt-data skill)
 };
@@ -3326,6 +3360,9 @@ const httpConfigurations: HttpConfigurations = {
     path: "/health", // liveness path
     readinessPath: "/ready", // readiness path
     rateLimit: false, // exempt probes from global client quotas (default)
+    details: false, // list checks in /ready (default: false in production, true elsewhere)
+    checkTimeout: 2000, // ms before a check counts as failed (default)
+    cacheTtl: 1000, // ms a readiness result is reused (default)
   },
 };
 
@@ -3362,7 +3399,7 @@ health.addCheck("db", async () => {
 health.removeCheck("db"); // unregister later if needed
 ```
 
-A check returns `boolean | Promise<boolean>`. **A thrown error counts as a failed check** (it's surfaced in the `checks` map + the 503, not logged — probes poll often, so a failure is a normal signal, not an error event). Keep checks cheap and fast; they run on every `/ready` poll.
+A check returns `boolean | Promise<boolean>`. **A thrown error counts as a failed check** (it's surfaced in the `checks` map + the 503, not logged — probes poll often, so a failure is a normal signal, not an error event). Concurrent probes share one run of the checks, a result is reused for `http.health.cacheTtl` ms, and a check that does not answer within `http.health.checkTimeout` ms fails. In production `/ready` answers `{ status }` only unless `http.health.details: true`.
 
 ### Routes-registered readiness signal
 
@@ -4186,6 +4223,17 @@ route like production (declared `Content-Length` refused before reading, chunked
 counted as they stream), and run the route's `preParsing` hooks. Keys the dev wildcard cannot
 honour (`schema`, `errorHandler`, `onSend`, `onResponse`, ...) log one boot warning naming the
 route and key. Multipart uploads use `http.fileUploadLimit`, not `bodyLimit`.
+
+### Routes that take uploads
+
+`uploads: true` declares that a route accepts multipart bodies; with
+`http.multipart.routes: "declared"` every other route answers 415 without reading one.
+`uploads: { maxTotalSize }` also sets the whole-request upload cap for that route
+(default `http.multipart.maxTotalSize`, 25 MB).
+
+```ts
+router.post("/avatars", uploadAvatar, { uploads: true });
+```
 
 ## Gotchas
 
@@ -6432,6 +6480,12 @@ return response.sendBuffer(buffer, { contentType: "image/png" });
 
 `SendFileOptions` lets you set `cacheTime`, `immutable`, `inline`, `filename` (download attachment name).
 
+`sendFile` answers a single `Range: bytes=…` with 206 + `Content-Range` (416 when the range starts past the end; `If-Range` honoured; several ranges get the whole file) and always sends `Accept-Ranges: bytes`. A file that fails mid-read answers an opaque 500; the path stays in the log.
+
+Server faults stay opaque: an `Error` passed as a body (`response.serverError(error)`), a `toJSON()` that throws while a returned value is sent, or a throwing hook answers `500 { error: "Internal server error." }` (plus `requestId` and `stack` in development) and the message goes to the log. Send the body you want the client to read, never the `Error` itself.
+
+Compression is `http.compression` (see the `configure-app` topic): set `Content-Encoding: identity` on a response to send it uncompressed.
+
 Conditional requests are handled for you (RFC 9110): `If-None-Match` compares weakly (`W/"a"` matches `"a"`) and answers 304 on GET/HEAD; `If-Match` compares strongly (a `W/` tag never passes) and answers 412. For your own ETags, use the same helper:
 
 ```ts
@@ -6597,6 +6651,21 @@ by-name assertion — "this cookie should be readable here" — so when
 **throw `CookieJarUnavailableError`** naming the missing cookie, instead of
 silently returning `undefined` / `false`. Register the plugin (see core's
 `http/plugins.ts`) before reading cookies by name.
+
+### Signed cookies and raw reads (5.53)
+
+`http.cookies.secret` signs nothing on its own. Write tamper-proof values with
+`response.cookie(name, value, { signed: true })` and read them with
+`request.signedCookie(name, defaultValue?)`, which returns the default for a
+missing, unsigned or edited cookie; both throw naming `http.cookies.secret`
+when it is unset. `request.cookie(name, defaultValue, { json: false })` (options type `RequestCookieOptions`; or
+`http.cookies.json: false` app-wide) returns the raw string instead of a
+JSON-parsed, client-typed value.
+
+```ts
+response.cookie("cartOwner", ownerId, { signed: true });
+const ownerId = request.signedCookie("cartOwner");
+```
 
 `request.cookies` (the plain getter, no by-name assertion) is unchanged and
 stays lenient — it returns `{}` when the jar is unavailable, because the
@@ -7014,6 +7083,8 @@ await storage.putFromBase64("data:image/png;base64,iVBORw0KGgo...", "uploads/pho
 await storage.put(request.file("image")!, "uploads/avatar.jpg"); // validate the upload first
 ```
 
+`putFromUrl` / `putFromBase64` store the MIME type of the location's extension, never the type the remote server or data URL declares (pass `{ mimeType }` to set it yourself). `putFromUrl` also pins each connection to the address that passed the private-host check, so DNS rebinding is refused.
+
 Every `put*` returns a `StorageFile`.
 
 ### Reading
@@ -7242,6 +7313,8 @@ export const temporaryFileController: RequestHandler = async ({ request, respons
 ```
 
 Cloud drivers always return `{ valid: false }` from `validateTemporaryToken` — they validate via presigned URL on the cloud side.
+
+A token is bound to the storage prefix (tenant) in effect when it was issued: under another tenant's prefix it is refused with `invalid_token`. Tokens from versions before 5.53 are refused too. Give each local disk its own `signatureKey`.
 
 ## Runtime driver registration
 
@@ -10027,7 +10100,8 @@ From `@warlock.js/core/src/http/uploaded-file.ts`:
 | `file.name`                            | `string`                                               | sanitized original filename                    |
 | `file.mimeType`                        | `string`                                               | e.g. `"image/jpeg"`                            |
 | `file.extension`                       | `string`                                               | lowercased, no dot — e.g. `"jpg"`              |
-| `file.isImage` / `isVideo` / `isAudio` | `boolean`                                              | MIME-type prefix checks                        |
+| `file.isImage` / `isVideo` / `isAudio` | `boolean`                                              | MIME-type prefix checks (client-declared)      |
+| `await file.detectedMimeType()`        | `string \| undefined`                                  | the type the file's bytes show                 |
 | `await file.size()`                    | `number` (bytes)                                       | buffers the file on first call                 |
 | `await file.buffer()`                  | `Buffer`                                               | cached after first call                        |
 | `await file.dimensions()`              | `{ width?, height? }`                                  | empty object if not an image                   |
@@ -10143,7 +10217,7 @@ Inside a seal schema, file rules chain on `v.file()`:
 
 ```ts
 v.file()                                          // must be UploadedFile
-  .image()                                        // must be image MIME
+  .image()                                        // raster image by its bytes; .image({ svg: true }) allows svg
   .accept(["jpg", "png", "webp"])                 // extension allowlist
   .mimeType(["image/jpeg", "image/png"])          // MIME allowlist
   .pdf() / .excel() / .word()                     // shortcuts
@@ -10243,6 +10317,13 @@ The reverse direction — sending a stored file back via `response.sendFile(...)
 - **`save()` rewrites the extension on format change.** `file.format("webp").save("avatars")` produces `avatars/<name>.webp` regardless of the upload's original extension.
 - **`.use(driver)` mutates the instance.** It returns `this`; subsequent saves on the same instance keep the driver. Re-instantiate or call `.use("local")` to reset.
 - **Multipart parsing needs `fileUploadLimit` headroom.** Default is `10MB` (configurable via `http.fileUploadLimit` in `src/config/http.ts`). Schema `maxSize` is checked after parsing, so set the multipart limit at least as high.
+- **Declared types are the client's word.** `mimeType`, `extension` and `isImage` come from the request. `image()` sniffs the bytes (svg only with `{ svg: true }`); `mimeType()`/`accept()` also refuse markup bytes (svg, html, xml) unless listed. `save()` stores raster images with their sniffed type and markup as `application/octet-stream`; `uploads.trustClientContentType: true` stores the declared type instead.
+- **Total size and route opt-in.** `http.multipart.maxTotalSize` (default 25 MB) caps a whole request (413, `EC108`); `uploads: { maxTotalSize }` on a route overrides it. `http.multipart.routes: "declared"` parses multipart only on routes with `uploads: true` (others answer 415, `EC109`); the default `"all"` warns once in production.
+
+  ```ts
+  router.post("/avatars", uploadAvatar, { uploads: true });
+  ```
+
 - **`request.file("key")` returns `undefined` for missing files** — no throw. Always check before chaining.
 - **The hash is empty until save.** `file.hash` is populated by the SHA-256 from `StorageFile.data()` after `save()` resolves.
 
@@ -11124,6 +11205,8 @@ Lifecycle:
 4. **Key + different body** → 422 `IdempotencyKeyConflict`. Client bug — same key must mean same intent.
 5. **Cache miss** → runs handler; on response sent, caches `{ status, body, bodyHash }` for TTL.
 
+The record is scoped to the concrete target (route params + query), not just the route pattern: one key on `/orders/1/cancel` and `/orders/2/cancel` runs both.
+
 Server errors (5xx) are not cached — clients can retry past a 5xx. 4xx responses ARE cached (they're deterministic outcomes of the request).
 
 **Client side, this only works if the client reuses the same key across retries.** Generate once at "intent to submit" time, persist it across the retry loop, drop it on confirmed success or final failure.
@@ -11190,7 +11273,7 @@ a non-empty string array, or a predicate function; received number.
 
 A hop count (`trustProxy: 2`) used to be documented as the shape to prefer. It is now refused **loudly**, because the Fastify version Warlock builds against treats a number as always-false at runtime: it silently degraded to "trust nothing" rather than walking past your proxies. Express the same topology as a proxy list (`"10.0.0.0/8"`) or a predicate.
 
-With `true`, any client that can reach the process directly picks its own IP and this allowlist is decorative. `X-Real-IP` is honoured only under `true` — it carries no chain to check a proxy list against — so if your edge sets only that header, have it set `X-Forwarded-For` too.
+With `true`, the client IP is the leftmost `X-Forwarded-For` entry, which the client writes itself behind an appending edge, so this allowlist is decorative. Single-address headers (`X-Real-IP`, `CF-Connecting-IP`) are read only when `http.realIpHeader` names one, and only from a peer `trustProxy` trusts.
 
 ```ts
 import { middleware } from "@warlock.js/core";
@@ -11213,9 +11296,11 @@ router.post("/webhooks/provider", webhookController, {
 });
 ```
 
-IPv4 CIDR matching only — IPv6 patterns are matched as exact strings.
+IPv4 and IPv6 exact addresses and CIDR blocks (`"2001:db8::/32"`); IPv6 compares by value and IPv4-mapped clients (`::ffff:10.0.0.1`) match IPv4 blocks. A pattern that is not an address or block throws when the middleware is created (at boot).
 
 ## `cache` — response caching
+
+With `withLocale` (default) and no `app.localeCodes`, a request for a non-default locale skips the cache (warned once) so random `?locale=` values cannot fill it — declare `app.localeCodes`.
 
 Cache successful JSON responses by key, serve replays from cache until TTL expiry. Useful for expensive read endpoints (analytics dashboards, expensive aggregations).
 
@@ -11870,6 +11955,14 @@ export const listFaqsController: GuardedRequestHandler = async ({ request, respo
 };
 ```
 
+Request input is safe to forward: besides capping `limit` at `maxPerPage` and whitelisting sort/select columns, `list()` / `listCached()` ignore `paginate=false`, `purgeCache` and `cacheKey` when the current request sent them (server code that sets them itself is unaffected). To let clients turn pagination off for one repository, opt in:
+
+```ts
+class CategoriesRepository extends RepositoryManager<Category> {
+  protected allowClientUnpaginated = true; // default false; app-wide: repository.allowClientUnpaginated
+}
+```
+
 ## When to drop to `Model.query()`
 
 Repositories are for the 90% case: filter, paginate, cache. For anything beyond — joins, aggregates, raw expressions, complex `OR` trees — drop to the model's query builder inside a service:
@@ -12358,7 +12451,7 @@ const uploadAvatarSchema = v.object({
 });
 ```
 
-Full file chain: `.image()`, `.accept(extensions)`, `.mimeType(types)`, `.pdf()`, `.excel()`, `.word()`, `.minSize(n)`, `.maxSize(n)`, `.minWidth(px)`, `.maxWidth(px)`, `.minHeight(px)`, `.maxHeight(px)`. Every rule returns `this`, so the field's output type stays `UploadedFile` through the chain; `.saveTo(dir)` switches it to `string` (the saved path). See the `upload-file` topic for the full upload flow.
+Full file chain: `.image()` (checks the bytes; `.image({ svg: true })` — `ImageRuleOptions` — also allows svg), `.accept(extensions)`, `.mimeType(types)`, `.pdf()`, `.excel()`, `.word()`, `.minSize(n)`, `.maxSize(n)`, `.minWidth(px)`, `.maxWidth(px)`, `.minHeight(px)`, `.maxHeight(px)`. Every rule returns `this`, so the field's output type stays `UploadedFile` through the chain; `.saveTo(dir)` switches it to `string` (the saved path). See the `upload-file` topic for the full upload flow.
 
 ### Optional file field
 
@@ -13305,7 +13398,7 @@ The comment covers the codes it names on its own line and the next; with no code
 
 ---
 name: warlock-doctor
-description: 'Run `warlock doctor` — a read-only diagnostics command that checks routes / config / connectors / optional-peers / health endpoints / multi-site renders / capabilities / release hygiene and prints a pass/warn/fail report, exiting non-zero on any failure. Add your own probe with the `DoctorCheck` contract and `runChecks` / `formatReportLines`. Triggers: `warlock doctor`, `warlock doctor --json`, `toDoctorJson`, `WL1001`, `doctorCommand`, `DoctorCheck`, `CheckResult`, `CheckStatus`, `DoctorReport`, `runChecks`, `formatReportLines`, `printReport`, `defaultDoctorChecks`; "diagnose my app", "preflight / preflight check", "is the app healthy", "why are there 0 routes", "pre-release sanity check", "CI smoke check"; run as `npx warlock doctor`. Skip: the live `/health` + `/ready` HTTP probes — the `health-checks` topic; authoring a general CLI command — the `write-cli-command` topic; releasing the package — `releasing-warlock-monorepo`; competing tools `npm doctor`, `nest info`, hand-rolled preflight scripts.'
+description: 'Run `warlock doctor` — a read-only diagnostics command that checks routes / config / connectors / optional-peers / health endpoints / multi-site renders / capabilities / deployment settings / release hygiene and prints a pass/warn/fail report, exiting non-zero on any failure. Add your own probe with the `DoctorCheck` contract and `runChecks` / `formatReportLines`. Triggers: `warlock doctor`, `warlock doctor --json`, `toDoctorJson`, `WL1001`, `doctorCommand`, `DoctorCheck`, `CheckResult`, `CheckStatus`, `DoctorReport`, `runChecks`, `formatReportLines`, `printReport`, `defaultDoctorChecks`; "diagnose my app", "preflight / preflight check", "is the app healthy", "why are there 0 routes", "pre-release sanity check", "CI smoke check", "is my config safe to deploy", "old app config defaults"; run as `npx warlock doctor`. Skip: the live `/health` + `/ready` HTTP probes — the `health-checks` topic; authoring a general CLI command — the `write-cli-command` topic; releasing the package — `releasing-warlock-monorepo`; competing tools `npm doctor`, `nest info`, hand-rolled preflight scripts.'
 ---
 
 # Warlock — `warlock doctor`
@@ -13329,7 +13422,7 @@ Summary: 5 ok, 1 warn, 0 fail
 
 ## Error codes and `--json`
 
-Every `warn`/`fail` finding carries a stable error code (`WL1001`, `WL2001`, …), printed after the detail and explained by `warlock explain <code>`. `--json` prints the report with the same `code` / `hint` / `skill` / `docs` fields `warlock check --json` uses (boot output goes to stderr):
+Every `warn`/`fail` finding except the deployment-settings warnings (below, which name the setting instead) carries a stable error code (`WL1001`, `WL2001`, …), printed after the detail and explained by `warlock explain <code>`. `--json` prints the report with the same `code` / `hint` / `skill` / `docs` fields `warlock check --json` uses (boot output goes to stderr):
 
 ```bash
 npx warlock doctor --json | jq '.results[] | select(.status != "ok") | "\(.code) \(.detail)"'
@@ -13361,18 +13454,19 @@ A custom check sets `code` on its non-ok results the same way (`{ name, status: 
 
 The default set is `defaultDoctorChecks` (in registration order — runtime-surface checks first, release hygiene last):
 
-| Check               | `ok`                                                                                   | `warn`                                          | `fail`                                                                                                     |
-| ------------------- | -------------------------------------------------------------------------------------- | ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| `routes`            | ≥ 1 route registered                                                                   | 0 routes (a route module likely failed to load) | —                                                                                                          |
-| `config`            | required sections (`app`, `http`) present                                              | —                                               | a required section is missing                                                                              |
-| `connectors`        | manager enumerable; reports registered + active set                                    | —                                               | (only if the probe itself throws)                                                                          |
-| `optional-peers`    | every known optional peer installed                                                    | a peer is missing → its feature is unavailable  | —                                                                                                          |
-| `jwt-secret`        | `auth.userType` configured and a JWT signing secret set                                | —                                               | `auth.userType` is configured but no signing secret (`auth.accessToken.secret` / `auth.jwt.secret`) is set |
-| `validation-labels` | every request-schema field has a label in each configured locale                       | a field has no label in a locale (WL4002)       | —                                                                                                          |
-| `health`            | `/health` + `/ready` will be exposed                                                   | `http.health.enabled = false` (probes off)      | —                                                                                                          |
-| `sites`             | each fixed-host site in `web.sites` renders its root page in development without a 5xx | —                                               | a site answers 5xx (`WL5005`), with the status, phase and page file                                        |
-| `capabilities`      | every required capability has a provider after boot                                    | a required capability has none (`WL2008`)       | —                                                                                                          |
-| `release-hygiene`   | `package.json` version matches the top `## x.y.z` CHANGELOG heading                    | no `CHANGELOG.md`, or no parseable heading      | version ≠ top heading                                                                                      |
+| Check               | `ok`                                                                                                 | `warn`                                                 | `fail`                                                                                                     |
+| ------------------- | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------- |
+| `routes`            | ≥ 1 route registered                                                                                 | 0 routes (a route module likely failed to load)        | —                                                                                                          |
+| `config`            | required sections (`app`, `http`) present                                                            | —                                                      | a required section is missing                                                                              |
+| `connectors`        | manager enumerable; reports registered + active set                                                  | —                                                      | (only if the probe itself throws)                                                                          |
+| `optional-peers`    | every known optional peer installed                                                                  | a peer is missing → its feature is unavailable         | —                                                                                                          |
+| `jwt-secret`        | `auth.userType` configured and a JWT signing secret set                                              | —                                                      | `auth.userType` is configured but no signing secret (`auth.accessToken.secret` / `auth.jwt.secret`) is set |
+| `validation-labels` | every request-schema field has a label in each configured locale                                     | a field has no label in a locale (WL4002)              | —                                                                                                          |
+| `health`            | `/health` + `/ready` will be exposed                                                                 | `http.health.enabled = false` (probes off)             | —                                                                                                          |
+| `sites`             | each fixed-host site in `web.sites` renders its root page in development without a 5xx               | —                                                      | a site answers 5xx (`WL5005`), with the status, phase and page file                                        |
+| `capabilities`      | every required capability has a provider after boot                                                  | a required capability has none (`WL2008`)              | —                                                                                                          |
+| deployment settings | the setting is within safe bounds (or the line is omitted when it is absent and the default is safe) | the setting to change, named in the detail (see below) | never                                                                                                      |
+| `release-hygiene`   | `package.json` version matches the top `## x.y.z` CHANGELOG heading                                  | no `CHANGELOG.md`, or no parseable heading             | version ≠ top heading                                                                                      |
 
 `validation-labels` is opt-in: it emits no line unless `validation.warnMissingLabels` is `true`, and it stays silent when the app sets its own `validation.translateAttribute`. It lists fields of registered request schemas (`validation.schema`, nested objects included) that have no label under `attributes.<field>` (or `validation.attributes.<field>`, or the configured `validation.attributeGroup`) in each locale of `app.localeCodes`.
 
@@ -13381,6 +13475,24 @@ The default set is `defaultDoctorChecks` (in registration order — runtime-surf
 `capabilities` reads the registry that `defineCapability()` fills (the `use-capabilities` topic): a required capability that no `provideCapability()` call filled while the app booted is a slot the first caller will trip over.
 
 `jwt-secret` is the pre-flight form of the silent first-login 500: when `auth.userType` is set but no signing secret is, every login and token operation fails with a generic 500 at runtime — `doctor` turns that into a `fail` before you ship. It resolves the secret from both the current key (`auth.accessToken.secret`) and the legacy `auth.jwt.secret`, so a project on the older-but-supported shape doesn't trip it. When `auth.userType` isn't configured at all (no auth), the check emits **no line** — it's skipped, not a pass — so it never nags a project that isn't doing auth.
+
+### Deployment settings
+
+An app keeps the config files it was generated with, so safer defaults in a newer scaffold never reach it. Nine checks read the resolved configuration and **warn** (never fail, so an existing CI gate keeps passing; no error code, the detail names the setting):
+
+| Check                | Warns when                                                                                                             | Change                                                                                            |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `upload-limits`      | one multipart request may hold more than 100 MB                                                                        | `http.multipart.maxTotalSize` (and `http.fileUploadLimit`); per route `uploads: { maxTotalSize }` |
+| `cors`               | `http.cors.origin` is `"*"` (also in a list, or unset: the default is `"*"`) or `true`; worse with `credentials: true`; present but empty (`undefined`/`null`/`""`) answers every request with a 500 | `http.cors.origin` → the allowed origins                                                          |
+| `auth-tokens`        | secret < 32 bytes; access tokens never expire or live > 30 days; > 1 day with refresh tokens off                       | `auth.accessToken.secret`, `auth.accessToken.expiresIn`, `auth.refreshToken.enabled`              |
+| `trust-proxy`        | `http.trustProxy: true` without `http.realIpHeader`                                                                    | proxy addresses/CIDR in `http.trustProxy`, or `http.realIpHeader`                                 |
+| `request-timeout`    | `http.requestTimeout` (or `http.serverOptions.requestTimeout`) is `0`                                                  | remove it (default 5 minutes) or set a bound                                                      |
+| `production-logging` | a production console channel prints `debug` lines                                                                      | `new ConsoleLog({ minLevel: "info" })`                                                            |
+| `compression`        | never — `ok` line notes when it is off (unneeded behind a compressing proxy/CDN)                                       | `http.compression: true`                                                                          |
+| `env-files`          | a root `.env` / `.env.*` file (not `.env.example`) is not ignored by git, or is committed (`git check-ignore`)         | `.env`, `.env.*`, `!.env.example` in `.gitignore`                                                 |
+| `memory-cache`       | the default cache store is a memory driver with `maxSize: Infinity` / `0` / `null`                                     | `cache.options.<store>.maxSize`                                                                   |
+
+`auth-tokens` runs only when `auth.userType` is set and `@warlock.js/auth` is installed in a `node_modules` the project's lookup walks (core never imports or resolves it: its `exports` offer only an `import` entry); it reads `auth.accessToken.*` / `auth.refreshToken.*`, then the older `auth.jwt.*`. Values are read as the config resolves on the machine running `doctor`.
 
 Optional peers are resolved from the **consuming app's** `node_modules` (via `createRequire(process.cwd())`), so the report reflects what _your_ project has installed, not core's own deps.
 
@@ -13391,7 +13503,7 @@ warn only  → exit 0   (warnings never fail the command)
 any fail    → exit 1   (so CI / a release script can gate on it)
 ```
 
-`doctor` itself can never crash: a check that throws is caught by the runner and recorded as a `fail` (detail `check threw: <message>`), not re-thrown.
+`doctor` itself can never crash: a check that throws is caught by the runner and recorded as a `fail` (detail `check threw: <message>`), not re-thrown. The deployment-settings checks catch their own errors and report a `warn` naming the error, so they never change the exit code.
 
 ## The contract
 
@@ -14944,7 +15056,7 @@ export const optionalAuth: Middleware = async ({ request, response }) => {
 - **`Middleware` is generic over the request type.** For middleware that assumes a validated schema, narrow it: `const m: Middleware<CreateProductRequest> = ({ request }) => { ... }`. But most middlewares run before validation, so the default `Middleware` is right.
 - **No `next()` parameter.** Express-style `next()` doesn't apply here. The framework chains based on return value.
 - **`request.baseRequest` / `response.baseResponse` are escape hatches, not API.** They expose the underlying Fastify primitives for cases the framework hasn't covered yet (streaming was the historical precedent). Prefer framework helpers first — `response.send()`, `response.header()`, `response.replay()`, `request.input()`, `request.detectIp()`, etc. If you find yourself reaching for `baseResponse` or `baseRequest` for non-streaming work, that's a missing helper — file an issue. The cache and idempotency middlewares both shipped with a quietly-broken FastifyReply-return bug because they bypassed the helper layer; the framework now guards `Response.send()` against double-send, but the right answer is "use the helper."
-- **Behind any proxy, use `request.detectIp()` not `request.ip`.** `request.ip` is the immediate peer (likely your load balancer); `request.detectIp()` honors `X-Real-IP` / `X-Forwarded-For`. Either way, only trust the result as far as you trust the upstream chain — those headers are client-settable; verify the request came through your trusted edge before treating the value as authoritative.
+- **Behind any proxy, use `request.detectIp()` not `request.ip`.** `request.ip` is the immediate peer (likely your load balancer); `request.detectIp()` honors `X-Forwarded-For` as far as `http.trustProxy` allows, plus the header named by `http.realIpHeader` when a trusted proxy sent it. Either way, only trust the result as far as you trust the upstream chain — those headers are client-settable; verify the request came through your trusted edge before treating the value as authoritative.
 
 ## See also
 

@@ -39,6 +39,20 @@ describe("doctor trust-proxy check", () => {
     expect(result?.detail).toContain("http.realIpHeader");
   });
 
+  it("is ok for a predicate function", async () => {
+    setConfig("http", { trustProxy: () => true } as never);
+
+    expect((await run())?.detail).toContain("function");
+  });
+
+  it("is silent on a shape the server refuses at start", async () => {
+    setConfig("http", { trustProxy: 2 } as never);
+    expect(await run()).toBeUndefined();
+
+    setConfig("http", { trustProxy: [] } as never);
+    expect(await run()).toBeUndefined();
+  });
+
   it("is silent when no proxy is trusted or the setting is absent", async () => {
     setConfig("http", { trustProxy: false } as never);
     expect(await run()).toBeUndefined();

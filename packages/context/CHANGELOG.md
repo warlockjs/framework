@@ -4,6 +4,17 @@ All notable changes to `@warlock.js/context` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.53.0 - 2026-11-11
+
+### Upgrading
+
+- The protected `storage` member of `Context` is a `ContextStorage` (`run`, `enterWith`, `getStore`, scoped to that context) rather than an `AsyncLocalStorage`. Subclasses that call those three methods keep working; other `AsyncLocalStorage` methods are not available on it.
+- An `enter()` of one context made inside another context's `run()` no longer stays active after that `run()` returns in the same synchronous step (the behaviour Node 24 and later already have).
+
+### Changed
+
+- Every context keeps its store in one `AsyncLocalStorage` shared by all contexts (one slot per context) instead of one `AsyncLocalStorage` each. On Node versions where each enabled `AsyncLocalStorage` adds work to every promise, a request with the four framework contexts pays that cost once instead of four times, and `contextManager.runAll()` enters every context in one step. `run()`, `enter()`, `update()`, `clear()` and contexts used outside the manager behave as before; a context class that overrides `run()` is still run through it.
+
 ## 5.34.3 - 2026-10-20
 
 ### Changed

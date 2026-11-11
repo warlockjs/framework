@@ -118,7 +118,7 @@ retry: {
 }
 ```
 
-`maxRetries` is the part that does the work: when a handler **throws**, herald reads the message's `x-retry-count` header and, while it's under `maxRetries`, republishes with the header incremented so the count actually advances (a plain requeue never advances it — the broker doesn't add that header). Once `x-retry-count` reaches `maxRetries`, it dead-letters (if `deadLetter` is configured) or drops the message with a loud `log.error` — a poison message can no longer ping-pong forever. This is shared by the automatic throw path and the explicit `ctx.retry()` call, so both honor the same cap.
+`maxRetries` is the part that does the work: when a handler **throws**, herald reads the message's `x-retry-count` header and, while it's under `maxRetries`, republishes with the header incremented so the count actually advances (a plain requeue never advances it — the broker doesn't add that header). Once `x-retry-count` reaches `maxRetries`, it dead-letters (if `deadLetter` is configured) or drops the message with a loud `log.error` — a poison message can no longer ping-pong forever. The header comes from the publisher, so a value that is not a non-negative integer (`"x"`, `-1`) counts as retries exhausted. This is shared by the automatic throw path and the explicit `ctx.retry()` call, so both honor the same cap.
 
 **Caveat on `delay`.** `RetryOptions.delay` (number or `(attempt) => number`) is **not applied on the automatic throw path** — a thrown handler requeues immediately, with no wait. The only place a delay takes effect is the explicit `ctx.retry(delayMs)` call, which republishes the message with an `x-delay` header — and even that needs the RabbitMQ delayed-message-exchange plugin installed, or the delay is ignored. So if you need real backoff, call `ctx.retry(ms)` from inside the handler and install the plugin; don't rely on the channel-level `retry.delay` for timing.
 
@@ -167,6 +167,8 @@ export class UserCreatedConsumer extends EventConsumer<{ id: number; email: stri
 The handler receives the **already-unwrapped payload** as the first argument and a `ConsumedEventMessage` as the second — `{ messageId, eventName, payload, version?, occurredAt?, metadata?, message }` (where `message` is the raw `Message` if you need `message.metadata.headers`). There is **no `ctx`**: the framework auto-acks when `handle` resolves, so you never call `ack`/`nack` yourself in this style.
 
 **A throw is a bounded retry, not an infinite requeue.** `handle` throwing routes through the same bounded-retry routine the raw `.subscribe()` throw path uses (below) — republishes with an incremented `x-retry-count`, capped at `maxRetries: 3` (there's no per-consumer `retry`/`deadLetter` config yet, so the cap is always the default). Once the cap is hit, the message is dropped with a loud `log.error` — never a silent, unbounded ack/nack loop.
+
+**A payload that fails the consumer's `schema` is rejected without requeue** (the broker dead-letters it when the queue has a dead-letter exchange) and logged once with `log.warn` and the validation errors. It is never redelivered in a loop and `handle` never sees it.
 
 Wiring: the channel name comes from `static eventName`, and `@Consumable` self-registers the moment the class module is **imported** — if a broker is already connected it subscribes immediately, otherwise it buffers and subscribes once `connectToBroker` fires. So the only wiring you need is to import the consumer file on the boot path (e.g. your module's `main.ts`).
 
@@ -289,6 +291,7 @@ npm install @warlock.js/herald amqplib   # amqplib for RabbitMQ
 6. **Subscribers control message flow** via `ctx.ack()` / `ctx.nack()` / `ctx.reject()` / `ctx.retry(ms)`.
 7. **Smart auto-ack is the default** (`autoAck` unset/`false`). The consumer runs with manual-ack enabled, but herald acks for you when the handler returns cleanly and nacks-with-requeue when it throws — so a crash mid-handling re-delivers, and a clean handler that forgot `ctx.ack()` is still acked. Call `ctx` methods explicitly only when you need a non-default outcome (reject, DLQ, delayed retry). `autoAck: true` is the dangerous mode: the broker acks on delivery, so a crash loses the message.
 8. **`username`/`password` never leak into thrown or logged errors.** They're URI-encoded when building the internal `amqp://` connection URL, and any connect failure — including one built from a caller-supplied `uri` — has `user:pass@` redacted before it's re-thrown/logged. Safe to log a connection error as-is; it will never contain a plaintext broker credential.
+9. **`disconnect()` is final; a broker-side close reconnects.** A deliberate `disconnect()` never schedules a reconnect (and cancels a pending one). After a broker restart the driver reconnects, moves every channel onto the new AMQP channel and re-attaches active subscriptions, so cached `channel()` objects keep working.
 
 ## Minimal example
 
@@ -603,7 +606,7 @@ For "multiple replies expected" patterns, use a regular `subscribe` + a request 
 
 ## Correlation across replies
 
-Each `request()` generates its own correlation ID and an exclusive reply queue under the hood. The reply carries the same ID; the client matches it to the awaiting promise and resolves. You don't manage correlation IDs manually — and you shouldn't pass your own `correlationId` on a `request()`, since herald overwrites it with the one it uses to match the reply. To thread your own trace id (e.g. a transaction id for logs) through to the responder, put it in `headers` instead — the responder reads it from `message.metadata.headers`.
+Each `request()` generates its own correlation ID; replies come back over RabbitMQ's direct reply-to (`amq.rabbitmq.reply-to`), through one consumer per connection shared by every request — no queue or consumer is created per call, and a request's entry is removed on its reply or timeout. Only AMQP properties (`expiration`, `priority`, `persistent`, `headers`) are published; `timeout` stays local. The reply carries the same ID; the client matches it to the awaiting promise and resolves. You don't manage correlation IDs manually — and you shouldn't pass your own `correlationId` on a `request()`, since herald overwrites it with the one it uses to match the reply. To thread your own trace id (e.g. a transaction id for logs) through to the responder, put it in `headers` instead — the responder reads it from `message.metadata.headers`.
 
 ## Things NOT to do
 

@@ -94,7 +94,7 @@ Each request is counted before the controller runs, for each tracked identifier:
 1. The first attempt opens the window with a create-only cache write that carries the TTL. An existing window keeps its deadline, so the window is fixed, not sliding.
 2. The counter is bumped with an atomic `cache.increment`.
 3. A request whose count goes past `max` is refused with `429` and writes the lock for `lockoutDuration`.
-4. After the controller responds, a failure (non-2xx by default) that used the last allowed attempt writes the lock, unless a success that finished meanwhile already reset the window; a 2xx response clears the counter and the lock.
+4. After the controller responds, a failure (non-2xx by default) that used the last allowed attempt writes the lock, unless a success that finished meanwhile already reset the counter; a 2xx response resets the counter to 0 and clears the lock. A counter that cannot be read back (expired, evicted, a failed read) does not count as reset, so the failure still locks.
 
 When the lock is written, the counter is rewritten with the same TTL, so both end together and the identifier starts a fresh window after the lockout.
 

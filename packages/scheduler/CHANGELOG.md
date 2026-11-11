@@ -4,6 +4,21 @@ All notable changes to `@warlock.js/scheduler` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.53.0 - 2026-11-11
+
+### Upgrading
+
+- Jobs still run one at a time by default. What an app can notice: `scheduler:tick` keeps firing while a job runs, and `job:skip` ("Job is already running") is emitted on those ticks for a due job whose run is still going. Apps with long jobs that hold back the others can call `scheduler.runInParallel(true)` (cap with the second argument) when their jobs are safe to run side by side.
+- An `onOneServer()` job on a plain interval no longer runs at boot; it first runs at the next wall-clock boundary (`everyHour()` at the top of the hour). Add `.at()` or use `cron()` to pick the exact times, or drop `onOneServer()` for a job that must run at boot.
+
+### Security
+
+- `onOneServer()` did not deduplicate interval schedules: each server computed its tick from its own boot time and from when its last run finished, so every server claimed a different tick and all of them ran the job. A plain interval with `onOneServer()` (`everyMinute()`, `everyHours(2)`, … with no `at()`, day or month constraint) is aligned to wall-clock boundaries in the job's timezone and advances from the scheduled tick, so every server claims the same tick and the job runs once per tick.
+
+### Changed
+
+- The scheduler tick no longer waits for jobs to finish, so `scheduler:tick` fires on time while jobs run. By default jobs still run one at a time, in the same order as before: jobs that come due while one runs wait for it, then run in registration order. With `runInParallel(true, n)` each due job starts on its own tick, at most `n` (default `10`) at once, so one long job no longer holds back the others; parallel mode used to wait for each batch. A job never overlaps itself: a tick that finds it still running emits `job:skip`. `shutdown()` waits for every run the scheduler started.
+
 ## 5.39.1 - 2026-10-26
 
 ### Fixed

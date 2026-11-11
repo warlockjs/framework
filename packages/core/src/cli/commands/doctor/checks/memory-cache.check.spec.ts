@@ -56,6 +56,16 @@ describe("doctor memory-cache check", () => {
     expect(result?.detail).toContain("cache.options.memory.maxSize");
   });
 
+  it("warns on maxSize: null, which the driver reads as no limit", async () => {
+    setConfig("cache", {
+      default: "memory",
+      drivers: { memory: MemoryCacheDriver },
+      options: { memory: { maxSize: null } },
+    } as never);
+
+    expect((await run())?.status).toBe("warn");
+  });
+
   it("recognises drivers built on the memory driver under any name", async () => {
     setConfig("cache", {
       default: "local",

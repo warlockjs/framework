@@ -24,7 +24,7 @@ Summary: 5 ok, 1 warn, 0 fail
 
 ## Error codes and `--json`
 
-Every `warn`/`fail` finding carries a stable error code (`WL1001`, `WL2001`, …), printed after the detail and explained by `warlock explain <code>`. `--json` prints the report with the same `code` / `hint` / `skill` / `docs` fields `warlock check --json` uses (boot output goes to stderr):
+Every `warn`/`fail` finding except the deployment-settings warnings (below, which name the setting instead) carries a stable error code (`WL1001`, `WL2001`, …), printed after the detail and explained by `warlock explain <code>`. `--json` prints the report with the same `code` / `hint` / `skill` / `docs` fields `warlock check --json` uses (boot output goes to stderr):
 
 ```bash
 npx warlock doctor --json | jq '.results[] | select(.status != "ok") | "\(.code) \(.detail)"'
@@ -82,19 +82,19 @@ The default set is `defaultDoctorChecks` (in registration order — runtime-surf
 
 An app keeps the config files it was generated with, so safer defaults in a newer scaffold never reach it. Nine checks read the resolved configuration and **warn** (never fail, so an existing CI gate keeps passing; no error code, the detail names the setting):
 
-| Check                | Warns when                                                                                                             | Change                                                                                            |
-| -------------------- | ---------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| `upload-limits`      | one multipart request may hold more than 100 MB                                                                        | `http.multipart.maxTotalSize` (and `http.fileUploadLimit`); per route `uploads: { maxTotalSize }` |
-| `cors`               | `http.cors.origin` is `"*"` (also in a list, or unset: the default is `"*"`) or `true`; worse with `credentials: true` | `http.cors.origin` → the allowed origins                                                          |
-| `auth-tokens`        | secret < 32 bytes; access tokens never expire or live > 30 days; > 1 day with refresh tokens off                       | `auth.accessToken.secret`, `auth.accessToken.expiresIn`, `auth.refreshToken.enabled`              |
-| `trust-proxy`        | `http.trustProxy: true` without `http.realIpHeader`                                                                    | proxy addresses/CIDR in `http.trustProxy`, or `http.realIpHeader`                                 |
-| `request-timeout`    | `http.requestTimeout` (or `http.serverOptions.requestTimeout`) is `0`                                                  | remove it (default 5 minutes) or set a bound                                                      |
-| `production-logging` | a production console channel prints `debug` lines                                                                      | `new ConsoleLog({ minLevel: "info" })`                                                            |
-| `compression`        | never — `ok` line notes when it is off (unneeded behind a compressing proxy/CDN)                                       | `http.compression: true`                                                                          |
-| `env-files`          | a root `.env` / `.env.*` file (not `.env.example`) is not ignored by git, or is committed (`git check-ignore`)         | `.env`, `.env.*`, `!.env.example` in `.gitignore`                                                 |
-| `memory-cache`       | the default cache store is a memory driver with `maxSize: Infinity` / `0`                                              | `cache.options.<store>.maxSize`                                                                   |
+| Check                | Warns when                                                                                                                                                                                           | Change                                                                                            |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `upload-limits`      | one multipart request may hold more than 100 MB                                                                                                                                                      | `http.multipart.maxTotalSize` (and `http.fileUploadLimit`); per route `uploads: { maxTotalSize }` |
+| `cors`               | `http.cors.origin` is `"*"` (also in a list, or unset: the default is `"*"`) or `true`; worse with `credentials: true`; present but empty (`undefined`/`null`/`""`) answers every request with a 500 | `http.cors.origin` → the allowed origins                                                          |
+| `auth-tokens`        | secret < 32 bytes; access tokens never expire or live > 30 days; > 1 day with refresh tokens off                                                                                                     | `auth.accessToken.secret`, `auth.accessToken.expiresIn`, `auth.refreshToken.enabled`              |
+| `trust-proxy`        | `http.trustProxy: true` without `http.realIpHeader`                                                                                                                                                  | proxy addresses/CIDR in `http.trustProxy`, or `http.realIpHeader`                                 |
+| `request-timeout`    | `http.requestTimeout` (or `http.serverOptions.requestTimeout`) is `0`                                                                                                                                | remove it (default 5 minutes) or set a bound                                                      |
+| `production-logging` | a production console channel prints `debug` lines                                                                                                                                                    | `new ConsoleLog({ minLevel: "info" })`                                                            |
+| `compression`        | never — `ok` line notes when it is off (unneeded behind a compressing proxy/CDN)                                                                                                                     | `http.compression: true`                                                                          |
+| `env-files`          | a root `.env` / `.env.*` file (not `.env.example`) is not ignored by git, or is committed (`git check-ignore`)                                                                                       | `.env`, `.env.*`, `!.env.example` in `.gitignore`                                                 |
+| `memory-cache`       | the default cache store is a memory driver with `maxSize: Infinity` / `0` / `null`                                                                                                                   | `cache.options.<store>.maxSize`                                                                   |
 
-`auth-tokens` runs only when `auth.userType` is set and `@warlock.js/auth` resolves from the project (core never imports it); it reads `auth.accessToken.*` / `auth.refreshToken.*`, then the older `auth.jwt.*`. Values are read as the config resolves on the machine running `doctor`.
+`auth-tokens` runs only when `auth.userType` is set and `@warlock.js/auth` is installed in a `node_modules` the project's lookup walks (core never imports or resolves it: its `exports` offer only an `import` entry); it reads `auth.accessToken.*` / `auth.refreshToken.*`, then the older `auth.jwt.*`. Values are read as the config resolves on the machine running `doctor`.
 
 Optional peers are resolved from the **consuming app's** `node_modules` (via `createRequire(process.cwd())`), so the report reflects what _your_ project has installed, not core's own deps.
 
@@ -105,7 +105,7 @@ warn only  → exit 0   (warnings never fail the command)
 any fail    → exit 1   (so CI / a release script can gate on it)
 ```
 
-`doctor` itself can never crash: a check that throws is caught by the runner and recorded as a `fail` (detail `check threw: <message>`), not re-thrown.
+`doctor` itself can never crash: a check that throws is caught by the runner and recorded as a `fail` (detail `check threw: <message>`), not re-thrown. The deployment-settings checks catch their own errors and report a `warn` naming the error, so they never change the exit code.
 
 ## The contract
 

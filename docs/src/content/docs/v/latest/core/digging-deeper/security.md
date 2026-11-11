@@ -288,6 +288,8 @@ trustProxy: ["173.245.48.0/20", "103.21.244.0/22"], // your edge's addresses
 realIpHeader: "cf-connecting-ip",
 ```
 
+The global `http.rateLimit`, `middleware.rateLimit()`, `middleware.ipFilter()` and the idempotency scope all key on this same client address (`request.detectIp()`), so they agree in every proxy configuration. An `http.rateLimit.keyGenerator` of your own still wins.
+
 > **Changed in 5.53.** Earlier releases read `X-Real-IP` whenever `trustProxy` was `true`. If your edge sets only `X-Real-IP` (for example nginx `proxy_set_header X-Real-IP $remote_addr`), set `realIpHeader: "x-real-ip"`; otherwise the client IP comes from `X-Forwarded-For`.
 
 ### Allowed hosts

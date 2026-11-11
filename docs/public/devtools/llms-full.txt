@@ -41,6 +41,22 @@ of it would fail to resolve there.
    404 unless the connection comes from `127.0.0.1` / `::1`. It checks the
    socket address, not `X-Forwarded-For`, so a forwarded-for header can't
    unlock it.
+4. **It only answers loopback hosts.** The `Host` must be `localhost`,
+   `*.localhost`, `127.0.0.1` or `[::1]`, a present `Origin` must be one of
+   those, and a request carrying `X-Forwarded-For` / `X-Forwarded-Host` /
+   `X-Real-IP` / `Forwarded` (a local proxy or tunnel) is refused. This stops a
+   website re-pointing its domain at 127.0.0.1 from reading request history,
+   queries and mail. Each refusal reason is logged once in the terminal.
+
+For a custom dev hostname or a private local proxy, add `src/config/devtools.ts`
+(a plain object, safe in production):
+
+```ts
+export default {
+  allowedHosts: ["app.test"], // default []; ".app.test" also matches subdomains
+  allowProxied: false, // default false
+};
+```
 
 ## What each panel shows
 

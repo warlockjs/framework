@@ -224,7 +224,7 @@ cache.setCacheConfigurations(config);
 await cache.init();
 ```
 
-`logging` turns the per-operation key log (`<key> fetched`, `<key> not found`, ...) on or off. Email addresses inside logged keys are masked (`user.member@example.com` logs as `u***@example.com`), in operation lines and in error lines (which are written even with logging off); other personal data in a key is logged as is, so keep it out of keys or turn logging off in production.
+`logging` turns the per-operation key log (`<key> fetched`, `<key> not found`, ...) on or off; it is off by default (`logging: true` turns it on). Errors and connection failures are always logged. Email addresses inside logged keys are masked (`user.member@example.com` logs as `u***@example.com`), in operation lines and in error lines (which are written even with logging off); other personal data in a key is logged as is, so keep it out of keys or turn logging off in production.
 
 ## Primary ops
 
@@ -760,7 +760,7 @@ Seven production drivers + a mock driver ship in-box. Pick by durability, scope,
 
 Memory, memoryExtended, lru and file caches are **per-process** (file: per host). With more than one server, use `redis` or `pg` for counters, throttles, one-time tokens (`pull`), shared `update`, `lock()` and tag invalidation; on memory each server counts and invalidates alone. `remember()`/`swr()`/`cached()` stampede protection is per process even on redis. Redis Cluster is unsupported.
 
-Driver storage notes: `memory` stores flat keys (`get("users")` after `set("users.1")` is a miss) and `maxSize` counts entries in LRU order; redis `flush()` without a `globalPrefix` runs `FLUSHDB` (whole database), so set a prefix.
+Driver storage notes: `memory` stores flat keys (`get("users")` after `set("users.1")` is a miss) and `maxSize` counts entries in LRU order (default `10000`, `Infinity` for no limit); redis `flush()` without a `globalPrefix` runs `FLUSHDB` (whole database), so set a prefix.
 
 ## Global config TTL — accepts number or string
 
@@ -1558,6 +1558,7 @@ Note: scope `ttl` defaults are NOT applied to SWR — `freshTtl` / `staleTtl` al
 
 - Don't create a `cache.namespace(prefix)` for a single read/write — the boilerplate doesn't pay off until the prefix repeats. Inline `cache.set("prefix.foo", ...)` is fine.
 - Don't expect `cache.namespace(prefix).clear()` to do anything on the `null` driver — `removeNamespace` no-ops there (it caches nothing).
+- Don't put raw request values in a prefix: ``cache.namespace(`tenant.${slug}`)`` with `slug = "acme.billing"` lands inside `tenant.acme`. Use `escapeCacheKeySegment(slug)` (percent-encodes `.` `,` `:` `{` `}` `"` `[` `]` `%`).
 - Don't mix prefix separators. The convention is `.` (dot) — pick one and stick with it across scopes so nested prefixes compose predictably.
 
 
@@ -1771,7 +1772,7 @@ Subsequent `set("user:1", ...)` with **no** `tags` leaves previous associations 
 | `redis`                             |               ✓ (native SET inside the prefix)               |
 | `pg`                                |            ✓ (JSON-array merge on the index row)             |
 
-The index uses driver primitives (`tagAdd` / `tagMembers` / `tagRemove`), so concurrent tagged writes never drop members. It stores un-prefixed keys, `invalidate()` deletes exactly the members it read, writes prune up to 20 dead members, and `remove()` / `pull()` detach the key. Tags are global across scopes. Across servers, use `redis` or `pg` so every server shares one index.
+The index uses driver primitives (`tagAdd` / `tagMembers` / `tagRemove`), so concurrent tagged writes never drop members. A tagged write samples up to 20 members (`tagSample`) and checks them with `exists` (no value read, no hit/miss events), so its cost does not grow with the tag; `invalidate()` removes members in batches (`removeMany`). Custom drivers without these primitives fall back to `tagMembers` / `has()` / `remove()`. It stores un-prefixed keys, `invalidate()` deletes exactly the members it read, writes prune up to 20 dead members, and `remove()` / `pull()` detach the key. Tags are global across scopes. Across servers, use `redis` or `pg` so every server shares one index.
 
 ## SWR with tags
 
@@ -1895,7 +1896,7 @@ The per-key lock map lives on the driver instance and is cleared after each chai
 
 ---
 name: use-cache-utils
-description: 'Low-level cache utilities re-exported from @warlock.js/cache — parseTtl, expiresAtToTtl, resolveTtl, normalizeToOptions, normalizeToRememberOptions, parseCacheKey, mergeTagSets, injectTags, cosineSimilarity, and the CACHE_FOR TTL enum. Triggers: `parseTtl`, `parseCacheKey`, `resolveTtl`, `expiresAtToTtl`, `cosineSimilarity`, `mergeTagSets`, `injectTags`, `CACHE_FOR`; "parse a duration to seconds", "build a cache key from an object", "score two vectors", "common TTL constant"; typical import `import { parseTtl, CACHE_FOR } from "@warlock.js/cache"`. Skip: building a whole custom driver — the `pick-cache-driver` topic; the high-level set API — the `configure-set-options` topic.'
+description: 'Low-level cache utilities re-exported from @warlock.js/cache — parseTtl, expiresAtToTtl, resolveTtl, normalizeToOptions, normalizeToRememberOptions, parseCacheKey, escapeCacheKeySegment, mergeTagSets, injectTags, cosineSimilarity, and the CACHE_FOR TTL enum. Triggers: `parseTtl`, `parseCacheKey`, `escapeCacheKeySegment`, `resolveTtl`, `expiresAtToTtl`, `cosineSimilarity`, `mergeTagSets`, `injectTags`, `CACHE_FOR`; "parse a duration to seconds", "build a cache key from an object", "score two vectors", "common TTL constant"; typical import `import { parseTtl, CACHE_FOR } from "@warlock.js/cache"`. Skip: building a whole custom driver — the `pick-cache-driver` topic; the high-level set API — the `configure-set-options` topic.'
 ---
 
 # Cache utilities
@@ -1940,10 +1941,12 @@ normalizeToRememberOptions("1h"); // { ttl: "1h" }   (no expiresAt/onConflict)
 ## Key + tag helpers
 
 ```ts
-import { parseCacheKey, mergeTagSets, injectTags } from "@warlock.js/cache";
+import { escapeCacheKeySegment, parseCacheKey, mergeTagSets, injectTags } from "@warlock.js/cache";
 
 parseCacheKey("users:1"); // "users.1"
 parseCacheKey({ page: 1, q: "John" }); // "page.1.q.John"
+parseCacheKey({ q: "a.b" }); // "q.a%2Eb" — separators inside object values are escaped
+escapeCacheKeySegment("acme.billing"); // "acme%2Ebilling" — one safe segment for a key or namespace
 parseCacheKey("user:1", { globalPrefix: "app" }); // "app.user.1"
 
 mergeTagSets(["a", "b"], ["b", "c"]); // ["a","b","c"] (deduped union)
@@ -2033,7 +2036,7 @@ cached(fn, {
 | Any args                                                      | `prefix.<16 hex>` — sha1 of a stable JSON encoding of the args, truncated |
 | `Map` / `Set` / function / symbol / class instance / circular | throws `CacheConfigurationError`                                          |
 
-The hash keeps distinct args on distinct keys (`("1.private", "")` ≠ `("1", "private")`). Object keys are sorted; `Date` → ISO string; order of args matters. Never build keys by hand: call `.invalidate(...args)`, which honours `config.driver`. When auto-key fails, use the options form with a custom `key` fn.
+The hash keeps distinct args on distinct keys (`("1.private", "")` ≠ `("1", "private")`). Object keys are sorted; `Date` → ISO string; `bigint` and `$`-prefixed object keys are encoded so they never collide with other args; an own `__proto__` key is kept; order of args matters. Never build keys by hand: call `.invalidate(...args)`, which honours `config.driver`. When auto-key fails, use the options form with a custom `key` fn.
 
 **Upgrade (5.20):** the key format changed from dot-joined args, so old entries are never read and every call misses once.
 

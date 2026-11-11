@@ -1,6 +1,6 @@
 import { config } from "../../../../config/config-getter";
 import type { DoctorCheck } from "../check.types";
-import { isSet } from "./config-values";
+import { isSet, warnOnError } from "./config-values";
 
 /**
  * Reports whether responses are compressed (`http.compression`).
@@ -12,7 +12,7 @@ import { isSet } from "./config-values";
  * NEEDS NO BOOTED APP — it reads config only. Silent when the app has no
  * `http` config.
  */
-export const compressionCheck: DoctorCheck = {
+export const compressionCheck: DoctorCheck = warnOnError({
   name: "compression",
   run: () => {
     if (!isSet(config.get("http"))) return undefined;
@@ -35,4 +35,4 @@ export const compressionCheck: DoctorCheck = {
         "with br/gzip, unless a proxy or CDN in front of the app already compresses responses.",
     };
   },
-};
+});

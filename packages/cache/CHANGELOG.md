@@ -4,6 +4,42 @@ All notable changes to `@warlock.js/cache` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.53.0 - 2026-11-11
+
+### Upgrading
+
+- Cache operation logging is off by default. Add `logging: true` to the cache configuration (or call `setLoggingState(true)`) to keep the per-operation lines.
+- The `memory` and `memoryExtended` drivers evict past 10,000 entries. Set `maxSize: Infinity` to keep the previous unbounded behaviour, or a number that fits your data. Rate-limit counters and login lockouts kept in a memory cache can now be evicted by a flood of distinct keys: in production keep them in a shared store (`redis` or `pg`), or set `maxSize: Infinity` on that memory driver.
+- Object cache keys whose values or property names contain `.`, `,`, `:`, `{`, `}`, `"`, `[`, `]` or `%`, and `cached()` calls with a `bigint` argument or an object key starting with `$` (such as `{ $gt: 5 }`), get a new key: those entries miss once and are written again.
+- Tag pruning checks no longer emit `hit` / `miss` events or refresh an entry's recency or sliding TTL.
+- The LRU driver's `swr()` returns a copy of the stored value; values it cannot copy (functions) fail there as they already did on `get()`.
+- The file driver creates a `cache.json.guard` file in a key's directory for a few milliseconds while it removes an expired entry under contention.
+- Removing an expired entry found by `get()` is awaited, so the `removed` event fires before `get()` resolves.
+
+### Security
+
+- The LRU driver's `swr()` returned the stored object itself, so a caller that changed the result changed the cached value for every later reader. Each `swr()` reader gets a copy, as `get()` already did; a create-only write that conflicts also returns a copy of the existing value.
+- The file driver's `lock()` and `set(..., { onConflict: "create" })` could be acquired by several callers at once when the previous entry had expired. An expired entry is now removed under a short-lived per-key guard file, so exactly one caller wins. Lock release (compare-and-delete) uses the same guard, so releasing a lock just as it expired never deletes the next holder's lock.
+- Object cache keys are no longer ambiguous: `.`, `,`, `:`, `{`, `}`, `"`, `[`, `]` and `%` inside an object key's values and property names are percent-encoded, so `{ a: "b.c" }` and `{ a: "b", c: "" }` are different keys, and an own `__proto__` key is kept as data. Keys without those characters are unchanged.
+- `cached()` auto-keys keep an own `__proto__` key of an argument as data, and an argument can no longer produce the same key as `undefined`, `NaN` or a `bigint` (object keys starting with `$` are escaped; a `bigint` gets its own marker).
+
+### Added
+
+- `escapeCacheKeySegment(value)` percent-encodes the key separator characters, so a request-derived value (a tenant slug, a search term) stays one segment of a key or namespace: ``cache.namespace(`tenant.${escapeCacheKeySegment(slug)}`)``.
+- Optional driver primitives `tagSample(tagKey, count)`, `exists(key)` and `removeMany(keys)`, used by tagged writes and tag invalidation. The Redis and Postgres drivers implement all three natively; a custom driver without them keeps the previous behaviour.
+
+### Changed
+
+- Cache drivers no longer log every operation by default. Each get and set used to write two log lines (with email masking and redaction) at `info` / `success`; errors and connection failures are always logged.
+- The `memory` and `memoryExtended` drivers keep at most 10,000 entries by default (`maxSize`), evicting the least recently used; they used to grow without bound, so keys built from request input could exhaust memory. Eviction no longer copies the whole key list on every write.
+- Tagged writes no longer read the whole tag index and up to 20 full cached values: they sample up to 20 members (`SRANDMEMBER` on Redis, a database-side sample on Postgres) and check them with an existence test (`EXISTS`, `SELECT 1`) in one batch. Tag invalidation removes entries in batches (pipelined deletes on Redis, one `DELETE … = ANY(...)` per 500 keys on Postgres).
+- Redis, Postgres and file `get()` no longer deep-clone a value that was just deserialized (it is already the caller's own copy).
+- A plain Redis `set()` sends the SWR sidecar update together with the value, and `remove()` sends both deletes together: one round trip instead of two.
+
+### Fixed
+
+- The file driver deletes an expired entry when it is read with a `globalPrefix` configured. The prefix used to be applied twice, so the directory stayed forever.
+
 ## 5.43.0 - 2026-11-01
 
 ### Added

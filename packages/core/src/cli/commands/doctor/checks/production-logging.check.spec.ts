@@ -53,6 +53,26 @@ describe("doctor production-logging check", () => {
     expect(await run()).toBeUndefined();
   });
 
+  it("is silent when production logging is turned off with any falsy value", async () => {
+    setConfig("log", { enabled: 0, channels: [new ConsoleLog()] } as never);
+
+    expect(await run()).toBeUndefined();
+  });
+
+  it("warns instead of failing when a channel throws", async () => {
+    const channel = new ConsoleLog();
+    channel.acceptsLevel = () => {
+      throw new Error("channel broke");
+    };
+
+    setConfig("log", { production: { channels: [channel] } } as never);
+
+    const result = await run();
+
+    expect(result?.status).toBe("warn");
+    expect(result?.detail).toContain("channel broke");
+  });
+
   it("is silent when no console channel is used in production", async () => {
     setConfig("log", { development: { channels: [new ConsoleLog()] } } as never);
 
