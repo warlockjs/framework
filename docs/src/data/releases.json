@@ -1,4 +1,26 @@
 {
+  "5.53.0": {
+    "publishedAt": "2026-11-11T19:37:07.564Z",
+    "matrix": "none",
+    "headline": "A security and performance hardening release: request and upload limits, safer database queries, stronger sign-in throttles, bounded caches, logs and queues, a private-by-default `ai.serve`, and one render per page.",
+    "highlights": [
+      "Uploads and requests are bounded: 25 MB per multipart request (`http.multipart.maxTotalSize`), a 5-minute request timeout, capped array indices and form fields, byte-checked image uploads, and client IPs read only through `http.realIpHeader`.",
+      "Database queries no longer write request values into SQL, MongoDB refuses `$` field names and caps LIKE wildcards, `strictMode` takes effect on saves, and `upsert()` / `restore()` respect tenant scopes.",
+      "Sign-in throttles count each attempt on arrival, unknown emails take as long as wrong passwords, provider logins no longer link unverified accounts, and `Auth` hides `password`; opt-in token digests at rest, `__Host-` cookies and issuer checks.",
+      "`ai.serve` sends only text to clients by default, output guardrails cover streamed text, guarded requests pin connections against DNS rebinding, and workspace `grep` and globs can no longer hang the process.",
+      "Pages render once per request, `Response.send()` skips its deep walk, cache logging is off by default, all contexts share one `AsyncLocalStorage`, and opt-in `http.compression` and `web.loaders: \"parallel\"` are available.",
+      "Memory caches, file-log buffers, finished jobs, Panoptic traces and page-cache variants have default limits, and error pages and 5xx bodies no longer show internal messages outside development."
+    ],
+    "upgradeNotes": [
+      "Multipart requests over 25 MB in total answer 413; raise `http.multipart.maxTotalSize` or set `uploads: { maxTotalSize }` on the route.",
+      "A client's `?paginate=false` is ignored on repository lists; set `allowClientUnpaginated = true` on the repository to allow it.",
+      "`strictMode: \"strip\"` now drops unknown fields on save and MongoDB updates validate nested data; set `strictMode = \"fail\"` to keep rejecting unknown fields.",
+      "Seal refuses arrays over 10,000 items and records over 10,000 keys without a schema bound; `configureSeal({ maxArrayItems: Infinity, maxRecordKeys: Infinity })` lifts it.",
+      "`ai.serve` streams text and `{ text, data, error }` only; `events: \"all\", toResult: (result) => result` restores the full stream.",
+      "Finished queue jobs are pruned by default and job data carries a new envelope; upgrade workers before dispatchers, or set `removeOnComplete: false` / `removeOnFail: false`.",
+      "Cache operation logging is off and memory caches evict past 10,000 entries; set `logging: true` or `maxSize: Infinity`."
+    ]
+  },
   "5.52.0": {
     "publishedAt": "2026-11-11T17:16:00.373Z",
     "matrix": "none",

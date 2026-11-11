@@ -136,6 +136,1496 @@
   ],
   "releases": [
     {
+      "version": "5.53.0",
+      "id": "v5-53-0",
+      "date": "November 11, 2026",
+      "isUnreleased": false,
+      "headlineHtml": "A security and performance hardening release: request and upload limits, safer database queries, stronger sign-in throttles, bounded caches, logs and queues, a private-by-default <code>ai.serve</code>, and one render per page.",
+      "highlights": [
+        "Uploads and requests are bounded: 25 MB per multipart request (<code>http.multipart.maxTotalSize</code>), a 5-minute request timeout, capped array indices and form fields, byte-checked image uploads, and client IPs read only through <code>http.realIpHeader</code>.",
+        "Database queries no longer write request values into SQL, MongoDB refuses <code>$</code> field names and caps LIKE wildcards, <code>strictMode</code> takes effect on saves, and <code>upsert()</code> / <code>restore()</code> respect tenant scopes.",
+        "Sign-in throttles count each attempt on arrival, unknown emails take as long as wrong passwords, provider logins no longer link unverified accounts, and <code>Auth</code> hides <code>password</code>; opt-in token digests at rest, <code>__Host-</code> cookies and issuer checks.",
+        "<code>ai.serve</code> sends only text to clients by default, output guardrails cover streamed text, guarded requests pin connections against DNS rebinding, and workspace <code>grep</code> and globs can no longer hang the process.",
+        "Pages render once per request, <code>Response.send()</code> skips its deep walk, cache logging is off by default, all contexts share one <code>AsyncLocalStorage</code>, and opt-in <code>http.compression</code> and <code>web.loaders: \"parallel\"</code> are available.",
+        "Memory caches, file-log buffers, finished jobs, Panoptic traces and page-cache variants have default limits, and error pages and 5xx bodies no longer show internal messages outside development."
+      ],
+      "upgradeNotes": [
+        "Multipart requests over 25 MB in total answer 413; raise <code>http.multipart.maxTotalSize</code> or set <code>uploads: { maxTotalSize }</code> on the route.",
+        "A client's <code>?paginate=false</code> is ignored on repository lists; set <code>allowClientUnpaginated = true</code> on the repository to allow it.",
+        "<code>strictMode: \"strip\"</code> now drops unknown fields on save and MongoDB updates validate nested data; set <code>strictMode = \"fail\"</code> to keep rejecting unknown fields.",
+        "Seal refuses arrays over 10,000 items and records over 10,000 keys without a schema bound; <code>configureSeal({ maxArrayItems: Infinity, maxRecordKeys: Infinity })</code> lifts it.",
+        "<code>ai.serve</code> streams text and <code>{ text, data, error }</code> only; <code>events: \"all\", toResult: (result) =&gt; result</code> restores the full stream.",
+        "Finished queue jobs are pruned by default and job data carries a new envelope; upgrade workers before dispatchers, or set <code>removeOnComplete: false</code> / <code>removeOnFail: false</code>.",
+        "Cache operation logging is off and memory caches evict past 10,000 entries; set <code>logging: true</code> or <code>maxSize: Infinity</code>."
+      ],
+      "summaryHtml": null,
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/5.53.0-summary.md",
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 49,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 4
+            },
+            {
+              "type": "Changed",
+              "n": 12
+            },
+            {
+              "type": "Fixed",
+              "n": 1
+            },
+            {
+              "type": "Deprecated",
+              "n": 1
+            },
+            {
+              "type": "Security",
+              "n": 31
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>http.compression</code> (<code>boolean | { threshold?: number; brotli?: boolean }</code>, default <code>false</code>; <code>threshold</code> defaults to 1024 bytes, <code>brotli</code> to <code>true</code>). When on, JSON, HTML, XML, text and other text-like responses are compressed with <code>br</code> or <code>gzip</code> as the client's <code>Accept-Encoding</code> allows, using Node's built-in <code>zlib</code>. It covers <code>response.send()</code> and its helpers, <code>sendFile()</code> / <code>sendBuffer()</code> of text types, and page responses from <code>@warlock.js/web</code>, including streamed pages, which are flushed after each burst of writes so the shell and deferred chunks still arrive progressively. HEAD, 204/206/304 answers, small bodies, binary types, responses that already set <code>Content-Encoding</code> or <code>Cache-Control: no-transform</code>, <code>response.sse()</code>, <code>response.stream()</code> and NDJSON are sent as they are. A compressed response gets <code>Accept-Encoding</code> merged into its <code>Vary</code> header, drops <code>Content-Length</code>, and a strong <code>ETag</code> turns weak. Leave it off behind a proxy or CDN that already compresses, and do not compress responses that mix a secret with reflected request input over HTTPS."
+            },
+            {
+              "type": "Added",
+              "html": "<code>response.sendFile()</code> answers a single <code>Range: bytes=…</code> request with <code>206 Partial Content</code> and only those bytes (<code>If-Range</code> honoured; <code>416</code> with <code>Content-Range: bytes */&lt;size&gt;</code> past the end), so media can be seeked and downloads resumed. File responses carry <code>Accept-Ranges: bytes</code> and <code>Content-Length</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<code>Restful</code> resources take <code>bulkDeleteLimit</code> (default <code>1000</code>) and <code>bulkDeleteConcurrency</code> (default <code>10</code>): <code>bulkDelete</code> refuses more ids than the limit with a 400 and deletes at most that many records at a time, instead of deleting any number of ids all at once."
+            },
+            {
+              "type": "Added",
+              "html": "<code>warlock add</code> adds the <code>@warlock.js/*</code> and <code>@mongez/*</code> packages it installs to <code>agentKit.pick</code> in <code>package.json</code> when the project has that allowlist, so their skills are synced to the coding agent. Projects without the allowlist are unchanged."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>Response.send()</code> no longer walks the whole body with an async call per value. Plain data with nothing to convert is passed to the serializer as it is; containers are copied only where a <code>toJSON()</code>, <code>Map</code> or other iterable was converted, and every <code>toJSON()</code> in the body starts in one pass and is awaited together. Output is unchanged. Responses replayed from the response cache and the idempotency middleware benefit the same way."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>Response.send()</code> no longer waits three event-loop turns per JSON response when nothing subscribed to <code>Response.on(...)</code>; listeners, when present, still run before the body is written."
+            },
+            {
+              "type": "Changed",
+              "html": "Request logging builds nothing a log channel would drop: the per-phase lines of <code>http.log</code> and the request start and complete lines skip building their entry (and the request snapshot) when no channel keeps that level, and a request builds its log snapshot once instead of once per line."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>router.proxy()</code> loads <code>@fastify/http-proxy</code> only when a proxy route is declared, and the translation-usage tooling loads <code>oxc-parser</code> on first use, so neither is loaded at every boot."
+            },
+            {
+              "type": "Changed",
+              "html": "Resource date fields parse each value once and compute the ISO string once; <code>url()</code>, <code>uploadsUrl()</code>, <code>publicUrl()</code> and <code>assetsUrl()</code> no longer compile regular expressions per call; a resource reads its schema entries once per class."
+            },
+            {
+              "type": "Changed",
+              "html": "The security headers and the static part of the <code>Content-Security-Policy</code> header are built once per configuration and route override instead of on every request (only the nonce changes per request); <code>auth.csrf.allowedOrigins</code> is normalised once per list. A production server no longer installs the development reload gate's per-request hook."
+            },
+            {
+              "type": "Changed",
+              "html": "Route name checks at registration and <code>router.getRoute()</code> use a name index instead of scanning every route; each route's request handler is built once instead of per request; the resolved middleware list is cached per route; the body parser binds its value parser once per body and no longer compiles a pattern per input key."
+            },
+            {
+              "type": "Changed",
+              "html": "The shared (<code>store: \"cache\"</code>) rate limiter counts with one cache round trip per request instead of three: the driver's atomic increment creates the window counter with its TTL, and each limiter's key prefix is hashed once instead of on every request."
+            },
+            {
+              "type": "Changed",
+              "html": "The in-memory <code>middleware.rateLimit()</code> keeps its buckets in two generations and drops the older one whole when a window passes, instead of scanning every bucket inside a request once a minute. Limits are counted exactly as before."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>hashPassword</code> and <code>verifyPassword</code> use the native <code>bcrypt</code> package when the app has installed it, so hashing runs on the libuv thread pool instead of the event loop. Hashes keep the same format; <code>bcryptjs</code> remains the default and still verifies <code>$2y$</code> hashes."
+            },
+            {
+              "type": "Changed",
+              "html": "Every model write cleared the repository's whole cache namespace twice when no transaction was open. Outside a transaction the namespace is now cleared once; inside a transaction it is still cleared when the event fires and again after COMMIT."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>response.sendFile()</code> checks and describes the file with one <code>stat</code> call instead of two."
+            },
+            {
+              "type": "Fixed",
+              "html": "The <code>database</code> cache driver's <code>removeNamespace()</code> removed only rows whose stored namespace matched exactly, so repository invalidation left <code>users.id.*</code> and <code>users.list.*</code> rows in place and later reads were stale. It now removes the namespace key and every key under it. <code>flush()</code> waits for the delete, and <code>flush()</code> without a global prefix no longer throws. An expired entry found by <code>get()</code> is removed under its stored key when a <code>globalPrefix</code> is set (the prefix was applied twice, so the row stayed)."
+            },
+            {
+              "type": "Deprecated",
+              "html": "<code>request.on(event, callback)</code>. It subscribes to the process-wide event bus, so a listener added while handling one request is never removed and runs for every later request. It keeps working and logs a one-time warning; subscribe once at module scope with <code>events.subscribe(\"request.&lt;event&gt;\", callback)</code> from <code>@mongez/events</code> instead (the request is the last argument)."
+            },
+            {
+              "type": "Security",
+              "html": "Multipart uploads have a total size cap per request: <code>http.multipart.maxTotalSize</code> (default 25 MB) counts files and fields together while the body arrives, answers 413 (<code>EC108</code>) as soon as a request passes it, and refuses a declared <code>Content-Length</code> above it before reading a byte. A route sets its own cap with the new route option <code>uploads: { maxTotalSize }</code>."
+            },
+            {
+              "type": "Security",
+              "html": "New <code>http.multipart.routes: \"declared\" | \"all\"</code> (default <code>\"all\"</code>). With <code>\"declared\"</code>, multipart bodies are parsed only on routes that set <code>uploads: true</code> (or <code>uploads: { ... }</code>); every other route answers 415 (<code>EC109</code>) without reading the body, so anonymous clients can no longer make an unrelated route buffer files before auth runs."
+            },
+            {
+              "type": "Security",
+              "html": "A query, urlencoded or multipart key can no longer name an array index above <code>http.input.maxArrayIndex</code> (default <code>1000</code>). One short key such as <code>?a[4294967294]=x</code> used to create a four-billion-slot sparse array that request logging then walked, blocking the process."
+            },
+            {
+              "type": "Security",
+              "html": "Urlencoded form bodies are decoded in one pass and capped at <code>http.urlencoded.maxFields</code> (default <code>1000</code>) fields; more answer 413 (<code>EC107</code>). Decoding used to look every key up again, so a body of 20,000 distinct keys held the event loop for seconds."
+            },
+            {
+              "type": "Security",
+              "html": "New <code>http.allowedHosts</code> (unset by default): when set, a request whose host is not listed (exact hosts, or <code>.example.com</code> for a domain and its subdomains) is refused with 400 (<code>EC110</code>) before routing. The host checked is the <code>Host</code> header, or <code>X-Forwarded-Host</code> when <code>http.trustProxy</code> trusts the proxy that sent it. The health endpoints are exempt."
+            },
+            {
+              "type": "Security",
+              "html": "<code>request.detectIp()</code> no longer reads a client-sent <code>X-Real-IP</code> when <code>http.trustProxy</code> is <code>true</code>, so a client can no longer pick its own IP to get around per-IP rate limits, <code>ipFilter</code> and idempotency scoping. Name the header your edge overwrites with the new <code>http.realIpHeader</code> (for example <code>\"cf-connecting-ip\"</code> or <code>\"x-real-ip\"</code>); it is read only when <code>trustProxy</code> trusts the socket peer that sent it. A production boot with <code>trustProxy: true</code> and no <code>realIpHeader</code> logs a one-time warning explaining that <code>true</code> takes the client-writable leftmost <code>X-Forwarded-For</code> entry."
+            },
+            {
+              "type": "Security",
+              "html": "The global rate limiter (<code>http.rateLimit</code>, including per-route <code>rateLimit</code> options) keys on the same client address as <code>request.detectIp()</code> and <code>middleware.rateLimit()</code>. It used <code>request.ip</code>, which under <code>trustProxy: true</code> is the client-writable leftmost <code>X-Forwarded-For</code> entry, so a client could still dodge the global limit by forging that header after the app set <code>http.realIpHeader</code>. An app's own <code>keyGenerator</code> still wins."
+            },
+            {
+              "type": "Security",
+              "html": "Signed cookies work end to end. <code>response.cookie(name, value, { signed: true })</code> signs with <code>http.cookies.secret</code>, and the new <code>request.signedCookie(name, defaultValue?)</code> verifies the signature and returns the default for a missing, unsigned or edited value. Both throw an error naming <code>http.cookies.secret</code> when it is not set. Before, setting the secret signed nothing and <code>request.cookie()</code> returned edited values unchecked."
+            },
+            {
+              "type": "Security",
+              "html": "<code>request.cookie(name, defaultValue, { json: false })</code> returns the raw string instead of a JSON-parsed value whose type the client chooses; <code>http.cookies.json: false</code> makes that the default (string values are then also written without JSON quoting). The default is unchanged."
+            },
+            {
+              "type": "Security",
+              "html": "Upload checks read the file's bytes. <code>v.file().image()</code> accepts raster images by their content (jpeg, png, webp, gif, avif, heic/heif, bmp, tiff, ico) whatever type the client declared, and accepts svg only with <code>image({ svg: true })</code>. <code>mimeType()</code>, <code>pdf()</code>, <code>excel()</code>, <code>word()</code> and <code>accept()</code> also refuse a file whose bytes are svg, html or xml unless that type or extension is listed. New <code>uploadedFile.detectedMimeType()</code> returns the type the bytes show."
+            },
+            {
+              "type": "Security",
+              "html": "<code>UploadedFile.save()</code> / <code>saveAs()</code> store raster images with the type their bytes show and store markup (svg, html, xml, script) as <code>application/octet-stream</code>, so an object served from an S3/R2 bucket or a CDN is downloaded rather than rendered on your domain. <code>uploads.trustClientContentType: true</code> stores the declared type as before."
+            },
+            {
+              "type": "Security",
+              "html": "New <code>http.requestTimeout</code> (default <code>300000</code> ms, 5 minutes) bounds how long a client may take to send one request, headers and body. It does not limit responses, so event streams and long downloads are unaffected. <code>0</code> turns it off."
+            },
+            {
+              "type": "Security",
+              "html": "<code>/ready</code> is cheap and bounded: concurrent probes share one run of the checks, a result is reused for <code>http.health.cacheTtl</code> ms (default <code>1000</code>), and a check that does not answer within <code>http.health.checkTimeout</code> ms (default <code>2000</code>) counts as failed. In production the body is <code>{ status }</code> only, so the public probe no longer lists your backing services; <code>http.health.details</code> chooses."
+            },
+            {
+              "type": "Security",
+              "html": "<code>middleware.ipFilter()</code> matches IPv6 CIDR blocks (<code>2001:db8::/32</code>), compares IPv6 addresses by value and matches IPv4-mapped clients against IPv4 blocks. An IPv6 deny list used to fail open. The exported <code>ipMatches()</code> / <code>anyMatch()</code> helpers gain the same IPv6 support."
+            },
+            {
+              "type": "Security",
+              "html": "<code>middleware.idempotency()</code> scopes each record to the concrete request target (route params and query), not just the route pattern, so one key reused on <code>/orders/1/cancel</code> and <code>/orders/2/cancel</code> runs both requests instead of replaying the first answer for the second."
+            },
+            {
+              "type": "Security",
+              "html": "An inbound <code>X-Request-Id</code> that matches a request still being answered is no longer reused: the new request gets a fresh id, so a client cannot merge its log records into another request's."
+            },
+            {
+              "type": "Security",
+              "html": "<code>middleware.cache()</code> no longer adds an unknown <code>?locale=</code> value to its cache key when <code>app.localeCodes</code> is not declared: a request for a non-default locale is answered without the cache (a warning is logged once), so random locales cannot fill the cache."
+            },
+            {
+              "type": "Security",
+              "html": "Server errors that reached the HTTP server outside the request pipeline (an <code>Error</code> passed to <code>response.serverError(error)</code>, a <code>toJSON()</code> that threw while a returned value was sent, a file that failed to read in <code>response.sendFile()</code> / <code>downloadFile()</code>, a hook that threw) were answered with the raw error message, so database driver messages, internal host names and absolute file paths could reach any visitor. Every such 5xx now answers <code>{ error: \"Internal server error.\" }</code> with <code>Cache-Control: private, no-store</code> (plus <code>requestId</code> and <code>stack</code> in development), and the message and stack go to the log. Client errors (4xx) keep their descriptive body."
+            },
+            {
+              "type": "Security",
+              "html": "A client could turn pagination off on any <code>list(request.all())</code>, <code>listCached(request.all())</code> or <code>Restful</code> list route with <code>?paginate=false</code> and receive every matching row in one response. <code>list()</code>, <code>listActive()</code>, <code>listCached()</code>, <code>latest()</code> and <code>oldest()</code> now ignore a <code>paginate: false</code> that the current request sent with that same value; server code that passes its own <code>paginate: false</code>, any call outside a request, and <code>defaultOptions</code> keep working. Opt back in per repository with <code>protected allowClientUnpaginated = true</code>, or app-wide with <code>repository.allowClientUnpaginated: true</code> (default <code>false</code>)."
+            },
+            {
+              "type": "Security",
+              "html": "<code>listCached</code> ignores <code>purgeCache</code> and <code>cacheKey</code> when the request sent them, keys the cache on the sanitised options and, when only the framework reads the options, keeps only the declared <code>filterBy</code> keys and the paging and sorting controls in the key. A client can no longer bypass the list cache, pick its key, or create a new entry per unknown query parameter. <code>?perform=1</code> no longer crashes the list query."
+            },
+            {
+              "type": "Security",
+              "html": "A filter value the database layer refuses (<code>UnsafeFilterError</code>: a <code>$</code> operator key inside a filter value, or a LIKE pattern over its wildcard or length cap) answers 400 with the refusal's message, from any route and from <code>Restful</code> list routes, instead of an opaque 500."
+            },
+            {
+              "type": "Security",
+              "html": "<code>putFromUrl</code>, <code>Image.fromUrl</code> and <code>downloadFileFromUrl</code> pin the connection to an address that passed the private-host check, on every redirect hop. A host that changed its DNS answer between the check and the request (DNS rebinding) could reach <code>127.0.0.1</code> or the cloud metadata address. Requests made through an injected <code>fetch</code> keep the pre-check only."
+            },
+            {
+              "type": "Security",
+              "html": "Local temporary-URL tokens sign the prefixed path and are refused (<code>invalid_token</code>) under a different storage prefix, so in a multi-tenant app one tenant's token no longer opens the file at the same relative path under another tenant's prefix. The payload types are checked and the signature covers an unambiguous encoding of the path and expiry."
+            },
+            {
+              "type": "Security",
+              "html": "<code>decrypt()</code> requires a 16-byte IV and a 16-byte GCM auth tag (what <code>encrypt()</code> has always written). It used to accept tags down to 4 bytes, which makes forging a ciphertext far cheaper."
+            },
+            {
+              "type": "Security",
+              "html": "The boot-time <code>[env]</code> override report prints credential-bearing values such as <code>REDIS_URL</code>, <code>MONGODB_URI</code> and <code>SMTP_PASS</code> as <code>&lt;redacted&gt;</code>, and masks the <code>user:password@</code> part of any URL value."
+            },
+            {
+              "type": "Security",
+              "html": "<code>downloadFileFromUrl</code> keeps a remote extension only when it is in the new <code>allowedExtensions</code> option (default: common image, document, archive and media types); anything else is saved as <code>.bin</code>, and <code>image/svg+xml</code> no longer maps to <code>.svg</code>. The remote URL or Content-Type used to choose <code>.html</code>, <code>.svg</code> or <code>.js</code>, which becomes stored XSS when the directory is served."
+            },
+            {
+              "type": "Security",
+              "html": "<code>putFromBase64</code> and <code>putFromUrl</code> store the Content-Type of the location's extension unless <code>mimeType</code> is passed, instead of the client's data-URL type or the remote Content-Type, so a bucket no longer serves <code>avatars/u1.png</code> as <code>text/html</code>."
+            },
+            {
+              "type": "Security",
+              "html": "<code>hashPassword</code> logs a one-time warning when a password is longer than the 72 bytes bcrypt uses; the new <code>encryption.password.rejectLongPasswords: true</code> (default <code>false</code>) makes it throw instead."
+            },
+            {
+              "type": "Security",
+              "html": "<code>warlock doctor</code> checks deployment settings that apps generated from older templates keep after an upgrade and warns with the exact setting to change: <code>upload-limits</code> (one multipart request may hold more than 100 MB), <code>cors</code> (<code>http.cors.origin</code> is <code>\"*\"</code>, unset or <code>true</code>, especially with <code>credentials: true</code>), <code>auth-tokens</code> (with <code>@warlock.js/auth</code> installed and <code>auth.userType</code> set: a signing secret shorter than 32 bytes, access tokens that never expire or live longer than 30 days, or multi-day access tokens with refresh tokens off), <code>trust-proxy</code> (<code>http.trustProxy: true</code> without <code>http.realIpHeader</code>), <code>request-timeout</code> (<code>http.requestTimeout</code> or <code>http.serverOptions.requestTimeout</code> set to <code>0</code>), <code>production-logging</code> (a production console channel with no <code>minLevel</code>), <code>compression</code> (an informational line when <code>http.compression</code> is off), <code>env-files</code> (an <code>.env</code> or <code>.env.*</code> file at the project root that git does not ignore, or that is committed) and <code>memory-cache</code> (the default cache store is the memory driver with <code>maxSize: Infinity</code> or <code>0</code>). A check prints nothing when the setting it reads is absent and the default is safe."
+            },
+            {
+              "type": "Security",
+              "html": "The <code>nodemailer</code> and <code>sharp</code> peer ranges include the releases that fix their published advisories (<code>nodemailer</code> <code>^8.0.5 || ^10.1.4</code>, <code>sharp</code> <code>^0.34.5 || ^0.35.5</code>), and <code>warlock add mail</code> / <code>warlock add image</code> install <code>nodemailer</code> <code>^10.1.4</code> and <code>sharp</code> <code>^0.35.5</code>. nodemailer 9 and later validate TLS certificates when fetching remote attachment content; sharp 0.35 requires Node.js 20.9 or later and caps input images at 5 channels by default."
+            },
+            {
+              "type": "Security",
+              "html": "The minimum <code>fastify</code> version is 5.12.6."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai",
+          "slug": "ai",
+          "total": 37,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 5
+            },
+            {
+              "type": "Changed",
+              "n": 9
+            },
+            {
+              "type": "Fixed",
+              "n": 2
+            },
+            {
+              "type": "Security",
+              "n": 21
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>ai.guardrail.links({ allowHosts, links, onMatch })</code> output detector (also exported as <code>links</code>, with the <code>LinkFilterOptions</code> type): strips Markdown images, reference definitions and <code>&lt;img&gt;</code> / <code>&lt;image&gt;</code> URLs whose host is not allowed, so a rendered reply cannot leak data to another host through an injected image; <code>links: true</code> also strips links. Default <code>onMatch: \"redact\"</code> keeps the alt or link text."
+            },
+            {
+              "type": "Added",
+              "html": "<code>ai.serve</code> options <code>events</code>, <code>toResult</code>, <code>authorize</code>, <code>public</code>, <code>maxInputChars</code> and <code>maxConcurrent</code> (described under Security); <code>session.createId</code> and <code>session.loadHistory</code> may be async."
+            },
+            {
+              "type": "Added",
+              "html": "<code>OutboundPolicy.crossOriginHeaders</code> (<code>string[]</code>, default <code>[]</code>) names extra headers to keep on a cross-origin redirect."
+            },
+            {
+              "type": "Added",
+              "html": "<code>semanticCache</code> option <code>cacheToolRuns</code> (<code>boolean</code>, default <code>false</code>) stores answers of runs that called tools."
+            },
+            {
+              "type": "Added",
+              "html": "<code>InterruptStore.claim(interruptId)</code> (optional) and <code>review.allowUpdates</code> (default <code>false</code>) for self-authored skills."
+            },
+            {
+              "type": "Changed",
+              "html": "Guardrail input detectors (including the paid moderation call) and <code>guardrail()</code>'s <code>inputCheck</code> run once per distinct user text per run instead of on every trip of a tool-using run."
+            },
+            {
+              "type": "Changed",
+              "html": "Scoped similarity search (memory <code>recall()</code> in the semantic, episodic and procedural tiers, the semantic cache lookup, and RAG <code>retrieve()</code>) asks the store for a wider page (×4, up to 1,000 candidates) when other scopes or namespaces fill the first page. A tenant whose entries ranked below other tenants' near-duplicates used to get no results. When the first page already holds enough of the caller's own entries, the store is queried exactly once, as before."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>extractJsonSchema</code> converts a schema once per target and <code>compact</code> setting and returns the same object afterwards, instead of converting every tool schema again on every model call."
+            },
+            {
+              "type": "Changed",
+              "html": "Orchestrator checkpoint retention (<code>keepSnapshots</code>, default <code>100</code>) works on the Postgres and Redis checkpoint stores. Their <code>prune()</code> treated the orchestrator's turn-index bound as a row count and only ever deleted turns 0–98, so sessions grew without limit; all three stores keep exactly the latest <code>keepSnapshots</code> turns."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>ai.checkpoint.redis()</code> stores one key per turn plus a small session head instead of one JSON document holding every row, so <code>save()</code> and <code>load()</code> cost the same on turn 5 and turn 5,000."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>ai.checkpoint.redis()</code> and <code>ai.human.interrupt.redis()</code> keep their <code>list()</code> index in a Redis set when the client has the set commands (<code>sAdd</code> / <code>sRem</code> / <code>sMembers</code> or <code>sadd</code> / <code>srem</code> / <code>smembers</code>): a save no longer reads the whole index, and concurrent new sessions or interrupts no longer drop ids. With a checkpoint <code>ttl</code>, <code>list()</code> removes ids of expired sessions. Clients with only <code>get</code> / <code>set</code> / <code>del</code> keep the JSON index (the checkpoint store updates it only on a session's first save)."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>proceduralSkillStore</code> lists the catalog and loads a skill with one cache read through a catalog index, instead of an embedding call plus a top-1000 similarity query on every agent run and every <code>loadSkill</code>. Libraries above 1,000 skills are no longer cut off."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>memoryScopedBudgetStore()</code> releases its per-key queue once a key goes idle and keeps only the current and previous window per key, instead of keeping an entry for every key and window forever."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>ai.session</code> no longer serializes every stored attachment of the history on each turn; the history is indexed only when a captured message lacks its content parts."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>ai.checkpoint.pg()</code>: re-saving the latest turn with the same state (the orchestrator does this to stamp and clear the compaction lock and to record <code>summarized_through</code>) updates that row instead of failing on the primary key, so <code>summarize</code> works on Postgres. A second save of a turn with a different state (two turns of one session at once) is still refused, now with an error that says so."
+            },
+            {
+              "type": "Fixed",
+              "html": "A URL skill source no longer caches a failed manifest fetch: one network error at first use used to make every later <code>list()</code> / <code>loadSkill</code> fail until the process restarted. The next call fetches again."
+            },
+            {
+              "type": "Security",
+              "html": "<code>ai.serve</code> no longer streams the whole run to the client. By default (<code>events: \"safe\"</code>) it sends only text deltas (<code>{ type, delta }</code>), completion markers and error markers, and the <code>result</code> frame is <code>{ text, data, error }</code>; the system prompt, tool inputs and outputs, reasoning, usage and the run report stay on the server. Errors reach the client as <code>{ code, message, reference }</code> with a fixed message per kind of failure; the full error is logged (<code>ai.serve</code> / <code>run.failed</code>) under the same reference. New options <code>events</code> (<code>\"safe\"</code> | <code>\"all\"</code> | event-type list | function) and <code>toResult</code> choose another shape."
+            },
+            {
+              "type": "Security",
+              "html": "<code>ai.serve</code> no longer crashes the process when <code>session.createId</code> or <code>session.loadHistory</code> throws: the request gets <code>500 { \"error\": \"internal_error\" }</code>, or the status of a <code>ServeHttpError</code> thrown from the callback. Both callbacks may be async and are awaited, so an async <code>loadHistory</code> works."
+            },
+            {
+              "type": "Security",
+              "html": "<code>ai.serve</code> refuses a non-string <code>input</code> with <code>400 { \"error\": \"invalid_input\" }</code> instead of passing arrays or objects to the agent as raw multimodal content. New <code>maxInputChars</code> option (default: no limit) answers longer input with <code>413</code>."
+            },
+            {
+              "type": "Security",
+              "html": "<code>ai.serve</code> logs a one-time warning in production when it has no <code>authToken</code>, no new <code>authorize(req)</code> callback and is not marked <code>public: true</code>. New <code>maxConcurrent</code> option (default: no limit) answers requests over the limit with <code>503 { \"error\": \"busy\" }</code>."
+            },
+            {
+              "type": "Security",
+              "html": "Output guardrails apply to streamed text. With output detectors (<code>ai.guardrail({ output })</code>) or an <code>outputCheck</code> (<code>guardrail()</code>), <code>agent.stream()</code> and <code>ai.serve</code> hold each trip's text until the check approves or redacts it and then stream it as one delta; a blocked trip streams no text, and reasoning deltas are not streamed. Opt out with <code>stream: \"unguarded\"</code>. Custom middleware gets the same hold with <code>trip.bufferStream: true</code>."
+            },
+            {
+              "type": "Security",
+              "html": "<code>ai.guardrail.pii()</code> scans in linear time. A crafted input such as a long run of <code>a.a.a…</code> used to block the event loop for seconds to minutes; matches are unchanged."
+            },
+            {
+              "type": "Security",
+              "html": "<code>ai.guardrail.injection()</code> matches its phrases on normalized text: extra spaces, line breaks, zero-width characters, full-width letters and <code>_</code> / <code>-</code> / <code>.</code> separators no longer hide a phrase. A caller <code>RegExp</code> marker with the <code>g</code> flag matches on every check instead of every other one."
+            },
+            {
+              "type": "Security",
+              "html": "Outbound requests (<code>guardedFetch</code>, <code>fetchTextWithPolicy</code>, <code>ai.rag.loadWeb</code>, remote text attachments, URL skill sources, and the <code>fetch_url</code> / <code>http_request</code> tools that build on them) connect only to an address that passed the private-IP check. The host name used to be resolved once for the check and again by <code>fetch</code>, so a host whose DNS answer changed between the two (DNS rebinding) could reach <code>127.0.0.1</code> or the cloud metadata address. With <code>denyPrivateIPsAfterDNS: true</code> (the default) and the global <code>fetch</code>, every connection and every redirect hop resolves through a checked lookup; TLS still verifies the certificate against the URL's host name. An injected <code>policy.fetch</code>, or an app-installed proxy or mock global dispatcher, keeps the DNS pre-check only."
+            },
+            {
+              "type": "Security",
+              "html": "<code>OutboundPolicy.timeoutMs</code> bounds the whole exchange, including the body download. The timer used to stop when the response headers arrived, so a server sending one byte every few seconds could hold the request open indefinitely. <code>readTextCapped</code> rejects with <code>OutboundPolicyError</code> at the deadline, and a body read any other way is aborted at the same moment."
+            },
+            {
+              "type": "Security",
+              "html": "On a redirect to another origin, only non-credential headers are sent on (<code>accept</code>, <code>accept-encoding</code>, <code>accept-language</code>, <code>cache-control</code>, <code>content-language</code>, <code>content-type</code>, <code>pragma</code>, <code>user-agent</code>). Only <code>authorization</code>, <code>cookie</code> and <code>proxy-authorization</code> used to be removed, so custom secrets such as <code>x-api-key</code> on a URL skill source followed the redirect."
+            },
+            {
+              "type": "Security",
+              "html": "<code>ai.middleware.semanticCache</code> serves a cached answer only to the same agent, system prompt and conversation. Each entry records a fingerprint of the agent name, the messages before the question and any media attached to it, and both the exact and the similarity lookup require it to match. The similarity lookup used to compare the last user message only, so a billing agent's answer could be served by a support agent in the same session, or one \"yes, go ahead\" answered with the reply to another. The exact-match key is SHA-256, and the stored prompt hash is checked on every exact hit."
+            },
+            {
+              "type": "Security",
+              "html": "<code>semanticCache</code> with the default <code>scope: \"session\"</code> skips the cache for a run without a <code>sessionId</code> (no read, no write, one warning) instead of pooling every such run together. A <code>scope</code> resolver that returns <code>undefined</code> or <code>\"\"</code> also skips the cache."
+            },
+            {
+              "type": "Security",
+              "html": "<code>semanticCache</code> no longer stores the answer of a run whose first model turn called tools, since that answer is built from tool results that can change or belong to one caller."
+            },
+            {
+              "type": "Security",
+              "html": "RAG retrieval matches a chunk's namespace exactly. Each chunk records the namespace it was indexed under; retrieval used to accept any key starting with the namespace, so <code>kb.acme</code> returned the chunks of <code>kb.acme.private</code>. Chunks indexed by earlier releases are read only when their key is the namespace followed by exactly <code>&lt;docId&gt;.&lt;chunkIndex&gt;</code>. <code>.</code>, <code>:</code> and <code>%</code> in a document id are escaped in the stored key, so a dotted id can no longer overwrite a chunk of a nested namespace."
+            },
+            {
+              "type": "Security",
+              "html": "<code>ai.rag.loadHtml</code> / <code>loadWeb</code> strip HTML with a linear scan. Unclosed markup (<code>&lt;!--</code>, <code>&lt;script&gt;</code> or a bare <code>&lt;</code> repeated) used to make the regular expressions rescan the rest of the page from every opener, so a few hundred kilobytes blocked the process for seconds. Output for the same input is unchanged."
+            },
+            {
+              "type": "Security",
+              "html": "Attachments: with <code>attachmentPolicy.allowedRoots</code> set, symbolic links in the path and in the roots are resolved before the containment check, and the resolved file is what gets read, so a link inside an allowed root that points outside it is refused. The one-time warning for a plain string read from local disk names <code>attachmentPolicy.allowBareLocalPaths</code> (set <code>false</code> to refuse such paths, <code>true</code> to keep them without the warning); the default stays permissive in this release."
+            },
+            {
+              "type": "Security",
+              "html": "<code>ai.human.resume(...)</code> applies a decision exactly once. It takes the pending interrupt with a new atomic <code>claim(interruptId)</code> on the <code>InterruptStore</code> (memory: synchronous take; Postgres: <code>DELETE ... WHERE status = 'pending' RETURNING ...</code>; Redis: only the caller whose <code>DEL</code> removed the key wins), so a double-clicked \"Approve\" or two reviewers at once no longer run the approved tool twice; the second call returns <code>already-resolved</code>. <code>claim</code> is optional on the contract: a custom store without it keeps working through <code>load</code> + <code>delete</code> and logs a one-time warning naming the method to add."
+            },
+            {
+              "type": "Security",
+              "html": "The decision <code>ai.human.resume(...)</code> pre-seeds for the re-run is bound to that re-run. Any concurrent execution of the same agent with the same session and arguments (or two calls without a <code>sessionId</code>) could take a reviewer's approval meant for another run; now only the gated call inside the resumed <code>agent.execute(...)</code> can."
+            },
+            {
+              "type": "Security",
+              "html": "Self-authored skill candidates are kept apart from live skills. Saving a candidate under the name of a promoted or authored skill no longer replaces or hides that skill in <code>proceduralSkillStore</code> and <code>MockSkillsStore</code>."
+            },
+            {
+              "type": "Security",
+              "html": "Skill promotion is bound to the reviewed content: <code>runReviewGate</code> calls <code>store.promote(candidate.name, { description, body, tags })</code>, and the built-in stores promote only a stored candidate with exactly that content (they throw when it differs). A candidate written under the same name while the reviewer was deciding is never promoted. <code>SkillsStoreContract.promote</code> takes this optional second argument."
+            },
+            {
+              "type": "Security",
+              "html": "The <code>saveSkill</code> tool refuses the name of a skill the library already serves, unless the new <code>review.allowUpdates: true</code> is set (default <code>false</code>), and limits its input: <code>name</code> 1–64 letters, digits, <code>-</code> or <code>_</code>; <code>description</code> up to 500 characters; <code>body</code> up to 16,384 characters; at most 10 <code>tags</code> of up to 32 characters."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/web",
+          "slug": "web",
+          "total": 30,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 3
+            },
+            {
+              "type": "Changed",
+              "n": 14
+            },
+            {
+              "type": "Security",
+              "n": 13
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>config.cache.query</code>: only the listed query parameters enter the server page cache key, so <code>?page=2&amp;ref=x</code> and <code>?page=2&amp;ref=y</code> share one entry. The option used to be rejected as an unknown key."
+            },
+            {
+              "type": "Added",
+              "html": "<code>config.cache.varyHeaders: string[]</code> adds the request headers a page depends on (for example the one <code>cache.varyBy</code> reads) to its <code>Vary</code> header."
+            },
+            {
+              "type": "Added",
+              "html": "<code>web.loaders: \"parallel\"</code> (default <code>\"serial\"</code>) starts the app, layout and page loaders together instead of one after another, so a page waits for its slowest loader rather than the sum of all three. Results settle in the same order with the same rules: the first level that throws, redirects or answers <code>notFound()</code> wins and nothing from the levels below it reaches the response; their loaders have already started and their <code>signal</code> is aborted. Use it only when no loader reads something a higher loader set on the request; keep auth gates in <code>middleware</code>."
+            },
+            {
+              "type": "Changed",
+              "html": "A page document renders once per request. The server used to render the whole page to a string first, only to check that it rendered, and then render it again for the stream the visitor received; it now decides the outcome from the streaming render itself. A throw while rendering still escalates through the same boundaries to <code>error.page.tsx</code> and the same status before the first byte is sent, and an error inside a <code>&lt;Suspense&gt;</code> boundary is still recoverable. The page's shell is sent as soon as it is ready."
+            },
+            {
+              "type": "Changed",
+              "html": "A client navigation (a data request, also used by prefetch, <code>refresh()</code>, live pages and <code>changeLocaleCode()</code>) renders the page once instead of twice and no longer starts a stream nobody reads."
+            },
+            {
+              "type": "Changed",
+              "html": "Loader data is serialized fewer times per request: the hydration payload is built once per document (it was built twice), its serializability check is the only pass over loader data before render, the inline payload budget reuses that check's text, and a data response serializes its payload once. Budget patterns from <code>build.budgets.payload.pages</code> are compiled once instead of on every request. Unserializable loader data still fails with the same <code>PageDataSerializationError</code>."
+            },
+            {
+              "type": "Changed",
+              "html": "Production documents add <code>&lt;link rel=\"modulepreload\"&gt;</code> for the page's own JavaScript chunks (root, matched layouts, the page and what they statically import) after the hydration entry's, so the browser downloads them alongside the entry instead of one round trip after it runs. Other pages' chunks are never preloaded."
+            },
+            {
+              "type": "Changed",
+              "html": "Production boot reads and parses the client build's Vite manifest once instead of once per page route, and a request's <code>linkStylesheetsFor()</code> set no longer re-reads it from disk."
+            },
+            {
+              "type": "Changed",
+              "html": "Page and root modules are validated once per loaded module instead of on every request."
+            },
+            {
+              "type": "Changed",
+              "html": "Global-registry translation pruning (apps without route dictionaries) checks each key against the page's usage through an index built once per page, instead of scanning the whole usage list for every key of the locale table on every request."
+            },
+            {
+              "type": "Changed",
+              "html": "The document's inline payload no longer carries a second copy of the locale-routing table; the browser reads it from the <code>&lt;meta name=\"warlock-locale-routing\"&gt;</code> tag the document already has. The payload budget's <code>other</code> section no longer counts it either."
+            },
+            {
+              "type": "Changed",
+              "html": "Multi-site page dispatch compiles each site's route table once (on its first request, and again only after a page is added) instead of parsing every route pattern on every request."
+            },
+            {
+              "type": "Changed",
+              "html": "Sitemap generation runs up to four page suppliers at a time; the output keeps page order."
+            },
+            {
+              "type": "Changed",
+              "html": "Requests for a retained (non-current) sitemap generation file are answered from an in-memory list of retained generations instead of a storage listing per request; an unknown generation id costs at most one listing a second."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>&lt;Link prefetch&gt;</code> waits until the pointer has rested on the link for 65 ms before prefetching, and leaving earlier sends nothing, so sweeping the pointer across a menu no longer sends one page-data request per link. Keyboard focus still prefetches at once."
+            },
+            {
+              "type": "Changed",
+              "html": "A click that lands while a link's prefetch is still in flight waits for that response instead of sending a second identical request, and the page's JavaScript chunk starts loading as soon as the prefetched data arrives instead of after the click's data."
+            },
+            {
+              "type": "Changed",
+              "html": "Pages with <code>config.live</code> stop polling while the browser tab is hidden. When the tab is visible again after a skipped poll, the page refreshes once and polling resumes."
+            },
+            {
+              "type": "Security",
+              "html": "Error details are no longer shown to visitors outside development. A built app started with <code>warlock start</code> withholds the error message, stack, the development error panel and <code>debug</code> props whatever <code>NODE_ENV</code> says, and outside it they are shown only for <code>NODE_ENV</code> <code>development</code> (or unset) and <code>test</code>. Any value other than exactly <code>production</code> (for example <code>staging</code>) used to disclose them. Submitted values in validation messages are redacted under the same rule. The server log is unchanged."
+            },
+            {
+              "type": "Security",
+              "html": "A failed page action no longer echoes secret-looking fields back into the page. The built-in <code>web.forms.redactValues</code> list covers <code>*password*</code>, <code>*passwd*</code>, <code>*passcode*</code>, <code>*token*</code>, <code>*secret*</code>, <code>*otp*</code>, <code>cvv</code>, <code>cvc</code>, <code>*card*number*</code> and <code>pin</code> (case-insensitive), so <code>current_password</code>, <code>newPassword</code>, <code>passwordConfirmation</code>, <code>card_number</code> and <code>otp_code</code> are no longer refilled in plain text. Names you set in <code>web.forms.redactValues</code> are added to this list instead of replacing it, so configuring <code>[\"ssn\"]</code> no longer stops <code>password</code> from being redacted. New <code>web.forms.echoValues</code> (default <code>true</code>): set it to <code>false</code> to echo no submitted value at all."
+            },
+            {
+              "type": "Security",
+              "html": "<code>warlock dev</code> keeps its dev-server host check on when the app has a dynamic site. Any dynamic site used to turn the check off, so a website you visited could point its own domain at <code>127.0.0.1</code> and read your app's source through the dev server. The dev server answers <code>localhost</code>, <code>*.localhost</code>, IP addresses, the fixed sites' hosts and the hosts in the new <code>web.devAllowedHosts</code> option (default: none; an entry starting with <code>.</code> also matches subdomains, such as <code>\".tenant.test\"</code>). <code>web.devAllowedHosts</code> also works for single-site apps opened on a custom dev hostname."
+            },
+            {
+              "type": "Security",
+              "html": "Multi-site page cache: the cache key uses the host site selection chose (the same host the page's canonical, <code>og:url</code>, hreflang and <code>siteUrl()</code> links are built from) instead of the raw <code>Host</code> header. Behind a trusted proxy, a request whose forwarded host differed from <code>Host</code> could have its render stored under the key every ordinary visitor of that <code>Host</code> reads."
+            },
+            {
+              "type": "Security",
+              "html": "Page cache keys write nested query values in full (<code>?filter[status]=draft</code>), with their keys sorted. Every nested value used to become <code>[object Object]</code>, so different filters shared one stored page."
+            },
+            {
+              "type": "Security",
+              "html": "A request carrying a query parameter that the page cache key leaves out (a tracking parameter such as <code>utm_source</code>, or a parameter outside <code>cache.query</code>) may still be served a stored page, but its own render is no longer stored. The page and its loaders see every parameter, so such a render could show other visitors a value they never sent."
+            },
+            {
+              "type": "Security",
+              "html": "New <code>pageCache.maxEntriesPerRoute</code> (default <code>1000</code>, <code>false</code> removes it) caps how many query-string variants one <code>serverCache</code> route stores per process. Past the ceiling a new variant is rendered and sent normally but not stored, and one <code>[warlock:web]</code> warning is logged per route, so a client looping over <code>?n=1..N</code> can no longer fill the cache backend."
+            },
+            {
+              "type": "Security",
+              "html": "Pages with <code>config.cache</code> send <code>Vary: Cookie, locale</code> (after <code>x-warlock-data</code>) when the locale cookies or the <code>locale</code> request header can change the page, so a CDN no longer serves one visitor's language to everyone. It is left out when the URL pins the locale (locale-prefixed and <code>[locale]</code> routes) and when the app has a single locale. HIT and MISS send the same single <code>Vary</code> header."
+            },
+            {
+              "type": "Security",
+              "html": "The <code>web.resolveHost</code> cache is bounded: <code>resolveCache.maxEntries</code> (default <code>10000</code>) keeps the most recently used hosts and drops expired ones first. A client sending random <code>Host</code> headers could grow it without limit. A host longer than 253 characters never reaches <code>resolveHost</code>."
+            },
+            {
+              "type": "Security",
+              "html": "Multi-site <code>/sitemap.xml</code> no longer runs every page's sitemap supplier on each request. Each site's supplier results are kept per site and tenant for <code>web.sitemap.regenerateEvery</code> (5 minutes when unset), concurrent requests share one build, and the response carries <code>ETag</code>, <code>Last-Modified</code> and <code>web.sitemap.cacheControl</code>, so a revalidating crawler gets a <code>304</code>."
+            },
+            {
+              "type": "Security",
+              "html": "Sitemap suppliers receive <code>{ site, tenantKey, shared }</code> (exported as <code>SitemapSupplierContext</code> from <code>@warlock.js/web/sitemap</code>). For an indexable dynamic site <code>tenantKey</code> is the key <code>web.resolveHost</code> returned, so a tenant's sitemap can list only that tenant's URLs. Outside production, a supplier for a dynamic site that takes no argument logs a warning once. Existing zero-argument suppliers keep working."
+            },
+            {
+              "type": "Security",
+              "html": "New <code>web.tlsAskAllow</code> (<code>\"any\"</code> by default, <code>\"loopback\"</code>, <code>\"private\"</code>, or a list of caller IPs) limits who may call the <code>web.tlsAsk</code> endpoint; other callers get <code>403</code>. The check uses the connection's own address, which forwarding headers cannot change. A domain longer than 253 characters is refused with <code>400</code> before <code>resolveHost</code> runs."
+            },
+            {
+              "type": "Security",
+              "html": "The minimum <code>devalue</code> version is 5.9.3 and the minimum <code>fastify</code> version is 5.12.6."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/cascade",
+          "slug": "cascade",
+          "total": 28,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 2
+            },
+            {
+              "type": "Changed",
+              "n": 12
+            },
+            {
+              "type": "Security",
+              "n": 14
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>queryEvents</code> connection option (MongoDB): turns command monitoring and the <code>query</code> event on or off. When unset it is on outside production; <code>logging: true</code> and <code>clientOptions.monitorCommands</code> also turn it on."
+            },
+            {
+              "type": "Added",
+              "html": "Model static <code>idReservationBlockSize</code> (number, default <code>1</code>): above 1, MongoDB <code>id</code> generation reserves that many ids in one counter round trip and hands them out from memory, instead of one round trip per insert. Ids stay unique but are no longer strictly increasing across processes, and ids left in a block when the process stops are never used."
+            },
+            {
+              "type": "Changed",
+              "html": "Hydrating a model copies its data once instead of twice and computes no diff. A write copies only the top-level field it reaches into and records the change; the flat map and the diff are rebuilt once, on the next read, so <code>k</code> <code>set()</code> calls followed by <code>save()</code> cost one diff instead of <code>k + 1</code>, and untouched fields compare by reference. An insert makes about three full copies of the document instead of eight; <code>reset()</code> after a save copies only the fields that changed. Dirty columns, their order, old and new values, removed columns and paths are unchanged."
+            },
+            {
+              "type": "Changed",
+              "html": "The writer builds a model's validation schema once per model class and reuses it instead of cloning the whole schema twice on every save."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>unique()</code> and <code>exists()</code> validation rules ask the database <code>exists()</code> instead of fetching and hydrating a whole model. When the looked-up model has a <code>fetching</code>, <code>hydrating</code> or <code>fetched</code> listener they still use <code>first()</code>, so those listeners keep seeing the lookup."
+            },
+            {
+              "type": "Changed",
+              "html": "Atomic writes (<code>atomic()</code>, <code>increase()</code>, <code>atomicIncrement()</code>, <code>findOneAndUpdate()</code>, <code>findAndReplace()</code>, <code>findOneAndDelete()</code>) on a model with no global scope, no own <code>query()</code> / builder and no fetch listener go straight to the database instead of first reading every matching id. <code>findAndUpdate()</code> reads the matching ids once instead of twice. <code>atomicIncrement()</code> / <code>atomicDecrement()</code> on a model with no other pending change no longer deep-copies the document."
+            },
+            {
+              "type": "Changed",
+              "html": "Sibling eager-loaded relations (<code>with(\"author\", \"tags\", \"category\")</code>) run their queries concurrently; they attach in the order named, the first named failure is the one reported, and inside a <code>transaction()</code> they still load one at a time."
+            },
+            {
+              "type": "Changed",
+              "html": "Sync fan-out awaits its listeners, so the fan-out queue runs one sync job at a time in commit order instead of starting every target write of a burst at once against the connection pool. A listener that rejects fails the job instead of becoming an unhandled rejection."
+            },
+            {
+              "type": "Changed",
+              "html": "MongoDB command monitoring decoded every reply twice. It is on only when something reads it (<code>queryEvents</code>, <code>logging: true</code>, or outside production when <code>queryEvents</code> is unset). The data-source registry also subscribes to a driver's <code>query</code> event only while it has a <code>query</code> listener of its own, so PostgreSQL skips its query instrumentation when nobody observes."
+            },
+            {
+              "type": "Changed",
+              "html": "MongoDB <code>count()</code> (and every <code>paginate()</code> total and <code>exists()</code>) no longer runs the query's sort, select projection, <code>addFields</code> or unread left joins, which cannot change the count."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>chunk()</code> pages by key when the query has no order or is ordered only by the primary key (<code>_id</code> on MongoDB): <code>where id &gt; last order by id limit size</code>, so late chunks cost the same as early ones, and rows the callback updates or deletes no longer make chunks skip or repeat rows. Other queries page by offset as before."
+            },
+            {
+              "type": "Changed",
+              "html": "PostgreSQL <code>insertMany()</code> serializes each document once (it stringified JSON columns twice) and splits a batch that would pass PostgreSQL's 65,535 bind-parameter limit into several statements inside one transaction."
+            },
+            {
+              "type": "Changed",
+              "html": "PostgreSQL <code>snake_case</code> naming caches column-name conversions instead of running a regex per column per row, and <code>joinWith()</code> computes its relation layout once per query instead of once per row."
+            },
+            {
+              "type": "Changed",
+              "html": "PostgreSQL TTL indexes are purged in batches of at most 5,000 rows (up to 100 batches per run) instead of one unbounded <code>DELETE</code>, and a run is skipped while the previous one is still deleting."
+            },
+            {
+              "type": "Security",
+              "html": "<code>set()</code>, <code>merge()</code> and <code>unset()</code> refuse, before anything is written, a path segment <code>__proto__</code>, <code>constructor</code> or <code>prototype</code>, and a <code>__proto__</code> key anywhere inside a <code>set()</code> / <code>merge()</code> value. The dirty tracker used to walk a dot path through <code>__proto__</code>, so <code>model.set({ \"__proto__.isAdmin\": true })</code> (a request body passed to <code>set()</code>), <code>model.merge(JSON.parse(...))</code> or <code>model.unset(\"__proto__.toString\")</code> wrote into or deleted from <code>Object.prototype</code> for the whole process. A nested key merely named <code>constructor</code> stays ordinary data."
+            },
+            {
+              "type": "Security",
+              "html": "MongoDB: an update wrote nested changes without validating them, so <code>merge({ permissions: { all: true } })</code> followed by <code>save()</code> reached the database unvalidated, uncast and unstripped, even under <code>strictMode: \"strip\"</code>. A nested change is now validated through its top-level field, with that field's whole current value, exactly as an insert validates it; only the changed leaves are written back, so the update stays partial. An undeclared nested object is stripped (<code>\"strip\"</code>), rejected (<code>\"fail\"</code>) or kept (<code>\"allow\"</code>), like an undeclared column."
+            },
+            {
+              "type": "Security",
+              "html": "<code>strictMode</code> had no effect on saves: the writer configured a copy of the schema and discarded it, so every mode behaved like <code>\"fail\"</code> for an unknown top-level field. <code>\"strip\"</code> now drops unknown fields on insert and update, and <code>\"allow\"</code> writes them. Saves that succeeded before behave the same; only saves that failed with an <code>unknownKeys</code> error change."
+            },
+            {
+              "type": "Security",
+              "html": "<code>Model.upsert()</code> ignored global scopes, so with a <code>tenant</code> scope an upsert matching another tenant's row by email updated it and returned it. A visible match is now updated by its primary key, a match hidden by a scope throws, and when nothing matches the row is inserted like <code>create()</code>."
+            },
+            {
+              "type": "Security",
+              "html": "<code>Model.restore()</code> and <code>Model.restoreAll()</code> ignored global scopes, so a \"restore from trash\" endpoint could restore and return another tenant's record, and <code>restoreAll()</code> restored every tenant's trash. Both apply the model's global scopes now, leaving out only the filters whose column is exactly the soft-delete column (<code>deletedAtColumn</code>); a scope that also filters other columns keeps them. A record a scope hides throws the same \"record not found\" error as a missing one."
+            },
+            {
+              "type": "Security",
+              "html": "MongoDB <code>whereLike</code> / <code>whereNotLike</code> (and the <code>like</code> / <code>notLike</code> operators of <code>where()</code>) turned every <code>%</code> into <code>.*</code>, so a search value such as <code>%a%a%a%a%b</code> made the database backtrack for seconds on each document. A string pattern may hold at most two <code>%</code> wildcards and 256 characters, which keeps <code>%term%</code>, <code>prefix%</code> and <code>%suffix</code> working; a longer pattern throws <code>UnsafeFilterError</code>. The new <code>like</code> driver option raises the caps (<code>driverOptions: { like: { maxWildcards, maxLength } }</code>, defaults <code>2</code> and <code>256</code>). A leading or trailing <code>%</code> is no longer compiled, a number passed as the pattern matches its text instead of crashing, and <code>likePatternToRegexSource()</code> applies the same caps."
+            },
+            {
+              "type": "Security",
+              "html": "The MongoDB driver silently dropped several filters from the pipeline, so reads, updates and deletes built from them reached every document. <code>whereDateBetween</code>, <code>whereDateNotBetween</code>, <code>whereArrayNotContains</code>, <code>whereArrayHasOrEmpty</code>, <code>whereArrayNotHaveOrEmpty</code>, <code>having</code>, <code>having(condition)</code> and <code>havingRaw</code> now reach the pipeline. <code>has</code>, <code>whereHas</code>, <code>orWhereHas</code>, <code>doesntHave</code> and <code>whereDoesntHave</code> throw <code>UnsupportedQueryOperationError</code> on MongoDB, any other operation the parser cannot translate throws instead of disappearing, and an <code>update()</code> / <code>delete()</code> / <code>increment()</code> on a query holding a stage its filter cannot carry (a <code>groupBy</code> / <code>having</code>, an inner join, <code>unwind</code>, a vector search) throws."
+            },
+            {
+              "type": "Security",
+              "html": "PostgreSQL <code>has(relation, operator, count)</code> wrote the operator and the count into the SQL text, so a count taken from a request (<code>?min=0 OR true</code>) was SQL injection. The count is a bound parameter (a whole number; a digit string is accepted), the operator must be one of <code>=</code>, <code>!=</code>, <code>&lt;&gt;</code>, <code>&gt;</code>, <code>&gt;=</code>, <code>&lt;</code>, <code>&lt;=</code>, and the comparison is parenthesised. <code>having()</code> on a <code>groupBy</code> aggregate alias checks its operator the same way."
+            },
+            {
+              "type": "Security",
+              "html": "PostgreSQL relation filters (<code>has</code>, <code>whereHas</code>, <code>orWhereHas</code>, …) sat outside the global-scope group, so an <code>orWhereHas</code> was ORed with the scopes and could return another tenant's or soft-deleted rows. They now sit inside the user conditions, under the scopes."
+            },
+            {
+              "type": "Security",
+              "html": "MongoDB helpers that put a value in an operator or expression position refuse request-shaped objects: the values of <code>whereArrayContains</code> / <code>whereArrayNotContains</code> / <code>whereArrayHasOrEmpty</code> / <code>whereArrayNotHaveOrEmpty</code> / <code>whereJsonContains</code> / <code>whereJsonDoesntContain</code> and the <code>filters</code> of <code>textSearch()</code> get the same <code>$</code>-key check as <code>where()</code>; <code>whereDay</code> / <code>whereMonth</code> / <code>whereYear</code> / <code>whereJsonLength</code> / <code>whereArrayLength</code> / <code>whereSize</code> accept only a finite number and <code>whereTime</code> only an <code>\"HH:MM\"</code> / <code>\"HH:MM:SS\"</code> string (an object there could run <code>$function</code> JavaScript in the database). Each throws <code>UnsafeFilterError</code>."
+            },
+            {
+              "type": "Security",
+              "html": "MongoDB <code>where(field, value)</code> and every other <code>where*</code> helper refuse a field name that starts with <code>$</code> or holds a <code>$</code> segment (<code>\"$where\"</code>, <code>\"$or\"</code>, <code>\"a.$b\"</code>), which on update or delete ran JavaScript or rewrote the filter. Use <code>whereRaw({ ... })</code> for an intentional operator."
+            },
+            {
+              "type": "Security",
+              "html": "PostgreSQL <code>whereJsonContainsKey</code>, <code>whereJsonLength</code>, <code>whereJsonIsArray</code>, <code>whereJsonIsObject</code>, <code>whereArrayLength</code> and <code>selectJson</code> concatenated their path, key and operator into raw SQL, at the top level and inside <code>where()</code> callbacks. They now quote the column, escape every JSON key, accept dot (<code>profile.avatar</code>) and arrow (<code>settings-&gt;theme</code>) paths, and check the operator against the comparison set; a first segment that names a table or alias of the query (base table, joined table, join alias) still means <code>table.column</code>. <code>selectExists</code> quotes its column and <code>selectAggregate</code> accepts only <code>sum</code>, <code>avg</code>, <code>min</code>, <code>max</code>, <code>count</code>, <code>first</code>, <code>last</code>. A <code>field::type</code> cast suffix must be a type name (one word, or a multi-word type such as <code>double precision</code> / <code>timestamp with time zone</code>), so <code>email::text is not null or true</code> is refused."
+            },
+            {
+              "type": "Security",
+              "html": "The MongoDB query log (<code>logging: true</code>) wrote whole command documents, including password hashes, tokens and API keys. It now logs the command, the collection and the shape of the command (field names and value types) only, and a failed command logs its error name and code with the duplicate-key value removed."
+            },
+            {
+              "type": "Security",
+              "html": "<code>paginate()</code> and <code>cursorPaginate()</code> accepted any page size, so <code>paginate({ limit: request.input(\"limit\") })</code> could load a whole table. <code>limit</code> and <code>page</code> must be whole numbers (digit strings are accepted), and the page size is capped at the new <code>maxLimit</code> option, default <code>1000</code>. <code>limit()</code> and <code>skip()</code> on a MongoDB query also require whole numbers (no ceiling). Refusals throw <code>UnsafeFilterError</code>."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/auth",
+          "slug": "auth",
+          "total": 18,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 2
+            },
+            {
+              "type": "Security",
+              "n": 16
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "The JWT verifier and signer are built once per settings and reused, instead of on every authenticated request."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>revokeAllTokens</code> (logout without a refresh token, password reset) ensures each token family once instead of once per rotated refresh row."
+            },
+            {
+              "type": "Security",
+              "html": "Login, token-issue and OTP throttles count each attempt when it arrives, before the controller runs. A burst of concurrent requests used to read \"not locked\" all at once and reach the password check hundreds of times; now at most <code>max</code> attempts per window get through and the rest answer <code>429</code> (<code>EC004</code>). A lockout also restarts the counting window, so the identifier gets a fresh <code>max</code> once the lock ends."
+            },
+            {
+              "type": "Security",
+              "html": "<code>loginThrottleMiddleware</code> takes <code>emailLock: \"pair\" | \"global\"</code> (default <code>\"global\"</code>, unchanged). <code>\"pair\"</code> locks the (email, IP) pair instead of the email for everyone, so a stranger can no longer keep a known account locked out; the email alone keeps a wider bucket, <code>accountMax</code> (default <code>max * 10</code>), against guessing spread over many IPs."
+            },
+            {
+              "type": "Security",
+              "html": "Login with an unknown email runs the same password-hash check as a wrong password, so response timing no longer reveals which accounts exist."
+            },
+            {
+              "type": "Security",
+              "html": "<code>requestPasswordReset</code> and <code>requestOtp</code> send the email or code in the background, so a known account no longer answers slower than an unknown one. A failed send is logged and emitted as the new <code>password.resetDeliveryFailed</code> / <code>otp.deliveryFailed</code> auth events. <code>auth.passwordReset.awaitDelivery</code> / <code>auth.otp.awaitDelivery</code> (default <code>false</code>) wait for the send instead."
+            },
+            {
+              "type": "Security",
+              "html": "A provider login no longer links to an existing account that never verified its email (someone could pre-register a victim's address with a password and end up sharing the account). New <code>auth.providers.linkExisting: \"verified\" | \"always\" | \"never\"</code> (default <code>\"verified\"</code>); a refused link throws the new <code>ProviderAccountLinkBlockedError</code> (403, <code>EC012</code>). A user model whose schema has no verification field links as before."
+            },
+            {
+              "type": "Security",
+              "html": "New <code>auth.hashTokensAtRest</code> (default <code>false</code>): access and refresh token rows store only the SHA-256 digest of the token, so a copied table cannot be replayed. No migration is needed: the digest goes in the existing <code>token</code> column, lookups accept both forms, and switching it on or off signs no one out. A freshly issued row exposes its raw token as <code>row.plainToken</code>."
+            },
+            {
+              "type": "Security",
+              "html": "In production, a signing secret shorter than 32 bytes (<code>auth.accessToken.secret</code>, <code>auth.refreshToken.secret</code>) or an access-token lifetime over 30 days logs a one-time warning."
+            },
+            {
+              "type": "Security",
+              "html": "New <code>auth.passkeys.userVerification: \"required\" | \"preferred\"</code> (default <code>\"preferred\"</code>, unchanged). <code>\"required\"</code> refuses passkey assertions made without a PIN or biometric."
+            },
+            {
+              "type": "Security",
+              "html": "<code>auth.cleanup</code> removes spent one-time tokens (including anonymous passkey challenges) with two set-based deletes instead of loading every row into memory. The docs show a per-IP throttle on the passkey login-options route."
+            },
+            {
+              "type": "Security",
+              "html": "GitHub, Discord, LinkedIn, Apple, Facebook and X provider requests time out after <code>timeoutMs</code> (default <code>5000</code>, per provider block), as Google already did, instead of waiting forever on a hanging provider."
+            },
+            {
+              "type": "Security",
+              "html": "Expired or malformed tokens and CSRF Origin mismatches are logged at <code>debug</code> instead of <code>error</code>, so anonymous clients can no longer flood the error log."
+            },
+            {
+              "type": "Security",
+              "html": "The route gate refuses a token whose <code>id</code> / <code>userType</code> claims name a different user than its <code>access_tokens</code> row, and issued tokens always carry the issuing user's <code>id</code> / <code>userType</code>, even when a custom payload sets them."
+            },
+            {
+              "type": "Security",
+              "html": "New optional <code>auth.accessToken.issuer</code> / <code>auth.accessToken.audience</code>: stamped as <code>iss</code> / <code>aud</code> on every token the app signs and required on every token it accepts, so apps sharing a secret cannot accept each other's tokens. Unset (the default) changes nothing."
+            },
+            {
+              "type": "Security",
+              "html": "The <code>Auth</code> base model hides <code>password</code> from serialized output (<code>static hidden = [\"password\"]</code>): <code>response.json(user)</code>, lean rows and embedded copies no longer carry the hash. <code>user.get(\"password\")</code> still reads it."
+            },
+            {
+              "type": "Security",
+              "html": "New <code>auth.cookie.hostPrefix</code> (default <code>false</code>): the auth cookies are written as <code>__Host-access_token</code> / <code>__Host-refresh_token</code> (Secure, <code>Path=/</code>, no Domain), so a subdomain or plain-HTTP page cannot plant or overwrite them. A cookie path other than <code>/</code> or a Domain throws naming the setting. The unprefixed cookie is still read while switching, and logout clears both."
+            },
+            {
+              "type": "Security",
+              "html": "The minimum <code>fast-jwt</code> version is 6.3.4."
+            }
+          ]
+        },
+        {
+          "name": "create-warlock",
+          "slug": "create-warlock",
+          "total": 14,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 4
+            },
+            {
+              "type": "Security",
+              "n": 10
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "New apps compress JSON and HTML responses (<code>compression: true</code> in <code>src/config/http.ts</code>; set <code>false</code> behind a compressing proxy)."
+            },
+            {
+              "type": "Changed",
+              "html": "New apps print one console line per request in production (<code>new ConsoleLog({ minLevel: \"info\" })</code> in <code>src/config/log.ts</code>) instead of every debug phase line."
+            },
+            {
+              "type": "Changed",
+              "html": "New apps bound both in-memory caches at 10,000 entries (<code>maxSize: 10_000</code> in <code>src/config/cache.ts</code>), evicting the least recently used."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>create-warlock</code> no longer installs <code>rimraf</code> and <code>@mongez/reinforcements</code>, which it never used."
+            },
+            {
+              "type": "Security",
+              "html": "New apps cap one uploaded file at 10 MB (<code>fileUploadLimit: 10 * 1024 * 1024</code> in <code>src/config/http.ts</code>). The starter allowed 12 GB per file, and every file part is held in memory before route middleware (including auth) runs, so one large upload to any route could exhaust the server's memory. The config comment shows how to raise it."
+            },
+            {
+              "type": "Security",
+              "html": "New apps set <code>http.multipart.routes: \"all\"</code> explicitly in <code>src/config/http.ts</code>, so a production boot no longer warns that the option is unset. The comment explains how to switch to <code>\"declared\"</code> and mark the starter's upload routes with <code>uploads: true</code>; the template keeps <code>\"all\"</code> because page actions cannot declare <code>uploads</code> yet."
+            },
+            {
+              "type": "Security",
+              "html": "New apps allow cross-origin browser calls only from the origins listed in <code>CORS_ORIGINS</code> (comma-separated in <code>.env</code>; empty means same origin only) instead of <code>origin: \"*\"</code>."
+            },
+            {
+              "type": "Security",
+              "html": "New apps issue 1-hour access tokens and 7-day rotating refresh tokens (<code>accessToken</code> / <code>refreshToken</code> in <code>src/config/auth.ts</code>) instead of 100-year access tokens with refresh disabled, store only a SHA-256 digest of each token (<code>hashTokensAtRest: true</code>), and use the current config keys instead of the deprecated <code>auth.jwt</code> block (no more deprecation warning at boot). Login returns <code>tokens.refreshToken</code>; <code>POST /auth/refresh-token</code> renews the pair; <code>POST /auth/logout</code> accepts <code>refreshToken</code> and then ends only that session."
+            },
+            {
+              "type": "Security",
+              "html": "The starter's password reset is rebuilt: codes come from <code>node:crypto</code> (<code>randomInt</code>) instead of <code>Math.random</code>, only a keyed HMAC of the code is stored (column <code>codeHash</code>), every check counts an attempt atomically and the code stops working after 5 wrong tries, <code>POST /auth/reset-password</code> is throttled per email as well as per IP, and every rejected code (unknown email, wrong, expired, used, out of attempts) gets the same answer. <code>POST /auth/forgot-password</code> answers the same way, without waiting for the account lookup, for registered and unknown emails (the lookup, the code and its delivery run after the response; a failure there is logged), and creates a code for real accounts (it used to answer 404 for everyone because it looked users up through an \"active\" filter on a column the starter <code>User</code> model does not have). Delivery of the code is left to the app: wire it in <code>src/app/auth/services/forgot-password.service.ts</code>."
+            },
+            {
+              "type": "Security",
+              "html": "The example modules check access: <code>GET</code> / <code>POST /users</code> require a user whose new <code>role</code> field is <code>\"admin\"</code> (<code>adminMiddleware</code> in <code>src/app/auth/middleware/admin.middleware.ts</code>), and <code>PUT /posts/:id</code> is refused with 403 unless the signed-in user wrote the post or is an admin; the new image is stored only after that check, so a refused update leaves no file behind. Any signed-in user used to be able to list every account's email, create accounts and overwrite any post."
+            },
+            {
+              "type": "Security",
+              "html": "The generated <code>.gitignore</code> ignores every env file (<code>.env</code> and <code>.env.*</code>) except <code>.env.example</code>, so <code>.env.production</code>, <code>.env.shared</code> and the JWT secrets <code>warlock jwt.generate</code> may write there are not committed."
+            },
+            {
+              "type": "Security",
+              "html": "New apps sync coding-agent skills only from their own <code>@warlock.js/*</code> and <code>@mongez/*</code> dependencies: the scaffold writes an <code>agentKit.pick</code> allowlist into <code>package.json</code>. Every install used to copy the <code>skills/</code> folder of every package in <code>node_modules</code>, transitive ones included, into the agent's skills folder."
+            },
+            {
+              "type": "Security",
+              "html": "The scaffold's <code>pnpm-workspace.yaml</code> exclusion from the release-age cooldown (<code>minimumReleaseAgeExclude: ['@warlock.js/*']</code>) is removed once the scaffold's own installs finish, so later installs in the app wait out the cooldown for framework releases too."
+            },
+            {
+              "type": "Security",
+              "html": "The scaffolder runs the project's <code>warlock</code> binary with <code>npx --no</code>, and its printed hints do the same, so a missing local binary fails instead of downloading and running the unrelated <code>warlock</code> package from the registry."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/seal",
+          "slug": "seal",
+          "total": 13,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 3
+            },
+            {
+              "type": "Changed",
+              "n": 1
+            },
+            {
+              "type": "Security",
+              "n": 9
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>v.record(...).maxKeys(n, errorMessage?)</code>: caps the keys of one record (emitted as <code>maxProperties</code> in JSON Schema). <code>.maxKeys(Infinity)</code> lifts the default cap for that schema."
+            },
+            {
+              "type": "Added",
+              "html": "<code>url({ protocols: [...] }, errorMessage?)</code> accepts only the listed schemes."
+            },
+            {
+              "type": "Added",
+              "html": "<code>configureSeal()</code> options <code>maxArrayItems</code> (default <code>10000</code>), <code>maxRecordKeys</code> (default <code>10000</code>), <code>maxErrors</code> (default <code>100</code>) and <code>maxDepth</code> (default <code>256</code>), also accepted by a single <code>validate()</code> call."
+            },
+            {
+              "type": "Changed",
+              "html": "Mutators on <code>v.object</code>, <code>v.array</code>, <code>v.record</code> and <code>v.tuple</code> (<code>.trim()</code>, <code>.stripUnknown()</code>, custom ones) run once per validation instead of twice."
+            },
+            {
+              "type": "Security",
+              "html": "Arrays and records have a default size cap. An array whose schema sets no <code>.maxLength()</code> / <code>.max()</code>, <code>.length()</code> or <code>.between()</code> may hold at most 10,000 items (<code>maxArrayItems</code>), and a record without the new <code>.maxKeys(n)</code> at most 10,000 keys (<code>maxRecordKeys</code>). Larger input fails with a <code>maxItems</code> / <code>maxKeys</code> validation error before any item is validated. Both are <code>configureSeal()</code> options and can also be passed to a single <code>validate()</code> call."
+            },
+            {
+              "type": "Security",
+              "html": "Array items and record values are validated 64 at a time instead of all at once, and an array or record stops validating once it has collected <code>maxErrors</code> errors (default <code>100</code>); the error list is cut to that length. A body of many invalid items, or of items with database-backed rules, no longer costs work and response size in proportion to its length."
+            },
+            {
+              "type": "Security",
+              "html": "The unknown-keys error lists at most 10 keys, then \"and N more\"."
+            },
+            {
+              "type": "Security",
+              "html": "A <code>__proto__</code> key in the input can no longer set the prototype of the validated output. Records refuse it with a <code>forbiddenKey</code> error; <code>v.any()</code> values and <code>.allowUnknown()</code> extras inside an object are copied without it; <code>.trim()</code> keeps it as a plain own key so a strict object still reports it as unknown; <code>.stripUnknown()</code> drops it."
+            },
+            {
+              "type": "Security",
+              "html": "<code>v.string().url()</code> refuses the script-capable schemes <code>javascript:</code>, <code>data:</code>, <code>vbscript:</code> and <code>file:</code>. Every other scheme (<code>https:</code>, <code>mailto:</code>, <code>ftp:</code>, custom app links) still passes."
+            },
+            {
+              "type": "Security",
+              "html": "The number rule refuses <code>NaN</code>, <code>Infinity</code> and <code>-Infinity</code> (an out-of-range JSON literal such as <code>1e999</code> parses to <code>Infinity</code>). <code>.abs()</code>, <code>.ceil()</code>, <code>.floor()</code>, <code>.round()</code>, <code>.toFixed()</code> and <code>.coerce()</code> convert only numbers and numeric strings, so <code>\"abc\"</code>, <code>true</code>, <code>[7]</code> and <code>{}</code> fail the type rule instead of being turned into <code>NaN</code> or a number."
+            },
+            {
+              "type": "Security",
+              "html": "<code>.urlDecode()</code> keeps a value with a malformed escape sequence as it was instead of throwing, which surfaced as a server error rather than a validation error."
+            },
+            {
+              "type": "Security",
+              "html": "Data nested more than <code>maxDepth</code> levels (default <code>256</code>) inside an object's output, for example under <code>v.any()</code>, fails with a <code>maxDepth</code> validation error instead of overflowing the call stack; <code>.trim()</code> stops descending at the same depth."
+            },
+            {
+              "type": "Security",
+              "html": "<code>pattern()</code> with a <code>g</code> or <code>y</code> regex gives the same result on every call; each check starts at index 0."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/cache",
+          "slug": "cache",
+          "total": 12,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 2
+            },
+            {
+              "type": "Changed",
+              "n": 5
+            },
+            {
+              "type": "Fixed",
+              "n": 1
+            },
+            {
+              "type": "Security",
+              "n": 4
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>escapeCacheKeySegment(value)</code> percent-encodes the key separator characters, so a request-derived value (a tenant slug, a search term) stays one segment of a key or namespace: `<code>cache.namespace(</code>tenant.${escapeCacheKeySegment(slug)}<code>)</code>`."
+            },
+            {
+              "type": "Added",
+              "html": "Optional driver primitives <code>tagSample(tagKey, count)</code>, <code>exists(key)</code> and <code>removeMany(keys)</code>, used by tagged writes and tag invalidation. The Redis and Postgres drivers implement all three natively; a custom driver without them keeps the previous behaviour."
+            },
+            {
+              "type": "Changed",
+              "html": "Cache drivers no longer log every operation by default. Each get and set used to write two log lines (with email masking and redaction) at <code>info</code> / <code>success</code>; errors and connection failures are always logged."
+            },
+            {
+              "type": "Changed",
+              "html": "The <code>memory</code> and <code>memoryExtended</code> drivers keep at most 10,000 entries by default (<code>maxSize</code>), evicting the least recently used; they used to grow without bound, so keys built from request input could exhaust memory. Eviction no longer copies the whole key list on every write."
+            },
+            {
+              "type": "Changed",
+              "html": "Tagged writes no longer read the whole tag index and up to 20 full cached values: they sample up to 20 members (<code>SRANDMEMBER</code> on Redis, a database-side sample on Postgres) and check them with an existence test (<code>EXISTS</code>, <code>SELECT 1</code>) in one batch. Tag invalidation removes entries in batches (pipelined deletes on Redis, one <code>DELETE … = ANY(...)</code> per 500 keys on Postgres)."
+            },
+            {
+              "type": "Changed",
+              "html": "Redis, Postgres and file <code>get()</code> no longer deep-clone a value that was just deserialized (it is already the caller's own copy)."
+            },
+            {
+              "type": "Changed",
+              "html": "A plain Redis <code>set()</code> sends the SWR sidecar update together with the value, and <code>remove()</code> sends both deletes together: one round trip instead of two."
+            },
+            {
+              "type": "Fixed",
+              "html": "The file driver deletes an expired entry when it is read with a <code>globalPrefix</code> configured. The prefix used to be applied twice, so the directory stayed forever."
+            },
+            {
+              "type": "Security",
+              "html": "The LRU driver's <code>swr()</code> returned the stored object itself, so a caller that changed the result changed the cached value for every later reader. Each <code>swr()</code> reader gets a copy, as <code>get()</code> already did; a create-only write that conflicts also returns a copy of the existing value."
+            },
+            {
+              "type": "Security",
+              "html": "The file driver's <code>lock()</code> and <code>set(..., { onConflict: \"create\" })</code> could be acquired by several callers at once when the previous entry had expired. An expired entry is now removed under a short-lived per-key guard file, so exactly one caller wins. Lock release (compare-and-delete) uses the same guard, so releasing a lock just as it expired never deletes the next holder's lock."
+            },
+            {
+              "type": "Security",
+              "html": "Object cache keys are no longer ambiguous: <code>.</code>, <code>,</code>, <code>:</code>, <code>{</code>, <code>}</code>, <code>\"</code>, <code>[</code>, <code>]</code> and <code>%</code> inside an object key's values and property names are percent-encoded, so <code>{ a: \"b.c\" }</code> and <code>{ a: \"b\", c: \"\" }</code> are different keys, and an own <code>__proto__</code> key is kept as data. Keys without those characters are unchanged."
+            },
+            {
+              "type": "Security",
+              "html": "<code>cached()</code> auto-keys keep an own <code>__proto__</code> key of an argument as data, and an argument can no longer produce the same key as <code>undefined</code>, <code>NaN</code> or a <code>bigint</code> (object keys starting with <code>$</code> are escaped; a <code>bigint</code> gets its own marker)."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/logger",
+          "slug": "logger",
+          "total": 12,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 4
+            },
+            {
+              "type": "Changed",
+              "n": 2
+            },
+            {
+              "type": "Security",
+              "n": 6
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>log.isEnabled(level)</code>: <code>false</code> when the logger <code>minLevel</code> or every channel's level settings drop that level (or there are no channels). Callers can check it before building an expensive log context."
+            },
+            {
+              "type": "Added",
+              "html": "<code>minLevel</code> option on <code>ConsoleLog</code>: the lowest severity that channel prints, for example <code>new ConsoleLog({ minLevel: \"info\" })</code> to hide debug lines on the terminal while file channels still record them. Not set by default."
+            },
+            {
+              "type": "Added",
+              "html": "<code>format: \"jsonl\"</code> option on <code>JSONFileLog</code> (type <code>JSONFileLogConfig</code>): one JSON object per line in a <code>.jsonl</code> file, written by appending only. The default <code>format: \"json\"</code> still rewrites the whole <code>{ \"messages\": [...] }</code> file on each write."
+            },
+            {
+              "type": "Added",
+              "html": "<code>LogChannel.acceptsLevel(level)</code> (checks <code>levels</code> by default), so custom channels can tell <code>log.isEnabled()</code> about their own level options."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>log.*</code> returns before redaction and fan-out when no channel would keep the entry."
+            },
+            {
+              "type": "Changed",
+              "html": "Registered secrets (<code>registerLogSecret</code>) no longer make every log entry be deep-copied: entries are first checked read-only with one combined matcher, and copied and masked only when they hold a registered value or key."
+            },
+            {
+              "type": "Security",
+              "html": "<code>FileLog</code> and <code>JSONFileLog</code> no longer lose entries logged while a write is in flight. The buffer is handed to the write and replaced by an empty one, so entries that arrive meanwhile wait for the next write; entries of a failed write go back to the buffer. Under steady traffic most entries used to be dropped silently."
+            },
+            {
+              "type": "Security",
+              "html": "<code>FileLog</code> no longer crashes the process when its log file cannot be opened (directory removed or rotated away, no permission, out of file descriptors). Writes append with a promise that rejects; a missing directory is created again and the write retried once; other failures go to <code>log.onChannelError(...)</code>. A channel whose log directory cannot be created at startup reports it instead of raising an unhandled rejection."
+            },
+            {
+              "type": "Security",
+              "html": "<code>FileLog</code> and <code>JSONFileLog</code> take <code>maxBufferedMessages</code> (default <code>10000</code>): while writes keep failing, the oldest entries past the limit are dropped and one notice is reported, so a broken disk cannot grow memory without bound. <code>Infinity</code> keeps everything."
+            },
+            {
+              "type": "Security",
+              "html": "<code>FileLog</code> keeps each entry on one line: line breaks, tabs and control characters in the message are written as <code>\\n</code>, <code>\\t</code>, <code>\\uXXXX</code>, and terminal escape sequences are removed, so text from a request cannot forge a log line or rewrite the terminal of whoever tails the file. An <code>Error</code>'s stack trace is written as is. New option <code>escape</code> (default <code>true</code>)."
+            },
+            {
+              "type": "Security",
+              "html": "<code>ConsoleLog</code> removes terminal escape sequences other than colours from message text (cursor movement, screen clearing, window titles, clipboard writes, the \"conceal\" style) and shows other control characters as <code>\\uXXXX</code>. Colour codes and line breaks are kept."
+            },
+            {
+              "type": "Security",
+              "html": "<code>JSONFileLog</code> never overwrites a log file it cannot parse: the file is renamed to <code>&lt;file&gt;.json.corrupt-&lt;epoch ms&gt;</code>, a new file is started and <code>onChannelError</code> is told where the old one went. It used to replace the whole file, deleting every earlier entry."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-workspace",
+          "slug": "ai-workspace",
+          "total": 10,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            },
+            {
+              "type": "Changed",
+              "n": 3
+            },
+            {
+              "type": "Security",
+              "n": 6
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>search.maxFileBytes</code> (default <code>2_000_000</code> bytes): <code>grep</code> skips larger files without reading them when the backend has <code>stat</code> (the local backend does), and reports how many it skipped in the result's new <code>skippedFiles</code> field."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>grep</code> no longer reads a few large dumps or logs in the workspace whole, 16 at a time; files over <code>search.maxFileBytes</code> are skipped."
+            },
+            {
+              "type": "Changed",
+              "html": "Glob patterns are compiled once and reused across every path of a walk instead of once per path checked."
+            },
+            {
+              "type": "Changed",
+              "html": "The \"closest text\" hint after a failed <code>edit_file</code> / <code>multi_edit</code> compares only the lines that share a word with the missed text, considers at most 64 lines of <code>oldString</code> and stops after a fixed amount of work, so a huge <code>oldString</code> against a huge file no longer blocks for seconds (a 2,000-line text against a 20,000-line file: about 3.2 s to about 0.12 s). Hints for ordinary edits are unchanged."
+            },
+            {
+              "type": "Security",
+              "html": "<code>grep</code> patterns run on a matcher that never backtracks: one line costs at most pattern size × line length, so a model-supplied pattern such as <code>((a)+)+$</code>, <code>(a|a)+$</code> or <code>\\d*\\d*\\d*x</code> can no longer hang the process. The previous guard only caught one nested-quantifier shape. Results are the same as <code>RegExp#test</code>. Lookarounds and backreferences need backtracking and are refused with <code>WorkspacePolicyError</code> type <code>\"unsafe-pattern\"</code> naming the construct, as are patterns that expand past 4000 states and a search that needs too much work per scanned character. A long scan yields to the event loop every few million matcher steps, so other requests keep being served and the run's abort signal stops it."
+            },
+            {
+              "type": "Security",
+              "html": "Glob matching (<code>glob</code>, <code>grep</code>'s <code>glob</code>, <code>list_dir</code>'s <code>ignore</code>, <code>denyPaths</code>, <code>search.skipDirs</code> and <code>.gitignore</code> lines) no longer compiles patterns into backtracking regular expressions. A wildcard-heavy glob from the model or from a cloned repository's <code>.gitignore</code> used to stall every search; matching is now linear. A model-supplied glob longer than 512 characters is refused as <code>\"unsafe-pattern\"</code>, and a <code>.gitignore</code> line longer than that is ignored."
+            },
+            {
+              "type": "Security",
+              "html": "<code>run_tests</code> refuses a <code>pattern</code> that starts with <code>-</code>. Quoting kept it one argument, but the runner still read it as an option (<code>npm test --node-options=--import=…</code> loads code), so a least-privilege agent without a shell or write tool could run code."
+            },
+            {
+              "type": "Security",
+              "html": "Shell policies that restrict which programs run (<code>allow</code>, <code>deny</code>, <code>denyPatterns</code>, <code>rules</code> or <code>allowCommand</code>) refuse setting a variable that makes an allowed program start another one or load code (<code>PATH</code>, <code>NODE_OPTIONS</code>, <code>GIT_SSH_COMMAND</code>, <code>GIT_EXTERNAL_DIFF</code>, <code>GIT_PAGER</code>, <code>PAGER</code>, <code>EDITOR</code>, <code>LD_PRELOAD</code>, <code>GIT_CONFIG_*</code>, <code>npm_config_*</code>, <code>*_COMMAND</code>, <code>*_ASKPASS</code> and similar) as a <code>NAME=value cmd</code> prefix, an <code>env NAME=value cmd</code> argument, an <code>export</code>, or through <code>read</code>, <code>printf -v</code> or <code>getopts</code>. Such a line is refused with reason <code>\"nested-command\"</code>, or asked about when <code>shell.onAsk</code> is set. New option <code>shell.allowAssignments: string[]</code> (default <code>[]</code>) permits named variables."
+            },
+            {
+              "type": "Security",
+              "html": "Spill files are created readable by the owner only (<code>0600</code>), and a spill directory the workspace creates is <code>0700</code>. When <code>output.spillDir</code> is outside the jail, <code>read_file</code> and <code>grep</code> open only the spill files this workspace (or its <code>readonly()</code> / <code>scope()</code> projections) wrote, so workspaces sharing one spill directory can no longer read each other's command output. <code>resolveInJail</code> takes an optional fourth argument with the readable spill file names."
+            },
+            {
+              "type": "Security",
+              "html": "Running <code>run_shell</code> commands and background jobs are killed when the host process receives <code>SIGTERM</code>, <code>SIGINT</code> or <code>SIGHUP</code> (POSIX), as well as on exit; foreground commands were never reaped before, and both kinds outlived a process-manager restart. The listeners exist only while a command runs, and the signal is raised again afterwards when the app has no handler of its own, so the host stops exactly as before."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-tools",
+          "slug": "ai-tools",
+          "total": 8,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            },
+            {
+              "type": "Security",
+              "n": 7
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "The HTML converter no longer re-reads its growing output on every tag and no longer backtracks over long runs of trailing spaces or tabs, so large pages convert in milliseconds instead of tens of seconds (a 1 MB page of paragraphs: 21 s to 0.14 s; of table cells: 24 s to 0.07 s)."
+            },
+            {
+              "type": "Security",
+              "html": "<code>http_request</code> no longer sends its static <code>headers</code> (an API key) to a host the model names. With <code>baseUrl</code> set, an absolute (<code>https://other.example/x</code>) or protocol-relative (<code>//other.example/x</code>) URL on another origin is refused with <code>HttpPolicyError</code> type <code>\"host-not-allowed\"</code> unless its host is listed in <code>allowHosts</code>, and redirects stay on the base host. Static headers go only to the origin of the first request: a redirect to another origin drops every static header, plus <code>authorization</code>, <code>cookie</code> and <code>proxy-authorization</code>."
+            },
+            {
+              "type": "Security",
+              "html": "<code>fetch_url</code> and <code>http_request</code>: <code>timeoutMs</code> bounds the whole call, reading the body included. A server that sends headers quickly and then drips its body used to hold the tool call open indefinitely; it now fails with a timeout error that names <code>timeoutMs</code> (<code>http_request</code>: new <code>HttpPolicyError</code> type <code>\"timeout\"</code>; <code>fetch_url</code>: <code>WebToolError</code> type <code>\"request-failed\"</code>). <code>fetch_url</code> also stops when the agent run is cancelled."
+            },
+            {
+              "type": "Security",
+              "html": "<code>web_search</code> has a new <code>timeoutMs</code> option (default <code>15_000</code>) covering the provider request and its response, and the run's abort signal cancels it. A slow or hung provider used to stall the agent run indefinitely; it now fails with <code>WebToolError</code> type <code>\"request-failed\"</code>."
+            },
+            {
+              "type": "Security",
+              "html": "The built-in HTML converter used by <code>fetch_url</code> (the <code>\"simple\"</code> extractor, and the <code>\"auto\"</code> fallback) is linear in page size. A page full of unterminated <code>&lt;tag</code> or <code>&lt;!--</code> openers used to block the Node process for minutes; such text is kept as text and never rescanned. Output for well-formed pages is unchanged."
+            },
+            {
+              "type": "Security",
+              "html": "The same converter caps list indentation and <code>&gt; </code> quote prefixes at 16 levels. A page of thousands of unclosed <code>&lt;ul&gt;&lt;li&gt;</code> or <code>&lt;blockquote&gt;</code> tags used to make the output grow with the square of the page size (a 400 KB page produced gigabytes and exhausted memory)."
+            },
+            {
+              "type": "Security",
+              "html": "The MCP HTTP client read response bodies without a size limit, and its timeout stopped applying once headers arrived, so a server could stream an endless or huge body. New transport option <code>maxResponseBytes</code> (number, default <code>10_485_760</code>, 10 MiB): a larger body rejects the call with <code>McpTransportError</code> type <code>\"protocol\"</code> without buffering the rest, and the call's <code>timeoutMs</code> also covers reading the body."
+            },
+            {
+              "type": "Security",
+              "html": "The MCP stdio client accepted stdout lines of any length. The same <code>maxResponseBytes</code> option caps one line; an oversized line is dropped, the calls in flight reject with type <code>\"protocol\"</code>, and the transport keeps serving later calls."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-panoptic",
+          "slug": "ai-panoptic",
+          "total": 7,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 2
+            },
+            {
+              "type": "Changed",
+              "n": 4
+            },
+            {
+              "type": "Security",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>panoptic.capacity</code> (number, default <code>1000</code>, <code>0</code> keeps every trace) for the store panoptic creates for the dashboard (in-memory, or cache-backed with <code>cache</code>). A store you pass in <code>exporters</code> is not affected."
+            },
+            {
+              "type": "Added",
+              "html": "<code>TraceSummary</code> and <code>TraceSpanSummary</code> types."
+            },
+            {
+              "type": "Changed",
+              "html": "The dashboard's own store keeps the newest 1,000 traces instead of growing without limit."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>GET api/traces</code> returns the newest 200 trace summaries instead of every full trace: ids, timings, usage and the root span's name, type, status, attributes and error message, plus <code>spanCount</code> and <code>totalCost</code>, without the span tree or captured prompts and tool I/O. <code>?limit=</code> changes the count, <code>?startedBefore=</code> pages back, and <code>?full=1</code> returns full traces. The dashboard page polls the summaries and fetches the open trace's full tree from <code>GET api/traces/:id</code>, re-fetching it only when the trace changes."
+            },
+            {
+              "type": "Changed",
+              "html": "The cache-backed trace store runs its cache writes one after another and writes the index once per burst of traces instead of once per trace, so an older index can no longer overwrite a newer one and drop traces from what a restart restores."
+            },
+            {
+              "type": "Changed",
+              "html": "Trace queries parse each trace's start time once instead of twice per comparison while sorting."
+            },
+            {
+              "type": "Security",
+              "html": "A malformed percent escape in a dashboard URL (<code>/api/traces/%E0%A4%A</code>, or the same on the evaluate route) threw an uncaught <code>URIError</code> from the request listener, which could stop the app in production. Such ids answer <code>400 { error: \"bad_trace_id\" }</code>, and any other handler failure answers <code>500 { error: \"internal\" }</code> instead of escaping the server."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/queue",
+          "slug": "queue",
+          "total": 6,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            },
+            {
+              "type": "Changed",
+              "n": 3
+            },
+            {
+              "type": "Security",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>JobRetention</code> accepts <code>{ age?, count? }</code> (<code>age</code> is milliseconds or a duration string like <code>\"12h\"</code>) next to <code>true</code>, <code>false</code> and a number."
+            },
+            {
+              "type": "Changed",
+              "html": "Finished jobs are no longer kept forever: <code>removeOnComplete</code> defaults to <code>{ age: \"24h\", count: 1000 }</code> and <code>removeOnFail</code> to <code>{ age: \"7d\", count: 5000 }</code>, so Redis and the local SQLite file stop growing with every job ever run."
+            },
+            {
+              "type": "Changed",
+              "html": "The local SQLite driver prunes finished jobs with one <code>DELETE</code> statement instead of reading, decoding and sorting every finished job in JavaScript on each completion."
+            },
+            {
+              "type": "Changed",
+              "html": "The memory driver no longer copies every stored job on each 100 ms poll or clones the whole store on each transaction: a poll copies only the job it picks, and a transaction records only what it changes. An idle worker's cost no longer grows with the number of finished jobs kept."
+            },
+            {
+              "type": "Security",
+              "html": "A job payload shaped like the queue's internal context envelope was read as one when no context was captured at dispatch (for example a public route passing a request body to <code>dispatch()</code>), so the worker could run the handler inside a context chosen by the caller, such as another tenant. Every dispatch is now wrapped in an envelope, so such a payload reaches the handler as plain data and never sets the context. A job declared with <code>context: false</code> never runs inside a restored context. Jobs queued before the upgrade still restore their context."
+            },
+            {
+              "type": "Security",
+              "html": "The minimum <code>fastify</code> version is 5.12.6."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/herald",
+          "slug": "herald",
+          "total": 5,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            },
+            {
+              "type": "Fixed",
+              "n": 2
+            },
+            {
+              "type": "Security",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "<code>channel.request()</code> created a reply queue and a consumer per call and never removed them, also on timeout. Replies now come back over RabbitMQ's direct reply-to through one shared consumer per connection, and each pending request is removed on its reply or timeout. A reply that is not valid JSON rejects the request instead of throwing inside the consumer."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>disconnect()</code> no longer triggers a reconnect and cancels a pending one, so a shutting-down process can exit."
+            },
+            {
+              "type": "Fixed",
+              "html": "After a broker restart the driver moves every channel obtained with <code>channel()</code> onto the new AMQP channel and re-attaches their active subscriptions, so publishes and consumers keep working instead of using the closed channel."
+            },
+            {
+              "type": "Security",
+              "html": "A message that failed an <code>EventConsumer</code>'s <code>schema</code> was requeued at once and redelivered forever, pinning a CPU core and starving valid messages behind it. It is now rejected without requeue (the broker dead-letters it when the queue has a dead-letter exchange) and logged once as a warning with the validation errors."
+            },
+            {
+              "type": "Security",
+              "html": "The retry cap trusted the publisher's <code>x-retry-count</code> header: a non-numeric value such as <code>\"x\"</code> was concatenated instead of incremented, so the message was retried forever. A value that is not a non-negative integer now counts as retries exhausted, and a numeric string is read as a number."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-cli",
+          "slug": "ai-cli",
+          "total": 3,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            },
+            {
+              "type": "Security",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "The stdout line splitter no longer rescans and re-joins the whole pending buffer on every chunk. A very long stream-JSON line (a tool result with a whole file) costs linear time instead of quadratic; line, CRLF and overflow behaviour are unchanged."
+            },
+            {
+              "type": "Security",
+              "html": "A CLI agent inherits the whole server environment by default (<code>inheritEnv: true</code>), so a model-driven coding CLI can read database URLs, signing keys and other providers' keys. New <code>inheritEnv: \"curated\"</code> passes only the minimal system set (PATH, home, temp, locale, proxy and TLS settings, Windows system variables) plus the adapter's own API key variables (<code>apiKeyEnv</code>); add anything else through <code>env</code>."
+            },
+            {
+              "type": "Security",
+              "html": "When <code>NODE_ENV</code> is <code>production</code> and <code>inheritEnv</code> is not set, the first run logs a one-time console warning that names the option. Set <code>inheritEnv: true</code> explicitly to keep the full environment and silence it."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/devtools",
+          "slug": "devtools",
+          "total": 3,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            },
+            {
+              "type": "Security",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>allowedHosts</code> (default <code>[]</code>) and <code>allowProxied</code> (default <code>false</code>), read from the app's <code>src/config/devtools.ts</code> (a plain object, safe in production) or passed to <code>devtoolsConnector()</code>. <code>allowedHosts</code> names a custom dev hostname such as <code>\"app.test\"</code> (<code>\".app.test\"</code> also matches subdomains); <code>allowProxied</code> allows a local proxy nobody else can reach."
+            },
+            {
+              "type": "Security",
+              "html": "The dashboard and its API answer only requests addressed to a loopback host (<code>localhost</code>, <code>*.localhost</code>, <code>127.0.0.1</code>, <code>[::1]</code>), refuse requests whose <code>Origin</code> is another site, and refuse requests carrying <code>X-Forwarded-For</code>, <code>X-Forwarded-Host</code>, <code>X-Real-IP</code> or <code>Forwarded</code>. A loopback socket used to be enough, so a website that pointed its domain at <code>127.0.0.1</code>, or anyone reaching the dev server through a tunnel, could read request history, SQL bindings, captured mail and AI prompts. A refused request gets an empty 404, and the terminal prints one warning per reason naming the option to change."
+            },
+            {
+              "type": "Security",
+              "html": "The minimum <code>fastify</code> version is 5.12.6."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/access",
+          "slug": "access",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            },
+            {
+              "type": "Security",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Checks on the same user object share one resolved permission and role set for up to one second: stacked <code>gate()</code>s, <code>canAll</code> / <code>canAny</code> and repeated <code>can()</code> calls read the cache once per request instead of once per check. <code>access.flush</code> and a new configuration drop the shared sets at once."
+            },
+            {
+              "type": "Security",
+              "html": "<code>access.flush(user)</code> without a tenant also drops the set cached for the tenant your resolver's <code>resolveTenant(user)</code> returns (the one <code>can(user, …)</code> reads), as well as the no-tenant set. It used to drop only the no-tenant set, so in apps with an ambient tenant a revoked permission kept working until the cache expired (10 minutes by default)."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/scheduler",
+          "slug": "scheduler",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            },
+            {
+              "type": "Security",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "The scheduler tick no longer waits for jobs to finish, so <code>scheduler:tick</code> fires on time while jobs run. By default jobs still run one at a time, in the same order as before: jobs that come due while one runs wait for it, then run in registration order. With <code>runInParallel(true, n)</code> each due job starts on its own tick, at most <code>n</code> (default <code>10</code>) at once, so one long job no longer holds back the others; parallel mode used to wait for each batch. A job never overlaps itself: a tick that finds it still running emits <code>job:skip</code>. <code>shutdown()</code> waits for every run the scheduler started."
+            },
+            {
+              "type": "Security",
+              "html": "<code>onOneServer()</code> did not deduplicate interval schedules: each server computed its tick from its own boot time and from when its last run finished, so every server claimed a different tick and all of them ran the job. A plain interval with <code>onOneServer()</code> (<code>everyMinute()</code>, <code>everyHours(2)</code>, … with no <code>at()</code>, day or month constraint) is aligned to wall-clock boundaries in the job's timezone and advances from the scheduled tick, so every server claims the same tick and the job runs once per tick."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/sitemap",
+          "slug": "sitemap",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            },
+            {
+              "type": "Security",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Shards are compressed off the main thread (<code>gzip: true</code> no longer blocks the event loop), and each URL block is rendered once instead of twice. The written files are byte-identical."
+            },
+            {
+              "type": "Security",
+              "html": "Sitemap paths are percent-encoded as the sitemap protocol requires: spaces, non-ASCII text (as UTF-8) and control characters become <code>%XX</code> escapes, and a <code>%</code> that does not start an escape becomes <code>%25</code>. A path built from user data (a slug with a control character) could make the whole file invalid XML. <code>escapeXml</code> also drops characters XML 1.0 cannot carry. Already-encoded paths and query strings are unchanged."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-anthropic",
+          "slug": "ai-anthropic",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "The adapter no longer deep-copies the whole request body (the full history, including base64 attachments and long tool results) on every <code>complete()</code>, <code>stream()</code> and <code>countTokens()</code> call. Only <code>providerOptions.anthropic.body</code> values are copied, so a value that cannot be copied is still refused before anything is sent. The public <code>buildRequest()</code> still returns a fully detached copy."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/context",
+          "slug": "context",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Every context keeps its store in one <code>AsyncLocalStorage</code> shared by all contexts (one slot per context) instead of one <code>AsyncLocalStorage</code> each. On Node versions where each enabled <code>AsyncLocalStorage</code> adds work to every promise, a request with the four framework contexts pays that cost once instead of four times, and <code>contextManager.runAll()</code> enters every context in one step. <code>run()</code>, <code>enter()</code>, <code>update()</code>, <code>clear()</code> and contexts used outside the manager behave as before; a context class that overrides <code>run()</code> is still run through it."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "5.52.0",
       "id": "v5-52-0",
       "date": "November 11, 2026",
