@@ -18,6 +18,17 @@ import {
 import { UploadedFile } from "../../http";
 import { fileExtensionRule, fileRule, fileTypeRule, imageRule } from "../file";
 
+/** Options for `v.file().image()`. */
+export type ImageRuleOptions = {
+  /**
+   * Accept svg files too. An svg can carry script, so only allow it where
+   * the file is never served from your own origin as `image/svg+xml`.
+   *
+   * @default false
+   */
+  svg?: boolean;
+};
+
 export const uploadedFileMetadataSchema = v.object({
   location: v.string().oneOf(["local", "cloud"]),
   width: v.int().positive(),
@@ -44,9 +55,23 @@ export class FileValidator extends BaseValidator {
     return value instanceof UploadedFile;
   }
 
-  /** Value must be an image */
-  public image(errorMessage?: string): this {
-    return this.addRule(imageRule, errorMessage);
+  /**
+   * Value must be an image, judged by the file's bytes rather than the type
+   * or name the client declared. Raster formats pass; svg (which can carry
+   * script) passes only with `{ svg: true }`.
+   *
+   * @example
+   * v.file().image();
+   * v.file().image({ svg: true }, "Upload a logo");
+   */
+  public image(errorMessage?: string): this;
+  public image(options: ImageRuleOptions, errorMessage?: string): this;
+  public image(optionsOrMessage?: string | ImageRuleOptions, errorMessage?: string): this {
+    if (typeof optionsOrMessage === "object" && optionsOrMessage !== null) {
+      return this.addRule(imageRule, errorMessage, { svg: optionsOrMessage.svg === true });
+    }
+
+    return this.addRule(imageRule, optionsOrMessage);
   }
 
   /** Accept specific file extensions */

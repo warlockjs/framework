@@ -379,3 +379,93 @@ describe("resume", () => {
     });
   });
 });
+
+describe("resume — concurrency", () => {
+  it("applies a decision once when two resumes of one interrupt race", async () => {
+    const store = memory();
+    await store.save(makeInterrupt());
+
+    const toolRuns = vi.fn();
+    const mw = humanApproval({
+      policy: { type: "allowlist", tools: ["refundCustomer"] },
+      handler: () => {
+        throw new Error("author handler should not run on a seeded re-run");
+      },
+    });
+    const { agent, execute } = makeFakeAgent({
+      before: async (ctx) => {
+        const verdict = await mw.tool!.before!(ctx);
+
+        if (verdict === undefined) {
+          toolRuns();
+        }
+
+        return verdict;
+      },
+    });
+
+    const outcomes = await Promise.all([
+      resume("support.sess-1.0.abc", { type: "approve" }, { store, agent }),
+      resume("support.sess-1.0.abc", { type: "approve" }, { store, agent }),
+    ]);
+
+    expect(outcomes.map((outcome) => outcome.type).sort()).toEqual(["already-resolved", "applied"]);
+    expect(execute).toHaveBeenCalledTimes(1);
+    expect(toolRuns).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not let a concurrent run of the same agent take the seeded decision", async () => {
+    const store = memory();
+    await store.save(makeInterrupt());
+
+    const authorHandler = vi.fn(() => ({ type: "reject" as const, reason: "needs review" }));
+    const mw = humanApproval({
+      policy: { type: "allowlist", tools: ["refundCustomer"] },
+      handler: authorHandler,
+    });
+
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let rerunVerdict: ToolInvokeResult<unknown> | void = undefined;
+    const { agent } = makeFakeAgent({
+      before: async (ctx) => {
+        await gate;
+        rerunVerdict = await mw.tool!.before!(ctx);
+
+        return rerunVerdict;
+      },
+    });
+
+    const pendingResume = resume("support.sess-1.0.abc", { type: "approve" }, { store, agent });
+
+    // Another execution with the same agent, session and args, outside the
+    // re-run: it must reach the author handler, not the seeded approval.
+    const otherVerdict = await mw.tool!.before!(makeToolContext());
+
+    release();
+    await pendingResume;
+
+    expect(authorHandler).toHaveBeenCalledTimes(1);
+    expect(otherVerdict).toBeDefined();
+    expect(rerunVerdict).toBeUndefined();
+  });
+
+  it("falls back to load + delete for a store without claim()", async () => {
+    const base = memory();
+    const store = {
+      save: base.save.bind(base),
+      load: base.load.bind(base),
+      delete: base.delete.bind(base),
+      schema: base.schema.bind(base),
+    };
+    await store.save(makeInterrupt());
+
+    const first = await resume("support.sess-1.0.abc", { type: "approve" }, { store });
+    const second = await resume("support.sess-1.0.abc", { type: "approve" }, { store });
+
+    expect(first.type).toBe("applied");
+    expect(second.type).toBe("already-resolved");
+  });
+});

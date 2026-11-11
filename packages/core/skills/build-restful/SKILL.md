@@ -170,6 +170,9 @@ router.restfulResource("/users", new UsersRestful(), {
 - `recordName` / `recordsListName` — response keys for `{ [recordName]: model }` and `{ [recordsListName]: [...] }`. Default `"record"` and `"records"`.
 - `returnOn` — after create/update/delete/patch, return the single record (default) or the full list (`"records"`).
 - `cache` — when `true` (default), `list()` and `get()` use the repository's cached variants (`listCached`/`getCached`).
+- `bulkDeleteLimit` — most ids one `bulkDelete` request may name; a longer list gets a 400. Default `1000`.
+- `bulkDeleteConcurrency` — records `bulkDelete` deletes at the same time. Default `10`.
+- `list()` forwards request input to the repository, so `?paginate=false` stays paginated (capped at `maxPerPage`) unless the repository sets `allowClientUnpaginated = true`.
 - `validation` — per-action schemas read by `router.restfulResource()`. Add `validation = { create?, update?, patch? }` as a public field on your subclass; the router consumes whichever entries exist. The field isn't declared on the base `Restful` class — it's duck-typed off the resource at registration time (see `router.ts > manageValidation`).
 
 ### Lifecycle hooks

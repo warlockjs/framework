@@ -127,10 +127,18 @@ Input is `{ query: string }`; output is the `RetrieveResult`. Default tool name 
 await kb.clear(); // drops every entry written under this rag's namespace
 ```
 
+`clear()` deletes by key prefix, so on a shared driver it also clears a nested namespace (`kb.acme` clears `kb.acme.private`) — give rags on one driver sibling names.
+
+## Namespace isolation (5.53)
+
+- Each chunk records its `namespace`; `retrieve()` matches it exactly, so `kb.acme` never reads `kb.acme.private`.
+- Chunks indexed before 5.53 (no `namespace` field) are read only when the key is `<namespace>.<docId>.<chunkIndex>` exactly; a dotted doc id needs a re-index.
+- When other namespaces fill the first `candidates` page, the store is queried again with a wider page (×4, up to 1,000).
+
 ## Advanced
 
 - `cacheVectorStore(driver)` + the `VectorStore` contract are exported for swapping in a custom store.
-- A stored chunk's namespaced key is `${namespace}.${sourceId}.${chunkIndex}`.
+- A stored chunk's namespaced key is `${namespace}.${sourceId}.${chunkIndex}`, with `.`, `:` and `%` in `sourceId` escaped (`%2E`, `%3A`, `%25`).
 
 ## See also
 

@@ -29,6 +29,22 @@ export type ExtractJsonSchemaOptions = {
 };
 
 /**
+ * Converted schemas per schema object, keyed by target + compact setting.
+ * Weakly held, so a schema that is no longer referenced is collected with
+ * its conversions.
+ */
+const extractedSchemas = new WeakMap<object, Map<string, Record<string, unknown>>>();
+
+/** Stable cache-key fragment for the `compact` option. */
+function compactCacheKey(compact: ExtractJsonSchemaOptions["compact"]): string {
+  if (!compact) {
+    return "full";
+  }
+
+  return compact === true || !compact.keepDescriptions ? "compact" : "compact+descriptions";
+}
+
+/**
  * Best-effort JSON Schema extraction from a Standard Schema instance.
  *
  * Different libraries expose their JSON representation through different
@@ -53,6 +69,11 @@ export type ExtractJsonSchemaOptions = {
  * Shared across every SDK adapter package (OpenAI, Anthropic, Bedrock…)
  * so each provider converts schemas identically.
  *
+ * The result is computed once per schema object, target and `compact`
+ * setting, then reused: every model call converts the same tool schemas,
+ * so later calls return the same object. Treat it as read-only — copy it
+ * before changing it.
+ *
  * @example
  * const schema = extractJsonSchema(mySealSchema);
  * // { type: "object", properties: { ... }, required: [ ... ], additionalProperties: false }
@@ -68,6 +89,12 @@ export function extractJsonSchema(
   if (!schema) return undefined;
 
   const target = options.target ?? "openai-strict";
+  const cacheKey = `${target}\u0000${compactCacheKey(options.compact)}`;
+  const cached = extractedSchemas.get(schema)?.get(cacheKey);
+
+  if (cached) {
+    return cached;
+  }
 
   // 1. Seal / Standard JSON Schema V1 pattern: ["~standard"].jsonSchema.input({ target })
   // 2. Top-level jsonSchema / _jsonSchema (Zod-like, property or method form)
@@ -75,11 +102,22 @@ export function extractJsonSchema(
     extractFromSealPath(schema, target) ??
     extractFromCandidateKeys(schema as unknown as Record<string, unknown>);
 
-  if (!extracted || !options.compact) {
-    return extracted;
+  if (!extracted) {
+    return undefined;
   }
 
-  return compactJsonSchema(extracted, options.compact === true ? {} : options.compact);
+  const result = options.compact
+    ? compactJsonSchema(extracted, options.compact === true ? {} : options.compact)
+    : extracted;
+
+  let perSchema = extractedSchemas.get(schema);
+  if (!perSchema) {
+    perSchema = new Map();
+    extractedSchemas.set(schema, perSchema);
+  }
+  perSchema.set(cacheKey, result);
+
+  return result;
 }
 
 /** Options for {@link compactJsonSchema}. */

@@ -2,6 +2,7 @@ import type { CacheDriver } from "@warlock.js/cache";
 import type { ExporterContract } from "../contracts/exporter.contract";
 import type { Trace } from "../contracts/trace.type";
 import { matchTrace } from "./match-trace";
+import { sortNewestFirst } from "./sort-newest-first";
 import { emptyUsage, sumUsage } from "./sum-usage";
 import type { TraceAggregate } from "./trace-aggregate.type";
 import type { TraceQuery } from "./trace-query.type";
@@ -125,6 +126,18 @@ class CacheTraceStore implements TraceStoreContract, ExporterContract {
 
   private readonly onError?: (error: unknown) => void;
 
+  /**
+   * Every cache write runs on this one chain, in `add` order, so an older
+   * index can never land after a newer one.
+   */
+  private writes: Promise<void> = Promise.resolve();
+
+  /** Trace writes queued on {@link writes} and not yet finished. */
+  private pendingWrites = 0;
+
+  /** The persisted index is behind the mirror and must be rewritten. */
+  private indexDirty = false;
+
   public constructor(
     input: CacheDriverInput,
     options: CacheTraceStoreOptions & { onError?: (error: unknown) => void } = {},
@@ -184,13 +197,14 @@ class CacheTraceStore implements TraceStoreContract, ExporterContract {
     this.mirror.delete(trace.traceId);
     this.mirror.set(trace.traceId, trace);
 
-    const addedAt = this.addCounter;
     this.addCounter += 1;
 
     const evicted = this.evictOverflow();
 
     // Write through to the cache fire-and-forget; reads never wait on this.
-    void this.persist(trace, addedAt, evicted);
+    this.indexDirty = true;
+    this.pendingWrites += 1;
+    this.enqueue(() => this.persist(trace, evicted));
   }
 
   /**
@@ -214,7 +228,7 @@ class CacheTraceStore implements TraceStoreContract, ExporterContract {
       }
     }
 
-    return this.sortNewestFirst(matched);
+    return sortNewestFirst(matched);
   }
 
   public aggregate(filter?: TraceQuery): TraceAggregate {
@@ -250,20 +264,26 @@ class CacheTraceStore implements TraceStoreContract, ExporterContract {
     const ids = [...this.mirror.keys()];
     this.mirror.clear();
 
-    void this.purge(ids);
+    this.indexDirty = false;
+    this.enqueue(() => this.purge(ids));
+  }
+
+  /** Append one write to the serial write chain. */
+  private enqueue(write: () => Promise<void>): void {
+    this.writes = this.writes.then(write);
   }
 
   /**
-   * Persist one trace + the rebuilt index to the cache, optionally removing
-   * a trace evicted by the capacity cap. Best-effort: any cache failure is
-   * routed to `onError`, never thrown — the mirror already reflects the
-   * write so runtime reads are unaffected.
+   * Persist one trace to the cache, optionally removing a trace evicted by
+   * the capacity cap, then — when no later trace write is queued — the
+   * index rebuilt from the mirror. A burst of adds therefore writes the
+   * index once, after every trace in the burst. Best-effort: any cache
+   * failure is routed to `onError`, never thrown — the mirror already
+   * reflects the write so runtime reads are unaffected.
    */
-  private async persist(
-    trace: Trace,
-    addedAt: number,
-    evictedId: string | undefined,
-  ): Promise<void> {
+  private async persist(trace: Trace, evictedId: string | undefined): Promise<void> {
+    this.pendingWrites -= 1;
+
     try {
       const driver = await this.resolveDriver();
 
@@ -273,7 +293,17 @@ class CacheTraceStore implements TraceStoreContract, ExporterContract {
         await driver.remove(this.traceKey(evictedId));
       }
 
-      await driver.set(this.indexKey(), this.buildIndex(addedAt));
+      if (this.pendingWrites === 0 && this.indexDirty) {
+        this.indexDirty = false;
+
+        try {
+          await driver.set(this.indexKey(), this.buildIndex(this.addCounter - 1));
+        } catch (error) {
+          // Leave the index marked stale so the next add rewrites it.
+          this.indexDirty = true;
+          throw error;
+        }
+      }
     } catch (error) {
       this.reportError(error);
     }
@@ -389,14 +419,6 @@ class CacheTraceStore implements TraceStoreContract, ExporterContract {
         break;
       }
     }
-  }
-
-  /**
-   * Sort matched traces newest-started first. A copy is sorted so the
-   * mirror's insertion order (which eviction depends on) is never disturbed.
-   */
-  private sortNewestFirst(traces: Trace[]): Trace[] {
-    return traces.sort((left, right) => Date.parse(right.startedAt) - Date.parse(left.startedAt));
   }
 
   /**

@@ -1,6 +1,7 @@
 import { get } from "@mongez/reinforcements";
 import { invalidRule, VALID_RULE, type SchemaRule } from "@warlock.js/seal";
 import { requireModelClass } from "../../model/register-model";
+import { recordExists } from "./record-exists";
 import type { UniqueRuleOptions } from "../types";
 
 /**
@@ -72,8 +73,8 @@ export const uniqueRule: SchemaRule<UniqueRuleOptions> = {
       });
     }
 
-    const document = await dbQuery.first();
+    const found = await recordExists(ResolvedModelClass, dbQuery);
 
-    return document ? invalidRule(this, context) : VALID_RULE;
+    return found ? invalidRule(this, context) : VALID_RULE;
   },
 };

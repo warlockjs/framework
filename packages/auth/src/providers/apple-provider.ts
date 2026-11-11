@@ -6,6 +6,7 @@ import type {
   ProviderProfile,
 } from "../contracts/providers";
 import { InvalidProviderCallbackError } from "../errors/invalid-provider-callback.error";
+import { providerTimeoutMs } from "./provider-timeout";
 import { loadOptionalPeer } from "../services/optional-peer";
 import type { JoseModule } from "./google-provider";
 import { pkceChallenge } from "./google-provider";
@@ -78,7 +79,12 @@ export class AppleProvider implements AuthProvider {
   /** Apple's default scopes (`name`, `email`) force `response_mode=form_post`. */
   public readonly callbackMode = "form_post";
 
-  public constructor(private readonly settings: AppleProviderConfig) {}
+  /** Deadline for each request to Apple, in milliseconds. */
+  private readonly timeoutMs: number;
+
+  public constructor(private readonly settings: AppleProviderConfig) {
+    this.timeoutMs = providerTimeoutMs("Apple", settings.timeoutMs);
+  }
 
   public authorizationUrl(state: ProviderAuthorizationState): string {
     const scopes = this.settings.scopes ?? DEFAULT_SCOPES;
@@ -165,6 +171,7 @@ export class AppleProvider implements AuthProvider {
 
     try {
       const response = await fetch(TOKEN_ENDPOINT, {
+        signal: AbortSignal.timeout(this.timeoutMs),
         method: "POST",
         headers: { "content-type": "application/x-www-form-urlencoded" },
         body: new URLSearchParams({
@@ -198,7 +205,9 @@ export class AppleProvider implements AuthProvider {
     jose: AppleJoseModule,
     idToken: string,
   ): Promise<Record<string, unknown>> {
-    appleKeySet ??= jose.createRemoteJWKSet(new URL(JWKS_URI));
+    appleKeySet ??= jose.createRemoteJWKSet(new URL(JWKS_URI), {
+      timeoutDuration: this.timeoutMs,
+    });
 
     try {
       const { payload } = await jose.jwtVerify(idToken, appleKeySet, {

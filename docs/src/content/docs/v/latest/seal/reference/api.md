@@ -64,6 +64,11 @@ type ValidateOptions = {
   translateRule?: TranslateRuleCallback;
   translateAttribute?: TranslateAttributeCallback;
   firstErrorOnly?: boolean;
+  // Limits (see `SealConfig`); a value here wins over `configureSeal()` for this call
+  maxArrayItems?: number;
+  maxRecordKeys?: number;
+  maxErrors?: number;
+  maxDepth?: number;
 };
 ```
 
@@ -79,6 +84,18 @@ v.string().uuid(4);
 v.string().min(3).max(50);
 ```
 
+`url()` accepts every scheme `URL` can parse except the script-capable ones: `javascript:`, `data:`, `vbscript:` and `file:` are refused. Pass `protocols` to accept only the listed schemes (with or without the trailing `:`), which is also how a refused scheme is opted back in:
+
+```ts
+v.string().url(); // https://…, mailto:…, myapp://… — not javascript:…
+v.string().url({ protocols: ["http", "https"] }); // web links only
+v.string().url({ protocols: ["https"] }, "Use an https link");
+```
+
+`pattern(regex)` gives the same answer on every call, also for a regex with the `g` or `y` flag (each check starts at index 0).
+
+`urlDecode()` leaves a value with a malformed escape sequence (`%E0%A4%A`) as it was instead of throwing; the other rules then judge the raw value.
+
 ### `v.email(emailMessage?, errorMessage?)`
 
 ```ts
@@ -90,6 +107,8 @@ v.email(); // shortcut for v.string().email()
 ```ts
 v.number().min(0).max(100);
 ```
+
+Only finite numbers pass: `NaN`, `Infinity` and `-Infinity` are refused. The math mutators (`abs()`, `ceil()`, `floor()`, `round()`, `toFixed()`) and `coerce()` convert numbers and numeric strings only; anything else (`"abc"`, `true`, `[7]`, `{}`) reaches the type rule unchanged and fails it.
 
 ### `v.int(errorMessage?)`
 
@@ -169,6 +188,8 @@ v.managed<string>(({ user }) => user.id);
 v.any(); // type: any
 ```
 
+Inside an object, `v.any()` values (and unknown keys kept by `.allowUnknown()`) are copied without `__proto__` keys, so a request body cannot set the prototype of the validated output. Data nested more than `maxDepth` levels below the object (256 by default) fails with a `maxDepth` error.
+
 ## Structural validators
 
 ### `v.object(schema, errorMessage?)`
@@ -186,11 +207,18 @@ v.object({
 v.array(v.string()).minLength(1).maxLength(10);
 ```
 
+An array without `.maxLength()` (or `.max()`), `.length()` or `.between()` may hold at most `maxArrayItems` items (10,000 by default, see `configureSeal`); a longer one fails with a `maxItems` error before any item is validated. An explicit `.maxLength(n)` replaces the default cap for that schema; `.maxLength(Infinity)` lifts it.
+
+Items are validated 64 at a time. Once `maxErrors` errors are collected (100 by default) no further items are validated, and the list is cut to that length.
+
 ### `v.record(valueValidator?, errorMessage?)`
 
 ```ts
 v.record(v.int()); // type: Record<string, number>
+v.record(v.int()).maxKeys(50); // at most 50 keys (JSON Schema: maxProperties)
 ```
+
+A record without `.maxKeys(n)` may hold at most `maxRecordKeys` keys (10,000 by default); a larger one fails with a `maxKeys` error. `.maxKeys(Infinity)` lifts the cap for that schema. Values are validated in batches under the same `maxErrors` limit as arrays. A `__proto__` key fails with a `forbiddenKey` error.
 
 ### `v.tuple(validators, errorMessage?)`
 
@@ -264,7 +292,7 @@ const config = getSealConfig(); // SealConfig
 ### `resetSealConfig()`
 
 ```ts
-resetSealConfig(); // clear translation hooks + reset firstErrorOnly to true
+resetSealConfig(); // clear translation hooks + reset firstErrorOnly and the limits to their defaults
 ```
 
 ### `SealConfig`
@@ -274,8 +302,20 @@ type SealConfig = {
   translateRule?: (ruleTranslation: RuleTranslation) => string;
   translateAttribute?: (attributeTranslation: AttributeTranslation) => string;
   firstErrorOnly?: boolean; // default: true
+  maxArrayItems?: number; // default: 10000 — arrays without .maxLength(); Infinity lifts it
+  maxRecordKeys?: number; // default: 10000 — records without .maxKeys(); Infinity lifts it
+  maxErrors?: number; // default: 100 — errors one array or record collects
+  maxDepth?: number; // default: 256 — nesting inside an object's output
 };
 ```
+
+The limits bound what one request can cost. Raise them for a schema with `.maxLength(n)` / `.maxKeys(n)`, for one call with the `validate()` options, or for the whole app:
+
+```ts
+configureSeal({ maxArrayItems: 50_000, maxErrors: 20 });
+```
+
+The limit errors use the rule names `maxItems`, `maxKeys` and `maxDepth`, so they can be translated like any other rule.
 
 Source: `@warlock.js/seal/src/config.ts`.
 

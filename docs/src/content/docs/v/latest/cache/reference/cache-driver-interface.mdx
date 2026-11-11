@@ -332,6 +332,16 @@ await tagged.set("item.1", product1);
 await tagged.invalidate(); // drops every key tagged "products" or "featured"
 ```
 
+## Optional tag and batch primitives
+
+A driver can implement these to make tagged writes and invalidation cheaper. Every built-in driver has them (the base driver supplies fallbacks); a custom driver without them still works through `has()` / `remove()`.
+
+```ts
+tagSample?(tagKey: CacheKey, count: number): Promise<string[]>; // up to `count` random members of a tag index
+exists?(key: CacheKey): Promise<boolean>; // live entry? no value read, no hit/miss events
+removeMany?(keys: CacheKey[]): Promise<void>; // batched removal, emits `removed` per key
+```
+
 ## similar(vector, options)
 
 Vector-based retrieval. Returns the nearest stored entries to `vector` by cosine similarity, ordered by descending score.

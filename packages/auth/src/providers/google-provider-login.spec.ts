@@ -49,6 +49,7 @@ vi.mock("../services/auth.service", () => ({ authService: { completeLogin } }));
 import { InMemoryModel, resetTables, tables } from "../test-support/in-memory-cascade";
 import { InvalidProviderCallbackError } from "../errors/invalid-provider-callback.error";
 import { ProviderEmailNotVerifiedError } from "../errors/provider-email-not-verified.error";
+import { ProviderAccountLinkBlockedError } from "../errors/provider-account-link-blocked.error";
 import { completeProviderLogin, startProviderLogin } from "./provider-login";
 import { PROVIDER_STATE_COOKIE } from "./provider-state-cookie";
 import { defined } from "../test-support/defined";
@@ -59,6 +60,20 @@ class User extends InMemoryModel {
   public get userType() {
     return "user";
   }
+}
+
+/** A user model whose schema declares the verification field. */
+class VerifyingUser extends User {
+  public static schema = { schema: { email: {}, emailVerifiedAt: {} } };
+}
+
+async function verifyingCallback(cookie: string | undefined, query: Record<string, unknown>) {
+  return completeProviderLogin(
+    VerifyingUser as never,
+    "google",
+    fakeRequest(cookie, query) as never,
+    fakeResponse() as never,
+  );
 }
 
 const CLIENT_ID = "client-123.apps.googleusercontent.com";
@@ -407,6 +422,60 @@ describe("completeProviderLogin (google)", () => {
     expect(tables.get("users")).toHaveLength(1);
     expect(defined(tables.get("provider_accounts")?.[0], "row").user_id).toBe(existing.id);
     expect((defined(completeLogin.mock.calls[0], "first call")[0] as User).id).toBe(existing.id);
+  });
+
+  it("refuses to link a verified provider email to an account that never verified it", async () => {
+    await VerifyingUser.create({ email: "ada@example.com", password: "set-by-someone-else" });
+    const login = await startLogin();
+    tokenEndpoint.idToken = await idToken(verifiedClaims(login.nonce));
+
+    const error = await verifyingCallback(login.cookie.value, {
+      code: login.code,
+      state: login.state,
+    }).catch((e) => e);
+
+    expect(error).toBeInstanceOf(ProviderAccountLinkBlockedError);
+    expect(error.status).toBe(403);
+    expect(tables.get("provider_accounts") ?? []).toHaveLength(0);
+    expect(completeLogin).not.toHaveBeenCalled();
+  });
+
+  it("links to an account that verified the email itself", async () => {
+    const existing = await VerifyingUser.create({
+      email: "ada@example.com",
+      emailVerifiedAt: new Date(),
+    });
+    const login = await startLogin();
+    tokenEndpoint.idToken = await idToken(verifiedClaims(login.nonce));
+
+    await verifyingCallback(login.cookie.value, { code: login.code, state: login.state });
+
+    expect(defined(tables.get("provider_accounts")?.[0], "row").user_id).toBe(existing.id);
+  });
+
+  it('linkExisting: "always" links an unverified account as before', async () => {
+    configValues["auth.providers.linkExisting"] = "always";
+    const existing = await VerifyingUser.create({ email: "ada@example.com" });
+    const login = await startLogin();
+    tokenEndpoint.idToken = await idToken(verifiedClaims(login.nonce));
+
+    await verifyingCallback(login.cookie.value, { code: login.code, state: login.state });
+
+    expect(defined(tables.get("provider_accounts")?.[0], "row").user_id).toBe(existing.id);
+  });
+
+  it('linkExisting: "never" refuses even a verified account', async () => {
+    configValues["auth.providers.linkExisting"] = "never";
+    await VerifyingUser.create({ email: "ada@example.com", emailVerifiedAt: new Date() });
+    const login = await startLogin();
+    tokenEndpoint.idToken = await idToken(verifiedClaims(login.nonce));
+
+    const error = await verifyingCallback(login.cookie.value, {
+      code: login.code,
+      state: login.state,
+    }).catch((e) => e);
+
+    expect(error).toBeInstanceOf(ProviderAccountLinkBlockedError);
   });
 
   it("an existing link resolves the user by provider id, whatever the email says now", async () => {

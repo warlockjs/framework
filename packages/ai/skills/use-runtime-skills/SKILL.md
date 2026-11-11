@@ -45,7 +45,7 @@ const lib = ai.skills({
 ### Sources — `SkillSource` (discriminated by `type`, never `kind`)
 
 - `{ type: "directory", path }` — reads `path/<folder>/SKILL.md` off disk (lazy `node:fs/promises`).
-- `{ type: "url", url, headers?, policy?, cacheTtlMs? }` — `urlSource(url, options)` fetches a JSON manifest of skills through the shared `guardedFetch` / `OutboundPolicy` guard (scheme/host allowlist, post-DNS private-IP deny, byte cap, timeout, per-hop redirect revalidation) — never a raw `fetch()`. A remote skill source is a prompt supply chain (bodies flow straight into model context), so every fetched record is also runtime-validated before it can be served. `policy` tunes the guard (e.g. `hostAllowlist`); see the `secure-outbound-requests` topic. The result is cached for the source's lifetime, or `cacheTtlMs` when set.
+- `{ type: "url", url, headers?, policy?, cacheTtlMs? }` — `urlSource(url, options)` fetches a JSON manifest of skills through the shared `guardedFetch` / `OutboundPolicy` guard (scheme/host allowlist, post-DNS private-IP deny, byte cap, timeout, per-hop redirect revalidation) — never a raw `fetch()`. A remote skill source is a prompt supply chain (bodies flow straight into model context), so every fetched record is also runtime-validated before it can be served. `policy` tunes the guard (e.g. `hostAllowlist`); see the `secure-outbound-requests` topic. The result is cached for the source's lifetime, or `cacheTtlMs` when set; a failed fetch is never cached (the next call retries). `headers` go to the manifest's origin only — a cross-origin redirect drops them unless named in `policy.crossOriginHeaders`.
 - `{ type: "store", store }` — any `SkillsStoreContract`, e.g. `MockSkillsStore`.
 
 Sources merge in order; a later source wins on a name collision.
@@ -95,6 +95,9 @@ Self-authoring is **gated and OFF unless a `review` gate is wired**:
 
 - Without `review`, the `saveSkill` tool is **never registered** — a candidate can never be written, let alone injected.
 - With `review: { approve, store }`, `saveSkill` writes an **INERT** `type: "candidate"` (`version: 0`), filtered out of every catalog/load until promoted.
+- Candidates are stored apart from live skills: a candidate saved under the name of a live skill never replaces or hides it. `runReviewGate` promotes with `store.promote(candidate.name, { description, body, tags })`, so only the content that was approved is promoted — the built-in stores throw when the stored candidate differs.
+- `saveSkill` refuses the name of a skill the library already serves unless `review.allowUpdates: true` (default `false`), and limits input: `name` 1–64 of `[A-Za-z0-9_-]`, `description` ≤ 500 chars, `body` ≤ 16,384 chars, ≤ 10 `tags` of ≤ 32 chars.
+- `proceduralSkillStore` lists and loads through a catalog index and per-skill keys (one cache read, no embedding call per run); skills from earlier releases are copied over once.
 - The `SkillReviewGate.approve(candidate)` is **default-DENY**: only `{ approve: true }` promotes the candidate to a new audited version (`promote` → `type: "promoted"`, `version + 1`). Anything else — `{ approve: false }`, a malformed result, or a **throw** (fail-closed) — keeps it inert. `runReviewGate(candidate, gate, emit?)` runs this and never throws (a throwing gate is a denial), emitting `promoted` / `denied` analytics events.
 
 The three interchangeable approve shapes — a policy fn, a validator agent, a human callback — all reduce to one `Promise<{ approve: boolean; reason? }>`.

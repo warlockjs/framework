@@ -135,6 +135,26 @@ describe("Scripts", () => {
     expect(html.split("/api/orders/:id").length - 1).toBe(1);
   });
 
+  it("embeds the locale-routing table once: the payload's document slot leaves it to the meta tag", () => {
+    const localeRouting = {
+      strategy: "prefix-except-default",
+      codes: ["en", "ar"],
+      defaultLocale: "en",
+    } as const;
+    const value = documentValue({
+      localeRouting,
+      payload: {
+        ...documentValue().payload,
+        document: { localeRouting, lang: "en" } as never,
+      },
+    });
+
+    const payload = readPayloadFromHtml(render(value)) as { document?: Record<string, unknown> };
+
+    expect(payload.document).toMatchObject({ lang: "en" });
+    expect(payload.document).not.toHaveProperty("localeRouting");
+  });
+
   it("emits only browser-safe named API metadata in its dedicated escaped channel", () => {
     const html = render(
       documentValue({ namedApiRoutes: { "orders.get": { path: "/orders/<id>", method: "GET" } } }),

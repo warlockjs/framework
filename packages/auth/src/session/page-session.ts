@@ -15,6 +15,7 @@ import {
   requiresCsrfOriginCheck,
 } from "../middleware/csrf-origin-check";
 import { authConfig } from "../services/auth-config";
+import { readAuthCookie } from "../services/auth-cookie-names";
 import { resolveRequestUser } from "../services/resolve-request-user";
 import { AuthErrorCodes } from "../utils/auth-error-codes";
 
@@ -106,7 +107,10 @@ function createModelResolver(options: SessionResolverOptions) {
     if (!headerWins && !useCookie) return null;
 
     // Cheap guest path: nothing to decode, so nothing is marked auth-derived.
-    if (!headerWins && !request.cookie(accessName) && !request.cookie(refreshName)) return null;
+    const hasCookie =
+      Boolean(readAuthCookie(request, accessName)) || Boolean(readAuthCookie(request, refreshName));
+
+    if (!headerWins && !hasCookie) return null;
 
     const allowedTypes = resolveUserTypes(options.userTypes);
     const renewalUserType = allowedTypes.length === 1 ? allowedTypes[0] : undefined;
@@ -187,13 +191,14 @@ export function sessionMiddleware(options: SessionMiddlewareOptions = {}): Middl
       const accessName = options.cookie ?? authConfig.cookie.name();
       const refreshName = options.refreshCookie ?? authConfig.cookie.refreshName();
 
-      if (request.cookie(accessName) || request.cookie(refreshName)) {
+      if (readAuthCookie(request, accessName) || readAuthCookie(request, refreshName)) {
         try {
           assertCsrfOriginAllowed(request);
         } catch (error) {
           if (!(error instanceof CsrfOriginMismatchError)) throw error;
 
-          log.error("http", "auth", error);
+          // A client error any cross-site page can trigger: debug, not error.
+          log.debug("http", "auth", error);
 
           return response.forbidden({
             error: t("auth.errors.csrfOriginMismatch"),

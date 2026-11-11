@@ -24,16 +24,16 @@
     "ar": "المستخدم غير موجود"
   },
   "otpSent": {
-    "en": "Verification code sent",
-    "ar": "تم إرسال رمز التحقق"
+    "en": "If an account uses this email, a verification code has been sent to it.",
+    "ar": "إذا كان هناك حساب بهذا البريد الإلكتروني، فقد تم إرسال رمز التحقق إليه."
   },
   "missingOtp": {
     "en": "Verification code not found",
     "ar": "رمز التحقق غير موجود"
   },
   "otpInvalid": {
-    "en": "Invalid verification code",
-    "ar": "رمز التحقق غير صالح"
+    "en": "Invalid or expired verification code. Request a new code and try again.",
+    "ar": "رمز التحقق غير صالح أو منتهي الصلاحية. اطلب رمزًا جديدًا وحاول مرة أخرى."
   },
   "otpExpired": {
     "en": "Verification code has expired",

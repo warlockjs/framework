@@ -31,7 +31,8 @@ describe("Type Rules", () => {
     expect((await validate(validator, 123)).isValid).toBe(true);
     expect((await validate(validator, 12.34)).isValid).toBe(true);
     expect((await validate(validator, "123")).isValid).toBe(false);
-    expect((await validate(validator, NaN)).isValid).toBe(true);
+    expect((await validate(validator, NaN)).isValid).toBe(false);
+    expect((await validate(validator, Infinity)).isValid).toBe(false);
   });
 
   it("booleanRule", async () => {

@@ -35,17 +35,47 @@ function assertPriority(value: unknown): asserts value is number {
   }
 }
 
-/** Every stored path carries its leading slash, so `/a` and `a` are one entry, not two. */
+/** Characters a URL may carry as they are (RFC 3986 unreserved and reserved, plus `%`). */
+const URL_UNSAFE_CHARACTER = /[^A-Za-z0-9\-._~:/?#[\]@!$&'()*+,;=%]/gu;
+/** A `%` that does not start a percent-escape. */
+const STRAY_PERCENT = /%(?![0-9A-Fa-f]{2})/g;
+
+function encodeCharacter(character: string): string {
+  try {
+    return encodeURIComponent(character);
+  } catch {
+    // A lone surrogate has no UTF-8 form; it becomes U+FFFD, like a decoder would show it.
+    return encodeURIComponent("\uFFFD");
+  }
+}
+
+/**
+ * Percent-encodes every character a sitemap URL may not carry raw: spaces,
+ * non-ASCII text (as UTF-8), and control characters, which would otherwise
+ * make the whole XML file unparseable. Existing `%XX` escapes are kept, so an
+ * already-encoded path is unchanged.
+ */
+function encodeUrlCharacters(value: string): string {
+  return value.replace(STRAY_PERCENT, "%25").replace(URL_UNSAFE_CHARACTER, encodeCharacter);
+}
+
+/**
+ * Every stored path carries its leading slash, so `/a` and `a` are one entry,
+ * not two, and is percent-encoded so a path built from user data (a slug with
+ * a space or a control character) can never break the file.
+ */
 export function normalizePath(path: unknown): string {
   if (typeof path !== "string" || path.trim() === "") {
     throw new InvalidSitemapEntryError("path is required and must be a non-empty string");
   }
 
-  // An absolute URL is left alone: the caller is overriding the base origin
-  // deliberately, which a cross-origin alternate legitimately needs.
-  if (/^https?:\/\//i.test(path)) return path;
+  const encoded = encodeUrlCharacters(path);
 
-  return path.startsWith("/") ? path : `/${path}`;
+  // An absolute URL keeps its own origin: the caller is overriding the base
+  // origin deliberately, which a cross-origin alternate legitimately needs.
+  if (/^https?:\/\//i.test(encoded)) return encoded;
+
+  return encoded.startsWith("/") ? encoded : `/${encoded}`;
 }
 
 /**

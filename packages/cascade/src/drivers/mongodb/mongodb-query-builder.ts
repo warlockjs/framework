@@ -25,10 +25,17 @@ import { UnsupportedQueryOperationError } from "../../errors/unsupported-query-o
 import { type DataSource } from "../../data-source/data-source";
 import { dataSourceRegistry } from "../../data-source/data-source-registry";
 import { assertLeanCompatible, stripHiddenFromLeanRecords } from "../../query-builder/lean-records";
+import {
+  resolvePageLimit,
+  resolvePageNumber,
+  toSafeCount,
+} from "../../query-builder/pagination-limits";
+import { runChunks, type KeysetPlan } from "../../query-builder/keyset-chunk";
 import { QueryBuilder } from "../../query-builder/query-builder";
 import { RelationLoader } from "../../relations/relation-loader";
 import { assertDefined, sanitizeFilter, sanitizeFilterValue } from "../../utils/sanitize-filter";
 import { type MongoDbDriver } from "./mongodb-driver";
+import { assertFiniteNumber, assertSafeFieldName, assertTimeString } from "./mongodb-filter-guards";
 import { MongoQueryOperations } from "./mongodb-query-operations";
 import { MongoQueryParser } from "./mongodb-query-parser";
 import { isPipelineStageObject } from "./pipeline-stage-object";
@@ -427,6 +434,8 @@ export class MongoQueryBuilder<T = unknown>
    * @param value - The time string in HH:MM:SS format
    */
   public whereTime(field: string, value: string): this {
+    // The value sits inside `$expr`, where an object is evaluated as code.
+    assertTimeString(value, field);
     this.operationsHelper.addMatchOperation("whereTime", { field, value });
     return this;
   }
@@ -437,6 +446,7 @@ export class MongoQueryBuilder<T = unknown>
    * @param value - The day of the month
    */
   public whereDay(field: string, value: number): this {
+    assertFiniteNumber(value, field, "whereDay");
     this.operationsHelper.addMatchOperation("whereDay", { field, value });
     return this;
   }
@@ -447,6 +457,7 @@ export class MongoQueryBuilder<T = unknown>
    * @param value - The month number
    */
   public whereMonth(field: string, value: number): this {
+    assertFiniteNumber(value, field, "whereMonth");
     this.operationsHelper.addMatchOperation("whereMonth", { field, value });
     return this;
   }
@@ -457,6 +468,7 @@ export class MongoQueryBuilder<T = unknown>
    * @param value - The year
    */
   public whereYear(field: string, value: number): this {
+    assertFiniteNumber(value, field, "whereYear");
     this.operationsHelper.addMatchOperation("whereYear", { field, value });
     return this;
   }
@@ -471,6 +483,7 @@ export class MongoQueryBuilder<T = unknown>
    * @param value - The value to search for
    */
   public whereJsonContains(path: string, value: unknown): this {
+    sanitizeFilterValue(value, path);
     this.operationsHelper.addMatchOperation("whereJsonContains", {
       path,
       value,
@@ -484,6 +497,7 @@ export class MongoQueryBuilder<T = unknown>
    * @param value - The value to exclude
    */
   public whereJsonDoesntContain(path: string, value: unknown): this {
+    sanitizeFilterValue(value, path);
     this.operationsHelper.addMatchOperation("whereJsonDoesntContain", {
       path,
       value,
@@ -507,6 +521,7 @@ export class MongoQueryBuilder<T = unknown>
    * @param value - The length value to compare against
    */
   public whereJsonLength(path: string, operator: WhereOperator, value: number): this {
+    assertFiniteNumber(value, path, "whereJsonLength");
     this.operationsHelper.addMatchOperation("whereJsonLength", {
       path,
       operator,
@@ -540,6 +555,7 @@ export class MongoQueryBuilder<T = unknown>
    * @param value - The length value to compare against
    */
   public whereArrayLength(field: string, operator: WhereOperator, value: number): this {
+    assertFiniteNumber(value, field, "whereArrayLength");
     this.operationsHelper.addMatchOperation("whereArrayLength", {
       field,
       operator,
@@ -909,6 +925,8 @@ export class MongoQueryBuilder<T = unknown>
   public whereSize(field: string, size: number): this;
   public whereSize(field: string, operator: ">" | ">=" | "=" | "<" | "<=", size: number): this;
   public whereSize(field: string, ...args: any[]): this {
+    assertFiniteNumber(args.length === 1 ? args[0] : args[1], field, "whereSize");
+
     if (args.length === 1) {
       this.operationsHelper.addMatchOperation("whereSize", {
         field,
@@ -935,6 +953,11 @@ export class MongoQueryBuilder<T = unknown>
    * @param filters - Optional additional filter conditions
    */
   public textSearch(query: string, filters?: WhereObject): this {
+    // The filters are spread into the `$match` verbatim, like where(object).
+    if (filters) {
+      sanitizeFilter(filters);
+    }
+
     this.operationsHelper.addMatchOperation("textSearch", { query, filters });
     return this;
   }
@@ -950,6 +973,11 @@ export class MongoQueryBuilder<T = unknown>
    * @param key - Optional key to check within array objects
    */
   public whereArrayContains(field: string, value: unknown, key?: string): this {
+    // An equality position: `{ $ne: null }` must not become an operator.
+    sanitizeFilterValue(value, field);
+    if (key !== undefined) {
+      assertSafeFieldName(key);
+    }
     this.operationsHelper.addMatchOperation("whereArrayContains", {
       field,
       value,
@@ -965,6 +993,11 @@ export class MongoQueryBuilder<T = unknown>
    * @param key - Optional key to check within array objects
    */
   public whereArrayNotContains(field: string, value: unknown, key?: string): this {
+    // An equality position: `{ $ne: null }` must not become an operator.
+    sanitizeFilterValue(value, field);
+    if (key !== undefined) {
+      assertSafeFieldName(key);
+    }
     this.operationsHelper.addMatchOperation("whereArrayNotContains", {
       field,
       value,
@@ -980,6 +1013,11 @@ export class MongoQueryBuilder<T = unknown>
    * @param key - Optional key to check within array objects
    */
   public whereArrayHasOrEmpty(field: string, value: unknown, key?: string): this {
+    // An equality position: `{ $ne: null }` must not become an operator.
+    sanitizeFilterValue(value, field);
+    if (key !== undefined) {
+      assertSafeFieldName(key);
+    }
     this.operationsHelper.addMatchOperation("whereArrayHasOrEmpty", {
       field,
       value,
@@ -995,6 +1033,11 @@ export class MongoQueryBuilder<T = unknown>
    * @param key - Optional key to check within array objects
    */
   public whereArrayNotHaveOrEmpty(field: string, value: unknown, key?: string): this {
+    // An equality position: `{ $ne: null }` must not become an operator.
+    sanitizeFilterValue(value, field);
+    if (key !== undefined) {
+      assertSafeFieldName(key);
+    }
     this.operationsHelper.addMatchOperation("whereArrayNotHaveOrEmpty", {
       field,
       value,
@@ -1020,6 +1063,7 @@ export class MongoQueryBuilder<T = unknown>
       }
     } else if (args.length === 2) {
       // Simple equality: where(field, value)
+      assertSafeFieldName(args[0]);
       this.operationsHelper.addMatchOperation(prefix, {
         field: args[0],
         operator: "=",
@@ -1031,6 +1075,7 @@ export class MongoQueryBuilder<T = unknown>
       // Every operator still binds a value, so `undefined` is rejected
       // regardless of which operator is used.
       const field = String(args[0]);
+      assertSafeFieldName(field);
       const operator = args[1];
       const value = operator === "=" ? sanitizeFilterValue(args[2], field) : args[2];
 
@@ -1487,7 +1532,8 @@ export class MongoQueryBuilder<T = unknown>
    * @param value - The maximum number of documents to return
    */
   public limit(value: number): this {
-    this.operationsHelper.addOperation("$limit", "limit", { value }, false);
+    const count = toSafeCount(value, "limit()");
+    this.operationsHelper.addOperation("$limit", "limit", { value: count }, false);
     return this;
   }
 
@@ -1496,7 +1542,8 @@ export class MongoQueryBuilder<T = unknown>
    * @param value - The number of documents to skip
    */
   public skip(value: number): this {
-    this.operationsHelper.addOperation("$skip", "skip", { value }, false);
+    const count = toSafeCount(value, "skip()");
+    this.operationsHelper.addOperation("$skip", "skip", { value: count }, false);
     return this;
   }
 
@@ -2131,7 +2178,7 @@ export class MongoQueryBuilder<T = unknown>
    * @returns the count of matching documents
    */
   public async count(): Promise<number> {
-    const pipeline = this.buildPipeline();
+    const pipeline = this.buildCountPipeline();
     pipeline.push({ $count: "total" });
 
     const results = await this.execute<{ total: number }>(pipeline);
@@ -2402,6 +2449,14 @@ export class MongoQueryBuilder<T = unknown>
 
   /**
    * Processes query results in chunks, executing a callback for each chunk.
+   *
+   * When the query is not ordered, or ordered by `_id` / the model's primary
+   * key alone, each chunk continues after the last key seen (keyset paging):
+   * every chunk costs the same, and rows the callback updates or deletes do
+   * not shift later chunks. An unordered query is read in `_id` order. Any
+   * other query (another sort, `limit`/`skip`, grouping, joins, a top-level
+   * `orWhere`) pages by `skip`.
+   *
    * @param size - The number of documents per chunk
    * @param callback - Function to execute for each chunk
    * @returns void
@@ -2410,28 +2465,75 @@ export class MongoQueryBuilder<T = unknown>
     size: number,
     callback: (rows: T[], chunkIndex: number) => Promise<boolean | void> | boolean | void,
   ): Promise<void> {
-    let chunkIndex = 0;
-    let hasMore = true;
+    // Scopes first: a scope's own sort or filters decide the plan too.
+    this.applyPendingScopes();
 
-    while (hasMore) {
-      const chunk = await this.clone()
-        .skip(chunkIndex * size)
-        .limit(size)
-        .get();
+    const plan = this.keysetChunkPlan();
 
-      if (chunk.length === 0) {
-        break;
+    await runChunks<T>(size, callback, plan, (page, pageSize) => {
+      const query = this.clone();
+
+      if (plan) {
+        if (page.after !== undefined) {
+          query.where(plan.key, plan.direction === "asc" ? ">" : "<", page.after);
+        }
+
+        if (!plan.sorted) {
+          query.orderBy(plan.key, plan.direction);
+        }
       }
 
-      const shouldContinue = await callback(chunk, chunkIndex);
-
-      if (shouldContinue === false) {
-        break;
+      if (page.offset !== undefined) {
+        query.skip(page.offset);
       }
 
-      hasMore = chunk.length === size;
-      chunkIndex++;
+      return query.limit(pageSize).get();
+    });
+  }
+
+  /**
+   * The keyset plan for `chunk()`, or undefined when the query must page by
+   * `skip` (see {@link chunk}).
+   */
+  private keysetChunkPlan(): KeysetPlan | undefined {
+    const primaryKey = (this.modelClass as { primaryKey?: string } | undefined)?.primaryKey;
+    let sortField: string | undefined;
+    let direction: "asc" | "desc" = "asc";
+
+    for (const op of this.operations) {
+      if (op.stage === "$match") {
+        // A later `where` joins a top-level `orWhere` chain as another OR
+        // branch, so the key condition could not narrow it.
+        if (op.type.startsWith("orWhere")) return undefined;
+        continue;
+      }
+
+      if (op.stage === "$project" && op.mergeable) continue;
+
+      if (op.stage === "$sort" && op.type === "orderBy") {
+        const opDirection = op.data.direction === "asc" ? "asc" : "desc";
+
+        if (sortField !== undefined && (sortField !== op.data.field || direction !== opDirection)) {
+          return undefined;
+        }
+
+        sortField = op.data.field;
+        direction = opDirection;
+        continue;
+      }
+
+      return undefined;
     }
+
+    if (sortField === undefined) {
+      return { key: "_id", direction: "asc", sorted: false };
+    }
+
+    if (sortField === "_id" || (primaryKey !== undefined && sortField === primaryKey)) {
+      return { key: sortField, direction, sorted: true };
+    }
+
+    return undefined;
   }
 
   /**
@@ -2440,8 +2542,8 @@ export class MongoQueryBuilder<T = unknown>
    * @returns pagination result with data and metadata
    */
   public async paginate(options?: PaginationOptions): Promise<PaginationResult<T>> {
-    const page = options?.page ?? 1;
-    const limit = options?.limit ?? 10;
+    const page = resolvePageNumber(options?.page);
+    const limit = resolvePageLimit(options?.limit, options?.maxLimit, "paginate");
     const skip = (page - 1) * limit;
 
     const [data, total] = await Promise.all([
@@ -2468,7 +2570,7 @@ export class MongoQueryBuilder<T = unknown>
   public async cursorPaginate(
     options?: CursorPaginationOptions,
   ): Promise<CursorPaginationResult<T>> {
-    const limit = options?.limit ?? 10;
+    const limit = resolvePageLimit(options?.limit, options?.maxLimit, "cursorPaginate");
     const cursor = options?.cursor;
     const column = options?.column ?? "id";
     const direction = options?.direction ?? "next";
@@ -2583,7 +2685,79 @@ export class MongoQueryBuilder<T = unknown>
       collection: this.collection,
       operations: this.operations,
       createSubBuilder: () => new MongoQueryBuilder(this.table, this.dataSource),
+      likeLimits: (this.dataSource.driver as MongoDbDriver).likeLimits,
     });
+  }
+
+  /**
+   * Build the pipeline `count()` runs: the read pipeline without the stages
+   * that cannot change how many documents come out. A `$sort` (the default
+   * list order) would otherwise sort the whole matched set only to count it,
+   * and a left `$lookup` would run one join per matched document.
+   *
+   * Dropped: `orderBy` sorts, and select projections, `addFields` and left
+   * joins that no later filter or grouping can read. Kept: every filter,
+   * grouping, unwind, inner join, random sample, limit/skip and raw stage.
+   */
+  protected buildCountPipeline(): any[] {
+    this.applyPendingScopes();
+
+    const operations = this.operations.filter((op, index) => !this.isCountNeutral(op, index));
+
+    return new MongoQueryParser({
+      collection: this.collection,
+      operations,
+      createSubBuilder: () => new MongoQueryBuilder(this.table, this.dataSource),
+      likeLimits: (this.dataSource.driver as MongoDbDriver).likeLimits,
+    }).parse();
+  }
+
+  /**
+   * Whether dropping `operations[index]` leaves the number of documents the
+   * pipeline yields unchanged (see {@link buildCountPipeline}).
+   */
+  private isCountNeutral(op: Operation, index: number): boolean {
+    if (op.stage === "$sort") {
+      return op.type === "orderBy";
+    }
+
+    const isLeftJoin = op.stage === "$lookup" && op.data?.type !== "inner";
+
+    if (op.stage !== "$project" && op.stage !== "$addFields" && !isLeftJoin) {
+      return false;
+    }
+
+    // Safe only when nothing after it can read the fields it adds or
+    // renames: later ops may only sort, project, limit or skip — or, for a
+    // projection, filter in the same segment (those filters run before it).
+    let barrierSeen = isLeftJoin || op.stage === "$addFields";
+
+    for (const next of this.operations.slice(index + 1)) {
+      const reorderable =
+        next.mergeable &&
+        (next.stage === "$match" || next.stage === "$project" || next.stage === "$sort");
+
+      if (next.stage === "$match") {
+        if (barrierSeen || !reorderable) return false;
+        continue;
+      }
+
+      if (
+        next.stage !== "$sort" &&
+        next.stage !== "$project" &&
+        next.stage !== "$addFields" &&
+        next.stage !== "$limit" &&
+        next.stage !== "$skip"
+      ) {
+        return false;
+      }
+
+      if (!reorderable) {
+        barrierSeen = true;
+      }
+    }
+
+    return true;
   }
 
   /**
@@ -2605,6 +2779,33 @@ export class MongoQueryBuilder<T = unknown>
     // Build the pipeline (this applies pending scopes, even with no user filters)
     // and extract the first $match stage
     const pipeline = this.buildPipeline();
+
+    // Writes send only that first `$match` as the filter. A stage that
+    // narrows the matched set in another way (a grouped `having`, an inner
+    // join, a vector search, a second `$match`) would be dropped and the
+    // write would reach documents the read would not return: refuse it.
+    const narrowingStage = pipeline.find(
+      (stage, index) =>
+        stage.$group ||
+        stage.$unwind ||
+        stage.$vectorSearch ||
+        stage.$setWindowFields ||
+        // An inner join: the `$lookup` followed by the match dropping rows
+        // with no joined document.
+        (stage.$lookup && pipeline[index + 1]?.$match?.[stage.$lookup.as] !== undefined),
+    );
+    const matchCount = pipeline.filter((stage) => stage.$match).length;
+
+    if (narrowingStage || matchCount > 1) {
+      const stageName = narrowingStage ? Object.keys(narrowingStage)[0] : "a second $match";
+
+      throw new UnsupportedQueryOperationError(
+        "update/delete",
+        "mongodb",
+        `The query holds ${stageName}, which a write filter cannot apply. Narrow the write with where() clauses only, or read the ids first and write with whereIn("id", ids).`,
+      );
+    }
+
     const matchStage = pipeline.find((stage) => stage.$match);
 
     if (matchStage && matchStage.$match) {
@@ -2731,7 +2932,7 @@ export class MongoQueryBuilder<T = unknown>
    * @param count - Optional count to compare against
    */
   public has(relation: string, operator?: string, count?: number): this {
-    // TODO: Implement has() using $lookup and $match
+    // Not translated on MongoDB yet: the parser refuses it when the query runs.
     this.operationsHelper.addMatchOperation("has", { relation, operator, count });
     return this;
   }
@@ -2742,8 +2943,22 @@ export class MongoQueryBuilder<T = unknown>
    * @param callback - Callback to define conditions
    */
   public whereHas(relation: string, callback: (query: QueryBuilderContract) => void): this {
-    // TODO: Implement whereHas() using $lookup with pipeline
+    // Not translated on MongoDB yet: the parser refuses it when the query runs.
     this.operationsHelper.addMatchOperation("whereHas", { relation, callback });
+    return this;
+  }
+
+  /**
+   * OR-joined variant of `whereHas`.
+   * @param relation - Relation name
+   * @param callback - Callback to define conditions
+   */
+  public override orWhereHas(
+    relation: string,
+    callback: (query: QueryBuilderContract) => void,
+  ): this {
+    // Not translated on MongoDB yet: the parser refuses it when the query runs.
+    this.operationsHelper.addMatchOperation("orWhereHas", { relation, callback });
     return this;
   }
 
@@ -2752,7 +2967,7 @@ export class MongoQueryBuilder<T = unknown>
    * @param relation - Relation name
    */
   public doesntHave(relation: string): this {
-    // TODO: Implement doesntHave() using $lookup and $match
+    // Not translated on MongoDB yet: the parser refuses it when the query runs.
     this.operationsHelper.addMatchOperation("doesntHave", { relation });
     return this;
   }
@@ -2763,7 +2978,7 @@ export class MongoQueryBuilder<T = unknown>
    * @param callback - Callback to define conditions
    */
   public whereDoesntHave(relation: string, callback: (query: QueryBuilderContract) => void): this {
-    // TODO: Implement whereDoesntHave() using $lookup with pipeline
+    // Not translated on MongoDB yet: the parser refuses it when the query runs.
     this.operationsHelper.addMatchOperation("whereDoesntHave", { relation, callback });
     return this;
   }

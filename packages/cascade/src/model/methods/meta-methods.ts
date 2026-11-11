@@ -115,6 +115,14 @@ function applyLocalDelta(model: Model, field: string, delta: number): void {
     return;
   }
 
+  if (!tracker.hasChanges()) {
+    // Nothing else pending (the common case): move the one value into the
+    // baseline without copying the whole document.
+    tracker.setAtPath(field, value);
+    tracker.reset();
+    return;
+  }
+
   const pending = tracker.getDirtyColumnsWithValues();
   const baseline = structuredClone(model.data) as Record<string, unknown>;
 

@@ -161,7 +161,23 @@ CORS comes from `@fastify/cors`, configured via `http.cors` (a `FastifyCorsOptio
 
 ### Cookies
 
-`@fastify/cookie` is always registered. Set `http.cookies.secret` to enable **signed** cookies; `http.cookies.options` becomes the cookie `parseOptions`. Without a secret, cookies are parsed but unsigned — fine for non-sensitive values, not for anything a client shouldn't be able to forge.
+`@fastify/cookie` is always registered, and `http.cookies.options` becomes the cookie `parseOptions`. A cookie is whatever the client sends: `request.cookie(name)` returns it unverified, so a client can edit it freely.
+
+For a value the client must not change, set `http.cookies.secret` **and** write and read the cookie as signed. The secret alone signs nothing:
+
+```ts
+response.cookie("cartOwner", ownerId, { signed: true }); // signed with http.cookies.secret
+
+const ownerId = request.signedCookie("cartOwner"); // undefined when missing or changed
+```
+
+`request.signedCookie(name, defaultValue?)` verifies the signature and returns `defaultValue` (or `undefined`) for a missing, unsigned or edited cookie. Both `signed: true` and `signedCookie()` throw an error naming `http.cookies.secret` when no secret is set.
+
+`request.cookie()` parses a value that is valid JSON, so the client picks its type (`{"a":1}` comes back as an object). Pass `{ json: false }` to get the raw string, or set `http.cookies.json: false` to make that the default (string values are then also written without JSON quoting):
+
+```ts
+const theme = request.cookie("theme", "light", { json: false }); // always a string
+```
 
 ### Request-id correlation
 
@@ -169,11 +185,13 @@ Every request gets a `request.id`. The framework echoes it back as a response he
 
 Inherited values are validated before use — non-empty printable ASCII, max 128 characters — to block log-injection from a malicious client (a forged newline in a header could otherwise corrupt your log stream). Knobs under `http.requestId`:
 
-| Key         | Default          | Effect                                                                                            |
-| ----------- | ---------------- | ------------------------------------------------------------------------------------------------- |
-| `header`    | `"X-Request-Id"` | Inbound + outbound header name.                                                                   |
-| `generator` | random 32-char   | Override the id generator.                                                                        |
-| `enabled`   | `true`           | Set `false` to stop echoing and inheriting. `request.id` is still generated for internal logging. |
+| Key         | Default          | Effect                          |
+| ----------- | ---------------- | ------------------------------- |
+| `header`    | `"X-Request-Id"` | Inbound + outbound header name. |
+| `generator` | random 32-char   | Override the id generator.      |
+
+An inherited id is used only while no other request with the same id is being answered: `request.id` keys the request's log records, so a client repeating the id of a request in flight gets a fresh id instead of merging its records into that one.
+| `enabled` | `true` | Set `false` to stop echoing and inheriting. `request.id` is still generated for internal logging. |
 
 ### Content-Security-Policy — new in 5.12
 
@@ -261,7 +279,31 @@ Need a header the framework does not manage? `app.http.addHook("onRequest", …)
 | `"10.0.0.0/8"`, `"loopback, 10.0.0.0/8"`, `["10.0.0.0/8", "192.168.0.0/16"]` | Walks left while each hop is a listed proxy, stops at the first that isn't.                                                            |
 | `(address, hop) => boolean`                                                  | Your own predicate.                                                                                                                    |
 
-Prefer the narrowest shape your topology allows. With `true`, any client that can reach the process directly can pick its own IP — an `ipFilter` allowlist in front of it becomes decorative. **`X-Real-IP` is honoured only under `trustProxy: true`** — it carries no chain to walk a proxy list against; under a bounded `trustProxy` the client IP comes from `X-Forwarded-For` instead, so if your edge only sets `X-Real-IP`, have it set `X-Forwarded-For` too.
+Prefer a list of your proxies' addresses. With `true`, the client IP is the leftmost `X-Forwarded-For` entry, and an edge that appends to that header (most load balancers and CDNs) leaves the client's own value there, so `true` is spoofable even when only your edge can reach the process. A production boot with `trustProxy: true` and no `realIpHeader` logs a warning.
+
+**Single-address headers (`X-Real-IP`, `CF-Connecting-IP`) are not read unless you name one** in `http.realIpHeader`. Many edges never set or strip those headers, so the client's own value would pass through. Set it only when your edge overwrites that header on every request; it is honoured only when `trustProxy` trusts the socket peer that sent it:
+
+```ts title="src/config/http.ts"
+trustProxy: ["173.245.48.0/20", "103.21.244.0/22"], // your edge's addresses
+realIpHeader: "cf-connecting-ip",
+```
+
+> **Changed in 5.53.** Earlier releases read `X-Real-IP` whenever `trustProxy` was `true`. If your edge sets only `X-Real-IP` (for example nginx `proxy_set_header X-Real-IP $remote_addr`), set `realIpHeader: "x-real-ip"`; otherwise the client IP comes from `X-Forwarded-For`.
+
+### Allowed hosts
+
+`http.allowedHosts` (unset by default) lists the hosts the app answers. A request whose host is not listed is refused with 400 (`code: "EC110"`) before routing. Entries are exact hosts or leading-dot suffixes (`".example.com"` matches the domain and every subdomain); the port is ignored. The host checked is the `Host` header, or `X-Forwarded-Host` when `trustProxy` trusts the proxy that sent it. The health endpoints are exempt, so orchestrators can probe by address.
+
+```ts
+allowedHosts: ["example.com", ".example.com"],
+```
+
+### Request timeout and input limits
+
+- **`http.requestTimeout`** (default `300000`, 5 minutes) bounds how long a client may take to send one request, headers and body. It does not limit the response, so event streams and long downloads are unaffected. `0` turns it off; `serverOptions.requestTimeout` wins over it. Raise it for large uploads on slow connections.
+- **`http.input.maxArrayIndex`** (default `1000`): query, urlencoded and multipart keys that name a larger array index (`a[4294967294]=x`) are dropped, so one short key cannot create a huge sparse array.
+- **`http.urlencoded.maxFields`** (default `1000`): a form body with more fields is answered 413 (`code: "EC107"`).
+- Multipart limits (`http.multipart.maxTotalSize`, `http.multipart.routes`) are described in [File uploads](./file-uploads.md).
 
 #### The value is validated at boot (5.2)
 
@@ -329,7 +371,7 @@ Concrete, verified-against-the-code steps. Only knobs that actually exist are li
 - **Hash passwords with `hashPassword`, never `encrypt` or `hmacHash`.** bcrypt only, on signup / login / password-change — never on the per-request hot path.
 - **Encrypt recoverable secrets, fingerprint them with `hmacHash` for lookup.** Look up by fingerprint; decrypt only at the moment of use. Never log a decrypted value.
 - **Lock down CORS** via `http.cors`. **Since 4.13.0 your configuration wins** — in 4.12.0 and earlier it was silently overridden by the permissive default.
-- **Sign cookies** by setting `http.cookies.secret` whenever a cookie value must not be client-forgeable.
+- **Sign the cookies that must not be client-forgeable**: set `http.cookies.secret`, write them with `response.cookie(name, value, { signed: true })` and read them with `request.signedCookie(name)`. The secret alone signs nothing.
 - **Consider `http.csp` (new in 5.12)** — opt-in `Content-Security-Policy`, off by default. Start with `reportOnly: true` to observe violations before enforcing.
 - **Check `http.bodyLimit`** — **since 4.13.0 it defaults to Fastify's own 1 MB** rather than the previous 200 GB — and add `middleware.maxBodySize()` on routes that accept user payloads.
 - **Add `middleware.rateLimit()`** to login, OTP, password-reset, and other abuse-prone endpoints — tighter than the global `http.rateLimit` backstop. Use a Redis store via `http.rateLimit` if you run multiple replicas and need a shared cap.

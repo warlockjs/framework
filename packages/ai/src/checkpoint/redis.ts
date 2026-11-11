@@ -3,6 +3,7 @@ import type {
   CheckpointStore,
 } from "../contracts/orchestrator/checkpoint-store.contract";
 import type { RedisClientLike } from "../contracts/orchestrator/snapshot-store.contract";
+import { redisSetCommands, type RedisSetCommands } from "../utils/redis-set-commands";
 
 /**
  * Options for the Redis {@link CheckpointStore} (orchestrator.md §8.3).
@@ -11,7 +12,11 @@ import type { RedisClientLike } from "../contracts/orchestrator/snapshot-store.c
  * `redis` and never opens or closes the client.
  */
 export type RedisCheckpointOptions = {
-  /** An already-connected `redis` client — anything matching {@link RedisClientLike}. */
+  /**
+   * An already-connected `redis` client — anything matching {@link RedisClientLike}.
+   * When the client also has the set commands (`sAdd`/`sRem`/`sMembers`
+   * or `sadd`/`srem`/`smembers`), the session index is kept as a Redis set.
+   */
   client: RedisClientLike;
   /**
    * Key prefix for every key this store writes. Lets one Redis database
@@ -30,41 +35,59 @@ export type RedisCheckpointOptions = {
 const DEFAULT_PREFIX = "warlock:orchestrator";
 
 /**
- * Per-session document persisted under one Redis key: the append-only
- * list of {@link CheckpointRecord} rows in turn order, mirroring the
- * Postgres append-only PK shape (§8.6) inside a single JSON value so
- * the store needs only `get`/`set`/`del` from {@link RedisClientLike}.
+ * Session head document persisted under the session key: the turn-index
+ * range whose rows are stored, one Redis key per turn. `save` writes one
+ * turn key plus this small head, and `load` reads the head plus the latest
+ * turn key — neither touches the session's older rows.
  */
-type SessionDocument = {
+type SessionHead = {
+  layout: 2;
+  /** Lowest turn index that may still have a stored row. */
+  firstTurn: number;
+  /** Highest stored turn index — the live session state. */
+  latestTurn: number;
+};
+
+/**
+ * Earlier layout of the session key: every row of the session inside one
+ * JSON value. Still read so sessions written by an earlier release keep
+ * loading; the first write (`save` / `prune`) moves the rows to one key per
+ * turn.
+ */
+type LegacySessionDocument = {
   rows: CheckpointRecord[];
 };
 
 /**
- * Per-orchestrator index document: the set of live session ids. Kept as
- * a JSON array because {@link RedisClientLike} exposes no `keys` / `scan`
- * — enumeration for the §9.3 boot drain must be self-maintained.
+ * Earlier layout of the per-orchestrator index (and the fallback layout
+ * for a client without set commands): a JSON array of live session ids.
  */
 type IndexDocument = {
   sessionIds: string[];
 };
 
+/** What the session key holds: the current head, an earlier-layout document, or nothing. */
+type SessionState =
+  | { type: "head"; head: SessionHead }
+  | { type: "legacy"; rows: CheckpointRecord[] }
+  | { type: "none" };
+
 /**
  * Redis-backed {@link CheckpointStore} (orchestrator.md §8.2).
  *
- * Owns: the per-session append-only document, a per-orchestrator
+ * Owns: one key per stored turn plus a small per-session head (so `save`
+ * and `load` cost the same on turn 5 and turn 5,000), a per-orchestrator
  * session-id index (so {@link RedisCheckpointStore.list} works without
  * `KEYS`/`SCAN`), the "latest turn wins" load, and the §4-Phase-6
  * retention prune. Does NOT own: durability guarantees beyond Redis's
  * own, the connection lifecycle (the dev passes a client), or the
  * `keepSnapshots` policy (that lives on the orchestrator config).
  *
- * Because {@link RedisClientLike} is intentionally minimal (`get` /
- * `set` / `del` only — §8.4), the store models a session as a single
- * JSON document rather than one Redis key per turn. This keeps every
- * operation a single round-trip and avoids depending on key scanning,
- * at the cost of read-modify-write on `save`. Callers must serialize
- * traffic per `sessionId` anyway (§17 "two turns racing"), so the
- * read-modify-write is safe under that contract.
+ * The session-id index is a Redis set when the client exposes the set
+ * commands (`sAdd`/`sRem`/`sMembers` or `sadd`/`srem`/`smembers`), so
+ * concurrent first saves never drop an id. A client with only
+ * `get`/`set`/`del` keeps the index as a JSON document, updated on a
+ * session's first save and on delete.
  *
  * Front it with the {@link redis} factory — callers never `new` it.
  */
@@ -72,11 +95,20 @@ class RedisCheckpointStore implements CheckpointStore {
   /** The dev-supplied redis client. Never disconnected by the store. */
   private readonly client: RedisClientLike;
 
+  /** Set commands of the client, or `undefined` for a `get`/`set`/`del`-only client. */
+  private readonly sets?: RedisSetCommands;
+
   /** Key prefix namespacing every key this store writes. */
   private readonly prefix: string;
 
   /** Idle-key TTL in seconds, or `undefined` for no expiry. */
   private ttl?: number;
+
+  /**
+   * One-time move of each orchestrator's earlier JSON index into the
+   * Redis set, memoized per orchestrator name for the process lifetime.
+   */
+  private readonly indexMigrations = new Map<string, Promise<void>>();
 
   public constructor(options: RedisCheckpointOptions) {
     if (
@@ -91,105 +123,178 @@ class RedisCheckpointStore implements CheckpointStore {
     }
 
     this.client = options.client;
+    this.sets = redisSetCommands(options.client);
     this.prefix = options.prefix ?? DEFAULT_PREFIX;
     this.ttl = options.ttl;
   }
 
   /**
    * Return the latest checkpoint (highest `turn_index`) for a session,
-   * or `undefined` when the session has no document. Rows are appended
-   * in turn order, so the last element is the latest.
+   * or `undefined` when the session has no rows. Reads the head and the
+   * latest turn key only.
    */
   public async load(
     orchestratorName: string,
     sessionId: string,
   ): Promise<CheckpointRecord | undefined> {
-    const document = await this.readSession(orchestratorName, sessionId);
+    const state = await this.readSession(orchestratorName, sessionId);
 
-    if (!document || document.rows.length === 0) {
+    if (state.type === "legacy") {
+      return state.rows.at(-1);
+    }
+
+    if (state.type === "none") {
       return undefined;
     }
 
-    return document.rows[document.rows.length - 1];
+    const raw = await this.client.get(
+      this.turnKey(orchestratorName, sessionId, state.head.latestTurn),
+    );
+
+    if (raw === null) {
+      return undefined;
+    }
+
+    return JSON.parse(raw) as CheckpointRecord;
   }
 
   /**
-   * Append a checkpoint row to its session document, creating the
-   * document and indexing the session id on first write. Append-only —
-   * an existing `turn_index` is never overwritten; a fresh row is
-   * pushed (§4 Phase 6, Q15).
+   * Store a checkpoint row under its own turn key and advance the session
+   * head. A re-save of the same `turn_index` (compaction lock / marker
+   * updates) replaces that turn's row, so the latest write wins. The
+   * session id is indexed on the session's first save.
    */
   public async save(record: CheckpointRecord): Promise<void> {
-    const { orchestrator_name, session_id } = record;
+    const { orchestrator_name, session_id, turn_index } = record;
 
-    const document = (await this.readSession(orchestrator_name, session_id)) ?? { rows: [] };
+    const state = await this.readSession(orchestrator_name, session_id);
+    const head =
+      state.type === "legacy"
+        ? await this.migrateRows(orchestrator_name, session_id, state.rows)
+        : state.type === "head"
+          ? state.head
+          : undefined;
 
-    document.rows.push(record);
+    await this.write(
+      this.turnKey(orchestrator_name, session_id, turn_index),
+      JSON.stringify(record),
+    );
 
-    await this.writeSession(orchestrator_name, session_id, document);
-    await this.indexSession(orchestrator_name, session_id);
+    const next: SessionHead = head
+      ? {
+          layout: 2,
+          firstTurn: Math.min(head.firstTurn, turn_index),
+          latestTurn: Math.max(head.latestTurn, turn_index),
+        }
+      : { layout: 2, firstTurn: turn_index, latestTurn: turn_index };
+
+    await this.writeHead(orchestrator_name, session_id, next);
+
+    // A set add is O(1) and idempotent, so it runs on every save (and
+    // re-indexes a session `list()` dropped after its keys expired). The
+    // JSON-document fallback only pays its read-modify-write on the
+    // session's first save.
+    if (this.sets || state.type === "none") {
+      await this.indexSession(orchestrator_name, session_id);
+    }
   }
 
   /**
-   * Drop a session document and de-index its session id.
+   * Drop every stored row of a session and de-index its session id.
    */
   public async delete(orchestratorName: string, sessionId: string): Promise<void> {
+    const state = await this.readSession(orchestratorName, sessionId);
+
+    if (state.type === "head") {
+      await this.deleteTurns(
+        orchestratorName,
+        sessionId,
+        state.head.firstTurn,
+        state.head.latestTurn + 1,
+      );
+    }
+
     await this.client.del(this.sessionKey(orchestratorName, sessionId));
     await this.deindexSession(orchestratorName, sessionId);
   }
 
   /**
    * List the session ids known for an orchestrator, optionally filtered
-   * by a session-id prefix. Reads the self-maintained index document
-   * (§9.3 boot drain).
+   * by a session-id prefix (§9.3 boot drain). With an idle TTL, ids whose
+   * session keys have expired are dropped from the index here.
    */
   public async list(orchestratorName: string, prefix?: string): Promise<string[]> {
-    const index = await this.readIndex(orchestratorName);
+    let sessionIds = await this.readIndex(orchestratorName);
 
-    if (prefix === undefined) {
-      return [...index.sessionIds];
+    if (this.ttl !== undefined && this.ttl > 0) {
+      sessionIds = await this.dropExpired(orchestratorName, sessionIds);
     }
 
-    return index.sessionIds.filter((sessionId) => sessionId.startsWith(prefix));
+    if (prefix === undefined) {
+      return sessionIds;
+    }
+
+    return sessionIds.filter((sessionId) => sessionId.startsWith(prefix));
   }
 
   /**
-   * Prune retained turns for a session down to the most recent
-   * `keepSnapshots` rows (orchestrator.md §4 Phase 6 / §15.2). Drops
-   * every row whose `turn_index` is below `(max_turn_index -
-   * keepSnapshots)`. The orchestrator calls this synchronously after a
-   * successful {@link save} when `keepSnapshots` is a finite number;
-   * `"all"` retention skips the call. Additive to the
-   * {@link CheckpointStore} contract — the policy stays on the
-   * orchestrator and the store only executes the bounded trim.
+   * Drop every row of a session whose `turn_index` is strictly below
+   * `keepBeforeTurnIndex` (orchestrator.md §4 Phase 6 / §15.2). The
+   * orchestrator calls this after each settled turn's save with
+   * `latest turn - keepSnapshots + 1`, so at most `keepSnapshots` rows
+   * stay; `"all"` retention skips the call. A bound above the latest turn
+   * removes the session entirely.
    */
   public async prune(
     orchestratorName: string,
     sessionId: string,
-    keepSnapshots: number,
+    keepBeforeTurnIndex: number,
   ): Promise<void> {
-    if (!Number.isFinite(keepSnapshots) || keepSnapshots < 0) {
+    if (!Number.isFinite(keepBeforeTurnIndex)) {
       return;
     }
 
-    const document = await this.readSession(orchestratorName, sessionId);
+    const state = await this.readSession(orchestratorName, sessionId);
 
-    if (!document || document.rows.length === 0) {
+    if (state.type === "none") {
       return;
     }
 
-    const lastRow = document.rows.at(-1);
-    if (!lastRow) return;
-    const maxTurnIndex = lastRow.turn_index;
-    const threshold = maxTurnIndex - keepSnapshots;
+    if (state.type === "legacy") {
+      const kept = state.rows.filter((row) => row.turn_index >= keepBeforeTurnIndex);
 
-    const kept = document.rows.filter((row) => row.turn_index >= threshold);
+      if (kept.length === 0) {
+        await this.delete(orchestratorName, sessionId);
 
-    if (kept.length === document.rows.length) {
+        return;
+      }
+
+      const head = await this.migrateRows(orchestratorName, sessionId, kept);
+
+      if (head) {
+        await this.writeHead(orchestratorName, sessionId, head);
+      }
+
       return;
     }
 
-    await this.writeSession(orchestratorName, sessionId, { rows: kept });
+    const { head } = state;
+
+    if (keepBeforeTurnIndex <= head.firstTurn) {
+      return;
+    }
+
+    if (keepBeforeTurnIndex > head.latestTurn) {
+      await this.delete(orchestratorName, sessionId);
+
+      return;
+    }
+
+    await this.deleteTurns(orchestratorName, sessionId, head.firstTurn, keepBeforeTurnIndex);
+    await this.writeHead(orchestratorName, sessionId, {
+      ...head,
+      firstTurn: keepBeforeTurnIndex,
+    });
   }
 
   /**
@@ -210,39 +315,100 @@ class RedisCheckpointStore implements CheckpointStore {
   }
 
   /**
-   * Read and parse a session document, or `undefined` when the key is
-   * absent.
+   * Read the session key: the current head, an earlier-layout document
+   * holding every row, or nothing.
    */
-  private async readSession(
-    orchestratorName: string,
-    sessionId: string,
-  ): Promise<SessionDocument | undefined> {
+  private async readSession(orchestratorName: string, sessionId: string): Promise<SessionState> {
     const raw = await this.client.get(this.sessionKey(orchestratorName, sessionId));
 
     if (raw === null) {
-      return undefined;
+      return { type: "none" };
     }
 
-    return JSON.parse(raw) as SessionDocument;
+    const parsed = JSON.parse(raw) as Partial<SessionHead> & Partial<LegacySessionDocument>;
+
+    if (Array.isArray(parsed.rows)) {
+      return parsed.rows.length === 0 ? { type: "none" } : { type: "legacy", rows: parsed.rows };
+    }
+
+    if (typeof parsed.firstTurn === "number" && typeof parsed.latestTurn === "number") {
+      return {
+        type: "head",
+        head: { layout: 2, firstTurn: parsed.firstTurn, latestTurn: parsed.latestTurn },
+      };
+    }
+
+    return { type: "none" };
   }
 
   /**
-   * Serialize and persist a session document, honoring the configured
-   * idle TTL when set.
+   * Move earlier-layout rows to one key per turn. Rows are written in
+   * stored order, so a later row for the same turn index wins. Returns
+   * the head describing the moved range (the caller writes it), or
+   * `undefined` for an empty list.
    */
-  private async writeSession(
+  private async migrateRows(
     orchestratorName: string,
     sessionId: string,
-    document: SessionDocument,
+    rows: CheckpointRecord[],
+  ): Promise<SessionHead | undefined> {
+    let head: SessionHead | undefined;
+
+    for (const row of rows) {
+      await this.write(
+        this.turnKey(orchestratorName, sessionId, row.turn_index),
+        JSON.stringify(row),
+      );
+
+      head = head
+        ? {
+            layout: 2,
+            firstTurn: Math.min(head.firstTurn, row.turn_index),
+            latestTurn: Math.max(head.latestTurn, row.turn_index),
+          }
+        : { layout: 2, firstTurn: row.turn_index, latestTurn: row.turn_index };
+    }
+
+    return head;
+  }
+
+  /** Delete the turn keys in `[fromTurn, toTurn)`. */
+  private async deleteTurns(
+    orchestratorName: string,
+    sessionId: string,
+    fromTurn: number,
+    toTurn: number,
   ): Promise<void> {
-    await this.write(this.sessionKey(orchestratorName, sessionId), JSON.stringify(document));
+    for (let turn = fromTurn; turn < toTurn; turn++) {
+      await this.client.del(this.turnKey(orchestratorName, sessionId, turn));
+    }
+  }
+
+  /** Persist a session head, honoring the configured idle TTL. */
+  private async writeHead(
+    orchestratorName: string,
+    sessionId: string,
+    head: SessionHead,
+  ): Promise<void> {
+    await this.write(this.sessionKey(orchestratorName, sessionId), JSON.stringify(head));
   }
 
   /**
-   * Read and parse the per-orchestrator index document, defaulting to an
-   * empty index when absent.
+   * Read the session ids of an orchestrator: the Redis set when the client
+   * has set commands, otherwise the JSON index document.
    */
-  private async readIndex(orchestratorName: string): Promise<IndexDocument> {
+  private async readIndex(orchestratorName: string): Promise<string[]> {
+    if (this.sets) {
+      await this.migrateIndex(orchestratorName);
+
+      return this.sets.members(this.setKey(orchestratorName));
+    }
+
+    return (await this.readIndexDocument(orchestratorName)).sessionIds;
+  }
+
+  /** Read and parse the JSON index document, defaulting to an empty index. */
+  private async readIndexDocument(orchestratorName: string): Promise<IndexDocument> {
     const raw = await this.client.get(this.indexKey(orchestratorName));
 
     if (raw === null) {
@@ -252,12 +418,16 @@ class RedisCheckpointStore implements CheckpointStore {
     return JSON.parse(raw) as IndexDocument;
   }
 
-  /**
-   * Add a session id to the per-orchestrator index, no-op when already
-   * present.
-   */
+  /** Add a session id to the orchestrator's index. */
   private async indexSession(orchestratorName: string, sessionId: string): Promise<void> {
-    const index = await this.readIndex(orchestratorName);
+    if (this.sets) {
+      await this.migrateIndex(orchestratorName);
+      await this.sets.add(this.setKey(orchestratorName), sessionId);
+
+      return;
+    }
+
+    const index = await this.readIndexDocument(orchestratorName);
 
     if (index.sessionIds.includes(sessionId)) {
       return;
@@ -268,12 +438,16 @@ class RedisCheckpointStore implements CheckpointStore {
     await this.write(this.indexKey(orchestratorName), JSON.stringify(index));
   }
 
-  /**
-   * Remove a session id from the per-orchestrator index, no-op when
-   * absent.
-   */
+  /** Remove a session id from the orchestrator's index. */
   private async deindexSession(orchestratorName: string, sessionId: string): Promise<void> {
-    const index = await this.readIndex(orchestratorName);
+    if (this.sets) {
+      await this.migrateIndex(orchestratorName);
+      await this.sets.remove(this.setKey(orchestratorName), sessionId);
+
+      return;
+    }
+
+    const index = await this.readIndexDocument(orchestratorName);
     const next = index.sessionIds.filter((id) => id !== sessionId);
 
     if (next.length === index.sessionIds.length) {
@@ -281,6 +455,75 @@ class RedisCheckpointStore implements CheckpointStore {
     }
 
     await this.write(this.indexKey(orchestratorName), JSON.stringify({ sessionIds: next }));
+  }
+
+  /**
+   * Move the earlier JSON index document of an orchestrator into the
+   * Redis set once per process, then delete the document. A failed move
+   * is retried on the next call.
+   */
+  private migrateIndex(orchestratorName: string): Promise<void> {
+    const existing = this.indexMigrations.get(orchestratorName);
+
+    if (existing) {
+      return existing;
+    }
+
+    const migration = (async () => {
+      const sets = this.sets;
+
+      if (!sets) {
+        return;
+      }
+
+      const raw = await this.client.get(this.indexKey(orchestratorName));
+
+      if (raw === null) {
+        return;
+      }
+
+      const legacy = JSON.parse(raw) as IndexDocument;
+
+      await sets.addMany(this.setKey(orchestratorName), legacy.sessionIds ?? []);
+      await this.client.del(this.indexKey(orchestratorName));
+    })();
+
+    this.indexMigrations.set(orchestratorName, migration);
+    migration.catch(() => this.indexMigrations.delete(orchestratorName));
+
+    return migration;
+  }
+
+  /**
+   * Drop index entries whose session key no longer exists (expired by the
+   * idle TTL). Returns the surviving ids.
+   */
+  private async dropExpired(orchestratorName: string, sessionIds: string[]): Promise<string[]> {
+    const live: string[] = [];
+    const expired: string[] = [];
+
+    for (const sessionId of sessionIds) {
+      const raw = await this.client.get(this.sessionKey(orchestratorName, sessionId));
+
+      (raw === null ? expired : live).push(sessionId);
+    }
+
+    if (expired.length === 0) {
+      return live;
+    }
+
+    if (this.sets) {
+      for (const sessionId of expired) {
+        await this.sets.remove(this.setKey(orchestratorName), sessionId);
+      }
+    } else {
+      const index = await this.readIndexDocument(orchestratorName);
+      const next = index.sessionIds.filter((id) => !expired.includes(id));
+
+      await this.write(this.indexKey(orchestratorName), JSON.stringify({ sessionIds: next }));
+    }
+
+    return live;
   }
 
   /**
@@ -299,15 +542,31 @@ class RedisCheckpointStore implements CheckpointStore {
   }
 
   /**
-   * Key for a session document — `<prefix>:session:<name>:<sessionId>`.
+   * Key for a session head — `<prefix>:session:<name>:<sessionId>`.
+   * Earlier releases stored the whole row document under this key.
    */
   private sessionKey(orchestratorName: string, sessionId: string): string {
     return `${this.prefix}:session:${orchestratorName}:${sessionId}`;
   }
 
   /**
-   * Key for a per-orchestrator session-id index —
-   * `<prefix>:index:<name>`.
+   * Key for one stored turn — `<prefix>:turn:<name>:<sessionId>:<turnIndex>`.
+   */
+  private turnKey(orchestratorName: string, sessionId: string, turnIndex: number): string {
+    return `${this.prefix}:turn:${orchestratorName}:${sessionId}:${turnIndex}`;
+  }
+
+  /**
+   * Key for the Redis-set session index — `<prefix>:sessions:<name>`.
+   */
+  private setKey(orchestratorName: string): string {
+    return `${this.prefix}:sessions:${orchestratorName}`;
+  }
+
+  /**
+   * Key for the JSON-document session index — `<prefix>:index:<name>`.
+   * Used by clients without set commands, and read once to move an
+   * earlier index into the set.
    */
   private indexKey(orchestratorName: string): string {
     return `${this.prefix}:index:${orchestratorName}`;

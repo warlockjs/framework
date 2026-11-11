@@ -72,6 +72,7 @@ import { createRefusalPageRenderer } from "./core-refusal-page";
 import { notFoundPageHandlerOptions } from "./not-found-handler-options";
 import { normalizePageModule } from "./normalize-page-module";
 import { productionDeclaredStylesheetUrls, productionStylesheetUrls } from "./stylesheet-urls";
+import { routeModulePreloadUrls } from "./hydration-client-url";
 import type { RequestStylesheetUrlResolver } from "./document-stylesheet-urls";
 import {
   DuplicateNotFoundPageError,
@@ -601,7 +602,15 @@ export function installPageRoutesFromManifest(
             pageFile: notFoundPage.sourceFile,
             loadModule,
             hydrationClientModuleUrl,
-            hydrationClientModulePreloadUrls,
+            hydrationClientModulePreloadUrls:
+              clientDir === undefined
+                ? hydrationClientModulePreloadUrls
+                : routeModulePreloadUrls({
+                    clientDir,
+                    sourceFiles: [app.sourceFile, notFoundPage.sourceFile],
+                    entryPreloadUrls: hydrationClientModulePreloadUrls,
+                    hydrationClientModuleUrl,
+                  }),
             loadErrorPage,
             errorPageFile: manifest.errorPage?.sourceFile,
             getRouteTranslations,
@@ -694,14 +703,24 @@ export function installPageRoutesFromManifest(
     // ever reaches when it is — `clientDir === undefined` is handled anyway,
     // rather than trusted away, because a caller can still pass this function
     // a manifest that violates its own generator's invariant.
+    const chainSourceFiles = [
+      app.sourceFile,
+      ...page.layouts.map((pageLayout) => pageLayout.sourceFile),
+      page.sourceFile,
+    ];
     const stylesheetUrls =
+      clientDir === undefined ? [] : productionStylesheetUrls(clientDir, chainSourceFiles);
+    // The same chain's own chunks, preloaded beside the hydration entry's so
+    // the browser fetches them in parallel instead of after the entry runs.
+    const routePreloadUrls =
       clientDir === undefined
-        ? []
-        : productionStylesheetUrls(clientDir, [
-            app.sourceFile,
-            ...page.layouts.map((pageLayout) => pageLayout.sourceFile),
-            page.sourceFile,
-          ]);
+        ? hydrationClientModulePreloadUrls
+        : routeModulePreloadUrls({
+            clientDir,
+            sourceFiles: chainSourceFiles,
+            entryPreloadUrls: hydrationClientModulePreloadUrls,
+            hydrationClientModuleUrl,
+          });
 
     const handlerOptions: PageRouteHandlerOptions = {
       path: effectivePath,
@@ -715,7 +734,7 @@ export function installPageRoutesFromManifest(
       loadRegistrationLayouts: () =>
         Promise.resolve(page.layouts.map((layout) => manifestModule(layout))),
       hydrationClientModuleUrl,
-      hydrationClientModulePreloadUrls,
+      hydrationClientModulePreloadUrls: routePreloadUrls,
       loadErrorPage,
       errorPageFile: manifest.errorPage?.sourceFile,
       getRouteTranslations,

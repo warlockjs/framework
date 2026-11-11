@@ -56,7 +56,7 @@ Subsequent `set("user:1", ...)` with **no** `tags` leaves previous associations 
 | `redis`                             |               ✓ (native SET inside the prefix)               |
 | `pg`                                |            ✓ (JSON-array merge on the index row)             |
 
-The index uses driver primitives (`tagAdd` / `tagMembers` / `tagRemove`), so concurrent tagged writes never drop members. It stores un-prefixed keys, `invalidate()` deletes exactly the members it read, writes prune up to 20 dead members, and `remove()` / `pull()` detach the key. Tags are global across scopes. Across servers, use `redis` or `pg` so every server shares one index.
+The index uses driver primitives (`tagAdd` / `tagMembers` / `tagRemove`), so concurrent tagged writes never drop members. A tagged write samples up to 20 members (`tagSample`) and checks them with `exists` (no value read, no hit/miss events), so its cost does not grow with the tag; `invalidate()` removes members in batches (`removeMany`). Custom drivers without these primitives fall back to `tagMembers` / `has()` / `remove()`. It stores un-prefixed keys, `invalidate()` deletes exactly the members it read, writes prune up to 20 dead members, and `remove()` / `pull()` detach the key. Tags are global across scopes. Across servers, use `redis` or `pg` so every server shares one index.
 
 ## SWR with tags
 

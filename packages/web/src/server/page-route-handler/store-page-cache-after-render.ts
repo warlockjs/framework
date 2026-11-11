@@ -13,6 +13,7 @@ import {
   type CappablePipeableStream,
 } from "../page-cache-entry-limit";
 import { setPageCacheEntry } from "../page-cache-store";
+import { admitPageCacheEntry } from "../page-cache-route-cap";
 import type { PageCacheOptIn } from "../../routing/route-identity";
 import type { SharedContext } from "../../index";
 import type { RenderedPage } from "../render-page";
@@ -153,17 +154,22 @@ export async function storePageCacheAfterRender(options: {
   if (!eligible || isNoncedDocumentCache(pageCacheVariant)) return empty;
 
   const ttl = cache.ttl ?? cache.maxAge;
+
+  // Per-route variant ceiling (`pageCache.maxEntriesPerRoute`): a new query
+  // variant past it is served normally but never stored.
+  if (!admitPageCacheEntry(cache, cacheKey, ttl)) return empty;
   const tags = resolveCacheTags(cache.tags, rendered.data, rendered.bundle?.shared);
   const maxEntryBytes = resolvePageCacheMaxEntryBytes();
   const headers = replayableHeaders(rendered.headers);
 
   if (pageCacheVariant === "html") {
     // Store the STREAMED document (already forced to `onAllReady` by
-    // `crawler: true` at the call site), never `rendered.html`: that is the
-    // synchronous escalation pass, where a `React.lazy` boundary that has not
-    // resolved yet in this process renders its Suspense fallback. The visitor
-    // on this MISS got the streamed bytes, so the stored entry — and every
-    // HIT — must be those same bytes.
+    // `crawler: true` at the call site), never `rendered.html`: the page
+    // route handler does not buffer one (`bufferHtml: false`), and a buffered
+    // copy would be a separate synchronous render in which a `React.lazy`
+    // boundary not yet loaded renders its Suspense fallback. The visitor on
+    // this MISS got the streamed bytes, so the stored entry — and every HIT —
+    // must be those same bytes.
     const isMiddlewareBody =
       rendered.bundle?.shortCircuit?.stage === "middleware" &&
       !rendered.bundle.shortCircuit.responseSent;

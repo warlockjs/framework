@@ -58,6 +58,8 @@ await User.restoreAll(); // restore every deleted record for this model
 
 There is no instance `user.restore()` — call `User.restore(id)`. `restoreAll(options?)` restores all soft-deleted (or all trashed) records for the model's table.
 
+**Restore honours global scopes.** A record another tenant's scope hides throws "record not found" from `restore(id)`, and `restoreAll()` restores only the caller's records. Restore leaves out only filters whose column is exactly `deletedAtColumn` (your `notDeleted` scope): hiding deleted rows is what restore undoes. A scope that also filters other columns keeps those filters, and a column that merely contains the name (`deletedAtSource`) is never skipped. For a cross-tenant admin restore, run it where the tenant scope applies no filter.
+
 ## Trash strategy — a separate store
 
 ```ts

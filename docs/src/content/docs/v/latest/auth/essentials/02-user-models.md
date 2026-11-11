@@ -100,7 +100,7 @@ export class User extends Auth<typeof userSchema> {
 
 Two things to lock in:
 
-- **`toJsonColumns` excludes `password`.** If you skip this, `JSON.stringify(user)` leaks the hash. Set it from day one.
+- **The password hash never serializes.** Since 5.53 `Auth` sets `static hidden = ["password"]`, so `toJSON()` (and `response.json(user)`), lean query rows and embedded copies drop it, while `user.get("password")` still reads it for verification. If your model sets its own `hidden` list, it replaces this one — keep `"password"` in it. `toJsonColumns` or a resource that leaves `password` out is still a good habit.
 - **Password is a normal column.** Auth doesn't add a `password` field to the schema — your schema defines it, your migration creates it, and you pass the hash on `create()`.
 
 ## Confirming a password without logging in

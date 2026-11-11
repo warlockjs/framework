@@ -100,6 +100,8 @@ The everyday case. Service takes `Partial<UserSchema>` from a request body, merg
 
 **Safe against id-retargeting by design.** `model.merge(req.body); await model.save();` is the canonical update-my-profile shape — and `req.body` is attacker-controlled. On an already-persisted model, `merge()` drops identity columns (`id`, `_id`, the configured primary key) instead of applying them, so a body carrying `{ id: "<victim-id>", role: "admin" }` cannot redirect the write onto someone else's row: `update()`/`replace()`/`destroy()` build their filter from `model.trustedPrimaryKey` — the id captured when the instance became persisted (hydration, or right after an insert), never the current in-memory value. Identity columns are also excluded from the `$set`/`$unset` payload, so an explicit `.set("id", …)` on a loaded record doesn't rewrite the key of the row it's pinned to either. This only applies to an _existing_ record — `User.create({ id, ... })` with an explicit id is unchanged, since there's no row to retarget yet. If you deliberately need to change a primary key, do it through the atomic/raw APIs (see the `perform-atomic-ops` topic), not `merge()`.
 
+**Unknown and nested fields follow `static strictMode`.** On insert and update alike, a field the schema doesn't declare is dropped (`"strip"`, default), rejected (`"fail"`), or written (`"allow"`); this covers nested objects too (`merge({ permissions: { all: true } })` writes nothing under `"strip"`). A nested change is validated through its top-level field and only the changed leaves are written. A path segment `__proto__` / `constructor` / `prototype` in `set()` / `unset()`, or a `__proto__` key inside a `set()` / `merge()` value, throws before anything is written.
+
 ### `.save()` after manual mutation — when changes are spread
 
 ```ts
@@ -120,6 +122,8 @@ Quick reference:
 | Bulk from an object    | `user.merge(data).save()` |
 | Replace object columns | `user.set(data).save()`   |
 | After spread mutations | `user.save()`             |
+
+**Write-heavy MongoDB model?** `public static idReservationBlockSize = 100;` reserves 100 generated ids per counter round-trip instead of one per insert (default `1`). Ids stay unique but are not strictly increasing across processes, and unused ids in a block are lost on restart.
 
 ## Remove a field — `.unset(field)`
 

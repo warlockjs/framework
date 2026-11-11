@@ -1,13 +1,23 @@
 import { writeFile } from "node:fs/promises";
-import { gzipSync } from "node:zlib";
+import { promisify } from "node:util";
+import { gzip as gzipCallback } from "node:zlib";
 import { join } from "node:path";
 import { normalizeEntry } from "./normalize-entry";
 import { shardFileName } from "./shard-name";
-import type { ResolvedSitemapEntry, SitemapOptions } from "./types";
+import type { SitemapOptions } from "./types";
 import type { DuplicatePathTracker } from "./duplicate-path-tracker";
 import type { RouteCounter } from "./route-counter";
 import type { SitemapSourceFactory } from "./sitemap-index-types";
-import { buildSitemapXml, IMAGE_NAMESPACE_ATTR, renderUrlBlock, XHTML_NAMESPACE_ATTR } from "./xml";
+import {
+  buildSitemapXml,
+  buildSitemapXmlFromBlocks,
+  IMAGE_NAMESPACE_ATTR,
+  renderUrlBlock,
+  XHTML_NAMESPACE_ATTR,
+} from "./xml";
+
+/** Compresses on the libuv thread pool, so a large shard never stalls the event loop. */
+const gzip = promisify(gzipCallback);
 
 /** One `addSource` group: the unnamed group merges every unkeyed call; a keyed group holds exactly one factory. */
 export type ShardGroup = {
@@ -56,13 +66,15 @@ const IMAGE_NAMESPACE_BYTES = Buffer.byteLength(IMAGE_NAMESPACE_ATTR, "utf8");
 async function writeShardFile(
   ctx: ShardWriterContext,
   fileName: string,
-  entries: readonly ResolvedSitemapEntry[],
+  blocks: readonly string[],
+  hasAlternates: boolean,
+  hasImages: boolean,
 ): Promise<{ bytes: number }> {
-  const xml = buildSitemapXml(entries, ctx.baseUrl);
+  const xml = buildSitemapXmlFromBlocks(blocks, hasAlternates, hasImages);
   const filePath = join(ctx.tempDir, fileName);
 
   if (ctx.gzip) {
-    const compressed = gzipSync(Buffer.from(xml, "utf8"));
+    const compressed = await gzip(Buffer.from(xml, "utf8"));
 
     await writeFile(filePath, compressed);
 
@@ -85,7 +97,9 @@ export async function writeShardGroup(
 ): Promise<ShardFile[]> {
   const results: ShardFile[] = [];
 
-  let buffer: ResolvedSitemapEntry[] = [];
+  // The current shard's `<url>` blocks, each rendered once: measured for the
+  // byte ceiling, then written as is.
+  let buffer: string[] = [];
   let bufferBytes = envelopeBytes(ctx.baseUrl);
   // Charged once, the moment the buffer's first alternate-bearing entry is added — mirrors
   // buildSitemapXml()'s own "at least one entry has alternates" rule for the same shard.
@@ -97,7 +111,13 @@ export async function writeShardGroup(
     if (buffer.length === 0) return;
 
     const fileName = shardFileName(ctx.filePrefix, group.key, ordinal, ctx.gzip);
-    const { bytes } = await writeShardFile(ctx, fileName, buffer);
+    const { bytes } = await writeShardFile(
+      ctx,
+      fileName,
+      buffer,
+      bufferHasAlternates,
+      bufferHasImages,
+    );
 
     results.push({ fileName, key: group.key, urls: buffer.length, bytes, gzipped: ctx.gzip });
 
@@ -119,7 +139,8 @@ export async function writeShardGroup(
 
       const entryHasAlternates = (resolved.alternates?.length ?? 0) > 0;
       const entryHasImages = (resolved.images?.length ?? 0) > 0;
-      const blockBytes = Buffer.byteLength(renderUrlBlock(resolved, ctx.baseUrl), "utf8") + 1;
+      const block = renderUrlBlock(resolved, ctx.baseUrl);
+      const blockBytes = Buffer.byteLength(block, "utf8") + 1;
       // What this entry would add to the CURRENT shard: its own block, plus the namespace
       // attribute if this is the shard's first alternate and the buffer doesn't carry it yet.
       const addedBytes =
@@ -136,7 +157,7 @@ export async function writeShardGroup(
       const addsNamespaceNow = entryHasAlternates && !bufferHasAlternates;
       const addsImageNamespaceNow = entryHasImages && !bufferHasImages;
 
-      buffer.push(resolved);
+      buffer.push(block);
       bufferBytes +=
         blockBytes +
         (addsNamespaceNow ? NAMESPACE_BYTES : 0) +

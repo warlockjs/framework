@@ -99,7 +99,25 @@ Both work on both drivers.
 connectToDatabase({ logging: true });
 ```
 
-Logs every query, its bindings, and execution time. Useful in development; **disabled by default and recommended OFF in production** — query logs can contain sensitive data and saturate your log shipper at scale.
+Logs every query and its execution time. Useful in development; **disabled by default and recommended OFF in production** — query logs saturate your log shipper at scale. Values are kept out of the log: PostgreSQL logs the SQL with the count and types of its bound values, and MongoDB logs the command, the collection and the shape of the command (field names and value types, never the documents or filter values). A failed MongoDB command logs its error name and code, with the duplicate-key value removed from the message.
+
+### `queryEvents`
+
+```ts
+connectToDatabase({ driver: "mongodb", database: "myapp", queryEvents: true });
+```
+
+Emits the `query` event (`dataSourceRegistry.on("query", …)`) for every database command — what the request log's query capture and devtools read. On MongoDB this turns on the client's command monitoring, which decodes every reply a second time, so it costs on each query.
+
+| Value           | MongoDB `query` events                                        |
+| --------------- | ------------------------------------------------------------- |
+| unset (default) | on outside production, off when `NODE_ENV` is `production`    |
+| `true`          | always on                                                     |
+| `false`         | off (unless `logging: true`, which needs the same monitoring) |
+
+When something subscribes to `query` events while a MongoDB data source has them off (the request log's query capture in production, for example), the registry logs one warning per data source naming `queryEvents: true`, instead of the listener silently receiving nothing. `driver.queryEventsEnabled` reports the resolved setting.
+
+An explicit `clientOptions.monitorCommands` wins over all of these. PostgreSQL emits the event whenever something listens, at no cost otherwise, and ignores this option.
 
 ## Driver-specific options — `driverOptions`
 
@@ -122,9 +140,19 @@ await connectToDatabase<MongoDriverOptions>({
       readConcern: { level: "majority" },
       writeConcern: { w: "majority" },
     },
+    like: { maxWildcards: 2, maxLength: 256 }, // caps on whereLike patterns (the defaults)
   },
 });
 ```
+
+**`like`** caps string `whereLike` / `whereNotLike` patterns (and the `like` / `notLike` operators of `where()`). MongoDB runs a LIKE pattern as a regex, and each `%` wildcard multiplies how long one long value can take to match, so a pattern over a cap is refused with an `UnsafeFilterError` before it reaches the database.
+
+| Option         | Default | Meaning                                                                      |
+| -------------- | ------- | ---------------------------------------------------------------------------- |
+| `maxWildcards` | `2`     | Most `%` wildcards per pattern (`%%%` counts once). `%term%`, `prefix%` fit. |
+| `maxLength`    | `256`   | Longest pattern, in characters.                                              |
+
+An explicit `RegExp` argument is code you wrote, not request input, and is not capped.
 
 ### Postgres driver options
 
@@ -250,6 +278,22 @@ When `true`, Cascade auto-stamps `createdAtColumn` and `updatedAtColumn` on inse
 ### `autoGenerateId` (MongoDB)
 
 MongoDB doesn't ship with auto-increment ids. When `autoGenerateId: true`, Cascade uses a counter collection to issue sequential numeric ids. Combine with `randomIncrement` and `initialId` for non-predictable id ranges. For Postgres, the database handles this natively — leave the option off.
+
+#### `idReservationBlockSize` (model static, MongoDB)
+
+Each generated id costs one round-trip to the counter collection, and every insert into a collection updates the same counter document. Set `idReservationBlockSize` on a write-heavy model to reserve a block of ids in one round-trip and hand them out from memory:
+
+```ts
+class PageView extends Model {
+  public static idReservationBlockSize = 100; // default: 1 (one round-trip per id)
+}
+```
+
+Ids stay unique, but are no longer strictly increasing across processes, and ids left in a block when the process stops are never used. It has no effect with `randomInitialId` / `randomIncrement` or on drivers with native ids.
+
+### `strictMode`
+
+What a save does with a field the model's schema doesn't declare, on insert and update, nested objects included: `"strip"` (default) drops it, `"fail"` rejects the save, `"allow"` writes it. Set it per model with `static strictMode`, or for every model here. See [Unknown fields](../the-basics/validation.md#unknown-fields--strictmode).
 
 ### `deleteStrategy` / `trashTable`
 

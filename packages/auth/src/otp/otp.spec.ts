@@ -108,6 +108,39 @@ describe("requestOtp", () => {
     expect(otpRows()).toHaveLength(0);
   });
 
+  it("answers without waiting for delivery, so timing does not reveal a known phone", async () => {
+    const send = vi.fn(() => new Promise<never>(() => {}));
+    configValues["auth.otp.send"] = send;
+
+    await expect(requestOtp(User as never, PHONE)).resolves.toBeUndefined();
+    expect(send).toHaveBeenCalledOnce();
+  });
+
+  it("reports a background delivery failure as otp.deliveryFailed", async () => {
+    const { authEvents } = await import("../services/auth-events");
+    const failed = vi.fn();
+    const subscription = authEvents.on("otp.deliveryFailed", failed);
+    configValues["auth.otp.send"] = vi.fn(async () => {
+      throw new Error("SMS gateway down");
+    });
+
+    try {
+      await requestOtp(User as never, PHONE);
+      await vi.waitFor(() => expect(failed).toHaveBeenCalledOnce());
+    } finally {
+      subscription.unsubscribe();
+    }
+  });
+
+  it("awaitDelivery: true waits for the delivery and passes its error on", async () => {
+    configValues["auth.otp.awaitDelivery"] = true;
+    configValues["auth.otp.send"] = vi.fn(async () => {
+      throw new Error("SMS gateway down");
+    });
+
+    await expect(requestOtp(User as never, PHONE)).rejects.toThrow("SMS gateway down");
+  });
+
   it("a new code invalidates the earlier one", async () => {
     const first = await issuedCode();
     await issuedCode();

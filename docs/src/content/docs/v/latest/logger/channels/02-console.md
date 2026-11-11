@@ -95,6 +95,27 @@ new ConsoleLog({
 `showContext` is off by default. Persistent channels (`FileLog`, `JSONFileLog`) always retain context regardless of this flag — they just don't surface it in the terminal. A typical setup keeps `showContext: true` in development and the default in production.
 :::
 
+## Minimum level — `minLevel`
+
+`minLevel` drops every entry below a severity on this channel only (`debug` < `info` = `success` < `warn` < `error` < `fatal`). Other channels still receive those entries. It is not set by default, so every level is printed.
+
+```ts
+import { ConsoleLog, FileLog, log } from "@warlock.js/logger";
+
+log.configure({
+  channels: [
+    new ConsoleLog({ minLevel: "info" }), // no debug lines on the terminal
+    new FileLog(), // the file still records debug entries
+  ],
+});
+```
+
+`minLevel` combines with `levels`: an entry must pass both. When no channel keeps a level, `log.isEnabled(level)` returns `false` and the logger skips the entry before redaction, so a `debug` line costs almost nothing in production.
+
+## Terminal escapes in messages
+
+Colour codes in a message are kept (the framework colours parts of its own messages), but every other terminal escape sequence is removed before printing: cursor movement, screen clearing, window titles, clipboard writes and the "conceal" style. Other control characters are shown as `\uXXXX`. Text taken from a request can therefore not rewrite or hide what the terminal shows. Line breaks are printed as they are.
+
 ## Filtering
 
 `ConsoleLog` accepts the shared `levels` array and `filter` predicate (see [Channels Overview](./01-overview/)). A common pattern is keeping the terminal focused on the subsystem you're working on:
@@ -118,4 +139,4 @@ new ConsoleLog({
 });
 ```
 
-The full option shape is [`ConsoleLogConfig`](../reference/03-channel-configurations/) — the shared options plus `showContext` / `contextDepth`.
+The full option shape is [`ConsoleLogConfig`](../reference/03-channel-configurations/) — the shared options plus `showContext` / `contextDepth` / `minLevel`.

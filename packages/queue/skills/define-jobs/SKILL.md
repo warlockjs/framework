@@ -44,6 +44,10 @@ await sendInvoice.dispatch(
 
 Option precedence: dispatch options > `defineJob` > `queue.defaultJobOptions`.
 
+## Retention
+
+Finished jobs are pruned by default: `removeOnComplete: { age: "24h", count: 1000 }`, `removeOnFail: { age: "7d", count: 5000 }`. A retention is `true` (remove at once), `false` (keep all), a number (newest N), or `{ age?, count? }` (`age` is ms or a duration string). Set it in `defineJob` or `queue.defaultJobOptions`; `false` restores keep-everything.
+
 ## Read a job
 
 ```ts
@@ -74,7 +78,8 @@ setQueueContext(
 
 - `undefined` from `capture` carries nothing; the value must be JSON-safe. Read it in a handler as `ctx.context` (`unknown`).
 - Jobs dispatched from a restored handler capture the same context.
-- `defineJob({ context: false })` opts a job out.
+- `defineJob({ context: false })` opts a job out; it never runs inside a restored context.
+- Every dispatch is wrapped in an envelope, so a payload shaped like one (an untrusted request body) is plain data to the handler and never sets the context.
 - Throw `UnrecoverableJobError` from a handler or `restore` to fail the job without retries.
 
 ## Test dispatches without Redis

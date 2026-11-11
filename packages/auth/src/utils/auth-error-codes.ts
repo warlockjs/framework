@@ -70,4 +70,11 @@ export enum AuthErrorCodes {
    * that did not advance.
    */
   InvalidPasskey = "EC011", // Error Code 011
+  /**
+   * Provider Account Link Blocked Error Code EC012
+   * EC012 = a provider login matched an existing account by email, but
+   * `auth.providers.linkExisting` refused to link it automatically (by
+   * default: the account never verified that email).
+   */
+  ProviderAccountLinkBlocked = "EC012", // Error Code 012
 }

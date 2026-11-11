@@ -1,6 +1,6 @@
 ---
 name: pick-log-channel
-description: 'Pick one of the four built-in channels — ConsoleLog (terminal), FileLog (plain text on disk), JSONFileLog (structured JSON for aggregators like Loki / Datadog / Elastic), SentryLog (forwards errors + breadcrumbs to Sentry). Triggers: `ConsoleLog`, `FileLog`, `JSONFileLog`, `SentryLog`, `chunk`, `rotate`, `groupBy`, `maxFileSize`, `showContext`, `log.channel`; "log to a file", "rotate log files", "daily log chunks", "json logs for datadog / loki / elastic", "send logs to Sentry"; typical import `import { ConsoleLog, FileLog, JSONFileLog, SentryLog } from "@warlock.js/logger"`. Skip: Sentry-specific setup — the `ship-logs-to-sentry` topic; custom sinks — the `write-custom-log-channel` topic; registration — the `configure-logger` topic; competing libs `winston-daily-rotate-file`, `pino-pretty`.'
+description: 'Pick one of the four built-in channels — ConsoleLog (terminal), FileLog (plain text on disk), JSONFileLog (structured JSON for aggregators like Loki / Datadog / Elastic), SentryLog (forwards errors + breadcrumbs to Sentry). Triggers: `ConsoleLog`, `FileLog`, `JSONFileLog`, `SentryLog`, `chunk`, `rotate`, `groupBy`, `maxFileSize`, `showContext`, `maxBufferedMessages`, `JSONFileLogConfig`, `format: "jsonl"`, `log.channel`; "log to a file", "rotate log files", "daily log chunks", "json logs for datadog / loki / elastic", "send logs to Sentry"; typical import `import { ConsoleLog, FileLog, JSONFileLog, SentryLog } from "@warlock.js/logger"`. Skip: Sentry-specific setup — the `ship-logs-to-sentry` topic; custom sinks — the `write-custom-log-channel` topic; registration — the `configure-logger` topic; competing libs `winston-daily-rotate-file`, `pino-pretty`.'
 ---
 
 # Channels — which one to pick and how to configure it
@@ -34,7 +34,9 @@ new ConsoleLog();
 Properties:
 
 - `name = "console"`, `terminal = true`
-- Accepts `ConsoleLogConfig` — `levels`, `filter`, `dateFormat`, `showContext`, `contextDepth`
+- Accepts `ConsoleLogConfig` — `levels`, `filter`, `dateFormat`, `showContext`, `contextDepth`, `minLevel`
+- `minLevel: "info"` hides lower levels on this channel only (other channels still get them)
+- Colour codes in messages are kept; other terminal escapes (cursor movement, screen clearing, clipboard writes) are removed
 - If `message` is an object, a second `console.log(message)` is issued so Node's inspector can expand it
 
 ### Showing context
@@ -68,6 +70,8 @@ new FileLog({
   maxMessagesToWrite: 100, // default: 100 — flush threshold
   groupBy: ["level", "module"], // optional subdirectory nesting
   retention: { maxFiles: 14, maxAgeDays: 30 }, // optional pruning of old files
+  maxBufferedMessages: 10_000, // default: 10000 — memory cap while writes keep failing
+  escape: true, // default: true — line breaks / control chars written as \n, \uXXXX
 });
 ```
 
@@ -89,6 +93,8 @@ Line format: `[date time] [level] [module][action]: message` — or a `[trace]` 
 - **Buffers!** Messages sit in memory until either `maxMessagesToWrite` is reached, 5 seconds pass, or `flushSync()` is called. A process that crashes without flushing loses buffered entries.
 - **`chunk: "daily"` picks a filename per day.** File name becomes `YYYY-MM-DD.log` (hourly: `YYYY-MM-DD-HH.log`), ignoring `name` unless `fileName` uses `{name}`. Since 5.31; keep the old `DD-MM-YYYY` with `fileName: "{DD}-{MM}-{YYYY}"`. Rotated archives are `<file name>-<rotateFileName>-<epoch ms>.<ext>`; `rotateFileName` is a pattern or function too (default `{YYYY}-{MM}-{DD}`).
 - **`retention` only touches this channel's files.** On boot and whenever a new file starts it removes files in the log directory (each group directory with `groupBy`) whose names match the channel's pattern — beyond `maxFiles` (newest by modification time, the current file counts) or older than `maxAgeDays`. Failures go to `log.onChannelError(...)`, never to the call site. `await channel.prune()` runs it on demand.
+- **One line per entry.** Line breaks and control characters in messages are escaped (`escape: false` keeps line breaks raw); the `[trace]` stack of an `Error` is written as is.
+- **Write failures never crash the process.** A missing log directory is recreated and the write retried; other failures go to `log.onChannelError(...)` and the entries stay buffered (oldest dropped past `maxBufferedMessages`, one notice).
 - **`groupBy` nests directories.** `groupBy: ["level", "module"]` produces `storage/logs/error/payments/app.log`. Order matters.
 - **Dispose channels you discard.** A live `FileLog` keeps a 5-second flush interval running. If you swap the channel list at runtime (reconfigure the logger), call `channel.dispose()` on the old instance — it clears that timer and drains the buffer one last time. Skipping it leaks one timer per discarded channel and keeps the event loop alive. (Channels that live for the whole process don't need this — process exit clears the timer.)
 
@@ -117,7 +123,8 @@ Differences from `FileLog`:
 - `extension` is always `"json"` — the option is silently ignored
 - Error `stack` is stored as `string[]` (split on newlines) — easy to query in aggregators
 - `content` holds the original user-supplied `message` (not a pre-formatted line)
-- Corrupted existing file → reinitialized to `{ messages: [] }` on next write (does not throw)
+- Corrupted existing file → renamed to `<file>.json.corrupt-<epoch ms>` (never overwritten), a new file is started and `onChannelError` is told
+- `format: "jsonl"` (type `JSONFileLogConfig`) → one JSON object per line in a `.jsonl` file, append-only writes; the default `"json"` rewrites the whole file on each write
 - **Safe serialization by construction.** All writes go through `safe-stable-stringify` with a custom `Error` replacer — circular refs become `"[Circular]"`, BigInt is stringified, functions/symbols are dropped, nested `Error` instances expand to `{ name, message, stack, ...enumerable }`. A context payload with a class graph or circular reference will never throw during the write.
 
 ## `SentryLog`

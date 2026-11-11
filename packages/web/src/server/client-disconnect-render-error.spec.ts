@@ -40,6 +40,7 @@ import {
   type PageTripleModule,
 } from "./index";
 import { connectSharedStore, type SharedStoreResolver } from "../shared";
+import { ClientDisconnectedError } from "./client-disconnected-error";
 import { resetServerErrorReportingStateForTests } from "./report-server-error";
 
 let previousRunner: PageContextRunner | undefined;
@@ -205,5 +206,49 @@ describe("card 0d43c0d6 — a client disconnect mid-stream is not reported as an
     );
     await Promise.resolve();
     expect(report).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("a client disconnect while the shell is still suspended", () => {
+  it("ends the render with ClientDisconnectedError instead of waiting for a shell that never settles", async () => {
+    const report = vi.fn();
+    config.set("web", { errors: { report } });
+
+    let releaseNever!: () => void;
+    const never = new Promise<never>((_resolve, reject) => {
+      releaseNever = () => reject(new Error("released after the test asserted — never read"));
+    });
+    never.catch(() => undefined);
+
+    // `use()` outside any Suspense boundary: the shell itself waits.
+    function SuspendedShell() {
+      use(never);
+      return createElement("main", null, "unreachable");
+    }
+
+    const entry = pageEntry("/suspended-shell", { default: SuspendedShell });
+    const http = createDisconnectableHttp("/suspended-shell");
+
+    const rendering = renderPageRequest("/suspended-shell", {
+      routes: [entry],
+      createHttp: () => ({ request: http.request, response: http.response }),
+      loadErrorPage: async () => ({
+        default: () => createElement("span", null, "error page"),
+      }),
+      bufferHtml: false,
+    });
+
+    // Let the loaders settle and the render attempt start, then disconnect.
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    http.reply.raw.emit("close");
+
+    await expect(rendering).rejects.toBeInstanceOf(ClientDisconnectedError);
+    expect(report).not.toHaveBeenCalled();
+    expect(console.error).not.toHaveBeenCalledWith(
+      expect.stringContaining("SSR render error while rendering"),
+      expect.anything(),
+    );
+
+    releaseNever();
   });
 });

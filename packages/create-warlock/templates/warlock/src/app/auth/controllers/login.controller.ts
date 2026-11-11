@@ -25,13 +25,17 @@ loginController.validation = {
   schema: loginSchema,
 };
 
-// The starter disables refresh tokens; add tokens.refreshToken when enabling them.
+// `accessToken` is sent as `Authorization: Bearer <token>` and expires after
+// `auth.accessToken.expiresIn` (1 hour). Before it does, send `refreshToken` to
+// POST /auth/refresh-token for a new pair; send it to POST /auth/logout too, so
+// only this session ends.
 loginController.responseSchema = {
   200: {
     body: {
       user: UserResource,
       tokens: {
         accessToken: { token: "string", expiresAt: "string" },
+        refreshToken: { token: "string", expiresAt: "string" },
       },
     },
   },

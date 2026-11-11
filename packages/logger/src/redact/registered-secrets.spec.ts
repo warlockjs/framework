@@ -3,7 +3,11 @@ import { LogChannel } from "../log-channel";
 import { Logger } from "../logger";
 import type { LoggingData } from "../types";
 import { applyRedact } from "./redact";
-import { maskRegisteredLogSecrets, registerLogSecret } from "./registered-secrets";
+import {
+  maskRegisteredLogSecrets,
+  redactRegisteredSecrets,
+  registerLogSecret,
+} from "./registered-secrets";
 
 class Capture extends LogChannel {
   public name = "capture";
@@ -119,5 +123,58 @@ describe("registered credentials", () => {
     } finally {
       write.mockRestore();
     }
+  });
+});
+
+describe("registered credentials: entries without a secret are not copied", () => {
+  it("returns an entry holding no registered value or key by identity", () => {
+    registerLogSecret("cow-registered-value", ["cowHiddenKey"]);
+    const original = entry("plain message", {
+      user: { id: 7, tags: ["a", "b"], profile: Object.create(null) as object },
+      note: "nothing to hide",
+    });
+
+    expect(redactRegisteredSecrets(original)).toBe(original);
+  });
+
+  it("still masks an entry holding a registered value or key, without mutating the input", () => {
+    registerLogSecret("cow-registered-value", ["cowHiddenKey"]);
+    const original = entry("plain", { nested: { text: "has cow-registered-value inside" } });
+    const masked = redactRegisteredSecrets(original);
+
+    expect(masked).not.toBe(original);
+    expect(masked.context?.nested.text).toBe("has [REDACTED] inside");
+    expect(original.context?.nested.text).toBe("has cow-registered-value inside");
+
+    const keyed = entry("plain", { list: [{ cowHiddenKey: "x" }] });
+
+    expect(redactRegisteredSecrets(keyed).context?.list[0].cowHiddenKey).toBe("[REDACTED]");
+  });
+
+  it("still rebuilds functions, accessors and class instances as before", () => {
+    registerLogSecret("cow-registered-value");
+
+    class Account {
+      public id = 1;
+    }
+
+    const withFunction = entry("x", { callback: () => 1 });
+    const withAccessor = entry("x", {
+      get lazy() {
+        return "computed";
+      },
+    });
+    const withInstance = entry("x", { account: new Account() });
+
+    expect(redactRegisteredSecrets(withFunction).context?.callback).toBe("[REDACTED]");
+    expect(redactRegisteredSecrets(withAccessor).context?.lazy).toBe("[REDACTED]");
+    expect(redactRegisteredSecrets(withInstance).context?.account).not.toBeInstanceOf(Account);
+  });
+
+  it("leaves strings without a secret as they are in one pass", () => {
+    registerLogSecret("cow-registered-value");
+    const text = "an ordinary line of text";
+
+    expect(maskRegisteredLogSecrets(text)).toBe(text);
   });
 });

@@ -164,6 +164,7 @@ export type ChildModel<TModel extends Model> = (new (...args: any[]) => TModel) 
     | "toJsonColumns"
     | "hidden"
     | "randomIncrement"
+    | "idReservationBlockSize"
     | "getDataSource"
     | "getDriver"
     | "query"

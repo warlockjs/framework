@@ -101,6 +101,8 @@ interface WorkspaceState {
   todos: TodoStore;
   /** Command patterns the host approved with `remember`. */
   approvals: WorkspaceCommandPattern[];
+  /** Names of the spill files written through this workspace or its projections. */
+  spillFiles: Set<string>;
 }
 
 /**
@@ -160,7 +162,12 @@ class WorkspaceImpl implements Workspace {
   ) {
     this.policy = policy;
     this.allowedTools = new Set(allowedTools);
-    this.state = state ?? { jobs: new ShellJobs(), todos: new TodoStore(), approvals: [] };
+    this.state = state ?? {
+      jobs: new ShellJobs(),
+      todos: new TodoStore(),
+      approvals: [],
+      spillFiles: new Set(),
+    };
     this.resolvedShell = resolveShell(policy.shell);
     const approvals = this.state.approvals;
 
@@ -184,6 +191,7 @@ class WorkspaceImpl implements Workspace {
     this.ops = createOps(backend, policy, {
       jobs: this.state.jobs,
       approvals: this.state.approvals,
+      spillFiles: this.state.spillFiles,
     });
     this.tools = this.buildTools();
   }

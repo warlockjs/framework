@@ -10,7 +10,7 @@ The `Scheduler` class is configurable through a set of chainable methods. All co
 
 The scheduler checks for due jobs on a recurring tick. The default tick interval is **1000 ms (1 second)**. Increase it to reduce CPU overhead when your shortest job interval is longer than a second:
 
-The tick interval is **drift-compensated** — if a tick's work takes 200 ms, the next tick fires 800 ms later (not 1000 ms), so the cadence between tick _starts_ averages the configured interval rather than `interval + work-time`. Long-running jobs still block the next tick (the scheduler is sequential around its loop), but short ticks don't slowly drift behind the wall clock.
+A tick only starts the jobs that are due; it never waits for them to finish, so `scheduler:tick` keeps firing on time while jobs run. The tick interval is also **drift-compensated**: the cadence between tick _starts_ averages the configured interval.
 
 ```ts
 import { Scheduler, job } from "@warlock.js/scheduler";
@@ -32,7 +32,9 @@ myScheduler.runEvery(50); // throws: "Tick interval must be at least 100ms"
 
 ## Parallel Execution — `runInParallel()`
 
-By default, jobs that are due at the same tick run **sequentially** (one after the other). Enable parallel mode to run them concurrently:
+By default, jobs run **one at a time**. Jobs that are due together run one after the other, and jobs that become due while one is running wait for it, then run in registration order. None is dropped. A job never overlaps itself: when a job is due while its previous run is still going, that tick is skipped with a `job:skip` event.
+
+One long job therefore holds back the others: a 20-minute nightly export delays an `everyMinute()` job by 20 minutes. Enable parallel mode so each due job starts on its own tick:
 
 ```ts
 import { Scheduler, job } from "@warlock.js/scheduler";
@@ -40,26 +42,23 @@ import { Scheduler, job } from "@warlock.js/scheduler";
 const myScheduler = new Scheduler();
 
 myScheduler
-  .runInParallel(true) // enable parallel execution
-  .addJob(job("job-a", taskA).everyHour())
-  .addJob(job("job-b", taskB).everyHour())
-  .addJob(job("job-c", taskC).everyHour())
+  .runInParallel(true) // due jobs run side by side
+  .addJob(job("export", bigExport).daily().at("02:00")) // takes 20 minutes
+  .addJob(job("dispatch-reminders", sendReminders).everyMinute()) // keeps firing every minute
   .start();
 ```
 
-All three jobs will start simultaneously on each hourly tick.
+Turn it on only when your jobs are safe to run at the same time as each other.
 
 ### Concurrency Limit
 
 Pass a second argument to cap how many jobs run at once:
 
 ```ts
-myScheduler.runInParallel(true, 5); // at most 5 concurrent jobs per tick
+myScheduler.runInParallel(true, 5); // at most 5 jobs running at once
 ```
 
-When more jobs are due than the concurrency limit allows, they are batched: the first 5 start together, the next batch starts after the first finishes, and so on.
-
-The default max concurrency is **10**.
+When more jobs are due than the limit allows, the extra ones wait in line and each starts as soon as a running job finishes. The default limit is **10**.
 
 ## Job Management
 
@@ -221,7 +220,7 @@ appScheduler.on("job:skip", (name, reason) => logger.warn({ name, reason }, "Job
 // Configuration
 appScheduler
   .runEvery(1_000) // check every second
-  .runInParallel(true, 5) // up to 5 concurrent jobs
+  .runInParallel(true, 5) // up to 5 jobs running at once
 
   // Jobs
   .addJob(

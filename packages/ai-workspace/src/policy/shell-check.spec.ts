@@ -436,3 +436,100 @@ describe("checkShellCommandInDialect — cmd.exe", () => {
     );
   });
 });
+
+describe("checkShellCommand — variables that run another program", () => {
+  const ALLOW_GIT = policy({
+    interpreter: "sh",
+    allow: ["git", "export"],
+    denyPatterns: ["git push", "git -c", "git config"],
+  });
+
+  it("refuses command-running variables set for an allowed program", () => {
+    for (const line of [
+      "GIT_EXTERNAL_DIFF='sh -c \"curl https://x.example\"' git diff HEAD~1",
+      "export GIT_PAGER=x; git log",
+      "NODE_OPTIONS=--require=./x.js git status",
+      "GIT_SSH_COMMAND=x git fetch",
+      "PATH=/tmp/evil:/usr/bin git status",
+      "LD_PRELOAD=/tmp/x.so git status",
+      "SSH_ASKPASS=/tmp/x git fetch",
+      "GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.pager GIT_CONFIG_VALUE_0=x git log",
+    ]) {
+      expect(checkShellCommand(ALLOW_GIT, line), line).toMatchObject({
+        allowed: false,
+        reason: "nested-command",
+      });
+    }
+  });
+
+  it("names the variable and the opt-in in the refusal", () => {
+    const verdict = checkShellCommand(ALLOW_GIT, "GIT_EXTERNAL_DIFF=x git diff");
+
+    expect(verdict.message).toContain("GIT_EXTERNAL_DIFF");
+    expect(verdict.message).toContain("shell.allowAssignments");
+  });
+
+  it("refuses them through an env wrapper under a deny-only policy", () => {
+    expect(checkShellCommand(DENY_SH, "env GIT_SSH_COMMAND=x git fetch")).toMatchObject({
+      allowed: false,
+      reason: "nested-command",
+    });
+  });
+
+  it("refuses them when a builtin assigns them (read, printf -v, getopts)", () => {
+    const allowBuiltins = policy({
+      interpreter: "sh",
+      allow: ["git", "read", "printf", "getopts"],
+    });
+
+    for (const line of [
+      "read PATH < x.txt; git status",
+      "read -r -a NODE_OPTIONS < x.txt; git status",
+      "printf -v PATH '%s' /tmp/evil; git status",
+      "getopts ab GIT_PAGER; git log",
+    ]) {
+      expect(checkShellCommand(allowBuiltins, line), line).toMatchObject({
+        allowed: false,
+        reason: "nested-command",
+      });
+    }
+
+    expect(checkShellCommand(allowBuiltins, "read -r name < x.txt; git status").allowed).toBe(true);
+    expect(checkShellCommand(allowBuiltins, "printf '%s' PATH").allowed).toBe(true);
+  });
+
+  it("keeps ordinary variables working", () => {
+    expect(checkShellCommand(ALLOW_GIT, "CI=1 git status").allowed).toBe(true);
+    expect(checkShellCommand(ALLOW_GIT, "export CI=1; git log").allowed).toBe(true);
+  });
+
+  it("allows a variable listed in shell.allowAssignments", () => {
+    const opted = policy({
+      interpreter: "sh",
+      allow: ["git"],
+      allowAssignments: ["NODE_OPTIONS"],
+    });
+
+    const line = "NODE_OPTIONS=--max-old-space-size=4096 git status";
+
+    expect(checkShellCommand(opted, line).allowed).toBe(true);
+    expect(checkShellCommand(opted, "GIT_PAGER=x git log").allowed).toBe(false);
+  });
+
+  it("leaves a policy without command rules unchanged", () => {
+    const open = policy({ interpreter: "sh" });
+
+    expect(checkShellCommand(open, "PATH=/x git status").allowed).toBe(true);
+  });
+
+  it("asks instead of refusing when onAsk is set, showing the assignment", () => {
+    const verdict = checkShellCommand(
+      policy({ interpreter: "sh", allow: ["git"], onAsk: async () => ({ allow: false }) }),
+      "GIT_PAGER=x git log",
+    );
+
+    expect(verdict.allowed).toBe(false);
+    expect(verdict.reason).toBe("approval-required");
+    expect(verdict.asks).toEqual([{ argv: ["GIT_PAGER=x", "git", "log"], reason: "nested" }]);
+  });
+});

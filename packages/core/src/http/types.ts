@@ -209,6 +209,18 @@ export type HttpServerOptions = Omit<FastifyHttpOptions<NodeHttpServer>, "http2"
 };
 
 /**
+ * `http.compression`: `true` turns response compression on with defaults,
+ * an object tunes it. `threshold` is the smallest body compressed, in bytes
+ * (default 1024); `brotli: false` offers only `gzip` (default `true`).
+ */
+export type HttpCompressionConfig =
+  | boolean
+  | {
+      threshold?: number;
+      brotli?: boolean;
+    };
+
+/**
  * Http Configurations list
  */
 export interface HttpConfigurations {
@@ -253,6 +265,22 @@ export interface HttpConfigurations {
    * undefined keeps the original body. HTML and streams are not formatted.
    */
   errorResponse?: HttpErrorResponseFormatter;
+  /**
+   * Compress responses with `br` or `gzip`, as the client's `Accept-Encoding`
+   * allows: JSON, HTML (including streamed pages), XML, text and other
+   * text-like bodies at least `threshold` bytes long. Event streams,
+   * `response.stream()`, responses that already set `Content-Encoding`,
+   * HEAD, 204 and 304 answers are sent as they are. Leave it off when a proxy
+   * or CDN in front of the app already compresses.
+   *
+   * @default false
+   * @example
+   * ```ts
+   * compression: true,
+   * compression: { threshold: 2048, brotli: false },
+   * ```
+   */
+  compression?: HttpCompressionConfig;
   /**
    * In `warlock dev`, warn once per route about POST/PUT/PATCH/DELETE routes
    * that have no auth middleware and no `public: true`. Development only;
@@ -318,7 +346,72 @@ export interface HttpConfigurations {
      * @default 1MB
      */
     fieldSize?: number;
+    /**
+     * Max size in bytes of all parts of one request together (files and
+     * fields). Counted while the body arrives: a request is answered 413 as
+     * soon as it passes the cap, and a declared `Content-Length` above it is
+     * refused before any byte is read. A route's `uploads.maxTotalSize`
+     * overrides it for that route.
+     *
+     * @default 25MB
+     */
+    maxTotalSize?: number;
+    /**
+     * Which routes parse multipart bodies. `"all"` parses them on every route,
+     * before route middleware (auth included) runs, and logs a warning once in
+     * production while left unset. `"declared"` parses them only on routes
+     * with `uploads` set and answers 415 elsewhere.
+     *
+     * @default "all"
+     */
+    routes?: "declared" | "all";
   };
+  /**
+   * Limits for `application/x-www-form-urlencoded` bodies.
+   */
+  urlencoded?: {
+    /**
+     * Most fields (repeats of a key count each) one body may carry; more
+     * answers 413.
+     *
+     * @default 1000
+     */
+    maxFields?: number;
+  };
+  /**
+   * Limits applied while query strings, urlencoded and multipart keys are
+   * turned into nested input (`items[0][name]`, `a.b`).
+   */
+  input?: {
+    /**
+     * The highest array index a key may name (`items[1000]`). Keys above it
+     * are dropped, so a short key cannot create a huge sparse array.
+     *
+     * @default 1000
+     */
+    maxArrayIndex?: number;
+  };
+  /**
+   * Milliseconds a client may take to send one whole request (headers and
+   * body). It does not limit the response, so event streams and long
+   * downloads are unaffected. `0` turns it off; `serverOptions.requestTimeout`
+   * wins over it. Raise it for large uploads over slow connections.
+   *
+   * @default 300000 (5 minutes)
+   */
+  requestTimeout?: number;
+  /**
+   * Hosts this app answers. A request whose host (the `Host` header, or
+   * `X-Forwarded-Host` when `trustProxy` trusts the proxy that sent it) is
+   * not listed is refused with 400 before routing. An entry is an exact host
+   * (`"example.com"`) or a leading-dot suffix (`".example.com"`, the domain
+   * and every subdomain). The health endpoints are exempt. Unset accepts any
+   * host.
+   *
+   * @example
+   * allowedHosts: ["example.com", ".example.com"]
+   */
+  allowedHosts?: string[];
   /**
    * Global Fastify body size limit in bytes.
    *
@@ -343,21 +436,44 @@ export interface HttpConfigurations {
    * - `(address, hop) => boolean` — custom predicate.
    *
    * Anything but `false` is a trust boundary: every hop you trust can forge the
-   * addresses to its left. Prefer the narrowest shape your topology allows —
-   * `true` is only safe when nothing but your edge can reach the process.
+   * addresses to its left. Prefer a list of your proxies' addresses or CIDR
+   * blocks. `true` takes the leftmost entry, which the client itself writes
+   * whenever the edge appends to `X-Forwarded-For` (most load balancers do),
+   * so it is spoofable even when only your edge can reach the process; a
+   * production boot with `true` and no `realIpHeader` logs a warning.
    *
    * @default false
    */
   trustProxy?: boolean | string | string[] | ((address: string, hop: number) => boolean);
+  /**
+   * A single-address header your edge overwrites on every request
+   * (`"cf-connecting-ip"`, `"x-real-ip"`), read as the client IP by
+   * `request.detectIp()`. Honoured only when `trustProxy` trusts the socket
+   * peer that sent it. Unset, no such header is read.
+   *
+   * @example
+   * realIpHeader: "cf-connecting-ip"
+   */
+  realIpHeader?: string;
   cookies?: {
     /**
-     * Secret key for signed cookies
+     * Secret that signs cookies written with `response.cookie(name, value,
+     * { signed: true })`; read them back with `request.signedCookie(name)`,
+     * which refuses a changed value. Setting it signs nothing on its own.
      */
     secret?: string;
     /**
      * Default cookie options
      */
     options?: CookieSerializeOptions;
+    /**
+     * Parse cookie values that are valid JSON in `request.cookie()` (the
+     * client then picks the value's type). `false` returns raw strings and
+     * makes `response.cookie()` write string values as-is.
+     *
+     * @default true
+     */
+    json?: boolean;
   };
   /**
    * Opt-in `Content-Security-Policy` header, built per-request from a
@@ -512,6 +628,27 @@ export interface HttpConfigurations {
      * @default false
      */
     rateLimit?: boolean;
+    /**
+     * Include each check's name and result in the readiness body. The probe
+     * is public, so production answers `{ status }` only unless this is set.
+     *
+     * @default false in production, true elsewhere
+     */
+    details?: boolean;
+    /**
+     * Milliseconds a readiness check may take before it counts as failed.
+     * `0` waits for it however long it takes.
+     *
+     * @default 2000
+     */
+    checkTimeout?: number;
+    /**
+     * Milliseconds one readiness result is reused for. Concurrent probes
+     * always share one run of the checks. `0` runs them for every probe.
+     *
+     * @default 1000
+     */
+    cacheTtl?: number;
   };
   /**
    * Host

@@ -32,6 +32,13 @@ export interface WebSearchOptions {
    */
   maxResults?: number;
   /**
+   * Per-call timeout in milliseconds for the provider request, including
+   * reading its response. The run's abort signal cancels the call too.
+   *
+   * @default 15_000
+   */
+  timeoutMs?: number;
+  /**
    * Override the tool name exposed to the LLM.
    *
    * @default "web_search"

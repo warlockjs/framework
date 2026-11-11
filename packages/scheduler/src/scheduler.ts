@@ -20,7 +20,8 @@ interface TypedEventEmitter<TEvents extends Record<string, unknown[]>> {
  *
  * Features:
  * - Event-based observability
- * - Parallel or sequential job execution
+ * - Jobs run off the tick: the tick never waits for a running job
+ * - One-at-a-time (default) or concurrent, capped job execution
  * - Drift compensation for accurate timing
  * - Graceful shutdown with job draining
  *
@@ -71,7 +72,7 @@ export class Scheduler
   private _tickInterval = 1000;
 
   /**
-   * Whether to run due jobs in parallel
+   * Whether due jobs may run side by side (up to `_maxConcurrency`) or one at a time
    */
   private _runInParallel = false;
 
@@ -79,6 +80,22 @@ export class Scheduler
    * Maximum concurrent jobs when running in parallel
    */
   private _maxConcurrency = 10;
+
+  /**
+   * Due jobs waiting for a free slot, in the order they will start
+   */
+  private _pending: Job[] = [];
+
+  /**
+   * One-at-a-time mode: a tick fired while a job was running, so the due jobs
+   * are collected as soon as the running batch finishes
+   */
+  private _tickDeferred = false;
+
+  /**
+   * Runs started by the scheduler that have not settled yet
+   */
+  private _inFlight = new Set<Promise<void>>();
 
   /**
    * Flag indicating scheduler is shutting down
@@ -252,9 +269,16 @@ export class Scheduler
   }
 
   /**
-   * Configure whether jobs should run in parallel
+   * Configure how many due jobs may run at once.
    *
-   * @param parallel - Enable parallel execution
+   * By default jobs run one at a time: jobs that become due while one runs
+   * wait for it and then run in registration order. Pass `true` to run due
+   * jobs side by side (at most `maxConcurrency` at once), so one long job no
+   * longer holds back the others. Either way the scheduler keeps ticking while
+   * jobs run, and a job never overlaps itself (a due job that is still running
+   * is skipped).
+   *
+   * @param parallel - Run due jobs concurrently (default: false)
    * @param maxConcurrency - Maximum concurrent jobs (default: 10)
    * @returns this for chaining
    */
@@ -321,6 +345,9 @@ export class Scheduler
 
     clearTimeout(this._timeoutId);
     this._timeoutId = null;
+    // Jobs still waiting for a slot never start once the scheduler stops.
+    this._pending.length = 0;
+    this._tickDeferred = false;
     untrackRunningScheduler(this);
 
     this.emit("scheduler:stopped");
@@ -338,14 +365,18 @@ export class Scheduler
     this._isShuttingDown = true;
     this.stop();
 
-    const runningJobs = this._jobs.filter((j) => j.isRunning);
+    this._pending.length = 0;
+    this._tickDeferred = false;
 
-    if (runningJobs.length > 0) {
+    const runningJobs = this._jobs.filter((j) => j.isRunning);
+    const inFlight = [...this._inFlight];
+
+    if (runningJobs.length > 0 || inFlight.length > 0) {
       let cap: NodeJS.Timeout | undefined;
 
       try {
         await Promise.race([
-          Promise.all(runningJobs.map((j) => j.waitForCompletion())),
+          Promise.allSettled([...inFlight, ...runningJobs.map((j) => j.waitForCompletion())]),
           new Promise<void>((resolve) => {
             cap = setTimeout(resolve, timeout);
           }),
@@ -415,77 +446,99 @@ export class Scheduler
   /**
    * Schedule the next tick.
    *
-   * Drift-compensated: after each tick, the next delay is `tickInterval -
-   * elapsed-tick-time` (clamped to 0). A tick that takes 600 ms on a 1 000 ms
-   * interval will be followed by a 400 ms delay so the *period* between tick
-   * starts averages `tickInterval` instead of `tickInterval + work-time`.
+   * A tick only starts the due jobs; it never waits for them, so a long job
+   * does not delay the next tick. Drift-compensated: the next delay is
+   * `tickInterval - elapsed-tick-time` (clamped to 0), so the period between
+   * tick starts averages `tickInterval`.
    */
   private _scheduleTick(delay: number): void {
     if (this._isShuttingDown) return;
 
-    this._timeoutId = setTimeout(async () => {
+    this._timeoutId = setTimeout(() => {
       const tickStart = Date.now();
 
-      await this._tick();
+      try {
+        this._tick();
+      } finally {
+        const elapsed = Date.now() - tickStart;
+        const nextDelay = Math.max(this._tickInterval - elapsed, 0);
 
-      const elapsed = Date.now() - tickStart;
-      const nextDelay = Math.max(this._tickInterval - elapsed, 0);
-
-      this._scheduleTick(nextDelay);
+        if (this._timeoutId !== null) this._scheduleTick(nextDelay);
+      }
     }, delay);
   }
 
   /**
-   * Execute a scheduler tick - check and run due jobs
+   * Execute a scheduler tick: queue the due jobs and start what the mode
+   * allows. Never waits for a job.
    */
-  private async _tick(): Promise<void> {
+  private _tick(): void {
     this.emit("scheduler:tick", new Date());
 
-    const dueJobs = this._jobs.filter((job) => {
-      // Time-based readiness only; running state is checked below so a
-      // `job:skip` event fires whenever overlap blocks a due run.
-      if (!job.isDue()) return false;
+    for (const job of this._jobs) {
+      // A due job whose previous run is still going is skipped for this tick.
+      if (job.isDue() && job.isRunning) {
+        this.emit("job:skip", job.name, "Job is already running");
+      }
+    }
 
+    if (this._runInParallel || this._inFlight.size === 0) {
+      this._collectDue();
+    } else {
+      // One at a time: jobs that become due while a job runs are collected
+      // once it finishes, as one batch in registration order.
+      this._tickDeferred = true;
+    }
+
+    this._drain();
+  }
+
+  /**
+   * Queue every due job that is neither running nor already queued, in
+   * registration order.
+   */
+  private _collectDue(): void {
+    for (const job of this._jobs) {
+      if (job.isDue() && !job.isRunning && !this._pending.includes(job)) {
+        this._pending.push(job);
+      }
+    }
+  }
+
+  /**
+   * Start queued jobs while a slot is free: up to `maxConcurrency` in
+   * parallel mode, one at a time otherwise. Called on every tick and whenever
+   * a run settles.
+   */
+  private _drain(): void {
+    if (!this._runInParallel && this._inFlight.size === 0 && this._pending.length === 0) {
+      // The tick that fired while the last batch ran is applied now.
+      if (this._tickDeferred && !this._isShuttingDown) this._collectDue();
+      this._tickDeferred = false;
+    }
+
+    const limit = this._runInParallel ? Math.max(1, this._maxConcurrency) : 1;
+
+    while (!this._isShuttingDown && this._pending.length > 0 && this._inFlight.size < limit) {
+      const job = this._pending.shift()!;
+
+      // Removed while it waited, or no longer due.
+      if (!this._jobs.includes(job) || !job.isDue()) continue;
+
+      // Started elsewhere (a manual `run()`) while it waited.
       if (job.isRunning) {
         this.emit("job:skip", job.name, "Job is already running");
-        return false;
+        continue;
       }
 
-      return true;
-    });
+      const run: Promise<void> = this._runJob(job).then(() => undefined);
 
-    if (dueJobs.length === 0) return;
+      this._inFlight.add(run);
 
-    if (this._runInParallel) {
-      await this._runJobsInParallel(dueJobs);
-    } else {
-      await this._runJobsSequentially(dueJobs);
-    }
-  }
-
-  /**
-   * Run jobs sequentially
-   */
-  private async _runJobsSequentially(jobs: Job[]): Promise<void> {
-    for (const job of jobs) {
-      if (this._isShuttingDown) break;
-      await this._runJob(job);
-    }
-  }
-
-  /**
-   * Run jobs in parallel with concurrency limit
-   */
-  private async _runJobsInParallel(jobs: Job[]): Promise<void> {
-    const batches: Job[][] = [];
-
-    for (let i = 0; i < jobs.length; i += this._maxConcurrency) {
-      batches.push(jobs.slice(i, i + this._maxConcurrency));
-    }
-
-    for (const batch of batches) {
-      if (this._isShuttingDown) break;
-      await Promise.allSettled(batch.map((job) => this._runJob(job)));
+      void run.finally(() => {
+        this._inFlight.delete(run);
+        this._drain();
+      });
     }
   }
 

@@ -20,7 +20,8 @@ The File Cache Driver stores cached data as files on disk. Each cache key is a d
 
 - Slower than memory or Redis for large caches
 - Not suitable for distributed/multi-server setups
-- Manual cleanup of expired files only happens on access
+- Manual cleanup of expired files only happens on access (with or without a `globalPrefix`)
+- `lock()` and `set(..., { onConflict: "create" })` admit exactly one winner, also when the previous entry has expired: an expired entry is removed under a short-lived `cache.json.guard` file in the key's directory, which a crashed process leaves behind for at most 10 seconds
 - `update()` and `merge()` throw [`CacheUnsupportedError`](/v/latest/cache/errors/#cacheunsupportederror) — the file driver has no file-lock primitive yet. Use the memory or redis driver for atomic read-modify-write, or wait for v2.1.
 - `cache.list()` works but is O(n) with disk I/O per operation. Avoid large lists on the file driver.
 

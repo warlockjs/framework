@@ -4,6 +4,8 @@ import fs from "fs";
 import { EOL } from "os";
 import path from "path";
 import { LogChannel } from "../log-channel";
+import { escapeLogValue, neutralizeTerminalText } from "../redact/escape-log-value";
+import { withDirectoryRetry } from "../utils/with-directory-retry";
 import type {
   BasicLogConfigurations,
   LogContract,
@@ -30,6 +32,19 @@ export const HOURLY_FILE_NAME = "{YYYY}-{MM}-{DD}-{HH}";
 export const ROTATE_FILE_NAME = "{YYYY}-{MM}-{DD}";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** Default `maxBufferedMessages`: entries kept in memory while writes fail. */
+const DEFAULT_MAX_BUFFERED_MESSAGES = 10_000;
+
+/**
+ * One batch an async write is putting on disk. `flushed` is set when
+ * `flushSync()` wrote it too (a shutdown during the write), so a failed async
+ * write does not put it back in the buffer.
+ */
+type InFlightBatch = { messages: LogMessage[]; flushed: boolean };
+
+/** Entries bound for one file. */
+type WriteTarget = { filePath: string; directory: string; messages: LogMessage[] };
 
 /**
  * Which old log files `FileLog` removes, on boot and whenever it starts a new
@@ -122,6 +137,27 @@ export type FileLogConfig = BasicLogConfigurations & {
    */
   maxMessagesToWrite?: number;
   /**
+   * Most entries kept in memory while writes keep failing (a missing or
+   * read-only log directory). Past it the oldest entries are dropped and one
+   * notice goes to the channel error handler, so a broken disk cannot grow
+   * memory without bound. `Infinity` keeps everything.
+   *
+   * @default 10000
+   */
+  maxBufferedMessages?: number;
+  /**
+   * Keep each entry on one line: line breaks, tabs and control characters in
+   * the message text are written as visible escapes (`\n`, `\t`, `\uXXXX`)
+   * and terminal escape sequences are removed, so text taken from a request
+   * cannot forge a log line. An `Error`'s stack trace is written as is.
+   *
+   * `false` writes line breaks and tabs raw; terminal escape sequences and
+   * other control characters are still neutralised.
+   *
+   * @default true
+   */
+  escape?: boolean;
+  /**
    * Group logs by
    * Please note that the order matters here
    * For example, if you set `groupBy: ['level', 'module']`, the logs will be added in level name first, then by module
@@ -156,11 +192,6 @@ export class FileLog extends LogChannel<FileLogConfig> implements LogContract {
   protected messages: LogMessage[] = [];
 
   /**
-   * Grouped messages
-   */
-  protected groupedMessages: Record<string, LogMessage[]> = {};
-
-  /**
    * Default channel configurations
    */
   protected defaultConfigurations: FileLogConfig = {
@@ -188,6 +219,27 @@ export class FileLog extends LogChannel<FileLogConfig> implements LogContract {
    * A flag to determine if the file is being written
    */
   protected isWriting = false;
+
+  /**
+   * The batch the running async write is putting on disk.
+   */
+  protected inFlight?: InFlightBatch;
+
+  /**
+   * The running async write, so `flush()` can wait for it.
+   */
+  protected writing?: Promise<void>;
+
+  /**
+   * Counts failed async writes; `flush()` stops draining after one.
+   */
+  protected writeFailures = 0;
+
+  /**
+   * Whether the "buffer full, oldest entries dropped" notice was reported
+   * since the last successful write.
+   */
+  protected bufferOverflowReported = false;
 
   /**
    * Handle for the periodic flush interval. Stored so it can be cleared
@@ -381,10 +433,10 @@ export class FileLog extends LogChannel<FileLogConfig> implements LogContract {
   }
 
   /**
-   * Get content
+   * The text written for the given entries: one `content` per line.
    */
-  protected get content() {
-    return this.messages.map((message) => message.content).join(EOL) + EOL;
+  protected contentOf(messages: LogMessage[]): string {
+    return messages.map((message) => message.content).join(EOL) + EOL;
   }
 
   /**
@@ -614,53 +666,64 @@ export class FileLog extends LogChannel<FileLogConfig> implements LogContract {
   }
 
   /**
-   * Synchronously flush messages
+   * Synchronously flush messages.
+   *
+   * Also writes the batch an async write is still putting on disk: on a
+   * shutdown that async write may never finish, and an entry written twice
+   * is better than one lost.
    */
   public flushSync(): void {
-    if (this.messages.length === 0 && Object.keys(this.groupedMessages).length === 0) return;
+    const inFlight = this.inFlight && !this.inFlight.flushed ? this.inFlight : undefined;
 
-    if (this.messagedShouldBeGrouped) {
-      this.prepareGroupedMessages();
-      // `Object.entries` rather than `for...in` + index: under
-      // `noUncheckedIndexedAccess` an index read is `LogMessage[] | undefined`
-      // even when the key came from the object itself, and entries hands over
-      // the value already narrowed. Same iteration, no assertion.
-      for (const [key, groupMessages] of Object.entries(this.groupedMessages)) {
-        const directoryPath = path.join(this.storagePath, key);
-        fs.mkdirSync(directoryPath, { recursive: true });
-        const filePath = path.join(directoryPath, `${this.fileName}.${this.extension}`);
-        const content = groupMessages.map((message) => message.content).join(EOL) + EOL;
-        fs.appendFileSync(filePath, content);
+    if (this.messages.length === 0 && !inFlight) return;
+
+    const messages = inFlight ? inFlight.messages.concat(this.messages) : this.messages;
+
+    this.messages = [];
+
+    try {
+      for (const target of this.writeTargets(messages)) {
+        fs.mkdirSync(target.directory, { recursive: true });
+        this.writeEntriesSync(target.filePath, target.messages);
       }
-    } else {
-      fs.mkdirSync(this.storagePath, { recursive: true });
-      fs.appendFileSync(this.filePath, this.content);
+    } catch (error) {
+      // Keep everything buffered (minus the in-flight batch, which the async
+      // write still owns) so a later flush can retry.
+      this.messages = (inFlight ? messages.slice(inFlight.messages.length) : messages).concat(
+        this.messages,
+      );
+      throw error;
     }
 
-    this.onSave();
+    if (inFlight) inFlight.flushed = true;
+
+    this.lastWriteTime = Date.now();
   }
 
   /**
    * Asynchronously drain buffered entries to disk.
    *
-   * The async analogue of {@link flushSync}: it reuses the same async writer
-   * as the background interval, so a caller on a graceful-shutdown path can
-   * `await channel.flush()` (or `await log.flush()`) and rely on the buffer
-   * being on disk once it resolves. `JSONFileLog` inherits this unchanged —
-   * its overridden `writeMessagesToFile` performs the JSON merge.
+   * The async analogue of {@link flushSync}: it waits for a write already in
+   * flight, then writes what is buffered, until the buffer is empty, so a
+   * caller on a graceful-shutdown path can `await channel.flush()` (or
+   * `await log.flush()`) and rely on the entries being on disk once it
+   * resolves. A failed write stops the drain; its entries stay buffered.
    */
   public async flush(): Promise<void> {
-    if (this.messages.length === 0 && Object.keys(this.groupedMessages).length === 0) {
-      return;
+    for (;;) {
+      if (this.writing) {
+        await this.writing;
+        continue;
+      }
+
+      if (this.messages.length === 0 || !this.isInitialized) return;
+
+      const failures = this.writeFailures;
+
+      await this.writeMessagesToFile();
+
+      if (this.writeFailures !== failures) return;
     }
-
-    // Clear the in-flight lock so a deliberate drain is never short-circuited
-    // by a half-finished background write, then await the async writer to
-    // completion — unlike the fire-and-forget interval, callers depend on the
-    // buffer reaching disk before this resolves.
-    this.isWriting = false;
-
-    await this.writeMessagesToFile();
   }
 
   /**
@@ -682,12 +745,12 @@ export class FileLog extends LogChannel<FileLogConfig> implements LogContract {
     // check if message is an instance of Error
     if (message instanceof Error) {
       // in that case we need to store the error message and stack trace
-      content += message.message + EOL;
+      content += this.messageText(message.message) + EOL;
       content += `[trace]` + EOL;
       content += message.stack;
       stack = message.stack;
     } else {
-      content += message;
+      content += this.messageText(message);
     }
 
     this.messages.push({
@@ -705,22 +768,56 @@ export class FileLog extends LogChannel<FileLogConfig> implements LogContract {
   }
 
   /**
+   * The message as written to the file: escaped to one line by default
+   * (`escape`), terminal escapes and control characters always neutralised.
+   */
+  protected messageText(message: unknown): string {
+    if (this.config("escape") === false) {
+      return neutralizeTerminalText(String(message));
+    }
+
+    return escapeLogValue(message);
+  }
+
+  /**
    * Check if messages should be written
    */
   protected async checkIfMessagesShouldBeWritten() {
+    this.enforceBufferLimit();
+
     if (this.messages.length >= this.maxMessagesToWrite || Date.now() - this.lastWriteTime > 5000) {
       await this.writeMessagesToFile();
     }
   }
 
   /**
-   * Should be called after messages are saved
+   * Drop the oldest buffered entries past `maxBufferedMessages`, reporting it
+   * once until the next successful write.
    */
-  protected onSave() {
-    this.messages = [];
-    this.groupedMessages = {};
-    this.isWriting = false;
-    this.lastWriteTime = Date.now();
+  protected enforceBufferLimit(): void {
+    const limit = this.config("maxBufferedMessages") ?? DEFAULT_MAX_BUFFERED_MESSAGES;
+
+    if (!(limit >= 0) || this.messages.length <= limit) return;
+
+    const dropped = this.messages.length - limit;
+
+    this.messages.splice(0, dropped);
+
+    if (this.bufferOverflowReported) return;
+
+    this.bufferOverflowReported = true;
+
+    this.reportError(
+      new Error(
+        `Log writes are failing and the buffer reached maxBufferedMessages (${limit}); the oldest ${dropped} entries were dropped. Make the log directory writable, or raise maxBufferedMessages.`,
+      ),
+      {
+        type: "error",
+        module: "logger",
+        action: "buffer",
+        message: `Log buffer full for ${this.storagePath}`,
+      },
+    );
   }
 
   /**
@@ -731,95 +828,166 @@ export class FileLog extends LogChannel<FileLogConfig> implements LogContract {
   }
 
   /**
-   * Write messages to the file
+   * Write the buffered messages to their file(s).
+   *
+   * The buffer is swapped out before the write starts, so entries logged
+   * while the write is in flight stay buffered for the next one; entries of
+   * a failed write go back to the front of the buffer.
    */
-  protected async writeMessagesToFile() {
+  protected async writeMessagesToFile(): Promise<void> {
     if (this.messages.length === 0 || this.isWriting || !this.isInitialized) return;
 
     this.isWriting = true;
 
-    if (this.messagedShouldBeGrouped) {
-      return await this.writeGroupedMessagesToFile();
-    }
+    const batch: InFlightBatch = { messages: this.messages, flushed: false };
 
-    try {
-      const filePath = this.filePath;
+    this.messages = [];
+    this.inFlight = batch;
 
-      await this.checkAndRotateFile(filePath); // Ensure we check file size before writing
-      await this.write(filePath, this.content);
-      this.onSave();
-    } catch (error) {
-      console.error("Failed to write log:", error);
-      // Implement fallback logic here
-      this.isWriting = false;
-      return;
-    }
+    const run = this.writeBatch(batch);
 
-    await this.afterWrite();
+    this.writing = run;
+
+    await run;
   }
 
   /**
-   * Write grouped messages to the file
+   * Write one swapped-out batch, then settle the channel state.
    */
-  protected async writeGroupedMessagesToFile(): Promise<void> {
-    // first step, is to group the messages
-    this.prepareGroupedMessages();
+  protected async writeBatch(batch: InFlightBatch): Promise<void> {
+    let failed: LogMessage[];
 
-    // now each key in the grouped messages, represents the directory path that should extend the storage path
-    for (const [key, groupMessages] of Object.entries(this.groupedMessages)) {
-      const directoryPath = path.join(this.storagePath, key);
+    try {
+      failed = await this.writeTargetsAsync(batch.messages);
+    } catch (error) {
+      failed = batch.messages;
+      this.reportWriteError(error, this.storagePath);
+    }
 
+    this.isWriting = false;
+    this.inFlight = undefined;
+    this.writing = undefined;
+
+    if (failed.length > 0) {
+      this.writeFailures++;
+
+      if (!batch.flushed) {
+        this.messages = failed.concat(this.messages);
+        this.enforceBufferLimit();
+      }
+    } else {
+      this.lastWriteTime = Date.now();
+      this.bufferOverflowReported = false;
+    }
+
+    if (failed.length < batch.messages.length) {
+      await this.afterWrite();
+    }
+
+    // Entries that arrived during the write may already fill another batch.
+    if (failed.length === 0 && this.messages.length >= this.maxMessagesToWrite) {
+      await this.writeMessagesToFile();
+    }
+  }
+
+  /**
+   * Write each target file; returns the entries whose file could not be
+   * written (each failure is reported and the other files still run).
+   */
+  protected async writeTargetsAsync(messages: LogMessage[]): Promise<LogMessage[]> {
+    const failed: LogMessage[] = [];
+    const grouped = this.messagedShouldBeGrouped;
+
+    for (const target of this.writeTargets(messages)) {
       try {
-        await ensureDirectoryAsync(directoryPath);
+        if (grouped) {
+          await ensureDirectoryAsync(target.directory);
+        }
 
-        const filePath = path.join(directoryPath, `${this.fileName}.${this.extension}`);
-
-        await this.checkAndRotateFile(filePath); // Ensure we check file size before writing
-
-        const content = groupMessages.map((message) => message.content).join(EOL) + EOL;
-
-        await this.write(filePath, content);
+        await this.checkAndRotateFile(target.filePath); // Ensure we check file size before writing
+        await this.writeEntries(target.filePath, target.messages);
       } catch (error) {
-        console.error("Failed to write log:", error);
+        failed.push(...target.messages);
+        this.reportWriteError(error, target.filePath);
       }
     }
 
-    this.onSave();
-    this.isWriting = false;
-
-    await this.afterWrite();
+    return failed;
   }
 
   /**
-   * Prepare grouped messages
+   * The file(s) the given entries go to: the channel file, or one file per
+   * group directory with `groupBy`.
    */
-  protected prepareGroupedMessages(): void {
-    this.messages.forEach((message) => {
+  protected writeTargets(messages: LogMessage[]): WriteTarget[] {
+    const fileName = `${this.fileName}.${this.extension}`;
+
+    if (!this.messagedShouldBeGrouped) {
+      return [
+        {
+          filePath: path.join(this.storagePath, fileName),
+          directory: this.storagePath,
+          messages,
+        },
+      ];
+    }
+
+    const groups = new Map<string, LogMessage[]>();
+
+    for (const message of messages) {
       const key = this.config("groupBy")!
         .map((groupKey) => encodeURIComponent(message[groupKey]))
         .join("/");
 
-      this.groupedMessages[key] = this.groupedMessages[key] || [];
-      this.groupedMessages[key].push(message);
+      const group = groups.get(key);
+
+      if (group) {
+        group.push(message);
+      } else {
+        groups.set(key, [message]);
+      }
+    }
+
+    return [...groups].map(([key, groupMessages]) => {
+      const directory = path.join(this.storagePath, key);
+
+      return { filePath: path.join(directory, fileName), directory, messages: groupMessages };
     });
   }
 
   /**
-   * Start writing to the file
+   * Append the given entries to one file. `JSONFileLog` overrides this.
    */
-  protected async write(filePath: string, content: string) {
-    return new Promise((resolve, reject) => {
-      const writer = fs.createWriteStream(filePath, { flags: "a" });
+  protected async writeEntries(filePath: string, messages: LogMessage[]): Promise<void> {
+    await this.write(filePath, this.contentOf(messages));
+  }
 
-      writer.write(content, (error) => {
-        writer.end();
-        if (error) {
-          reject(error);
-        } else {
-          resolve(true);
-        }
-      });
+  /**
+   * Synchronous {@link writeEntries}, used by {@link flushSync}.
+   */
+  protected writeEntriesSync(filePath: string, messages: LogMessage[]): void {
+    fs.appendFileSync(filePath, this.contentOf(messages));
+  }
+
+  /**
+   * Send a write failure to the channel error handler.
+   */
+  protected reportWriteError(error: unknown, target: string): void {
+    this.reportError(error, {
+      type: "error",
+      module: "logger",
+      action: "write",
+      message: `Log write failed for ${target}`,
     });
+  }
+
+  /**
+   * Append content to a file. A failure rejects (it never becomes an
+   * uncaught stream error); a missing directory (removed or rotated away
+   * while the process runs) is recreated and the append retried once.
+   */
+  protected async write(filePath: string, content: string): Promise<void> {
+    await withDirectoryRetry(filePath, () => fs.promises.appendFile(filePath, content));
   }
 }
 

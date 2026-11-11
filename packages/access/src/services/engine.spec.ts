@@ -285,3 +285,87 @@ describe("engine — ambient tenant + policy helpers", () => {
     expect(uncoveredResult).toBe(false);
   });
 });
+
+describe("flush with an ambient tenant", () => {
+  it("drops the set the checks read, so a revoked permission stops working at once", async () => {
+    setAccessConfig({
+      resolver: { resolvePermissions, resolveRoles, resolveTenant: () => "t1" },
+    });
+
+    expect(await check(user, "orders.delete")).toBe(true);
+
+    // the role is revoked in the app's storage
+    resolvePermissions.mockResolvedValue([]);
+    await flush(user);
+
+    expect(await check(user, "orders.delete")).toBe(false);
+  });
+
+  it("also drops the no-tenant set", async () => {
+    setAccessConfig({
+      resolver: { resolvePermissions, resolveRoles, resolveTenant: () => "t1" },
+    });
+
+    await flush(user);
+
+    expect(cacheRemove).toHaveBeenCalledWith("access.perms.user.1.t1");
+    expect(cacheRemove).toHaveBeenCalledWith("access.perms.user.1._");
+  });
+});
+
+describe("one resolution per user object", () => {
+  it("reads the shared cache once for several checks on the same user object", async () => {
+    await check(user, "orders.view");
+    cacheGet.mockClear();
+
+    await check(user, "orders.update");
+    await check(user, "orders.delete");
+
+    expect(cacheGet).not.toHaveBeenCalled();
+  });
+
+  it("canAll-style sequences on a fresh user object cost one cache read", async () => {
+    const fresh = { id: 2, userType: "user" } as never;
+
+    for (const permission of ["orders.view", "orders.update", "orders.delete"]) {
+      await check(fresh, permission);
+    }
+
+    expect(cacheGet).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not share sets between different user objects", async () => {
+    const other = { id: 1, userType: "user" } as never;
+
+    await check(user, "orders.view");
+    cacheGet.mockClear();
+    await check(other, "orders.view");
+
+    expect(cacheGet).toHaveBeenCalledTimes(1);
+  });
+
+  it("stops reusing a set after a second", async () => {
+    vi.useFakeTimers();
+
+    try {
+      const fresh = { id: 3, userType: "user" } as never;
+      await check(fresh, "orders.view");
+      cacheGet.mockClear();
+      vi.advanceTimersByTime(1500);
+
+      await check(fresh, "orders.view");
+
+      expect(cacheGet).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("retries a resolution that failed instead of reusing the failure", async () => {
+    const fresh = { id: 4, userType: "user" } as never;
+    resolvePermissions.mockRejectedValueOnce(new Error("db down"));
+
+    expect(await check(fresh, "orders.view")).toBe(false);
+    expect(await check(fresh, "orders.view")).toBe(true);
+  });
+});

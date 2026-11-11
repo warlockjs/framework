@@ -31,17 +31,21 @@ export type AttachmentPolicy = {
   /**
    * Sandbox roots for LOCAL file attachments. When set, a local path must
    * resolve inside one of these absolute roots, else it is rejected with
-   * `OutboundPolicyError`. When omitted, local reads are not path-
-   * restricted (back-compat) — set this to confine reads to an uploads
-   * directory.
+   * `OutboundPolicyError`. Symbolic links are followed before the check
+   * (in the path and in the roots), so a link inside a root that points
+   * outside it is refused, and the resolved file is what gets read. When
+   * omitted, local reads are not path-restricted (back-compat) — set this
+   * to confine reads to an uploads directory.
    */
   allowedRoots?: string[];
   /**
    * Allow bare-STRING local paths (e.g. `"./notes.txt"`, `"/etc/passwd"`).
-   * Staged deprecation: today bare-string local paths are allowed but warn
-   * once (outside tests). Set `false` to hard-deny them now — the typed
-   * `{ type, source: { absolutePath } }` StorageFile route stays supported
-   * (and is gated by {@link allowedRoots}).
+   * Staged deprecation: left unset, bare-string local paths are allowed but
+   * warn once (outside tests); `false` becomes the default in the next
+   * major. Set `false` to hard-deny them now — do this whenever attachment
+   * strings can come from users — or `true` to keep them and silence the
+   * warning. The typed `{ type, source: { absolutePath } }` StorageFile
+   * route stays supported (and is gated by {@link allowedRoots}).
    */
   allowBareLocalPaths?: boolean;
 };

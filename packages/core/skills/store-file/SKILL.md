@@ -108,6 +108,8 @@ await storage.putFromBase64("data:image/png;base64,iVBORw0KGgo...", "uploads/pho
 await storage.put(request.file("image")!, "uploads/avatar.jpg"); // validate the upload first
 ```
 
+`putFromUrl` / `putFromBase64` store the MIME type of the location's extension, never the type the remote server or data URL declares (pass `{ mimeType }` to set it yourself). `putFromUrl` also pins each connection to the address that passed the private-host check, so DNS rebinding is refused.
+
 Every `put*` returns a `StorageFile`.
 
 ### Reading
@@ -336,6 +338,8 @@ export const temporaryFileController: RequestHandler = async ({ request, respons
 ```
 
 Cloud drivers always return `{ valid: false }` from `validateTemporaryToken` — they validate via presigned URL on the cloud side.
+
+A token is bound to the storage prefix (tenant) in effect when it was issued: under another tenant's prefix it is refused with `invalid_token`. Tokens from versions before 5.53 are refused too. Give each local disk its own `signatureKey`.
 
 ## Runtime driver registration
 

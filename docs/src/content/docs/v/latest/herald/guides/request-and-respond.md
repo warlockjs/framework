@@ -6,7 +6,7 @@ sidebar:
   label: "Request and respond"
 ---
 
-Most messaging is fire-and-forget. When you need a reply — "compute this tax, give me the number" — herald has a request/respond pair. Under the hood it's a temporary reply queue plus correlation-ID matching; on the surface, it's a typed promise.
+Most messaging is fire-and-forget. When you need a reply — "compute this tax, give me the number" — herald has a request/respond pair. Under the hood it's RabbitMQ's direct reply-to plus correlation-ID matching; on the surface, it's a typed promise.
 
 ## The shape
 
@@ -36,16 +36,15 @@ The responder's return value becomes the reply. You can also reply explicitly vi
 
 ## What happens under the hood
 
-1. `request` creates an **exclusive auto-delete reply queue** with a random name.
-2. It generates a `correlationId` for this call.
-3. It publishes your payload to the channel with `replyTo: <reply-queue>` and the correlation ID.
-4. It starts consuming the reply queue and waits.
-5. The responder receives the message, runs your handler, and calls `ctx.reply` (or your handler returns and `respond` calls it for you).
-6. The reply is sent to `msg.properties.replyTo` with the same correlation ID.
-7. The caller's promise resolves with `content.payload`.
-8. The reply queue auto-deletes when the caller disconnects.
+1. The first `request` on a connection starts **one** consumer on RabbitMQ's direct reply-to (`amq.rabbitmq.reply-to`). Every later request on that connection shares it; no queue is declared per call.
+2. It generates a `correlationId` for this call and records the pending request under it.
+3. It publishes your payload to the channel with `replyTo: amq.rabbitmq.reply-to` and the correlation ID. Only AMQP message properties are sent (`expiration`, `priority`, `persistent`, `headers`); `timeout` stays local.
+4. The responder receives the message, runs your handler, and calls `ctx.reply` (or your handler returns and `respond` calls it for you).
+5. The reply is sent to `msg.properties.replyTo` with the same correlation ID.
+6. The shared consumer finds the pending request by correlation ID, removes it and resolves the caller's promise with `content.payload`. A reply that is not valid JSON rejects the promise instead.
+7. On timeout the pending request is removed too, so a late reply is dropped.
 
-You don't manage any of this. The correlation ID is generated and matched for you; the reply queue is created and torn down for you.
+You don't manage any of this. The correlation ID is generated and matched for you, and nothing is left behind after a reply or a timeout.
 
 ## Timeout
 
@@ -124,8 +123,8 @@ The caller fetches from S3 directly. The bus stays fast.
 A stuck request without a timeout leaks:
 
 - The caller's promise never resolves.
-- The reply queue stays open until the caller disconnects.
-- If the caller is long-lived, the queue accumulates.
+- Its pending entry stays in memory until the caller disconnects.
+- If the caller is long-lived, those entries accumulate.
 
 Always set a real timeout, even if it's 10 minutes. Catch the rejection and decide whether to retry, fail the operation, or alert.
 

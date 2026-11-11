@@ -87,9 +87,17 @@ export const removeSpecialCharactersMutator: Mutator = async (value) => {
   return value?.toString().replace(/[^a-zA-Z0-9]/g, "");
 };
 
-/** URL decode */
+/**
+ * URL decode. A malformed escape sequence (`%E0%A4%A`) leaves the value as it
+ * was, so the rules see the raw input instead of the decoder throwing.
+ */
 export const urlDecodeMutator: Mutator = async (value) => {
-  return decodeURIComponent(value);
+  try {
+    return decodeURIComponent(value);
+  } catch (error) {
+    if (error instanceof URIError) return value;
+    throw error;
+  }
 };
 
 /** URL encode */

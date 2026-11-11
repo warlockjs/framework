@@ -23,6 +23,37 @@ Validation fires automatically inside every `save()` — both inserts and update
 
 The catch: you don't call `validate(...)` yourself. Cascade does. Your responsibility is **declaring** the schema and **handling** the error if it fires.
 
+### What an update validates
+
+An insert validates the whole document. An update validates only the fields that changed, so columns the schema doesn't list (added by a migration, computed by `withCount`, ...) are never touched.
+
+A change inside a nested object (`merge({ profile: { bio } })`, `set("profile.bio", ...)`) is validated through its top-level field: the whole current value of `profile` goes through the schema, exactly as it would on insert. Only the changed leaves are written back, so the update stays partial and siblings keep their stored values. An undeclared nested object follows `strictMode` like an undeclared column. An explicit `unset("profile.theme")` is written as a removal even when the schema gives `theme` a `.default()`, the same as `unset()` of a top-level column.
+
+## Unknown fields — `strictMode`
+
+`static strictMode` decides what happens to a field the schema doesn't declare, on insert and on update (nested objects included). The default comes from the data source: `"strip"` on MongoDB, `"fail"` on PostgreSQL unless the data source's `modelOptions.strictMode` says otherwise (the generated project config sets `"strip"` for both):
+
+| Value     | Unknown field                                                   |
+| --------- | --------------------------------------------------------------- |
+| `"strip"` | Dropped silently: never validated, never written                |
+| `"fail"`  | The save throws `DatabaseWriterValidationError` (`unknownKeys`) |
+| `"allow"` | Kept and written as-is                                          |
+
+```ts
+@RegisterModel()
+export class User extends Model<UserSchema> {
+  public static schema = userSchema;
+  public static strictMode: StrictMode = "fail";
+}
+
+// strip (default): `isAdmin` and `permissions` never reach the database
+await user.merge({ name: "Ada", isAdmin: true, permissions: { all: true } }).save();
+```
+
+System columns (`id`, `_id`, the timestamp and soft-delete columns) are always allowed. Unknown keys **inside a declared nested object** (`v.object({ bio: v.string() })`) follow that object's own rule, which rejects them unless the nested schema calls `.allowUnknown()` or `.stripUnknown()`.
+
+The schema the writer validates with is built once per model class and reused; it is rebuilt when `schema`, `strictMode` or a timestamp/soft-delete column name changes.
+
 ## The minimal schema
 
 ```ts
@@ -160,6 +191,8 @@ What each does:
 Both rules accept the **registered model name** (`"User"`, `"Organization"`) or the **model class directly** (`User`, `Organization`). Use the string form when you'd hit a circular import otherwise; use the class form when the import is clean.
 
 Both rules run inside the regular validation pass; failures join `DatabaseWriterValidationError.errors[]` alongside `required` / `email` / etc. Same error handling downstream.
+
+Both ask the database a yes/no question (`exists()`, one row at most, no model hydration). When the looked-up model has a `fetching`, `hydrating` or `fetched` listener, the lookup runs through `first()` instead, so those listeners still see it.
 
 ### Excluding the current record on update
 

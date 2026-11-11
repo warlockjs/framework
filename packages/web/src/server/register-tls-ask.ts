@@ -14,6 +14,7 @@ export function registerTlsAsk(router: Router, web: WebConfigurations): void {
     sites: web.sites,
     resolveHost: web.resolveHost,
     resolveCache: web.resolveCache,
+    allow: web.tlsAskAllow,
   });
 
   router.get(web.tlsAsk, async ({ request, response }) => {

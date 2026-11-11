@@ -32,7 +32,9 @@ export type UrlSourceOptions = {
  *
  * The request is made lazily on the first `list()` / `load()`. The result
  * is cached for the source's lifetime, or for `cacheTtlMs` when set
- * (a stale cache refetches on next access).
+ * (a stale cache refetches on next access). A failed fetch is never
+ * cached: the calls waiting on it receive the error, and the next call
+ * fetches again.
  */
 export function urlSource(url: string, options: UrlSourceOptions = {}): SkillsStoreContract {
   const { headers, policy, cacheTtlMs } = options;
@@ -45,8 +47,18 @@ export function urlSource(url: string, options: UrlSourceOptions = {}): SkillsSt
       cacheTtlMs !== undefined && cachedAtMs !== undefined && Date.now() - cachedAtMs > cacheTtlMs;
 
     if (!cache || expired) {
+      const pending = fetchManifest(url, headers, policy);
       cachedAtMs = Date.now();
-      cache = fetchManifest(url, headers, policy);
+      cache = pending;
+
+      // Drop a failed fetch so one network blip does not fail every later
+      // call — only when no newer fetch has replaced it meanwhile.
+      pending.catch(() => {
+        if (cache === pending) {
+          cache = undefined;
+          cachedAtMs = undefined;
+        }
+      });
     }
 
     return cache;

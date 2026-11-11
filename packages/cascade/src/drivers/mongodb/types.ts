@@ -1,4 +1,5 @@
 import type { TransactionOptions } from "mongodb";
+import type { LikePatternLimits } from "../../utils/like-pattern-limits";
 
 /**
  * MongoDB pipeline stage names.
@@ -61,4 +62,23 @@ export type MongoDriverOptions = {
    * Applied to all transactions unless overridden.
    */
   transactionOptions?: TransactionOptions;
+
+  /**
+   * Caps on string `whereLike` / `whereNotLike` patterns (and the `like` /
+   * `notLike` where operators). MongoDB runs a LIKE pattern as a regex, and
+   * each `%` wildcard multiplies how long one value can take to match, so a
+   * pattern over a cap is refused with an `UnsafeFilterError`.
+   *
+   * - `maxWildcards` — most `%` wildcards per pattern (a run `%%` counts once).
+   *   Default `2`: `%term%`, `prefix%` and `%suffix` all fit.
+   * - `maxLength` — longest pattern in characters. Default `256`.
+   *
+   * An explicit `RegExp` argument is developer-authored and not capped.
+   *
+   * @example
+   * ```typescript
+   * driverOptions: { like: { maxWildcards: 3 } }
+   * ```
+   */
+  like?: LikePatternLimits;
 };

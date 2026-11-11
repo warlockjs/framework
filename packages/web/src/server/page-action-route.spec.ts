@@ -106,24 +106,39 @@ let sessionSeenByMiddleware: number | undefined;
 const MULTIPART_BOUNDARY = "----warlockboundary";
 
 /** One multipart body carrying a single file field. */
-function multipartFile(field: string, filename: string, mimetype: string, content: string) {
+function multipartFile(
+  field: string,
+  filename: string,
+  mimetype: string,
+  content: string | Buffer,
+) {
+  const head = [
+    `--${MULTIPART_BOUNDARY}`,
+    `Content-Disposition: form-data; name="${field}"; filename="${filename}"`,
+    `Content-Type: ${mimetype}`,
+    "",
+    "",
+  ].join("\r\n");
+
   return {
     headers: {
       "content-type": `multipart/form-data; boundary=${MULTIPART_BOUNDARY}`,
       origin: SAME_ORIGIN,
       [WARLOCK_DATA_REQUEST_HEADER]: WARLOCK_DATA_REQUEST_VALUE,
     },
-    payload: [
-      `--${MULTIPART_BOUNDARY}`,
-      `Content-Disposition: form-data; name="${field}"; filename="${filename}"`,
-      `Content-Type: ${mimetype}`,
-      "",
-      content,
-      `--${MULTIPART_BOUNDARY}--`,
-      "",
-    ].join("\r\n"),
+    payload: Buffer.concat([
+      Buffer.from(head),
+      Buffer.isBuffer(content) ? content : Buffer.from(content),
+      Buffer.from(`\r\n--${MULTIPART_BOUNDARY}--\r\n`),
+    ]),
   };
 }
+
+/** The 8-byte PNG signature plus filler: `v.file().image()` judges a file by its bytes. */
+const PNG_BYTES = Buffer.concat([
+  Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+  Buffer.from("PNGDATA"),
+]);
 
 const Page = () => createElement("main", null, "page");
 
@@ -640,7 +655,7 @@ describe("page actions (real Fastify, real pipeline)", () => {
   });
 
   it("spec 14: a multipart file reaches request.file, and a Seal file rule rejects the wrong type with 422", async () => {
-    const good = multipartFile("avatar", "me.png", "image/png", "PNGDATA");
+    const good = multipartFile("avatar", "me.png", "image/png", PNG_BYTES);
     const bad = multipartFile("avatar", "notes.txt", "text/plain", "hello");
     const accepted = await server.inject({
       method: "POST",

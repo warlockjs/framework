@@ -46,6 +46,12 @@ export class TupleValidator extends BaseValidator {
     return cloned;
   }
 
+  /** @inheritdoc */
+  protected override copyMutated(value: unknown): unknown {
+    // Without mutators the rules have always shared the container's array.
+    return this.mutators.length > 0 && Array.isArray(value) ? [...value] : value;
+  }
+
   /**
    * Validate tuple - check length then validate each position
    *
@@ -64,7 +70,10 @@ export class TupleValidator extends BaseValidator {
     const valueForRules = data ?? this.getDefaultValue();
     const mutatedData = await this.mutate(valueForRules, context);
 
-    const result = await this.validateRules(data, context);
+    const result = await this.validateRules(data, context, {
+      source: valueForRules,
+      value: mutatedData,
+    });
 
     if (result.isValid === false) return result;
 

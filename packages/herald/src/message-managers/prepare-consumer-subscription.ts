@@ -1,3 +1,4 @@
+import { log } from "@warlock.js/logger";
 import type { MessageHandler } from "./../types";
 import { type EventConsumerClass } from "./types";
 
@@ -21,7 +22,21 @@ export function prepareConsumerSubscription(
     if (consumer.schema) {
       const result = await consumer.validate(eventPayload);
       if (!result || result.isValid === false) {
-        ctx.nack();
+        // An invalid payload can never pass on redelivery: reject it without
+        // requeueing (the broker dead-letters it when the queue has a
+        // dead-letter exchange) instead of looping on it forever.
+        log.warn(
+          "herald",
+          "invalid-message",
+          `Rejected a message for "${Consumer.eventName}" that failed the consumer's schema. ` +
+            "Fix the publisher, or relax the consumer's `schema`.",
+          {
+            eventName: Consumer.eventName,
+            messageId: message.metadata.messageId,
+            errors: result ? result.errors : [],
+          },
+        );
+        await ctx.reject();
         return;
       }
 

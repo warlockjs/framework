@@ -406,6 +406,52 @@ describe("password reset", () => {
     expect(tokenRows).toHaveLength(1);
   });
 
+  it("answers without waiting for the reset email, so timing does not reveal the account", async () => {
+    makeUser(1, { email: "a@x.io" });
+    await requestPasswordReset(UserModel as never, "warm-up@x.io");
+    const definition = defined(
+      definitions.find((candidate) => candidate.type === "auth.password-reset"),
+      "reset notification",
+    );
+    definition.send.mockImplementationOnce(() => new Promise(() => {}));
+
+    await expect(requestPasswordReset(UserModel as never, "a@x.io")).resolves.toBeUndefined();
+    expect(definition.send).toHaveBeenCalledOnce();
+  });
+
+  it("reports a background delivery failure as password.resetDeliveryFailed", async () => {
+    makeUser(1, { email: "a@x.io" });
+    const { authEvents } = await import("./auth-events");
+    const failed = vi.fn();
+    const subscription = authEvents.on("password.resetDeliveryFailed", failed);
+    await requestPasswordReset(UserModel as never, "warm-up@x.io");
+    const definition = defined(
+      definitions.find((candidate) => candidate.type === "auth.password-reset"),
+      "reset notification",
+    );
+    definition.send.mockRejectedValueOnce(new Error("SMTP down"));
+
+    try {
+      await requestPasswordReset(UserModel as never, "a@x.io");
+      await vi.waitFor(() => expect(failed).toHaveBeenCalledOnce());
+    } finally {
+      subscription.unsubscribe();
+    }
+  });
+
+  it("awaitDelivery: true waits for the email and passes its error on", async () => {
+    makeUser(1, { email: "a@x.io" });
+    configValues["auth.passwordReset.awaitDelivery"] = true;
+    await requestPasswordReset(UserModel as never, "warm-up@x.io");
+    const definition = defined(
+      definitions.find((candidate) => candidate.type === "auth.password-reset"),
+      "reset notification",
+    );
+    definition.send.mockRejectedValueOnce(new Error("SMTP down"));
+
+    await expect(requestPasswordReset(UserModel as never, "a@x.io")).rejects.toThrow("SMTP down");
+  });
+
   it("issuing a new reset token invalidates the previous unused one", async () => {
     makeUser(1, { email: "a@x.io", password: "hashed:old" });
     await requestPasswordReset(UserModel as never, "a@x.io");

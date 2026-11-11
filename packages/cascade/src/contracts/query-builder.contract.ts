@@ -71,6 +71,13 @@ export type CursorPaginationOptions = {
   direction?: "next" | "prev";
   limit: number;
   column?: string;
+  /**
+   * Ceiling on `limit`: a larger page size is lowered to this value.
+   * Pass `Infinity` to disable it.
+   *
+   * @default 1000
+   */
+  maxLimit?: number;
 };
 
 /**
@@ -79,6 +86,15 @@ export type CursorPaginationOptions = {
 export type PaginationOptions = {
   page?: number;
   limit?: number;
+  /**
+   * Ceiling on `limit`: a larger page size is lowered to this value (the
+   * result's `pagination.limit` reports the size used). `limit` and `page`
+   * must be whole numbers (digit strings are accepted). Pass `Infinity` to
+   * disable the ceiling.
+   *
+   * @default 1000
+   */
+  maxLimit?: number;
 };
 
 /**

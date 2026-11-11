@@ -234,15 +234,16 @@ describe("MongoQueryBuilder — filter security", () => {
       const pipeline = builder().whereLike("email", "%@gmail.com").parse().pipeline;
       const source = regexSourceOf(pipeline, "email");
 
-      expect(source).toBe(".*@gmail\\.com");
+      // The regex is unanchored, so the leading % adds nothing and is dropped.
+      expect(source).toBe("@gmail\\.com");
       expect(new RegExp(source).test("alice@gmail.com")).toBe(true);
       expect(new RegExp(source).test("alice@gmail-com")).toBe(false);
     });
 
-    it("collapses a run of % into a single wildcard", () => {
+    it("collapses a run of % into one wildcard and drops the unanchored edges", () => {
       const pipeline = builder().whereLike("name", "%%%%%%%%%%a%%%%%%%%%%").parse().pipeline;
 
-      expect(regexSourceOf(pipeline)).toBe(".*a.*");
+      expect(regexSourceOf(pipeline)).toBe("a");
     });
 
     it("keeps plain substring matching unchanged", () => {

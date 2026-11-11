@@ -440,3 +440,146 @@ describe("httpRequestTool — private-network deny (SSRF defaults)", () => {
     expect(data?.body).toEqual({ ok: true });
   });
 });
+
+describe("httpRequestTool — static headers stay on the base URL origin", () => {
+  const secretHeaders = { authorization: "Bearer k", "x-api-key": "secret" };
+
+  it("refuses an absolute or protocol-relative URL on another host before any fetch", async () => {
+    const calls = stubFetch(() => jsonResponse({}));
+    const tool = httpRequestTool({ baseUrl: "https://api.example.com", headers: secretHeaders });
+
+    for (const url of ["https://evil.example/c", "//evil.example/c", "http://api.example.com/x"]) {
+      const { data, error } = await tool.invoke({ url });
+
+      expect(data, url).toBeUndefined();
+      expect(causeOf(error), url).toBeInstanceOf(HttpPolicyError);
+      expect((causeOf(error) as HttpPolicyError).type, url).toBe("host-not-allowed");
+    }
+
+    expect(calls).toHaveLength(0);
+  });
+
+  it("still sends a relative path, with the static headers, to the base URL", async () => {
+    const calls = stubFetch(() => jsonResponse({ ok: true }));
+
+    const { error } = await httpRequestTool({
+      baseUrl: "https://api.example.com/v1/",
+      headers: secretHeaders,
+    }).invoke({ url: "charges" });
+
+    expect(error).toBeUndefined();
+    expect(firstCall(calls).url).toBe("https://api.example.com/v1/charges");
+    expect(firstCall(calls).headers["x-api-key"]).toBe("secret");
+  });
+
+  it("accepts another host when allowHosts lists it", async () => {
+    const calls = stubFetch(() => jsonResponse({ ok: true }));
+
+    const { error } = await httpRequestTool({
+      baseUrl: "https://api.example.com",
+      allowHosts: ["api.example.com", "files.example.com"],
+    }).invoke({ url: "https://files.example.com/a" });
+
+    expect(error).toBeUndefined();
+    expect(firstCall(calls).url).toBe("https://files.example.com/a");
+  });
+
+  it("keeps redirects of a baseUrl tool on the base host", async () => {
+    const calls = stubFetch(
+      () =>
+        new Response(null, { status: 302, headers: { location: "https://evil.example/collect" } }),
+    );
+
+    const { error } = await httpRequestTool({
+      baseUrl: "https://api.example.com",
+      headers: secretHeaders,
+    }).invoke({ url: "/start" });
+
+    expect((causeOf(error) as HttpPolicyError).type).toBe("host-not-allowed");
+    expect(calls).toHaveLength(1);
+  });
+
+  it("drops every static header on a redirect to another origin", async () => {
+    const calls = stubFetch((call) =>
+      call.url.startsWith("https://api.example.com/")
+        ? new Response(null, {
+            status: 302,
+            headers: { location: "https://cdn.example.net/file" },
+          })
+        : textResponse("done"),
+    );
+
+    const { data, error } = await httpRequestTool({
+      allowHosts: ["api.example.com", "cdn.example.net"],
+      headers: secretHeaders,
+    }).invoke({ url: "https://api.example.com/download", headers: { accept: "text/plain" } });
+
+    expect(error).toBeUndefined();
+    expect(data?.body).toBe("done");
+    expect(calls).toHaveLength(2);
+    expect(calls[0]?.headers["x-api-key"]).toBe("secret");
+    expect(calls[1]?.headers.authorization).toBeUndefined();
+    expect(calls[1]?.headers["x-api-key"]).toBeUndefined();
+    expect(calls[1]?.headers.accept).toBe("text/plain");
+  });
+
+  it("keeps the static headers on a same-origin redirect", async () => {
+    const calls = stubFetch((call) =>
+      call.url.endsWith("/old")
+        ? new Response(null, { status: 301, headers: { location: "/new" } })
+        : textResponse("moved"),
+    );
+
+    const { data } = await httpRequestTool({
+      baseUrl: "https://api.example.com",
+      headers: secretHeaders,
+    }).invoke({ url: "/old" });
+
+    expect(data?.body).toBe("moved");
+    expect(calls[1]?.url).toBe("https://api.example.com/new");
+    expect(calls[1]?.headers["x-api-key"]).toBe("secret");
+  });
+});
+
+describe("httpRequestTool — the deadline covers the body", () => {
+  /** A response whose body sends one chunk and then never ends. */
+  function drippingResponse(): Response {
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode("partial"));
+      },
+    });
+
+    return new Response(body, { status: 200, headers: { "content-type": "text/plain" } });
+  }
+
+  it("fails with a timeout when the body never finishes", async () => {
+    stubFetch(() => drippingResponse());
+
+    const { data, error } = await httpRequestTool({ timeoutMs: 50 }).invoke({
+      url: "https://api.test/drip",
+    });
+
+    expect(data).toBeUndefined();
+    expect(causeOf(error)).toBeInstanceOf(HttpPolicyError);
+    expect((causeOf(error) as HttpPolicyError).type).toBe("timeout");
+    expect(error?.message).toContain("timeoutMs");
+  });
+
+  it("stops reading the body when the run is aborted", async () => {
+    stubFetch(() => drippingResponse());
+    const controller = new AbortController();
+    const tool = httpRequestTool({ timeoutMs: 60_000 });
+
+    const pending = tool.invoke(
+      { url: "https://api.test/drip" },
+      { artifacts: {}, signal: controller.signal },
+    );
+    setTimeout(() => controller.abort(new Error("run cancelled")), 20);
+
+    const { data, error } = await pending;
+
+    expect(data).toBeUndefined();
+    expect(error).toBeDefined();
+  });
+});

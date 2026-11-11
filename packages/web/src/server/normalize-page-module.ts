@@ -56,7 +56,17 @@ export type NormalizedPageModule = {
 };
 
 const MODULE_EXPORTS = new Set<string>(MODULE_EXPORT_NAMES);
-const CACHE_KEYS = new Set(["public", "maxAge", "serverCache", "tags", "varyBy", "ttl"]);
+const CACHE_KEYS = new Set([
+  "public",
+  "maxAge",
+  "serverCache",
+  "tags",
+  "varyBy",
+  "ttl",
+  "query",
+  "varyHeaders",
+]);
+const HEADER_NAME_PATTERN = /^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/;
 const ACTION_CONFIG_KEYS = new Set(["validation", "middleware"]);
 const ACTION_NAME_PATTERN = /^[a-z][a-zA-Z0-9]*$/;
 const ROUTE_KEYS = new Set(["path", "name"]);
@@ -78,13 +88,28 @@ function fail(sourceFile: string, detail: string): never {
   throw new InvalidPageModuleConfigError(sourceFile, detail);
 }
 
+/** Allowed-key lists as sets, built once per list. */
+const allowedKeySets = new WeakMap<readonly string[], Set<string>>();
+
+function allowedKeySet(allowed: readonly string[] | Set<string>): Set<string> {
+  if (allowed instanceof Set) return allowed;
+
+  let keys = allowedKeySets.get(allowed);
+  if (keys === undefined) {
+    keys = new Set(allowed);
+    allowedKeySets.set(allowed, keys);
+  }
+
+  return keys;
+}
+
 function assertExactKeys(
   value: Record<string, unknown>,
   allowed: readonly string[] | Set<string>,
   sourceFile: string,
   subject: string,
 ): void {
-  const allowedKeys = allowed instanceof Set ? allowed : new Set(allowed);
+  const allowedKeys = allowedKeySet(allowed);
   const unknown = Object.keys(value).filter((key) => !allowedKeys.has(key));
   if (unknown.length > 0) {
     const childSpreadHint =
@@ -146,6 +171,28 @@ function validateCache(value: unknown, sourceFile: string): PageCacheOptIn {
   }
   if (value.serverCache === true && value.tags === undefined) {
     fail(sourceFile, "config.cache.serverCache requires config.cache.tags.");
+  }
+  if (
+    value.query !== undefined &&
+    (!Array.isArray(value.query) ||
+      !value.query.every((key) => typeof key === "string" && key.length > 0))
+  ) {
+    fail(
+      sourceFile,
+      'config.cache.query must be an array of query parameter names when defined, e.g. ["page"].',
+    );
+  }
+  if (
+    value.varyHeaders !== undefined &&
+    (!Array.isArray(value.varyHeaders) ||
+      !value.varyHeaders.every(
+        (name) => typeof name === "string" && HEADER_NAME_PATTERN.test(name),
+      ))
+  ) {
+    fail(
+      sourceFile,
+      'config.cache.varyHeaders must be an array of request header names when defined, e.g. ["x-theme"].',
+    );
   }
   return value as PageCacheOptIn;
 }
@@ -435,9 +482,19 @@ function validatePageSitemap(value: unknown, sourceFile: string): SitemapPageExp
 }
 
 /**
+ * Normalized results by raw namespace, then by kind and source file. A module
+ * namespace is fixed once loaded (development hands a new namespace object on
+ * every change), so the live request path validates each one once instead of
+ * on every request. A namespace that fails validation is never stored, so it
+ * fails again, with the same message, on its next use.
+ */
+const normalizedModules = new WeakMap<object, Map<string, NormalizedPageModule>>();
+
+/**
  * Validate a raw ESM namespace and project config into the existing internal
- * flattened shape. The result is a new object; `raw` is never written to or
- * used as registration identity.
+ * flattened shape. The result is a new object, shared by every later call for
+ * the same namespace, kind and source file; callers never write to it. `raw`
+ * is never written to or used as registration identity.
  */
 export function normalizePageModule(
   raw: unknown,
@@ -445,6 +502,24 @@ export function normalizePageModule(
   sourceFile: string,
 ): NormalizedPageModule {
   if (!plainObject(raw)) fail(sourceFile, "module namespace must be an object.");
+
+  const cacheKey = `${kind}\0${sourceFile}`;
+  const known = normalizedModules.get(raw)?.get(cacheKey);
+  if (known !== undefined) return known;
+
+  const normalized = normalizeUncached(raw, kind, sourceFile);
+  const forNamespace = normalizedModules.get(raw) ?? new Map<string, NormalizedPageModule>();
+  forNamespace.set(cacheKey, normalized);
+  normalizedModules.set(raw, forNamespace);
+
+  return normalized;
+}
+
+function normalizeUncached(
+  raw: Record<string, unknown>,
+  kind: PageModuleKind,
+  sourceFile: string,
+): NormalizedPageModule {
   assertExactKeys(raw, MODULE_EXPORTS, sourceFile, "module exports");
 
   const hasConfig = Object.prototype.hasOwnProperty.call(raw, "config");

@@ -70,6 +70,11 @@ ai.tools.webSearch({ provider: "tavily", apiKey: process.env.TAVILY_API_KEY, max
 - `provider`: `"tavily"` (LLM-ready snippets plus a relevance `score`), `"brave"`, or `"serpapi"`. Each is called over the global `fetch` — **no provider SDK is required**.
 - `apiKey` falls back to a per-provider env var: `TAVILY_API_KEY` / `BRAVE_API_KEY` / `SERPAPI_API_KEY`. A missing key is a `WebToolError` of type `"missing-key"`.
 - The model's `maxResults` is clamped into `[1, options.maxResults]` (default `5`).
+- `timeoutMs` (default `15_000`) bounds each provider call, response included; a slow or hung provider fails the call with a `WebToolError` of type `"request-failed"` instead of holding the agent run. Cancelling the run aborts the call too.
+
+```ts
+ai.tools.webSearch({ provider: "brave", timeoutMs: 8_000 });
+```
 
 ## `fetch_url` — read a page you have the URL for
 
@@ -89,7 +94,9 @@ ai.tools.fetchUrl({
 - `allowHosts` (when set) rejects any other host **before the fetch** (an SSRF guardrail) → `WebToolError` of type `"denied-host"`, and redirect targets are held to the same allowlist.
 - **Private-network deny by default.** Every request — and every redirect hop — routes through `@warlock.js/ai`'s hardened `guardedFetch` outbound policy instead of a local host check. It refuses private / loopback / link-local / CGNAT / cloud-metadata addresses (`169.254.169.254`, RFC1918, `localhost`, …) by resolving the hostname via DNS and checking every returned address, failing closed on resolution failure — and re-validates every redirect `Location` (scheme, allowlist, private-IP deny) before following it. This applies even with no `allowHosts` set, so a bare `ai.tools.fetchUrl()` is not an SSRF primitive.
 - `allowPrivateNetwork` (default `false`) — set `true` only for a deliberate internal/dev target (e.g. a local dev server); pair it with `allowHosts` to scope it rather than opening the whole private range.
-- `maxBytes` caps the body and flags `truncated`; `timeoutMs` aborts via `AbortSignal.timeout`.
+- `maxBytes` caps the body and flags `truncated`.
+- `timeoutMs` (default `15_000`) bounds the **whole** call — connect, redirects, the challenge retry and reading the body — so a server that answers quickly and then drips its body fails with a `"request-failed"` error that names `timeoutMs`. Cancelling the agent run aborts the fetch.
+- The built-in converter is linear in page size: an unterminated `<tag` or `<!--` (hostile or broken HTML) is kept as text, never rescanned, so a fetched page cannot stall the process.
 
 > **Heavy deps are lazy optional peers.** `"text"` / `"markdown"` lazily import `@mozilla/readability` + `jsdom` only when used — a missing peer surfaces a `WebToolError` of type `"missing-peer"` carrying the exact `npm install @mozilla/readability jsdom` string, never a raw import-time crash. `"html"` needs nothing.
 
@@ -111,10 +118,11 @@ All guardrails are enforced **before the network call** and surface as a typed `
 
 - a method outside `allowMethods` → `"method-not-allowed"`;
 - a host outside `allowHosts` → `"host-not-allowed"` (SSRF guardrail);
+- with `baseUrl` set, a URL on another origin — absolute (`https://other.example/x`) or protocol-relative (`//other.example/x`) — → `"host-not-allowed"`, unless its host is listed in `allowHosts`;
 - an unresolvable URL → `"invalid-url"`.
 - **Private-network deny by default** — like `fetch_url`, every request and redirect hop routes through the hardened `guardedFetch` outbound policy, refusing private/loopback/link-local/CGNAT/cloud-metadata addresses (DNS-resolved and re-checked per redirect hop) even when `allowHosts` isn't set → `"host-not-allowed"`. Set `allowPrivateNetwork: true` (default `false`) to permit a deliberate internal target.
 
-When `baseUrl` is set the model passes a **path** joined against it; otherwise it must pass an absolute `http(s)` URL. Static `headers` merge **under** the per-call headers (per-call wins). An object `body` is JSON-serialized (with a default `content-type: application/json`); a string `body` is sent verbatim; `body` is dropped for `GET`. The response body is JSON-parsed when the `content-type` is JSON, else returned as text.
+When `baseUrl` is set the model passes a **path** joined against it, and the request — and every redirect — stays on the base host unless `allowHosts` names others; otherwise it must pass an absolute `http(s)` URL. Static `headers` merge **under** the per-call headers (per-call wins) and are sent **only to the origin of the first request**: a redirect to another origin drops every static header, plus `authorization`, `cookie` and `proxy-authorization`. Put credentials in `headers` only together with `baseUrl` or `allowHosts`; without either, the model chooses where the first request goes. `timeoutMs` (default `15_000`) bounds the whole exchange, body included (`"timeout"`), and cancelling the run aborts it. An object `body` is JSON-serialized (with a default `content-type: application/json`); a string `body` is sent verbatim; `body` is dropped for `GET`. The response body is JSON-parsed when the `content-type` is JSON, else returned as text.
 
 ## `calculator` — safe arithmetic (never `eval`)
 

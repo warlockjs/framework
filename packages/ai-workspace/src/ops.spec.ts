@@ -9,6 +9,7 @@ import type {
   WorkspaceBackend,
   WorkspaceBackendExecOptions,
   WorkspaceBackendExecResult,
+  WorkspaceBackendStat,
   WorkspacePolicy,
 } from "./contracts";
 
@@ -426,10 +427,13 @@ describe("createOps.grep", () => {
     expect(result.matches.some((m) => m.path.startsWith(".git/"))).toBe(false);
   });
 
-  it("rejects a catastrophic-backtracking pattern (ReDoS shape) instead of compiling it", async () => {
+  it("runs a nested-quantifier pattern without backtracking", async () => {
+    backend.files.set(abs("src/run.ts"), `${"a".repeat(40)}!\naaab\n`);
     const ops = createOps(backend, policy());
 
-    await expect(ops.grep("(a+)+$")).rejects.toMatchObject({ type: "unsafe-pattern" });
+    const result = await ops.grep("(a+)+b$", { path: "src/run.ts" });
+
+    expect(result.matches).toEqual([{ path: "src/run.ts", line: 2, text: "aaab" }]);
   });
 
   it("rejects an overly long pattern", async () => {
@@ -438,13 +442,130 @@ describe("createOps.grep", () => {
     await expect(ops.grep("a".repeat(500))).rejects.toMatchObject({ type: "unsafe-pattern" });
   });
 
-  it("bounds the worst-case time a pathological pattern can spend on one line", async () => {
-    // A ReDoS-shaped pattern that's still short and passes the length cap
-    // but is caught by the nested-quantifier heuristic — proves the guard
-    // isn't solely relying on length.
+  it("finishes hostile patterns on lines built to make them backtrack", async () => {
+    // Each pattern needs seconds to forever on these lines with a
+    // backtracking engine; the linear matcher answers at once.
+    backend.files.set(abs("src/hostile.txt"), `${"a".repeat(40)}!\n${"1".repeat(1500)}!\n`);
     const ops = createOps(backend, policy());
 
-    await expect(ops.grep("(a*)*b")).rejects.toBeInstanceOf(WorkspacePolicyError);
+    const patterns = ["((a)+)+$", "(a|a)+$", "(\\w|\\d)+$", "(a*)*b", "\\d*\\d*\\d*\\d*\\d*x"];
+
+    for (const pattern of patterns) {
+      const result = await ops.grep(pattern, { path: "src/hostile.txt" });
+
+      expect(result.total, pattern).toBe(0);
+    }
+  });
+
+  it("refuses lookarounds and backreferences with a clear error", async () => {
+    const ops = createOps(backend, policy());
+
+    for (const pattern of ["foo(?=bar)", "(?<!x)foo", "(a)\\1"]) {
+      await expect(ops.grep(pattern), pattern).rejects.toMatchObject({
+        type: "unsafe-pattern",
+        message: expect.stringMatching(/not supported/),
+      });
+    }
+  });
+
+  it("stops a pattern that needs too much work per character", async () => {
+    // 90 optional "a"s keep ~90 partial matches open on every character of
+    // an all-"a" file — far past the per-character allowance.
+    backend.files.set(abs("src/flood.txt"), `${"a".repeat(1999)}\n`.repeat(500));
+    const ops = createOps(backend, policy());
+
+    await expect(ops.grep(`${"a?".repeat(90)}$`, { path: "src/flood.txt" })).rejects.toMatchObject({
+      type: "unsafe-pattern",
+      message: expect.stringMatching(/too much work/),
+    });
+  });
+
+  it("yields to the event loop during a long scan, so an abort stops it", async () => {
+    // ~30 open partial matches per character: under the per-character
+    // allowance, but millions of steps over this file.
+    backend.files.set(abs("src/slow.txt"), `${"a".repeat(1999)}\n`.repeat(400));
+    const ops = createOps(backend, policy());
+    const controller = new AbortController();
+    const readFile = backend.readFile.bind(backend);
+
+    // The abort is queued once the file is read: it can only run if the
+    // scan that follows gives the event loop a turn.
+    backend.readFile = async (absPath: string): Promise<string> => {
+      const content = await readFile(absPath);
+
+      setImmediate(() => controller.abort(new Error("run cancelled")));
+
+      return content;
+    };
+
+    await expect(
+      ops.grep(`${"a?".repeat(30)}$`, { path: "src/slow.txt", signal: controller.signal }),
+    ).rejects.toThrow("run cancelled");
+  });
+
+  it("keeps ordinary regular-expression results", async () => {
+    backend.files.set(
+      abs("src/ordinary.ts"),
+      "export const Foo = 1;\nconst fooBar = Foo;\n// TODO: tidy\nlet x=2\n",
+    );
+    const ops = createOps(backend, policy());
+    const lines = async (pattern: string, ignoreCase = false): Promise<number[]> =>
+      (await ops.grep(pattern, { path: "src/ordinary.ts", ignoreCase })).matches.map((m) => m.line);
+
+    expect(await lines("^export\\s+const")).toEqual([1]);
+    expect(await lines("\\bFoo\\b")).toEqual([1, 2]);
+    expect(await lines("foo", true)).toEqual([1, 2]);
+    expect(await lines("TODO|let\\s*\\w=\\d")).toEqual([3, 4]);
+    expect(await lines("= [A-Z]\\w+;")).toEqual([2]);
+  });
+
+  it("skips files over search.maxFileBytes without reading them, and counts them", async () => {
+    class StatBackend extends FakeBackend {
+      public readonly reads: string[] = [];
+
+      public override async readFile(absPath: string): Promise<string> {
+        this.reads.push(absPath);
+
+        return super.readFile(absPath);
+      }
+
+      public async stat(absPath: string): Promise<WorkspaceBackendStat> {
+        const content = this.files.get(absPath);
+
+        return content === undefined
+          ? { type: "directory", size: 0 }
+          : { type: "file", size: Buffer.byteLength(content) };
+      }
+    }
+
+    const sized = new StatBackend();
+    sized.files.set(abs("data/dump.sql"), `foo\n${"x".repeat(5_000_000)}`);
+    sized.files.set(abs("data/small.sql"), "foo\n");
+    const ops = createOps(sized, policy({ search: { maxFileBytes: 1_000_000 } }));
+
+    const result = await ops.grep("foo", { path: "data" });
+
+    expect(result.matches.map((m) => m.path)).toEqual(["data/small.sql"]);
+    expect(result.skippedFiles).toBe(1);
+    expect(sized.reads).not.toContain(abs("data/dump.sql"));
+  });
+
+  it("skips an oversized file after reading it when the backend has no stat", async () => {
+    backend.files.set(abs("logs/big.log"), `foo\n${"y".repeat(3_000_000)}`);
+    const ops = createOps(backend, policy());
+
+    const result = await ops.grep("foo", { path: "logs" });
+
+    expect(result.total).toBe(0);
+    expect(result.skippedFiles).toBe(1);
+  });
+
+  it("refuses an overlong glob option", async () => {
+    const ops = createOps(backend, policy());
+
+    await expect(ops.grep("foo", { glob: "*?".repeat(300) })).rejects.toMatchObject({
+      type: "unsafe-pattern",
+    });
   });
 
   it("skips lines longer than the scan cap rather than testing them", async () => {

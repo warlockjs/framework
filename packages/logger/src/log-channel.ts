@@ -1,5 +1,11 @@
 import { maskRegisteredLogSecrets } from "./redact/registered-secrets";
-import type { BasicLogConfigurations, LogContract, LoggingData, RedactConfig } from "./types";
+import type {
+  BasicLogConfigurations,
+  LogContract,
+  LoggingData,
+  LogLevel,
+  RedactConfig,
+} from "./types";
 
 /**
  * Receives a failure the channel hits outside a `log()` call (for example
@@ -85,6 +91,19 @@ export abstract class LogChannel<
           }
 
           this.isInitialized = true;
+        } catch (error) {
+          // A failed setup (a log directory that cannot be created) must not
+          // become an unhandled rejection that ends the process. Report it and
+          // let the channel run: each later write retries and reports its own
+          // failure.
+          this.reportError(error, {
+            type: "error",
+            module: "logger",
+            action: "init",
+            message: `Log channel "${this.name}" failed to initialize`,
+          });
+
+          this.isInitialized = true;
         } finally {
           resolve();
         }
@@ -143,6 +162,18 @@ export abstract class LogChannel<
     };
 
     return this;
+  }
+
+  /**
+   * Whether this channel can keep an entry of the given level at all, judged
+   * by level options alone (`levels`, and `minLevel` where the channel has
+   * one). A `filter` is not consulted: it needs the entry. Used by
+   * `Logger.isEnabled()` to skip building entries no channel would keep.
+   */
+  public acceptsLevel(level: LogLevel): boolean {
+    const allowedLevels = this.config("levels");
+
+    return !allowedLevels?.length || allowedLevels.includes(level);
   }
 
   /**

@@ -18,6 +18,9 @@ import { BaseCacheDriver } from "./base-cache-driver";
 /** Compare-and-set attempts before `update()` gives up under contention. */
 const PG_UPDATE_MAX_ATTEMPTS = 10;
 
+/** Keys deleted per statement by `removeMany()`. */
+const PG_REMOVE_BATCH_SIZE = 500;
+
 /**
  * Allowed characters in a Postgres identifier (table name). We accept the
  * conservative ASCII subset and reject anything else — interpolating an
@@ -522,34 +525,21 @@ export class PgCacheDriver
 
     // pg's JSONB type round-trips through node-postgres as a parsed JS value
     // already — but some pool implementations may hand back a string. Be defensive.
+    // Each query result is freshly parsed for this caller (by node-postgres,
+    // or below when a pool hands back a string), so it is already a private
+    // copy: no further clone is needed.
     let value = rows[0].value;
     if (typeof value === "string") {
       try {
         value = JSON.parse(value);
       } catch {
-        // Leave it as-is; cloning below will fail loud if it's truly broken.
+        // Leave it as-is.
       }
     }
 
-    if (value === null || value === undefined) {
-      await this.emit("hit", { key: parsedKey, value });
-      return value;
-    }
+    await this.emit("hit", { key: parsedKey, value });
 
-    const type = typeof value;
-    if (type === "string" || type === "number" || type === "boolean") {
-      await this.emit("hit", { key: parsedKey, value });
-      return value;
-    }
-
-    try {
-      const cloned = structuredClone(value);
-      await this.emit("hit", { key: parsedKey, value: cloned });
-      return cloned;
-    } catch (error) {
-      this.logError(`Failed to clone cached value for ${parsedKey}`, error);
-      throw error;
-    }
+    return value;
   }
 
   /**
@@ -809,6 +799,72 @@ export class PgCacheDriver
     throw new CacheError(
       `cache.update(): '${parsedKey}' changed on every attempt (${PG_UPDATE_MAX_ATTEMPTS} tries) — too much write contention.`,
     );
+  }
+
+  /**
+   * {@inheritdoc}
+   *
+   * `SELECT 1`: no value transfer, no `hit`/`miss` events.
+   */
+  public async exists(key: CacheKey): Promise<boolean> {
+    const { rows } = await this.pgClient.query(
+      `/* cache:exists */ SELECT 1 FROM ${this.table}
+       WHERE key = $1 AND (expires_at IS NULL OR expires_at > now())`,
+      [this.parseKey(key)],
+    );
+
+    return rows.length > 0;
+  }
+
+  /**
+   * {@inheritdoc}
+   *
+   * Picks the members in the database and returns only those, however large
+   * the index is.
+   */
+  public async tagSample(tagKey: CacheKey, count: number): Promise<string[]> {
+    if (count <= 0) {
+      return [];
+    }
+
+    const t = this.table;
+    const { rows } = await this.pgClient.query(
+      `/* cache:tag-sample */ SELECT x.member FROM ${t},
+         jsonb_array_elements_text(
+           CASE WHEN jsonb_typeof(${t}.value) = 'array' THEN ${t}.value ELSE '[]'::jsonb END
+         ) AS x(member)
+       WHERE ${t}.key = $1 AND (${t}.expires_at IS NULL OR ${t}.expires_at > now())
+       ORDER BY random()
+       LIMIT $2`,
+      [this.parseKey(tagKey), count],
+    );
+
+    return rows.map((row: { member: string }) => row.member);
+  }
+
+  /**
+   * {@inheritdoc}
+   *
+   * One `DELETE … WHERE key = ANY($1)` per chunk instead of one per key.
+   */
+  public async removeMany(keys: CacheKey[]): Promise<void> {
+    const parsedKeys = keys.map((key) => this.parseKey(key));
+
+    for (let start = 0; start < parsedKeys.length; start += PG_REMOVE_BATCH_SIZE) {
+      const chunk = parsedKeys.slice(start, start + PG_REMOVE_BATCH_SIZE);
+
+      for (const parsedKey of chunk) this.log("removing", parsedKey);
+
+      await this.pgClient.query(
+        `/* cache:remove-many */ DELETE FROM ${this.table} WHERE key = ANY($1::text[])`,
+        [chunk],
+      );
+
+      for (const parsedKey of chunk) {
+        this.log("removed", parsedKey);
+        await this.emit("removed", { key: parsedKey });
+      }
+    }
   }
 
   /**

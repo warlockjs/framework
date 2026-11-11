@@ -1126,6 +1126,7 @@ export class WebConnector extends BaseConnector {
         cacheDir: this.options.cacheDir,
         hmrServer: fastify.server,
         sites: config.get("web", {}).sites,
+        devAllowedHosts: config.get("web", {}).devAllowedHosts,
         moduleBoundary: config.get("web", {}).moduleBoundary,
         fonts: config.get("web", {}).fonts,
         handlePageHotUpdate: (file) => this.handlePageHotUpdate(file),

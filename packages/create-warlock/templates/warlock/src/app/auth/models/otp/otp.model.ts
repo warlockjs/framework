@@ -2,7 +2,8 @@ import { Model, RegisterModel } from "@warlock.js/cascade";
 import { v, type Infer } from "@warlock.js/seal";
 
 const otpSchema = v.object({
-  code: v.string(),
+  // Keyed hash of the code (see `app/auth/utils/otp-code.ts`); the code itself is never stored.
+  codeHash: v.string(),
   type: v.string(),
   target: v.string(),
   channel: v.string(),
@@ -28,6 +29,11 @@ export class OTP extends Model<OTPSchema> {
    * Model schema
    */
   public static schema = otpSchema;
+
+  /**
+   * Never serialize the code hash: for a short code it is as sensitive as the code.
+   */
+  public static hidden = ["codeHash"];
 
   /**
    * Check if OTP is valid (not expired, not used, not max attempts)
@@ -60,16 +66,32 @@ export class OTP extends Model<OTPSchema> {
   }
 
   /**
-   * Mark OTP as used
+   * Count one verification attempt, atomically and only while the OTP is
+   * unused and under `maxAttempts`. Resolves `false` when no attempt is left,
+   * so concurrent guesses can never compare the code more than `maxAttempts`
+   * times in total.
    */
-  public async markAsUsed(): Promise<this> {
-    return this.set("usedAt", new Date()).save();
+  public async recordAttempt(): Promise<boolean> {
+    const counted = await OTP.atomic(
+      { id: this.id, usedAt: null, attempts: { $lt: this.get("maxAttempts") ?? 0 } },
+      { $inc: { attempts: 1 } },
+      // Code-authored filter; nothing here comes from the request.
+      { trustedFilter: true },
+    );
+
+    return counted > 0;
   }
 
   /**
-   * Increment failed attempt
+   * Mark the OTP as used. Resolves `false` when another request used it first,
+   * so a code is redeemed at most once.
    */
-  public async incrementAttempt(): Promise<this> {
-    return this.set("attempts", (this.get("attempts") ?? 0) + 1).save();
+  public async consume(): Promise<boolean> {
+    const consumed = await OTP.atomic(
+      { id: this.id, usedAt: null },
+      { $set: { usedAt: new Date() } },
+    );
+
+    return consumed > 0;
   }
 }

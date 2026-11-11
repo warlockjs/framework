@@ -108,20 +108,26 @@ class InjectionDetector implements SyncGuardrailDetector {
     return { type: "flag", reason, matches };
   }
 
-  /** Collect every marker hit in `text`, in marker registration order. */
+  /**
+   * Collect every marker hit in `text`, in marker registration order.
+   * Phrases are matched against the {@link normalizeForMatch normalized}
+   * text and their spans mapped back to offsets in the original `text`.
+   */
   private scan(text: string): GuardrailMatch[] {
-    const lowered = text.toLowerCase();
+    const normalized = normalizeForMatch(text);
     const matches: GuardrailMatch[] = [];
 
     for (const marker of this.markers) {
       if (marker.phrase !== undefined) {
-        const start = lowered.indexOf(marker.phrase);
+        const start = normalized.text.indexOf(marker.phrase);
 
         if (start !== -1) {
+          const end = start + marker.phrase.length - 1;
+
           matches.push({
             rule: `${DETECTOR_NAME}.${marker.label}`,
             label: marker.label,
-            span: [start, start + marker.phrase.length - 1],
+            span: [normalized.starts[start] ?? start, normalized.ends[end] ?? end],
           });
         }
 
@@ -129,7 +135,9 @@ class InjectionDetector implements SyncGuardrailDetector {
       }
 
       // Caller-supplied RegExp — tested against the original (not lowered)
-      // text so author-controlled case sensitivity is preserved.
+      // text so author-controlled case sensitivity is preserved. It is a
+      // flag-stripped copy (see `compileMarkers`), so no `lastIndex` state
+      // carries over between checks.
       const pattern = marker.pattern;
 
       if (pattern === undefined) {
@@ -153,11 +161,80 @@ class InjectionDetector implements SyncGuardrailDetector {
   }
 }
 
+/** Invisible format characters (zero-width space / joiners, BOM, bidi marks). */
+const FORMAT_CHAR = /\p{Cf}/u;
+
+/** Characters that separate words for matching: whitespace and `_` `-` `.`. */
+const SEPARATOR_CHAR = /[\s_.-]/;
+
+/**
+ * Text prepared for phrase matching, with a map back to the original.
+ * `starts[i]` / `ends[i]` are the first / last original offsets of the
+ * character that produced `text[i]`.
+ */
+interface NormalizedText {
+  readonly text: string;
+  readonly starts: readonly number[];
+  readonly ends: readonly number[];
+}
+
+/**
+ * Normalize text so trivial obfuscation does not hide a phrase: each code
+ * point is NFKC-folded (full-width and compatibility forms become plain
+ * letters) and lowercased, invisible format characters are dropped, and
+ * every run of whitespace, `_`, `-` or `.` becomes one space. Linear in the
+ * length of `text`.
+ */
+function normalizeForMatch(text: string): NormalizedText {
+  const chars: string[] = [];
+  const starts: number[] = [];
+  const ends: number[] = [];
+  let index = 0;
+
+  while (index < text.length) {
+    const codePoint = text.codePointAt(index) ?? 0;
+    const width = codePoint > 0xffff ? 2 : 1;
+    const source = text.slice(index, index + width);
+
+    if (codePoint < 0x80 || !FORMAT_CHAR.test(source)) {
+      // ASCII needs no compatibility folding; skip the per-character NFKC call.
+      const folded =
+        codePoint < 0x80 ? source.toLowerCase() : source.normalize("NFKC").toLowerCase();
+
+      for (const char of folded) {
+        if (SEPARATOR_CHAR.test(char)) {
+          if (chars.length === 0) {
+            continue;
+          }
+
+          if (chars[chars.length - 1] === " ") {
+            ends[ends.length - 1] = index + width - 1;
+            continue;
+          }
+
+          chars.push(" ");
+        } else {
+          chars.push(char);
+        }
+
+        starts.push(index);
+        ends.push(index + width - 1);
+      }
+    }
+
+    index += width;
+  }
+
+  return { text: chars.join(""), starts, ends };
+}
+
 /**
  * Compile the built-in phrase set plus any caller `markers` into a single
- * ordered list. A caller `string` becomes a lowercased substring matcher
- * (labelled `custom`); a caller `RegExp` is carried as-is (labelled
- * `custom`). Built-ins keep their threat-category label.
+ * ordered list. A caller `string` becomes a substring matcher normalized the
+ * same way as the inspected text (labelled `custom`); a caller `RegExp` is
+ * copied without its `g` / `y` flags (labelled `custom`), so a shared
+ * detector never carries `lastIndex` from one check into the next.
+ * Built-ins keep their threat-category label.
  */
 function compileMarkers(extra: readonly (string | RegExp)[]): readonly CompiledMarker[] {
   const compiled: CompiledMarker[] = BUILT_IN_MARKERS.map((entry) => ({
@@ -167,12 +244,20 @@ function compileMarkers(extra: readonly (string | RegExp)[]): readonly CompiledM
 
   for (const marker of extra) {
     if (typeof marker === "string") {
-      compiled.push({ label: "custom", phrase: marker.toLowerCase() });
+      const phrase = normalizeForMatch(marker).text.trim();
+
+      // A marker made only of separators would match every text.
+      if (phrase.length > 0) {
+        compiled.push({ label: "custom", phrase });
+      }
 
       continue;
     }
 
-    compiled.push({ label: "custom", pattern: marker });
+    compiled.push({
+      label: "custom",
+      pattern: new RegExp(marker.source, marker.flags.replace(/[gy]/g, "")),
+    });
   }
 
   return compiled;
@@ -186,6 +271,13 @@ function compileMarkers(extra: readonly (string | RegExp)[]): readonly CompiledM
  * mode"`, `"do anything now"`), and exfiltration (`"reveal your system
  * prompt"`) — extensible with caller `markers` (case-insensitive substrings
  * or `RegExp`s).
+ *
+ * Phrases match on normalized text: case, NFKC compatibility forms,
+ * invisible format characters (zero-width space, joiners) and runs of
+ * whitespace / `_` / `-` / `.` are folded, so `"Ignore  previous\ninstructions"`
+ * still matches. Caller `RegExp` markers run on the original text, without
+ * their `g` / `y` flags. This is a heuristic, and it does not see tool
+ * results: check content that enters through tools where it enters.
  *
  * Zero runtime dependency: matching is pure string / regex. On a hit the
  * verdict is `flag` by default (record but allow); pass `onMatch: "block"`

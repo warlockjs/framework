@@ -7,6 +7,7 @@ import { resolveRobotsConfig, resolveSitemapReferenceUrl } from "./resolve-robot
 import { resolveSitemapConfig } from "./resolve-sitemap-config";
 import { joinOrigin } from "@warlock.js/sitemap";
 import {
+  createRootSiteSelector,
   createSitemapSiteSelector,
   isNonIndexableDynamicSite,
   selectSitemapSite,
@@ -57,6 +58,7 @@ export function registerRobotsRoute(router: Router, options: RegisterRobotsRoute
 
   const sitemapUrl = resolveSitemapReferenceUrl();
   const siteSelector = createSitemapSiteSelector();
+  const rootSiteSelector = createRootSiteSelector();
   // `resolveLocaleRouting()`, not `readLocaleRouting()`: this route can be
   // registered standalone (e.g. directly in tests), before either page-route
   // installer has run `publishLocaleRouting()`. Reading `web.localeRouting`
@@ -64,7 +66,7 @@ export function registerRobotsRoute(router: Router, options: RegisterRobotsRoute
   const localeRouting = resolveLocaleRouting();
 
   router.get("/robots.txt", async ({ request, response }) => {
-    const selected = await selectSitemapSite(request, siteSelector);
+    const selected = await selectSitemapSite(request, siteSelector, rootSiteSelector);
     if (selected?.kind === "not-found") return response.notFound();
     if (selected && isNonIndexableDynamicSite(selected)) {
       return response.text("User-agent: *\nDisallow: /\n");

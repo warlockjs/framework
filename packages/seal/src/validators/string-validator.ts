@@ -299,9 +299,26 @@ export class StringValidator extends PrimitiveValidator {
     return this.addRule(emailRule, errorMessage);
   }
 
-  /** Value must be a valid URL */
-  public url(errorMessage?: string) {
-    return this.addRule(urlRule, errorMessage);
+  /**
+   * Value must be a valid URL.
+   *
+   * Every scheme is accepted except the script-capable ones (`javascript:`,
+   * `data:`, `vbscript:`, `file:`). Pass `protocols` to accept only the
+   * listed schemes.
+   *
+   * @example
+   * ```ts
+   * v.string().url()                                     // https://…, mailto:…, myapp://…
+   * v.string().url({ protocols: ["http", "https"] })     // web links only
+   * v.string().url({ protocols: ["https"] }, "Use an https link")
+   * ```
+   */
+  public url(optionsOrErrorMessage?: string | { protocols?: string[] }, errorMessage?: string) {
+    if (typeof optionsOrErrorMessage === "string" || optionsOrErrorMessage === undefined) {
+      return this.addRule(urlRule, optionsOrErrorMessage);
+    }
+
+    return this.addRule(urlRule, errorMessage, { protocols: optionsOrErrorMessage.protocols });
   }
 
   /** Value can not have whitespace */

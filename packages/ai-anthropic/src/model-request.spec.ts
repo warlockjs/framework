@@ -146,6 +146,41 @@ describe("Anthropic built requests", () => {
     expect(create.mock.calls[1]?.[0]).toEqual(request.body);
   });
 
+  it("does not deep-copy the request body on its own calls, but still detaches buildRequest()", async () => {
+    const { model, create } = setup();
+    const history: Message[] = [{ role: "user", content: "a long tool result ".repeat(1024) }];
+    const clone = vi.spyOn(globalThis, "structuredClone");
+
+    try {
+      await model.complete(history);
+      for await (const _chunk of model.stream(history)) {
+        // drain
+      }
+
+      expect(clone).not.toHaveBeenCalled();
+
+      const options: ModelCallOptions = {
+        providerOptions: { anthropic: { body: { metadata: { user_id: "u1" } } } },
+      };
+      await model.complete(history, options);
+      const sent = create.mock.calls[2]?.[0] as { metadata: { user_id: string } };
+      const callerBody = options.providerOptions?.anthropic as {
+        body: { metadata: { user_id: string } };
+      };
+      callerBody.body.metadata.user_id = "changed";
+
+      // Only the caller's body values are copied, so later edits never reach a sent body.
+      expect(clone).toHaveBeenCalledTimes(1);
+      expect(sent.metadata.user_id).toBe("u1");
+
+      const detached = model.buildRequest(history);
+      expect(clone).toHaveBeenCalledTimes(2);
+      expect(detached.body.messages).not.toBe(create.mock.calls[0]?.[0].messages);
+    } finally {
+      clone.mockRestore();
+    }
+  });
+
   it("retains reserved-field validation during dry runs", () => {
     const { model, create } = setup();
     expect(() =>

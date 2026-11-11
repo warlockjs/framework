@@ -85,6 +85,23 @@ The button is a plain link — it must be a top-level navigation, not a
   (403, `EC010`) and nothing is linked or created. A verified email links the
   matching user by `auth.providers.emailField`, or creates one with
   `{ email, name, emailVerifiedAt: now }`.
+- **Linking an existing account** follows `auth.providers.linkExisting`
+  (default `"verified"`): an account found by email is linked only when it has
+  verified that address itself (`auth.verification.field` holds a value).
+  Otherwise someone who pre-registered the victim's address with a password
+  would share the account with them. A refused link throws
+  `ProviderAccountLinkBlockedError` (403, `EC012`) and nothing is linked; the
+  user signs in with their password (or verifies their email) first. A user
+  model whose schema does not declare the verification field links as
+  before. `"always"` restores the old behaviour; `"never"` never links by
+  email.
+
+  ```ts
+  providers: {
+    linkExisting: "verified", // default; or "always" | "never"
+  },
+  ```
+
 - For another OIDC provider, implement `AuthProvider`
   (`authorizationUrl(state)`, `handleCallback({ query, expected })`) and
   register it under `auth.providers.custom.<name>`.
@@ -127,7 +144,17 @@ These providers work the same way as Google. Add a config block under
 `auth.providers.<name>`, a GET route that redirects to
 `startProviderLogin(response, "<name>")`, and a GET callback that calls
 `completeProviderLogin(User, "<name>", request, response)`. The state cookie,
-the rejections (`EC009`), and the linking rules (`EC010`) are the same too.
+the rejections (`EC009`), and the linking rules (`EC010`, `EC012`) are the same too.
+
+Every provider request (token exchange, profile, key set) has a deadline:
+`timeoutMs`, a positive integer in milliseconds, default `5000`, on each
+provider's block (Apple included). A provider that does not answer in time
+fails the callback with `InvalidProviderCallbackError` (`code-exchange-failed`
+or `profile-fetch-failed`) instead of holding the request open.
+
+```ts
+github: { clientId, clientSecret, redirectUri, timeoutMs: 8000 },
+```
 
 ```ts title="src/config/auth.ts"
 providers: {
@@ -246,12 +273,25 @@ router.post("/auth/apple/callback", async ({ request, response }) => {
 ## Passkeys
 
 ```ts title="src/config/auth.ts"
-passkeys: { rpID: "example.com", rpName: "Example", origin: "https://example.com" },
+passkeys: {
+  rpID: "example.com",
+  rpName: "Example",
+  origin: "https://example.com",
+  // userVerification: "preferred", // default; "required" demands a PIN or biometric
+},
 ```
+
+`userVerification` decides whether the authenticator must verify the person
+(PIN, fingerprint, face) in both ceremonies. `"preferred"` (the default) also
+accepts a passkey that only proves possession, such as a security key without
+a PIN. `"required"` refuses such an assertion with `InvalidPasskeyError`, so a
+passkey login is two factors; users whose authenticator cannot verify them
+cannot register or sign in with it.
 
 ```ts title="src/app/users/routes.ts"
 import {
   generatePasskeyAuthenticationOptions,
+  loginThrottleMiddleware,
   generatePasskeyRegistrationOptions,
   verifyPasskeyAuthentication,
   verifyPasskeyRegistration,
@@ -275,8 +315,15 @@ router.post(
 );
 
 // Log in
-router.post("/auth/passkeys/login/options", async ({ response }) =>
-  response.success(await generatePasskeyAuthenticationOptions()),
+// Anonymous and one challenge row per call: throttle it per IP.
+router.post(
+  "/auth/passkeys/login/options",
+  async ({ response }) => response.success(await generatePasskeyAuthenticationOptions()),
+  {
+    middleware: [
+      loginThrottleMiddleware({ by: ["ip"], isFailure: () => true, max: 30, window: "1m" }),
+    ],
+  },
 );
 router.post("/auth/passkeys/login", async ({ request, response }) => {
   const { tokens } = await verifyPasskeyAuthentication(request, request.input("credential"));
@@ -370,7 +417,10 @@ router.post(
   the text. Auth ships no SMS/WhatsApp driver.
 - **Anti-enumeration:** an unknown phone gets the same `requestOtp` result
   (nothing sent) and the same `InvalidOneTimeTokenError` (400, `EC008`) from
-  `verifyOtp`.
+  `verifyOtp`. The code is sent in the background, so the response time does
+  not reveal a registered phone either; a failed delivery is logged and emitted
+  as the `otp.deliveryFailed` auth event. Set `auth.otp.awaitDelivery: true` to
+  wait for the delivery (and get its error) instead.
 - `verifyOtp` is a POST — the [CSRF Origin
   check](./protect-routes.md#csrf-origin-check-for-cookie-auth) applies when
   the route is cookie-authenticated; otherwise there is no ambient credential

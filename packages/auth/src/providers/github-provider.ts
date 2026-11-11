@@ -6,6 +6,7 @@ import type {
   ProviderProfile,
 } from "../contracts/providers";
 import { InvalidProviderCallbackError } from "../errors/invalid-provider-callback.error";
+import { providerTimeoutMs } from "./provider-timeout";
 import { pkceChallenge } from "./google-provider";
 
 const AUTHORIZATION_ENDPOINT = "https://github.com/login/oauth/authorize";
@@ -43,7 +44,12 @@ type GitHubEmail = {
 export class GitHubProvider implements AuthProvider {
   public readonly name = "github";
 
-  public constructor(private readonly settings: GitHubProviderConfig) {}
+  /** Deadline for each request to GitHub, in milliseconds. */
+  private readonly timeoutMs: number;
+
+  public constructor(private readonly settings: GitHubProviderConfig) {
+    this.timeoutMs = providerTimeoutMs("GitHub", settings.timeoutMs);
+  }
 
   public authorizationUrl(state: ProviderAuthorizationState): string {
     const url = new URL(AUTHORIZATION_ENDPOINT);
@@ -94,6 +100,7 @@ export class GitHubProvider implements AuthProvider {
 
     try {
       const response = await fetch(TOKEN_ENDPOINT, {
+        signal: AbortSignal.timeout(this.timeoutMs),
         method: "POST",
         headers: {
           "content-type": "application/x-www-form-urlencoded",
@@ -132,6 +139,7 @@ export class GitHubProvider implements AuthProvider {
   private async fetchUser(accessToken: string): Promise<GitHubUser> {
     try {
       const response = await fetch(USER_ENDPOINT, {
+        signal: AbortSignal.timeout(this.timeoutMs),
         headers: {
           authorization: `Bearer ${accessToken}`,
           accept: "application/vnd.github+json",
@@ -155,6 +163,7 @@ export class GitHubProvider implements AuthProvider {
 
     try {
       const response = await fetch(EMAILS_ENDPOINT, {
+        signal: AbortSignal.timeout(this.timeoutMs),
         headers: {
           authorization: `Bearer ${accessToken}`,
           accept: "application/vnd.github+json",

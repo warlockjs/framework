@@ -1,5 +1,6 @@
 // Built-in zero-dependency detectors
 export { injection } from "./injection";
+export { links } from "./links";
 export { pii } from "./pii";
 export { topic } from "./topic";
 

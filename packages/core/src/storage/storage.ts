@@ -641,9 +641,10 @@ export class Storage extends ScopedStorage implements StorageManagerContract {
       throw new Error(`Failed to fetch file from URL: missing content-type header`);
     }
 
-    const mimeType = putOptions.mimeType || result.contentType || undefined;
-
-    return this.put(result.buffer, location, { ...putOptions, mimeType });
+    // The stored Content-Type follows `location`'s extension (or an explicit
+    // `options.mimeType`), never the remote server's header: a cloud bucket
+    // serves the object with it, and `text/html` there would run as a page.
+    return this.put(result.buffer, location, putOptions);
   }
 
   /**
@@ -661,12 +662,16 @@ export class Storage extends ScopedStorage implements StorageManagerContract {
    * // From plain base64
    * const file = await storage.putFromBase64(base64String, "images/photo.jpg");
    *
-   * // From data URL (auto-extracts MIME type)
+   * // From a data URL (the prefix is stripped)
    * const file = await storage.putFromBase64(
    *   "data:image/png;base64,iVBORw0KGgo...",
    *   "images/photo.png"
    * );
    * ```
+   *
+   * The stored Content-Type follows `location`'s extension (or an explicit
+   * `options.mimeType`), not the MIME type a data URL declares: that type
+   * is client input, and a cloud bucket serves the object with it.
    */
   public async putFromBase64(
     base64: string,
@@ -674,7 +679,7 @@ export class Storage extends ScopedStorage implements StorageManagerContract {
     options?: PutOptions,
   ): Promise<StorageFile> {
     let data = base64;
-    let mimeType = options?.mimeType;
+    const mimeType = options?.mimeType;
 
     if (base64.startsWith("data:")) {
       const match = base64.match(/^data:([^;]+);base64,(.+)$/);
@@ -683,7 +688,6 @@ export class Storage extends ScopedStorage implements StorageManagerContract {
         const matchedData = match[2];
 
         if (matchedMimeType !== undefined && matchedData !== undefined) {
-          mimeType = mimeType || matchedMimeType;
           data = matchedData;
         }
       }

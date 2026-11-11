@@ -8,6 +8,7 @@ import { createInMemoryTraceStore } from "../store/in-memory-trace-store";
 import { makeTrace } from "../test-support/make-trace";
 import {
   applyPanopticConfig,
+  DEFAULT_DASHBOARD_STORE_CAPACITY,
   getActiveDashboardHandle,
   resetAppliedPanopticConfig,
 } from "./apply-panoptic-config";
@@ -114,6 +115,42 @@ describe("applyPanopticConfig", () => {
     expect(res.status).toBe(200);
   });
 
+  it("bounds the store it creates for the dashboard to the default capacity", async () => {
+    applyPanopticConfig({ dashboard: { port: 0 } });
+
+    const [observer] = getObservers();
+
+    for (let index = 0; index <= DEFAULT_DASHBOARD_STORE_CAPACITY; index += 1) {
+      await observer?.collect(rootReport(`r${index}`));
+    }
+
+    const handle = await waitForDashboard();
+    const aggregate = (await (await fetch(`${handle.url}api/aggregate`)).json()) as {
+      traces: number;
+    };
+    const oldest = await fetch(`${handle.url}api/traces/r0`);
+
+    expect(aggregate.traces).toBe(DEFAULT_DASHBOARD_STORE_CAPACITY);
+    expect(oldest.status).toBe(404);
+  });
+
+  it("uses the configured capacity for the store it creates", async () => {
+    applyPanopticConfig({ dashboard: { port: 0 }, capacity: 2 });
+
+    const [observer] = getObservers();
+
+    for (const id of ["a", "b", "c"]) {
+      await observer?.collect(rootReport(id));
+    }
+
+    const handle = await waitForDashboard();
+    const aggregate = (await (await fetch(`${handle.url}api/aggregate`)).json()) as {
+      traces: number;
+    };
+
+    expect(aggregate.traces).toBe(2);
+  });
+
   it("routes a cache-store failure to onError instead of swallowing it silently", async () => {
     const onError = vi.fn();
     const boom = new Error("ECONNREFUSED");
@@ -162,4 +199,20 @@ async function waitForDashboard(): Promise<DashboardHandle> {
   }
 
   throw new Error("dashboard did not start in time");
+}
+
+/** A minimal completed root report, as the core observe seam delivers it. */
+function rootReport(runId: string) {
+  return {
+    runId,
+    rootRunId: runId,
+    name: "agent",
+    type: "agent" as const,
+    status: "completed" as const,
+    startedAt: "2026-06-22T10:00:00.000Z",
+    endedAt: "2026-06-22T10:00:01.000Z",
+    duration: 1000,
+    usage: { input: 1, output: 1, total: 2 },
+    children: [],
+  };
 }

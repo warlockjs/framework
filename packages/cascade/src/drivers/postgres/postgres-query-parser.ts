@@ -14,10 +14,54 @@ import type {
   WhereOperator,
 } from "../../contracts/query-builder.contract";
 import type { SqlDialectContract } from "../sql/sql-dialect.contract";
+import { JSON_PATH_PLACEHOLDER, type JsonPathOperand } from "../../query-builder/json-path-operand";
 import { escapeSqlLiteral, PostgresDialect } from "./postgres-dialect";
 
 /** Allowed `::cast` type names, e.g. `int`, `numeric(10,2)`, `text[]`. */
 const SAFE_CAST_PATTERN = /^[a-z_][a-z0-9_ ]*(\(\d+(,\d+)?\))?(\[\])?$/i;
+
+/**
+ * Words a multi-word type name may use (`double precision`, `character
+ * varying`, `timestamp with time zone`, `interval day to second`). A single
+ * word can be any type name, custom types included; a name of several words
+ * must be built from these, so a cast suffix cannot smuggle in `or`, `and`,
+ * `is` or any other SQL keyword.
+ */
+const MULTI_WORD_TYPE_WORDS = new Set([
+  "double",
+  "precision",
+  "character",
+  "char",
+  "varying",
+  "national",
+  "bit",
+  "timestamp",
+  "time",
+  "with",
+  "without",
+  "zone",
+  "interval",
+  "year",
+  "month",
+  "day",
+  "hour",
+  "minute",
+  "second",
+  "to",
+]);
+
+/** True when `cast` is a type name: one identifier, or known type words. */
+function isSafeCastType(cast: string): boolean {
+  if (!SAFE_CAST_PATTERN.test(cast)) return false;
+
+  const words = cast
+    .replace(/\(.*$|\[\]$/, "")
+    .trim()
+    .toLowerCase()
+    .split(/\s+/);
+
+  return words.length === 1 || words.every((word) => MULTI_WORD_TYPE_WORDS.has(word));
+}
 
 /** Allowed orderBy direction, with optional NULLS placement. */
 const SAFE_DIRECTION_PATTERN = /^(asc|desc)(\s+nulls\s+(first|last))?$/i;
@@ -772,6 +816,14 @@ export class PostgresQueryParser {
       dialect: this.dialect,
       operations: (nested as PostgresParserOperation[] | undefined) ?? [],
     });
+
+    // The group sees the tables this query joins, so `table.column` inside it
+    // (global scopes wrap every user condition in such a group) resolves the
+    // same as outside it.
+    for (const table of this.joinedTables) {
+      subParser.joinedTables.add(table);
+    }
+
     subParser.parse();
 
     if (subParser.whereClauses.length === 0) {
@@ -810,7 +862,7 @@ export class PostgresQueryParser {
    * Process a raw WHERE operation.
    */
   private processWhereRaw(data: Record<string, unknown>, boolean: "AND" | "OR"): void {
-    const expression = data.expression as string;
+    const expression = this.withJsonPath(data.expression as string, data);
     const bindings = (data.bindings as unknown[]) ?? [];
 
     // Replace ? placeholders with $n
@@ -1016,7 +1068,16 @@ export class PostgresQueryParser {
    * Process raw SELECT expression.
    */
   private processSelectRaw(data: Record<string, unknown>): void {
-    const expression = data.expression as string | Record<string, unknown>;
+    const raw = data.expression as string | Record<string, unknown>;
+    const expression =
+      typeof raw === "string"
+        ? this.withJsonPath(raw, data)
+        : Object.fromEntries(
+            Object.entries(raw).map(([alias, expr]) => [
+              alias,
+              typeof expr === "string" ? this.withJsonPath(expr, data) : expr,
+            ]),
+          );
     const bindings = (data.bindings as unknown[]) ?? [];
 
     if (typeof expression === "string") {
@@ -1311,14 +1372,73 @@ export class PostgresQueryParser {
     }
 
     if (cast) {
-      if (!SAFE_CAST_PATTERN.test(cast)) {
-        throw new Error(`PostgresQueryParser: unsafe cast type "${cast}"`);
+      if (!isSafeCastType(cast)) {
+        throw new Error(
+          `PostgresQueryParser: unsafe cast type "${cast}". Use a type name such as int, numeric(10,2), text[] or timestamp with time zone.`,
+        );
       }
 
       return `(${expression})::${cast}`;
     }
 
     return expression;
+  }
+
+  /**
+   * Put the resolved JSON path of `data.jsonPath` in place of
+   * {@link JSON_PATH_PLACEHOLDER}; expressions without one are returned as is.
+   */
+  private withJsonPath(expression: string, data: Record<string, unknown>): string {
+    const operand = data.jsonPath as JsonPathOperand | undefined;
+
+    if (!operand || typeof expression !== "string") {
+      return expression;
+    }
+
+    return expression.split(JSON_PATH_PLACEHOLDER).join(this.jsonPathExpression(operand));
+  }
+
+  /**
+   * SQL for a JSON path operand. A first segment that names a table or alias
+   * of this query (the base table, its alias, a joined table or join alias)
+   * keeps meaning `table.column`; otherwise the first segment is the column.
+   * Every further segment is a JSON key (digits read as an array index).
+   */
+  private jsonPathExpression({ path, asText = false }: JsonPathOperand): string {
+    const text = String(path);
+    const arrowForm = text.includes("->");
+    const segments = (arrowForm ? text.split("->") : text.split(".")).map((segment) =>
+      segment.trim(),
+    );
+    const head = segments.shift() ?? "";
+    let sql: string;
+
+    if (arrowForm) {
+      // "column->key" or "table.column->key"
+      const dot = head.indexOf(".");
+
+      sql =
+        dot > 0 && this.isTableReference(head.slice(0, dot))
+          ? `${this.quoteTable(head.slice(0, dot))}.${this.dialect.quoteIdentifier(head.slice(dot + 1))}`
+          : this.dialect.quoteIdentifier(head);
+    } else if (segments.length > 0 && this.isTableReference(head)) {
+      // "table.column" or "table.column.key..."
+      sql = `${this.quoteTable(head)}.${this.dialect.quoteIdentifier(segments.shift() as string)}`;
+    } else {
+      sql = this.dialect.quoteIdentifier(head);
+    }
+
+    segments.forEach((segment, index) => {
+      const key =
+        segment.length >= 2 && segment.startsWith("'") && segment.endsWith("'")
+          ? segment.slice(1, -1)
+          : segment;
+      const arrow = asText && index === segments.length - 1 ? "->>" : "->";
+
+      sql += /^\d+$/.test(key) ? `${arrow}${key}` : `${arrow}'${escapeSqlLiteral(key)}'`;
+    });
+
+    return sql;
   }
 
   /**

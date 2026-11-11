@@ -121,6 +121,18 @@ describe("glob and grep walk", () => {
     );
   });
 
+  it("walks a repository whose .gitignore holds a backtracking-shaped line", async () => {
+    // As a regular expression this line needs exponential time on the long
+    // name below; the glob matcher checks it in one pass.
+    const longName = `${"a".repeat(100)}.ts`;
+    const files = {
+      ".gitignore": `${"*?".repeat(20)}Z\n${"*".repeat(600)}\n`,
+      [`src/${longName}`]: "x",
+    };
+
+    expect(await spiedOps(files).ops.glob("src/*.ts")).toEqual([`src/${longName}`]);
+  });
+
   it("applies a parent .gitignore when the search starts in a subfolder", async () => {
     const files = { ".gitignore": "*.tmp\n", "src/a.tmp": "t", "src/a.ts": "a" };
 

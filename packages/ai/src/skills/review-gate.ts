@@ -10,7 +10,9 @@ export type ReviewOutcome =
  * Run a candidate through the **default-DENY** review gate (Phase 2).
  *
  * The gate's `approve(candidate)` decides: only `{ approve: true }`
- * promotes the candidate to a new audited version via `gate.store.promote`.
+ * promotes the candidate to a new audited version via `gate.store.promote`,
+ * bound to the approved content (name, description, body, tags): the store
+ * refuses to promote a stored candidate that differs from what was reviewed.
  * Everything else — `{ approve: false }`, a malformed result, or a THROW
  * (fail-closed) — leaves the candidate inert and emits a `denied` event.
  * On approval, a `promoted` event fires with the new version.
@@ -46,7 +48,13 @@ export async function runReviewGate(
     return { promoted: false, reason: verdict?.reason };
   }
 
-  const record = await gate.store.promote(candidate.name);
+  // Promote exactly the content the gate approved: a candidate written
+  // under the same name after (or during) the review is never promoted.
+  const record = await gate.store.promote(candidate.name, {
+    description: candidate.description,
+    body: candidate.body,
+    tags: candidate.tags,
+  });
 
   emit?.({ type: "promoted", skill: record.name, version: record.version });
 

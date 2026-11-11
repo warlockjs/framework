@@ -1,6 +1,6 @@
 ---
 title: "warlock doctor"
-description: The read-only diagnostics command — runs routes / config / connectors / optional-peers / health / release-hygiene checks, prints a pass/warn/fail report, and exits non-zero on any failure. What each check verifies, the status/exit-code semantics, and how to wire it into CI.
+description: The read-only diagnostics command — runs routes / config / connectors / optional-peers / health / deployment-settings / release-hygiene checks, prints a pass/warn/fail report, and exits non-zero on any failure. What each check verifies, the status/exit-code semantics, and how to wire it into CI.
 sidebar:
   order: 5
   label: "warlock doctor"
@@ -32,7 +32,7 @@ Summary: 5 ok, 1 warn, 0 fail
 
 ## What it checks
 
-Six checks run in a fixed order — runtime-surface first, release hygiene last:
+The checks run in a fixed order — runtime-surface first, then the [deployment settings](#deployment-settings), release hygiene last:
 
 | Check                | Status meaning                                                                                                                                                                                                                                                                                                                         |
 | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -44,7 +44,32 @@ Six checks run in a fixed order — runtime-surface first, release hygiene last:
 | `sites`              | In an app with `web.sites`, renders the root page of every site that has fixed hostnames through the development page pipeline and **fails** (`WL5005`) on any 5xx, naming the status, the phase and the page file. Dynamic sites (hosts resolved at runtime) are listed as not rendered. See [Multi-site render](#multi-site-render). |
 | `capabilities`       | **`warn`** (`WL2008`) for each required [capability](../digging-deeper/capabilities.md) that nothing provided while the app booted. Silent when the app defines none.                                                                                                                                                                  |
 | `health`             | The built-in `/health` (liveness) and `/ready` (readiness) endpoints will be exposed. **`warn`** when disabled via `http.health.enabled = false`.                                                                                                                                                                                      |
+| deployment settings  | `upload-limits`, `cors`, `auth-tokens`, `trust-proxy`, `request-timeout`, `production-logging`, `compression`, `env-files`, `memory-cache`: **`warn`** with the setting to change. Never a `fail`. See [Deployment settings](#deployment-settings).                                                                                    |
 | `release-hygiene`    | The project `package.json` version matches the top `## x.y.z` heading in `CHANGELOG.md`. A mismatch is a **`fail`**; a missing/unparseable changelog is a **`warn`**.                                                                                                                                                                  |
+
+## Deployment settings
+
+Apps keep the config files they were generated with, so a safer default in a new release does not reach an app created before it. These checks read the app's resolved configuration and report the settings worth changing before a deploy. They are **warnings only**: they never fail the command, so an existing CI job that runs `warlock doctor` keeps passing. Each one prints nothing when the setting it reads is absent and the framework default is safe.
+
+| Check                | Warns when                                                                                                                                                                   | Setting to change                                                                                                 |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `upload-limits`      | one multipart request may hold more than 100 MB in memory. A large `fileUploadLimit` alone is fine while the total cap (default 25 MB) holds it back; the `ok` line says so. | `http.multipart.maxTotalSize` (and `http.fileUploadLimit`); raise per route with `uploads: { maxTotalSize }`      |
+| `cors`               | `http.cors.origin` is `"*"` (also inside a list, or unset, since the default is `"*"`) or `true`, with a sharper message together with `credentials: true`.                  | `http.cors.origin`: the list of browser origins allowed to call the API                                           |
+| `auth-tokens`        | a signing secret is shorter than 32 bytes, access tokens never expire or live longer than 30 days, or access tokens live longer than a day with refresh tokens off.          | `auth.accessToken.secret` / `auth.refreshToken.secret`, `auth.accessToken.expiresIn`, `auth.refreshToken.enabled` |
+| `trust-proxy`        | `http.trustProxy` is `true` and `http.realIpHeader` is not set, so the client IP is a value the client can write.                                                            | `http.trustProxy` (your proxy addresses or CIDR blocks) or `http.realIpHeader`                                    |
+| `request-timeout`    | the request timeout is `0` (off).                                                                                                                                            | `http.requestTimeout` (or `http.serverOptions.requestTimeout`, which wins)                                        |
+| `production-logging` | a console channel used in production (`log.channels` or `log.production.channels`) prints `debug` lines.                                                                     | `new ConsoleLog({ minLevel: "info" })` in `src/config/log.ts`                                                     |
+| `compression`        | never: an `ok` line notes when response compression is off, and that it is not needed behind a proxy or CDN that compresses.                                                 | `http.compression: true`                                                                                          |
+| `env-files`          | an env file at the project root (`.env`, `.env.*`, templates such as `.env.example` excepted) is not ignored by git, or is already committed. Asks `git check-ignore`.       | add `.env` and `.env.*` (then `!.env.example`) to `.gitignore`; `git rm --cached` a committed one                 |
+| `memory-cache`       | the default cache store is the memory driver (or one built on it) with `maxSize: Infinity` or `0`. Unset, it keeps 10,000 entries.                                           | `cache.options.<store>.maxSize`                                                                                   |
+
+`auth-tokens` runs only when `auth.userType` is configured and `@warlock.js/auth` is installed in the project; it reads the current `auth.accessToken` / `auth.refreshToken` keys and falls back to the older `auth.jwt` block. A missing secret is the `jwt-secret` check's failure. The values are read as the configuration resolves when doctor runs, from the env files the CLI loads on that machine: a value set only on the server (a production secret, for example) is reported as it resolves where you run the command. `production-logging` reads the `production` block of the log config whatever the current environment.
+
+```
+⚠ cors: http.cors.origin is "*" — any website can call this API from a browser and read the answers. List the browser origins allowed to call the API in http.cors.origin (new apps read them from CORS_ORIGINS), or keep "*" only for a fully public API that uses no cookies.
+⚠ auth-tokens: auth.accessToken.expiresIn is "100y", so access tokens never expire, and refresh tokens are off — a stolen token works for good. Set a short auth.accessToken.expiresIn (for example "1h") and turn refresh tokens on (auth.refreshToken.enabled: true) so sessions outlive it.
+✓ compression: responses are compressed (http.compression)
+```
 
 ## Statuses and exit code
 
@@ -62,7 +87,7 @@ warlock doctor || exit 1   # fail the pipeline on any fail-status check
 
 ## Error codes and `--json`
 
-Every `warn` or `fail` finding carries a stable [error code](./error-codes.md), shown after the detail in the plain report (`✗ config: missing required config section(s): http [WL1001]`). `warlock explain WL1001` prints what to do.
+Every `warn` or `fail` finding except the [deployment settings](#deployment-settings) warnings (which name the setting to change instead) carries a stable [error code](./error-codes.md), shown after the detail in the plain report (`✗ config: missing required config section(s): http [WL1001]`). `warlock explain WL1001` prints what to do.
 
 `--json` prints the report with the same `code` / `hint` / `skill` / `docs` fields [`warlock check --json`](./check.md#the-json-report) uses, so one consumer reads both:
 

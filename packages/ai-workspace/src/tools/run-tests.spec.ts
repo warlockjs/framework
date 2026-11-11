@@ -147,6 +147,35 @@ describe("makeRunTestsTool", () => {
     expect(data).toBeUndefined();
     expect(error).toBeDefined();
   });
+
+  it("rejects a pattern that is a runner option, without running anything", async () => {
+    const calls: string[] = [];
+    const ops = {
+      exec: async (command: string) => {
+        calls.push(command);
+
+        return { exitCode: 0, stdout: "", stderr: "", timedOut: false };
+      },
+    } as unknown as WorkspaceOps;
+    const runTests = makeRunTestsTool(ops);
+
+    for (const pattern of [
+      "--node-options=--import=data:text/javascript,process.exit(9)",
+      "-c",
+      "  --config=evil.config.js",
+    ]) {
+      const { data, error } = await runTests.invoke({ pattern });
+
+      expect(data, pattern).toBeUndefined();
+      expect(error?.message, pattern).toMatch(/not an option/);
+    }
+
+    expect(calls).toEqual([]);
+
+    await runTests.invoke({ pattern: "src/cart" });
+
+    expect(calls).toEqual(['npm test "src/cart"']);
+  });
 });
 
 describe("makeRunTestsTool cancellation", () => {

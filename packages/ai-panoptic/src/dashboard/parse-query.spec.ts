@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseQuery } from "./parse-query";
+import { DEFAULT_TRACE_LIST_LIMIT, parseListOptions, parseQuery } from "./parse-query";
 
 /** Build a `URLSearchParams` from a query string for terse cases. */
 function qs(search: string): URLSearchParams {
@@ -61,5 +61,22 @@ describe("parseQuery", () => {
       status: "failed",
       startedAfter: "2026-06-01T00:00:00.000Z",
     });
+  });
+});
+
+describe("parseListOptions", () => {
+  it("defaults to summaries capped at the default limit", () => {
+    expect(parseListOptions(qs(""))).toEqual({ limit: DEFAULT_TRACE_LIST_LIMIT, full: false });
+  });
+
+  it("reads a positive integer limit and the full switch", () => {
+    expect(parseListOptions(qs("limit=50&full=1"))).toEqual({ limit: 50, full: true });
+    expect(parseListOptions(qs("full=true")).full).toBe(true);
+  });
+
+  it("falls back to the default for an invalid limit", () => {
+    for (const value of ["0", "-3", "2.5", "abc", ""]) {
+      expect(parseListOptions(qs(`limit=${value}`)).limit).toBe(DEFAULT_TRACE_LIST_LIMIT);
+    }
   });
 });

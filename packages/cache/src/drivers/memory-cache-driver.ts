@@ -34,6 +34,13 @@ function cloneValue<T>(value: T): T {
   return structuredClone(value);
 }
 
+/**
+ * Entries a memory driver keeps when `maxSize` is not configured. Past it the
+ * least recently used entries are evicted, so request-derived keys cannot
+ * grow the heap without bound.
+ */
+const DEFAULT_MAX_SIZE = 10_000;
+
 export class MemoryCacheDriver
   extends BaseCacheDriver<MemoryCacheDriver, MemoryCacheOptions>
   implements CacheDriver<MemoryCacheDriver, MemoryCacheOptions>, StructuresCapable
@@ -175,10 +182,22 @@ export class MemoryCacheDriver
   }
 
   /**
-   * Mark an entry as most recently used (only tracked when `maxSize` is set).
+   * The entry limit: `maxSize`, or 10,000 when it is not set. `Infinity`
+   * (or `0`) means no limit.
+   */
+  protected get maxSize(): number {
+    const configured = this.options?.maxSize;
+
+    if (configured === undefined) return DEFAULT_MAX_SIZE;
+
+    return configured > 0 ? configured : Infinity;
+  }
+
+  /**
+   * Mark an entry as most recently used (not tracked without a limit).
    */
   protected touch(parsedKey: string, entry: CacheData) {
-    if (!this.options.maxSize) return;
+    if (this.maxSize === Infinity) return;
 
     this.entries.delete(parsedKey);
     this.entries.set(parsedKey, entry);
@@ -529,6 +548,22 @@ export class MemoryCacheDriver
   /**
    * {@inheritdoc}
    */
+  public async tagSample(tagKey: CacheKey, count: number): Promise<string[]> {
+    return this.tagIndex.sample(this.parseKey(tagKey), count);
+  }
+
+  /**
+   * {@inheritdoc}
+   *
+   * A synchronous lookup: no copy, no events, no recency or TTL change.
+   */
+  public async exists(key: CacheKey): Promise<boolean> {
+    return this.readLive(this.parseKey(key)) !== undefined;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
   public async flush() {
     this.log("flushing");
     if (this.options.globalPrefix) {
@@ -552,13 +587,16 @@ export class MemoryCacheDriver
    * within `maxSize`. Never evicts `protectedKey` (the key just written).
    */
   protected enforceMaxSize(protectedKey: string) {
-    const maxSize = this.options.maxSize;
+    const maxSize = this.maxSize;
 
-    if (!maxSize) {
+    if (this.entries.size <= maxSize) {
       return;
     }
 
-    for (const lruKey of [...this.entries.keys()]) {
+    // Iterate the live key view (deleting the current key during Map
+    // iteration is safe): normally only the oldest key is touched, with no
+    // copy of the key list.
+    for (const lruKey of this.entries.keys()) {
       if (this.entries.size <= maxSize) {
         break;
       }

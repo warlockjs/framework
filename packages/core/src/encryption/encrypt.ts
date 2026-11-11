@@ -8,6 +8,16 @@ import { type EncryptionConfigurations } from "./types";
 const DEFAULT_ALGORITHM = "aes-256-gcm";
 
 /**
+ * GCM auth tag length `encrypt()` produces and `decrypt()` requires.
+ */
+const AUTH_TAG_BYTES = 16;
+
+/**
+ * Exactly 16 bytes in hex: the IV and auth tag length `encrypt()` writes.
+ */
+const FULL_BLOCK_HEX = /^[0-9a-fA-F]{32}$/;
+
+/**
  * Get the encryption key from config, validated as a 32-byte hex string.
  */
 function getEncryptionKey(keyBytes: number): Buffer {
@@ -121,9 +131,23 @@ export function decrypt(cipherText: string): string {
       throw new Error("Invalid encrypted format. Expected iv:ciphertext:authTag");
     }
 
-    const decipher = crypto.createDecipheriv(algorithm, keyBuffer, Buffer.from(ivHex, "hex"));
+    // `encrypt()` always writes a 16-byte IV and a 16-byte tag. A shorter tag
+    // makes a forged ciphertext far cheaper to find, so refuse anything else.
+    if (!FULL_BLOCK_HEX.test(ivHex) || !FULL_BLOCK_HEX.test(authTagHex)) {
+      throw new Error(
+        "Invalid encrypted format. The IV and the auth tag must each be 16 bytes (32 hex characters).",
+      );
+    }
 
-    (decipher as crypto.DecipherGCM).setAuthTag(Buffer.from(authTagHex, "hex"));
+    // `getAlgorithm()` only returns one of the GCM names in ALGORITHM_KEY_BYTES.
+    const decipher = crypto.createDecipheriv(
+      algorithm as crypto.CipherGCMTypes,
+      keyBuffer,
+      Buffer.from(ivHex, "hex"),
+      { authTagLength: AUTH_TAG_BYTES },
+    );
+
+    decipher.setAuthTag(Buffer.from(authTagHex, "hex"));
 
     let decrypted = decipher.update(encryptedHex, "hex", "utf8");
     // .final() throws if auth tag is invalid (data tampered)

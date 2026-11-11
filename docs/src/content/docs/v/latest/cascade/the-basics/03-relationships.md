@@ -397,6 +397,17 @@ const drafters = await User.query()
   .get();
 ```
 
+:::caution — MongoDB
+The `has` family (`has`, `whereHas`, `orWhereHas`, `doesntHave`, `whereDoesntHave`) runs on PostgreSQL. On MongoDB the query throws an `UnsupportedQueryOperationError` when it runs, rather than ignoring the condition and returning (or updating, or deleting) every row. Filter by the related ids instead:
+
+```ts
+const authorIds = await Post.query().where("status", "published").pluck("authorId");
+const users = await User.query().whereIn("id", authorIds).get();
+```
+
+On PostgreSQL the `count` of `has(relation, operator, count)` is bound as a parameter, and the operator must be one of `=`, `!=`, `<>`, `>`, `>=`, `<`, `<=`.
+:::
+
 ### `.withCount()` — count without loading
 
 Sometimes you want _how many_ related records each row has, not the records themselves:

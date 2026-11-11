@@ -1,4 +1,5 @@
 import type { ChildModel } from "@warlock.js/cascade";
+import { log } from "@warlock.js/logger";
 import type { Auth } from "../models/auth.model";
 import { authConfig } from "./auth-config";
 import { authEvents } from "./auth-events";
@@ -47,6 +48,11 @@ async function writePassword(user: Auth, plainPassword: string): Promise<void> {
  * **Anti-enumeration:** resolves `undefined` whether or not the account exists
  * — an unknown identifier simply sends nothing. Notification availability is
  * checked before the lookup, so a misconfigured app fails identically for both.
+ * The notification is sent in the background: awaiting it (an SMTP round trip
+ * for a known account, nothing for an unknown one) would let response timing
+ * reveal which accounts exist. A send that fails is logged and emitted as
+ * `password.resetDeliveryFailed`; set `auth.passwordReset.awaitDelivery: true`
+ * to wait for it (and receive its error) instead.
  *
  * @throws NotificationsUnavailableError when `@warlock.js/notifications` is not installed or not configured.
  *
@@ -79,7 +85,20 @@ export async function requestPasswordReset<T extends Auth>(
 
   const url = authConfig.passwordReset.url()?.(token, user);
 
-  await notification.send(user, { token, expiresAt, ...(url ? { url } : {}) });
+  const delivery = Promise.resolve().then(() =>
+    notification.send(user, { token, expiresAt, ...(url ? { url } : {}) }),
+  );
+
+  if (authConfig.passwordReset.awaitDelivery()) {
+    await delivery;
+
+    return;
+  }
+
+  delivery.catch((error: unknown) => {
+    log.error("auth", "password-reset", error);
+    authEvents.emit("password.resetDeliveryFailed", user, error);
+  });
 }
 
 /**

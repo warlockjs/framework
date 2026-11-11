@@ -154,7 +154,7 @@ await storage.putStream(createReadStream("./video.mp4"), "uploads/video.mp4");
 // From a remote URL — Warlock downloads then stores
 await storage.putFromUrl("https://example.com/image.jpg", "uploads/image.jpg");
 
-// From a base64 data URL — MIME extracted from the prefix automatically
+// From a base64 data URL — the `data:...;base64,` prefix is stripped
 await storage.putFromBase64("data:image/png;base64,iVBORw0KGgo...", "uploads/photo.png");
 
 // From a local file on disk (put(string) stores the string itself, not the file)
@@ -166,7 +166,9 @@ await storage.put(request.file("avatar"), `avatars/${userId}.jpg`);
 
 For uploads, the usual pattern is `UploadedFile.save(directory, options?)` — that lives on the file object itself. See [File uploads](./file-uploads.md) for the full flow.
 
-`putFromUrl` refuses private, loopback, link-local and cloud-metadata hosts before it downloads. The classifier behind that check, `isPrivateOrReservedIp`, is also exported on its own from `@warlock.js/core/net`. That subpath loads only `node:net` and the classifier — never the HTTP server, database, cache or mail modules the root `@warlock.js/core` entry boots — so a worker, CLI or standalone agent process can use the same rules without bundling the framework:
+> **Changed in 5.53:** `putFromUrl` and `putFromBase64` store the file with the MIME type of its location's extension (`uploads/photo.png` → `image/png`), not the type the remote server or the data URL declares. A cloud bucket serves an object with its stored Content-Type, so a declared `text/html` saved as `avatars/u1.png` would otherwise render as a page. A location without a known extension is stored as `application/octet-stream`. Pass `{ mimeType }` to set the type yourself.
+
+`putFromUrl` refuses private, loopback, link-local and cloud-metadata hosts before it downloads. The connection itself is pinned to an address that passed that check, so a host whose DNS answer changes after the check (DNS rebinding to `127.0.0.1` or `169.254.169.254`) is refused when connecting, on every redirect hop too. Pinning applies to requests made through the runtime's own `fetch`; when you inject a `fetch` the pre-check is the guard. The classifier behind that check, `isPrivateOrReservedIp`, is also exported on its own from `@warlock.js/core/net`. That subpath loads only `node:net` and the classifier — never the HTTP server, database, cache or mail modules the root `@warlock.js/core` entry boots — so a worker, CLI or standalone agent process can use the same rules without bundling the framework:
 
 ```ts
 import { isPrivateOrReservedIp } from "@warlock.js/core/net";
@@ -190,7 +192,7 @@ type PutOptions = {
 };
 ```
 
-Pass any combination as the third arg to `put` / `putStream` / `putFromUrl` / `putFromBase64`. `mimeType` is the only one that affects the local driver — the rest are cloud-only knobs that the local driver silently ignores.
+Pass any combination as the third arg to `put` / `putStream` / `putFromUrl` / `putFromBase64`. `mimeType` is the only one that affects the local driver — the rest are cloud-only knobs that the local driver silently ignores. Without `mimeType`, the type comes from the location's extension.
 
 ## Reading files
 
@@ -555,6 +557,15 @@ stream.pipe(response.raw);
 ```
 
 Cloud drivers return `{ valid: false, error: "invalid_token" }` from `validateTemporaryToken` — they validate via the presigned URL on the cloud side, not here. If you're in cross-driver code, check `result.valid` and `result.absolutePath` and fall back to streaming.
+
+> **Changed in 5.53:** tokens are bound to the storage prefix they were issued under, and tokens issued by earlier versions are refused with `invalid_token` (they lasted one hour by default, so issue new links after upgrading).
+
+A token signs the file's path **with** the storage prefix in effect when it was issued (the tenant prefix set through `storageDriverContext.setPrefix(...)`, or the driver's `prefix` option). It opens exactly that file:
+
+- Validated where the same prefix is in effect, or where no prefix is set, it opens the file it was issued for. `result.path` is the location relative to the prefix in effect, as the other storage methods take it.
+- Validated where a different prefix is in effect (another tenant's host), it is refused with `invalid_token`, even when a file exists at the same relative path there.
+
+Two local disks that share one `signatureKey` accept each other's tokens for files at the same path; give each disk its own key.
 
 The local driver reads its HMAC key from the `signatureKey` option on the driver config — set it in `src/config/storage.ts` if you use temporary URLs in dev.
 

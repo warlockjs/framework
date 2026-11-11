@@ -1,7 +1,9 @@
 import { colors } from "@mongez/copper";
 import { inspect } from "util";
 import { LogChannel } from "../log-channel";
+import { neutralizeTerminalText } from "../redact/escape-log-value";
 import type { BasicLogConfigurations, LoggingData, LogLevel } from "../types";
+import { meetsMinLevel } from "../utils/level-rank";
 
 export type ConsoleLogConfig = BasicLogConfigurations & {
   /**
@@ -21,6 +23,18 @@ export type ConsoleLogConfig = BasicLogConfigurations & {
    * @default 4
    */
   contextDepth?: number;
+  /**
+   * Lowest severity this channel prints, in the order
+   * `debug` < `info` = `success` < `warn` < `error` < `fatal`. Entries below
+   * it are skipped by this channel only; other channels still receive them.
+   * Combines with `levels` (an entry must pass both).
+   *
+   * @default undefined (every level is printed)
+   *
+   * @example
+   * new ConsoleLog({ minLevel: "info" }); // hide debug lines
+   */
+  minLevel?: LogLevel;
 };
 
 /**
@@ -104,6 +118,22 @@ export class ConsoleLog extends LogChannel<ConsoleLogConfig> {
   /**
    * {@inheritdoc}
    */
+  public acceptsLevel(level: LogLevel): boolean {
+    return meetsMinLevel(level, this.config("minLevel")) && super.acceptsLevel(level);
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  protected shouldBeLogged(data: LoggingData): boolean {
+    if (!meetsMinLevel(data.type, this.config("minLevel"))) return false;
+
+    return super.shouldBeLogged(data);
+  }
+
+  /**
+   * {@inheritdoc}
+   */
   public log(data: LoggingData) {
     const { module, action, message, type: level } = data;
 
@@ -125,7 +155,9 @@ export class ConsoleLog extends LogChannel<ConsoleLogConfig> {
       colors.slate(`(${time})`),
       colors.cyan(`[${module}]`),
       colors.magenta(`[${action}]`),
-      style.message(message),
+      // Colour codes stay; any other terminal escape in the text (cursor
+      // movement, screen clearing, clipboard writes) is removed.
+      style.message(typeof message === "string" ? neutralizeTerminalText(message) : message),
     );
 
     if (typeof message === "object") {

@@ -46,11 +46,14 @@ import type { HttpConfigurations } from "@warlock.js/core";
 
 const httpConfigurations: HttpConfigurations = {
   fileUploadLimit: 50 * 1024 * 1024, // 50 MB per file
+  multipart: { maxTotalSize: 50 * 1024 * 1024 }, // the whole request (default 25 MB)
   // ...
 };
 
 export default httpConfigurations;
 ```
+
+A per-file limit above 25 MB also needs a larger total cap (`http.multipart.maxTotalSize`, see [Total size per request](#total-size-per-request-553) below), or a route-level `uploads.maxTotalSize`.
 
 > **Changed in 5.21:** multipart uploads now have default limits — 10 MB per file, 10 files and 100 fields per request. Exceeding any of them returns **413**. Tune them with `fileUploadLimit` (per-file bytes) and the `http.multipart` keys `files`, `fields` and `fieldSize`:
 >
@@ -62,6 +65,34 @@ export default httpConfigurations;
 > ```
 
 This is a Fastify plugin limit — the multipart parser rejects bodies that exceed it before the request ever hits a controller. Set it generously above your largest expected file, then validate stricter limits in the schema per-field.
+
+### Total size per request (5.53)
+
+`http.multipart.maxTotalSize` (default **25 MB**) caps all parts of one request together, files and fields. The bytes are counted as they arrive, so a request is answered **413** (`code: "EC108"`) as soon as it passes the cap, and a declared `Content-Length` above it is refused before a single byte is read. A route that takes bigger uploads raises the cap for itself with `uploads.maxTotalSize`:
+
+```ts title="src/config/http.ts"
+multipart: { maxTotalSize: 25 * 1024 * 1024 },
+```
+
+```ts
+router.post("/videos", uploadVideo, { uploads: { maxTotalSize: 500 * 1024 * 1024 } });
+```
+
+Files are held in memory until the handler saves them, so keep these caps close to what your routes really need.
+
+### Accepting uploads only on routes that take them (5.53)
+
+Multipart bodies are parsed before route middleware runs, auth included. By default (`http.multipart.routes: "all"`) every route parses them, and a production boot logs a warning while the option is unset. Set it to `"declared"` and mark the routes that take files with `uploads`: every other route answers **415** (`code: "EC109"`) without reading the body.
+
+```ts title="src/config/http.ts"
+multipart: { routes: "declared" },
+```
+
+```ts
+router.post("/avatars", uploadAvatar, { uploads: true });
+```
+
+The default is expected to become `"declared"` in the next major release.
 
 > **Not the JSON body limit.** `fileUploadLimit` bounds multipart file parts. JSON bodies are bounded by `http.bodyLimit`, which one route can raise with `serverOptions.bodyLimit` (see [routing](../the-basics/routing-deep.md)). Multipart requests are never held to `bodyLimit`.
 
@@ -143,17 +174,22 @@ The `UploadedFile` surface is split into properties, type-checks, transforms, an
 
 ### Properties
 
-| Property              | Type              | Note                                        |
-| --------------------- | ----------------- | ------------------------------------------- |
-| `file.name`           | `string`          | sanitised filename                          |
-| `file.mimeType`       | `string`          | e.g. `"image/jpeg"`, `"application/pdf"`    |
-| `file.extension`      | `string`          | lowercase, no dot — `"jpg"`, `"pdf"`        |
-| `file.hash`           | `string`          | SHA-256 hash, populated after `.save()`     |
-| `await file.size()`   | `Promise<number>` | byte length (buffers content on first call) |
-| `await file.buffer()` | `Promise<Buffer>` | full content, cached after first call       |
-| `file.isImage`        | `boolean`         | MIME starts with `"image"`                  |
-| `file.isVideo`        | `boolean`         | MIME starts with `"video"`                  |
-| `file.isAudio`        | `boolean`         | MIME starts with `"audio"`                  |
+| Property                        | Type                           | Note                                        |
+| ------------------------------- | ------------------------------ | ------------------------------------------- |
+| `file.name`                     | `string`                       | sanitised filename                          |
+| `file.mimeType`                 | `string`                       | e.g. `"image/jpeg"`, `"application/pdf"`    |
+| `file.extension`                | `string`                       | lowercase, no dot — `"jpg"`, `"pdf"`        |
+| `file.hash`                     | `string`                       | SHA-256 hash, populated after `.save()`     |
+| `await file.size()`             | `Promise<number>`              | byte length (buffers content on first call) |
+| `await file.buffer()`           | `Promise<Buffer>`              | full content, cached after first call       |
+| `file.isImage`                  | `boolean`                      | MIME starts with `"image"`                  |
+| `file.isVideo`                  | `boolean`                      | MIME starts with `"video"`                  |
+| `file.isAudio`                  | `boolean`                      | MIME starts with `"audio"`                  |
+| `await file.detectedMimeType()` | `Promise<string \| undefined>` | the type the bytes show (see below)         |
+
+`mimeType`, `extension` and the `is*` checks come from what the client declared, and a client can declare anything. `detectedMimeType()` reads the file's first bytes instead and returns the type they show: raster images (jpeg, png, webp, gif, avif, heic/heif, bmp, tiff, ico), `image/svg+xml`, `application/pdf`, `text/html` or `application/xml`, or `undefined` for anything else. Use it to decide what a file really is.
+
+**Stored content type.** `save()` stores the type the bytes show for raster images, and stores markup (svg, html, xml, script) as `application/octet-stream`, whether the bytes or the client declared it, so a bucket or CDN serving the object makes the browser download it instead of rendering it on your domain. Other files keep the declared type. Set `uploads.trustClientContentType: true` to store the declared type as-is (only when every upload comes from a trusted source).
 
 Two more — both useful for resources / API responses:
 
@@ -349,7 +385,8 @@ The framework injects `v.file()` into seal via the `filePlugin` (auto-registered
 ```ts
 v.file(); // required — must be an UploadedFile
 v.file().optional(); // optional file field
-v.file().image(); // must be an image
+v.file().image(); // must be a raster image, judged by its bytes
+v.file().image({ svg: true }); // svg allowed too
 v.file().accept(["jpg", "png"]); // allowed extensions
 v.file().mimeType("application/pdf"); // single MIME
 v.file().mimeType(["image/png", "image/jpeg"]); // many MIMEs
@@ -367,6 +404,8 @@ v.file().max(1024); // alias for maxSize
 v.file().image().minWidth(100).maxWidth(4000);
 v.file().image().minHeight(100).maxHeight(4000);
 ```
+
+**Since 5.53 `image()` checks the bytes**, not the declared type or name: jpeg, png, webp, gif, avif, heic/heif, bmp, tiff and ico pass, and svg passes only with `image({ svg: true })` — an svg can carry script, so allow it only where the file is never served from your own origin as `image/svg+xml`. `mimeType()`, `pdf()`, `excel()`, `word()` and `accept()` still compare the declared type and extension, and also refuse a file whose bytes are markup (svg, html, xml) unless that markup type or extension is listed.
 
 ### Optional file field
 

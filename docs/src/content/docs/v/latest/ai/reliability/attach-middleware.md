@@ -91,7 +91,9 @@ ai.middleware.guardrail({
 
 Rejection → `GuardrailViolationError` with `phase: "input" | "output"` and the configured `reason`. Output checks fire BEFORE tool dispatch — a rejected response means the tools it requested are never invoked.
 
-Checks run on every trip (including tool follow-ups and repair attempts). Gate to only the first trip via `ctx.tripIndex === 0` when you want input-screening only.
+`outputCheck` runs on every trip (including tool follow-ups and repair attempts). `inputCheck` runs once per distinct user text per run: a later trip whose text already passed skips it.
+
+In a streaming run (`agent.stream()`, `ai.serve`), `outputCheck` holds each trip's text until it passes, then streams the text as one delta; a rejected trip streams no text, and reasoning deltas are not streamed. Set `stream: "unguarded"` to stream deltas before the check runs (the check then only changes the result). A custom middleware that checks or rewrites `response.content` in `trip.after` gets the same hold by setting `trip: { bufferStream: true, after(ctx, response) { … } }`.
 
 ## `ai.middleware.semanticCache`
 
@@ -109,6 +111,7 @@ ai.middleware.semanticCache({
   ttlMs: 60 * 60 * 1000,
   namespace: "support-faq",
   // scope: "session" (default) — see "Session-scoped by default" below
+  // cacheToolRuns: false (default) — answers built from tool results are not stored
 });
 ```
 
@@ -116,11 +119,13 @@ ai.middleware.semanticCache({
 
 **How it works.**
 
-- **Exact-match** — FNV hash over the message list. `store.get(hash)` returns an instant hit.
-- **Vector-match** — embeds the prompt, calls `store.similar(vector, { topK: 1, threshold })`. The driver uses its native ANN index.
+- **Exact-match** — SHA-256 over the whole message list. `store.get(hash)` returns an instant hit; the stored prompt hash, scope and context are re-checked before it is served.
+- **Vector-match** — embeds the last user message, calls `store.similar(vector, { topK, threshold })`. The driver uses its native ANN index; when other scopes or conversations fill the first page of candidates, the page is widened so this caller's own entry is still found.
+- **Same context only.** Every entry records a fingerprint of the agent, its system prompt and the conversation before the question (plus any image or file attached to it). Both paths require it to match, so two agents in one session, or the same _"yes, go ahead"_ at two points of a conversation, never share an answer.
 - **Hits** return a synthetic `ModelResponse` with `usage: { input: 0, output: 0, total: 0 }`.
 - **Writes** happen at `trip.after` on miss.
 - **Trip-zero only.** Only first-trip responses get cached. Tool-using loops never cache tool-call responses — would infinite-loop.
+- **Tool runs are not stored by default.** When the first turn calls tools, the final answer is built from tool results (a balance, a stock level) that can change or belong to one caller, so it is not cached. Set `cacheToolRuns: true` to store it under the first turn's prompt.
 - **Never use memory drivers in production** — they do a linear scan per query.
 
 ### Session-scoped by default
@@ -136,11 +141,11 @@ ai.middleware.semanticCache({ embedder, threshold: 0.95, scope: "shared" });
 ai.middleware.semanticCache({ embedder, threshold: 0.95, scope: (ctx) => tenantIdFrom(ctx) });
 ```
 
-- **`"session"`** (default) — isolated per `sessionId`. A run made _without_ a `sessionId` shares one unscoped pool — pass `sessionId` on `agent.execute()` to get the isolation (a supervisor / orchestrator forwards its own automatically).
-- **`"shared"`** — one pool for every caller, regardless of session — the pre-4.15.0 behavior.
-- **a resolver function** — `(context) => key | undefined`; `undefined` falls back to the unscoped pool.
+- **`"session"`** (default) — isolated per `sessionId`. A run made _without_ a `sessionId` skips the cache: it neither reads nor writes (a one-time warning names the fix). Pass `sessionId` on `agent.execute()` (a supervisor / orchestrator forwards its own automatically).
+- **`"shared"`** — one pool for every caller, regardless of session. Use it for answers that may be served to anyone.
+- **a resolver function** — `(context) => key | undefined`; `undefined` (or `""`) skips the cache for that run. Return a constant to pool such runs on purpose.
 
-Entries written before upgrading to this scoping are unscoped and are only read back by unscoped (or `"shared"`) runs.
+Entries written by earlier releases carry no context fingerprint and are no longer served; the cache refills as questions come in.
 
 ## `ai.middleware.dedupe`
 

@@ -6,6 +6,7 @@ import type {
   FetchUrlOptions,
   FetchUrlResult,
 } from "../contracts";
+import { createDeadline, type CallDeadline } from "../deadline";
 import { WebToolError } from "../errors";
 import { htmlToMarkdown } from "./html-to-markdown";
 import { objectSchema, stringField } from "./schema";
@@ -170,16 +171,19 @@ function assertHostAllowed(url: URL, allowHosts?: string[]): void {
  * Read the response body up to `maxBytes`, stopping early once the cap is
  * reached. Returns the decoded text and whether it was truncated. When
  * the body has no stream (a stubbed `Response`), falls back to `.text()`
- * and truncates the decoded string at `maxBytes`.
+ * and truncates the decoded string at `maxBytes`. Every read is raced
+ * against the call's `deadline`, so a server that drips its body cannot
+ * hold the call open past `timeoutMs`.
  */
 async function readBody(
   response: Response,
   maxBytes: number,
+  deadline: CallDeadline,
 ): Promise<{ body: string; truncated: boolean }> {
   const stream = response.body;
 
   if (!stream) {
-    const bytes = new TextEncoder().encode(await response.text());
+    const bytes = new TextEncoder().encode(await deadline.race(response.text()));
 
     if (bytes.byteLength > maxBytes) {
       return { body: decodeUtf8Prefix(bytes, maxBytes), truncated: true };
@@ -193,23 +197,27 @@ async function readBody(
   let received = 0;
   let truncated = false;
 
-  for (;;) {
-    const { done, value } = await reader.read();
+  try {
+    for (;;) {
+      const { done, value } = await deadline.race(reader.read());
 
-    if (done) {
-      break;
-    }
-
-    if (value) {
-      received += value.byteLength;
-      chunks.push(value);
-
-      if (received >= maxBytes) {
-        truncated = true;
-        await reader.cancel();
+      if (done) {
         break;
       }
+
+      if (value) {
+        received += value.byteLength;
+        chunks.push(value);
+
+        if (received >= maxBytes) {
+          truncated = true;
+          break;
+        }
+      }
     }
+  } finally {
+    // Abandon any unread remainder without waiting on a stalled stream.
+    reader.cancel().catch(() => undefined);
   }
 
   const merged = new Uint8Array(received);
@@ -367,8 +375,10 @@ function isChallenge(response: Response): boolean {
  * - **`allowHosts`** — when set, a request to any host not in the list is
  *   rejected before the fetch, and redirect targets are held to the same
  *   allowlist.
- * - **`timeoutMs`** — the request is aborted via `AbortSignal.timeout`
- *   (default {@link DEFAULT_TIMEOUT_MS}).
+ * - **`timeoutMs`** — bounds the whole call: connect, redirects, the
+ *   challenge retry and reading the body (default
+ *   {@link DEFAULT_TIMEOUT_MS}). The run's abort signal (`ctx.signal`)
+ *   cancels it too.
  * - **`maxBytes`** — the response body is read up to this cap and the
  *   result flags `truncated` when it was cut off (default
  *   {@link DEFAULT_MAX_BYTES}).
@@ -422,59 +432,90 @@ export function fetchUrlTool(
       "specific page you already have the URL for.",
     input: inputSchema,
     readOnly: true,
-    async execute(input) {
+    async execute(input, ctx) {
       const url = parseUrl(input.url);
       assertHostAllowed(url, allowHosts);
 
-      const send = async (headers?: Record<string, string>): Promise<Response> => {
-        try {
-          // The shared hardened outbound path: private-IP deny by default,
-          // per-hop redirect re-validation, timeout — never a raw fetch.
-          return await guardedFetch(
-            url.toString(),
-            {
-              allowedSchemes: ["http", "https"],
-              hostAllowlist: allowHosts,
-              denyPrivateIPsAfterDNS: !allowPrivateNetwork,
-              timeoutMs,
-            },
-            headers ? { headers } : undefined,
-          );
-        } catch (cause) {
-          if (cause instanceof OutboundPolicyError) {
-            throw new WebToolError(`fetch_url blocked: ${cause.message}`, {
-              type: "denied-host",
-              cause,
-            });
-          }
+      // One deadline for the whole call, kept armed through the body read.
+      const deadline = createDeadline(timeoutMs, ctx?.signal, timeoutError);
 
-          const message = cause instanceof Error ? cause.message : String(cause);
+      try {
+        return await fetchAndRender(url, deadline);
+      } finally {
+        deadline.clear();
+      }
+    },
+  });
 
-          throw new WebToolError(`fetch_url request failed: ${message}`, {
-            type: "request-failed",
+  /** The error a call that outlived `timeoutMs` fails with. */
+  function timeoutError(): WebToolError {
+    return new WebToolError(
+      `fetch_url timed out after ${timeoutMs}ms before the page was fully received. ` +
+        `Raise the tool's timeoutMs option if this site is slow.`,
+      { type: "request-failed", context: { timeoutMs } },
+    );
+  }
+
+  /** Fetch `url` within `deadline` (one challenge retry) and render the body. */
+  async function fetchAndRender(url: URL, deadline: CallDeadline): Promise<FetchUrlResult> {
+    const send = async (headers?: Record<string, string>): Promise<Response> => {
+      try {
+        // The shared hardened outbound path: private-IP deny by default,
+        // per-hop redirect re-validation, timeout — never a raw fetch.
+        return await guardedFetch(
+          url.toString(),
+          {
+            allowedSchemes: ["http", "https"],
+            hostAllowlist: allowHosts,
+            denyPrivateIPsAfterDNS: !allowPrivateNetwork,
+            timeoutMs,
+            signal: deadline.signal,
+          },
+          headers ? { headers } : undefined,
+        );
+      } catch (cause) {
+        if (deadline.timedOut) {
+          throw deadline.signal.reason;
+        }
+
+        if (cause instanceof OutboundPolicyError) {
+          throw new WebToolError(`fetch_url blocked: ${cause.message}`, {
+            type: "denied-host",
             cause,
           });
         }
-      };
 
-      let response = await send();
+        const message = cause instanceof Error ? cause.message : String(cause);
 
-      if (retryOnChallenge && isChallenge(response)) {
-        // One retry with browser-like headers; the same guarded path and policy apply.
-        await response.body?.cancel().catch(() => undefined);
-        response = await send(CHALLENGE_RETRY_HEADERS);
+        throw new WebToolError(`fetch_url request failed: ${message}`, {
+          type: "request-failed",
+          cause,
+        });
       }
+    };
 
-      const { body, truncated } = await readBody(response, maxBytes);
-      const rendered = await render(body, response.url || url.toString(), extract, extractor);
+    let response = await send();
 
-      return {
-        url: response.url || url.toString(),
-        status: response.status,
-        content: rendered.content,
-        truncated,
-        ...(rendered.extractor ? { extractor: rendered.extractor } : {}),
-      };
-    },
-  });
+    if (retryOnChallenge && isChallenge(response)) {
+      // One retry with browser-like headers; the same guarded path and policy apply.
+      await response.body?.cancel().catch(() => undefined);
+      response = await send(CHALLENGE_RETRY_HEADERS);
+    }
+
+    const { body, truncated } = await readBody(response, maxBytes, deadline).catch(
+      (cause: unknown) => {
+        // The outbound guard aborts a body still streaming at its own deadline.
+        throw deadline.timedOut || cause instanceof OutboundPolicyError ? timeoutError() : cause;
+      },
+    );
+    const rendered = await render(body, response.url || url.toString(), extract, extractor);
+
+    return {
+      url: response.url || url.toString(),
+      status: response.status,
+      content: rendered.content,
+      truncated,
+      ...(rendered.extractor ? { extractor: rendered.extractor } : {}),
+    };
+  }
 }

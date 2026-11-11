@@ -1,6 +1,7 @@
 import { areEqual, clone } from "@mongez/reinforcements";
 import { isPlainObject } from "@mongez/supportive-is";
 import { pruneEmptyParents } from "./utils/prune-empty-parents";
+import { assertSafeFieldPath, assertSafeValueKeys } from "./utils/safe-path";
 
 function canBeFlatten(object: unknown): boolean {
   return isPlainObject(object);
@@ -59,6 +60,14 @@ type DirtyColumnValues = { oldValue: unknown; newValue: unknown };
  * The tracker stores both raw (nested) and flattened (dot-notation) versions of the data
  * to accurately detect modifications, additions, and removals at any nesting level.
  *
+ * Cost model: construction copies the data once (the baseline). The current
+ * snapshot starts as the baseline itself and copies a top-level field only the
+ * first time a write reaches inside it, so fields nobody touched stay shared and
+ * compare by reference. Writes only record the change; the flat map and the diff
+ * are rebuilt once, on the next read (`getDirtyColumns()`, `hasChanges()`, ...).
+ * Subclasses that read `currentFlattened`, `dirtyColumns` or `removedColumns`
+ * directly call {@link refreshDirtyState} first.
+ *
  * @example
  * ```typescript
  * const tracker = new DatabaseDirtyTracker({ name: "Alice", age: 30 });
@@ -110,14 +119,32 @@ export class DatabaseDirtyTracker {
    */
   protected readonly replacedRoots = new Set<string>();
 
+  /**
+   * Whether `currentRaw` is the tracker's own top-level object. Until the first
+   * write it IS `initialRaw` (nothing changed, so nothing to copy).
+   */
+  private currentIsCopy = false;
+
+  /**
+   * Top-level fields of `currentRaw` that hold the tracker's own copy. Every
+   * other field is shared with `initialRaw` and must be copied before a write
+   * reaches inside it. Ignored while {@link ownsAllRoots} is set.
+   */
+  private readonly ownedRoots = new Set<string>();
+
+  /** Set by `replaceCurrentData()`: every field of `currentRaw` is a fresh copy. */
+  private ownsAllRoots = false;
+
+  /** A write happened since the flat map and the diff were last rebuilt. */
+  private stale = false;
+
   public constructor(data: Record<string, unknown>) {
     this.initialRaw = this.cloneData(data);
-    this.currentRaw = this.cloneData(data);
+    this.currentRaw = this.initialRaw;
 
     this.initialFlattened = this.flattenData(this.initialRaw);
-    this.currentFlattened = { ...this.initialFlattened };
-
-    this.updateDirtyState();
+    // Nothing can differ yet: current and initial are the same snapshot.
+    this.currentFlattened = this.initialFlattened;
   }
 
   /**
@@ -134,6 +161,8 @@ export class DatabaseDirtyTracker {
    * ```
    */
   public getDirtyColumns(): string[] {
+    this.refreshDirtyState();
+
     return Array.from(this.dirtyColumns);
   }
 
@@ -150,6 +179,8 @@ export class DatabaseDirtyTracker {
    * @returns Distinct paths to remove
    */
   public getRemovedPaths(): string[] {
+    this.refreshDirtyState();
+
     const paths = new Set<string>();
 
     for (const column of this.removedColumns) {
@@ -206,7 +237,7 @@ export class DatabaseDirtyTracker {
         continue;
       }
 
-      if (areEqual(initial, current)) {
+      if (initial === current || areEqual(initial, current)) {
         continue;
       }
 
@@ -234,6 +265,8 @@ export class DatabaseDirtyTracker {
    * ```
    */
   public hasChanges(): boolean {
+    this.refreshDirtyState();
+
     return (
       this.dirtyColumns.size > 0 ||
       this.removedColumns.size > 0 ||
@@ -247,6 +280,8 @@ export class DatabaseDirtyTracker {
    * Check if the given column is dirty (changed)
    */
   public isDirty(column: string): boolean {
+    this.refreshDirtyState();
+
     return this.dirtyColumns.has(column);
   }
 
@@ -266,6 +301,8 @@ export class DatabaseDirtyTracker {
    * ```
    */
   public getRemovedColumns(): string[] {
+    this.refreshDirtyState();
+
     return Array.from(this.removedColumns);
   }
 
@@ -286,6 +323,8 @@ export class DatabaseDirtyTracker {
    * ```
    */
   public getDirtyColumnsWithValues(): Record<string, DirtyColumnValues> {
+    this.refreshDirtyState();
+
     const result: Record<string, DirtyColumnValues> = {};
 
     for (const column of this.dirtyColumns) {
@@ -302,7 +341,7 @@ export class DatabaseDirtyTracker {
   }
 
   /**
-   * Replaces the current data snapshot entirely and recomputes the diff.
+   * Replaces the current data snapshot entirely; the diff is rebuilt on the next read.
    *
    * This is useful when you want to replace all current data with a new set,
    * while keeping the initial baseline for comparison.
@@ -318,12 +357,14 @@ export class DatabaseDirtyTracker {
    */
   public replaceCurrentData(data: Record<string, unknown>): void {
     this.currentRaw = this.cloneData(data);
-    this.currentFlattened = this.flattenData(this.currentRaw);
-    this.updateDirtyState();
+    this.currentIsCopy = true;
+    this.ownsAllRoots = true;
+    this.ownedRoots.clear();
+    this.stale = true;
   }
 
   /**
-   * Merges a partial payload into the current snapshot and recomputes the diff.
+   * Merges a partial payload into the current snapshot; the diff is rebuilt on the next read.
    *
    * This performs a deep merge, preserving existing nested structures while
    * updating only the specified fields.
@@ -339,22 +380,54 @@ export class DatabaseDirtyTracker {
    * ```
    */
   public mergeChanges(partial: Record<string, unknown>): void {
+    // Check everything before writing anything, so a refused payload leaves
+    // the snapshot untouched.
+    for (const key of Object.keys(partial)) {
+      if (key.includes(".")) {
+        assertSafeFieldPath(key);
+      }
+    }
+
+    assertSafeValueKeys(partial);
+
+    this.beginWrite();
+
+    for (const [key, value] of Object.entries(partial)) {
+      if (isPlainObject(value) && this.hasOwnPlainObject(this.currentRaw, key)) {
+        // Deep-merged in place: needs the tracker's own copy of the field.
+        this.ownRoot(key);
+      } else {
+        // Replaced by a fresh copy of `value`.
+        this.claimRoot(key);
+      }
+    }
+
     this.mergeIntoRaw(this.currentRaw, partial);
-    this.currentFlattened = this.flattenData(this.currentRaw);
-    this.updateDirtyState();
   }
 
   /**
    * Replaces the value at a dot-notation path (no deep merge), mirroring
    * `model.set()` so stale nested keys are detected as removed.
+   *
+   * @throws Error when a path segment is `__proto__`, `constructor` or
+   *   `prototype`, or the value carries a `__proto__` key
    */
   public setAtPath(path: string, value: unknown): void {
+    assertSafeFieldPath(path);
+    assertSafeValueKeys(value, path);
+
     const segments = path.split(".");
-    let container = this.currentRaw as Record<string, unknown>;
+
+    this.beginWrite();
 
     if (segments.length === 1) {
       this.replacedRoots.add(path);
+      this.claimRoot(path);
+    } else {
+      this.ownRoot(segments[0] as string);
     }
+
+    let container = this.currentRaw as Record<string, unknown>;
 
     for (let index = 0; index < segments.length - 1; index += 1) {
       const segment = segments[index] as string;
@@ -367,8 +440,6 @@ export class DatabaseDirtyTracker {
     }
 
     container[segments[segments.length - 1] as string] = this.cloneData(value);
-    this.currentFlattened = this.flattenData(this.currentRaw);
-    this.updateDirtyState();
   }
 
   /**
@@ -390,15 +461,21 @@ export class DatabaseDirtyTracker {
     const targets = Array.isArray(columns) ? columns : [columns];
 
     for (const path of targets) {
+      assertSafeFieldPath(path);
+    }
+
+    this.beginWrite();
+
+    for (const path of targets) {
       if (!path.includes(".")) {
         this.replacedRoots.add(path);
+        this.claimRoot(path);
+      } else {
+        this.ownRoot(path.split(".")[0] as string);
       }
 
       this.deleteFromRaw(path);
     }
-
-    this.currentFlattened = this.flattenData(this.currentRaw);
-    this.updateDirtyState();
   }
 
   /**
@@ -422,16 +499,115 @@ export class DatabaseDirtyTracker {
    * ```
    */
   public reset(data?: Record<string, unknown>): void {
-    const source = data ?? this.currentRaw;
-    this.initialRaw = this.cloneData(source);
-    this.currentRaw = this.cloneData(source);
+    if (data) {
+      this.initialRaw = this.cloneData(data);
+      this.initialFlattened = this.flattenData(this.initialRaw);
+    } else if (this.currentIsCopy) {
+      this.initialRaw = this.adoptCurrentAsBaseline();
+      this.initialFlattened = this.flattenData(this.initialRaw);
+    }
+    // Otherwise nothing was written since the last snapshot: the current data
+    // IS the baseline, so the baseline stays as it is.
 
-    this.initialFlattened = this.flattenData(this.initialRaw);
-    this.currentFlattened = this.flattenData(this.currentRaw);
+    this.currentRaw = this.initialRaw;
+    this.currentFlattened = this.initialFlattened;
+    this.currentIsCopy = false;
+    this.ownedRoots.clear();
+    this.ownsAllRoots = false;
+    this.stale = false;
 
     this.dirtyColumns.clear();
     this.removedColumns.clear();
     this.replacedRoots.clear();
+  }
+
+  /**
+   * Rebuild the flat map and the diff if a write happened since the last
+   * rebuild. Every public reader calls this first; a subclass reading
+   * `currentFlattened`, `dirtyColumns` or `removedColumns` directly must too.
+   */
+  protected refreshDirtyState(): void {
+    if (!this.stale) {
+      return;
+    }
+
+    this.stale = false;
+    this.currentFlattened = this.flattenData(this.currentRaw);
+    this.updateDirtyState();
+  }
+
+  /**
+   * The current snapshot as a new baseline. Fields the tracker wrote are copied
+   * (their values may have been handed out by `getDirtyColumnsWithValues()`,
+   * and a caller mutating one must not move the baseline); untouched fields are
+   * already shared with the old baseline and are reused as they are.
+   */
+  private adoptCurrentAsBaseline(): Record<string, unknown> {
+    if (this.ownsAllRoots) {
+      return this.cloneData(this.currentRaw);
+    }
+
+    const baseline = Object.create(Object.getPrototypeOf(this.currentRaw)) as Record<
+      string,
+      unknown
+    >;
+
+    for (const key of Object.keys(this.currentRaw)) {
+      const value = this.currentRaw[key];
+      baseline[key] = this.ownedRoots.has(key) ? this.cloneData(value) : value;
+    }
+
+    return baseline;
+  }
+
+  /**
+   * Start a write: give `currentRaw` its own top-level object the first time
+   * (fields stay shared with the baseline until a write reaches inside one) and
+   * mark the diff as out of date.
+   */
+  private beginWrite(): void {
+    if (!this.currentIsCopy) {
+      const copy = Object.create(Object.getPrototypeOf(this.currentRaw)) as Record<string, unknown>;
+
+      for (const key of Object.keys(this.currentRaw)) {
+        copy[key] = this.currentRaw[key];
+      }
+
+      this.currentRaw = copy;
+      this.currentIsCopy = true;
+      this.ownedRoots.clear();
+      this.ownsAllRoots = false;
+    }
+
+    this.stale = true;
+  }
+
+  /**
+   * Copy a top-level field of `currentRaw` before a write reaches inside it,
+   * so the baseline (which may share it) never changes.
+   */
+  private ownRoot(root: string): void {
+    if (this.ownsAllRoots || this.ownedRoots.has(root)) {
+      return;
+    }
+
+    this.ownedRoots.add(root);
+
+    if (Object.prototype.hasOwnProperty.call(this.currentRaw, root)) {
+      this.currentRaw[root] = this.cloneData(this.currentRaw[root]);
+    }
+  }
+
+  /** Record that a top-level field is about to be replaced by a fresh copy. */
+  private claimRoot(root: string): void {
+    if (!this.ownsAllRoots) {
+      this.ownedRoots.add(root);
+    }
+  }
+
+  /** Whether `container` has an OWN property `key` holding a plain object. */
+  private hasOwnPlainObject(container: Record<string, unknown>, key: string): boolean {
+    return Object.prototype.hasOwnProperty.call(container, key) && isPlainObject(container[key]);
   }
 
   /**
@@ -445,7 +621,7 @@ export class DatabaseDirtyTracker {
   /**
    * Recomputes the dirty and removed column sets by comparing initial and current snapshots.
    *
-   * This method is called internally after any operation that modifies the current data.
+   * Called by {@link refreshDirtyState} on the first read after a write.
    * It iterates through all keys in both flattened snapshots and determines which columns
    * have been modified or removed.
    *
@@ -471,7 +647,9 @@ export class DatabaseDirtyTracker {
       const initialValue = this.initialFlattened[key];
       const currentValue = hasCurrent ? this.currentFlattened[key] : undefined;
 
-      if (!areEqual(initialValue, currentValue)) {
+      // Untouched fields share their values with the baseline, so the cheap
+      // identity check settles most keys before the deep comparison.
+      if (!Object.is(initialValue, currentValue) && !areEqual(initialValue, currentValue)) {
         this.dirtyColumns.add(key);
       }
     }
@@ -498,7 +676,14 @@ export class DatabaseDirtyTracker {
    */
   protected mergeIntoRaw(target: Record<string, unknown>, source: Record<string, unknown>): void {
     for (const [key, value] of Object.entries(source)) {
-      if (isPlainObject(value) && isPlainObject(target[key])) {
+      if (key === "__proto__") {
+        // Throws, naming the key.
+        assertSafeValueKeys(source);
+      }
+
+      // Only descend into the target's OWN objects: an inherited one would be
+      // a prototype, and the merge would write into every object in the process.
+      if (isPlainObject(value) && this.hasOwnPlainObject(target, key)) {
         this.mergeIntoRaw(target[key] as Record<string, unknown>, value as Record<string, unknown>);
         continue;
       }
@@ -517,6 +702,8 @@ export class DatabaseDirtyTracker {
    * @private
    */
   protected deleteFromRaw(path: string): void {
+    assertSafeFieldPath(path);
+
     const segments = path.split(".");
     let container: unknown = this.currentRaw;
 
@@ -582,7 +769,12 @@ export class DatabaseDirtyTracker {
       return container[numericIndex];
     }
 
-    if (container && typeof container === "object") {
+    // Own properties only: an inherited one is a prototype, never stored data.
+    if (
+      container &&
+      typeof container === "object" &&
+      Object.prototype.hasOwnProperty.call(container, segment)
+    ) {
       return (container as Record<string, unknown>)[segment];
     }
 

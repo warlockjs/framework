@@ -160,6 +160,12 @@ export class Job {
    */
   private _oneServer: { lockTtl?: CacheTtl; key: string } | null = null;
 
+  /**
+   * The tick the last run was scheduled for; aligned schedules advance from it
+   * so a run that finishes exactly on a boundary never repeats that tick.
+   */
+  private _lastScheduledAt: Dayjs | null = null;
+
   // ─────────────────────────────────────────────────────────────────────────────
   // Public Properties
   // ─────────────────────────────────────────────────────────────────────────────
@@ -567,6 +573,12 @@ export class Job {
    * truncated to the second, so all servers compute the same key). The winner
    * runs the job; the others skip that tick silently. Works with `preventOverlap()`.
    *
+   * A plain interval (`everyMinute()`, `everyHours(2)`, … with no `at()`,
+   * day or month constraint) is aligned to wall-clock boundaries in the job's
+   * timezone (`everyHour()` fires at the top of each hour), so servers that
+   * booted at different times share every tick. Such a job does not fire at
+   * boot; it waits for the next boundary.
+   *
    * Requires a shared cache driver (redis / pg) and the optional
    * `@warlock.js/cache` peer. On a memory driver it only dedupes within one process.
    *
@@ -584,6 +596,9 @@ export class Job {
     }
 
     this._oneServer = { lockTtl: options.lockTtl, key };
+
+    // A schedule computed before this call is re-aligned to shared boundaries.
+    if (this.nextRun !== null) this._determineNextRun();
 
     return this;
   }
@@ -639,6 +654,7 @@ export class Job {
     this._cronParser = null;
     this.nextRun = null;
     this._lastRun = null;
+    this._lastScheduledAt = null;
     this._isRunning = false;
     return this;
   }
@@ -746,6 +762,7 @@ export class Job {
       };
     } finally {
       this._lastRun = this._now();
+      this._lastScheduledAt = scheduledAt;
       this._determineNextRun();
       this._isRunning = false;
 
@@ -941,6 +958,51 @@ export class Job {
   }
 
   /**
+   * Whether this is an `onOneServer()` job on a plain interval: no `at()`, day
+   * or month constraint that would already pin it to wall-clock times.
+   */
+  private _isAlignedSchedule(): boolean {
+    return (
+      this._oneServer !== null &&
+      this._intervals.time === undefined &&
+      this._intervals.day === undefined &&
+      this._intervals.month === undefined &&
+      this._intervals.dayOfMonthMode !== "last"
+    );
+  }
+
+  /**
+   * The first interval boundary at or after (`inclusive`) / strictly after
+   * `from`, counted from the epoch in the job's timezone. Every server computes
+   * the same boundaries whenever it booted.
+   */
+  private _alignedBoundary(from: Dayjs, inclusive: boolean, value: number, type: TimeType): Dayjs {
+    if (type === "month" || type === "year") {
+      const months = Math.max(1, Math.round(type === "year" ? value * 12 : value));
+      const start = from.startOf("month");
+      const index = start.year() * 12 + start.month();
+      let step = Math.ceil(index / months) * months - index;
+      let candidate = start.add(step, "month");
+
+      while (inclusive ? candidate.isBefore(from) : !candidate.isAfter(from)) {
+        step += months;
+        candidate = start.add(step, "month");
+      }
+
+      return candidate;
+    }
+
+    const size = value * UNIT_MS[type];
+    const offset = from.utcOffset() * 60_000;
+    const local = from.valueOf() + offset;
+    let boundary = Math.ceil(local / size) * size;
+
+    if (!inclusive && boundary <= local) boundary += size;
+
+    return dayjs(boundary - offset).tz(this._timezone);
+  }
+
+  /**
    * Calculate the next run time based on interval or cron configuration.
    *
    * Strategy: apply all constraints (month, day, time) ONCE before the
@@ -965,6 +1027,18 @@ export class Job {
     const intervalValue = this._intervals.every?.value;
     const intervalType = this._intervals.every?.type;
     const hasInterval = !!(intervalValue && intervalType);
+
+    if (hasInterval && this._isAlignedSchedule()) {
+      const now = this._now();
+      let next = this._alignedBoundary(now, true, intervalValue!, intervalType!);
+
+      if (this._lastScheduledAt && !next.isAfter(this._lastScheduledAt)) {
+        next = this._alignedBoundary(this._lastScheduledAt, false, intervalValue!, intervalType!);
+      }
+
+      this.nextRun = next;
+      return;
+    }
 
     // After a previous run, jump ahead by EXACTLY one interval. Previously
     // we used `lastRun + 1s` and relied on the advance loop to catch up,

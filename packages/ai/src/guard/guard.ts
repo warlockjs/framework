@@ -75,7 +75,7 @@ function recordFlag(ctx: MiddlewareTripContext, name: string, record: FlagRecord
  * fold, so a flagged-but-otherwise-clean run resolves to `allow`.
  */
 type PhaseOutcome =
-  | { readonly type: "allow" }
+  | { readonly type: "allow"; readonly faulted: boolean }
   | { readonly type: "redact"; readonly text: string }
   | {
       readonly type: "block";
@@ -117,6 +117,8 @@ async function runDetectors(
   ctx: MiddlewareTripContext,
   name: string,
 ): Promise<PhaseOutcome> {
+  let faulted = false;
+
   for (const detector of detectors) {
     let verdict: GuardrailVerdict;
 
@@ -124,6 +126,7 @@ async function runDetectors(
       verdict = await detector.check(text, { phase, ctx });
     } catch (error) {
       // Infra fault — fail open: record and continue, never abort the run.
+      faulted = true;
       recordFlag(ctx, name, {
         detector: detector.name,
         phase,
@@ -177,7 +180,17 @@ async function runDetectors(
     };
   }
 
-  return { type: "allow" };
+  return { type: "allow", faulted };
+}
+
+/**
+ * The `ctx.state` key holding the user text this guard's `input` detectors
+ * already allowed during the run. The prompt does not change between the
+ * trips of one run, so later trips skip the detectors (and any paid
+ * moderation call) while it stays the same.
+ */
+function allowedInputKey(name: string): string {
+  return `${name}.input-allowed`;
 }
 
 /**
@@ -224,10 +237,13 @@ async function block(
  * - **`input`** detectors run at `trip.before` over the outbound prompt
  *   (`extractUserText(ctx.messages)`). `block` / `flag` only — the core
  *   `trip.before` seam cannot rewrite-and-continue, so a `redact` verdict here
- *   is downgraded to a `block`.
+ *   is downgraded to a `block`. They run once per distinct user text per run:
+ *   a later trip with the same text that already passed skips them.
  * - **`output`** detectors run at `trip.after` over `response.content`. Full
  *   `allow` / `redact` / `block` / `flag` support — a `redact` returns a
- *   replacement `ModelResponse` with the rewritten `content`.
+ *   replacement `ModelResponse` with the rewritten `content`. In a streaming
+ *   run each trip's text is held until they approve it (`stream`, default
+ *   `"buffered"`), so redacted or blocked text never reaches the stream.
  * - **`tool`** detectors run at `tool.before` over `JSON.stringify(toolArgs)`.
  *   `block` / `flag`; a `redact` is downgraded to a `block`
  *   (`tool-arg-redaction-unsupported`). Scoped to `toolNames` via the core
@@ -267,6 +283,8 @@ export function guard(options: GuardOptions): AgentMiddleware {
   const middleware: AgentMiddleware = {
     name,
     trip: {
+      // Hold streamed text until the output detectors have approved it.
+      bufferStream: output.length > 0 && options.stream !== "unguarded",
       async before(ctx: MiddlewareTripContext): Promise<void> {
         if (input.length === 0) {
           return;
@@ -278,10 +296,21 @@ export function guard(options: GuardOptions): AgentMiddleware {
           return;
         }
 
+        // Same user text as an earlier trip of this run that passed: the
+        // verdict cannot change, so the detectors do not run again.
+        if (ctx.state.get(allowedInputKey(name)) === prompt) {
+          return;
+        }
+
         const outcome = await runDetectors(input, prompt, "input", ctx, name);
 
         if (outcome.type === "block") {
           await block(outcome, "input", ctx, name, escalation);
+        }
+
+        // A detector that faulted (failed open) gets another chance next trip.
+        if (outcome.type === "allow" && !outcome.faulted) {
+          ctx.state.set(allowedInputKey(name), prompt);
         }
 
         // `allow` (incl. any recorded flags) and a downgraded-but-impossible

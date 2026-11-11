@@ -184,7 +184,14 @@ class FakeRedisClient {
   }
 
   public async exists(key: string): Promise<number> {
-    return this.store.has(key) ? 1 : 0;
+    const expiresAt = this.expires.get(key);
+    const live = this.store.has(key) && !(expiresAt && expiresAt < Date.now());
+    return live || this.sets.has(key) ? 1 : 0;
+  }
+
+  public async sRandMemberCount(key: string, count: number): Promise<string[]> {
+    this.assertSet(key);
+    return [...(this.sets.get(key) ?? [])].slice(0, count);
   }
 
   public async flushDb(): Promise<void> {
@@ -1213,5 +1220,126 @@ describe("RedisCacheDriver — tag index (native SET)", () => {
       await expect(driver.extend("k", -5)).rejects.toThrow(CacheConfigurationError);
       expect(pExpire).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe("RedisCacheDriver round trips", () => {
+  beforeAll(async () => {
+    await importDriver();
+  }, 60000);
+
+  beforeEach(async () => {
+    await fakeClient.flushAll();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  async function connected() {
+    const RedisCacheDriver = await importDriver();
+    const driver = new RedisCacheDriver();
+
+    driver.setOptions({ url: "redis://localhost" });
+    await driver.connect();
+
+    return driver;
+  }
+
+  it("does not deep-clone the freshly parsed value on get", async () => {
+    const driver = await connected();
+
+    await driver.set("user", { name: "Ada", roles: ["admin"] });
+
+    const clone = vi.spyOn(globalThis, "structuredClone");
+    const first = await driver.get("user");
+    const second = await driver.get("user");
+
+    expect(clone).not.toHaveBeenCalled();
+    expect(first).toEqual({ name: "Ada", roles: ["admin"] });
+    expect(first).not.toBe(second);
+  });
+
+  it("sends the sidecar write of a plain set together with the value", async () => {
+    const driver = await connected();
+    const order: string[] = [];
+    const originalSet = fakeClient.set.bind(fakeClient);
+    const originalDel = fakeClient.del.bind(fakeClient);
+
+    vi.spyOn(fakeClient, "set").mockImplementation(async (...args) => {
+      order.push("set:start");
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      order.push("set:end");
+      return originalSet(...args);
+    });
+    vi.spyOn(fakeClient, "del").mockImplementation(async (keys) => {
+      order.push("del");
+      return originalDel(keys);
+    });
+
+    await driver.set("k", "v", 60);
+
+    // The sidecar DEL is issued before the value SET has finished: one round trip.
+    expect(order.indexOf("del")).toBeLessThan(order.indexOf("set:end"));
+    await expect(driver.get("k")).resolves.toBe("v");
+  });
+
+  it("sends both deletes of remove() together", async () => {
+    const driver = await connected();
+    const pending: string[] = [];
+    let concurrent = 0;
+    const originalDel = fakeClient.del.bind(fakeClient);
+
+    await driver.set("k", "v");
+
+    vi.spyOn(fakeClient, "del").mockImplementation(async (keys) => {
+      pending.push(String(keys));
+      concurrent = Math.max(concurrent, pending.length);
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      pending.pop();
+      return originalDel(keys);
+    });
+
+    await driver.remove("k");
+
+    expect(concurrent).toBe(2);
+    await expect(driver.get("k")).resolves.toBeNull();
+  });
+
+  it("prunes a tag index with SRANDMEMBER and EXISTS, never reading the full set or values", async () => {
+    const driver = await connected();
+
+    await fakeClient.sAdd(
+      "cache.tags.pages",
+      Array.from({ length: 1000 }, (_, index) => `page.${index}`),
+    );
+
+    const sMembers = vi.spyOn(fakeClient, "sMembers");
+    const get = vi.spyOn(fakeClient, "get");
+    const sample = vi.spyOn(fakeClient, "sRandMemberCount");
+
+    await driver.tags(["pages"]).set("page.new", "<html>");
+
+    expect(sMembers).not.toHaveBeenCalled();
+    expect(get).not.toHaveBeenCalled();
+    expect(sample).toHaveBeenCalledWith("cache.tags.pages", 21);
+  });
+
+  it("invalidates a tag's entries with batched deletes", async () => {
+    const driver = await connected();
+    const tagged = driver.tags(["users"]);
+
+    for (let index = 0; index < 20; index++) {
+      await tagged.set(`user.${index}`, index);
+    }
+
+    const removed = vi.fn();
+    driver.on("removed", removed);
+
+    await tagged.invalidate();
+
+    expect(removed).toHaveBeenCalledTimes(20);
+    await expect(driver.get("user.3")).resolves.toBeNull();
+    expect(fakeClient.store.size).toBe(0);
   });
 });

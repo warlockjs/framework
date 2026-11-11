@@ -38,6 +38,7 @@ listUsersController.responseSchema = {
       },
     },
   },
+  403: { body: { error: { code: "string", message: "string" }, requestId: "string" } },
   422: { body: { error: { code: "string", message: "string" }, requestId: "string" } },
   500: { body: { error: { code: "string", message: "string" }, requestId: "string" } },
 };

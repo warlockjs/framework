@@ -257,7 +257,7 @@ if (outcome.type === "applied" && outcome.result) {
 }
 ```
 
-`resume` loads the `PendingInterrupt`, validates the decision, **deletes the record**, then (when an `agent` is supplied) re-executes the original turn with the decision **pre-seeded** — so the gated tool call this time resolves to the ruling instead of pausing again. The original prompt is recovered from `request.context.originalInput` unless you pass `input` to override.
+`resume` validates the decision, **claims the `PendingInterrupt`** (removes and returns it in one atomic step), then (when an `agent` is supplied) re-executes the original turn with the decision **pre-seeded** — so the gated tool call this time resolves to the ruling instead of pausing again. The original prompt is recovered from `request.context.originalInput` unless you pass `input` to override.
 
 > **Durable v1 model — re-run, not mid-flight suspend.** Resume re-executes the turn from the top with the decision seeded; it does **not** rehydrate an in-flight supervisor at the exact suspended step. Keep the gated tool deterministic up to the gate, or pass a fresh `input` that reflects what already happened.
 
@@ -286,13 +286,15 @@ type ResumeResult<TOutput = unknown> =
 - **apply-only** — omit `agent`. `resume` loads, validates, deletes, and returns `{ type: "applied", decision }` for a caller-owned re-drive (e.g. a custom transport). No turn is re-run.
 - **re-run** — pass `agent`. `resume` additionally re-executes the turn; the `AgentResult` rides `outcome.result`.
 
-**Idempotent.** A second resume of an already-resolved (deleted) or never-raised interrupt is a no-op — it returns `{ type: "already-resolved" }` without re-applying the decision or re-running the turn. The record is deleted _before_ the re-run, so even a re-run that itself raises a fresh interrupt cannot collide with the one being resolved. Webhook retries are safe.
+**Idempotent and exactly-once.** A second resume of an already-resolved (deleted) or never-raised interrupt is a no-op — it returns `{ type: "already-resolved" }` without re-applying the decision or re-running the turn. The claim is atomic in every built-in store, so when two resumes of one interrupt race (a double-clicked "Approve", two reviewers at once) exactly one applies the decision and the other returns `already-resolved`. The record is claimed _before_ the re-run, so even a re-run that itself raises a fresh interrupt cannot collide with the one being resolved. Webhook retries are safe.
+
+The pre-seeded decision is bound to that re-run: only the gated call made inside the resumed `agent.execute(...)` can take it. Another execution of the same agent with the same session and arguments running at the same moment reaches its own handler, never the reviewer's ruling.
 
 `resume` also validates the decision payload (a webhook can hand it anything): a `reject` without a string `reason`, an `edit` without `args`, or an unknown `type` throws a `TypeError` loudly rather than mis-driving the re-run.
 
 ## Interrupt stores — `ai.human.interrupt.{memory,pg,redis}()`
 
-All three implement the same `InterruptStore` contract (`save` / `load` / `delete` / optional `list` / `schema`), shaped like the orchestrator's `SnapshotStore` so a single `pg.Pool` or redis client can back both.
+All three implement the same `InterruptStore` contract (`save` / `load` / `delete` / `claim` / optional `list` / `schema`), shaped like the orchestrator's `SnapshotStore` so a single `pg.Pool` or redis client can back both.
 
 ```ts
 interface InterruptStore {
@@ -300,9 +302,14 @@ interface InterruptStore {
   load(interruptId: string): Promise<PendingInterrupt | undefined>;
   delete(interruptId: string): Promise<void>;
   list?(prefix?: string): Promise<string[]>;
+  // Remove and return a pending record in one atomic step; undefined when
+  // it is unknown, not pending, or already claimed by a concurrent caller.
+  claim?(interruptId: string): Promise<PendingInterrupt | undefined>;
   schema(): string; // DDL string for stores with a table; "" otherwise
 }
 ```
+
+`claim` is optional so existing custom stores keep working: without it, `resume` falls back to `load` + `delete` and logs a one-time warning, because two concurrent resumes can then both apply the decision. Add `claim` to a custom store — for SQL, `DELETE ... WHERE interrupt_id = $1 AND status = 'pending' RETURNING ...`; for a key-value store, a delete that reports whether it removed the key.
 
 ### Memory
 
@@ -337,7 +344,7 @@ await client.connect();
 const store = ai.human.interrupt.redis({ client });
 ```
 
-Pass `{ client }` (a connected redis client) **or** `{ url }` to let the store lazily `import("redis")`, build, and connect its own. `prefix` defaults to `warlock:ai-human:interrupt:`. `schema()` returns an empty string (Redis needs no migration); `list()` is backed by a self-maintained id index since the structural client surface exposes no `SCAN`.
+Pass `{ client }` (a connected redis client) **or** `{ url }` to let the store lazily `import("redis")`, build, and connect its own. `prefix` defaults to `warlock:ai-human:interrupt:`. `schema()` returns an empty string (Redis needs no migration); `list()` is backed by a self-maintained id index since the structural client surface exposes no `SCAN`: a Redis set when the client has the set commands (`sAdd`/`sRem`/`sMembers` or `sadd`/`srem`/`smembers`), so parallel interrupts never drop an id, otherwise a JSON array. An index written by an earlier release is copied into the set on first use. `claim()` reads the record and deletes it; only the caller whose `DEL` removed the key receives it.
 
 > **Optional peers.** `pg` and `redis` are **not** hard dependencies. A memory-only app never installs either, and importing `@warlock.js/ai` never forces them to resolve. The driver loads only the first time a pg/redis store actually does IO.
 

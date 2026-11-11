@@ -80,7 +80,7 @@ if (outcome.type === "applied" && outcome.result) {
 }
 ```
 
-`ai.human.resume(interruptId, decision, options)` loads the `PendingInterrupt`, validates the decision shape, deletes the record, and — when an `agent` is supplied — re-executes the original prompt with the decision **pre-seeded** so the gated tool call resolves to the ruling instead of pausing again. The prompt comes from `request.context.originalInput`; pass `options.input` to override (e.g. to append the reviewer's note), and `options.executeOptions` to forward history / output schema / signal to the re-run.
+`ai.human.resume(interruptId, decision, options)` validates the decision shape, claims the `PendingInterrupt` (removes and returns it atomically), and — when an `agent` is supplied — re-executes the original prompt with the decision **pre-seeded** so the gated tool call resolves to the ruling instead of pausing again. The prompt comes from `request.context.originalInput`; pass `options.input` to override (e.g. to append the reviewer's note), and `options.executeOptions` to forward history / output schema / signal to the re-run.
 
 ### The ruling is bound to one exact call
 
@@ -103,11 +103,11 @@ type ResumeResult =
   | { type: "already-resolved"; interruptId: string };
 ```
 
-A second resume of an already-resolved (deleted) or never-raised interrupt returns `{ type: "already-resolved" }` — it never double-applies the decision or re-runs the turn. The record is deleted **before** the re-run, so even a re-run that itself raises a fresh interrupt can't collide with the one being resolved. A malformed decision (`reject` with no `reason`, `edit` with no `args`, an unknown `type`) throws a `TypeError` loudly rather than silently mis-driving the re-run.
+A second resume of an already-resolved (deleted) or never-raised interrupt returns `{ type: "already-resolved" }` — it never double-applies the decision or re-runs the turn. `resume` takes the record with the store's atomic `claim(interruptId)` (memory: synchronous take; pg: `DELETE ... AND status = 'pending' RETURNING`; redis: only the caller whose `DEL` removed the key wins), so two racing resumes of one interrupt apply it exactly once. A custom `InterruptStore` without `claim` falls back to `load` + `delete` with a one-time warning — add `claim` to make it race-safe. The seeded decision is scoped to the re-run's own `agent.execute(...)`: a concurrent run of the same agent, session and args never takes it. The record is claimed **before** the re-run, so even a re-run that itself raises a fresh interrupt can't collide with the one being resolved. A malformed decision (`reject` with no `reason`, `edit` with no `args`, an unknown `type`) throws a `TypeError` loudly rather than silently mis-driving the re-run.
 
 ## The `InterruptStore`
 
-`ai.human.interrupt.{memory,pg,redis}()` build the store. The contract mirrors `@warlock.js/ai`'s `CheckpointStore` / `SnapshotStore` — `save` / `load` / `delete` / optional `list(prefix?)` / `schema()` — so a consumer already running an orchestrator can reuse the **same** pool for the interrupt table.
+`ai.human.interrupt.{memory,pg,redis}()` build the store. The contract mirrors `@warlock.js/ai`'s `CheckpointStore` / `SnapshotStore` — `save` / `load` / `delete` / optional `claim(interruptId)` / optional `list(prefix?)` / `schema()` (all three built-in stores implement `claim`) — so a consumer already running an orchestrator can reuse the **same** pool for the interrupt table.
 
 | Factory                             | Backing                                                 | Deps                                     |
 | ----------------------------------- | ------------------------------------------------------- | ---------------------------------------- |

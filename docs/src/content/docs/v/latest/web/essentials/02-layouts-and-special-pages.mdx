@@ -313,6 +313,15 @@ In production the panel and `debug` are absent and the page stays generic:
 the message and stack never reach the response, and the `errorCode` joins it to
 the log record.
 
+"Production" here means anything that is not plainly development: a built
+bundle started with `warlock start` never shows error details, whatever
+`NODE_ENV` says, and outside it details are shown only when `NODE_ENV` is
+`development` (or unset) or `test`. A staging deploy started with
+`NODE_ENV=staging` gets the generic page too. Use `warlock dev` when you need
+the details in the browser; the server log always has them. Validation
+messages follow the same rule: whenever details are withheld, submitted values
+are redacted from them.
+
 ## Reporting errors to your own service
 
 Every server and client failure already logs unconditionally — that floor can

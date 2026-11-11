@@ -126,6 +126,30 @@ export interface ResourceConstructor<Out = GenericObject> {
   new (originalData: GenericObject | Resource | Model): ResourceContract<Out>;
 }
 
+/**
+ * `Object.entries()` of each normalized schema, built once per schema object
+ * instead of once per resource instance.
+ */
+const schemaEntries = new WeakMap<object, [string, ResourceFieldConfig][]>();
+
+function schemaEntriesOf(
+  parsedSchema: Record<string, ResourceFieldConfig>,
+): [string, ResourceFieldConfig][] {
+  let entries = schemaEntries.get(parsedSchema);
+
+  if (entries === undefined) {
+    entries = Object.entries(parsedSchema);
+    schemaEntries.set(parsedSchema, entries);
+  }
+
+  return entries;
+}
+
+/** Read one field from a model (through its accessors) or a plain object. */
+function readSourceField(source: GenericObject | Resource | Model, field: string) {
+  return source instanceof Model ? source.get(field) : get(source, field);
+}
+
 export class Resource implements ResourceContract {
   /**
    * Resource data
@@ -241,7 +265,7 @@ export class Resource implements ResourceContract {
     // constructor's normalized input (a wrapped resource's serialized data).
     const source = this.originalData instanceof Model ? this.originalData : this.resource;
 
-    for (const [outputKey, outputSettings] of Object.entries(parsedSchema)) {
+    for (const [outputKey, outputSettings] of schemaEntriesOf(parsedSchema)) {
       const inputKey =
         outputSettings instanceof ResourceFieldBuilder ? outputSettings.getInputKey() : undefined;
       const inputValue = this.resolveSourceValue(source, outputKey, inputKey);
@@ -457,11 +481,11 @@ export class Resource implements ResourceContract {
     inputKey?: string,
   ) {
     const key = inputKey ?? outputKey;
-    const read = (field: string) =>
-      source instanceof Model ? source.get(field) : get(source, field);
-    const value = read(key);
+    const value = readSourceField(source, key);
 
-    return outputKey === "id" && key === "id" && value === undefined ? read("_id") : value;
+    return outputKey === "id" && key === "id" && value === undefined
+      ? readSourceField(source, "_id")
+      : value;
   }
 
   /**

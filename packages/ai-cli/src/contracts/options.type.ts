@@ -52,11 +52,17 @@ export type CliAgentOptions = CliRunOptions & {
   /**
    * Which of the current process's environment variables the CLI inherits.
    * `true` (default) inherits everything except the adapter's own home
-   * variables; `false` passes only a minimal system set (PATH, HOME, TEMP,
-   * locale, proxy and Windows system variables); a list passes the minimal
-   * set plus those names.
+   * variables; `"curated"` passes the minimal system set plus the adapter's
+   * own API key variables (`apiKeyEnv`); `false` passes only the minimal
+   * system set (PATH, HOME, TEMP, locale, proxy and Windows system
+   * variables); a list passes the minimal set plus those names.
+   *
+   * With the default, the CLI sees every server secret (database URLs,
+   * signing keys, other providers' keys). Prefer `"curated"` and add what
+   * the CLI needs through `env`. In production, leaving this unset logs a
+   * one-time warning; set `true` explicitly to keep it and silence the warning.
    */
-  inheritEnv?: boolean | string[];
+  inheritEnv?: boolean | "curated" | string[];
   /**
    * Run the capability probe (`--help`/`--version`) before the first run.
    * Default `true`. Turning it off skips the flag check — a CLI version

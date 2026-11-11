@@ -77,11 +77,13 @@ export class NullCacheDriver
    * {@inheritdoc}
    */
   public async removeNamespace(namespace: string) {
-    const loggableNamespace = maskEmailsInText(namespace);
+    if (this.shouldLog) {
+      const loggableNamespace = maskEmailsInText(namespace);
 
-    log.info("cache", "clearing namespace", loggableNamespace);
+      log.info("cache", "clearing namespace", loggableNamespace);
 
-    log.success("cache", "namespace cleared", loggableNamespace);
+      log.success("cache", "namespace cleared", loggableNamespace);
+    }
 
     return this;
   }
@@ -101,9 +103,11 @@ export class NullCacheDriver
     _value: any,
     _ttlOrOptions?: CacheTtl | CacheSetOptions,
   ): Promise<any> {
-    log.info("cache", "setting key", this.loggableKey(key));
+    if (this.shouldLog) {
+      log.info("cache", "setting key", this.loggableKey(key));
 
-    log.success("cache", "key set", this.loggableKey(key));
+      log.success("cache", "key set", this.loggableKey(key));
+    }
 
     return this;
   }
@@ -112,9 +116,11 @@ export class NullCacheDriver
    * {@inheritdoc}
    */
   public async get(key: CacheKey) {
-    log.info("cache", "fetching", this.loggableKey(key));
+    if (this.shouldLog) {
+      log.info("cache", "fetching", this.loggableKey(key));
 
-    log.success("cache", "fetched", this.loggableKey(key));
+      log.success("cache", "fetched", this.loggableKey(key));
+    }
 
     return null;
   }
@@ -132,18 +138,22 @@ export class NullCacheDriver
    * {@inheritdoc}
    */
   public async remove(key: CacheKey) {
-    log.info("cache", "removing", this.loggableKey(key));
+    if (this.shouldLog) {
+      log.info("cache", "removing", this.loggableKey(key));
 
-    log.success("cache", "removed", this.loggableKey(key));
+      log.success("cache", "removed", this.loggableKey(key));
+    }
   }
 
   /**
    * {@inheritdoc}
    */
   public async flush() {
-    log.info("cache", "flushing", "all");
+    if (this.shouldLog) {
+      log.info("cache", "flushing", "all");
 
-    log.success("cache", "flushed", "all");
+      log.success("cache", "flushed", "all");
+    }
   }
 
   /**
@@ -160,6 +170,8 @@ export class NullCacheDriver
    * {@inheritdoc}
    */
   public async connect() {
-    log.success("cache", "connected", "Connected to null cache driver");
+    if (this.shouldLog) {
+      log.success("cache", "connected", "Connected to null cache driver");
+    }
   }
 }

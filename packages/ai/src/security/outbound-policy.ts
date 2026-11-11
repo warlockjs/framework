@@ -14,8 +14,46 @@ const DEFAULT_MAX_REDIRECTS = 5;
 /** 3xx statuses whose `Location` a follow re-issues. */
 const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
 
-/** Credential headers that must not survive a cross-origin redirect. */
-const CROSS_ORIGIN_STRIP_HEADERS = ["authorization", "cookie", "proxy-authorization"];
+/**
+ * Request headers that carry no credential and still travel when a redirect
+ * moves to another origin. Every other caller-supplied header (an
+ * `authorization`, a cookie, or a custom secret such as `x-api-key`) is
+ * dropped on that hop unless the policy lists it in `crossOriginHeaders`.
+ */
+const CROSS_ORIGIN_SAFE_HEADERS: ReadonlySet<string> = new Set([
+  "accept",
+  "accept-encoding",
+  "accept-language",
+  "cache-control",
+  "content-language",
+  "content-type",
+  "pragma",
+  "user-agent",
+]);
+
+/**
+ * Key under which the runtime's `fetch` keeps its process-wide dispatcher.
+ * The pinned dispatcher is built from the same class, so it speaks the
+ * protocol the global `fetch` expects without a separate HTTP client.
+ */
+const GLOBAL_DISPATCHER_KEY = Symbol.for("undici.globalDispatcher.1");
+
+/**
+ * The runtime's `fetch` as it was when this module loaded — used only to
+ * make the runtime create its default dispatcher, so a `fetch` replaced
+ * later (a test stub, an instrumentation wrapper) never sees that call.
+ */
+const runtimeFetch: typeof fetch | undefined = globalThis.fetch;
+
+/**
+ * Deadline state of a response returned by {@link guardedFetch}: the
+ * signal that fires at `timeoutMs` and the hook that clears the timer.
+ * {@link readTextCapped} reads it so the body read stays inside the same
+ * deadline as the request.
+ */
+type ResponseDeadline = { signal: AbortSignal; release: () => void };
+
+const responseDeadlines = new WeakMap<Response, ResponseDeadline>();
 
 /**
  * Fill an {@link OutboundPolicy} with strict defaults: https-only,
@@ -30,6 +68,7 @@ export function resolveOutboundPolicy(policy: OutboundPolicy = {}): ResolvedOutb
     maxBytes: policy.maxBytes ?? DEFAULT_MAX_BYTES,
     timeoutMs: policy.timeoutMs ?? DEFAULT_TIMEOUT_MS,
     maxRedirects: policy.maxRedirects ?? DEFAULT_MAX_REDIRECTS,
+    crossOriginHeaders: policy.crossOriginHeaders ?? [],
     signal: policy.signal,
     fetch: policy.fetch ?? globalThis.fetch,
   };
@@ -130,6 +169,165 @@ async function assertHostNotPrivate(host: string, rawUrl: string): Promise<void>
   }
 }
 
+/** Options the socket layer passes to a custom `lookup`. */
+type SocketLookupOptions = { family?: number | string; hints?: number; all?: boolean };
+
+/** Callback shape of a socket `lookup` (single-address and `all` forms). */
+type SocketLookupCallback = (
+  error: Error | null,
+  address?: string | Array<{ address: string; family: number }>,
+  family?: number,
+) => void;
+
+/**
+ * The connection-time resolver of the pinned dispatcher. It resolves the
+ * host once, refuses the connection when ANY returned address is private /
+ * reserved, and hands exactly the checked addresses to the socket — so the
+ * address that passed the check is the address connected to. A second DNS
+ * answer (a rebinding host flipping to `127.0.0.1` / `169.254.169.254`
+ * after the pre-check) is caught here, at connect time, on every hop.
+ */
+function pinnedLookup(
+  hostname: string,
+  options: SocketLookupOptions,
+  callback: SocketLookupCallback,
+): void {
+  const family = options.family === "IPv4" ? 4 : options.family === "IPv6" ? 6 : options.family;
+
+  const resolving = lookup(hostname, {
+    all: true,
+    ...(typeof family === "number" ? { family } : {}),
+    ...(options.hints !== undefined ? { hints: options.hints } : {}),
+  }) as Promise<Array<{ address: string; family: number }>>;
+
+  resolving.then(
+    (addresses) => {
+      for (const { address } of addresses) {
+        if (isPrivateOrReservedIp(address)) {
+          callback(
+            new OutboundPolicyError(
+              `outbound request blocked — host "${hostname}" resolved to a private/reserved address (${address}) when connecting`,
+              { context: { host: hostname, address } },
+            ),
+          );
+          return;
+        }
+      }
+
+      const first = addresses[0];
+      if (!first) {
+        callback(
+          new OutboundPolicyError(
+            `outbound request blocked — could not resolve host "${hostname}" to verify it is public`,
+            { context: { host: hostname } },
+          ),
+        );
+        return;
+      }
+
+      if (options.all) {
+        callback(null, addresses);
+      } else {
+        callback(null, first.address, first.family);
+      }
+    },
+    (error: unknown) => callback(error instanceof Error ? error : new Error(String(error))),
+  );
+}
+
+/** Dispatcher class the pinned dispatcher was built from, and the instance. */
+let pinned: { from: unknown; dispatcher: object } | undefined;
+
+/**
+ * The dispatcher that pins every connection to an address that passed the
+ * private-IP check ({@link pinnedLookup}), or `undefined` when pinning is
+ * not available: the runtime exposes no default dispatcher, or the app
+ * installed its own non-`Agent` global dispatcher (a proxy or a mock), in
+ * which case the request keeps going through it and the DNS pre-check
+ * remains the guard. TLS still verifies the certificate against the URL's
+ * host name: only the address resolution is replaced.
+ */
+async function pinnedDispatcher(): Promise<object | undefined> {
+  const holder = globalThis as unknown as Record<symbol, unknown>;
+
+  if (holder[GLOBAL_DISPATCHER_KEY] === undefined) {
+    // The runtime creates its default dispatcher on the first `fetch`.
+    try {
+      await (await runtimeFetch?.("data:,"))?.arrayBuffer();
+    } catch {
+      return undefined;
+    }
+  }
+
+  const current = holder[GLOBAL_DISPATCHER_KEY];
+  const DispatcherClass =
+    current && typeof current === "object"
+      ? (current as { constructor?: unknown }).constructor
+      : undefined;
+
+  if (typeof DispatcherClass !== "function" || DispatcherClass.name !== "Agent") {
+    return undefined;
+  }
+
+  if (pinned?.from !== DispatcherClass) {
+    const Agent = DispatcherClass as new (options: {
+      connect: { lookup: typeof pinnedLookup };
+    }) => object;
+
+    pinned = {
+      from: DispatcherClass,
+      dispatcher: new Agent({ connect: { lookup: pinnedLookup } }),
+    };
+  }
+
+  return pinned.dispatcher;
+}
+
+/**
+ * The first {@link OutboundPolicyError} in an error's `cause` chain. The
+ * platform `fetch` wraps a refused connection as `TypeError("fetch
+ * failed")`; unwrapping it keeps the policy error the caller catches.
+ */
+function findPolicyError(error: unknown): OutboundPolicyError | undefined {
+  let current: unknown = error;
+
+  for (let depth = 0; depth < 5 && current; depth++) {
+    if (current instanceof OutboundPolicyError) {
+      return current;
+    }
+
+    current = (current as { cause?: unknown }).cause;
+  }
+
+  return undefined;
+}
+
+/**
+ * Reject when `signal` aborts before `promise` settles, with the signal's
+ * reason. The listener is removed once either side settles.
+ */
+function raceAbort<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
+  if (signal.aborted) {
+    return Promise.reject(signal.reason);
+  }
+
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => reject(signal.reason);
+    signal.addEventListener("abort", onAbort, { once: true });
+
+    promise.then(
+      (value) => {
+        signal.removeEventListener("abort", onAbort);
+        resolve(value);
+      },
+      (error: unknown) => {
+        signal.removeEventListener("abort", onAbort);
+        reject(error);
+      },
+    );
+  });
+}
+
 /** Merge the internal timeout signal with an optional caller signal. */
 function mergeSignals(timeout: AbortSignal, external?: AbortSignal): AbortSignal {
   if (!external) return timeout;
@@ -166,10 +364,22 @@ function headersToRecord(headersInit?: RequestInit["headers"]): Record<string, s
  * with `redirect: "manual"` and its `Location` is re-run through
  * {@link assertUrlAllowed} before being followed (capped at
  * `maxRedirects`), so a 3xx from an allowed host cannot smuggle the
- * request to a private / metadata / off-allowlist target. Credential
- * headers are stripped when a hop crosses an origin boundary. Pass
- * `init.redirect: "manual"` to receive the raw 3xx, or `"error"` to
- * reject on any redirect.
+ * request to a private / metadata / off-allowlist target. When a hop
+ * crosses an origin boundary, only non-credential headers (`accept`,
+ * `accept-language`, `content-type`, `user-agent`, …) and the names in
+ * `policy.crossOriginHeaders` are sent on. Pass `init.redirect: "manual"`
+ * to receive the raw 3xx, or `"error"` to reject on any redirect.
+ *
+ * **Address pinning.** With `denyPrivateIPsAfterDNS` on and the global
+ * `fetch`, every connection resolves its host through a checked lookup and
+ * connects only to the addresses that passed — a DNS answer that changes
+ * between the pre-check and the connection (DNS rebinding) is refused. An
+ * injected `policy.fetch` is used as-is (the pre-check still applies).
+ *
+ * **Deadline.** `timeoutMs` covers the whole exchange: the request, every
+ * redirect hop, and the body read. The returned response's body stream is
+ * aborted when the deadline passes, and {@link readTextCapped} rejects
+ * with an {@link OutboundPolicyError} at that point.
  */
 export async function guardedFetch(
   rawUrl: string,
@@ -187,31 +397,52 @@ export async function guardedFetch(
       }),
     );
   }, policy.timeoutMs);
+  // The deadline outlives this call (it bounds the body read); it must
+  // never be what keeps the process alive.
+  (timer as unknown as { unref?: () => void }).unref?.();
 
+  const release = (): void => clearTimeout(timer);
   const signal = mergeSignals(timeoutController.signal, policy.signal);
   const redirectMode = init?.redirect ?? "follow";
   const headers = headersToRecord(init?.headers);
+  const keepAcrossOrigins = new Set(policy.crossOriginHeaders.map((name) => name.toLowerCase()));
   let method = init?.method ?? "GET";
   let body = init?.body ?? undefined;
 
+  const dispatcher =
+    policy.denyPrivateIPsAfterDNS && policy.fetch === globalThis.fetch
+      ? await pinnedDispatcher()
+      : undefined;
+
+  const settle = (response: Response): Response => {
+    responseDeadlines.set(response, { signal, release });
+    return response;
+  };
+
   try {
     for (let hop = 0; ; hop++) {
-      const response = await policy.fetch(url, {
-        ...init,
-        method,
-        headers: { ...headers },
-        body,
-        redirect: "manual",
-        signal,
-      });
+      let response: Response;
+      try {
+        response = await policy.fetch(url, {
+          ...init,
+          method,
+          headers: { ...headers },
+          body,
+          redirect: "manual",
+          signal,
+          ...(dispatcher ? { dispatcher } : {}),
+        } as RequestInit);
+      } catch (error) {
+        throw findPolicyError(error) ?? error;
+      }
 
       const location = response.headers.get("location");
       if (!REDIRECT_STATUSES.has(response.status) || location === null) {
-        return response;
+        return settle(response);
       }
 
       if (redirectMode === "manual") {
-        return response;
+        return settle(response);
       }
 
       if (redirectMode === "error") {
@@ -248,8 +479,10 @@ export async function guardedFetch(
       }
 
       if (next.origin !== url.origin) {
-        for (const name of CROSS_ORIGIN_STRIP_HEADERS) {
-          delete headers[name];
+        for (const name of Object.keys(headers)) {
+          if (!CROSS_ORIGIN_SAFE_HEADERS.has(name) && !keepAcrossOrigins.has(name)) {
+            delete headers[name];
+          }
         }
       }
 
@@ -267,8 +500,9 @@ export async function guardedFetch(
 
       url = next;
     }
-  } finally {
-    clearTimeout(timer);
+  } catch (error) {
+    release();
+    throw error;
   }
 }
 
@@ -277,8 +511,31 @@ export async function guardedFetch(
  * `content-length` over the cap fails fast; otherwise the stream is read
  * chunk-by-chunk and aborted the moment the running total exceeds
  * `maxBytes`. Throws {@link OutboundPolicyError} on overflow.
+ *
+ * A response from {@link guardedFetch} keeps that request's deadline: a
+ * body that is still arriving when `timeoutMs` passes (a server dripping
+ * bytes) rejects with an {@link OutboundPolicyError} instead of holding the
+ * caller open.
  */
 export async function readTextCapped(response: Response, maxBytes: number): Promise<string> {
+  const deadline = responseDeadlines.get(response);
+
+  try {
+    return await readCapped(response, maxBytes, deadline?.signal);
+  } finally {
+    if (deadline) {
+      deadline.release();
+      responseDeadlines.delete(response);
+    }
+  }
+}
+
+/** {@link readTextCapped}'s body, raced against the request's deadline. */
+async function readCapped(
+  response: Response,
+  maxBytes: number,
+  signal: AbortSignal | undefined,
+): Promise<string> {
   const declared = Number(response.headers.get("content-length"));
   if (Number.isFinite(declared) && declared > maxBytes) {
     throw new OutboundPolicyError(
@@ -287,8 +544,11 @@ export async function readTextCapped(response: Response, maxBytes: number): Prom
     );
   }
 
+  const withDeadline = <T>(promise: Promise<T>): Promise<T> =>
+    signal ? raceAbort(promise, signal) : promise;
+
   if (!response.body) {
-    const text = await response.text();
+    const text = await withDeadline(response.text());
     if (Buffer.byteLength(text) > maxBytes) {
       throw new OutboundPolicyError(`outbound response body exceeded the ${maxBytes}-byte cap`, {
         context: { maxBytes },
@@ -302,7 +562,15 @@ export async function readTextCapped(response: Response, maxBytes: number): Prom
   let total = 0;
 
   for (;;) {
-    const { done, value } = await reader.read();
+    let chunk: Awaited<ReturnType<typeof reader.read>>;
+    try {
+      chunk = await withDeadline(reader.read());
+    } catch (error) {
+      void reader.cancel().catch(() => undefined);
+      throw error;
+    }
+
+    const { done, value } = chunk;
     if (done) break;
     if (!value) continue;
 
@@ -331,6 +599,13 @@ export async function fetchTextWithPolicy(
 ): Promise<{ ok: boolean; status: number; statusText: string; text: string }> {
   const policy = resolveOutboundPolicy(policyInput);
   const response = await guardedFetch(rawUrl, policy, init);
+
+  if (!response.ok) {
+    // The body is never read: stop the deadline and free the connection.
+    responseDeadlines.get(response)?.release();
+    responseDeadlines.delete(response);
+    await response.body?.cancel().catch(() => undefined);
+  }
 
   return {
     ok: response.ok,

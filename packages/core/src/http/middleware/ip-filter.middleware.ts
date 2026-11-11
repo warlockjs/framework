@@ -1,7 +1,7 @@
 import type { Middleware } from "../../router";
 import { HttpErrorCodes } from "../error-codes";
 import { t } from "./inject-request-context";
-import { anyMatch } from "./utils/cidr-match";
+import { compileIpMatcher } from "./utils/ip-matcher";
 
 /**
  * Options for the IP filter middleware. Use at least one of `allow` / `deny`.
@@ -10,13 +10,13 @@ import { anyMatch } from "./utils/cidr-match";
  */
 export type IpFilterOptions = {
   /**
-   * Allowlist of exact IPv4 / IPv6 strings or IPv4 CIDR blocks. When present,
-   * only IPs matching the list pass through.
+   * Allowlist of exact IPv4 / IPv6 addresses or IPv4 / IPv6 CIDR blocks.
+   * When present, only IPs matching the list pass through.
    */
   allow?: string[];
   /**
-   * Denylist of exact IPv4 / IPv6 strings or IPv4 CIDR blocks. Matched IPs
-   * are rejected regardless of the allowlist.
+   * Denylist of exact IPv4 / IPv6 addresses or IPv4 / IPv6 CIDR blocks.
+   * Matched IPs are rejected regardless of the allowlist.
    */
   deny?: string[];
   /**
@@ -28,6 +28,12 @@ export type IpFilterOptions = {
 /**
  * Allow / deny requests by client IP. Fail-closed: if the IP can't be read,
  * the request is rejected with 403.
+ *
+ * Patterns are parsed once, when the middleware is created: an entry that is
+ * not an IP address or CIDR block throws then (at boot), instead of silently
+ * matching nothing. IPv6 blocks (`2001:db8::/32`) match by prefix, IPv6
+ * addresses compare by value, and IPv4-mapped IPv6 clients
+ * (`::ffff:10.0.0.1`) match IPv4 patterns.
  *
  * Reads the client IP via `request.detectIp()`, which honors the forwarding
  * headers only when `http.trustProxy` is set — otherwise the socket peer
@@ -54,6 +60,9 @@ export type IpFilterOptions = {
  * });
  */
 export function ipFilterMiddleware(options: IpFilterOptions): Middleware {
+  const deny = options.deny ? compileIpMatcher(options.deny, "ipFilter deny") : undefined;
+  const allow = options.allow ? compileIpMatcher(options.allow, "ipFilter allow") : undefined;
+
   return ({ request, response }) => {
     const ip = request.detectIp();
 
@@ -64,14 +73,14 @@ export function ipFilterMiddleware(options: IpFilterOptions): Middleware {
       });
     }
 
-    if (options.deny && anyMatch(ip, options.deny)) {
+    if (deny && deny(ip)) {
       return response.forbidden({
         error: options.errorMessage || t("http.ipForbidden"),
         errorCode: HttpErrorCodes.IpForbidden,
       });
     }
 
-    if (options.allow && !anyMatch(ip, options.allow)) {
+    if (allow && !allow(ip)) {
       return response.forbidden({
         error: options.errorMessage || t("http.ipForbidden"),
         errorCode: HttpErrorCodes.IpForbidden,

@@ -301,7 +301,53 @@ describe("siteAllowedHosts", () => {
     ).toEqual({ allowedHosts: ["landing.test", "client.test"] });
   });
 
-  it("allows any host when a site is dynamic", () => {
-    expect(siteAllowedHosts({ tenants: { dynamic: true } })).toEqual({ allowedHosts: true });
+  it("keeps the host check on when a site is dynamic", () => {
+    expect(siteAllowedHosts({ tenants: { dynamic: true } })).toEqual({});
+    expect(
+      siteAllowedHosts({ landing: { hosts: ["landing.test"] }, tenants: { dynamic: true } }),
+    ).toEqual({ allowedHosts: ["landing.test"] });
+  });
+
+  it("adds web.devAllowedHosts for dynamic sites, never turning the check off", () => {
+    expect(
+      siteAllowedHosts({ landing: { hosts: ["landing.test"] }, tenants: { dynamic: true } }, [
+        ".tenant.test",
+        "landing.test",
+      ]),
+    ).toEqual({ allowedHosts: ["landing.test", ".tenant.test"] });
+  });
+
+  it("adds web.devAllowedHosts for a single-site app", () => {
+    expect(siteAllowedHosts(undefined, ["app.test"])).toEqual({ allowedHosts: ["app.test"] });
+  });
+
+  it("turns the host check off only for an explicit devAllowedHosts: true", () => {
+    expect(siteAllowedHosts({ tenants: { dynamic: true } }, true)).toEqual({
+      allowedHosts: true,
+    });
+  });
+
+  it("passes the allowed hosts to the dev server config", async () => {
+    const appRoot = fs.mkdtempSync(path.join(os.tmpdir(), "warlock-dev-hosts-"));
+    const hmrServer = createNodeServer();
+
+    try {
+      const config = await createWebConnectorViteConfig({
+        appRoot,
+        appSrcRoot: path.join(appRoot, "src"),
+        webRoot: WEB_ROOT,
+        workspaceRoot: WORKSPACE_ROOT,
+        hmrServer,
+        sites: { tenants: { dynamic: true } },
+        devAllowedHosts: [".tenant.test"],
+        handlePageHotUpdate: async () => false,
+        leadingPlugins: [],
+      });
+
+      expect(config.server?.allowedHosts).toEqual([".tenant.test"]);
+    } finally {
+      hmrServer.close();
+      fs.rmSync(appRoot, { recursive: true, force: true });
+    }
   });
 });

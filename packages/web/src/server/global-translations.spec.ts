@@ -250,6 +250,19 @@ describe("production usage lookup", () => {
     expect(lookup.usageFor("orders.list")).toBeUndefined();
   });
 
+  it("turns a source file's record into a usage once, and answers later lookups with the same object", () => {
+    registerRouteSourceFile("orders.list", "src/web/orders/index.page.tsx");
+    const lookup = productionGlobalTranslationDeliveryInput({
+      sharedGroups: SHARED,
+      prune: true,
+      usage: {
+        "src/web/orders/index.page.tsx": { keys: ["orders.title"], prefixes: [], dynamic: false },
+      },
+    });
+
+    expect(lookup.usageFor("orders.list")).toBe(lookup.usageFor("orders.list"));
+  });
+
   it("takes the shared groups and pruning switch from the build, with the defaults when absent", () => {
     const lookup = productionGlobalTranslationDeliveryInput(undefined);
 

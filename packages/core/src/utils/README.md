@@ -15,7 +15,7 @@ Shared utility functions used across the entire framework. Provides path resolut
 | `get-localized.ts`      | `getLocalized()` — extracts localized value for current locale                                                                                   |
 | `to-json.ts`            | `toJSON()` — safe JSON serialization                                                                                                             |
 | `promise-all-object.ts` | `promiseAllObject()` — `Promise.all` for an object of promises                                                                                   |
-| `download-file.ts`      | `downloadFile()` — downloads a file from a URL                                                                                                   |
+| `download-file.ts`      | `downloadFileFromUrl()` — SSRF-guarded download into a directory; a remote extension outside `allowedExtensions` is saved as `.bin`              |
 | `cleanup-temp-files.ts` | Cleans up temporary files                                                                                                                        |
 | `app-log.ts`            | Application-level log helper                                                                                                                     |
 | `database-log.ts`       | Database operation log helper                                                                                                                    |

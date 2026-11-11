@@ -1,7 +1,7 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Request } from "../request";
 import type { Response } from "../response";
-import { rateLimitMiddleware } from "./rate-limit.middleware";
+import { memoryRateLimitBucketCount, rateLimitMiddleware } from "./rate-limit.middleware";
 
 let seq = 0;
 
@@ -113,5 +113,55 @@ describe("rateLimitMiddleware IP keys", () => {
       run(mw, ipv4Path, undefined, "::ffff:1.2.3.4").response.tooManyRequests,
     ).not.toHaveBeenCalled();
     expect(run(mw, ipv4Path, undefined, "1.2.3.4").response.tooManyRequests).toHaveBeenCalled();
+  });
+});
+
+describe("rateLimitMiddleware in-memory buckets", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("keeps a bucket's own window across a generation change", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(1_000_000);
+
+    const path = `/g${seq++}`;
+    const mw = rateLimitMiddleware({ max: 2, duration: 1_000 });
+
+    expect(run(mw, path, undefined, "1.1.1.1").response.tooManyRequests).not.toHaveBeenCalled();
+
+    vi.setSystemTime(1_000_900);
+    run(mw, path, undefined, "2.2.2.2");
+
+    // the generation turns over here; 2.2.2.2's bucket (900 ms old) still counts
+    vi.setSystemTime(1_001_000);
+    run(mw, path, undefined, "2.2.2.2");
+
+    vi.setSystemTime(1_001_500);
+    expect(run(mw, path, undefined, "2.2.2.2").response.tooManyRequests).toHaveBeenCalled();
+
+    // 1.1.1.1's window ended at 1_001_000: it starts over
+    expect(run(mw, path, undefined, "1.1.1.1").response.tooManyRequests).not.toHaveBeenCalled();
+  });
+
+  it("drops expired buckets a generation at a time instead of growing", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(2_000_000);
+
+    const path = `/g${seq++}`;
+    const mw = rateLimitMiddleware({ max: 5, duration: 1_000 });
+    const before = memoryRateLimitBucketCount();
+
+    for (let i = 0; i < 2_000; i++) run(mw, path, undefined, `10.0.${i >> 8}.${i & 255}`);
+
+    expect(memoryRateLimitBucketCount() - before).toBe(2_000);
+
+    vi.setSystemTime(2_001_000);
+    run(mw, path, undefined, "9.9.9.9");
+
+    vi.setSystemTime(2_002_000);
+    run(mw, path, undefined, "9.9.9.9");
+
+    expect(memoryRateLimitBucketCount() - before).toBeLessThanOrEqual(2);
   });
 });

@@ -4,7 +4,7 @@ import { OTP } from "../otp.model";
 export default Migration.create(
   OTP,
   {
-    code: string(20).index(),
+    codeHash: string(64),
     type: string(50),
     target: string(255),
     channel: string(50),

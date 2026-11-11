@@ -1,9 +1,7 @@
-import { stringify } from "devalue";
-
 import type { Request, Response } from "@warlock.js/core";
 
 import { DATA_RESPONSE_CONTENT_TYPE } from "../../routing/data-request";
-import { buildHydrationPayload } from "../build-hydration-payload";
+import { serializeHydrationPayload } from "../build-hydration-payload";
 import type { RenderedPage } from "../render-page";
 import { writeDeferredNdjsonResponse } from "../write-deferred-ndjson-response";
 import { persistRequestedLocale } from "./persist-requested-locale";
@@ -83,7 +81,7 @@ export async function sendPageDataResponse(options: {
   // this response's content type.
   response.setContentType(DATA_RESPONSE_CONTENT_TYPE);
   await response.send(
-    precomputedJsonBody ?? stringify(buildHydrationPayload(rendered.bundle, request.locale)),
+    precomputedJsonBody ?? serializeHydrationPayload(rendered.bundle, request.locale),
     status,
   );
 }

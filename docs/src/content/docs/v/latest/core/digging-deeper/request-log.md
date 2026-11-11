@@ -110,7 +110,7 @@ One JSON object per request. Fields that are off, empty or unknown are left out.
 ```
 
 - `logs` are the logger entries emitted while the request ran, matched by request id (at most 200 per request).
-- `queries` needs `@warlock.js/cascade`: queries are counted per request, `slowest` is the slowest, and a query shape that ran five times or more is listed under `nPlusOne`. Shapes carry no bound values.
+- `queries` needs `@warlock.js/cascade`: queries are counted per request, `slowest` is the slowest, and a query shape that ran five times or more is listed under `nPlusOne`. Shapes carry no bound values. A MongoDB data source emits query events in production only with `queryEvents: true`, which costs on every query; when this process serves HTTP with the request log on and `include.queries` capturing, the framework turns it on for you unless `src/config/database.ts` sets `queryEvents` itself. An explicit `queryEvents: false` wins: production records then carry no queries, and a one-time warning names the option.
 - `phases` come from [request tracing](./request-tracing.md) spans (route match, middleware, validation, handler and a page's phases). Turning the request log on registers an internal tracing hook for them; without spans a request has one `handler` phase.
 - `error` is attached to `5xx` responses and to requests that threw. For a failing page it is the same record `@warlock.js/web` logs (message, stack, phase, page file, site); for a thrown or logged `HttpError`/`AppError` it is that error. `include.stack: false` drops the stack.
 - `session` is read from `request.locals.user` (set by `@warlock.js/auth`): its `id` and `userType`.

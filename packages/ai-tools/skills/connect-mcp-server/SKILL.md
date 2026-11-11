@@ -34,12 +34,14 @@ The `server` argument is discriminated by `type`:
 
 ```ts
 // Spawn a child process and speak JSON-RPC over its stdin/stdout.
-// Uses node:child_process + node:readline — NO dependency.
+// Uses node:child_process — NO dependency.
 { type: "stdio", command: "npx", args: ["-y", "@modelcontextprotocol/server-github"], env: { GITHUB_TOKEN: "…" } }
 
 // Streamable HTTP against an endpoint.
 { type: "http", url: "https://mcp.example.com/rpc", headers: { authorization: "Bearer …" } }
 ```
+
+> **Response cap.** Both transports take `maxResponseBytes` (default 10 MiB): a larger HTTP body, or a longer stdio line, rejects the call with `McpTransportError` type `"protocol"`. `timeoutMs` also covers reading the HTTP body.
 
 > **stdio env is not inherited.** When you pass `env`, only those keys reach the child — pass what the server needs (e.g. its API token) explicitly.
 

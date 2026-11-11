@@ -279,9 +279,18 @@ export const config = {
   for bytes that vary on something besides the host (a preview-theme cookie).
   It runs before the lookup — before any middleware — so read the request
   directly. A non-function is a boot-time `InvalidPageCacheOptInError`.
+- `query?: string[]` — the query parameters that change the page. Only these
+  enter the key (`?page=2&ref=x` and `?page=2&ref=y` share one entry); without
+  it every parameter except tracking ones (`utm_*`, `fbclid`, `gclid`, ...)
+  does. A request carrying a parameter the key leaves out may be served a
+  stored entry, but its own render is never stored.
+- `varyHeaders?: string[]` — request headers the page depends on, added to
+  `Vary` (e.g. the header `varyBy` reads).
 
-**Cache key**: the request `Host` (lower-cased, port kept), the normalised
-pathname (lower-cased, trailing slash stripped), the sorted query string, the
+**Cache key**: the request `Host` (lower-cased, port kept; in multi-site mode
+the host site selection chose), the normalised
+pathname (case kept, trailing slash stripped), the sorted query string
+(nested values such as `filter[status]` written out in full), the
 resolved `locale`, the representation — `html` for a document request, `json`
 for the `x-warlock-data` representation — and `varyBy`'s result. Two hosts
 (tenants) never share an entry. The stored document is the streamed one the
@@ -302,7 +311,13 @@ detected crawler request (a crawler may still read a HIT, it just never
 writes the crawler-specific render).
 
 **Response headers**: `x-warlock-cache: hit | miss | bypass`, alongside the
-usual `Cache-Control`.
+usual `Cache-Control`. A `cache` route's `Vary` lists `x-warlock-data`, then
+`Cookie, locale` unless the URL pinned the locale or the app has one locale,
+`User-Agent` when the page defers, and `cache.varyHeaders`.
+
+**Variant ceiling**: `pageCache.maxEntriesPerRoute` (default `1_000`, `false`
+removes it) caps the stored query variants per route and process; a new
+variant past it is served but not stored, with one warning per route.
 
 **Size ceiling**: `pageCache.maxEntryBytes` (config key, default `1_048_576`
 — 1 MiB) caps one stored entry; an oversized MISS is still served to the

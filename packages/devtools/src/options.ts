@@ -18,5 +18,11 @@ export function resolveDevtoolsOptions(options: DevtoolsOptions = {}): ResolvedD
     throw new Error('Devtools option "nPlusOneThreshold" must be at least 2.');
   }
 
-  return { path, maxRequests, nPlusOneThreshold };
+  return {
+    path,
+    maxRequests,
+    nPlusOneThreshold,
+    allowedHosts: options.allowedHosts ?? [],
+    allowProxied: options.allowProxied ?? false,
+  };
 }

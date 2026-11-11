@@ -52,6 +52,9 @@ import { loadPostgresTTLPurgeJobs, unregisterAllPostgresTTLPurgeJobs } from "./p
 import { assertPostgresUpdate } from "./postgres-update-validator";
 import type { PostgresPoolConfig, PostgresQueryResult, PostgresTransactionOptions } from "./types";
 
+/** Most bound parameters one PostgreSQL statement accepts. */
+const POSTGRES_MAX_BIND_PARAMETERS = 65_535;
+
 /**
  * A unique index usable as an `ON CONFLICT` target.
  */
@@ -809,10 +812,11 @@ export class PostgresDriver implements DriverContract {
       return [];
     }
 
-    // Get all unique columns across all documents
+    // Serialize each document once (JSON columns are stringified here), then
+    // collect every column used across them.
+    const serializedDocuments = documents.map((doc) => this.serialize(doc, table));
     const allColumns = new Set<string>();
-    for (const doc of documents) {
-      const serialized = this.serialize(doc, table);
+    for (const serialized of serializedDocuments) {
       Object.keys(serialized).forEach((key) => allColumns.add(key));
     }
     const columns = Array.from(allColumns);
@@ -820,32 +824,59 @@ export class PostgresDriver implements DriverContract {
     const quotedColumns = columns.map((c) => this.dialect.quoteIdentifier(c)).join(", ");
     const quotedTable = this.dialect.quoteTableIdentifier(table);
 
-    // Build value sets and params
-    const valueSets: string[] = [];
-    const params: unknown[] = [];
-    let paramIndex = 1;
+    // PostgreSQL accepts at most 65,535 bound parameters per statement, so a
+    // wide or long batch is split into several INSERTs.
+    const rowsPerStatement = Math.max(
+      1,
+      Math.floor(POSTGRES_MAX_BIND_PARAMETERS / Math.max(columns.length, 1)),
+    );
 
-    for (const doc of documents) {
-      const serialized = this.serialize(doc, table);
-      const rowPlaceholders: string[] = [];
+    const insertBatch = async (
+      batch: Record<string, unknown>[],
+    ): Promise<readonly Record<string, unknown>[]> => {
+      const valueSets: string[] = [];
+      const params: unknown[] = [];
+      let paramIndex = 1;
 
-      for (const col of columns) {
-        if (col in serialized) {
-          rowPlaceholders.push(this.dialect.placeholder(paramIndex++));
-          params.push(serialized[col]);
-        } else {
-          rowPlaceholders.push("DEFAULT");
+      for (const serialized of batch) {
+        const rowPlaceholders: string[] = [];
+
+        for (const col of columns) {
+          if (col in serialized) {
+            rowPlaceholders.push(this.dialect.placeholder(paramIndex++));
+            params.push(serialized[col]);
+          } else {
+            rowPlaceholders.push("DEFAULT");
+          }
         }
+
+        valueSets.push(`(${rowPlaceholders.join(", ")})`);
       }
 
-      valueSets.push(`(${rowPlaceholders.join(", ")})`);
+      const sql = `INSERT INTO ${quotedTable} (${quotedColumns}) VALUES ${valueSets.join(", ")} RETURNING *`;
+
+      const result = await this.query<Record<string, unknown>>(sql, params);
+
+      return result.rows;
+    };
+
+    if (serializedDocuments.length <= rowsPerStatement) {
+      return (await insertBatch(serializedDocuments)) as unknown as InsertResult[];
     }
 
-    const sql = `INSERT INTO ${quotedTable} (${quotedColumns}) VALUES ${valueSets.join(", ")} RETURNING *`;
+    // Several statements: run them in one transaction (joining the caller's
+    // when there is one) so the batch stays all-or-nothing.
+    return this.transaction(async () => {
+      const rows: Record<string, unknown>[] = [];
 
-    const result = await this.query<Record<string, unknown>>(sql, params);
+      for (let start = 0; start < serializedDocuments.length; start += rowsPerStatement) {
+        rows.push(
+          ...(await insertBatch(serializedDocuments.slice(start, start + rowsPerStatement))),
+        );
+      }
 
-    return result.rows as unknown as InsertResult[];
+      return rows as unknown as InsertResult[];
+    });
   }
 
   /**

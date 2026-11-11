@@ -1,6 +1,6 @@
 ---
 name: configure-app
-description: 'Configure a Warlock app — the two layers (`warlock.config.ts` for framework-level wiring, `src/config/*.ts` for subsystems), `.env` + `env()`, the `config()` getter for runtime reads, and `app.publicUrl`/`PUBLIC_APP_URL` (the app''s public origin). Triggers: `defineConfig`, `config.get`, `config.key`, `env`, `ConfigRegistry`, `HttpConfigurations`, `AppConfigurations`, `publicUrl`, `PUBLIC_APP_URL`, `getPublicUrl`; "add a new config file", "warlock.config.ts vs src/config", "read env values", "runtime config lookup", "app public origin/URL"; typical import `import { defineConfig, config, env } from "@warlock.js/core"`. Skip: cache driver registration — the `cache-basics` topic of the `warlock-js-cache` skill; mail config — the `send-mail` topic; storage config — the `store-file` topic; sitemap refusal on a missing origin — the `generate-sitemap` topic of the `warlock-js-web` skill; competing libs `dotenv` direct, `convict`, `node-config`.'
+description: 'Configure a Warlock app — the two layers (`warlock.config.ts` for framework-level wiring, `src/config/*.ts` for subsystems), `.env` + `env()`, the `config()` getter for runtime reads, and `app.publicUrl`/`PUBLIC_APP_URL` (the app''s public origin). Triggers: `defineConfig`, `config.get`, `config.key`, `env`, `ConfigRegistry`, `HttpConfigurations`, `HttpCompressionConfig`, `http.compression`, `AppConfigurations`, `publicUrl`, `PUBLIC_APP_URL`, `getPublicUrl`; "add a new config file", "warlock.config.ts vs src/config", "read env values", "runtime config lookup", "app public origin/URL"; typical import `import { defineConfig, config, env } from "@warlock.js/core"`. Skip: cache driver registration — the `cache-basics` topic of the `warlock-js-cache` skill; mail config — the `send-mail` topic; storage config — the `store-file` topic; sitemap refusal on a missing origin — the `generate-sitemap` topic of the `warlock-js-web` skill; competing libs `dotenv` direct, `convict`, `node-config`.'
 ---
 
 # Warlock — configure the app
@@ -42,13 +42,17 @@ const httpConfigurations: HttpConfigurations = {
   port: env("HTTP_PORT", 3000),
   host: env("HTTP_HOST", "localhost"),
   log: true, // one info summary line per request; per-phase lines at debug (logPhases: "info" restores them)
-  fileUploadLimit: 12 * 1024 * 1024 * 1024,
+  fileUploadLimit: 10 * 1024 * 1024, // largest single file; parts are buffered in memory before middleware runs
+  multipart: { maxTotalSize: 25 * 1024 * 1024, routes: "declared" }, // whole-request cap; parse only on routes with `uploads`
+  requestTimeout: 300_000, // ms to send one request (default); 0 turns it off
+  // allowedHosts: ["example.com", ".example.com"], // opt-in: other Host values answer 400
+  // trustProxy: ["10.0.0.0/8"], realIpHeader: "cf-connecting-ip", // proxies you trust + the header your edge overwrites
   rateLimit: {
     max: 260,
     duration: 60 * 1000,
   },
   cors: {
-    origin: "*",
+    origin: String(env("CORS_ORIGINS", "")).split(",").filter(Boolean), // empty = same origin only
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
   },
   cookies: {
@@ -88,6 +92,26 @@ serverOptions: {
 Framework-owned settings (`trustProxy`, `bodyLimit`,
 `gracefulShutdown.forceCloseConnections`) have their own `http.*` keys;
 setting them in `serverOptions` as well overrides those keys.
+
+### `compression` — response compression (5.53.0)
+
+Off by default (new scaffolds turn it on). `compression: true` (type
+`HttpCompressionConfig`) compresses JSON, HTML (streamed pages included), XML,
+text and other text-like bodies with `br` or `gzip`, as `Accept-Encoding`
+allows; `{ threshold?: number /* bytes, default 1024 */, brotli?: boolean /*
+default true */ }` tunes it. Skipped: HEAD, 204/206/304, small bodies,
+responses that already set `Content-Encoding` (or `Cache-Control:
+no-transform`), binary types, `sse()`, `stream()` and NDJSON. `Vary` gains
+`Accept-Encoding` (merged into the one header), `Content-Length` is dropped and
+a strong `ETag` turns weak. Leave it off behind a proxy or CDN that already
+compresses. A response that mixes a secret (CSRF token) with reflected request
+input must not be compressed over HTTPS: there is no per-route option, so set
+`Cache-Control: no-transform` on that response.
+
+```ts
+compression: true,
+// compression: { threshold: 2048, brotli: false },
+```
 
 ### `securityHeaders` — security response headers (5.42.0)
 
@@ -307,6 +331,8 @@ Same shape — TS validates the union; runtime picks the `default` key.
 
 `http.errorMapper(error, request)` maps errors that are not an `HttpError` to `{ status, message?, payload? }` (return `undefined` to keep the default opaque `500`). A mapped 5xx keeps the opaque message unless the mapper sets one.
 
+Request input limits: `http.input.maxArrayIndex` (default 1000) drops keys naming a larger array index (`a[99999]`); `http.urlencoded.maxFields` (default 1000) answers 413 (`EC107`) past it. `http.cookies.secret` only signs cookies written with `{ signed: true }` (read with `request.signedCookie()`). `/ready` hides its check list in production unless `http.health.details: true`.
+
 `http.logging` controls what request log entries carry: `{ body?: boolean, query?: boolean, redactQueryParams?: string[] }` (body/query default `true`). A route's `logging` option overrides it — use `logging: { body: false, query: false }` on routes that accept secrets or arbitrary text. Entries carry `request.toLogSnapshot()`, never the `Request` object, with credential query values masked in the URL.
 
 ## Per-env knobs
@@ -377,6 +403,7 @@ Internal `@warlock.js/*` packages read from `config.get("<name>")` the same way 
 - **Don't mutate `config` at runtime.** It's read-only by convention. For dynamic overrides, fold into the call-site options (e.g. `cache.set(key, val, { driver: "redis" })`).
 - **`Application.isProduction` is preferred over `process.env.NODE_ENV` checks** in config files — same source, but it survives `setEnvironment(...)` and reads consistently.
 - **`warlock.config.ts` is the boot config; `src/config/` is the runtime config.** Putting runtime tuning into `warlock.config.ts` doesn't crash but won't be visible via `config.get(...)`.
+- **`warlock add` keeps `agentKit.pick` current.** When `package.json` limits `agent-kit sync` to an allowlist (`agentKit.pick`, written by `create-warlock`), `warlock add` adds the `@warlock.js/*` and `@mongez/*` packages it installs, so their skills reach the coding agent. No allowlist, no change.
 
 ## See also
 

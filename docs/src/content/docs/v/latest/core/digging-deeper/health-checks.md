@@ -28,6 +28,8 @@ GET /ready  → 200 {"status":"ok","checks":{"db":true}}
             → 503 {"status":"error","checks":{"db":false}}
 ```
 
+In production `/ready` answers `{"status":"ok"}` / `{"status":"error"}` only: the probe is public, and the check names would tell anyone which backing services exist and which are down. Set `http.health.details` to choose (since 5.53).
+
 ### Configuration
 
 Both endpoints are on by default. Tune them in `src/config/http.ts`:
@@ -41,6 +43,9 @@ const httpConfigurations: HttpConfigurations = {
     path: "/health", // liveness path
     readinessPath: "/ready", // readiness path
     rateLimit: false, // exempt probes from global client quotas (default)
+    details: false, // list checks in the /ready body (default: false in production, true elsewhere)
+    checkTimeout: 2000, // ms before a check counts as failed (default; 0 waits forever)
+    cacheTtl: 1000, // ms one readiness result is reused (default; 0 reruns every probe)
   },
 };
 
@@ -77,7 +82,9 @@ health.addCheck("cache", async () => cache.ping());
 health.removeCheck("db");
 ```
 
-A check returns `boolean | Promise<boolean>`. A **thrown error counts as a failed check** — it's reported in the `checks` map and the `503`, not logged (probes poll constantly; a failure is a normal signal, not an error event). Keep checks cheap: they run on every `/ready` poll.
+A check returns `boolean | Promise<boolean>`. A **thrown error counts as a failed check** — it's reported in the `checks` map and the `503`, not logged (probes poll constantly; a failure is a normal signal, not an error event).
+
+Probes stay cheap and bounded however often `/ready` is hit: concurrent probes share one run of the checks, a finished result is reused for `http.health.cacheTtl` ms (default 1000), and a check that does not answer within `http.health.checkTimeout` ms (default 2000) counts as failed, so a hanging dependency cannot hold the probe. Adding or removing a check drops the reused result.
 
 A natural place to register a check is inside `Application.onceBooted(...)`, or from a custom connector's `start()`.
 

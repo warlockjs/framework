@@ -101,6 +101,12 @@ return response.sendBuffer(buffer, { contentType: "image/png" });
 
 `SendFileOptions` lets you set `cacheTime`, `immutable`, `inline`, `filename` (download attachment name).
 
+`sendFile` answers a single `Range: bytes=…` with 206 + `Content-Range` (416 when the range starts past the end; `If-Range` honoured; several ranges get the whole file) and always sends `Accept-Ranges: bytes`. A file that fails mid-read answers an opaque 500; the path stays in the log.
+
+Server faults stay opaque: an `Error` passed as a body (`response.serverError(error)`), a `toJSON()` that throws while a returned value is sent, or a throwing hook answers `500 { error: "Internal server error." }` (plus `requestId` and `stack` in development) and the message goes to the log. Send the body you want the client to read, never the `Error` itself.
+
+Compression is `http.compression` (see the `configure-app` topic): set `Content-Encoding: identity` on a response to send it uncompressed.
+
 Conditional requests are handled for you (RFC 9110): `If-None-Match` compares weakly (`W/"a"` matches `"a"`) and answers 304 on GET/HEAD; `If-Match` compares strongly (a `W/` tag never passes) and answers 412. For your own ETags, use the same helper:
 
 ```ts
@@ -266,6 +272,21 @@ by-name assertion — "this cookie should be readable here" — so when
 **throw `CookieJarUnavailableError`** naming the missing cookie, instead of
 silently returning `undefined` / `false`. Register the plugin (see core's
 `http/plugins.ts`) before reading cookies by name.
+
+### Signed cookies and raw reads (5.53)
+
+`http.cookies.secret` signs nothing on its own. Write tamper-proof values with
+`response.cookie(name, value, { signed: true })` and read them with
+`request.signedCookie(name, defaultValue?)`, which returns the default for a
+missing, unsigned or edited cookie; both throw naming `http.cookies.secret`
+when it is unset. `request.cookie(name, defaultValue, { json: false })` (options type `RequestCookieOptions`; or
+`http.cookies.json: false` app-wide) returns the raw string instead of a
+JSON-parsed, client-typed value.
+
+```ts
+response.cookie("cartOwner", ownerId, { signed: true });
+const ownerId = request.signedCookie("cartOwner");
+```
 
 `request.cookies` (the plain getter, no by-name assertion) is unchanged and
 stays lenient — it returns `{}` when the jar is unavailable, because the

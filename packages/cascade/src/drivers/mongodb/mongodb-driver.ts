@@ -52,6 +52,7 @@ import { MongoMigrationDriver } from "./mongodb-migration-driver";
 import { MongoQueryBuilder } from "./mongodb-query-builder";
 import { MongoSyncAdapter } from "./mongodb-sync-adapter";
 import { withTimeout } from "../../utils/with-timeout";
+import { describeCommandFailure, describeCommandShape } from "./mongodb-command-shape";
 import { toMongoUpdate } from "./mongodb-update-translator";
 import type { MongoDriverOptions } from "./types";
 
@@ -207,6 +208,11 @@ export class MongoDbDriver implements DriverContract {
       password?: string;
       authSource?: string;
       logging?: boolean;
+      /**
+       * Emit the `query` event (request log query capture, devtools). Unset:
+       * on outside production, off in production. `logging: true` turns it on.
+       */
+      queryEvents?: boolean;
       clientOptions?: MongoClientOptions;
     },
     private readonly driverOptions?: MongoDriverOptions,
@@ -215,6 +221,32 @@ export class MongoDbDriver implements DriverContract {
       ...DEFAULT_TRANSACTION_OPTIONS,
       ...driverOptions?.transactionOptions,
     };
+  }
+
+  /**
+   * Whether this driver emits the `query` event, i.e. whether MongoDB command
+   * monitoring is on: an explicit `clientOptions.monitorCommands`, else
+   * `logging: true` or `queryEvents` (unset: on outside production).
+   */
+  public get queryEventsEnabled(): boolean {
+    const explicit = this.config.clientOptions?.monitorCommands;
+
+    if (explicit !== undefined) {
+      return explicit;
+    }
+
+    return (
+      this.config.logging === true ||
+      (this.config.queryEvents ?? process.env.NODE_ENV !== "production")
+    );
+  }
+
+  /**
+   * Caps on string LIKE patterns, from the `like` driver option. Read by the
+   * query parser when it compiles `whereLike` to a regex.
+   */
+  public get likeLimits(): MongoDriverOptions["like"] {
+    return this.driverOptions?.like;
   }
 
   /**
@@ -366,7 +398,10 @@ export class MongoDbDriver implements DriverContract {
         client.on("commandStarted", (event: any) => {
           if (ignoredCommands.includes(event.commandName)) return;
 
-          let cmdStr = JSON.stringify(event.command);
+          // Values are left out: documents and filters hold password hashes,
+          // tokens and API keys. The log shows the command, the collection
+          // and the shape (field names and value types) only.
+          let cmdStr = JSON.stringify(describeCommandShape(event.command));
           if (cmdStr.length > 300) {
             cmdStr = cmdStr.substring(0, 300) + "...";
           }
@@ -375,7 +410,6 @@ export class MongoDbDriver implements DriverContract {
             module: "database.mongodb",
             action: "query.executing",
             message: `[${event.commandName}] ${cmdStr}`,
-            context: { command: event.command },
           });
         });
 
@@ -396,7 +430,7 @@ export class MongoDbDriver implements DriverContract {
             module: "database.mongodb",
             action: "query.error",
             message: `[${event.duration.toFixed(2)}ms] [${event.commandName}]`,
-            context: { failure: event.failure },
+            context: { failure: describeCommandFailure(event.failure) },
           });
         });
       }
@@ -1018,10 +1052,13 @@ export class MongoDbDriver implements DriverContract {
       ...(this.config.clientOptions ?? {}),
     };
 
-    // Command monitoring feeds the public `query` event; an app that set
-    // `clientOptions.monitorCommands` explicitly keeps its choice.
+    // Command monitoring feeds the public `query` event and the query log.
+    // With it on, the MongoDB client decodes every reply a second time for
+    // the monitoring event, so it is on only when something reads it:
+    // `logging`, `queryEvents: true`, or (when `queryEvents` is unset)
+    // outside production. An explicit `clientOptions.monitorCommands` wins.
     if (baseOptions.monitorCommands === undefined) {
-      baseOptions.monitorCommands = true;
+      baseOptions.monitorCommands = this.queryEventsEnabled;
     }
 
     if (this.config.username && !baseOptions.auth) {

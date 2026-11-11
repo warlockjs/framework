@@ -59,7 +59,7 @@ For "multiple replies expected" patterns, use a regular `subscribe` + a request 
 
 ## Correlation across replies
 
-Each `request()` generates its own correlation ID and an exclusive reply queue under the hood. The reply carries the same ID; the client matches it to the awaiting promise and resolves. You don't manage correlation IDs manually — and you shouldn't pass your own `correlationId` on a `request()`, since herald overwrites it with the one it uses to match the reply. To thread your own trace id (e.g. a transaction id for logs) through to the responder, put it in `headers` instead — the responder reads it from `message.metadata.headers`.
+Each `request()` generates its own correlation ID; replies come back over RabbitMQ's direct reply-to (`amq.rabbitmq.reply-to`), through one consumer per connection shared by every request — no queue or consumer is created per call, and a request's entry is removed on its reply or timeout. Only AMQP properties (`expiration`, `priority`, `persistent`, `headers`) are published; `timeout` stays local. The reply carries the same ID; the client matches it to the awaiting promise and resolves. You don't manage correlation IDs manually — and you shouldn't pass your own `correlationId` on a `request()`, since herald overwrites it with the one it uses to match the reply. To thread your own trace id (e.g. a transaction id for logs) through to the responder, put it in `headers` instead — the responder reads it from `message.metadata.headers`.
 
 ## Things NOT to do
 

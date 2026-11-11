@@ -1,5 +1,20 @@
-import { parseSync, visitorKeys, type Node, type Program } from "oxc-parser";
+import { createRequire } from "node:module";
+import type * as OxcParser from "oxc-parser";
+import type { Node, Program } from "oxc-parser";
 export type * from "oxc-parser";
+
+let oxcParser: typeof OxcParser | undefined;
+
+/**
+ * `oxc-parser` loads a native addon. The root package export reaches this file
+ * (translation-usage tooling), so loading it on first use keeps it out of
+ * every production boot that never parses source.
+ */
+function loadOxcParser(): typeof OxcParser {
+  oxcParser ??= createRequire(import.meta.url)("oxc-parser") as typeof OxcParser;
+
+  return oxcParser;
+}
 
 export type SourceFile = Program & { fileName: string; text: string };
 /**
@@ -12,7 +27,7 @@ const PARENT = Symbol("warlock.parent");
 
 export function forEachChild(node: Node, visit: (node: Node) => void): void {
   const record = node as unknown as Record<string, unknown>;
-  for (const key of visitorKeys[node.type] ?? []) {
+  for (const key of loadOxcParser().visitorKeys[node.type] ?? []) {
     const value = record[key];
     for (const child of Array.isArray(value) ? value : [value]) {
       if (child && typeof child === "object" && "type" in child) visit(child as Node);
@@ -21,7 +36,10 @@ export function forEachChild(node: Node, visit: (node: Node) => void): void {
 }
 
 export function parseSourceFile(fileName: string, text: string): SourceFile {
-  const source = Object.assign(parseSync(fileName, text).program, { fileName, text });
+  const source = Object.assign(loadOxcParser().parseSync(fileName, text).program, {
+    fileName,
+    text,
+  });
   const attach = (node: Node): void => {
     forEachChild(node, (child) => {
       Object.defineProperty(child, PARENT, { value: node, configurable: true });

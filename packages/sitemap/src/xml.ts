@@ -9,13 +9,27 @@ const XML_ESCAPES: Record<string, string> = {
   "'": "&apos;",
 };
 
-/** Escapes the five XML-significant characters. A URL's query string routinely contains `&`. */
+/**
+ * Characters XML 1.0 forbids anywhere in a document: C0 controls other than
+ * tab, newline and carriage return, U+FFFE/U+FFFF, and lone surrogates.
+ */
+const XML_ILLEGAL_CHARACTERS =
+  // oxlint-disable-next-line eslint/no-control-regex -- removing control characters is the point.
+  /[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]|[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g;
+
+/**
+ * Escapes the five XML-significant characters (a URL's query string routinely
+ * contains `&`) and drops characters XML cannot carry at all, so one bad value
+ * cannot make the whole file unparseable.
+ */
 export function escapeXml(value: string): string {
   // The character class and the table are written together, so the lookup can
   // only miss if one is edited without the other; falling back to the original
   // character keeps that editing mistake from silently emitting `undefined`
   // into a URL.
-  return value.replace(/[&<>"']/g, (char) => XML_ESCAPES[char] ?? char);
+  return value
+    .replace(XML_ILLEGAL_CHARACTERS, "")
+    .replace(/[&<>"']/g, (char) => XML_ESCAPES[char] ?? char);
 }
 
 const XHTML_NAMESPACE = "http://www.w3.org/1999/xhtml";
@@ -80,10 +94,25 @@ export function renderUrlBlock(entry: ResolvedSitemapEntry, baseUrl: string): st
  * alternate — an unused namespace on every single-language sitemap is noise.
  */
 export function buildSitemapXml(entries: readonly ResolvedSitemapEntry[], baseUrl: string): string {
-  const hasAlternates = entries.some((entry) => (entry.alternates?.length ?? 0) > 0);
-  const hasImages = entries.some((entry) => (entry.images?.length ?? 0) > 0);
+  return buildSitemapXmlFromBlocks(
+    entries.map((entry) => renderUrlBlock(entry, baseUrl)),
+    entries.some((entry) => (entry.alternates?.length ?? 0) > 0),
+    entries.some((entry) => (entry.images?.length ?? 0) > 0),
+  );
+}
+
+/**
+ * {@link buildSitemapXml} from `<url>` blocks already rendered by
+ * {@link renderUrlBlock}, so the shard writer renders each entry once: the
+ * block it measured is the block it writes.
+ */
+export function buildSitemapXmlFromBlocks(
+  blocks: readonly string[],
+  hasAlternates: boolean,
+  hasImages: boolean,
+): string {
   const namespaces = `${hasAlternates ? XHTML_NAMESPACE_ATTR : ""}${hasImages ? IMAGE_NAMESPACE_ATTR : ""}`;
-  const body = entries.map((entry) => renderUrlBlock(entry, baseUrl)).join("\n");
+  const body = blocks.join("\n");
 
   return (
     `<?xml version="1.0" encoding="UTF-8"?>\n` +

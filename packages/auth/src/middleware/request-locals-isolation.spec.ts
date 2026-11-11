@@ -99,7 +99,7 @@ import { makeCtx } from "./test-support/make-ctx";
 
 /** A token row the database considers live (same shape as auth.middleware.spec.ts). */
 function liveRow(fields: Record<string, unknown>) {
-  return { isExpired: false, destroy: vi.fn(), ...fields };
+  return { isExpired: false, userId: 1, destroy: vi.fn(), ...fields };
 }
 
 /** `auth.userType.<type>` resolves to the supplied user model; everything else falls back. */
@@ -166,7 +166,7 @@ describe("request.locals.user cross-request isolation (5.12.0 move)", () => {
   it("keeps two requests isolated when handled CONCURRENTLY through the async context", async () => {
     const decoded = { id: 42, userType: "user" };
     jwtVerify.mockResolvedValue(decoded);
-    accessTokenFindByToken.mockResolvedValue(liveRow({ userType: "user" }));
+    accessTokenFindByToken.mockResolvedValue(liveRow({ userId: 42, userType: "user" }));
     stubConfig({ find: vi.fn().mockResolvedValue({ id: 42, userType: "user" }) });
 
     const middleware = authMiddleware([]);

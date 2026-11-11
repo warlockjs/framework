@@ -62,4 +62,31 @@ describe("loadHtml", () => {
   it("returns no document when the markup strips to nothing", () => {
     expect(loadHtml("<style>.a{}</style><script>x()</script>")).toEqual([]);
   });
+
+  // Unclosed markup used to make every opener rescan the rest of the page
+  // (minutes of blocked event loop for a few hundred KB). The scan is now
+  // linear; the generous per-test timeout is the bound.
+  it("strips large unclosed markup without rescanning the page", { timeout: 10_000 }, () => {
+    const lone = loadHtml("<".repeat(200_000));
+    expect(lone[0]?.text).toBe("<".repeat(200_000));
+
+    const comments = loadHtml("<!--".repeat(200_000));
+    expect(comments[0]?.text.length).toBe(800_000);
+
+    const scripts = loadHtml(`${"<script>".repeat(200_000)}tail`);
+    // Each unclosed `<script>` opener is still dropped as a lone tag.
+    expect(scripts[0]?.text).toBe("tail");
+
+    const titled = loadHtml(`${"<title>".repeat(200_000)}body`);
+    expect(titled[0]?.metadata?.title).toBeUndefined();
+  });
+
+  it("keeps the established output for mixed and malformed markup", () => {
+    const [doc] = loadHtml(
+      '<!-- a --><P class="x">One</P><scripts>kept</scripts><SCRIPT type="t">gone()</Script >' +
+        "<br/>Two &amp; <b>three</b> <> x < y <!-- open",
+    );
+
+    expect(doc?.text).toBe("One\nkept gone()\nTwo & three <> x < y <!-- open");
+  });
 });

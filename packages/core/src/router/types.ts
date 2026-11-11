@@ -1,6 +1,7 @@
 import type { GenericObject } from "@mongez/reinforcements";
 import type { ObjectValidator, ValidationResult } from "@warlock.js/seal";
 import type { RouteShorthandOptions } from "fastify";
+import type { RouteUploadsOption } from "../http/multipart";
 import type { RouteSecurityHeaders } from "../http/security-headers";
 import type { Request, Response, ReturnedResponse } from "../http";
 import type { RequestLoggingOptions } from "../http/request-log-snapshot";
@@ -324,6 +325,17 @@ export interface RouteOptions {
    * router.post("/oauth/callback", handler, { csrf: false });
    */
   csrf?: false;
+  /**
+   * Declare that this route takes multipart uploads. Required when
+   * `http.multipart.routes` is `"declared"`: other routes answer 415 to a
+   * multipart body without reading it. An object also sets the total upload
+   * size for this route alone (instead of `http.multipart.maxTotalSize`).
+   *
+   * @example
+   * router.post("/avatars", uploadAvatar, { uploads: true });
+   * router.post("/videos", uploadVideo, { uploads: { maxTotalSize: 200 * 1024 * 1024 } });
+   */
+  uploads?: RouteUploadsOption;
   /**
    * Override `http.securityHeaders` for this route. An object is merged over
    * the app-wide config key by key; `false` sends none of the security

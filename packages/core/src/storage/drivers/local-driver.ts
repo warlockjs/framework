@@ -35,6 +35,12 @@ import type {
 import { getMimeType } from "../utils/mime";
 
 /**
+ * Format version of local temporary-URL tokens. Version 2 signs the path
+ * with the storage prefix it was issued under.
+ */
+const TEMPORARY_TOKEN_VERSION = 2;
+
+/**
  * Local filesystem storage driver
  *
  * Stores files on the local filesystem with support for:
@@ -401,16 +407,58 @@ export class LocalDriver implements StorageDriverContract {
     }
 
     const exp = Math.floor(Date.now() / 1000) + expiresIn;
-    const sig = crypto
-      .createHmac("sha256", this.signatureKey)
-      .update(`${location}:${exp}`)
-      .digest("hex");
+    // Sign the location WITH the storage prefix in effect (the tenant), so the
+    // token opens this exact file and not the same relative path elsewhere.
+    const path = this.applyPrefix(location);
+    const sig = this.signTemporaryToken(path, exp);
 
-    const payload: TemporaryTokenPayload = { path: location, exp, sig };
+    const payload: TemporaryTokenPayload = { v: TEMPORARY_TOKEN_VERSION, path, exp, sig };
     const json = JSON.stringify(payload);
 
     // Use base64url encoding (URL-safe base64)
     return Buffer.from(json).toString("base64url");
+  }
+
+  /**
+   * HMAC of a temporary token: an unambiguous encoding of the format
+   * version, the prefixed path and the expiry.
+   */
+  protected signTemporaryToken(path: string, exp: number): string {
+    return crypto
+      .createHmac("sha256", this.signatureKey!)
+      .update(JSON.stringify([TEMPORARY_TOKEN_VERSION, path, exp]))
+      .digest("hex");
+  }
+
+  /**
+   * Whether a decoded token has the current shape with the expected types.
+   * Tokens issued before the format carried a version are refused.
+   */
+  protected isTemporaryTokenPayload(payload: unknown): payload is TemporaryTokenPayload {
+    if (!payload || typeof payload !== "object") return false;
+
+    const { v, path, exp, sig } = payload as Record<string, unknown>;
+
+    return (
+      v === TEMPORARY_TOKEN_VERSION &&
+      typeof path === "string" &&
+      path.length > 0 &&
+      typeof exp === "number" &&
+      Number.isSafeInteger(exp) &&
+      exp > 0 &&
+      typeof sig === "string" &&
+      /^[a-f0-9]{64}$/.test(sig)
+    );
+  }
+
+  /**
+   * The storage prefix in effect (context prefix first, then the driver's
+   * `prefix` option), without trailing slashes.
+   */
+  protected activePrefix(): string | undefined {
+    const prefix = storageDriverContext.getPrefix() || this.options.prefix;
+
+    return prefix ? prefix.replace(/\/+$/, "") : undefined;
   }
 
   /**
@@ -426,18 +474,20 @@ export class LocalDriver implements StorageDriverContract {
     }
 
     // Decode token
-    let payload: TemporaryTokenPayload;
+    let decoded: unknown;
     try {
       const json = Buffer.from(token, "base64url").toString("utf-8");
-      payload = JSON.parse(json);
+      decoded = JSON.parse(json);
     } catch {
       return { valid: false, error: "invalid_token" };
     }
 
-    // Validate payload structure
-    if (!payload.path || !payload.exp || !payload.sig) {
+    // Validate payload structure and types (refuses unversioned tokens too)
+    if (!this.isTemporaryTokenPayload(decoded)) {
       return { valid: false, error: "invalid_token" };
     }
+
+    const payload = decoded;
 
     // Check expiration
     const now = Math.floor(Date.now() / 1000);
@@ -446,10 +496,7 @@ export class LocalDriver implements StorageDriverContract {
     }
 
     // Verify signature
-    const expectedSig = crypto
-      .createHmac("sha256", this.signatureKey)
-      .update(`${payload.path}:${payload.exp}`)
-      .digest("hex");
+    const expectedSig = this.signTemporaryToken(payload.path, payload.exp);
 
     const sigBuffer = Buffer.from(payload.sig, "hex");
     const expectedBuffer = Buffer.from(expectedSig, "hex");
@@ -467,22 +514,46 @@ export class LocalDriver implements StorageDriverContract {
       return { valid: false, error: "invalid_signature" };
     }
 
+    // The signed path already carries the prefix it was issued under: resolve
+    // it as-is (never re-apply the current prefix), and when a prefix is in
+    // effect now, the file must sit under it — a token issued for one tenant
+    // does not open a file through another tenant.
+    const prefix = this.activePrefix();
+    let absolutePath: string;
+
+    try {
+      absolutePath = resolveWithinRoot(this.root, payload.path);
+
+      if (prefix) {
+        const prefixRoot = resolveWithinRoot(this.root, prefix.replace(/^[\\/]+/, ""));
+        resolveWithinRoot(prefixRoot, absolutePath);
+      }
+    } catch {
+      return { valid: false, error: "invalid_token" };
+    }
+
     // Check file exists
-    const absolutePath = this.getAbsolutePath(payload.path);
     if (!(await fileExistsAsync(absolutePath))) {
       return { valid: false, error: "file_not_found" };
     }
 
+    // The location relative to the prefix in effect, as the driver's other
+    // methods take it (they apply the prefix themselves).
+    const location =
+      prefix && payload.path.startsWith(`${prefix}/`)
+        ? payload.path.slice(prefix.length + 1)
+        : payload.path;
+
     // Build successful result with convenience methods
     const result: TemporaryTokenValidation = {
       valid: true,
-      path: payload.path,
+      path: location,
       absolutePath,
       expiresAt: new Date(payload.exp * 1000),
-      mimeType: this.guessMimeType(payload.path),
+      mimeType: this.guessMimeType(location),
       driver: this,
-      getFile: () => this.get(payload.path),
-      getStream: () => this.getStream(payload.path),
+      getFile: () => this.get(location),
+      getStream: () => this.getStream(location),
     };
 
     return result;

@@ -83,7 +83,7 @@ retry: {
 }
 ```
 
-`maxRetries` is the part that does the work: when a handler **throws**, herald reads the message's `x-retry-count` header and, while it's under `maxRetries`, republishes with the header incremented so the count actually advances (a plain requeue never advances it — the broker doesn't add that header). Once `x-retry-count` reaches `maxRetries`, it dead-letters (if `deadLetter` is configured) or drops the message with a loud `log.error` — a poison message can no longer ping-pong forever. This is shared by the automatic throw path and the explicit `ctx.retry()` call, so both honor the same cap.
+`maxRetries` is the part that does the work: when a handler **throws**, herald reads the message's `x-retry-count` header and, while it's under `maxRetries`, republishes with the header incremented so the count actually advances (a plain requeue never advances it — the broker doesn't add that header). Once `x-retry-count` reaches `maxRetries`, it dead-letters (if `deadLetter` is configured) or drops the message with a loud `log.error` — a poison message can no longer ping-pong forever. The header comes from the publisher, so a value that is not a non-negative integer (`"x"`, `-1`) counts as retries exhausted. This is shared by the automatic throw path and the explicit `ctx.retry()` call, so both honor the same cap.
 
 **Caveat on `delay`.** `RetryOptions.delay` (number or `(attempt) => number`) is **not applied on the automatic throw path** — a thrown handler requeues immediately, with no wait. The only place a delay takes effect is the explicit `ctx.retry(delayMs)` call, which republishes the message with an `x-delay` header — and even that needs the RabbitMQ delayed-message-exchange plugin installed, or the delay is ignored. So if you need real backoff, call `ctx.retry(ms)` from inside the handler and install the plugin; don't rely on the channel-level `retry.delay` for timing.
 
@@ -132,6 +132,8 @@ export class UserCreatedConsumer extends EventConsumer<{ id: number; email: stri
 The handler receives the **already-unwrapped payload** as the first argument and a `ConsumedEventMessage` as the second — `{ messageId, eventName, payload, version?, occurredAt?, metadata?, message }` (where `message` is the raw `Message` if you need `message.metadata.headers`). There is **no `ctx`**: the framework auto-acks when `handle` resolves, so you never call `ack`/`nack` yourself in this style.
 
 **A throw is a bounded retry, not an infinite requeue.** `handle` throwing routes through the same bounded-retry routine the raw `.subscribe()` throw path uses (below) — republishes with an incremented `x-retry-count`, capped at `maxRetries: 3` (there's no per-consumer `retry`/`deadLetter` config yet, so the cap is always the default). Once the cap is hit, the message is dropped with a loud `log.error` — never a silent, unbounded ack/nack loop.
+
+**A payload that fails the consumer's `schema` is rejected without requeue** (the broker dead-letters it when the queue has a dead-letter exchange) and logged once with `log.warn` and the validation errors. It is never redelivered in a loop and `handle` never sees it.
 
 Wiring: the channel name comes from `static eventName`, and `@Consumable` self-registers the moment the class module is **imported** — if a broker is already connected it subscribes immediately, otherwise it buffers and subscribes once `connectToBroker` fires. So the only wiring you need is to import the consumer file on the boot path (e.g. your module's `main.ts`).
 

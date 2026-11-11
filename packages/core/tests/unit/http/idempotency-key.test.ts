@@ -127,17 +127,19 @@ describe("buildIdempotencyCacheKey", () => {
       // A stored `null` is not the same as an absent key, so remove it
       // outright rather than setting it to `undefined`.
       config.unset("http.trustProxy");
+      config.unset("http.realIpHeader");
     });
 
     /**
      * `X-Forwarded-For` resolution belongs to Fastify (`request.ip`) and is
      * covered end to end in `detect-ip.test.ts` against a live server, since a
-     * seeded `baseRequest` cannot reproduce the chain walk. `X-Real-IP` is the
-     * one header `detectIp()` reads itself, so it is what this seeded request
-     * can assert the scoping against.
+     * seeded `baseRequest` cannot reproduce the chain walk. The header named by
+     * `http.realIpHeader` is the one `detectIp()` reads itself, so it is what
+     * this seeded request can assert the scoping against.
      */
-    it("prefers X-Real-IP over the peer IP for the anonymous scope", () => {
+    it("prefers the http.realIpHeader value over the peer IP for the anonymous scope", () => {
       config.set("http.trustProxy", true);
+      config.set("http.realIpHeader", "x-real-ip");
 
       const request = makeRequest({
         headers: { "x-real-ip": "198.51.100.7" },
@@ -146,5 +148,40 @@ describe("buildIdempotencyCacheKey", () => {
 
       expect(buildIdempotencyCacheKey(request, "KEY")).toBe("idem:anonymous:198.51.100.7:::KEY");
     });
+  });
+});
+
+describe("buildIdempotencyCacheKey — request target", () => {
+  function requestFor(params: Record<string, string>, query: Record<string, string> = {}) {
+    const request = new Request();
+
+    request.setRequest({
+      headers: {},
+      ip: "203.0.113.9",
+      params,
+      query,
+    } as unknown as FastifyRequest);
+
+    return request;
+  }
+
+  it("gives two resources behind one route pattern their own records", () => {
+    const first = buildIdempotencyCacheKey(requestFor({ id: "1" }), "KEY");
+    const second = buildIdempotencyCacheKey(requestFor({ id: "2" }), "KEY");
+
+    expect(first).not.toBe(second);
+  });
+
+  it("keeps the same record for a retry of the same target", () => {
+    const first = buildIdempotencyCacheKey(requestFor({ id: "1" }, { a: "x", b: "y" }), "KEY");
+    const retry = buildIdempotencyCacheKey(requestFor({ id: "1" }, { b: "y", a: "x" }), "KEY");
+
+    expect(first).toBe(retry);
+  });
+
+  it("separates the same route by query", () => {
+    expect(buildIdempotencyCacheKey(requestFor({}, { account: "1" }), "KEY")).not.toBe(
+      buildIdempotencyCacheKey(requestFor({}, { account: "2" }), "KEY"),
+    );
   });
 });

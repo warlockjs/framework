@@ -159,7 +159,7 @@ authEvents.off(event?): void;
 authEvents.unsubscribeAll(): void;
 ```
 
-Event names: `login.attempt`, `login.success`, `login.failed`, `logout`, `logout.all`, `logout.failsafe`, `token.created`, `token.refreshed`, `token.revoked`, `token.expired`, `token.familyRevoked`, `password.changed`, `password.resetRequested`, `password.reset`, `session.created`, `session.destroyed`, `cleanup.completed`.
+Event names: `login.attempt`, `login.success`, `login.failed`, `logout`, `logout.all`, `logout.failsafe`, `token.created`, `token.refreshed`, `token.revoked`, `token.expired`, `token.familyRevoked`, `password.changed`, `password.resetRequested`, `password.reset`, `password.resetDeliveryFailed`, `otp.deliveryFailed`, `session.created`, `session.destroyed`, `cleanup.completed`.
 
 Source: `@warlock.js/auth/src/services/auth-events.ts`.
 
@@ -319,10 +319,14 @@ enum AuthErrorCodes {
   CsrfOriginMismatch = "EC006", // New in 5.12
   EmailNotVerified = "EC007", // New in 5.13
   InvalidOneTimeToken = "EC008", // New in 5.13
+  InvalidProviderCallback = "EC009",
+  ProviderEmailNotVerified = "EC010",
+  InvalidPasskey = "EC011",
+  ProviderAccountLinkBlocked = "EC012", // New in 5.53
 }
 ```
 
-The error-code values the middleware (and the login-throttle guard) return alongside the localized message. Switch on these on the client. `CsrfOriginMismatch` (`EC006`) is new in 5.12 — see [Protect routes → CSRF Origin check](../guides/protect-routes.md#csrf-origin-check-for-cookie-auth). `EmailNotVerified` (`EC007`, thrown by `requireVerifiedEmail()`) and `InvalidOneTimeToken` (`EC008`, one code for an unknown/wrong-purpose/expired/used verification or reset token) are new in 5.13 — see [Verify email and reset password](../guides/verify-email-and-reset-password.md).
+The error-code values the middleware (and the login-throttle guard) return alongside the localized message. Switch on these on the client. `CsrfOriginMismatch` (`EC006`) is new in 5.12 — see [Protect routes → CSRF Origin check](../guides/protect-routes.md#csrf-origin-check-for-cookie-auth). `EmailNotVerified` (`EC007`, thrown by `requireVerifiedEmail()`) and `InvalidOneTimeToken` (`EC008`, one code for an unknown/wrong-purpose/expired/used verification or reset token) are new in 5.13 — see [Verify email and reset password](../guides/verify-email-and-reset-password.md). `ProviderAccountLinkBlocked` (`EC012`, thrown as `ProviderAccountLinkBlockedError`, 403) is new in 5.53: a provider login matched an existing account that `auth.providers.linkExisting` does not allow linking — see [Login with providers](../guides/login-with-providers.md).
 
 Source: `@warlock.js/auth/src/utils/auth-error-codes.ts`.
 

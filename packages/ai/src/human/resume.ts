@@ -1,5 +1,49 @@
-import type { ApprovalDecision, PendingInterrupt, ResumeOptions, ResumeResult } from "./contracts";
-import { clearSeededDecision, seedDecision } from "./resume-seed";
+import { log } from "@warlock.js/logger";
+import type {
+  ApprovalDecision,
+  InterruptStore,
+  PendingInterrupt,
+  ResumeOptions,
+  ResumeResult,
+} from "./contracts";
+import { runWithSeededDecision } from "./resume-seed";
+
+/** Whether the "store has no claim()" warning was already logged in this process. */
+let warnedMissingClaim = false;
+
+/**
+ * Take a pending interrupt so exactly one resume applies it. Uses the
+ * store's atomic `claim` when it has one; otherwise falls back to
+ * `load` + `delete` (two concurrent resumes can both pass) and logs a
+ * one-time warning naming the method to add.
+ */
+async function claimPending(
+  store: InterruptStore,
+  interruptId: string,
+): Promise<PendingInterrupt | undefined> {
+  if (typeof store.claim === "function") {
+    return store.claim(interruptId);
+  }
+
+  if (!warnedMissingClaim) {
+    warnedMissingClaim = true;
+    log.warn(
+      "ai.human",
+      "resume.claim",
+      "the interrupt store has no claim() method, so two concurrent resumes of one interrupt can both apply the decision; add claim(interruptId) that removes and returns a pending record in one atomic step",
+    );
+  }
+
+  const pending = await store.load(interruptId);
+
+  if (pending === undefined || pending.status !== "pending") {
+    return undefined;
+  }
+
+  await store.delete(interruptId);
+
+  return pending;
+}
 
 /**
  * Validate that a decision is a well-formed {@link ApprovalDecision}.
@@ -39,11 +83,12 @@ function assertDecision(decision: ApprovalDecision): void {
  * Re-run the agent for a resumed interrupt with the decision pre-seeded.
  *
  * Stages the decision in the process-local seed registry keyed by the
- * pending action's binding, then re-executes the original prompt. The agent's
+ * interrupt id and the pending action's binding, then re-executes the
+ * original prompt inside that seed scope. The agent's
  * `ai.human.approval(...)` middleware consumes the seed on the gated tool
  * call — so this time it resolves to the human's ruling instead of pausing
- * again. The seed is cleared in a `finally` so a re-run that errors before
- * the gated call never leaks a stale seed into a later run.
+ * again. The seed is dropped when the re-run settles, so a re-run that
+ * errors before the gated call never leaks a stale seed into a later run.
  */
 async function rerun<TOutput>(
   pending: PendingInterrupt,
@@ -67,23 +112,22 @@ async function rerun<TOutput>(
   const executeOptions =
     sessionId === undefined ? options.executeOptions : { ...options.executeOptions, sessionId };
 
-  seedDecision(pending.request.bindingKey, decision);
+  // The seed is scoped to this re-run: only the gated call made inside
+  // `agent.execute` below can take it, never a concurrent execution of the
+  // same agent with the same session and arguments.
+  const result = await runWithSeededDecision(
+    pending.interruptId,
+    pending.request.bindingKey,
+    decision,
+    () => agent.execute(input, executeOptions),
+  );
 
-  try {
-    const result = await agent.execute(input, executeOptions);
-
-    return {
-      type: "applied",
-      interruptId: pending.interruptId,
-      decision,
-      result,
-    };
-  } finally {
-    // If the seeded call never fired (the re-run errored early, or the
-    // policy no longer gates the tool), drop the stale seed so it cannot
-    // leak into an unrelated later run of the same agent.
-    clearSeededDecision(pending.request.bindingKey);
-  }
+  return {
+    type: "applied",
+    interruptId: pending.interruptId,
+    decision,
+    result,
+  };
 }
 
 /**
@@ -97,10 +141,13 @@ async function rerun<TOutput>(
  * resolves to the ruling instead of pausing again. It does **not** rehydrate
  * an in-flight supervisor — that is the deferred v2 lift.
  *
- * **Idempotent.** A second resume of an already-resolved (deleted) or
- * never-raised interrupt is a no-op: it returns `{ type: "already-resolved" }`
- * without re-applying the decision or re-running the turn — mirroring the
- * orchestrator resume's drain idempotency. The record is deleted **before**
+ * **Idempotent and exactly-once.** The pending record is taken with the
+ * store's atomic `claim`, so of several concurrent resumes of one interrupt
+ * (a double-clicked "Approve") exactly one applies the decision. A second
+ * resume of an already-resolved (deleted) or never-raised interrupt is a
+ * no-op: it returns `{ type: "already-resolved" }` without re-applying the
+ * decision or re-running the turn — mirroring the orchestrator resume's
+ * drain idempotency. The record is deleted **before**
  * the re-run, so even a re-run that itself raises a fresh interrupt cannot
  * collide with the one being resolved.
  *
@@ -140,19 +187,16 @@ export async function resume<TOutput = unknown>(
 ): Promise<ResumeResult<TOutput>> {
   assertDecision(decision);
 
-  const { store } = options;
-  const pending = await store.load(interruptId);
+  // Claim (remove + return in one atomic step) BEFORE the re-run so a re-run
+  // that itself raises a new interrupt cannot collide with the one being
+  // resolved, and a concurrent resume of the same id gets nothing.
+  const pending = await claimPending(options.store, interruptId);
 
-  // No live interrupt — already resolved + deleted, or never raised. Never
-  // double-apply; never re-run. Idempotent no-op.
-  if (pending === undefined || pending.status !== "pending") {
+  // No live interrupt — already resolved + deleted, claimed by a concurrent
+  // resume, or never raised. Never double-apply; never re-run.
+  if (pending === undefined) {
     return { type: "already-resolved", interruptId };
   }
-
-  // Resolve + delete BEFORE the re-run so a re-run that itself raises a new
-  // interrupt cannot collide with the one being resolved, and a concurrent
-  // resume of the same id sees it gone.
-  await store.delete(interruptId);
 
   if (!options.agent) {
     return { type: "applied", interruptId, decision };

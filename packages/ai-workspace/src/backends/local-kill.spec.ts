@@ -117,3 +117,85 @@ describe("killed commands settle at the deadline", () => {
     expect(Date.now() - killedAt).toBeLessThan(1_500);
   }, 15_000);
 });
+
+// Records its own pid in the file named by argv[2], then waits.
+const SLEEPER = `
+require("node:fs").writeFileSync(process.argv[2], String(process.pid));
+setTimeout(() => {}, 60000);
+`;
+
+describe.skipIf(process.platform === "win32")("commands die with the host on a stop signal", () => {
+  let root: string;
+  const started: number[] = [];
+
+  beforeEach(async () => {
+    root = join(tmpdir(), `ws-signal-${randomBytes(6).toString("hex")}`);
+    await mkdir(root, { recursive: true });
+    await writeFile(join(root, "sleeper.cjs"), SLEEPER);
+  });
+
+  // Only the pids this spec's own sleepers recorded are signalled.
+  afterEach(async () => {
+    for (const pid of started.splice(0)) {
+      if (alive(pid)) {
+        process.kill(pid, "SIGKILL");
+      }
+    }
+
+    await rm(root, { recursive: true, force: true });
+  });
+
+  const waitFor = async (check: () => boolean, ms: number): Promise<boolean> => {
+    for (const deadline = Date.now() + ms; Date.now() < deadline;) {
+      if (check()) {
+        return true;
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+
+    return check();
+  };
+
+  const pidFrom = (name: string): number => Number(readFileSync(join(root, name), "utf8"));
+
+  it("kills running exec commands and background jobs on SIGTERM", async () => {
+    const backend = createLocalBackend();
+
+    if (backend.start === undefined) throw new Error("the local backend supports background jobs");
+
+    // Stands in for the app's own shutdown handler, so the hook only kills
+    // the trees and does not re-raise the signal at the test runner.
+    const appHandler = (): void => {};
+
+    process.on("SIGTERM", appHandler);
+
+    try {
+      const foreground = backend.exec("node sleeper.cjs fg.pid", { cwd: root, env });
+      const job = backend.start("node sleeper.cjs bg.pid", { cwd: root, env, onOutput: () => {} });
+
+      const bothStarted = (): boolean =>
+        existsSync(join(root, "fg.pid")) && existsSync(join(root, "bg.pid"));
+
+      expect(await waitFor(bothStarted, 5_000)).toBe(true);
+
+      started.push(pidFrom("fg.pid"), pidFrom("bg.pid"));
+
+      process.emit("SIGTERM", "SIGTERM");
+
+      expect(await waitFor(() => started.every((pid) => !alive(pid)), 1_000)).toBe(true);
+      expect((await foreground).exitCode).toBe(137);
+      expect((await job.done).exitCode).toBe(137);
+    } finally {
+      process.off("SIGTERM", appHandler);
+    }
+  }, 15_000);
+
+  it("removes its signal listeners once no command is running", async () => {
+    const before = process.listenerCount("SIGINT");
+    const result = await createLocalBackend().exec("node -e 0", { cwd: root, env });
+
+    expect(result.exitCode).toBe(0);
+    expect(process.listenerCount("SIGINT")).toBe(before);
+  }, 15_000);
+});

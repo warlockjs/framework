@@ -23,7 +23,10 @@ export async function processJob(job: Job): Promise<unknown> {
     );
   }
 
-  const { payload, context: captured } = unwrapPayload(job.data);
+  const unwrapped = unwrapPayload(job.data);
+  const payload = unwrapped.payload;
+  // A job declared with `context: false` never runs inside a restored context.
+  const captured = definition.context === false ? undefined : unwrapped.context;
 
   const abort = createJobAbort(job.name, job.opts as unknown as JobTimeoutSettings);
 

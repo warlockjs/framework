@@ -41,10 +41,11 @@ const policy: OutboundPolicy = {
 | `hostAllowlist`          | `string[]`     | _(none)_            | When set, the request host must equal an entry **or be a subdomain** of one (`cdn.example.com` allows `a.cdn.example.com`). When omitted, any host passes the allowlist check — the private-IP guard still applies.                                                               |
 | `denyPrivateIPsAfterDNS` | `boolean`      | `true`              | Resolve the host through DNS and reject when it maps to a private / loopback / link-local / unique-local / cloud-metadata (`169.254.169.254`) address. The core SSRF guard — catches a public hostname that resolves inward.                                                      |
 | `maxBytes`               | `number`       | `5_242_880` (5 MiB) | Max response body in bytes. A declared `content-length` over this fails fast; otherwise the body is read with a running cap and aborted on overflow.                                                                                                                              |
-| `timeoutMs`              | `number`       | `10_000`            | Per-request timeout in milliseconds.                                                                                                                                                                                                                                              |
+| `timeoutMs`              | `number`       | `10_000`            | Deadline in milliseconds for the whole exchange: the request, every redirect hop, and the body read. A server that drips bytes cannot hold the caller past it.                                                                                                                    |
 | `maxRedirects`           | `number`       | `5`                 | Maximum redirect hops `guardedFetch` will follow. Every hop's `Location` is re-run through the same scheme / host-allowlist / private-IP checks before being followed — see [Redirects are revalidated per hop](#redirects-are-revalidated-per-hop-not-delegated-to-fetch) below. |
+| `crossOriginHeaders`     | `string[]`     | `[]`                | Header names still sent after a redirect moves to another origin, on top of the built-in non-credential set. Every other header you set is dropped on that hop — see [Redirects are revalidated per hop](#redirects-are-revalidated-per-hop-not-delegated-to-fetch).              |
 | `signal`                 | `AbortSignal`  | _(none)_            | Caller signal, merged with the internal timeout — whichever fires first aborts the request.                                                                                                                                                                                       |
-| `fetch`                  | `typeof fetch` | `globalThis.fetch`  | Injected `fetch` implementation (for tests, proxies, or a wrapper that already enforces app-level rules).                                                                                                                                                                         |
+| `fetch`                  | `typeof fetch` | `globalThis.fetch`  | Injected `fetch` implementation (for tests, proxies, or a wrapper that already enforces app-level rules). With the global `fetch`, each connection is pinned to an address that passed the private-IP check; an injected `fetch` is used as-is (the DNS pre-check still applies). |
 
 ## `resolveOutboundPolicy(policy?)`
 
@@ -59,6 +60,8 @@ const resolved = resolveOutboundPolicy();
 //   denyPrivateIPsAfterDNS: true,
 //   maxBytes: 5_242_880,
 //   timeoutMs: 10_000,
+//   maxRedirects: 5,
+//   crossOriginHeaders: [],
 //   fetch: globalThis.fetch,
 //   hostAllowlist: undefined,
 //   signal: undefined,
@@ -118,7 +121,18 @@ const body = await readTextCapped(response, policy.maxBytes);
 Validating only the _initial_ URL and then letting the platform's `fetch` follow redirects automatically leaves a gap: a URL that passes every check can still `3xx` into `http://169.254.169.254/` or an internal host, and the platform would follow it with no re-check. `guardedFetch` closes that gap — it never sets `redirect: "follow"` on the underlying request. Every hop is issued with `redirect: "manual"`, and when the response is a redirect, its `Location` header is resolved and re-run through the exact same `assertUrlAllowed` (scheme, host allowlist, post-DNS private-IP deny) **before** it is followed:
 
 - Capped at `policy.maxRedirects` (default `5`) — one hop past the cap throws `OutboundPolicyError`.
-- **Credential headers are stripped on a cross-origin hop.** `authorization`, `cookie`, and `proxy-authorization` are dropped the moment a redirect's target origin differs from the current one, so a redirect can't carry credentials meant for the original host to somewhere else.
+- **Only non-credential headers cross origins.** The moment a redirect's target origin differs from the current one, every header you set is dropped except `accept`, `accept-encoding`, `accept-language`, `cache-control`, `content-language`, `content-type`, `pragma` and `user-agent` — so an `authorization`, a cookie, or a custom secret such as `x-api-key` never reaches the other host. List a header in `crossOriginHeaders` to send it on anyway:
+
+  ```ts
+  await guardedFetch(
+    url,
+    { crossOriginHeaders: ["x-request-id"] },
+    { headers: { "x-request-id": id } },
+  );
+  ```
+
+  A same-origin hop keeps every header.
+
 - **Method/body semantics match `fetch`'s own redirect handling.** A `303` — and the legacy convention of a `301`/`302` on a non-`GET`/`HEAD` request — re-issues the next hop as a bodyless `GET`.
 - The net guarantee: a redirect can never land `guardedFetch` on a URL the original request could not have reached directly.
 
@@ -138,6 +152,8 @@ await guardedFetch(url, policy, { redirect: "error" }); // throws OutboundPolicy
 
 Reads a `Response` body as UTF-8 text with a hard byte cap. A declared `content-length` over the cap fails fast; otherwise the stream is read chunk-by-chunk and aborted the instant the running total exceeds `maxBytes`. Throws `OutboundPolicyError` on overflow.
 
+A response from `guardedFetch` keeps that request's `timeoutMs` deadline: a body still arriving when it passes rejects with `OutboundPolicyError`. If you read the body some other way, the deadline still applies — the response stream is aborted when it passes.
+
 ### `assertUrlAllowed(url, resolvedPolicy)`
 
 The validation step `guardedFetch` runs internally, exposed so you can pre-flight a URL **before** any network call: it checks the scheme allowlist, the host allowlist, and (when `denyPrivateIPsAfterDNS` is on) resolves the host via DNS and rejects any private / reserved address. Returns the parsed `URL` on success; throws `OutboundPolicyError` otherwise.
@@ -156,8 +172,13 @@ It takes a **resolved** policy — call `resolveOutboundPolicy` first.
 `denyPrivateIPsAfterDNS` is the heart of the protection, and it fails **closed**:
 
 - An **IP literal** is checked directly — `http://10.0.0.1/`, `http://[::1]/`, `http://169.254.169.254/` are all rejected.
-- A **hostname** is resolved via DNS and **every** returned address is checked, so a public-looking name that resolves inward (a DNS-rebinding or metadata-pointing host) is caught.
+- A **hostname** is resolved via DNS and **every** returned address is checked, so a public-looking name that resolves inward (a metadata-pointing host) is caught.
+- **The connection goes to the address that was checked.** With the global `fetch`, every connection — the first request and each redirect hop — resolves its host through a checked lookup and connects only to the addresses that passed. A DNS-rebinding host that answers a public address to the check and `127.0.0.1` or `169.254.169.254` a moment later is refused at connect time. TLS still verifies the certificate against the URL's host name.
 - A **resolution failure** is itself a block — if the host can't be resolved to verify it is public, the request is denied, not allowed.
+
+:::note
+Pinning works with the runtime's own `fetch` dispatcher. If your app routes `fetch` through a proxy or mock dispatcher (`setGlobalDispatcher(new ProxyAgent(…))`), requests keep going through it — the proxy resolves the name — and the DNS pre-check remains the guard. A `policy.fetch` you inject is used as-is, also with the pre-check only. If your app installed its own `Agent` as the global dispatcher with custom connect options (a private CA, a client certificate), guarded requests go through a separate pinned agent built with the default connect options; to keep your options, inject a `policy.fetch` that uses your dispatcher.
+:::
 
 `isPrivateOrReservedIp(address)` is exported standalone if you want the same private / loopback / link-local / unique-local / metadata classification in your own checks.
 

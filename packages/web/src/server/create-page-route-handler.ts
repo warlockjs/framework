@@ -742,6 +742,9 @@ export function createPageRouteHandler(options: PageRouteHandlerOptions): PageRo
         clientApiRouteNames,
         namedRouteRegistry,
         payloadBudget,
+        // This handler streams the document and serializes the data payload;
+        // it never reads `rendered.html`, so the page renders once.
+        bufferHtml: false,
       });
 
       if (rendered instanceof Response) return rendered;
@@ -902,6 +905,8 @@ export function createPageRouteHandler(options: PageRouteHandlerOptions): PageRo
         dataRepresentation: wantsData,
         cacheOptedIn: cache !== undefined,
         deferred: rendered.usesDefer ?? false,
+        request,
+        varyHeaders: cache?.varyHeaders,
       });
 
       if (varyHeader !== undefined) {

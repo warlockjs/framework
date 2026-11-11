@@ -285,24 +285,24 @@ It follows the response, not the request stream: reading the request body to the
 
 Helpers for "who is this request":
 
-| Property                       | Type                  | Note                                                       |
-| ------------------------------ | --------------------- | ---------------------------------------------------------- |
-| `request.locals.user`          | your user model       | populated by `authMiddleware`; `undefined` on guest routes |
-| `request.id`                   | `string`              | 32-char request id, regenerated per request                |
-| `request.ip`                   | `string`              | client IP (Fastify's parsed value)                         |
-| `request.realIp`               | `string`              | proxy-aware (`x-real-ip` → `x-forwarded-for` → `ip`)       |
-| `request.ips`                  | `string[]`            | the full forwarded-for chain                               |
-| `request.userAgent`            | `string \| undefined` | user-agent header                                          |
-| `request.referer`              | `string \| undefined` | referer header                                             |
-| `request.origin`               | `string`              | `Origin` header                                            |
-| `request.originDomain`         | `string \| null`      | origin's hostname (no `www.`)                              |
-| `request.method`               | `string`              | HTTP verb                                                  |
-| `request.path` / `.url`        | `string`              | URL path                                                   |
-| `request.originalUrl`          | `string`              | path + query exactly as the client sent it                 |
-| `request.originalPath`         | `string`              | pathname as sent, trailing slash kept                      |
-| `request.fullUrl`              | `string`              | scheme + host + path                                       |
-| `request.domain` / `.hostname` | `string`              | hostname (no `www.`)                                       |
-| `request.route`                | `Route`               | the matched route object                                   |
+| Property                       | Type                  | Note                                                         |
+| ------------------------------ | --------------------- | ------------------------------------------------------------ |
+| `request.locals.user`          | your user model       | populated by `authMiddleware`; `undefined` on guest routes   |
+| `request.id`                   | `string`              | 32-char request id, regenerated per request                  |
+| `request.ip`                   | `string`              | client IP (Fastify's parsed value)                           |
+| `request.realIp`               | `string`              | proxy-aware (`http.realIpHeader` → `x-forwarded-for` → `ip`) |
+| `request.ips`                  | `string[]`            | the full forwarded-for chain                                 |
+| `request.userAgent`            | `string \| undefined` | user-agent header                                            |
+| `request.referer`              | `string \| undefined` | referer header                                               |
+| `request.origin`               | `string`              | `Origin` header                                              |
+| `request.originDomain`         | `string \| null`      | origin's hostname (no `www.`)                                |
+| `request.method`               | `string`              | HTTP verb                                                    |
+| `request.path` / `.url`        | `string`              | URL path                                                     |
+| `request.originalUrl`          | `string`              | path + query exactly as the client sent it                   |
+| `request.originalPath`         | `string`              | pathname as sent, trailing slash kept                        |
+| `request.fullUrl`              | `string`              | scheme + host + path                                         |
+| `request.domain` / `.hostname` | `string`              | hostname (no `www.`)                                         |
+| `request.route`                | `Route`               | the matched route object                                     |
 
 `request.locals.user` is only present after an auth middleware sets it. On guarded routes you can trust it; on public routes, you have to narrow:
 
@@ -401,9 +401,11 @@ const theme = request.cookie("theme", "light"); // with default
 
 const hasSession = request.hasCookie("session_id");
 const all = request.cookies; // full map
+const ref = request.cookie("ref", "", { json: false }); // always the raw string
+const owner = request.signedCookie("cartOwner"); // verified; undefined if missing or edited
 ```
 
-Cookies are parsed by the framework's cookie plugin — they arrive on the request as already-decoded values. Set cookies on the **response** via `response.cookie(name, value, options)` — see [HTTP response](./http-response.md#cookies).
+Cookies are parsed by the framework's cookie plugin — they arrive on the request as already-decoded values. A cookie is whatever the client sent: `request.cookie()` parses a value that is valid JSON, so the client also picks its type; pass `{ json: false }` (or set `http.cookies.json: false`) to always get a string. For a value the client must not change, write it with `response.cookie(name, value, { signed: true })` and read it with `request.signedCookie(name, defaultValue?)`, which needs `http.cookies.secret` and returns the default for an edited or unsigned value. Set cookies on the **response** via `response.cookie(name, value, options)` — see [HTTP response](./http-response.md#cookies).
 
 `request.cookie(name)` and `request.hasCookie(name)` throw `CookieJarUnavailableError` when `@fastify/cookie` isn't registered on the Fastify instance, instead of quietly returning `undefined` / `false` — a by-name read is a deliberate assertion that the cookie should be readable, so a missing jar is a configuration fault, not an absent cookie. `request.cookies` (the plain map) stays lenient and returns `{}` in the same situation.
 

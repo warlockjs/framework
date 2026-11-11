@@ -234,6 +234,7 @@ const faqAgent = ai.agent({
       threshold: 0.95, // high enough that only true paraphrases hit
       ttlMs: 60 * 60 * 1000, // an hour — long enough to catch a burst of repeats
       namespace: "support-faq", // isolate this agent's entries on a shared driver
+      scope: "shared", // FAQ answers carry no caller's data — serve them to everyone
     }),
   ],
 });

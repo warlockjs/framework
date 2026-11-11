@@ -49,7 +49,10 @@ export async function generatePasskeyRegistrationOptions(user: Auth): Promise<Pa
       id: credential.credentialId,
       transports: credential.get("transports") ?? undefined,
     })),
-    authenticatorSelection: { residentKey: "preferred", userVerification: "preferred" },
+    authenticatorSelection: {
+      residentKey: "preferred",
+      userVerification: authConfig.passkeys.userVerification(),
+    },
   });
 
   await storePasskeyChallenge("passkey-registration", options.challenge, user);
@@ -87,7 +90,7 @@ export async function verifyPasskeyRegistration(
       expectedChallenge: challenge,
       expectedOrigin: origins,
       expectedRPID: authConfig.passkeys.settings().rpID,
-      requireUserVerification: false,
+      requireUserVerification: authConfig.passkeys.userVerification() === "required",
     });
   } catch (error) {
     throw new InvalidPasskeyError("registration-verification-failed", error);

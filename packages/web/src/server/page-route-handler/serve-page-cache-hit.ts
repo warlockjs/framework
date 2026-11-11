@@ -2,7 +2,11 @@ import { config, type Request, type Response } from "@warlock.js/core";
 import { LIVE_PAGE_REQUEST_HEADER } from "../../live-page-data";
 
 import type { PageCacheOptIn } from "../../routing/route-identity";
-import { computePageCacheKey, type PageCacheVariant } from "../page-cache-key";
+import {
+  computePageCacheKey,
+  hasUnkeyedQueryParams,
+  type PageCacheVariant,
+} from "../page-cache-key";
 import { getPageCacheEntry } from "../page-cache-store";
 import { markPageResponse } from "../set-cookie-cache-floor-hook";
 import { pageVaryHeader } from "../page-vary-header";
@@ -15,12 +19,29 @@ import { persistRequestedLocale } from "./persist-requested-locale";
 
 type SelectedPageSite = {
   key: string;
+  /** The host site selection chose, the same one the render builds its URLs from. */
+  host?: string;
   tenantKey?: string;
 };
 
 /**
+ * The selected site's host plus the port the request's `Host` header names.
+ * Site selection (and every origin URL the render writes) follows the
+ * proxy-forwarded host when `http.trustProxy` trusts it, so the key must too:
+ * keying on the raw `Host` header would file a render made for a forwarded
+ * host under the key every ordinary visitor of the `Host` computes.
+ */
+function selectedSiteCacheHost(requestHost: string, site: SelectedPageSite): string {
+  if (site.host === undefined) return requestHost.toLowerCase();
+
+  const port = requestHost.trim().match(/:(\d+)$/)?.[1];
+
+  return port === undefined ? site.host.toLowerCase() : `${site.host.toLowerCase()}:${port}`;
+}
+
+/**
  * Decides the host a page cache entry is keyed under. For a selected site, the
- * host has already passed site selection, so it is lowercased (with its port)
+ * key uses the host site selection chose (lowercased, with the request's port)
  * and never bypasses because of `app.url`. Without a selected site, `app.url`
  * permits only its configured host (case-insensitive, port-aware); a foreign
  * request host returns `"bypass"` — no lookup and no store. Without `app.url`
@@ -30,7 +51,7 @@ export function resolvePageCacheHost(
   requestHost: string,
   site?: SelectedPageSite,
 ): string | "bypass" {
-  if (site !== undefined) return requestHost.toLowerCase();
+  if (site !== undefined) return selectedSiteCacheHost(requestHost, site);
 
   const configured = config.get("app.url") as string | undefined;
 
@@ -139,7 +160,7 @@ export async function resolvePageCacheHitOrMiss(options: {
     vary: cache.varyBy?.(request),
     path: request.path,
     query: request.query as Record<string, unknown>,
-    queryAllowlist: (cache as PageCacheOptIn & { query?: string[] }).query,
+    queryAllowlist: cache.query,
     locale: request.locale,
     variant: pageCacheVariant,
     translationsRevision: options.translationsRevision,
@@ -159,7 +180,17 @@ export async function resolvePageCacheHitOrMiss(options: {
   }
 
   if (hit === undefined) {
-    return { served: false, cacheHeaderValue: "miss", cacheKey, attemptStorageAfterRender: true };
+    // A parameter left out of the key still reaches the loaders and the page,
+    // so this render may reflect it: serve it, but never store it for others.
+    return {
+      served: false,
+      cacheHeaderValue: "miss",
+      cacheKey,
+      attemptStorageAfterRender: !hasUnkeyedQueryParams(
+        request.query as Record<string, unknown>,
+        cache.query,
+      ),
+    };
   }
 
   // Middleware is the gate; the cache sits behind it. An allowlist, geo-block
@@ -225,6 +256,8 @@ export async function resolvePageCacheHitOrMiss(options: {
       dataRepresentation: pageCacheVariant === "json",
       cacheOptedIn: true,
       deferred: hit.usesDefer,
+      request,
+      varyHeaders: cache.varyHeaders,
     }),
   );
 

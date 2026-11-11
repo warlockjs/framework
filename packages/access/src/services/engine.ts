@@ -6,6 +6,7 @@ import { AccessConfigError } from "../utils/access-config-error";
 import { accessConfig } from "./access-config";
 import { matchesPermission } from "./matcher";
 import { getPolicy } from "./policies";
+import { invalidateResolutionMemo, memoizeForUser } from "./resolution-memo";
 
 const PERMISSIONS_PREFIX = "access.perms.";
 const ROLES_PREFIX = "access.roles.";
@@ -61,27 +62,63 @@ async function cached(key: string, loader: () => Promise<string[]>): Promise<str
   return value;
 }
 
-/** The user's effective permission set for a tenant (cached). */
+/**
+ * The user's effective permission set for a tenant (cached). Checks on the
+ * same user object share one resolution for a short while, so stacked gates
+ * and `canAll` / `canAny` read the shared cache once per request.
+ */
 export function permissionsFor(user: Auth, tenant?: string): Promise<string[]> {
-  return cached(cacheKey(PERMISSIONS_PREFIX, user, tenant), () =>
-    accessConfig.resolver().resolvePermissions(user, tenant),
+  const key = cacheKey(PERMISSIONS_PREFIX, user, tenant);
+
+  return memoizeForUser(user, key, () =>
+    cached(key, () => accessConfig.resolver().resolvePermissions(user, tenant)),
   );
 }
 
-/** The user's roles for a tenant (cached). */
+/** The user's roles for a tenant (cached, shared per user object like {@link permissionsFor}). */
 export function rolesFor(user: Auth, tenant?: string): Promise<string[]> {
-  return cached(cacheKey(ROLES_PREFIX, user, tenant), () =>
-    accessConfig.resolver().resolveRoles(user, tenant),
+  const key = cacheKey(ROLES_PREFIX, user, tenant);
+
+  return memoizeForUser(user, key, () =>
+    cached(key, () => accessConfig.resolver().resolveRoles(user, tenant)),
   );
 }
 
-/** Drop the cached role/permission sets for a user (after any out-of-band role change). */
+/**
+ * The tenants whose cached sets `flush(user, tenant)` must drop: the one
+ * passed, else the ambient tenant the checks themselves use (the resolver's
+ * `resolveTenant`) together with the no-tenant entry.
+ */
+function tenantsToFlush(user: Auth, tenant?: string): Array<string | undefined> {
+  if (tenant !== undefined) return [tenant];
+
+  let ambient: string | undefined;
+
+  try {
+    ambient = accessConfig.tenant(user);
+  } catch {
+    ambient = undefined;
+  }
+
+  return ambient === undefined ? [undefined] : [ambient, undefined];
+}
+
+/**
+ * Drop the cached role/permission sets for a user (after any out-of-band role
+ * change). Without a `tenant` it drops the set for the user's ambient tenant
+ * (what `can(user, …)` reads) and the no-tenant set.
+ */
 export async function flush(user: Auth, tenant?: string): Promise<void> {
   try {
-    await cache.remove(cacheKey(PERMISSIONS_PREFIX, user, tenant));
-    await cache.remove(cacheKey(ROLES_PREFIX, user, tenant));
+    for (const target of tenantsToFlush(user, tenant)) {
+      await cache.remove(cacheKey(PERMISSIONS_PREFIX, user, target));
+      await cache.remove(cacheKey(ROLES_PREFIX, user, target));
+    }
   } catch (error) {
     log.error("access", "cache", error);
+  } finally {
+    // After the shared entries are gone, so a check cannot re-memoise them.
+    invalidateResolutionMemo();
   }
 }
 

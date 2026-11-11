@@ -6,6 +6,7 @@ import type {
   ProviderProfile,
 } from "../contracts/providers";
 import { InvalidProviderCallbackError } from "../errors/invalid-provider-callback.error";
+import { providerTimeoutMs } from "./provider-timeout";
 import { pkceChallenge } from "./google-provider";
 
 const AUTHORIZATION_ENDPOINT = "https://discord.com/oauth2/authorize";
@@ -31,7 +32,12 @@ type DiscordUser = {
 export class DiscordProvider implements AuthProvider {
   public readonly name = "discord";
 
-  public constructor(private readonly settings: DiscordProviderConfig) {}
+  /** Deadline for each request to Discord, in milliseconds. */
+  private readonly timeoutMs: number;
+
+  public constructor(private readonly settings: DiscordProviderConfig) {
+    this.timeoutMs = providerTimeoutMs("Discord", settings.timeoutMs);
+  }
 
   public authorizationUrl(state: ProviderAuthorizationState): string {
     const url = new URL(AUTHORIZATION_ENDPOINT);
@@ -83,6 +89,7 @@ export class DiscordProvider implements AuthProvider {
 
     try {
       const response = await fetch(TOKEN_ENDPOINT, {
+        signal: AbortSignal.timeout(this.timeoutMs),
         method: "POST",
         headers: { "content-type": "application/x-www-form-urlencoded" },
         body: new URLSearchParams({
@@ -114,6 +121,7 @@ export class DiscordProvider implements AuthProvider {
   private async fetchUser(accessToken: string): Promise<DiscordUser> {
     try {
       const response = await fetch(USER_ENDPOINT, {
+        signal: AbortSignal.timeout(this.timeoutMs),
         headers: { authorization: `Bearer ${accessToken}` },
       });
 

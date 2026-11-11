@@ -26,4 +26,5 @@ export {
 
 export type { DashboardHandle, DashboardOptions } from "./dashboard.type";
 export type { ServeConfig } from "./serve";
+export type { TraceSpanSummary, TraceSummary } from "./trace-summary";
 export type { PromptGroup, SessionGroup, TraceFilter, TypeGroup, TypeStat } from "./trace-filter";

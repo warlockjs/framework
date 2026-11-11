@@ -124,10 +124,25 @@ export function skills(config: SkillsConfig): SkillsContract {
       // and a candidate can never be written, let alone injected.
       if (reviewExposed && config.review) {
         const reviewStore = config.review.store;
+        const allowUpdates = config.review.allowUpdates === true;
 
         entries.push(
           saveSkillTool({
-            saveCandidate: (record) => reviewStore.saveCandidate(record),
+            saveCandidate: async (record) => {
+              // Unless updates are allowed, a candidate may not take the
+              // name of a skill the library (or the review store) serves.
+              if (
+                !allowUpdates &&
+                ((await loadRecord(stores, record.name)) ??
+                  (await reviewStore.load(record.name))) !== undefined
+              ) {
+                throw new Error(
+                  `A skill named "${record.name}" already exists; propose the skill under a new name.`,
+                );
+              }
+
+              return reviewStore.saveCandidate(record);
+            },
             onSaved: (record) =>
               emit({ type: "saved", skill: record.name, version: record.version, runId }),
           }),

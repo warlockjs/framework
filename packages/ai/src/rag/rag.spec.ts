@@ -214,3 +214,112 @@ describe("rag — index → retrieve", () => {
     expect(() => rag({ embedder: new FakeEmbedder() })).toThrow(/store/);
   });
 });
+
+describe("rag — namespace isolation", () => {
+  it("does not return the chunks of a nested namespace on the same store", async () => {
+    const store = makeStore();
+    const publicKb = rag({
+      namespace: "kb.acme",
+      embedder: new FakeEmbedder(),
+      store,
+      chunk: { size: 1000 },
+    });
+    const privateKb = rag({
+      namespace: "kb.acme.private",
+      embedder: new FakeEmbedder(),
+      store,
+      chunk: { size: 1000 },
+    });
+
+    await publicKb.index(makeDocs([{ id: "faq", text: "opening hours and holidays" }]));
+    await privateKb.index(
+      makeDocs([{ id: "salaries", text: "opening hours and holidays payroll" }]),
+    );
+
+    const fromPublic = await publicKb.retrieve("opening hours", { topK: 5, threshold: 0 });
+    expect(fromPublic.chunks.map((chunk) => chunk.citation.sourceId)).toEqual(["faq"]);
+
+    const fromPrivate = await privateKb.retrieve("opening hours", { topK: 5, threshold: 0 });
+    expect(fromPrivate.chunks.map((chunk) => chunk.citation.sourceId)).toEqual(["salaries"]);
+  });
+
+  it("keeps a dotted document id apart from a namespace of the same spelling", async () => {
+    const store = makeStore();
+    const outer = rag({
+      namespace: "kb",
+      embedder: new FakeEmbedder(),
+      store,
+      chunk: { size: 1000 },
+    });
+    const inner = rag({
+      namespace: "kb.acme",
+      embedder: new FakeEmbedder(),
+      store,
+      chunk: { size: 1000 },
+    });
+
+    // Same raw key spelling `kb.acme.x.0` before ids were encoded.
+    await outer.index(makeDocs([{ id: "acme.x", text: "outer document text" }]));
+    await inner.index(makeDocs([{ id: "x", text: "inner document text" }]));
+
+    const fromOuter = await outer.retrieve("document text", { topK: 5, threshold: 0 });
+    const fromInner = await inner.retrieve("document text", { topK: 5, threshold: 0 });
+
+    expect(fromOuter.chunks.map((chunk) => chunk.text)).toEqual(["outer document text"]);
+    expect(fromInner.chunks.map((chunk) => chunk.text)).toEqual(["inner document text"]);
+  });
+
+  it("still reads a chunk indexed before namespaces were recorded", async () => {
+    const store = makeStore();
+    const embedder = new FakeEmbedder();
+    const kb = rag({ namespace: "kb.acme", embedder, store, chunk: { size: 1000 } });
+    const { vector } = await embedder.embed("legacy chunk");
+
+    // The pre-upgrade shape: no `namespace` field.
+    await store.set(
+      "kb.acme.old.0",
+      { sourceId: "old", chunkIndex: 0, span: [0, 12], text: "legacy chunk" },
+      { vector },
+    );
+    // A pre-upgrade chunk of the nested namespace stays out.
+    await store.set(
+      "kb.acme.private.secret.0",
+      { sourceId: "secret", chunkIndex: 0, span: [0, 12], text: "legacy chunk" },
+      { vector },
+    );
+
+    const result = await kb.retrieve("legacy chunk", { topK: 5, threshold: 0 });
+
+    expect(result.chunks.map((chunk) => chunk.citation.sourceId)).toEqual(["old"]);
+  });
+
+  it("finds its own chunks when other namespaces crowd the nearest results", async () => {
+    const store = makeStore();
+    const crowd = rag({
+      namespace: "kb.crowd",
+      embedder: new FakeEmbedder(),
+      store,
+      chunk: { size: 1000 },
+    });
+    const mine = rag({
+      namespace: "kb.mine",
+      embedder: new FakeEmbedder(),
+      store,
+      chunk: { size: 1000 },
+    });
+
+    await crowd.index(
+      makeDocs(
+        Array.from({ length: 120 }, (_, index) => ({
+          id: `c${index}`,
+          text: "shared topic words",
+        })),
+      ),
+    );
+    await mine.index(makeDocs([{ id: "own", text: "shared topic words plus mine" }]));
+
+    const result = await mine.retrieve("shared topic words", { topK: 2, threshold: 0 });
+
+    expect(result.chunks.map((chunk) => chunk.citation.sourceId)).toEqual(["own"]);
+  });
+});

@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { readFile, realpath } from "node:fs/promises";
 import { extname, isAbsolute, relative, resolve as resolvePath } from "node:path";
 import type { AttachmentPolicy } from "../contracts/attachment-policy.type";
 import type { Attachment } from "../contracts/attachment.type";
@@ -149,8 +149,8 @@ async function prepareBinaryPart(
     );
   }
 
-  enforceLocalPathPolicy(resolved.value, bareString, policy);
-  const bytes = await readFile(resolved.value);
+  const localPath = await enforceLocalPathPolicy(resolved.value, bareString, policy);
+  const bytes = await readFile(localPath);
 
   return { type: kind, source: { base64: bytes.toString("base64"), mediaType } };
 }
@@ -199,8 +199,8 @@ async function prepareImagePart(
     );
   }
 
-  enforceLocalPathPolicy(resolved.value, bareString, policy);
-  const bytes = await readFile(resolved.value);
+  const localPath = await enforceLocalPathPolicy(resolved.value, bareString, policy);
+  const bytes = await readFile(localPath);
 
   return {
     type: "image",
@@ -251,8 +251,8 @@ async function prepareTextPart(
     return { type: "text", text: decoded };
   }
 
-  enforceLocalPathPolicy(resolved.value, bareString, policy);
-  const bytes = await readFile(resolved.value, "utf8");
+  const localPath = await enforceLocalPathPolicy(resolved.value, bareString, policy);
+  const bytes = await readFile(localPath, "utf8");
 
   return { type: "text", text: bytes };
 }
@@ -261,20 +261,23 @@ async function prepareTextPart(
 let warnedBareLocalPath = false;
 
 /**
- * Enforce the local-file half of {@link AttachmentPolicy} (S1):
+ * Enforce the local-file half of {@link AttachmentPolicy} (S1) and return
+ * the path to read:
  *
  * - **Bare-string local paths** are staged for deprecation. With
- *   `allowBareLocalPaths: false` they hard-deny now; otherwise they warn
+ *   `allowBareLocalPaths: false` they hard-deny now; left unset they warn
  *   once (outside tests) — the typed `StorageFile.absolutePath` route is
  *   the supported way to read a local file.
- * - **`allowedRoots` sandbox** — when set, the resolved path must live
- *   inside one of the roots, else the read is refused.
+ * - **`allowedRoots` sandbox** — when set, the path and the roots are
+ *   resolved through symbolic links first, the real path must live inside
+ *   one of the real roots, and that real path is what gets read. A link
+ *   inside a root that points outside it is refused.
  */
-function enforceLocalPathPolicy(
+async function enforceLocalPathPolicy(
   path: string,
   bareString: boolean,
   policy: AttachmentPolicy | undefined,
-): void {
+): Promise<string> {
   if (bareString) {
     if (policy?.allowBareLocalPaths === false) {
       throw new OutboundPolicyError(
@@ -283,30 +286,62 @@ function enforceLocalPathPolicy(
       );
     }
 
-    if (!warnedBareLocalPath && !process.env.VITEST && process.env.NODE_ENV !== "test") {
+    if (
+      policy?.allowBareLocalPaths === undefined &&
+      !warnedBareLocalPath &&
+      !process.env.VITEST &&
+      process.env.NODE_ENV !== "test"
+    ) {
       warnedBareLocalPath = true;
       console.warn(
-        "[warlock-ai] reading a local file attachment from a bare string path is deprecated and will be denied by default in a future minor. " +
-          "Pass a typed `{ type, source: { absolutePath } }` StorageFile and confine reads with `attachmentPolicy.allowedRoots`.",
+        "[warlock-ai] an attachment was read from local disk because a plain string looked like a file path. " +
+          "If attachments can come from users, set `attachmentPolicy.allowBareLocalPaths: false` (it becomes the default in the next major) " +
+          "and pass local files as typed `{ type, source: { absolutePath } }` StorageFiles confined by `attachmentPolicy.allowedRoots`; " +
+          "set `allowBareLocalPaths: true` to keep reading them and silence this warning.",
       );
     }
   }
 
   const roots = policy?.allowedRoots;
-  if (roots && roots.length > 0) {
-    const target = resolvePath(path);
-    const inside = roots.some((root) => {
-      const rel = relative(resolvePath(root), target);
-      return rel === "" || (!rel.startsWith("..") && !isAbsolute(rel));
-    });
-
-    if (!inside) {
-      throw new OutboundPolicyError(
-        `local file attachment "${path}" is outside the allowed roots`,
-        { context: { path, allowedRoots: roots } },
-      );
-    }
+  if (!roots || roots.length === 0) {
+    return path;
   }
+
+  const outside = (): OutboundPolicyError =>
+    new OutboundPolicyError(
+      `local file attachment "${path}" is outside the allowed roots (symbolic links are followed before the check) — move the file under \`attachmentPolicy.allowedRoots\` or add its folder there`,
+      { context: { path, allowedRoots: roots } },
+    );
+
+  if (
+    !isInsideAny(
+      resolvePath(path),
+      roots.map((root) => resolvePath(root)),
+    )
+  ) {
+    throw outside();
+  }
+
+  // A missing file fails here with the same filesystem error the read
+  // would have raised.
+  const target = await realpath(resolvePath(path));
+  const realRoots = await Promise.all(
+    roots.map((root) => realpath(resolvePath(root)).catch(() => resolvePath(root))),
+  );
+
+  if (!isInsideAny(target, realRoots)) {
+    throw outside();
+  }
+
+  return target;
+}
+
+/** Whether `target` equals or lives under one of `roots` (all absolute). */
+function isInsideAny(target: string, roots: string[]): boolean {
+  return roots.some((root) => {
+    const rel = relative(root, target);
+    return rel === "" || (!rel.startsWith("..") && !isAbsolute(rel));
+  });
 }
 
 function isTaggedAttachment(

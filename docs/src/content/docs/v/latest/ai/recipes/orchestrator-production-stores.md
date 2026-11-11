@@ -276,7 +276,7 @@ export const supportBot = ai.orchestrator({
 });
 ```
 
-`keepSnapshots` is a `number | "all"` and **defaults to `100`**. After every successful `save()`, the orchestrator calls the store's `prune()` to delete rows whose `turn_index` falls below `(max_turn_index - keepSnapshots)` for that session — so each session keeps at most the latest `keepSnapshots` turns. Setting `keepSnapshots: "all"` disables pruning entirely (the orchestrator skips the `prune()` call); use it only when you genuinely need the full per-turn audit trail and have your own retention story.
+`keepSnapshots` is a `number | "all"` and **defaults to `100`**. After every successful `save()`, the orchestrator calls the store's `prune(orchestratorName, sessionId, keepBeforeTurnIndex)` with `keepBeforeTurnIndex = latest turn_index - keepSnapshots + 1`, and the store deletes every row whose `turn_index` is below that bound — so each session keeps exactly the latest `keepSnapshots` turns on the memory, pg and redis stores alike. A custom store's `prune()` receives the same turn-index bound, not a row count. Setting `keepSnapshots: "all"` disables pruning entirely (the orchestrator skips the `prune()` call); use it only when you genuinely need the full per-turn audit trail and have your own retention story.
 
 A few mechanics worth knowing:
 
@@ -291,8 +291,10 @@ Across a horizontally-scaled deployment, the stores are shared but the orchestra
 
 Why it matters for each store:
 
-- **Redis checkpoint store.** A session is one JSON document, and `save()` is a read-modify-write (load the document, push the new row, write it back). Two concurrent turns for one session would interleave that read-modify-write and lose a row. The store is correct _only_ under per-session serialization.
-- **Postgres checkpoint store.** `save()` is a single append-only `INSERT`, so the database protects you from a silent clobber — but two concurrent turns would both compute the same next `turn_index` and the second `INSERT` collides on the primary key `(orchestrator_name, session_id, turn_index)` and throws. That is a hard failure, not corruption, but it is still a turn you have to retry. Serializing per session avoids it.
+- **Redis checkpoint store.** Each turn is stored under its own key (`<prefix>:turn:<name>:<sessionId>:<turn>`) next to a small session head (`<prefix>:session:<name>:<sessionId>`) that records the stored turn range, so a `save()` writes one turn plus the head and a `load()` reads the head plus the latest turn — the cost per turn stays the same however long the session runs. The head is a read-modify-write, so two concurrent turns for one session could still race on it. The store is correct _only_ under per-session serialization.
+- **Redis session index.** When your client exposes the set commands (`sAdd`/`sRem`/`sMembers` on `redis`, `sadd`/`srem`/`smembers` on `ioredis`), the checkpoint store keeps the session ids for `list()` in a Redis set (`<prefix>:sessions:<name>`) and the interrupt store keeps its ids in `<prefix>index:set`, so concurrent new sessions never drop an id and a save never reads the whole index. A client with only `get`/`set`/`del` keeps the JSON-array index. With a checkpoint `ttl`, `list()` drops ids whose session has expired.
+- **Upgrading from an earlier release.** Sessions written as one JSON document (`{ rows: [...] }` under the session key) still load; the next `save()` or `prune()` moves their rows to per-turn keys. An earlier JSON index is copied into the Redis set on first use and then deleted.
+- **Postgres checkpoint store.** `save()` is one `INSERT` per turn, so the database protects you from a silent clobber — but two concurrent turns would both compute the same next `turn_index`, and the second save of that turn with a different `state` is refused with an error ("already saved with a different state"). That is a hard failure, not corruption, but it is still a turn you have to retry. Serializing per session avoids it. A re-save of the same turn with the same `state` (the orchestrator stamping or clearing the compaction lock, or recording `summarized_through`) updates that row in place.
 
 So, regardless of store, route every request for a given `sessionId` through a single in-flight turn at a time. Concretely:
 
@@ -308,7 +310,7 @@ The same lock is what the boot-drain "serialize the drain" note refers to: a `re
 :::
 
 :::note[The stores never own the connection]
-You build the `pg.Pool` / redis client, you keep it, you close it on shutdown. The stores only ever call `query` (pg) or `get`/`set`/`del` (redis). A leaked pool is your bug to fix, not the framework's — wire `pool.end()` / `redisClient.quit()` into your shutdown path.
+You build the `pg.Pool` / redis client, you keep it, you close it on shutdown. The stores only ever call `query` (pg) or `get`/`set`/`del` plus, when present, the set commands (redis). A leaked pool is your bug to fix, not the framework's — wire `pool.end()` / `redisClient.quit()` into your shutdown path.
 :::
 
 - **`ttl` is for idle cleanup, not correctness.** The pg checkpoint `ttl` marks old rows eligible for cleanup on prune; the redis `ttl` expires written keys. Don't set it shorter than your longest expected gap between user turns, or a live session can evaporate.

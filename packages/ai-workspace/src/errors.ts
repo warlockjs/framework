@@ -9,9 +9,10 @@ import { AIError, type AIErrorOptions } from "@warlock.js/ai";
  *   says why: an executable outside `shell.allow` or inside `shell.deny`, a
  *   metacharacter in argv mode, a redirection outside the jail in shell
  *   mode, …), or a mutating method was called on a read-only projection.
- * - `"unsafe-pattern"` — a `grep` pattern was too long or matched a
- *   catastrophic-backtracking shape (nested quantifiers) that could hang
- *   the process (ReDoS).
+ * - `"unsafe-pattern"` — a `grep` pattern or a `glob` / `list_dir` glob
+ *   was too long, a `grep` pattern used a lookaround or a backreference
+ *   (the linear matcher cannot run them), or a `grep` needed too much work
+ *   per character scanned.
  */
 export type WorkspacePolicyViolation = "path-escape" | "denied-command" | "unsafe-pattern";
 

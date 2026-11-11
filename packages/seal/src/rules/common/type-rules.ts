@@ -19,12 +19,14 @@ export const stringRule: SchemaRule = {
 
 /**
  * Number rule - validates number type
+ *
+ * Only finite numbers pass: `NaN`, `Infinity` and `-Infinity` are refused.
  */
 export const numberRule: SchemaRule = {
   name: "number",
   defaultErrorMessage: "The :input must be a number",
   async validate(value: any, context) {
-    if (typeof value === "number") {
+    if (typeof value === "number" && Number.isFinite(value)) {
       return VALID_RULE;
     }
     return invalidRule(this, context);

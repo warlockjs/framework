@@ -1,6 +1,7 @@
 import { Model } from "@warlock.js/cascade";
 import { v } from "@warlock.js/seal";
 import type { DeviceInfo } from "../../contracts/types";
+import { plainTokenOf, storedTokenForms } from "../../utils/token-digest";
 import { isNeverExpiring, isUsableExpiry } from "../../utils/token-expiry";
 import type { Auth } from "../auth.model";
 
@@ -59,6 +60,10 @@ export class RefreshToken extends Model {
    * `hidden` only strips it from `toJSON()` / `JSON.stringify(model)` (e.g. a
    * session list returned via `response.json`); `get("token")`,
    * `findByToken` / `findForUser` and every query still read the column.
+   *
+   * With `auth.hashTokensAtRest` on, the column holds the token's SHA-256
+   * digest instead; read the raw token of a freshly issued row through
+   * {@link plainToken}.
    */
   public static hidden = ["token"];
 
@@ -73,6 +78,15 @@ export class RefreshToken extends Model {
   /** Token family this row belongs to (rotation / replay grouping). */
   public get familyId(): string {
     return this.get("family_id");
+  }
+
+  /**
+   * The raw refresh token, when it is known: always for a row stored
+   * unhashed, and for a hashed row only in the process that just issued it
+   * (e.g. the row `authService.createRefreshToken` returns).
+   */
+  public get plainToken(): string | undefined {
+    return plainTokenOf(this, this.get("token"));
   }
 
   /**
@@ -144,7 +158,8 @@ export class RefreshToken extends Model {
   }
 
   /**
-   * Persist a freshly-signed refresh token for the user.
+   * Persist a freshly-signed refresh token for the user. `token` is the value
+   * to store: the raw JWT, or its digest under `auth.hashTokensAtRest`.
    */
   public static issue(user: Auth, token: string, options: RefreshTokenIssueOptions) {
     return this.create({
@@ -164,10 +179,11 @@ export class RefreshToken extends Model {
   }
 
   /**
-   * Find a refresh-token row by its raw token string.
+   * Find a refresh-token row by its raw token string, whether the row stores
+   * the token hashed or raw (one query).
    */
   public static findByToken(token: string): Promise<RefreshToken | null> {
-    return this.first({ token });
+    return this.query().whereIn("token", storedTokenForms(token)).first();
   }
 
   /**
@@ -175,7 +191,10 @@ export class RefreshToken extends Model {
    * revoke a token that actually belongs to them.
    */
   public static findForUser(user: Auth, token: string): Promise<RefreshToken | null> {
-    return this.first({ token, user_id: user.id });
+    return this.query()
+      .where({ user_id: user.id })
+      .whereIn("token", storedTokenForms(token))
+      .first();
   }
 
   /** Find any member of a family, including an already-revoked legacy member. */
@@ -192,10 +211,13 @@ export class RefreshToken extends Model {
   }
 
   /**
-   * Delete a specific refresh token belonging to the user.
+   * Delete a specific refresh token belonging to the user, stored hashed or raw.
    */
   public static deleteForUser(user: Auth, token: string) {
-    return this.delete({ token, user_id: user.id });
+    return this.query()
+      .where({ user_id: user.id })
+      .whereIn("token", storedTokenForms(token))
+      .delete();
   }
 
   /**

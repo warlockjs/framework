@@ -80,6 +80,9 @@ export class SoftwareAuthenticator {
 
   public counter = 0;
 
+  /** Whether assertions report user verification (PIN, biometric); off simulates a key without a PIN. */
+  public userVerified = true;
+
   private readonly privateKey: KeyObject;
 
   private readonly publicJwk: { x: string; y: string };
@@ -159,7 +162,9 @@ export class SoftwareAuthenticator {
   /** A `navigator.credentials.get()` response signing `challenge` with the current counter. */
   public authenticate(challenge: string): PasskeyResponseJSON {
     const clientDataJSON = this.clientData("webauthn.get", challenge);
-    const authData = this.authenticatorData(FLAG_USER_PRESENT | FLAG_USER_VERIFIED);
+    const authData = this.authenticatorData(
+      FLAG_USER_PRESENT | (this.userVerified ? FLAG_USER_VERIFIED : 0),
+    );
     const signature = sign("sha256", Buffer.concat([authData, sha256(clientDataJSON)]), {
       key: this.privateKey,
       dsaEncoding: "der",

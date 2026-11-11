@@ -39,6 +39,7 @@ type PanopticConfig = {
   exporters?: ExporterContract[]; // sinks the collector feeds
   cache?: CacheDriverInput; // persist traces across restarts
   dashboard?: boolean | DashboardOptions; // serve the local dashboard
+  capacity?: number; // traces kept by the store panoptic creates (default 1000)
   observeAll?: boolean; // observe every flow by default
 };
 ```
@@ -47,6 +48,7 @@ type PanopticConfig = {
 | ------------ | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `exporters`  | `[]`    | The sinks the collector fans each trace out to — a store, `consoleExporter()`, `otelExporter()`, `langfuseExporter()`, … Exactly the array you'd pass to `panoptic({ exporters })`.                                                                                                                                                                                                        |
 | `cache`      | _unset_ | A `@warlock.js/cache` `CacheDriver` (or a `() => CacheDriver \| Promise<CacheDriver>` factory) that backs a [persistent trace store](/v/latest/ai/observability/querying-traces/#persisting-traces-across-restarts). When set — and no store-shaped exporter was supplied — the dashboard reads a cache-backed store that **survives a process restart** instead of a fresh in-memory one. |
+| `capacity`   | `1000`  | How many traces the store panoptic creates for the dashboard keeps (in-memory or `cache`-backed). Past it the oldest trace is dropped. `0` keeps every trace. Ignored when you supply your own store in `exporters`.                                                                                                                                                                       |
 | `observeAll` | `false` | When `true`, every flow is observed unless it opts out. When `false`, only flows that set `observe: true` (or a flow-local observer) are collected.                                                                                                                                                                                                                                        |
 | `dashboard`  | _unset_ | `true` uses the [dashboard defaults](/v/latest/ai/observability/local-dashboard/); an object overrides them. See [the local dashboard](/v/latest/ai/observability/local-dashboard/) for the full option set.                                                                                                                                                                               |
 

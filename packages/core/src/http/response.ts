@@ -3,7 +3,6 @@ import type { OutgoingHttpHeaders } from "node:http";
 import config from "@mongez/config";
 import type { EventSubscription } from "@mongez/events";
 import events from "@mongez/events";
-import { fileExistsAsync } from "@warlock.js/fs";
 import { isIterable, isPlainObject, isScalar } from "@mongez/supportive-is";
 import type { LogLevel } from "@warlock.js/logger";
 import { log } from "@warlock.js/logger";
@@ -28,6 +27,8 @@ import type { Route } from "../router";
 import { StorageFile } from "../storage";
 import { renderReact } from "./../react";
 import type { Request } from "./request";
+import { prepareStreamCompression } from "./compression";
+import { resolveByteRange, statFile } from "./file-range";
 import { evaluateConditionalRequest } from "./conditional-request";
 import { flushPendingCookies } from "./flush-pending-cookies";
 import { streamReactResponse, type PipeableReactStream } from "./stream-react-response";
@@ -133,6 +134,11 @@ function secureCookieDefaults(): CookieSerializeOptions {
  */
 export function toSingleLineSseField(value: unknown): string {
   return String(value).replace(/[\r\n\0]/g, "");
+}
+
+/** A slot whose value an async `toJSON()` is still producing. */
+class PendingValue {
+  public constructor(public readonly promise: Promise<unknown>) {}
 }
 
 export class Response {
@@ -309,6 +315,10 @@ export class Response {
    * Trigger the response event
    */
   protected static async trigger(event: ResponseEvent, ...args: any[]) {
+    // Nothing subscribed: nothing to wait for. Listeners, when there are
+    // any, still run on a later turn of the event loop.
+    if (events.subscriptions(`response.${event}`).length === 0) return true;
+
     // make a timeout to make sure the request events is executed first
     return new Promise((resolve) => {
       setImmediate(async () => {
@@ -326,9 +336,33 @@ export class Response {
   }
 
   /**
-   * Parse the given value
+   * Parse the given value: call `toJSON()` on anything that has one (models,
+   * resources, dates), turn a `Map` into an object and any other iterable
+   * into an array, and await every async `toJSON()`.
+   *
+   * Plain data with nothing to convert is returned as it is, without a copy;
+   * a container is copied only when one of its children changed, so
+   * caller-owned (e.g. cached) objects are never rewritten. Every `toJSON()`
+   * in the tree is started in one synchronous pass and the async ones are
+   * awaited together.
    */
   public async parse(value: any): Promise<any> {
+    const pending: Promise<unknown>[] = [];
+    const parsed = this.parseNode(value, pending);
+
+    if (parsed instanceof PendingValue) return await parsed.promise;
+
+    if (pending.length > 0) await Promise.all(pending);
+
+    return parsed;
+  }
+
+  /**
+   * One synchronous step of {@link parse}. Returns the value itself when
+   * nothing under it changed, the converted value, or a {@link PendingValue}
+   * for an async `toJSON()`; the latter's slot is filled through `pending`.
+   */
+  protected parseNode(value: any, pending: Promise<unknown>[]): any {
     // if it is a falsy value, return it
     if (!value || isScalar(value)) return value;
 
@@ -339,24 +373,41 @@ export class Response {
 
     // a Map serialises as a plain object rather than an array of pairs
     if (value instanceof Map) {
-      return await this.parse(Object.fromEntries(value));
+      return this.parseNode(Object.fromEntries(value), pending);
     }
 
-    // if it has a `toJSON` method, call it and await the result then return it
+    // if it has a `toJSON` method, call it; its output is used as it is
     if (value.toJSON) {
       value.request = this.request;
-      return await value.toJSON();
+
+      const output = value.toJSON();
+
+      if (output !== null && output !== undefined && typeof output.then === "function") {
+        return new PendingValue(Promise.resolve(output));
+      }
+
+      return output;
     }
 
     // if it is iterable, an array or array-like object then parse each item
     if (isIterable(value)) {
-      const values = Array.from(value);
+      const isArray = Array.isArray(value);
+      const items: any[] = isArray ? value : Array.from(value);
+      // A non-array iterable is already copied by `Array.from`.
+      let copy: any[] | undefined = isArray ? undefined : items;
 
-      return Promise.all(
-        values.map(async (item: any) => {
-          return await this.parse(item);
-        }),
-      );
+      for (let index = 0; index < items.length; index++) {
+        const item = items[index];
+        const parsed = this.parseNode(item, pending);
+
+        if (parsed === item) continue;
+
+        copy ??= items.slice();
+
+        this.assignParsed(copy, index, parsed, pending);
+      }
+
+      return copy ?? items;
     }
 
     // if not plain object, then return it
@@ -364,15 +415,47 @@ export class Response {
       return value;
     }
 
-    // loop over the object and check if the value and call `parse` on it
-    // parse into a copy so caller-owned (e.g. cached) objects are never rewritten
-    const parsed: Record<string, any> = {};
+    let copy: Record<string, any> | undefined;
 
     for (const key in value) {
-      parsed[key] = await this.parse(value[key]);
+      const child = value[key];
+      const parsed = this.parseNode(child, pending);
+
+      if (parsed === child) continue;
+
+      if (copy === undefined) {
+        copy = {};
+
+        for (const name in value) {
+          copy[name] = value[name];
+        }
+      }
+
+      this.assignParsed(copy, key, parsed, pending);
     }
 
-    return parsed;
+    return copy ?? value;
+  }
+
+  /** Put a parsed child into its (copied) container, now or once it resolves. */
+  private assignParsed(
+    target: any,
+    key: string | number,
+    parsed: any,
+    pending: Promise<unknown>[],
+  ) {
+    if (parsed instanceof PendingValue) {
+      target[key] = undefined;
+      pending.push(
+        parsed.promise.then((resolved) => {
+          target[key] = resolved;
+        }),
+      );
+
+      return;
+    }
+
+    target[key] = parsed;
   }
 
   /**
@@ -381,11 +464,17 @@ export class Response {
   public log(message: string, level: LogLevel = "info") {
     if (!config.get("http.log")) return;
 
+    const type = phaseLogLevel(level);
+
+    // No channel keeps this level: skip building the entry and its snapshot.
+    // (A partial test double without `isEnabled` keeps every line.)
+    if (log.isEnabled?.(type) === false) return;
+
     log.log({
       module: "response",
       action: this.route.method + " " + this.route.path.replace("/*", "") + `:${this.request.id}`,
       message,
-      type: phaseLogLevel(level),
+      type,
       context: {
         request: this.request.toLogSnapshot(),
         response: { statusCode: this.statusCode },
@@ -900,11 +989,16 @@ export class Response {
 
     this.flushPendingCookies();
 
+    // `http.compression`: decided here because this stream never passes
+    // through the reply's `onSend` hooks.
+    const encoding = prepareStreamCompression(this.baseResponse, this, this.statusCode);
+
     return streamReactResponse({
       raw: this.baseResponse.raw,
       statusCode: this.statusCode,
       headers: this.getHeaders() as OutgoingHttpHeaders,
       pipeableStream,
+      encoding,
     }).then(() => {
       Response.trigger("sent", this);
       for (const callback of this.events.get("sent") || []) {
@@ -1333,16 +1427,34 @@ export class Response {
    * @example
    * // Deliberately readable by client-side JS
    * response.cookie("theme", "dark", { httpOnly: false });
+   *
+   * @example
+   * // Tamper-proof: signed with http.cookies.secret, read with request.signedCookie()
+   * response.cookie("cartOwner", ownerId, { signed: true });
+   *
+   * With `http.cookies.json: false`, string values are written as-is (like
+   * `raw: true`), matching how `request.cookie()` then reads them.
    */
   public cookie(name: string, value: CookieValue, options: CookieOptions = {}) {
     const { raw, ...cookieOptions } = options;
     const defaultOptions = config.get("http.cookies.options", {});
-    const serializedValue = raw ? String(value) : JSON.stringify(value);
+    const writeRaw =
+      raw || (typeof value === "string" && config.get("http.cookies.json") === false);
+    const serializedValue = writeRaw ? String(value) : JSON.stringify(value);
     const mergedCookieOptions = {
       ...secureCookieDefaults(),
       ...defaultOptions,
       ...cookieOptions,
     };
+
+    if (
+      mergedCookieOptions.signed &&
+      typeof (this.baseResponse as { signCookie?: unknown }).signCookie !== "function"
+    ) {
+      throw new Error(
+        `Cannot sign cookie "${name}": http.cookies.secret is not set. Set it (for example from a COOKIE_SECRET environment variable), or drop \`signed: true\`.`,
+      );
+    }
 
     if (
       typeof mergedCookieOptions.maxAge === "number" &&
@@ -1663,7 +1775,11 @@ export class Response {
   }
 
   /**
-   * Send a file as a response
+   * Send a file as a response.
+   *
+   * Answers a single `Range: bytes=…` request with 206 and only those bytes
+   * (`If-Range` honoured), so media can be seeked and downloads resumed; an
+   * unsatisfiable range answers 416. A multi-range request gets the whole file.
    */
   public async sendFile(filePath: string | StorageFile, options?: number | SendFileOptions) {
     if (filePath instanceof StorageFile) {
@@ -1672,8 +1788,10 @@ export class Response {
 
     this.log(`Sending file: ${filePath}`);
 
-    // Check if file exists first
-    if (!(await fileExistsAsync(filePath))) {
+    // One stat answers both "does it exist" and the validators below.
+    const stats = await statFile(filePath);
+
+    if (!stats) {
       return this.notFound({
         error: "File Not Found",
       });
@@ -1683,8 +1801,6 @@ export class Response {
       // Normalize options to object format
       const opts = typeof options === "number" ? { cacheTime: options } : options || {};
 
-      // Get file stats for ETag and Last-Modified
-      const stats = await fs.promises.stat(filePath);
       const lastModified = stats.mtime;
 
       // Generate ETag based on file size and modification time
@@ -1693,6 +1809,7 @@ export class Response {
       // Set Last-Modified header
       this.header("Last-Modified", lastModified.toUTCString());
       this.header("ETag", etag);
+      this.header("Accept-Ranges", "bytes");
 
       // Set content type
       const contentType = this.getFileContentType(filePath);
@@ -1709,18 +1826,48 @@ export class Response {
       );
       if (answered) return this.baseResponse;
 
-      // Use streaming for efficient file sending
-      const stream = fs.createReadStream(filePath);
+      const range = resolveByteRange({
+        method: this.request.method,
+        range: this.request.header("range"),
+        ifRange: this.request.header("if-range"),
+        etag,
+        lastModified,
+        size: stats.size,
+      });
 
-      // Handle stream errors
+      if (range === "unsatisfiable") {
+        this.log("Requested range not satisfiable, sending 416");
+        this.removeHeader("Content-Type");
+        const reply = this.baseResponse
+          .status(416)
+          .header("Content-Range", `bytes */${stats.size}`)
+          .send();
+
+        this.fireSentEvents(416);
+
+        return reply;
+      }
+
+      if (range) {
+        this.baseResponse.status(206);
+        this.currentStatusCode = 206;
+        this.header("Content-Range", `bytes ${range.start}-${range.end}/${stats.size}`);
+        this.header("Content-Length", String(range.end - range.start + 1));
+      } else {
+        this.header("Content-Length", String(stats.size));
+      }
+
+      // Use streaming for efficient file sending
+      const stream = fs.createReadStream(
+        filePath,
+        range ? { start: range.start, end: range.end } : undefined,
+      );
+
+      // A read failure is answered by the server's error handler, which
+      // keeps the client body opaque: file system messages carry absolute
+      // paths. The detail stays in the log.
       stream.on("error", (error) => {
         this.log(`Error reading file: ${error.message}`, "error");
-        if (!this.baseResponse.sent) {
-          this.serverError({
-            error: "Error reading file",
-            message: error.message,
-          });
-        }
       });
 
       // Send the stream (endTime will be set by finish event listener)
@@ -1729,7 +1876,6 @@ export class Response {
       this.log(`Error sending file: ${error.message}`, "error");
       return this.serverError({
         error: "Error sending file",
-        message: error.message,
       });
     }
   }
@@ -1813,7 +1959,7 @@ export class Response {
    */
   public async downloadFile(filePath: string, filename?: string) {
     // Check if file exists first
-    if (!(await fileExistsAsync(filePath))) {
+    if (!(await statFile(filePath))) {
       return this.notFound({
         error: "File Not Found",
       });
@@ -1834,15 +1980,10 @@ export class Response {
 
       const stream = fs.createReadStream(filePath);
 
-      // Handle stream errors
+      // A read failure is answered by the server's error handler, which
+      // keeps the client body opaque; the detail stays in the log.
       stream.on("error", (error) => {
         this.log(`Error reading file for download: ${error.message}`, "error");
-        if (!this.baseResponse.sent) {
-          this.serverError({
-            error: "Error reading file",
-            message: error.message,
-          });
-        }
       });
 
       // Send the stream (endTime will be set by finish event listener)
@@ -1851,7 +1992,6 @@ export class Response {
       this.log(`Error downloading file: ${error.message}`, "error");
       return this.serverError({
         error: "Error downloading file",
-        message: error.message,
       });
     }
   }

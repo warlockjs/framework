@@ -306,7 +306,7 @@ extractJsonSchema(lookup.input, { compact: true });
 compactJsonSchema({ type: "string", description: "Order id", examples: ["A-1"] }); // { type: "string" }
 ```
 
-Compact mode drops `description` / `title` / `examples` / `example` / `default` / `$comment` / `deprecated` / `readOnly` / `writeOnly` / `$schema` at every level and collapses `anyOf` / `oneOf` of bare `const` branches into `enum` (`{ keepDescriptions: true }` keeps descriptions). Validation and property names are untouched; the tool's own `description` is always sent. Trade-off: no per-field guidance for the model — name fields clearly and keep must-know rules in the tool `description`. `compactToolSchemas(tools)` returns compact copies for direct `model.complete(messages, { tools })` calls.
+Compact mode drops `description` / `title` / `examples` / `example` / `default` / `$comment` / `deprecated` / `readOnly` / `writeOnly` / `$schema` at every level and collapses `anyOf` / `oneOf` of bare `const` branches into `enum` (`{ keepDescriptions: true }` keeps descriptions). Validation and property names are untouched; the tool's own `description` is always sent. Trade-off: no per-field guidance for the model — name fields clearly and keep must-know rules in the tool `description`. `compactToolSchemas(tools)` returns compact copies for direct `model.complete(messages, { tools })` calls. `extractJsonSchema` converts each schema once per target + `compact` setting and returns the same object afterwards — treat it as read-only (copy before changing).
 
 ## Schema lint — per-provider checks at definition time
 

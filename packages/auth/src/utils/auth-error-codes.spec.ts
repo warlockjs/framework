@@ -19,6 +19,7 @@ describe("AuthErrorCodes", () => {
     expect(AuthErrorCodes.InvalidProviderCallback).toBe("EC009");
     expect(AuthErrorCodes.ProviderEmailNotVerified).toBe("EC010");
     expect(AuthErrorCodes.InvalidPasskey).toBe("EC011");
+    expect(AuthErrorCodes.ProviderAccountLinkBlocked).toBe("EC012");
   });
 
   it("keeps every code unique", () => {

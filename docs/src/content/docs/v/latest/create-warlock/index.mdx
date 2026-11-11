@@ -151,11 +151,13 @@ With `--pm=pnpm`, `create-warlock` reads `pnpm --version` and writes the pnpm se
 
 | pnpm             | What the app gets                                                                                                        |
 | ---------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| 10.26+, 11, 12   | `pnpm-workspace.yaml` with `allowBuilds` (and `minimumReleaseAgeExclude` for `@warlock.js/*`)                            |
+| 10.26+, 11, 12   | `pnpm-workspace.yaml` with `allowBuilds`                                                                                 |
 | 10.5 – 10.25     | the same file, plus an `onlyBuiltDependencies` list, which these versions read instead                                   |
 | 7 – 9, 10.0–10.4 | no `pnpm-workspace.yaml` (these versions reject one without `packages:`); `pnpm.onlyBuiltDependencies` in `package.json` |
 
 Inside an existing pnpm workspace the app gets neither: the parent workspace's settings apply. If you upgrade pnpm later, move the approvals to the row for the new version.
+
+During scaffolding the workspace file also carries `minimumReleaseAgeExclude: ['@warlock.js/*']`, so the first install can fetch a release published minutes earlier. `create-warlock` removes it once its installs finish: later installs in the app keep pnpm's release-age cooldown for every package, framework included. `create-warlock` runs the app's own `warlock` binary with `npx --no`, so it never downloads a package from the registry in its place.
 
 ## Where to go next
 
@@ -235,6 +237,26 @@ The contact, locale, user create/list and post create/update examples declare `r
 Oxlint enables `typescript/no-explicit-any`, explicit member accessibility, `curly`, and `no-console`. The hybrid interface-for-contracts/type-for-data convention stays a review rule because `consistent-type-definitions` only supports one global preference. App sub-folder barrels remain permitted; web imports target individual component and hook files to keep client bundles lean and server-only code out of barrels. Run `npm run lint:check` and `npm run format:check` in the generated app.
 
 These model/resource conventions apply to newly generated apps. Existing apps adopting public UUIDs must add and backfill a unique column before changing their resource output or route lookups; updating a skill alone does not migrate stored data.
+
+## Secure defaults
+
+A new app ships with these settings; review them before going live:
+
+| Setting                 | Starter value                                                                                                                                       | Where                        | How to change it                                                                                                                   |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| Largest uploaded file   | `fileUploadLimit: 10 * 1024 * 1024` (10 MB)                                                                                                         | `src/config/http.ts`         | Raise it to the largest file the app accepts. Every file part is held in memory before route middleware runs.                      |
+| CORS                    | origins listed in `CORS_ORIGINS` (comma-separated); empty = same origin only                                                                        | `.env`, `src/config/http.ts` | `CORS_ORIGINS=https://app.example.com,http://localhost:5173`                                                                       |
+| Response compression    | `compression: true` (br/gzip)                                                                                                                       | `src/config/http.ts`         | `false` when a proxy or CDN already compresses                                                                                     |
+| Multipart uploads       | `multipart: { routes: "all" }`: every route reads file uploads                                                                                      | `src/config/http.ts`         | Set `"declared"` and add `uploads: true` to each route that takes files; other routes answer 415                                   |
+| Access / refresh tokens | `accessToken.expiresIn: "1h"`, `refreshToken: { enabled: true, expiresIn: "7d" }`, `hashTokensAtRest: true` (only a digest of each token is stored) | `src/config/auth.ts`         | Clients renew with `POST /auth/refresh-token` and log out with `POST /auth/logout` (send `refreshToken` to end only that session). |
+| Production console log  | `new ConsoleLog({ minLevel: "info" })`: one line per request                                                                                        | `src/config/log.ts`          | `minLevel: "debug"` while investigating                                                                                            |
+| In-memory caches        | `maxSize: 10_000` entries each, least recently used evicted                                                                                         | `src/config/cache.ts`        | Raise or lower `maxSize`                                                                                                           |
+| Env files in git        | `.env` and `.env.*` ignored, `.env.example` tracked                                                                                                 | `.gitignore`                 | Add `!.env.shared` to commit a file without secrets                                                                                |
+| Agent skills            | `agentKit.pick` in `package.json` lists the `@warlock.js/*` and `@mongez/*` dependencies; `warlock add` appends what it installs                    | `package.json`               | Add a third-party package only after reading its `skills/` folder                                                                  |
+
+The example modules show the access checks an app needs: `/users` (list and create) requires a user whose `role` is `"admin"` (`app/auth/middleware/admin.middleware.ts`), and a post can be updated only by its author or an admin. The password-reset flow creates a 6-digit code with `node:crypto`, stores only a keyed hash of it, retires it after 5 wrong tries, throttles attempts per email and per IP, and answers `forgot-password` the same way, and as fast, for known and unknown emails (the lookup and the code are handled after the response). A refused post update stores nothing: the new image is saved only after the author check. The code is not sent until you wire your mail delivery in `app/auth/services/forgot-password.service.ts`.
+
+Apps generated by earlier versions keep their own files: copy the settings above into them where they apply.
 
 ## Client asset limits
 

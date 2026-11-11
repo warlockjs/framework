@@ -6,6 +6,7 @@ import type {
   ProviderProfile,
 } from "../contracts/providers";
 import { InvalidProviderCallbackError } from "../errors/invalid-provider-callback.error";
+import { providerTimeoutMs } from "./provider-timeout";
 import { loadOptionalPeer } from "../services/optional-peer";
 import type { JoseModule } from "./google-provider";
 import { pkceChallenge } from "./google-provider";
@@ -38,7 +39,12 @@ let linkedinKeySet: unknown;
 export class LinkedInProvider implements AuthProvider {
   public readonly name = "linkedin";
 
-  public constructor(private readonly settings: LinkedInProviderConfig) {}
+  /** Deadline for each request to LinkedIn, in milliseconds. */
+  private readonly timeoutMs: number;
+
+  public constructor(private readonly settings: LinkedInProviderConfig) {
+    this.timeoutMs = providerTimeoutMs("LinkedIn", settings.timeoutMs);
+  }
 
   public authorizationUrl(state: ProviderAuthorizationState): string {
     const url = new URL(AUTHORIZATION_ENDPOINT);
@@ -97,6 +103,7 @@ export class LinkedInProvider implements AuthProvider {
 
     try {
       const response = await fetch(TOKEN_ENDPOINT, {
+        signal: AbortSignal.timeout(this.timeoutMs),
         method: "POST",
         headers: { "content-type": "application/x-www-form-urlencoded" },
         body: new URLSearchParams({
@@ -127,7 +134,9 @@ export class LinkedInProvider implements AuthProvider {
 
   /** Verify signature, issuer, audience and expiry; resolve the claims. */
   private async verifyIdToken(jose: JoseModule, idToken: string): Promise<Record<string, unknown>> {
-    linkedinKeySet ??= jose.createRemoteJWKSet(new URL(JWKS_URI));
+    linkedinKeySet ??= jose.createRemoteJWKSet(new URL(JWKS_URI), {
+      timeoutDuration: this.timeoutMs,
+    });
 
     try {
       const { payload } = await jose.jwtVerify(idToken, linkedinKeySet, {

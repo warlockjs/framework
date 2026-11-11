@@ -236,7 +236,10 @@ export class LocalDriver implements QueueDriver {
         throw new UnrecoverableJobError(
           `No job named "${job.name}" is defined in this process. Import its definition in the worker.`,
         );
-      const { payload, context: captured } = unwrapPayload(job.data);
+      const unwrapped = unwrapPayload(job.data);
+      const payload = unwrapped.payload;
+      // A job declared with `context: false` never runs inside a restored context.
+      const captured = definition.context === false ? undefined : unwrapped.context;
       const context: JobContext = {
         id: job.id,
         name: job.name,
@@ -332,18 +335,18 @@ export class LocalDriver implements QueueDriver {
       if (!current || !ownsLease(current, token)) return false;
       update(current);
       this.store.put(current);
-      if (retain && (current.state === "completed" || current.state === "failed")) {
+      const state = current.state;
+      if (retain && (state === "completed" || state === "failed")) {
         const retention =
-          current.state === "completed"
-            ? current.options.removeOnComplete
-            : current.options.removeOnFail;
+          state === "completed" ? current.options.removeOnComplete : current.options.removeOnFail;
         if (retention === true) this.store.remove(current.queue, current.id);
-        if (typeof retention === "number") {
-          for (const old of newestFirst(this.store.list(current.queue, current.state)).slice(
-            retention,
-          ))
-            this.store.remove(old.queue, old.id);
-        }
+        if (typeof retention === "number")
+          this.store.prune(current.queue, state, { count: retention });
+        if (typeof retention === "object" && retention !== null)
+          this.store.prune(current.queue, state, {
+            count: retention.count,
+            before: retention.age === undefined ? undefined : Date.now() - retention.age,
+          });
       }
       return true;
     });

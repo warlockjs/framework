@@ -238,6 +238,13 @@ dataSourceRegistry.on("query", (event) => {
 an optional error. Postgres events can include `sql` and `bindings`; MongoDB
 events can include `collection`, `command`, and `pipeline`.
 
+Observing costs nothing until something listens: the registry subscribes to
+each driver only while it has a `query` listener of its own. On MongoDB the
+event also needs the client's command monitoring, which is on outside
+production and off in production unless the data source sets
+`queryEvents: true` (or `logging: true`) — see the
+[Configuration guide](../architecture-concepts/configuration.md#queryevents).
+
 ## Going further
 
 - **The full `connectToDatabase` option surface** for any single data source: [Configuration guide](../architecture-concepts/configuration.md)

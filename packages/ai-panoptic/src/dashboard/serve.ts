@@ -5,7 +5,8 @@ import { evaluateSystemPrompt } from "../evaluate/evaluate-system-prompt";
 import { extractLastSystemPrompt } from "../evaluate/extract-last-system-prompt";
 import { findSpanById } from "../evaluate/find-span-by-id";
 import type { TraceStoreContract } from "../store/trace-store.contract";
-import { parseQuery } from "./parse-query";
+import { parseListOptions, parseQuery } from "./parse-query";
+import { toTraceSummary } from "./trace-summary";
 import { dashboardHtml } from "./ui.html";
 
 /** Fully-resolved routing config the request handler closes over. */
@@ -112,8 +113,10 @@ function isAuthorized(
  *
  * Routes (all under `config.basePath`):
  *
- * - `GET api/traces`        → `store.query(parseQuery(searchParams))`
- * - `GET api/traces/:id`    → `store.get(id)` or `404`
+ * - `GET api/traces`        → the newest `?limit=` (default 200) matches of
+ *   `store.query(parseQuery(searchParams))`, as {@link TraceSummary}
+ *   entries (no span tree or captured content); `?full=1` returns full traces
+ * - `GET api/traces/:id`    → `store.get(id)` or `404` (`400` for a malformed id)
  * - `GET api/aggregate`     → `store.aggregate(parseQuery(searchParams))`
  * - `GET {basePath}`        → the self-contained HTML page
  * - `POST api/traces/:traceId/spans/:spanId/evaluate` → ONLY when
@@ -123,6 +126,8 @@ function isAuthorized(
  *   other route (the path is never even pattern-matched).
  *
  * Anything else → `404`. A method the matched route doesn't accept → `405`.
+ * A handler failure answers `500` instead of escaping the server's
+ * `request` listener, so one bad request can never take the app down.
  * Host allowlist + bearer-token auth (S4) are checked for EVERY request,
  * regardless of method, before any routing. The store shapes
  * ({@link Trace}/{@link TraceSpan}) are already JSON-safe, so GET responses
@@ -140,6 +145,14 @@ export function createRequestHandler(
   const apiPrefix = `${base}api`;
 
   return function handle(req: IncomingMessage, res: ServerResponse): void {
+    try {
+      route(req, res);
+    } catch {
+      sendInternalError(res);
+    }
+  };
+
+  function route(req: IncomingMessage, res: ServerResponse): void {
     // `req.url` is path + query only; a dummy origin lets URL parse it.
     const url = new URL(req.url ?? "/", "http://localhost");
     const pathname = url.pathname;
@@ -167,8 +180,16 @@ export function createRequestHandler(
     if (req.method === "POST" && config.evaluate) {
       const match = matchEvaluatePath(pathname, apiPrefix);
 
+      if (match === "malformed") {
+        sendJson(res, 400, { error: "bad_trace_id" });
+
+        return;
+      }
+
       if (match) {
-        void handleEvaluate(store, config.evaluate, match.traceId, match.spanId, req, res);
+        handleEvaluate(store, config.evaluate, match.traceId, match.spanId, req, res).catch(() =>
+          sendInternalError(res),
+        );
 
         return;
       }
@@ -181,13 +202,23 @@ export function createRequestHandler(
     }
 
     if (pathname === `${apiPrefix}/traces`) {
-      sendJson(res, 200, store.query(parseQuery(url.searchParams)));
+      const { limit, full } = parseListOptions(url.searchParams);
+      const traces = store.query(parseQuery(url.searchParams)).slice(0, limit);
+
+      sendJson(res, 200, full ? traces : traces.map(toTraceSummary));
 
       return;
     }
 
     if (pathname.startsWith(`${apiPrefix}/traces/`)) {
-      const traceId = decodeURIComponent(pathname.slice(`${apiPrefix}/traces/`.length));
+      const traceId = safeDecode(pathname.slice(`${apiPrefix}/traces/`.length));
+
+      if (traceId === undefined) {
+        sendJson(res, 400, { error: "bad_trace_id" });
+
+        return;
+      }
+
       const trace = traceId.length > 0 ? store.get(traceId) : undefined;
 
       if (trace === undefined) {
@@ -225,7 +256,30 @@ export function createRequestHandler(
     }
 
     sendJson(res, 404, { error: "not_found" });
-  };
+  }
+}
+
+/**
+ * `decodeURIComponent` that answers `undefined` for a malformed escape
+ * (`%E0%A4%A`) instead of throwing a `URIError`.
+ */
+function safeDecode(value: string): string | undefined {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return undefined;
+  }
+}
+
+/** Answer `500` unless a response is already on its way. */
+function sendInternalError(res: ServerResponse): void {
+  if (res.headersSent) {
+    res.end();
+
+    return;
+  }
+
+  sendJson(res, 500, { error: "internal" });
 }
 
 /** Write a JSON response with the given status code and security headers. */
@@ -241,12 +295,13 @@ function sendJson(res: ServerResponse, status: number, body: unknown): void {
  * Match `{apiPrefix}/traces/:traceId/spans/:spanId/evaluate` — the one
  * write route. Returns `undefined` for anything else, including the plain
  * `{apiPrefix}/traces/:id` read route (no `/spans/.../evaluate` suffix),
- * so the two never collide.
+ * so the two never collide. `"malformed"` when an id is not valid
+ * percent-encoding.
  */
 function matchEvaluatePath(
   pathname: string,
   apiPrefix: string,
-): { traceId: string; spanId: string } | undefined {
+): { traceId: string; spanId: string } | "malformed" | undefined {
   const prefix = `${apiPrefix}/traces/`;
 
   if (!pathname.startsWith(prefix)) {
@@ -259,10 +314,14 @@ function matchEvaluatePath(
     return undefined;
   }
 
-  return {
-    traceId: decodeURIComponent(match[1]),
-    spanId: decodeURIComponent(match[2]),
-  };
+  const traceId = safeDecode(match[1] ?? "");
+  const spanId = safeDecode(match[2] ?? "");
+
+  if (traceId === undefined || spanId === undefined) {
+    return "malformed";
+  }
+
+  return { traceId, spanId };
 }
 
 /**

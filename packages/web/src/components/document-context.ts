@@ -257,7 +257,7 @@ export function escapePayload(json: string): string {
  * framework injecting them by string surgery post-render (Suki, room seq
  * 1205): the resolved page metadata and the exact payload the hydration
  * script will read back. Provided once, around the root element, before
- * `renderToString` runs (`render-page.ts`'s stage 9 — the bundle is already
+ * the page renders (`render-page.ts`'s stage 9 — the bundle is already
  * complete by then). Universal: no server-only imports, so the client's
  * hydration entry (a later slice) can provide the same shape from the parsed
  * payload script.

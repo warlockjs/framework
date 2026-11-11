@@ -159,11 +159,19 @@ function select(
   return { head, tail };
 }
 
+/** Permission bits of a spill file: readable and writable by the owner only. */
+const SPILL_FILE_MODE = 0o600;
+/** Permission bits of a spill directory the workspace creates. */
+const SPILL_DIR_MODE = 0o700;
+
 /**
  * Keeps oversized command, search and read output from flooding the model:
  * with `output.spillDir` set it saves the full output to a file and returns
  * the part the policy keeps plus a pointer to it. One instance per ops layer;
- * it remembers the files it wrote so `dispose()` can remove them.
+ * it remembers the files it wrote so `dispose()` can remove them, and adds
+ * each file name to `readable` — the only spill files `read_file` may open
+ * when the spill directory is outside the jail (it may be shared with other
+ * workspaces). Files are created owner-only (`0600`).
  */
 export class OutputSpiller {
   private readonly created: string[] = [];
@@ -172,6 +180,7 @@ export class OutputSpiller {
   public constructor(
     private readonly backend: WorkspaceBackend,
     private readonly policy: WorkspacePolicy,
+    private readonly readable: Set<string> = new Set(),
   ) {
     this.dir = resolveSpillDir(policy);
 
@@ -239,9 +248,10 @@ export class OutputSpiller {
       const rand = Math.random().toString(36).slice(2, 8) || "x";
       const file = path.join(this.dir, `spill-${Date.now()}-${rand}-${safe}.txt`);
 
-      await this.backend.mkdir(this.dir);
-      await this.backend.writeFile(file, content);
+      await this.backend.mkdir(this.dir, { mode: SPILL_DIR_MODE });
+      await this.backend.writeFile(file, content, { mode: SPILL_FILE_MODE });
       this.created.push(file);
+      this.readable.add(path.basename(file));
 
       return file;
     } catch {

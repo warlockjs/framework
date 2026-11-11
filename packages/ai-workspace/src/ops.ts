@@ -5,13 +5,18 @@ import { WorkspaceEditError, WorkspacePolicyError } from "./errors";
 import { runAfterEdit } from "./hooks/after-edit";
 import { ShellOutputStreamer } from "./hooks/shell-output";
 import { OutputSpiller, splitLines } from "./output/spill";
-import { globToRegExp, isInside, matchesAnyGlob } from "./policy/jail";
+import { compileGlob, isInside, MAX_GLOB_LENGTH, matchesAnyGlob } from "./policy/jail";
 import { buildCommandEnv, resolveInJail } from "./policy/policy";
 import { refusalReason, samePattern } from "./policy/approval-helpers";
 import { checkShellCommand } from "./policy/shell-check";
 import { resolveShell, type ResolvedShell } from "./policy/shell-interpreter";
 import { DEFAULT_MAX_BACKGROUND_JOBS, ShellJobs } from "./shell-jobs";
 import { executePatch } from "./patch/execute-patch";
+import {
+  compileLinearRegex,
+  type LinearRegex,
+  UnsupportedPatternError,
+} from "./search/linear-regex";
 import {
   DEFAULT_SEARCH_CONCURRENCY,
   DEFAULT_SEARCH_MAX_FILES,
@@ -85,13 +90,34 @@ const CANCELLED_BEFORE_START_EXIT_CODE = 130;
  */
 const MAX_GREP_PATTERN_LENGTH = 200;
 /**
- * Hard ceiling on the number of characters of a single line handed to
- * `RegExp#test` during a `grep`. Catastrophic backtracking is exponential
- * in input length, so bounding the input scanned per call bounds the
- * worst-case time a single pathological line can cost — lines longer than
- * this are skipped rather than scanned.
+ * Hard ceiling on the number of characters of a single line a `grep`
+ * pattern is matched against; longer lines (minified bundles, lockfile
+ * hashes) are skipped rather than scanned.
  */
 const MAX_GREP_LINE_SCAN_LENGTH = 2000;
+/** Default largest file `grep` reads; bigger ones are skipped and counted. */
+const DEFAULT_SEARCH_MAX_FILE_BYTES = 2_000_000;
+/** Marks a `grep` candidate skipped for exceeding `search.maxFileBytes`. */
+const TOO_LARGE = Symbol("too-large");
+/**
+ * Work allowance for one `grep` call: matcher steps may not exceed this
+ * base plus {@link GREP_STEPS_PER_CHARACTER} per character scanned. Ordinary
+ * patterns use one or two steps per character; a pattern that keeps
+ * dozens of partial matches alive on every character is stopped with an
+ * error instead of scanning on.
+ */
+const GREP_BASE_STEPS = 5_000_000;
+const GREP_STEPS_PER_CHARACTER = 64;
+/**
+ * Matcher steps `grep` runs before it yields to the event loop (and checks
+ * the abort signal). A pattern near the per-character allowance over a
+ * batch of large files is still linear but slow; yielding keeps the host
+ * serving other work while it runs.
+ */
+const GREP_STEPS_PER_SLICE = 2_000_000;
+
+/** Most states a compiled `grep` pattern may have (bounded repeats expand). */
+const MAX_GREP_PATTERN_STATES = 4000;
 
 /** The `cat -n` prefix for a line: right-aligned number (min width 6) and a tab. */
 function linePrefix(lineNumber: number): string {
@@ -177,33 +203,43 @@ function capOutput(value: string, maxBytes: number): { value: string; truncated:
 }
 
 /**
- * A quantifier: `+`, `*`, `?`, or a `{m,n}` bound.
+ * Compile a model-supplied `grep` pattern with the linear matcher: within
+ * the length cap, and free of lookarounds and backreferences (which need a
+ * backtracking engine). A syntax error keeps the built-in message.
  */
-const QUANTIFIER_SOURCE = String.raw`[+*?]|\{\d*,?\d*\}`;
-
-/**
- * Heuristic catastrophic-backtracking detector: flags a quantified group
- * that itself contains a quantifier (e.g. `(a+)+`, `(a*)*`, `(.+)*`) —
- * the classic exponential-blowup shape. Not a full regex-safety analyzer
- * (it won't catch every ReDoS shape, e.g. quantified alternation like
- * `(a|a)+`), but it rejects the shape an agent is most likely to emit,
- * intentionally or via prompt injection.
- */
-const NESTED_QUANTIFIER_PATTERN = new RegExp(
-  String.raw`\([^()]*(?:${QUANTIFIER_SOURCE})[^()]*\)(?:${QUANTIFIER_SOURCE})`,
-);
-
-/**
- * Whether `pattern` is safe enough to compile and run against workspace
- * content: within the length cap and free of the nested-quantifier shape
- * that causes catastrophic regex backtracking (ReDoS).
- */
-function isSafeGrepPattern(pattern: string): boolean {
+function compileGrepPattern(pattern: string, ignoreCase: boolean): LinearRegex {
   if (pattern.length > MAX_GREP_PATTERN_LENGTH) {
-    return false;
+    throw new WorkspacePolicyError(
+      `Grep pattern is longer than ${MAX_GREP_PATTERN_LENGTH} characters; search for a shorter pattern.`,
+      { type: "unsafe-pattern", pattern },
+    );
   }
 
-  return !NESTED_QUANTIFIER_PATTERN.test(pattern);
+  try {
+    return compileLinearRegex(pattern, { ignoreCase, maxStates: MAX_GREP_PATTERN_STATES });
+  } catch (error) {
+    if (error instanceof UnsupportedPatternError) {
+      throw new WorkspacePolicyError(`Grep pattern cannot be used: ${error.message}.`, {
+        type: "unsafe-pattern",
+        pattern,
+      });
+    }
+
+    throw error;
+  }
+}
+
+/**
+ * Refuse a model-supplied glob longer than {@link MAX_GLOB_LENGTH}: every
+ * walked path is matched against it, so its length bounds the work.
+ */
+function assertGlobLength(glob: string, option: string): void {
+  if (glob.length > MAX_GLOB_LENGTH) {
+    throw new WorkspacePolicyError(
+      `The ${option} glob is longer than ${MAX_GLOB_LENGTH} characters; pass a shorter pattern.`,
+      { type: "unsafe-pattern", pattern: glob.slice(0, 80) },
+    );
+  }
 }
 
 /**
@@ -222,6 +258,8 @@ export interface OpsRuntime {
   jobs: ShellJobs;
   /** Patterns the host approved with `remember`, shared by every view of the workspace. */
   approvals?: WorkspaceCommandPattern[];
+  /** Names of the spill files this workspace wrote — the ones its reads may open. */
+  spillFiles?: Set<string>;
 }
 
 class Ops implements WorkspaceOps {
@@ -243,6 +281,9 @@ class Ops implements WorkspaceOps {
   /** Saves oversized output to files when `output.spillDir` is set. */
   private readonly spiller: OutputSpiller;
 
+  /** Spill files this workspace wrote (shared with its projections). */
+  private readonly spillFiles: Set<string>;
+
   public constructor(
     private readonly backend: WorkspaceBackend,
     private readonly policy: WorkspacePolicy,
@@ -250,7 +291,8 @@ class Ops implements WorkspaceOps {
   ) {
     this.resolvedShell = resolveShell(policy.shell);
     this.approvals = runtime.approvals ?? [];
-    this.spiller = new OutputSpiller(backend, policy);
+    this.spillFiles = runtime.spillFiles ?? new Set();
+    this.spiller = new OutputSpiller(backend, policy, this.spillFiles);
   }
 
   /** The edit-policy settings applied to every replacement. */
@@ -361,7 +403,7 @@ class Ops implements WorkspaceOps {
     inputPath: string,
     opts?: { offset?: number; limit?: number },
   ): Promise<ReadFileResult> {
-    const { absolutePath } = await resolveInJail(this.policy, inputPath, "read");
+    const { absolutePath } = await resolveInJail(this.policy, inputPath, "read", this.spillFiles);
     const raw = await this.backend.readFile(absolutePath);
 
     // Hash the full content the backend returned (SHA-256 via
@@ -888,6 +930,10 @@ class Ops implements WorkspaceOps {
     const depth = Math.min(Math.max(1, Math.floor(opts?.depth ?? 1)), maxDepth);
     const maxEntries = Math.max(1, Math.floor(listPolicy?.maxEntries ?? DEFAULT_LIST_MAX_ENTRIES));
     const ignore = [...(listPolicy?.ignore ?? DEFAULT_LIST_IGNORE), ...(opts?.ignore ?? [])];
+
+    for (const glob of opts?.ignore ?? []) {
+      assertGlobLength(glob, "list_dir ignore");
+    }
     const insideCwd = isInside(root, jailRoot);
 
     if (!(await this.isDirectory(root))) {
@@ -996,24 +1042,22 @@ class Ops implements WorkspaceOps {
     pattern: string,
     opts?: { glob?: string; ignoreCase?: boolean; path?: string; signal?: AbortSignal },
   ): Promise<GrepResult> {
-    if (!isSafeGrepPattern(pattern)) {
-      throw new WorkspacePolicyError(
-        `Grep pattern is too long or too likely to cause catastrophic regex backtracking: ${pattern}`,
-        { type: "unsafe-pattern", pattern },
-      );
+    const regex = compileGrepPattern(pattern, opts?.ignoreCase === true);
+
+    if (opts?.glob) {
+      assertGlobLength(opts.glob, "grep");
     }
 
     const { absolutePath: jailRoot } = await resolveInJail(this.policy, ".");
-    const flags = opts?.ignoreCase ? "i" : "";
-    const regex = new RegExp(pattern, flags);
-    const globRegex = opts?.glob ? globToRegExp(opts.glob) : undefined;
+    const globMatcher = opts?.glob ? compileGlob(opts.glob) : undefined;
+    const maxFileBytes = this.policy.search?.maxFileBytes ?? DEFAULT_SEARCH_MAX_FILE_BYTES;
 
     let within: string | undefined;
     let singleFile: string | undefined;
 
     if (opts?.path !== undefined && opts.path !== "" && opts.path !== ".") {
       // Jail- and deny-checked like every other path; a refusal throws.
-      const resolved = await resolveInJail(this.policy, opts.path, "read");
+      const resolved = await resolveInJail(this.policy, opts.path, "read", this.spillFiles);
 
       if (await this.isDirectory(resolved.absolutePath)) {
         within = resolved.absolutePath;
@@ -1032,7 +1076,7 @@ class Ops implements WorkspaceOps {
     for (const absFile of files) {
       const relativePath = path.relative(jailRoot, absFile).split(path.sep).join("/");
 
-      if (globRegex && !globRegex.test(relativePath)) {
+      if (globMatcher && !globMatcher.test(relativePath)) {
         continue;
       }
 
@@ -1045,17 +1089,34 @@ class Ops implements WorkspaceOps {
     }
 
     const matches: GrepMatch[] = [];
+    let skippedFiles = 0;
+    let scannedCharacters = 0;
+    let stepsAtLastYield = 0;
 
     // Read in bounded-concurrency batches, then scan each batch in sorted
-    // order so the output order never depends on read timing.
+    // order so the output order never depends on read timing. A file over
+    // `search.maxFileBytes` is skipped (and counted) without being read.
     for (let start = 0; start < candidates.length; start += GREP_READ_CONCURRENCY) {
       opts?.signal?.throwIfAborted();
 
       const batch = candidates.slice(start, start + GREP_READ_CONCURRENCY);
       const contents = await Promise.all(
-        batch.map(async ({ absFile }) => {
+        batch.map(async ({ absFile }): Promise<string | typeof TOO_LARGE | undefined> => {
           try {
-            return await this.backend.readFile(absFile);
+            if (this.backend.stat !== undefined) {
+              const stats = await this.backend.stat(absFile);
+
+              if (stats.type === "file" && stats.size > maxFileBytes) {
+                return TOO_LARGE;
+              }
+            }
+
+            const content = await this.backend.readFile(absFile);
+
+            // Without `stat` (or through a symlink) the size is known only after the read.
+            return content.length * 3 > maxFileBytes && Buffer.byteLength(content) > maxFileBytes
+              ? TOO_LARGE
+              : content;
           } catch {
             // Unreadable entry (vanished, binary handle) — skip, don't fail.
             return undefined;
@@ -1066,6 +1127,12 @@ class Ops implements WorkspaceOps {
       for (const [offset, content] of contents.entries()) {
         const relativePath = batch[offset]?.relativePath ?? "";
 
+        if (content === TOO_LARGE) {
+          skippedFiles++;
+
+          continue;
+        }
+
         if (content === undefined || content.slice(0, GREP_BINARY_SNIFF_LENGTH).includes("\0")) {
           continue;
         }
@@ -1075,31 +1142,51 @@ class Ops implements WorkspaceOps {
         for (let index = 0; index < lines.length; index++) {
           const line = lines[index] ?? "";
 
-          // Cap the input size a single `RegExp#test` call scans: backtracking
-          // cost is exponential in input length, so this bounds the worst-case
-          // time even a pathological (but length/shape-allowed) pattern can
-          // burn on any one line.
           if (line.length > MAX_GREP_LINE_SCAN_LENGTH) {
             continue;
           }
 
-          if (regex.test(line)) {
+          scannedCharacters += line.length + 1;
+
+          const found = regex.test(line);
+
+          if (regex.steps > GREP_BASE_STEPS + GREP_STEPS_PER_CHARACTER * scannedCharacters) {
+            throw new WorkspacePolicyError(
+              `Grep stopped in ${relativePath}: the pattern needs too much work on every character ` +
+                `(it keeps dozens of partial matches open). Simplify the pattern, or narrow ` +
+                `the search with path or glob.`,
+              { type: "unsafe-pattern", pattern },
+            );
+          }
+
+          if (regex.steps - stepsAtLastYield > GREP_STEPS_PER_SLICE) {
+            stepsAtLastYield = regex.steps;
+            await new Promise<void>((resolve) => setImmediate(resolve));
+            opts?.signal?.throwIfAborted();
+          }
+
+          if (found) {
             matches.push({ path: relativePath, line: index + 1, text: line });
 
             if (matches.length >= DEFAULT_MAX_GREP_MATCHES) {
-              return this.fitMatches(matches, walked.truncated);
+              return this.fitMatches(matches, walked.truncated, skippedFiles);
             }
           }
         }
       }
     }
 
-    return this.fitMatches(matches, walked.truncated);
+    return this.fitMatches(matches, walked.truncated, skippedFiles);
   }
 
   /** Apply the `output` limits to a finished match list. */
-  private async fitMatches(matches: GrepMatch[], maxFilesReached: boolean): Promise<GrepResult> {
-    const result = await this.fitMatchesWithin(matches);
+  private async fitMatches(
+    matches: GrepMatch[],
+    maxFilesReached: boolean,
+    skippedFiles: number,
+  ): Promise<GrepResult> {
+    const fitted = await this.fitMatchesWithin(matches);
+    const result = skippedFiles > 0 ? { ...fitted, skippedFiles } : fitted;
 
     return maxFilesReached ? { ...result, truncated: true, maxFilesReached: true } : result;
   }
@@ -1148,8 +1235,10 @@ class Ops implements WorkspaceOps {
     pattern: string,
     signal: AbortSignal | undefined,
   ): Promise<{ paths: string[]; maxFilesReached: boolean }> {
+    assertGlobLength(pattern, "glob");
+
     const { absolutePath: jailRoot } = await resolveInJail(this.policy, ".");
-    const regex = globToRegExp(pattern);
+    const matcher = compileGlob(pattern);
     const walked = await this.searchFiles(jailRoot, pattern, signal);
     const matched: string[] = [];
 
@@ -1160,7 +1249,7 @@ class Ops implements WorkspaceOps {
         continue;
       }
 
-      if (regex.test(relativePath)) {
+      if (matcher.test(relativePath)) {
         matched.push(relativePath);
       }
     }

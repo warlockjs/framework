@@ -82,7 +82,8 @@ From `@warlock.js/core/src/http/uploaded-file.ts`:
 | `file.name`                            | `string`                                               | sanitized original filename                    |
 | `file.mimeType`                        | `string`                                               | e.g. `"image/jpeg"`                            |
 | `file.extension`                       | `string`                                               | lowercased, no dot — e.g. `"jpg"`              |
-| `file.isImage` / `isVideo` / `isAudio` | `boolean`                                              | MIME-type prefix checks                        |
+| `file.isImage` / `isVideo` / `isAudio` | `boolean`                                              | MIME-type prefix checks (client-declared)      |
+| `await file.detectedMimeType()`        | `string \| undefined`                                  | the type the file's bytes show                 |
 | `await file.size()`                    | `number` (bytes)                                       | buffers the file on first call                 |
 | `await file.buffer()`                  | `Buffer`                                               | cached after first call                        |
 | `await file.dimensions()`              | `{ width?, height? }`                                  | empty object if not an image                   |
@@ -198,7 +199,7 @@ Inside a seal schema, file rules chain on `v.file()`:
 
 ```ts
 v.file()                                          // must be UploadedFile
-  .image()                                        // must be image MIME
+  .image()                                        // raster image by its bytes; .image({ svg: true }) allows svg
   .accept(["jpg", "png", "webp"])                 // extension allowlist
   .mimeType(["image/jpeg", "image/png"])          // MIME allowlist
   .pdf() / .excel() / .word()                     // shortcuts
@@ -298,6 +299,13 @@ The reverse direction — sending a stored file back via `response.sendFile(...)
 - **`save()` rewrites the extension on format change.** `file.format("webp").save("avatars")` produces `avatars/<name>.webp` regardless of the upload's original extension.
 - **`.use(driver)` mutates the instance.** It returns `this`; subsequent saves on the same instance keep the driver. Re-instantiate or call `.use("local")` to reset.
 - **Multipart parsing needs `fileUploadLimit` headroom.** Default is `10MB` (configurable via `http.fileUploadLimit` in `src/config/http.ts`). Schema `maxSize` is checked after parsing, so set the multipart limit at least as high.
+- **Declared types are the client's word.** `mimeType`, `extension` and `isImage` come from the request. `image()` sniffs the bytes (svg only with `{ svg: true }`); `mimeType()`/`accept()` also refuse markup bytes (svg, html, xml) unless listed. `save()` stores raster images with their sniffed type and markup as `application/octet-stream`; `uploads.trustClientContentType: true` stores the declared type instead.
+- **Total size and route opt-in.** `http.multipart.maxTotalSize` (default 25 MB) caps a whole request (413, `EC108`); `uploads: { maxTotalSize }` on a route overrides it. `http.multipart.routes: "declared"` parses multipart only on routes with `uploads: true` (others answer 415, `EC109`); the default `"all"` warns once in production.
+
+  ```ts
+  router.post("/avatars", uploadAvatar, { uploads: true });
+  ```
+
 - **`request.file("key")` returns `undefined` for missing files** — no throw. Always check before chaining.
 - **The hash is empty until save.** `file.hash` is populated by the SHA-256 from `StorageFile.data()` after `save()` resolves.
 

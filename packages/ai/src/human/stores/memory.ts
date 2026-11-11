@@ -45,6 +45,22 @@ class MemoryInterruptStore implements InterruptStore {
   }
 
   /**
+   * Take a pending interrupt: read and remove it synchronously, so only
+   * the first of several concurrent claims receives it.
+   */
+  public async claim(interruptId: string): Promise<PendingInterrupt | undefined> {
+    const record = this.interrupts.get(interruptId);
+
+    if (record === undefined || record.status !== "pending") {
+      return undefined;
+    }
+
+    this.interrupts.delete(interruptId);
+
+    return record;
+  }
+
+  /**
    * List the interrupt ids the store knows, optionally filtered by a
    * prefix. Returns a fresh array each call so a caller can mutate it
    * freely without touching the backing index.

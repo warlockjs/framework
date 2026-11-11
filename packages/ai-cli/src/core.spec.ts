@@ -1,13 +1,17 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { cli } from "./cli";
 import { ai } from "@warlock.js/ai";
 import { renderPrompt, toUsage } from "./model/cli-model";
 import { helpLists, missingFlags, parseVersion } from "./probe/probe";
 import { addUsage, ResultAggregator } from "./session/aggregate";
-import { buildEnvironment } from "./session/environment";
+import {
+  buildEnvironment,
+  resetInheritedEnvironmentWarning,
+  warnInheritedEnvironment,
+} from "./session/environment";
 import { EventLog } from "./stream/event-log";
 import { jsonLinesParser } from "./stream/json-lines";
-import { createLineSplitter } from "./stream/line-splitter";
+import { createLineSplitter, MAX_LINE_BYTES } from "./stream/line-splitter";
 import { toToml } from "./utils/toml";
 
 describe("capability probe helpers", () => {
@@ -54,6 +58,56 @@ describe("stream plumbing", () => {
     splitter.end();
 
     expect(lines).toEqual(['{"a":"é"}', '{"b":1}', "last"]);
+  });
+
+  it("keeps a very long line delivered in many chunks whole", () => {
+    const lines: string[] = [];
+    const splitter = createLineSplitter((line) => lines.push(line));
+    const body = "x".repeat(16 * 1024 * 1024);
+    const text = Buffer.from(`{"a":"${body}"}\r\n{"b":1}\n`);
+    const chunk = 64 * 1024;
+
+    for (let offset = 0; offset < text.length; offset += chunk) {
+      splitter.write(text.subarray(offset, offset + chunk));
+    }
+
+    splitter.end();
+
+    expect(lines).toHaveLength(2);
+    expect(lines[0]).toBe(`{"a":"${body}"}`);
+    expect(lines[1]).toBe('{"b":1}');
+  });
+
+  it("joins a CRLF split across chunks and emits several lines from one chunk", () => {
+    const lines: string[] = [];
+    const splitter = createLineSplitter((line) => lines.push(line));
+
+    splitter.write(Buffer.from("one\r"));
+    splitter.write(Buffer.from("\ntwo\nthree\nfo"));
+    splitter.write(Buffer.from("ur"));
+    splitter.end();
+
+    expect(lines).toEqual(["one", "two", "three", "four"]);
+  });
+
+  it("drops a line past the cap, reports it once and resumes on the next line", () => {
+    const lines: string[] = [];
+    const onOverflow = vi.fn();
+    const splitter = createLineSplitter((line) => lines.push(line), onOverflow);
+    const chunk = Buffer.alloc(4 * 1024 * 1024, "y");
+    const chunks = Math.ceil(MAX_LINE_BYTES / chunk.length) + 2;
+
+    splitter.write(Buffer.from("before\n"));
+
+    for (let index = 0; index < chunks; index++) {
+      splitter.write(chunk);
+    }
+
+    splitter.write(Buffer.from("tail-of-long-line\nafter\n"));
+    splitter.end();
+
+    expect(onOverflow).toHaveBeenCalledTimes(1);
+    expect(lines).toEqual(["before", "after"]);
   });
 
   it("skips non-JSON lines in a JSONL parser", () => {
@@ -177,6 +231,18 @@ describe("environment", () => {
     ).toMatchObject({ OPENAI_API_KEY: "sk-other" });
   });
 
+  it("passes the minimal set plus the adapter's credential variables with inheritance curated", () => {
+    expect(
+      buildEnvironment({
+        source: { ...source, ANTHROPIC_API_KEY: "sk-ant", DATABASE_URL: "postgres://secret" },
+        inherit: "curated",
+        credentials: ["ANTHROPIC_API_KEY"],
+        managed: ["CLAUDE_CONFIG_DIR"],
+        platform: "linux",
+      }),
+    ).toEqual({ PATH: "/usr/bin", HOME: "/home/dev", ANTHROPIC_API_KEY: "sk-ant" });
+  });
+
   it("treats Windows names case-insensitively", () => {
     expect(
       buildEnvironment({
@@ -187,6 +253,33 @@ describe("environment", () => {
         platform: "win32",
       }),
     ).toEqual({ PATH: "D:\\bin" });
+  });
+});
+
+describe("inheritEnv production warning", () => {
+  afterEach(() => {
+    resetInheritedEnvironmentWarning();
+    vi.restoreAllMocks();
+  });
+
+  it("warns once in production when inheritEnv is left at its default", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    warnInheritedEnvironment("Claude Code", undefined, { NODE_ENV: "production" });
+    warnInheritedEnvironment("Claude Code", undefined, { NODE_ENV: "production" });
+
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(String(warn.mock.calls[0]?.[0])).toContain("inheritEnv");
+  });
+
+  it("stays silent outside production or when inheritEnv is set explicitly", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    warnInheritedEnvironment("Claude Code", undefined, { NODE_ENV: "development" });
+    warnInheritedEnvironment("Claude Code", true, { NODE_ENV: "production" });
+    warnInheritedEnvironment("Claude Code", "curated", { NODE_ENV: "production" });
+
+    expect(warn).not.toHaveBeenCalled();
   });
 });
 

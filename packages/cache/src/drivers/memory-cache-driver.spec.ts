@@ -212,6 +212,43 @@ describe("MemoryCacheDriver", () => {
   });
 
   describe("maxSize LRU eviction", () => {
+    it("bounds the store at 10,000 entries when maxSize is not set", async () => {
+      driver.setOptions({});
+
+      for (let index = 0; index <= 10_000; index++) {
+        await driver.set(`k.${index}`, index);
+      }
+
+      await expect(driver.get("k.0")).resolves.toBeNull();
+      await expect(driver.get("k.1")).resolves.toBe(1);
+      await expect(driver.get("k.10000")).resolves.toBe(10_000);
+    });
+
+    it("keeps everything with maxSize: Infinity", async () => {
+      driver.setOptions({ maxSize: Infinity });
+
+      for (let index = 0; index <= 10_000; index++) {
+        await driver.set(`k.${index}`, index);
+      }
+
+      await expect(driver.get("k.0")).resolves.toBe(0);
+    });
+
+    it("evicts only the oldest key per overflowing write", async () => {
+      driver.setOptions({ maxSize: 1000 });
+
+      for (let index = 0; index < 1000; index++) {
+        await driver.set(`k.${index}`, index);
+      }
+
+      const drop = vi.spyOn(driver as unknown as { dropEntry: (key: string) => void }, "dropEntry");
+
+      await driver.set("k.new", 1);
+
+      expect(drop).toHaveBeenCalledTimes(1);
+      expect(drop).toHaveBeenCalledWith("k.0");
+    });
+
     it("does not evict while under the configured max", async () => {
       driver.setOptions({ maxSize: 2 });
       await driver.set("a", 1);

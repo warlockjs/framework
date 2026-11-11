@@ -26,7 +26,7 @@ ai.config({
 
 That's it. Panoptic:
 
-- creates an in-memory store and registers it as an exporter (so traces fill it as runs complete), **unless** you already passed a store via `exporters` — in which case that store is reused and the dashboard reads it;
+- creates an in-memory store that keeps the newest 1,000 traces (set `panoptic.capacity` to change it, `0` for no limit) and registers it as an exporter (so traces fill it as runs complete), **unless** you already passed a store via `exporters` — in which case that store is reused and the dashboard reads it;
 - starts the server on the configured port, binding loopback-only;
 - opens your browser at the URL when `open: true`.
 
@@ -95,8 +95,8 @@ The served page is dependency-free vanilla JS that polls the JSON API and render
 
 - **Headline aggregates** from `/api/aggregate` — trace count, completed / failed / cancelled counts, and arrow-coded token rollups (`↓input · ↑output · total`) plus total cost.
 - **A per-type Stats panel** (toggled on) above the list — one row per root type (`Agent` / `Workflow` / `Supervisor` / `Team` / `Planner` / …) with Count, Failed (and its rate), p50 and p95 latency, total Tokens, and total Cost, computed over the **active filtered set**. Distinct from the headline strip: that's whole-store counts, this breaks the current slice down by type.
-- **A newest-first trace list** from `/api/traces` (the store already sorts by root `startedAt`, descending), each row carrying a **cost-heatmap accent** tinted by its rollup cost relative to the trace's most expensive node.
-- **A two-pane drawer** per selected trace: the left pane toggles between a collapsible **nested call tree** and a **Gantt timeline** (span offset + duration, critical path highlighted); the right pane shows the selected node's detail. Both walk each trace's `root.children` — the same span tree the exporters see, with per-span status, timing, arrow-coded tokens, per-node rollup cost, and (when [content capture](/v/latest/ai/observability/what-panoptic-traces/) is on) input/output. The node detail also shows **started** and **ended** wall-clock timestamps — formatted `28 Jun 2026 03:16 PM` (named month, 12-hour, minute precision) — alongside the elapsed duration, and renders metadata keys humanized (`Supervisor Terminated By`, not raw `supervisor.terminatedBy`).
+- **A newest-first trace list** from `/api/traces` (the newest 200 trace summaries; the store already sorts by root `startedAt`, descending), each row carrying a **cost-heatmap accent** tinted by its rollup cost relative to the trace's most expensive node.
+- **A two-pane drawer** per selected trace: the left pane toggles between a collapsible **nested call tree** and a **Gantt timeline** (span offset + duration, critical path highlighted); the right pane shows the selected node's detail. Opening a trace fetches its full tree from `/api/traces/:id`; the poll re-fetches it only when the trace changes. Both panes walk each trace's `root.children` — the same span tree the exporters see, with per-span status, timing, arrow-coded tokens, per-node rollup cost, and (when [content capture](/v/latest/ai/observability/what-panoptic-traces/) is on) input/output. The node detail also shows **started** and **ended** wall-clock timestamps — formatted `28 Jun 2026 03:16 PM` (named month, 12-hour, minute precision) — alongside the elapsed duration, and renders metadata keys humanized (`Supervisor Terminated By`, not raw `supervisor.terminatedBy`).
 - **A metadata panel** — session id, ids, version, attributes — and colour-coded Title-case type labels (`Supervisor` / `Team` / `Agent` / `Tool` / …; `Team` is its own type, distinct from `Supervisor`).
 
 ### Theme, search, grouping, deep-links
@@ -110,11 +110,11 @@ The served page is dependency-free vanilla JS that polls the JSON API and render
 
 The dashboard server exposes three **read-only** `GET` routes under `basePath` (all under `{basePath}api`). They're a thin shell over the [trace store](/v/latest/ai/observability/querying-traces/), so you can also curl them or build your own UI:
 
-| Route                      | Backed by                                   | Returns                                                   |
-| -------------------------- | ------------------------------------------- | --------------------------------------------------------- |
-| `GET {base}api/traces`     | `store.query(parseQuery(searchParams))`     | Matching traces, newest-started first.                    |
-| `GET {base}api/traces/:id` | `store.get(id)`                             | One `Trace` by id, or `404 { error: "trace_not_found" }`. |
-| `GET {base}api/aggregate`  | `store.aggregate(parseQuery(searchParams))` | The `TraceAggregate` rollup for the filter.               |
+| Route                      | Backed by                                   | Returns                                                                                                            |
+| -------------------------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `GET {base}api/traces`     | `store.query(parseQuery(searchParams))`     | The newest matching trace **summaries** (see below), newest-started first.                                         |
+| `GET {base}api/traces/:id` | `store.get(id)`                             | One full `Trace` by id, `404 { error: "trace_not_found" }`, or `400 { error: "bad_trace_id" }` for a malformed id. |
+| `GET {base}api/aggregate`  | `store.aggregate(parseQuery(searchParams))` | The `TraceAggregate` rollup for the filter.                                                                        |
 
 The query string maps onto a [`TraceQuery`](/v/latest/ai/observability/querying-traces/#filtering-with-tracequery): `traceId`, `sessionId`, `status` (**repeatable** — `?status=failed&status=cancelled`), `startedAfter`, and `startedBefore`. Unknown params and unknown `status` tokens are dropped. So filtering is just a query string:
 
@@ -124,6 +124,18 @@ curl 'http://127.0.0.1:4319/api/traces?sessionId=session-42&status=failed&status
 
 # the aggregate rollup for that same slice
 curl 'http://127.0.0.1:4319/api/aggregate?sessionId=session-42'
+```
+
+### The trace list returns summaries
+
+`GET api/traces` returns at most `?limit=` entries (default `200`), each a `TraceSummary`: the trace's ids, timings, usage and root span (name, type, status, attributes, error type and message) plus `spanCount` and `totalCost`, but no span tree and no captured `input` / `output`. A poll therefore stays small however much content the traces carry. Fetch `api/traces/:id` for the full trace, or add `?full=1` to get full traces in the list (the shape before 5.53).
+
+To page back, pass `startedBefore` set to the `startedAt` of the last entry you received (the bound is inclusive, so skip the ids you already have):
+
+```bash
+curl 'http://127.0.0.1:4319/api/traces?limit=50'
+curl 'http://127.0.0.1:4319/api/traces?limit=50&startedBefore=2026-06-22T10:00:00.000Z'
+curl 'http://127.0.0.1:4319/api/traces?full=1&limit=10'   # full traces
 ```
 
 Non-`GET` methods get `405`; anything outside these routes (and the page itself) gets `404`. The store shapes are already JSON-safe, so responses are a plain `JSON.stringify` — no serializer and no write surface (these routes are read-only). When `authToken` is set, the same bearer check guards them — but these API routes accept the token **only** via the `Authorization` header, not `?token=` (that fallback exists solely for the page route) — and security headers (`nosniff`, a strict CSP, `X-Frame-Options: DENY`) ride on every response.
@@ -142,7 +154,7 @@ Going off-loopback is **gated**. Set `host` to a non-loopback value and you **mu
 - **Port in use → actionable error.** A busy port rejects with `Panoptic dashboard: port … in use; pass { port: 0 } for an ephemeral port` rather than a raw Node error. Use `port: 0` in tests so parallel runs never collide.
 - **`open: true` is best-effort.** A failed browser launch is swallowed — the server still starts and the handle still resolves. Read `handle.url` and open it yourself if nothing pops up.
 - **Started at most once.** Via `ai.config`, the dashboard is idempotent — repeat `ai.config({ panoptic: { dashboard } })` calls don't start a second server. Use the low-level `dashboard()` directly if you genuinely need more than one.
-- **Persistence is opt-in.** The default in-memory store is wiped on process exit (and bounded by its `capacity` if you set one). For trace history that survives a restart, back the dashboard with a [cache-persistent store](/v/latest/ai/observability/querying-traces/#persisting-traces-across-restarts) via [`ai.config({ panoptic: { cache } })`](/v/latest/ai/observability/configuring-panoptic/#persisting-traces-across-a-restart). For long-term archives still use a durable exporter (OTel / Langfuse / file).
+- **Persistence is opt-in.** The default in-memory store is wiped on process exit and keeps the newest 1,000 traces (`panoptic.capacity`). For trace history that survives a restart, back the dashboard with a [cache-persistent store](/v/latest/ai/observability/querying-traces/#persisting-traces-across-restarts) via [`ai.config({ panoptic: { cache } })`](/v/latest/ai/observability/configuring-panoptic/#persisting-traces-across-a-restart). For long-term archives still use a durable exporter (OTel / Langfuse / file).
 
 ## Related
 

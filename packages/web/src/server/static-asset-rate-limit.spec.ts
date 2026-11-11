@@ -28,7 +28,11 @@ const originalStrategy = Application.runtimeStrategy;
 const clientDirs: string[] = [];
 
 afterEach(async () => {
-  await getHttpServer()?.close();
+  const httpServer = getHttpServer();
+  // `fetch` keeps its sockets alive; one that turns idle just after `close()`
+  // starts would hold the close open until the keep-alive timeout.
+  httpServer?.server.closeAllConnections();
+  await httpServer?.close();
   setConfig("http", undefined);
   setConfig("storage.publicRoot", undefined);
   setConfig("app.baseUrl", undefined);

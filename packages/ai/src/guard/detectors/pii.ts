@@ -24,10 +24,14 @@ const DEFAULT_MASK = "[REDACTED]";
  * - `phone`       — North-American style, optional `+1`, separators, parens.
  * - `credit-card` — 13–16 digit runs, optional space / hyphen grouping.
  * - `ipv4`        — four dotted octets (loosely; out-of-range octets still match).
+ *
+ * `email` is not scanned with this table: a single address regex restarts
+ * inside every run of local-part characters, which costs quadratic time on
+ * input such as `"a.".repeat(n)`. {@link scanEmails} finds the same matches
+ * in one forward pass anchored on each `@`.
  */
-const CATEGORY_PATTERNS: Record<PiiCategory, RegExp> = {
+const CATEGORY_PATTERNS: Record<Exclude<PiiCategory, "email">, RegExp> = {
   ssn: /\b\d{3}[-\s]\d{2}[-\s]\d{4}\b/g,
-  email: /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g,
   phone: /(?:\+?1[-.\s]?)?(?:\(\d{3}\)|\d{3})[-.\s]?\d{3}[-.\s]?\d{4}\b/g,
   "credit-card": /\b(?:\d[ -]?){13,16}\b/g,
   ipv4: /\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/g,
@@ -77,6 +81,16 @@ function scanCategories(text: string, categories: readonly PiiCategory[]): RawHi
   const hits: RawHit[] = [];
 
   for (const category of categories) {
+    if (category === "email") {
+      // One push per hit: spreading a large hit list into `push` overflows
+      // the call stack, and a throwing detector fails open.
+      for (const hit of scanEmails(text)) {
+        hits.push(hit);
+      }
+
+      continue;
+    }
+
     const pattern = CATEGORY_PATTERNS[category];
     pattern.lastIndex = 0;
 
@@ -96,6 +110,90 @@ function scanCategories(text: string, categories: readonly PiiCategory[]): RawHi
 
       match = pattern.exec(text);
     }
+  }
+
+  return hits;
+}
+
+/**
+ * The part of an address after its `@`: domain characters, a dot, a 2+ letter
+ * top-level label and a word boundary. Run sticky at `@ + 1`; its cost is
+ * linear in the domain run that follows that one `@`.
+ */
+const EMAIL_DOMAIN = /[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/y;
+
+/** Whether `code` is an address local-part character: `[A-Za-z0-9._%+-]`. */
+function isLocalPartChar(code: number): boolean {
+  return (
+    isWordChar(code) ||
+    code === 46 /* . */ ||
+    code === 37 /* % */ ||
+    code === 43 /* + */ ||
+    code === 45 /* - */
+  );
+}
+
+/** Whether `code` is a regex word character: `[A-Za-z0-9_]`. */
+function isWordChar(code: number): boolean {
+  return (
+    (code >= 48 && code <= 57) ||
+    (code >= 65 && code <= 90) ||
+    (code >= 97 && code <= 122) ||
+    code === 95
+  );
+}
+
+/** Whether a regex `\b` holds at `index` (a word / non-word transition). */
+function isWordBoundary(text: string, index: number): boolean {
+  const before = index > 0 && isWordChar(text.charCodeAt(index - 1));
+  const after = index < text.length && isWordChar(text.charCodeAt(index));
+
+  return before !== after;
+}
+
+/**
+ * Find email addresses in one forward pass. Returns exactly the matches of
+ * `/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g`, in order, but
+ * anchors on each `@`: the local part is the run of local-part characters
+ * that ends at the `@` (starting at its first word boundary, never before the
+ * end of the previous match), and the domain is matched once from the `@`.
+ * Every character is visited a bounded number of times, so adversarial
+ * input cannot make the scan quadratic.
+ */
+function scanEmails(text: string): RawHit[] {
+  const hits: RawHit[] = [];
+  let searchFrom = 0;
+  let at = text.indexOf("@");
+
+  while (at !== -1) {
+    let runStart = at;
+
+    while (runStart > searchFrom && isLocalPartChar(text.charCodeAt(runStart - 1))) {
+      runStart -= 1;
+    }
+
+    let start = -1;
+
+    for (let index = runStart; index < at; index += 1) {
+      if (isWordBoundary(text, index)) {
+        start = index;
+        break;
+      }
+    }
+
+    if (start !== -1) {
+      EMAIL_DOMAIN.lastIndex = at + 1;
+      const domain = EMAIL_DOMAIN.exec(text);
+
+      if (domain !== null) {
+        const end = at + 1 + domain[0].length;
+
+        hits.push({ label: "email", start, end: end - 1 });
+        searchFrom = end;
+      }
+    }
+
+    at = text.indexOf("@", Math.max(at + 1, searchFrom));
   }
 
   return hits;
@@ -136,6 +234,10 @@ function scanDictionary(text: string, dictionary: readonly string[]): RawHit[] {
  * on the same characters (e.g. a credit-card run inside a phone-shaped
  * span); keeping the earliest, widest span makes redaction deterministic
  * and avoids masking a sub-span twice.
+ *
+ * Kept spans are disjoint and sorted, so the last kept span has the largest
+ * end: a hit overlaps a kept span exactly when it overlaps that last one.
+ * Comparing against it alone keeps the pass O(n log n).
  */
 function dedupeHits(hits: RawHit[]): RawHit[] {
   const sorted = [...hits].sort((a, b) => {
@@ -148,14 +250,12 @@ function dedupeHits(hits: RawHit[]): RawHit[] {
   });
 
   const kept: RawHit[] = [];
+  let lastEnd = -1;
 
   for (const hit of sorted) {
-    const overlaps = kept.some(
-      (existing) => hit.start <= existing.end && hit.end >= existing.start,
-    );
-
-    if (!overlaps) {
+    if (hit.start > lastEnd) {
       kept.push(hit);
+      lastEnd = hit.end;
     }
   }
 
@@ -163,19 +263,23 @@ function dedupeHits(hits: RawHit[]): RawHit[] {
 }
 
 /**
- * Rewrite `text`, replacing every kept hit's span with its mask. Applied
- * right-to-left so earlier offsets stay valid as later spans are spliced.
+ * Rewrite `text`, replacing every kept hit's span with its mask. The hits
+ * are disjoint, so one forward pass collects the untouched slices and masks
+ * and joins them once.
  */
 function redactText(text: string, hits: RawHit[], mask: string | undefined): string {
-  const ordered = [...hits].sort((a, b) => b.start - a.start);
-  let result = text;
+  const ordered = [...hits].sort((a, b) => a.start - b.start);
+  const parts: string[] = [];
+  let cursor = 0;
 
   for (const hit of ordered) {
-    const replacement = applyMask(mask, hit.label);
-    result = result.slice(0, hit.start) + replacement + result.slice(hit.end + 1);
+    parts.push(text.slice(cursor, hit.start), applyMask(mask, hit.label));
+    cursor = hit.end + 1;
   }
 
-  return result;
+  parts.push(text.slice(cursor));
+
+  return parts.join("");
 }
 
 /** Fold a {@link RawHit} into the public {@link GuardrailMatch} shape. */

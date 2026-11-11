@@ -6,6 +6,7 @@ import type {
   XProviderConfig,
 } from "../contracts/providers";
 import { InvalidProviderCallbackError } from "../errors/invalid-provider-callback.error";
+import { providerTimeoutMs } from "./provider-timeout";
 import { pkceChallenge } from "./google-provider";
 
 const AUTHORIZATION_ENDPOINT = "https://twitter.com/i/oauth2/authorize";
@@ -37,7 +38,12 @@ type XUser = {
 export class XProvider implements AuthProvider {
   public readonly name = "x";
 
-  public constructor(private readonly settings: XProviderConfig) {}
+  /** Deadline for each request to X, in milliseconds. */
+  private readonly timeoutMs: number;
+
+  public constructor(private readonly settings: XProviderConfig) {
+    this.timeoutMs = providerTimeoutMs("X", settings.timeoutMs);
+  }
 
   public authorizationUrl(state: ProviderAuthorizationState): string {
     const url = new URL(AUTHORIZATION_ENDPOINT);
@@ -95,6 +101,7 @@ export class XProvider implements AuthProvider {
 
     try {
       const response = await fetch(TOKEN_ENDPOINT, {
+        signal: AbortSignal.timeout(this.timeoutMs),
         method: "POST",
         headers: {
           "content-type": "application/x-www-form-urlencoded",
@@ -136,6 +143,7 @@ export class XProvider implements AuthProvider {
       url.searchParams.set("user.fields", "profile_image_url");
 
       const response = await fetch(url.toString(), {
+        signal: AbortSignal.timeout(this.timeoutMs),
         headers: { authorization: `Bearer ${accessToken}` },
       });
 

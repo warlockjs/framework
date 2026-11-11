@@ -77,6 +77,8 @@ type FakeDocumentOptions = {
   payloadText?: string | null;
   withRoot?: boolean;
   withLegacyRoot?: boolean;
+  /** The `content` of `<meta name="warlock-locale-routing">`; absent means no tag. */
+  localeRoutingMeta?: string;
 };
 
 let root: FakeRoot;
@@ -86,6 +88,7 @@ function installFakeDocument(options: FakeDocumentOptions = {}): void {
     payloadText = stringify(validPayload),
     withRoot = true,
     withLegacyRoot = false,
+    localeRoutingMeta,
   } = options;
 
   root = { id: HYDRATION_ROOT_ID, innerHTML: SERVER_MARKUP };
@@ -99,6 +102,13 @@ function installFakeDocument(options: FakeDocumentOptions = {}): void {
       if (id === HYDRATION_ROOT_ID) return withRoot ? root : null;
 
       if (id === "root") return withLegacyRoot ? { id: "root", innerHTML: SERVER_MARKUP } : null;
+
+      return null;
+    },
+    querySelector(selector: string) {
+      if (selector === 'meta[name="warlock-locale-routing"]' && localeRoutingMeta !== undefined) {
+        return { getAttribute: (name: string) => (name === "content" ? localeRoutingMeta : null) };
+      }
 
       return null;
     },
@@ -213,6 +223,26 @@ describe("hydratePage", () => {
 
     const provider = mountedRootTree() as ReactElement<{ value: object }>;
     expect(provider.props.value).not.toHaveProperty("namedApiRoutes");
+  });
+
+  it("rebuilds the locale-routing table from its meta tag, which the payload's document slot omits", () => {
+    const content = '{"strategy":"prefix-except-default","codes":["en","ar"],"defaultLocale":"en"}';
+    installFakeDocument({ localeRoutingMeta: content });
+
+    hydratePage(() => "tree");
+
+    const provider = mountedRootTree() as ReactElement<{ value: { localeRouting?: unknown } }>;
+    // Re-serialized exactly as `<Head/>` writes the tag, so the hydrated meta matches.
+    expect(JSON.stringify(provider.props.value.localeRouting)).toBe(content);
+  });
+
+  it("leaves the locale-routing table out of the context when the document has no meta tag", () => {
+    installFakeDocument();
+
+    hydratePage(() => "tree");
+
+    const provider = mountedRootTree() as ReactElement<{ value: object }>;
+    expect(provider.props.value).not.toHaveProperty("localeRouting");
   });
 
   it("awaits a buildTree that returns a Promise, then mounts it", async () => {

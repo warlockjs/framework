@@ -1,5 +1,5 @@
 import config from "@mongez/config";
-import proxy, { type FastifyHttpProxyOptions } from "@fastify/http-proxy";
+import type { FastifyHttpProxyOptions } from "@fastify/http-proxy";
 import { WarlockError } from "../errors/warlock-error";
 import type { FastifyStaticOptions } from "@fastify/static";
 import { ltrim, merge, toCamelCase, trim } from "@mongez/reinforcements";
@@ -17,7 +17,7 @@ import { Response } from "../http/response";
 import { type FastifyInstance } from "../http/server";
 import { buildTracingContext, dispatchPhase, isTracingEnabled } from "../http/tracing";
 import { describeRouteForLog } from "./describe-route-for-log";
-import { logRequestLifecycle } from "./log-request-lifecycle";
+import { logRequestLifecycle, type RequestLogPorts } from "./log-request-lifecycle";
 import {
   forgetPositionalHandlerSuspects,
   inspectHandlerSignature,
@@ -170,6 +170,20 @@ function describeRouteClaimant(route: Route) {
   return `${type} ${route.method} ${route.path} (${source})`;
 }
 
+/**
+ * The log sink of every request's lifecycle entries. One object for the
+ * process rather than four closures per request; `isEnabled` lets the
+ * lifecycle skip building an entry no log channel would keep.
+ */
+const requestLifecycleLogPorts: RequestLogPorts = {
+  info: (entry) => log.info(entry),
+  warn: (entry) => log.warn(entry),
+  error: (entry) => log.error(entry),
+  now: () => performance.now(),
+  // A logger replaced by a partial test double may lack `isEnabled`: keep the line.
+  isEnabled: (level) => log.isEnabled?.(level) ?? true,
+};
+
 export class Router {
   /**
    * Routes list
@@ -185,6 +199,14 @@ export class Router {
    * paths that no longer exist. A version counter cannot miss that.
    */
   private routesVersion = 0;
+
+  /**
+   * Route name to the first route carrying it, for one route array (the
+   * live table or a replacement draft). Rebuilt when the array or its length
+   * changes, so name checks at registration and `getRoute()` stay constant
+   * time instead of scanning every route.
+   */
+  private nameIndex?: { routes: Route[]; length: number; byName: Map<string, Route> };
 
   /**
    * The route table a worker-scoped test runtime returns to between files.
@@ -407,6 +429,10 @@ export class Router {
   public proxy(options: FastifyHttpProxyOptions): this;
   public proxy(...args: any[]) {
     this.beforeScanning((_router, server) => {
+      // Loaded when a proxy route is declared, not on every boot: the plugin
+      // pulls in an HTTP client and a WebSocket stack most apps never use.
+      const proxy = import("@fastify/http-proxy");
+
       if (args.length === 1) {
         server.register(proxy, args[0]);
       } else {
@@ -520,7 +546,7 @@ export class Router {
 
     if (routeData.name) {
       // check if the name exists
-      const route = routes.find((route) => route.name === routeData.name);
+      const route = this.routeNamed(routes, routeData.name);
 
       if (route) {
         // check again if the route name exists with the same method
@@ -550,13 +576,55 @@ export class Router {
       inspectHandlerSignature(routeData.handler, routeData);
     }
 
+    const nameIndex = this.nameIndex;
+    const indexed = nameIndex?.routes === routes && nameIndex.length === routes.length;
+
     routes.push(routeData);
+
+    // Keep the name index in step instead of rebuilding it on the next add.
+    if (indexed && nameIndex) {
+      nameIndex.length = routes.length;
+
+      if (routeData.name && !nameIndex.byName.has(routeData.name)) {
+        nameIndex.byName.set(routeData.name, routeData);
+      }
+    }
 
     if (!this.routeReplacementTransaction) {
       this.routesVersion++;
     }
 
     return this;
+  }
+
+  /**
+   * The first route in `routes` named `name` (what `routes.find()` by name
+   * returns), through {@link nameIndex}.
+   */
+  private routeNamed(routes: Route[], name: string): Route | undefined {
+    let index = this.nameIndex;
+
+    if (!index || index.routes !== routes || index.length !== routes.length) {
+      const byName = new Map<string, Route>();
+
+      for (const route of routes) {
+        if (route.name && !byName.has(route.name)) byName.set(route.name, route);
+      }
+
+      index = { routes, length: routes.length, byName };
+      this.nameIndex = index;
+    }
+
+    const route = index.byName.get(name);
+
+    // A route renamed after it was indexed: fall back to a scan, re-index later.
+    if (route && route.name !== name) {
+      this.nameIndex = undefined;
+
+      return routes.find((candidate) => candidate.name === name);
+    }
+
+    return route;
   }
 
   /**
@@ -1150,14 +1218,19 @@ export class Router {
           ...route.serverOptions?.config,
           // `undefined` keeps the global policy; `false` exempts the route.
           rateLimit: resolveRouteRateLimit(route),
+          // read by the multipart hooks (`http/multipart.ts`)
+          ...(route.uploads !== undefined && { uploads: route.uploads }),
         },
       };
+
+      // Built once per route, not once per request.
+      const handle = this.routeHandler(route);
 
       requestMethodFunction(
         route.path,
         options,
         async (baseRequest: FastifyRequest, reply: FastifyReply) => {
-          const { output, response } = await this.handleRoute(route)(baseRequest, reply);
+          const { output, response } = await handle(baseRequest, reply);
 
           return output || response.baseResponse;
         },
@@ -1311,7 +1384,7 @@ export class Router {
 
       try {
         // Call the matched route handler
-        const { output, response } = await this.handleRoute(match.route)(
+        const { output, response } = await this.routeHandler(match.route)(
           fastifyRequest,
           fastifyReply,
         );
@@ -1370,7 +1443,7 @@ export class Router {
    * Get the route path for the given route name
    */
   public getRoute(name: string, params: Record<string, any> = {}) {
-    const route = this.routes.find((route) => route.name === name);
+    const route = this.routeNamed(this.routes, name);
 
     if (!route) {
       throw new WarlockError("WL3003", `Route name "${name}" not found`);
@@ -1423,7 +1496,7 @@ export class Router {
     (fastifyRequest as unknown as Record<symbol, unknown>)[REFUSAL_STATUS] = status;
 
     try {
-      await this.handleRoute(route)(fastifyRequest, fastifyReply);
+      await this.routeHandler(route)(fastifyRequest, fastifyReply);
     } catch (error) {
       if (!fastifyReply.sent) {
         delete (fastifyRequest as unknown as Record<symbol, unknown>)[REFUSAL_STATUS];
@@ -1435,6 +1508,21 @@ export class Router {
     }
 
     return true;
+  }
+
+  /** {@link handleRoute}'s handler for each route, built once per route. */
+  private routeHandlers = new WeakMap<Route, ReturnType<Router["handleRoute"]>>();
+
+  /** The request handler of `route`, built on first use and reused after. */
+  private routeHandler(route: Route): ReturnType<Router["handleRoute"]> {
+    let handler = this.routeHandlers.get(route);
+
+    if (handler === undefined) {
+      handler = this.handleRoute(route);
+      this.routeHandlers.set(route, handler);
+    }
+
+    return handler;
   }
 
   /**
@@ -1479,12 +1567,7 @@ export class Router {
         a MISSING one legible as a hang.
       */
       const result = await logRequestLifecycle(
-        {
-          info: (entry) => log.info(entry),
-          warn: (entry) => log.warn(entry),
-          error: (entry) => log.error(entry),
-          now: () => performance.now(),
-        },
+        requestLifecycleLogPorts,
         {
           module: "route",
           action: describeRouteForLog(route.method, route.path),
@@ -1492,7 +1575,8 @@ export class Router {
           // A bounded snapshot, built once with the route's logging policy
           // applied — never the Request/Response instances, whose native
           // request, reply and URL graphs would reach every log channel.
-          context: { request: request.toLogSnapshot() },
+          // Built only when a log channel will keep one of the entries.
+          context: () => ({ request: request.toLogSnapshot() }),
           request,
           // Read after the run: the status is decided during the request.
           statusCode: () => fastifyResponse.statusCode,

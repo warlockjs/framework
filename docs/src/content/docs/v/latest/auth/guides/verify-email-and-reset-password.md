@@ -94,6 +94,8 @@ router.post("/auth/reset-password", resetPasswordController, {
 });
 ```
 
+`requestPasswordReset` sends the reset notification in the background: awaiting an SMTP round trip only for accounts that exist would let the response time reveal which addresses are registered. A send that fails is logged and emitted as the `password.resetDeliveryFailed` auth event (`authEvents.on("password.resetDeliveryFailed", (user, error) => …)`). Set `auth.passwordReset.awaitDelivery: true` (default `false`) to wait for the send and receive its error from `requestPasswordReset` instead.
+
 `resetPassword` writes the new password, then calls `authService.revokeAllTokens(user)`: every refresh token is revoked and every access token deleted — which also kills cookie sessions, since a cookie session is backed by an access-token row. It emits `password.reset`; `requestPasswordReset` emits `password.resetRequested`.
 
 **Password hashing.** By default auth saves `hashPassword(plain)` and checks it with `verifyPassword`, the same check login uses. If your model already hashes on save (`useHashedPassword()`), that first write would be hashed twice and fail the check — so auth falls back to saving the plaintext and lets your transformer hash it once, then verifies again. If neither write passes the check, it throws rather than leaving a broken password in place. To take over entirely, set `auth.passwordReset.setPassword(user, plain)`.

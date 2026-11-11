@@ -241,6 +241,18 @@ export function locateEdit(
   return { tier: null, ranges: [], viaView: false };
 }
 
+/**
+ * Most `oldString` lines (those with at least one token) compared with the
+ * file when looking for the closest text; later lines are not considered.
+ */
+const MAX_HINT_WANTED_LINES = 64;
+
+/**
+ * Most (wanted line, file line) token pairs one hint may visit; the search
+ * stops with the best candidate found so far once it is spent.
+ */
+const MAX_HINT_WORK = 2_000_000;
+
 function clipLine(line: string): string {
   const flat = line.replace(/\r$/, "");
 
@@ -249,22 +261,6 @@ function clipLine(line: string): string {
 
 function tokens(line: string): Set<string> {
   return new Set(line.match(/[A-Za-z0-9_$]+/g) ?? []);
-}
-
-function similarity(left: Set<string>, right: Set<string>): number {
-  if (left.size === 0 || right.size === 0) {
-    return 0;
-  }
-
-  let shared = 0;
-
-  for (const token of left) {
-    if (right.has(token)) {
-      shared++;
-    }
-  }
-
-  return shared / (left.size + right.size - shared);
 }
 
 /**
@@ -296,17 +292,70 @@ export function describeMiss(
   const wanted = oldString.split("\n");
   let best = { score: 0, fileLine: -1, offset: 0 };
 
-  wanted.forEach((text, offset) => {
-    const own = tokens(text);
+  // Token → the file lines that hold it, so each wanted line is compared
+  // only with the lines it shares a token with (any other line scores 0).
+  const postings = new Map<string, number[]>();
 
-    fileTokens.forEach((candidate, fileLine) => {
-      const score = similarity(own, candidate);
+  fileTokens.forEach((candidate, fileLine) => {
+    for (const token of candidate) {
+      const list = postings.get(token);
+
+      if (list === undefined) {
+        postings.set(token, [fileLine]);
+      } else {
+        list.push(fileLine);
+      }
+    }
+  });
+
+  const shared = new Int32Array(lines.length);
+  let considered = 0;
+  let work = 0;
+
+  for (let offset = 0; offset < wanted.length && considered < MAX_HINT_WANTED_LINES; offset++) {
+    const own = tokens(wanted[offset] ?? "");
+
+    if (own.size === 0) {
+      continue;
+    }
+
+    considered++;
+
+    const touched: number[] = [];
+
+    for (const token of own) {
+      const holders = postings.get(token) ?? [];
+
+      work += holders.length;
+
+      for (const fileLine of holders) {
+        if (shared[fileLine] === 0) {
+          touched.push(fileLine);
+        }
+
+        shared[fileLine] = (shared[fileLine] ?? 0) + 1;
+      }
+    }
+
+    // Same order as a full scan (file line ascending), so ties resolve alike.
+    touched.sort((left, right) => left - right);
+
+    for (const fileLine of touched) {
+      const common = shared[fileLine] ?? 0;
+      const size = fileTokens[fileLine]?.size ?? 0;
+      const score = common / (own.size + size - common);
+
+      shared[fileLine] = 0;
 
       if (score > best.score) {
         best = { score, fileLine, offset };
       }
-    });
-  });
+    }
+
+    if (work > MAX_HINT_WORK) {
+      break;
+    }
+  }
 
   if (best.fileLine === -1 || best.score < 0.5) {
     return undefined;

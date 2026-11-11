@@ -132,6 +132,7 @@ await mem.recall("what is my email?"); // only the UNSCOPED pool
 - The match is **exact equality**, enforced inside every tier (`working` / `semantic` / `episodic` / `procedural`) before hits are scored, merged, or sliced — not something the caller filters afterward.
 - Omitting `scope` is **not** a wildcard: an unscoped recall reads only unscoped entries. There is no "all scopes" query.
 - Identical text under two scopes stays two independent entries (including the procedural tier's reinforcement counter).
+- A busy scope cannot starve another: when fewer than `k` of the driver's first candidate page belong to the recalling scope, recall re-queries with a wider page (×4, up to 1,000 candidates).
 - `ai.orchestrator({ memory })` sets this automatically from the turn's `sessionId` — see the `run-orchestrator` topic.
 - `clear(tier?)` is scope-agnostic: it drops the tier for every scope.
 

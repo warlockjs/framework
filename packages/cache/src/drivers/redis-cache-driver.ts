@@ -13,6 +13,7 @@ import { CacheConfigurationError, CacheError, CacheUnsupportedError } from "../t
 import { parseTtl, safeErrorInfo } from "../utils";
 import { RedisStructuresBackend } from "../structures/redis-structures-backend";
 import type { CacheStructuresBackend, StructuresCapable } from "../structures/types";
+import { sampleMembers } from "../tag-sample";
 import { BaseCacheDriver } from "./base-cache-driver";
 
 // ============================================================
@@ -280,6 +281,73 @@ export class RedisCacheDriver
   }
 
   /**
+   * {@inheritdoc}
+   *
+   * `SRANDMEMBER key count`: transfers only the sampled members, however
+   * large the index is.
+   */
+  public async tagSample(tagKey: CacheKey, count: number): Promise<string[]> {
+    if (count <= 0) {
+      return [];
+    }
+
+    const parsedKey = this.parseKey(tagKey);
+
+    return this.withTagSet(parsedKey, async (client) => {
+      if (typeof client.sRandMemberCount !== "function") {
+        return sampleMembers((await client.sMembers(parsedKey)) ?? [], count);
+      }
+
+      return ((await client.sRandMemberCount(parsedKey, count)) as string[] | null) ?? [];
+    });
+  }
+
+  /**
+   * {@inheritdoc}
+   *
+   * `EXISTS`: no value transfer, no `hit`/`miss` events.
+   */
+  public async exists(key: CacheKey): Promise<boolean> {
+    const parsedKey = this.parseKey(key);
+    const client = this.client as any;
+
+    if (typeof client?.exists !== "function") {
+      return (await this.client?.get(parsedKey)) != null;
+    }
+
+    return Number(await client.exists(parsedKey)) > 0;
+  }
+
+  /**
+   * {@inheritdoc}
+   *
+   * Issues every key's `DEL` (and its SWR sidecar's) at once, in chunks, so
+   * the client sends them pipelined instead of one round trip per key. Single
+   * key commands keep it cluster-slot safe.
+   */
+  public async removeMany(keys: CacheKey[]): Promise<void> {
+    const parsedKeys = keys.map((key) => this.parseKey(key));
+
+    for (let start = 0; start < parsedKeys.length; start += REMOVE_BATCH_SIZE) {
+      const chunk = parsedKeys.slice(start, start + REMOVE_BATCH_SIZE);
+
+      for (const parsedKey of chunk) this.log("removing", parsedKey);
+
+      await Promise.all(
+        chunk.flatMap((parsedKey) => [
+          this.client?.del(parsedKey),
+          this.client?.del(this.swrMetaKey(parsedKey)),
+        ]),
+      );
+
+      for (const parsedKey of chunk) {
+        this.log("removed", parsedKey);
+        await this.emit("removed", { key: parsedKey });
+      }
+    }
+  }
+
+  /**
    * Run a SET command against a tag key, upgrading a pre-5.20 index first.
    *
    * Earlier versions stored the index as a JSON-array STRING under the same
@@ -344,6 +412,11 @@ export class RedisCacheDriver
 
     let reply: string | null | undefined;
 
+    // A plain upsert sends the SWR sidecar write together with the value
+    // (the client pipelines commands issued at once): one round trip.
+    // Conditional writes touch the sidecar only once the value was written.
+    let sidecarWrite: Promise<unknown> | undefined;
+
     if (onConflict === "create") {
       const options: { NX: true; EX?: number } = { NX: true };
       if (hasExpiry) {
@@ -356,10 +429,20 @@ export class RedisCacheDriver
         options.EX = ttl as number;
       }
       reply = await this.client?.set(parsedKey, serialized, options);
-    } else if (hasExpiry) {
-      reply = await this.client?.set(parsedKey, serialized, { EX: ttl as number });
     } else {
-      reply = await this.client?.set(parsedKey, serialized);
+      const write = hasExpiry
+        ? this.client?.set(parsedKey, serialized, { EX: ttl as number })
+        : this.client?.set(parsedKey, serialized);
+
+      sidecarWrite = this.writeSwrSidecar(
+        parsedKey,
+        staleAt,
+        hasExpiry ? (ttl as number) : undefined,
+      );
+
+      const [written] = await Promise.all([write, sidecarWrite]);
+
+      reply = written;
     }
 
     const wasSet = reply === "OK";
@@ -373,20 +456,8 @@ export class RedisCacheDriver
       await this.applyTags(key, tags);
     }
 
-    if (staleAt === undefined) {
-      // A plain write invalidates any freshness marker left by an earlier SWR
-      // write, otherwise the old `staleAt` would apply to the new value.
-      await this.client?.del(this.swrMetaKey(parsedKey));
-    } else {
-      // Sidecar key for SWR freshness — keeps the main value JSON
-      // backwards-compatible with entries written before SWR landed.
-      const sidecarOptions: { EX?: number } = {};
-
-      if (hasExpiry) {
-        sidecarOptions.EX = ttl as number;
-      }
-
-      await this.client?.set(this.swrMetaKey(parsedKey), String(staleAt), sidecarOptions);
+    if (!sidecarWrite) {
+      await this.writeSwrSidecar(parsedKey, staleAt, hasExpiry ? (ttl as number) : undefined);
     }
 
     this.log("cached", parsedKey);
@@ -423,6 +494,29 @@ export class RedisCacheDriver
     await this.emit("removed", { key: parsedKey });
 
     return true;
+  }
+
+  /**
+   * Write (or clear) the SWR freshness sidecar of a key. A plain write
+   * (`staleAt` undefined) drops any marker left by an earlier SWR write,
+   * otherwise the old `staleAt` would apply to the new value; an SWR write
+   * stores it next to the value — keeping the main value JSON compatible with
+   * entries written before SWR landed.
+   */
+  protected async writeSwrSidecar(
+    parsedKey: string,
+    staleAt: number | undefined,
+    ttl: number | undefined,
+  ): Promise<unknown> {
+    if (staleAt === undefined) {
+      return this.client?.del(this.swrMetaKey(parsedKey));
+    }
+
+    return this.client?.set(
+      this.swrMetaKey(parsedKey),
+      String(staleAt),
+      ttl === undefined ? {} : { EX: ttl },
+    );
   }
 
   /**
@@ -498,32 +592,14 @@ export class RedisCacheDriver
 
     this.log("fetched", key);
 
-    // Parse and return the value directly (Redis handles expiration natively)
+    // Parse and return the value directly (Redis handles expiration
+    // natively). `JSON.parse` already builds a private copy for this caller,
+    // so no further clone is needed.
     const parsedValue = JSON.parse(value);
 
-    // Apply cloning for immutability protection
-    if (parsedValue === null || parsedValue === undefined) {
-      // Emit hit event
-      await this.emit("hit", { key, value: parsedValue });
-      return parsedValue;
-    }
+    await this.emit("hit", { key, value: parsedValue });
 
-    const type = typeof parsedValue;
-    if (type === "string" || type === "number" || type === "boolean") {
-      // Emit hit event
-      await this.emit("hit", { key, value: parsedValue });
-      return parsedValue;
-    }
-
-    try {
-      const clonedValue = structuredClone(parsedValue);
-      // Emit hit event
-      await this.emit("hit", { key, value: clonedValue });
-      return clonedValue;
-    } catch (error) {
-      this.logError(`Failed to clone cached value for ${key}`, error);
-      throw error;
-    }
+    return parsedValue;
   }
 
   /**
@@ -536,9 +612,9 @@ export class RedisCacheDriver
 
     // Drop the SWR sidecar alongside the main key — keeps metadata from
     // surviving a `remove` and confusing a later `swr` read.
-    // Two separate DELs (not one multi-key DEL) so it stays cluster-slot safe.
-    await this.client?.del(key);
-    await this.client?.del(this.swrMetaKey(key));
+    // Two separate DELs (not one multi-key DEL) so it stays cluster-slot
+    // safe, sent together so the client pipelines them in one round trip.
+    await Promise.all([this.client?.del(key), this.client?.del(this.swrMetaKey(key))]);
 
     this.log("removed", key);
 

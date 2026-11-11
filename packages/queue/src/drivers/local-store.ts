@@ -22,6 +22,9 @@ export type LocalJob = {
   leaseUntil: number;
 };
 
+/** What `prune` keeps: jobs finished at or after `before`, at most `count` of them. */
+export type RetentionWindow = { count?: number; before?: number };
+
 /** Synchronous transactions contain no user code or await points. */
 export interface LocalStore {
   transaction<T>(run: () => T): T;
@@ -31,6 +34,12 @@ export interface LocalStore {
   ready(queue: string, now: number): LocalJob | undefined;
   put(job: LocalJob): void;
   remove(queue: string, id: string): void;
+  /**
+   * Delete the finished jobs of one state that fall outside a retention: those
+   * finished before `before`, and those past the newest `count` (newest by
+   * finish time, then by insertion).
+   */
+  prune(queue: string, state: "completed" | "failed", keep: RetentionWindow): void;
   close(): void;
 }
 

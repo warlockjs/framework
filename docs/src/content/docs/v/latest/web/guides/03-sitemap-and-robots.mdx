@@ -99,6 +99,18 @@ import { regenerateSitemap } from "@warlock.js/web/sitemap";
 await regenerateSitemap();
 ```
 
+Suppliers run up to four at a time; their URLs still appear in page order. A
+supplier receives one argument, `{ site, tenantKey, shared }`: empty for a
+single-site app, the site key in multi-site mode, and for a dynamic (tenant)
+site the tenant's `key` from `web.resolveHost`. A tenant site's supplier must
+filter by `tenantKey`; see
+[Multiple sites](/v/latest/web/guides/multiple-sites-in-one-app/#search-and-tls-endpoints).
+
+Paths are percent-encoded as the sitemap protocol requires: spaces, non-ASCII
+text and control characters in a path become `%XX` escapes, so a slug with an
+unusual character can never make the file invalid XML. A path you already
+encoded (`encodeURIComponent(slug)`) is left as it is.
+
 ## HTTP behavior
 
 A small sitemap is served at `path`. Larger or locale-split outputs publish

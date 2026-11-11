@@ -243,6 +243,36 @@ export default {
 };
 ```
 
+## Parallel loaders — `web.loaders`
+
+By default (`"serial"`) a level's loader starts only after every level above it
+has settled: app, then layout, then page. A page under an app loader that takes
+20 ms, a layout loader that takes 30 ms and a page loader that takes 40 ms waits
+about 90 ms.
+
+Set `web.loaders` to `"parallel"` to start all three together, so the same page
+waits about 40 ms:
+
+```ts title="src/config/web.ts"
+export default {
+  loaders: "parallel",
+};
+```
+
+The results still settle in the same order, with the same rules: the first
+level (app, then layout, then page) that throws, redirects or answers
+`notFound()` wins, and nothing a level below it produced — data, cookies,
+headers — reaches the response. Those lower loaders have already started,
+though: their side effects happen, and their `signal` fires so a loader that
+checks it can stop. Page `validation` also runs alongside the levels above.
+
+Turn it on only when no loader reads something a loader above it set (for
+example a user the app loader put on the request). A layout that guards a
+section with its loader still redirects a guest, but the page loader has already
+started for that guest; put such a guard in `middleware` instead, which always
+runs before any loader. The layouts of one chain keep running outermost first in
+both modes.
+
 ## Terminal outcomes
 
 - A core `Response` returned by any loader stops every lower loader and bypasses

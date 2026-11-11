@@ -205,6 +205,9 @@ export function productionGlobalTranslationDeliveryInput(
   translations: PageManifestTranslations | undefined,
 ): GlobalTranslationDeliveryInput {
   const usage = translations?.usage ?? {};
+  // The manifest's records are fixed for the process: each is turned into a
+  // usage once, which also lets the pruning walk reuse its key index.
+  const usages = new Map<string, TranslationUsage>();
 
   return {
     sharedGroups: translations?.sharedGroups ?? DEFAULT_SHARED_TRANSLATION_GROUPS,
@@ -213,8 +216,16 @@ export function productionGlobalTranslationDeliveryInput(
       const sourceFile = routeSourceFileOf(routeName);
       if (sourceFile === undefined || !Object.hasOwn(usage, sourceFile)) return undefined;
 
+      const known = usages.get(sourceFile);
+      if (known !== undefined) return known;
+
       const record = usage[sourceFile];
-      return record === undefined ? undefined : usageFromRecord(record);
+      if (record === undefined) return undefined;
+
+      const resolved = usageFromRecord(record);
+      usages.set(sourceFile, resolved);
+
+      return resolved;
     },
   };
 }

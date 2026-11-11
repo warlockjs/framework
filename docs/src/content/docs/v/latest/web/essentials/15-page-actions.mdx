@@ -180,7 +180,16 @@ browser-safe schema.
 | `formErrors`   | A helper's `message`, plus messages for inputs without a field |
 | `values`       | Submitted strings, echoed on failure only                      |
 
-`values` never includes files, and omits names matching `web.forms.redactValues`. The default is `["password", "password_confirmation", "*token*", "*secret*"]`; `*` matches any run of characters. Set `forms.redactValues` in the `web` config to replace the list.
+`values` never includes files, and never includes a field whose name looks secret. The built-in patterns are `*password*`, `*passwd*`, `*passcode*`, `*token*`, `*secret*`, `*otp*`, `cvv`, `cvc`, `*card*number*` and `pin`, matched case-insensitively (`*` matches any run of characters), so `current_password`, `newPassword`, `card_number` and `otp_code` are never echoed. Add your own names with `web.forms.redactValues`; they are added to the built-in list, never replace it. Set `web.forms.echoValues: false` to echo no submitted value at all.
+
+```ts title="src/config/web.ts"
+export default {
+  forms: {
+    redactValues: ["ssn", "*_answer"], // default: none beyond the built-in list
+    echoValues: true, // default; false re-fills nothing after a failure
+  },
+};
+```
 
 The same state renders on the server without JS, after a JS swap, and after a JS 422.
 

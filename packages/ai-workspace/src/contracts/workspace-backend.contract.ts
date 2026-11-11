@@ -141,12 +141,20 @@ export interface WorkspaceBackendDirEntry {
 export interface WorkspaceBackend {
   /** Read a file's full UTF-8 content at an absolute path. */
   readFile(absPath: string): Promise<string>;
-  /** Write full content to an absolute path (atomically where supported). */
-  writeFile(absPath: string, content: string): Promise<void>;
+  /**
+   * Write full content to an absolute path (atomically where supported).
+   * `options.mode` asks for those POSIX permission bits on the file (the
+   * workspace passes `0o600` for spill files); a backend without
+   * permissions may ignore it.
+   */
+  writeFile(absPath: string, content: string, options?: { mode?: number }): Promise<void>;
   /** Whether anything exists at an absolute path (file or directory). */
   exists(absPath: string): Promise<boolean>;
-  /** Create a directory (and parents) at an absolute path; idempotent. */
-  mkdir(absPath: string): Promise<void>;
+  /**
+   * Create a directory (and parents) at an absolute path; idempotent.
+   * `options.mode` sets the permission bits of directories it creates.
+   */
+  mkdir(absPath: string, options?: { mode?: number }): Promise<void>;
   /** Remove a file or directory tree at an absolute path. */
   remove(absPath: string): Promise<void>;
   /** List immediate children of an absolute directory as absolute paths. */

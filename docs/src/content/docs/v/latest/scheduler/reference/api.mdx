@@ -185,10 +185,10 @@ typed event emitter. Use the exported `scheduler` singleton, or
 
 ### Configuration
 
-| Method                                         | Returns | Purpose                                                                                 |
-| ---------------------------------------------- | ------- | --------------------------------------------------------------------------------------- |
-| `runEvery(ms)`                                 | `this`  | Tick interval. Minimum **100 ms** (lower throws). Default 1000 ms.                      |
-| `runInParallel(parallel, maxConcurrency = 10)` | `this`  | Run a tick's due jobs concurrently, batched by `maxConcurrency`. Default is sequential. |
+| Method                                         | Returns | Purpose                                                                                                                                                                                                             |
+| ---------------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `runEvery(ms)`                                 | `this`  | Tick interval. Minimum **100 ms** (lower throws). Default 1000 ms.                                                                                                                                                  |
+| `runInParallel(parallel, maxConcurrency = 10)` | `this`  | `false` (default): one job at a time; jobs that come due meanwhile run afterwards in registration order. `true`: due jobs run side by side, at most `maxConcurrency` at once. Ticks never wait for jobs either way. |
 
 ### Lifecycle
 

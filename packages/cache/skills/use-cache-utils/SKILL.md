@@ -1,6 +1,6 @@
 ---
 name: use-cache-utils
-description: 'Low-level cache utilities re-exported from @warlock.js/cache — parseTtl, expiresAtToTtl, resolveTtl, normalizeToOptions, normalizeToRememberOptions, parseCacheKey, mergeTagSets, injectTags, cosineSimilarity, and the CACHE_FOR TTL enum. Triggers: `parseTtl`, `parseCacheKey`, `resolveTtl`, `expiresAtToTtl`, `cosineSimilarity`, `mergeTagSets`, `injectTags`, `CACHE_FOR`; "parse a duration to seconds", "build a cache key from an object", "score two vectors", "common TTL constant"; typical import `import { parseTtl, CACHE_FOR } from "@warlock.js/cache"`. Skip: building a whole custom driver — the `pick-cache-driver` topic; the high-level set API — the `configure-set-options` topic.'
+description: 'Low-level cache utilities re-exported from @warlock.js/cache — parseTtl, expiresAtToTtl, resolveTtl, normalizeToOptions, normalizeToRememberOptions, parseCacheKey, escapeCacheKeySegment, mergeTagSets, injectTags, cosineSimilarity, and the CACHE_FOR TTL enum. Triggers: `parseTtl`, `parseCacheKey`, `escapeCacheKeySegment`, `resolveTtl`, `expiresAtToTtl`, `cosineSimilarity`, `mergeTagSets`, `injectTags`, `CACHE_FOR`; "parse a duration to seconds", "build a cache key from an object", "score two vectors", "common TTL constant"; typical import `import { parseTtl, CACHE_FOR } from "@warlock.js/cache"`. Skip: building a whole custom driver — the `pick-cache-driver` topic; the high-level set API — the `configure-set-options` topic.'
 ---
 
 # Cache utilities
@@ -45,10 +45,12 @@ normalizeToRememberOptions("1h"); // { ttl: "1h" }   (no expiresAt/onConflict)
 ## Key + tag helpers
 
 ```ts
-import { parseCacheKey, mergeTagSets, injectTags } from "@warlock.js/cache";
+import { escapeCacheKeySegment, parseCacheKey, mergeTagSets, injectTags } from "@warlock.js/cache";
 
 parseCacheKey("users:1"); // "users.1"
 parseCacheKey({ page: 1, q: "John" }); // "page.1.q.John"
+parseCacheKey({ q: "a.b" }); // "q.a%2Eb" — separators inside object values are escaped
+escapeCacheKeySegment("acme.billing"); // "acme%2Ebilling" — one safe segment for a key or namespace
 parseCacheKey("user:1", { globalPrefix: "app" }); // "app.user.1"
 
 mergeTagSets(["a", "b"], ["b", "c"]); // ["a","b","c"] (deduped union)

@@ -81,6 +81,10 @@ Existing build and CSS Modules configuration continues to work without changes.
 - builds the hydration client and a Vite manifest;
 - resolves root, matched-layout, and page CSS into ordered, deduplicated,
   render-blocking asset links;
+- adds `<link rel="modulepreload">` for the same chain's JavaScript chunks
+  (root, matched layouts, the page, and what they statically import) after the
+  hydration entry's own, so the browser fetches them alongside the entry
+  instead of after it runs. Other pages' chunks are never preloaded;
 - stores the client asset directory in the page manifest so `warlock start`
   does not need to load the TypeScript build config.
 
@@ -341,11 +345,18 @@ In production, the work that depends only on the build is done once:
 | Page route names for the browser route table | At build, baked into the page manifest. The table is resolved once per page, site and viewer kind, then reused. |
 | Per-page translation usage and shared tables | At build. A page's translation snapshot is built on its first request per locale and reused.                    |
 | Sitemap and robots discovery                 | At boot (and on the configured refresh or model events). Requests only serve the generated artifacts.           |
+| Client manifest (stylesheets, preloads)      | Read once at boot; each page's stylesheet and module preload lists are resolved when its route is installed.    |
+| Page module validation                       | Once per loaded module, on its first request.                                                                   |
 
 In development the same work reruns once per file change, not per request. The
 `translations` and `named-api-routes` tracing phases (see
 [request tracing](/v/latest/core/digging-deeper/request-tracing/)) show what
 each request spent on it.
+
+A document request renders its page once and streams that render. A client
+navigation (a data request) renders the page once to decide its outcome (an
+error during render still becomes the error page and status) and sends only the
+payload.
 
 ## Browser regression checks
 

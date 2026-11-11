@@ -17,6 +17,8 @@
  * the regex engine as a pattern.
  */
 
+import { assertSafeLikePattern, likePatternText } from "./like-pattern-limits";
+
 /** Characters that carry meaning to the regex engine and must be neutralized. */
 const REGEX_METACHARACTERS = /[.*+?^${}()|[\]\\]/g;
 
@@ -48,8 +50,12 @@ export function escapeRegex(value: string): string {
  * (`whereLike("name", "ar")` finds "Carol"), which is the documented behavior of
  * this driver and is unchanged by the escaping.
  *
+ * A pattern with more than two `%` wildcards, or longer than 256 characters,
+ * is refused: each extra `.*` multiplies the backtracking cost per value.
+ *
  * @param pattern - The user-supplied LIKE pattern
  * @returns Regex source matching the pattern literally, `%` aside
+ * @throws UnsafeFilterError when the pattern exceeds the wildcard or length cap
  *
  * @example
  * ```typescript
@@ -58,7 +64,11 @@ export function escapeRegex(value: string): string {
  * ```
  */
 export function likePatternToRegexSource(pattern: string): string {
-  return escapeRegex(pattern).replace(/%+/g, ".*");
+  const text = likePatternText(pattern);
+
+  assertSafeLikePattern(text, undefined);
+
+  return escapeRegex(text).replace(/%+/g, ".*");
 }
 
 /**

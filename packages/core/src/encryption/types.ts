@@ -51,4 +51,13 @@ export type EncryptionPasswordConfigurations = {
    * 10–12 is the standard range. Defaults to 12.
    */
   salt?: number;
+
+  /**
+   * bcrypt uses only the first 72 bytes (UTF-8) of a password. When `true`,
+   * `hashPassword()` throws for a longer password instead of hashing its
+   * first 72 bytes. When `false`, a longer password is hashed as before and a
+   * one-time warning is logged.
+   * @default false
+   */
+  rejectLongPasswords?: boolean;
 };

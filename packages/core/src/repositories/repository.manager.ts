@@ -1,6 +1,7 @@
 import { cache, type CacheKey, type CacheDriver } from "@warlock.js/cache";
 import { log } from "@warlock.js/logger";
 import { config } from "../config";
+import { requestContext } from "../http/context/request-context";
 import { CascadeAdapter } from "./adapters/cascade";
 import type {
   AggregateExpressions,
@@ -91,6 +92,24 @@ export class RepositoryManager<T = unknown, F = Record<string, any>> {
    * @protected
    */
   protected maxPerPage = 100;
+
+  /**
+   * Whether the current request may switch pagination off with `paginate=false`
+   * on `list()` / `listActive()` / `listCached()`. Off by default: a
+   * `paginate: false` the request sent is ignored (with a one-time warning) and
+   * the list stays paginated, at most `maxPerPage` rows per page.
+   *
+   * Only request input is restricted. `paginate: false` from server code (a
+   * value the current request did not send, or any call outside a request) and
+   * from `defaultOptions` / `repository.defaultOptions` works as before.
+   *
+   * App-wide default: `repository.allowClientUnpaginated` in config, read
+   * when a list runs (so a repository created before the config loaded still
+   * follows it). A value set on the repository wins.
+   * @default false
+   * @protected
+   */
+  protected allowClientUnpaginated?: boolean;
 
   /**
    * Get adapter instance (lazy-loaded)
@@ -752,6 +771,9 @@ export class RepositoryManager<T = unknown, F = Record<string, any>> {
       string,
       any
     >;
+
+    this.dropRequestControls(caller);
+
     const defaults: Record<string, any> = {
       ...((config.get("repository.defaultOptions") as object) || {}),
       ...(this.defaultOptions || {}),
@@ -833,6 +855,149 @@ export class RepositoryManager<T = unknown, F = Record<string, any>> {
   private static readonly warnedDroppedOrder = new WeakMap<object, Set<string>>();
 
   /**
+   * Ignored-request-option warnings already logged, per repository class and
+   * option name.
+   */
+  private static readonly warnedRequestControls = new WeakMap<object, Set<string>>();
+
+  /**
+   * Control options that shape a `listCached()` result. With the filter keys
+   * declared in `filterBy`, they are the only options that reach the list
+   * cache key when nothing else can read the options (see `listCacheKeyOptions`).
+   */
+  private static readonly listKeyControls = new Set([
+    "cacheKey",
+    "paginationMode",
+    "paginate",
+    "page",
+    "limit",
+    "defaultLimit",
+    "select",
+    "simpleSelect",
+    "deselect",
+    "orderBy",
+    "sortBy",
+    "sortDirection",
+    "cursor",
+    "direction",
+    "cursorColumn",
+    "activeScope",
+  ]);
+
+  /**
+   * The parsed input of the current HTTP request, or `undefined` outside a
+   * request (CLI commands, jobs, seeds, tests without a request).
+   */
+  protected requestInput(): Record<string, any> | undefined {
+    const request = requestContext.getRequest();
+
+    if (!request || typeof request.all !== "function") return undefined;
+
+    const input = request.all();
+
+    return input && typeof input === "object" ? input : undefined;
+  }
+
+  /**
+   * Drop the control options a request may not set through `list(request.all())`:
+   * `paginate: false` (unless `allowClientUnpaginated`), `purgeCache` and
+   * `cacheKey`. An option counts as request input when the current request
+   * sent that key with the same value; a value the request did not send came
+   * from server code and is kept.
+   */
+  private dropRequestControls(caller: Record<string, any>): void {
+    const input = this.requestInput();
+
+    if (!input) return;
+
+    const sentSameValue = (key: string): boolean =>
+      Object.prototype.hasOwnProperty.call(input, key) &&
+      (input[key] === caller[key] || String(input[key]) === String(caller[key]));
+
+    const allowUnpaginated =
+      this.allowClientUnpaginated ?? config.get("repository.allowClientUnpaginated") === true;
+
+    if (caller.paginate === false && sentSameValue("paginate") && !allowUnpaginated) {
+      delete caller.paginate;
+
+      this.warnIgnoredRequestControl(
+        "paginate",
+        `paginate=false from the request was ignored; the list stays paginated (at most ${this.maxPerPage} rows per page, the repository's maxPerPage). Set \`allowClientUnpaginated = true\` on the repository, or \`repository.allowClientUnpaginated\` in config, to let clients turn pagination off.`,
+      );
+    }
+
+    for (const key of ["purgeCache", "cacheKey"]) {
+      if (caller[key] !== undefined && sentSameValue(key)) {
+        delete caller[key];
+
+        this.warnIgnoredRequestControl(
+          key,
+          `${key} from the request was ignored: a client may not ${key === "purgeCache" ? "bypass the list cache" : "choose the cache key"}. Pass ${key} from server code instead of forwarding it from request input.`,
+        );
+      }
+    }
+  }
+
+  /**
+   * Log a dropped request option once per repository class and option.
+   */
+  private warnIgnoredRequestControl(option: string, message: string): void {
+    const warned =
+      RepositoryManager.warnedRequestControls.get(this.constructor) ?? new Set<string>();
+
+    if (warned.has(option)) return;
+
+    warned.add(option);
+    RepositoryManager.warnedRequestControls.set(this.constructor, warned);
+
+    log.warn("repository", option, `${this.constructor.name}: ${message}`);
+  }
+
+  /**
+   * Options that make up the `listCached()` cache key.
+   *
+   * When only the framework reads the options (the Cascade adapter, no
+   * function filter rules, no callback options, and the option-handling
+   * methods are not overridden), the key holds just the declared `filterBy`
+   * keys and the controls that shape the result, so an unknown query
+   * parameter cannot create a new cache entry. Otherwise custom code may read
+   * any option, and every option stays in the key.
+   */
+  protected listCacheKeyOptions(options: Record<string, any>): Record<string, any> {
+    const { purgeCache: _purgeCache, ...keyOptions } = options;
+
+    if (!this.appliesDeclaredOptionsOnly(options)) {
+      return keyOptions;
+    }
+
+    const filterKeys = new Set(Object.keys(this.filterBy || {}));
+
+    return Object.fromEntries(
+      Object.entries(keyOptions).filter(
+        ([key]) => filterKeys.has(key) || RepositoryManager.listKeyControls.has(key),
+      ),
+    );
+  }
+
+  /**
+   * Whether nothing but the framework's own option handling reads the list
+   * options, so undeclared keys cannot change the result.
+   */
+  private appliesDeclaredOptionsOnly(options: Record<string, any>): boolean {
+    const base = RepositoryManager.prototype;
+
+    return (
+      !this.containsFunction(options) &&
+      !Object.values(this.filterBy || {}).some((rule) => typeof rule === "function") &&
+      this.applyOptionsToQuery === base.applyOptionsToQuery &&
+      this.sanitizeControls === base.sanitizeControls &&
+      this.prepareClientOptions === base.prepareClientOptions &&
+      this.readActiveScope === base.readActiveScope &&
+      this.adapter?.constructor === CascadeAdapter
+    );
+  }
+
+  /**
    * Whether a trusted default `orderBy` (config or repository) exists.
    */
   private hasDefaultOrderBy(): boolean {
@@ -845,7 +1010,7 @@ export class RepositoryManager<T = unknown, F = Record<string, any>> {
    * Columns `orderBy` / `sortBy` / `cursorColumn` may target.
    */
   protected getSortableColumns(): Set<string> {
-    return new Set(["id", ...this.sortable, ...Object.keys(this.filterBy || {})]);
+    return new Set(["id", ...(this.sortable || []), ...Object.keys(this.filterBy || {})]);
   }
 
   /**
@@ -872,6 +1037,12 @@ export class RepositoryManager<T = unknown, F = Record<string, any>> {
 
     if (safe.defaultLimit) {
       safe.defaultLimit = Math.min(safe.defaultLimit, this.maxPerPage);
+    }
+
+    // Request input can never hold a function, so a non-function `perform`
+    // came from a client (`?perform=1`) and would only crash the query.
+    if (raw.perform !== undefined && typeof raw.perform !== "function") {
+      delete raw.perform;
     }
 
     if (safe.cursorColumn !== undefined && !allowed.has(safe.cursorColumn)) {
@@ -1857,7 +2028,9 @@ export class RepositoryManager<T = unknown, F = Record<string, any>> {
       return (await this._listImpl(options)) as PaginationResult<T>;
     }
 
-    const opts = this.prepareOptions(options);
+    // The same client-safe options `_listImpl` queries with: request input
+    // cannot switch pagination off, bypass the cache or pick the cache key.
+    const opts = this.prepareClientOptions(options);
 
     // Function values (callback filters) stringify to their name, so two different
     // callbacks would share one cache entry and leak each other's rows. Function
@@ -1866,7 +2039,7 @@ export class RepositoryManager<T = unknown, F = Record<string, any>> {
       return (await this._listImpl(options)) as PaginationResult<T>;
     }
 
-    const cacheKey = this.cacheKey("list", opts);
+    const cacheKey = this.cacheKey("list", this.listCacheKeyOptions(opts));
 
     // Bypass + refresh the cache when purgeCache is requested.
     if (!opts.purgeCache) {

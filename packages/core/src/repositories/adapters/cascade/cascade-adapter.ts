@@ -1,4 +1,9 @@
-import { afterCommit, type ChildModel, Model } from "@warlock.js/cascade";
+import {
+  afterCommit,
+  type ChildModel,
+  databaseTransactionContext,
+  Model,
+} from "@warlock.js/cascade";
 import type {
   ChunkCallback,
   CursorPaginationOptions,
@@ -46,10 +51,14 @@ export class CascadeAdapter<T extends Model<any>> implements RepositoryAdapterCo
 
     // Model events fire INSIDE the transaction, before COMMIT. Clear now (existing
     // behaviour) and again after COMMIT, so a concurrent read that re-cached the
-    // old committed row in between does not leave a stale entry behind.
+    // old committed row in between does not leave a stale entry behind. Outside a
+    // transaction the write is already committed: one clear is enough.
     const handle = (model: any) => {
       eventsCallback(model);
-      afterCommit(() => eventsCallback(model));
+
+      if (databaseTransactionContext.hasActiveTransaction()) {
+        afterCommit(() => eventsCallback(model));
+      }
     };
 
     events.push(

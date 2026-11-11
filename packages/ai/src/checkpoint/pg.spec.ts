@@ -51,7 +51,7 @@ class FakePgClient implements PgClientLike {
       return this.handleList(sql, params);
     }
 
-    if (sql.startsWith("DELETE FROM") && sql.includes("turn_index < (")) {
+    if (sql.startsWith("DELETE FROM") && sql.includes("turn_index < $3")) {
       return this.handlePrune(params);
     }
 
@@ -62,7 +62,40 @@ class FakePgClient implements PgClientLike {
     throw new Error(`FakePgClient: unrecognized query: ${sql}`);
   }
 
+  /**
+   * Models `ON CONFLICT … DO UPDATE … WHERE existing.state = EXCLUDED.state
+   * RETURNING turn_index`: a new turn is inserted; a re-save of a stored
+   * turn updates it only when the state is unchanged, else returns no row.
+   */
   private handleInsert(params: unknown[]): { rows: unknown[] } {
+    const existing = this.rows.find(
+      (row) =>
+        row.orchestrator_name === params[0] &&
+        row.session_id === params[1] &&
+        row.turn_index === params[2],
+    );
+
+    if (existing) {
+      if (
+        JSON.stringify(JSON.parse(existing.state)) !==
+        JSON.stringify(JSON.parse(params[3] as string))
+      ) {
+        return { rows: [] };
+      }
+
+      Object.assign(existing, {
+        last_route: params[4] as string | null,
+        signature: params[5] as string,
+        version: params[6] as string | null,
+        summarized_through: params[7] as number | null,
+        lock_acquired_at: params[8] as string | null,
+        lock_expires_at: params[9] as string | null,
+        saved_at: params[10] as string,
+      });
+
+      return { rows: [{ turn_index: existing.turn_index }] };
+    }
+
     this.rows.push({
       orchestrator_name: params[0] as string,
       session_id: params[1] as string,
@@ -77,7 +110,7 @@ class FakePgClient implements PgClientLike {
       saved_at: params[10] as string,
     });
 
-    return { rows: [] };
+    return { rows: [{ turn_index: params[2] }] };
   }
 
   private handleLoad(params: unknown[]): { rows: unknown[] } {
@@ -120,25 +153,14 @@ class FakePgClient implements PgClientLike {
   }
 
   private handlePrune(params: unknown[]): { rows: unknown[] } {
-    const [orchestratorName, sessionId, keepSnapshots] = params as [string, string, number];
-
-    const sessionRows = this.rows.filter(
-      (row) => row.orchestrator_name === orchestratorName && row.session_id === sessionId,
-    );
-
-    if (sessionRows.length === 0) {
-      return { rows: [] };
-    }
-
-    const maxTurnIndex = Math.max(...sessionRows.map((row) => row.turn_index));
-    const threshold = maxTurnIndex - keepSnapshots;
+    const [orchestratorName, sessionId, keepBeforeTurnIndex] = params as [string, string, number];
 
     this.rows = this.rows.filter(
       (row) =>
         !(
           row.orchestrator_name === orchestratorName &&
           row.session_id === sessionId &&
-          row.turn_index < threshold
+          row.turn_index < keepBeforeTurnIndex
         ),
     );
 
@@ -217,6 +239,32 @@ describe("checkpoint pg store", () => {
     expect(loaded?.state).toEqual({ count: 2 });
   });
 
+  it("should update the lock columns when the latest turn is re-saved with the same state", async () => {
+    const client = new FakePgClient();
+    const store = pg({ client });
+    const record = makeRecord({ turn_index: 3, state: { count: 3 } });
+
+    await store.save(record);
+    // The compaction lock is stamped by re-saving the latest row.
+    await store.save({ ...record, lock_acquired_at: "2026-01-01T00:00:00.000Z" });
+
+    expect(client.rows).toHaveLength(1);
+    expect((await store.load("support", "sess-1"))?.lock_acquired_at).toBe(
+      "2026-01-01T00:00:00.000Z",
+    );
+    expect(client.queries[0]).toContain("ON CONFLICT (orchestrator_name, session_id, turn_index)");
+  });
+
+  it("should refuse a second save of a turn with a different state", async () => {
+    const store = pg({ client: new FakePgClient() });
+
+    await store.save(makeRecord({ turn_index: 1, state: { count: 1 } }));
+
+    await expect(store.save(makeRecord({ turn_index: 1, state: { count: 99 } }))).rejects.toThrow(
+      /already saved with a different state/,
+    );
+  });
+
   it("should round-trip a fan-out last_route array", async () => {
     const store = pg({ client: new FakePgClient() });
 
@@ -285,7 +333,7 @@ describe("checkpoint pg store", () => {
     expect(matches).toEqual(["a_1"]);
   });
 
-  it("should prune turns below max - keepSnapshots", async () => {
+  it("should prune turns below the keep-before turn index", async () => {
     const client = new FakePgClient();
     const store = pg({ client });
 
@@ -293,14 +341,12 @@ describe("checkpoint pg store", () => {
       await store.save(makeRecord({ turn_index: turn }));
     }
 
-    const pruneable = store as unknown as {
-      prune(name: string, sessionId: string, keep: number): Promise<void>;
-    };
-    await pruneable.prune("support", "sess-1", 2);
+    await store.prune?.("support", "sess-1", 3);
 
     const remaining = client.rows.map((row) => row.turn_index).sort((left, right) => left - right);
 
     expect(remaining).toEqual([3, 4, 5]);
+    expect(client.queries.at(-1)).toContain("turn_index < $3");
   });
 
   it("should no-op prune for a non-finite keep bound", async () => {
@@ -316,6 +362,6 @@ describe("checkpoint pg store", () => {
     await pruneable.prune("support", "sess-1", Number.POSITIVE_INFINITY);
 
     expect(client.rows).toHaveLength(2);
-    expect(client.queries.some((query) => query.includes("turn_index < ("))).toBe(false);
+    expect(client.queries.some((query) => query.includes("turn_index < $3"))).toBe(false);
   });
 });

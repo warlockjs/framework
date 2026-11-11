@@ -6,7 +6,7 @@ sidebar:
   label: "Throttle login attempts"
 ---
 
-`loginThrottleMiddleware()` defends login, refresh and password-reset routes against brute-force and credential stuffing. It counts only **failed** attempts, clears the counter when a login succeeds, and rejects a locked request with `429` (`AuthErrorCodes.TooManyAttempts`, `EC004`) before the controller — and the bcrypt verify — ever runs.
+`loginThrottleMiddleware()` defends login, refresh and password-reset routes against brute-force and credential stuffing. It counts every attempt as it arrives, clears the counter when a login succeeds, and rejects a locked or over-the-limit request with `429` (`AuthErrorCodes.TooManyAttempts`, `EC004`) before the controller — and the bcrypt verify — ever runs. A burst of concurrent requests cannot outrun the limit: at most `max` attempts per window reach the controller.
 
 ```ts
 import { loginThrottleMiddleware } from "@warlock.js/auth";
@@ -62,26 +62,43 @@ router.prefix("/auth", () => {
 
 ## Options
 
-| Option            | Default                            | Purpose                                   |
-| ----------------- | ---------------------------------- | ----------------------------------------- |
-| `max`             | `5`                                | Failures within the window before lockout |
-| `window`          | `"15m"`                            | Counting window (`ms`-string or seconds)  |
-| `lockoutDuration` | `"15m"`                            | How long the lock lasts once tripped      |
-| `by`              | `["email", "ip"]`                  | Identifiers tracked, each independently   |
-| `identifierKey`   | `"email"`                          | Credential field used as the account key  |
-| `errorMessage`    | i18n `auth.errors.tooManyAttempts` | 429 message override                      |
-| `isFailure`       | `(res) => !res.isOk`               | What counts as a failed attempt           |
-| `identify`        | built-in email + ip extraction     | Custom identifier list                    |
+| Option            | Default                            | Purpose                                                         |
+| ----------------- | ---------------------------------- | --------------------------------------------------------------- |
+| `max`             | `5`                                | Failures within the window before lockout                       |
+| `window`          | `"15m"`                            | Counting window (`ms`-string or seconds)                        |
+| `lockoutDuration` | `"15m"`                            | How long the lock lasts once tripped                            |
+| `by`              | `["email", "ip"]`                  | Identifiers tracked, each independently                         |
+| `identifierKey`   | `"email"`                          | Credential field used as the account key                        |
+| `errorMessage`    | i18n `auth.errors.tooManyAttempts` | 429 message override                                            |
+| `isFailure`       | `(res) => !res.isOk`               | What counts as a failed attempt                                 |
+| `identify`        | built-in email + ip extraction     | Custom identifier list                                          |
+| `emailLock`       | `"global"`                         | `"pair"`: lock the (email, IP) pair, not the email for everyone |
+| `accountMax`      | `max * 10`                         | Email-wide limit across all IPs under `emailLock: "pair"`       |
 
-## How failures are counted
+## Keep strangers from locking an account
 
-After the controller responds, a non-2xx response counts as a failure for each tracked identifier:
+With the default `emailLock: "global"`, `max` failures for an email from any IP lock that email for everyone, the owner included, so anyone who knows an address can keep it locked. `emailLock: "pair"` puts the `max` lock on the (email, IP) pair instead: a stranger guessing from their own IP locks only themselves. The email alone keeps a wider bucket, `accountMax` (default `max * 10`), which still stops guessing spread over many IPs.
 
-1. The first failure opens the window with a create-only cache write that carries the TTL. An existing window keeps its deadline, so the window is fixed, not sliding.
+```ts
+router.post("/auth/login", loginController, {
+  middleware: [loginThrottleMiddleware({ emailLock: "pair" })],
+});
+```
+
+`emailLock` only applies when `by` tracks both `"email"` and `"ip"` and no custom `identify` is set.
+
+## How attempts are counted
+
+Each request is counted before the controller runs, for each tracked identifier:
+
+1. The first attempt opens the window with a create-only cache write that carries the TTL. An existing window keeps its deadline, so the window is fixed, not sliding.
 2. The counter is bumped with an atomic `cache.increment`.
-3. When the count reaches `max`, a lock key is written for `lockoutDuration`.
+3. A request whose count goes past `max` is refused with `429` and writes the lock for `lockoutDuration`.
+4. After the controller responds, a failure (non-2xx by default) that used the last allowed attempt writes the lock, unless a success that finished meanwhile already reset the window; a 2xx response clears the counter and the lock.
 
-Because the bump is atomic, concurrent failures on different servers are never lost: on the **redis** and **pg** cache drivers the counts are exact across every instance. A 2xx response clears the counter and the lock.
+When the lock is written, the counter is rewritten with the same TTL, so both end together and the identifier starts a fresh window after the lockout.
+
+Because the bump is atomic, concurrent attempts on different servers are never lost: on the **redis** and **pg** cache drivers the counts are exact across every instance. Successful requests that are still in flight also hold an attempt, so a client cannot have more than `max` requests in flight on one bucket.
 
 :::caution
 The **memory** cache driver is per-process. With it, counts and locks are per instance, so an attacker spreading attempts across servers gets `max` tries on each. Use redis or pg when you run more than one instance.
@@ -98,6 +115,21 @@ A custom `identify` returns its keys as they are; hash anything personal yoursel
 ## Fails open
 
 Storage is `@warlock.js/cache`. If the cache driver is unavailable the middleware logs the error and lets the request through — a throttle outage must never become an auth outage. That also means no cache, no protection.
+
+## Throttle the passkey options route
+
+`POST /auth/passkeys/login/options` needs no account and stores one short-lived challenge row per call. Throttle it per IP, counting every request:
+
+```ts
+router.post("/auth/passkeys/login/options", passkeyLoginOptionsController, {
+  public: true,
+  middleware: [
+    loginThrottleMiddleware({ by: ["ip"], isFailure: () => true, max: 30, window: "1m" }),
+  ],
+});
+```
+
+`warlock auth.cleanup` removes spent challenge rows with two set-based deletes, without loading them into memory.
 
 ## Related
 

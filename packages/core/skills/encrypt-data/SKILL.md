@@ -94,6 +94,7 @@ const plainKey = decrypt(apiKey.get("key"));
 `decrypt()` throws on:
 
 - Invalid format (not three colon-separated parts).
+- An IV or auth tag that is not exactly 16 bytes (a truncated tag is refused).
 - Wrong key.
 - Tampered ciphertext (auth tag mismatch).
 - Wrong algorithm vs the one used to encrypt.

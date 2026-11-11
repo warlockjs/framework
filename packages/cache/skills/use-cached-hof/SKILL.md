@@ -45,7 +45,7 @@ cached(fn, {
 | Any args                                                      | `prefix.<16 hex>` — sha1 of a stable JSON encoding of the args, truncated |
 | `Map` / `Set` / function / symbol / class instance / circular | throws `CacheConfigurationError`                                          |
 
-The hash keeps distinct args on distinct keys (`("1.private", "")` ≠ `("1", "private")`). Object keys are sorted; `Date` → ISO string; order of args matters. Never build keys by hand: call `.invalidate(...args)`, which honours `config.driver`. When auto-key fails, use the options form with a custom `key` fn.
+The hash keeps distinct args on distinct keys (`("1.private", "")` ≠ `("1", "private")`). Object keys are sorted; `Date` → ISO string; `bigint` and `$`-prefixed object keys are encoded so they never collide with other args; an own `__proto__` key is kept; order of args matters. Never build keys by hand: call `.invalidate(...args)`, which honours `config.driver`. When auto-key fails, use the options form with a custom `key` fn.
 
 **Upgrade (5.20):** the key format changed from dot-joined args, so old entries are never read and every call misses once.
 

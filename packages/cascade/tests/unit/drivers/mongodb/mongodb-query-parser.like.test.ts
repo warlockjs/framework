@@ -20,4 +20,8 @@ describe("resolveMongoLikePattern", () => {
   it("uses a RegExp argument verbatim", () => {
     expect(resolveMongoLikePattern(/^a+$/)).toBe("^a+$");
   });
+
+  it("drops a leading and trailing % (the match is unanchored)", () => {
+    expect(resolveMongoLikePattern("%a_b%")).toBe("a.b");
+  });
 });

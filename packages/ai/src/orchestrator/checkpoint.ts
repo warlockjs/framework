@@ -85,11 +85,14 @@ export async function persistCheckpoint<TState>(
 }
 
 /**
- * Prune session rows older than `max_turn_index - keepSnapshots` (§4
- * Phase 6). Synchronous-after-save; opted out with
- * `keepSnapshots: "all"`. Delegated to an optional store-side `prune`
- * hook so each driver implements deletion in its own dialect — the
- * engine never reaches into store internals.
+ * Prune session rows so the latest `keepSnapshots` turns remain (§4
+ * Phase 6): the store's `prune` receives the turn-index bound
+ * `latest - keepSnapshots + 1` and drops every row below it (a turn
+ * index, not a row count — the memory, pg and Redis stores all read it so).
+ * Synchronous-after-save; opted out with `keepSnapshots: "all"`.
+ * Delegated to an optional store-side `prune` hook so each driver
+ * implements deletion in its own dialect — the engine never reaches into
+ * store internals.
  */
 async function prune<TState>(
   ctx: OrchestratorEngineContext<unknown, TState>,

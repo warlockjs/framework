@@ -4,6 +4,7 @@ import type { ChildModel, Model, ModelSchema } from "../model";
 import { mergeDriverFields } from "./accessor-methods";
 import { sanitizeFilter } from "../../utils/sanitize-filter";
 import { emitModelEvent } from "./instance-event-methods";
+import { hasGlobalScopes, scopeUpsertFilter } from "./query-methods";
 
 /**
  * Default number of rows processed per chunk by {@link createManyRecords}.
@@ -330,6 +331,14 @@ export async function upsertRecord<
 ): Promise<TModel> {
   const driver = ModelClass.getDriver();
   const safeFilter = sanitizeFilter(filter as Record<string, unknown>);
+
+  // Global scopes (tenant, soft delete) pin the write like every other write
+  // static: a visible match is updated by its primary key, and a match hidden
+  // by a scope is refused instead of being updated.
+  const writeFilter = hasGlobalScopes(ModelClass)
+    ? await scopeUpsertFilter(ModelClass, safeFilter)
+    : safeFilter;
+
   const mergedData = { ...safeFilter, ...data } as Record<string, unknown>;
 
   const tempModel = new ModelClass(mergedData as Partial<TSchema>);
@@ -372,7 +381,7 @@ export async function upsertRecord<
 
   const result = await driver.findOneAndUpdate(
     ModelClass.table,
-    safeFilter,
+    writeFilter,
     { $set: setData, $setOnInsert: setOnInsert },
     { ...options, upsert: true, returnDocument: "after" },
   );

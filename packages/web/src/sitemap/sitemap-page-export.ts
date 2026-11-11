@@ -6,6 +6,7 @@
  */
 import type { ChangeFreq } from "@warlock.js/sitemap";
 import type { SitemapPageUrl } from "./expand-locale-entries";
+import type { SharedContext } from "../index";
 
 export type { SitemapPageUrl };
 
@@ -36,9 +37,25 @@ export type SitemapModelLike = {
   };
 };
 
-export type SitemapPageSupplier = () =>
-  | Promise<Iterable<SitemapPageUrl>>
-  | Iterable<SitemapPageUrl>;
+/**
+ * What a sitemap supplier receives. Single-site generation passes an empty
+ * object. A multi-site sitemap names its site, and a dynamic (tenant) site
+ * also names the tenant it is built for: a supplier for a dynamic site must
+ * scope its rows by `tenantKey`, or every tenant's sitemap lists every
+ * tenant's URLs.
+ */
+export type SitemapSupplierContext = {
+  /** The site key, in multi-site mode. */
+  readonly site?: string;
+  /** The tenant's `key` from `web.resolveHost`, when building a dynamic site's sitemap. */
+  readonly tenantKey?: string;
+  /** The tenant's `shared` from `web.resolveHost`, when it returned one. */
+  readonly shared?: Readonly<Partial<SharedContext>>;
+};
+
+export type SitemapPageSupplier = (
+  context: SitemapSupplierContext,
+) => Promise<Iterable<SitemapPageUrl>> | Iterable<SitemapPageUrl>;
 
 /** A page-owned URL supplier with optional model dependencies for later invalidation wiring. */
 export type SitemapPageEntriesDeclaration = SitemapPageOptions & {

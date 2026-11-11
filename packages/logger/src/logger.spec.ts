@@ -1359,3 +1359,67 @@ describe("Logger — failure isolation and bounded flush", () => {
     }
   });
 });
+
+describe("Logger.isEnabled", () => {
+  class LevelChannel extends LogChannel {
+    public name = "levels";
+    public received: LoggingData[] = [];
+
+    public log(data: LoggingData) {
+      if (this.shouldBeLogged(data)) this.received.push(data);
+    }
+  }
+
+  it("is false with no channels", () => {
+    expect(new Logger().isEnabled("error")).toBe(false);
+  });
+
+  it("follows the logger-wide minLevel", () => {
+    const instance = new Logger().addChannel(new LevelChannel()).setMinLevel("warn");
+
+    expect(instance.isEnabled("info")).toBe(false);
+    expect(instance.isEnabled("warn")).toBe(true);
+  });
+
+  it("is true when at least one channel's levels accept the level", () => {
+    const instance = new Logger()
+      .addChannel(new LevelChannel({ levels: ["error"] }))
+      .addChannel(new LevelChannel({ levels: ["info", "error"] }));
+
+    expect(instance.isEnabled("info")).toBe(true);
+    expect(instance.isEnabled("debug")).toBe(false);
+  });
+
+  it("treats a channel that cannot answer as accepting every level", () => {
+    const instance = new Logger();
+
+    instance.channels.push({ name: "plain", log: () => {} } as unknown as LogChannel);
+
+    expect(instance.isEnabled("debug")).toBe(true);
+  });
+
+  it("never walks (redacts) an entry that no channel keeps", () => {
+    const instance = new Logger().addChannel(new LevelChannel({ levels: ["error"] }));
+    const ownKeys = vi.fn((target: object) => Reflect.ownKeys(target));
+    const context = new Proxy({ password: "secret", items: [1, 2, 3] }, { ownKeys });
+
+    instance.info("orders", "list", "ok", context);
+
+    expect(ownKeys).not.toHaveBeenCalled();
+
+    instance.error("orders", "list", "failed", context);
+
+    expect(ownKeys).toHaveBeenCalled();
+  });
+
+  it("still delivers kept entries to the channels that accept them", () => {
+    const errorsOnly = new LevelChannel({ levels: ["error"] });
+    const everything = new LevelChannel();
+    const instance = new Logger().addChannel(errorsOnly).addChannel(everything);
+
+    instance.info("m", "a", "kept by one");
+
+    expect(errorsOnly.received).toHaveLength(0);
+    expect(everything.received).toHaveLength(1);
+  });
+});

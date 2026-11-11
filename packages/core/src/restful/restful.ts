@@ -1,5 +1,5 @@
 import type { GenericObject } from "@mongez/reinforcements";
-import type { Model } from "@warlock.js/cascade";
+import { UnsafeFilterError, type Model } from "@warlock.js/cascade";
 import { log } from "@warlock.js/logger";
 import type { Request, Response } from "../http";
 import type { QueryBuilderContract, RepositoryManager } from "../repositories";
@@ -46,6 +46,22 @@ export abstract class Restful<T extends Model> implements RouteResource {
   public cache = true;
 
   /**
+   * Most ids one `bulkDelete` request may name. A longer list is refused with
+   * 400 before any record is loaded.
+   *
+   * @default 1000
+   */
+  protected bulkDeleteLimit = 1000;
+
+  /**
+   * How many records `bulkDelete` deletes at the same time (each delete runs
+   * the middleware, `beforeDelete`, `destroy()` and `onDelete`).
+   *
+   * @default 10
+   */
+  protected bulkDeleteConcurrency = 10;
+
+  /**
    * Find record instance by id
    */
   public async find(id: number) {
@@ -82,6 +98,10 @@ export abstract class Restful<T extends Model> implements RouteResource {
 
       return response.success(responseDocument);
     } catch (error: any) {
+      // A filter value the database layer refused came from the client: the
+      // request funnel answers it with a 400.
+      if (error instanceof UnsafeFilterError) throw error;
+
       log.error("restful", "list", error);
       return response.serverError(error);
     }
@@ -312,6 +332,12 @@ export abstract class Restful<T extends Model> implements RouteResource {
         });
       }
 
+      if (ids.length > this.bulkDeleteLimit) {
+        return response.badRequest({
+          error: `Too many ids: at most ${this.bulkDeleteLimit} records can be deleted in one request. Send them in smaller batches, or raise bulkDeleteLimit on the resource.`,
+        });
+      }
+
       const records = await this.repository.all({
         perform: (query: QueryBuilderContract<T>) =>
           query.whereIn(
@@ -320,17 +346,21 @@ export abstract class Restful<T extends Model> implements RouteResource {
           ),
       });
 
-      await Promise.all(
-        records.map(async (record) => {
-          if (await this.callMiddleware("delete", request, response, record)) {
-            return;
-          }
+      const deleteRecord = async (record: T) => {
+        if (await this.callMiddleware("delete", request, response, record)) {
+          return;
+        }
 
-          await this.beforeDelete(request, response, record);
-          await record.destroy();
-          this.onDelete(request, response, record);
-        }),
-      );
+        await this.beforeDelete(request, response, record);
+        await record.destroy();
+        this.onDelete(request, response, record);
+      };
+
+      const concurrency = Math.max(1, Math.floor(this.bulkDeleteConcurrency) || 1);
+
+      for (let index = 0; index < records.length; index += concurrency) {
+        await Promise.all(records.slice(index, index + concurrency).map(deleteRecord));
+      }
 
       if (this.returnOn.delete === "records") {
         return this.list({ request, response });

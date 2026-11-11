@@ -418,7 +418,12 @@ export type PutOptions = {
  */
 export type TemporaryTokenPayload = {
   /**
-   * Relative file path
+   * Token format version. The local driver issues and accepts version 2 only.
+   */
+  v?: number;
+  /**
+   * File path relative to the storage root, including the storage prefix
+   * (tenant) in effect when the token was issued
    */
   path: string;
   /**

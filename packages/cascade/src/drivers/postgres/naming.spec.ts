@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { PostgresDialect } from "./postgres-dialect";
 import { PostgresDriver } from "./postgres-driver";
 import { PostgresQueryParser } from "./postgres-query-parser";
-import { camelToSnake, snakeToCamel } from "./naming";
+import { camelToSnake, snakeKeysToCamel, snakeToCamel } from "./naming";
 
 describe("Postgres snake_case naming", () => {
   it("converts naming helper values", () => {
@@ -58,5 +58,32 @@ describe("Postgres snake_case naming", () => {
     expect(parser.parse().query).toBe(
       'SELECT * FROM "userProfiles" WHERE "userProfiles"."createdAt" = $1',
     );
+  });
+
+  it("converts each column name once and reuses it for later rows", () => {
+    snakeKeysToCamel({ created_at: 1, user_id: 2 });
+
+    const replace = vi.spyOn(String.prototype, "replace");
+    const rows = [
+      { created_at: 1, user_id: 2 },
+      { created_at: 3, user_id: 4 },
+    ].map((row) => snakeKeysToCamel(row));
+    const calls = replace.mock.calls.length;
+    replace.mockRestore();
+
+    expect(rows).toEqual([
+      { createdAt: 1, userId: 2 },
+      { createdAt: 3, userId: 4 },
+    ]);
+    expect(calls).toBe(0);
+    expect(camelToSnake("createdAt")).toBe("created_at");
+    expect(camelToSnake("createdAt")).toBe("created_at");
+  });
+
+  it("never writes a __proto__ column to the prototype", () => {
+    const row = snakeKeysToCamel(JSON.parse('{"__proto__": 1, "a_b": 2}'));
+
+    expect(Object.keys(row)).toEqual(["_Proto__", "aB"]);
+    expect(Object.getPrototypeOf(row)).toBe(Object.prototype);
   });
 });

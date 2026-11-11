@@ -32,7 +32,8 @@ export function bindLivePageData(socket: LivePageSocket) {
 `LivePageOptions` and structural `LivePageSocket` are exported from the web root.
 Reuse an existing socket if the app has one. No client dependency is required for
 polling: `configureLivePageData({})` removes the binding. `pollInterval` defaults
-to 30,000 ms and must be finite, between 1 and 2,147,483,647. Tags must be a
+to 30,000 ms and must be finite, between 1 and 2,147,483,647. Polling pauses in
+a hidden tab and refreshes once when it is visible again. Tags must be a
 non-empty string array; they describe dependencies of the whole loader pipeline,
 independent of response-cache policy.
 
@@ -397,6 +398,8 @@ A client navigation to the same URL still receives that same 400 status, with no
 ## Execution order
 
 Loaders run **sequentially, root to leaf, each one awaited before the next starts**: `root.setup.ts`'s `AppLoader`, then every matched `LayoutLoader` from outermost to innermost, then the page's `PageLoader`. The runtime has three top-level slots (`app`, `layout`, `page`), but the layout slot composes the full matched layout chain. A page may have only one _rendering_ layout; prefix-, middleware-, and loader-only layouts may still appear at multiple ancestry levels.
+
+`web.loaders: "parallel"` (default `"serial"`) starts the app, layout and page loaders together and settles them in that same order with the same rules below: the first level that throws or short-circuits wins and the levels under it commit nothing, but their loaders already started (their `signal` aborts). Use it only when no loader reads what a higher loader set on the request; keep auth gates in `middleware`, which always runs first. The layouts of one chain stay outermost-first in both modes.
 
 **The first core `Response` a loader returns is terminal.** Returning a `Response` object stops the pipeline immediately: no lower loader starts, `metadata` is not resolved, and that response is sent as-is. It is more terminal than a short-circuit — because the response is returned whole, the buffered header/cookie writes made at that same level are discarded along with everything below it. Use `response.redirect()` / `response.notFound()` (which produce a `LoaderShortCircuit`, committing that level's buffer inclusively) when you want your buffered writes to survive; return a raw `Response` only when you mean "this exact response, nothing else."
 

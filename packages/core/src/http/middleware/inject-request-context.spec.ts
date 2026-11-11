@@ -1,4 +1,4 @@
-import { DatabaseWriterValidationError } from "@warlock.js/cascade";
+import { DatabaseWriterValidationError, UnsafeFilterError } from "@warlock.js/cascade";
 import config from "@mongez/config";
 import { contextManager } from "@warlock.js/context";
 import { log } from "@warlock.js/logger";
@@ -250,6 +250,27 @@ describe("http.errorMapper", () => {
     const { response } = await run(new Error("unexpected"));
 
     expect(response.serverError).toHaveBeenCalled();
+  });
+
+  it("answers a refused filter value with a 400 carrying its message", async () => {
+    withMapper(undefined);
+
+    const message = 'Unsafe filter: the LIKE pattern for field "name" holds 5 "%" wildcards.';
+    const { response, logs } = await run(new UnsafeFilterError(message, "name"));
+
+    expect(response.setStatusCode).toHaveBeenCalledWith(400);
+    expect(response.send).toHaveBeenCalledWith(expect.objectContaining({ error: message }));
+    expect(errorLevel(logs)).toHaveLength(0);
+  });
+
+  it("answers a refused filter value with a 400 even when the mapper claims every error", async () => {
+    const mapper = vi.fn(() => ({ status: 500 }));
+    withMapper(mapper);
+
+    const { response } = await run(new UnsafeFilterError("Unsafe filter", "name"));
+
+    expect(mapper).not.toHaveBeenCalled();
+    expect(response.setStatusCode).toHaveBeenCalledWith(400);
   });
 });
 

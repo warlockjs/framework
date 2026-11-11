@@ -66,7 +66,7 @@ Internally `index()`:
 
 1. Splits each document with the chunker (see below), preserving order.
 2. Sub-batches the embed calls (96 chunk texts per `embedder.embedMany()` call) so one giant document never blows the provider's per-request token cap.
-3. Upserts each chunk's record + vector into the store under `namespace.sourceId.chunkIndex`.
+3. Upserts each chunk's record + vector into the store under `namespace.sourceId.chunkIndex`, with the namespace recorded on the chunk. `.`, `:` and `%` in a document id are escaped in the key (`a.b` → `a%2Eb`), so a dotted id can never collide with a nested namespace.
 
 Empty or whitespace-only documents yield zero chunks — nothing is written and no empty batch is ever embedded.
 
@@ -128,7 +128,7 @@ type Citation = {
 ### Failure modes (all graceful)
 
 - **No hits clear the threshold** → `{ query, chunks: [] }`. Never throws.
-- **Two rags share one driver** → namespace-prefix filtering keeps them isolated.
+- **Two rags share one driver** → each chunk records its namespace and retrieval matches it exactly, so nested names stay apart too: `kb.acme` never reads the chunks of `kb.acme.private`. When other namespaces fill the first page of `candidates`, the store is asked again with a wider page (up to 1,000), so a small namespace on a busy driver still finds its own chunks.
 - **A reranker throws** → caught; the raw cosine order is used instead. A flaky optional reranker never fails the whole retrieval.
 - **Dimension mismatch** (indexed with model A, queried with model B) → throws a clear error rather than returning garbage hits. Index and query must use the same embedding model.
 
@@ -190,6 +190,12 @@ The tool input is `{ query: string }`; the output is the full `RetrieveResult` (
 ```ts
 await kb.clear(); // drops every entry written under this rag's namespace
 ```
+
+`clear()` removes keys by namespace prefix, so on a shared driver it also removes the chunks of a nested namespace (`kb.acme.clear()` also clears `kb.acme.private`). Give rags that share a driver sibling names (`kb.acme.public`, `kb.acme.private`) rather than nesting one inside another.
+
+:::note[Chunks indexed before 5.53]
+Older chunks do not record their namespace. Retrieval still reads them when their key is the namespace followed by exactly `<docId>.<chunkIndex>`; a chunk whose document id contained a `.` is skipped until you re-index it. Re-index once (`clear()` then `index()`) to bring an existing knowledge base fully onto exact namespace matching.
+:::
 
 ## When to use RAG vs. the alternatives
 

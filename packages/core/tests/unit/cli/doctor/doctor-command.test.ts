@@ -67,6 +67,15 @@ describe("default doctor check set", () => {
       "sites",
       "capabilities",
       "locales-ts-deprecated",
+      "upload-limits",
+      "cors",
+      "auth-tokens",
+      "trust-proxy",
+      "request-timeout",
+      "production-logging",
+      "compression",
+      "env-files",
+      "memory-cache",
       "release-hygiene",
     ]);
   });

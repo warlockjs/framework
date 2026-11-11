@@ -114,6 +114,8 @@ scheduler.addJob(job("sync", sync).everyMinutes(5).onOneServer({ lockTtl: "10m",
 
 For every tick, the servers race to create a cache entry keyed `scheduler.<key ?? name>.<scheduledTickEpochMs>`. The server that creates it runs the job; the others skip that tick and emit `job:skip`.
 
+A plain interval (`everyMinute()`, `everyHours(2)`, `everyMinutes(5)`, … with no `at()`, day or month constraint) is aligned to wall-clock boundaries in the job's timezone when `onOneServer()` is set: `everyHour()` fires at the top of each hour and `everyMinutes(5)` at :00, :05, :10, and so on. Servers that booted at different times therefore compute the same tick and share one claim. Such a job does not fire at boot; its first run is the next boundary. Schedules pinned with `at()`, a day or a cron expression already land on the same wall-clock times on every server.
+
 That entry is a **claim**, not a lock: it is create-only, has a TTL, and is never released. Because it is never released, a server whose timer fires late — after the winner already finished — still loses, so a tick never runs twice.
 
 | Option    | Default                                           | Purpose                           |

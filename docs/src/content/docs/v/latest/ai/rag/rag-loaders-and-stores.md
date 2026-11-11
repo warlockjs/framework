@@ -42,7 +42,7 @@ interface VectorStore {
 | Loader                          | Input                                         | Deps                       | Emits                                         |
 | ------------------------------- | --------------------------------------------- | -------------------------- | --------------------------------------------- |
 | `ai.rag.loadText(input, opts?)` | `string` \| `{ id, text }` \| array of either | none                       | one doc per non-empty item                    |
-| `ai.rag.loadHtml(html, opts?)`  | raw HTML string                               | none (regex strip)         | one doc, `metadata.title` from `<title>`      |
+| `ai.rag.loadHtml(html, opts?)`  | raw HTML string                               | none (linear strip)        | one doc, `metadata.title` from `<title>`      |
 | `ai.rag.loadWeb(url, opts?)`    | absolute URL                                  | none (core `guardedFetch`) | one doc, SSRF-safe fetch                      |
 | `ai.rag.loadPdf(bytes, opts?)`  | `Buffer` \| `ArrayBuffer` \| `Uint8Array`     | lazy `pdf-parse` peer      | one doc, or one per page with `perPage: true` |
 
@@ -80,7 +80,9 @@ await kb.index(
 );
 ```
 
-HTML responses run through the same tag-strip pass as `loadHtml`; non-HTML text (`text/plain`, markdown) is used verbatim. `metadata.source` is the resolved URL and `metadata.contentType` the server-reported type. A non-OK response, a policy block, a timeout, or an over-cap body throws `OutboundPolicyError`.
+HTML responses run through the same tag-strip pass as `loadHtml`; non-HTML text (`text/plain`, markdown) is used verbatim. `metadata.source` is the resolved URL and `metadata.contentType` the server-reported type. A non-OK response, a policy block, a timeout (which covers the body download too), or an over-cap body throws `OutboundPolicyError`.
+
+The tag-strip pass is a single linear scan: markup that never closes (thousands of `<!--`, `<script>` or bare `<`) costs time in proportion to the page size, so a hostile page cannot stall the process.
 
 ### `loadPdf` — lazy optional peer, page-precise citations
 

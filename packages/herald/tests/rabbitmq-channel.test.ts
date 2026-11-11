@@ -234,6 +234,54 @@ describe("RabbitMQChannel — subscribe smart ack", () => {
     expect(amqp.reject).toHaveBeenCalled();
   });
 
+  it("treats a non-numeric x-retry-count from the publisher as retries exhausted", async () => {
+    // A string header used to be concatenated ("x" + 1 = "x1", never > maxRetries),
+    // so the message was republished forever with a growing header.
+    await channel.subscribe(
+      async () => {
+        throw new Error("boom");
+      },
+      {
+        retry: { maxRetries: 3, delay: 0 },
+        deadLetter: { channel: "orders.failed" },
+      },
+    );
+
+    await amqp.deliver(amqp.buildDelivery({ orderId: 1 }, { headers: { "x-retry-count": "x" } }));
+
+    expect(amqp.sent.find((entry) => entry.queue === "orders")).toBeUndefined();
+    expect(amqp.sent.find((entry) => entry.queue === "orders.failed")).toBeDefined();
+  });
+
+  it("reads a numeric-string x-retry-count as a number", async () => {
+    await channel.subscribe(
+      async () => {
+        throw new Error("boom");
+      },
+      { retry: { maxRetries: 3, delay: 0 } },
+    );
+
+    await amqp.deliver(amqp.buildDelivery({ orderId: 1 }, { headers: { "x-retry-count": "1" } }));
+
+    const republish = amqp.sent.find((entry) => entry.queue === "orders");
+    expect((republish!.options.headers as Record<string, unknown>)["x-retry-count"]).toBe(2);
+  });
+
+  it("drops a message whose x-retry-count is negative or fractional instead of retrying", async () => {
+    await channel.subscribe(
+      async () => {
+        throw new Error("boom");
+      },
+      { retry: { maxRetries: 3, delay: 0 } },
+    );
+
+    await amqp.deliver(amqp.buildDelivery({ orderId: 1 }, { headers: { "x-retry-count": -5 } }));
+    await amqp.deliver(amqp.buildDelivery({ orderId: 2 }, { headers: { "x-retry-count": 1.5 } }));
+
+    expect(amqp.sent.filter((entry) => entry.queue === "orders")).toHaveLength(0);
+    expect(amqp.reject).toHaveBeenCalledTimes(2);
+  });
+
   it("rejects invalid messages on the consume side without running the handler", async () => {
     const handler = vi.fn();
     const schema = v.object({ orderId: v.int() });

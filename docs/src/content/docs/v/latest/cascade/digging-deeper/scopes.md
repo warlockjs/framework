@@ -85,6 +85,10 @@ await User.query().withoutGlobalScopes().get();
 
 This is local to the query — it doesn't remove the scope from the model.
 
+### Writes honour global scopes too
+
+The write statics apply the same scopes as queries: `atomic()`, `findOneAndUpdate()`, `findAndUpdate()`, `findAndReplace()`, `findOneAndDelete()`, `upsert()`, `restore()` and `restoreAll()` only touch rows the scopes let the caller see. `upsert()` updates a visible match by its primary key and throws when its filter matches a row a scope hides (another tenant's, a soft-deleted one) instead of updating it; when nothing matches it inserts, like `create()`, so set the tenant column in the data you pass. A model with no global scope skips the extra lookup and sends the write straight to the database.
+
 ### Removing a global scope permanently
 
 ```ts

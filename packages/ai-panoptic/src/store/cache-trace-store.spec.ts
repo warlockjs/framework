@@ -346,6 +346,79 @@ describe("createCacheTraceStore", () => {
     expect(store.get("t1")?.traceId).toBe("t1");
   });
 
+  it("keeps every trace of a burst in the index when writes finish out of order", async () => {
+    const driver = mockDriver();
+    // Random write latency: without serialised writes, an older index can
+    // land after a newer one and drop entries.
+    driver.set.mockImplementation(async (key: string, value: unknown) => {
+      await new Promise((resolve) => setTimeout(resolve, Math.floor(Math.random() * 5)));
+      driver.storage.set(key, value);
+
+      return value;
+    });
+    const store = createCacheTraceStore(driver as never);
+
+    for (let index = 0; index < 50; index += 1) {
+      store.add(trace({ traceId: `t${index}` }));
+    }
+
+    await vi.waitFor(() => {
+      const index = driver.storage.get("panoptic:index") as unknown[] | undefined;
+      expect(index).toHaveLength(50);
+    });
+
+    const indexWrites = driver.set.mock.calls.filter(([key]) => key === "panoptic:index");
+    expect(indexWrites.length).toBeLessThan(5);
+
+    const restored = createCacheTraceStore(driver as never);
+    await restored.ready();
+
+    expect(restored.size).toBe(50);
+  });
+
+  it("writes the index after each spaced-out add so a restart sees every trace", async () => {
+    const driver = mockDriver();
+    const store = createCacheTraceStore(driver as never);
+
+    store.add(trace({ traceId: "a" }));
+    await flush();
+    store.add(trace({ traceId: "b" }));
+    await flush();
+
+    const index = driver.storage.get("panoptic:index") as Array<{ id: string }>;
+    expect(index.map((entry) => entry.id)).toEqual(["a", "b"]);
+  });
+
+  it("rewrites a failed index on the next add", async () => {
+    const driver = mockDriver();
+    const onError = vi.fn();
+    const store = createCacheTraceStore(driver as never, { onError });
+
+    driver.set.mockImplementation(async (key: string, value: unknown) => {
+      if (key === "panoptic:index") {
+        throw new Error("index write failed");
+      }
+
+      driver.storage.set(key, value);
+
+      return value;
+    });
+    store.add(trace({ traceId: "a" }));
+    await flush();
+
+    driver.set.mockImplementation(async (key: string, value: unknown) => {
+      driver.storage.set(key, value);
+
+      return value;
+    });
+    store.add(trace({ traceId: "b" }));
+    await flush();
+
+    expect(onError).toHaveBeenCalledTimes(1);
+    const index = driver.storage.get("panoptic:index") as Array<{ id: string }>;
+    expect(index.map((entry) => entry.id)).toEqual(["a", "b"]);
+  });
+
   it("routes a hydration failure to onError and leaves the mirror empty", async () => {
     const driver = mockDriver();
     driver.get.mockRejectedValue(new Error("cache down"));

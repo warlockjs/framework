@@ -99,6 +99,21 @@ export type PageCacheOptIn = {
    * back to `maxAge` when omitted — see `../server/create-page-route-handler.ts`.
    */
   ttl?: number;
+  /**
+   * The query parameters that change this page, e.g. `["page", "sort"]`. When
+   * set, only these enter the server cache key, so `?page=2&ref=x` and
+   * `?page=2&ref=y` share one entry. A request carrying any other parameter
+   * can still be served a stored entry, but its own render is never stored.
+   * When omitted, every parameter except common tracking ones (`utm_*`,
+   * `fbclid`, `gclid`, ...) enters the key.
+   */
+  query?: readonly string[];
+  /**
+   * Request headers this page's response depends on, added to its `Vary`
+   * header so a CDN or shared proxy keeps one copy per value — for example the
+   * header `varyBy` reads: `varyHeaders: ["x-theme"]`.
+   */
+  varyHeaders?: readonly string[];
 };
 
 /** What a function-form `config.cache.tags` receives besides the page data. */

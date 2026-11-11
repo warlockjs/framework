@@ -243,4 +243,39 @@ describe("retrieve", () => {
 
     expect(queriedTopK).toBe(17);
   });
+
+  it("queries the store once when its first page fills the candidate pool", async () => {
+    const store = makeStore();
+    const embedder = new FakeEmbedder();
+    const namespace = "ai.rag.docs";
+
+    const pageSizes: number[] = [];
+    const spyStore: VectorStore = {
+      async upsert() {},
+      async query(vector, options) {
+        pageSizes.push(options.topK);
+
+        return store.query(vector, options);
+      },
+      async removeNamespace() {},
+    };
+
+    for (let index = 0; index < 6; index++) {
+      await seed(
+        store,
+        embedder,
+        namespace,
+        storedChunk({ sourceId: `d${index}`, text: "aaaa bbbb" }),
+      );
+    }
+
+    const result = await retrieve(
+      "aaaa bbbb",
+      { embedder, store: spyStore, namespace },
+      { topK: 2, candidates: 4, threshold: 0 },
+    );
+
+    expect(result.chunks).toHaveLength(2);
+    expect(pageSizes).toEqual([4]);
+  });
 });

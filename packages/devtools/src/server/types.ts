@@ -45,6 +45,8 @@ export type MountDevtoolsRoutesDeps = {
   /** The persisted request log; absent when core is too old to have one. */
   requestLog?: DevtoolsRequestLogSource;
   isDevelopment: () => boolean;
+  /** Receives one line per distinct refused request (wrong host, foreign origin, proxied). */
+  warn?: (message: string) => void;
   explain?: (query: DevtoolsQuery) => Promise<unknown>;
   listRoutes?: () => DevtoolsRouteRow[] | Promise<DevtoolsRouteRow[]>;
   /** Builds the OpenAPI 3.1 document for the registered routes; injected so devtools never imports core at load. */

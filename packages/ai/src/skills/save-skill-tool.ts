@@ -17,9 +17,55 @@ export type SaveSkillResult =
   | { error: string };
 
 /**
+ * Size limits on a model-proposed skill. A candidate is stored and later
+ * shown to a reviewer (and, once promoted, injected into prompts), so the
+ * model cannot write arbitrarily large or oddly named records.
+ */
+const SAVE_SKILL_LIMITS = {
+  /** Name: 1–64 characters, letters, digits, `-` and `_`, starting with a letter or digit. */
+  name: /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/,
+  /** Maximum description length, in characters. */
+  description: 500,
+  /** Maximum body length, in characters. */
+  body: 16_384,
+  /** Maximum number of tags. */
+  tags: 10,
+  /** Maximum length of one tag, in characters. */
+  tag: 32,
+} as const;
+
+/**
+ * Return a message naming the first limit `input` breaks, or `undefined`
+ * when it is within every {@link SAVE_SKILL_LIMITS} bound.
+ */
+function limitIssue(input: SaveSkillInput): string | undefined {
+  if (!SAVE_SKILL_LIMITS.name.test(input.name)) {
+    return "saveSkill `name` must be 1-64 characters of letters, digits, '-' or '_', starting with a letter or digit";
+  }
+
+  if (input.description.length > SAVE_SKILL_LIMITS.description) {
+    return `saveSkill \`description\` must be at most ${SAVE_SKILL_LIMITS.description} characters`;
+  }
+
+  if (input.body.length > SAVE_SKILL_LIMITS.body) {
+    return `saveSkill \`body\` must be at most ${SAVE_SKILL_LIMITS.body} characters`;
+  }
+
+  if (input.tags && input.tags.length > SAVE_SKILL_LIMITS.tags) {
+    return `saveSkill \`tags\` may hold at most ${SAVE_SKILL_LIMITS.tags} tags`;
+  }
+
+  if (input.tags?.some((tag) => tag.length === 0 || tag.length > SAVE_SKILL_LIMITS.tag)) {
+    return `saveSkill each tag must be 1-${SAVE_SKILL_LIMITS.tag} characters`;
+  }
+
+  return undefined;
+}
+
+/**
  * Hand-built Standard Schema for the `saveSkill` input — dependency-free,
  * mirroring `loadSkillSchema`. Requires `name` / `description` / `body`;
- * `tags` is an optional string array.
+ * `tags` is an optional string array. Enforces {@link SAVE_SKILL_LIMITS}.
  */
 function saveSkillSchema(): StandardSchemaV1<SaveSkillInput> {
   return {
@@ -58,14 +104,19 @@ function saveSkillSchema(): StandardSchemaV1<SaveSkillInput> {
           return { issues: [{ message: "saveSkill `tags` must be a string[] when provided" }] };
         }
 
-        return {
-          value: {
-            name: candidate.name,
-            description: candidate.description,
-            body: candidate.body,
-            ...(candidate.tags !== undefined ? { tags: candidate.tags as string[] } : {}),
-          },
+        const input: SaveSkillInput = {
+          name: candidate.name,
+          description: candidate.description,
+          body: candidate.body,
+          ...(candidate.tags !== undefined ? { tags: candidate.tags as string[] } : {}),
         };
+        const issue = limitIssue(input);
+
+        if (issue !== undefined) {
+          return { issues: [{ message: issue }] };
+        }
+
+        return { value: input };
       },
     },
   };

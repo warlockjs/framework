@@ -78,7 +78,7 @@ vi.mock("@warlock.js/core", async () => ({
 }));
 
 vi.mock("@warlock.js/logger", () => ({
-  log: { error: vi.fn() },
+  log: { error: vi.fn(), debug: vi.fn() },
 }));
 
 vi.mock("../services/jwt", async (importOriginal) => {
@@ -130,7 +130,7 @@ function buildResponse() {
  * stayed silent would be asserting the opposite of what the test means.
  */
 function liveRow(fields: Record<string, unknown>) {
-  return { isExpired: false, destroy: vi.fn(), ...fields };
+  return { isExpired: false, userId: 1, destroy: vi.fn(), ...fields };
 }
 
 /**
@@ -440,7 +440,12 @@ describe("authMiddleware", () => {
   it("rejects a token whose persisted expires_at has passed, even though the JWT verifies", async () => {
     jwtVerify.mockResolvedValue({ id: 1, userType: "user", exp: 4_102_444_800 });
     const destroy = vi.fn();
-    accessTokenFindByToken.mockResolvedValue({ userType: "user", isExpired: true, destroy });
+    accessTokenFindByToken.mockResolvedValue({
+      userId: 1,
+      userType: "user",
+      isExpired: true,
+      destroy,
+    });
     stubConfig({ find: vi.fn().mockResolvedValue({ id: 1, userType: "user" }) });
 
     const middleware = authMiddleware([]);
@@ -458,7 +463,12 @@ describe("authMiddleware", () => {
   it("deletes the dead row on the way out rather than leaving it for cleanup", async () => {
     jwtVerify.mockResolvedValue({ id: 1, userType: "user", exp: 4_102_444_800 });
     const destroy = vi.fn();
-    accessTokenFindByToken.mockResolvedValue({ userType: "user", isExpired: true, destroy });
+    accessTokenFindByToken.mockResolvedValue({
+      userId: 1,
+      userType: "user",
+      isExpired: true,
+      destroy,
+    });
     // The user resolves, so the expiry gate is the only path that can destroy
     // the row — otherwise the pre-existing user-not-found branch would.
     stubConfig({ find: vi.fn().mockResolvedValue({ id: 1, userType: "user" }) });
@@ -475,7 +485,7 @@ describe("authMiddleware", () => {
   // check, so the absent-getter case is pinned rather than left to chance.
   it("rejects when the token row cannot say whether it is expired", async () => {
     jwtVerify.mockResolvedValue({ id: 1, userType: "user", exp: 4_102_444_800 });
-    accessTokenFindByToken.mockResolvedValue({ userType: "user", destroy: vi.fn() });
+    accessTokenFindByToken.mockResolvedValue({ userId: 1, userType: "user", destroy: vi.fn() });
     stubConfig({ find: vi.fn().mockResolvedValue({ id: 1, userType: "user" }) });
 
     const middleware = authMiddleware([]);
@@ -495,6 +505,7 @@ describe("authMiddleware", () => {
   it("still admits a valid, unexpired token", async () => {
     jwtVerify.mockResolvedValue({ id: 1, userType: "user", exp: 4_102_444_800 });
     accessTokenFindByToken.mockResolvedValue({
+      userId: 1,
       userType: "user",
       isExpired: false,
       destroy: vi.fn(),
@@ -574,6 +585,24 @@ describe("authMiddleware", () => {
     expect(response.unauthorized).toHaveBeenCalledWith(
       expect.objectContaining({ errorCode: AuthErrorCodes.InvalidAccessToken }),
     );
+  });
+
+  it("logs an expired or garbage token at debug level, never as an error", async () => {
+    const { log } = await import("@warlock.js/logger");
+    vi.mocked(log.error).mockClear();
+    vi.mocked(log.debug).mockClear();
+    jwtVerify.mockRejectedValue(
+      Object.assign(new Error("token expired"), {
+        code: "FAST_JWT_EXPIRED",
+      }),
+    );
+
+    await authMiddleware([])(
+      makeCtx({ request: buildRequest("expired-token"), response: buildResponse() }),
+    );
+
+    expect(log.error).not.toHaveBeenCalled();
+    expect(log.debug).toHaveBeenCalledOnce();
   });
 
   // D6. `assertTokenType` (services/jwt.ts) throws a `TokenTypeError` carrying

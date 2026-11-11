@@ -8,6 +8,7 @@
  */
 
 import { isLazy, type Lazy } from "@mongez/reinforcements";
+import { databaseTransactionContext } from "../context/database-transaction-context";
 import type { ChildModel, Model } from "../model/model";
 import { getModelFromRegistry, resolveModelName } from "../model/register-model";
 import {
@@ -237,9 +238,90 @@ export class RelationLoader<TModel extends Model = Model> {
       if (callbackConstraint) node.childConstraints[childPath] = callbackConstraint;
     }
 
-    for (const [root, node] of nodes) {
-      await this.loadRelation(root, node.constraint, node.children, node.childConstraints);
+    const roots = Array.from(nodes);
+
+    // Inside a transaction the queries share one session (MongoDB) or one
+    // client (PostgreSQL), which must not run them concurrently.
+    if (roots.length <= 1 || databaseTransactionContext.hasActiveTransaction()) {
+      for (const [root, node] of roots) {
+        await this.loadRelation(root, node.constraint, node.children, node.childConstraints);
+      }
+
+      return;
     }
+
+    await this.loadSiblingsInParallel(roots);
+  }
+
+  /**
+   * Load sibling root relations concurrently: each one is its own batched
+   * query and writes its own property, so none depends on another.
+   *
+   * The result is the same as loading them one after another: a failure is
+   * reported for the first failing relation in the order they were asked for,
+   * and relations new to a model are attached in that order too (the order of
+   * `loadedRelations` and of the model's own keys, which serialization follows).
+   */
+  private async loadSiblingsInParallel(
+    roots: Array<
+      [
+        string,
+        {
+          constraint?: RelationConstraintCallback;
+          children: string[];
+          childConstraints: RelationConstraints;
+        },
+      ]
+    >,
+  ): Promise<void> {
+    const attachedBefore = this.models.map(
+      (model) =>
+        new Set(
+          roots
+            .map(([root]) => root)
+            .filter(
+              (root) =>
+                Object.prototype.hasOwnProperty.call(model, root) ||
+                (
+                  model as unknown as { loadedRelations?: Map<string, LoadedRelationResult> }
+                ).loadedRelations?.has(root) === true,
+            ),
+        ),
+    );
+
+    const results = await Promise.allSettled(
+      roots.map(([root, node]) =>
+        this.loadRelation(root, node.constraint, node.children, node.childConstraints),
+      ),
+    );
+
+    for (const result of results) {
+      if (result.status === "rejected") {
+        throw result.reason;
+      }
+    }
+
+    this.models.forEach((model, index) => {
+      const loadedRelations = (
+        model as unknown as { loadedRelations?: Map<string, LoadedRelationResult> }
+      ).loadedRelations;
+
+      if (!loadedRelations) {
+        return;
+      }
+
+      for (const [root] of roots) {
+        if (attachedBefore[index]!.has(root) || !loadedRelations.has(root)) {
+          continue;
+        }
+
+        const value = loadedRelations.get(root) as LoadedRelationResult;
+
+        loadedRelations.delete(root);
+        delete (model as unknown as Record<string, unknown>)[root];
+        attachLoadedRelation(model as object, root, value);
+      }
+    });
   }
 
   // ==========================================================================

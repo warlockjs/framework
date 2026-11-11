@@ -1,10 +1,33 @@
 import type { ChildModel } from "@warlock.js/cascade";
 import type { ProviderProfile } from "../contracts/providers";
 import { InvalidProviderCallbackError } from "../errors/invalid-provider-callback.error";
+import { ProviderAccountLinkBlockedError } from "../errors/provider-account-link-blocked.error";
 import { ProviderEmailNotVerifiedError } from "../errors/provider-email-not-verified.error";
 import type { Auth } from "../models/auth.model";
 import { ProviderAccount } from "../models/provider-account";
 import { authConfig } from "../services/auth-config";
+import { isEmailVerified } from "../services/email-verification";
+
+/** Whether the user model's schema declares the verification field. */
+function tracksVerification(Model: ChildModel<Auth>, field: string): boolean {
+  const shape = (Model as unknown as { schema?: { schema?: unknown } }).schema?.schema;
+
+  return typeof shape === "object" && shape !== null && Object.hasOwn(shape, field);
+}
+
+/** Whether `auth.providers.linkExisting` lets a provider login take over `existing`. */
+function mayLinkExisting(Model: ChildModel<Auth>, existing: Auth): boolean {
+  const policy = authConfig.providers.linkExisting();
+
+  if (policy === "always") return true;
+  if (policy === "never") return false;
+
+  if (isEmailVerified(existing)) return true;
+
+  // A model that never records verification cannot prove ownership either
+  // way; keep linking it rather than lock its users out of provider login.
+  return !tracksVerification(Model, authConfig.verification.field());
+}
 
 /** Default creation for a first provider login: email, name, and the verified stamp. */
 async function createUserFor<T extends Auth>(
@@ -36,6 +59,9 @@ async function createUserFor<T extends Auth>(
  *    address at the provider take over the matching account.
  * 3. Verified: the user whose `auth.providers.emailField` matches, else a new
  *    user (`auth.providers.createUser`, or the default) — then the link is stored.
+ *    An existing user is linked only as `auth.providers.linkExisting` allows
+ *    (default `"verified"`: that account verified the email itself); otherwise
+ *    {@link ProviderAccountLinkBlockedError} is thrown and nothing is linked.
  */
 export async function resolveProviderUser<T extends Auth>(
   Model: ChildModel<T>,
@@ -60,6 +86,10 @@ export async function resolveProviderUser<T extends Auth>(
   const existing = (await Model.first({
     [authConfig.providers.emailField()]: profile.email,
   })) as T | null;
+
+  if (existing && !mayLinkExisting(Model as unknown as ChildModel<Auth>, existing)) {
+    throw new ProviderAccountLinkBlockedError();
+  }
 
   const user = existing ?? (await createUserFor(Model, profile));
 

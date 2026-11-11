@@ -15,8 +15,8 @@ import type { DescribeToolSchemaOptions, ToolContract } from "@warlock.js/ai";
  * How the MCP client reaches a server. Discriminated by `type`.
  *
  * - `"stdio"` — spawn `command` (+ `args`) as a child process and speak
- *   JSON-RPC over its stdin/stdout (uses `node:child_process` +
- *   `node:readline`; no dependency).
+ *   JSON-RPC over its stdin/stdout (uses `node:child_process`; no
+ *   dependency).
  * - `"http"` — Streamable HTTP transport against `url`.
  */
 export type McpTransport =
@@ -33,6 +33,13 @@ export type McpTransport =
        * SystemRoot equivalents). Other host variables are not inherited.
        */
       env?: Record<string, string>;
+      /**
+       * Longest stdout message (one line) accepted from the server, in
+       * bytes. A longer one is dropped and the calls in flight reject.
+       *
+       * @default 10_485_760 (10 MiB)
+       */
+      maxResponseBytes?: number;
     }
   | {
       /** Streamable HTTP transport. */
@@ -49,6 +56,14 @@ export type McpTransport =
        * that run longer. Defaults to the global `fetch`.
        */
       fetch?: typeof globalThis.fetch;
+      /**
+       * Largest response body accepted from the server, in bytes. A larger
+       * one rejects the call. The call's `timeoutMs` covers reading the
+       * body too, so a server that stalls mid-body times out.
+       *
+       * @default 10_485_760 (10 MiB)
+       */
+      maxResponseBytes?: number;
     };
 
 /**

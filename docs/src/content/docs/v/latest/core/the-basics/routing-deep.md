@@ -85,17 +85,18 @@ router.get("/products", listProducts, {
 
 The full surface:
 
-| Option                 | Purpose                                                                           |
-| ---------------------- | --------------------------------------------------------------------------------- |
-| `name`                 | Explicit route name (default: auto-generated from the path, dots replace slashes) |
-| `middleware`           | Array of middleware fns for this route                                            |
-| `middlewarePrecedence` | `"before"` or `"after"` — order vs. group middleware (default: `"after"`)         |
-| `description`          | Free text for OpenAPI / docs                                                      |
-| `label`                | Route label for docs                                                              |
-| `restful`              | Marks the route as part of a RESTful resource (the framework sets this for you)   |
-| `isPage`               | Marks the route as React SSR-rendered                                             |
-| `rateLimit`            | Per-route rate limit override                                                     |
-| `serverOptions`        | Fastify route-shorthand options for very low-level tuning                         |
+| Option                 | Purpose                                                                                                                   |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `name`                 | Explicit route name (default: auto-generated from the path, dots replace slashes)                                         |
+| `middleware`           | Array of middleware fns for this route                                                                                    |
+| `middlewarePrecedence` | `"before"` or `"after"` — order vs. group middleware (default: `"after"`)                                                 |
+| `description`          | Free text for OpenAPI / docs                                                                                              |
+| `label`                | Route label for docs                                                                                                      |
+| `restful`              | Marks the route as part of a RESTful resource (the framework sets this for you)                                           |
+| `isPage`               | Marks the route as React SSR-rendered                                                                                     |
+| `rateLimit`            | Per-route rate limit override                                                                                             |
+| `uploads`              | `true` (or `{ maxTotalSize }`): the route takes multipart uploads — see [File uploads](../digging-deeper/file-uploads.md) |
+| `serverOptions`        | Fastify route-shorthand options for very low-level tuning                                                                 |
 
 ### Raising the body limit for one route
 

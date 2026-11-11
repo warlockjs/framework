@@ -218,7 +218,9 @@ user.set({ "filters.status": "closed" });
 
 Values are cast, dirty-tracked and written as whole-field updates exactly as with the single form, and the method returns the model. In a typed model every key is a schema column, a system column or a dot path, and each value is checked against its column's type.
 
-`set` strips identity columns (`id`, `_id`, the primary key) from a persisted model just as `merge` does, so `user.set(req.body)` cannot retarget the save. Cascade has no guarded or fillable list: besides the identity columns, every key in the object is written, so pick the fields you accept before passing a request body.
+`set` strips identity columns (`id`, `_id`, the primary key) from a persisted model just as `merge` does, so `user.set(req.body)` cannot retarget the save. Cascade has no guarded or fillable list: besides the identity columns, every key the schema accepts is written, nested objects included, and a key it doesn't declare follows the model's [`strictMode`](./validation.md#unknown-fields--strictmode) (stripped by default). Pick the fields you accept before passing a request body all the same.
+
+A field path segment `__proto__`, `constructor` or `prototype` (`set("__proto__.isAdmin", true)`, a request body key `"__proto__.x"`), or a `__proto__` key anywhere inside a `set()` / `merge()` value, throws before anything is written: those names can never be columns, and following them would change every object in the process. `unset()` refuses the same path segments. A nested key that is merely named `constructor` (`{ specs: { constructor: "Ford" } }`) is ordinary data and stays allowed in `merge()`.
 
 Keys that overlap in one call, such as `settings` with `settings.theme`, or `a.b` with `a.b.c`, throw an error that names both keys before anything is written. Set the whole column or the leaf, not both.
 

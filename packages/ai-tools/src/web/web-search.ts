@@ -6,6 +6,7 @@ import type {
   WebSearchResult,
   WebSearchResultItem,
 } from "../contracts";
+import { createDeadline, type CallDeadline } from "../deadline";
 import { WebToolError } from "../errors";
 import { objectSchema, optionalNumberField, stringField } from "./schema";
 
@@ -14,6 +15,9 @@ const DEFAULT_NAME = "web_search";
 
 /** Default per-call result cap when the constructor does not set one. */
 const DEFAULT_MAX_RESULTS = 5;
+
+/** Default per-call timeout for the provider request, in milliseconds. */
+const DEFAULT_TIMEOUT_MS = 15_000;
 
 /**
  * Per-provider configuration — the environment variable consulted when no
@@ -83,17 +87,23 @@ interface SerpApiResponse {
 /**
  * Issue the provider HTTP call and return its parsed JSON, mapping a
  * non-OK status or a network failure to a typed {@link WebToolError}.
+ * The request and the JSON read both run inside the call's `deadline`.
  */
 async function fetchJson(
   url: string,
   init: RequestInit,
   provider: SearchProvider,
+  deadline: CallDeadline,
 ): Promise<unknown> {
   let response: Response;
 
   try {
-    response = await fetch(url, init);
+    response = await deadline.race(fetch(url, { ...init, signal: deadline.signal }));
   } catch (cause) {
+    if (deadline.signal.aborted) {
+      throw deadline.signal.reason;
+    }
+
     const message = cause instanceof Error ? cause.message : String(cause);
 
     throw new WebToolError(`web_search request to the "${provider}" provider failed: ${message}`, {
@@ -109,7 +119,7 @@ async function fetchJson(
     });
   }
 
-  return response.json();
+  return deadline.race(response.json());
 }
 
 /** Drive Tavily's `/search` HTTP API and normalize its hits. */
@@ -117,6 +127,7 @@ async function searchTavily(
   query: string,
   maxResults: number,
   apiKey: string,
+  deadline: CallDeadline,
 ): Promise<WebSearchResultItem[]> {
   const json = (await fetchJson(
     "https://api.tavily.com/search",
@@ -126,6 +137,7 @@ async function searchTavily(
       body: JSON.stringify({ api_key: apiKey, query, max_results: maxResults }),
     },
     "tavily",
+    deadline,
   )) as TavilyResponse;
 
   return (json.results ?? []).slice(0, maxResults).map((hit) => ({
@@ -141,6 +153,7 @@ async function searchBrave(
   query: string,
   maxResults: number,
   apiKey: string,
+  deadline: CallDeadline,
 ): Promise<WebSearchResultItem[]> {
   const url = new URL("https://api.search.brave.com/res/v1/web/search");
   url.searchParams.set("q", query);
@@ -153,6 +166,7 @@ async function searchBrave(
       headers: { accept: "application/json", "x-subscription-token": apiKey },
     },
     "brave",
+    deadline,
   )) as BraveResponse;
 
   return (json.web?.results ?? []).slice(0, maxResults).map((hit) => ({
@@ -167,13 +181,19 @@ async function searchSerpApi(
   query: string,
   maxResults: number,
   apiKey: string,
+  deadline: CallDeadline,
 ): Promise<WebSearchResultItem[]> {
   const url = new URL("https://serpapi.com/search.json");
   url.searchParams.set("q", query);
   url.searchParams.set("num", String(maxResults));
   url.searchParams.set("api_key", apiKey);
 
-  const json = (await fetchJson(url.toString(), { method: "GET" }, "serpapi")) as SerpApiResponse;
+  const json = (await fetchJson(
+    url.toString(),
+    { method: "GET" },
+    "serpapi",
+    deadline,
+  )) as SerpApiResponse;
 
   return (json.organic_results ?? []).slice(0, maxResults).map((hit) => ({
     title: hit.title ?? "",
@@ -197,6 +217,10 @@ async function searchSerpApi(
  * The model passes `{ query, maxResults? }`; `maxResults` is clamped into
  * `[1, options.maxResults]` (default {@link DEFAULT_MAX_RESULTS}).
  *
+ * Each call is bounded by `timeoutMs` (default {@link DEFAULT_TIMEOUT_MS}),
+ * covering the provider request and its response, and the run's abort
+ * signal (`ctx.signal`) cancels it.
+ *
  * **Errors flow as data.** A missing key, a non-OK provider status, or a
  * network failure throws a typed {@link WebToolError}; the `tool()`
  * wrapper catches it and surfaces it in the returned `{ error }` field —
@@ -217,6 +241,7 @@ export function webSearchTool(
 ): ToolContract<WebSearchInput, WebSearchResult> {
   const provider = options.provider;
   const maxResults = options.maxResults ?? DEFAULT_MAX_RESULTS;
+  const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
 
   return tool<WebSearchInput, WebSearchResult>({
     name: options.name ?? DEFAULT_NAME,
@@ -226,25 +251,36 @@ export function webSearchTool(
       "changed since training, or anything you are unsure about.",
     input: inputSchema,
     readOnly: true,
-    async execute(input) {
+    async execute(input, ctx) {
       const apiKey = resolveApiKey(provider, options.apiKey);
       const limit = clampResults(input.maxResults, maxResults);
+      const deadline = createDeadline(
+        timeoutMs,
+        ctx?.signal,
+        () =>
+          new WebToolError(
+            `web_search request to the "${provider}" provider timed out after ${timeoutMs}ms. ` +
+              `Try again, or raise the tool's timeoutMs option.`,
+            { type: "request-failed", context: { timeoutMs } },
+          ),
+      );
 
-      let results: WebSearchResultItem[];
+      const search = (): Promise<WebSearchResultItem[]> => {
+        switch (provider) {
+          case "tavily":
+            return searchTavily(input.query, limit, apiKey, deadline);
+          case "brave":
+            return searchBrave(input.query, limit, apiKey, deadline);
+          case "serpapi":
+            return searchSerpApi(input.query, limit, apiKey, deadline);
+        }
+      };
 
-      switch (provider) {
-        case "tavily":
-          results = await searchTavily(input.query, limit, apiKey);
-          break;
-        case "brave":
-          results = await searchBrave(input.query, limit, apiKey);
-          break;
-        case "serpapi":
-          results = await searchSerpApi(input.query, limit, apiKey);
-          break;
+      try {
+        return { results: await search() };
+      } finally {
+        deadline.clear();
       }
-
-      return { results };
     },
   });
 }

@@ -46,11 +46,23 @@ The `server` argument is discriminated by `type`:
 
 ```ts
 // Spawn a child process and speak JSON-RPC over its stdin/stdout.
-// Uses node:child_process + node:readline — NO dependency.
+// Uses node:child_process — NO dependency.
 { type: "stdio", command: "npx", args: ["-y", "@modelcontextprotocol/server-github"], env: { GITHUB_TOKEN: "…" } }
 
 // Streamable HTTP against an endpoint.
 { type: "http", url: "https://mcp.example.com/rpc", headers: { authorization: "Bearer …" } }
+```
+
+### Response size and body timeout
+
+Both transports accept `maxResponseBytes` (default `10_485_760`, 10 MiB): the largest HTTP response body, or the longest stdout line from a stdio server. Over http a larger body rejects the call with `McpTransportError` type `"protocol"`, without buffering the rest. Over stdio the oversized line is dropped and the calls in flight reject the same way; the transport keeps serving later calls. The per-call `timeoutMs` also covers reading the HTTP body, so a server that sends headers and then stalls times out.
+
+```ts
+const big = ai.mcp({
+  type: "http",
+  url: "https://mcp.example.com/rpc",
+  maxResponseBytes: 50 * 1024 * 1024,
+});
 ```
 
 ### Long-running calls over http

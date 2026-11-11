@@ -12,6 +12,17 @@ after hydration a plain in-app click fetches page data and swaps the page tree.
 Use `navigateTo()` for a path, `href()` to resolve a named route, and `refresh()`
 to fetch the current App, Layout, and Page loaders again without pushing history.
 
+## Prefetch on interaction
+
+`<Link prefetch>` fetches the destination's page data before the click. On
+hover it waits until the pointer has rested on the link for 65 ms, and leaving
+earlier sends nothing, so sweeping the pointer across a menu costs no requests.
+Keyboard focus prefetches at once. A click that lands while the prefetch is
+still in flight waits for that response instead of sending a second request,
+and the page's JavaScript chunk starts loading as soon as the prefetched data
+arrives. Each prefetched response serves one navigation; a second click on the
+same link fetches again.
+
 ## Show pending navigation state
 
 `useIsNavigating()` returns the router's current boolean state. It is `true`

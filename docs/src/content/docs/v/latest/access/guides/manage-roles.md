@@ -28,7 +28,9 @@ import { access } from "@warlock.js/access";
 await access.flush(user, "tenant-1"); // after an out-of-band change to this user's grants
 ```
 
-The `tenant` argument is optional — omit it for single-tenant apps (roles are stored globally). In a **multi-tenant** app, always pass the tenant: an omitted or unresolved tenant scopes to global roles only, never the cross-tenant union.
+The `tenant` argument is optional — omit it for single-tenant apps (roles are stored globally). In a **multi-tenant** app, always pass the tenant: an omitted or unresolved tenant scopes to global roles only, never the cross-tenant union. Without a `tenant`, `flush(user)` drops the set for the tenant your resolver's `resolveTenant(user)` returns (the one `can(user, …)` reads) together with the no-tenant set.
+
+The memory cache driver is per-process: `flush` there clears only the process that runs it. Use a shared cache driver (redis, pg) when you run more than one instance.
 
 ## Manage the catalog
 

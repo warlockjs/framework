@@ -157,9 +157,11 @@ So a `ResourceNotFoundError("Order not found", { orderId })` produces:
 
 The payload lands under a `payload` key, not spread at the top level. In `development` the response also carries a `stack` field; in production it's omitted.
 
-**Unknown errors are an opaque 500.** If you throw something that isn't an `HttpError` — a plain `Error`, a `TypeError` — and no [error mapper](#mapping-your-own-errors-httperrormapper) claims it, the pipeline logs it with its stack and responds `500` with `{ error: "Internal server error." }`. Its message never reaches the client. One framework exception is wired in: `DatabaseWriterValidationError` from `@warlock.js/cascade` answers with `http.modelValidationErrorStatus` (default `500`); a 4xx status there sends its `errors` array.
+**Unknown errors are an opaque 500.** If you throw something that isn't an `HttpError` — a plain `Error`, a `TypeError` — and no [error mapper](#mapping-your-own-errors-httperrormapper) claims it, the pipeline logs it with its stack and responds `500` with `{ error: "Internal server error." }`. Its message never reaches the client. Two framework exceptions are wired in: `DatabaseWriterValidationError` from `@warlock.js/cascade` answers with `http.modelValidationErrorStatus` (default `500`); a 4xx status there sends its `errors` array. `UnsafeFilterError` from `@warlock.js/cascade` (a filter value the database layer refused, such as a `$` operator key in a filter value or a LIKE pattern over its wildcard or length cap) answers `400` with its message, like an `HttpError` (the error mapper is not consulted).
 
 A thrown error that resolves to a 4xx is logged once at `warn` (`Name: message (status)`, no stack); 5xx and unknown errors are logged at `error` with the stack.
+
+**Errors outside the request pipeline are opaque too.** Since 5.53, a 5xx that reaches the HTTP server without passing through the pipeline above answers `{ error: "Internal server error." }` as well, with `Cache-Control: private, no-store`, and its message and stack go to the log (`module: "http"`, `action: "request.response"`). That covers an `Error` passed as a body (`response.serverError(error)`), a `toJSON()` that throws while a handler's returned value is sent, a file that fails to read in `response.sendFile()`, and a hook that throws. In `development` the body also carries `requestId` and `stack`. Client errors (4xx, for example a malformed JSON body) keep their descriptive body.
 
 ### The 5xx error record
 

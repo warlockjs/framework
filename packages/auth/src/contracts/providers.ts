@@ -81,6 +81,8 @@ export type GitHubProviderConfig = {
   redirectUri: string;
   /** @default ["read:user", "user:email"] */
   scopes?: string[];
+  /** Positive integer deadline per token, profile or key-set request, in milliseconds. @default 5000 */
+  timeoutMs?: number;
 };
 
 /** `auth.providers.discord`. */
@@ -91,6 +93,8 @@ export type DiscordProviderConfig = {
   redirectUri: string;
   /** @default ["identify", "email"] */
   scopes?: string[];
+  /** Positive integer deadline per token, profile or key-set request, in milliseconds. @default 5000 */
+  timeoutMs?: number;
 };
 
 /** `auth.providers.linkedin`. */
@@ -101,6 +105,8 @@ export type LinkedInProviderConfig = {
   redirectUri: string;
   /** @default ["openid", "profile", "email"] */
   scopes?: string[];
+  /** Positive integer deadline per token, profile or key-set request, in milliseconds. @default 5000 */
+  timeoutMs?: number;
 };
 
 /** `auth.providers.apple`. */
@@ -117,6 +123,8 @@ export type AppleProviderConfig = {
   redirectUri: string;
   /** @default ["name", "email"] */
   scopes?: string[];
+  /** Positive integer deadline per token, profile or key-set request, in milliseconds. @default 5000 */
+  timeoutMs?: number;
 };
 
 /** `auth.providers.facebook`. */
@@ -127,6 +135,8 @@ export type FacebookProviderConfig = {
   redirectUri: string;
   /** @default ["email", "public_profile"] */
   scopes?: string[];
+  /** Positive integer deadline per token, profile or key-set request, in milliseconds. @default 5000 */
+  timeoutMs?: number;
 };
 
 /** `auth.providers.x`. */
@@ -137,6 +147,8 @@ export type XProviderConfig = {
   redirectUri: string;
   /** @default ["tweet.read", "users.read"] */
   scopes?: string[];
+  /** Positive integer deadline per token, profile or key-set request, in milliseconds. @default 5000 */
+  timeoutMs?: number;
 };
 
 /** Creates the app user for a verified provider profile with no matching account. */
@@ -146,6 +158,9 @@ export type ProviderUserCreator = (
 ) => Auth | Promise<Auth>;
 
 /** `auth.providers`. */
+/** Policy for linking a provider login to an existing account by email. */
+export type ProviderLinkExisting = "verified" | "always" | "never";
+
 export type ProvidersConfig = {
   google?: GoogleProviderConfig;
   github?: GitHubProviderConfig;
@@ -161,6 +176,24 @@ export type ProvidersConfig = {
   emailField?: string;
   /** Replace the default user creation (`{ email, name, <verification.field>: now }`). */
   createUser?: ProviderUserCreator;
+  /**
+   * Whether a first provider login may link to an existing account found by
+   * its (provider-verified) email.
+   *
+   * - `"verified"` — link only when that account has verified the email
+   *   itself (`auth.verification.field` holds a value). A user model whose
+   *   schema does not declare that field links as `"always"` does.
+   * - `"always"` — link to any account with that email.
+   * - `"never"` — never link by email; the user signs in another way and
+   *   links the provider from a signed-in session.
+   *
+   * A refused link throws `ProviderAccountLinkBlockedError` (403, `EC012`).
+   * Linking an unverified account would hand the provider user an account
+   * someone else may have pre-registered with their address (and still holds
+   * the password for).
+   * @default "verified"
+   */
+  linkExisting?: ProviderLinkExisting;
   /** Providers auth does not ship, by name. */
   custom?: Record<string, AuthProvider>;
 };
@@ -180,6 +213,18 @@ export type PasskeysConfig = {
   challengeExpiresIn?: string;
   /** Account name shown by the authenticator. @default user email, else id */
   userName?: (user: Auth) => string;
+  /**
+   * Whether the authenticator must verify the user (PIN, biometric) during
+   * registration and login.
+   *
+   * - `"preferred"` — ask for it, but accept a passkey that only proves
+   *   possession of the authenticator (e.g. a security key without a PIN).
+   * - `"required"` — refuse an assertion without user verification, so a
+   *   passkey login is two factors (the device plus the PIN or biometric).
+   *   Users whose authenticator cannot verify them cannot register or sign in.
+   * @default "preferred"
+   */
+  userVerification?: "required" | "preferred";
 };
 
 /** Data an OTP delivery receives. */
@@ -211,4 +256,13 @@ export type OtpConfig = {
   message?: (code: string) => string;
   /** Replace delivery entirely. */
   send?: OtpSender;
+  /**
+   * Wait for the code delivery before `requestOtp` resolves, so a delivery
+   * error reaches the caller. Off by default: the code is sent in the
+   * background, so the response time does not reveal whether the phone belongs
+   * to an account. A background failure is logged and emitted as
+   * `otp.deliveryFailed`.
+   * @default false
+   */
+  awaitDelivery?: boolean;
 };

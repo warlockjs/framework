@@ -5,6 +5,8 @@ import { authConfig } from "./auth-config";
 
 const getSecretKey = () => authConfig.accessToken.secret();
 const getAlgorithm = () => authConfig.accessToken.algorithm();
+const getIssuer = () => authConfig.accessToken.issuer();
+const getAudience = () => authConfig.accessToken.audience();
 
 // Refresh tokens may declare their own secret; when unset/empty we fall back to
 // the access-token secret (the documented optional behavior).
@@ -119,6 +121,72 @@ function withRequiredClaims(callerClaims?: string[]): string[] {
   return [...new Set([...callerClaims, ...REQUIRED_CLAIMS])];
 }
 
+type Sign = (payload: Record<string, unknown>) => Promise<string> | string;
+type Verify = (token: string) => Promise<unknown> | unknown;
+
+/**
+ * One prepared signer/verifier per token kind, rebuilt only when the settings
+ * that shape it change. Building one validates options and prepares the key
+ * (a PEM key is parsed), which is wasted work when it happens on every
+ * authenticated request with settings that never change.
+ */
+const prepared = new Map<string, { fingerprint: string; value: Sign | Verify }>();
+
+function preparedFor<T extends Sign | Verify>(
+  slot: string,
+  settings: Record<string, unknown>,
+  build: () => T,
+): T {
+  const fingerprint = JSON.stringify(settings);
+  const current = prepared.get(slot);
+
+  if (current && current.fingerprint === fingerprint) return current.value as T;
+
+  const value = build();
+  prepared.set(slot, { fingerprint, value });
+
+  return value;
+}
+
+/** Whether the caller passed only the options the prepared instances are keyed on. */
+function onlyKeyedOptions(options: object, allowed: string[] = []): boolean {
+  return Object.keys(options).every((name) => allowed.includes(name));
+}
+
+/**
+ * Issuer/audience claims stamped on signed tokens, from
+ * `auth.accessToken.issuer` / `auth.accessToken.audience` (both optional).
+ */
+function issuedClaims(): { iss?: string; aud?: string | string[] } {
+  const iss = getIssuer();
+  const aud = getAudience();
+
+  return {
+    ...(iss !== undefined ? { iss } : {}),
+    ...(aud !== undefined ? { aud } : {}),
+  };
+}
+
+/**
+ * Verifier options that require the configured issuer/audience. A configured
+ * claim is also REQUIRED, so a token signed before it was set (which has none)
+ * is rejected rather than slipping past the check.
+ */
+function expectedClaims(): {
+  allowedIss?: string;
+  allowedAud?: string | string[];
+  required: string[];
+} {
+  const iss = getIssuer();
+  const aud = getAudience();
+
+  return {
+    ...(iss !== undefined ? { allowedIss: iss } : {}),
+    ...(aud !== undefined ? { allowedAud: aud } : {}),
+    required: [...(iss !== undefined ? ["iss"] : []), ...(aud !== undefined ? ["aud"] : [])],
+  };
+}
+
 export const jwt = {
   /**
    * Generate a new JWT token for the user.
@@ -132,11 +200,13 @@ export const jwt = {
       ...options
     }: SignerOptions & { key?: string } = {},
   ): Promise<string> {
-    // Create a signer function with predefined options
-    const sign = createSigner({ key, ...options, algorithm });
+    const claims = issuedClaims();
+    const build = () => createSigner({ key, ...claims, ...options, algorithm }) as Sign;
+    const sign = onlyKeyedOptions(options, ["expiresIn"])
+      ? preparedFor("sign:access", { key, algorithm, claims, expiresIn: options.expiresIn }, build)
+      : build();
 
-    const token = await sign({ jti: randomUUID(), ...payload, tokenType: ACCESS_TOKEN_TYPE });
-    return token;
+    return sign({ jti: randomUUID(), ...payload, tokenType: ACCESS_TOKEN_TYPE });
   },
 
   /**
@@ -153,14 +223,21 @@ export const jwt = {
       ...options
     }: VerifierOptions & { key?: string } = {},
   ): Promise<T> {
-    const verify = createVerifier({
-      key,
-      ...options,
-      algorithms,
-      requiredClaims: withRequiredClaims(requiredClaims),
-    });
+    const { required, ...expected } = expectedClaims();
+    const build = () =>
+      createVerifier({
+        key,
+        ...expected,
+        ...options,
+        algorithms,
+        requiredClaims: withRequiredClaims([...(requiredClaims ?? []), ...required]),
+      }) as Verify;
+    const verify =
+      requiredClaims === undefined && onlyKeyedOptions(options)
+        ? preparedFor("verify:access", { key, algorithms, expected, required }, build)
+        : build();
 
-    const decoded = await verify(token as string);
+    const decoded = (await verify(token)) as T;
 
     assertTokenType(decoded, ACCESS_TOKEN_TYPE);
 
@@ -179,7 +256,12 @@ export const jwt = {
       ...options
     }: SignerOptions & { key?: string } = {},
   ): Promise<string> {
-    const sign = createSigner({ key, expiresIn, algorithm, ...options });
+    const claims = issuedClaims();
+    const build = () => createSigner({ key, expiresIn, algorithm, ...claims, ...options }) as Sign;
+    const sign = onlyKeyedOptions(options)
+      ? preparedFor("sign:refresh", { key, algorithm, claims, expiresIn }, build)
+      : build();
+
     return sign({ jti: randomUUID(), ...payload, tokenType: REFRESH_TOKEN_TYPE });
   },
 
@@ -195,14 +277,21 @@ export const jwt = {
       ...options
     }: VerifierOptions & { key?: string } = {},
   ): Promise<T> {
-    const verify = createVerifier({
-      key,
-      algorithms,
-      ...options,
-      requiredClaims: withRequiredClaims(requiredClaims),
-    });
+    const { required, ...expected } = expectedClaims();
+    const build = () =>
+      createVerifier({
+        key,
+        algorithms,
+        ...expected,
+        ...options,
+        requiredClaims: withRequiredClaims([...(requiredClaims ?? []), ...required]),
+      }) as Verify;
+    const verify =
+      requiredClaims === undefined && onlyKeyedOptions(options)
+        ? preparedFor("verify:refresh", { key, algorithms, expected, required }, build)
+        : build();
 
-    const decoded = await verify(token);
+    const decoded = (await verify(token)) as T;
 
     assertTokenType(decoded, REFRESH_TOKEN_TYPE);
 

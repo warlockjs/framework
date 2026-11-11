@@ -2,7 +2,7 @@ import { mkdirSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
 import type { JobState, QueueConfig } from "../types";
-import type { LocalJob, LocalStore } from "./local-store";
+import type { LocalJob, LocalStore, RetentionWindow } from "./local-store";
 
 /**
  * The part of `node:sqlite` this store uses. Declared here so apps type-check the
@@ -138,6 +138,27 @@ export class SqliteStore implements LocalStore {
     this.db
       .prepare("DELETE FROM warlock_queue_jobs WHERE namespace = ? AND queue = ? AND id = ?")
       .run(this.namespace, queue, id);
+  }
+  /** One DELETE statement; the rows are never decoded in JavaScript. */
+  public prune(queue: string, state: "completed" | "failed", keep: RetentionWindow): void {
+    const finishedAt = "COALESCE(json_extract(body, '$.finishedAt'), 0)";
+    const outside: string[] = [];
+    const parameters: SqliteValue[] = [this.namespace, queue, state];
+    if (keep.before !== undefined) {
+      outside.push(`${finishedAt} < ?`);
+      parameters.push(keep.before);
+    }
+    if (keep.count !== undefined) {
+      outside.push(`seq NOT IN (SELECT seq FROM warlock_queue_jobs
+        WHERE namespace = ? AND queue = ? AND state = ?
+        ORDER BY ${finishedAt} DESC, seq DESC LIMIT ?)`);
+      parameters.push(this.namespace, queue, state, keep.count);
+    }
+    if (outside.length === 0) return;
+    this.db
+      .prepare(`DELETE FROM warlock_queue_jobs
+      WHERE namespace = ? AND queue = ? AND state = ? AND (${outside.join(" OR ")})`)
+      .run(...parameters);
   }
   public close(): void {
     this.db.close();

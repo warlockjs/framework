@@ -1,88 +1,23 @@
+import { matchesPattern } from "./ip-matcher";
+
 /**
- * Match an IPv4 address against an exact IP or a CIDR block.
- *
- * IPv6 patterns are matched as exact-string only — full IPv6 CIDR support is
- * out of scope; ACLs in production almost always use IPv4 ranges. Add IPv6 CIDR
- * later if a real use-case appears.
+ * Match an IP address against an exact address or a CIDR block, IPv4 or
+ * IPv6. IPv4-mapped IPv6 addresses (`::ffff:1.2.3.4`) match IPv4 patterns,
+ * and IPv6 addresses compare by value (`2001:0db8::1` equals `2001:db8::1`).
+ * An invalid address or pattern matches nothing.
  *
  * @example
- * ipMatches("10.0.0.5", "10.0.0.0/8");      // true
- * ipMatches("10.0.0.5", "10.0.0.5");        // true
- * ipMatches("192.168.1.1", "10.0.0.0/8");   // false
+ * ipMatches("10.0.0.5", "10.0.0.0/8");          // true
+ * ipMatches("10.0.0.5", "10.0.0.5");            // true
+ * ipMatches("2001:db8::5", "2001:db8::/32");    // true
+ * ipMatches("192.168.1.1", "10.0.0.0/8");       // false
  */
-function ipv4ToInt(ip: string): number | null {
-  const parts = ip.split(".");
-
-  if (parts.length !== 4) {
-    return null;
-  }
-
-  let result = 0;
-
-  for (const part of parts) {
-    const num = Number(part);
-
-    if (!Number.isInteger(num) || num < 0 || num > 255) {
-      return null;
-    }
-
-    result = (result << 8) + num;
-  }
-
-  return result >>> 0;
-}
-
-const IPV4_MAPPED_PREFIX = /^::ffff:(?=\d+\.\d+\.\d+\.\d+$)/i;
-
-/**
- * Normalize IPv4-mapped IPv6 (`::ffff:1.2.3.4`) to plain IPv4.
- */
-function normalizeIp(value: string): string {
-  return value.replace(IPV4_MAPPED_PREFIX, "");
-}
-
 export function ipMatches(rawIp: string, rawPattern: string): boolean {
   if (!rawIp || !rawPattern) {
     return false;
   }
 
-  const ip = normalizeIp(rawIp);
-  const pattern = normalizeIp(rawPattern);
-
-  if (pattern === ip) {
-    return true;
-  }
-
-  if (!pattern.includes("/")) {
-    return false;
-  }
-
-  const [base, bitsRaw] = pattern.split("/");
-
-  if (base === undefined || bitsRaw === undefined) {
-    return false;
-  }
-
-  const bits = Number(bitsRaw);
-
-  if (!Number.isInteger(bits) || bits < 0 || bits > 32) {
-    return false;
-  }
-
-  const ipInt = ipv4ToInt(ip);
-  const baseInt = ipv4ToInt(base);
-
-  if (ipInt === null || baseInt === null) {
-    return false;
-  }
-
-  if (bits === 0) {
-    return true;
-  }
-
-  const mask = (~0 << (32 - bits)) >>> 0;
-
-  return (ipInt & mask) === (baseInt & mask);
+  return matchesPattern(rawIp, rawPattern);
 }
 
 /**

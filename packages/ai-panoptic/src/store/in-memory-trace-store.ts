@@ -1,6 +1,7 @@
 import type { ExporterContract } from "../contracts/exporter.contract";
 import type { Trace } from "../contracts/trace.type";
 import { matchTrace } from "./match-trace";
+import { sortNewestFirst } from "./sort-newest-first";
 import { emptyUsage, sumUsage } from "./sum-usage";
 import type { TraceAggregate } from "./trace-aggregate.type";
 import type { TraceQuery } from "./trace-query.type";
@@ -87,7 +88,7 @@ class InMemoryTraceStore implements TraceStoreContract, ExporterContract {
       }
     }
 
-    return this.sortNewestFirst(matched);
+    return sortNewestFirst(matched);
   }
 
   public aggregate(filter?: TraceQuery): TraceAggregate {
@@ -153,15 +154,6 @@ class InMemoryTraceStore implements TraceStoreContract, ExporterContract {
         break;
       }
     }
-  }
-
-  /**
-   * Sort matched traces newest-started first. A copy is sorted so the
-   * underlying insertion order (which eviction depends on) is never
-   * disturbed.
-   */
-  private sortNewestFirst(traces: Trace[]): Trace[] {
-    return traces.sort((left, right) => Date.parse(right.startedAt) - Date.parse(left.startedAt));
   }
 
   /**

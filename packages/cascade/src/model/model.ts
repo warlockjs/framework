@@ -449,6 +449,27 @@ export abstract class Model<out TSchema extends ModelSchema = ModelSchema> {
   public static randomIncrement?: boolean | (() => number);
 
   /**
+   * How many sequential ids one counter round-trip reserves (MongoDB `id`).
+   *
+   * With the default `1`, every insert asks the id counter for the next id.
+   * A larger value reserves a block of ids at once and hands them out from
+   * memory, so N inserts cost N / blockSize counter round-trips. Ids stay
+   * unique, but are no longer strictly increasing across processes, and ids
+   * left in a block when the process stops are never used (gaps). Ignored with
+   * `randomInitialId` / `randomIncrement`, and by drivers with native ids.
+   *
+   * @default 1
+   *
+   * @example
+   * ```typescript
+   * class PageView extends Model {
+   *   public static idReservationBlockSize = 100;
+   * }
+   * ```
+   */
+  public static idReservationBlockSize?: number;
+
+  /**
    * Created at column name.
    */
   public static createdAtColumn?: string | false;

@@ -218,3 +218,85 @@ describe("cookie helper response param", () => {
     expectTypeOf<ActionResponse>().toMatchTypeOf<HelperResponse>();
   });
 });
+
+describe("auth.cookie.hostPrefix", () => {
+  it("writes both session cookies under the __Host- prefix, Secure, on Path=/", () => {
+    stubCookieConfig({ "auth.cookie.hostPrefix": true });
+    const response = buildResponse();
+
+    authService.setSessionCookies(response, tokens);
+
+    expect(response.cookie).toHaveBeenCalledWith(
+      "__Host-access_token",
+      "the-access",
+      expect.objectContaining({ path: "/", secure: true }),
+    );
+    expect(response.cookie).toHaveBeenCalledWith(
+      "__Host-refresh_token",
+      "the-refresh",
+      expect.objectContaining({ path: "/", secure: true }),
+    );
+    expect(response.cookie.mock.calls.some(([, , options]) => "domain" in options)).toBe(false);
+  });
+
+  it("is off by default: names stay unprefixed", () => {
+    const response = buildResponse();
+
+    authService.setSessionCookies(response, tokens);
+
+    expect(response.cookie.mock.calls.map(([name]) => name)).toEqual([
+      "access_token",
+      "refresh_token",
+    ]);
+  });
+
+  it("refuses a Domain resolver, naming the settings to change", () => {
+    stubCookieConfig({
+      "auth.cookie.hostPrefix": true,
+      "auth.cookie.cookieDomain": () => ".example.com",
+    });
+    const response = buildResponse();
+
+    expect(() => authService.setSessionCookies(response, tokens, {} as Request)).toThrow(
+      /auth\.cookie\.cookieDomain/,
+    );
+    expect(response.cookie).not.toHaveBeenCalled();
+  });
+
+  it("refuses a cookie path other than /", () => {
+    stubCookieConfig({ "auth.cookie.hostPrefix": true, "auth.cookie.path": "/api" });
+
+    expect(() => authService.setAuthCookie(buildResponse(), tokens.accessToken)).toThrow(
+      /auth\.cookie\.path/,
+    );
+  });
+
+  it("refuses a global cookie domain in http.cookies.options", () => {
+    stubCookieConfig({
+      "auth.cookie.hostPrefix": true,
+      "http.cookies.options": { domain: ".example.com" },
+    });
+
+    expect(() => authService.setAuthCookie(buildResponse(), tokens.accessToken)).toThrow(
+      /http\.cookies\.options/,
+    );
+  });
+
+  it("clears the prefixed and the pre-switch unprefixed cookies on logout", () => {
+    stubCookieConfig({ "auth.cookie.hostPrefix": true });
+    const response = buildResponse();
+
+    authService.clearSessionCookies(response);
+
+    expect(response.clearCookie).toHaveBeenCalledWith("__Host-access_token", {
+      path: "/",
+      secure: true,
+    });
+    expect(response.clearCookie).toHaveBeenCalledWith("access_token", { path: "/" });
+    expect(response.clearCookie).toHaveBeenCalledWith("__Host-refresh_token", {
+      path: "/",
+      secure: true,
+    });
+    expect(response.clearCookie).toHaveBeenCalledWith("refresh_token", { path: "/" });
+  });
+});

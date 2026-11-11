@@ -48,14 +48,8 @@ function incr(store: CacheRateLimitStore, key: string, timeWindow = 60_000) {
 }
 
 describe("incrementSharedRateLimit", () => {
-  it("passes the TTL to the atomic bump when a seed disappears before increment", async () => {
+  it("creates the window counter with its TTL in the atomic bump", async () => {
     const increment = vi.spyOn(driver, "increment");
-    const set = driver.set.bind(driver);
-    vi.spyOn(driver, "set").mockImplementation(async (key, value, options) => {
-      const result = await set(key, value, options);
-      await driver.remove(key);
-      return result;
-    });
     const now = Date.now();
     expect((await incrementSharedRateLimit("race", "source", 60_000, now)).current).toBe(1);
     expect(increment).toHaveBeenCalledWith(expect.any(String), 1, { ttl: 120 });
@@ -88,12 +82,24 @@ describe("incrementSharedRateLimit", () => {
     expect((await readSharedRateLimit("a", "one", 60_000, now)).current).toBe(2);
   });
 
-  it("never puts the raw group key in a cache key", async () => {
+  it("counts with one cache round-trip per request", async () => {
+    const increment = vi.spyOn(cache, "increment");
     const set = vi.spyOn(cache, "set");
+    const get = vi.spyOn(cache, "get");
+
+    await incrementSharedRateLimit("one-trip", "1.2.3.4", 60_000);
+
+    expect(increment).toHaveBeenCalledTimes(1);
+    expect(set).not.toHaveBeenCalled();
+    expect(get).not.toHaveBeenCalled();
+  });
+
+  it("never puts the raw group key in a cache key", async () => {
+    const increment = vi.spyOn(cache, "increment");
 
     await incrementSharedRateLimit("route./login", "member@example.com", 60_000);
 
-    const keys = set.mock.calls.map((call) => String(call[0]));
+    const keys = increment.mock.calls.map((call) => String(call[0]));
 
     expect(keys.length).toBeGreaterThan(0);
     expect(keys.some((key) => key.includes("member@example.com"))).toBe(false);

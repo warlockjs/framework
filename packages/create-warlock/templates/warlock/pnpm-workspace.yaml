@@ -1,7 +1,8 @@
 allowBuilds:
   esbuild: true
 
-# Our own release family is published minutes before installs run; exclude the
-# scope by pattern, never by pinned version or a package the app does not use.
+# Lets the scaffold's own installs fetch our release family published minutes
+# earlier; create-warlock removes this block once those installs finish.
+# Exclude the scope by pattern, never by pinned version or a package the app does not use.
 minimumReleaseAgeExclude:
   - '@warlock.js/*'

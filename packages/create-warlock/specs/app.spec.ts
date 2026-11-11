@@ -139,7 +139,7 @@ describe("App.installFeatures", () => {
     expect(executeCommand).not.toHaveBeenCalled();
   });
 
-  it("runs `npx warlock add <features> --no-install` with --no-install last", async () => {
+  it("runs `npx --no warlock add <features> --no-install` with --no-install last", async () => {
     const instance = makeApp(workdir);
 
     await instance.installFeatures(["postgres", "test", "openai"]);
@@ -147,7 +147,9 @@ describe("App.installFeatures", () => {
     expect(executeCommand).toHaveBeenCalledTimes(1);
     const [bin, args] = executeCommand.mock.calls[0];
     expect(bin).toBe("npx");
-    expect(args).toEqual(["warlock", "add", "postgres", "test", "openai", "--no-install"]);
+    // `--no` keeps npx on the project's own bin: it never downloads the
+    // unrelated unscoped `warlock` package from the registry.
+    expect(args).toEqual(["--no", "warlock", "add", "postgres", "test", "openai", "--no-install"]);
     // --no-install MUST be the final token (the CLI parser would otherwise
     // swallow the first feature as the flag's value).
     expect(args[args.length - 1]).toBe("--no-install");

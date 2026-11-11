@@ -1,10 +1,12 @@
 import type { ChildModel } from "@warlock.js/cascade";
+import { log } from "@warlock.js/logger";
 import { createHmac, randomBytes, randomInt } from "node:crypto";
 import type { OtpMessage, OtpSender } from "../contracts/providers";
 import type { DeviceInfo, LoginResult } from "../contracts/types";
 import { InvalidOneTimeTokenError } from "../errors/invalid-one-time-token.error";
 import type { Auth } from "../models/auth.model";
 import { authConfig } from "../services/auth-config";
+import { authEvents } from "../services/auth-events";
 import { authService } from "../services/auth.service";
 import { oneTimeTokenModel } from "../services/one-time-tokens";
 import { loadOptionalPeer } from "../services/optional-peer";
@@ -80,7 +82,11 @@ async function resolveDelivery(channel: string): Promise<OtpSender> {
  * The code is stored only as a keyed hash in `one_time_tokens` (purpose
  * `otp`), expires after `auth.otp.expiresIn` (default 5m), and replaces any
  * earlier unused code. **Anti-enumeration:** an unknown phone resolves the same
- * way and sends nothing. Throttle the route with `otpRequestThrottleMiddleware()`.
+ * way and sends nothing, and the code is delivered in the background so the
+ * response time does not reveal a known phone. A failed delivery is logged and
+ * emitted as `otp.deliveryFailed`; set `auth.otp.awaitDelivery: true` to wait
+ * for it (and receive its error) instead. Throttle the route with
+ * `otpRequestThrottleMiddleware()`.
  *
  * @throws AuthProviderSdkMissingError when `@warlock.js/notifications` is not
  *   installed and no `auth.otp.send` is configured.
@@ -108,7 +114,18 @@ export async function requestOtp<T extends Auth>(
 
   const message: OtpMessage = { body: authConfig.otp.message(code), code, expiresAt };
 
-  await deliver(phone, message, channel);
+  const delivery = Promise.resolve().then(() => deliver(phone, message, channel));
+
+  if (authConfig.otp.awaitDelivery()) {
+    await delivery;
+
+    return;
+  }
+
+  delivery.catch((error: unknown) => {
+    log.error("auth", "otp", error);
+    authEvents.emit("otp.deliveryFailed", user, error);
+  });
 }
 
 /**

@@ -1,6 +1,7 @@
 import type { CacheDriver, CacheSimilarHit } from "@warlock.js/cache";
 import type { EmbedderContract } from "../contracts/embedder.contract";
 import type { MemoryItem, RecalledMemory } from "../contracts/memory/memory-item.type";
+import { similarWithin } from "../utils/similar-within";
 import { deriveMemoryId } from "./derive-id";
 
 /**
@@ -96,19 +97,19 @@ export class EpisodicMemory {
   ): Promise<RecalledMemory[]> {
     const { vector } = await this.embedder.embed(query);
 
-    const hits = await this.store.similar<StoredEpisode>(vector, {
-      topK: Math.max(k * RECALL_OVERSCAN, k),
-      threshold,
-    });
-
     const prefix = `${this.namespace}.`;
+
+    // Widen the candidate page when other scopes crowd this one out of it.
+    const hits = await similarWithin(
+      (topK) => this.store.similar<StoredEpisode>(vector, { topK, threshold }),
+      (hit: CacheSimilarHit<StoredEpisode>) =>
+        hit.key.startsWith(prefix) && hit.value?.scope === scope,
+      { topK: Math.max(k * RECALL_OVERSCAN, k), want: k },
+    );
+
     const now = this.now();
 
     return hits
-      .filter(
-        (hit: CacheSimilarHit<StoredEpisode>) =>
-          hit.key.startsWith(prefix) && hit.value?.scope === scope,
-      )
       .map((hit: CacheSimilarHit<StoredEpisode>) => ({
         id: hit.value.id,
         text: hit.value.text,

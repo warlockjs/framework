@@ -108,6 +108,8 @@ const fromJson = compactJsonSchema({
 // { type: "string" }
 ```
 
+`extractJsonSchema` converts a schema once per target and `compact` setting and returns the same object on later calls — every model call sends the same tool schemas, so the conversion is not repeated. Treat the result as read-only; copy it before changing it.
+
 ## Discover tools from a stable catalogue
 
 `ai.tools.catalogue({ core, searchable, limit? })` ships in `@warlock.js/ai` itself, alongside `ai.tools.measure`. The named `catalogue` export is the same factory. Give the agent `catalogue.tools`: it advertises the core and two fixed meta-tools, `tool_search` and `tool_call`. Search results carry schemas in tool messages; they never expand the advertised definitions on later trips.

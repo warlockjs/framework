@@ -17,6 +17,7 @@ function fakeQuery() {
     return query;
   });
   query.first = vi.fn(async () => ({ id: 1 }));
+  query.exists = vi.fn(async () => true);
   return { query, wheres };
 }
 

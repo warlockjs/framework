@@ -50,21 +50,20 @@ export class PageDataSerializationError extends Error {
  * Validate that `value` can travel the devalue wire, attributing any failure
  * to `level` and `route`.
  *
- * Deliberately serializes and discards the result: this is a VALIDATION pass,
- * run once per level at payload-build time, so a class instance a loader
- * returned is caught with the right level/route/key path attached before it
- * ever reaches a caller that only knows "the payload" as one combined object.
- * The real serialization that puts bytes on the wire happens later, in
- * whichever wire path (document script, NDJSON line, data-request body) reads
- * this same value.
+ * This is a VALIDATION pass, run once per level at payload-build time, so a
+ * class instance a loader returned is caught with the right level/route/key
+ * path attached before it ever reaches a caller that only knows "the payload"
+ * as one combined object. The devalue text it produced is returned so a
+ * caller that needs this same value's text (the payload budget, a deferred
+ * settlement line) does not serialize it a second time.
  */
 export function assertPageDataSerializable(
   value: unknown,
   level: PageDataLevel,
   route: string,
-): void {
+): string {
   try {
-    stringify(value);
+    return stringify(value);
   } catch (error) {
     if (error instanceof DevalueError) {
       throw new PageDataSerializationError(level, error.path, route, error);

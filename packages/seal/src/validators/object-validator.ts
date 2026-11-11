@@ -2,6 +2,7 @@ import { createRootContext } from "../helpers/root-context";
 import { except } from "@mongez/reinforcements";
 import { isPlainObjectValue as isPlainObject } from "../helpers/plain-object";
 import { setKeyPath } from "../helpers/path-helpers";
+import { isForbiddenKey, maxDepthRule, resolveSealLimit } from "../helpers/limits";
 import { objectTrimMutator, stripUnknownMutator } from "../mutators/object-mutators";
 import { plainObjectRule } from "../rules/common/type-rules";
 import { unknownKeyRule } from "../rules/common/unknown-key";
@@ -420,6 +421,11 @@ export class ObjectValidator<out TSchema extends Schema = Schema> extends BaseVa
     return super.mutate({ ...data }, context);
   }
 
+  /** @inheritdoc */
+  protected override copyMutated(value: unknown): unknown {
+    return isPlainObject(value) ? { ...value } : value;
+  }
+
   /** Validate the data */
   public async validate(
     data: any,
@@ -439,7 +445,10 @@ export class ObjectValidator<out TSchema extends Schema = Schema> extends BaseVa
       this.setRuleAttributesList(rule);
     }
 
-    const result = await this.validateRules(mutatedData, context);
+    const result = await this.validateRules(mutatedData, context, {
+      source: mutatedData,
+      value: mutatedData,
+    });
 
     if (result.isValid === false) return result;
 
@@ -558,8 +567,21 @@ export class ObjectValidator<out TSchema extends Schema = Schema> extends BaseVa
       }
     }
 
-    // Remove undefined values
-    const cleanedData = removeUndefinedValues(orderedData);
+    // Remove undefined values. Data nested deeper than `maxDepth` fails
+    // validation instead of exhausting the call stack.
+    let cleanedData: any;
+
+    try {
+      cleanedData = removeUndefinedValues(orderedData, resolveSealLimit(context, "maxDepth"));
+    } catch (error) {
+      if (!(error instanceof NestingTooDeepError)) throw error;
+
+      const depthErrors = await this.checkRule(maxDepthRule, orderedData, context, {
+        maxDepth: resolveSealLimit(context, "maxDepth"),
+      });
+
+      return { isValid: false, errors: depthErrors ?? [], data: undefined };
+    }
 
     const transformedData = await this.startTransformationPipeline(cleanedData, context);
 
@@ -568,7 +590,7 @@ export class ObjectValidator<out TSchema extends Schema = Schema> extends BaseVa
         ? transformedData
         : {
             ...transformedData,
-            ...except(mutatedData, Object.keys(this.schema)),
+            ...withoutForbiddenKeys(except(mutatedData, Object.keys(this.schema))),
           };
 
     return this.refineResult(
@@ -677,8 +699,34 @@ export class ObjectValidator<out TSchema extends Schema = Schema> extends BaseVa
   }
 }
 
-/** Recursively remove undefined values from an object */
-function removeUndefinedValues(obj: any, visited = new WeakMap<object, any>()): any {
+/** Raised by `removeUndefinedValues` when the data is nested deeper than allowed */
+class NestingTooDeepError extends Error {}
+
+/** Drop keys that would replace the prototype of the object they are spread into */
+function withoutForbiddenKeys(obj: Record<string, unknown>): Record<string, unknown> {
+  if (!Object.keys(obj).some(isForbiddenKey)) return obj;
+
+  const result: Record<string, unknown> = {};
+
+  for (const [key, value] of Object.entries(obj)) {
+    if (!isForbiddenKey(key)) result[key] = value;
+  }
+
+  return result;
+}
+
+/**
+ * Recursively remove undefined values from an object.
+ *
+ * `__proto__` keys are dropped: assigning one would set the copy's prototype.
+ * Containers nested `maxDepth` levels below `obj` raise `NestingTooDeepError`.
+ */
+function removeUndefinedValues(
+  obj: any,
+  maxDepth: number,
+  depth = 0,
+  visited = new WeakMap<object, any>(),
+): any {
   // Handle primitives and null
   if (obj === null) {
     return obj;
@@ -686,7 +734,9 @@ function removeUndefinedValues(obj: any, visited = new WeakMap<object, any>()): 
 
   // Handle arrays
   if (Array.isArray(obj)) {
-    return obj.map((item) => removeUndefinedValues(item, visited));
+    if (depth > maxDepth) throw new NestingTooDeepError();
+
+    return obj.map((item) => removeUndefinedValues(item, maxDepth, depth + 1, visited));
   }
 
   // Skip non-plain objects (class instances, Dates, Buffers, etc.)
@@ -699,13 +749,15 @@ function removeUndefinedValues(obj: any, visited = new WeakMap<object, any>()): 
     return visited.get(obj);
   }
 
+  if (depth > maxDepth) throw new NestingTooDeepError();
+
   // Process plain objects
   const result: any = {};
   visited.set(obj, result); // Mark as processing BEFORE recursion
 
   for (const [key, value] of Object.entries(obj)) {
-    if (value !== undefined) {
-      result[key] = removeUndefinedValues(value, visited);
+    if (value !== undefined && !isForbiddenKey(key)) {
+      result[key] = removeUndefinedValues(value, maxDepth, depth + 1, visited);
     }
   }
 

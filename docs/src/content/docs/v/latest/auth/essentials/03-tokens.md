@@ -94,7 +94,7 @@ The `userAgent` / `ip` / `deviceId` keys flow straight into the row. They show u
 
 `familyId` is used internally when refreshing — you keep the old family. Don't set it manually on login.
 
-`payload` overrides the default access-token payload (`{ id, userType, created_at }`). Use it to embed extra signed claims.
+`payload` overrides the default access-token payload (`{ id, userType, created_at }`). Use it to embed extra signed claims. The `id` and `userType` claims are always those of the user the token is issued to, whatever the payload says, and a presented token must name the same user as its `access_tokens` row or it is rejected.
 
 ## Cleanup
 

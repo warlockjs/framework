@@ -5,7 +5,6 @@ import {
   buildTracingContext,
   config,
   dispatchPhase,
-  environment,
   getPublicUrl,
   isTracingEnabled,
   Response,
@@ -13,6 +12,7 @@ import {
 } from "@warlock.js/core";
 import DefaultApp from "../components/default-app";
 import { devErrorPanelElement } from "../components/dev-error-panel";
+import { discloseErrorDetails } from "./error-disclosure";
 import {
   DocumentContext,
   escapePayload,
@@ -25,7 +25,7 @@ import type { SharedContext } from "../index";
 import { LocaleProvider } from "../localization";
 import { withSessionProvider } from "./with-session-provider";
 import { loadStreamingReactDomServer } from "./load-react-dom-server";
-import { buildHydrationPayload } from "./build-hydration-payload";
+import { buildHydrationPayload, serializedPayloadSections } from "./build-hydration-payload";
 import {
   hydrationErrorPageProps,
   isForbiddenPageStatus,
@@ -280,16 +280,25 @@ export type RenderPageRequestOptions = {
    * `false`, so every other page keeps exactly the metadata it resolved.
    */
   noindex?: boolean;
+  /**
+   * Also render the final document to a string, for {@link RenderedPage.html}
+   * — `renderPageRequest`'s test-helper contract (assert on `.html` with no
+   * server, no browser). Defaults to `true`. The page route handler passes
+   * `false`: it streams `pipeableStream` (a document) or serializes the
+   * payload (a data request) and never reads `html`, so a live request renders
+   * its page once. The outcome (escalation, status) is decided by the streaming
+   * render either way; this only adds the string copy.
+   */
+  bufferHtml?: boolean;
 };
 
 export type RenderedPage = {
   /**
-   * The full document ("" when the pipeline short-circuited before render).
-   * Built by the SAME final element `pipeableStream` (below) streams —
-   * `finishRender` proves that element renders cleanly here, synchronously,
-   * BEFORE ever starting the stream, so this string doubles as `renderPageRequest`'s
-   * long-standing test-helper contract (assert on `.html` with no server, no
-   * browser) and the input the escalation loop verifies is safe to stream.
+   * The full document ("" when the pipeline short-circuited before render, or
+   * when the caller passed `bufferHtml: false`). Rendered from the SAME final
+   * element `pipeableStream` (below) streams, after that stream's shell is
+   * ready, so this string is `renderPageRequest`'s long-standing test-helper
+   * contract (assert on `.html` with no server, no browser).
    */
   html: string;
   status: number;
@@ -314,10 +323,11 @@ export type RenderedPage = {
    * `create-page-route-handler.ts` pipes this through core's
    * `Response.streamReact` instead of sending `html` as a buffered body.
    *
-   * Undefined for every RESPONSE that is not a rendered document: a
+   * Undefined for every RESPONSE that is not a rendered document: a data
+   * request (`dataRequest: true`, which answers with its payload), a
    * middleware 2xx short-circuit's own returned value, the empty-body
    * short-circuit/404 cases, and `renderPageFailure`'s pre-triple fallback
-   * (which has no triple to prove safe to stream — see that function).
+   * (which has no triple to escalate through — see that function).
    */
   pipeableStream?: PipeableStream;
   /**
@@ -415,7 +425,7 @@ function FrameworkRootBoundary({
 
 /** What the development error panel may show; always `undefined` in production. */
 function developmentDetails(details: PageErrorDetails | undefined): PageErrorDetails | undefined {
-  return environment() === "production" ? undefined : details;
+  return discloseErrorDetails() ? details : undefined;
 }
 
 /** Details for a failure that never went through an error record. */
@@ -424,7 +434,7 @@ function describeUnrecordedFailure(
   route: PageDataBundle["route"],
   request: Request,
 ): PageErrorDetails | undefined {
-  if (environment() === "production") return undefined;
+  if (!discloseErrorDetails()) return undefined;
 
   return describeServerError(thrown, {
     phase: taggedErrorPhase(thrown) ?? "request-handler",
@@ -455,7 +465,7 @@ export function resolveServerErrorPageProps(
   props: ServerErrorPageProps,
   errorPage: SerializedErrorPageProps,
 ): ServerErrorPageProps {
-  if (environment() !== "production") {
+  if (discloseErrorDetails()) {
     return errorPage.debug === undefined ? props : { ...props, debug: errorPage.debug };
   }
   return { ...props, error: errorPage.error };
@@ -804,19 +814,47 @@ function reportErrorPageFailure(
   );
 }
 
+/** A render attempt whose shell is ready — see {@link renderElementToPipeableStream}. */
+type RenderAttempt = {
+  pipeableStream: PipeableStream;
+  allReady: Promise<void>;
+  discard: () => void;
+};
+
 /**
- * Render an already-finalized document element through React's streaming
- * renderer, resolving once it is ready to pipe.
+ * The buffered document for a caller that asked for one
+ * (`RenderPageRequestOptions.bufferHtml`): `element` rendered to a string.
+ * Runs only after a streaming attempt of the same element reached its shell,
+ * so it never decides the outcome; if it cannot render synchronously (a shell
+ * that only completes asynchronously), the buffered copy is left empty.
+ */
+async function bufferedDocument(element: ReactNode): Promise<string> {
+  // Lazy import: react-dom is a peer used only on this path, so merely
+  // loading the server barrel never requires it.
+  const { renderToString } = await import("react-dom/server");
+
+  try {
+    return emitDocument(renderToString(element));
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * One render attempt: start React's streaming renderer on `element` and
+ * resolve once its shell is ready to pipe (or its whole tree, with
+ * `waitForAll`). This is the ONLY render a document request runs: the
+ * escalation loop in `finishRender` calls it for the page, and again for each
+ * boundary it escalates to.
  *
- * `element` is the SAME wrapped element the escalation loop below just
- * proved renders cleanly via `renderToString` — this call exists to produce
- * the actual `PipeableStream` bytes go out on, not to re-decide what
- * renders. `onShellError` firing here would mean React's two renderers
- * disagree on the exact same tree, which the loop above has already ruled
- * out; it is still wired, defensively, straight into a rejection so a
- * caller that awaits this and lets it throw falls onto today's existing
- * error-page/escalation path with nothing yet written to the client — the
- * Stage 1 contract for "errors before the shell is ready".
+ * A shell error rejects with React's own error and nothing written — the same
+ * signal a throwing synchronous render gives, so the loop escalates exactly as
+ * it would for a throw: errors inside a Suspense boundary are recoverable and
+ * never reject, same as before. React reports a shell error through `onError`
+ * first; errors seen before the shell settles are therefore held, reported as
+ * "stream" errors once the shell is ready and dropped when it fails (the loop
+ * reports the shell error itself, as a render error), so every failure is
+ * reported once.
  *
  * `allReady` (the returned `Promise<void>`) resolves whenever React's own
  * `onAllReady` fires, REGARDLESS of `waitForAll` — Stage 1 requests
@@ -825,6 +863,17 @@ function reportErrorPageFailure(
  * key has settled AND `onAllReady` has fired") needs that later signal too,
  * so it is always requested from React, never gated on the same flag that
  * decides when piping may START.
+ *
+ * `discard()` is for an attempt whose bytes nobody will read (a data request
+ * renders only to decide its outcome): it stops the remaining work and
+ * silences the abort it causes.
+ *
+ * `signal` is the request's abort signal: a client that disconnects while the
+ * attempt is still waiting for its shell (a shell that suspends on a lazy
+ * component or a pending `use()`) aborts the render with
+ * `ClientDisconnectedError`, so a shell that never settles cannot hold the
+ * render open after the visitor left. The listener is removed once the
+ * attempt settles; from then on the caller's own disconnect wiring applies.
  */
 async function renderElementToPipeableStream(
   element: ReactNode,
@@ -844,7 +893,8 @@ async function renderElementToPipeableStream(
   nonce: string | undefined,
   /** Reporting context only (card 1db238ca) — never read for anything else here. */
   request: Request,
-): Promise<{ pipeableStream: PipeableStream; allReady: Promise<void> }> {
+  signal: AbortSignal | undefined,
+): Promise<RenderAttempt> {
   // Not `import("react-dom/server")`: on Bun and Deno that resolves to a
   // build without `renderToPipeableStream` (see load-react-dom-server.ts).
   const { renderToPipeableStream } = await loadStreamingReactDomServer();
@@ -854,17 +904,44 @@ async function renderElementToPipeableStream(
     resolveAllReady = resolve;
   });
 
-  const pipeableStream = await new Promise<PipeableStream>((resolve, reject) => {
-    let stream: PipeableStream;
+  // Errors React reported before the shell settled — see the doc above.
+  let shellSettled = false;
+  let discarded = false;
+  const earlyErrors: unknown[] = [];
+
+  let stream!: PipeableStream;
+
+  // Only a NEW abort event counts: a signal already aborted by a loader
+  // timeout never fires again, and a disconnect before render never reaches
+  // this call (`execute-page-request.ts`'s `finish`).
+  const abortBeforeReady = (): void => stream?.abort(new ClientDisconnectedError());
+
+  signal?.addEventListener("abort", abortBeforeReady, { once: true });
+
+  const settled = new Promise<PipeableStream>((resolve, reject) => {
     const options: RenderToPipeableStreamOptions = {
       nonce,
+      onShellReady: () => {
+        shellSettled = true;
+
+        for (const error of earlyErrors.splice(0)) {
+          reportRenderError(route, error, request, "stream");
+        }
+
+        if (!waitForAll) resolve(stream);
+      },
       onShellError: (error) => {
-        // Nothing is written yet, so the caller's catch answers; tag it so that
-        // catch reports it as a stream failure rather than a bare handler error.
-        tagErrorPhase(error, "stream");
+        // Nothing is written yet: the caller's escalation loop answers, and
+        // reports this error itself. Anything held above belongs to this
+        // failed attempt and is dropped with it.
+        shellSettled = true;
+        discarded = true;
+        earlyErrors.length = 0;
         reject(error);
       },
       onError: (error) => {
+        if (discarded) return;
+
         // A client disconnect aborts this SAME stream with
         // `ClientDisconnectedError` as its reason (below, and
         // `defer-emission.ts`'s `onClientDisconnect`) — expected, not a
@@ -875,6 +952,11 @@ async function renderElementToPipeableStream(
           console.debug(
             `[warlock:web] client disconnected while rendering ${route?.path ?? route?.name ?? "an unknown route"}`,
           );
+          return;
+        }
+
+        if (!shellSettled) {
+          earlyErrors.push(error);
           return;
         }
 
@@ -904,14 +986,26 @@ async function renderElementToPipeableStream(
         resolve(stream);
       };
     } else {
-      options.onShellReady = () => resolve(stream);
       options.onAllReady = () => resolveAllReady();
     }
 
     stream = renderToPipeableStream(element, options);
   });
 
-  return { pipeableStream, allReady };
+  let pipeableStream: PipeableStream;
+
+  try {
+    pipeableStream = await settled;
+  } finally {
+    signal?.removeEventListener("abort", abortBeforeReady);
+  }
+
+  const discard = (): void => {
+    discarded = true;
+    pipeableStream.abort();
+  };
+
+  return { pipeableStream, allReady, discard };
 }
 
 async function finishRender(
@@ -945,6 +1039,8 @@ async function finishRender(
     crawler?: boolean;
     /** See `RenderPageRequestOptions.noindex`. */
     noindex?: boolean;
+    /** See `RenderPageRequestOptions.bufferHtml`. */
+    bufferHtml: boolean;
     getRouteTranslations?: import("./route-translations").RouteTranslationsResolver;
     appFile: string;
     errorPageFile?: string;
@@ -1191,10 +1287,6 @@ async function finishRender(
   const renderShellStartedAt = tracingEnabled ? performance.now() : 0;
 
   // ── stage 9 · RENDER ─────────────────────────────────────────────────────
-  // Lazy import: react-dom is a peer used only on this path, so merely
-  // loading the server barrel never requires it.
-  const { renderToString } = await import("react-dom/server");
-
   // JSON.stringify omits object properties whose value is undefined. Loader
   // `<Head/>`/`<Scripts/>` read this context — metadata and the payload are
   // both already final by this point (stages 1-8 are done), so there is
@@ -1258,9 +1350,9 @@ async function finishRender(
 
   const namedApiRoutesConfig = config.get("web.namedApiRoutes") as NamedApiRoutesOption | undefined;
 
-  let documentValue: DocumentContextValue = {
-    metadata: bundle.metadata,
-    payload: buildHydrationPayload(bundle, documentSlots.locale, sessionExtras(bundle)),
+  // The document slots are resolved first, so the payload — which carries
+  // them — is built once, with its serializability check run once.
+  const document: NonNullable<PageDataBundle["document"]> = {
     nonce: documentSlots.nonce,
     lang: documentSlots.locale,
     fontPreloads: preloadFonts ? fonts?.preloads : undefined,
@@ -1292,13 +1384,13 @@ async function finishRender(
   };
 
   // Resolve document slots before either wire representation is serialized.
-  const { payload: _payload, metadata: _metadata, ...document } = documentValue;
   bundle.document = document;
-  documentValue.payload = buildHydrationPayload(
-    bundle,
-    documentSlots.locale,
-    sessionExtras(bundle),
-  );
+
+  let documentValue: DocumentContextValue = {
+    metadata: bundle.metadata,
+    payload: buildHydrationPayload(bundle, documentSlots.locale, sessionExtras(bundle)),
+    ...document,
+  };
 
   if (streamOptions.payloadBudget !== undefined) {
     reportPayloadBudget({
@@ -1306,6 +1398,7 @@ async function finishRender(
       route: { name: bundle.route.name, path: bundle.route.path },
       payload: documentValue.payload,
       routes: documentValue.namedApiRoutes,
+      serialized: serializedPayloadSections(documentValue.payload),
     });
   }
 
@@ -1323,17 +1416,35 @@ async function finishRender(
     });
   };
 
+  // Crawler mode forces `onAllReady` regardless of the caller's own
+  // `waitForAll` — decision 2's "wait for React's onAllReady before the
+  // first byte", since nothing has flushed yet and a crawler must receive
+  // the fully resolved document, never a shell it cannot observe the rest
+  // of.
+  const waitForAll = streamOptions.waitForAll || streamOptions.crawler === true;
+
   // Records the LAST wrapped element every `renderWithContext` call rendered
-  // — read after the escalation loop below settles, to feed the second,
-  // streaming render pass (`renderElementToPipeableStream`). A `let`, read by
-  // closure rather than snapshotted, so it always reflects whichever
-  // `documentValue` was live at the moment it was wrapped (error-page
-  // fallbacks reassign `documentValue` and re-wrap before rendering again).
+  // — read after the escalation loop below settles, for the buffered `html`
+  // (`RenderPageRequestOptions.bufferHtml`). A `let`, read by closure rather
+  // than snapshotted, so it always reflects whichever `documentValue` was live
+  // at the moment it was wrapped (error-page fallbacks reassign
+  // `documentValue` and re-wrap before rendering again).
   let finalWrappedElement: ReactNode;
 
-  const renderWithContext = (element: ReactNode): string => {
+  // One streaming render attempt per element: the attempt that reaches its
+  // shell IS the response stream, so the document renders once. A shell
+  // error rejects, and the loop below escalates on it exactly as it would on
+  // a throw. See `renderElementToPipeableStream`.
+  const renderWithContext = (element: ReactNode): Promise<RenderAttempt> => {
     finalWrappedElement = wrapWithContext(element);
-    return renderToString(finalWrappedElement);
+    return renderElementToPipeableStream(
+      finalWrappedElement,
+      waitForAll,
+      bundle.route,
+      documentSlots.nonce,
+      request,
+      bundle.abortSignal,
+    );
   };
 
   // A boundary that throws while rendering escalates to
@@ -1343,9 +1454,9 @@ async function finishRender(
   // render) and is replaced by each escalation — `bundle.error` itself is
   // never mutated, staying a truthful stage 1-8 record.
   let currentError = bundle.error;
-  let body: string;
+  let attempt: RenderAttempt;
 
-  const renderFrameworkRoot = (): string => {
+  const renderFrameworkRoot = (): Promise<RenderAttempt> => {
     bundle.routeTranslations = bindRequestRouteTranslations(
       request,
       streamOptions.getRouteTranslations,
@@ -1368,7 +1479,7 @@ async function finishRender(
       }),
     );
   };
-  const renderFrameworkAfterErrorPageFailure = (): string => {
+  const renderFrameworkAfterErrorPageFailure = (): Promise<RenderAttempt> => {
     bundle.errorPage = undefined;
     bundle.metadata = ERROR_PAGE_METADATA;
     documentValue = {
@@ -1382,7 +1493,7 @@ async function finishRender(
   const renderErrorPage = async (
     thrown: unknown,
     serializableError: unknown = thrown,
-  ): Promise<string | undefined> => {
+  ): Promise<RenderAttempt | undefined> => {
     if (!loadErrorPage) return undefined;
     bundle.routeTranslations = bindRequestRouteTranslations(
       request,
@@ -1419,7 +1530,7 @@ async function finishRender(
       metadata: bundle.metadata,
       payload: buildHydrationPayload(bundle, documentSlots.locale, sessionExtras(bundle)),
     };
-    return renderWithContext(
+    return await renderWithContext(
       wrapRootward(
         triple,
         bundle,
@@ -1441,19 +1552,21 @@ async function finishRender(
       // exists (or after that boundary has itself thrown below).
       if (currentError?.boundary.boundaryLevel === "app" && !triple.app.ErrorBoundary) {
         try {
-          body =
+          attempt =
             (await renderErrorPage(
               currentError.originalError ?? currentError.error,
               currentError.error,
-            )) ?? renderFrameworkRoot();
+            )) ?? (await renderFrameworkRoot());
         } catch (errorPageThrown) {
+          if (errorPageThrown instanceof ClientDisconnectedError) throw errorPageThrown;
+
           reportErrorPageFailure(
             bundle.route,
             errorPageThrown,
             request,
             currentError.originalError ?? currentError.error,
           );
-          body = renderFrameworkAfterErrorPageFailure();
+          attempt = await renderFrameworkAfterErrorPageFailure();
         }
         break;
       }
@@ -1462,9 +1575,13 @@ async function finishRender(
         ? buildBoundaryElement(triple, bundle, currentError, request.id)
         : buildPageElement(triple, bundle);
 
-      body = renderWithContext(element);
+      attempt = await renderWithContext(element);
       break;
     } catch (thrown) {
+      // The visitor left while an attempt waited for its shell: nothing failed
+      // and nobody is waiting for an error page. The page handler swallows it.
+      if (thrown instanceof ClientDisconnectedError) throw thrown;
+
       // Floor first: whatever we do next (escalate to a boundary, fall to the
       // framework terminal), the throw must not vanish. See reportRenderError.
       reportRenderError(bundle.route, thrown, request);
@@ -1478,10 +1595,12 @@ async function finishRender(
         // a complete `<html>` document (default-app.tsx:22-46) rather than
         // a bare `<main>` fragment.
         try {
-          body = (await renderErrorPage(thrown)) ?? renderFrameworkRoot();
+          attempt = (await renderErrorPage(thrown)) ?? (await renderFrameworkRoot());
         } catch (errorPageThrown) {
+          if (errorPageThrown instanceof ClientDisconnectedError) throw errorPageThrown;
+
           reportErrorPageFailure(bundle.route, errorPageThrown, request, thrown);
-          body = renderFrameworkAfterErrorPageFailure();
+          attempt = await renderFrameworkAfterErrorPageFailure();
         }
         break;
       }
@@ -1531,29 +1650,8 @@ async function finishRender(
     ? (currentError.statusCode ?? 500)
     : ((bundle as Bundle).commit?.statusCode ?? 200);
 
-  const html = emitDocument(body);
-
-  // Crawler mode forces `onAllReady` regardless of the caller's own
-  // `waitForAll` — decision 2's "wait for React's onAllReady before the
-  // first byte", since nothing has flushed yet and a crawler must receive
-  // the fully resolved document, never a shell it cannot observe the rest
-  // of.
-  const waitForAll = streamOptions.waitForAll || streamOptions.crawler === true;
-
-  // Stage 9's second pass: the element above just proved safe to render (the
-  // escalation loop ran it to completion, synchronously, with no throw) —
-  // stream THAT SAME element for the bytes that actually reach the client.
-  // See `renderElementToPipeableStream` and `RenderedPage.pipeableStream`.
-  const { pipeableStream: renderedStream, allReady } = await renderElementToPipeableStream(
-    finalWrappedElement,
-    waitForAll,
-    bundle.route,
-    documentSlots.nonce,
-    request,
-  );
-
-  // React's shell is ready to pipe the instant `renderElementToPipeableStream`
-  // resolves (`onShellReady`, or `onAllReady` when `waitForAll` is set) — the
+  // React's shell is ready to pipe the instant the last attempt above
+  // resolved (`onShellReady`, or `onAllReady` when `waitForAll` is set) — the
   // phase closes here, before the deferred-emission wrapping below, which is
   // no longer part of "render", it is streaming.
   if (tracingEnabled) {
@@ -1563,14 +1661,23 @@ async function finishRender(
     });
   }
 
-  // The data-request inline path's own wire restore (see where it is set,
-  // above): both render passes above (the escalation loop's synchronous
-  // proof pass, and the streaming pass just above) have already read
-  // `bundle.pageData` — with the settled thenable in place, neither ever
-  // suspended on it — so it is safe to put the plain value back now, before
-  // anything downstream builds the actual JSON body this request answers
-  // with.
-  restoreInlineDeferredForDataWire?.();
+  // The buffered document (`RenderedPage.html`): the same final element as a
+  // string, rendered only for a caller that asked for it. The page route
+  // handler streams and never reads it.
+  const html = streamOptions.bufferHtml ? await bufferedDocument(finalWrappedElement) : "";
+
+  // A DATA request answers with its payload only: the render above decided
+  // the outcome (a render-time throw escalated into `errorPage` and the
+  // status), and its bytes have no reader. Stop the remaining work and hand
+  // no stream back.
+  if (dataRequest) {
+    attempt.discard();
+    restoreInlineDeferredForDataWire?.();
+
+    return { html, status, headers, cookies, data: bundle.pageData, bundle, usesDefer };
+  }
+
+  const { pipeableStream: renderedStream, allReady } = attempt;
 
   // Stage 2: a page with deferred keys gets its stream wrapped so each
   // settlement writes a `__WARLOCK_DEFER__` chunk after the shell has
@@ -1655,11 +1762,10 @@ async function finishRender(
  *
  * Deliberately still `renderToString`, not streamed: this is the ONE
  * terminal attempt at a module-load/registration failure, already
- * exceptional and rare, and
- * there is no real triple behind it for a second, streaming render pass to
- * prove safe the way `finishRender`'s escalation loop does for every other
- * document. Buffering the one attempt this function ever makes costs nothing
- * a real page request would notice.
+ * exceptional and rare, and there is no real triple behind it to escalate
+ * through the way `finishRender`'s loop does for every other document.
+ * Buffering the one attempt this function ever makes costs nothing a real
+ * page request would notice.
  */
 export async function renderPageFailure(options: RenderPageFailureOptions): Promise<RenderedPage> {
   const { request, response, name, path, thrown, loadErrorPage } = options;
@@ -1845,6 +1951,7 @@ export async function renderPageRequest(
           payloadBudget: options.payloadBudget,
           crawler: options.crawler,
           noindex: options.noindex,
+          bufferHtml: options.bufferHtml ?? true,
           getRouteTranslations: options.getRouteTranslations,
           appFile: options.appFile ?? "",
           errorPageFile: options.errorPageFile,

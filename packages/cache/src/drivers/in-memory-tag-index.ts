@@ -40,6 +40,32 @@ export class InMemoryTagIndex {
   }
 
   /**
+   * Up to `count` members of a tag set from a random starting point, without
+   * copying the whole set.
+   */
+  public sample(tagKey: string, count: number): string[] {
+    const set = this.sets.get(tagKey);
+
+    if (!set || count <= 0) {
+      return [];
+    }
+
+    const skip = set.size > count ? Math.floor(Math.random() * (set.size - count + 1)) : 0;
+    const picked: string[] = [];
+    let index = 0;
+
+    for (const member of set) {
+      if (index++ < skip) continue;
+
+      picked.push(member);
+
+      if (picked.length >= count) break;
+    }
+
+    return picked;
+  }
+
+  /**
    * Remove members from a tag set; an emptied set is dropped.
    */
   public remove(tagKey: string, members: readonly string[]): void {

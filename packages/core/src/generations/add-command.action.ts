@@ -41,6 +41,7 @@ type ProjectPackageJson = {
   dependencies?: Record<string, string>;
   devDependencies?: Record<string, string>;
   scripts?: Record<string, string>;
+  agentKit?: { pick?: Record<string, unknown> };
 };
 
 export const allowedFeatures = Object.keys(featuresMap);
@@ -186,6 +187,10 @@ export async function addCommandAction(options: CommandActionData) {
     }
   }
 
+  if (!isGenerationDryRun()) {
+    await appendAgentKitPick([...Object.keys(dependencies), ...Object.keys(devDependencies)]);
+  }
+
   setGenerationDetail("features", resolvedFeatures);
   setGenerationDetail("dependencies", { ...dependencies });
   setGenerationDetail("devDependencies", { ...devDependencies });
@@ -246,6 +251,37 @@ export async function addCommandAction(options: CommandActionData) {
 
     console.log(`Scripts added successfully ${colors.green(Object.keys(scripts).join(", "))}`);
   }
+}
+
+/**
+ * A project created by create-warlock limits `agent-kit sync` to an allowlist
+ * (`agentKit.pick` in package.json), so only reviewed packages can place skills
+ * in the developer's coding agent. Add the `@warlock.js/*` and `@mongez/*`
+ * packages being installed to it, so their skills are synced too. A project
+ * without the allowlist is left alone: its sync already covers every package.
+ */
+export async function appendAgentKitPick(packages: string[]): Promise<void> {
+  const names = packages.filter(
+    (name) => name.startsWith("@warlock.js/") || name.startsWith("@mongez/"),
+  );
+
+  if (names.length === 0) return;
+
+  const packageJsonPath = rootPath("package.json");
+  const packageJson = await getJsonFileAsync<ProjectPackageJson>(packageJsonPath);
+  const pick = packageJson.agentKit?.pick;
+
+  if (!pick || typeof pick !== "object" || Array.isArray(pick)) return;
+
+  const missing = names.filter((name) => !(name in pick));
+
+  if (missing.length === 0) return;
+
+  for (const name of missing) {
+    pick[name] = true;
+  }
+
+  await putJsonFileAsync(packageJsonPath, packageJson);
 }
 
 /**

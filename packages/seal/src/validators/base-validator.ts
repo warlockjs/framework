@@ -747,8 +747,18 @@ export class BaseValidator<TInput = unknown, TOutput = TInput> {
     return result;
   }
 
-  /** Validate presence and value rules before containers descend into children. */
-  protected async validateRules(data: any, context: SchemaContext): Promise<ValidationResult> {
+  /**
+   * Validate presence and value rules before containers descend into children.
+   *
+   * A container that already ran its mutators passes `premutated`: when the
+   * value the rules would mutate is that same `source`, a copy of its mutated
+   * `value` is used instead of running the mutators a second time.
+   */
+  protected async validateRules(
+    data: any,
+    context: SchemaContext,
+    premutated?: { source: unknown; value: unknown },
+  ): Promise<ValidationResult> {
     if (data === null && this.isNullable) {
       return { isValid: true, errors: [], data: null };
     }
@@ -797,7 +807,9 @@ export class BaseValidator<TInput = unknown, TOutput = TInput> {
     let mutatedData =
       this.isOptional && valueForRules === undefined
         ? undefined
-        : await this.mutate(valueForRules, context);
+        : premutated !== undefined && premutated.source === valueForRules
+          ? this.copyMutated(premutated.value)
+          : await this.mutate(valueForRules, context);
 
     const errors: ValidationResult["errors"] = [];
     let isValid = true;
@@ -869,6 +881,37 @@ export class BaseValidator<TInput = unknown, TOutput = TInput> {
     };
 
     return result;
+  }
+
+  /**
+   * The copy of an already-mutated container value that the rules run on, so
+   * the container's own copy stays untouched until it validates its children.
+   */
+  protected copyMutated(value: unknown): unknown {
+    return value;
+  }
+
+  /**
+   * Run a one-off rule (a limit the container applies itself) and return its
+   * errors in the same shape the rule pipeline reports them, or `undefined`
+   * when it passes.
+   */
+  protected async checkRule<T extends SchemaRuleOptions = SchemaRuleOptions>(
+    rule: SchemaRule<T>,
+    value: unknown,
+    context: SchemaContext,
+    options: T,
+    errorMessage?: string,
+  ): Promise<ValidationResult["errors"] | undefined> {
+    const contextualRule = this.createRule(rule, errorMessage, options);
+
+    this.setRuleAttributesList(contextualRule);
+
+    const result = await contextualRule.validate(value, context);
+
+    if (result.isValid) return undefined;
+
+    return [{ type: contextualRule.name, error: result.error, input: result.path ?? context.path }];
   }
 
   /**

@@ -22,6 +22,49 @@ import { afterCommit } from "../transactions/after-commit";
 import type { DataSource } from "./../data-source/data-source";
 
 /**
+ * One top-level field touched by an update: written back whole (a column, or
+ * a field assigned as a whole), or leaf by leaf (nested changes).
+ */
+type UpdateField = { whole: boolean; replaced: boolean; leaves: string[] };
+
+/** Validation schemas a model class reuses across saves (see `validationSchemas()`). */
+type CachedValidationSchemas = {
+  schema: ObjectValidator;
+  strictMode: StrictMode;
+  createdAtColumn: unknown;
+  updatedAtColumn: unknown;
+  deletedAtColumn: unknown;
+  systemKeys: string[];
+  base: ObjectValidator;
+  insert: ObjectValidator;
+};
+
+const validationSchemaCache = new WeakMap<object, CachedValidationSchemas>();
+
+/** Marks a path that does not exist (a stored `undefined` is a value). */
+const MISSING = Symbol("missing");
+
+/** Read a dot path through own properties of plain objects. */
+function getPath(value: unknown, path: string): unknown {
+  let current = value;
+
+  for (const segment of path.split(".")) {
+    if (
+      current === null ||
+      typeof current !== "object" ||
+      Array.isArray(current) ||
+      !Object.prototype.hasOwnProperty.call(current, segment)
+    ) {
+      return MISSING;
+    }
+
+    current = (current as Record<string, unknown>)[segment];
+  }
+
+  return current;
+}
+
+/**
  * Database writer service that orchestrates model persistence.
  *
  * Handles the complete save pipeline:
@@ -61,6 +104,19 @@ export class DatabaseWriter implements WriterContract {
 
   /** Dirty columns an update validation dropped (strip mode); never written. */
   private readonly unvalidatedColumns = new Set<string>();
+
+  /**
+   * Top-level fields an update validation dropped whole (strip mode). Nothing
+   * below them is set.
+   */
+  private readonly droppedFields = new Set<string>();
+
+  /**
+   * Dropped fields that were assigned as a whole (`set("field", {...})`): the
+   * removals that assignment caused are not written either. An explicit
+   * `unset("field.key")` still is, like an unset of a top-level column.
+   */
+  private readonly droppedReplacedFields = new Set<string>();
 
   /** Model constructor reference */
   private readonly ctor: ChildModel<Model>;
@@ -213,57 +269,27 @@ export class DatabaseWriter implements WriterContract {
       return;
     }
 
-    // Whitelist the framework-managed system columns so a model carrying them
-    // (id / _id / timestamps / soft-delete deletedAt) validates cleanly instead
-    // of being stripped (strictMode "strip") or rejected (strictMode "fail").
-    // `when(...)` adds each timestamp/soft-delete column only when configured
-    // (truthy) — the lazy factory means a disabled column (`false`) never even
-    // builds a bogus schema key.
+    // Clone full schema for insert, partial (dirty fields only) for updates.
     //
-    // The whitelist must apply to BOTH insert and update: on insert a caller may
-    // supply a backdated createdAt (e.g. data migrations / imports), and without
-    // the whitelist strictMode "strip" silently drops it before it reaches the
-    // writer, while "fail" rejects the whole insert.
-    const systemColumns = {
-      id: v.scalar().optional(),
-      _id: v.any().optional(),
-      ...when(this.ctor.createdAtColumn, () => ({
-        [this.ctor.createdAtColumn as string]: v.date().optional(),
-      })),
-      ...when(this.ctor.updatedAtColumn, () => ({
-        [this.ctor.updatedAtColumn as string]: v.date().optional(),
-      })),
-      ...when(this.ctor.deletedAtColumn, () => ({
-        [this.ctor.deletedAtColumn as string]: v.date().optional(),
-      })),
-    };
-
-    // Clone full schema for insert, partial (dirty keys only) for updates.
-    //
-    // An update validates ONLY the dirty columns and merges back only those
+    // An update validates ONLY the dirty fields and merges back only those
     // keys: columns the schema does not list (migration-added, withCount, ...)
     // are never touched, so they can no longer be turned into `$unset`.
+    //
+    // A nested change is reported as leaf paths (`profile.role`); it is
+    // validated through its top-level field, with the whole current value of
+    // that field, so nested data follows the schema and `strictMode` exactly
+    // like a top-level column does.
+    const updateFields = isInsert ? undefined : this.collectUpdateFields();
     const dataToValidate: Record<string, unknown> = isInsert
       ? this.model.data
       : Object.fromEntries(
-          this.model
-            .getDirtyColumns()
-            .filter((column) => column in this.model.data)
-            .map((column) => [column, this.model.data[column]]),
+          Array.from(updateFields!.keys()).map((field) => [field, this.model.data[field]]),
         );
 
+    const schemas = this.validationSchemas(this.schema);
     const validationSchema = isInsert
-      ? this.schema.clone().extend(systemColumns)
-      : this.schema.clone(Object.keys(dataToValidate)).extend(systemColumns);
-
-    // Apply strict mode
-    if (this.strictMode === "strip") {
-      validationSchema.stripUnknown();
-    } else if (this.strictMode === "fail") {
-      validationSchema.allowUnknown(false);
-    } else if (this.strictMode === "allow") {
-      validationSchema.allowUnknown(true);
-    }
+      ? schemas.insert
+      : schemas.base.clone([...Object.keys(dataToValidate), ...schemas.systemKeys]);
 
     // Run validation
     const result = await v.validate(validationSchema, dataToValidate, {
@@ -290,19 +316,53 @@ export class DatabaseWriter implements WriterContract {
     } else {
       const validated = result.data as Record<string, unknown>;
 
-      for (const column of Object.keys(dataToValidate)) {
-        if (column in validated) {
+      for (const [column, field] of updateFields!) {
+        if (!(column in validated)) {
+          if (dataToValidate[column] === null && column in validationSchema.schema) {
+            // An explicit null on a KNOWN column that passed validation: an
+            // optional, non-nullable leaf coalesces null to "absent" in seal, so
+            // it is missing from the result. It is a deliberate "clear this
+            // column", not an unknown one to strip. A required column never
+            // gets here: its rule rejects the null and validation throws.
+            this.model.set(column, null);
+          } else {
+            // Dropped by strictMode "strip": never write an unvalidated field,
+            // nor anything below it.
+            this.unvalidatedColumns.add(column);
+            this.droppedFields.add(column);
+
+            // Assigned as a whole: the keys it lost are part of the dropped
+            // value, so their removal is not written either.
+            if (field.replaced) {
+              this.droppedReplacedFields.add(column);
+            }
+          }
+
+          continue;
+        }
+
+        if (field.whole) {
           this.model.set(column, validated[column]);
-        } else if (dataToValidate[column] === null && column in validationSchema.schema) {
-          // An explicit null on a KNOWN column that passed validation: an
-          // optional, non-nullable leaf coalesces null to "absent" in seal, so
-          // it is missing from the result. It is a deliberate "clear this
-          // column", not an unknown one to strip (Real-Estate #18). A required
-          // column never gets here: its rule rejects the null and validation throws.
-          this.model.set(column, null);
-        } else {
-          // Dropped by strictMode "strip": never write an unvalidated column.
-          this.unvalidatedColumns.add(column);
+          continue;
+        }
+
+        // Partial nested change: write back only the changed leaves, so the
+        // update stays partial and siblings keep their stored values.
+        for (const leaf of field.leaves) {
+          // Unset by the caller: its removal is written as before. An explicit
+          // unset wins over a schema `.default()`, as it does for a column.
+          if (getPath(this.model.data, leaf) === MISSING) {
+            continue;
+          }
+
+          const value = getPath(validated[column], leaf.slice(column.length + 1));
+
+          if (value !== MISSING) {
+            this.model.set(leaf, value);
+          } else {
+            // Present in the data but dropped by the field's schema.
+            this.unvalidatedColumns.add(leaf);
+          }
         }
       }
     }
@@ -311,6 +371,142 @@ export class DatabaseWriter implements WriterContract {
     if (!options.skipEvents) {
       await this.model.emitEvent("validated", { result });
     }
+  }
+
+  /**
+   * The model's validation schemas, built once per model class and reused by
+   * every save until `schema`, `strictMode` or a system column name changes.
+   *
+   * The framework-managed system columns (id / _id / timestamps / soft-delete
+   * deletedAt) are whitelisted so a model carrying them validates cleanly
+   * instead of being stripped (strictMode "strip") or rejected ("fail"). Each
+   * timestamp/soft-delete column is added only when configured (truthy). The
+   * whitelist applies to BOTH insert and update: on insert a caller may supply
+   * a backdated createdAt (data migrations, imports).
+   *
+   * `base` is never validated itself (an update clones the dirty fields from
+   * it); `insert` is a copy of it that every insert validates with.
+   */
+  private validationSchemas(schema: ObjectValidator): CachedValidationSchemas {
+    const ctor = this.ctor;
+    const cached = validationSchemaCache.get(ctor);
+
+    if (
+      cached &&
+      cached.schema === schema &&
+      cached.strictMode === this.strictMode &&
+      cached.createdAtColumn === ctor.createdAtColumn &&
+      cached.updatedAtColumn === ctor.updatedAtColumn &&
+      cached.deletedAtColumn === ctor.deletedAtColumn
+    ) {
+      return cached;
+    }
+
+    const systemColumns = {
+      id: v.scalar().optional(),
+      _id: v.any().optional(),
+      ...when(ctor.createdAtColumn, () => ({
+        [ctor.createdAtColumn as string]: v.date().optional(),
+      })),
+      ...when(ctor.updatedAtColumn, () => ({
+        [ctor.updatedAtColumn as string]: v.date().optional(),
+      })),
+      ...when(ctor.deletedAtColumn, () => ({
+        [ctor.deletedAtColumn as string]: v.date().optional(),
+      })),
+    };
+
+    // Seal validators are immutable: each configuration call returns a new
+    // validator, so the result must be kept.
+    let base: ObjectValidator = schema.extend(systemColumns);
+
+    if (this.strictMode === "strip") {
+      base = base.stripUnknown();
+    } else if (this.strictMode === "fail") {
+      base = base.allowUnknown(false);
+    } else if (this.strictMode === "allow") {
+      base = base.allowUnknown(true);
+    }
+
+    const entry: CachedValidationSchemas = {
+      schema,
+      strictMode: this.strictMode,
+      createdAtColumn: ctor.createdAtColumn,
+      updatedAtColumn: ctor.updatedAtColumn,
+      deletedAtColumn: ctor.deletedAtColumn,
+      systemKeys: Object.keys(systemColumns),
+      base,
+      insert: base.clone(),
+    };
+
+    validationSchemaCache.set(ctor, entry);
+
+    return entry;
+  }
+
+  /**
+   * Group the dirty columns of an update by the top-level field they live in.
+   *
+   * A dirty column that is itself a key of the data (scalars, arrays, dates,
+   * every SQL column) is validated and written back whole, as before. A leaf
+   * path (`profile.role`, reported for nested changes) is validated through
+   * its top-level field and written back leaf by leaf. A field assigned as a
+   * whole (`set("profile", {...})`) is written back whole.
+   */
+  private collectUpdateFields(): Map<string, UpdateField> {
+    const data = this.model.data as Record<string, unknown>;
+    const fields = new Map<string, UpdateField>();
+
+    const fieldOf = (column: string): UpdateField => {
+      let field = fields.get(column);
+
+      if (!field) {
+        field = { whole: false, replaced: false, leaves: [] };
+        fields.set(column, field);
+      }
+
+      return field;
+    };
+
+    for (const column of this.model.getDirtyColumns()) {
+      if (column in data) {
+        fieldOf(column).whole = true;
+        continue;
+      }
+
+      const separator = column.indexOf(".");
+
+      if (separator <= 0) {
+        continue;
+      }
+
+      const root = column.slice(0, separator);
+
+      if (root in data) {
+        fieldOf(root).leaves.push(column);
+      }
+    }
+
+    for (const root of this.model.dirtyTracker.getReplacedColumns()) {
+      if (root in data) {
+        const field = fieldOf(root);
+        field.whole = true;
+        field.replaced = true;
+      }
+    }
+
+    return fields;
+  }
+
+  /** Whether a dirty column sits in a field the update validation dropped. */
+  private isUnvalidated(column: string): boolean {
+    if (this.unvalidatedColumns.has(column)) {
+      return true;
+    }
+
+    const separator = column.indexOf(".");
+
+    return separator > 0 && this.droppedFields.has(column.slice(0, separator));
   }
 
   /**
@@ -574,7 +770,7 @@ export class DatabaseWriter implements WriterContract {
     // partial by intent and keep going through the per-leaf path below.
     const replacedColumns = this.model.dirtyTracker
       .getReplacedColumns()
-      .filter((column) => !identityColumns.has(column) && !this.unvalidatedColumns.has(column));
+      .filter((column) => !identityColumns.has(column) && !this.isUnvalidated(column));
 
     // A leaf under a whole-written field must not be sent too: MongoDB rejects
     // an update touching both `nested` and `nested.a`.
@@ -586,9 +782,7 @@ export class DatabaseWriter implements WriterContract {
       .getDirtyColumns()
       .filter(
         (column) =>
-          !identityColumns.has(column) &&
-          !this.unvalidatedColumns.has(column) &&
-          !isUnderReplaced(column),
+          !identityColumns.has(column) && !this.isUnvalidated(column) && !isUnderReplaced(column),
       );
 
     if (dirtyColumns.length > 0) {
@@ -605,7 +799,12 @@ export class DatabaseWriter implements WriterContract {
     // a parent emptied by an unset is removed too instead of left behind as `{}`.
     const removedColumns = this.model.dirtyTracker
       .getRemovedPaths()
-      .filter((column) => !identityColumns.has(column) && !isUnderReplaced(column));
+      .filter(
+        (column) =>
+          !identityColumns.has(column) &&
+          !isUnderReplaced(column) &&
+          !this.droppedReplacedFields.has(column.split(".")[0] as string),
+      );
 
     if (removedColumns.length > 0) {
       operations.$unset = {};

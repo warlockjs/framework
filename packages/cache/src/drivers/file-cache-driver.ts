@@ -1,5 +1,6 @@
 import { randomBytes } from "node:crypto";
 import fs from "node:fs";
+import type { FileHandle } from "node:fs/promises";
 import {
   atomicWriteJsonAsync,
   ensureDirectoryAsync,
@@ -19,6 +20,18 @@ import type {
 } from "../types";
 import { CacheConfigurationError, CacheError, CacheUnsupportedError } from "../types";
 import { BaseCacheDriver } from "./base-cache-driver";
+
+/**
+ * How many times an exclusive write (or a compare-and-delete) retries while
+ * another caller is removing the same entry.
+ */
+const EXCLUSIVE_ATTEMPTS = 50;
+
+/**
+ * A removal guard older than this belongs to a process that died while
+ * holding it (the guarded step takes a few milliseconds).
+ */
+const STALE_GUARD_MS = 10_000;
 
 export class FileCacheDriver
   extends BaseCacheDriver<FileCacheDriver, FileCacheOptions>
@@ -242,8 +255,9 @@ export class FileCacheDriver
   /**
    * Create `filePath` only if it does not exist. Writes a temp file, then
    * hard-links it to the target (EEXIST = already present). An existing but
-   * expired entry is removed (the file only, never the directory) and the
-   * link retried once.
+   * expired entry is removed under the key's removal guard (see
+   * {@link withRemovalGuard}), so of several contenders only one can ever
+   * win the retried link.
    *
    * Returns `null` when written, or `{ existing }` on conflict.
    */
@@ -256,7 +270,7 @@ export class FileCacheDriver
     try {
       await fs.promises.writeFile(tempPath, JSON.stringify(data, null, 2));
 
-      for (let attempt = 0; attempt < 2; attempt++) {
+      for (let attempt = 0; attempt < EXCLUSIVE_ATTEMPTS; attempt++) {
         try {
           await fs.promises.link(tempPath, filePath);
           return null;
@@ -266,36 +280,164 @@ export class FileCacheDriver
           }
         }
 
-        let current: CacheData | undefined;
+        const current = await this.readEntryFile(filePath);
 
-        try {
-          current = (await getJsonFileAsync(filePath)) as CacheData | undefined;
-        } catch {
-          current = undefined;
-        }
-
-        const expired =
-          current?.expiresAt !== undefined &&
-          current.expiresAt !== null &&
-          current.expiresAt <= Date.now();
-
-        if (current && !expired) {
-          return { existing: current.data ?? null };
-        }
-
-        if (attempt === 0 && expired) {
-          await fs.promises.rm(filePath, { force: true });
-          continue;
-        }
+        // Removed between the link and the read: try the link again.
+        if (!current) continue;
 
         // Unreadable (corrupt) file: treat as held, never delete it.
-        return { existing: null };
+        if (!current.entry) return { existing: null };
+
+        if (!isExpiredEntry(current.entry)) {
+          return { existing: current.entry.data ?? null };
+        }
+
+        const guarded = await this.withRemovalGuard(filePath, async () => {
+          // Re-read inside the guard: only the expired file that was judged
+          // is removed, never one written since.
+          const latest = await this.readEntryFile(filePath);
+
+          if (latest?.entry && latest.inode === current.inode && isExpiredEntry(latest.entry)) {
+            await fs.promises.unlink(filePath).catch(ignoreMissing);
+          }
+        });
+
+        // Another contender is removing it: give it a moment, then retry.
+        if (!guarded) await delay(1);
       }
 
       return { existing: null };
     } finally {
       await fs.promises.unlink(tempPath).catch(() => undefined);
     }
+  }
+
+  /**
+   * Run `task` while holding the key's removal guard: a `<file>.guard` file
+   * created exclusively. Entry files are only ever created by an exclusive
+   * link onto a missing path, so while every removal of a live or expired
+   * entry by `writeExclusive` / `deleteIfEquals` happens under this guard, no
+   * removal can delete an entry another writer has just created.
+   *
+   * Returns `false` (without running `task`) when another caller holds the
+   * guard. A guard left behind by a crashed process is cleared once it is
+   * older than {@link STALE_GUARD_MS}.
+   */
+  protected async withRemovalGuard(filePath: string, task: () => Promise<void>): Promise<boolean> {
+    const guardPath = `${filePath}.guard`;
+    let handle: FileHandle;
+
+    try {
+      handle = await fs.promises.open(guardPath, "wx");
+    } catch (error: any) {
+      // The key directory is gone, so is the entry: nothing to remove.
+      if (error?.code === "ENOENT") return true;
+
+      if (error?.code !== "EEXIST") throw error;
+
+      await this.clearStaleGuard(guardPath);
+
+      return false;
+    }
+
+    try {
+      await handle.close();
+      await task();
+
+      return true;
+    } finally {
+      await fs.promises.unlink(guardPath).catch(() => undefined);
+    }
+  }
+
+  /**
+   * Remove a removal guard whose holder died (older than {@link STALE_GUARD_MS}).
+   */
+  protected async clearStaleGuard(guardPath: string): Promise<void> {
+    try {
+      const { mtimeMs } = await fs.promises.stat(guardPath);
+
+      if (Date.now() - mtimeMs > STALE_GUARD_MS) {
+        await fs.promises.unlink(guardPath).catch(ignoreMissing);
+      }
+    } catch (error: any) {
+      if (error?.code !== "ENOENT") throw error;
+    }
+  }
+
+  /**
+   * Read an entry file together with its inode, so a later step can tell
+   * whether the file at the same path is still the one that was read.
+   * `undefined` when the file does not exist; `entry: undefined` when it
+   * cannot be parsed.
+   */
+  protected async readEntryFile(
+    filePath: string,
+  ): Promise<{ entry: CacheData | undefined; inode: number } | undefined> {
+    let handle: FileHandle;
+
+    try {
+      handle = await fs.promises.open(filePath, "r");
+    } catch (error: any) {
+      if (error?.code === "ENOENT") return undefined;
+
+      throw error;
+    }
+
+    try {
+      const { ino } = await handle.stat();
+      const text = await handle.readFile("utf-8");
+
+      try {
+        const entry = JSON.parse(text) as CacheData | null;
+
+        return { entry: entry && typeof entry === "object" ? entry : undefined, inode: ino };
+      } catch {
+        return { entry: undefined, inode: ino };
+      }
+    } finally {
+      await handle.close();
+    }
+  }
+
+  /**
+   * {@inheritdoc}
+   *
+   * Compare-and-delete under the key's removal guard, so a lock released just
+   * as it expired never deletes a successor's lock.
+   */
+  protected async deleteIfEquals(key: CacheKey, expected: unknown): Promise<boolean> {
+    const parsedKey = this.parseKey(key);
+    const fileDirectory = this.keyDirectory(parsedKey);
+    const filePath = path.resolve(fileDirectory, this.fileName);
+    let deleted = false;
+
+    for (let attempt = 0; attempt < EXCLUSIVE_ATTEMPTS; attempt++) {
+      const guarded = await this.withRemovalGuard(filePath, async () => {
+        const current = await this.readEntryFile(filePath);
+
+        if (!current?.entry || isExpiredEntry(current.entry) || current.entry.data !== expected) {
+          return;
+        }
+
+        await fs.promises.unlink(filePath).catch(ignoreMissing);
+        deleted = true;
+      });
+
+      if (guarded) break;
+
+      await delay(1);
+    }
+
+    if (!deleted) return false;
+
+    // Drop the key directory when nothing else was written into it meanwhile.
+    await fs.promises.rmdir(fileDirectory).catch(() => undefined);
+
+    this.log("removed", parsedKey);
+    await this.emit("removed", { key: parsedKey });
+
+    return true;
   }
 
   /**
@@ -380,8 +522,9 @@ export class FileCacheDriver
     }
 
     // Only a successfully parsed but expired entry is removed (inside
-    // parseCachedData).
-    const result = await this.parseCachedData(parsedKey, value);
+    // parseCachedData). The value was just parsed from disk, so it is already
+    // a private copy: no clone.
+    const result = await this.parseCachedData(parsedKey, value, false);
 
     if (result === null) {
       await this.emit("miss", { key: parsedKey });
@@ -396,7 +539,13 @@ export class FileCacheDriver
    * {@inheritdoc}
    */
   public async remove(key: CacheKey) {
-    const parsedKey = this.parseKey(key);
+    await this.removeParsed(this.parseKey(key));
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  protected async removeParsed(parsedKey: string): Promise<void> {
     this.log("removing", parsedKey);
 
     const fileDirectory = this.keyDirectory(parsedKey);
@@ -439,4 +588,20 @@ export class FileCacheDriver
     this.log("connected");
     await this.emit("connected");
   }
+}
+
+/**
+ * Whether a stored entry is past its deadline. `Infinity` (no expiry) is
+ * written to JSON as `null`, so only a real number can be expired.
+ */
+function isExpiredEntry(entry: CacheData): boolean {
+  return typeof entry.expiresAt === "number" && entry.expiresAt <= Date.now();
+}
+
+function ignoreMissing(error: NodeJS.ErrnoException): void {
+  if (error?.code !== "ENOENT") throw error;
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }

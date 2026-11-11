@@ -22,7 +22,7 @@ In-memory storage with optional automatic eviction when a size limit is reached.
 - Not shared between processes or servers — with more than one server use [Redis](/v/latest/cache/redis/) or [Postgres](/v/latest/cache/pg/)
 - Keys are stored flat: `get("users")` after `set("users.1", …)` is a miss, and `maxSize` counts entries (evicting in LRU order)
 - `increment`, `pull` and `update` are atomic within the process only
-- Memory growth: Without `maxSize`, cache can grow indefinitely (use `maxSize` or [LRU Memory Cache Driver](/v/latest/cache/lru-memory/) for automatic eviction)
+- Memory growth: the driver keeps at most `maxSize` entries, 10,000 by default, evicting the least recently used ones; `maxSize: Infinity` removes the limit
 
 ## Alternatives
 
@@ -54,11 +54,11 @@ export default cacheConfigurations;
 
 ## Options
 
-| Option         | Type               | Default     | Description                                                                   |
-| -------------- | ------------------ | ----------- | ----------------------------------------------------------------------------- |
-| `globalPrefix` | string \| Function | `undefined` | Global prefix for all cache keys                                              |
-| `ttl`          | number \| string   | `Infinity`  | Default TTL — seconds or a duration string (`"1h"`, `"7d"`)                   |
-| `maxSize`      | number             | `undefined` | Maximum number of items. When exceeded, least recently used items are evicted |
+| Option         | Type               | Default     | Description                                                                                                          |
+| -------------- | ------------------ | ----------- | -------------------------------------------------------------------------------------------------------------------- |
+| `globalPrefix` | string \| Function | `undefined` | Global prefix for all cache keys                                                                                     |
+| `ttl`          | number \| string   | `Infinity`  | Default TTL — seconds or a duration string (`"1h"`, `"7d"`)                                                          |
+| `maxSize`      | number             | `10000`     | Maximum number of items. When exceeded, least recently used items are evicted. `Infinity` (or `0`) removes the limit |
 
 ### Global Prefix
 
@@ -86,7 +86,11 @@ export default cacheConfigurations;
 
 ### Memory Size Limit (maxSize)
 
-The `maxSize` option limits the number of items in the cache. When the limit is reached, the least recently used (LRU) items are automatically evicted.
+The `maxSize` option limits the number of items in the cache. When the limit is reached, the least recently used (LRU) items are automatically evicted. It defaults to `10000`, so keys built from request input (page numbers, filters, query strings) cannot grow the heap without bound. Set `maxSize: Infinity` to keep every entry until it expires.
+
+Rate-limit counters and login lockouts kept in a bounded memory cache can be evicted by a flood of distinct keys (and are per process anyway): in production, keep them in a shared store (`redis` or `pg`), or set `maxSize: Infinity` on the memory driver that holds them.
+
+Eviction touches only the oldest entries; a write past the limit costs the same however large the cache is.
 
 ```ts
 {

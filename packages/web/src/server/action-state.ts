@@ -16,18 +16,30 @@ export type ActionState<TData = unknown> = {
 
 export type SealActionError = { input?: string; error?: string; message?: string };
 
-/** Default `web.forms.redactValues`. `*` matches any run of characters. */
+/**
+ * Field names never echoed back after a failed action, case-insensitive.
+ * `*` matches any run of characters. `web.forms.redactValues` adds to this
+ * list; it never replaces it.
+ */
 export const DEFAULT_REDACT_VALUES: readonly string[] = [
-  "password",
-  "password_confirmation",
+  "*password*",
+  "*passwd*",
+  "*passcode*",
   "*token*",
   "*secret*",
+  "*otp*",
+  "cvv",
+  "cvc",
+  "*card*number*",
+  "pin",
 ];
 
 export type ToActionStateOptions = {
   action: string;
-  /** `web.forms.redactValues`; defaults to `DEFAULT_REDACT_VALUES`. */
+  /** `web.forms.redactValues`: extra patterns, merged with `DEFAULT_REDACT_VALUES`. */
   redactValues?: readonly string[];
+  /** `web.forms.echoValues`: `false` echoes no submitted value at all. Defaults to `true`. */
+  echoValues?: boolean;
   /** The body input to echo on failure. */
   values?: Record<string, unknown>;
   /** Inputs a field will claim; other errors also reach `formErrors`. Omit to claim all. */
@@ -158,7 +170,15 @@ export function toActionState(
     folded = foldErrors(source.errors, claimed);
   }
 
-  const values = echoValues(options.values, options.redactValues ?? DEFAULT_REDACT_VALUES);
+  const values =
+    options.echoValues === false
+      ? undefined
+      : echoValues(
+          options.values,
+          options.redactValues?.length
+            ? [...DEFAULT_REDACT_VALUES, ...options.redactValues]
+            : DEFAULT_REDACT_VALUES,
+        );
 
   return {
     action: options.action,

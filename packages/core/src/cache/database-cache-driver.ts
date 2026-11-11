@@ -62,9 +62,17 @@ export class DatabaseCacheDriver
 
     namespace = this.parseKey(namespace);
 
-    await this.model.delete({
-      namespace,
-    });
+    if (!namespace) {
+      // The root namespace: every entry.
+      await this.model.query().delete();
+    } else {
+      // The namespace's own key and every key under it (`users`, `users.id.1`,
+      // `users.list.*`), as the other drivers remove them. The stored
+      // `namespace` column holds only the parent segments, so an exact match
+      // on it would leave the nested rows behind.
+      await this.model.query().where("key", namespace).delete();
+      await this.model.query().whereStartsWith("key", `${namespace}.`).delete();
+    }
 
     this.log("cleared", namespace);
 
@@ -156,14 +164,22 @@ export class DatabaseCacheDriver
   }
 
   /**
+   * Remove an entry by its stored (already prefixed) key, e.g. an expired
+   * entry found by `get()`. `remove()` would apply `globalPrefix` a second time.
+   */
+  protected async removeParsed(parsedKey: string): Promise<void> {
+    await this.model.delete({ key: parsedKey });
+  }
+
+  /**
    * {@inheritdoc}
    */
   public async flush() {
     this.log("flushing");
     if (this.options.globalPrefix) {
-      this.removeNamespace("");
+      await this.removeNamespace("");
     } else {
-      await this.model.delete();
+      await this.model.query().delete();
     }
 
     this.log("flushed");

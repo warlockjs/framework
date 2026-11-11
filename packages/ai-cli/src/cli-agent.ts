@@ -13,7 +13,7 @@ import type { ModelContract } from "@warlock.js/ai";
 import { CliError } from "./errors";
 import { type CliModelConfig, cliModel } from "./model/cli-model";
 import { assertCapabilities, probeCli } from "./probe/probe";
-import { buildEnvironment } from "./session/environment";
+import { buildEnvironment, warnInheritedEnvironment } from "./session/environment";
 import { createRunDirectories, writeLaunchFiles } from "./session/run-directory";
 import { cancelledSession, startSession } from "./session/session";
 import { buildInvocation, fitsCommandLine, type Invocation } from "./spawn/invocation";
@@ -121,6 +121,7 @@ export function createCliAgent(
     buildEnvironment({
       source: host.env,
       inherit: options.inheritEnv ?? true,
+      credentials: adapter.apiKeyEnv,
       managed: [],
       user: options.env,
       platform: host.platform,
@@ -258,9 +259,11 @@ export function createCliAgent(
       await writeLaunchFiles(chosen.plan.files ?? [], directories);
 
       const apiKeyEnv = adapter.apiKeyEnv[0];
+      warnInheritedEnvironment(adapter.title, options.inheritEnv, host.env);
       const env = buildEnvironment({
         source: host.env,
         inherit: options.inheritEnv ?? true,
+        credentials: adapter.apiKeyEnv,
         managed: home === "inherit" ? [] : adapter.homeEnv,
         // A CLI that prefers $PWD over its real cwd must not see the host's.
         plan: host.platform === "win32" ? chosen.plan.env : { PWD: cwd, ...chosen.plan.env },

@@ -5,7 +5,7 @@ description: 'Inspect and retry failed `@warlock.js/queue` jobs: `failedJobs({ q
 
 # Failed jobs
 
-A job is failed once it has used every attempt, or failed in a way that cannot be retried (for example, no handler for its name). Failed jobs are kept unless you set `removeOnFail`.
+A job is failed once it has used every attempt, or failed in a way that cannot be retried (for example, no handler for its name). Failed jobs are kept for 7 days, at most the newest 5,000 (`removeOnFail: { age: "7d", count: 5000 }` by default); set `removeOnFail: false` to keep every failure.
 
 ```ts
 import { failedJobs, retryFailedJob } from "@warlock.js/queue";

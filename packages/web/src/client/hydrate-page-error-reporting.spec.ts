@@ -41,6 +41,7 @@ function installFakeDocument(): { id: string; innerHTML: string } {
       if (id === HYDRATION_ROOT_ID) return root;
       return null;
     },
+    querySelector: () => null,
   });
 
   return root;

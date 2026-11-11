@@ -156,3 +156,23 @@ function mergeOneApproval(yaml: string, packageName: string): string {
   const indentation = /^([ \t]+)\S/m.exec(mapping)?.[1] ?? "  ";
   return `${yaml.slice(0, start)}${indentation}${packageName}: true\n${mapping}${yaml.slice(end)}`;
 }
+
+/**
+ * Drop the `minimumReleaseAgeExclude` block (and the comment lines directly
+ * above it) from a pnpm-workspace.yaml.
+ *
+ * The template carries that exclusion so the scaffold's own installs can fetch
+ * an `@warlock.js/*` release published minutes earlier. Left in the app, it
+ * would let every future `@warlock.js/*` version skip pnpm's release-age
+ * cooldown forever, so the scaffolder removes it once its installs are done.
+ */
+export function removeReleaseAgeExclusion(yaml: string): string {
+  const next = yaml.replace(
+    /(?:^#[^\r\n]*\r?\n)*^minimumReleaseAgeExclude:[^\r\n]*(?:\r?\n|$)(?:^[ \t]+-[^\r\n]*(?:\r?\n|$))*/m,
+    "",
+  );
+
+  if (next === yaml) return yaml;
+
+  return `${next.replace(/(?:\r?\n){3,}/g, "\n\n").replace(/\s*$/, "")}\n`;
+}

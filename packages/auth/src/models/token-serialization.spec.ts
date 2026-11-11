@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { DatabaseDirtyTracker, dataSourceRegistry, type DriverContract } from "@warlock.js/cascade";
 import {
   afterAll,
@@ -23,6 +24,19 @@ import { RefreshToken } from "./refresh-token/refresh-token.model";
  */
 const ACCESS_TOKEN_VALUE = "eyJhbGciOiJIUzI1NiJ9.access-secret-payload.signature";
 const REFRESH_TOKEN_VALUE = "eyJhbGciOiJIUzI1NiJ9.refresh-secret-payload.signature";
+const digest = (value: string) => createHash("sha256").update(value).digest("hex");
+
+/** A query builder that records the lookup and finds nothing. */
+function lookupStub() {
+  const builder = {
+    where: vi.fn(() => builder),
+    whereIn: vi.fn(() => builder),
+    first: vi.fn(async () => null),
+  };
+
+  return builder;
+}
+
 const ONE_TIME_TOKEN_HASH = "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08";
 
 let warnSpy: MockInstance<typeof console.warn>;
@@ -105,13 +119,17 @@ describe("AccessToken serialization hides the bearer token", () => {
     expect(model.data.token).toBe(ACCESS_TOKEN_VALUE);
   });
 
-  it("findByToken still queries by the raw token column", async () => {
-    const first = vi.spyOn(AccessToken, "first").mockResolvedValue(null);
+  it("findByToken queries the token column for the raw value and its digest", async () => {
+    const builder = lookupStub();
+    const query = vi.spyOn(AccessToken, "query").mockReturnValue(builder as never);
 
     await AccessToken.findByToken(ACCESS_TOKEN_VALUE);
 
-    expect(first).toHaveBeenCalledWith({ token: ACCESS_TOKEN_VALUE });
-    first.mockRestore();
+    expect(builder.whereIn).toHaveBeenCalledWith("token", [
+      digest(ACCESS_TOKEN_VALUE),
+      ACCESS_TOKEN_VALUE,
+    ]);
+    query.mockRestore();
   });
 
   it("does not trigger cascade's sensitive-field warning", () => {
@@ -147,15 +165,18 @@ describe("RefreshToken serialization hides the bearer token", () => {
     expect(model.data.token).toBe(REFRESH_TOKEN_VALUE);
   });
 
-  it("findByToken / findForUser still query by the raw token column", async () => {
-    const first = vi.spyOn(RefreshToken, "first").mockResolvedValue(null);
+  it("findByToken / findForUser query the token column for the raw value and its digest", async () => {
+    const builder = lookupStub();
+    const query = vi.spyOn(RefreshToken, "query").mockReturnValue(builder as never);
 
     await RefreshToken.findByToken(REFRESH_TOKEN_VALUE);
     await RefreshToken.findForUser({ id: 7 } as never, REFRESH_TOKEN_VALUE);
 
-    expect(first).toHaveBeenNthCalledWith(1, { token: REFRESH_TOKEN_VALUE });
-    expect(first).toHaveBeenNthCalledWith(2, { token: REFRESH_TOKEN_VALUE, user_id: 7 });
-    first.mockRestore();
+    const forms = [digest(REFRESH_TOKEN_VALUE), REFRESH_TOKEN_VALUE];
+    expect(builder.whereIn).toHaveBeenNthCalledWith(1, "token", forms);
+    expect(builder.whereIn).toHaveBeenNthCalledWith(2, "token", forms);
+    expect(builder.where).toHaveBeenCalledWith({ user_id: 7 });
+    query.mockRestore();
   });
 
   it("does not trigger cascade's sensitive-field warning", () => {

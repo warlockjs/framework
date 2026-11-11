@@ -15,8 +15,20 @@ import "../init";
  * UploadedFile so the `instanceof UploadedFile` guards pass (same pattern as
  * `file-rules.test.ts`).
  */
+/** Leading bytes that make each declared type sniff as itself. */
+const SAMPLE_BYTES: Record<string, Buffer> = {
+  "image/png": Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0]),
+  "application/pdf": Buffer.from("%PDF-1.7\n"),
+};
+
 function uploadedFile(filename: string, mimetype: string): UploadedFile {
-  return new UploadedFile({ filename, mimetype } as unknown as MultipartFile);
+  const bytes = SAMPLE_BYTES[mimetype] ?? Buffer.from("plain bytes");
+
+  return new UploadedFile({
+    filename,
+    mimetype,
+    toBuffer: async () => bytes,
+  } as unknown as MultipartFile);
 }
 
 describe("v.file().optional() — optional file field", () => {

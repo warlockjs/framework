@@ -78,4 +78,23 @@ describe("urlSource — fetch hardening + manifest validation (S3)", () => {
     await expect(source.list()).rejects.toThrow();
     expect(fetchImpl).not.toHaveBeenCalled();
   });
+  it("retries after a failed manifest fetch instead of caching the failure", async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("network blip"))
+      .mockResolvedValue(new Response(goodManifest, { status: 200 }));
+    const source = urlSource("https://skills.example.com/m.json", {
+      policy: withFetch(fetchImpl as unknown as () => Promise<Response>),
+    });
+
+    await expect(source.list()).rejects.toThrow(/network blip/);
+
+    const list = await source.list();
+    expect(list.map((entry) => entry.name)).toEqual(["greet"]);
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+
+    // The successful manifest is cached as before.
+    await source.load("greet");
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
 });

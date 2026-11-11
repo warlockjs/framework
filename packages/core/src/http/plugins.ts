@@ -1,4 +1,3 @@
-import fastifyMultipart from "@fastify/multipart";
 import config from "@mongez/config";
 import { existsSync } from "node:fs";
 import type { FastifyRequest } from "fastify";
@@ -9,6 +8,7 @@ import { rootPath } from "../utils";
 import { buildCorsOptions } from "./build-cors-options";
 import { buildRateLimitOptions } from "./build-rate-limit-options";
 import { registerLazyStatic } from "./lazy-static";
+import { registerMultipart } from "./multipart";
 import { parseUrlencodedBody } from "./parse-urlencoded-body";
 import type { FastifyInstance } from "./server";
 
@@ -29,19 +29,10 @@ export async function registerHttpPlugins(server: FastifyInstance) {
   // 👇🏻 register cors plugin
   server.register(import("@fastify/cors"), buildCorsOptions());
 
-  // 👇🏻 import multipart plugin
-  server.register(fastifyMultipart, {
-    attachFieldsToBody: true,
-    limits: {
-      // file size could be up to 10MB
-      fileSize: config.get("http.fileUploadLimit", 10 * 1024 * 1024),
-      // every file part is buffered in memory (`attachFieldsToBody`), so cap the counts too;
-      // hitting any limit makes @fastify/multipart throw an error with statusCode 413
-      files: config.get("http.multipart.files", 10),
-      fields: config.get("http.multipart.fields", 100),
-      fieldSize: config.get("http.multipart.fieldSize", 1024 * 1024),
-    },
-  });
+  // 👇🏻 multipart plugin, with the per-part, total and per-route limits
+  registerMultipart(server);
+
+  const urlencodedMaxFields = config.get("http.urlencoded.maxFields");
 
   // 👇🏻 parse application/x-www-form-urlencoded bodies (Apple's OAuth
   // `form_post` callback, plain HTML forms). Fastify only parses JSON and
@@ -58,7 +49,7 @@ export async function registerHttpPlugins(server: FastifyInstance) {
     { parseAs: "string" },
     (_request: FastifyRequest, body: string, done: (err: Error | null, body?: any) => void) => {
       try {
-        done(null, parseUrlencodedBody(body));
+        done(null, parseUrlencodedBody(body, { maxFields: urlencodedMaxFields }));
       } catch (error) {
         done(error as Error, undefined);
       }

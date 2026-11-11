@@ -50,6 +50,26 @@ export const config: PageConfig = {
   `varyBy: (request) => String(request.header("x-theme") ?? "")`. Don't vary
   on a cookie: a request that carries one bypasses the cache entirely (see
   below). A non-function `varyBy` is a boot-time error naming the page file.
+- `query?: string[]` lists the query parameters that change the page. Only
+  these enter the cache key, so `?page=2&ref=x` and `?page=2&ref=y` share one
+  entry. Omit it and every parameter except common tracking ones (`utm_*`,
+  `fbclid`, `gclid`, `msclkid`, `mc_eid`, `_ga`) enters the key.
+- `varyHeaders?: string[]` lists request headers the page depends on. They are
+  added to the response's `Vary` header so a CDN keeps one copy per value, for
+  example the header `varyBy` reads: `varyHeaders: ["x-theme"]`.
+
+```ts title="src/web/posts/index.setup.ts"
+export const config: PageConfig = {
+  route: { path: "/posts", name: "posts.index" },
+  cache: {
+    public: true,
+    maxAge: 60,
+    serverCache: true,
+    tags: ["posts"],
+    query: ["page", "sort"], // ?page=2&sort=new; any other parameter is ignored by the key
+  },
+};
+```
 
 ## What gets cached
 
@@ -62,6 +82,27 @@ Storage is checked once per render and requires all of:
   `Cache-Control`. If Warlock cannot determine whether the request used
   authenticated state, it refuses to store, exactly as it refuses to emit a
   public `Cache-Control`.
+- No query parameter that the key leaves out (a tracking parameter, or one
+  outside `cache.query`). The page and its loaders still see every parameter,
+  so such a render could show a value no other visitor asked for. It is
+  served, and may itself be served a stored entry, but it is never stored.
+  Tagged traffic (`?utm_source=...`) gets HITs once a clean request has stored
+  the entry.
+
+**Each route stores at most `pageCache.maxEntriesPerRoute` variants**
+(default `1_000`). Every distinct query string is its own entry, so without a
+ceiling a client looping over `?n=1`, `?n=2`, ... could fill the cache backend.
+Past the ceiling, a new variant is rendered and sent normally but not stored,
+and one `[warlock:web]` warning is logged per route. Variants already stored
+keep being refreshed, and a slot frees up when its entry's TTL ends. The count
+is kept per process. Declare `cache.query` so unrelated parameters stop
+creating variants, raise the number, or set `false` to remove the ceiling:
+
+```ts title="src/config/pageCache.ts"
+export default {
+  maxEntriesPerRoute: 5_000, // or false
+};
+```
 
 **One entry is capped at `pageCache.maxEntryBytes`** (default `1_048_576`,
 1 MiB). A cache miss copies the document for storage up to that size. A page
@@ -103,8 +144,14 @@ consent banner) always gets a fresh render. Anonymous traffic without cookies
 - The path is normalised: trailing slash stripped (except the root `/`). The
   path keeps its case, so `/About` and `/about` are separate entries.
   (Changed in 5.21: earlier versions lower-cased the path.)
+- In multi-site mode the host is the one site selection chose (with the
+  request's port). Behind a trusted proxy (`http.trustProxy`) that is the
+  forwarded host, the same host every URL in the render is built from, so a
+  render made for a forwarded host is never stored under another host's key.
 - The query string is re-serialized with its keys sorted, so `?a=1&b=2` and
-  `?b=2&a=1` resolve to the same entry.
+  `?b=2&a=1` resolve to the same entry. Nested values
+  (`?filter[status]=draft`) are written out in full, with their own keys
+  sorted, so different filters never share an entry.
 - `locale` is the resolved locale for the request.
 - `variant` is `html` for a document request or `json` for the
   `x-warlock-data` representation. A request for the NDJSON representation on
@@ -186,6 +233,21 @@ connector. Declare `config.live.tags` to opt an open page into loader re-runs;
 
 Every response from a `serverCache` route carries `x-warlock-cache: hit`,
 `miss`, or `bypass`, alongside the usual `Cache-Control`.
+
+## The `Vary` header
+
+A route with `config.cache` is `Cache-Control: public`, so a CDN or shared
+proxy may hold it. Its `Vary` header (the same on a HIT and a MISS) lists what
+the response depends on besides the URL:
+
+- `x-warlock-data`, which separates the HTML document from the client
+  navigation data;
+- `Cookie` and `locale`, because the locale cookies and the `locale` request
+  header select the page's language. They are left out when the URL pinned
+  the locale (a locale-prefixed or `[locale]` route) and when the app
+  supports a single locale;
+- `User-Agent` for a page that uses `defer()`;
+- the route's `cache.varyHeaders`.
 
 ## `@warlock.js/cache` is an optional peer
 

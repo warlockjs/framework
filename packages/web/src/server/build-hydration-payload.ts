@@ -96,8 +96,8 @@ const globalDeliveries = new WeakMap<
 >();
 
 /**
- * A render builds the payload twice (the document context, then the final
- * payload) and a data request builds it again. Pruning the registry's table is
+ * A data request builds the payload again for its response, and an error page
+ * rebuilds it for its own document. Pruning the registry's table is
  * a walk over every key, so the result is kept on the request's bundle: one
  * walk per request instead of one per payload.
  */
@@ -118,11 +118,103 @@ function deliverGlobalOnce(bundle: PageDataBundle, locale: string) {
   return delivered;
 }
 
+/**
+ * The devalue text of the three loader-data sections of a payload this module
+ * built, produced by its serializability check. The payload budget reads them
+ * instead of serializing the same values again (`payload-budget.ts`). Keyed by
+ * the payload object, which no caller mutates between building and measuring.
+ */
+export type SerializedPayloadSections = {
+  readonly app: string;
+  readonly layout: string;
+  readonly page: string;
+};
+
+const serializedSections = new WeakMap<object, SerializedPayloadSections>();
+
+/** The section text {@link buildHydrationPayload} recorded for `payload`, if it built it. */
+export function serializedPayloadSections(
+  payload: HydrationDocumentPayloadSource,
+): SerializedPayloadSections | undefined {
+  return serializedSections.get(payload);
+}
+
+/** The payload object plus the values its serializability check covers. */
+type AssembledPayload = {
+  payload: HydrationDocumentPayloadSource;
+  appData: unknown;
+  layoutData: unknown;
+  pageData: unknown;
+  session: HydrationDocumentPayloadSource["session"];
+};
+
+/**
+ * Validate the loader-data levels and the session user, in this order, with
+ * the level and route attached to the first failure. Returns the text of the
+ * three data levels.
+ */
+function assertPayloadSerializable(
+  assembled: AssembledPayload,
+  route: string,
+): SerializedPayloadSections {
+  // devalue is the wire format for every one of these (the ruling this file's
+  // header already enforces for SHAPE now also covers SERIALIZABILITY): a
+  // class instance, function or symbol a loader returned is caught HERE, with
+  // the level and route attached, rather than surfacing later as an opaque
+  // devalue throw from whichever wire path happens to serialize the combined
+  // payload first.
+  const app = assertPageDataSerializable(assembled.appData, "app", route);
+  const layout = assertPageDataSerializable(assembled.layoutData, "layout", route);
+  const page = assertPageDataSerializable(assembled.pageData, "page", route);
+  assertSessionUserSerializable(assembled.session, route);
+
+  return { app, layout, page };
+}
+
 export function buildHydrationPayload(
   bundle: PageDataBundle,
   locale: string,
   extras: BuildHydrationPayloadExtras = {},
 ): HydrationDocumentPayloadSource {
+  const assembled = assembleHydrationPayload(bundle, locale, extras);
+  const sections = assertPayloadSerializable(assembled, bundle.route.name);
+
+  serializedSections.set(assembled.payload, sections);
+
+  return assembled.payload;
+}
+
+/**
+ * The devalue text of {@link buildHydrationPayload}'s payload — what a data
+ * response, an NDJSON first line or a stored JSON variant sends.
+ *
+ * One serialization on success: the whole payload is serialized first, and
+ * only when that fails are the levels checked one by one, so a failure still
+ * raises the same {@link PageDataSerializationError} (level, key path, route)
+ * that building the payload raises. A failure outside the checked levels
+ * propagates as devalue reported it.
+ */
+export function serializeHydrationPayload(
+  bundle: PageDataBundle,
+  locale: string,
+  extras: BuildHydrationPayloadExtras = {},
+): string {
+  const assembled = assembleHydrationPayload(bundle, locale, extras);
+
+  try {
+    return stringify(assembled.payload);
+  } catch (error) {
+    assertPayloadSerializable(assembled, bundle.route.name);
+
+    throw error;
+  }
+}
+
+function assembleHydrationPayload(
+  bundle: PageDataBundle,
+  locale: string,
+  extras: BuildHydrationPayloadExtras,
+): AssembledPayload {
   if (bundle.routeTranslations !== undefined && bundle.routeTranslations.locale !== locale) {
     throw new Error(
       `Route translation snapshot locale ${JSON.stringify(bundle.routeTranslations.locale)} does not match payload locale ${JSON.stringify(locale)}.`,
@@ -149,19 +241,9 @@ export function buildHydrationPayload(
     ...(bundle.inlinedDeferredKeys ?? []),
   ];
 
-  // devalue is the wire format for every one of these (the ruling this file's
-  // header already enforces for SHAPE now also covers SERIALIZABILITY): a
-  // class instance, function or symbol a loader returned is caught HERE, with
-  // the level and route attached, rather than surfacing later as an opaque
-  // devalue throw from whichever wire path happens to serialize the combined
-  // payload first.
-  assertPageDataSerializable(appData, "app", bundle.route.name);
-  assertPageDataSerializable(layoutData, "layout", bundle.route.name);
-  assertPageDataSerializable(pageData, "page", bundle.route.name);
   const session = extras.session ?? bundle.session;
-  assertSessionUserSerializable(session, bundle.route.name);
 
-  return {
+  const payload: HydrationDocumentPayloadSource = {
     ...(bundle.document === undefined ? {} : { document: bundle.document }),
     appData,
     ...(bundle.live === undefined ? {} : { live: bundle.live }),
@@ -218,4 +300,6 @@ export function buildHydrationPayload(
     // Stage 2.5 rides on the bundle, so the data (JSON/NDJSON) writers carry it too.
     ...(session === undefined ? {} : { session }),
   };
+
+  return { payload, appData, layoutData, pageData, session };
 }

@@ -429,6 +429,11 @@ export interface GrepResult {
   spilledTo?: string[];
   /** True when the search stopped at `search.maxFiles` before it had looked at every file. */
   maxFilesReached?: boolean;
+  /**
+   * Files left unsearched because they are larger than
+   * `search.maxFileBytes`; absent when none were skipped.
+   */
+  skippedFiles?: number;
 }
 
 /** Input to the `list_dir` tool. */

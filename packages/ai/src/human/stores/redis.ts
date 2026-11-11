@@ -3,6 +3,7 @@ import type {
   PendingInterrupt,
   RedisClientLike,
 } from "../contracts/interrupt-store.contract";
+import { redisSetCommands, type RedisSetCommands } from "../../utils/redis-set-commands";
 
 /**
  * Options for the Redis {@link InterruptStore}.
@@ -42,10 +43,16 @@ const DEFAULT_PREFIX = "warlock:ai-human:interrupt:";
 
 /**
  * Index key (under the configured prefix) holding the JSON array of live
- * interrupt ids. The structural {@link RedisClientLike} surface exposes no
+ * interrupt ids, for clients without set commands. The structural {@link RedisClientLike} surface exposes no
  * `SCAN` / `KEYS`, so enumeration for `list()` is self-maintained.
  */
 const INDEX_SUFFIX = "index";
+
+/**
+ * Key suffix (under the configured prefix) of the Redis-set id index,
+ * used when the client exposes the set commands.
+ */
+const SET_INDEX_SUFFIX = "index:set";
 
 /**
  * Module specifier for the optional `redis` driver. Held in a `string`
@@ -108,12 +115,18 @@ async function buildRedisClient(url: string): Promise<RedisClientLike> {
  * `list()` works without `SCAN`/`KEYS`.
  *
  * Owns: durable round-tripping of the {@link PendingInterrupt} envelope so
- * a reviewer can rule out-of-process, the namespaced key layout, and the
- * per-store id index that backs enumeration. Does NOT own: durability
+ * a reviewer can rule out-of-process, the namespaced key layout, the
+ * per-store id index that backs enumeration, and the atomic `claim` that
+ * lets exactly one resume take an interrupt. Does NOT own: durability
  * guarantees beyond Redis's own, the connection lifecycle (a dev-supplied
  * client is never disconnected; a store-built client from a `url` is left
  * connected for the process to reuse), or migration —
  * {@link RedisInterruptStore.schema} returns an empty string.
+ *
+ * The id index is a Redis set when the client exposes the set commands
+ * (`sAdd`/`sRem`/`sMembers` or `sadd`/`srem`/`smembers`), so concurrent
+ * saves never drop an id and a save never reads the whole index. A
+ * client with only `get`/`set`/`del` keeps the JSON-array index.
  *
  * A call has exactly one live interrupt, so `save()` overwrites the key.
  *
@@ -129,6 +142,12 @@ class RedisInterruptStore implements InterruptStore {
    * import + connect happens at most once.
    */
   private clientPromise: Promise<RedisClientLike>;
+
+  /**
+   * One-time move of an earlier JSON-array index into the Redis set,
+   * memoized for the store's lifetime (reset when it fails).
+   */
+  private indexMigration?: Promise<void>;
 
   public constructor(options: RedisInterruptOptions) {
     this.prefix = options.prefix ?? DEFAULT_PREFIX;
@@ -208,8 +227,38 @@ class RedisInterruptStore implements InterruptStore {
   }
 
   /**
+   * Take a pending interrupt. `DEL` reports how many keys it removed and
+   * Redis runs it atomically, so when several callers claim the same id
+   * only the one whose `DEL` removed the key receives the record.
+   */
+  public async claim(interruptId: string): Promise<PendingInterrupt | undefined> {
+    const client = await this.client();
+    const raw = await client.get(this.recordKey(interruptId));
+
+    if (raw === null) {
+      return undefined;
+    }
+
+    const record = JSON.parse(raw) as PendingInterrupt;
+
+    if (record.status !== "pending") {
+      return undefined;
+    }
+
+    const removed = await client.del(this.recordKey(interruptId));
+
+    if (removed !== 1) {
+      return undefined;
+    }
+
+    await this.deindexId(interruptId);
+
+    return record;
+  }
+
+  /**
    * List the interrupt ids known to the store, optionally filtered by a
-   * prefix. Reads the self-maintained index document.
+   * prefix. Reads the self-maintained index.
    */
   public async list(prefix?: string): Promise<string[]> {
     const ids = await this.readIndex();
@@ -231,10 +280,24 @@ class RedisInterruptStore implements InterruptStore {
   }
 
   /**
-   * Read and parse the id index, defaulting to an empty list when absent.
+   * Read the id index: the Redis set when the client has set commands,
+   * otherwise the JSON-array document (an empty list when absent).
    */
   private async readIndex(): Promise<string[]> {
     const client = await this.client();
+    const sets = redisSetCommands(client);
+
+    if (sets) {
+      await this.migrateIndex(client, sets);
+
+      return sets.members(this.setKey());
+    }
+
+    return this.readIndexDocument(client);
+  }
+
+  /** Read and parse the JSON-array index document. */
+  private async readIndexDocument(client: RedisClientLike): Promise<string[]> {
     const raw = await client.get(this.indexKey());
 
     if (raw === null) {
@@ -248,7 +311,17 @@ class RedisInterruptStore implements InterruptStore {
    * Add an interrupt id to the index, no-op when already present.
    */
   private async indexId(interruptId: string): Promise<void> {
-    const ids = await this.readIndex();
+    const client = await this.client();
+    const sets = redisSetCommands(client);
+
+    if (sets) {
+      await this.migrateIndex(client, sets);
+      await sets.add(this.setKey(), interruptId);
+
+      return;
+    }
+
+    const ids = await this.readIndexDocument(client);
 
     if (ids.includes(interruptId)) {
       return;
@@ -256,7 +329,6 @@ class RedisInterruptStore implements InterruptStore {
 
     ids.push(interruptId);
 
-    const client = await this.client();
     await client.set(this.indexKey(), JSON.stringify(ids));
   }
 
@@ -264,15 +336,51 @@ class RedisInterruptStore implements InterruptStore {
    * Remove an interrupt id from the index, no-op when absent.
    */
   private async deindexId(interruptId: string): Promise<void> {
-    const ids = await this.readIndex();
+    const client = await this.client();
+    const sets = redisSetCommands(client);
+
+    if (sets) {
+      await this.migrateIndex(client, sets);
+      await sets.remove(this.setKey(), interruptId);
+
+      return;
+    }
+
+    const ids = await this.readIndexDocument(client);
     const next = ids.filter((id) => id !== interruptId);
 
     if (next.length === ids.length) {
       return;
     }
 
-    const client = await this.client();
     await client.set(this.indexKey(), JSON.stringify(next));
+  }
+
+  /**
+   * Move an earlier JSON-array index into the Redis set once, then delete
+   * the document. A failed move is retried on the next call.
+   */
+  private migrateIndex(client: RedisClientLike, sets: RedisSetCommands): Promise<void> {
+    if (this.indexMigration) {
+      return this.indexMigration;
+    }
+
+    const migration = (async () => {
+      const ids = await this.readIndexDocument(client);
+
+      if (ids.length > 0) {
+        await sets.addMany(this.setKey(), ids);
+      }
+
+      await client.del(this.indexKey());
+    })();
+
+    this.indexMigration = migration;
+    migration.catch(() => {
+      this.indexMigration = undefined;
+    });
+
+    return migration;
   }
 
   /**
@@ -283,10 +391,20 @@ class RedisInterruptStore implements InterruptStore {
   }
 
   /**
-   * Key for the self-maintained id index — `<prefix>index`.
+   * Key for the JSON-array id index — `<prefix>index`. Used by clients
+   * without set commands, and read once to move an earlier index into
+   * the set.
    */
   private indexKey(): string {
     return `${this.prefix}${INDEX_SUFFIX}`;
+  }
+
+  /**
+   * Key for the Redis-set id index — `<prefix>index:set`. Interrupt ids
+   * always contain a `.`, so the suffix never collides with a record key.
+   */
+  private setKey(): string {
+    return `${this.prefix}${SET_INDEX_SUFFIX}`;
   }
 }
 

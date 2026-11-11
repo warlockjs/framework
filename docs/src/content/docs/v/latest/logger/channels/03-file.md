@@ -46,6 +46,24 @@ Error: Card declined
     at processTicksAndRejections (node:internal/process/task_queues:95:5)
 ```
 
+### Message escaping — `escape`
+
+Each entry stays on one line. Line breaks, tabs and control characters in the message are written as visible escapes (`\n`, `\t`, `\uXXXX`) and terminal escape sequences are removed, so text taken from a request cannot forge a second log line or rewrite the terminal of whoever tails the file. An `Error`'s stack trace after `[trace]` is written as is.
+
+```ts
+log.warn("auth", "login-failed", `bad password for ${email}`);
+// email = "x\n[12-11-2026 10:00:00] [info] [auth][login]: admin logged in"
+// [12-11-2026 10:00:01] [warn] [auth][login-failed]: bad password for x\n[12-11-2026 10:00:00] [info] ...
+```
+
+`escape: false` writes line breaks and tabs raw (multi-line messages), while terminal escapes and other control characters are still removed. Default: `true`.
+
+### Write failures
+
+Writes append to the file and never crash the process. When the log directory was removed while the app runs, it is created again and the write retried once. Any other failure (a read-only disk, no free file handles) goes to the logger's [`onChannelError`](../reference/01-logger/) handler, and the entries stay buffered for the next write. Entries logged while a write is in flight are kept for the following write.
+
+While writes keep failing, at most `maxBufferedMessages` entries (default `10000`) stay in memory; past it the oldest are dropped and one notice is reported. Set `maxBufferedMessages: Infinity` to keep everything.
+
 ## File naming and chunking
 
 The `chunk` option controls how entries split across files. Dated names are ISO dates, so the files sort by name in date order.
@@ -208,6 +226,14 @@ new FileLog({
 
   // Messages held in memory before flushing. Also flushed every 5s. @default 100
   maxMessagesToWrite: 100,
+
+  // Entries kept in memory while writes keep failing; the oldest go first.
+  // @default 10000
+  maxBufferedMessages: 10_000,
+
+  // Escape line breaks and control characters so each entry is one line.
+  // @default true
+  escape: true,
 
   // Arrange files into a subdirectory hierarchy. Order = nesting depth.
   groupBy: ["level", "module"],

@@ -45,7 +45,7 @@ At least one source is required — the factory throws otherwise.
 ### Sources — `SkillSource` (discriminated by `type`, never `kind`)
 
 - `{ type: "directory", path }` — reads `path/<folder>/SKILL.md` off the local filesystem (lazy `node:fs/promises`).
-- `{ type: "url", url, headers? }` — `fetch()`es a JSON manifest of skills.
+- `{ type: "url", url, headers?, policy? }` — fetches a JSON manifest of skills through the [outbound policy](/v/latest/ai/reliability/outbound-policy/). `headers` (an auth token, an API key) are sent to the manifest's origin only — a redirect to another host drops them. A failed fetch is not cached: the next `list()` / `loadSkill` tries again.
 - `{ type: "store", store }` — any `SkillsStoreContract`, e.g. the shipped `MockSkillsStore`.
 
 Sources merge in order; a later source wins on a name collision.
@@ -134,6 +134,25 @@ const lib = ai.skills({
 ```
 
 `approve` resolving `{ approve: true }` promotes the candidate to a new audited VERSION; anything else — including a throw, treated as deny — keeps it inert. The gate is default-DENY by design: nothing the agent writes becomes live without an explicit approval.
+
+Candidates are kept apart from live skills and bound to what was reviewed:
+
+- **A candidate never touches a live skill.** Saving a candidate under the name of a promoted or authored skill leaves that skill catalogued and loadable; only a promotion replaces it.
+- **Promotion is bound to the approved content.** `runReviewGate` calls `store.promote(candidate.name, { description, body, tags })`, and the built-in stores promote only a stored candidate with exactly that content. A different candidate written under the same name while the reviewer was deciding is never promoted; the store throws instead. A custom store receives the same second argument.
+- **Existing names are refused by default.** `saveSkill` returns an error result asking for a new name when the library (or the review store) already serves a skill by that name. Set `review.allowUpdates: true` to let the agent propose updates to existing skills (they still go through the gate).
+- **Input limits.** `saveSkill` accepts a `name` of 1–64 letters, digits, `-` or `_` (starting with a letter or digit), a `description` up to 500 characters, a `body` up to 16,384 characters and at most 10 `tags` of up to 32 characters each. Anything larger is refused as invalid tool input, so the model retries within the limits.
+
+```ts
+review: {
+  store,
+  approve,
+  allowUpdates: true, // default false — let saveSkill propose a new version of an existing skill
+},
+```
+
+### `proceduralSkillStore` storage
+
+`proceduralSkillStore({ embedder, store })` keeps a catalog index (`<namespace>.__skills__.index`) and one key per live skill, so listing the catalog and `loadSkill` are a single cache read each — no embedding call and no similarity scan on every run, and no 1,000-skill ceiling. Candidates live under their own keys until promoted; a promoted skill is also remembered in the procedural memory tier. Skills stored by an earlier release (one procedural memory per name) are read once with a similarity recall and copied to this layout the first time the index is missing.
 
 ## When to use runtime skills
 

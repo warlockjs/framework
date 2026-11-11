@@ -1,4 +1,5 @@
 import { EventEmitter } from "node:events";
+import { log } from "@warlock.js/logger";
 import { databaseDataSourceContext } from "../context/database-data-source-context";
 import { MissingDataSourceError } from "../errors/missing-data-source.error";
 import { DataSource, type DataSourceOptions } from "./data-source";
@@ -37,6 +38,72 @@ class DataSourceRegistry {
   private readonly detached = new WeakSet<DataSource>();
   /** In-flight `getOrRegister` factories, so concurrent callers share one creation. */
   private readonly pending = new Map<string, Promise<DataSource>>();
+  /**
+   * The driver `query` listener attached per source. Attached only while the
+   * registry itself has a `query` listener: a driver with no `query` listener
+   * skips its instrumentation entirely (no timing, no event object).
+   */
+  private readonly queryForwarders = new Map<DataSource, (event: unknown) => void>();
+  /** Sources already warned about emitting no `query` events (warned once each). */
+  private readonly warnedQueryEventsOff = new Set<string>();
+
+  public constructor() {
+    // Attach the per-driver forwarders when the first registry `query`
+    // listener arrives, and detach them when the last one leaves.
+    this.events.on("newListener", (event: string) => {
+      if (event === "query" && this.events.listenerCount("query") === 0) {
+        for (const source of this.sources.values()) {
+          this.attachQueryForwarder(source);
+        }
+      }
+    });
+
+    this.events.on("removeListener", (event: string) => {
+      if (event === "query" && this.events.listenerCount("query") === 0) {
+        for (const source of [...this.queryForwarders.keys()]) {
+          this.detachQueryForwarder(source);
+        }
+      }
+    });
+  }
+
+  /** Forward the source driver's `query` events to the registry. */
+  private attachQueryForwarder(source: DataSource): void {
+    if (this.queryForwarders.has(source) || this.detached.has(source)) return;
+
+    const forward = (event: unknown): void => {
+      if (!this.detached.has(source)) {
+        this.events.emit("query", { ...(event as QueryEvent), connection: source.name });
+      }
+    };
+
+    this.queryForwarders.set(source, forward);
+    source.driver.on("query", forward);
+
+    // A driver that reports its query events as off (MongoDB in production
+    // without `queryEvents: true`) never calls the listener: say so once,
+    // instead of the listener silently receiving nothing.
+    const driver = source.driver as { queryEventsEnabled?: boolean };
+
+    if (driver.queryEventsEnabled === false && !this.warnedQueryEventsOff.has(source.name)) {
+      this.warnedQueryEventsOff.add(source.name);
+      log.warn(
+        "database",
+        "queryEvents",
+        `Something listens to database query events, but data source "${source.name}" does not emit them (MongoDB command monitoring is off in production). Set queryEvents: true on that data source to capture its queries (request log query counts, devtools).`,
+      );
+    }
+  }
+
+  /** Stop forwarding the source driver's `query` events. */
+  private detachQueryForwarder(source: DataSource): void {
+    const forward = this.queryForwarders.get(source);
+
+    if (!forward) return;
+
+    this.queryForwarders.delete(source);
+    source.driver.off("query", forward);
+  }
 
   /**
    * Register a new data source definition.
@@ -85,6 +152,7 @@ class DataSourceRegistry {
 
     if (previous) {
       this.detached.add(previous);
+      this.detachQueryForwarder(previous);
 
       if (meta?.replace) {
         previous.driver.disconnect().catch(() => undefined);
@@ -118,11 +186,9 @@ class DataSourceRegistry {
       if (!this.detached.has(source)) this.events.emit("disconnected", source);
     });
 
-    source.driver.on("query", (event) => {
-      if (!this.detached.has(source)) {
-        this.events.emit("query", { ...(event as QueryEvent), connection: source.name });
-      }
-    });
+    if (this.events.listenerCount("query") > 0) {
+      this.attachQueryForwarder(source);
+    }
 
     return source;
   }
@@ -136,6 +202,7 @@ class DataSourceRegistry {
 
     this.sources.delete(source.name);
     this.detached.add(source);
+    this.detachQueryForwarder(source);
 
     if (this.defaultSource === source) {
       this.defaultSource = undefined;

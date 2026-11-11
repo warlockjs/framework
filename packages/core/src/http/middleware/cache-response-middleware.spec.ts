@@ -1,3 +1,4 @@
+import config from "@mongez/config";
 import { cache, MemoryCacheDriver } from "@warlock.js/cache";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Request } from "./../request";
@@ -221,5 +222,66 @@ describe("cacheMiddleware — tags", () => {
       body: { data: [1] },
       contentType: "application/json",
     });
+  });
+});
+
+describe("cacheMiddleware — locale in the key", () => {
+  beforeEach(async () => {
+    cache.setCacheConfigurations({
+      default: "memory",
+      logging: false,
+      drivers: { memory: MemoryCacheDriver },
+      options: { memory: {} },
+    });
+
+    await cache.init();
+  });
+
+  afterEach(async () => {
+    config.set("app.localeCodes", undefined);
+    await cache.disconnect();
+  });
+
+  function requestIn(locale: string): Request {
+    return { getLocaleCode: () => locale, path: "/catalog" } as Request;
+  }
+
+  it("answers unknown locales without the cache when app.localeCodes is not set", async () => {
+    const middleware = cacheMiddleware({ cacheKey: "catalog", ttl: 60 });
+
+    for (const locale of ["zz1", "zz2"]) {
+      const { response } = createResponse();
+      const onSent = vi.spyOn(response, "onSent");
+
+      await middleware({ request: requestIn(locale), response } as never);
+
+      expect(onSent).not.toHaveBeenCalled();
+    }
+
+    await expect(cache.get("catalog:zz1")).resolves.toBeNull();
+  });
+
+  it("still caches the default locale when app.localeCodes is not set", async () => {
+    const middleware = cacheMiddleware({ cacheKey: "catalog", ttl: 60 });
+    const request = requestIn("en");
+    const { response, simulateSend } = createResponse();
+
+    await middleware({ request, response } as never);
+    await simulateSend({ request, statusCode: 200, parsedBody: { items: [] } });
+
+    await expect(cache.get("catalog:en")).resolves.toMatchObject({ data: { items: [] } });
+  });
+
+  it("keys declared locales separately", async () => {
+    config.set("app.localeCodes", ["en", "ar"]);
+
+    const middleware = cacheMiddleware({ cacheKey: "catalog", ttl: 60 });
+    const request = requestIn("ar");
+    const { response, simulateSend } = createResponse();
+
+    await middleware({ request, response } as never);
+    await simulateSend({ request, statusCode: 200, parsedBody: { items: ["a"] } });
+
+    await expect(cache.get("catalog:ar")).resolves.toMatchObject({ data: { items: ["a"] } });
   });
 });

@@ -49,6 +49,26 @@ export async function emitStaticEvent<TContext = unknown>(
   }
 }
 
+/**
+ * Whether any static listener for one of `events` is registered on the class
+ * or one of its ancestors, i.e. whether `emitStaticEvent` would call anything.
+ */
+export function hasStaticEventListeners(ModelClass: any, events: ModelEventName[]): boolean {
+  let current = ModelClass;
+
+  while (current && current !== Function.prototype) {
+    const emitter = modelEventsRegistry.get(current) as ModelEvents<any> | undefined;
+
+    if (emitter && events.some((event) => (emitter.listeners.get(event)?.size ?? 0) > 0)) {
+      return true;
+    }
+
+    current = Object.getPrototypeOf(current);
+  }
+
+  return false;
+}
+
 export function cleanupModelEvents(ModelClass: any): void {
   modelEventsRegistry.delete(ModelClass);
   removeModelFromRegistery(ModelClass.name);

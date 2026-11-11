@@ -2,13 +2,13 @@ import {
   buildTracingContext,
   config,
   dispatchPhase,
-  environment,
   isTracingEnabled,
   Response,
   type Request,
   whenReloadSettled,
 } from "@warlock.js/core";
 import { getSealConfig, v } from "@warlock.js/seal";
+import { discloseErrorDetails } from "./error-disclosure";
 import { enterSharedScope, sealShared, shared } from "../shared";
 import { connectRequestSearch } from "../routing/query-string";
 import type { PageRoute } from "../context";
@@ -28,7 +28,11 @@ import { resolveThrownHttpStatus } from "./resolve-thrown-http-status";
 import { DeferredInNonPageLoaderError, isDeferred, splitDeferredPageData } from "../loaders/defer";
 import { createDeferredSettlement, type DeferSettlement } from "./defer-settlement";
 import { serializeLoaderData } from "./serialize-loader-data";
-import { resolveDeferTimeoutMs, resolveLoaderTimeoutMs } from "./streaming-config";
+import {
+  resolveDeferTimeoutMs,
+  resolveLoaderMode,
+  resolveLoaderTimeoutMs,
+} from "./streaming-config";
 import { PageLoaderTimeoutError } from "./page-loader-timeout-error";
 import {
   buildErrorRecord,
@@ -168,9 +172,7 @@ async function validatePageInput(
   const result = await v.validate(
     schema,
     data,
-    environment() === "production"
-      ? { ...getSealConfig(), redactValue: REDACTED_VALUE }
-      : undefined,
+    !discloseErrorDetails() ? { ...getSealConfig(), redactValue: REDACTED_VALUE } : undefined,
   );
 
   if (!result.isValid) return { valid: false, errors: result.errors };
@@ -377,7 +379,8 @@ async function runActionStage(options: ActionStageOptions): Promise<ActionStageO
 
   const pageInput = request.validated();
   const redactValues = config.get("web.forms.redactValues") as readonly string[] | undefined;
-  const stateOptions = { action: resolved.name, redactValues, values: resolved.input };
+  const echoValues = config.get("web.forms.echoValues") as boolean | undefined;
+  const stateOptions = { action: resolved.name, redactValues, echoValues, values: resolved.input };
   const restorePageInput = () => request.setValidatedData(pageInput);
   const fail = (state: ActionState): ActionStageOutcome => {
     bundle.actionData = state;
@@ -394,9 +397,7 @@ async function runActionStage(options: ActionStageOptions): Promise<ActionStageO
     const result = await v.validate(
       actionConfig.validation,
       resolved.input,
-      environment() === "production"
-        ? { ...getSealConfig(), redactValue: REDACTED_VALUE }
-        : undefined,
+      !discloseErrorDetails() ? { ...getSealConfig(), redactValue: REDACTED_VALUE } : undefined,
     );
 
     if (!result.isValid) {
@@ -777,6 +778,150 @@ export async function executePageRequest<TResult = PageDataBundle>(
     // boolean check per level rather than a config read per iteration.
     const tracingEnabled = isTracingEnabled();
 
+    /** What one level's turn produced, before the settle rules below apply it. */
+    type LevelRun = {
+      outcome:
+        | { type: "skip" }
+        | { type: "signal"; signal: LoaderSignal }
+        | { type: "value"; value: unknown };
+      /** The composed layout loader's per-layout values, when it captured them. */
+      layoutValues?: unknown[];
+    };
+
+    // `web.loaders: "parallel"` starts every level's turn at once; each level
+    // still settles in `LEVEL_ORDER` below, with the same rules. Serial (the
+    // default) starts a level only after every level above it has settled.
+    const parallelLoaders = resolveLoaderMode() === "parallel";
+    // Parallel mode: each level's loader gets a signal that aborts with the
+    // request's AND when a level above it ends the request first.
+    const levelAbortControllers = parallelLoaders
+      ? LEVEL_ORDER.map(() => {
+          const controller = new AbortController();
+          requestAbortController.signal.addEventListener(
+            "abort",
+            () => controller.abort(requestAbortController.signal.reason),
+            { once: true },
+          );
+          return controller;
+        })
+      : undefined;
+
+    // One level's turn: its validation (page only) and its loader.
+    const runLevel = async (index: number, level: PageLevelName): Promise<LevelRun> => {
+      // The page's top-level `validation` export runs HERE, at the front of
+      // the page level's own turn (card 5056fb56): app and layout loaders
+      // have already run, so their data survives a rejection exactly as it
+      // survives an ordinary page-loader throw — the error page renders
+      // inside a layout that still has the `data` it reads — and the page's
+      // OWN loader has not (the "before the loader" contract). A layout that
+      // short-circuited or threw has already broken out above, so validation
+      // never runs for a request that ancestor already stopped. It runs even
+      // for a page with no loader: `request.validated()` is still the
+      // page's to read. Under `web.loaders: "parallel"` it runs alongside the
+      // levels above instead, and a level above that ends the request first
+      // still wins.
+      if (level === "page" && triple.page.validation && !pageValidationDone) {
+        try {
+          const outcome = await Promise.race([
+            validatePageInput(triple.page.validation, request),
+            loaderTimeoutSignal,
+          ]);
+
+          if (!outcome.valid) {
+            return {
+              outcome: {
+                type: "signal",
+                signal: { kind: "validation", index, errors: outcome.errors },
+              },
+            };
+          }
+        } catch (thrown) {
+          if (!(thrown instanceof PageLoaderTimeoutError)) throw thrown;
+
+          return { outcome: { type: "signal", signal: { kind: "throw", index, level, thrown } } };
+        }
+      }
+
+      const loader = triple[level].loader;
+
+      if (!loader) return { outcome: { type: "skip" } };
+
+      let value: unknown;
+      const loaderStartedAt = tracingEnabled ? performance.now() : 0;
+      const levelAbortController = levelAbortControllers?.[index];
+      const loaderContext = {
+        request,
+        response: createBufferedResponse(buffers[level]),
+        shared: sealedShared,
+        site: request.site,
+        route: pageRoute,
+        // Parallel mode: also aborted when a level above this one ends the
+        // request first, so a loader that honours cancellation stops.
+        signal: levelAbortController?.signal ?? requestAbortController.signal,
+        ...(stageSession === undefined ? {} : { session: stageSession }),
+      };
+      const layoutValues =
+        level === "layout" && triple.layout.layoutMetadata !== undefined
+          ? new Array<unknown>(triple.layout.layoutMetadata.length)
+          : undefined;
+
+      if (layoutValues !== undefined) beginLayoutLoaderCapture(loaderContext, layoutValues);
+
+      try {
+        value = await Promise.race([loader(loaderContext), loaderTimeoutSignal]);
+      } catch (thrown) {
+        // `requireUser(ctx)` for a guest: the ordinary redirect short-circuit.
+        return {
+          outcome: {
+            type: "signal",
+            signal: isPageRedirectSignal(thrown)
+              ? {
+                  kind: "shortCircuit",
+                  index,
+                  level,
+                  circuit: { kind: "redirect", statusCode: thrown.statusCode, url: thrown.url },
+                }
+              : { kind: "throw", index, level, thrown },
+          },
+          layoutValues,
+        };
+      } finally {
+        if (layoutValues !== undefined) endLayoutLoaderCapture(loaderContext);
+      }
+
+      if (tracingEnabled) {
+        const attrs: Record<string, unknown> = { level };
+
+        // "the layout path when present" — only the layout level ever
+        // carries one, and only when this route actually has a layout file
+        // (`create-page-route-handler.ts` threads it onto the entry).
+        if (level === "layout" && matched.entry.layoutPath !== undefined) {
+          attrs.layoutPath = matched.entry.layoutPath;
+        }
+
+        dispatchPhase(buildTracingContext(request), {
+          name: "loader",
+          durationMs: performance.now() - loaderStartedAt,
+          attrs,
+        });
+      }
+
+      return { outcome: { type: "value", value }, layoutValues };
+    };
+
+    // Parallel mode starts every turn now — unless stage 5b already ended
+    // the request or the client is already gone. A turn whose level is never
+    // settled (a level above it ended the request) is discarded; its rejection
+    // is observed here so it is never an unhandled one.
+    const startedRuns =
+      parallelLoaders && !signal && !requestAbortController.signal.aborted
+        ? LEVEL_ORDER.map((level, index) => {
+            const run = runLevel(index, level);
+            run.catch(() => undefined);
+            return run;
+          })
+        : undefined;
+
     for (const [index, level] of LEVEL_ORDER.entries()) {
       // Stage 5b already ended the request (an action redirect, throw or a
       // failed page validation): no loader runs.
@@ -801,98 +946,31 @@ export async function executePageRequest<TResult = PageDataBundle>(
         break;
       }
 
-      // The page's top-level `validation` export runs HERE, at the front of
-      // the page level's own turn (card 5056fb56): app and layout loaders
-      // have already run, so their data survives a rejection exactly as it
-      // survives an ordinary page-loader throw — the error page renders
-      // inside a layout that still has the `data` it reads — and the page's
-      // OWN loader has not (the "before the loader" contract). A layout that
-      // short-circuited or threw has already broken out above, so validation
-      // never runs for a request that ancestor already stopped. It runs even
-      // for a page with no loader: `request.validated()` is still the
-      // page's to read.
-      if (level === "page" && triple.page.validation && !pageValidationDone) {
-        try {
-          const outcome = await Promise.race([
-            validatePageInput(triple.page.validation, request),
-            loaderTimeoutSignal,
-          ]);
+      const run = await (startedRuns?.[index] ?? runLevel(index, level));
 
-          if (!outcome.valid) {
-            signal = { kind: "validation", index, errors: outcome.errors };
-            break;
-          }
-        } catch (thrown) {
-          if (!(thrown instanceof PageLoaderTimeoutError)) throw thrown;
+      // Assigned even when the composed layout loader threw: stage 8 reads
+      // whatever each layout produced before the throw.
+      if (run.layoutValues !== undefined) capturedLayoutData = run.layoutValues;
 
-          signal = { kind: "throw", index, level, thrown };
-          break;
-        }
-      }
-
-      const loader = triple[level].loader;
-
-      if (!loader) continue;
-
-      let value: unknown;
-      const loaderStartedAt = tracingEnabled ? performance.now() : 0;
-      const loaderContext = {
-        request,
-        response: createBufferedResponse(buffers[level]),
-        shared: sealedShared,
-        site: request.site,
-        route: pageRoute,
-        signal: requestAbortController.signal,
-        ...(stageSession === undefined ? {} : { session: stageSession }),
-      };
-      const layoutValues =
-        level === "layout" && triple.layout.layoutMetadata !== undefined
-          ? new Array<unknown>(triple.layout.layoutMetadata.length)
-          : undefined;
-
-      if (layoutValues !== undefined) beginLayoutLoaderCapture(loaderContext, layoutValues);
-
-      try {
-        value = await Promise.race([loader(loaderContext), loaderTimeoutSignal]);
-      } catch (thrown) {
-        // `requireUser(ctx)` for a guest: the ordinary redirect short-circuit.
-        signal = isPageRedirectSignal(thrown)
-          ? {
-              kind: "shortCircuit",
-              index,
-              level,
-              circuit: { kind: "redirect", statusCode: thrown.statusCode, url: thrown.url },
-            }
-          : { kind: "throw", index, level, thrown };
+      if (run.outcome.type === "signal") {
+        signal = run.outcome.signal;
+        // Parallel mode: the levels below never settle, so stop their loaders.
+        levelAbortControllers?.slice(index + 1).forEach((controller) => controller.abort());
         break;
-      } finally {
-        if (layoutValues !== undefined) {
-          capturedLayoutData = layoutValues;
-          endLayoutLoaderCapture(loaderContext);
-        }
       }
 
-      if (tracingEnabled) {
-        const attrs: Record<string, unknown> = { level };
+      if (run.outcome.type === "skip") continue;
 
-        // "the layout path when present" — only the layout level ever
-        // carries one, and only when this route actually has a layout file
-        // (`create-page-route-handler.ts` threads it onto the entry).
-        if (level === "layout" && matched.entry.layoutPath !== undefined) {
-          attrs.layoutPath = matched.entry.layoutPath;
-        }
+      const value = run.outcome.value;
 
-        dispatchPhase(buildTracingContext(request), {
-          name: "loader",
-          durationMs: performance.now() - loaderStartedAt,
-          attrs,
-        });
+      if (value instanceof Response) {
+        levelAbortControllers?.slice(index + 1).forEach((controller) => controller.abort());
+        return value;
       }
-
-      if (value instanceof Response) return value;
 
       if (isLoaderShortCircuit(value)) {
         signal = { kind: "shortCircuit", index, level, circuit: value };
+        levelAbortControllers?.slice(index + 1).forEach((controller) => controller.abort());
         break;
       }
 

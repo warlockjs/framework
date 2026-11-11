@@ -47,8 +47,15 @@ export type AgentMiddlewareExecuteHooks = {
  *   engine builds its `LLMTrip` record or dispatches tool calls.
  * - `onError`— fires when the model call threw. Return a `ModelResponse`
  *   to recover (fallback chain), or `void` to propagate the error up.
+ * - `bufferStream` — set `true` when `after` checks or rewrites the
+ *   response text. In streaming mode the agent then holds the trip's text
+ *   deltas until every `after` hook has run and emits the approved,
+ *   possibly rewritten, text as one `agent.trip.streaming` delta; a
+ *   rejected trip streams no text. The trip's reasoning deltas, which no
+ *   `after` hook sees, are not streamed.
  */
 export type AgentMiddlewareTripHooks = {
+  bufferStream?: boolean;
   before?(ctx: MiddlewareTripContext): void | ModelResponse | Promise<void | ModelResponse>;
   after?(
     ctx: MiddlewareTripContext,

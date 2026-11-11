@@ -36,7 +36,7 @@ Seven production drivers + a mock driver ship in-box. Pick by durability, scope,
 
 Memory, memoryExtended, lru and file caches are **per-process** (file: per host). With more than one server, use `redis` or `pg` for counters, throttles, one-time tokens (`pull`), shared `update`, `lock()` and tag invalidation; on memory each server counts and invalidates alone. `remember()`/`swr()`/`cached()` stampede protection is per process even on redis. Redis Cluster is unsupported.
 
-Driver storage notes: `memory` stores flat keys (`get("users")` after `set("users.1")` is a miss) and `maxSize` counts entries in LRU order; redis `flush()` without a `globalPrefix` runs `FLUSHDB` (whole database), so set a prefix.
+Driver storage notes: `memory` stores flat keys (`get("users")` after `set("users.1")` is a miss) and `maxSize` counts entries in LRU order (default `10000`, `Infinity` for no limit); redis `flush()` without a `globalPrefix` runs `FLUSHDB` (whole database), so set a prefix.
 
 ## Global config TTL — accepts number or string
 

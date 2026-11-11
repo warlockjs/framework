@@ -338,7 +338,27 @@ export function matchClientRoute(
   entries: readonly ClientPageEntry[],
   pathname: string,
 ): ClientRouteMatch | null {
+  return matchCompiledRoutes(compileRoutes(entries), pathname);
+}
+
+/**
+ * Compiles `entries` once and returns a matcher with exactly
+ * {@link matchClientRoute}'s results, for a caller whose table does not
+ * change between matches (the server's multi-site dispatch). Collisions throw
+ * here, where `matchClientRoute` would throw on each call.
+ */
+export function createClientRouteMatcher(
+  entries: readonly ClientPageEntry[],
+): (pathname: string) => ClientRouteMatch | null {
   const routes = compileRoutes(entries);
+
+  return (pathname) => matchCompiledRoutes(routes, pathname);
+}
+
+function matchCompiledRoutes(
+  routes: readonly CompiledRoute[],
+  pathname: string,
+): ClientRouteMatch | null {
   const sanitized = sanitizePathname(pathname);
   if (!sanitized) return null;
 

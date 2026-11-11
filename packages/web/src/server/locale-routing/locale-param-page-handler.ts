@@ -15,6 +15,7 @@
 import type { HttpContext } from "@warlock.js/core";
 import { frameworkDefaultNotFoundDocument } from "../not-found-page";
 import type { PageRouteHandler } from "../create-page-route-handler";
+import { markLocaleFromPath } from "../page-vary-header";
 
 import { LOCALE_PARAM_NAME } from "../../routing/locale-param-route";
 
@@ -53,6 +54,7 @@ export function localeParamPageHandler(
     }
 
     request.locale = value;
+    markLocaleFromPath(request);
 
     return pageHandler(context);
   };

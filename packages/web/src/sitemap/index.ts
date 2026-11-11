@@ -24,6 +24,7 @@ export type {
   SitemapPageExport,
   SitemapPageOptions,
   SitemapPageUrl,
+  SitemapSupplierContext,
 } from "./sitemap-page-export";
 export type { RobotsConfig, RobotsGroup } from "./robots-config-types";
 

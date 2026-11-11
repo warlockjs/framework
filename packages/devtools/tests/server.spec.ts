@@ -183,6 +183,103 @@ describe("mountDevtoolsRoutes guard", () => {
     expect(response.statusCode).toBe(404);
   });
 
+  it("returns 404 for a loopback socket addressed to a foreign host (DNS rebinding)", async () => {
+    const warnings: string[] = [];
+    const { deps } = createDeps({ warn: (message) => warnings.push(message) });
+    const server = buildServer(deps);
+
+    for (const host of ["evil.example", "evil.example:3000", "localhost.evil.example"]) {
+      const response = await server.inject({
+        method: "GET",
+        url: "/__warlock/api/requests",
+        remoteAddress: "127.0.0.1",
+        headers: { host },
+      });
+
+      expect(response.statusCode).toBe(404);
+      expect(response.body).toBe("");
+    }
+
+    expect(warnings[0]).toContain('"allowedHosts"');
+  });
+
+  it("serves a loopback socket addressed to a loopback host", async () => {
+    const { deps } = createDeps();
+    const server = buildServer(deps);
+
+    for (const host of ["localhost:3000", "127.0.0.1:3000", "[::1]:3000", "app.localhost:3000"]) {
+      const response = await server.inject({
+        method: "GET",
+        url: "/__warlock/api/requests",
+        remoteAddress: "127.0.0.1",
+        headers: { host },
+      });
+
+      expect(response.statusCode).toBe(200);
+    }
+  });
+
+  it("serves a custom dev host only when it is listed in allowedHosts", async () => {
+    const listed = buildServer(
+      createDeps({ options: { ...options, allowedHosts: ["app.test", ".tenant.test"] } }).deps,
+    );
+    const unlisted = buildServer(createDeps().deps);
+
+    for (const host of ["app.test:3000", "tenant.test", "a.tenant.test"]) {
+      const request = {
+        method: "GET" as const,
+        url: "/__warlock/api/requests",
+        remoteAddress: "127.0.0.1",
+        headers: { host },
+      };
+
+      expect((await listed.inject(request)).statusCode).toBe(200);
+      expect((await unlisted.inject(request)).statusCode).toBe(404);
+    }
+  });
+
+  it("returns 404 for a request from a foreign origin", async () => {
+    const { deps } = createDeps();
+    const server = buildServer(deps);
+
+    for (const origin of ["http://evil.example:3000", "null"]) {
+      const response = await server.inject({
+        method: "GET",
+        url: "/__warlock/api/requests",
+        remoteAddress: "127.0.0.1",
+        headers: { host: "localhost:3000", origin },
+      });
+
+      expect(response.statusCode).toBe(404);
+    }
+
+    const sameOrigin = await server.inject({
+      method: "GET",
+      url: "/__warlock/api/requests",
+      remoteAddress: "127.0.0.1",
+      headers: { host: "localhost:3000", origin: "http://localhost:3000" },
+    });
+
+    expect(sameOrigin.statusCode).toBe(200);
+  });
+
+  it("returns 404 for a proxied loopback request unless allowProxied is set", async () => {
+    const strict = buildServer(createDeps().deps);
+    const proxied = buildServer(createDeps({ options: { ...options, allowProxied: true } }).deps);
+
+    for (const header of ["x-forwarded-for", "x-forwarded-host", "x-real-ip", "forwarded"]) {
+      const request = {
+        method: "GET" as const,
+        url: "/__warlock/api/requests",
+        remoteAddress: "127.0.0.1",
+        headers: { host: "localhost:3000", [header]: "203.0.113.9" },
+      };
+
+      expect((await strict.inject(request)).statusCode).toBe(404);
+      expect((await proxied.inject(request)).statusCode).toBe(200);
+    }
+  });
+
   it("does not affect a route registered on the same server outside the dashboard prefix", async () => {
     const { deps } = createDeps();
     const server = buildServer(deps);

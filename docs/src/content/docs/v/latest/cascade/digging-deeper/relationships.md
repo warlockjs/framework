@@ -204,6 +204,8 @@ const user = await User.query().with("posts.comments.author").find(id);
 
 Cascade resolves each segment in turn — load posts, load comments for those posts, load authors for those comments. Each segment is a single batched query, so the total cost is `1 + N_paths` queries, not `1 + N × M × K`.
 
+Sibling relations don't depend on each other, so `.with("author", "tags", "category")` sends their queries at the same time: the request waits for the slowest one, not for the sum. The result is the same as loading them one after another — relations attach in the order you named them, and if more than one fails you get the error of the first one named. Inside a `transaction()` they load one at a time, because the transaction's session (MongoDB) or client (PostgreSQL) must not run queries concurrently.
+
 Same shape works with constraints:
 
 ```ts

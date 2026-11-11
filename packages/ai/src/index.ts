@@ -57,7 +57,7 @@ export { guard } from "./guard/guard";
 export type { FlagRecord } from "./guard/guard";
 export { guardrail } from "./guard/guardrail";
 export type { GuardrailFactory } from "./guard/guardrail";
-export { injection, moderation, pii, topic } from "./guard/detectors";
+export { injection, links, moderation, pii, topic } from "./guard/detectors";
 export { OPENAI_INSTALL_INSTRUCTIONS } from "./guard/errors";
 export type {
   GuardOptions,
@@ -70,6 +70,7 @@ export type {
   GuardrailPhase,
   GuardrailVerdict,
   InjectionDetectorOptions,
+  LinkFilterOptions,
   OpenAiClientLike,
   OpenAiModerationCreateBody,
   OpenAiModerationOptions,

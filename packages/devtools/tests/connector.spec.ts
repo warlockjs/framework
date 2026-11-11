@@ -15,9 +15,11 @@ vi.mock("../src/server", () => ({ mountDevtoolsRoutes }));
 // run, and the connector only needs these two names to decide and mount.
 // Sources that reach for other core exports fail to attach, which the
 // connector reports and survives — exactly the behaviour under test.
+const configured: Record<string, unknown> = {};
 vi.mock("@warlock.js/core", () => ({
   Application: { runtimeStrategy: "production" },
   getHttpServer: vi.fn(() => ({ fastify: true })),
+  config: { get: (name: string) => configured[name] },
 }));
 vi.mock("@warlock.js/cascade", () => ({}));
 vi.mock("@warlock.js/cache", () => ({}));
@@ -168,6 +170,59 @@ describe("devtoolsConnector Postman hook", () => {
     };
 
     expect(deps.getPostmanCollection).toBeUndefined();
+
+    await connector.shutdown();
+  });
+});
+
+describe("devtoolsConnector options from src/config/devtools.ts", () => {
+  afterEach(() => {
+    delete configured.devtools;
+    vi.resetModules();
+  });
+
+  it("reads the guard options from the app config, with connector options winning", async () => {
+    const core = await import("@warlock.js/core");
+    (core.Application as { runtimeStrategy: string }).runtimeStrategy = "development";
+    configured.devtools = { allowedHosts: ["app.test"], allowProxied: true, maxRequests: 50 };
+    mountDevtoolsRoutes.mockClear();
+
+    const { devtoolsConnector } = await import("../src/devtools-connector");
+    const connector = devtoolsConnector({ maxRequests: 20 });
+
+    await connector.boot();
+
+    expect(mountDevtoolsRoutes).toHaveBeenCalledWith(
+      { fastify: true },
+      expect.objectContaining({
+        options: expect.objectContaining({
+          allowedHosts: ["app.test"],
+          allowProxied: true,
+          maxRequests: 20,
+        }),
+        warn: expect.any(Function),
+      }),
+    );
+
+    await connector.shutdown();
+  });
+
+  it("defaults to no extra hosts and no proxied requests", async () => {
+    const core = await import("@warlock.js/core");
+    (core.Application as { runtimeStrategy: string }).runtimeStrategy = "development";
+    mountDevtoolsRoutes.mockClear();
+
+    const { devtoolsConnector } = await import("../src/devtools-connector");
+    const connector = devtoolsConnector();
+
+    await connector.boot();
+
+    expect(mountDevtoolsRoutes).toHaveBeenCalledWith(
+      { fastify: true },
+      expect.objectContaining({
+        options: expect.objectContaining({ allowedHosts: [], allowProxied: false }),
+      }),
+    );
 
     await connector.shutdown();
   });

@@ -116,7 +116,12 @@ async function createHealthWorker(mode: "source" | "published", root: string): P
   const externalImports = Object.values(result.metafile.outputs).flatMap((output) =>
     output.imports.filter((imported) => imported.external).map((imported) => imported.path),
   );
-  expect(externalImports).toContain("oxc-parser");
+  // `tooling/syntax/ast` loads oxc-parser on first parse through `createRequire`,
+  // so it is never a static import and must never be inlined into the bundle;
+  // the worker below still parses, resolving it from the linked node_modules.
+  expect(Object.keys(result.metafile.inputs).some((input) => input.includes("oxc-parser"))).toBe(
+    false,
+  );
   expect(externalImports).toContain("typescript/unstable/sync");
   // Model core's own installed dependency tree, retaining each package's real
   // location so native optional bindings resolve from their owning package.

@@ -434,6 +434,8 @@ warlock add test --dry-run --json            # preview files and dependencies as
 
 `warlock add` runs even when `warlock.config.ts` cannot be loaded, for example because it imports a package that is not installed yet. It prints a warning and continues, so `warlock add web` can install the package the config is waiting for.
 
+When `package.json` has an `agentKit.pick` allowlist (every app created by `create-warlock` has one), `warlock add` adds the `@warlock.js/*` and `@mongez/*` packages it installs to it, so `agent-kit sync` copies their skills too. A project without the allowlist is left unchanged. The `mail` feature installs `nodemailer` `^10.1.4` and `image` installs `sharp` `^0.35.5`.
+
 | Flag                | Description                                                                                                                                                                                                                                             |
 | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `--package-manager` | Package manager to use (auto-detected if omitted).                                                                                                                                                                                                      |

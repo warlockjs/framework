@@ -204,6 +204,10 @@ return response.sendBuffer(buffer, { contentType: "image/png" });
 
 If the path doesn't exist, `sendFile` returns 404 with `{ error: "File Not Found" }` automatically.
 
+`sendFile` also answers byte ranges (since 5.53), so video and audio can be seeked and downloads resumed. Every file response carries `Accept-Ranges: bytes` and `Content-Length`. A single `Range: bytes=start-end` (or `start-`, or `-suffix`) answers `206 Partial Content` with only those bytes and a `Content-Range` header; a range that starts past the end answers `416` with `Content-Range: bytes */<size>`. An `If-Range` that no longer names the file (a different strong ETag or modification date), several ranges in one header, or another unit get the whole file with `200`.
+
+If the file fails while it is being read, the client gets the opaque `500` described in [Error handling](../digging-deeper/error-handling.md) and the file system message (which names the absolute path) goes to the log.
+
 The same comparison is exported for your own handlers:
 
 ```ts
@@ -609,6 +613,7 @@ return response.success({ data });
 - **Don't set `secure: Application.isProduction` for cookies any more.** Since 4.10.0 `secure` already tracks the environment — on everywhere except development. Writing it by hand is not just redundant, it's narrower: it turns `secure` **off** in test and staging, where the default keeps it on.
 - **`response.success()` with no arg returns `{ success: true }`.** If you want truly empty, use `response.noContent()` (204).
 - **`sendFile(path)` checks file existence and returns 404 if missing.** You don't need to pre-`fs.access` it.
+- **An `Error` passed to `serverError()` is never shown to the client.** It answers the opaque `{ error: "Internal server error." }` and the message goes to the log. Send the body you want the client to see instead.
 - **SSE keep-alives matter.** Most proxies (nginx, Cloudflare) close idle connections after 30–60s. Send a `sse.comment("ping")` every 25 seconds for long-lived streams.
 
 ## See also
@@ -669,6 +674,35 @@ bounds a stream that never finishes.
 `http.serverOptions: { http2: true }` uses session draining by default. The
 framework maps idle-connection shutdown to session tracking on HTTP/2, so Fastify
 never receives its unsupported `forceCloseConnections: "idle"` setting.
+
+## Compression
+
+Turn on `http.compression` to send responses compressed with `br` or `gzip`, whichever the client's `Accept-Encoding` prefers (`br` wins a tie). It is off by default; new apps created with `create-warlock` turn it on.
+
+```ts title="src/config/http.ts"
+import type { HttpConfigurations } from "@warlock.js/core";
+
+export default {
+  compression: true,
+  // or tune it:
+  // compression: { threshold: 2048, brotli: false },
+} satisfies HttpConfigurations;
+```
+
+| Option      | Type      | Default | Effect                                      |
+| ----------- | --------- | ------- | ------------------------------------------- |
+| `threshold` | `number`  | `1024`  | smallest body, in bytes, that is compressed |
+| `brotli`    | `boolean` | `true`  | offer `br`; `false` offers only `gzip`      |
+
+What is compressed: JSON, HTML, XML, plain text, SVG, CSS/JS and other text-like bodies sent through `response.send()` and its helpers, `sendFile()`/`sendBuffer()` of those types, page responses from `@warlock.js/web` (buffered and streamed), and the JSON error bodies. A streamed page (`streamReact`) is flushed after each burst of writes, so the shell and each deferred chunk still arrive as soon as they are rendered.
+
+What is sent as it is: `HEAD` requests, `204`, `206` and `304` answers, bodies under `threshold`, responses that already set a `Content-Encoding` (set `Content-Encoding: identity` to opt one response out), `Cache-Control: no-transform`, images, archives and other binary types, and long-lived streams that must reach the client line by line: `response.sse()` (`text/event-stream`), `response.stream()`, and NDJSON.
+
+A compressed response gets `Accept-Encoding` added to its existing `Vary` header (one header, never a second one), loses its `Content-Length` (the encoded size differs; Fastify sets the new one for buffered bodies), and a strong `ETag` becomes weak (`W/"…"`), which `If-None-Match` still matches.
+
+Leave it off when a reverse proxy or CDN in front of the app already compresses: the work would be done twice.
+
+Do not compress a response that carries a secret (a CSRF token, a session-bound value) next to text the request controls (a reflected search term, a form value): over HTTPS, an attacker who can send many requests can recover the secret from the compressed sizes. There is no per-route or per-content-type option; opt such a response out from its handler with `response.header("Cache-Control", "private, no-store, no-transform")` (or `Content-Encoding: identity`), or leave `http.compression` off.
 
 ## Format every JSON error response
 

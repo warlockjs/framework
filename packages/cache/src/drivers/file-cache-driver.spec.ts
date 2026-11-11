@@ -496,3 +496,125 @@ describe("FileCacheDriver — extend", () => {
     await expect(driver.extend("k", -1)).rejects.toThrow();
   });
 });
+
+describe("FileCacheDriver exclusive writes on an expired entry", () => {
+  let driver: FileCacheDriver;
+  let directory: string;
+
+  beforeEach(async () => {
+    directory = mkdtempSync(join(tmpdir(), "warlock-cache-"));
+    driver = new FileCacheDriver();
+    driver.setOptions({ directory: () => directory });
+    await driver.connect();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    rmSync(directory, { recursive: true, force: true });
+  });
+
+  function writeExpiredEntry(key: string) {
+    mkdirSync(resolve(directory, key), { recursive: true });
+    writeFileSync(
+      resolve(directory, key, "cache.json"),
+      JSON.stringify({ data: "previous-holder", ttl: 1, expiresAt: Date.now() - 1000 }),
+    );
+  }
+
+  it("lets exactly one of many concurrent creates win, round after round", async () => {
+    for (let round = 0; round < 20; round++) {
+      const key = `lock.round-${round}`;
+
+      writeExpiredEntry(key);
+
+      const results = await Promise.all(
+        Array.from({ length: 10 }, (_, index) =>
+          driver.set(key, `holder-${index}`, { onConflict: "create", ttl: 60 }),
+        ),
+      );
+
+      expect(results.filter((result) => result.wasSet)).toHaveLength(1);
+
+      // The winner's value is what is stored.
+      const winner = results.findIndex((result) => result.wasSet);
+
+      await expect(driver.get(key)).resolves.toBe(`holder-${winner}`);
+    }
+  });
+
+  it("never leaves claimed or temporary files behind", async () => {
+    writeExpiredEntry("lock.clean");
+
+    await Promise.all(
+      Array.from({ length: 5 }, () => driver.set("lock.clean", "x", { onConflict: "create" })),
+    );
+
+    const { readdirSync } = await import("node:fs");
+
+    expect(readdirSync(resolve(directory, "lock.clean"))).toEqual(["cache.json"]);
+  });
+
+  it("releases a lock only when it still holds the caller's value", async () => {
+    const outcome = await driver.lock("job", 60, async () => {
+      // Another holder took over (the lock expired and was re-acquired).
+      writeFileSync(
+        resolve(directory, "job", "cache.json"),
+        JSON.stringify({ data: "successor", ttl: 60, expiresAt: Date.now() + 60_000 }),
+      );
+
+      return "done";
+    });
+
+    expect(outcome).toEqual({ acquired: true, value: "done" });
+    await expect(driver.get("job")).resolves.toBe("successor");
+  });
+
+  it("releases quietly when the key was removed while the lock was held", async () => {
+    const error = vi.spyOn(driver as unknown as { logError: () => void }, "logError");
+
+    await driver.lock("job", 60, async () => {
+      await driver.remove("job");
+    });
+
+    expect(error).not.toHaveBeenCalled();
+  });
+
+  it("releases its own lock", async () => {
+    await driver.lock("job", 60, async () => "done");
+
+    await expect(driver.get("job")).resolves.toBeNull();
+    expect(existsSync(resolve(directory, "job"))).toBe(false);
+  });
+});
+
+describe("FileCacheDriver expired entries with a globalPrefix", () => {
+  let directory: string;
+
+  beforeEach(() => {
+    directory = mkdtempSync(join(tmpdir(), "warlock-cache-"));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    rmSync(directory, { recursive: true, force: true });
+  });
+
+  it("removes the expired entry's directory on read", async () => {
+    const driver = new FileCacheDriver();
+
+    driver.setOptions({ directory: () => directory, globalPrefix: "store" });
+    await driver.connect();
+
+    await driver.set("user.1", { id: 1 }, 1);
+
+    expect(existsSync(resolve(directory, "store.user.1"))).toBe(true);
+
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(Date.now() + 5000);
+
+    await expect(driver.get("user.1")).resolves.toBeNull();
+
+    expect(existsSync(resolve(directory, "store.user.1"))).toBe(false);
+    expect(existsSync(resolve(directory, "store.store.user.1"))).toBe(false);
+  });
+});

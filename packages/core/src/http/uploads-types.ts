@@ -216,6 +216,17 @@ export type UploadsConfigurations = {
   defaultPrefixFormat?: string;
 
   /**
+   * Store uploads with the content type the client declared. By default the
+   * stored type comes from the file's bytes for raster images, and markup
+   * (svg, html, xml, script) is stored as `application/octet-stream`, so a
+   * bucket or CDN serving the object downloads it instead of rendering it on
+   * your domain. Set `true` only when every upload comes from a trusted source.
+   *
+   * @default false
+   */
+  trustClientContentType?: boolean;
+
+  /**
    * Bounded on-demand image variants for local `/uploads` images, served by
    * `uploadedFileController`.
    *

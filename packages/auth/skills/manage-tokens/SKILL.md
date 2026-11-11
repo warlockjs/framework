@@ -36,6 +36,10 @@ const pair = await authService.createTokenPair(user, deviceInfo);
 
 `createTokenPair` is the typical issuance path. It respects `config.auth.refreshToken.enabled` — if disabled, returns only `accessToken`.
 
+A custom `payload` (`generateAccessToken(user, payload)` / `deviceInfo.payload`) may add claims, but `id` and `userType` are always stamped from `user`; the route gate also refuses a token whose claims name a different user than its row.
+
+With `auth.hashTokensAtRest: true` the token columns hold SHA-256 digests. `createTokenPair` / `login` still return the raw tokens; the row `createRefreshToken` returns exposes its raw token as `row.plainToken` (`row.get("token")` is the digest).
+
 ## Refresh with rotation — `refreshTokens`
 
 Refresh and family revocation use durable family revision checks inside a
@@ -178,6 +182,8 @@ const decodedRefresh = await jwt.verifyRefreshToken(refreshToken);
 If tokens minted before 4.12.0 may lack an `exp`, see `warlock auth.purge-never-expiring` in the `run-auth-commands` topic — they are still in your token tables and no date-based cleanup can reach them.
 
 `authService.generateAccessToken` / `createRefreshToken` read `config.auth.accessToken.expiresIn` / `config.auth.refreshToken.expiresIn`, validate them, and throw naming the key if the value is not a positive `ms` duration — before anything is signed, persisted, or capped.
+
+`config.auth.accessToken.issuer` / `audience` (optional) are stamped as `iss` / `aud` on every token `jwt.generate` / `generateRefreshToken` sign and **required** by `jwt.verify` / `verifyRefreshToken` — tokens signed before they were set are refused. The verifier and signer are prepared once per settings and reused (no per-request key parsing); passing your own extra options builds a fresh one.
 
 The package signs access and refresh tokens with independent secrets — `config.auth.accessToken.secret` and `config.auth.refreshToken.secret`. Setting a distinct `refresh.secret` is recommended: it prevents an access-token compromise from forging refresh tokens (and vice versa). The refresh secret is **optional** — when `config.auth.refreshToken.secret` is unset, refresh tokens fall back to the main `config.auth.accessToken.secret`, so refresh works out of the box without a second secret.
 

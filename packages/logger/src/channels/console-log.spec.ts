@@ -231,4 +231,56 @@ describe("ConsoleLog", () => {
       expect(consoleSpy).toHaveBeenCalledTimes(1);
     });
   });
+
+  describe("minLevel", () => {
+    it("skips entries below minLevel and prints the rest", () => {
+      const channel = new ConsoleLog({ minLevel: "info" });
+
+      channel.log(dataFor({ type: "debug" }));
+      expect(consoleSpy).not.toHaveBeenCalled();
+
+      channel.log(dataFor({ type: "info" }));
+      channel.log(dataFor({ type: "success" }));
+      channel.log(dataFor({ type: "error" }));
+      expect(consoleSpy).toHaveBeenCalledTimes(3);
+    });
+
+    it("prints every level when minLevel is not set", () => {
+      const channel = new ConsoleLog();
+
+      channel.log(dataFor({ type: "debug" }));
+
+      expect(consoleSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it("answers acceptsLevel from minLevel and levels together", () => {
+      const channel = new ConsoleLog({ minLevel: "warn", levels: ["warn", "fatal"] });
+
+      expect(channel.acceptsLevel("info")).toBe(false);
+      expect(channel.acceptsLevel("warn")).toBe(true);
+      expect(channel.acceptsLevel("error")).toBe(false);
+      expect(channel.acceptsLevel("fatal")).toBe(true);
+    });
+  });
+
+  describe("terminal escapes in message text", () => {
+    it("removes non-colour escape sequences and keeps colour codes", () => {
+      const channel = new ConsoleLog();
+
+      channel.log(
+        dataFor({
+          message: "id \u001b[33m7\u001b[39m\u001b]52;c;eA==\u0007\u001b[2J\u001b[8mhidden",
+        }),
+      );
+
+      const printed = String(consoleSpy.mock.calls[0]?.[4]);
+
+      expect(printed).toContain("\u001b[33m7\u001b[39m");
+      expect(printed).not.toContain("\u001b]52");
+      expect(printed).not.toContain("\u001b[2J");
+      expect(printed).not.toContain("\u001b[8m");
+      expect(printed).not.toContain("\u0007");
+      expect(stripAnsi(printed)).toContain("hidden");
+    });
+  });
 });

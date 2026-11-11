@@ -54,6 +54,13 @@ export type PanopticConfig = {
    */
   dashboard?: boolean | DashboardOptions;
   /**
+   * How many traces the store panoptic creates for the dashboard keeps (the
+   * in-memory store, or the cache-backed one when {@link cache} is set).
+   * Past it the oldest trace is dropped. Default `1000`; `0` keeps every
+   * trace. Ignored when you supply your own store through `exporters`.
+   */
+  capacity?: number;
+  /**
    * Observe every flow (`ai.agent` / `ai.workflow` / `ai.supervisor` /
    * `ai.team`) by default. Individual flows opt out with `observe: false`.
    * Default `false` — opt-in observability.

@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { log, maskEmailsInText } from "@warlock.js/logger";
 import { MemoryCacheList } from "../list/memory-cache-list";
+import { sampleMembers } from "../tag-sample";
 import { TaggedCache } from "../tagged-cache";
 import type {
   CacheConflictPolicy,
@@ -95,9 +96,13 @@ export abstract class BaseCacheDriver<
   protected clientDriver!: ClientType;
 
   /**
-   * Determine whether to log or not
+   * Whether each operation (fetching, caching, removing…) is logged. Off by
+   * default: per-operation lines cost CPU on every cache call and put cache
+   * keys in production logs. Errors and connection failures are always
+   * logged. Turn it on with the `logging: true` cache option or
+   * `setLoggingState(true)`.
    */
-  protected shouldLog: boolean = true;
+  protected shouldLog: boolean = false;
 
   /**
    * {@inheritdoc}
@@ -348,6 +353,40 @@ export abstract class BaseCacheDriver<
   }
 
   /**
+   * {@inheritdoc}
+   *
+   * Default implementation: reads every member and picks a random window.
+   * Drivers with a native random-member command override it (redis
+   * `SRANDMEMBER`, the in-process drivers' index).
+   */
+  public async tagSample(tagKey: CacheKey, count: number): Promise<string[]> {
+    return sampleMembers(await this.tagMembers(tagKey), count);
+  }
+
+  /**
+   * {@inheritdoc}
+   *
+   * Default implementation: the raw entry read (no `hit`/`miss` on drivers
+   * that override {@link getEntry}). Drivers with a cheaper existence check
+   * override it.
+   */
+  public async exists(key: CacheKey): Promise<boolean> {
+    return (await this.getEntry(key)) !== null;
+  }
+
+  /**
+   * {@inheritdoc}
+   *
+   * Default implementation: `remove()` per key, one after another. Drivers
+   * with a network round trip per command override it.
+   */
+  public async removeMany(keys: CacheKey[]): Promise<void> {
+    for (const key of keys) {
+      await this.remove(key);
+    }
+  }
+
+  /**
    * The index stored as a plain entry, or `[]`. Non-string members (a corrupted
    * or foreign value) are ignored rather than trusted.
    */
@@ -391,6 +430,15 @@ export abstract class BaseCacheDriver<
    * {@inheritdoc}
    */
   public abstract flush(): Promise<void>;
+
+  /**
+   * Remove an entry by its already-parsed key (prefix applied). `remove()`
+   * parses its key again, which would apply a `globalPrefix` twice; drivers
+   * that store by parsed key override this. The default calls `remove()`.
+   */
+  protected async removeParsed(parsedKey: string): Promise<void> {
+    await this.remove(parsedKey);
+  }
 
   /**
    * {@inheritdoc}
@@ -826,7 +874,11 @@ export abstract class BaseCacheDriver<
    * Log the operation
    */
   protected log(operation: CacheOperationType, key?: string | any) {
-    if (!this.shouldLog) return;
+    // Connection failures and client errors are logged whether or not
+    // operation logging is on.
+    const alwaysLogged = operation === "connectionFailed" || operation === "error";
+
+    if (!this.shouldLog && !alwaysLogged) return;
 
     if (typeof key === "string") {
       // this will be likely used with file cache driver as it will convert the dot to slash
@@ -838,6 +890,8 @@ export abstract class BaseCacheDriver<
 
     if (operation === "connectionFailed") {
       log.fatal(`cache.${this.name}`, operation, key);
+
+      if (!this.shouldLog) return;
     }
 
     if (operation == "notFound" || operation == "expired") {
@@ -929,13 +983,22 @@ export abstract class BaseCacheDriver<
   }
 
   /**
-   * Parse fetched data from cache
+   * Parse fetched data from cache.
+   *
+   * Object values are deep-cloned so callers cannot mutate stored state; a
+   * driver that just deserialized `data` (it is already a private copy)
+   * passes `clone: false`.
    */
-  protected async parseCachedData(key: string, data: CacheData) {
+  protected async parseCachedData(key: string, data: CacheData, clone = true) {
     this.log("fetched", key);
 
     if (data.expiresAt && data.expiresAt < Date.now()) {
-      this.remove(key);
+      try {
+        await this.removeParsed(key);
+      } catch (error) {
+        this.logError(`Failed to remove expired entry ${key}`, error);
+      }
+
       return null;
     }
 
@@ -947,7 +1010,7 @@ export abstract class BaseCacheDriver<
     }
 
     const type = typeof value;
-    if (type === "string" || type === "number" || type === "boolean") {
+    if (type === "string" || type === "number" || type === "boolean" || !clone) {
       return value;
     }
 

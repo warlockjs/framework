@@ -87,7 +87,7 @@ The package exposes two ways to set a store:
 - **`run(store, callback)`** wraps a function. When the callback finishes (resolved or rejected), the store is released. This is the safe default.
 - **`enter(store)`** sets the store and returns immediately. There is no callback to bound the lifetime; the store lives until the surrounding async scope ends. Use this only when the framework forces your hand — classic Express middleware where you call `next()` and return synchronously.
 
-`enter()` is `AsyncLocalStorage.enterWith(store)` under the hood. The Node docs flag it as easier to misuse than `run()` because nothing forces a cleanup boundary. In `@warlock.js/context`, prefer `run()` everywhere you can; reach for `enter()` only when the integration leaves you no choice.
+`enter()` is `AsyncLocalStorage.enterWith(store)` under the hood (on the storage all contexts share; only this context's slot changes). The Node docs flag it as easier to misuse than `run()` because nothing forces a cleanup boundary. In `@warlock.js/context`, prefer `run()` everywhere you can; reach for `enter()` only when the integration leaves you no choice.
 
 ## Reading: `get`, `getStore`, `hasContext`
 

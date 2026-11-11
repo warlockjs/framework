@@ -276,11 +276,57 @@ export function applySecurityHeadersToRaw(
 ): void {
   if (raw.headersSent) return;
 
-  const headers = buildSecurityHeaders(resolveSecurityHeadersConfig(routeConfig));
-
-  for (const [name, value] of Object.entries(headers)) {
+  for (const [name, value] of securityHeaderEntries(routeConfig)) {
     raw.setHeader(name, value);
   }
+}
+
+/** A built header list and the config values it was built from. */
+type CachedSecurityHeaders = { inputs: readonly unknown[]; entries: [string, string][] };
+
+/** The app-wide header list (no route override). */
+let appWideSecurityHeaders: CachedSecurityHeaders | undefined;
+
+/** One header list per route override object. */
+const routeSecurityHeaders = new WeakMap<object, CachedSecurityHeaders>();
+
+function sameInputs(first: readonly unknown[], second: readonly unknown[]): boolean {
+  return first.length === second.length && first.every((value, index) => value === second[index]);
+}
+
+/**
+ * The header list for the app config and an optional route override, built
+ * once and reused while the config values it depends on (compared by
+ * identity: replacing a config object rebuilds it) and the environment stay
+ * the same. Every request used to rebuild and re-serialise the same headers.
+ */
+function securityHeaderEntries(routeConfig?: RouteSecurityHeaders | null): [string, string][] {
+  const appConfig = config.get("http.securityHeaders");
+  const inputs = [
+    appConfig,
+    config.get("http.csp.enabled"),
+    config.get("http.csp.directives"),
+    environment(),
+  ];
+  const routeKey = routeConfig && typeof routeConfig === "object" ? routeConfig : undefined;
+  const appWide = routeConfig === undefined || routeConfig === null;
+  const cached = routeKey
+    ? routeSecurityHeaders.get(routeKey)
+    : appWide
+      ? appWideSecurityHeaders
+      : undefined;
+
+  if (cached && sameInputs(cached.inputs, inputs)) return cached.entries;
+
+  const entries = Object.entries(
+    buildSecurityHeaders(mergeSecurityHeadersConfig(appConfig, routeConfig)),
+  );
+  const built: CachedSecurityHeaders = { inputs, entries };
+
+  if (routeKey) routeSecurityHeaders.set(routeKey, built);
+  else if (appWide) appWideSecurityHeaders = built;
+
+  return entries;
 }
 
 /** Header names this module may set, lower-cased. */

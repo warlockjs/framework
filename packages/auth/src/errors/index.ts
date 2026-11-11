@@ -4,4 +4,5 @@ export * from "./invalid-one-time-token.error";
 export * from "./invalid-passkey.error";
 export * from "./invalid-provider-callback.error";
 export * from "./notifications-unavailable.error";
+export * from "./provider-account-link-blocked.error";
 export * from "./provider-email-not-verified.error";

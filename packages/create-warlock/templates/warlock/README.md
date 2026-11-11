@@ -62,7 +62,26 @@ npm run start
 ```
 
 `start` prints its "started" line only once the server is actually serving.
-Set `NODE_ENV=production` and your production `.env` values on the host.
+Set `NODE_ENV=production` and your production `.env` values on the host. Every
+env file except `.env.example` is git-ignored, so secrets in `.env.production`
+or `.env.shared` stay out of the repository.
+
+Before going live, review `src/config/http.ts`: `CORS_ORIGINS` lists the sites
+allowed to call the API from a browser, `fileUploadLimit` caps one uploaded
+file (10 MB), and `compression` should be `false` when a proxy already
+compresses responses.
+
+## Authentication
+
+`POST /auth/login` returns an access token (valid 1 hour, sent as
+`Authorization: Bearer <token>`) and a refresh token (valid 7 days). Before the
+access token expires, send `{ "refreshToken": "..." }` to
+`POST /auth/refresh-token` for a new pair; send the same body to
+`POST /auth/logout` to end that session. `/users` is admin-only: set an
+account's `role` to `"admin"` to use it.
+
+`POST /auth/forgot-password` creates a 6-digit reset code but does not send it
+yet: wire your mail delivery in `src/app/auth/services/forgot-password.service.ts`.
 
 ## Project structure
 
@@ -144,7 +163,8 @@ This project ships instructions and skills for AI coding agents:
   (`CLAUDE.md`, …) are generated from it; edit `AGENTS.md`, then run
   `npm run skills:sync`.
 - `skills/` — project conventions (code standards, API design, testing, …).
-  Package skills for every `@warlock.js/*` dependency are synced in on install.
+  Package skills for every `@warlock.js/*` dependency are synced in on install;
+  only the packages listed in `agentKit.pick` (in `package.json`) are synced.
 
 ## Learn more
 

@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { usageOf, translationDeclarationUsage, scanTranslationSource } from "@warlock.js/core";
+import {
+  isTranslationKeyUsed,
+  usageOf,
+  translationDeclarationUsage,
+  scanTranslationSource,
+} from "@warlock.js/core";
 import {
   canonicalJson,
   contentHash,
@@ -12,6 +17,7 @@ import {
   sharedAssetFileName,
   sharedTableFor,
   sharedTranslationAssets,
+  translationKeyMatcher,
   usageFromRecord,
   type TranslationSourceEntries,
 } from "./delivery";
@@ -188,5 +194,72 @@ describe("usage records", () => {
       literals: [],
       literalPrefixes: [],
     });
+  });
+});
+
+describe("translationKeyMatcher", () => {
+  const usages = [
+    usageOf({ keys: ["orders", "cart.items", "app.title", "", "nav."] }),
+    usageOf({ literals: ["client", "cart.items", "statuses.", "my_key"] }),
+    usageOf({ prefixes: ["orders.statuses."], literalPrefixes: ["members.t"] }),
+    usageOf({ keys: ["a.b_c"], literals: ["x_y.z"] }),
+    usageOf({}),
+    EVERYTHING_USAGE,
+  ];
+  const keys = [
+    "",
+    ".",
+    "_one",
+    "orders",
+    "orders.title",
+    "orders_other",
+    "orders_other.note",
+    "ordersX",
+    "cart.items",
+    "cart.items_one",
+    "cart.items_one.note",
+    "cart.items.extra",
+    "cart.itemsx",
+    "cart.my_items_one",
+    "app.title",
+    "app.title_zero",
+    "app.titles",
+    "nav.home",
+    "nav",
+    "client",
+    "client.name",
+    "client_one",
+    "statuses.paid",
+    "statuses",
+    "my_key",
+    "my_key_other",
+    "my",
+    "orders.statuses.paid",
+    "orders.statusesX",
+    "members.title",
+    "members",
+    "a.b_c",
+    "a.b_c_one",
+    "a.b_c.d",
+    "a.b",
+    "x_y.z",
+    "x_y.z_two",
+    "x_y",
+  ];
+
+  it("answers every key exactly as isTranslationKeyUsed does", () => {
+    for (const usage of usages) {
+      const isUsed = translationKeyMatcher(usage);
+
+      for (const key of keys) {
+        expect([usage, key, isUsed(key)]).toEqual([usage, key, isTranslationKeyUsed(usage, key)]);
+      }
+    }
+  });
+
+  it("indexes each usage once", () => {
+    const usage = usageOf({ keys: ["orders"] });
+
+    expect(translationKeyMatcher(usage)).toBe(translationKeyMatcher(usage));
   });
 });

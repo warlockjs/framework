@@ -77,14 +77,14 @@ missing `handle`, or a non-integer `attempts < 1`. See
 
 `JobOptions` (also the shape of `queue.defaultJobOptions`):
 
-| Field               | Type           | Notes                                                                     |
-| ------------------- | -------------- | ------------------------------------------------------------------------- |
-| `attempts?`         | `number`       | Total attempts including the first. Default `1`                           |
-| `backoff?`          | `JobBackoff`   | `number` (fixed ms) or `{ type: "fixed" \| "exponential", delay }`        |
-| `removeOnComplete?` | `JobRetention` | `boolean \| number` — `true` removes at once, a number keeps the newest N |
-| `removeOnFail?`     | `JobRetention` | Same shape, for failed jobs                                               |
-| `timeout?`          | `Duration`     | Longest one attempt may run. Must be greater than zero. Default: no limit |
-| `failOnTimeout?`    | `boolean`      | Fail for good on timeout instead of retrying. Default `false`             |
+| Field               | Type           | Notes                                                                                                                                                                                          |
+| ------------------- | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `attempts?`         | `number`       | Total attempts including the first. Default `1`                                                                                                                                                |
+| `backoff?`          | `JobBackoff`   | `number` (fixed ms) or `{ type: "fixed" \| "exponential", delay }`                                                                                                                             |
+| `removeOnComplete?` | `JobRetention` | `boolean \| number \| { age?, count? }` — `true` removes at once, `false` keeps all, a number keeps the newest N, `age` (a `Duration`) drops older jobs. Default `{ age: "24h", count: 1000 }` |
+| `removeOnFail?`     | `JobRetention` | Same shape, for failed jobs. Default `{ age: "7d", count: 5000 }`                                                                                                                              |
+| `timeout?`          | `Duration`     | Longest one attempt may run. Must be greater than zero. Default: no limit                                                                                                                      |
+| `failOnTimeout?`    | `boolean`      | Fail for good on timeout instead of retrying. Default `false`                                                                                                                                  |
 
 ### `registeredJobs()` / `queueOf(definition)`
 
@@ -280,9 +280,11 @@ interface QueueDriver {
 }
 ```
 
-`DriverDispatch` is `{ name, queue, data, options }`: `data` is the serialized
-payload/context envelope, `options` is merged job/dispatch configuration
-with numeric millisecond delay. Prefer `defineJob()` and `startWorkers()`
+`DriverDispatch` is `{ name, queue, data, options }`: `data` is the
+payload/context envelope `{ __warlock: { v: 2, context? }, payload }` that
+`defineJob()` writes for every dispatch (tools that show raw job data, such
+as the dashboard, show this wrapper), `options` is merged job/dispatch
+configuration with numeric millisecond delay and retention `age`. Prefer `defineJob()` and `startWorkers()`
 for normal use: they capture context, merge defaults, register handlers,
 and honour process roles and `workers.enabled`.
 

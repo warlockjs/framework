@@ -3,8 +3,8 @@ import { anyMatch, ipMatches } from "../../../src/http/middleware/utils/cidr-mat
 
 /**
  * Pure IPv4 / CIDR matching used by the ipFilter middleware. No network — just
- * bit math. Source: core/src/http/middleware/utils/cidr-match.ts. IPv6 is
- * exact-string only by design (no IPv6 CIDR support).
+ * address math. Source: core/src/http/middleware/utils/cidr-match.ts. IPv4 and
+ * IPv6, exact addresses and CIDR blocks.
  */
 describe("ipMatches — exact matches", () => {
   it("matches an identical IPv4 string", () => {
@@ -92,5 +92,20 @@ describe("anyMatch", () => {
 
   it("returns false for an empty pattern list", () => {
     expect(anyMatch("10.0.0.5", [])).toBe(false);
+  });
+});
+
+describe("ipMatches — IPv6", () => {
+  it("matches an address inside an IPv6 block", () => {
+    expect(ipMatches("2001:db8::5", "2001:db8::/32")).toBe(true);
+    expect(ipMatches("2001:db9::5", "2001:db8::/32")).toBe(false);
+  });
+
+  it("compares IPv6 addresses by value", () => {
+    expect(ipMatches("2001:0db8:0000::1", "2001:db8::1")).toBe(true);
+  });
+
+  it("matches an IPv4-mapped IPv6 address against an IPv4 block", () => {
+    expect(ipMatches("::ffff:10.0.0.5", "10.0.0.0/8")).toBe(true);
   });
 });

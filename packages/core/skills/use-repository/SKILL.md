@@ -289,6 +289,14 @@ export const listFaqsController: GuardedRequestHandler = async ({ request, respo
 };
 ```
 
+Request input is safe to forward: besides capping `limit` at `maxPerPage` and whitelisting sort/select columns, `list()` / `listCached()` ignore `paginate=false`, `purgeCache` and `cacheKey` when the current request sent them (server code that sets them itself is unaffected). To let clients turn pagination off for one repository, opt in:
+
+```ts
+class CategoriesRepository extends RepositoryManager<Category> {
+  protected allowClientUnpaginated = true; // default false; app-wide: repository.allowClientUnpaginated
+}
+```
+
 ## When to drop to `Model.query()`
 
 Repositories are for the 90% case: filter, paginate, cache. For anything beyond — joins, aggregates, raw expressions, complex `OR` trees — drop to the model's query builder inside a service:

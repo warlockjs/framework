@@ -2,6 +2,8 @@
 
 All four share this surface. The picking guide (which factory to call) is in the `pick-seal-primitive` topic. For `.optional()` / `.in()` / `.oneOf()`, see the `compose-seal-modifiers` topic.
 
+Only finite numbers pass the type rule: `NaN`, `Infinity` and `-Infinity` are refused. The math mutators (`.abs()`, `.ceil()`, `.floor()`, `.round()`, `.toFixed()`) and `.coerce()` convert numbers and numeric strings only; `"abc"`, `true`, `[7]` and `{}` reach the type rule unchanged and fail it.
+
 ## Range — global value comparison
 
 | Method                  | Args                     | JSON Schema              | Example                    |

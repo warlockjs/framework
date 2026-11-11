@@ -360,14 +360,135 @@ describe("JSONFileLog", () => {
 
       await waitForInit(channel);
 
-      const errorSpy = vi.spyOn(console, "error");
+      const reporter = vi.fn();
+
+      channel.setErrorReporter(reporter);
       vi.spyOn(fs.promises, "writeFile").mockRejectedValue(new Error("disk full"));
 
       await channel.log(dataFor({ message: "doomed" }));
 
-      await waitForCondition(() => errorSpy.mock.calls.length > 0);
+      expect(reporter).toHaveBeenCalledWith(
+        expect.objectContaining({ message: "disk full" }),
+        expect.objectContaining({ action: "write" }),
+      );
+    });
+  });
 
-      expect(errorSpy).toHaveBeenCalledWith("Failed to write log:", expect.any(Error));
+  describe("corrupt files", () => {
+    it("moves a corrupt file aside instead of overwriting it (async path)", async () => {
+      const channel = track(new JSONFileLog({ storagePath, maxMessagesToWrite: 1 }));
+      const reporter = vi.fn();
+
+      channel.setErrorReporter(reporter);
+
+      await waitForInit(channel);
+
+      fs.writeFileSync(channel.filePath, '{"messages":[{"content":"earlier"}');
+
+      await channel.log(dataFor({ message: "next" }));
+
+      const aside = fs
+        .readdirSync(storagePath)
+        .filter((name) => name.startsWith(`${channel.fileName}.json.corrupt-`));
+
+      expect(aside).toHaveLength(1);
+      expect(fs.readFileSync(path.join(storagePath, aside[0] ?? ""), "utf-8")).toContain("earlier");
+      expect(JSON.parse(fs.readFileSync(channel.filePath, "utf-8")).messages).toHaveLength(1);
+      expect(reporter).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ action: "corrupt-file" }),
+      );
+    });
+
+    it("moves a corrupt file aside on the sync path too", async () => {
+      const channel = track(new JSONFileLog({ storagePath, maxMessagesToWrite: 1000 }));
+
+      channel.setErrorReporter(() => {});
+
+      await waitForInit(channel);
+
+      fs.writeFileSync(channel.filePath, "truncated{");
+
+      await channel.log(dataFor({ message: "next" }));
+      channel.flushSync();
+
+      const aside = fs
+        .readdirSync(storagePath)
+        .filter((name) => name.startsWith(`${channel.fileName}.json.corrupt-`));
+
+      expect(aside).toHaveLength(1);
+      expect(fs.readFileSync(path.join(storagePath, aside[0] ?? ""), "utf-8")).toBe("truncated{");
+    });
+  });
+
+  describe("entries logged while a write is in flight", () => {
+    it("writes every entry when logs keep arriving during writes", async () => {
+      const channel = track(new JSONFileLog({ storagePath, maxMessagesToWrite: 10 }));
+
+      await waitForInit(channel);
+
+      const pending: Array<void | Promise<void>> = [];
+
+      for (let index = 0; index < 2000; index++) {
+        pending.push(channel.log(dataFor({ message: `entry-${index}` })));
+
+        if (index % 50 === 0) {
+          await new Promise((resolve) => setImmediate(resolve));
+        }
+      }
+
+      await Promise.all(pending);
+      await channel.flush();
+
+      const contents = JSON.parse(fs.readFileSync(channel.filePath, "utf-8"));
+
+      expect(contents.messages).toHaveLength(2000);
+    });
+  });
+
+  describe("format: jsonl", () => {
+    it("appends one JSON object per line to a .jsonl file without reading it back", async () => {
+      const channel = track(
+        new JSONFileLog({ storagePath, maxMessagesToWrite: 10, format: "jsonl" }),
+      );
+
+      await waitForInit(channel);
+
+      const readFile = vi.spyOn(fs.promises, "readFile");
+
+      for (let index = 0; index < 100; index++) {
+        await channel.log(dataFor({ message: `entry-${index}`, context: { index } }));
+      }
+
+      await channel.flush();
+
+      expect(channel.extension).toBe("jsonl");
+      expect(channel.filePath.endsWith(".jsonl")).toBe(true);
+      expect(readFile).not.toHaveBeenCalled();
+
+      const lines = fs.readFileSync(channel.filePath, "utf-8").trim().split(/\r?\n/);
+
+      expect(lines).toHaveLength(100);
+      expect(JSON.parse(lines[99] ?? "")).toMatchObject({
+        content: "entry-99",
+        context: { index: 99 },
+      });
+    });
+
+    it("writes JSON lines on flushSync too", async () => {
+      const channel = track(
+        new JSONFileLog({ storagePath, maxMessagesToWrite: 1000, format: "jsonl" }),
+      );
+
+      await waitForInit(channel);
+
+      await channel.log(dataFor({ message: "one" }));
+      await channel.log(dataFor({ message: "two" }));
+      channel.flushSync();
+
+      const lines = fs.readFileSync(channel.filePath, "utf-8").trim().split(/\r?\n/);
+
+      expect(lines.map((line) => JSON.parse(line).content)).toEqual(["one", "two"]);
     });
   });
 

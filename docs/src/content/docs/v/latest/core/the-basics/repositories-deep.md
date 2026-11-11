@@ -208,7 +208,7 @@ The interesting ones:
 | `orderBy`      | The only ordering field that's honored. Three forms — see below.                                    |
 | `perform`      | Escape hatch — custom query callback. Covered in [Custom queries](#custom-queries-beyond-filterby). |
 
-> **`sortBy` / `sortDirection` apply only without `orderBy`.** When no `orderBy` is set, `sortBy` and `sortDirection` (default `"asc"`) become one order clause; an `orderBy` always wins. Prefer `orderBy` for ordering. Note that there is no working `purgeCache` option: invalidation is driven by model events (see [Caching](#caching)), so a `purgeCache` flag on the options object is inert.
+> **`sortBy` / `sortDirection` apply only without `orderBy`.** When no `orderBy` is set, `sortBy` and `sortDirection` (default `"asc"`) become one order clause; an `orderBy` always wins. Prefer `orderBy` for ordering. `purgeCache: true` makes `listCached`, `allCached` and `countCached` skip the cached value and refresh it; `listCached` ignores it when the current request sent it (see [Options from the request](#options-from-the-request)).
 
 > **Changed in 5.21:** `list(request.all())` no longer lets the client pick any sort or page size. A client-supplied sort or page size is honoured only when it is whitelisted by the repository; anything else falls back to the repository defaults. Options passed from application code (`list({ orderBy, limit })`) are unchanged.
 
@@ -221,6 +221,43 @@ class PostsRepository extends RepositoryManager<Post> {
 ```
 
 **Default order.** `sortable` only restricts what a caller may ask for. A default `orderBy` you write in code (the repository's `defaultOptions`) or in config (`repository.defaultOptions`) is trusted and always applied, whether or not its columns are in `sortable`. Precedence is: the caller's allowed `orderBy`, then the repository's `defaultOptions.orderBy`, then `repository.defaultOptions.orderBy` from config. When a caller's `orderBy` is dropped, the default order applies instead of none. `limit`, `perPage` and `defaultLimit` are still capped by `maxPerPage`, defaults included.
+
+### Options from the request
+
+> **Changed in 5.53:** a client can no longer turn pagination off, skip the list cache or choose its cache key through `list(request.all())`.
+
+`list()`, `listActive()`, `listCached()`, `latest()` and `oldest()` are safe to call with `request.all()`. Besides the sort and page-size rules above, three control options are ignored when the current request sent them:
+
+| Option            | When the request sent it                                                                                    |
+| ----------------- | ----------------------------------------------------------------------------------------------------------- |
+| `paginate: false` | Ignored: the list stays paginated, at most `maxPerPage` rows per page. A one-time warning names the opt-in. |
+| `purgeCache`      | Ignored: `listCached` reads the cache as usual.                                                             |
+| `cacheKey`        | Ignored: only server code chooses the list cache key.                                                       |
+
+An option counts as request input when the current HTTP request carries that key with the same value (query string, body or route params). The same option set by server code (a key the request did not send or sent with another value, or any call outside a request, such as a job, a seed or a CLI command) and from `defaultOptions` / `repository.defaultOptions` works as before. Server code cannot be told apart from the client when both pass the same value: an export endpoint that calls `list({ paginate: false })` while the client also sent `?paginate=false` is capped, so set `allowClientUnpaginated` on that repository or call `all()` for an export:
+
+```ts
+// The request did not send `paginate`: honoured, every matching row is returned.
+const { data } = await categoriesRepository.list({ ...request.all(), paginate: false });
+```
+
+To let clients switch pagination off for one repository (a dropdown that loads every option, for example), opt in on the repository, or for every repository in config:
+
+```ts
+class CategoriesRepository extends RepositoryManager<Category> {
+  protected allowClientUnpaginated = true; // default false
+}
+```
+
+```ts title="src/config/repository.ts"
+export default defineConfig({
+  repository: {
+    allowClientUnpaginated: true, // default false
+  },
+});
+```
+
+A non-function `perform` (such as `?perform=1`) is also dropped from request input: a request can never carry a callback.
 
 `orderBy` has three forms:
 
@@ -636,6 +673,8 @@ repositories.<name>.all.<JSON-of-options>
 
 `<name>` resolves from `this.name` if set, otherwise from `this.adapter.resolveRepositoryName()` — for Cascade, that's the model's `table`.
 
+The `listCached` key is built from the options after the request rules above are applied. When only the framework reads the options (the Cascade adapter, no function rules in `filterBy`, no callback such as `perform`, and `applyOptionsToQuery` / `sanitizeControls` / `prepareClientOptions` / `readActiveScope` not overridden), it holds only the `filterBy` keys and the controls that shape the page (`page`, `limit`, `orderBy`, `select`, cursor options and so on). An unknown query parameter (`?x=1`, `?x=2`, …) then reuses one entry instead of creating a new one per value. When custom code may read other options, every option stays in the key, as before.
+
 ### Invalidation
 
 Invalidation is automatic: when the model fires `created`, `updated`, or `deleted`, the repository's `clearCache()` runs, which removes the entire namespace:
@@ -651,6 +690,8 @@ public registerEvents() {
 ```
 
 Writes on this repository **or any other code path that fires the model events** trigger invalidation. That's why you should let the repository own writes for cached models — going around via raw queries means stale cache.
+
+A write outside a transaction clears the namespace once. Inside a transaction the namespace is cleared when the event fires and again after COMMIT, so a read that re-cached the old row while the transaction was open does not leave a stale entry behind.
 
 For finer control, you can invalidate manually:
 
@@ -758,6 +799,7 @@ type RepositoryConfigurations = {
   defaultOptions?: Partial<RepositoryOptions>;
   isActiveColumn?: string;
   isActiveValue?: any;
+  allowClientUnpaginated?: boolean; // default false, see "Options from the request"
 };
 ```
 
@@ -859,7 +901,8 @@ What's interesting here:
 - **`defaultLimit` is 15 at the framework level.** Override in `defaultOptions` to change per repository.
 - **Filter rules are not optional.** A caller passing `{ status: "active" }` with no `status` key in `filterBy` gets an unfiltered query and a silent drop. Wire every filter key you accept.
 - **The repository lifecycle hooks are not wired.** `onCreating`, `onCreate`, `onUpdating`, `onUpdate`, `onSaving`, `onSave`, `onDeleting`, `onDelete`, `beforeListing`, and `onList` exist on the base class but are never called. Use Cascade model events or override the action method instead.
-- **`sortBy` / `sortDirection` apply only without `orderBy`, and `purgeCache` is ignored.** Cache invalidation runs off model events, so a `purgeCache` flag is inert.
+- **`sortBy` / `sortDirection` apply only without `orderBy`.** `purgeCache` refreshes a cached read when server code sets it; `listCached` ignores it when the request sent it.
+- **A client cannot turn pagination off.** `paginate=false` from the request is ignored unless the repository sets `allowClientUnpaginated = true`. Server code that passes `paginate: false` itself is unaffected, unless the request also sent `paginate=false` (use `all()` for exports).
 - **Cursor pagination owns the sort order for its `cursorColumn`.** Passing `orderBy` on the same column is silently overridden with a console warning.
 - **`updateMany` / `deleteMany` skip the model lifecycle.** Fast, but no `creating` / `updating` / `deleting` events fire — and therefore no cache invalidation. Call `clearCache()` manually after a bulk write, or accept stale cache until next mutation.
 - **Bulk paginate methods (`listCached`) only support page mode.** Cursor pagination skips the cache entirely.

@@ -161,8 +161,18 @@ source.driver.on("query", onQuery);
 source.driver.off("query", onQuery);
 ```
 
-A throwing listener never fails the query. Mongo command monitoring is enabled
-unless `clientOptions.monitorCommands` is explicitly set.
+A throwing listener never fails the query. The registry subscribes to each
+driver only while it has a `query` listener itself. MongoDB command monitoring
+(which decodes every reply twice) follows the `queryEvents` connection option:
+unset, it is on outside production and off when `NODE_ENV` is `production`;
+`queryEvents: true` (or `logging: true`) turns it on, and an explicit
+`clientOptions.monitorCommands` wins. Set `queryEvents: true` to keep MongoDB
+`query` events (request-log query capture, devtools) in production. A `query`
+listener attached while a MongoDB source has them off logs one warning per
+source naming `queryEvents: true`.
+
+`logging: true` never writes values: PostgreSQL logs the count and types of
+bound values, MongoDB logs the command, collection and field shape only.
 
 ## Postgres session time zone
 

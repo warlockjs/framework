@@ -1,4 +1,5 @@
 import { createDecoder } from "fast-jwt";
+import { isTokenDigest } from "./token-digest";
 
 /**
  * Payload decoder. Deliberately signature-*unaware*: these helpers answer
@@ -51,10 +52,19 @@ export function tokenHasExpClaim(token: unknown): boolean {
  *
  * Two independent ways to answer "no", either of which is enough:
  * - the persisted expiry is unusable, so no date check can ever retire the row;
- * - the token itself carries no `exp`, so signature verification never retires it.
+ * - the token itself carries no `exp`, so signature verification never retires it
+ *   (not checkable for a row stored as a digest, which this package only ever
+ *   writes for tokens it signed with an `exp`).
  *
  * This is the predicate the `auth.purge-never-expiring` remediation selects on.
  */
 export function isNeverExpiring(token: unknown, expiresAt: unknown): boolean {
-  return !isUsableExpiry(expiresAt) || !tokenHasExpClaim(token);
+  if (!isUsableExpiry(expiresAt)) return true;
+
+  // A row stored hashed (`auth.hashTokensAtRest`) holds a digest, not a JWT,
+  // so its claims cannot be read; it was issued with an `exp` by construction,
+  // and its persisted expiry is the deadline that applies.
+  if (isTokenDigest(token)) return false;
+
+  return !tokenHasExpClaim(token);
 }

@@ -65,7 +65,23 @@ export type PayloadMeasurement = {
 /** Bytes of a value's devalue text as the document embeds it; `undefined` is not embedded. */
 export function serializedBytes(value: unknown): number {
   if (value === undefined) return 0;
-  return new TextEncoder().encode(stringify(value)).length;
+  return Buffer.byteLength(stringify(value), "utf8");
+}
+
+/**
+ * Devalue text of data sections the caller already serialized (the payload's
+ * serializability check produces it), measured instead of serializing the
+ * same value again. Each entry must be the text of the matching payload key.
+ */
+export type KnownPayloadSectionText = {
+  readonly app?: string;
+  readonly layout?: string;
+  readonly page?: string;
+};
+
+function sectionBytes(value: unknown, known: string | undefined): number {
+  if (value === undefined) return 0;
+  return known === undefined ? serializedBytes(value) : Buffer.byteLength(known, "utf8");
 }
 
 /** The payload keys that are measured as sections of their own. */
@@ -92,11 +108,12 @@ function withoutKey(record: Record<string, unknown>, key: string): Record<string
 export function measureDocumentPayload(
   payload: HydrationDocumentPayloadSource,
   routes: NamedApiRouteMetadata | undefined,
+  known: KnownPayloadSectionText = {},
 ): PayloadMeasurement {
   const sections: Record<PayloadSection, number> = {
-    page: serializedBytes(payload.pageData),
-    layout: serializedBytes(payload.layoutData),
-    app: serializedBytes(payload.appData),
+    page: sectionBytes(payload.pageData, known.page),
+    layout: sectionBytes(payload.layoutData, known.layout),
+    app: sectionBytes(payload.appData, known.app),
     translations: serializedBytes(payload.translations),
     routes: serializedBytes(routes),
     session: serializedBytes(payload.session),
@@ -104,13 +121,16 @@ export function measureDocumentPayload(
   };
 
   // Everything the payload carries that is not one of the sections above. The
-  // route table travels in its own script, so the copy the payload's `document`
-  // slot holds is not measured a second time.
+  // route table travels in its own script and the locale-routing table in its
+  // own meta tag, so the copies the payload's `document` slot holds are not
+  // measured: the document does not embed them there (`components/scripts.ts`).
   const other: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(payload)) {
     if (!SECTION_KEYS.has(key)) other[key] = value;
   }
-  if (isPlainRecord(other.document)) other.document = withoutKey(other.document, "namedApiRoutes");
+  if (isPlainRecord(other.document)) {
+    other.document = withoutKey(withoutKey(other.document, "namedApiRoutes"), "localeRouting");
+  }
   sections.other = serializedBytes(other);
 
   const total = PAYLOAD_SECTIONS.reduce((sum, section) => sum + sections[section], 0);
@@ -165,6 +185,16 @@ export function parsePayloadSize(size: string): number {
  * glob syntax is refused, so a pattern cannot silently match nothing.
  */
 export function payloadPatternMatches(pattern: string, routePath: string): boolean {
+  return compilePayloadPattern(pattern).test(routePath);
+}
+
+/** Compiled route-path globs, by pattern: a configured budget has a handful, matched per request. */
+const compiledPatterns = new Map<string, RegExp>();
+
+function compilePayloadPattern(pattern: string): RegExp {
+  const known = compiledPatterns.get(pattern);
+  if (known !== undefined) return known;
+
   if (/[[\]{}()!\\]/.test(pattern)) {
     throw new Error(
       `Invalid payload budget pattern ${JSON.stringify(pattern)}: supported wildcards are *, ** and ?.`,
@@ -183,7 +213,9 @@ export function payloadPatternMatches(pattern: string, routePath: string): boole
     else if (character === "?") expression += "[^/]";
     else expression += character?.replace(/[.+^$|]/g, "\\$&") ?? "";
   }
-  return new RegExp(`${expression}$`).test(routePath);
+  const compiled = new RegExp(`${expression}$`);
+  compiledPatterns.set(pattern, compiled);
+  return compiled;
 }
 
 /** The configuration shape `build.budgets.payload` takes, as the user writes it. */
@@ -222,6 +254,28 @@ export function payloadBudgetFor(
     if (payloadPatternMatches(entry.pattern, routePath)) bytes = entry.bytes;
   }
   return { bytes, mode: budget.mode };
+}
+
+/** The limit per route path, per resolved budget: the budget and the route table are fixed for the process. */
+const limitsByBudget = new WeakMap<
+  PagePayloadBudget,
+  Map<string, { readonly bytes: number; readonly mode: "warn" | "error" }>
+>();
+
+function cachedPayloadBudgetFor(
+  budget: PagePayloadBudget,
+  routePath: string,
+): { readonly bytes: number; readonly mode: "warn" | "error" } {
+  let limits = limitsByBudget.get(budget);
+  if (limits === undefined) {
+    limits = new Map();
+    limitsByBudget.set(budget, limits);
+  }
+  const known = limits.get(routePath);
+  if (known !== undefined) return known;
+  const limit = payloadBudgetFor(budget, routePath);
+  limits.set(routePath, limit);
+  return limit;
 }
 
 /** Route names already reported in this process: one line per route, never per request. */
@@ -268,14 +322,16 @@ export function reportPayloadBudget(input: {
   readonly route: { readonly name: string; readonly path: string };
   readonly payload: HydrationDocumentPayloadSource;
   readonly routes: NamedApiRouteMetadata | undefined;
+  /** Section text the caller already produced; see {@link KnownPayloadSectionText}. */
+  readonly serialized?: KnownPayloadSectionText;
 }): void {
   // Checked before measuring: a route is reported once per process, and a route
   // already reported needs no further measuring.
   if (reportedRoutes.has(input.route.name)) return;
 
   try {
-    const { bytes, mode } = payloadBudgetFor(input.budget, input.route.path);
-    const measurement = measureDocumentPayload(input.payload, input.routes);
+    const { bytes, mode } = cachedPayloadBudgetFor(input.budget, input.route.path);
+    const measurement = measureDocumentPayload(input.payload, input.routes, input.serialized);
     if (measurement.total <= bytes) return;
 
     reportedRoutes.add(input.route.name);

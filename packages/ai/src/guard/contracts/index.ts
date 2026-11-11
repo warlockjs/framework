@@ -27,6 +27,7 @@ export type {
   GuardrailBlockEvent,
   GuardrailEscalation,
   InjectionDetectorOptions,
+  LinkFilterOptions,
   OpenAiModerationOptions,
   PiiCategory,
   PiiDetectorOptions,

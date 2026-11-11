@@ -67,6 +67,9 @@ A token passes three separate checks, in order — a token can fail any one of t
 1. **The JWT verifies** — signature, algorithm, `tokenType`, and (since 4.12.0) the presence of an `exp` claim that has not passed. A token with _no_ `exp` is rejected: there is no deadline to check, so it would otherwise verify indefinitely.
 2. **The access-token row still exists** — deleting it (logout) invalidates the token immediately, before its JWT expiry.
 3. **The row's own `expires_at` has not passed** (since 4.12.0). The database is the authority on the session: a row whose expiry has elapsed is rejected and deleted, even if the JWT itself is still within its lifetime. A row with a missing or unparseable `expires_at` is treated as expired, not as never-expiring.
+4. **The claims name the row's user** (since 5.53): the token's `id` (and `userType`, when present) must equal the row's `user_id` / `user_type`, or it is `InvalidAccessToken`.
+
+Expired or malformed tokens and CSRF Origin mismatches are logged at `debug`, not `error` — any anonymous client can produce them.
 
 Missing or invalid credentials return 401; an authenticated disallowed user type returns 403:
 
@@ -268,6 +271,8 @@ export default {
 ```
 
 The cookie name `setAuthCookie`/`clearAuthCookie` write **must match** the name a `cookie:<name>` token source reads — they are not linked automatically.
+
+`auth.cookie.hostPrefix: true` (default `false`) writes the auth cookies as `__Host-<name>` with `Secure`, so a subdomain or plain-HTTP page cannot plant or overwrite them. It requires `path: "/"` and no Domain (`cookie.cookieDomain`, `options.domain`, `http.cookies.options.domain`); a write that breaks this throws naming the setting. Reads (`cookie:<name>` sources, `pageSession`) try `__Host-<name>` first and fall back to `<name>`, and the clear helpers remove both, so switching it on signs no one out.
 
 ### CSRF: an automatic Origin check on cookie-authenticated writes
 

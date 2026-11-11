@@ -24,9 +24,16 @@ export function Scripts(props: ScriptsProps): ReactElement {
   const context = useDocumentContext("Scripts");
   const { payload, nonce, hydrationClientModuleUrl, namedApiRoutes, siteKey } = context;
   const { payload: _payload, metadata: _metadata, ...document } = context;
-  // The route table has its own script (below), so the copy the payload's
-  // `document` slot holds is left out of this one: it would ship the table twice.
-  const { namedApiRoutes: _namedApiRoutes, ...documentSlots } = payload.document ?? document;
+  // The route table has its own script (below), and the locale-routing table
+  // its own `<meta name="warlock-locale-routing">` tag (`<Head/>`), so the
+  // copies the payload's `document` slot holds are left out of this one: each
+  // would ship twice. The browser rebuilds both from those elements before it
+  // hydrates (`client/hydrate-page.tsx`).
+  const {
+    namedApiRoutes: _namedApiRoutes,
+    localeRouting: _localeRouting,
+    ...documentSlots
+  } = payload.document ?? document;
   const documentPayload = { ...payload, document: documentSlots };
 
   // `renderPageFailure` marks its payload non-hydrating (page-render-bundle.ts):

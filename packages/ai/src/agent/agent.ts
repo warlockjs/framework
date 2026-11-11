@@ -639,6 +639,12 @@ class Execution<TOutput> {
   >;
   private readonly middlewareState: MiddlewareState = new Map();
   /**
+   * Set while the current trip's streamed text is held back for a
+   * `trip.bufferStream` middleware; `runTripThroughPipeline` emits the
+   * approved text once the pipeline returns.
+   */
+  private tripTextHeld = false;
+  /**
    * The agent's own tools plus this run's skill tools (`loadSkill`, and
    * `saveSkill` when a review gate is configured). Built once per execution
    * because `loadSkillTool` closes over a per-run counter enforcing
@@ -1672,13 +1678,37 @@ class Execution<TOutput> {
       messages: this.messages,
     };
 
-    return (await runPipeline(
+    this.tripTextHeld = false;
+
+    const response = (await runPipeline(
       this.middleware,
       "trip",
       context,
       () => this.getModelResponse(tripIndex),
       this.logger,
     )) as ModelResponse;
+
+    // The streamed text was held for a `bufferStream` middleware: release
+    // what its `trip.after` approved (possibly rewritten) as one delta.
+    if (this.tripTextHeld) {
+      this.tripTextHeld = false;
+
+      if (response.content) {
+        this.emit("agent.trip.streaming", { delta: response.content, tripIndex });
+      }
+    }
+
+    return response;
+  }
+
+  /**
+   * Whether streamed text must wait for `trip.after`: some middleware
+   * checks or rewrites the response text (an output guardrail) and set
+   * `trip.bufferStream`. Emitting deltas first would hand the consumer
+   * text the check later redacts or rejects.
+   */
+  private holdsStreamedText(): boolean {
+    return this.middleware.some((entry) => entry.trip?.bufferStream === true);
   }
 
   /** Whether the model edits context itself, so the agent only passes the hint. */
@@ -1798,6 +1828,10 @@ class Execution<TOutput> {
     let serverToolCalls: ModelResponse["serverToolCalls"];
     const toolCalls: ModelToolCallRequest[] = [];
     const recoveredCalls: ModelToolCallRequest[] = [];
+    // Output checks run in `trip.after`; until then the text stays in
+    // `content` (`runTripThroughPipeline` releases the approved text).
+    const holdText = this.holdsStreamedText();
+    this.tripTextHeld = holdText;
 
     const guardConfig = this.resolveStreamingToolGuard();
     const guard = guardConfig
@@ -1807,7 +1841,9 @@ class Execution<TOutput> {
           onSafeDelta: (delta) => {
             content += delta;
 
-            this.emit("agent.trip.streaming", { delta, tripIndex });
+            if (!holdText) {
+              this.emit("agent.trip.streaming", { delta, tripIndex });
+            }
           },
           onRecoveredCall: (request) => {
             recoveredCalls.push(request);
@@ -1831,7 +1867,9 @@ class Execution<TOutput> {
         } else {
           content += chunk.content;
 
-          this.emit("agent.trip.streaming", { delta: chunk.content, tripIndex });
+          if (!holdText) {
+            this.emit("agent.trip.streaming", { delta: chunk.content, tripIndex });
+          }
         }
 
         continue;
@@ -1849,7 +1887,11 @@ class Execution<TOutput> {
       }
 
       if (chunk.type === "reasoning") {
-        this.emit("agent.trip.reasoning", { delta: chunk.delta, tripIndex });
+        // No output check inspects reasoning, so it is not streamed while
+        // the trip's text is held for one.
+        if (!holdText) {
+          this.emit("agent.trip.reasoning", { delta: chunk.delta, tripIndex });
+        }
         continue;
       }
 

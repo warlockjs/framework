@@ -19,18 +19,29 @@ export function createLineSplitter(
   onOverflow: () => void = () => undefined,
 ): { write(chunk: Buffer): void; end(): void } {
   const decoder = new StringDecoder("utf8");
-  let pending = "";
+  // The unfinished line, kept as parts and joined only when its newline
+  // arrives, so each chunk is scanned once however long the line grows.
+  let parts: string[] = [];
+  let pendingLength = 0;
   let overflowed = false;
 
-  const consume = (text: string): void => {
-    pending += text;
+  const takePending = (tail: string): string => {
+    const line = parts.length === 0 ? tail : parts.join("") + tail;
 
-    let newline = pending.indexOf("\n");
+    parts = [];
+    pendingLength = 0;
+
+    return line;
+  };
+
+  const consume = (text: string): void => {
+    let start = 0;
+    let newline = text.indexOf("\n");
 
     while (newline !== -1) {
-      const line = pending.slice(0, newline).replace(/\r$/, "");
+      const line = takePending(text.slice(start, newline)).replace(/\r$/, "");
 
-      pending = pending.slice(newline + 1);
+      start = newline + 1;
 
       if (overflowed) {
         overflowed = false;
@@ -38,11 +49,17 @@ export function createLineSplitter(
         onLine(line);
       }
 
-      newline = pending.indexOf("\n");
+      newline = text.indexOf("\n", start);
     }
 
-    if (pending.length > MAX_LINE_BYTES) {
-      pending = "";
+    if (start < text.length) {
+      parts.push(start === 0 ? text : text.slice(start));
+      pendingLength += text.length - start;
+    }
+
+    if (pendingLength > MAX_LINE_BYTES) {
+      parts = [];
+      pendingLength = 0;
 
       if (!overflowed) {
         overflowed = true;
@@ -58,11 +75,11 @@ export function createLineSplitter(
     end(): void {
       consume(decoder.end());
 
-      if (pending.length > 0 && !overflowed) {
-        onLine(pending.replace(/\r$/, ""));
-      }
+      const rest = takePending("");
 
-      pending = "";
+      if (rest.length > 0 && !overflowed) {
+        onLine(rest.replace(/\r$/, ""));
+      }
     },
   };
 }

@@ -79,6 +79,35 @@ export function resolveLoaderTimeoutMs(): number {
   return value;
 }
 
+/** How a page's loaders start: one level after another, or all at once. */
+export type LoaderMode = "serial" | "parallel";
+
+/** Raised at request time when `web.loaders` is misconfigured. */
+export class LoaderModeConfigError extends Error {
+  public constructor(message: string) {
+    super(message);
+    this.name = "LoaderModeConfigError";
+  }
+}
+
+/**
+ * Read `web.loaders`: `"serial"` (the default) starts the app, layout and page
+ * loaders one after another; `"parallel"` starts them together and settles
+ * them in the same order. Anything else fails the request loudly, the same
+ * way a misconfigured {@link resolveLoaderTimeoutMs} does.
+ */
+export function resolveLoaderMode(): LoaderMode {
+  const value = config.get("web", {}).loaders ?? "serial";
+
+  if (value !== "serial" && value !== "parallel") {
+    throw new LoaderModeConfigError(
+      `web.loaders must be "serial" or "parallel"; received ${JSON.stringify(value)}.`,
+    );
+  }
+
+  return value;
+}
+
 /**
  * Read `web.streaming.crawlers` as-is — `false`, an options object, or
  * `undefined` (no override configured). `detect-crawler.ts` is the sole

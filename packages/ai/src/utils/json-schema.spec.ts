@@ -145,3 +145,43 @@ describe("extractJsonSchema — priority", () => {
     });
   });
 });
+
+describe("extractJsonSchema — conversion reuse", () => {
+  it("converts a schema once per target and returns the same object", () => {
+    const inputFn = vi.fn(({ target }: { target: string }) => ({
+      type: "object",
+      properties: { q: { type: "string", description: "query" } },
+      "x-target": target,
+    }));
+    const schema = makeStandardShell({ jsonSchema: { input: inputFn } });
+
+    const first = extractJsonSchema(schema);
+    const second = extractJsonSchema(schema);
+
+    expect(second).toBe(first);
+    expect(inputFn).toHaveBeenCalledTimes(1);
+
+    // A different target or compact setting is its own conversion.
+    const draft = extractJsonSchema(schema, { target: "draft-2020-12" });
+    expect(draft).not.toBe(first);
+    expect(draft?.["x-target"]).toBe("draft-2020-12");
+    expect(inputFn).toHaveBeenCalledTimes(2);
+
+    const compact = extractJsonSchema(schema, { compact: true });
+    expect(compact).toEqual({
+      type: "object",
+      properties: { q: { type: "string" } },
+      "x-target": "openai-strict",
+    });
+    expect(extractJsonSchema(schema, { compact: {} })).toBe(compact);
+    expect(extractJsonSchema(schema, { compact: { keepDescriptions: true } })).not.toBe(compact);
+  });
+
+  it("keeps two schema objects apart", () => {
+    const a = makeStandardShell({ jsonSchema: { input: () => ({ type: "object", title: "a" }) } });
+    const b = makeStandardShell({ jsonSchema: { input: () => ({ type: "object", title: "b" }) } });
+
+    expect(extractJsonSchema(a)?.title).toBe("a");
+    expect(extractJsonSchema(b)?.title).toBe("b");
+  });
+});

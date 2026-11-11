@@ -2,9 +2,15 @@ import { stringify } from "devalue";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   PREFETCH_CACHE_LIMIT,
+  PREFETCH_HOVER_DELAY_MS,
   PREFETCH_TTL_MS,
+  cancelScheduledPrefetch,
+  clearPrefetchCache,
+  connectPrefetchChunkWarmer,
   prefetchPageData,
   resetPrefetchCache,
+  schedulePrefetchPageData,
+  takeOrJoinPrefetchedPageData,
   takePrefetchedPageData,
 } from "./prefetch";
 
@@ -247,5 +253,131 @@ describe("expiry", () => {
     await prefetchPageData("/products");
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("takeOrJoinPrefetchedPageData", () => {
+  it("returns a cached payload synchronously and consumes it", async () => {
+    respondWith();
+
+    await prefetchPageData("/products");
+
+    const taken = takeOrJoinPrefetchedPageData("/products");
+
+    expect(taken).not.toBeInstanceOf(Promise);
+    expect(taken).toEqual({ type: "payload", payload: PAYLOAD, url: "/products" });
+    expect(takeOrJoinPrefetchedPageData("/products")).toBeUndefined();
+  });
+
+  it("joins a prefetch still in flight, so the click sends no second request", async () => {
+    const fetchMock = respondWith();
+    const pending = prefetchPageData("/products");
+
+    const joined = takeOrJoinPrefetchedPageData("/products");
+
+    expect(joined).toBeInstanceOf(Promise);
+    expect(await joined).toEqual({ type: "payload", payload: PAYLOAD, url: "/products" });
+
+    await pending;
+
+    expect(fetchMock).toHaveBeenCalledOnce();
+    // Spent by the join: a second navigation goes to the network.
+    expect(takeOrJoinPrefetchedPageData("/products")).toBeUndefined();
+  });
+
+  it("lets only one navigation join the same prefetch", () => {
+    respondWith();
+    void prefetchPageData("/products");
+
+    expect(takeOrJoinPrefetchedPageData("/products")).toBeInstanceOf(Promise);
+    expect(takeOrJoinPrefetchedPageData("/products")).toBeUndefined();
+  });
+
+  it("resolves a joined prefetch to undefined when the cache is cleared meanwhile", async () => {
+    respondWith();
+    void prefetchPageData("/products");
+
+    const joined = takeOrJoinPrefetchedPageData("/products");
+
+    clearPrefetchCache();
+
+    expect(await joined).toBeUndefined();
+  });
+
+  it("resolves a joined prefetch to undefined when it must hard-navigate", async () => {
+    respondWith({ status: 404 });
+    void prefetchPageData("/missing");
+
+    expect(await takeOrJoinPrefetchedPageData("/missing")).toBeUndefined();
+  });
+
+  it("cancels a hover prefetch still waiting out its delay", async () => {
+    vi.useFakeTimers();
+
+    const fetchMock = respondWith();
+
+    schedulePrefetchPageData("/products");
+
+    expect(takeOrJoinPrefetchedPageData("/products")).toBeUndefined();
+
+    await vi.advanceTimersByTimeAsync(PREFETCH_HOVER_DELAY_MS * 2);
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("hover intent", () => {
+  it("prefetches once the pointer has rested for the delay", async () => {
+    vi.useFakeTimers();
+
+    const fetchMock = respondWith();
+
+    schedulePrefetchPageData("/products");
+    await vi.advanceTimersByTimeAsync(PREFETCH_HOVER_DELAY_MS - 1);
+
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(1);
+
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it("sends nothing when the pointer leaves first", async () => {
+    vi.useFakeTimers();
+
+    const fetchMock = respondWith();
+
+    schedulePrefetchPageData("/products");
+    await vi.advanceTimersByTimeAsync(PREFETCH_HOVER_DELAY_MS / 2);
+    cancelScheduledPrefetch("/products");
+    await vi.advanceTimersByTimeAsync(PREFETCH_HOVER_DELAY_MS * 2);
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("page chunk warming", () => {
+  it("asks the connected warmer for the prefetched page's chunk", async () => {
+    respondWith();
+
+    const warm = vi.fn();
+    const disconnect = connectPrefetchChunkWarmer(warm);
+
+    await prefetchPageData("/products");
+    disconnect();
+
+    expect(warm).toHaveBeenCalledExactlyOnceWith("products.list");
+  });
+
+  it("warms nothing for a result the navigation would hard-navigate", async () => {
+    respondWith({ status: 404 });
+
+    const warm = vi.fn();
+    const disconnect = connectPrefetchChunkWarmer(warm);
+
+    await prefetchPageData("/missing");
+    disconnect();
+
+    expect(warm).not.toHaveBeenCalled();
   });
 });

@@ -39,7 +39,9 @@ import type {
   WhereObject,
   WhereOperator,
 } from "../contracts/query-builder.contract";
+import { toSqlComparisonOperator } from "../drivers/postgres/sql-comparison-operator";
 import { assertDefined, sanitizeFilter, sanitizeFilterValue } from "../utils/sanitize-filter";
+import { JSON_PATH_PLACEHOLDER, jsonPathOperation } from "./json-path-operand";
 
 // ============================================================================
 // TYPES
@@ -65,6 +67,9 @@ export type Op = {
  * joinWith({ actions: q => q.where("status", "pending").limit(5) })
  */
 export type JoinWithConstraint = string | ((q: QueryBuilder) => void);
+
+/** Aggregate functions `selectAggregate()` writes into SQL text. */
+const SELECT_AGGREGATES = new Set(["sum", "avg", "min", "max", "count", "first", "last"]);
 
 // ============================================================================
 // QUERY BUILDER — CONCRETE, DIRECTLY INSTANTIABLE
@@ -719,53 +724,69 @@ export class QueryBuilder<T = unknown> {
   }
 
   /**
-   * JSON path key exists.
-   * Uses a `whereRaw` so existing SQL parsers get `IS NOT NULL` immediately.
+   * JSON path key exists (the value at the path is not NULL).
+   *
+   * The JSON helpers record a raw SQL expression whose path the SQL parser
+   * resolves: a column followed by keys, written with dots
+   * (`profile.address.city`) or arrows (`settings->theme`). A leading segment
+   * naming a table or alias of the query keeps meaning `table.column`
+   * (`posts.meta.theme`); an all-digit key is an array index. Every
+   * identifier is quoted and every key escaped.
    */
   public whereJsonContainsKey(path: string): this {
-    this.addOperation("whereRaw", { expression: `${path} IS NOT NULL`, bindings: [] });
+    this.addOperation("whereRaw", jsonPathOperation(`${JSON_PATH_PLACEHOLDER} IS NOT NULL`, path));
     return this;
   }
 
   /**
    * Constrain the length of a JSON array at a path.
+   * The operator must be one of `=`, `!=`, `<>`, `>`, `>=`, `<`, `<=`.
    * @example q.whereJsonLength("tags", ">", 3)
    */
   public whereJsonLength(path: string, operator: WhereOperator, value: number): this {
-    this.addOperation("whereRaw", {
-      expression: `jsonb_array_length(${this.quoteColumn(path)}) ${operator} ?`,
-      bindings: [value],
-    });
+    this.addOperation(
+      "whereRaw",
+      jsonPathOperation(
+        `jsonb_array_length(${JSON_PATH_PLACEHOLDER}) ${toSqlComparisonOperator(operator, "whereJsonLength()")} ?`,
+        path,
+        [value],
+      ),
+    );
     return this;
   }
 
   /** JSON path must resolve to an array. */
   public whereJsonIsArray(path: string): this {
-    this.addOperation("whereRaw", {
-      expression: `jsonb_typeof(${path}) = 'array'`,
-      bindings: [],
-    });
+    this.addOperation(
+      "whereRaw",
+      jsonPathOperation(`jsonb_typeof(${JSON_PATH_PLACEHOLDER}) = 'array'`, path),
+    );
     return this;
   }
 
   /** JSON path must resolve to an object. */
   public whereJsonIsObject(path: string): this {
-    this.addOperation("whereRaw", {
-      expression: `jsonb_typeof(${path}) = 'object'`,
-      bindings: [],
-    });
+    this.addOperation(
+      "whereRaw",
+      jsonPathOperation(`jsonb_typeof(${JSON_PATH_PLACEHOLDER}) = 'object'`, path),
+    );
     return this;
   }
 
   /**
-   * Constrain the number of elements in an array field.
+   * Constrain the number of elements in an array field (`table.column` accepted).
+   * The operator must be one of `=`, `!=`, `<>`, `>`, `>=`, `<`, `<=`.
    * @example q.whereArrayLength("roles", ">=", 2)
    */
   public whereArrayLength(field: string, operator: WhereOperator, value: number): this {
-    this.addOperation("whereRaw", {
-      expression: `array_length(${field}, 1) ${operator} ?`,
-      bindings: [value],
-    });
+    this.addOperation(
+      "whereRaw",
+      jsonPathOperation(
+        `array_length(${JSON_PATH_PLACEHOLDER}, 1) ${toSqlComparisonOperator(operator, "whereArrayLength()")} ?`,
+        field,
+        [value],
+      ),
+    );
     return this;
   }
 
@@ -1329,6 +1350,14 @@ export class QueryBuilder<T = unknown> {
     aggregate: "sum" | "avg" | "min" | "max" | "count" | "first" | "last",
     alias: string,
   ): this {
+    // The function name lands in SQL text: accept the documented ones only.
+    if (!SELECT_AGGREGATES.has(String(aggregate).toLowerCase())) {
+      throw new Error(
+        `selectAggregate(): unsupported aggregate ${JSON.stringify(String(aggregate).slice(0, 40))}. ` +
+          `Use one of sum, avg, min, max, count, first, last.`,
+      );
+    }
+
     return this.selectRaw({
       [alias]: `${aggregate.toUpperCase()}(${field === "*" ? field : this.quoteColumn(field)})`,
     });
@@ -1336,7 +1365,7 @@ export class QueryBuilder<T = unknown> {
 
   /** Existence check as a projected boolean field. */
   public selectExists(field: string, alias: string): this {
-    return this.selectRaw({ [alias]: `${field} IS NOT NULL` });
+    return this.selectRaw({ [alias]: `${this.quoteColumn(field)} IS NOT NULL` });
   }
 
   /** COUNT as a projected field. */
@@ -1377,13 +1406,19 @@ export class QueryBuilder<T = unknown> {
     return this;
   }
 
-  /** JSON path extraction as a projected field. */
+  /**
+   * JSON path extraction (the last key as text) as a projected field. The
+   * path follows the rules of {@link whereJsonContainsKey}.
+   */
   public selectJson(path: string, alias?: string): this {
-    const parts = path.split("->");
-    const column = parts[0] ?? "";
-    const jsonPath = parts.slice(1).join("->");
-    const expr = jsonPath ? `${column}->>'${jsonPath}'` : column;
-    return alias ? this.selectAs(expr, alias) : this.selectRaw(expr);
+    const operation = jsonPathOperation(JSON_PATH_PLACEHOLDER, path, [], true);
+
+    this.addOperation("selectRaw", {
+      ...operation,
+      expression: alias ? { [alias]: JSON_PATH_PLACEHOLDER } : JSON_PATH_PLACEHOLDER,
+    });
+
+    return this;
   }
 
   /** JSON extraction via raw expression. */

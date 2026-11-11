@@ -12,34 +12,41 @@ Every built-in channel extends `BasicLogConfigurations` (the shared options — 
 
 `ConsoleLog` options — `BasicLogConfigurations` plus:
 
-| Option         | Type      | Default | Description                                                                                                                                                |
-| -------------- | --------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `showContext`  | `boolean` | `false` | Render the entry's `context` on a second line via `util.inspect`. When `false`, context is dropped from console output (file/JSON channels still keep it). |
-| `contextDepth` | `number`  | `4`     | Depth passed to `util.inspect` when rendering context. Only applies when `showContext` is enabled.                                                         |
+| Option         | Type       | Default | Description                                                                                                                                                |
+| -------------- | ---------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `showContext`  | `boolean`  | `false` | Render the entry's `context` on a second line via `util.inspect`. When `false`, context is dropped from console output (file/JSON channels still keep it). |
+| `contextDepth` | `number`   | `4`     | Depth passed to `util.inspect` when rendering context. Only applies when `showContext` is enabled.                                                         |
+| `minLevel`     | `LogLevel` | none    | Lowest severity this channel prints (`debug` < `info` = `success` < `warn` < `error` < `fatal`). Other channels are not affected.                          |
 
 ## `FileLogConfig`
 
 `FileLog` options — `BasicLogConfigurations` plus:
 
-| Option               | Type                                                         | Default                           | Description                                                                                                                                                        |
-| -------------------- | ------------------------------------------------------------ | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `storagePath`        | `string`                                                     | `process.cwd() + "/storage/logs"` | Directory where log files are stored. Created automatically.                                                                                                       |
-| `name`               | `string`                                                     | `"app"`                           | File name of a `single` chunk (without extension) and the `{name}` token.                                                                                          |
-| `chunk`              | `"single" \| "daily" \| "hourly"`                            | `"single"`                        | How entries split across files.                                                                                                                                    |
-| `rotate`             | `boolean`                                                    | `true`                            | Rotate the file when it exceeds `maxFileSize`.                                                                                                                     |
-| `extension`          | `string`                                                     | `"log"`                           | File extension. Ignored by `JSONFileLog` (always `"json"`).                                                                                                        |
-| `fileName`           | `string \| (date: Date) => string`                           | by `chunk`                        | File name pattern (`{YYYY}` `{MM}` `{DD}` `{HH}` `{mm}` `{name}`) or function; replaces the chunk's default (`name`, `{YYYY}-{MM}-{DD}`, `{YYYY}-{MM}-{DD}-{HH}`). |
-| `rotateFileName`     | `string \| (date: Date) => string`                           | `"{YYYY}-{MM}-{DD}"`              | Middle part of a rotated file's name (`<file name>-<rotateFileName>-<epoch ms>.<extension>`); same forms as `fileName`.                                            |
-| `retention`          | `{ maxFiles?: number; maxAgeDays?: number; match?: RegExp }` | none                              | Remove this channel's old files on boot and when a new file starts. See [File Channel → Retention](../channels/03-file/#retention--pruning-old-files).             |
-| `maxFileSize`        | `number`                                                     | `10485760` (10 MB)                | Max bytes before rotation. Only checked when `rotate` is `true`.                                                                                                   |
-| `maxMessagesToWrite` | `number`                                                     | `100`                             | Messages held in the in-memory buffer before flushing. Also flushed every 5 seconds.                                                                               |
-| `groupBy`            | `("level" \| "module" \| "action")[]`                        | none                              | Arrange files into a subdirectory hierarchy. Order = nesting depth.                                                                                                |
+| Option                | Type                                                         | Default                           | Description                                                                                                                                                                 |
+| --------------------- | ------------------------------------------------------------ | --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `storagePath`         | `string`                                                     | `process.cwd() + "/storage/logs"` | Directory where log files are stored. Created automatically.                                                                                                                |
+| `name`                | `string`                                                     | `"app"`                           | File name of a `single` chunk (without extension) and the `{name}` token.                                                                                                   |
+| `chunk`               | `"single" \| "daily" \| "hourly"`                            | `"single"`                        | How entries split across files.                                                                                                                                             |
+| `rotate`              | `boolean`                                                    | `true`                            | Rotate the file when it exceeds `maxFileSize`.                                                                                                                              |
+| `extension`           | `string`                                                     | `"log"`                           | File extension. Ignored by `JSONFileLog` (always `"json"`).                                                                                                                 |
+| `fileName`            | `string \| (date: Date) => string`                           | by `chunk`                        | File name pattern (`{YYYY}` `{MM}` `{DD}` `{HH}` `{mm}` `{name}`) or function; replaces the chunk's default (`name`, `{YYYY}-{MM}-{DD}`, `{YYYY}-{MM}-{DD}-{HH}`).          |
+| `rotateFileName`      | `string \| (date: Date) => string`                           | `"{YYYY}-{MM}-{DD}"`              | Middle part of a rotated file's name (`<file name>-<rotateFileName>-<epoch ms>.<extension>`); same forms as `fileName`.                                                     |
+| `retention`           | `{ maxFiles?: number; maxAgeDays?: number; match?: RegExp }` | none                              | Remove this channel's old files on boot and when a new file starts. See [File Channel → Retention](../channels/03-file/#retention--pruning-old-files).                      |
+| `maxFileSize`         | `number`                                                     | `10485760` (10 MB)                | Max bytes before rotation. Only checked when `rotate` is `true`.                                                                                                            |
+| `maxMessagesToWrite`  | `number`                                                     | `100`                             | Messages held in the in-memory buffer before flushing. Also flushed every 5 seconds.                                                                                        |
+| `groupBy`             | `("level" \| "module" \| "action")[]`                        | none                              | Arrange files into a subdirectory hierarchy. Order = nesting depth.                                                                                                         |
+| `maxBufferedMessages` | `number`                                                     | `10000`                           | Entries kept in memory while writes keep failing; past it the oldest are dropped and one notice is reported. `Infinity` keeps everything.                                   |
+| `escape`              | `boolean`                                                    | `true`                            | Write line breaks, tabs and control characters in messages as visible escapes so each entry is one line. `false` keeps line breaks raw; terminal escapes are still removed. |
 
 `FileLogConfig` also re-declares `levels` and `dateFormat` from the shared base, so they're available alongside the file-specific options.
 
 ## `JSONFileLog`
 
-`JSONFileLog` **extends `FileLog`** — it accepts the entire `FileLogConfig` shape and behaves identically for chunking, rotation, buffering, and `groupBy`. The one override: `extension` is forced to `"json"` regardless of what you pass.
+`JSONFileLog` **extends `FileLog`** — it accepts the entire `FileLogConfig` shape and behaves identically for chunking, rotation, buffering, and `groupBy`. The one override: `extension` is forced to `"json"` (`"jsonl"` with `format: "jsonl"`) regardless of what you pass. Its config type is `JSONFileLogConfig`, which adds:
+
+| Option   | Type                | Default  | Description                                                                                                     |
+| -------- | ------------------- | -------- | --------------------------------------------------------------------------------------------------------------- |
+| `format` | `"json" \| "jsonl"` | `"json"` | `"json"`: one `{ messages: [...] }` document per file. `"jsonl"`: one JSON object per line, append-only writes. |
 
 See [JSON File Channel](../channels/04-json-file/) for the output-format differences.
 

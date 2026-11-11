@@ -68,3 +68,15 @@ describe("isNeverExpiring", () => {
     expect(isNeverExpiring(withExp, new Date(Date.now() + 60_000))).toBe(false);
   });
 });
+
+describe("rows stored as a digest (hashTokensAtRest)", () => {
+  const DIGEST = "a".repeat(64);
+
+  it("are judged by their persisted expiry, not as tokens without an exp claim", () => {
+    expect(isNeverExpiring(DIGEST, new Date(Date.now() + 60_000))).toBe(false);
+  });
+
+  it("still count as never-expiring when the persisted expiry is unusable", () => {
+    expect(isNeverExpiring(DIGEST, new Date("not a date"))).toBe(true);
+  });
+});

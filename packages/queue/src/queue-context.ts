@@ -41,32 +41,47 @@ export function resetQueueContext(): void {
   activeContext = undefined;
 }
 
-/** The job-data envelope written when a context was captured. */
+/**
+ * The job-data envelope every dispatch writes. Version 2 is written for every
+ * job, with or without a captured context, so a payload that happens to look
+ * like an envelope is never read as one.
+ */
 export type QueueEnvelope = {
-  __warlock: { v: 1; context?: unknown };
+  __warlock: { v: 2; context?: unknown };
   payload: unknown;
 };
 
-/** Wrap a payload with the captured context; no context leaves it bare. */
+/** Wrap a payload in the job-data envelope; the context is kept only when one was captured. */
 export function wrapPayload(payload: unknown, context: unknown): unknown {
-  if (context === undefined) return payload;
+  const meta: QueueEnvelope["__warlock"] = { v: 2 };
 
-  return { __warlock: { v: 1, context }, payload } satisfies QueueEnvelope;
+  if (context !== undefined) meta.context = context;
+
+  return { __warlock: meta, payload } satisfies QueueEnvelope;
 }
 
-/** Split job data into payload and captured context; bare data passes through. */
+/**
+ * Split job data into payload and captured context.
+ *
+ * Version 2 envelopes are what every dispatch writes now. Version 1 envelopes
+ * were only ever written when a context was captured, so jobs queued before the
+ * upgrade still restore theirs. Anything else is a bare payload with no context.
+ */
 export function unwrapPayload(data: unknown): { payload: unknown; context: unknown } {
-  const envelope = data as Partial<QueueEnvelope> | null;
+  const envelope = data as { __warlock?: { v?: unknown; context?: unknown } } | null;
 
   if (
     envelope !== null &&
     typeof envelope === "object" &&
     typeof envelope.__warlock === "object" &&
     envelope.__warlock !== null &&
-    envelope.__warlock.v === 1 &&
+    (envelope.__warlock.v === 2 || envelope.__warlock.v === 1) &&
     "payload" in envelope
   ) {
-    return { payload: envelope.payload, context: envelope.__warlock.context };
+    return {
+      payload: (envelope as { payload: unknown }).payload,
+      context: envelope.__warlock.context,
+    };
   }
 
   return { payload: data, context: undefined };

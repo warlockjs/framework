@@ -70,7 +70,13 @@ The query helper above is application-owned: select eligible published rows.
 A plain `sitemap: productSitemap` function remains supported. The object form
 adds `invalidateOn` and static defaults, including `locales: false` for every
 supplied entry. Supplier functions return an Iterable or Promise of an Iterable;
-the Web adapter currently materializes entries in memory.
+the Web adapter currently materializes entries in memory. Up to four suppliers
+run at once; output keeps page order. A supplier receives a
+`SitemapSupplierContext` — `{ site, tenantKey, shared }`, empty in a single-site
+app. In multi-site mode a dynamic (tenant) site's supplier must filter by
+`tenantKey`: `entries: ({ tenantKey }) => listListings(tenantKey)`. Multi-site
+sitemaps are built per site on request and reused for `regenerateEvery`
+(5 minutes when unset), served with `ETag`/`Last-Modified` and 304s.
 
 Sitemap configuration and its exclusive model imports are projected out of the
 browser graph. Keep models in server modules and do not read them from the page

@@ -102,6 +102,7 @@ describe("semanticCache — exact-match path", () => {
       model,
       middleware: [
         semanticCache({
+          scope: "shared",
           embedder: new DeterministicEmbedder(),
           store,
           threshold: 0.99,
@@ -139,7 +140,12 @@ describe("semanticCache — paused turns", () => {
     const ai = agent({
       model,
       middleware: [
-        semanticCache({ embedder: new DeterministicEmbedder(), store, threshold: 0.99 }),
+        semanticCache({
+          embedder: new DeterministicEmbedder(),
+          store,
+          threshold: 0.99,
+          scope: "shared",
+        }),
       ],
     });
 
@@ -171,7 +177,12 @@ describe("semanticCache — responses cut off by the model's limits", () => {
       model,
       continueOnOutputLimit: 1,
       middleware: [
-        semanticCache({ embedder: new DeterministicEmbedder(), store, threshold: 0.99 }),
+        semanticCache({
+          embedder: new DeterministicEmbedder(),
+          store,
+          threshold: 0.99,
+          scope: "shared",
+        }),
       ],
     });
 
@@ -189,6 +200,7 @@ describe("semanticCache — responses cut off by the model's limits", () => {
       model,
       middleware: [
         semanticCache({
+          scope: "shared",
           embedder: new DeterministicEmbedder(),
           store: fresh.driver,
           threshold: 0.99,
@@ -211,7 +223,12 @@ describe("semanticCache — responses cut off by the model's limits", () => {
     const result = await agent({
       model: sdk.model({ name: "gpt-test" }),
       middleware: [
-        semanticCache({ embedder: new DeterministicEmbedder(), store, threshold: 0.99 }),
+        semanticCache({
+          embedder: new DeterministicEmbedder(),
+          store,
+          threshold: 0.99,
+          scope: "shared",
+        }),
       ],
     }).execute("huge question");
 
@@ -236,6 +253,7 @@ describe("semanticCache — vector-match path", () => {
       model,
       middleware: [
         semanticCache({
+          scope: "shared",
           embedder: new DeterministicEmbedder(),
           store,
           threshold: 0.5,
@@ -266,6 +284,7 @@ describe("semanticCache — vector-match path", () => {
       model,
       middleware: [
         semanticCache({
+          scope: "shared",
           embedder: new DeterministicEmbedder(),
           store: makeStore().driver,
           threshold: 0.999,
@@ -302,6 +321,7 @@ describe("semanticCache — TTL expiry", () => {
         model,
         middleware: [
           semanticCache({
+            scope: "shared",
             embedder: new DeterministicEmbedder(),
             store,
             threshold: 0.5,
@@ -341,6 +361,7 @@ describe("semanticCache — hash discrimination", () => {
       model,
       middleware: [
         semanticCache({
+          scope: "shared",
           embedder: new DeterministicEmbedder(),
           store: makeStore().driver,
           threshold: 0.99999,
@@ -375,6 +396,7 @@ describe("semanticCache — namespace isolation", () => {
       model,
       middleware: [
         semanticCache({
+          scope: "shared",
           embedder: new DeterministicEmbedder(),
           store,
           threshold: 0.5,
@@ -387,6 +409,7 @@ describe("semanticCache — namespace isolation", () => {
       model,
       middleware: [
         semanticCache({
+          scope: "shared",
           embedder: new DeterministicEmbedder(),
           store,
           threshold: 0.5,
@@ -452,6 +475,7 @@ describe("semanticCache — multi-trip / tool-using agents", () => {
       tools: [echoTool],
       middleware: [
         semanticCache({
+          scope: "shared",
           embedder: new DeterministicEmbedder(),
           store: makeStore().driver,
           threshold: 0.95,
@@ -475,7 +499,7 @@ describe("semanticCache — multi-trip / tool-using agents", () => {
    * and served back on the next run, short-circuiting before the tool
    * ever executed. Mid-stream responses must never enter the store.
    */
-  it("never caches a tool_calls response", async () => {
+  it("with cacheToolRuns, stores the post-tool answer but never a tool_calls response", async () => {
     const echoSchema: StandardSchemaV1<{ value: string }> = {
       "~standard": {
         version: 1,
@@ -524,6 +548,8 @@ describe("semanticCache — multi-trip / tool-using agents", () => {
       tools: [echoTool],
       middleware: [
         semanticCache({
+          scope: "shared",
+          cacheToolRuns: true,
           embedder: new DeterministicEmbedder(),
           store,
           threshold: 0.99,
@@ -786,5 +812,163 @@ describe("semanticCache — session scoping (security)", () => {
 
     expect(anonymous.text).toBe("anonymous answer");
     expect(mockModel.callCount).toBe(2);
+  });
+});
+
+/**
+ * Per-context matching: a cached answer is served only to the same agent,
+ * system prompt and conversation, a run without a scope key never touches
+ * the cache, and answers built from tool results are not stored unless
+ * `cacheToolRuns` is set.
+ */
+describe("semanticCache — context isolation (security)", () => {
+  it("does not serve one agent's answer to another agent in the same session", async () => {
+    const sdk = MockSDK({
+      responses: [
+        { content: "billing: your balance is 120", finishReason: "stop" },
+        { content: "support: please contact billing", finishReason: "stop" },
+      ],
+    });
+    const model = sdk.model({ name: "gpt-test" });
+    const mockModel = sdk.models[sdk.models.length - 1];
+    const { driver: store } = makeStore();
+    const cache = semanticCache({ embedder: new DeterministicEmbedder(), store, threshold: 0.5 });
+
+    const billing = agent({
+      model,
+      systemPrompt: "You are the billing agent.",
+      middleware: [cache],
+    });
+    const support = agent({
+      model,
+      systemPrompt: "You are the support agent.",
+      middleware: [cache],
+    });
+
+    await billing.execute("what is my balance?", { sessionId: "user-a" });
+    const fromSupport = await support.execute("what is my balance?", { sessionId: "user-a" });
+
+    expect(fromSupport.text).toBe("support: please contact billing");
+    expect(mockModel.callCount).toBe(2);
+  });
+
+  it("does not serve an answer given at another point of a conversation", async () => {
+    const sdk = MockSDK({
+      responses: [
+        { content: "deleting the staging database", finishReason: "stop" },
+        { content: "sending the invoice", finishReason: "stop" },
+      ],
+    });
+    const model = sdk.model({ name: "gpt-test" });
+    const mockModel = sdk.models[sdk.models.length - 1];
+    const { driver: store } = makeStore();
+    const cache = semanticCache({ embedder: new DeterministicEmbedder(), store, threshold: 0.5 });
+    const ai = agent({ model, middleware: [cache] });
+
+    await ai.execute("yes, go ahead", {
+      sessionId: "user-a",
+      history: [
+        { role: "user", content: "drop the staging database?" },
+        { role: "assistant", content: "Shall I go ahead?" },
+      ],
+    });
+    const second = await ai.execute("yes, go ahead", {
+      sessionId: "user-a",
+      history: [
+        { role: "user", content: "send the invoice?" },
+        { role: "assistant", content: "Shall I go ahead?" },
+      ],
+    });
+
+    expect(second.text).toBe("sending the invoice");
+    expect(mockModel.callCount).toBe(2);
+  });
+
+  it("neither reads nor writes for a run without a sessionId under the default scope", async () => {
+    const sdk = MockSDK({
+      responses: [
+        { content: "answer for A", finishReason: "stop" },
+        { content: "answer for B", finishReason: "stop" },
+      ],
+    });
+    const model = sdk.model({ name: "gpt-test" });
+    const mockModel = sdk.models[sdk.models.length - 1];
+    const { driver: store, countEntries } = makeStore();
+    const ai = agent({
+      model,
+      middleware: [semanticCache({ embedder: new DeterministicEmbedder(), store, threshold: 0.5 })],
+    });
+
+    await ai.execute("what is my current balance?");
+    expect(countEntries()).toBe(0);
+
+    const second = await ai.execute("what is my current balance?");
+    expect(second.text).toBe("answer for B");
+    expect(mockModel.callCount).toBe(2);
+  });
+
+  it("skips the cache when a scope resolver returns no key", async () => {
+    const sdk = MockSDK({
+      responses: [
+        { content: "first", finishReason: "stop" },
+        { content: "second", finishReason: "stop" },
+      ],
+    });
+    const model = sdk.model({ name: "gpt-test" });
+    const { driver: store, countEntries } = makeStore();
+    const ai = agent({
+      model,
+      middleware: [
+        semanticCache({
+          embedder: new DeterministicEmbedder(),
+          store,
+          threshold: 0.5,
+          scope: () => undefined,
+        }),
+      ],
+    });
+
+    await ai.execute("same question");
+    expect((await ai.execute("same question")).text).toBe("second");
+    expect(countEntries()).toBe(0);
+  });
+
+  it("does not store the answer of a run that called tools by default", async () => {
+    const echoSchema: StandardSchemaV1<{ value: string }> = {
+      "~standard": {
+        version: 1,
+        vendor: "test",
+        validate: (value) => ({ value: value as { value: string } }),
+      },
+    };
+    const echoTool = tool({
+      name: "echo",
+      description: "echoes input",
+      input: echoSchema,
+      execute: async ({ value }) => `echoed:${value}`,
+    });
+    const sdk = MockSDK({
+      responses: [
+        {
+          content: "",
+          finishReason: "tool_calls",
+          toolCalls: [{ id: "a", name: "echo", input: { value: "x" } }],
+        },
+        { content: "balance is 120", finishReason: "stop" },
+      ],
+    });
+    const model = sdk.model({ name: "gpt-test" });
+    const { driver: store, countEntries } = makeStore();
+    const ai = agent({
+      model,
+      tools: [echoTool],
+      middleware: [semanticCache({ embedder: new DeterministicEmbedder(), store, threshold: 0.5 })],
+      maxTrips: 5,
+    });
+
+    const run = await ai.execute("what is my balance?", { sessionId: "user-a" });
+
+    expect(run.text).toBe("balance is 120");
+    expect(countEntries()).toBe(0);
   });
 });

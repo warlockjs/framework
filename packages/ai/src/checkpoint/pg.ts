@@ -190,18 +190,32 @@ class PgCheckpointStore implements CheckpointStore {
   }
 
   /**
-   * Persist a fresh checkpoint row. Append-only — an existing
-   * `turn_index` is never overwritten; the PK collision surfaces as a
-   * Postgres error rather than a silent clobber (§4 Phase 6, Q15).
+   * Persist a checkpoint row. One row per `turn_index`: a second save of
+   * the same turn with the SAME `state` updates that row in place — the
+   * orchestrator does this to stamp or clear the compaction lock and to
+   * record `summarized_through` on the latest turn. A second save of the
+   * same turn with a DIFFERENT `state` (two turns of one session running at
+   * once) is refused with an error rather than silently overwriting the
+   * first turn (§4 Phase 6, Q15).
    */
   public async save(record: CheckpointRecord): Promise<void> {
-    await this.client.query(
-      `INSERT INTO ${this.table} (
+    const { rows } = await this.client.query(
+      `INSERT INTO ${this.table} AS existing (
          orchestrator_name, session_id, turn_index, state, last_route,
          signature, version, summarized_through, lock_acquired_at,
          lock_expires_at, saved_at
        )
-       VALUES ($1, $2, $3, $4::jsonb, $5, $6, $7, $8, $9, $10, $11)`,
+       VALUES ($1, $2, $3, $4::jsonb, $5, $6, $7, $8, $9, $10, $11)
+       ON CONFLICT (orchestrator_name, session_id, turn_index) DO UPDATE SET
+         last_route = EXCLUDED.last_route,
+         signature = EXCLUDED.signature,
+         version = EXCLUDED.version,
+         summarized_through = EXCLUDED.summarized_through,
+         lock_acquired_at = EXCLUDED.lock_acquired_at,
+         lock_expires_at = EXCLUDED.lock_expires_at,
+         saved_at = EXCLUDED.saved_at
+       WHERE existing.state = EXCLUDED.state
+       RETURNING turn_index`,
       [
         record.orchestrator_name,
         record.session_id,
@@ -216,6 +230,15 @@ class PgCheckpointStore implements CheckpointStore {
         record.saved_at,
       ],
     );
+
+    if (rows.length === 0) {
+      throw new Error(
+        `ai.checkpoint.pg: turn ${record.turn_index} of session "${record.session_id}" ` +
+          `(orchestrator "${record.orchestrator_name}") is already saved with a different state — ` +
+          `two turns of this session ran at once. Serialize turns per session (for example with ` +
+          `a session lock) and retry the turn.`,
+      );
+    }
   }
 
   /**
@@ -259,22 +282,18 @@ class PgCheckpointStore implements CheckpointStore {
   }
 
   /**
-   * Prune retained turns for a session down to the most recent
-   * `keepSnapshots` rows (orchestrator.md §4 Phase 6 / §15.2). Deletes
-   * every row with `turn_index < (max_turn_index - keepSnapshots)`. The
+   * Drop every row of a session whose `turn_index` is strictly below
+   * `keepBeforeTurnIndex` (orchestrator.md §4 Phase 6 / §15.2). The
    * orchestrator calls this synchronously after a successful
-   * {@link save} when `keepSnapshots` is a finite number; `"all"`
-   * retention skips the call entirely. Additive to the
-   * {@link CheckpointStore} contract — the contract carries no prune
-   * hook, so the policy stays on the orchestrator and the store only
-   * executes the bounded delete.
+   * {@link save} with `latest turn - keepSnapshots + 1`, so at most
+   * `keepSnapshots` rows stay; `"all"` retention skips the call entirely.
    */
   public async prune(
     orchestratorName: string,
     sessionId: string,
-    keepSnapshots: number,
+    keepBeforeTurnIndex: number,
   ): Promise<void> {
-    if (!Number.isFinite(keepSnapshots) || keepSnapshots < 0) {
+    if (!Number.isFinite(keepBeforeTurnIndex)) {
       return;
     }
 
@@ -282,12 +301,8 @@ class PgCheckpointStore implements CheckpointStore {
       `DELETE FROM ${this.table}
        WHERE orchestrator_name = $1
          AND session_id = $2
-         AND turn_index < (
-           SELECT max(turn_index) - $3
-           FROM ${this.table}
-           WHERE orchestrator_name = $1 AND session_id = $2
-         )`,
-      [orchestratorName, sessionId, keepSnapshots],
+         AND turn_index < $3`,
+      [orchestratorName, sessionId, keepBeforeTurnIndex],
     );
   }
 

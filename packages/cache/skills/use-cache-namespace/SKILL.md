@@ -83,4 +83,5 @@ Note: scope `ttl` defaults are NOT applied to SWR — `freshTtl` / `staleTtl` al
 
 - Don't create a `cache.namespace(prefix)` for a single read/write — the boilerplate doesn't pay off until the prefix repeats. Inline `cache.set("prefix.foo", ...)` is fine.
 - Don't expect `cache.namespace(prefix).clear()` to do anything on the `null` driver — `removeNamespace` no-ops there (it caches nothing).
+- Don't put raw request values in a prefix: ``cache.namespace(`tenant.${slug}`)`` with `slug = "acme.billing"` lands inside `tenant.acme`. Use `escapeCacheKeySegment(slug)` (percent-encodes `.` `,` `:` `{` `}` `"` `[` `]` `%`).
 - Don't mix prefix separators. The convention is `.` (dot) — pick one and stick with it across scopes so nested prefixes compose predictably.

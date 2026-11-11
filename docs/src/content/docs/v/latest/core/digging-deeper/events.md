@@ -78,7 +78,7 @@ sub.unsubscribe();
 - **Returns**: an `EventSubscription` from `@mongez/events` — call `.unsubscribe()` to detach.
 - **Listener arg**: the framework `Response` instance (not the raw Fastify reply). Use `response.statusCode`, `response.body`, `response.parsedBody`, `response.request`, etc.
 
-Under the hood, `Response.on(event, …)` subscribes to the `response.${event}` channel on the global bus, and the response fires it via an internal `trigger()` that defers one tick (`setTimeout(…, 0)`) so per-request work settles first.
+Under the hood, `Response.on(event, …)` subscribes to the `response.${event}` channel on the global bus, and the response fires it via an internal `trigger()` that defers one event-loop turn (`setImmediate`) so per-request work settles first. An event nobody subscribed to costs nothing: no turn is waited for.
 
 ### Which events actually fire
 
@@ -142,7 +142,7 @@ sub.unsubscribe();
 
 All four are genuinely fired (`executingMiddleware` / `executedMiddleware` from the request's middleware runner, `executingAction` / `executedAction` from the request-context middleware that wraps the handler).
 
-> **`request.on(...)` is broken — do not use it.** The `Request` class exposes an `on(eventName, callback)` method, but its body calls `this.subscribe(...)`, and **no `subscribe` method exists** on the class (it doesn't extend an emitter). Calling `request.on(...)` throws `this.subscribe is not a function` at runtime. The index signature on `Request` hides this from the type checker. Subscribe through `events.subscribe("request.<event>", …)` instead, as shown above. `request.trigger(event, …)` works fine — it's only the subscribe side that's unwired.
+> **`request.on(...)` is deprecated — subscribe through the bus instead.** `request.on(eventName, callback)` subscribes to the same process-wide `request.<event>` channel as `events.subscribe(...)`. The listener is never removed when the request ends and runs for every later request, so calling it inside a handler or middleware adds one more listener per request. Since 5.53 the first call logs a one-time deprecation warning. Subscribe once at module scope with `events.subscribe("request.<event>", callback)` instead, as shown above; the request is the last argument the callback receives.
 
 Because subscriptions on the global bus are app-wide (not per-request), a listener you register stays registered until you `.unsubscribe()` it. Register them once at boot, not inside a handler.
 
@@ -278,7 +278,7 @@ For the model event API itself (subscribing to `onCreated` on your own models), 
 
 - **Listener leaks on HMR.** Every surface here registers app-wide listeners. If you call `Response.on(...)`, `globalUseCasesEvents.on*(...)`, `mailEvents.on*(...)`, or `events.subscribe(...)` at a module's **top level**, each hot reload during dev piles on another listener — and they fire on every event thereafter. Register in a module's `main.ts` (auto-loaded once per boot, not per re-import), and/or keep the returned handle and `.unsubscribe()` on cleanup.
 - **Keep the unsubscribe handle.** Every subscribe call returns a detach handle — an `EventSubscription` with `.unsubscribe()` (Response, mail, per-request) or a plain `{ unsubscribe() }` object (use-case hooks). Discard it and you can never detach the listener.
-- **`request.on(...)` throws — use the bus.** As covered above, `request.on(...)` calls a non-existent `this.subscribe(...)`. Subscribe to per-request events via `events.subscribe("request.<event>", …)` from `@mongez/events`.
+- **`request.on(...)` is process-wide — use the bus at module scope.** As covered above, a listener added with `request.on(...)` outlives the request and runs for every later one. Subscribe once with `events.subscribe("request.<event>", …)` from `@mongez/events`.
 - **`sendingBadRequestJson` never fires.** It's a declared `ResponseEvent` that nothing triggers. Use `badRequest` instead.
 - **Response events defer one tick.** `Response.trigger` wraps dispatch in `setTimeout(…, 0)`, so a `sending` listener runs slightly after the synchronous send call returns. Don't assume a Response listener has run by the next synchronous line.
 - **Streaming skips most Response events.** `response.stream()` and `response.sse()` only fire `sending`/`sent`/`success` — not the JSON or per-status-code events (`successCreate` also fires on `stream().end()` for a 201, but not on `sse().end()`). If your observer must see every response, account for the streaming paths separately.

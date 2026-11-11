@@ -218,12 +218,14 @@ the operation duration in milliseconds.
 1. When you store a key with tags, the driver adds the key to each tag's index with a set primitive (`tagAdd`), so concurrent tagged writes never drop members.
 2. Each tag keeps the un-prefixed keys associated with it. Redis uses a native SET inside the prefix; Postgres merges into a JSON array on one row; the memory, LRU and mock drivers use a separate store that eviction and expiry never touch. The file driver keeps a serialized list.
 3. When you invalidate tags, the cache reads the members and deletes exactly those, then drops the index.
-4. Tag indexes have no TTL. Each tagged write also prunes up to 20 dead members, and `remove()` / `pull()` detach the key from its tags.
+4. Tag indexes have no TTL. Each tagged write also prunes up to 20 dead members, and `remove()` / `pull()` detach the key from its tags. The write samples those members (`tagSample`: Redis `SRANDMEMBER`, a database-side sample on Postgres) and checks them with an existence test (`exists`: Redis `EXISTS`, `SELECT 1` on Postgres) in one batch, so it never reads the whole index or any cached value, and the checks do not count as hits or misses.
+5. Invalidation removes the members in batches (`removeMany`): pipelined deletes on Redis, one `DELETE … = ANY(...)` per 500 keys on Postgres.
 
 ### Performance Impact
 
 - **Storage**: Minimal overhead - one additional key per tag per unique key
-- **Invalidation**: Efficient - O(n) where n is the number of keys per tag
+- **Tagged writes**: constant work per write, however many keys a tag holds
+- **Invalidation**: O(n) where n is the number of keys per tag, sent in batches
 - **Reads**: No performance impact - tagged cache reads are as fast as regular cache
 - **Memory**: Tag relationships stored in cache (uses same driver)
 

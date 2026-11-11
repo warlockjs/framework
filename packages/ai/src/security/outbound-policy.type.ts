@@ -45,7 +45,11 @@ export type OutboundPolicy = {
    * and aborted on overflow. Default `5_242_880` (5 MiB).
    */
   maxBytes?: number;
-  /** Per-request timeout in milliseconds. Default `10_000`. */
+  /**
+   * Deadline in milliseconds for the whole exchange: the request, every
+   * redirect hop, and the body read (a server that drips bytes cannot hold
+   * the caller past it). Default `10_000`.
+   */
   timeoutMs?: number;
   /**
    * Maximum number of redirect hops `guardedFetch` will follow. Every
@@ -55,6 +59,18 @@ export type OutboundPolicy = {
    */
   maxRedirects?: number;
   /**
+   * Header names still sent after a redirect moves to ANOTHER origin, on
+   * top of the built-in non-credential set (`accept`, `accept-encoding`,
+   * `accept-language`, `cache-control`, `content-language`,
+   * `content-type`, `pragma`, `user-agent`). Every other header the caller
+   * set — `authorization`, `cookie`, or a custom secret such as
+   * `x-api-key` — is dropped on that hop. Default `[]`.
+   *
+   * @example
+   * { crossOriginHeaders: ["x-request-id"] }
+   */
+  crossOriginHeaders?: string[];
+  /**
    * Caller `AbortSignal`, merged with the internal timeout — whichever
    * fires first aborts the request.
    */
@@ -62,7 +78,10 @@ export type OutboundPolicy = {
   /**
    * Injected `fetch` implementation (for tests, proxies, or a wrapper
    * that already enforces app-level SSRF rules). Defaults to the global
-   * `fetch`.
+   * `fetch`. With the global `fetch`, each connection is pinned to an
+   * address that passed the private-IP check (a host whose DNS answer
+   * changes after the check is refused); an injected `fetch` is used
+   * as-is, with the DNS pre-check still applied.
    */
   fetch?: typeof fetch;
 };
@@ -75,6 +94,7 @@ export type ResolvedOutboundPolicy = {
   maxBytes: number;
   timeoutMs: number;
   maxRedirects: number;
+  crossOriginHeaders: string[];
   signal?: AbortSignal;
   fetch: typeof fetch;
 };

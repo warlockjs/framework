@@ -1,11 +1,19 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
-import { createInterface, type Interface } from "node:readline";
 import type { JsonRpcId, JsonRpcRequest, JsonRpcResponse, McpTransport } from "../contracts";
 import { McpTransportError } from "../errors";
 import type { McpTransportClient } from "./transport.type";
 
 /** Default per-request wait before a transport call is abandoned. */
 const DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
+
+/**
+ * Default cap on one response: an HTTP response body, or one stdout line of
+ * a stdio server. Override per transport with `maxResponseBytes`.
+ */
+const DEFAULT_MAX_RESPONSE_BYTES = 10 * 1024 * 1024;
+
+/** The newline byte that frames stdio messages. */
+const NEWLINE = 0x0a;
 
 /** The JSON-RPC version literal every outbound message carries. */
 const JSONRPC_VERSION = "2.0";
@@ -123,8 +131,9 @@ function armCall(
 /**
  * The stdio transport — spawns a child process and speaks JSON-RPC over
  * its stdin/stdout, one JSON object per line (newline-delimited framing).
- * Uses only Node built-ins (`node:child_process` + `node:readline`); no
- * dependency.
+ * Uses only Node built-ins (`node:child_process`); no dependency. A stdout
+ * line longer than `maxResponseBytes` is dropped and fails the calls in
+ * flight instead of growing the buffer without bound.
  *
  * Constructed via {@link createStdioTransport}; the class itself is
  * internal.
@@ -133,8 +142,16 @@ class StdioTransport implements McpTransportClient {
   /** The spawned server process. */
   private readonly child: ChildProcessWithoutNullStreams;
 
-  /** Line reader over the child's stdout — one JSON-RPC message per line. */
-  private readonly reader: Interface;
+  /** Longest stdout line kept, in bytes. */
+  private readonly maxLineBytes: number;
+
+  /** Bytes of the stdout line still waiting for its newline. */
+  private lineParts: Buffer[] = [];
+
+  private lineBytes = 0;
+
+  /** The current line passed the cap; drop bytes until its newline. */
+  private discarding = false;
 
   /** In-flight requests awaiting a correlated response, keyed by id. */
   private readonly pending = new Map<JsonRpcId, PendingCall>();
@@ -166,13 +183,83 @@ class StdioTransport implements McpTransportClient {
     }
 
     this.child = child;
-    this.reader = createInterface({ input: child.stdout });
+    this.maxLineBytes = transport.maxResponseBytes ?? DEFAULT_MAX_RESPONSE_BYTES;
 
-    this.reader.on("line", (line) => this.onLine(line));
+    child.stdout.on("data", (chunk: Buffer) => this.onData(chunk));
 
     // A child that dies takes every in-flight (and future) call with it.
     child.on("exit", (code) => this.failAll("connect", `child exited with code ${code ?? "null"}`));
     child.on("error", (error) => this.failAll("connect", error.message));
+  }
+
+  /**
+   * Split stdout into lines at the newline byte (never inside a UTF-8
+   * sequence), keeping at most `maxLineBytes` of an unfinished line. A line
+   * past the cap is dropped up to its newline and the calls in flight are
+   * failed, since its id can no longer be read.
+   */
+  private onData(chunk: Buffer): void {
+    let start = 0;
+    let newline = chunk.indexOf(NEWLINE);
+
+    while (newline !== -1) {
+      const tail = chunk.subarray(start, newline);
+
+      if (this.discarding) {
+        this.discarding = false;
+      } else if (this.lineBytes + tail.length > this.maxLineBytes) {
+        this.failOversizedLine();
+      } else {
+        const line = this.lineParts.length === 0 ? tail : Buffer.concat([...this.lineParts, tail]);
+
+        this.emitLine(line.toString("utf8"));
+      }
+
+      this.lineParts = [];
+      this.lineBytes = 0;
+      start = newline + 1;
+      newline = chunk.indexOf(NEWLINE, start);
+    }
+
+    if (start >= chunk.length || this.discarding) {
+      return;
+    }
+
+    const rest = chunk.subarray(start);
+
+    if (this.lineBytes + rest.length > this.maxLineBytes) {
+      this.lineParts = [];
+      this.lineBytes = 0;
+      this.discarding = true;
+      this.failOversizedLine();
+
+      return;
+    }
+
+    this.lineParts.push(rest);
+    this.lineBytes += rest.length;
+  }
+
+  /** A carriage return also ends a line, as it does for a line reader. */
+  private emitLine(text: string): void {
+    for (const line of text.split("\r")) {
+      this.onLine(line);
+    }
+  }
+
+  /** Reject every call in flight: an oversized line cannot be correlated. */
+  private failOversizedLine(): void {
+    for (const [id, call] of this.pending) {
+      this.pending.delete(id);
+      call.cleanup();
+      call.reject(
+        new McpTransportError(
+          `MCP stdio transport received a message over the ${this.maxLineBytes}-byte limit; it was dropped. ` +
+            "Raise the transport's maxResponseBytes if this server sends larger results.",
+          { type: "protocol", context: { maxResponseBytes: this.maxLineBytes } },
+        ),
+      );
+    }
   }
 
   /**
@@ -292,7 +379,7 @@ class StdioTransport implements McpTransportClient {
     }
 
     this.closed = true;
-    this.reader.close();
+    this.child.stdout.removeAllListeners("data");
     this.failAll("closed", "transport closed by caller");
     this.child.kill();
   }
@@ -340,6 +427,9 @@ class HttpTransport implements McpTransportClient {
   /** The `fetch` used for every request (injectable). */
   private readonly fetchImpl: typeof globalThis.fetch;
 
+  /** Largest response body read, in bytes. */
+  private readonly maxResponseBytes: number;
+
   /** Monotonic id source for outbound requests. */
   private nextId = 1;
 
@@ -347,6 +437,7 @@ class HttpTransport implements McpTransportClient {
     this.url = transport.url;
     // Resolved per call when not injected, so a replaced global still applies.
     this.fetchImpl = transport.fetch ?? ((input, init) => globalThis.fetch(input, init));
+    this.maxResponseBytes = transport.maxResponseBytes ?? DEFAULT_MAX_RESPONSE_BYTES;
     this.headers = {
       "content-type": "application/json",
       accept: "application/json, text/event-stream",
@@ -373,61 +464,72 @@ class HttpTransport implements McpTransportClient {
       }
     }
 
-    let response: Response;
-
+    // The timer stays armed until the body is read: a server that sends
+    // headers and then drips (or never ends) the body still times out.
     try {
-      response = await this.fetchImpl(this.url, {
-        method: "POST",
-        headers: this.headers,
-        body: JSON.stringify(request),
-        signal: controller.signal,
-      });
-    } catch (cause) {
-      const aborted = controller.signal.aborted;
-      const message = cause instanceof Error ? cause.message : String(cause);
-      const timeoutCode = findTimeoutCode(cause);
+      let response: Response;
 
-      if (timeoutCode && !aborted) {
+      try {
+        response = await this.fetchImpl(this.url, {
+          method: "POST",
+          headers: this.headers,
+          body: JSON.stringify(request),
+          signal: controller.signal,
+        });
+      } catch (cause) {
+        const aborted = controller.signal.aborted;
+        const message = cause instanceof Error ? cause.message : String(cause);
+        const timeoutCode = findTimeoutCode(cause);
+
+        if (timeoutCode && !aborted) {
+          throw new McpTransportError(
+            `MCP http transport request "${request.method}" timed out (${timeoutCode}): ${message}. The HTTP client gave up waiting for the server; for long calls pass a "fetch" with a longer headers timeout.`,
+            { type: "timeout", method: request.method, cause },
+          );
+        }
+
         throw new McpTransportError(
-          `MCP http transport request "${request.method}" timed out (${timeoutCode}): ${message}. The HTTP client gave up waiting for the server; for long calls pass a "fetch" with a longer headers timeout.`,
-          { type: "timeout", method: request.method, cause },
+          aborted
+            ? `MCP request "${request.method}" timed out or was aborted after ${timeoutMs}ms.`
+            : `MCP http transport request "${request.method}" failed: ${message}`,
+          { type: aborted ? "timeout" : "connect", method: request.method, cause },
         );
       }
 
-      throw new McpTransportError(
-        aborted
-          ? `MCP request "${request.method}" timed out or was aborted after ${timeoutMs}ms.`
-          : `MCP http transport request "${request.method}" failed: ${message}`,
-        { type: aborted ? "timeout" : "connect", method: request.method, cause },
-      );
+      if (!response.ok) {
+        throw new McpTransportError(
+          `MCP http transport request "${request.method}" returned HTTP ${response.status}.`,
+          { type: "connect", method: request.method, context: { status: response.status } },
+        );
+      }
+
+      try {
+        return await this.parseBody<TResult>(response, request.method, controller.signal);
+      } catch (cause) {
+        const timeoutCode = findTimeoutCode(cause);
+
+        if (timeoutCode) {
+          throw new McpTransportError(
+            `MCP http transport response for "${request.method}" timed out (${timeoutCode}) while reading the body.`,
+            { type: "timeout", method: request.method, cause },
+          );
+        }
+
+        if (controller.signal.aborted && !(cause instanceof McpTransportError)) {
+          throw new McpTransportError(
+            `MCP request "${request.method}" timed out or was aborted after ${timeoutMs}ms while reading the response body.`,
+            { type: "timeout", method: request.method, cause },
+          );
+        }
+
+        throw cause;
+      }
     } finally {
       clearTimeout(timer);
 
       if (signal) {
         signal.removeEventListener("abort", onAbort);
       }
-    }
-
-    if (!response.ok) {
-      throw new McpTransportError(
-        `MCP http transport request "${request.method}" returned HTTP ${response.status}.`,
-        { type: "connect", method: request.method, context: { status: response.status } },
-      );
-    }
-
-    try {
-      return await this.parseBody<TResult>(response, request.method);
-    } catch (cause) {
-      const timeoutCode = findTimeoutCode(cause);
-
-      if (timeoutCode) {
-        throw new McpTransportError(
-          `MCP http transport response for "${request.method}" timed out (${timeoutCode}) while reading the body.`,
-          { type: "timeout", method: request.method, cause },
-        );
-      }
-
-      throw cause;
     }
   }
 
@@ -441,8 +543,9 @@ class HttpTransport implements McpTransportClient {
   private async parseBody<TResult>(
     response: Response,
     method: string,
+    signal: AbortSignal,
   ): Promise<JsonRpcResponse<TResult>> {
-    const raw = await response.text();
+    const raw = await this.readBody(response, method, signal);
     const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
 
     const jsonText = contentType.includes("text/event-stream") ? extractSseData(raw) : raw;
@@ -463,6 +566,66 @@ class HttpTransport implements McpTransportClient {
         cause,
       });
     }
+  }
+
+  /**
+   * Read the body as UTF-8 text, at most `maxResponseBytes`. A declared
+   * `content-length` over the cap fails before reading; otherwise the read
+   * stops as soon as the running total passes it. The read also ends when
+   * `signal` aborts (the request timeout or the caller's signal).
+   */
+  private async readBody(response: Response, method: string, signal: AbortSignal): Promise<string> {
+    const max = this.maxResponseBytes;
+    const tooLarge = (): McpTransportError =>
+      new McpTransportError(
+        `MCP http transport response for "${method}" is over the ${max}-byte limit. ` +
+          "Raise the transport's maxResponseBytes if this server returns larger results.",
+        { type: "protocol", method, context: { maxResponseBytes: max } },
+      );
+    const declared = Number(response.headers.get("content-length"));
+
+    if (Number.isFinite(declared) && declared > max) {
+      void response.body?.cancel().catch(() => undefined);
+      throw tooLarge();
+    }
+
+    if (!response.body) {
+      const text = await untilAborted(response.text(), signal);
+
+      if (Buffer.byteLength(text) > max) {
+        throw tooLarge();
+      }
+
+      return text;
+    }
+
+    const reader = response.body.getReader();
+    const chunks: Uint8Array[] = [];
+    let total = 0;
+
+    try {
+      for (;;) {
+        const result = await untilAborted(reader.read(), signal);
+
+        if (result.done) {
+          break;
+        }
+
+        const value = result.value;
+        total += value.byteLength;
+
+        if (total > max) {
+          throw tooLarge();
+        }
+
+        chunks.push(value);
+      }
+    } catch (error) {
+      void reader.cancel().catch(() => undefined);
+      throw error;
+    }
+
+    return new TextDecoder().decode(Buffer.concat(chunks));
   }
 
   public async notify(method: string, params?: unknown): Promise<void> {
@@ -495,6 +658,31 @@ class HttpTransport implements McpTransportClient {
     // Streamable HTTP is stateless per request — nothing persistent to
     // release.
   }
+}
+
+/** Settle with `promise`, or reject as soon as `signal` aborts. */
+function untilAborted<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
+  if (signal.aborted) {
+    promise.catch(() => undefined);
+
+    return Promise.reject(new Error("aborted"));
+  }
+
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = (): void => reject(new Error("aborted"));
+
+    signal.addEventListener("abort", onAbort, { once: true });
+    promise.then(
+      (value) => {
+        signal.removeEventListener("abort", onAbort);
+        resolve(value);
+      },
+      (error: unknown) => {
+        signal.removeEventListener("abort", onAbort);
+        reject(error);
+      },
+    );
+  });
 }
 
 /**

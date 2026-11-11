@@ -201,6 +201,19 @@ await cache.set("posts.123", postData);
 await cache.set("posts.123.comments", comments);
 ```
 
+### Escape Values From Requests
+
+A `.` inside a value turns it into two segments: a tenant slug `acme.billing` would read and write inside the `acme` namespace, and `acme`'s clear would wipe it. Pass values that come from a request through `escapeCacheKeySegment()`, which percent-encodes the separator characters (`.` `,` `:` `{` `}` `"` `[` `]` and `%`) and leaves other text unchanged:
+
+```ts
+import { cache, escapeCacheKeySegment } from "@warlock.js/cache";
+
+const scope = cache.namespace(`tenant.${escapeCacheKeySegment(tenantSlug)}`);
+// "acme.billing" → "tenant.acme%2Ebilling", never inside "tenant.acme"
+```
+
+Object keys do this for you: separator characters inside an object key's values and property names are escaped, so `{ a: "b.c" }` and `{ a: "b", c: "" }` are different keys. Values without separators keep the same key as before.
+
 ### Avoid Colons or Other Separators
 
 ```ts

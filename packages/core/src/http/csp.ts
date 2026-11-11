@@ -1,6 +1,10 @@
 import config from "@mongez/config";
 import type { Request } from "./request";
-import { frameAncestorSources, resolveSecurityHeadersConfig } from "./security-headers";
+import {
+  frameAncestorSources,
+  resolveSecurityHeadersConfig,
+  type RouteSecurityHeaders,
+} from "./security-headers";
 import type { Response } from "./response";
 
 /**
@@ -252,14 +256,74 @@ export function applyCspHeader(request: Request, response: Response): void {
     ? "Content-Security-Policy-Report-Only"
     : "Content-Security-Policy";
 
+  const template = cspHeaderTemplate(cspConfig, request.route?.securityHeaders);
+
+  response.header(headerName, template.before + request.nonce + template.after);
+}
+
+/**
+ * Stands in for the nonce while the static part of the header is built; it
+ * cannot occur in a real directive (header values carry no NUL).
+ */
+const NONCE_PLACEHOLDER = "\u0000warlock-csp-nonce\u0000";
+
+/** The header value around the nonce, and the config values it came from. */
+type CspHeaderTemplate = {
+  inputs: readonly unknown[];
+  before: string;
+  after: string;
+};
+
+let appWideCspTemplate: CspHeaderTemplate | undefined;
+
+const routeCspTemplates = new WeakMap<object, CspHeaderTemplate>();
+
+/**
+ * The header value with a hole where the request's nonce goes, built once
+ * per config (compared by identity: replacing a config object rebuilds it)
+ * and route override. Only the nonce differs between two requests, so the
+ * directive merge and serialisation no longer run on every request; the
+ * result is the same string {@link buildCspHeaderValue} returns.
+ */
+function cspHeaderTemplate(
+  cspConfig: CspConfig,
+  routeSecurity: RouteSecurityHeaders | undefined,
+): CspHeaderTemplate {
+  const inputs = [cspConfig, cspConfig.directives, config.get("http.securityHeaders")];
+  const routeKey = routeSecurity && typeof routeSecurity === "object" ? routeSecurity : undefined;
+  const cached = routeKey
+    ? routeCspTemplates.get(routeKey)
+    : routeSecurity === undefined
+      ? appWideCspTemplate
+      : undefined;
+
+  if (
+    cached &&
+    cached.inputs.length === inputs.length &&
+    cached.inputs.every((value, index) => value === inputs[index])
+  ) {
+    return cached;
+  }
+
   // One CSP header carries `frame-ancestors` exactly once: the policy from
   // `http.securityHeaders` (route override included) when it is on, which
   // replaces this header's earlier frame-ancestors-only copy.
-  const securityConfig = resolveSecurityHeadersConfig(request.route?.securityHeaders);
+  const securityConfig = resolveSecurityHeadersConfig(routeSecurity);
   const frameAncestors =
     securityConfig && securityConfig.frameAncestors !== false
       ? frameAncestorSources(securityConfig.frameAncestors ?? "none")
       : undefined;
 
-  response.header(headerName, buildCspHeaderValue(cspConfig, request.nonce, frameAncestors));
+  const value = buildCspHeaderValue(cspConfig, NONCE_PLACEHOLDER, frameAncestors);
+  const at = value.indexOf(NONCE_PLACEHOLDER);
+  const template: CspHeaderTemplate = {
+    inputs,
+    before: value.slice(0, at),
+    after: value.slice(at + NONCE_PLACEHOLDER.length),
+  };
+
+  if (routeKey) routeCspTemplates.set(routeKey, template);
+  else if (routeSecurity === undefined) appWideCspTemplate = template;
+
+  return template;
 }

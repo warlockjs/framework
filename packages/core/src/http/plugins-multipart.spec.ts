@@ -10,6 +10,7 @@ async function limits() {
   register.mockClear();
   await registerHttpPlugins({
     register,
+    addHook: vi.fn(),
     addContentTypeParser: vi.fn(),
     after: vi.fn().mockResolvedValue(undefined),
   } as any);

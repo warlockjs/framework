@@ -4,14 +4,73 @@ import type { CacheKey, CacheSetOptions, CacheTtl, RememberOptions } from "./typ
 import { CacheConfigurationError } from "./types";
 
 /**
- * Make a proper key for the cache
+ * Characters that `parseCacheKey` strips or turns into the `.` separator.
+ * Inside a value they would make two different keys equal.
+ */
+const KEY_SEPARATOR_CHARACTERS = /[%.,:{}"[\]]/g;
+
+/**
+ * Escape a value for use as ONE segment of a cache key or namespace: the
+ * characters the key format treats as separators or strips (`.` `,` `:`
+ * `{` `}` `"` `[` `]`, and `%` itself) are percent-encoded, so the value can
+ * never reach into another key or namespace. Values without those
+ * characters are returned unchanged.
+ *
+ * Use it for request-derived text (slugs, search terms, ids from a client).
+ *
+ * @example
+ * cache.namespace(`tenant.${escapeCacheKeySegment(tenantSlug)}`);
+ * // slug "acme.billing" → namespace "tenant.acme%2Ebilling", never inside "tenant.acme"
+ */
+export function escapeCacheKeySegment(value: string): string {
+  return value.replace(
+    KEY_SEPARATOR_CHARACTERS,
+    (character) => `%${character.charCodeAt(0).toString(16).toUpperCase().padStart(2, "0")}`,
+  );
+}
+
+/**
+ * Escape every string (and object key) inside an object key, so a value that
+ * contains a separator cannot be read as two segments. Values without
+ * separator characters keep their exact previous encoding.
+ */
+function escapeKeyObject(value: unknown): unknown {
+  if (typeof value === "string") {
+    return escapeCacheKeySegment(value);
+  }
+
+  if (Array.isArray(value)) {
+    return value.map(escapeKeyObject);
+  }
+
+  if (value === null || typeof value !== "object" || value instanceof Date) {
+    return value;
+  }
+
+  // A null-prototype object keeps an own `__proto__` key as data.
+  const escaped: Record<string, unknown> = Object.create(null);
+
+  for (const [name, child] of Object.entries(value)) {
+    escaped[escapeCacheKeySegment(name)] = escapeKeyObject(child);
+  }
+
+  return escaped;
+}
+
+/**
+ * Make a proper key for the cache.
+ *
+ * String keys are used as they are (`:` and `,` become `.`; `{}"[]` are
+ * removed). In an object key, separator characters inside the object's keys
+ * and string values are escaped first (see {@link escapeCacheKeySegment}),
+ * so `{ a: "b.c" }` and `{ a: "b", c: "" }` are different keys.
  */
 export function parseCacheKey(
   key: CacheKey,
   options: { globalPrefix?: string | (() => string) } = {},
 ): string {
   if (typeof key === "object") {
-    key = JSON.stringify(key);
+    key = JSON.stringify(escapeKeyObject(key));
   }
 
   // remove any curly braces and double quotes along with []

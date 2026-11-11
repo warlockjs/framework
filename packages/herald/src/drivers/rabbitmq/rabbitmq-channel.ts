@@ -27,8 +27,13 @@ export class RabbitMQChannel<TPayload = unknown> implements ChannelContract<TPay
   public readonly name: string;
   public readonly options: ChannelOptions<TPayload>;
 
-  private readonly amqpChannel: any;
+  private amqpChannel: any;
   private readonly subscriptions = new Map<string, RabbitMQSubscription>();
+  /** What each subscription consumes with, so a reconnect can re-attach it. */
+  private readonly consumers = new Map<
+    string,
+    { handler: MessageHandler<TPayload>; options?: SubscribeOptions }
+  >();
   private asserted = false;
 
   /**
@@ -139,6 +144,61 @@ export class RabbitMQChannel<TPayload = unknown> implements ChannelContract<TPay
     // Use consumerId from options if provided, otherwise generate a random one
     const subscriptionId = options?.consumerId ?? randomUUID();
 
+    const consumerTag = await this.startConsumer(handler, options, subscriptionId);
+
+    const subscription = new RabbitMQSubscription(
+      subscriptionId,
+      this.name,
+      consumerTag,
+      this.amqpChannel,
+    );
+
+    this.subscriptions.set(subscriptionId, subscription);
+    this.consumers.set(subscriptionId, { handler, options });
+
+    return subscription;
+  }
+
+  /**
+   * Point this channel at a new AMQP channel after a reconnect: the queue is
+   * asserted again and every active subscription is re-attached, so publishes
+   * and consumers keep working instead of using the closed channel.
+   *
+   * @internal Called by the driver.
+   */
+  public async rebind(amqpChannel: any): Promise<void> {
+    if (amqpChannel === this.amqpChannel) return;
+
+    this.amqpChannel = amqpChannel;
+    this.asserted = false;
+
+    if (this.subscriptions.size === 0) return;
+
+    await this.assert();
+
+    for (const [subscriptionId, subscription] of this.subscriptions) {
+      const consumer = this.consumers.get(subscriptionId);
+
+      if (!consumer || !subscription.isActive() || subscription.isPaused()) continue;
+
+      const consumerTag = await this.startConsumer(
+        consumer.handler,
+        consumer.options,
+        subscriptionId,
+      );
+
+      subscription.rebind(consumerTag, amqpChannel);
+    }
+  }
+
+  /**
+   * Start an AMQP consumer for a subscription and return its consumer tag.
+   */
+  private async startConsumer(
+    handler: MessageHandler<TPayload>,
+    options: SubscribeOptions | undefined,
+    subscriptionId: string,
+  ): Promise<string> {
     // Set prefetch if specified
     if (options?.prefetch) {
       await this.amqpChannel.prefetch(options.prefetch);
@@ -192,7 +252,10 @@ export class RabbitMQChannel<TPayload = unknown> implements ChannelContract<TPay
             replyTo: msg.properties.replyTo,
             priority: msg.properties.priority,
             headers: msg.properties.headers,
-            retryCount: msg.properties.headers?.["x-retry-count"] || 0,
+            retryCount: readRetryCount(
+              msg.properties.headers?.["x-retry-count"],
+              options?.retry?.maxRetries ?? 3,
+            ),
             originalChannel: this.name,
           };
 
@@ -266,7 +329,10 @@ export class RabbitMQChannel<TPayload = unknown> implements ChannelContract<TPay
             // reached. Route through the same bounded-retry path `ctx.retry()`
             // uses, so the counter increments (and the cap/dead-letter fires)
             // on this automatic path too.
-            const currentRetryCount = msg.properties.headers?.["x-retry-count"] || 0;
+            const currentRetryCount = readRetryCount(
+              msg.properties.headers?.["x-retry-count"],
+              options?.retry?.maxRetries ?? 3,
+            );
             await this.retryOrGiveUp(msg, currentRetryCount, options, parsedMessage);
           } else {
             // No retry configured - reject without requeue (already bounded:
@@ -278,16 +344,7 @@ export class RabbitMQChannel<TPayload = unknown> implements ChannelContract<TPay
       consumerOptions,
     );
 
-    const subscription = new RabbitMQSubscription(
-      subscriptionId,
-      this.name,
-      consumerTag,
-      this.amqpChannel,
-    );
-
-    this.subscriptions.set(subscriptionId, subscription);
-
-    return subscription;
+    return consumerTag;
   }
 
   /**
@@ -298,6 +355,7 @@ export class RabbitMQChannel<TPayload = unknown> implements ChannelContract<TPay
     if (subscription) {
       await subscription.unsubscribe();
       this.subscriptions.delete(consumerId);
+      this.consumers.delete(consumerId);
     }
   }
 
@@ -405,6 +463,11 @@ export class RabbitMQChannel<TPayload = unknown> implements ChannelContract<TPay
 
   /**
    * Request-response pattern
+   *
+   * Replies come back over RabbitMQ's direct reply-to: one reply consumer per
+   * AMQP channel, shared by every request, with each pending request tracked
+   * by its correlation id until its reply or its timeout. No queue or consumer
+   * is created per call.
    */
   public async request<TResponse = unknown>(
     payload: TPayload,
@@ -412,32 +475,23 @@ export class RabbitMQChannel<TPayload = unknown> implements ChannelContract<TPay
   ): Promise<TResponse> {
     await this.assert();
 
+    const replies = replyRouterFor(this.amqpChannel);
+    await replies.start();
+
     const correlationId = randomUUID();
     const timeout = options?.timeout ?? 30000;
 
-    // Create exclusive reply queue
-    const { queue: replyQueue } = await this.amqpChannel.assertQueue("", {
-      exclusive: true,
-      autoDelete: true,
-    });
-
     return new Promise<TResponse>((resolve, reject) => {
-      const timeoutId = setTimeout(() => {
+      const timer = setTimeout(() => {
+        replies.pending.delete(correlationId);
         reject(new Error(`Request timeout after ${timeout}ms`));
       }, timeout);
 
-      // Consume reply
-      this.amqpChannel.consume(
-        replyQueue,
-        (msg: any) => {
-          if (msg?.properties.correlationId === correlationId) {
-            clearTimeout(timeoutId);
-            const content = JSON.parse(msg.content.toString());
-            resolve(content.payload as TResponse);
-          }
-        },
-        { noAck: true },
-      );
+      replies.pending.set(correlationId, {
+        resolve: (reply) => resolve(reply as TResponse),
+        reject,
+        timer,
+      });
 
       // Send request
       const messageContent = JSON.stringify({
@@ -449,12 +503,22 @@ export class RabbitMQChannel<TPayload = unknown> implements ChannelContract<TPay
         },
       });
 
-      this.amqpChannel.sendToQueue(this.name, Buffer.from(messageContent), {
-        correlationId,
-        replyTo: replyQueue,
-        expiration: timeout.toString(),
-        ...options,
-      });
+      try {
+        // Only known AMQP properties: `timeout` and the other request options
+        // are not message properties, and the correlation id is always ours.
+        this.amqpChannel.sendToQueue(this.name, Buffer.from(messageContent), {
+          correlationId,
+          replyTo: DIRECT_REPLY_TO,
+          expiration: String(options?.expiration ?? timeout),
+          priority: options?.priority,
+          persistent: options?.persistent,
+          headers: options?.headers,
+        });
+      } catch (error) {
+        clearTimeout(timer);
+        replies.pending.delete(correlationId);
+        reject(error);
+      }
     });
   }
 
@@ -517,6 +581,7 @@ export class RabbitMQChannel<TPayload = unknown> implements ChannelContract<TPay
       await subscription.unsubscribe();
     }
     this.subscriptions.clear();
+    this.consumers.clear();
 
     try {
       await this.amqpChannel.deleteQueue(this.name);
@@ -529,15 +594,109 @@ export class RabbitMQChannel<TPayload = unknown> implements ChannelContract<TPay
 }
 
 /**
+ * RabbitMQ's pseudo-queue for direct replies: replies reach the consumer on the
+ * requesting AMQP channel without a queue being declared.
+ */
+const DIRECT_REPLY_TO = "amq.rabbitmq.reply-to";
+
+type PendingReply = {
+  resolve: (payload: unknown) => void;
+  reject: (error: Error) => void;
+  timer: NodeJS.Timeout;
+};
+
+/**
+ * Routes direct replies on one AMQP channel to the request waiting for them.
+ * RabbitMQ allows a single direct reply-to consumer per AMQP channel, so every
+ * herald channel on that AMQP channel shares one router.
+ */
+class ReplyRouter {
+  public readonly pending = new Map<string, PendingReply>();
+  private consuming?: Promise<void>;
+
+  public constructor(private readonly amqpChannel: any) {}
+
+  /** Start the shared reply consumer once; a failed start is retried by the next request. */
+  public start(): Promise<void> {
+    if (!this.consuming) {
+      const consuming = Promise.resolve(
+        this.amqpChannel.consume(DIRECT_REPLY_TO, (msg: any) => this.route(msg), { noAck: true }),
+      ).then(() => undefined);
+
+      consuming.catch(() => {
+        if (this.consuming === consuming) this.consuming = undefined;
+      });
+
+      this.consuming = consuming;
+    }
+
+    return this.consuming;
+  }
+
+  private route(msg: any): void {
+    const correlationId = msg?.properties?.correlationId;
+    const entry = correlationId ? this.pending.get(correlationId) : undefined;
+
+    // A reply nobody waits for (late, after its timeout) is dropped.
+    if (!entry) return;
+
+    this.pending.delete(correlationId);
+    clearTimeout(entry.timer);
+
+    let content: { payload?: unknown };
+
+    try {
+      content = JSON.parse(msg.content.toString());
+    } catch {
+      entry.reject(
+        new Error(
+          "The reply to this request is not valid JSON. Check that the responder replies through `ctx.reply()` or `respond()`.",
+        ),
+      );
+      return;
+    }
+
+    entry.resolve(content?.payload);
+  }
+}
+
+const replyRouters = new WeakMap<object, ReplyRouter>();
+
+function replyRouterFor(amqpChannel: any): ReplyRouter {
+  let router = replyRouters.get(amqpChannel);
+
+  if (!router) {
+    router = new ReplyRouter(amqpChannel);
+    replyRouters.set(amqpChannel, router);
+  }
+
+  return router;
+}
+
+/**
+ * Read the `x-retry-count` header. The header comes from whoever published the
+ * message, so anything that is not a non-negative integer counts as retries
+ * exhausted: a forged value can never make the retry loop unbounded.
+ */
+function readRetryCount(raw: unknown, maxRetries: number): number {
+  if (raw === undefined || raw === null) return 0;
+
+  const parsed = typeof raw === "number" ? raw : typeof raw === "string" ? Number(raw) : NaN;
+
+  return Number.isInteger(parsed) && parsed >= 0 ? parsed : maxRetries;
+}
+
+/**
  * RabbitMQ Subscription Implementation
  */
 class RabbitMQSubscription implements Subscription {
   public readonly id: string;
   public readonly channel: string;
-  public readonly consumerTag: string;
+  public consumerTag: string;
 
-  private readonly amqpChannel: any;
+  private amqpChannel: any;
   private _isActive = true;
+  private _isPaused = false;
 
   public constructor(id: string, channel: string, consumerTag: string, amqpChannel: any) {
     this.id = id;
@@ -556,6 +715,7 @@ class RabbitMQSubscription implements Subscription {
   public async pause(): Promise<void> {
     // RabbitMQ doesn't have native pause, cancel consumer
     await this.amqpChannel.cancel(this.consumerTag);
+    this._isPaused = true;
   }
 
   public async resume(): Promise<void> {
@@ -565,5 +725,16 @@ class RabbitMQSubscription implements Subscription {
 
   public isActive(): boolean {
     return this._isActive;
+  }
+
+  /** Whether `pause()` cancelled the consumer (a reconnect leaves it paused). */
+  public isPaused(): boolean {
+    return this._isPaused;
+  }
+
+  /** Follow the consumer re-attached on a new AMQP channel after a reconnect. */
+  public rebind(consumerTag: string, amqpChannel: any): void {
+    this.consumerTag = consumerTag;
+    this.amqpChannel = amqpChannel;
   }
 }

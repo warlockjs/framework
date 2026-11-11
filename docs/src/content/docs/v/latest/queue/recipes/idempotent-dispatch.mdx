@@ -36,9 +36,11 @@ A second `dispatch()` call with a `jobId` that still exists in Redis
 does not enqueue a duplicate. The second webhook delivery for the same
 invoice adds nothing.
 
-Once the job has **completed or failed**, the id is free again (unless
-you keep it with `removeOnComplete: false`) — dispatching the same
-`jobId` after that starts a fresh run. If you need "never run this
+While a finished job is still retained, the id stays taken. Once
+retention removes it (by default a completed job after 24 hours or past
+the newest 1,000, a failed one after 7 days or past the newest 5,000),
+the id is free again — dispatching the same `jobId` after that starts a
+fresh run. `removeOnComplete: false` keeps the id taken for good. If you need "never run this
 twice, ever," check your own persisted state (e.g. `invoice.sentAt`)
 before calling `dispatch()` at all; `jobId` only protects the window
 while the job exists in the queue.

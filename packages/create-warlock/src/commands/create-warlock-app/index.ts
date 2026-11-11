@@ -206,13 +206,17 @@ export async function createWarlockApp(application: App): Promise<ScaffoldOutcom
           .join("\n     "),
         result: featureInstall?.ok === false ? featureInstall : undefined,
         hints: [
-          `Retry inside the project with: npx warlock add ${failedFeatures
+          `Retry inside the project with: npx --no warlock add ${failedFeatures
             .map(({ feature }) => feature)
             .join(" ")}`,
         ],
       });
     }
   }
+
+  // The release-age exclusion was only for the installs above; the app must not
+  // keep it (it would exempt every future @warlock.js/* release from the cooldown).
+  application.removeReleaseAgeExclusion();
 
   // Step 4: Initialize Git repository if requested
   if (useGit) {
@@ -271,7 +275,7 @@ export async function createWarlockApp(application: App): Promise<ScaffoldOutcom
     const warmSpinner = spinner();
     warmSpinner.start(spinnerMessages.warmingCache);
 
-    const warmed = await application.exec("npx warlock --warm-cache");
+    const warmed = await application.exec("npx --no warlock --warm-cache");
 
     warmSpinner.stop(warmed ? spinnerMessages.cacheWarmed : spinnerMessages.cacheWarmFailed);
 

@@ -149,7 +149,7 @@ Typical flow:
 
 ## Add semantic response caching
 
-Layer `semanticCache` middleware on top to skip the LLM call entirely when a similar question was answered recently:
+Layer `semanticCache` middleware on top to skip the LLM call entirely when a similar question was answered recently. The knowledge base is public, so the cache is shared across callers, and because every answer is built from the `searchKb` tool, `cacheToolRuns` opts those answers in (by default a run that called tools is not cached):
 
 ```ts
 const supportAgent = ai.agent({
@@ -160,6 +160,8 @@ const supportAgent = ai.agent({
       threshold: 0.95,
       ttlMs: 60 * 60 * 1000, // 1 hour
       namespace: "kb-support",
+      scope: "shared", // public KB answers may be served to every caller
+      cacheToolRuns: true, // the answers come from the searchKb tool
     }),
   ],
   tools: [searchKb],

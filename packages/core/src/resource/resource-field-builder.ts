@@ -244,34 +244,41 @@ export class ResourceFieldBuilder {
    * Transform date value
    */
   protected transformDate(value: string | Date, locale?: string) {
+    // Parsed once and reused below (dayjs objects are immutable).
+    const source = (value as any)?.iso || value;
+    const parsed = dayjs(source);
+
     // Bad data ("" or garbage) must not throw and turn the response into a 500
-    if (!dayjs((value as any)?.iso || value).isValid()) {
+    if (!parsed.isValid()) {
       return this.isNullable ? null : undefined;
     }
 
     if (typeof this.dateOptionsInput === "string") {
+      // The single-value outputs read `value` itself, not its `iso` key.
+      const date = source === value ? parsed : dayjs(value);
+
       if (this.dateOptionsInput === "format") {
-        return dayjs(value).format(this.dateFormat);
+        return date.format(this.dateFormat);
       }
 
       if (this.dateOptionsInput === "iso") {
-        return dayjs(value).toISOString();
+        return date.toISOString();
       }
 
       if (this.dateOptionsInput === "timestamp") {
-        return dayjs(value).valueOf();
+        return date.valueOf();
       }
 
       if (this.dateOptionsInput === "humanTime") {
-        return (dayjs as any)(value).fromNow();
+        return (date as any).fromNow();
       }
 
       if (this.dateOptionsInput === "locale") {
         if (!locale) {
-          return dayjs(value).format(this.dateFormat);
+          return date.format(this.dateFormat);
         }
 
-        return dayjs(value).locale(locale).format(this.dateFormat);
+        return date.locale(locale).format(this.dateFormat);
       }
     }
 
@@ -284,11 +291,7 @@ export class ResourceFieldBuilder {
       iso?: string;
     } = {};
 
-    let dayjsObject = dayjs((value as any)?.iso || value);
-
-    if (locale) {
-      dayjsObject = dayjsObject.locale(locale);
-    }
+    const dayjsObject = locale ? parsed.locale(locale) : parsed;
 
     if (this.dateOptionsInput.iso) {
       output.iso = dayjsObject.toISOString();
@@ -308,10 +311,6 @@ export class ResourceFieldBuilder {
 
     if (this.dateOptionsInput.locale) {
       output.locale = dayjsObject.format(this.dateFormat);
-    }
-
-    if (this.dateOptionsInput.iso) {
-      output.iso = dayjsObject.toISOString();
     }
 
     return output;

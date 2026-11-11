@@ -1,6 +1,6 @@
 ---
 name: guard-input-output
-description: 'Build the composed guardrail middleware with @warlock.js/ai and wire it into an agent — `ai.guardrail({ input, output, tool, toolNames, escalation })`. Triggers: `ai.guardrail`, `guard`, `GuardOptions`, `GuardrailVerdict`, `GuardrailDetector`, `GuardrailPhase`, `GuardrailMatch`, `GuardrailViolationError`, `ai.guardrail.topic`, `ai.guardrail.injection`, `topicFilter`, `injectionDetector`, `toolNames`, `forTool`; ''add a guardrail to my agent'', ''block prompt injection'', ''filter banned topics'', ''guard agent input and output'', ''stop the model leaking data into a tool call'', ''scope a detector to one tool''; typical import `import { ai } from "@warlock.js/ai"` (`ai.guardrail` ships in core) or `import { guard } from "@warlock.js/ai"`. Skip: PII detection/redaction specifically — the `detect-and-redact-pii` topic; routing a block to a human — the `escalate-block-to-human` topic; the core middleware pipeline / hook contract — the `run-ai-agent` topic.'
+description: 'Build the composed guardrail middleware with @warlock.js/ai and wire it into an agent — `ai.guardrail({ input, output, tool, toolNames, escalation })`. Triggers: `ai.guardrail`, `guard`, `GuardOptions`, `GuardrailVerdict`, `GuardrailDetector`, `GuardrailPhase`, `GuardrailMatch`, `GuardrailViolationError`, `ai.guardrail.topic`, `ai.guardrail.injection`, `ai.guardrail.links`, `bufferStream`, `topicFilter`, `injectionDetector`, `toolNames`, `forTool`; ''add a guardrail to my agent'', ''block prompt injection'', ''filter banned topics'', ''guard agent input and output'', ''stop the model leaking data into a tool call'', ''scope a detector to one tool'', ''strip external images from model replies'', ''guardrails with streaming''; typical import `import { ai } from "@warlock.js/ai"` (`ai.guardrail` ships in core) or `import { guard } from "@warlock.js/ai"`. Skip: PII detection/redaction specifically — the `detect-and-redact-pii` topic; routing a block to a human — the `escalate-block-to-human` topic; the core middleware pipeline / hook contract — the `run-ai-agent` topic.'
 ---
 
 # Guard agent input, output, and tool args
@@ -39,6 +39,18 @@ const policy = guard({ input: [injection({ onMatch: "block" })] });
 
 Each phase array runs its detectors in **registration order**; the first non-`allow` verdict decides the action for that phase (short-circuit). A phase you don't configure is inert — a guard with no detectors is a no-op middleware.
 
+`input` detectors run **once per distinct user text per run**: later trips of a tool-using run with the same prompt skip them (one moderation call, not one per trip). A detector that faulted runs again next trip.
+
+## Streaming (`agent.stream()`, `ai.serve`)
+
+With `output` detectors, each trip's text is **held** until they approve it, then streamed as one `agent.trip.streaming` delta: redacted text streams redacted, a blocked trip streams no text, and reasoning deltas are not streamed. Latency cost only for agents with output detectors. Opt out (deltas stream before the check, which then only changes `result.text`):
+
+```ts
+ai.guardrail({ output: [ai.guardrail.pii()], stream: "unguarded" }); // default "buffered"
+```
+
+Same rule and option on `guardrail({ outputCheck, stream })`. A custom middleware that checks `response.content` in `trip.after` opts into the hold with `trip: { bufferStream: true, after(...) {...} }`.
+
 ## The verdict model
 
 A detector inspects text and returns a `GuardrailVerdict`, discriminated by `type` (never `kind`):
@@ -63,11 +75,12 @@ if (result.error instanceof ai.errors.GuardrailViolationError) {
 
 ## Built-in detectors
 
-Three zero-dependency detectors ship (a fourth, `moderation`, is an optional `openai` peer — see the `detect-and-redact-pii` topic):
+Four zero-dependency detectors ship (a fifth, `moderation`, is an optional `openai` peer — see the `detect-and-redact-pii` topic):
 
-- **`ai.guardrail.injection(options?)`** — jailbreak / prompt-injection marker phrases. Extra `markers` (string | RegExp); `onMatch` defaults to `"flag"`, callers commonly use `"block"` on input.
+- **`ai.guardrail.injection(options?)`** — jailbreak / prompt-injection marker phrases, matched on normalized text (case, NFKC forms, zero-width characters, and runs of whitespace / `_` / `-` / `.` folded, so `"Ignore  previous\ninstructions"` matches). Extra `markers` (string, normalized the same way | RegExp, run on the original text without `g` / `y`); `onMatch` defaults to `"flag"`, callers commonly use `"block"` on input. Heuristic only; it does not see tool results.
 - **`ai.guardrail.topic(options)`** — `deny` (string substring | RegExp) and/or `allow` (allow-list miss triggers `onMatch`). `onMatch` is `"block" | "flag"`, default `"block"`.
 - **`ai.guardrail.pii(options?)`** — PII regex + dictionary (its own skill).
+- **`ai.guardrail.links(options?)`** — `output` detector against exfiltration through rendered replies: strips Markdown images, reference definitions, `<img src|srcset>` and `<image src|href>` whose host is not on `allowHosts` (`"cdn.example.com"`, `"*.example.org"`); `links: true` also strips Markdown links, `<a href>` and `<https://…>` autolinks. Relative URLs stay; `data:` / `javascript:` / entity-encoded URLs are refused. `onMatch` default `"redact"` (keeps alt / link text), or `"block"` / `"flag"`. Not an HTML sanitizer.
 
 ```ts
 const policy = ai.guardrail({
@@ -75,6 +88,7 @@ const policy = ai.guardrail({
     ai.guardrail.injection({ onMatch: "block", markers: ["ignore previous instructions"] }),
     ai.guardrail.topic({ deny: ["competitor-name"], onMatch: "block" }),
   ],
+  output: [ai.guardrail.links({ allowHosts: ["cdn.example.com"] })], // or the named export `links(...)`
 });
 ```
 

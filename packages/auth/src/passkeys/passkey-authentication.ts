@@ -52,7 +52,7 @@ export async function generatePasskeyAuthenticationOptions(): Promise<PasskeyOpt
 
   const options = await webauthn.generateAuthenticationOptions({
     rpID: authConfig.passkeys.settings().rpID,
-    userVerification: "preferred",
+    userVerification: authConfig.passkeys.userVerification(),
   });
 
   await storePasskeyChallenge("passkey-authentication", options.challenge);
@@ -105,7 +105,7 @@ export async function verifyPasskeyAuthentication(
         counter: stored.counter,
         transports: stored.get("transports") ?? undefined,
       },
-      requireUserVerification: false,
+      requireUserVerification: authConfig.passkeys.userVerification() === "required",
     });
   } catch (error) {
     // The SDK enforces the counter rule itself and throws a generic Error for

@@ -57,4 +57,26 @@ describe("CascadeAdapter.registerEvents cache invalidation", () => {
 
     expect(cache.get("user:1")).toBeUndefined();
   });
+
+  it("clears the cache exactly once for a write outside a transaction", async () => {
+    const { model, handlers } = fakeModel();
+    let clears = 0;
+
+    new CascadeAdapter(model as any).registerEvents(() => {
+      clears++;
+    });
+
+    for (const name of ["created", "updated", "deleted"]) {
+      const handler = handlers[name];
+      if (!handler) throw new Error(`Cascade adapter did not register the ${name} handler.`);
+
+      clears = 0;
+      handler({});
+
+      // Let any deferred (next-microtask) callback run before counting.
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(clears).toBe(1);
+    }
+  });
 });

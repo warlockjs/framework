@@ -13,6 +13,8 @@ The inner validator runs against each element. Failure on any element fails the 
 | `.between(a, b, msg?)`       | inclusive range        | `minItems: a, maxItems: b` | `v.array(v.string()).between(1, 10)` |
 | `.lengthBetween(a, b, msg?)` | alias for `.between()` | `minItems: a, maxItems: b` | —                                    |
 
+**Default item cap.** An array with no `.maxLength`/`.length`/`.between` holds at most 10,000 items (`configureSeal({ maxArrayItems })`); longer input fails with a `maxItems` error before any item runs. An explicit `.maxLength(n)` replaces the cap for that schema (`.maxLength(Infinity)` lifts it). Items run 64 at a time, and collection stops at `maxErrors` errors (100).
+
 **Note on `.min`/`.max`:** the array validator does not expose `.min`/`.max` directly — use `.minLength`/`.maxLength` (or `.between`/`.length`). This is intentional: `.min`/`.max` would conflict with primitive value-comparison semantics if they ever bled into here.
 
 ## Uniqueness & sort

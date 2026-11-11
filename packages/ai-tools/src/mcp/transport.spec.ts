@@ -310,6 +310,70 @@ describe("HTTP transport — Streamable HTTP over fetch", () => {
     });
   });
 
+  it("times out a body that never ends once timeoutMs elapses", async () => {
+    const endless = new ReadableStream<Uint8Array>({
+      pull: async (controller) => {
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        controller.enqueue(new TextEncoder().encode(" "));
+      },
+    });
+    const client = createJsonRpcClient({
+      type: "http",
+      url: "https://srv.test/mcp",
+      fetch: vi.fn(async () => new Response(endless, { status: 200 })),
+    });
+
+    await expect(client.call("slow", undefined, { timeoutMs: 50 })).rejects.toMatchObject({
+      type: "timeout",
+    });
+  });
+
+  it("rejects a body over maxResponseBytes while streaming it", async () => {
+    const chunk = new Uint8Array(64 * 1024).fill(0x20);
+    let sent = 0;
+    const huge = new ReadableStream<Uint8Array>({
+      pull: (controller) => {
+        sent += chunk.byteLength;
+        controller.enqueue(chunk);
+        if (sent >= 20 * 1024 * 1024) controller.close();
+      },
+    });
+    const client = createJsonRpcClient({
+      type: "http",
+      url: "https://srv.test/mcp",
+      maxResponseBytes: 1_000_000,
+      fetch: vi.fn(async () => new Response(huge, { status: 200 })),
+    });
+
+    const error = await client.call("big").catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(McpTransportError);
+    expect(error).toMatchObject({ type: "protocol" });
+    expect((error as Error).message).toContain("maxResponseBytes");
+    // The read stopped near the cap instead of buffering all 20 MB.
+    expect(sent).toBeLessThan(2 * 1024 * 1024);
+  });
+
+  it("rejects a declared content-length over maxResponseBytes before reading", async () => {
+    const client = createJsonRpcClient({
+      type: "http",
+      url: "https://srv.test/mcp",
+      maxResponseBytes: 10,
+      fetch: vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({ jsonrpc: "2.0", id: 1, result: { long: "x".repeat(50) } }),
+            {
+              status: 200,
+              headers: { "content-type": "application/json", "content-length": "80" },
+            },
+          ),
+      ),
+    });
+
+    await expect(client.call("big")).rejects.toMatchObject({ type: "protocol" });
+  });
+
   it("close() is a no-op for the stateless HTTP transport", async () => {
     stubFetch(
       () => new Response(JSON.stringify({ jsonrpc: "2.0", id: 1, result: {} }), { status: 200 }),
@@ -430,6 +494,58 @@ describe("stdio transport — real child process round-trip", () => {
     await transport.close();
 
     await expect(pending).rejects.toBeInstanceOf(McpTransportError);
+  });
+
+  it("drops a stdout line over maxResponseBytes, fails the call, and keeps serving", async () => {
+    // Answers "big" with a line far over the cap, anything else normally.
+    const server = `
+      const readline = require("node:readline");
+      const rl = readline.createInterface({ input: process.stdin });
+      rl.on("line", (line) => {
+        const msg = JSON.parse(line);
+        if (msg.id === undefined) return;
+        const result = msg.method === "big" ? { blob: "x".repeat(50000) } : { echoed: msg.method };
+        process.stdout.write(JSON.stringify({ jsonrpc: "2.0", id: msg.id, result }) + "\\n");
+      });
+    `;
+    const client = createJsonRpcClient({
+      type: "stdio",
+      command: process.execPath,
+      args: ["-e", server],
+      maxResponseBytes: 1000,
+    });
+
+    const error = await client.call("big").catch((caught: unknown) => caught);
+
+    expect(error).toMatchObject({ type: "protocol" });
+    expect((error as Error).message).toContain("maxResponseBytes");
+    await expect(client.call<{ echoed: string }>("small")).resolves.toEqual({ echoed: "small" });
+
+    await client.close();
+  });
+
+  it("splits stdout lines on CRLF and on newlines split across chunks", async () => {
+    const server = `
+      const readline = require("node:readline");
+      const rl = readline.createInterface({ input: process.stdin });
+      rl.on("line", (line) => {
+        const msg = JSON.parse(line);
+        if (msg.id === undefined) return;
+        const text = JSON.stringify({ jsonrpc: "2.0", id: msg.id, result: { echoed: msg.method } });
+        process.stdout.write(text.slice(0, 5));
+        setTimeout(() => process.stdout.write(text.slice(5) + "\\r\\n"), 10);
+      });
+    `;
+    const client = createJsonRpcClient({
+      type: "stdio",
+      command: process.execPath,
+      args: ["-e", server],
+    });
+
+    await expect(client.call<{ echoed: string }>("one")).resolves.toEqual({ echoed: "one" });
+    await expect(client.call<{ echoed: string }>("two")).resolves.toEqual({ echoed: "two" });
+
+    await client.close();
   });
 
   it("surfaces a spawn failure as a connect error", () => {

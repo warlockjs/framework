@@ -73,6 +73,50 @@ describe("output spill", () => {
     expect(window.endLine - window.startLine).toBe(2);
   });
 
+  it("keeps a workspace's spill files from another workspace sharing the directory", async () => {
+    const spillDir = path.join(outside, "shared-spill");
+    const backend = createMockBackend({ commands: { big: { stdout: BIG } } });
+    const policy: WorkspacePolicy = {
+      cwd: jailRoot,
+      shell: { allow: ["big"] },
+      output: { spillDir, maxLines: 20 },
+    };
+    const owner = createOps(backend, policy);
+    const other = createOps(backend, policy);
+    const file = (await owner.exec("big")).truncation?.stdout?.path as string;
+
+    expect((await owner.readFile(file, { limit: 1 })).content).toContain("line 0 ");
+    await expect(other.readFile(file)).rejects.toMatchObject({ type: "path-escape" });
+    await expect(other.grep("line", { path: file })).rejects.toMatchObject({
+      type: "path-escape",
+    });
+    await expect(other.grep("line", { path: spillDir })).rejects.toMatchObject({
+      type: "path-escape",
+    });
+  });
+
+  it.skipIf(process.platform === "win32")(
+    "creates spill files readable by the owner only",
+    async () => {
+      const { statSync } = await import("node:fs");
+      const root = realpathSync(mkdtempSync(path.join(tmpdir(), "ws-spill-mode-")));
+      const spillDir = path.join(outside, "mode-spill");
+
+      writeFileSync(path.join(root, "long.txt"), BIG.slice(0, 20_000));
+
+      const ops = createOps(createLocalBackend(), {
+        cwd: root,
+        read: { maxBytes: 500 },
+        output: { spillDir },
+      });
+      const read = await ops.readFile("long.txt");
+      const file = read.truncation?.path as string;
+
+      expect(statSync(file).mode & 0o777).toBe(0o600);
+      expect(statSync(spillDir).mode & 0o777).toBe(0o700);
+    },
+  );
+
   it("still refuses a path outside the jail and the spill directory", async () => {
     const { ops } = setup({ output: { spillDir: path.join(outside, "spill") } });
 

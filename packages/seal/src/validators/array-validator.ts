@@ -1,5 +1,7 @@
 import { createRootContext } from "../helpers/root-context";
 import { setKeyPath } from "../helpers";
+import { maxItemsRule, resolveSealLimit } from "../helpers/limits";
+import { validateItems } from "../helpers/validate-items";
 import { flipArrayMutator, sortArrayMutator, uniqueArrayMutator } from "../mutators";
 import {
   arrayRule,
@@ -153,6 +155,19 @@ export class ArrayValidator extends BaseValidator {
     return super.mutate([...data], context);
   }
 
+  /** @inheritdoc */
+  protected override copyMutated(value: unknown): unknown {
+    return Array.isArray(value) ? [...value] : value;
+  }
+
+  /** Whether the schema sets its own upper bound on the item count */
+  protected hasExplicitMaxItems(): boolean {
+    return this.rules.some(
+      (rule) =>
+        rule.name === "maxLength" || rule.name === "betweenLength" || rule.name === "length",
+    );
+  }
+
   /** Validate array
    *
    * Absent input (and absent without `.default()`) propagates as `data: undefined`
@@ -171,7 +186,22 @@ export class ArrayValidator extends BaseValidator {
     const valueForRules = data ?? this.getDefaultValue();
     const mutatedData = await this.mutate(valueForRules, context);
 
-    const result = await this.validateRules(data, context);
+    // Default item cap for schemas without their own `.max()`: checked before
+    // the value rules so an oversized array costs one length read.
+    if (Array.isArray(mutatedData) && !this.hasExplicitMaxItems()) {
+      const maxItems = resolveSealLimit(context, "maxArrayItems");
+
+      if (mutatedData.length > maxItems) {
+        const capErrors = await this.checkRule(maxItemsRule, mutatedData, context, { maxItems });
+
+        if (capErrors) return { isValid: false, errors: capErrors, data: undefined };
+      }
+    }
+
+    const result = await this.validateRules(data, context, {
+      source: valueForRules,
+      value: mutatedData,
+    });
 
     if (result.isValid === false) return result;
 
@@ -182,16 +212,17 @@ export class ArrayValidator extends BaseValidator {
     // Defensive: type rule (arrayRule) should have failed for non-arrays.
     if (!Array.isArray(mutatedData)) return result;
 
-    const errors: ValidationResult["errors"] = [];
-
-    // Validate all items in parallel (consistent with ObjectValidator)
-    const validationPromises = mutatedData.map(async (value: any, index: number) => {
+    // Items are validated in bounded batches; collection stops once the
+    // `maxErrors` limit is reached.
+    const errors = await validateItems(mutatedData.length, context, async (index, report) => {
+      const value = mutatedData[index];
+      const key = index.toString();
       const childContext: SchemaContext = {
         ...context,
         parent: mutatedData,
         value,
-        key: index.toString(),
-        path: setKeyPath(context.path, index.toString()),
+        key,
+        path: setKeyPath(context.path, key),
       };
 
       const childResult = await this.validator.validate(value, childContext);
@@ -200,12 +231,8 @@ export class ArrayValidator extends BaseValidator {
       mutatedData[index] = childResult.data;
 
       // Collect errors from this element
-      if (childResult.isValid === false) {
-        errors.push(...childResult.errors);
-      }
+      if (childResult.isValid === false) report(childResult.errors);
     });
-
-    await Promise.all(validationPromises);
 
     return this.refineResult(
       {

@@ -80,6 +80,17 @@ export interface InterruptStore {
   list?(prefix?: string): Promise<string[]>;
 
   /**
+   * Atomically take a pending interrupt: remove it and return it in one
+   * step, so when several callers claim the same id at once exactly one
+   * receives the record and the others receive `undefined`. Returns
+   * `undefined` for an unknown id or a record whose status is not
+   * `"pending"` (left in place). `ai.human.resume(...)` uses it so a
+   * decision applies once; a custom store without it falls back to
+   * `load` + `delete`, which is not race-safe.
+   */
+  claim?(interruptId: string): Promise<PendingInterrupt | undefined>;
+
+  /**
    * Return the DDL string for this store's backing table. The dev runs
    * it through their migration tool; the framework never auto-migrates.
    * Stores with no backing table (memory, redis) return an empty string
@@ -108,7 +119,9 @@ export interface PgClientLike {
  *
  * `@warlock.js/ai` takes **no** hard dependency on `redis`; the dev
  * installs it (an optional peer) and passes the connected client in. The
- * store only calls `get` / `set` / `del`.
+ * store calls `get` / `set` / `del`, and keeps its id index as a Redis set
+ * when the client also has the set commands (`sAdd`/`sRem`/`sMembers` or
+ * `sadd`/`srem`/`smembers`).
  */
 export interface RedisClientLike {
   get(key: string): Promise<string | null>;

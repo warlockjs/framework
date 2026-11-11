@@ -30,6 +30,7 @@ function fakeRuleQuery(firstResult: unknown) {
     return query;
   });
   query.first = vi.fn(async () => firstResult);
+  query.exists = vi.fn(async () => Boolean(firstResult));
   query.wheres = wheres;
   return query as Record<string, unknown> & {
     where: ReturnType<typeof vi.fn>;

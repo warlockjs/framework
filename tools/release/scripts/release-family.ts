@@ -30,6 +30,7 @@ import {
 import { assertReleaseSummaryExists } from "./release-summary-gate.ts";
 import { runZeroEditGeneratorGate, type GeneratorGateContext } from "./zero-edit-generator-gate.ts";
 import { runStrictnessGate, type StrictnessGateRunResult } from "./strictness-gate.ts";
+import { stripSourceMapSources } from "./strip-source-map-sources.ts";
 
 export const NPM_ORIGIN = "https://registry.npmjs.org";
 export const EXACT_VERSION =
@@ -793,6 +794,9 @@ async function buildAndPackAllMembers(
   for (const entry of releaseCommitSha ? built : []) {
     const { member } = entry;
     const buildDirectory = path.join(BUILD_ROOT, ...member.name.split("/"), version);
+    // Ship source maps without the embedded TypeScript sources; mapped stack
+    // traces keep every file name and line.
+    await stripSourceMapSources(buildDirectory);
     const packed = await runtime.runCommand({
       command: process.execPath,
       args: [

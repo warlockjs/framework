@@ -27,6 +27,9 @@ export const userSchema = v.object({
   // Stamped by `@warlock.js/auth`'s `verifyEmail()` (the `auth.verification.field`
   // default). Absent/undefined means unverified — see the `verified` scope below.
   emailVerifiedAt: v.date().optional(),
+  // "admin" unlocks the admin-only routes (see `app/auth/middleware/admin.middleware.ts`).
+  // Request input never sets it: controllers pick the fields they accept.
+  role: v.enum(["user", "admin"]).default("user"),
 });
 
 export type UserSchema = Infer<typeof userSchema>;

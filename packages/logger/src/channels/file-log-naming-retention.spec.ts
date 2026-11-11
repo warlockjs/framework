@@ -122,6 +122,7 @@ describe("FileLog naming and retention", () => {
     });
 
     it("recovers from a fileName function that throws", async () => {
+      const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
       let broken = true;
       const channel = track(
         new FileLog({
@@ -136,7 +137,7 @@ describe("FileLog naming and retention", () => {
       await waitForInit(channel);
 
       await channel.log(dataFor("first"));
-      expect(console.error).toHaveBeenCalledWith("Failed to write log:", expect.any(Error));
+      expect(stderr).toHaveBeenCalledWith(expect.stringContaining("no name"));
 
       broken = false;
       await channel.log(dataFor("second"));

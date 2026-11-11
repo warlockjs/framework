@@ -7,7 +7,7 @@ sidebar:
 Every job attempt can fail — a throw inside `handle`, an unknown job
 name in the worker, a downstream timeout. `attempts` and `backoff`
 control retrying; once every attempt is spent, the job is failed and
-stays in Redis (unless `removeOnFail` says otherwise) so it can be
+stays in Redis (for a week, up to the newest 5,000, unless `removeOnFail` says otherwise) so it can be
 inspected and retried later.
 
 ## Configuring retries
@@ -108,9 +108,11 @@ it runs through the full retry budget again if it fails.
 
 ## Keeping the failed list bounded
 
-Failed jobs are kept forever by default so `failedJobs()` has something
-to show. Set `removeOnFail` on `defineJob` (or `defaultJobOptions`) to
-bound it:
+Failed jobs are kept for 7 days, at most the newest 5,000 per queue, by
+default (`removeOnFail: { age: "7d", count: 5000 }`), so `failedJobs()`
+has something to show without growing forever. Set `removeOnFail` on
+`defineJob` (or `defaultJobOptions`) to change it, or `false` to keep
+every failure:
 
 ```ts
 defineJob({

@@ -43,6 +43,26 @@ v.record(); // type: Record<string, any>
 
 Reach for `v.record` when keys are dynamic (user-provided, dictionary-style) but values share a schema. Use `v.record(keyValidator, valueValidator)` to constrain present keys, or `v.object` to require named keys.
 
+Bound the key count with `.maxKeys(n)` (JSON Schema `maxProperties`). Without it a record holds at most 10,000 keys (`configureSeal({ maxRecordKeys })`); `.maxKeys(Infinity)` lifts the cap. A `__proto__` key always fails with a `forbiddenKey` error.
+
+## Size limits
+
+Seal bounds what one payload can cost. Each limit is a `configureSeal()` option, can be passed per call to `validate(schema, data, { … })`, and fails with a normal validation error named after the rule:
+
+| Option          | Default | Applies to                                                       | Error type |
+| --------------- | ------- | ---------------------------------------------------------------- | ---------- |
+| `maxArrayItems` | 10,000  | `v.array` without `.maxLength`/`.length`/`.between`              | `maxItems` |
+| `maxRecordKeys` | 10,000  | `v.record` without `.maxKeys`                                    | `maxKeys`  |
+| `maxErrors`     | 100     | errors one array or record collects (items run 64 at a time)     | —          |
+| `maxDepth`      | 256     | nesting inside an object's output (`v.any()`, `.allowUnknown()`) | `maxDepth` |
+
+```ts
+configureSeal({ maxArrayItems: 50_000 }); // app-wide
+v.array(v.int()).maxLength(50_000); // one schema
+```
+
+Inside an object, `v.any()` values and `.allowUnknown()` extras are copied without `__proto__` keys, so input cannot set the output's prototype.
+
 ## `v.tuple` — positional types
 
 ```ts

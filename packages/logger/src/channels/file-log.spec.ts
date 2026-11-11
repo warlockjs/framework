@@ -502,24 +502,234 @@ describe("FileLog", () => {
   describe("write failures", () => {
     it("reports a write error without throwing and clears the writing flag", async () => {
       const channel = track(new FileLog({ storagePath, maxMessagesToWrite: 1 }));
+      const reporter = vi.fn();
+
+      channel.setErrorReporter(reporter);
 
       await waitForInit(channel);
 
-      const errorSpy = vi.spyOn(console, "error");
-      vi.spyOn(fs, "createWriteStream").mockReturnValue({
-        write: (_content: unknown, callback: (error: Error) => void) => {
-          callback(new Error("disk full"));
-
-          return false;
-        },
-        end: () => {},
-      } as unknown as fs.WriteStream);
+      vi.spyOn(fs.promises, "appendFile").mockRejectedValue(new Error("disk full"));
 
       await channel.log(dataFor({ message: "doomed" }));
 
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      expect(reporter).toHaveBeenCalledWith(
+        expect.objectContaining({ message: "disk full" }),
+        expect.objectContaining({ module: "logger", action: "write" }),
+      );
+      expect((channel as unknown as { isWriting: boolean }).isWriting).toBe(false);
+    });
 
-      expect(errorSpy).toHaveBeenCalledWith("Failed to write log:", expect.any(Error));
+    it("keeps the entries of a failed write buffered and writes them on the next flush", async () => {
+      const channel = track(new FileLog({ storagePath, maxMessagesToWrite: 1 }));
+
+      channel.setErrorReporter(() => {});
+
+      await waitForInit(channel);
+
+      const append = vi.spyOn(fs.promises, "appendFile").mockRejectedValueOnce(new Error("busy"));
+
+      await channel.log(dataFor({ message: "first" }));
+
+      append.mockRestore();
+
+      await channel.flush();
+
+      expect(fs.readFileSync(channel.filePath, "utf-8")).toContain("[mod][act]: first");
+    });
+
+    it("does not crash the process when the log directory disappears; it recreates it", async () => {
+      const channel = track(new FileLog({ storagePath, maxMessagesToWrite: 1000 }));
+      const reporter = vi.fn();
+      const uncaught = vi.fn();
+
+      channel.setErrorReporter(reporter);
+      process.on("uncaughtException", uncaught);
+
+      try {
+        await waitForInit(channel);
+
+        removeDir(storagePath);
+
+        await channel.log(dataFor({ message: "after removal" }));
+        await channel.flush();
+
+        await new Promise((resolve) => setTimeout(resolve, 20));
+
+        expect(uncaught).not.toHaveBeenCalled();
+        expect(fs.readFileSync(channel.filePath, "utf-8")).toContain("after removal");
+      } finally {
+        process.off("uncaughtException", uncaught);
+      }
+    });
+
+    it("reports, and never throws, when the log path cannot be opened at all", async () => {
+      const blocker = path.join(storagePath, "not-a-directory");
+
+      fs.writeFileSync(blocker, "");
+
+      const channel = track(new FileLog({ storagePath: blocker, maxMessagesToWrite: 1 }));
+      const reporter = vi.fn();
+      const uncaught = vi.fn();
+
+      channel.setErrorReporter(reporter);
+      process.on("uncaughtException", uncaught);
+
+      try {
+        // `init()` cannot create the directory either: reported, not thrown.
+        await channel.ready;
+
+        expect(reporter).toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({ action: "init" }),
+        );
+
+        await channel.log(dataFor({ message: "nowhere to go" }));
+        await new Promise((resolve) => setTimeout(resolve, 20));
+
+        expect(uncaught).not.toHaveBeenCalled();
+        expect(reporter).toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({ action: "write" }),
+        );
+      } finally {
+        process.off("uncaughtException", uncaught);
+        channels.splice(channels.indexOf(channel), 1);
+      }
+    });
+
+    it("drops the oldest entries past maxBufferedMessages and reports it once", async () => {
+      const channel = track(
+        new FileLog({ storagePath, maxMessagesToWrite: 2, maxBufferedMessages: 5 }),
+      );
+      const reporter = vi.fn();
+
+      channel.setErrorReporter(reporter);
+
+      await waitForInit(channel);
+
+      vi.spyOn(fs.promises, "appendFile").mockRejectedValue(new Error("read-only"));
+
+      for (let index = 0; index < 20; index++) {
+        await channel.log(dataFor({ message: `entry-${index}` }));
+      }
+
+      const buffered = (channel as unknown as { messages: Array<{ content: string }> }).messages;
+
+      expect(buffered).toHaveLength(5);
+      expect(buffered.at(-1)?.content).toContain("entry-19");
+
+      const overflowReports = reporter.mock.calls.filter(
+        ([, entry]) => (entry as LoggingData).action === "buffer",
+      );
+
+      expect(overflowReports).toHaveLength(1);
+
+      vi.restoreAllMocks();
+      channels.splice(channels.indexOf(channel), 1);
+      channel.dispose();
+    });
+  });
+
+  describe("entries logged while a write is in flight", () => {
+    it("writes every entry when logs keep arriving during writes", async () => {
+      const channel = track(new FileLog({ storagePath, maxMessagesToWrite: 10 }));
+
+      await waitForInit(channel);
+
+      const pending: Array<void | Promise<void>> = [];
+
+      for (let index = 0; index < 5000; index++) {
+        pending.push(channel.log(dataFor({ message: `entry-${index}` })));
+
+        // Yield now and then so writes start while more entries arrive.
+        if (index % 50 === 0) {
+          await new Promise((resolve) => setImmediate(resolve));
+        }
+      }
+
+      await Promise.all(pending);
+      await channel.flush();
+
+      const lines = fs.readFileSync(channel.filePath, "utf-8").trim().split(/\r?\n/);
+
+      expect(lines).toHaveLength(5000);
+      expect(new Set(lines.map((line) => line.split(": ").at(-1))).size).toBe(5000);
+    });
+
+    it("writes every entry on the grouped path too", async () => {
+      const channel = track(
+        new FileLog({ storagePath, maxMessagesToWrite: 10, groupBy: ["level"] }),
+      );
+
+      await waitForInit(channel);
+
+      const pending: Array<void | Promise<void>> = [];
+
+      for (let index = 0; index < 1000; index++) {
+        pending.push(channel.log(dataFor({ message: `entry-${index}` })));
+
+        if (index % 25 === 0) {
+          await new Promise((resolve) => setImmediate(resolve));
+        }
+      }
+
+      await Promise.all(pending);
+      await channel.flush();
+
+      const filePath = path.join(storagePath, "info", `${channel.fileName}.log`);
+
+      expect(fs.readFileSync(filePath, "utf-8").trim().split(/\r?\n/)).toHaveLength(1000);
+    });
+  });
+
+  describe("message escaping", () => {
+    it("keeps each entry on one line and removes terminal escapes", async () => {
+      const channel = track(new FileLog({ storagePath, maxMessagesToWrite: 1000 }));
+
+      await waitForInit(channel);
+
+      await channel.log(
+        dataFor({
+          message: "a\n[01-01-2026 10:00:00] [info] [auth][login]: forged\u001b]52;c;eA==\u0007",
+        }),
+      );
+      channel.flushSync();
+
+      const contents = fs.readFileSync(channel.filePath, "utf-8");
+
+      expect(contents.trim().split(/\r?\n/)).toHaveLength(1);
+      expect(contents).toContain("a\\n[01-01-2026 10:00:00]");
+      expect(contents).not.toContain("\u001b");
+      expect(contents).not.toContain("\u0007");
+    });
+
+    it("writes an Error's stack trace as is", async () => {
+      const channel = track(new FileLog({ storagePath, maxMessagesToWrite: 1000 }));
+      const error = new Error("bad\ninput");
+
+      await waitForInit(channel);
+
+      await channel.log(dataFor({ type: "error", message: error }));
+      channel.flushSync();
+
+      const contents = fs.readFileSync(channel.filePath, "utf-8");
+
+      expect(contents).toContain("bad\\ninput");
+      expect(contents).toContain(String(error.stack));
+    });
+
+    it("writes line breaks raw with escape: false, still removing terminal escapes", async () => {
+      const channel = track(new FileLog({ storagePath, maxMessagesToWrite: 1000, escape: false }));
+
+      await waitForInit(channel);
+
+      await channel.log(dataFor({ message: "line one\nline two\u001b[2J" }));
+      channel.flushSync();
+
+      const contents = fs.readFileSync(channel.filePath, "utf-8");
+
+      expect(contents).toContain("line one\nline two");
+      expect(contents).not.toContain("\u001b");
     });
   });
 

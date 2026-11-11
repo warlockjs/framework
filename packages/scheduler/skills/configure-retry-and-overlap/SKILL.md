@@ -83,7 +83,7 @@ Tells the scheduler to skip a tick if the job is already running.
 job("queue", processQueue).everyMinutes(5).preventOverlap();
 ```
 
-**Important nuance.** The scheduler awaits each tick's jobs before scheduling the next tick — so **concurrent same-job runs from the scheduler's own loop are structurally impossible**, regardless of `preventOverlap()`. Where it actually matters: jobs whose callbacks ALSO get invoked outside the scheduler.
+**Important nuance.** Ticks never wait for jobs, but the scheduler's own loop never starts a job that is still running: that tick emits `job:skip` ("Job is already running"), regardless of `preventOverlap()`. Where `preventOverlap()` actually matters: jobs whose callbacks ALSO get invoked outside the scheduler.
 
 Real-world shapes that benefit:
 
@@ -134,6 +134,8 @@ If retries push the total work past the next interval, `preventOverlap()` ensure
 job("nightly-report", buildReport).daily().at("02:00").onOneServer().preventOverlap();
 job("sync", sync).everyMinutes(5).onOneServer({ lockTtl: "10m", key: "sync-v2" });
 ```
+
+With `onOneServer()`, a plain interval (no `at()`, day or month constraint) is aligned to wall-clock boundaries in the job's timezone (`everyMinutes(5)` fires at :00, :05, …), so servers that booted at different times share each tick. It does not fire at boot; the first run is the next boundary.
 
 - Claim key: `scheduler.<key ?? name>.<scheduledTickEpochMs>` (scheduled tick time truncated to the second, so every server derives the same key). Losers skip the tick and the scheduler emits `job:skip`.
 - It is a **claim, not a lock**: a create-only, TTL-bounded cache entry that is never released, only expires. That guarantees one run per tick even if another server's timer fires late, after the winner finished.

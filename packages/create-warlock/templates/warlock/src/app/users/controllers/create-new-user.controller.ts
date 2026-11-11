@@ -33,6 +33,7 @@ createNewUserController.validation = {
 
 createNewUserController.responseSchema = {
   201: { body: { message: "string", user: UserResource } },
+  403: { body: { error: { code: "string", message: "string" }, requestId: "string" } },
   422: { body: { error: { code: "string", message: "string" }, requestId: "string" } },
   500: { body: { error: { code: "string", message: "string" }, requestId: "string" } },
   400: { body: { error: { code: "string", message: "string" }, requestId: "string" } },

@@ -5,6 +5,7 @@ import type {
   RetrieveOptions,
   RetrieveResult,
 } from "./contracts/citation.type";
+import { similarWithin } from "../utils/similar-within";
 import type { RagReranker } from "./rerank/reranker.contract";
 import type { VectorStore } from "./store/vector-store.contract";
 
@@ -20,6 +21,12 @@ export const DEFAULT_THRESHOLD = 0.5;
  * duplicated here.
  */
 export type StoredChunk = {
+  /**
+   * The rag namespace the chunk was indexed under. Retrieval matches it
+   * exactly. Absent on chunks indexed before it was recorded; those are
+   * matched by key shape (see {@link belongsTo}).
+   */
+  namespace?: string;
   sourceId: string;
   chunkIndex: number;
   span: [start: number, end: number];
@@ -31,7 +38,7 @@ export type StoredChunk = {
 export type RetrieveDeps = {
   embedder: EmbedderContract;
   store: VectorStore;
-  /** Namespace prefix every stored key carries (e.g. `"ai.rag.docs"`). */
+  /** Namespace every stored chunk carries (e.g. `"ai.rag.docs"`). */
   namespace: string;
   /** Optional reranker; when absent the cosine order is kept. */
   reranker?: RagReranker;
@@ -51,7 +58,8 @@ export type RetrieveDeps = {
  *
  * Behavior matches the design's failure modes:
  * - No hits clearing the threshold → `{ query, chunks: [] }`, never throws.
- * - Namespace-prefix filtering keeps two rags sharing one driver isolated.
+ * - Exact namespace matching keeps two rags sharing one driver isolated,
+ *   nested names (`kb.acme` / `kb.acme.private`) included.
  * - A reranker that throws is caught; the raw cosine order is used instead.
  * - A dimension mismatch (indexed with model A, queried with model B)
  *   throws a clear error rather than returning garbage hits.
@@ -79,21 +87,46 @@ export async function retrieve(
     );
   }
 
-  const hits = await deps.store.query<StoredChunk>(vector, {
-    topK: candidates,
-    threshold,
-    tags,
-  });
-
-  const prefix = `${deps.namespace}.`;
+  // The store ranks across every namespace it holds; widen the page when
+  // other namespaces crowd this one out of the first `candidates` hits.
+  const hits = await similarWithin(
+    (pageSize) => deps.store.query<StoredChunk>(vector, { topK: pageSize, threshold, tags }),
+    (hit) => belongsTo(hit, deps.namespace),
+    { topK: candidates, want: candidates },
+  );
 
   let retrieved: RetrievedChunk[] = hits
-    .filter((hit) => hit.key.startsWith(prefix))
+    .slice(0, candidates)
     .map((hit) => toRetrievedChunk(hit.value, hit.score));
 
   retrieved = await applyReranker(query, retrieved, deps.reranker);
 
   return { query, chunks: retrieved.slice(0, topK) };
+}
+
+/**
+ * Whether a store hit is a chunk of `namespace`. A chunk that records its
+ * namespace must match it exactly, so `kb.acme` never reads the chunks of
+ * `kb.acme.private`. An older chunk without the field is accepted only when
+ * its key is the namespace followed by exactly `<docId>.<chunkIndex>`.
+ */
+function belongsTo(hit: { key: string; value: StoredChunk }, namespace: string): boolean {
+  if (!hit.value) {
+    return false;
+  }
+
+  if (hit.value.namespace !== undefined) {
+    return hit.value.namespace === namespace;
+  }
+
+  const prefix = `${namespace}.`;
+  if (!hit.key.startsWith(prefix)) {
+    return false;
+  }
+
+  const rest = hit.key.slice(prefix.length).split(".");
+
+  return rest.length === 2 && rest[0] !== "" && /^\d+$/.test(rest[1] ?? "");
 }
 
 /** Build a cited {@link RetrievedChunk} from a stored chunk + its cosine score. */

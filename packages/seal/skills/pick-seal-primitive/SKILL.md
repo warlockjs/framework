@@ -119,7 +119,7 @@ Both are **skipped** when their parent `v.object` generates JSON Schema — they
 | Need                                   | Reach for                                                            |
 | -------------------------------------- | -------------------------------------------------------------------- |
 | Email                                  | `v.string().email()` or `v.email()`                                  |
-| URL                                    | `v.string().url()`                                                   |
+| URL                                    | `v.string().url()` (`{ protocols: ["https"] }` to restrict schemes)  |
 | UUID                                   | `v.string().uuid()` (see [`string-methods.md`](./string-methods.md)) |
 | Number 0–100                           | `v.number().between(0, 100)`                                         |
 | Positive integer                       | `v.int().positive()`                                                 |

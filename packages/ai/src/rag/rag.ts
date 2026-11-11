@@ -107,6 +107,7 @@ export function rag(config: RagConfig): Rag {
 
         for (const piece of pieces) {
           const value: StoredChunk = {
+            namespace,
             sourceId: doc.id,
             chunkIndex: piece.index,
             span: piece.span,
@@ -215,7 +216,18 @@ export function rag(config: RagConfig): Rag {
  * Namespaced key for a stored chunk. Uses the `.` separator (matching
  * `SemanticMemory.keyFor`) so namespace-prefix filtering on the returned
  * `hit.key` stays aligned with the cache's `parseKey` normalization.
+ *
+ * The document id is encoded so it never contains a separator: the key is
+ * always the namespace followed by exactly two segments, so chunks of
+ * namespace `kb` (document `acme.x`) and of namespace `kb.acme` (document
+ * `x`) can never share a key. Ids without `.`, `:` or `%` keep their
+ * previous key, so re-indexing them overwrites their earlier chunks.
  */
 function keyFor(namespace: string, sourceId: string, chunkIndex: number): string {
-  return `${namespace}.${sourceId}.${chunkIndex}`;
+  return `${namespace}.${encodeKeySegment(sourceId)}.${chunkIndex}`;
+}
+
+/** Escape `%`, `.` and `:` (the cache maps `:` to `.`) in one key segment. */
+function encodeKeySegment(segment: string): string {
+  return segment.replace(/[%.:]/g, (char) => (char === "%" ? "%25" : char === "." ? "%2E" : "%3A"));
 }

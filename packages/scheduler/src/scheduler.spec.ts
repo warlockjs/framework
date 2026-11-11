@@ -331,11 +331,8 @@ describe("Scheduler — tick behaviour", () => {
   });
 
   it("emits job:skip when a tick finds a due job already running", async () => {
-    // The scheduler awaits each tick's jobs, so the only way overlap can
-    // be observed within a single process is when a run was initiated
-    // outside the scheduler's own loop (manual `.run()`, another caller,
-    // parallel batch leftover). Simulate that by kicking off run()
-    // externally before starting the scheduler.
+    // Simulate a run initiated outside the scheduler's own loop (a manual
+    // `.run()`), already in flight when the scheduler starts.
     const scheduler = new Scheduler();
     const jobInstance = job("a", async () => {
       await new Promise((resolve) => setTimeout(resolve, 5000));
@@ -377,6 +374,132 @@ describe("Scheduler — tick behaviour", () => {
 // ─────────────────────────────────────────────────────────────────────────────
 // Sequential vs parallel execution
 // ─────────────────────────────────────────────────────────────────────────────
+
+describe("Scheduler — jobs run off the tick", () => {
+  const slowAndFast = (slowMs: number) => {
+    const fastRuns: number[] = [];
+    const slow = job("slow", async () => {
+      await new Promise((resolve) => setTimeout(resolve, slowMs));
+    }).everyMinute();
+    const fast = job("fast", async () => {
+      fastRuns.push(Date.now());
+    }).everySecond();
+
+    return { slow, fast, fastRuns };
+  };
+
+  it("in parallel mode a long job does not delay another job's ticks", async () => {
+    const scheduler = new Scheduler().runInParallel(true);
+    const { slow, fast, fastRuns } = slowAndFast(5_000);
+    scheduler.addJobs([slow, fast]);
+
+    scheduler.start();
+    await vi.advanceTimersByTimeAsync(1_000); // first tick starts both
+    expect(slow.isRunning).toBe(true);
+
+    await vi.advanceTimersByTimeAsync(4_000); // four more ticks while slow runs
+    expect(slow.isRunning).toBe(true);
+    expect(fastRuns).toHaveLength(5);
+
+    scheduler.stop();
+    await vi.advanceTimersByTimeAsync(1_000);
+  });
+
+  it("keeps ticking while a job runs and skips a due job that is still running", async () => {
+    const scheduler = new Scheduler();
+    const longJob = job("long", async () => {
+      await new Promise((resolve) => setTimeout(resolve, 3_500));
+    }).everySecond();
+    scheduler.addJob(longJob);
+    const ticks = vi.fn();
+    const skips = vi.fn();
+    const starts = vi.fn();
+    scheduler.on("scheduler:tick", ticks);
+    scheduler.on("job:skip", skips);
+    scheduler.on("job:start", starts);
+
+    scheduler.start();
+    await vi.advanceTimersByTimeAsync(3_000);
+
+    expect(ticks).toHaveBeenCalledTimes(3);
+    expect(starts).toHaveBeenCalledTimes(1);
+    expect(skips).toHaveBeenCalledWith("long", "Job is already running");
+
+    scheduler.stop();
+    await vi.advanceTimersByTimeAsync(1_000);
+  });
+
+  it("by default runs one job at a time without blocking the tick", async () => {
+    const scheduler = new Scheduler();
+    const { slow, fast, fastRuns } = slowAndFast(3_000);
+    scheduler.addJobs([slow, fast]);
+    const ticks = vi.fn();
+    scheduler.on("scheduler:tick", ticks);
+
+    scheduler.start();
+    await vi.advanceTimersByTimeAsync(2_500);
+
+    // The tick keeps firing, but `fast` waits for `slow` to finish.
+    expect(ticks).toHaveBeenCalledTimes(2);
+    expect(slow.isRunning).toBe(true);
+    expect(fastRuns).toHaveLength(0);
+
+    await vi.advanceTimersByTimeAsync(1_600); // slow ends at 4 s, then fast starts
+    expect(slow.isRunning).toBe(false);
+    expect(fastRuns).toHaveLength(1);
+
+    scheduler.stop();
+  });
+
+  it("by default, jobs that became due during a long run run afterwards in registration order", async () => {
+    // Pinned against the behaviour before ticks stopped waiting for jobs:
+    // nothing that came due while `slow` ran is dropped, and the batch that
+    // follows runs in registration order, not in the order jobs came due.
+    const scheduler = new Scheduler();
+    const order: string[] = [];
+    const record =
+      (name: string, ms = 0) =>
+      async () => {
+        order.push(name);
+        if (ms > 0) await new Promise((resolve) => setTimeout(resolve, ms));
+      };
+
+    scheduler.addJobs([
+      job("slow", record("slow", 3_500)).everyMinute(), // due at the first tick (1 s), ends at 4.5 s
+      job("late", record("late")).daily().at("10:00:03"), // registered first, due last
+      job("early", record("early")).daily().at("10:00:02"),
+    ]);
+
+    scheduler.start();
+    await vi.advanceTimersByTimeAsync(4_000);
+    expect(order).toEqual(["slow"]);
+
+    await vi.advanceTimersByTimeAsync(600);
+    expect(order).toEqual(["slow", "late", "early"]);
+
+    scheduler.stop();
+  });
+
+  it("shutdown() waits for runs the scheduler started", async () => {
+    const scheduler = new Scheduler();
+    let finished = false;
+    scheduler.addJob(
+      job("a", async () => {
+        await new Promise((resolve) => setTimeout(resolve, 2_500));
+        finished = true;
+      }).everySecond(),
+    );
+
+    scheduler.start();
+    await vi.advanceTimersByTimeAsync(1_000);
+
+    const done = scheduler.shutdown();
+    await vi.advanceTimersByTimeAsync(2_500);
+    await done;
+
+    expect(finished).toBe(true);
+  });
+});
 
 describe("Scheduler — execution modes", () => {
   it("sequential mode runs jobs one after another", async () => {
@@ -469,11 +592,11 @@ describe("Scheduler — execution modes", () => {
     expect(liveCount.current).toBeGreaterThan(0); // batch 2 started
 
     // Release rest to let test cleanup.
+    scheduler.stop();
     while (callbacks.length > 0) {
       callbacks.shift()?.();
+      await vi.advanceTimersByTimeAsync(0);
     }
-    await vi.runAllTimersAsync();
-    scheduler.stop();
   });
 
   it("runInParallel is chainable", () => {

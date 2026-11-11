@@ -63,6 +63,7 @@ await authorize(user, "orders.update", { resource: order, tenant }); // grant AN
 
 ## Gotchas
 
+- **One resolution per user object per request.** Checks on the same user object share the resolved permission/role set for up to one second, so stacked `gate()`s and `canAll` / `canAny` read the cache once. `access.flush` drops the shared sets immediately.
 - **Fails closed, but config errors are loud.** A resolver or policy that throws → denied and logged (a user with no roles is denied, never allowed by accident). The one exception: `AccessConfigError` (e.g. no resolver configured) is **re-thrown**, not denied — a misconfig must surface, not hide. A cache outage is different again: it degrades to the resolver (the cache fails _open_; the decision still fails closed).
 - Stack `gate` **after** `authMiddleware` — it reads `request.locals.user`; without an authenticated user it `403`s.
 - The boolean `can*` family never throws; the `authorize*` family throws `ForbiddenError`. Pick per layer (controllers gate with middleware, services assert with `authorize`).

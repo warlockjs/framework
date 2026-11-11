@@ -37,7 +37,6 @@
  */
 import { PassThrough } from "node:stream";
 import type { PipeableStream } from "react-dom/server";
-import { stringify } from "devalue";
 import { escapePayload } from "../components/document-context";
 import { DEFER_BOOTSTRAP_SOURCE } from "../client/runtime/defer-registry";
 import { serializePageError } from "./error-page";
@@ -106,8 +105,9 @@ function scriptTag(nonce: string | undefined, innerScript: string): string {
 function deferCallScript(key: string, settlement: DeferSettlement, routeName: string): string {
   const serializedKey = escapePayload(JSON.stringify(key));
 
-  assertPageDataSerializable(settlement, "page", routeName);
-  const serializedSettlement = escapePayload(JSON.stringify(stringify(settlement)));
+  const serializedSettlement = escapePayload(
+    JSON.stringify(assertPageDataSerializable(settlement, "page", routeName)),
+  );
 
   return `__WARLOCK_DEFER__(${serializedKey}, ${serializedSettlement})`;
 }

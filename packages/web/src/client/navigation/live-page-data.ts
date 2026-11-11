@@ -20,6 +20,10 @@ export function configureLivePageData(options: { socket?: LivePageSocket }): voi
   for (const listener of configurationListeners) listener();
 }
 
+function isDocumentHidden(): boolean {
+  return typeof document !== "undefined" && document.visibilityState === "hidden";
+}
+
 /** One controller per mounted navigation runtime, across page swaps. */
 export function startLivePageData(runtime: {
   readOptions: () => LivePageOptions | undefined;
@@ -30,6 +34,12 @@ export function startLivePageData(runtime: {
   const queuedTags = new Set<string>();
   let pollQueued = false;
   let focusQueued = false;
+  // A poll skipped because the tab was hidden; one refresh catches up when it
+  // is visible again.
+  let missedPoll = false;
+  // A visible-again catch-up is queued or running, so the `focus` event that
+  // usually follows it must not send a second refresh.
+  let catchingUp = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
   let detachSocket: (() => void) | undefined;
 
@@ -44,7 +54,10 @@ export function startLivePageData(runtime: {
     const focused = focusQueued;
     pollQueued = false;
     focusQueued = false;
-    if (!shouldRefresh) return;
+    if (!shouldRefresh) {
+      if (focused) catchingUp = false;
+      return;
+    }
 
     running = true;
     let applied = false;
@@ -56,6 +69,7 @@ export function startLivePageData(runtime: {
       // A failed background refresh keeps the current page and retries later.
     } finally {
       running = false;
+      if (focused) catchingUp = false;
       if (!disposed) {
         if (!applied) {
           for (const tag of tags) queuedTags.add(tag);
@@ -74,8 +88,13 @@ export function startLivePageData(runtime: {
     if (disposed) return;
     timer = setTimeout(() => {
       if (!configuredSocket?.connected) {
-        pollQueued = true;
-        void drain();
+        if (isDocumentHidden()) {
+          // Nobody is looking: a background tab must not refresh forever.
+          missedPoll = true;
+        } else {
+          pollQueued = true;
+          void drain();
+        }
       }
       schedulePoll();
     }, runtime.readOptions()?.pollInterval ?? 30_000);
@@ -118,11 +137,24 @@ export function startLivePageData(runtime: {
     wake();
   };
 
-  const onFocus = (): void => {
+  const queueFocus = (): void => {
+    missedPoll = false;
     focusQueued = true;
     wake();
   };
+  const onFocus = (): void => {
+    if (catchingUp) return;
+    queueFocus();
+  };
+  const onVisibilityChange = (): void => {
+    if (isDocumentHidden() || !missedPoll) return;
+    catchingUp = true;
+    queueFocus();
+  };
   if (typeof window !== "undefined") window.addEventListener("focus", onFocus);
+  if (typeof document !== "undefined") {
+    document.addEventListener("visibilitychange", onVisibilityChange);
+  }
 
   const unsubscribeNavigation = subscribeNavigationPending(wake);
   const unsubscribeDirty = subscribeDirtyForms(wake);
@@ -134,6 +166,9 @@ export function startLivePageData(runtime: {
     if (timer !== undefined) clearTimeout(timer);
     detachSocket?.();
     if (typeof window !== "undefined") window.removeEventListener("focus", onFocus);
+    if (typeof document !== "undefined") {
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    }
     configurationListeners.delete(bindSocket);
     unsubscribeNavigation();
     unsubscribeDirty();

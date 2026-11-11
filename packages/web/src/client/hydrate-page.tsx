@@ -10,6 +10,8 @@ import {
 import { readHydrationPayload, type HydrationDocumentPayloadSource } from "../hydration-payload";
 import { hydrateShared } from "../shared";
 import { readNamedApiRoutes } from "../routing/named-api-routes";
+import { LOCALE_ROUTING_META_NAME } from "../routing/locale-routing-meta-name";
+import type { LocaleRouting } from "../routing/locale-routing";
 import { installSession } from "../session/use-user";
 import { LevelErrorBoundary } from "./build-hydrated-tree";
 import { describeHydrationMismatch, formatHydrationMismatch } from "./describe-hydration-mismatch";
@@ -49,6 +51,27 @@ function installWindowErrorReporters(): void {
       pathname: window.location.pathname,
     });
   });
+}
+
+/**
+ * The server's locale-routing table, read back from the
+ * `<meta name="warlock-locale-routing">` tag `<Head/>` rendered from it. The
+ * document's inline payload leaves its own copy out (`components/scripts.ts`),
+ * so this is how the hydrated `<Head/>` renders the same tag. Parsed as-is,
+ * so re-serializing it yields the exact `content` the server wrote.
+ */
+function readDocumentLocaleRouting(): LocaleRouting | undefined {
+  const content = document
+    .querySelector(`meta[name="${LOCALE_ROUTING_META_NAME}"]`)
+    ?.getAttribute("content");
+
+  if (!content) return undefined;
+
+  try {
+    return JSON.parse(content) as LocaleRouting;
+  } catch {
+    return undefined;
+  }
 }
 
 /** Test-only: allow a spec to re-install the listeners against a fresh `window`. */
@@ -242,10 +265,13 @@ export function hydratePage(buildTree: BuildHydratedTree, options: HydratePageOp
   // that: without it `<Scripts/>` would render no table script here and the
   // hydrated tree would not match the server's markup.
   const namedApiRoutes = payload.document?.namedApiRoutes ?? readNamedApiRoutes();
+  // Same for the locale-routing table, which travels in its own meta tag.
+  const localeRouting = payload.document?.localeRouting ?? readDocumentLocaleRouting();
 
   const value: DocumentContextValue = {
     ...payload.document,
     ...(namedApiRoutes === undefined ? {} : { namedApiRoutes }),
+    ...(localeRouting === undefined ? {} : { localeRouting }),
     metadata: payload.metadata,
     payload,
   };

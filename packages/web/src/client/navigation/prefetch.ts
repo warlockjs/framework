@@ -8,7 +8,9 @@
  *     be told it failed. A failed prefetch leaves the cache empty and the click
  *     fetches for real, which is the behaviour we had before this file existed.
  *   - it never delays a click. `prefetchPageData` is fire-and-forget; the
- *     navigation path reads the cache synchronously and does not wait on it.
+ *     navigation path reads the cache synchronously, and a click that lands
+ *     while the prefetch is still in the air JOINS that request instead of
+ *     sending the same one a second time (`takeOrJoinPrefetchedPageData`).
  *   - it is BOUNDED and it EXPIRES. A cached payload is a copy of a page that
  *     may already have changed, so it may only be served while it is very
  *     probably still true.
@@ -55,6 +57,15 @@ export const PREFETCH_CACHE_LIMIT = 10;
  */
 export const PREFETCH_TTL_MS = 30_000;
 
+/**
+ * How long the pointer must rest on a link before its prefetch starts, in
+ * milliseconds. A pointer sweeping across a menu crosses each link in less
+ * than this, so a sweep costs no requests; a pointer heading for a click
+ * settles well within it. Focus does not wait: a keyboard user who tabs to a
+ * link has already chosen it.
+ */
+export const PREFETCH_HOVER_DELAY_MS = 65;
+
 type CacheEntry = {
   result: PrefetchedPageData;
   /** `Date.now()` at which this entry stops being servable. */
@@ -67,13 +78,45 @@ type CacheEntry = {
  */
 const cache = new Map<string, CacheEntry>();
 
+/** A prefetch still in the air; `claimed` once a navigation joined it. */
+type InFlightPrefetch = {
+  promise: Promise<PrefetchedPageData | undefined>;
+  claimed: boolean;
+};
+
 /**
  * URLs with a request already in the air. Repeated `mouseenter` events on the
  * same anchor are the norm, not the exception — a pointer crossing a link fires
  * as the user's hand settles — and without this each one would be its own
- * request for the same page.
+ * request for the same page. Kept as the request's promise, so a click that
+ * lands before the answer can wait for it instead of asking again.
  */
-const inFlight = new Set<string>();
+const inFlight = new Map<string, InFlightPrefetch>();
+
+/** Hover prefetches waiting out {@link PREFETCH_HOVER_DELAY_MS}. */
+const scheduled = new Map<string, ReturnType<typeof setTimeout>>();
+
+/**
+ * Warms a page's JavaScript chunk once its prefetched data arrives, so the
+ * click does not wait for the chunk after the data. Connected by the
+ * navigation runtime, which owns the page registry; absent on the server and
+ * before the runtime mounts.
+ */
+let warmPageChunk: ((name: string) => void) | undefined;
+
+/**
+ * Connect (or, with `undefined`, disconnect) the page-chunk warmer the
+ * navigation runtime provides. Returns the disconnect.
+ */
+export function connectPrefetchChunkWarmer(
+  warmer: ((name: string) => void) | undefined,
+): () => void {
+  warmPageChunk = warmer;
+
+  return () => {
+    if (warmPageChunk === warmer) warmPageChunk = undefined;
+  };
+}
 
 /**
  * Bumped by every {@link clearPrefetchCache}. A request that started before a
@@ -116,6 +159,8 @@ export async function prefetchPageData(url: string): Promise<void> {
 
   if (inFlight.has(url)) return;
 
+  cancelScheduledPrefetch(url);
+
   // A fresh entry means the answer is already here; an expired one is dropped
   // now so the fetch below can replace it.
   const cached = cache.get(url);
@@ -126,10 +171,24 @@ export async function prefetchPageData(url: string): Promise<void> {
     cache.delete(url);
   }
 
-  inFlight.add(url);
+  const entry: InFlightPrefetch = { promise: Promise.resolve(undefined), claimed: false };
 
-  const startedIn = generation;
+  inFlight.set(url, entry);
+  entry.promise = runPrefetch(url, entry, generation);
 
+  await entry.promise;
+}
+
+/**
+ * The request behind {@link prefetchPageData}. Resolves to the payload, or
+ * `undefined` for anything a navigation must not use (a failure, a
+ * `hard-navigate`, a cache cleared meanwhile). Never rejects.
+ */
+async function runPrefetch(
+  url: string,
+  entry: InFlightPrefetch,
+  startedIn: number,
+): Promise<PrefetchedPageData | undefined> {
   try {
     const result = await fetchPageData(url);
 
@@ -141,13 +200,23 @@ export async function prefetchPageData(url: string): Promise<void> {
       re-asks and gets the same answer, correctly, through the navigation path
       that already knows how to degrade.
     */
-    if (result.type !== "payload") return;
+    if (result.type !== "payload") return undefined;
 
-    if (startedIn !== generation) return;
+    if (startedIn !== generation) return undefined;
 
-    if (cache.size >= PREFETCH_CACHE_LIMIT) evictOldest();
+    // Fire and forget: a chunk that fails to load here fails again on the
+    // click, which already knows how to degrade.
+    warmPageChunk?.(result.payload.name);
 
-    cache.set(url, { result, expiresAt: Date.now() + PREFETCH_TTL_MS });
+    // A navigation that joined this request takes the payload straight from
+    // the promise; caching it as well would let a second click spend it again.
+    if (!entry.claimed) {
+      if (cache.size >= PREFETCH_CACHE_LIMIT) evictOldest();
+
+      cache.set(url, { result, expiresAt: Date.now() + PREFETCH_TTL_MS });
+    }
+
+    return result;
   } catch {
     /*
       `fetchPageData` already converts every network failure into a
@@ -157,11 +226,40 @@ export async function prefetchPageData(url: string): Promise<void> {
       about requests nobody made is how a helpful optimisation becomes noise
       that hides real errors.
     */
+    return undefined;
   } finally {
     // In `finally` so a failed attempt does not poison the URL for the rest of
-    // the session — the next hover is allowed to try again.
-    inFlight.delete(url);
+    // the session — the next hover is allowed to try again. Only this
+    // request's own slot: after a clear, a newer prefetch may hold the URL.
+    if (inFlight.get(url) === entry) inFlight.delete(url);
   }
+}
+
+/**
+ * Prefetch `url` once the pointer has rested on it for
+ * {@link PREFETCH_HOVER_DELAY_MS}; {@link cancelScheduledPrefetch} (pointer
+ * left) drops it before any request is made.
+ */
+export function schedulePrefetchPageData(url: string): void {
+  if (!isBrowser() || scheduled.has(url)) return;
+
+  scheduled.set(
+    url,
+    setTimeout(() => {
+      scheduled.delete(url);
+      void prefetchPageData(url);
+    }, PREFETCH_HOVER_DELAY_MS),
+  );
+}
+
+/** Drop a hover prefetch that has not started yet. */
+export function cancelScheduledPrefetch(url: string): void {
+  const timer = scheduled.get(url);
+
+  if (timer === undefined) return;
+
+  clearTimeout(timer);
+  scheduled.delete(url);
 }
 
 /**
@@ -189,12 +287,42 @@ export function takePrefetchedPageData(url: string): PrefetchedPageData | undefi
 }
 
 /**
+ * What a navigation spends instead of fetching: a live cached payload
+ * (returned as-is, synchronously), or the promise of a prefetch still in the
+ * air (joined — CLAIMED, so no other navigation can spend it, and it resolves
+ * to `undefined` when it yields nothing usable). `undefined` when there is
+ * neither; the caller then fetches. A hover prefetch still waiting out its
+ * delay is cancelled, since the click is about to ask for the same page.
+ */
+export function takeOrJoinPrefetchedPageData(
+  url: string,
+): PrefetchedPageData | Promise<PrefetchedPageData | undefined> | undefined {
+  cancelScheduledPrefetch(url);
+
+  const taken = takePrefetchedPageData(url);
+
+  if (taken !== undefined) return taken;
+
+  const pending = inFlight.get(url);
+
+  if (pending === undefined || pending.claimed) return undefined;
+
+  pending.claimed = true;
+
+  return pending.promise;
+}
+
+/**
  * Drop everything. For tests, and for any caller that knows the cached pages
  * are now wrong — the module-level cache would otherwise outlive a suite and
  * leak into the next one.
  */
 export function resetPrefetchCache(): void {
   clearPrefetchCache();
+
+  for (const timer of scheduled.values()) clearTimeout(timer);
+
+  scheduled.clear();
 }
 
 /**

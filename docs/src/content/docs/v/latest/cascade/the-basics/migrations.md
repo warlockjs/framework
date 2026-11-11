@@ -311,7 +311,7 @@ Every key is optional — include only what the migration changes. The `AlterSch
 - `addFullText` / `dropFullText` — full-text search indexes.
 - `addGeoIndex` / `dropGeoIndex` — geo-spatial.
 - `addVectorIndex` / `dropVectorIndex` — `[{ column, options: { dimensions, similarity } }]`.
-- `addTTLIndex` / `dropTTLIndex` — `[{ column, expireAfterSeconds }]` (MongoDB-primary; auto-expire documents).
+- `addTTLIndex` / `dropTTLIndex` — `[{ column, expireAfterSeconds }]` (MongoDB-primary; auto-expire documents). On PostgreSQL a scheduler job purges expired rows every minute in batches of up to 5,000 rows (at most 100 batches per run, so a large backlog is cleared over several runs), and a run is skipped while the previous one is still deleting.
 
 **Raw**
 

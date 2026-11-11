@@ -127,4 +127,53 @@ describe("health registry", () => {
 
     expect(result.checks).toEqual({ "http-routes": false });
   });
+
+  it("runs each check once for concurrent probes", async () => {
+    Application.markBooted(bootContext);
+    let runs = 0;
+    health.addCheck("db", async () => {
+      runs++;
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      return true;
+    });
+
+    const results = await Promise.all(Array.from({ length: 50 }, () => health.readiness()));
+
+    expect(runs).toBe(1);
+    expect(results.every((result) => result.status === "ok")).toBe(true);
+  });
+
+  it("reuses a result within http.health.cacheTtl and reruns after a check changes", async () => {
+    Application.markBooted(bootContext);
+    let runs = 0;
+    health.addCheck("db", () => {
+      runs++;
+      return true;
+    });
+
+    await health.readiness();
+    await health.readiness();
+    expect(runs).toBe(1);
+
+    health.addCheck("cache", () => true);
+    await health.readiness();
+    expect(runs).toBe(2);
+  });
+
+  it("fails a check that never answers once http.health.checkTimeout passes", async () => {
+    const { default: config } = await import("@mongez/config");
+    config.set("http.health", { checkTimeout: 20 });
+
+    try {
+      Application.markBooted(bootContext);
+      health.addCheck("hangs", () => new Promise<boolean>(() => {}));
+
+      const result = await health.readiness();
+
+      expect(result.status).toBe("error");
+      expect(result.checks).toEqual({ hangs: false });
+    } finally {
+      config.set("http.health", undefined);
+    }
+  });
 });

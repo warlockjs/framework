@@ -32,7 +32,11 @@ import { applyDocumentMetadata } from "./document-metadata";
 import { connectLocaleChanger, createLocaleChanger } from "./change-locale-code";
 import { fetchPageData } from "./fetch-page-data";
 import { createEntryKey, ensureEntryKey, withEntryKey } from "./history-entry-key";
-import { takePrefetchedPageData } from "./prefetch";
+import {
+  connectPrefetchChunkWarmer,
+  takeOrJoinPrefetchedPageData,
+  type PrefetchedPageData,
+} from "./prefetch";
 import { connectRefresher, createRefresher, type RefreshablePage } from "./refresh";
 import { connectActionSubmitter, createActionSubmitter } from "./action-submitter";
 import {
@@ -341,8 +345,18 @@ export function NavigationRoot({
         await, and the synchronous path reaches the same `isCurrent()` check.
         A prefetched hit is never aborted — there is no request in flight to
         abort — so `signal` is only ever consulted on the network path.
+
+        A click that lands while the hover prefetch is still in the air JOINS
+        it rather than sending the same request again; a newer navigation
+        stops the wait through `signal`, exactly as it would stop a fetch.
       */
-        const result = takePrefetchedPageData(url) ?? (await fetchPageData(url, signal));
+        const prefetched = takeOrJoinPrefetchedPageData(url);
+        const joined =
+          prefetched instanceof Promise ? await untilAborted(prefetched, signal) : prefetched;
+
+        if (disposed || !isCurrent()) return;
+
+        const result = joined ?? (await fetchPageData(url, signal));
 
         if (disposed || !isCurrent()) return;
 
@@ -679,8 +693,21 @@ export function NavigationRoot({
 
     window.addEventListener("popstate", onPopState);
 
+    // A prefetched page's chunk loads alongside its data, so the click does
+    // not wait for it afterwards. Failures are left to the click's own load.
+    const disconnectChunkWarmer = connectPrefetchChunkWarmer((name) => {
+      const entry = pages.find((candidate) => candidate.name === name);
+
+      if (entry === undefined) return;
+
+      void Promise.resolve()
+        .then(() => entry.load())
+        .catch(() => undefined);
+    });
+
     return () => {
       disposed = true;
+      disconnectChunkWarmer();
       stopLivePageData();
       activeController?.abort();
       activePendingCompletion?.();
@@ -853,4 +880,22 @@ export function NavigationRoot({
       </LocaleProvider>
     </DocumentContext.Provider>
   );
+}
+
+/** `promise`'s value, or `undefined` as soon as `signal` aborts. */
+function untilAborted(
+  promise: Promise<PrefetchedPageData | undefined>,
+  signal: AbortSignal,
+): Promise<PrefetchedPageData | undefined> {
+  if (signal.aborted) return Promise.resolve(undefined);
+
+  return new Promise((resolve) => {
+    const onAbort = (): void => resolve(undefined);
+
+    signal.addEventListener("abort", onAbort, { once: true });
+    void promise.then((value) => {
+      signal.removeEventListener("abort", onAbort);
+      resolve(value);
+    });
+  });
 }

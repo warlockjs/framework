@@ -11,6 +11,15 @@ export abstract class Auth<out Schema extends ModelSchema = ModelSchema>
   implements Authenticable
 {
   /**
+   * The password hash never leaves the server through serialization:
+   * `toJSON()` (so `response.json(user)`), lean query rows and embedded
+   * copies all drop it, while `user.get("password")` / `user.string("password")`
+   * still read it for verification. A subclass that sets its own `hidden`
+   * replaces this list, so keep `"password"` in it.
+   */
+  public static hidden: string[] = ["password"];
+
+  /**
    * Get user type
    */
   public abstract get userType(): string;

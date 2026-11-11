@@ -182,14 +182,17 @@ describe("guardedFetch — redirect re-validation (SSRF hardening)", () => {
     await guardedFetch(
       "https://8.8.8.8/page",
       { fetch: fetchImpl as unknown as typeof fetch },
-      { headers: { authorization: "Bearer secret", "x-app": "warlock" } },
+      { headers: { authorization: "Bearer secret", "x-app": "warlock", accept: "text/html" } },
     );
 
     const firstHeaders = fetchImpl.mock.calls[0][1].headers as Record<string, string>;
     const secondHeaders = fetchImpl.mock.calls[1][1].headers as Record<string, string>;
     expect(firstHeaders.authorization).toBe("Bearer secret");
+    expect(firstHeaders["x-app"]).toBe("warlock");
     expect(secondHeaders.authorization).toBeUndefined();
-    expect(secondHeaders["x-app"]).toBe("warlock");
+    // A custom header is not known to be safe, so it stays with its origin.
+    expect(secondHeaders["x-app"]).toBeUndefined();
+    expect(secondHeaders.accept).toBe("text/html");
   });
 });
 

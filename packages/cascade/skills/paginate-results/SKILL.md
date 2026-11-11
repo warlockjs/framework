@@ -18,7 +18,7 @@ page.data; // User[]
 page.pagination; // { total, page, limit, pages }
 ```
 
-`PaginationOptions` is `{ page?, limit? }` — there is no `filter` field; filter by chaining `.where()` before `.paginate()` (below).
+`PaginationOptions` is `{ page?, limit?, maxLimit? }` — there is no `filter` field; filter by chaining `.where()` before `.paginate()` (below). `limit` and `page` must be whole numbers (digit strings like `"20"` are accepted, `"abc"` throws `UnsafeFilterError`). The page size is capped at `maxLimit`, **1000** by default, so passing `request.input("limit")` cannot load a whole table; `pagination.limit` reports the size used. Raise it per call: `paginate({ limit: 5000, maxLimit: 10_000 })`. `cursorPaginate()` takes the same `maxLimit`.
 
 Chain off `.where()` for filtered pagination:
 
@@ -62,7 +62,7 @@ await User.where("status", "active").chunk(500, async (users) => {
 });
 ```
 
-`.chunk(size, fn)` streams the table 500 records at a time, calling `fn` per batch. Constant memory regardless of total row count.
+`.chunk(size, fn)` streams the table 500 records at a time, calling `fn` per batch. Constant memory regardless of total row count. When the query has no order, or is ordered only by the primary key (`_id` on MongoDB), chunks page by key (`where id > last`), so every chunk costs the same and rows the callback updates or deletes don't shift later chunks; any other order pages by offset.
 
 Return `false` from the callback to stop early:
 

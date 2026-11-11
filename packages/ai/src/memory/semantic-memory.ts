@@ -1,6 +1,7 @@
 import type { CacheDriver, CacheSimilarHit } from "@warlock.js/cache";
 import type { EmbedderContract } from "../contracts/embedder.contract";
 import type { MemoryItem, RecalledMemory } from "../contracts/memory/memory-item.type";
+import { similarWithin } from "../utils/similar-within";
 import { deriveMemoryId } from "./derive-id";
 
 /**
@@ -83,22 +84,20 @@ export class SemanticMemory {
     scope?: string,
   ): Promise<RecalledMemory[]> {
     const { vector } = await this.embedder.embed(query);
+    const prefix = `${this.namespace}.`;
 
     // A scoped recall overscans: the driver ranks across every scope in
     // the index, so a plain top-`k` could be filled entirely by foreign
-    // scopes and starve this one. Pull extra candidates, filter, then cap.
-    const hits = await this.store.similar<StoredMemory>(vector, {
-      topK: scope === undefined ? k : Math.max(k * RECALL_OVERSCAN, k),
-      threshold,
-    });
-
-    const prefix = `${this.namespace}.`;
+    // scopes and starve this one. Pull extra candidates, filter, then cap;
+    // when foreign entries still fill the page, widen it.
+    const hits = await similarWithin(
+      (topK) => this.store.similar<StoredMemory>(vector, { topK, threshold }),
+      (hit: CacheSimilarHit<StoredMemory>) =>
+        hit.key.startsWith(prefix) && hit.value?.scope === scope,
+      { topK: scope === undefined ? k : Math.max(k * RECALL_OVERSCAN, k), want: k },
+    );
 
     return hits
-      .filter(
-        (hit: CacheSimilarHit<StoredMemory>) =>
-          hit.key.startsWith(prefix) && hit.value?.scope === scope,
-      )
       .map((hit: CacheSimilarHit<StoredMemory>) => ({
         id: hit.value.id,
         text: hit.value.text,

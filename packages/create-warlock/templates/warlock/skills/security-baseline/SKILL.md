@@ -71,7 +71,7 @@ The framework returns `422 Unprocessable Entity` with structured field errors au
 
 ### 1.3 File uploads
 
-- Cap the size at the route level (`fileUploadLimit` in `config/http.ts` is the project floor; tighten per-route).
+- Cap the size at the route level (`fileUploadLimit` in `config/http.ts`, 10 MB in the starter, is the project ceiling for one file; tighten per-route). Every file part is held in memory before route middleware runs, so raise the ceiling only as far as the largest file the app really accepts.
 - Sniff the real MIME type from the bytes; don't trust the `Content-Type` header.
 - Never use the client-supplied filename as a path component — generate a server-side identifier.
 - Quarantine until processed; scan if user-visible.
@@ -103,7 +103,7 @@ Any field whose value would determine permission (`userId`, `organizationId`, `r
 
 ### 2.2 Authentication via `@warlock.js/auth`
 
-The project's auth stack: JWT access tokens and optional refresh tokens, configured in `src/config/auth.ts`. The starter uses `NO_EXPIRATION` for access tokens and disables refresh tokens; choose finite lifetimes and explicitly enable refresh when the application needs sessions. Password hashing via `bcryptjs`. The framework's `authService` (`@warlock.js/auth`) is the single entry point:
+The project's auth stack: JWT access tokens and optional refresh tokens, configured in `src/config/auth.ts`. The starter issues 1-hour access tokens and 7-day refresh tokens: `POST /auth/login` returns both, the client renews the pair with `POST /auth/refresh-token` (rotated on every use), and `POST /auth/logout` with the refresh token ends that one session. Keep access tokens short-lived; never set `NO_EXPIRATION` for them. Password hashing via `bcryptjs`. The framework's `authService` (`@warlock.js/auth`) is the single entry point:
 
 ```typescript
 // ✅ thin wrapper service — the framework does the work
@@ -150,7 +150,7 @@ Use centralized role helpers, never inline string comparisons (`user.role === "a
 
 ### 3.1 `.env` is never committed
 
-- `.env.local` and `.env` are in `.gitignore` from day one.
+- Every env file (`.env`, `.env.local`, `.env.production`, `.env.shared`, …) is in `.gitignore` from day one (`.env` and `.env.*`); only `.env.example` is tracked. To commit a file that holds no secrets, add a `!.env.<name>` line.
 - `.env.example` is committed and documents every variable the app needs.
 - Production secrets come from the deployment platform's secret manager (Doppler, AWS Secrets Manager, Kubernetes secrets), not files on disk.
 
@@ -165,11 +165,9 @@ import { env } from "@warlock.js/core";
 
 const authConfigurations: AuthConfigurations = {
   userType: { user: User },
-  jwt: {
-    secret: env("JWT_SECRET"),
-    expiresIn: "1h",
-    refresh: {/* ... */},
-  },
+  accessToken: { secret: env("JWT_SECRET"), expiresIn: "1h" },
+  refreshToken: { enabled: true, secret: env("JWT_REFRESH_SECRET"), expiresIn: "7d" },
+  hashTokensAtRest: true, // the database keeps only a SHA-256 digest of each token
 };
 ```
 
@@ -257,10 +255,10 @@ export const afterLoginController: RequestHandler = async ({ request, response }
 
 ### 5.4 CORS
 
-`config/http.ts` controls the CORS policy. The template default `origin: "*"` is **fine for early development** — but before production:
+`config/http.ts` controls the CORS policy. The template allows only the origins listed in `CORS_ORIGINS` (comma-separated, empty = same origin only):
 
-- Replace `*` with the explicit frontend origin(s).
-- If credentials cross the boundary (cookies, auth headers), `*` is no longer allowed by the spec anyway.
+- Add each frontend origin that calls the API from another site, e.g. `CORS_ORIGINS=https://app.example.com,http://localhost:5173`.
+- Never use `origin: "*"` for an API that serves user data; with credentials (cookies, auth headers) the spec forbids it anyway.
 
 ---
 
@@ -276,7 +274,17 @@ Login, signup, password-reset, and refresh-token endpoints get a much tighter li
 
 ### 6.3 Account-targeted limits
 
-For `/auth/login` and `/auth/reset-password`, key the limiter on the **email or user-id** in the payload as well as the IP — otherwise an attacker rotating IPs has free rein on a target account.
+For `/auth/login` and `/auth/reset-password`, key the limiter on the **email or user-id** in the payload as well as the IP — otherwise an attacker rotating IPs has free rein on a target account. The starter does this: `loginThrottleMiddleware()` and `tokenConsumeThrottleMiddleware({ by: ["email", "ip"] })`.
+
+### 6.3.1 One-time codes
+
+The starter's password-reset codes (`src/app/auth/services/otp.service.ts`) show the rules for any one-time code:
+
+- Generate it with `node:crypto` (`randomInt`), never `Math.random`.
+- Store only a keyed hash (HMAC with an app secret), never the code; a plain hash of 6 digits is reversed by trying all million values.
+- Count every check atomically and retire the code after `maxAttempts` (5) wrong tries.
+- Answer every rejection (unknown email, wrong, expired, used, out of attempts) with the same error, and answer `forgot-password` the same, and as fast, for known and unknown emails: respond first and do the account lookup and code delivery afterwards (log failures).
+- Store an uploaded file only after the authorization check passes (validate it with `v.file()`, then `file.save()` in the controller), so a refused request leaves no file behind.
 
 ### 6.4 Progressive lockout
 

@@ -4,6 +4,12 @@ const keys = new Set<string>();
 const values = new Set<string>();
 const MASK = "[REDACTED]";
 let orderedValues: string[] = [];
+/**
+ * One expression matching any registered value, longest first, so a string
+ * that holds no secret is cleared in a single pass. `undefined` when it could
+ * not be built (then each value is searched for on its own).
+ */
+let secretPattern: RegExp | undefined;
 
 /**
  * Register credentials for process-lifetime masking in every Logger instance.
@@ -18,11 +24,47 @@ export function registerLogSecret(value: string, secretKeys: readonly string[] =
   if (!value || values.has(value)) return;
   values.add(value);
   orderedValues = [...values].sort((left, right) => right.length - left.length);
+  secretPattern = buildSecretPattern(orderedValues);
+}
+
+/** Above this total length the values are searched for one by one. */
+const MAX_PATTERN_LENGTH = 16 * 1024;
+
+function buildSecretPattern(secrets: readonly string[]): RegExp | undefined {
+  let total = 0;
+
+  for (const secret of secrets) total += secret.length;
+
+  if (total > MAX_PATTERN_LENGTH) return undefined;
+
+  try {
+    return new RegExp(
+      secrets.map((secret) => secret.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|"),
+    );
+  } catch {
+    // Too large for one expression; fall back to scanning value by value.
+    return undefined;
+  }
+}
+
+/** Whether the text holds any registered value. */
+function containsSecret(text: string): boolean {
+  if (secretPattern) {
+    try {
+      return secretPattern.test(text);
+    } catch {
+      // The engine gave up on this expression (its message could quote a
+      // credential, so it is dropped); scan value by value from now on.
+      secretPattern = undefined;
+    }
+  }
+
+  return orderedValues.some((secret) => text.includes(secret));
 }
 
 /** Exact substring masking; no encoding, hashing, or fuzzy matching. */
 export function maskRegisteredLogSecrets(text: string): string {
-  if (orderedValues.length === 0) return text;
+  if (orderedValues.length === 0 || !containsSecret(text)) return text;
   let cursor = 0;
   let result = "";
   while (cursor < text.length) {
@@ -44,9 +86,84 @@ export function maskRegisteredLogSecrets(text: string): string {
   return result;
 }
 
-/** @internal Final safety pass, after user censors have run. */
+/**
+ * Whether the masking pass below would change anything in `value`: a string
+ * or key holding a registered value, a registered key, a function, symbol or
+ * accessor, an opaque object, or an object the pass rebuilds rather than
+ * copies field for field (class instances, errors, symbol-keyed fields).
+ * Read-only: no getter, `toJSON` or inspection hook runs.
+ */
+function needsMasking(root: unknown): boolean {
+  const seen = new WeakSet<object>();
+
+  function check(value: unknown): boolean {
+    if (typeof value === "string") return containsSecret(value);
+    if (typeof value === "function" || typeof value === "symbol") return true;
+    if (value === null || typeof value !== "object") return false;
+    if (seen.has(value)) return false;
+    seen.add(value);
+
+    const prototype: unknown = Object.getPrototypeOf(value);
+
+    if (value instanceof Map) {
+      if (prototype !== Map.prototype) return true;
+
+      for (const [key, child] of Map.prototype.entries.call(value) as IterableIterator<
+        [unknown, unknown]
+      >) {
+        if (typeof key === "string" && keys.has(normalizeRedactKey(key))) return true;
+        if (check(key) || check(child)) return true;
+      }
+
+      return false;
+    }
+
+    if (value instanceof Set) {
+      if (prototype !== Set.prototype) return true;
+
+      for (const child of Set.prototype.values.call(value) as IterableIterator<unknown>) {
+        if (check(child)) return true;
+      }
+
+      return false;
+    }
+
+    const isArray = Array.isArray(value);
+
+    // Only plain objects and arrays are returned as they are; anything else is
+    // rebuilt by the masking pass, exactly as before.
+    const plain = isArray
+      ? prototype === Array.prototype
+      : prototype === Object.prototype || prototype === null;
+
+    if (!plain) return true;
+
+    for (const key of Reflect.ownKeys(value)) {
+      if (typeof key === "symbol") return true;
+      if (isArray && key === "length") continue;
+
+      const descriptor = Object.getOwnPropertyDescriptor(value, key);
+
+      if (!descriptor) continue;
+      if (!("value" in descriptor)) return true;
+      if (keys.has(normalizeRedactKey(key)) || containsSecret(key)) return true;
+      if (check(descriptor.value)) return true;
+    }
+
+    return false;
+  }
+
+  return check(root);
+}
+
+/**
+ * @internal Final safety pass, after user censors have run. Returns the value
+ * itself (same reference) when nothing in it needs masking, so entries that
+ * hold no registered secret are never copied.
+ */
 export function redactRegisteredSecrets<T>(value: T): T {
   if (keys.size === 0 && values.size === 0) return value;
+  if (!needsMasking(value)) return value;
   const seen = new WeakMap<object, unknown>();
 
   function visit(value: unknown): unknown {

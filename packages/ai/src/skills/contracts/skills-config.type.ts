@@ -68,6 +68,14 @@ export type SkillReviewGate = {
   approve: (candidate: SkillRecord) => Promise<{ approve: boolean; reason?: string }>;
   /** Where promoted skills are written. Required when `review` is set. */
   store: SkillsStoreContract;
+  /**
+   * Let the `saveSkill` tool propose a candidate under the name of a skill
+   * the library already serves (an update that replaces it once approved).
+   * Default `false`: the tool refuses such a name and asks the model for a
+   * new one, so text reaching the agent cannot queue a replacement for an
+   * existing skill.
+   */
+  allowUpdates?: boolean;
 };
 
 /**

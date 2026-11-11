@@ -44,6 +44,8 @@ dependencies of that page's entire loader pipeline.
 `pollInterval` is in milliseconds and defaults to **30,000**. It must be finite
 and between 1 and 2,147,483,647. Polling runs only when the configured socket is
 absent or disconnected. It uses the same navigation and form guards as pushes.
+Polling pauses while the browser tab is hidden; when the tab is visible again
+after a skipped poll, the page refreshes once and polling resumes.
 
 ## Connect the existing socket client
 

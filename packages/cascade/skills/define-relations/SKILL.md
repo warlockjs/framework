@@ -92,6 +92,8 @@ Multiple relations:
 await User.with("posts", "roles").get();
 ```
 
+Sibling relations load concurrently (one round-trip of latency, not one per relation); they still attach in the order named, and inside a `transaction()` they load one at a time.
+
 Nested relations via dot:
 
 ```ts
@@ -109,7 +111,7 @@ const usersWithPublishedPosts = await User.whereHas("posts", (query) => {
 }).get();
 ```
 
-`.whereHas(relation, callback)` runs the callback on a query builder scoped to the related model. Use when "find Xs that have at least one Y matching Z."
+`.whereHas(relation, callback)` runs the callback on a query builder scoped to the related model. Use when "find Xs that have at least one Y matching Z." The `has` family runs on PostgreSQL (the `has()` count is bound; its operator must be `=`, `!=`, `<>`, `>`, `>=`, `<`, `<=`); on MongoDB it throws `UnsupportedQueryOperationError` — filter by `whereIn("id", await Post.query().where(...).pluck("authorId"))` instead.
 
 ## Setting a relation on save — `setRelation`
 

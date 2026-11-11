@@ -88,7 +88,11 @@ async function canonicalize(target: string): Promise<string> {
  * @param policy - The bounding policy (its `cwd` is the jail root).
  * @param inputPath - A workspace-relative or absolute path to resolve.
  * @param access - `"read"` also accepts the `output.spillDir` directory (only
- *   `readFile` asks for it); `"write"` (default) never does.
+ *   `readFile` and `grep` ask for it); `"write"` (default) never does.
+ * @param readableSpillFiles - With `"read"`, narrows a spill directory
+ *   outside the jail to these file names (the files this workspace wrote),
+ *   so workspaces sharing one spill directory cannot read each other's
+ *   output. Absent ⇒ the whole spill directory is readable.
  * @returns The canonical absolute path plus its `/`-separated relative form.
  * @throws {WorkspacePolicyError} When the path escapes the jail or hits a deny glob.
  *
@@ -99,6 +103,7 @@ export async function resolveInJail(
   policy: WorkspacePolicy,
   inputPath: string,
   access: "read" | "write" = "write",
+  readableSpillFiles?: ReadonlySet<string>,
 ): Promise<ResolvedPath> {
   const jailRoot = await canonicalize(policy.cwd);
   const requested = path.isAbsolute(inputPath) ? inputPath : path.join(policy.cwd, inputPath);
@@ -122,8 +127,17 @@ export async function resolveInJail(
 
   const spillDir = access === "read" && !insideCwd ? resolveSpillDir(policy) : undefined;
 
-  if (spillDir !== undefined && isInside(absolutePath, await canonicalize(spillDir))) {
-    return { absolutePath, relativePath: "" };
+  if (spillDir !== undefined) {
+    const canonicalSpillDir = await canonicalize(spillDir);
+    const readable =
+      readableSpillFiles === undefined
+        ? isInside(absolutePath, canonicalSpillDir)
+        : path.dirname(absolutePath) === canonicalSpillDir &&
+          readableSpillFiles.has(path.basename(absolutePath));
+
+    if (readable) {
+      return { absolutePath, relativePath: "" };
+    }
   }
 
   if (!insideCwd && !insideAllow) {

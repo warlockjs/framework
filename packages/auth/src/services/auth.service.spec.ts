@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // ── access-token model ──────────────────────────────────────────────────────
@@ -147,6 +148,18 @@ vi.mock("@warlock.js/logger", () => ({
   log: { warn: vi.fn(), error: vi.fn() },
 }));
 
+// ── cache (renewal successor pairs parked under hashTokensAtRest) ────────────
+const cacheStore = new Map<string, unknown>();
+
+vi.mock("@warlock.js/cache", () => ({
+  cache: {
+    set: async (key: string, value: unknown) => {
+      cacheStore.set(key, value);
+    },
+    get: async (key: string) => cacheStore.get(key) ?? null,
+  },
+}));
+
 const randomString = vi.fn();
 
 vi.mock("@mongez/reinforcements", () => ({
@@ -251,6 +264,17 @@ describe("authService.buildAccessTokenPayload", () => {
 });
 
 describe("authService.generateAccessToken", () => {
+  it("keeps a custom payload's extra claims but always stamps the issuing user's identity", async () => {
+    const user = buildUser({ id: 7 });
+
+    await authService.generateAccessToken(user, { id: 99, userType: "admin", role: "editor" });
+
+    expect(jwtGenerate).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 7, userType: "user", role: "editor" }),
+      expect.anything(),
+    );
+  });
+
   it("signs, persists via AccessToken.issue, and returns the token + expiry", async () => {
     const user = buildUser({ id: 7 });
 
@@ -940,6 +964,29 @@ describe("authService.attemptLogin", () => {
     expect(emit).toHaveBeenCalledWith("login.failed", { email: "a@b.c" }, "User not found");
   });
 
+  it("still runs one password check for an unknown account, so timing does not reveal it", async () => {
+    const Model = { first: vi.fn().mockResolvedValue(null) } as never;
+    hashPassword.mockResolvedValue("dummy-hash");
+    verifyPassword.mockResolvedValue(false);
+
+    await authService.attemptLogin(Model, { email: "nobody@x.io", password: "guess" });
+
+    // the dummy hash is made once per process, so only the password is pinned
+    expect(verifyPassword).toHaveBeenCalledOnce();
+    expect(verifyPassword.mock.calls[0]?.[0]).toBe("guess");
+  });
+
+  it("runs the password check for an account with no password and refuses it", async () => {
+    const Model = { first: vi.fn().mockResolvedValue(buildUser({ password: undefined })) } as never;
+    hashPassword.mockResolvedValue("dummy-hash");
+    verifyPassword.mockResolvedValue(true);
+
+    const result = await authService.attemptLogin(Model, { email: "a@b.c", password: "x" });
+
+    expect(result).toBeNull();
+    expect(verifyPassword).toHaveBeenCalledOnce();
+  });
+
   it("returns null and emits login.failed on a wrong password", async () => {
     const Model = { first: vi.fn().mockResolvedValue(buildUser()) } as never;
     verifyPassword.mockResolvedValue(false);
@@ -1274,6 +1321,19 @@ describe("authService.revokeAllTokens", () => {
       expect.arrayContaining(["legacy-active", "legacy-rotated"]),
     );
   });
+
+  it("ensures each family once, however many rotated rows it has", async () => {
+    const user = buildUser({ id: 7 });
+    refreshTokenFamiliesForUser.mockResolvedValue(
+      Array.from({ length: 50 }, (_, index) =>
+        buildRefreshTokenRow({ family_id: index % 2 === 0 ? "family-a" : "family-b" }),
+      ),
+    );
+
+    await authService.revokeAllTokens(user);
+
+    expect(authTokenFamilyEnsure).toHaveBeenCalledTimes(2);
+  });
 });
 
 describe("authService.revokeTokenFamily", () => {
@@ -1423,5 +1483,143 @@ describe("authService.getActiveSessions", () => {
 
     expect(await authService.getActiveSessions(user)).toBe(rows);
     expect(refreshTokenActiveFor).toHaveBeenCalledWith(user);
+  });
+});
+
+describe("hashTokensAtRest", () => {
+  const sha256 = (value: string) => createHash("sha256").update(value).digest("hex");
+  const SECRET = "access-secret-for-hash-at-rest-specs-0123456789";
+
+  function configure(values: Record<string, unknown>) {
+    configKey.mockImplementation((key: string, fallback?: unknown) =>
+      key in values ? values[key] : fallback,
+    );
+  }
+
+  beforeEach(() => {
+    cacheStore.clear();
+  });
+
+  it("stores only digests and hands the raw tokens back to the caller", async () => {
+    configure({ "auth.hashTokensAtRest": true, "auth.accessToken.secret": SECRET });
+
+    const pair = await authService.createTokenPair(buildUser());
+
+    expect(accessTokenIssue).toHaveBeenCalledWith(
+      expect.anything(),
+      sha256("signed-access-token"),
+      expect.any(Date),
+      "random-family-id",
+    );
+    expect(refreshTokenIssue).toHaveBeenCalledWith(
+      expect.anything(),
+      sha256("signed-refresh-token"),
+      expect.anything(),
+    );
+    expect(pair.accessToken.token).toBe("signed-access-token");
+    expect(pair.refreshToken?.token).toBe("signed-refresh-token");
+  });
+
+  it("keeps storing raw tokens when the option is off (the default)", async () => {
+    await authService.createTokenPair(buildUser());
+
+    expect(accessTokenIssue).toHaveBeenCalledWith(
+      expect.anything(),
+      "signed-access-token",
+      expect.any(Date),
+      "random-family-id",
+    );
+  });
+
+  describe("automatic renewal duplicate inside the overlap window", () => {
+    const fields = {
+      family_id: "fam-1",
+      user_id: 1,
+      user_type: "user",
+      expires_at: new Date(Date.now() + 30_000).toISOString(),
+    };
+
+    function hashedSuccessorRows() {
+      accessTokenFind.mockResolvedValue({
+        isExpired: false,
+        get: (key: string) => ({ ...fields, token: sha256("access-2-token") })[key],
+      });
+      refreshTokenFind.mockResolvedValue({
+        isValid: true,
+        get: (key: string) => ({ ...fields, token: sha256("refresh-2-token") })[key],
+      });
+    }
+
+    function revokedOld() {
+      return buildRefreshTokenRow(
+        {
+          id: "old-row",
+          family_id: "fam-1",
+          revoked_at: new Date(),
+          successor_access_token_id: "access-2",
+          successor_refresh_token_id: "refresh-2",
+        },
+        false,
+      );
+    }
+
+    it("hands back the parked successor pair even though the rows hold digests", async () => {
+      configure({
+        "auth.hashTokensAtRest": true,
+        "auth.accessToken.secret": SECRET,
+        "auth.userType.user": { find: vi.fn().mockResolvedValue(buildUser()) },
+      });
+      jwtVerifyRefreshToken.mockResolvedValue({ userId: 1, userType: "user", familyId: "fam-1" });
+
+      // the first renewal: rotate and park the new pair
+      const fresh = buildRefreshTokenRow({ id: "old-row", family_id: "fam-1" }, true);
+      jwtGenerate.mockResolvedValueOnce("access-2-token");
+      jwtGenerateRefreshToken.mockResolvedValueOnce("refresh-2-token");
+      refreshTokenIssue.mockResolvedValueOnce(
+        buildRefreshTokenRow({ id: "refresh-2", token: sha256("refresh-2-token") }),
+      );
+      refreshTokenFindByToken.mockImplementation(async (token: string) =>
+        token === "old"
+          ? fresh
+          : buildRefreshTokenRow({ id: "refresh-2", token: sha256(token), family_id: "fam-1" }),
+      );
+      accessTokenFindByToken.mockResolvedValue({
+        id: "access-2",
+        isExpired: false,
+        get: (key: string) => ({ ...fields, token: sha256("access-2-token") })[key],
+      });
+
+      const first = await authService.renewAutomaticSession("old", "user");
+
+      expect(first?.accessToken.token).toBe("access-2-token");
+      // parked once, encrypted: the raw token never sits in the cache in clear
+      expect(cacheStore.size).toBe(1);
+      expect([...cacheStore.values()].join("")).not.toContain("access-2-token");
+
+      // the duplicate: the old row is now revoked and linked to digest rows
+      refreshTokenFindByToken.mockResolvedValue(revokedOld());
+      hashedSuccessorRows();
+
+      const duplicate = await authService.renewAutomaticSession("old", "user");
+
+      expect(duplicate).toEqual({
+        accessToken: { token: "access-2-token", expiresAt: fields.expires_at },
+        refreshToken: { token: "refresh-2-token", expiresAt: fields.expires_at },
+      });
+    });
+
+    it("fails quietly (no family revoke) when the parked pair is gone", async () => {
+      configure({
+        "auth.hashTokensAtRest": true,
+        "auth.accessToken.secret": SECRET,
+        "auth.userType.user": { find: vi.fn().mockResolvedValue(buildUser()) },
+      });
+      jwtVerifyRefreshToken.mockResolvedValue({ userId: 1, userType: "user", familyId: "fam-1" });
+      refreshTokenFindByToken.mockResolvedValue(revokedOld());
+      hashedSuccessorRows();
+
+      await expect(authService.renewAutomaticSession("old", "user")).resolves.toBeNull();
+      expect(refreshTokenRevokeFamily).not.toHaveBeenCalled();
+    });
   });
 });

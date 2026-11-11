@@ -1,4 +1,4 @@
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
@@ -289,6 +289,42 @@ describe("prepareAttachmentPart", () => {
       );
 
       expect(part).toEqual({ type: "text", text: "allowed" });
+    });
+
+    it("refuses a symbolic link inside an allowed root that points outside it", async () => {
+      const root = join(tempDir, "uploads");
+      const outside = join(tempDir, "private");
+      await mkdir(root, { recursive: true });
+      await mkdir(outside, { recursive: true });
+      await writeFile(join(outside, "invoice.txt"), "other tenant", "utf8");
+      await symlink(join(outside, "invoice.txt"), join(root, "link.txt"));
+
+      await expect(
+        prepareAttachmentPart(
+          { type: "text", source: join(root, "link.txt") },
+          { allowedRoots: [root] },
+        ),
+      ).rejects.toBeInstanceOf(OutboundPolicyError);
+
+      // A linked folder escapes the same way.
+      await symlink(outside, join(root, "linked-dir"));
+      await expect(
+        prepareAttachmentPart(join(root, "linked-dir", "invoice.txt"), { allowedRoots: [root] }),
+      ).rejects.toBeInstanceOf(OutboundPolicyError);
+    });
+
+    it("follows a symbolic link that stays inside an allowed root", async () => {
+      const root = join(tempDir, "inside-root");
+      await mkdir(root, { recursive: true });
+      await writeFile(join(root, "real.txt"), "real content", "utf8");
+      await symlink(join(root, "real.txt"), join(root, "alias.txt"));
+
+      const part = await prepareAttachmentPart(
+        { type: "text", source: join(root, "alias.txt") },
+        { allowedRoots: [root] },
+      );
+
+      expect(part).toEqual({ type: "text", text: "real content" });
     });
   });
 });

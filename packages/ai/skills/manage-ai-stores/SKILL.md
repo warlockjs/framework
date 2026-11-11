@@ -131,7 +131,8 @@ Append-only from v1 — `save()` never overwrites a prior `turn_index`. `load(na
 Both stores: `load(...)`, `save(...)`, `delete(...)`, optional `list(...)`, `schema()`.
 
 - **`list(orchestratorName, prefix?)`** (checkpoint) / **`list(prefix?)`** (snapshot) — enumerate session/run ids for the production boot-drain loop. Optional: stores that can't enumerate omit it.
-- The orchestrator's **`keepSnapshots`** retention policy lives on the orchestrator config, NOT the store — the orchestrator calls the pg store's `prune()` after a successful `save` when `keepSnapshots` is a finite number; `"all"` skips pruning.
+- The orchestrator's **`keepSnapshots`** retention policy lives on the orchestrator config, NOT the store — the orchestrator calls the store's `prune(name, sessionId, keepBeforeTurnIndex)` after a successful `save` when `keepSnapshots` is a finite number; `"all"` skips pruning. The third argument is a turn index (`latest turn - keepSnapshots + 1`), not a row count: the memory, pg and redis stores delete every row below it, so exactly `keepSnapshots` turns stay. Implement a custom `prune()` the same way.
+- The redis checkpoint store keeps one key per turn plus a small session head, so `save` / `load` cost the same on turn 5 and turn 5,000. When the client has the set commands (`sAdd`/`sRem`/`sMembers` or `sadd`/`srem`/`smembers`), the `list()` index is a Redis set (no lost ids under concurrent new sessions); otherwise a JSON array. Sessions and indexes written by earlier releases are still read and are moved to the new layout on the next write.
 
 ## Boot-drain pattern
 

@@ -5,7 +5,7 @@ import type {
   RestorerResult,
 } from "../contracts/database-restorer.contract";
 import type { DataSource } from "../data-source/data-source";
-import type { Model } from "../model/model";
+import type { GlobalScopeDefinition, Model } from "../model/model";
 import type { DeleteStrategy } from "../types";
 import { enqueueSyncFanout } from "../sync/sync-fanout";
 import { triggerModelEvent } from "../sync/model-events";
@@ -91,8 +91,10 @@ export class DatabaseRestorer implements RestorerContract {
       );
     }
 
-    // 3. Fetch record based on strategy
-    const recordData = await this.fetchRecordByStrategy(id, strategy);
+    // 3. Fetch record based on strategy. A record the model's global scopes
+    // (tenant, ...) hide from the caller is reported as not found.
+    const fetched = await this.fetchRecordByStrategy(id, strategy);
+    const recordData = fetched && (await this.isVisibleToScopes(id, strategy)) ? fetched : null;
 
     if (!recordData) {
       throw new Error(
@@ -182,8 +184,12 @@ export class DatabaseRestorer implements RestorerContract {
       );
     }
 
-    // 3. Fetch all records based on strategy
-    const recordsToRestore = await this.fetchAllRecordsByStrategy(strategy);
+    // 3. Fetch all records based on strategy, keeping only those the model's
+    // global scopes (tenant, ...) let the caller see.
+    const recordsToRestore = await this.keepVisibleToScopes(
+      await this.fetchAllRecordsByStrategy(strategy),
+      strategy,
+    );
 
     if (recordsToRestore.length === 0) {
       return {
@@ -431,6 +437,138 @@ export class DatabaseRestorer implements RestorerContract {
   }
 
   /**
+   * The model's global scopes that apply to restore lookups. A deleted record
+   * is hidden by the soft-delete filter by definition (it is what `restore()`
+   * undoes), so filters on the soft-delete column are left out; every other
+   * filter (tenant, ownership, ...) still decides what the caller may restore.
+   *
+   * A filter is on the soft-delete column only when its column is exactly
+   * `deletedAtColumn` (or `<table>.<deletedAtColumn>`). A scope made only of
+   * such filters is dropped; a scope that also filters other columns is kept,
+   * with just the soft-delete filters removed. `undefined` when no scope applies.
+   */
+  private restoreScopes(): Map<string, GlobalScopeDefinition> | undefined {
+    const chain: Array<Map<string, GlobalScopeDefinition>> = [];
+    let current: unknown = this.ctor;
+
+    while (current && current !== Function.prototype) {
+      if (Object.prototype.hasOwnProperty.call(current, "globalScopes")) {
+        const scopes = (current as { globalScopes?: Map<string, GlobalScopeDefinition> })
+          .globalScopes;
+
+        if (scopes && scopes.size > 0) {
+          chain.unshift(scopes);
+        }
+      }
+
+      current = Object.getPrototypeOf(current);
+    }
+
+    if (chain.length === 0) {
+      return undefined;
+    }
+
+    const deletedAtColumn = this.ctor.deletedAtColumn;
+    const scopes = new Map<string, GlobalScopeDefinition>();
+
+    const isSoftDeleteColumn = (column: string): boolean =>
+      typeof deletedAtColumn === "string" &&
+      (column === deletedAtColumn || column === `${this.table}.${deletedAtColumn}`);
+
+    for (const map of chain) {
+      for (const [name, definition] of map) {
+        if (!deletedAtColumn) {
+          scopes.set(name, definition);
+          continue;
+        }
+
+        const columns = scopeFilterColumns(definition.callback);
+        const softDelete = columns.filter(isSoftDeleteColumn);
+
+        if (softDelete.length === 0) {
+          scopes.set(name, definition);
+        } else if (softDelete.length === columns.length) {
+          // Only the soft-delete filter: not a visibility rule for restore.
+          scopes.delete(name);
+        } else {
+          // Mixed (tenant + soft delete): keep everything but the soft-delete filter.
+          scopes.set(name, {
+            ...definition,
+            callback: (query) =>
+              definition.callback(withoutColumnFilters(query, isSoftDeleteColumn)),
+          });
+        }
+      }
+    }
+
+    return scopes.size > 0 ? scopes : undefined;
+  }
+
+  /**
+   * A query on `table` that the restore scopes (see {@link restoreScopes})
+   * apply to, or `undefined` when no scope applies.
+   */
+  private scopedQuery(strategy: "trash" | "soft") {
+    const scopes = this.restoreScopes();
+
+    if (!scopes) {
+      return undefined;
+    }
+
+    const table = strategy === "trash" ? this.resolveTrashTable() : this.table;
+    const query = this.driver.queryBuilder(table);
+
+    (query as unknown as { pendingGlobalScopes?: Map<string, unknown> }).pendingGlobalScopes =
+      scopes;
+
+    if (strategy === "trash") {
+      query.where("originalTable", this.table);
+    }
+
+    return query;
+  }
+
+  /** Whether the deleted record `id` is visible through the restore scopes. */
+  private async isVisibleToScopes(id: string | number, strategy: "trash" | "soft") {
+    const query = this.scopedQuery(strategy);
+
+    if (!query) {
+      return true;
+    }
+
+    return await query.where(this.primaryKey, id).exists();
+  }
+
+  /** Keep the deleted records that are visible through the restore scopes. */
+  private async keepVisibleToScopes(
+    records: Record<string, unknown>[],
+    strategy: "trash" | "soft",
+  ): Promise<Record<string, unknown>[]> {
+    if (records.length === 0) {
+      return records;
+    }
+
+    const query = this.scopedQuery(strategy);
+
+    if (!query) {
+      return records;
+    }
+
+    const visible = new Set(
+      (
+        await query
+          .whereIn(
+            this.primaryKey,
+            records.map((record) => record[this.primaryKey]),
+          )
+          .pluck(this.primaryKey)
+      ).map((value) => String(value)),
+    );
+
+    return records.filter((record) => visible.has(String(record[this.primaryKey])));
+  }
+
+  /**
    * Handle ID conflict by checking if ID exists and assigning new one if needed.
    *
    * @param recordData - The record data to restore
@@ -554,4 +692,128 @@ export class DatabaseRestorer implements RestorerContract {
         ),
     });
   }
+}
+
+/**
+ * Query builder methods whose first argument is not a filtered column.
+ */
+const NON_FILTER_METHODS = new Set(["whereRaw", "orWhereRaw", "whereTrusted", "raw"]);
+
+/**
+ * The columns a global scope callback filters on: the callback is run against
+ * a recording stand-in for the query builder, and the column of every filter
+ * call is collected: the first argument when it is a string
+ * (`where("tenantId", …)`, `whereNull("deletedAt")`), the keys of an object
+ * argument (`where({ deletedAt: null })`), and the same inside nested
+ * callbacks (`where(q => …)`). Values are never read as columns.
+ */
+function scopeFilterColumns(callback: (query: any) => void): string[] {
+  const columns: string[] = [];
+
+  const recorder = (depth: number): unknown => {
+    const proxy: unknown = new Proxy(function stand() {}, {
+      get(_target, property) {
+        if (typeof property === "symbol" || property === "then") {
+          return undefined;
+        }
+
+        return (...args: unknown[]) => {
+          const [first] = args;
+
+          if (NON_FILTER_METHODS.has(property)) {
+            // An opaque filter: counts as "another column", never as soft delete.
+            columns.push(`\u0000${property}`);
+          } else if (typeof first === "string") {
+            columns.push(first);
+          } else if (first && typeof first === "object" && !Array.isArray(first)) {
+            columns.push(...Object.keys(first));
+          }
+
+          for (const arg of args) {
+            if (typeof arg === "function" && depth < 8) {
+              try {
+                arg(recorder(depth + 1));
+              } catch {
+                // A nested callback that cannot run against the stand-in is skipped.
+              }
+            }
+          }
+
+          return proxy;
+        };
+      },
+    });
+
+    return proxy;
+  };
+
+  try {
+    callback(recorder(0));
+  } catch {
+    // A scope that cannot run outside a real query keeps applying in full.
+  }
+
+  return columns;
+}
+
+/**
+ * The query builder as a scope sees it, minus every filter call on a column
+ * `isColumn` accepts (first-argument column, or keys of an object filter);
+ * nested callbacks get the same view of their sub-builder.
+ */
+function withoutColumnFilters<T>(query: T, isColumn: (column: string) => boolean): T {
+  const view: any = new Proxy(query as object, {
+    get(target, property, receiver) {
+      const value = Reflect.get(target, property, receiver);
+
+      if (typeof value !== "function" || typeof property === "symbol") {
+        return value;
+      }
+
+      return (...args: unknown[]) => {
+        const [first] = args;
+
+        if (!NON_FILTER_METHODS.has(property) && typeof first === "string" && isColumn(first)) {
+          return view;
+        }
+
+        // A nested group made only of such filters would be left empty.
+        if (typeof first === "function") {
+          const nested = scopeFilterColumns(first as (query: any) => void);
+
+          if (nested.length > 0 && nested.every(isColumn)) {
+            return view;
+          }
+        }
+
+        if (first && typeof first === "object" && !Array.isArray(first)) {
+          const kept = Object.fromEntries(
+            Object.entries(first as Record<string, unknown>).filter(([key]) => !isColumn(key)),
+          );
+
+          if (Object.keys(kept).length === 0) {
+            return view;
+          }
+
+          args[0] = kept;
+        }
+
+        const wrapped = args.map((arg) =>
+          typeof arg === "function"
+            ? (sub: unknown, ...rest: unknown[]) =>
+                (arg as (...callArgs: unknown[]) => unknown)(
+                  withoutColumnFilters(sub, isColumn),
+                  ...rest,
+                )
+            : arg,
+        );
+
+        const result = (value as (...callArgs: unknown[]) => unknown).apply(target, wrapped);
+
+        return result === target ? view : result;
+      };
+    },
+  });
+
+  return view as T;
 }

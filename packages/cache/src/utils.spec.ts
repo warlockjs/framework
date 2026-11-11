@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { CacheConfigurationError } from "./types";
 import {
   CACHE_FOR,
+  escapeCacheKeySegment,
   expiresAtToTtl,
   injectTags,
   mergeTagSets,
@@ -53,6 +54,21 @@ describe("parseCacheKey", () => {
 
   it("returns empty string for empty key without prefix", () => {
     expect(parseCacheKey("")).toBe("");
+  });
+
+  it("keeps object values containing a separator apart from other objects", () => {
+    expect(parseCacheKey({ a: "b.c" })).not.toBe(parseCacheKey({ a: "b", c: "" }));
+    expect(parseCacheKey({ q: "x,y" })).not.toBe(parseCacheKey({ q: "x", y: undefined, z: "" }));
+    expect(parseCacheKey({ q: "a:b" })).not.toBe(parseCacheKey({ q: "a.b" }));
+    expect(parseCacheKey({ "a.b": 1 })).not.toBe(parseCacheKey({ a: { b: 1 } }));
+  });
+
+  it("encodes object keys without separator characters exactly as before", () => {
+    expect(parseCacheKey({ users: { page: 2, name: "ali" } })).toBe("users.page.2.name.ali");
+  });
+
+  it("keeps an own __proto__ key of an object key as data", () => {
+    expect(parseCacheKey(JSON.parse('{"__proto__":{"x":1}}'))).not.toBe(parseCacheKey({}));
   });
 
   it("returns prefix-only when key is empty", () => {
@@ -332,5 +348,22 @@ describe("safeErrorInfo", () => {
   it("stringifies and redacts non-Error thrown values", () => {
     const info = safeErrorInfo("redis://user:s3cr3t@host failed");
     expect(info.message).toBe("redis://[REDACTED]@host failed");
+  });
+});
+
+describe("escapeCacheKeySegment", () => {
+  it("percent-encodes separator characters and % itself", () => {
+    expect(escapeCacheKeySegment("acme.billing")).toBe("acme%2Ebilling");
+    expect(escapeCacheKeySegment('a:b,c{d}"e[f]%')).toBe("a%3Ab%2Cc%7Bd%7D%22e%5Bf%5D%25");
+  });
+
+  it("leaves other text unchanged", () => {
+    expect(escapeCacheKeySegment("user-42_ä @x")).toBe("user-42_ä @x");
+  });
+
+  it("keeps a namespace built from an escaped segment out of its neighbours", () => {
+    const own = parseCacheKey(`tenant.${escapeCacheKeySegment("acme.billing")}`);
+
+    expect(own.startsWith("tenant.acme.")).toBe(false);
   });
 });

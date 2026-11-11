@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { environment } from "@warlock.js/core";
+import { discloseErrorDetails } from "./error-disclosure";
 import type {
   PageErrorDetails,
   SerializedErrorPageProps,
@@ -116,13 +116,13 @@ export function serializePageError(thrown: unknown, requestId?: string): Seriali
       name: thrown.name,
       message: thrown.message,
       errors: sanitizeValidationIssues(thrown.errors),
-      ...(environment() !== "production" && typeof thrown.stack === "string"
+      ...(discloseErrorDetails() && typeof thrown.stack === "string"
         ? { stack: thrown.stack }
         : {}),
     };
   }
 
-  if (environment() === "production") {
+  if (!discloseErrorDetails()) {
     // A `PublicPageError` and a thrown value that resolves to a 4xx status
     // (a core `HttpError` such as `ForbiddenError`/`BadRequestError`) both
     // keep their own message — `isVisitorSafePageError` is the single answer
@@ -192,7 +192,7 @@ export function hydrationErrorPageProps(
 
   // Where the failure happened is development knowledge: production never
   // carries it, whatever the caller passes.
-  return environment() === "production" || debug === undefined
+  return !discloseErrorDetails() || debug === undefined
     ? { error, status: props.status }
     : { error, status: props.status, debug };
 }

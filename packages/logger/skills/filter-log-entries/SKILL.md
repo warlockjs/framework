@@ -1,6 +1,6 @@
 ---
 name: filter-log-entries
-description: 'Drop log entries — per-channel levels whitelist, per-channel filter predicate, logger-wide setMinLevel(level) fast path. Triggers: `levels`, `filter`, `minLevel`, `log.setMinLevel`, `shouldBeLogged`, `LoggingData`, `LogLevel`; "silence a noisy module", "route errors to a dedicated file", "raise global severity floor", "drop debug logs in prod"; typical import `import { log } from "@warlock.js/logger"`. Skip: custom sinks — the `write-custom-log-channel` topic; channel picks — the `pick-log-channel` topic; competing libs `pino.levels`, `winston.format.filter`, `debug` env var.'
+description: 'Drop log entries — per-channel levels whitelist, per-channel filter predicate, logger-wide setMinLevel(level) fast path. Triggers: `levels`, `filter`, `minLevel`, `log.setMinLevel`, `log.isEnabled`, `acceptsLevel`, `shouldBeLogged`, `LoggingData`, `LogLevel`; "silence a noisy module", "route errors to a dedicated file", "raise global severity floor", "drop debug logs in prod"; typical import `import { log } from "@warlock.js/logger"`. Skip: custom sinks — the `write-custom-log-channel` topic; channel picks — the `pick-log-channel` topic; competing libs `pino.levels`, `winston.format.filter`, `debug` env var.'
 ---
 
 # Filtering — `levels` + `filter` predicate + `minLevel`
@@ -50,6 +50,26 @@ log.setMinLevel(undefined); // accept everything again
 ```
 
 This runs **before** the channel loop — cheaper than per-channel `levels` filters when you want a uniform floor. Per-channel `levels` and `filter` still run on top for channels that need a tighter or differently-shaped rule.
+
+## 4. Per-channel `minLevel` on `ConsoleLog`
+
+```ts
+new ConsoleLog({ minLevel: "info" }); // no debug lines on the terminal; FileLog still gets them
+```
+
+Same ordering as the logger-wide floor; combines with `levels` (an entry must pass both).
+
+## Asking before building — `log.isEnabled(level)`
+
+`log.isEnabled(level)` is `true` when at least one channel may keep that level (logger `minLevel`, each channel's `levels`, and `ConsoleLog`'s `minLevel`; `filter` predicates are not consulted). With no channels it is `false`. `log.*` already skips redaction and fan-out when it is `false`; check it yourself before building an expensive context:
+
+```ts
+if (log.isEnabled("debug")) {
+  log.debug("orders", "snapshot", "order state", buildSnapshot(order));
+}
+```
+
+Custom channels answer through `LogChannel.acceptsLevel(level)` (override it when your channel has its own level option).
 
 ## Combining — real patterns
 

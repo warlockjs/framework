@@ -166,21 +166,19 @@ export class OneTimeToken extends Model {
   /**
    * Hard-delete every spent row — expired, or consumed (used, invalidated by a
    * newer token, or exhausted). Neither can ever be redeemed again, so nothing
-   * reads them. Hard-deleted, never trashed. Returns the number removed. Runs from the `auth.cleanup` CLI
-   * command (a cold batch path).
+   * reads them. Returns the number removed. Runs from the `auth.cleanup` CLI
+   * command.
+   *
+   * Two set-based deletes, never a read: the rows are not loaded into memory,
+   * so a table grown by anonymous passkey-option calls cannot make the cleanup
+   * run out of memory. A query-builder delete is a driver-level hard delete,
+   * so no token hash is copied into a trash collection.
    */
   public static async purgeSpent(): Promise<number> {
-    const expired = await this.query().where("expires_at", "<", new Date()).get();
-    const consumed = await this.query().whereNotNull("consumed_at").get();
-    const spent = new Map([...expired, ...consumed].map((token) => [String(token.id), token]));
+    const expired = await this.query().where("expires_at", "<", new Date()).delete();
+    const consumed = await this.query().whereNotNull("consumed_at").delete();
 
-    for (const token of spent.values()) {
-      // `static deleteStrategy` above already forces "permanent" regardless
-      // of the data source default (Mongo's is "trash").
-      await token.destroy();
-    }
-
-    return spent.size;
+    return expired + consumed;
   }
 
   /** Find a token by hash, scoped to a purpose — a token of the other purpose is not found. */

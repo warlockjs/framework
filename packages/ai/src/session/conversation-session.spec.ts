@@ -1,7 +1,7 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { agent } from "../agent/agent";
 import type {
   AgentSnapshot,
@@ -16,7 +16,7 @@ import { file } from "../snapshot/file";
 import { memory } from "../snapshot/memory";
 import { sqlite } from "../snapshot/sqlite";
 import { tool } from "../tool/tool";
-import { session } from "./conversation-session";
+import { conversationAfterRun, session } from "./conversation-session";
 import type { ConversationSessionRecord } from "./conversation-session.type";
 
 const signed = (signature: string): ProviderContentBlock[] => [
@@ -391,5 +391,65 @@ describe("ai.session", () => {
 
       expect((await chat.history())[2]).toMatchObject({ role: "tool", content: "[1,2,3]" });
     });
+  });
+});
+
+describe("ai.session — storing a turn after a multipart history", () => {
+  const parts = [
+    { type: "text" as const, text: "describe" },
+    { type: "image" as const, source: { url: "https://example.com/cat.png" } },
+  ];
+  const previous: Message[] = [
+    { role: "user", content: parts },
+    { role: "assistant", content: "a cat" },
+  ];
+
+  function resultWith(captured: unknown[]) {
+    return {
+      report: {
+        messages: captured,
+        trips: [{ finishReason: "stop", output: "done" }],
+      },
+    } as unknown as Parameters<typeof conversationAfterRun>[3];
+  }
+
+  it("does not serialize the stored attachments when captured messages carry their parts", () => {
+    const flat = JSON.stringify(parts);
+    const stringify = vi.spyOn(JSON, "stringify");
+
+    try {
+      const messages = conversationAfterRun(
+        previous,
+        "next",
+        false,
+        resultWith([
+          { role: "user", content: flat, contentParts: parts },
+          { role: "assistant", content: "a cat" },
+          { role: "user", content: "next" },
+        ]),
+      );
+      const stringifiedParts = stringify.mock.calls.filter(([value]) => value === parts);
+
+      expect(stringifiedParts).toHaveLength(0);
+      expect(messages[0]?.content).toEqual(parts);
+      expect(messages.at(-1)).toEqual({ role: "assistant", content: "done" });
+    } finally {
+      stringify.mockRestore();
+    }
+  });
+
+  it("still restores a multipart turn captured without its parts", () => {
+    const messages = conversationAfterRun(
+      previous,
+      "next",
+      false,
+      resultWith([
+        { role: "user", content: JSON.stringify(parts) },
+        { role: "assistant", content: "a cat" },
+        { role: "user", content: "next" },
+      ]),
+    );
+
+    expect(messages[0]?.content).toEqual(parts);
   });
 });

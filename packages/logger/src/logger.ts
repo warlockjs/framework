@@ -12,6 +12,7 @@ import type {
   RedactConfig,
 } from "./types";
 import { clearMessage } from "./utils/clear-message";
+import { meetsMinLevel } from "./utils/level-rank";
 
 const SIGNAL_EVENTS: ReadonlySet<AutoFlushEvent> = new Set([
   "SIGINT",
@@ -20,22 +21,6 @@ const SIGNAL_EVENTS: ReadonlySet<AutoFlushEvent> = new Set([
   "SIGBREAK",
   "SIGUSR2",
 ]);
-
-/**
- * Severity ranks used by `setMinLevel`. Higher number = more severe. The
- * ordering matches conventional log-level hierarchies: `debug` is noisiest
- * and easiest to drop; `error` is the loudest and never dropped by the
- * minimum-level filter. `success` sits beside `info` — it's an informational
- * outcome, not a warning.
- */
-const LEVEL_RANK: Record<LogLevel, number> = {
-  debug: 0,
-  info: 1,
-  success: 1,
-  warn: 2,
-  error: 3,
-  fatal: 4,
-};
 
 export class Logger {
   /**
@@ -185,6 +170,34 @@ export class Logger {
   }
 
   /**
+   * Whether an entry of `level` would reach at least one channel, judged by
+   * level settings alone: the logger-wide `minLevel`, then each channel's
+   * `levels` (and `minLevel` on `ConsoleLog`). Returns `false` when there are
+   * no channels. Channel `filter` functions are not consulted (they need the
+   * entry), so `true` means "some channel may keep it".
+   *
+   * Cheap enough to call before building an expensive log context.
+   *
+   * @example
+   * if (log.isEnabled("debug")) {
+   *   log.debug("orders", "snapshot", "order state", buildSnapshot(order));
+   * }
+   */
+  public isEnabled(level: LogLevel): boolean {
+    if (!meetsMinLevel(level, this.minLevel)) return false;
+
+    for (const channel of this.channels) {
+      // A channel that does not extend `LogChannel` cannot be asked; assume it
+      // keeps everything.
+      if (typeof channel.acceptsLevel !== "function" || channel.acceptsLevel(level)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  /**
    * Set channels
    */
   public setChannels(channels: LogChannel[]) {
@@ -253,7 +266,8 @@ export class Logger {
    * to {@link onChannelError}.
    */
   public log(data: LoggingData): this {
-    if (this.minLevel && LEVEL_RANK[data.type] < LEVEL_RANK[this.minLevel]) {
+    // No channel would keep it: skip redaction and fan-out entirely.
+    if (!this.isEnabled(data.type)) {
       return this;
     }
 

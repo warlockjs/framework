@@ -254,6 +254,28 @@ class PgInterruptStore implements InterruptStore {
   }
 
   /**
+   * Take a pending interrupt in one statement: delete the row while it is
+   * still `pending` and return it. Concurrent claims of the same id race
+   * on the row lock, so exactly one receives the record.
+   */
+  public async claim(interruptId: string): Promise<PendingInterrupt | undefined> {
+    const client = await this.client();
+
+    const { rows } = await client.query(
+      `DELETE FROM ${this.table}
+       WHERE interrupt_id = $1 AND status = 'pending'
+       RETURNING interrupt_id, request, status, saved_at`,
+      [interruptId],
+    );
+
+    if (rows.length === 0) {
+      return undefined;
+    }
+
+    return rowToRecord(rows[0] as Record<string, unknown>);
+  }
+
+  /**
    * List the interrupt ids known to the store, optionally filtered by a
    * prefix. The `_` and `%` LIKE wildcards in the prefix are escaped so an
    * opaque interruptId that happens to contain them is matched literally.

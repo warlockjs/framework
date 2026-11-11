@@ -41,7 +41,7 @@ A singleton (`contextManager`, exported from `@warlock.js/context`) that holds a
 
 - **`register(name, context)`** — add a context to the map. Returns the manager for chaining.
 - **`buildStores(payload)`** — call every registered context's `buildStore(payload)`, return a `{ name: store }` record.
-- **`runAll(stores, callback)`** — nest every context's `run()` in registration order, invoke `callback` at the innermost layer.
+- **`runAll(stores, callback)`** — activate every context with its store (or `{}`) for the duration of `callback`, in one step.
 - **`enterAll(stores)`** — call every context's `enter(store)`. No callback, no auto-cleanup.
 - **`clearAll()`** — call every context's `clear()`. Use after `enterAll` if you need a clean slate.
 
@@ -63,9 +63,13 @@ await contextManager.runAll(stores, async () => {
 
 This keeps the boundary code generic. Add a `metrics` context, implement its `buildStore`, register it — the boundary code does not change.
 
+## One storage for every context
+
+All contexts share a single `AsyncLocalStorage`; each context has its own slot in it. Node does extra work for every promise per enabled `AsyncLocalStorage`, so four contexts cost the same as one. `runAll` sets every slot in one step, and each context still behaves as if it had its own storage: running, entering or clearing one never changes another's store.
+
 ## Order matters
 
-`runAll` nests in **registration order**. First registered = outermost layer. The innermost context can see the outermost's store, but not the other way round (the outermost runs first; the inner contexts have not started yet at that moment).
+Contexts that use the built-in `run()` become active together, so their order does not matter for reads. A context class that overrides `run()` is still run through it, inside the others, in **registration order** (first registered = outermost).
 
 ```ts
 contextManager

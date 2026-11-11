@@ -251,3 +251,85 @@ describe("validateSitesAtBoot", () => {
     );
   });
 });
+
+describe("createSiteSelector resolveCache bound", () => {
+  const dynamicSites: SitesConfig = { tenant: { dynamic: true } };
+
+  it("remembers at most maxEntries hosts however many distinct hosts arrive", async () => {
+    const resolveHost = vi.fn(async () => null);
+    const { select } = createSiteSelector({
+      sites: dynamicSites,
+      resolveHost,
+      resolveCache: { ttl: 60, maxEntries: 100 },
+    });
+
+    for (let n = 0; n < 1_000; n++) await select(at(`random-${n}.example`));
+    resolveHost.mockClear();
+
+    // The 100 most recent hosts are still remembered; the first ones were dropped.
+    await select(at("random-999.example"));
+    await select(at("random-900.example"));
+    expect(resolveHost).not.toHaveBeenCalled();
+
+    await select(at("random-0.example"));
+    expect(resolveHost).toHaveBeenCalledTimes(1);
+  });
+
+  it("drops the least recently used host first", async () => {
+    const resolveHost = vi.fn(async ({ host }: { host: string }) => ({
+      site: "tenant",
+      key: host,
+    }));
+    const { select } = createSiteSelector({
+      sites: dynamicSites,
+      resolveHost,
+      resolveCache: { ttl: 60, maxEntries: 2 },
+    });
+
+    await select(at("a.example"));
+    await select(at("b.example"));
+    await select(at("a.example")); // a is now the most recent
+    await select(at("c.example")); // evicts b
+    resolveHost.mockClear();
+
+    await select(at("a.example"));
+    expect(resolveHost).not.toHaveBeenCalled();
+
+    await select(at("b.example"));
+    expect(resolveHost).toHaveBeenCalledWith({ host: "b.example", request });
+  });
+
+  it("sweeps expired hosts before evicting live ones", async () => {
+    let now = 0;
+    const resolveHost = vi.fn(async ({ host }: { host: string }) => ({
+      site: "tenant",
+      key: host,
+    }));
+    const { select } = createSiteSelector({
+      sites: dynamicSites,
+      resolveHost,
+      resolveCache: { ttl: 10, maxEntries: 2 },
+      now: () => now,
+    });
+
+    await select(at("old.example"));
+    now = 5_000;
+    await select(at("live.example"));
+    now = 6_000;
+    await select(at("old.example")); // a hit: old.example is now the most recent
+    now = 11_000; // old.example has expired; live.example (least recent) has not
+    await select(at("new.example"));
+    resolveHost.mockClear();
+
+    await select(at("live.example"));
+    expect(resolveHost).not.toHaveBeenCalled();
+  });
+
+  it("never sends a host longer than a DNS name to the resolver", async () => {
+    const resolveHost = vi.fn(async () => ({ site: "tenant", key: "x" }));
+    const { select } = createSiteSelector({ sites: dynamicSites, resolveHost });
+
+    expect((await select(at(`${"a".repeat(254)}.example`))).kind).toBe("not-found");
+    expect(resolveHost).not.toHaveBeenCalled();
+  });
+});

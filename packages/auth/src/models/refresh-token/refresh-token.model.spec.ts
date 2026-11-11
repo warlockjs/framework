@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { createSigner } from "fast-jwt";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -67,8 +68,11 @@ function buildQueryStub(rows: unknown[]) {
   const builder: Record<string, unknown> = {};
 
   builder.where = vi.fn(() => builder);
+  builder.whereIn = vi.fn(() => builder);
   builder.orderBy = vi.fn(() => builder);
   builder.get = vi.fn().mockResolvedValue(rows);
+  builder.first = vi.fn().mockResolvedValue(rows[0] ?? null);
+  builder.delete = vi.fn().mockResolvedValue(rows.length);
 
   return builder;
 }
@@ -184,15 +188,20 @@ describe("RefreshToken statics", () => {
     );
   });
 
-  it("findByToken / findForUser / deleteForUser scope by the right columns", async () => {
+  it("findByToken / findForUser / deleteForUser match either stored form and scope by user", async () => {
+    const forms = [createHash("sha256").update("tok").digest("hex"), "tok"];
+    const query = buildQueryStub([]);
+    modelQuery.mockReturnValue(query);
+
     await RefreshToken.findByToken("tok");
-    expect(modelFirst).toHaveBeenCalledWith({ token: "tok" });
+    expect(query.whereIn).toHaveBeenCalledWith("token", forms);
 
     await RefreshToken.findForUser(user, "tok");
-    expect(modelFirst).toHaveBeenCalledWith({ token: "tok", user_id: 7 });
+    expect(query.where).toHaveBeenCalledWith({ user_id: 7 });
 
     await RefreshToken.deleteForUser(user, "tok");
-    expect(modelDelete).toHaveBeenCalledWith({ token: "tok", user_id: 7 });
+    expect(query.delete).toHaveBeenCalledOnce();
+    expect(query.whereIn).toHaveBeenCalledTimes(3);
   });
 
   it("revokeAllFor fetches active rows, revokes each, and returns them", async () => {

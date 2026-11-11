@@ -259,13 +259,17 @@ export class ScopedStorage implements ScopedStorageContract {
       throw new Error(`Failed to fetch file from ${url}: missing content-type header`);
     }
 
-    const mimeType = putOptions.mimeType || result.contentType || undefined;
-
-    return this.put(result.buffer, location, { ...putOptions, mimeType });
+    // The stored Content-Type follows `location`'s extension (or an explicit
+    // `options.mimeType`), never the remote server's header: a cloud bucket
+    // serves the object with it, and `text/html` there would run as a page.
+    return this.put(result.buffer, location, putOptions);
   }
 
   /**
    * Store a file from base64 data URL
+   *
+   * The stored Content-Type follows `location`'s extension (or an explicit
+   * `options.mimeType`), not the MIME type the data URL declares.
    *
    * @param dataUrl - Data URL (data:image/png;base64,iVBORw0KG...)
    * @param location - Destination path in storage
@@ -300,10 +304,9 @@ export class ScopedStorage implements ScopedStorageContract {
 
     const buffer = Buffer.from(base64Data, "base64");
 
-    return this.put(buffer, location, {
-      ...options,
-      mimeType: options?.mimeType || mimeType,
-    });
+    // The declared `mimeType` is client input: the driver derives the stored
+    // type from `location` unless the caller passed one explicitly.
+    return this.put(buffer, location, options);
   }
 
   /**

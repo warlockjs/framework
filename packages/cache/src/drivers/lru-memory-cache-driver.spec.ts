@@ -401,4 +401,36 @@ describe("LRUMemoryCacheDriver — extend", () => {
     await expect(driver.get("a")).resolves.toBe(1);
     await expect(driver.get("b")).resolves.toBeNull();
   });
+
+  describe("swr() isolation", () => {
+    it("hands each caller a copy: mutating a result never changes the cached value", async () => {
+      const options = { freshTtl: 60, staleTtl: 120 };
+      const load = vi.fn(async () => ({ items: ["a"], currentUser: null as string | null }));
+
+      const first = await driver.swr("home", options, load);
+      first.currentUser = "alice@example.com";
+      first.items.push("b");
+
+      const second = await driver.swr("home", options, load);
+      second.currentUser = "bob@example.com";
+
+      const third = await driver.swr("home", options, load);
+
+      expect(load).toHaveBeenCalledTimes(1);
+      expect(third).toEqual({ items: ["a"], currentUser: null });
+      expect(await driver.get("home")).toEqual({ items: ["a"], currentUser: null });
+    });
+
+    it("returns a copy of the existing value when a create-only write conflicts", async () => {
+      await driver.set("lock", { owner: "a" });
+
+      const result = (await driver.set("lock", { owner: "b" }, { onConflict: "create" })) as {
+        existing: { owner: string };
+      };
+
+      result.existing.owner = "changed";
+
+      expect(await driver.get("lock")).toEqual({ owner: "a" });
+    });
+  });
 });

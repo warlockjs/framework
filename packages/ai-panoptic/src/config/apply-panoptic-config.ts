@@ -27,6 +27,9 @@ type AppliedState = {
 
 let applied: AppliedState | undefined;
 
+/** Traces kept by the store panoptic creates for the dashboard, unless `capacity` says otherwise. */
+export const DEFAULT_DASHBOARD_STORE_CAPACITY = 1000;
+
 /**
  * Read a {@link PanopticConfig} and wire panoptic onto the core observe
  * seam — the bridge `ai.config({ panoptic })` resolves through. Builds a
@@ -69,14 +72,16 @@ export function applyPanopticConfig(config?: PanopticConfig): void {
     // the durable cache-backed store; otherwise fall back to in-memory so
     // the dashboard works with no cache configured.
     if (store === undefined && config.dashboard) {
+      const capacity = config.capacity ?? DEFAULT_DASHBOARD_STORE_CAPACITY;
+
       if (config.cache !== undefined) {
         const onError =
           config.onError ?? ((error: unknown) => log.error("ai-panoptic", "cacheStore", error));
 
-        cacheStore = createCacheTraceStore(config.cache, { onError });
+        cacheStore = createCacheTraceStore(config.cache, { onError, capacity });
         store = cacheStore;
       } else {
-        store = createInMemoryTraceStore();
+        store = createInMemoryTraceStore({ capacity });
       }
 
       exporters.push(store as unknown as ExporterContract);

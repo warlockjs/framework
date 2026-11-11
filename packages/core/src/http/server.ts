@@ -10,10 +10,15 @@ import type {
 
 type DrainServer = NodeHttpServer | Http2Server | Http2SecureServer;
 type DrainResponse = ServerResponse | Http2ServerResponse;
+import { Application } from "../application/application";
 import { normalizeRequestPath } from "../router/normalize-request-path";
+import { registerAllowedHosts } from "./allowed-hosts";
+import { warnOnTrustAllProxies } from "./trusted-proxy";
 import { dispatchRefusal } from "./refusal-dispatch";
+import { registerResponseCompression } from "./compression";
 import { registerErrorResponseFormatter } from "./error-response";
 import { registerReloadGate } from "./reload-gate";
+import { registerServerErrorHandler } from "./server-error-handler";
 import { applySecurityHeadersToRaw, registerSecurityHeaders } from "./security-headers";
 import type { HttpServerOptions } from "./types";
 
@@ -55,6 +60,19 @@ function resolveTrustProxy(value: unknown): TrustProxy {
   );
 }
 
+/** Default for `http.requestTimeout`: five minutes to send one request. */
+const DEFAULT_REQUEST_TIMEOUT = 300_000;
+
+/**
+ * `http.requestTimeout` in milliseconds: a non-negative integer (0 turns the
+ * limit off), otherwise the default.
+ */
+function resolveRequestTimeout(value: unknown): number {
+  return typeof value === "number" && Number.isInteger(value) && value >= 0
+    ? value
+    : DEFAULT_REQUEST_TIMEOUT;
+}
+
 function normalizeRequestUrl(url: string): string {
   const queryIndex = url.indexOf("?");
 
@@ -67,6 +85,8 @@ export function startHttpServer(options?: HttpServerOptions): FastifyInstance {
   // `config.set(key, undefined)` stores null rather than unsetting, so an app
   // that clears a key is treated the same as an app that never configured it.
   const trustProxy = resolveTrustProxy(config.get("http.trustProxy", false));
+
+  warnOnTrustAllProxies(trustProxy, config.get("http.realIpHeader"));
 
   const bodyLimit = config.get("http.bodyLimit") ?? undefined;
   const configuredRewriteUrl = options?.rewriteUrl;
@@ -97,6 +117,12 @@ export function startHttpServer(options?: HttpServerOptions): FastifyInstance {
     // the `maxBodySize()` middleware runs AFTER parsing and cannot reject
     // before the bytes are resident.
     ...(bodyLimit !== undefined && { bodyLimit }),
+    // How long a client may take to send one whole request (headers and
+    // body). Fastify's own default is 0 (unbounded), which lets a client
+    // trickle a body forever. It does not limit the response, so event
+    // streams and long downloads are unaffected. `serverOptions.requestTimeout`
+    // wins.
+    requestTimeout: resolveRequestTimeout(config.get("http.requestTimeout")),
     // Close idle keep-alive connections on shutdown while letting in-flight
     // requests finish — the basis for graceful draining. Override via
     // `http.gracefulShutdown.forceCloseConnections`.
@@ -131,8 +157,18 @@ export function startHttpServer(options?: HttpServerOptions): FastifyInstance {
   // First onRequest hook: every later hook (CORS, rate limit, reload gate) and
   // every refusal they send already carries the headers.
   registerSecurityHeaders(server);
+  // Unknown hosts are refused before anything else runs (opt-in).
+  registerAllowedHosts(server);
   registerErrorResponseFormatter(server);
-  registerReloadGate(server);
+  // After the formatter: the formatted error body is the one compressed.
+  registerResponseCompression(server);
+  // 5xx errors that bypass the request funnel answer an opaque body.
+  registerServerErrorHandler(server);
+  // The reload gate only ever closes under `warlock dev`; a production server
+  // skips the per-request hook.
+  if (Application.runtimeStrategy !== "production") {
+    registerReloadGate(server);
+  }
 
   // `"idle"` promises that idle keep-alive connections close on shutdown. Fastify
   // only reaps the ones idle at the moment close starts; a connection whose

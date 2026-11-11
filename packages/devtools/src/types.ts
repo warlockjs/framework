@@ -32,10 +32,32 @@ export type DevtoolsOptions = {
    * @default 5
    */
   nPlusOneThreshold?: number;
+  /**
+   * Extra `Host` names the dashboard answers besides `localhost`,
+   * `*.localhost`, `127.0.0.1` and `[::1]`, e.g. a custom dev hostname such as
+   * `"app.test"`. An entry starting with `.` also matches every subdomain
+   * (`".app.test"` matches `app.test` and `admin.app.test`). The socket must
+   * still be loopback.
+   *
+   * @default []
+   */
+  allowedHosts?: readonly string[];
+  /**
+   * Answer requests that carry `X-Forwarded-For`, `X-Forwarded-Host`,
+   * `X-Real-IP` or `Forwarded`. Off by default: a local proxy or tunnel makes
+   * every visitor look like a loopback client. Turn on only for a local proxy
+   * that nobody else can reach.
+   *
+   * @default false
+   */
+  allowProxied?: boolean;
 };
 
 /** `DevtoolsOptions` with every default applied. */
-export type ResolvedDevtoolsOptions = Required<DevtoolsOptions>;
+export type ResolvedDevtoolsOptions = Required<
+  Pick<DevtoolsOptions, "path" | "maxRequests" | "nPlusOneThreshold">
+> &
+  Pick<DevtoolsOptions, "allowedHosts" | "allowProxied">;
 
 /** A source file position, as shown next to an N+1 warning. */
 export type DevtoolsCallerLocation = {

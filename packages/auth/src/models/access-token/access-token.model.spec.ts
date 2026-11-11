@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { createSigner } from "fast-jwt";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -46,10 +47,16 @@ function buildQueryStub(rows: unknown[]) {
   const builder: Record<string, unknown> = {};
 
   builder.where = vi.fn(() => builder);
+  builder.whereIn = vi.fn(() => builder);
   builder.get = vi.fn().mockResolvedValue(rows);
+  builder.first = vi.fn().mockResolvedValue(rows[0] ?? null);
+  builder.delete = vi.fn().mockResolvedValue(rows.length);
 
   return builder;
 }
+
+/** The two stored forms of "tok": its SHA-256 digest (hashed at rest) and the raw value. */
+const TOK_FORMS = [createHash("sha256").update("tok").digest("hex"), "tok"];
 
 const user = { id: 7, userType: "admin" } as never;
 
@@ -80,16 +87,25 @@ describe("AccessToken statics", () => {
     });
   });
 
-  it("findByToken looks up by the raw token", async () => {
+  it("findByToken matches the token stored hashed or raw, in one query", async () => {
+    const query = buildQueryStub([]);
+    modelQuery.mockReturnValue(query);
+
     await AccessToken.findByToken("tok");
 
-    expect(modelFirst).toHaveBeenCalledWith({ token: "tok" });
+    expect(query.whereIn).toHaveBeenCalledWith("token", TOK_FORMS);
+    expect(query.first).toHaveBeenCalledOnce();
   });
 
-  it("deleteForUser scopes the delete to the user + token", async () => {
+  it("deleteForUser scopes the delete to the user + token (either stored form)", async () => {
+    const query = buildQueryStub([]);
+    modelQuery.mockReturnValue(query);
+
     await AccessToken.deleteForUser(user, "tok");
 
-    expect(modelDelete).toHaveBeenCalledWith({ token: "tok", user_id: 7 });
+    expect(query.where).toHaveBeenCalledWith({ user_id: 7 });
+    expect(query.whereIn).toHaveBeenCalledWith("token", TOK_FORMS);
+    expect(query.delete).toHaveBeenCalledOnce();
   });
 
   it("deleteAllForUser deletes every token for the user", async () => {

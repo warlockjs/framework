@@ -58,6 +58,12 @@ router, pick the topic, then read that topic's file.
 If a skill you expect is missing, run `npm run skills:sync` (it also runs
 automatically on `postinstall`).
 
+Only packages listed in `agentKit.pick` in `package.json` are synced: the
+`@warlock.js/*` and `@mongez/*` packages this project depends on (`warlock add`
+appends the ones it installs). A skill is an instruction your agent follows, so
+add a third-party package there only after reading its `skills/` folder; drop
+single skills with `agentKit.omit`.
+
 ## Available project skills (`skills/`)
 
 - **api-design** — HTTP conventions: response envelopes, status codes, pagination,

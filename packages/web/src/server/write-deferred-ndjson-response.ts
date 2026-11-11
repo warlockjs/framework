@@ -22,7 +22,7 @@
  */
 import type { Request, Response } from "@warlock.js/core";
 import { stringify } from "devalue";
-import { buildHydrationPayload } from "./build-hydration-payload";
+import { serializeHydrationPayload } from "./build-hydration-payload";
 import type { DeferSettlement } from "./defer-settlement";
 import { serializePageError } from "./error-page";
 import { pathnameFromRequest, type ServerErrorContext } from "./error-reporting-config";
@@ -110,7 +110,7 @@ export async function writeDeferredNdjsonResponse(
 
   // devalue's output is JSON-compatible text with no raw newlines, so this
   // stays a well-formed NDJSON line 1 unchanged.
-  raw.write(`${stringify(buildHydrationPayload(bundle, locale))}\n`);
+  raw.write(`${serializeHydrationPayload(bundle, locale)}\n`);
 
   if (signal?.aborted) {
     endOnce();
@@ -134,8 +134,10 @@ export async function writeDeferredNdjsonResponse(
         let line: DeferredNdjsonLine;
 
         try {
-          assertPageDataSerializable(value, "page", bundle.route.name);
-          line = { defer: key, settlement: stringify(value) };
+          line = {
+            defer: key,
+            settlement: assertPageDataSerializable(value, "page", bundle.route.name),
+          };
         } catch (thrown) {
           // Line 1 is already flushed — this can never become a second
           // response attempt. Settle the key in-band, on the SAME wire

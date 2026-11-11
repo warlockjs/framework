@@ -208,6 +208,18 @@ export class SitemapArtifactStore {
     return undefined;
   }
 
+  /** Every published manifest's key, newest first, from one storage listing. */
+  public async listManifestKeys(): Promise<SitemapManifestKey[]> {
+    return this.manifestCandidates();
+  }
+
+  /** Reads one listed manifest; `undefined` when it vanished or is invalid. */
+  public async readManifestKey(
+    candidate: SitemapManifestKey,
+  ): Promise<SitemapGenerationManifest | undefined> {
+    return this.readManifestCandidate(candidate);
+  }
+
   public async getArtifactStream(
     manifest: SitemapGenerationManifest,
     path: string,

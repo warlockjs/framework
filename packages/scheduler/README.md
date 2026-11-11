@@ -67,7 +67,7 @@ process.on("SIGTERM", async () => {
 job("nightly-report", buildReport).daily().at("02:00").onOneServer();
 ```
 
-Servers race for a create-only cache claim keyed `scheduler.<key ?? name>.<scheduledTickEpochMs>`. The claim is never released (it only expires), so exactly one server runs each tick even if another server's timer fires late. Losers skip the tick and emit `job:skip`. Options: `{ lockTtl?, key? }` — `lockTtl` is the claim TTL; the default is the interval capped at 1h (min 60s; 1h for cron jobs). Needs a job name or `key`. Requires the optional `@warlock.js/cache` peer with a shared driver (redis/pg); the memory driver only dedupes within one process.
+Servers race for a create-only cache claim keyed `scheduler.<key ?? name>.<scheduledTickEpochMs>`. The claim is never released (it only expires), so exactly one server runs each tick even if another server's timer fires late. Losers skip the tick and emit `job:skip`. Options: `{ lockTtl?, key? }` — `lockTtl` is the claim TTL; the default is the interval capped at 1h (min 60s; 1h for cron jobs). Needs a job name or `key`. Requires the optional `@warlock.js/cache` peer with a shared driver (redis/pg); the memory driver only dedupes within one process. A plain interval (no `at()`, day or month constraint) is aligned to wall-clock boundaries in the job's timezone, so servers that booted at different times share each tick; it does not fire at boot.
 
 ## Documentation
 

@@ -36,10 +36,15 @@ export async function loginService(
 }
 
 /**
- * Logout user
+ * Logout user: revoke the given access token and the refresh-token session it
+ * belongs to. Without a refresh token every session of the user is revoked.
  */
-export async function logoutService(user: Auth): Promise<void> {
-  return authService.logout(user);
+export async function logoutService(
+  user: Auth,
+  accessToken?: string,
+  refreshToken?: string,
+): Promise<void> {
+  return authService.logout(user, accessToken, refreshToken);
 }
 
 /**

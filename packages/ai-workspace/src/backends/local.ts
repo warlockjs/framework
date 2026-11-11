@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { lstat, readdir, realpath } from "node:fs/promises";
+import { chmod, lstat, mkdir, readdir, realpath, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { platform } from "node:process";
 import { StringDecoder } from "node:string_decoder";
@@ -226,29 +226,87 @@ export function planSpawn(
 }
 
 /**
- * Kill functions of every background process still running, so they can
- * be reaped if the Node process exits without the workspace being disposed
- * (detached process groups would otherwise outlive it).
+ * Kill functions of every command and background process still running, so
+ * they can be reaped when the Node process exits or is stopped by a signal
+ * without the workspace being disposed (detached process groups do not
+ * receive the host's signals and would otherwise outlive it).
  */
-const liveBackgroundKills = new Set<() => void>();
+const liveProcessKills = new Set<() => void>();
 
 let exitHookInstalled = false;
 
-/** Track a live background tree; installs (once) the exit hook that kills them. */
-function trackBackgroundProcess(kill: () => void): () => void {
-  liveBackgroundKills.add(kill);
+/** Signals that stop the host: its process trees are killed first (POSIX). */
+const HOST_STOP_SIGNALS: readonly NodeJS.Signals[] = ["SIGTERM", "SIGINT", "SIGHUP"];
+
+let signalHooksInstalled = false;
+
+/** Kill every tracked tree now. */
+function killLiveProcesses(): void {
+  for (const killTreeNow of liveProcessKills) {
+    killTreeNow();
+  }
+}
+
+/**
+ * On a stop signal: kill the tracked trees, stop listening, and — when no
+ * other listener handles the signal — raise it again so the host stops
+ * exactly as it would have without these hooks. An app that handles the
+ * signal itself keeps full control of its shutdown.
+ */
+function onHostStopSignal(signal: NodeJS.Signals): void {
+  killLiveProcesses();
+  removeSignalHooks();
+
+  if (process.listenerCount(signal) === 0) {
+    process.kill(process.pid, signal);
+  }
+}
+
+function installSignalHooks(): void {
+  if (signalHooksInstalled || platform === "win32") {
+    return;
+  }
+
+  signalHooksInstalled = true;
+
+  for (const signal of HOST_STOP_SIGNALS) {
+    process.on(signal, onHostStopSignal);
+  }
+}
+
+function removeSignalHooks(): void {
+  if (!signalHooksInstalled) {
+    return;
+  }
+
+  signalHooksInstalled = false;
+
+  for (const signal of HOST_STOP_SIGNALS) {
+    process.off(signal, onHostStopSignal);
+  }
+}
+
+/**
+ * Track a live process tree (a running `exec` command or a background job).
+ * Installs (once) the exit hook, and while any tree is live the stop-signal
+ * hooks, that kill them. Returns the untrack function.
+ */
+function trackProcessTree(kill: () => void): () => void {
+  liveProcessKills.add(kill);
 
   if (!exitHookInstalled) {
     exitHookInstalled = true;
-    process.on("exit", () => {
-      for (const killTreeNow of liveBackgroundKills) {
-        killTreeNow();
-      }
-    });
+    process.on("exit", killLiveProcesses);
   }
 
+  installSignalHooks();
+
   return () => {
-    liveBackgroundKills.delete(kill);
+    liveProcessKills.delete(kill);
+
+    if (liveProcessKills.size === 0) {
+      removeSignalHooks();
+    }
   };
 }
 
@@ -273,8 +331,21 @@ class LocalBackend implements WorkspaceBackend {
    * concurrent reader never observes a half-written file, and missing parent
    * directories are created.
    */
-  public async writeFile(absPath: string, content: string): Promise<void> {
-    await fs.files.put(absPath, content, { atomic: true });
+  public async writeFile(
+    absPath: string,
+    content: string,
+    options?: { mode?: number },
+  ): Promise<void> {
+    if (options?.mode === undefined) {
+      await fs.files.put(absPath, content, { atomic: true });
+
+      return;
+    }
+
+    // Created with the requested bits (never readable by others in between),
+    // then set again in case the file already existed.
+    await writeFile(absPath, content, { mode: options.mode });
+    await chmod(absPath, options.mode);
   }
 
   /** Whether anything (file or directory) exists at an absolute path. */
@@ -283,8 +354,14 @@ class LocalBackend implements WorkspaceBackend {
   }
 
   /** Create a directory (and any missing parents) at an absolute path; idempotent. */
-  public async mkdir(absPath: string): Promise<void> {
-    await fs.dirs.ensure(absPath);
+  public async mkdir(absPath: string, options?: { mode?: number }): Promise<void> {
+    if (options?.mode === undefined) {
+      await fs.dirs.ensure(absPath);
+
+      return;
+    }
+
+    await mkdir(absPath, { recursive: true, mode: options.mode });
   }
 
   /**
@@ -430,6 +507,8 @@ class LocalBackend implements WorkspaceBackend {
         detached: platform !== "win32",
       });
 
+      // Reaped with the host if it exits or is stopped while this runs.
+      const untrack = trackProcessTree(() => killTree(child.pid, child));
       const stdoutChunks: Buffer[] = [];
       const stderrChunks: Buffer[] = [];
       let stdoutBytes = 0;
@@ -497,6 +576,7 @@ class LocalBackend implements WorkspaceBackend {
         }
 
         settled = true;
+        untrack();
 
         if (graceTimer !== undefined) {
           clearTimeout(graceTimer);
@@ -629,7 +709,7 @@ class LocalBackend implements WorkspaceBackend {
       }
     };
 
-    const untrack = trackBackgroundProcess(kill);
+    const untrack = trackProcessTree(kill);
 
     child.stdout?.on("data", (chunk: Buffer) => {
       const text = stdoutDecoder.write(chunk);

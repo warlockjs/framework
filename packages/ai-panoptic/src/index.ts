@@ -86,6 +86,8 @@ export type { EvaluateConfig, EvaluateVerdict } from "./evaluate";
 // Dashboard — zero-dependency local server over a trace store.
 export { dashboard } from "./dashboard";
 export type { DashboardHandle, DashboardOptions } from "./dashboard";
+// The `GET api/traces` list entry shape.
+export type { TraceSpanSummary, TraceSummary } from "./dashboard/trace-summary";
 
 // Dashboard trace-list helpers — the pure search / filter / group-by /
 // cost-heatmap / prompt-version folds the inlined UI mirrors 1:1. Exported

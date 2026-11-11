@@ -1,5 +1,9 @@
 /** Managed sitemap runtime lifecycle. HTTP serving only observes this state. */
-import type { SitemapSetResult } from "@warlock.js/sitemap";
+import type {
+  SitemapGenerationManifest,
+  SitemapManifestKey,
+  SitemapSetResult,
+} from "@warlock.js/sitemap";
 import { collectSitemapModelDependencies } from "./collect-sitemap-entries";
 import { type GenerateSitemapOptions } from "./generate-sitemap";
 import { resolveSitemapConfig } from "./resolve-sitemap-config";
@@ -39,17 +43,71 @@ function reportFailure(error: unknown): void {
   console.error("[warlock:web] sitemap regeneration failed:", error);
 }
 
-function createServingState(
-  active: SitemapLocalRuntime,
+/** How often an unknown generation id may trigger a fresh storage listing. */
+const UNKNOWN_GENERATION_RELIST_MS = 1_000;
+
+export function createServingState(
+  active: Pick<SitemapLocalRuntime, "store" | "currentManifest">,
   cacheControl: string,
   pollMs: number,
+  now: () => number = Date.now,
 ): SitemapServingState {
   let observed = active.currentManifest;
   let lastPoll = 0;
+  // Retained generations: their keys from the last storage listing, and the
+  // manifests already read (a published manifest never changes).
+  let retained: { listedAt: number; keys: Map<string, SitemapManifestKey> } | undefined;
+  const manifests = new Map<string, SitemapGenerationManifest>();
+
+  const relist = async (): Promise<Map<string, SitemapManifestKey>> => {
+    const keys = new Map<string, SitemapManifestKey>();
+
+    for (const candidate of await active.store.listManifestKeys()) {
+      if (!keys.has(candidate.generationId)) keys.set(candidate.generationId, candidate);
+    }
+
+    retained = { listedAt: now(), keys };
+
+    for (const generationId of manifests.keys()) {
+      if (!keys.has(generationId)) manifests.delete(generationId);
+    }
+
+    return keys;
+  };
 
   return {
     store: active.store,
     cacheControl,
+    getManifestByGeneration: async (generationId) => {
+      let keys =
+        retained === undefined || now() - retained.listedAt >= pollMs
+          ? await relist()
+          : retained.keys;
+
+      // A generation another instance published since the last listing is
+      // found within a second; random ids cost at most one listing a second.
+      if (
+        !keys.has(generationId) &&
+        retained !== undefined &&
+        now() - retained.listedAt >= UNKNOWN_GENERATION_RELIST_MS
+      ) {
+        keys = await relist();
+      }
+
+      const candidate = keys.get(generationId);
+
+      if (candidate === undefined) return undefined;
+
+      const known = manifests.get(generationId);
+
+      if (known !== undefined) return known;
+
+      const manifest = await active.store.readManifestKey(candidate);
+
+      if (manifest !== undefined) manifests.set(generationId, manifest);
+
+      return manifest;
+    },
     getManifest: async () => {
       // A local publication is visible immediately, before the poll throttle.
       const local = active.currentManifest;

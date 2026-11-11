@@ -94,13 +94,34 @@ export function normalizeOrigin(origin: string): string {
 
 /** Same-origin, or an explicit entry in `auth.csrf.allowedOrigins` (default `[]`). */
 export function isAllowedCsrfOrigin(origin: string, request: Request): boolean {
-  if (normalizeOrigin(origin) === normalizeOrigin(ownOrigin(request))) return true;
+  const normalized = normalizeOrigin(origin);
+
+  if (normalized === normalizeOrigin(ownOrigin(request))) return true;
 
   const allowedOrigins: string[] = config.get("auth.csrf.allowedOrigins", []);
 
-  const normalized = normalizeOrigin(origin);
+  return normalizedAllowedOrigins(allowedOrigins).has(normalized);
+}
 
-  return allowedOrigins.some((allowed) => normalizeOrigin(allowed) === normalized);
+/** `auth.csrf.allowedOrigins`, normalised once per configured list. */
+const normalizedOriginLists = new WeakMap<
+  readonly string[],
+  { length: number; origins: Set<string> }
+>();
+
+function normalizedAllowedOrigins(allowedOrigins: readonly string[]): Set<string> {
+  let cached = normalizedOriginLists.get(allowedOrigins);
+
+  // Rebuilt when an entry was added to or removed from the same list.
+  if (cached === undefined || cached.length !== allowedOrigins.length) {
+    cached = {
+      length: allowedOrigins.length,
+      origins: new Set(allowedOrigins.map((allowed) => normalizeOrigin(allowed))),
+    };
+    normalizedOriginLists.set(allowedOrigins, cached);
+  }
+
+  return cached.origins;
 }
 
 /**

@@ -179,6 +179,7 @@ Model.save()
 A few practical consequences:
 
 - **Sync runs after the source save commits.** It's not part of the source transaction.
+- **Sync jobs run one at a time, in commit order.** Each job ends when its target writes do, so a burst of saves (an import, a bulk edit) queues its sync writes instead of opening them all at once against the connection pool. A listener on the model's sync event that rejects fails the job, which is retried (3 attempts) and then logged.
 - **The bulk update doesn't fire target-model lifecycle events.** `Product`'s `onUpdating`/`onUpdated` don't run for sync-driven updates — they're driver-level bulk writes.
 - **Sync is non-atomic across collections.** A sync that updates `Product` and `Module` is two separate driver operations. If you need cross-collection atomicity, wrap the source save and the sync in a transaction — but note that the sync's bulk updates happen _after_ the source save commits, so a transaction wrapping just the source save won't roll back the sync.
 

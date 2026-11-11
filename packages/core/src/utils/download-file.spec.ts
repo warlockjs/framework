@@ -50,4 +50,44 @@ describe("downloadFileFromUrl", () => {
 
     expect(await readdir(dir)).toEqual(["avatar.png"]);
   });
+
+  it.each(["page.html", "x.svg", "app.js", "doc.xhtml"])(
+    "saves a remote %s as .bin when no file name is given",
+    async (remote) => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => new Response("<script>alert(1)</script>")),
+      );
+
+      await downloadFileFromUrl(`http://93.184.216.34/${remote}`, dir);
+
+      const [saved] = await readdir(dir);
+      expect(path.extname(saved ?? "")).toBe(".bin");
+    },
+  );
+
+  it("does not take .svg from an image/svg+xml Content-Type", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response("<svg/>", { headers: { "content-type": "image/svg+xml" } })),
+    );
+
+    await downloadFileFromUrl("http://93.184.216.34/avatar", dir);
+
+    const [saved] = await readdir(dir);
+    expect(path.extname(saved ?? "")).toBe("");
+  });
+
+  it("keeps an extension listed in allowedExtensions", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response("<svg/>")),
+    );
+
+    await downloadFileFromUrl("http://93.184.216.34/logo.svg", dir, "logo", {
+      allowedExtensions: ["svg"],
+    });
+
+    expect(await readdir(dir)).toEqual(["logo.svg"]);
+  });
 });

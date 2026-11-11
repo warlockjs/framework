@@ -120,10 +120,15 @@ export async function triggerModelEvent(
   const legacy = getLegacyModelEvent(modelClass, eventType);
   const current = getModelEvent(getModelEventKey(modelClass), eventType);
 
+  // Every listener is awaited, so a sync fan-out job ends when its target
+  // writes do: the fan-out queue then runs one job at a time, in commit order,
+  // instead of starting every target write of a burst at once. A listener that
+  // rejects fails the job, which the queue retries and reports.
+  //
   // Deprecated class-name form, kept for 5.21 compatibility.
-  await events.triggerAll(legacy, ...args);
+  await events.triggerAllAsync(legacy, ...args);
 
   if (current !== legacy) {
-    await events.triggerAll(current, ...args);
+    await events.triggerAllAsync(current, ...args);
   }
 }

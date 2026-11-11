@@ -20,7 +20,10 @@ const DEFAULT_TEST_COMMAND = "npm test";
  * only field and is optional; when present it must be a string without
  * double quotes or newlines — the pattern is forwarded to the runner as a
  * single double-quoted argument, and those characters would break out of
- * the quoting (i.e. inject extra arguments or commands). Validation
+ * the quoting (i.e. inject extra arguments or commands). A pattern that
+ * starts with `-` is refused too: quoting keeps it one argument, but the
+ * runner would still read it as an option (`--node-options=…` makes `npm`
+ * load code, `--config=…` does the same for most runners). Validation
  * happens without a runtime schema dependency, mirroring the wider tool
  * layer.
  */
@@ -51,6 +54,20 @@ const runTestsInputSchema: StandardSchemaV1<RunTestsInput> = withJsonSchema<RunT
             issues: [
               {
                 message: "pattern must not contain double quotes or newlines",
+                path: ["pattern"],
+              },
+            ],
+          };
+        }
+
+        const pattern = candidate.pattern;
+
+        if (typeof pattern === "string" && pattern.trimStart().startsWith("-")) {
+          return {
+            issues: [
+              {
+                message:
+                  "pattern must be a test path or name, not an option (it must not start with -)",
                 path: ["pattern"],
               },
             ],
@@ -126,7 +143,8 @@ export function quotePattern(
  * the command as a **single quoted argument** — a path/suite filter the
  * tokenizer hands to the runner as one argv element (e.g.
  * `npm test "src/cart"`), so shell metacharacters inside it are literal
- * data, never a second command. Like `run_shell`, the resolved command's
+ * data, never a second command; a pattern starting with `-` is refused, so
+ * it can never be read as a runner option. Like `run_shell`, the resolved command's
  * executable is gated by the shell policy — a denial surfaces in the
  * result's `error` field — and a non-zero exit (failing tests) comes back
  * as `data` for the agent to read and fix. The agent run's cancellation
@@ -159,7 +177,8 @@ export function makeRunTestsTool(
       // The pattern rides as ONE quoted token (double quotes and newlines are
       // rejected by the schema; under /bin/sh it is single-quoted, so `$` and
       // backticks stay literal), so it reaches the runner as a single argv
-      // element and can never smuggle in additional commands or arguments.
+      // element and can never smuggle in additional commands or arguments;
+      // the schema refuses a leading `-`, so that element is never an option.
       const command = input.pattern
         ? `${baseCommand} ${quotePattern(input.pattern, options?.interpreter ?? "none", options?.dialect, options?.platform)}`
         : baseCommand;

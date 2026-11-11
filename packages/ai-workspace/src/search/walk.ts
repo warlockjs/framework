@@ -1,6 +1,12 @@
 import path from "node:path";
 import type { WorkspaceBackend, WorkspaceBackendDirEntry } from "../contracts";
-import { globToRegExp, isInside, matchesAnyGlob } from "../policy/jail";
+import {
+  compileGlob,
+  type GlobMatcher,
+  isInside,
+  MAX_GLOB_LENGTH,
+  matchesAnyGlob,
+} from "../policy/jail";
 
 /** Directories `glob` and `grep` never descend into unless `search.skipDirs` says otherwise. */
 export const DEFAULT_SEARCH_SKIP_DIRS: readonly string[] = [".git", "node_modules"];
@@ -19,7 +25,7 @@ interface IgnoreRule {
   nameOnly: boolean;
   /** Pattern began with `**\/`: it may match at any depth under `base`. */
   anywhere: boolean;
-  regex: RegExp;
+  matcher: GlobMatcher;
 }
 
 /** What a walk looks at and how it is bounded. */
@@ -98,7 +104,10 @@ function parseGitignore(content: string, base: string): IgnoreRule[] {
       line = line.slice(1);
     }
 
-    if (line === "") {
+    // An empty pattern matches nothing; an overlong one (no real ignore
+    // rule is this long) is dropped so a cloned repository cannot hand the
+    // walk an arbitrarily expensive pattern.
+    if (line === "" || line.length > MAX_GLOB_LENGTH) {
       continue;
     }
 
@@ -108,7 +117,7 @@ function parseGitignore(content: string, base: string): IgnoreRule[] {
       dirOnly,
       anywhere,
       nameOnly: !anywhere && !line.includes("/") && !raw.trimStart().startsWith("/"),
-      regex: globToRegExp(line),
+      matcher: compileGlob(line),
     });
   }
 
@@ -133,13 +142,13 @@ function isIgnored(
     let hit: boolean;
 
     if (rule.nameOnly) {
-      hit = rule.regex.test(name);
+      hit = rule.matcher.test(name);
     } else if (rule.anywhere) {
       const parts = local.split("/");
 
-      hit = parts.some((_, index) => rule.regex.test(parts.slice(index).join("/")));
+      hit = parts.some((_, index) => rule.matcher.test(parts.slice(index).join("/")));
     } else {
-      hit = rule.regex.test(local);
+      hit = rule.matcher.test(local);
     }
 
     if (hit) {
@@ -153,7 +162,7 @@ function isIgnored(
 /** Whether a directory name or relative path is one of the `skipDirs` globs. */
 function isSkipped(name: string, rel: string, skipDirs: readonly string[]): boolean {
   return skipDirs.some((glob) =>
-    glob.includes("/") ? matchesAnyGlob(rel, [glob]) : globToRegExp(glob).test(name),
+    glob.includes("/") ? matchesAnyGlob(rel, [glob]) : compileGlob(glob).test(name),
   );
 }
 
@@ -240,7 +249,7 @@ export async function walkFiles(options: WalkOptions): Promise<WalkResult> {
   const isDenied = (rel: string): boolean => denyPaths.length > 0 && matchesAnyGlob(rel, denyPaths);
   const isDeniedDir = (rel: string): boolean =>
     isDenied(rel) ||
-    denyPaths.some((glob) => glob.endsWith("/**") && globToRegExp(glob.slice(0, -3)).test(rel));
+    denyPaths.some((glob) => glob.endsWith("/**") && compileGlob(glob.slice(0, -3)).test(rel));
 
   const startRel = path.relative(jailRoot, startDir).split(path.sep).join("/");
   let inherited: IgnoreRule[] = [];

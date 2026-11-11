@@ -6,7 +6,11 @@ import type {
   MouseEvent,
   ReactElement,
 } from "react";
-import { prefetchPageData } from "../client/navigation/prefetch";
+import {
+  cancelScheduledPrefetch,
+  prefetchPageData,
+  schedulePrefetchPageData,
+} from "../client/navigation/prefetch";
 import { readCurrentLocale } from "../routing/current-locale";
 import { hasLeadingLocaleParam } from "../routing/locale-param-route";
 import { withLocalePrefix } from "../routing/locale-prefixed-paths";
@@ -655,12 +659,20 @@ export function Link({
     like the navigator's. The navigator needs a seam because the runtime behind
     it drags React state and the page registry into the server bundle; the
     prefetch cache is a `Map` and a `fetch` call, inert until an event fires.
+
+    Hover waits for the pointer to rest (`PREFETCH_HOVER_DELAY_MS`) and leaving
+    first cancels it, so sweeping across a menu sends nothing. Focus is
+    immediate.
   */
   const prefetchHandlers = prefetchesOnInteraction
     ? {
         onMouseEnter: (event: MouseEvent<HTMLAnchorElement>): void => {
           elementProps.onMouseEnter?.(event);
-          void prefetchPageData(url);
+          schedulePrefetchPageData(url);
+        },
+        onMouseLeave: (event: MouseEvent<HTMLAnchorElement>): void => {
+          elementProps.onMouseLeave?.(event);
+          cancelScheduledPrefetch(url);
         },
         onFocus: (event: FocusEvent<HTMLAnchorElement>): void => {
           elementProps.onFocus?.(event);

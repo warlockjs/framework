@@ -22,16 +22,19 @@ export type LoginThrottleIdentifier = "email" | "ip";
 /**
  * Options for {@link loginThrottleMiddleware}.
  *
- * Failure-aware by design: only counts requests whose response is non-2xx
- * (or whatever `isFailure` says) and resets on success, so a user who types
- * a wrong password three times then the right one is not penalised.
+ * Failure-aware by design: every attempt is counted when it arrives (so a
+ * burst of concurrent requests cannot outrun the limit), and a successful
+ * response (2xx, or whatever `isFailure` says) resets the count, so a user who
+ * types a wrong password three times then the right one is not penalised.
  *
  * @example
  * loginThrottleMiddleware({ max: 5, window: "15m", lockoutDuration: "15m" });
  */
 export type LoginThrottleOptions = {
   /**
-   * Failures allowed within the window before the identifier is locked.
+   * Failures allowed within the window before the identifier is locked. It
+   * also caps how many attempts may be in flight at once: a request beyond it
+   * is refused with `429` before the controller runs.
    *
    * @default 5
    */
@@ -66,6 +69,30 @@ export type LoginThrottleOptions = {
    * @default "email"
    */
   identifierKey?: string;
+
+  /**
+   * Who an account lock applies to when both `"email"` and `"ip"` are tracked.
+   *
+   * - `"global"` — `max` failures for an email, from any source, lock that
+   *   email for everyone (the account owner included).
+   * - `"pair"` — the `max` lock applies to the (email, source IP) pair, so a
+   *   stranger guessing from their own IP cannot lock the owner out. The email
+   *   alone keeps a wider bucket (`accountMax`) that still stops guessing
+   *   spread across many IPs.
+   *
+   * Ignored when `identify` is set or `by` does not track both.
+   *
+   * @default "global"
+   */
+  emailLock?: "pair" | "global";
+
+  /**
+   * Attempts one email may take from all sources together within the window
+   * before it is locked, when `emailLock` is `"pair"`.
+   *
+   * @default max * 10
+   */
+  accountMax?: number;
 
   /**
    * Override the default error message returned with the 429 response.
@@ -206,27 +233,39 @@ function buildDefaultIdentifiers(
   request: Request,
   tracked: LoginThrottleIdentifier[],
   credentialField: string,
-): string[] {
-  const identifiers: string[] = [];
+  max: number,
+  pair: { accountMax: number } | undefined,
+): TrackedIdentifier[] {
+  const identifiers: TrackedIdentifier[] = [];
+  const value = tracked.includes("email") ? request.input(credentialField) : undefined;
+  const email = typeof value === "string" && value.trim().length > 0 ? value : undefined;
+  const ip = tracked.includes("ip") ? request.detectIp() : undefined;
 
-  if (tracked.includes("email")) {
-    const value = request.input(credentialField);
+  if (email !== undefined) {
+    if (pair && ip) {
+      // The hard lock belongs to this source only; the email-wide bucket is
+      // wider, so a stranger cannot lock the owner out with `max` guesses.
+      const pairValue = `${normalizeEmailIdentifier(email)}|${ip}`;
 
-    if (typeof value === "string" && value.trim().length > 0) {
-      identifiers.push(`email.${throttleIdentifierHash("email", value)}`);
+      identifiers.push({ key: `email-ip.${throttleIdentifierHash("email-ip", pairValue)}`, max });
+      identifiers.push({
+        key: `email.${throttleIdentifierHash("email", email)}`,
+        max: pair.accountMax,
+      });
+    } else {
+      identifiers.push({ key: `email.${throttleIdentifierHash("email", email)}`, max });
     }
   }
 
-  if (tracked.includes("ip")) {
-    const ip = request.detectIp();
-
-    if (ip) {
-      identifiers.push(`ip.${throttleIdentifierHash("ip", ip)}`);
-    }
+  if (ip) {
+    identifiers.push({ key: `ip.${throttleIdentifierHash("ip", ip)}`, max });
   }
 
   return identifiers;
 }
+
+/** One throttle bucket: its cache-key suffix and the attempts it allows. */
+type TrackedIdentifier = { key: string; max: number };
 
 /**
  * Failure-aware login throttle. Locks an identifier (account, IP, or both)
@@ -237,11 +276,15 @@ function buildDefaultIdentifiers(
  *
  * 1. **Before the controller** — reject with `429` if a lock key is set,
  *    skipping the DB lookup AND the bcrypt verify (this also neutralises the
- *    CPU-DoS angle of brute-forcing).
+ *    CPU-DoS angle of brute-forcing). Otherwise count the attempt in a
+ *    fixed-window counter right away, and reject with `429` (setting the lock)
+ *    when it goes past `max`. Counting at entry is what bounds a burst of
+ *    concurrent requests: at most `max` attempts per window reach the
+ *    controller, however many arrive at once.
  * 2. **After the controller** — observe the outcome via `response.onSent`.
- *    On failure (non-2xx by default), bump a fixed-window counter; once it
- *    reaches `max`, set a lock key with `lockoutDuration` TTL. On success,
- *    clear both the counter and the lock for that identifier.
+ *    On failure (non-2xx by default), set a lock key with `lockoutDuration`
+ *    TTL once the attempt count has reached `max`. On success, clear both the
+ *    counter and the lock for that identifier.
  *
  * Storage is `@warlock.js/cache` (a peer dependency of `@warlock.js/auth`,
  * transitively guaranteed via `@warlock.js/core`). Lockout state is shared
@@ -270,25 +313,79 @@ export function loginThrottleMiddleware(options: LoginThrottleOptions = {}): Mid
   const lockoutDuration = options.lockoutDuration ?? "15m";
   const tracked = options.by ?? ["email", "ip"];
   const credentialField = options.identifierKey ?? "email";
+  const pair =
+    options.emailLock === "pair" && tracked.includes("email") && tracked.includes("ip")
+      ? { accountMax: options.accountMax ?? max * 10 }
+      : undefined;
+
+  /**
+   * Lock an identifier for `lockoutDuration`. The counter is rewritten with
+   * the same TTL, so the two expire together and the identifier starts a fresh
+   * window once the lockout ends. Rewriting keeps a value of at least `count`,
+   * so a request that slipped past the lock check still sees "over the limit".
+   */
+  const lock = async (identifier: string, count: number): Promise<void> => {
+    const lockSeconds = durationSeconds(lockoutDuration);
+
+    // The lock stores its own deadline: a driver with sliding expiration
+    // (`memoryExtended`) pushes the key's TTL forward on every read, but the
+    // deadline in the value does not move, so a client that keeps retrying is
+    // still released after `lockoutDuration`.
+    await cache.set(
+      lockKey(identifier),
+      lockSeconds === undefined ? true : Date.now() + lockSeconds * 1000,
+      { ttl: lockoutDuration },
+    );
+    await cache.set(counterKey(identifier), count, { ttl: lockoutDuration });
+  };
 
   return async ({ request, response }) => {
-    const identifiers = options.identify
-      ? options.identify(request)
-      : buildDefaultIdentifiers(request, tracked, credentialField);
+    const identifiers: TrackedIdentifier[] = options.identify
+      ? options.identify(request).map((key) => ({ key, max }))
+      : buildDefaultIdentifiers(request, tracked, credentialField, max, pair);
 
     if (identifiers.length === 0) return;
 
     warnIfNullDriver();
 
+    const tooManyRequests = () =>
+      response.tooManyRequests({
+        error: options.errorMessage ?? t("auth.errors.tooManyAttempts"),
+        errorCode: AuthErrorCodes.TooManyAttempts,
+      });
+
+    /** The attempt number this request took in each identifier's window. */
+    const counts = new Map<string, number>();
+
     try {
       for (const identifier of identifiers) {
-        const locked = isLocked(await cache.get(lockKey(identifier)));
+        if (isLocked(await cache.get(lockKey(identifier.key)))) {
+          return tooManyRequests();
+        }
+      }
 
-        if (locked) {
-          return response.tooManyRequests({
-            error: options.errorMessage ?? t("auth.errors.tooManyAttempts"),
-            errorCode: AuthErrorCodes.TooManyAttempts,
-          });
+      for (const identifier of identifiers) {
+        const key = counterKey(identifier.key);
+
+        // Open the window on the first attempt: the create-only write means
+        // only one of several racing servers sets the TTL, and an existing
+        // window keeps its deadline (fixed window). The bump itself is an
+        // atomic increment, so concurrent attempts across servers are never
+        // lost (redis INCRBY / pg upsert keep the window's TTL). Passing the
+        // TTL on the bump also expires a key recreated after the seed.
+        await cache.set(key, 0, { ttl: window, onConflict: "create" });
+        const count = await cache.increment(key, 1, { ttl: window });
+
+        if (typeof count !== "number" || !Number.isFinite(count)) continue;
+
+        counts.set(identifier.key, count);
+
+        if (count > identifier.max) {
+          if (count === identifier.max + 1) {
+            await lock(identifier.key, count);
+          }
+
+          return tooManyRequests();
         }
       }
     } catch (error) {
@@ -309,39 +406,27 @@ export function loginThrottleMiddleware(options: LoginThrottleOptions = {}): Mid
 
         if (!failed) {
           for (const identifier of identifiers) {
-            await cache.remove(counterKey(identifier));
-            await cache.remove(lockKey(identifier));
+            await cache.remove(counterKey(identifier.key));
+            await cache.remove(lockKey(identifier.key));
           }
 
           return;
         }
 
+        // Already counted at entry; a failure that used the last allowed
+        // attempt starts the lockout, unless a success that finished while it
+        // ran already reset the window (a correct login racing a mistyped one
+        // must not lock the account it just signed in to).
         for (const identifier of identifiers) {
-          const key = counterKey(identifier);
+          const count = counts.get(identifier.key);
 
-          // Open the window on the first failure: the create-only write means
-          // only one of several racing servers sets the TTL, and an existing
-          // window keeps its deadline (fixed window). The bump itself is an
-          // atomic increment, so concurrent failures across servers are never
-          // lost (redis INCRBY / pg upsert keep the window's TTL). Passing
-          // the TTL on the bump also expires a key recreated after the seed.
-          await cache.set(key, 0, { ttl: window, onConflict: "create" });
-          const count = await cache.increment(key, 1, { ttl: window });
+          if (count === undefined || count < identifier.max) continue;
 
-          if (count >= max) {
-            const lockSeconds = durationSeconds(lockoutDuration);
+          const current = Number((await cache.get(counterKey(identifier.key))) ?? 0);
 
-            // The lock stores its own deadline: a driver with sliding
-            // expiration (`memoryExtended`) pushes the key's TTL forward on
-            // every read, but the deadline in the value does not move, so a
-            // client that keeps retrying is still released after
-            // `lockoutDuration`.
-            await cache.set(
-              lockKey(identifier),
-              lockSeconds === undefined ? true : Date.now() + lockSeconds * 1000,
-              { ttl: lockoutDuration },
-            );
-          }
+          if (Number.isFinite(current) && current < count) continue;
+
+          await lock(identifier.key, count);
         }
       } catch (error) {
         log.error("auth", "login-throttle", error);

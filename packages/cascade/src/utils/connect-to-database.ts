@@ -104,6 +104,20 @@ export type ConnectionOptions<TDriverOptions = any, TClientOptions = any> = {
    */
   logging?: boolean;
 
+  /**
+   * Emit the `query` event for every database command (read by the request
+   * log's query capture and by devtools).
+   *
+   * On MongoDB this turns on the client's command monitoring, which decodes
+   * every reply a second time, so it costs on each query. Unset, it is on
+   * outside production and off when `NODE_ENV` is `production`; `logging: true`
+   * also turns it on. PostgreSQL emits the event whenever someone listens, at
+   * no cost otherwise, and ignores this option.
+   *
+   * @default undefined (on outside production)
+   */
+  queryEvents?: boolean;
+
   // ============================================================================
   // CONNECTION DETAILS (Shared across drivers)
   // ============================================================================
@@ -380,6 +394,7 @@ export async function connectToDatabase<TDriverOptions = any, TClientOptions = a
           password: options.password,
           authSource: options.authSource,
           logging: options.logging,
+          queryEvents: options.queryEvents,
           clientOptions: options.clientOptions as any,
         },
         options.driverOptions as any,

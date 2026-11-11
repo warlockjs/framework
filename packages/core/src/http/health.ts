@@ -1,4 +1,15 @@
+import config from "@mongez/config";
 import { Application } from "../application";
+
+/** Default for `http.health.checkTimeout`: a check slower than this fails. */
+const DEFAULT_HEALTH_CHECK_TIMEOUT = 2000;
+
+/** Default for `http.health.cacheTtl`: how long one readiness result is reused. */
+const DEFAULT_HEALTH_CACHE_TTL = 1000;
+
+function nonNegativeInteger(value: unknown, fallback: number): number {
+  return typeof value === "number" && Number.isInteger(value) && value >= 0 ? value : fallback;
+}
 
 /**
  * A readiness probe registered via `health.addCheck(...)`. Returns whether its
@@ -25,11 +36,21 @@ export type HealthStatus = {
 class HealthRegistry {
   private readonly checks = new Map<string, HealthCheck>();
 
+  /** Bumped whenever the set of checks changes, so a cached result is dropped. */
+  private checksVersion = 0;
+
+  /** The run every concurrent readiness call shares. */
+  private inFlight?: Promise<HealthStatus>;
+
+  /** The last finished run, reused for `http.health.cacheTtl` ms. */
+  private cached?: { at: number; version: number; result: HealthStatus };
+
   /**
    * Register (or replace) a readiness check by name — e.g. a database ping.
    */
   public addCheck(name: string, check: HealthCheck): void {
     this.checks.set(name, check);
+    this.checksVersion++;
   }
 
   /**
@@ -37,6 +58,7 @@ class HealthRegistry {
    */
   public removeCheck(name: string): void {
     this.checks.delete(name);
+    this.checksVersion++;
   }
 
   /**
@@ -51,17 +73,61 @@ class HealthRegistry {
    * Readiness — should this instance receive traffic? Requires a finished boot,
    * no in-progress shutdown, and every registered check passing. Load balancers
    * use it to decide whether to ROUTE to the instance.
+   *
+   * Probes are cheap and bounded: concurrent calls share one run of the
+   * checks, a finished result is reused for `http.health.cacheTtl` ms
+   * (default 1000, `0` turns reuse off), and a check that takes longer than
+   * `http.health.checkTimeout` ms (default 2000) counts as failed.
    */
   public async readiness(): Promise<HealthStatus> {
     if (!Application.isBooted || Application.isShuttingDown) {
       return { status: "error" };
     }
 
+    const ttl = nonNegativeInteger(config.get("http.health.cacheTtl"), DEFAULT_HEALTH_CACHE_TTL);
+    const cached = this.cached;
+
+    if (
+      cached &&
+      ttl > 0 &&
+      cached.version === this.checksVersion &&
+      Date.now() - cached.at < ttl
+    ) {
+      return copyStatus(cached.result);
+    }
+
+    if (!this.inFlight) {
+      const version = this.checksVersion;
+
+      this.inFlight = this.runChecks()
+        .then((result) => {
+          if (version === this.checksVersion) {
+            this.cached = { at: Date.now(), version, result };
+          }
+
+          return result;
+        })
+        .finally(() => {
+          this.inFlight = undefined;
+        });
+    }
+
+    return copyStatus(await this.inFlight);
+  }
+
+  /**
+   * Run every registered check once, in registration order.
+   */
+  private async runChecks(): Promise<HealthStatus> {
+    const timeout = nonNegativeInteger(
+      config.get("http.health.checkTimeout"),
+      DEFAULT_HEALTH_CHECK_TIMEOUT,
+    );
     const checks: Record<string, boolean> = {};
     let allPassed = true;
 
     for (const [name, check] of this.checks) {
-      const passed = await this.runCheck(check);
+      const passed = await this.runCheck(check, timeout);
       checks[name] = passed;
 
       if (!passed) {
@@ -90,18 +156,38 @@ class HealthRegistry {
   }
 
   /**
-   * Run one check. A thrown error counts as a failed check rather than crashing
+   * Run one check. A thrown error, or no answer within `timeoutMs` (`0`
+   * waits forever), counts as a failed check rather than crashing
    * the probe. The failure is surfaced in the readiness `checks` map and the
    * 503 status — not logged, since probes poll frequently and a failed check is
    * a normal signal, not an error event.
    */
-  private async runCheck(check: HealthCheck): Promise<boolean> {
+  private async runCheck(check: HealthCheck, timeoutMs: number): Promise<boolean> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
     try {
-      return await check();
+      const run = Promise.resolve().then(check);
+
+      if (timeoutMs === 0) return await run;
+
+      // a check that never settles must not hold the probe
+      const timedOut = new Promise<boolean>((resolve) => {
+        timer = setTimeout(() => resolve(false), timeoutMs);
+        timer.unref?.();
+      });
+
+      return await Promise.race([run, timedOut]);
     } catch {
       return false;
+    } finally {
+      if (timer) clearTimeout(timer);
     }
   }
+}
+
+/** A copy, so a caller changing the result never changes the cached one. */
+function copyStatus(result: HealthStatus): HealthStatus {
+  return result.checks ? { status: result.status, checks: { ...result.checks } } : { ...result };
 }
 
 /**

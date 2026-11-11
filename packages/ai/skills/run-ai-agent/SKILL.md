@@ -323,6 +323,8 @@ Model must declare `capabilities.vision`. OpenAI adapter auto-infers from name; 
 
 A URL _image_ attachment is passed to the provider as a URL — the provider fetches it, not the framework, so there's no server-side SSRF surface. A **remote `{ type: "text", source: <url> }` attachment IS fetched server-side** (the adapter needs the raw text inline) and is default-DENY: it throws unless `attachmentPolicy.allowRemoteFetch: true`, and when enabled runs through the shared `guardedFetch` / `OutboundPolicy` guard — see the `secure-outbound-requests` topic.
 
+Local files: `attachmentPolicy.allowedRoots` confines reads to absolute roots, following symbolic links first (a link inside a root pointing outside is refused; the resolved file is read). `attachmentPolicy.allowBareLocalPaths` — unset: a plain string that looks like a path is read from disk with a one-time warning; `false`: refused (use it whenever attachment strings come from users; the default in the next major); `true`: allowed, no warning.
+
 ## Pattern — streaming
 
 ```ts
@@ -351,6 +353,38 @@ for await (const event of myAgent.stream("Write utils.ts")) {
 ```
 
 The agent asks the model for these by setting `streamChunks: true` on streaming calls; `modelOptions: { streamChunks: false }` (or `{ reasoning: true }`, …) turns them down. `execute()` never emits them. Calling `model.stream()` yourself, the matching `reasoning` / `tool-args` / `usage` chunks are opt-in through the same `streamChunks` option, so existing chunk consumers see no change. Reasoning only streams when the provider is asked to show it (Anthropic `thinkingDisplay: "summarized"` on Claude 5 models, OpenAI Responses `reasoning.summary`, Gemini `includeThoughts`).
+
+With an output guardrail (`ai.guardrail({ output: [...] })`, `guardrail({ outputCheck })`, or any middleware with `trip.bufferStream: true`) each trip's text arrives as **one** `agent.trip.streaming` delta after the check approves (or redacts) it, a blocked trip streams no text, and reasoning is not streamed. `stream: "unguarded"` on the guardrail restores token-by-token deltas (the check then only changes `result.text`).
+
+## Pattern — serve over HTTP (`ai.serve`)
+
+```ts
+import { createServer } from "node:http";
+import { ai, ServeHttpError } from "@warlock.js/ai";
+
+createServer(
+  ai.serve(myAgent, {
+    authorize: async (req) => Boolean(await userFromSession(req)), // or authToken
+    session: {
+      createId: async (req) => (await sessionIdFor(req)) ?? throwUnauthorized(),
+      loadHistory: async ({ sessionId }) => historyStore.load(sessionId), // awaited
+    },
+    maxInputChars: 8_000, // optional; 413 input_too_large
+    maxConcurrent: 50, // optional; 503 busy
+  }),
+).listen(8787);
+
+function throwUnauthorized(): never {
+  throw new ServeHttpError(401, "unauthorized"); // → 401 { "error": "unauthorized" }
+}
+```
+
+- Default wire format is client-safe (`events: "safe"`): text deltas (`{ type, delta }`), completion markers, `agent.error` / `supervisor.error` as `{ type, error }`, and a `result` frame of `{ text, data, error }`. No system prompt, tool inputs/outputs, reasoning, usage or report. `events: "all"` + `toResult: (r) => r` restore the full trace for trusted consumers; `events: string[]` or `(event) => data | undefined` pick a custom set.
+- Errors on the wire are `{ code, message, reference }` (fixed message per error kind); the full error is logged as `ai.serve` / `run.failed` under `reference`.
+- Default `toInput` requires a string `body.input` (else `400 invalid_input`); map a structured body with `toInput`.
+- A throwing callback answers `500 internal_error` (or the `ServeHttpError` status) and never crashes the process.
+- No `authToken` / `authorize` and no `public: true` → one-time warning in production.
+- `streamToSSE(stream, { mapEvent, mapResult, mapError })` is the transport-agnostic building block; without options it is verbatim (trusted sinks only).
 
 ## Pattern — cancellation
 

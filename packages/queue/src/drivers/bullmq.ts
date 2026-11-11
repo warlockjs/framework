@@ -1,7 +1,8 @@
 import { log } from "@warlock.js/logger";
-import { Queue, Worker, type Job, type JobsOptions } from "bullmq";
+import { Queue, Worker, type Job, type JobsOptions, type KeepJobs } from "bullmq";
 import type { DriverDispatch, QueueDriver } from "../driver";
 import { FailedJobNotFoundError } from "../errors";
+import type { ResolvedJobRetention } from "../job-options";
 import { processJob } from "../process-job";
 import { unwrapPayload } from "../queue-context";
 import type { DispatchedJob, FailedJob, JobSnapshot, JobState, QueueConfig } from "../types";
@@ -27,10 +28,12 @@ export class BullMQDriver implements QueueDriver {
   }
 
   public async dispatch(request: DriverDispatch): Promise<DispatchedJob> {
-    const { backoff, ...rest } = request.options;
+    const { backoff, removeOnComplete, removeOnFail, ...rest } = request.options;
     const options: JobsOptions = {
       ...rest,
       backoff: typeof backoff === "number" ? { type: "fixed", delay: backoff } : backoff,
+      removeOnComplete: toKeepJobs(removeOnComplete),
+      removeOnFail: toKeepJobs(removeOnFail),
     };
     const job = await this.getQueue(request.queue).add(request.name, request.data, options);
     return { id: String(job.id), name: request.name, queue: request.queue };
@@ -100,6 +103,18 @@ export class BullMQDriver implements QueueDriver {
     this.queues.clear();
     await Promise.all(queues.map((queue) => queue.close()));
   }
+}
+
+/** BullMQ counts retention age in seconds; ours is resolved to milliseconds. */
+function toKeepJobs(
+  retention: ResolvedJobRetention | undefined,
+): boolean | number | KeepJobs | undefined {
+  if (retention === undefined || typeof retention !== "object") return retention;
+  if (retention.age === undefined) return { count: retention.count ?? 0 };
+  return {
+    age: Math.ceil(retention.age / 1000),
+    ...(retention.count === undefined ? {} : { count: retention.count }),
+  };
 }
 
 function toSnapshot(job: Job, state: JobState): JobSnapshot {

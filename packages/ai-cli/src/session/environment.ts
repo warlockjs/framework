@@ -40,7 +40,13 @@ export const MINIMAL_ENV = [
 
 export type BuildEnvironmentInput = {
   source: Record<string, string | undefined>;
-  inherit: boolean | readonly string[];
+  /**
+   * `true` — everything; `false` — the minimal set; `"curated"` — the minimal
+   * set plus `credentials`; a list — the minimal set plus those names.
+   */
+  inherit: boolean | "curated" | readonly string[];
+  /** The adapter's own credential variables (`apiKeyEnv`), passed by `"curated"`. */
+  credentials?: readonly string[];
   /** Variables the adapter manages (config home); never inherited from `source`. */
   managed: readonly string[];
   /** Adapter plan variables (config home, …). */
@@ -62,10 +68,16 @@ export function buildEnvironment(input: BuildEnvironmentInput): Record<string, s
   const normalize = (name: string): string =>
     input.platform === "win32" ? name.toUpperCase() : name;
   const managed = new Set(input.managed.map(normalize));
+  const extra =
+    input.inherit === false
+      ? []
+      : input.inherit === "curated"
+        ? (input.credentials ?? [])
+        : input.inherit === true
+          ? []
+          : input.inherit;
   const allowed =
-    input.inherit === true
-      ? undefined
-      : new Set([...MINIMAL_ENV, ...(input.inherit === false ? [] : input.inherit)].map(normalize));
+    input.inherit === true ? undefined : new Set([...MINIMAL_ENV, ...extra].map(normalize));
 
   const environment: Record<string, string> = {};
 
@@ -106,4 +118,34 @@ export function buildEnvironment(input: BuildEnvironmentInput): Record<string, s
   }
 
   return environment;
+}
+
+let warnedInheritedEnvironment = false;
+
+/**
+ * One console warning per process when a CLI agent runs in production with
+ * `inheritEnv` left at its default (`true`), which hands every server
+ * variable — database URLs, signing keys, other providers' keys — to a
+ * model-driven CLI.
+ */
+export function warnInheritedEnvironment(
+  title: string,
+  inheritEnv: boolean | "curated" | readonly string[] | undefined,
+  env: Record<string, string | undefined>,
+): void {
+  if (warnedInheritedEnvironment || inheritEnv !== undefined || env.NODE_ENV !== "production") {
+    return;
+  }
+
+  warnedInheritedEnvironment = true;
+  console.warn(
+    `[warlock-ai-cli] ${title} receives the whole server environment because \`inheritEnv\` is not set (default \`true\`). ` +
+      'Set `inheritEnv: "curated"` to pass only the system variables and the CLI\'s own API key variable, ' +
+      "or `inheritEnv: true` to keep the current behaviour and silence this warning.",
+  );
+}
+
+/** Re-arm the one-time `inheritEnv` warning. For tests. */
+export function resetInheritedEnvironmentWarning(): void {
+  warnedInheritedEnvironment = false;
 }

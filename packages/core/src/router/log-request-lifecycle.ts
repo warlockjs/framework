@@ -65,6 +65,12 @@ export type RequestLogPorts = {
   error(entry: RequestLogEntry): void;
   /** Monotonic milliseconds. Called exactly twice per request. */
   now(): number;
+  /**
+   * Whether an entry at `level` would be kept by any log channel. When it
+   * returns `false` the entry (and its context) is not built at all.
+   * Absent means every level is kept.
+   */
+  isEnabled?(level: "info" | "warn" | "error"): boolean;
 };
 
 export type RequestLogDescriptor = {
@@ -76,8 +82,11 @@ export type RequestLogDescriptor = {
    * handed to `log.info` / `warn` / `error`, whose parameter is
    * `Record<string, any>` — `unknown` was not assignable, so the adapter in
    * router.ts could not compile even though every real caller passes an object.
+   *
+   * A function is called at most once, the first time an entry is written,
+   * so a context nobody logs is never built.
    */
-  context?: Record<string, any>;
+  context?: Record<string, any> | (() => Record<string, any>);
   /**
    * Read AFTER the run settles — the status is decided during the request, so
    * capturing it up front would report the default on every entry.
@@ -114,12 +123,27 @@ export async function logRequestLifecycle<TResult>(
   const startedAt = ports.now();
   const tracingEnabled = isTracingEnabled();
 
-  ports.info({
-    module: descriptor.module,
-    action: descriptor.action,
-    message: `Starting Request: ${descriptor.requestId}`,
-    context: descriptor.context,
-  });
+  let context: Record<string, any> | undefined;
+  let contextBuilt = false;
+
+  const write = (level: Level, message: string): void => {
+    if (ports.isEnabled?.(level) === false) return;
+
+    if (!contextBuilt) {
+      contextBuilt = true;
+      context =
+        typeof descriptor.context === "function" ? descriptor.context() : descriptor.context;
+    }
+
+    ports[level]({
+      module: descriptor.module,
+      action: descriptor.action,
+      message,
+      context,
+    });
+  };
+
+  write("info", `Starting Request: ${descriptor.requestId}`);
 
   if (tracingEnabled && descriptor.request) {
     dispatchRequestStart(buildTracingContext(descriptor.request));
@@ -133,12 +157,7 @@ export async function logRequestLifecycle<TResult>(
       recordRequestLogError(descriptor.requestId, error);
     }
 
-    ports[level]({
-      module: descriptor.module,
-      action: descriptor.action,
-      message: `Completed Request: ${descriptor.requestId} — ${outcome} in ${duration}ms`,
-      context: descriptor.context,
-    });
+    write(level, `Completed Request: ${descriptor.requestId} — ${outcome} in ${duration}ms`);
 
     if (tracingEnabled && descriptor.request) {
       dispatchRequestEnd(buildTracingContext(descriptor.request), {

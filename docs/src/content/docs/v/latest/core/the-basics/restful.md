@@ -207,6 +207,24 @@ The handlers come from the class — `productsRestful.list`, `productsRestful.ge
 
 All seven exist on the base `Restful` class — `router.restfulResource(...)` generates a route for any of them the class exposes. The framework picks based on the presence of each method on the resource you pass.
 
+`list` passes the request input to the repository, so the repository's client rules apply: page size capped at `maxPerPage`, whitelisted sorting, and `?paginate=false`, `?purgeCache` and `?cacheKey` ignored unless the repository opts in (see [Options from the request](./repositories-deep.md#options-from-the-request)).
+
+`bulkDelete` is bounded:
+
+| Property                | Default | What it does                                                                                          |
+| ----------------------- | ------- | ----------------------------------------------------------------------------------------------------- |
+| `bulkDeleteLimit`       | `1000`  | Most ids one request may name. A longer `id` list gets a 400 before any record is loaded.             |
+| `bulkDeleteConcurrency` | `10`    | Records deleted at the same time (each runs the middleware, `beforeDelete`, `destroy()`, `onDelete`). |
+
+```ts
+class ProductsRestful extends Restful<Product> {
+  protected repository = productsRepository;
+
+  protected bulkDeleteLimit = 200;
+  protected bulkDeleteConcurrency = 5;
+}
+```
+
 ### Validation
 
 The class declares validation in a `validation` property — per action or shared:

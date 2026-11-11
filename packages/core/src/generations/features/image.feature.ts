@@ -3,6 +3,6 @@ import type { FeatureDefinition } from "./types";
 export const imageFeature: FeatureDefinition = {
   description: "Installs sharp for image processing",
   dependencies: {
-    sharp: "^0.34.5",
+    sharp: "^0.35.5",
   },
 };

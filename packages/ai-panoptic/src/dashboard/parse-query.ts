@@ -73,3 +73,33 @@ export function parseQuery(params: URLSearchParams): TraceQuery {
 
   return query;
 }
+
+/** Traces `GET api/traces` returns when the request names no `limit`. */
+export const DEFAULT_TRACE_LIST_LIMIT = 200;
+
+/** Paging and shape options of `GET api/traces`. */
+export type TraceListOptions = {
+  /** Newest traces to return. */
+  limit: number;
+  /** Return full traces (span tree and captured content) instead of summaries. */
+  full: boolean;
+};
+
+/**
+ * Read `?limit=` (a positive integer, default {@link DEFAULT_TRACE_LIST_LIMIT})
+ * and `?full=1` from a `GET api/traces` request. An invalid `limit` falls
+ * back to the default. Page further back with `?startedBefore=` set to the
+ * `startedAt` of the last trace received.
+ *
+ * @example
+ * parseListOptions(new URLSearchParams("limit=50&full=1"));
+ * // → { limit: 50, full: true }
+ */
+export function parseListOptions(params: URLSearchParams): TraceListOptions {
+  const raw = params.get("limit");
+  const parsed = raw === null ? Number.NaN : Number(raw);
+  const limit = Number.isInteger(parsed) && parsed > 0 ? parsed : DEFAULT_TRACE_LIST_LIMIT;
+  const full = params.get("full");
+
+  return { limit, full: full === "1" || full === "true" };
+}

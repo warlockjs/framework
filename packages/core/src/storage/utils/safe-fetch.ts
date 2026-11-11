@@ -28,6 +28,21 @@ const DEFAULT_MAX_REDIRECTS = 5;
 const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
 
 /**
+ * Key under which the runtime's `fetch` keeps its process-wide dispatcher.
+ * The pinned dispatcher is built from the same class, so it speaks the
+ * protocol the runtime's `fetch` expects without a separate HTTP client.
+ */
+const GLOBAL_DISPATCHER_KEY = Symbol.for("undici.globalDispatcher.1");
+
+/**
+ * The runtime's own `fetch`, captured when this module loads. Address
+ * pinning applies to requests made through it; a `fetch` injected through
+ * the options (or installed globally later, as test doubles are) is used
+ * as-is with the DNS pre-check as the guard.
+ */
+const runtimeFetch: typeof fetch | undefined = globalThis.fetch;
+
+/**
  * Options controlling a guarded outbound fetch. Every field is optional;
  * {@link resolveFetchPolicy} fills safe defaults. The defaults are
  * deliberately strict (https+http, private-IP deny ON, 30s timeout,
@@ -126,6 +141,141 @@ async function assertHostNotPrivate(host: string, rawUrl: string): Promise<void>
   }
 }
 
+/** Options the socket layer passes to a custom `lookup`. */
+type SocketLookupOptions = { family?: number | string; hints?: number; all?: boolean };
+
+/** Callback shape of a socket `lookup` (single-address and `all` forms). */
+type SocketLookupCallback = (
+  error: Error | null,
+  address?: string | Array<{ address: string; family: number }>,
+  family?: number,
+) => void;
+
+/**
+ * The connection-time resolver of the pinned dispatcher. It resolves the
+ * host once, refuses the connection when ANY returned address is private /
+ * reserved, and hands exactly the checked addresses to the socket, so the
+ * address that passed the check is the address connected to. A DNS answer
+ * that changes after the pre-check (DNS rebinding to `127.0.0.1` or
+ * `169.254.169.254`) is caught here, on every hop. Mirrors `@warlock.js/ai`'s
+ * `pinnedLookup` (ai/src/security/outbound-policy.ts).
+ */
+function pinnedLookup(
+  hostname: string,
+  options: SocketLookupOptions,
+  callback: SocketLookupCallback,
+): void {
+  const family = options.family === "IPv4" ? 4 : options.family === "IPv6" ? 6 : options.family;
+
+  lookup(hostname, {
+    all: true,
+    ...(typeof family === "number" ? { family } : {}),
+    ...(options.hints !== undefined ? { hints: options.hints } : {}),
+  }).then(
+    (addresses) => {
+      for (const { address } of addresses) {
+        if (isPrivateOrReservedIp(address)) {
+          callback(
+            new StorageError(
+              `outbound request blocked — host "${hostname}" resolved to a private/reserved address (${address}) when connecting`,
+              { context: { host: hostname, address } },
+            ),
+          );
+          return;
+        }
+      }
+
+      const first = addresses[0];
+
+      if (!first) {
+        callback(
+          new StorageError(
+            `outbound request blocked — could not resolve host "${hostname}" to verify it is public`,
+            { context: { host: hostname } },
+          ),
+        );
+        return;
+      }
+
+      if (options.all) {
+        callback(null, addresses);
+      } else {
+        callback(null, first.address, first.family);
+      }
+    },
+    (error: unknown) => callback(error instanceof Error ? error : new Error(String(error))),
+  );
+}
+
+/** Dispatcher class the pinned dispatcher was built from, and the instance. */
+let pinned: { from: unknown; dispatcher: object } | undefined;
+
+/**
+ * The dispatcher that pins every connection to an address that passed the
+ * private-IP check ({@link pinnedLookup}), or `undefined` when pinning is
+ * not available: the runtime exposes no default dispatcher, or the app
+ * installed its own non-`Agent` global dispatcher (a proxy or a mock), in
+ * which case the request keeps going through it and the DNS pre-check
+ * remains the guard. TLS still verifies the certificate against the URL's
+ * host name: only the address resolution is replaced.
+ */
+async function pinnedDispatcher(): Promise<object | undefined> {
+  if (!runtimeFetch) return undefined;
+
+  const holder = globalThis as unknown as Record<symbol, unknown>;
+
+  if (holder[GLOBAL_DISPATCHER_KEY] === undefined) {
+    // The runtime creates its default dispatcher on the first `fetch`.
+    try {
+      await (await runtimeFetch("data:,")).arrayBuffer();
+    } catch {
+      return undefined;
+    }
+  }
+
+  const current = holder[GLOBAL_DISPATCHER_KEY];
+  const DispatcherClass =
+    current && typeof current === "object"
+      ? (current as { constructor?: unknown }).constructor
+      : undefined;
+
+  if (typeof DispatcherClass !== "function" || DispatcherClass.name !== "Agent") {
+    return undefined;
+  }
+
+  if (pinned?.from !== DispatcherClass) {
+    const Agent = DispatcherClass as new (options: {
+      connect: { lookup: typeof pinnedLookup };
+    }) => object;
+
+    pinned = {
+      from: DispatcherClass,
+      dispatcher: new Agent({ connect: { lookup: pinnedLookup } }),
+    };
+  }
+
+  return pinned.dispatcher;
+}
+
+/**
+ * The first {@link StorageError} in an error's `cause` chain. The platform
+ * `fetch` wraps a refused connection as `TypeError("fetch failed")`;
+ * unwrapping it keeps the guard's error the caller catches.
+ */
+function findStorageError(error: unknown): StorageError | undefined {
+  let current: unknown = error;
+
+  for (let depth = 0; depth < 5 && current; depth++) {
+    if (current instanceof StorageError) {
+      return current;
+    }
+
+    current = (current as { cause?: unknown }).cause;
+  }
+
+  return undefined;
+}
+
 /**
  * Validate a URL against the policy BEFORE any network call: scheme
  * allowlist and (when private hosts are not allowed) a DNS resolution that
@@ -188,6 +338,12 @@ export type SafeFetchResult = {
  * (ai/src/security/outbound-policy.ts:188-284); duplicated per this
  * module's file-header note since core cannot depend on ai.
  *
+ * **Address pinning.** With private hosts denied and the runtime's own
+ * `fetch`, every connection resolves its host through a checked lookup and
+ * connects only to the addresses that passed, so a DNS answer that changes
+ * between the pre-check and the connection (DNS rebinding) is refused. An
+ * injected `options.fetch` is used as-is (the pre-check still applies).
+ *
  * @throws {StorageError} On a blocked URL (initial or redirect target),
  * a redirect-hop bound overflow, timeout, or oversized body.
  */
@@ -197,6 +353,14 @@ export async function safeFetchToBuffer(
 ): Promise<SafeFetchResult> {
   const policy = resolveFetchPolicy(options);
   let url = await assertUrlAllowed(rawUrl, policy);
+
+  // Pin each connection to a checked address (closes DNS rebinding between
+  // the pre-check above and the connection) when the request goes through
+  // the runtime's own `fetch`.
+  const dispatcher =
+    !policy.allowPrivateHosts && policy.fetch === runtimeFetch
+      ? await pinnedDispatcher()
+      : undefined;
 
   const controller = new AbortController();
   const timer = setTimeout(() => {
@@ -211,7 +375,15 @@ export async function safeFetchToBuffer(
     let response: Response;
 
     for (let hop = 0; ; hop++) {
-      response = await policy.fetch(url, { signal: controller.signal, redirect: "manual" });
+      try {
+        response = await policy.fetch(url, {
+          signal: controller.signal,
+          redirect: "manual",
+          ...(dispatcher ? { dispatcher } : {}),
+        } as RequestInit);
+      } catch (error) {
+        throw findStorageError(error) ?? error;
+      }
 
       const location = response.headers.get("location");
       if (!REDIRECT_STATUSES.has(response.status) || location === null) {

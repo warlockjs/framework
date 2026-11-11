@@ -1,4 +1,5 @@
 import type { CacheDriver, CacheKey, CacheSetOptions, CacheTtl, TaggedCacheDriver } from "./types";
+import { sampleMembers } from "./tag-sample";
 import { parseCacheKey } from "./utils";
 
 /** Implemented by `BaseCacheDriver`; a custom driver may not have it. */
@@ -76,29 +77,61 @@ export class TaggedCache implements TaggedCacheDriver {
    * to its live members without any write paying for a full scan.
    */
   protected async pruneTag(tagKey: string, justWritten: string): Promise<void> {
-    const members = (await this.membersOf(tagKey)).filter((member) => member !== justWritten);
+    const limit = TaggedCache.PRUNE_CHECKS_PER_WRITE;
 
-    if (members.length === 0) {
+    // One extra so the window stays full after dropping the key just written.
+    const window = (await this.sampleOf(tagKey, limit + 1))
+      .filter((member) => member !== justWritten)
+      .slice(0, limit);
+
+    if (window.length === 0) {
       return;
     }
 
-    const limit = TaggedCache.PRUNE_CHECKS_PER_WRITE;
-    const start = members.length > limit ? Math.floor(Math.random() * members.length) : 0;
-    const window = Array.from(
-      { length: Math.min(limit, members.length) },
-      (_, index) => members[(start + index) % members.length]!,
-    );
-
-    const missing: string[] = [];
-
-    for (const member of window) {
-      if (!(await this.driver.has(member))) {
-        missing.push(member);
-      }
-    }
+    // Checked together: a networked driver sends them as one batch.
+    const present = await Promise.all(window.map((member) => this.memberExists(member)));
+    const missing = window.filter((_, index) => !present[index]);
 
     if (missing.length > 0) {
       await this.removeFromTag(tagKey, missing);
+    }
+  }
+
+  /**
+   * Up to `count` random members of an index: the driver's `tagSample` when it
+   * has one, else a window of the full member list.
+   */
+  protected async sampleOf(tagKey: string, count: number): Promise<string[]> {
+    if (typeof this.driver.tagSample === "function") {
+      return this.driver.tagSample(tagKey, count);
+    }
+
+    return sampleMembers(await this.membersOf(tagKey), count);
+  }
+
+  /**
+   * Whether an indexed key still has a live entry: the driver's `exists`
+   * (no value read, no hit/miss events) when it has one, else `has()`.
+   */
+  protected async memberExists(member: string): Promise<boolean> {
+    if (typeof this.driver.exists === "function") {
+      return this.driver.exists(member);
+    }
+
+    return this.driver.has(member);
+  }
+
+  /**
+   * Remove entries by their indexed keys: the driver's batched `removeMany`
+   * when it has one, else `remove()` per key.
+   */
+  protected async removeEntries(keys: string[]): Promise<void> {
+    if (typeof this.driver.removeMany === "function") {
+      return this.driver.removeMany(keys);
+    }
+
+    for (const key of keys) {
+      await this.driver.remove(key);
     }
   }
 
@@ -232,8 +265,9 @@ export class TaggedCache implements TaggedCacheDriver {
       const members = await this.membersOf(tagKey);
 
       // Remove the tagged entries — indexed un-prefixed, so `remove()` prefixes once
+      await this.removeEntries(members);
+
       for (const member of members) {
-        await this.driver.remove(member);
         removed.add(member);
       }
 

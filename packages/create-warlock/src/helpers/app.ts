@@ -22,6 +22,7 @@ import {
   mergePackageJsonBuildApprovals,
   mergePnpmBuildApprovals,
   pnpmBuildApprovalLayout,
+  removeReleaseAgeExclusion,
   requiredPnpmBuildApprovals,
 } from "./pnpm-build-approvals";
 import { fallbackRange } from "./warlock-versions";
@@ -148,6 +149,24 @@ export class App {
     // Inside a parent workspace the parent's policy decides; leave it alone.
     if (isInsidePnpmWorkspace(this.path)) return this;
     this.fitPnpmSettingsToVersion(packages);
+    return this;
+  }
+
+  /**
+   * Remove the template's `minimumReleaseAgeExclude` once the scaffold's
+   * installs are done, so later installs in the app keep pnpm's release-age
+   * cooldown for `@warlock.js/*` too. See {@link removeReleaseAgeExclusion}.
+   */
+  public removeReleaseAgeExclusion() {
+    const workspacePath = path.join(this.path, "pnpm-workspace.yaml");
+
+    if (!fileExists(workspacePath)) return this;
+
+    const current = getFile(workspacePath) as string;
+    const next = removeReleaseAgeExclusion(current);
+
+    if (next !== current) putFile(workspacePath, next);
+
     return this;
   }
 
@@ -474,6 +493,7 @@ export default defineConfig({
 
     write("README.md", (content) =>
       content
+        .replace(/^## Authentication\r?\n[\s\S]*?(?=^## )/m, "")
         .replace(/^\| `npm run (migrate|migrate\.fresh|migrate\.list|seed|jwt)`.*\r?\n/gm, "")
         .replace("(users, auth, posts, …)", "(home, contact, …)")
         .replace(
@@ -610,26 +630,43 @@ export default defineConfig({
   }
 
   /**
-   * Record non-default `agent-kit` targets into the generated `package.json`'s
-   * `agentKit.targets` block.
+   * Write the generated `package.json`'s `agentKit` block.
    *
-   * The template's own `postinstall` (`agent-kit init && agent-kit sync`)
-   * already targets `claude` with no flags, so the single-target default case
-   * needs no template edit at all — this only writes when the selection is
-   * anything else, keeping the scaffold diff-free for the common path.
+   * - `pick`: the allowlist of packages whose skills `agent-kit sync` copies
+   *   into the coding agent's skills folder — every `@warlock.js/*` and
+   *   `@mongez/*` package the project depends on. Without it, sync copies the
+   *   `skills/` folder of EVERY package in `node_modules` (transitive ones
+   *   included), so any dependency could hand the developer's agent
+   *   instructions on the next install. `warlock add` appends the framework
+   *   packages it installs later.
+   * - `targets`: only when the selection is not the default (`claude`); the
+   *   template's own `postinstall` (`agent-kit init && agent-kit sync`) already
+   *   targets `claude`.
    */
   public configureAgentKitTargets(agents: string[]) {
-    const isDefault = agents.length === 1 && agents[0] === "claude";
-    if (isDefault) return this;
-
     const packageJsonPath = path.resolve(this.path, "package.json");
     if (!fileExists(packageJsonPath)) return this;
 
     const packageJson = getJsonFile(packageJsonPath) as {
-      agentKit?: { targets?: string[] };
+      dependencies?: Record<string, string>;
+      devDependencies?: Record<string, string>;
+      agentKit?: { targets?: string[]; pick?: Record<string, true | string[]> };
     };
-    packageJson.agentKit = { ...packageJson.agentKit, targets: agents };
+
+    const isDefault = agents.length === 1 && agents[0] === "claude";
+    const pick: Record<string, true | string[]> = { ...packageJson.agentKit?.pick };
+
+    for (const name of agentKitSkillPackages(packageJson)) {
+      pick[name] ??= true;
+    }
+
+    packageJson.agentKit = {
+      ...packageJson.agentKit,
+      ...(isDefault ? {} : { targets: agents }),
+      pick: Object.fromEntries(Object.entries(pick).sort(([a], [b]) => a.localeCompare(b))),
+    };
     putJsonFile(packageJsonPath, packageJson);
+    delete this.jsonFiles[packageJsonPath];
 
     return this;
   }
@@ -644,11 +681,15 @@ export default defineConfig({
    * `--no-install` is passed LAST on purpose: the CLI parser treats the
    * positional after a bare flag as that flag's value, so it must follow the
    * feature list, not precede it.
+   *
+   * `npx --no` runs the project's own `warlock` bin and fails when it is
+   * missing, instead of downloading whatever package holds the unscoped
+   * `warlock` name from the registry and running it.
    */
   public async installFeatures(features: string[]) {
     if (features.length === 0) return true;
 
-    return this.exec(`npx warlock add ${features.join(" ")} --no-install`);
+    return this.exec(`npx --no warlock add ${features.join(" ")} --no-install`);
   }
 
   /**
@@ -754,6 +795,22 @@ export default defineConfig({
 
     return this.jsonFiles[fullPath];
   }
+}
+
+/** Scopes whose packages' skills a generated app syncs into its coding agent. */
+const AGENT_KIT_SKILL_SCOPES = ["@warlock.js/", "@mongez/"];
+
+/** The dependency names (dependencies and devDependencies) whose skills `agent-kit sync` may copy. */
+export function agentKitSkillPackages(packageJson: {
+  dependencies?: Record<string, string>;
+  devDependencies?: Record<string, string>;
+}): string[] {
+  return [
+    ...Object.keys(packageJson.dependencies ?? {}),
+    ...Object.keys(packageJson.devDependencies ?? {}),
+  ]
+    .filter((name) => AGENT_KIT_SKILL_SCOPES.some((scope) => name.startsWith(scope)))
+    .sort();
 }
 
 export function app(app: Application) {

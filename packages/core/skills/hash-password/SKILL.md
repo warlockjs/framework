@@ -22,7 +22,9 @@ const valid = await verifyPassword("user-password-123", hashed);
 // → true / false
 ```
 
-Both are async because bcrypt is CPU-bound. The framework uses `bcryptjs` (pure JS — portable across every platform, no native build) under the hood.
+Both are async because bcrypt is CPU-bound. The framework uses `bcryptjs` (pure JS — portable across every platform, no native build) under the hood. When the app installs the native `bcrypt` package, both helpers use it automatically: hashing then runs on the libuv thread pool instead of the event loop (worth it on busy login endpoints; raise `UV_THREADPOOL_SIZE` for many concurrent logins). Hashes are the same `$2b$` format either way, so existing hashes keep verifying.
+
+bcrypt reads only the first 72 bytes (UTF-8) of a password. A longer one is hashed with a one-time warning; set `password.rejectLongPasswords: true` to make `hashPassword` throw instead, and cap password length in validation.
 
 ## Configuration — `src/config/encryption.ts`
 
@@ -32,6 +34,7 @@ import type { EncryptionConfigurations } from "@warlock.js/core";
 const encryptionConfig: EncryptionConfigurations = {
   password: {
     salt: 12, // bcrypt rounds — 10–12 is the standard band
+    rejectLongPasswords: true, // optional, default false: throw for passwords over 72 bytes
   },
   // ...other crypto config (key/hmacKey for encrypt/decrypt — see encrypt-data skill)
 };

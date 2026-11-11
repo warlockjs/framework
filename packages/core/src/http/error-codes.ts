@@ -45,6 +45,27 @@ export enum HttpErrorCodes {
   Maintenance = "EC106",
 
   /**
+   * A urlencoded form body carries more fields than `http.urlencoded.maxFields`.
+   */
+  TooManyFormFields = "EC107",
+
+  /**
+   * A multipart body is larger in total than `http.multipart.maxTotalSize`.
+   */
+  MultipartTooLarge = "EC108",
+
+  /**
+   * A multipart body was sent to a route that does not declare `uploads: true`
+   * while `http.multipart.routes` is `"declared"`.
+   */
+  MultipartNotAccepted = "EC109",
+
+  /**
+   * The request's host is not listed in `http.allowedHosts`.
+   */
+  HostNotAllowed = "EC110",
+
+  /**
    * Default core CSRF-Origin guard (SECURITY, card 8a752ab2, `./csrf-default-guard.ts`)
    * refused an unsafe-method, cookie-carrying request whose `Origin`/`Referer`
    * did not name the request's own origin or an entry in

@@ -10,5 +10,6 @@ export default Migration.create(User, {
   imageMetadata: json().nullable(),
   lastLogin: timestamp().nullable(),
   emailVerifiedAt: timestamp().nullable(),
+  role: string(20).default("user"),
   deletedAt: timestamp().nullable(),
 });

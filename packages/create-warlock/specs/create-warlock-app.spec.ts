@@ -98,6 +98,9 @@ function makeFakeApp(
     installFeatures: vi.fn(async () => hooks.installFeaturesResult ?? true),
     pinViteResolution: vi.fn(() => true),
     approveSelectedFeatureBuilds: vi.fn(() => true),
+    removeReleaseAgeExclusion: vi.fn(function (this: unknown) {
+      return this;
+    }),
     git: vi.fn(async () => true),
     exec: vi.fn(async () => true),
   };
@@ -285,12 +288,12 @@ describe("createWarlockApp — jwt vs cache-warm branch", () => {
     expect(fake.exec).toHaveBeenCalledWith("yarn jwt");
   });
 
-  it("warms the cache via npx warlock when useJWT is false", async () => {
+  it("warms the cache via the local warlock bin when useJWT is false", async () => {
     const fake = makeFakeApp({ useJWT: false });
 
     await run(fake);
 
-    expect(fake.exec).toHaveBeenCalledWith("npx warlock --warm-cache");
+    expect(fake.exec).toHaveBeenCalledWith("npx --no warlock --warm-cache");
     expect(runPackageManagerCommand).not.toHaveBeenCalled();
   });
 });

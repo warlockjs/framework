@@ -28,6 +28,20 @@ import type { DevtoolsDisposer, DevtoolsOptions, DevtoolsQuery } from "./types";
  */
 export const DEVTOOLS_CONNECTOR_PRIORITY = 12;
 
+/**
+ * The app's `src/config/devtools.ts`, or `{}` when there is none (or the
+ * config store cannot be read, which must never stop the dev server).
+ */
+function readConfiguredOptions(readConfig: () => { get(name: string): unknown }): DevtoolsOptions {
+  try {
+    const value = readConfig().get("devtools");
+
+    return value !== null && typeof value === "object" ? (value as DevtoolsOptions) : {};
+  } catch {
+    return {};
+  }
+}
+
 /** Options accepted by `devtoolsConnector()`. */
 export type DevtoolsConnectorOptions = DevtoolsOptions;
 
@@ -46,6 +60,8 @@ export type DevtoolsConnectorOptions = DevtoolsOptions;
  * package is installed (`warlock add devtools`). Keep it OUT of
  * `warlock.config.ts` — devtools is a dev dependency, so a production
  * install doesn't have it and a config import of it would fail there.
+ * Options come from the app's `src/config/devtools.ts` instead (a plain
+ * object, no import of this package); options passed here win over it.
  */
 export function devtoolsConnector(options: DevtoolsConnectorOptions = {}): Connector {
   let active = false;
@@ -59,7 +75,8 @@ export function devtoolsConnector(options: DevtoolsConnectorOptions = {}): Conne
     lifecyclePhase: "late" as ConnectorLifecyclePhase,
     isActive: () => active,
     async boot() {
-      const { Application, getHttpServer } = await import("@warlock.js/core");
+      const core = await import("@warlock.js/core");
+      const { Application, getHttpServer } = core;
       const { log } = await import("@warlock.js/logger");
 
       if (Application.runtimeStrategy !== "development") {
@@ -71,7 +88,10 @@ export function devtoolsConnector(options: DevtoolsConnectorOptions = {}): Conne
         return;
       }
 
-      const resolved = resolveDevtoolsOptions(options);
+      const resolved = resolveDevtoolsOptions({
+        ...readConfiguredOptions(() => core.config),
+        ...options,
+      });
       const collector = createCollector(resolved);
 
       await attachSource(log, "tracing", () => attachTracingSource(collector, resolved));
@@ -98,6 +118,7 @@ export function devtoolsConnector(options: DevtoolsConnectorOptions = {}): Conne
         options: resolved,
         requestLog,
         isDevelopment: () => Application.runtimeStrategy === "development",
+        warn: (message) => log.warn("devtools", "refused", message),
         explain: (query) => explainQuery(query),
         listRoutes: () => listRoutes(),
         getOpenApiDocument: () => getOpenApiDocument(),

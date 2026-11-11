@@ -115,6 +115,29 @@ describe("memory interrupt store", () => {
     expect(await store.list!()).toEqual(["a"]);
   });
 
+  it("should hand a pending interrupt to exactly one of several concurrent claims", async () => {
+    const store = memory();
+
+    await store.save(makeInterrupt());
+
+    const claims = await Promise.all([
+      store.claim?.("support.sess-1.0.abc"),
+      store.claim?.("support.sess-1.0.abc"),
+    ]);
+
+    expect(claims.filter((claim) => claim !== undefined)).toHaveLength(1);
+    expect(await store.load("support.sess-1.0.abc")).toBeUndefined();
+  });
+
+  it("should not claim a resolved interrupt", async () => {
+    const store = memory();
+
+    await store.save(makeInterrupt({ status: "resolved" }));
+
+    expect(await store.claim?.("support.sess-1.0.abc")).toBeUndefined();
+    expect(await store.load("support.sess-1.0.abc")).toBeDefined();
+  });
+
   it("should expose an empty schema for the memory store", () => {
     const store = memory();
 

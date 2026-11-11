@@ -129,16 +129,16 @@ Token lookups go by the unique `token` string (`findByToken`), which already uni
 
 Your subclass inherits and may override these statics — the service calls them, never raw queries:
 
-| Static                                         | Role                                                     |
-| ---------------------------------------------- | -------------------------------------------------------- |
-| `issue(user, token, …)`                        | persist a freshly-signed token (override to add columns) |
-| `findByToken(token)`                           | look a row up by its token string                        |
-| `findForUser(user, token)`                     | a user-scoped lookup (logout)                            |
-| `activeFor(user)`                              | active, unexpired sessions, newest-first                 |
-| `revokeAllFor(user)` / `revokeFamily(id)`      | revoke a set, returning the revoked rows                 |
-| `enforceMax(user, max)`                        | cap concurrent refresh tokens                            |
-| `purgeExpired()`                               | delete expired rows (CLI cleanup)                        |
-| `findNeverExpiring()` / `purgeNeverExpiring()` | find/delete rows that can never expire (CLI remediation) |
+| Static                                         | Role                                                                                                                               |
+| ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `issue(user, token, …)`                        | persist a freshly-signed token (override to add columns); `token` is the value to store — the digest under `auth.hashTokensAtRest` |
+| `findByToken(token)`                           | look a row up by its token string — must match the stored digest **or** the raw value (`whereIn("token", [sha256(token), token])`) |
+| `findForUser(user, token)`                     | a user-scoped lookup (logout), same two forms                                                                                      |
+| `activeFor(user)`                              | active, unexpired sessions, newest-first                                                                                           |
+| `revokeAllFor(user)` / `revokeFamily(id)`      | revoke a set, returning the revoked rows                                                                                           |
+| `enforceMax(user, max)`                        | cap concurrent refresh tokens                                                                                                      |
+| `purgeExpired()`                               | delete expired rows (CLI cleanup)                                                                                                  |
+| `findNeverExpiring()` / `purgeNeverExpiring()` | find/delete rows that can never expire (CLI remediation)                                                                           |
 
 Plus two instance getters, both of which the route gate consults on every request:
 

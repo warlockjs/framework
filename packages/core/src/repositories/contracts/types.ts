@@ -335,7 +335,9 @@ export type RepositoryOptions = {
   cursorColumn?: string;
 
   /**
-   * Whether to purge cache after reading
+   * Skip the cached value and refresh it (`listCached`, `allCached`,
+   * `countCached`). `listCached` ignores it when the current request sent
+   * it: only server code may bypass the list cache.
    */
   purgeCache?: boolean;
 
@@ -466,4 +468,12 @@ export type RepositoryConfigurations = {
    * Default active column value
    */
   isActiveValue?: any;
+
+  /**
+   * Whether a request may turn pagination off with `paginate=false` on
+   * `list()` / `listActive()` / `listCached()`. A repository's own
+   * `allowClientUnpaginated` property wins.
+   * @default false
+   */
+  allowClientUnpaginated?: boolean;
 };

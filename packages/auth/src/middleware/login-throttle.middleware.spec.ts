@@ -125,7 +125,9 @@ describe("loginThrottleMiddleware", () => {
 
   it("sets the lock key once the failure counter reaches `max`", async () => {
     // counter already exists → the create-only seed is a no-op (TTL preserved)
-    cacheGet.mockResolvedValue(0);
+    cacheGet.mockImplementation(async (key: string) =>
+      key.startsWith("auth.throttle.count.") ? 5 : null,
+    );
     cacheIncrement.mockResolvedValue(5);
 
     const middleware = loginThrottleMiddleware({
@@ -198,7 +200,8 @@ describe("loginThrottleMiddleware", () => {
 
     expect(cacheRemove).toHaveBeenCalledWith(`auth.throttle.count.email.${SARA_KEY}`);
     expect(cacheRemove).toHaveBeenCalledWith(`auth.throttle.lock.email.${SARA_KEY}`);
-    expect(cacheIncrement).not.toHaveBeenCalled();
+    // counted once when it arrived, never again after the response
+    expect(cacheIncrement).toHaveBeenCalledOnce();
   });
 
   it("no-ops when no identifier can be extracted (request lacks email and ip)", async () => {
@@ -301,6 +304,163 @@ describe("loginThrottleMiddleware", () => {
     );
 
     expect(keys.some((key) => key.includes("1.2.3.4"))).toBe(false);
+  });
+});
+
+/** A tiny in-process cache with the semantics the throttle relies on. */
+function useMemoryCache(): Map<string, unknown> {
+  const store = new Map<string, unknown>();
+  const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+  cacheGet.mockImplementation(async (key: string) => {
+    await tick();
+
+    return store.get(key) ?? null;
+  });
+  cacheSet.mockImplementation(
+    async (key: string, value: unknown, options?: { onConflict?: string }) => {
+      await tick();
+
+      if (options?.onConflict === "create" && store.has(key)) return;
+
+      store.set(key, value);
+    },
+  );
+  cacheIncrement.mockImplementation(async (key: string, amount = 1) => {
+    await tick();
+    const next = Number(store.get(key) ?? 0) + amount;
+    store.set(key, next);
+
+    return next;
+  });
+  cacheRemove.mockImplementation(async (key: string) => {
+    store.delete(key);
+  });
+
+  return store;
+}
+
+/** Run a slow failing "controller" behind the throttle, as a server would. */
+async function attempt(
+  middleware: ReturnType<typeof loginThrottleMiddleware>,
+  controller: () => void,
+  options: { ok?: boolean; ip?: string } = {},
+): Promise<"refused" | "handled"> {
+  const response = buildResponse(options.ok ?? false);
+  const request = { ...buildRequest(), detectIp: () => options.ip ?? "1.2.3.4" };
+
+  await middleware(makeCtx({ request, response }));
+
+  if (response.tooManyRequests.mock.calls.length > 0) return "refused";
+
+  controller();
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  await response.fireSent();
+
+  return "handled";
+}
+
+describe("concurrent attempts", () => {
+  it("lets at most `max` concurrent login attempts reach the controller", async () => {
+    useMemoryCache();
+    let reached = 0;
+    const middleware = loginThrottleMiddleware({ max: 5, by: ["email", "ip"] });
+
+    const outcomes = await Promise.all(
+      Array.from({ length: 20 }, () => attempt(middleware, () => reached++)),
+    );
+
+    expect(reached).toBe(5);
+    expect(outcomes.filter((outcome) => outcome === "refused")).toHaveLength(15);
+  });
+
+  it("caps a concurrent burst of token-issue requests at the issue limit", async () => {
+    useMemoryCache();
+    let sent = 0;
+    const middleware = loginThrottleMiddleware({
+      max: 3,
+      window: "1h",
+      lockoutDuration: "1h",
+      isFailure: () => true,
+    });
+
+    await Promise.all(
+      Array.from({ length: 12 }, () => attempt(middleware, () => sent++, { ok: true })),
+    );
+
+    expect(sent).toBe(3);
+  });
+
+  it("does not lock an account whose correct login finished while a wrong one was in flight", async () => {
+    const store = useMemoryCache();
+    const middleware = loginThrottleMiddleware({ max: 3, by: ["email"] });
+
+    await attempt(middleware, () => {});
+
+    // The correct attempt arrives, then a mistyped one takes the last allowed
+    // slot; the correct one finishes first.
+    const right = buildResponse(true);
+    await middleware(makeCtx({ request: buildRequest(), response: right }));
+    const wrong = buildResponse(false);
+    await middleware(makeCtx({ request: buildRequest(), response: wrong }));
+    await right.fireSent();
+    await wrong.fireSent();
+
+    expect(right.tooManyRequests).not.toHaveBeenCalled();
+    expect(wrong.tooManyRequests).not.toHaveBeenCalled();
+    expect(store.has(`auth.throttle.lock.email.${SARA_KEY}`)).toBe(false);
+    expect(await attempt(middleware, () => {}, { ok: true })).toBe("handled");
+  });
+
+  it("starts a fresh window for the identifier once its lockout ends", async () => {
+    const store = useMemoryCache();
+    const middleware = loginThrottleMiddleware({ max: 2, by: ["email"] });
+
+    await attempt(middleware, () => {});
+    await attempt(middleware, () => {});
+    expect(await attempt(middleware, () => {})).toBe("refused");
+
+    // the lock and the counter share one TTL, so both are gone together
+    store.delete(`auth.throttle.lock.email.${SARA_KEY}`);
+    store.delete(`auth.throttle.count.email.${SARA_KEY}`);
+
+    expect(await attempt(middleware, () => {}, { ok: true })).toBe("handled");
+  });
+});
+
+describe("emailLock", () => {
+  it('"global" (default): failures from one IP lock the email for every IP', async () => {
+    useMemoryCache();
+    const middleware = loginThrottleMiddleware({ max: 5 });
+
+    for (let index = 0; index < 5; index++) {
+      await attempt(middleware, () => {}, { ip: "6.6.6.6" });
+    }
+
+    expect(await attempt(middleware, () => {}, { ok: true, ip: "1.2.3.4" })).toBe("refused");
+  });
+
+  it('"pair": failures from one IP do not block a correct login from another IP', async () => {
+    useMemoryCache();
+    const middleware = loginThrottleMiddleware({ max: 5, emailLock: "pair" });
+
+    for (let index = 0; index < 5; index++) {
+      await attempt(middleware, () => {}, { ip: "6.6.6.6" });
+    }
+
+    expect(await attempt(middleware, () => {}, { ip: "6.6.6.6" })).toBe("refused");
+    expect(await attempt(middleware, () => {}, { ok: true, ip: "1.2.3.4" })).toBe("handled");
+  });
+
+  it('"pair": the email-wide bucket still locks guessing spread over many IPs', async () => {
+    useMemoryCache();
+    const middleware = loginThrottleMiddleware({ max: 5, emailLock: "pair", accountMax: 6 });
+
+    for (let index = 0; index < 6; index++) {
+      await attempt(middleware, () => {}, { ip: `10.0.0.${index}` });
+    }
+
+    expect(await attempt(middleware, () => {}, { ok: true, ip: "1.2.3.4" })).toBe("refused");
   });
 });
 

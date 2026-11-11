@@ -105,6 +105,10 @@ The response shape (via `response.unauthorized`):
 
 The error code is from the `AuthErrorCodes` enum — handy for the frontend to switch on without parsing the message.
 
+A token whose `id` / `userType` claims name a different user than its `access_tokens` row is `InvalidAccessToken` too: the row decides whose session it is.
+
+An expired or malformed token, and a CSRF Origin mismatch, are ordinary client errors any anonymous caller can produce, so they are logged at **debug** level, not as errors; real failures (a broken key, a missing secret) still reach the error log.
+
 ## Reading the user in a controller
 
 ```ts

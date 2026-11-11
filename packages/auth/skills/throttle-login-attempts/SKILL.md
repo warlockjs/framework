@@ -1,13 +1,13 @@
 ---
 name: throttle-login-attempts
-description: 'Brute-force / credential-stuffing protection via `loginThrottleMiddleware` — a failure-aware route gate that counts only failed logins (resets on success), locks per-account and per-source after a threshold, and rejects pre-controller with 429 so the DB lookup and bcrypt verify are skipped. Cache-backed (shared across replicas), fixed-window, fails open on a cache outage. Triggers: `loginThrottleMiddleware`, `AuthErrorCodes.TooManyAttempts`, `EC004`, "rate limit login", "brute force protection", "lock account after failed logins", "throttle login attempts", "too many login attempts 429"; typical import `import { loginThrottleMiddleware } from "@warlock.js/auth"`. Skip: generic per-route request rate limiting that counts every request (use core `middleware.rateLimit`); gating a route by auth — the `protect-routes` topic; issuing tokens — the `handle-login-and-logout` topic.'
+description: 'Brute-force / credential-stuffing protection via `loginThrottleMiddleware` — a failure-aware route gate that counts each attempt as it arrives and resets on a successful login, locks per-account and per-source after a threshold, and rejects pre-controller with 429 so the DB lookup and bcrypt verify are skipped. Cache-backed (shared across replicas), fixed-window, fails open on a cache outage. Triggers: `loginThrottleMiddleware`, `AuthErrorCodes.TooManyAttempts`, `EC004`, "rate limit login", "brute force protection", "lock account after failed logins", "throttle login attempts", "too many login attempts 429"; typical import `import { loginThrottleMiddleware } from "@warlock.js/auth"`. Skip: generic per-route request rate limiting that counts every request (use core `middleware.rateLimit`); gating a route by auth — the `protect-routes` topic; issuing tokens — the `handle-login-and-logout` topic.'
 ---
 
 # Throttle login attempts with `loginThrottleMiddleware`
 
 `loginThrottleMiddleware(options?)` returns a Warlock middleware that defends the login (and refresh / password-reset) routes against brute-force and credential-stuffing — without punishing a user who fat-fingers a password then gets it right.
 
-The trick that makes it different from a plain rate limiter: it's **failure-aware**. It hooks the response _after_ your controller runs (`response.onSent`), counts only the attempts that actually failed, and **clears the counter the moment a login succeeds**. A generic request limiter can't do that — it runs before the controller and counts every hit, success or not.
+The trick that makes it different from a plain rate limiter: it's **failure-aware**. It counts each attempt before your controller runs (so concurrent bursts cannot outrun the limit), hooks the response _after_ the controller (`response.onSent`), locks only when a failure used the last allowed attempt, and **clears the counter the moment a login succeeds**. A generic request limiter can't do that — it counts every hit and never resets on success.
 
 ## The shortest version
 
@@ -54,8 +54,8 @@ router.post("/auth/reset-password", resetPasswordController, {
 
 ## How it behaves
 
-1. **Before the controller** — if the account or the IP is currently locked, it short-circuits with `429` and never touches the database or the bcrypt verify (this is also what neutralises the CPU-DoS angle of brute-forcing). The body carries `AuthErrorCodes.TooManyAttempts` (`EC004`).
-2. **After the controller** — it inspects the outcome. A non-2xx response is a failed login: it bumps a fixed-window counter for each tracked identifier, and once a counter reaches `max` it writes a lock key. A 2xx response is a success: it **clears** the counter and lock for that identifier.
+1. **Before the controller** — if the account or the IP is currently locked, it short-circuits with `429` and never touches the database or the bcrypt verify (this is also what neutralises the CPU-DoS angle of brute-forcing). The body carries `AuthErrorCodes.TooManyAttempts` (`EC004`). Otherwise it **counts the attempt right away** (fixed-window counter per identifier) and answers `429` once the count passes `max`, so a burst of concurrent requests cannot outrun the limit: at most `max` attempts per window reach the controller.
+2. **After the controller** — it inspects the outcome. A non-2xx response that used the last allowed attempt writes the lock key (the counter is rewritten with the lock's TTL so both end together), unless a success that finished meanwhile already reset the window. A 2xx response is a success: it **clears** the counter and lock for that identifier.
 
 Per-account tracking stops a password-spray against one user from many IPs; per-source tracking stops one IP from stuffing many accounts. A lock on **either** identifier rejects the request — defense-in-depth.
 
@@ -84,16 +84,22 @@ loginThrottleMiddleware({
 });
 ```
 
-| Option            | Default                            | Purpose                                   |
-| ----------------- | ---------------------------------- | ----------------------------------------- |
-| `max`             | `5`                                | Failures within the window before lockout |
-| `window`          | `"15m"`                            | Counting window (`ms`-string or seconds)  |
-| `lockoutDuration` | `"15m"`                            | Lock TTL once tripped                     |
-| `by`              | `["email", "ip"]`                  | Identifiers tracked independently         |
-| `identifierKey`   | `"email"`                          | Credential field used as the account key  |
-| `errorMessage`    | i18n `auth.errors.tooManyAttempts` | 429 message override                      |
-| `isFailure`       | `(res) => !res.isOk`               | What counts as a failed attempt           |
-| `identify`        | built-in email + ip extraction     | Custom identifier list                    |
+| Option            | Default                            | Purpose                                                               |
+| ----------------- | ---------------------------------- | --------------------------------------------------------------------- |
+| `max`             | `5`                                | Failures within the window before lockout                             |
+| `window`          | `"15m"`                            | Counting window (`ms`-string or seconds)                              |
+| `lockoutDuration` | `"15m"`                            | Lock TTL once tripped                                                 |
+| `by`              | `["email", "ip"]`                  | Identifiers tracked independently                                     |
+| `identifierKey`   | `"email"`                          | Credential field used as the account key                              |
+| `errorMessage`    | i18n `auth.errors.tooManyAttempts` | 429 message override                                                  |
+| `isFailure`       | `(res) => !res.isOk`               | What counts as a failed attempt                                       |
+| `identify`        | built-in email + ip extraction     | Custom identifier list                                                |
+| `emailLock`       | `"global"`                         | `"pair"` locks the (email, IP) pair instead of the email for everyone |
+| `accountMax`      | `max * 10`                         | Email-wide limit across all IPs when `emailLock: "pair"`              |
+
+`emailLock: "pair"` stops a stranger from locking a known account out: their `max` failures lock only their own (email, IP) pair, while the email-wide bucket (`accountMax`) still stops guessing spread over many IPs. It applies when `by` tracks both `"email"` and `"ip"` and no `identify` is set.
+
+Throttle the anonymous passkey options route the same way, counting every request: `loginThrottleMiddleware({ by: ["ip"], isFailure: () => true, max: 30, window: "1m" })`.
 
 ## The 429 response
 
@@ -123,7 +129,7 @@ router.post("/auth/forgot-password", forgotController, {
 
 |                              | `loginThrottleMiddleware` (auth)             | `middleware.rateLimit` (core) |
 | ---------------------------- | -------------------------------------------- | ----------------------------- |
-| Counts                       | only **failed** logins                       | **every** request             |
+| Counts                       | every attempt, until a login succeeds        | **every** request             |
 | Resets on a successful login | yes                                          | no                            |
 | Locks per account / per IP   | yes                                          | per key (default IP)          |
 | Storage                      | `@warlock.js/cache` (shared across replicas) | in-process map                |
@@ -133,8 +139,8 @@ They compose. For a hard ceiling on request volume _and_ failure-aware account l
 ## Gotchas
 
 - **Needs an initialised cache driver.** Storage is `@warlock.js/cache` (a peer dep, transitively present via core). If the driver isn't configured at runtime, the middleware **fails open** — it logs and lets the request through, because a throttle outage must never become an auth outage. That also means: no cache, no protection. Verify your cache config in production.
-- **Account lockout can be weaponised.** An attacker who knows a victim's email can lock them out by spamming failures. The per-IP counter mitigates this (the attacker's IP locks too), but for purely anonymous endpoints prefer `by: ["ip"]`. For high-value accounts, consider a CAPTCHA step instead of a hard lock.
-- **Counts are atomic and exact across servers (redis/pg).** Each failure does a create-only `cache.set(key, 0, { ttl: window })` (only the first failure opens the window and sets the TTL) followed by an atomic `cache.increment(key, 1, { ttl: window })`, so concurrent failures on different servers are never lost. Passing the TTL on the increment also expires a counter recreated after its seed expires, without extending an existing window. The memory cache driver is per-process — counts and locks are then per-process, so use redis/pg when running more than one instance.
+- **Account lockout can be weaponised.** With the default `emailLock: "global"`, an attacker who knows a victim's email can lock them out by spamming failures. Set `emailLock: "pair"` to lock the (email, IP) pair instead; for purely anonymous endpoints prefer `by: ["ip"]`. For high-value accounts, consider a CAPTCHA step instead of a hard lock.
+- **Counts are atomic and exact across servers (redis/pg).** Each attempt does a create-only `cache.set(key, 0, { ttl: window })` (only the first failure opens the window and sets the TTL) followed by an atomic `cache.increment(key, 1, { ttl: window })`, so concurrent failures on different servers are never lost. Passing the TTL on the increment also expires a counter recreated after its seed expires, without extending an existing window. The memory cache driver is per-process — counts and locks are then per-process, so use redis/pg when running more than one instance.
 - **Account and IP keys are hashed.** The built-in extractor keys both by an HMAC of the trimmed, lower-cased value (`email.<hmac>`, `ip.<hmac>`), keyed from `auth.accessToken.secret`, so cache logs never show the address or IP and a list of known emails cannot reverse the key. Without a configured secret it falls back to SHA-256. A custom `identify` is used as is — hash personal values yourself (`throttleIdentifierHash(kind, value)` is exported).
 - **Fixed window, not sliding.** The window is anchored at the first failure and does not extend on each subsequent one — predictable lockout timing. The lock key is independent and always lasts `lockoutDuration`: the lock stores its own deadline, so even a sliding-expiry driver (`memoryExtended`) cannot extend it.
 - **Needs a real cache driver.** The `null` driver stores nothing, so the throttle never locks; it warns once when that happens. On Redis, any version from 6 works.

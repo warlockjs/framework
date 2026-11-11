@@ -53,5 +53,13 @@ export type SchemaContext = {
     firstErrorOnly?: boolean;
     /** Rendered as `:value` in error messages instead of the submitted input */
     redactValue?: string;
+    /** Item cap for arrays without an explicit `.max()` (see `configureSeal`) */
+    maxArrayItems?: number;
+    /** Key cap for records without an explicit `.maxKeys()` (see `configureSeal`) */
+    maxRecordKeys?: number;
+    /** Most errors one array or record collects (see `configureSeal`) */
+    maxErrors?: number;
+    /** Deepest nesting allowed inside an object's output (see `configureSeal`) */
+    maxDepth?: number;
   };
 };

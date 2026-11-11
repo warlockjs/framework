@@ -92,7 +92,10 @@ type SitemapAlternate = {
   path: string;
 };
 
-/** An entry after normalisation: leading slash, defaults folded in, lastmod serialised. */
+/**
+ * An entry after normalisation: leading slash, percent-encoded path, defaults
+ * folded in, lastmod serialised.
+ */
 type ResolvedSitemapEntry = Omit<SitemapEntry, "lastmod"> & { lastmod?: string };
 
 type ChangeFreq = "always" | "hourly" | "daily" | "weekly" | "monthly" | "yearly" | "never";
@@ -154,7 +157,16 @@ function joinOrigin(origin: string, routePath: string): string;
 
 `buildSitemapXml` writes the sitemaps.org `urlset` document. It uses the
 correct namespace and element order, declares the `xhtml` namespace only when
-an entry has alternates, and escapes `&`, `<`, `>`, `"`, and `'`.
+an entry has alternates, and escapes `&`, `<`, `>`, `"`, and `'`. `escapeXml`
+also drops characters XML 1.0 cannot carry (control characters other than tab
+and line breaks, `U+FFFE`, `U+FFFF`, lone surrogates), so one bad value cannot
+make the file unparseable.
+
+Every entry and alternate `path` is percent-encoded as the protocol requires:
+spaces, non-ASCII text (as UTF-8) and control characters become `%XX` escapes,
+and a `%` that does not start an escape becomes `%25`. Paths that are already
+encoded, and query strings, are left unchanged, so `/posts/café` and
+`/posts/caf%C3%A9` are the same entry.
 `joinOrigin` joins an origin and a path with exactly one slash between them.
 
 ## Not in this package

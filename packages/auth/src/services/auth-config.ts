@@ -21,6 +21,7 @@ import type {
   LinkedInProviderConfig,
   OtpSender,
   PasskeysConfig,
+  ProviderLinkExisting,
   ProviderUserCreator,
   XProviderConfig,
 } from "../contracts/providers";
@@ -28,6 +29,39 @@ import type { Auth } from "../models/auth.model";
 import { defaultNormalizeCredentials } from "../utils/normalize-credentials";
 
 const warnedLegacyKeys = new Set<string>();
+
+/** One-time production warnings already logged, by key. */
+const warnedProduction = new Set<string>();
+
+/** Signing secrets shorter than this are brute-forceable from one captured token. */
+const MIN_SECRET_BYTES = 32;
+
+/** Access-token lifetimes past this get a production warning. */
+const LONG_ACCESS_TOKEN_MS = 30 * 24 * 60 * 60 * 1000;
+
+/** Same answer as core's `environment()`, read directly so config stays dependency-light. */
+function isProduction(): boolean {
+  return process.env.NODE_ENV === "production";
+}
+
+/** Log `message` once per process, in production only. */
+function warnOnceInProduction(key: string, message: string): void {
+  if (!isProduction() || warnedProduction.has(key)) return;
+
+  warnedProduction.add(key);
+  log.warn("auth", "config", message);
+}
+
+/** Warn (production, once) when a signing secret is too short to resist offline guessing. */
+function checkSecretStrength(key: string, secret: string): void {
+  if (Buffer.byteLength(secret) >= MIN_SECRET_BYTES) return;
+
+  warnOnceInProduction(
+    `secret:${key}`,
+    `auth.${key} is shorter than ${MIN_SECRET_BYTES} bytes, so a captured token lets an attacker ` +
+      `guess it offline and forge tokens. Generate a strong secret with "warlock jwt.generate".`,
+  );
+}
 
 const permitAuthentication: CanAuthenticate = (): boolean => true;
 
@@ -141,6 +175,11 @@ export const authConfig = {
 
     return canAuthenticate(user);
   },
+  /**
+   * Store only a SHA-256 digest of each access and refresh token
+   * (`auth.hashTokensAtRest`). @default false
+   */
+  hashTokensAtRest: (): boolean => config.key<boolean>("auth.hashTokensAtRest", false) === true,
   /** Login identifier normalizer, or `false` for exact matching. */
   normalizeCredentials: (): false | NormalizeCredentials =>
     config.key<false | NormalizeCredentials>(
@@ -156,10 +195,34 @@ export const authConfig = {
         throw new Error("auth: no JWT secret configured — set `auth.accessToken.secret`.");
       }
 
+      checkSecretStrength("accessToken.secret", secret);
+
       return secret;
     },
     /** Signing algorithm (legacy: `auth.jwt.algorithm`). */
     algorithm: (): Algorithm => resolve("accessToken.algorithm", "jwt.algorithm", "HS256"),
+    /** `iss` claim stamped on and required of every token; unset ⇒ not used. */
+    issuer: (): string | undefined => {
+      const issuer = config.key<unknown>("auth.accessToken.issuer");
+
+      return typeof issuer === "string" && issuer.length > 0 ? issuer : undefined;
+    },
+    /** `aud` claim stamped on and required of every token; unset ⇒ not used. */
+    audience: (): string | string[] | undefined => {
+      const audience = config.key<unknown>("auth.accessToken.audience");
+
+      if (typeof audience === "string" && audience.length > 0) return audience;
+
+      if (
+        Array.isArray(audience) &&
+        audience.length > 0 &&
+        audience.every((entry) => typeof entry === "string" && entry.length > 0)
+      ) {
+        return audience as string[];
+      }
+
+      return undefined;
+    },
     /** Lifetime as an `ms`-string (legacy: `auth.jwt.expiresIn`). */
     expiresIn: (): string | undefined => resolve("accessToken.expiresIn", "jwt.expiresIn"),
     /**
@@ -167,11 +230,23 @@ export const authConfig = {
      * to 1 hour when unset; throws naming the key when the configured value is
      * not a positive `ms` duration. See {@link parseDuration}.
      */
-    expiresInMs: (): number =>
-      parseDuration(
+    expiresInMs: (): number => {
+      const lifetime = parseDuration(
         "accessToken.expiresIn",
         authConfig.accessToken.expiresIn() ?? DEFAULT_ACCESS_TOKEN_EXPIRES_IN,
-      ),
+      );
+
+      if (lifetime > LONG_ACCESS_TOKEN_MS) {
+        warnOnceInProduction(
+          "accessToken.expiresIn",
+          "auth.accessToken.expiresIn is longer than 30 days: a stolen access token stays usable " +
+            'that long. Use a short lifetime (e.g. "1h") with refresh tokens ' +
+            "(auth.refreshToken.enabled) instead.",
+        );
+      }
+
+      return lifetime;
+    },
   },
   pageAuth: {
     /**
@@ -200,6 +275,8 @@ export const authConfig = {
     path: (): string => config.key("auth.cookie.path", "/"),
     /** Select the request-scoped cookie Domain; undefined keeps it host-only. */
     cookieDomain: (): CookieDomainResolver | undefined => config.key("auth.cookie.cookieDomain"),
+    /** Write the auth cookies as `__Host-<name>` (Secure, `Path=/`, no Domain). @default false */
+    hostPrefix: (): boolean => config.key<boolean>("auth.cookie.hostPrefix", false) === true,
   },
   csrf: {
     /**
@@ -237,6 +314,9 @@ export const authConfig = {
     url: (): OneTimeTokenUrlBuilder | undefined => config.key("auth.passwordReset.url"),
     /** App-owned password writer replacing the default. */
     setPassword: (): PasswordSetter | undefined => config.key("auth.passwordReset.setPassword"),
+    /** Wait for the reset notification before `requestPasswordReset` resolves. @default false */
+    awaitDelivery: (): boolean =>
+      config.key<boolean>("auth.passwordReset.awaitDelivery", false) === true,
   },
   providers: {
     /** `auth.providers.google`, when configured. */
@@ -264,6 +344,12 @@ export const authConfig = {
     emailField: (): string => config.key("auth.providers.emailField", "email"),
     /** App-owned user creation for a first provider login. */
     createUser: (): ProviderUserCreator | undefined => config.key("auth.providers.createUser"),
+    /** Linking a first provider login to an existing account by email. @default "verified" */
+    linkExisting: (): ProviderLinkExisting => {
+      const value = config.key<unknown>("auth.providers.linkExisting", "verified");
+
+      return value === "always" || value === "never" ? value : "verified";
+    },
   },
   passkeys: {
     /** `auth.passkeys`; throws naming the keys when `rpID`, `rpName` or `origin` is missing. */
@@ -284,6 +370,11 @@ export const authConfig = {
 
       return Array.isArray(origin) ? origin : [origin];
     },
+    /** User-verification requirement for both ceremonies. @default "preferred" */
+    userVerification: (): "required" | "preferred" =>
+      config.key<PasskeysConfig | undefined>("auth.passkeys")?.userVerification === "required"
+        ? "required"
+        : "preferred",
     /** Challenge lifetime in ms; throws naming the key when unusable. @default "5m" */
     challengeExpiresInMs: (): number =>
       parseDuration(
@@ -309,10 +400,18 @@ export const authConfig = {
     },
     /** App-owned delivery replacing the notifications channel send. */
     send: (): OtpSender | undefined => config.key("auth.otp.send"),
+    /** Wait for the code delivery before `requestOtp` resolves. @default false */
+    awaitDelivery: (): boolean => config.key<boolean>("auth.otp.awaitDelivery", false) === true,
   },
   refreshToken: {
     /** Separate refresh secret (legacy: `auth.jwt.refresh.secret`); empty ⇒ fall back to the access secret. */
-    secret: (): string | undefined => resolve("refreshToken.secret", "jwt.refresh.secret"),
+    secret: (): string | undefined => {
+      const secret = resolve<string | undefined>("refreshToken.secret", "jwt.refresh.secret");
+
+      if (secret) checkSecretStrength("refreshToken.secret", secret);
+
+      return secret;
+    },
     /** Whether refresh tokens are enabled (legacy: `auth.jwt.refresh.enabled`). */
     enabled: (): boolean => resolve("refreshToken.enabled", "jwt.refresh.enabled", true),
     /** Lifetime as an `ms`-string (legacy: `auth.jwt.refresh.expiresIn`). */

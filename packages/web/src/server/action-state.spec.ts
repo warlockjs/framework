@@ -71,13 +71,56 @@ describe("toActionState()", () => {
     expect(state.values).toEqual({ email: "a@b.c", tags: ["a", "b"] });
   });
 
-  it("honours a configured redactValues list over the default", () => {
+  it("never echoes common secret field names", () => {
+    const secrets = {
+      current_password: "a",
+      new_password: "b",
+      newPassword: "c",
+      passwordConfirmation: "d",
+      password_confirmation: "e",
+      passwd: "f",
+      passcode: "g",
+      pin: "1234",
+      PIN: "1234",
+      otp: "000000",
+      otp_code: "000000",
+      cvv: "123",
+      CVC: "123",
+      card_number: "4111",
+      cardNumber: "4111",
+      credit_card_number: "4111",
+      refreshToken: "t",
+      client_secret: "s",
+    };
     const state = toActionState(
       { kind: "errors", errors: [] },
-      { action: "default", redactValues: ["ssn"], values: { ssn: "1", password: "p" } },
+      { action: "default", values: { ...secrets, email: "a@b.c", pinned: "yes" } },
     );
 
-    expect(state.values).toEqual({ password: "p" });
+    expect(state.values).toEqual({ email: "a@b.c", pinned: "yes" });
+  });
+
+  it("adds a configured redactValues list to the defaults instead of replacing them", () => {
+    const state = toActionState(
+      { kind: "errors", errors: [] },
+      {
+        action: "default",
+        redactValues: ["ssn"],
+        values: { ssn: "1", password: "p", name: "Ada" },
+      },
+    );
+
+    expect(state.values).toEqual({ name: "Ada" });
+  });
+
+  it("echoes nothing when echoValues is false", () => {
+    const state = toActionState(
+      { kind: "errors", errors: [{ input: "email", error: "bad" }] },
+      { action: "default", echoValues: false, values: { email: "a@b.c" } },
+    );
+
+    expect(state.values).toBeUndefined();
+    expect(state.errors).toEqual({ email: "bad" });
   });
 
   it("reports success with data and no values", () => {

@@ -283,11 +283,17 @@ export class WebToolError extends AIError {
  *   target) was refused by the outbound policy: not on the tool's
  *   `allowHosts` allowlist, or a private / loopback / link-local /
  *   cloud-metadata address blocked by the default private-network deny
- *   (an SSRF guardrail).
+ *   (an SSRF guardrail), or — with `baseUrl` set — a different origin.
  * - `"invalid-url"` — the supplied URL (or its join with `baseUrl`)
  *   could not be parsed into an absolute `http(s)` URL.
+ * - `"timeout"` — the whole exchange (connect, redirects and reading the
+ *   body) took longer than the tool's `timeoutMs`.
  */
-export type HttpPolicyFailure = "method-not-allowed" | "host-not-allowed" | "invalid-url";
+export type HttpPolicyFailure =
+  | "method-not-allowed"
+  | "host-not-allowed"
+  | "invalid-url"
+  | "timeout";
 
 /**
  * Options for {@link HttpPolicyError} — the structured `type`
@@ -303,7 +309,8 @@ export type HttpPolicyErrorOptions = AIErrorOptions & {
  * does not permit — a disallowed method, a host outside the allowlist,
  * or an unparseable URL. The rejection happens *before* any network
  * request, so a guarded tool can never be coaxed into reaching an
- * off-allowlist host (an SSRF guardrail).
+ * off-allowlist host (an SSRF guardrail). The one exception is
+ * `"timeout"`: the call was stopped after `timeoutMs`, body included.
  *
  * **Surface.** Thrown from inside the tool's `execute`, so the framework's
  * `tool()` wrapper catches it and surfaces it in the returned `{ error }`

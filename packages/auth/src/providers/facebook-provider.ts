@@ -6,6 +6,7 @@ import type {
   ProviderProfile,
 } from "../contracts/providers";
 import { InvalidProviderCallbackError } from "../errors/invalid-provider-callback.error";
+import { providerTimeoutMs } from "./provider-timeout";
 import { pkceChallenge } from "./google-provider";
 
 const AUTHORIZATION_ENDPOINT = "https://www.facebook.com/v19.0/dialog/oauth";
@@ -40,7 +41,12 @@ type FacebookUser = {
 export class FacebookProvider implements AuthProvider {
   public readonly name = "facebook";
 
-  public constructor(private readonly settings: FacebookProviderConfig) {}
+  /** Deadline for each request to Facebook, in milliseconds. */
+  private readonly timeoutMs: number;
+
+  public constructor(private readonly settings: FacebookProviderConfig) {
+    this.timeoutMs = providerTimeoutMs("Facebook", settings.timeoutMs);
+  }
 
   public authorizationUrl(state: ProviderAuthorizationState): string {
     const url = new URL(AUTHORIZATION_ENDPOINT);
@@ -98,7 +104,10 @@ export class FacebookProvider implements AuthProvider {
       url.searchParams.set("code", code);
       url.searchParams.set("code_verifier", codeVerifier);
 
-      const response = await fetch(url.toString(), { headers: { accept: "application/json" } });
+      const response = await fetch(url.toString(), {
+        headers: { accept: "application/json" },
+        signal: AbortSignal.timeout(this.timeoutMs),
+      });
 
       if (!response.ok) {
         throw new Error(`Facebook token endpoint answered ${response.status}`);
@@ -127,7 +136,10 @@ export class FacebookProvider implements AuthProvider {
       url.searchParams.set("fields", "id,name,email,picture");
       url.searchParams.set("access_token", accessToken);
 
-      const response = await fetch(url.toString(), { headers: { accept: "application/json" } });
+      const response = await fetch(url.toString(), {
+        headers: { accept: "application/json" },
+        signal: AbortSignal.timeout(this.timeoutMs),
+      });
 
       if (!response.ok) {
         throw new Error(`Facebook /me endpoint answered ${response.status}`);

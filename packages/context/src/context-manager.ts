@@ -1,4 +1,5 @@
-import type { Context } from "./base-context";
+import { Context } from "./base-context";
+import { ContextSlot, runWithSlots } from "./shared-storage";
 
 /**
  * Context Manager - Orchestrates multiple contexts together
@@ -43,22 +44,40 @@ export class ContextManager {
   /**
    * Run all registered contexts together
    *
-   * Nests all context.run() calls, ensuring all contexts are active
-   * for the duration of the callback.
+   * Activates every registered context for the duration of the callback,
+   * each with `stores[name]` (or `{}`). Contexts that use the built-in
+   * `run()` are entered together in one step of the shared async storage;
+   * a context that overrides `run()` is still run through its own `run()`,
+   * inside, in registration order.
    *
    * @param stores - Context stores keyed by context name
    * @param callback - Async function to execute
    * @returns Result of the callback
    */
   public async runAll<T>(stores: Record<string, any>, callback: () => Promise<T>): Promise<T> {
-    const entries = Array.from(this.contexts.entries());
+    const slots: Array<readonly [ContextSlot<any>, unknown]> = [];
+    const custom: Array<[string, Context<any>]> = [];
 
-    // Build nested context runners
-    const runner = entries.reduceRight((next, [name, context]) => {
+    for (const [name, context] of this.contexts.entries()) {
+      const slot = sharedSlotOf(context);
+
+      if (slot) {
+        slots.push([slot, stores[name] || {}]);
+      } else {
+        custom.push([name, context]);
+      }
+    }
+
+    // Contexts with their own run(): nested as before, innermost last.
+    const runner = custom.reduceRight((next, [name, context]) => {
       return () => context.run(stores[name] || {}, next);
     }, callback);
 
-    return runner();
+    if (slots.length === 0) {
+      return runner();
+    }
+
+    return runWithSlots(slots, runner);
   }
 
   /**
@@ -137,6 +156,18 @@ export class ContextManager {
   public unregister(name: string): boolean {
     return this.contexts.delete(name);
   }
+}
+
+/**
+ * The shared-storage slot of a context that uses the built-in `run()`, or
+ * `undefined` when it overrides `run()` or its storage.
+ */
+function sharedSlotOf(context: Context<any>): ContextSlot<any> | undefined {
+  if (context.run !== Context.prototype.run) return undefined;
+
+  const storage = (context as unknown as { storage?: unknown }).storage;
+
+  return storage instanceof ContextSlot ? storage : undefined;
 }
 
 /**

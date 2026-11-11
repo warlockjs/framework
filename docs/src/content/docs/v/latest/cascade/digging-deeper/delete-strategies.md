@@ -144,6 +144,12 @@ const all = await User.restoreAll();
 // → restores every deletable record for this model
 ```
 
+### Restore and global scopes
+
+`restore()` and `restoreAll()` apply the model's global scopes, so a caller only restores what its scopes let it see: with a `tenant` scope, `restore(id)` of another tenant's record throws the same "record not found" error as a missing one, and `restoreAll()` restores only the caller's records. The trash copy keeps every column, so tenant columns work for the `trash` strategy too.
+
+Filters on the soft-delete column are left out: a deleted record is hidden by them by definition, and undoing that is what `restore()` is for. A filter counts only when its column is exactly `deletedAtColumn` (or `<table>.<deletedAtColumn>`) — a column such as `deletedAtSource` is an ordinary filter. A scope made only of such filters, such as `notDeleted` below, is skipped; a scope that also filters other columns (`where("tenantId", id).whereNull("deletedAt")`) still applies its other filters. To restore across tenants (an admin tool), run the call where your tenant scope applies no filter, the same way you run any other cross-tenant query.
+
 ### Handling id conflicts on restore
 
 The interesting edge case is _trash → restore_ when the original id has since been reused. (For example, you trashed user 42, someone else got assigned user 42 by an auto-increment, and now you want to restore the old user 42.)

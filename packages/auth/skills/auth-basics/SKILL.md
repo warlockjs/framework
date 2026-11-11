@@ -80,8 +80,17 @@ export default {
     rotation: true,
     maxPerUser: 5,
   },
+  hashTokensAtRest: true, // store only SHA-256 digests of access/refresh tokens
 };
 ```
+
+### Hardening options (5.53)
+
+- `hashTokensAtRest: true` (default `false`) — `access_tokens.token` / `refresh_tokens.token` hold the SHA-256 digest, never the JWT, so a copied table cannot be replayed. No migration; lookups accept both forms, so switching it on or off signs no one out. A row loaded from the DB has no raw token any more; a freshly issued row exposes it as `row.plainToken`. Automatic cookie renewal parks the successor pair encrypted in the cache for the overlap window.
+- `accessToken.issuer` / `accessToken.audience` (default unset) — stamped as `iss` / `aud` on every token signed and required on every token accepted. Setting either signs everyone out once (old tokens lack the claim).
+- `cookie.hostPrefix: true` (default `false`) — auth cookies become `__Host-access_token` / `__Host-refresh_token` (Secure, `Path=/`, no Domain; a write with another path or a Domain throws naming the setting). The unprefixed cookie is still read during the switch, and both are cleared on logout.
+- In production a signing secret under 32 bytes, or an access-token lifetime over 30 days, logs a one-time warning.
+- `Auth` hides `password` from serialized output (`static hidden = ["password"]`); a model that sets its own `hidden` must keep `"password"` in it.
 
 ### Token lifetimes are validated — a bad one throws
 

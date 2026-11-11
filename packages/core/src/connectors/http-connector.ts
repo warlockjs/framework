@@ -17,6 +17,7 @@ import {
 import { ensureFatalIsVisible } from "../logger/fatal-visibility";
 import { router } from "../router/router";
 import { type Environment } from "../utils";
+import { environment } from "../utils/environment";
 import { setBaseUrl } from "../utils/urls";
 import { container } from "./../container";
 import { BaseConnector } from "./base-connector";
@@ -151,10 +152,19 @@ export class HttpConnector extends BaseConnector {
       return reply.code(result.status === "ok" ? 200 : 503).send(result);
     });
 
+    // The probe is public: in production it answers the status only, so it
+    // does not list which backing services exist or which are down.
+    const showDetails =
+      typeof healthConfig?.details === "boolean"
+        ? healthConfig.details
+        : environment() !== "production";
+
     this.http.get(readinessPath, routeOptions, async (_request: any, reply: any) => {
       const result = await health.readiness();
 
-      return reply.code(result.status === "ok" ? 200 : 503).send(result);
+      return reply
+        .code(result.status === "ok" ? 200 : 503)
+        .send(showDetails ? result : { status: result.status });
     });
   }
 

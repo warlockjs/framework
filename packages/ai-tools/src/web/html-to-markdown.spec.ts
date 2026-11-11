@@ -62,3 +62,61 @@ describe("htmlToMarkdown", () => {
     );
   });
 });
+
+// Hostile pages at the fetch_url default body cap (1 MB). A converter that
+// rescans the rest of the document per unterminated tag needs minutes for
+// these; a linear one needs well under a second, so the generous per-test
+// limit below only trips on the quadratic behaviour.
+describe("htmlToMarkdown — hostile input stays linear", () => {
+  const MB = 1_000_000;
+  const LIMIT = { timeout: 30_000 };
+
+  it("treats a page of unterminated tags as text", LIMIT, () => {
+    const html = "<a ".repeat(MB / 3);
+
+    expect(htmlToMarkdown(html, { plain: true })).toBe(html.trim());
+  });
+
+  it("keeps an unterminated comment opener as text", LIMIT, () => {
+    const html = "<!--".repeat(MB / 4);
+
+    expect(htmlToMarkdown(html)).toBe(html);
+  });
+
+  it("handles a page of unclosed main openers", LIMIT, () => {
+    const html = "<main ".repeat(MB / 6);
+
+    expect(htmlToMarkdown(html)).toBe(html.trim());
+  });
+
+  it("handles an unterminated quote in every tag", LIMIT, () => {
+    const html = '<a x="'.repeat(MB / 6);
+
+    expect(htmlToMarkdown(html, { plain: true })).toBe(html);
+  });
+
+  it("converts a large page of blocks, cells and trailing spaces", LIMIT, () => {
+    const blocks = "<p>a</p>".repeat(MB / 8);
+    const cells = `<table><tr>${"<td>".repeat(MB / 4)}x</tr></table>`;
+    const spaces = `<pre>${" ".repeat(MB)}x${" ".repeat(MB)}</pre>`;
+
+    expect(htmlToMarkdown(blocks).split("\n\n")).toHaveLength(MB / 8);
+    // Leading separators are trimmed with the rest of the outer whitespace.
+    expect(htmlToMarkdown(cells, { plain: true })).toBe("x");
+    expect(htmlToMarkdown(spaces, { plain: true })).toBe("x");
+  });
+
+  it("keeps the output linear for thousands of unclosed lists and quotes", LIMIT, () => {
+    const lists = "<ul><li>x".repeat(MB / 9);
+    const quotes = "<blockquote>x".repeat(MB / 13);
+
+    // Indentation and `> ` prefixes stop growing past 16 levels.
+    expect(htmlToMarkdown(lists).length).toBeLessThan(6 * MB);
+    expect(htmlToMarkdown(quotes).length).toBeLessThan(6 * MB);
+    expect(htmlToMarkdown("<ul><li>a<ul><li>b</li></ul></li></ul>")).toBe("- a\n  - b");
+  });
+
+  it("still finds a real tag after an unterminated quote", () => {
+    expect(htmlToMarkdown('<a "x <b>bold</b>')).toBe('<a "x **bold**');
+  });
+});

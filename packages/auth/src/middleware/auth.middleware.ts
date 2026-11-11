@@ -220,7 +220,8 @@ export function authMiddleware(
       } catch (error) {
         if (!(error instanceof CsrfOriginMismatchError)) throw error;
 
-        log.error("http", "auth", error);
+        // A client error any cross-site page can trigger: debug, not error.
+        log.debug("http", "auth", error);
         return response.forbidden({
           error: t("auth.errors.csrfOriginMismatch"),
           errorCode: AuthErrorCodes.CsrfOriginMismatch,

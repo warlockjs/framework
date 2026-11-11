@@ -74,6 +74,8 @@ Lifecycle:
 4. **Key + different body** → 422 `IdempotencyKeyConflict`. Client bug — same key must mean same intent.
 5. **Cache miss** → runs handler; on response sent, caches `{ status, body, bodyHash }` for TTL.
 
+The record is scoped to the concrete target (route params + query), not just the route pattern: one key on `/orders/1/cancel` and `/orders/2/cancel` runs both.
+
 Server errors (5xx) are not cached — clients can retry past a 5xx. 4xx responses ARE cached (they're deterministic outcomes of the request).
 
 **Client side, this only works if the client reuses the same key across retries.** Generate once at "intent to submit" time, persist it across the retry loop, drop it on confirmed success or final failure.
@@ -140,7 +142,7 @@ a non-empty string array, or a predicate function; received number.
 
 A hop count (`trustProxy: 2`) used to be documented as the shape to prefer. It is now refused **loudly**, because the Fastify version Warlock builds against treats a number as always-false at runtime: it silently degraded to "trust nothing" rather than walking past your proxies. Express the same topology as a proxy list (`"10.0.0.0/8"`) or a predicate.
 
-With `true`, any client that can reach the process directly picks its own IP and this allowlist is decorative. `X-Real-IP` is honoured only under `true` — it carries no chain to check a proxy list against — so if your edge sets only that header, have it set `X-Forwarded-For` too.
+With `true`, the client IP is the leftmost `X-Forwarded-For` entry, which the client writes itself behind an appending edge, so this allowlist is decorative. Single-address headers (`X-Real-IP`, `CF-Connecting-IP`) are read only when `http.realIpHeader` names one, and only from a peer `trustProxy` trusts.
 
 ```ts
 import { middleware } from "@warlock.js/core";
@@ -163,9 +165,11 @@ router.post("/webhooks/provider", webhookController, {
 });
 ```
 
-IPv4 CIDR matching only — IPv6 patterns are matched as exact strings.
+IPv4 and IPv6 exact addresses and CIDR blocks (`"2001:db8::/32"`); IPv6 compares by value and IPv4-mapped clients (`::ffff:10.0.0.1`) match IPv4 blocks. A pattern that is not an address or block throws when the middleware is created (at boot).
 
 ## `cache` — response caching
+
+With `withLocale` (default) and no `app.localeCodes`, a request for a non-default locale skips the cache (warned once) so random `?locale=` values cannot fill it — declare `app.localeCodes`.
 
 Cache successful JSON responses by key, serve replays from cache until TTL expiry. Useful for expensive read endpoints (analytics dashboards, expensive aggregations).
 

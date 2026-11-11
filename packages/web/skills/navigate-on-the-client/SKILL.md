@@ -71,7 +71,7 @@ export function NavigationLinks() {
 - `params` and `query` apply only to route names.
 - `newTab` supplies `_blank` and `noopener noreferrer` unless you provide your own `target` or `rel`.
 
-`prefetch` fetches in-app page data on hover or keyboard focus. It is ignored for external, email, telephone, new-tab, and explicitly targeted links. Prefetch is best-effort and never delays the interaction.
+`prefetch` fetches in-app page data on hover (after the pointer rests 65 ms; leaving earlier sends nothing) or keyboard focus (at once). A click during an in-flight prefetch reuses that request, and the page chunk loads as soon as the prefetched data arrives. It is ignored for external, email, telephone, new-tab, and explicitly targeted links. Prefetch is best-effort and never delays the interaction.
 
 Modified clicks, middle clicks, downloads, another browsing context, or an earlier `preventDefault()` remain browser-owned.
 

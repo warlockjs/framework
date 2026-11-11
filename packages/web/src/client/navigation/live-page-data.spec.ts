@@ -172,3 +172,64 @@ it("marks focus catch-up and removes the listener on disposal", async () => {
   browser.dispatchEvent(new Event("focus"));
   expect(refresh).not.toHaveBeenCalled();
 });
+
+describe("live page polling in a hidden tab", () => {
+  function stubDocument(state: "hidden" | "visible") {
+    const target = new EventTarget() as EventTarget & { visibilityState: string };
+    target.visibilityState = state;
+    vi.stubGlobal("document", target);
+    return {
+      show() {
+        target.visibilityState = "visible";
+        target.dispatchEvent(new Event("visibilitychange"));
+      },
+      hide() {
+        target.visibilityState = "hidden";
+        target.dispatchEvent(new Event("visibilitychange"));
+      },
+    };
+  }
+
+  it("does not poll while the tab is hidden, and refreshes once when it is visible again", async () => {
+    const browser = new EventTarget();
+    vi.stubGlobal("window", browser);
+    const page = stubDocument("hidden");
+    configureLivePageData({});
+    start();
+
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(refresh).not.toHaveBeenCalled();
+
+    page.show();
+    // The window focus that follows a tab switch is covered by the catch-up.
+    browser.dispatchEvent(new Event("focus"));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(refresh).toHaveBeenCalledOnce();
+    expect(refresh).toHaveBeenLastCalledWith({ reason: "focus" });
+
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(refresh).toHaveBeenCalledTimes(2);
+  });
+
+  it("sends no catch-up when no poll was skipped", async () => {
+    const page = stubDocument("visible");
+    configureLivePageData({});
+    start();
+
+    page.hide();
+    page.show();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(refresh).not.toHaveBeenCalled();
+  });
+
+  it("removes the visibility listener on disposal", async () => {
+    const page = stubDocument("hidden");
+    configureLivePageData({});
+    start();
+    await vi.advanceTimersByTimeAsync(1000);
+    stop?.();
+    page.show();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(refresh).not.toHaveBeenCalled();
+  });
+});

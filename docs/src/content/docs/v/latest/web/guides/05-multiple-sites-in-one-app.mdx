@@ -7,6 +7,8 @@ sidebar:
   label: Multiple sites
 ---
 
+import { Aside } from "@astrojs/starlight/components";
+
 Use multi-site mode when one deployment serves genuinely separate web experiences: a marketing site, an application dashboard, and tenant-owned domains, for example. It gives each experience its own document root and route table while ordinary `src/app` API routes remain host-agnostic.
 
 ## Folder layout
@@ -75,6 +77,8 @@ Upgrade: move each `src/web/(group)` site folder to `src/web/$sites/<key>` and d
 
 `resolveCache: { ttl }` caches the resolver result by host for `ttl` **seconds**. It is off by default: a resolver that varies by a cookie or header must not reuse one visitor's result for every visitor on that host. Enable it only when the answer depends on the host alone.
 
+The `Host` header is chosen by the client, so the cache is bounded: `resolveCache: { ttl: 60, maxEntries: 10_000 }` keeps at most `maxEntries` hosts (default `10_000`), drops expired hosts first and then the least recently used one. A host longer than 253 characters (the longest DNS name) never reaches `resolveHost`; it is treated as an unknown host.
+
 `basePath` puts an entire site below a path prefix on its hosts. In the example, the tenant-admin site is selected for `/admin` and descendants. `unknownHost` defaults to a plain 404; set it to a configured site key to use that site as a fallback.
 
 `localeRouting` on a site replaces the global `web.localeRouting` for that site. Omit it to inherit the global setting; use `{}` to disable locale routing for that site. The global locale codes and default locale still come from `app.localeCodes` and `app.localeCode`.
@@ -90,6 +94,16 @@ acme.localhost:2030
 ```
 
 These hosts belong in application environment/configuration. Web does not add a separate hosts-file or environment-variable convention.
+
+`warlock dev` answers only hosts it knows: `localhost`, every `*.localhost` name, IP addresses and the fixed sites' `hosts`. This host check stops a website you visit from pointing its own domain at `127.0.0.1` and reading your dev server's source. A dynamic site's tenant hosts are only known at runtime, so list the ones you use in development in `web.devAllowedHosts` (default: none). An entry starting with `.` also matches every subdomain:
+
+```ts title="src/config/web.ts"
+export default {
+  devAllowedHosts: [".tenant.test", "acme.example.test"],
+};
+```
+
+A request for any other host gets a 403 "Blocked request. This host is not allowed" from the dev server; add the host to `web.devAllowedHosts`. `devAllowedHosts: true` turns the check off and re-opens that hole, so prefer listing hosts. Production is not affected.
 
 ## Use the selected site on the server
 
@@ -155,7 +169,33 @@ to keep path prefixes out of every table.
 
 With the normal sitemap and robots features enabled, `/sitemap.xml` and `/robots.txt` are selected per site. A site's sitemap contains only that site's pages and uses that request's site origin and `basePath`. A resolver-selected dynamic site is omitted from indexing unless its resolver result has `indexable: true`: its sitemap is a 404 and its robots response disallows all crawling otherwise.
 
-Set `web.tlsAsk` to expose a Caddy on-demand TLS `ask` endpoint. It requires `web.sites`; Warlock allows a domain only when it is a configured fixed host or `resolveHost` claims it.
+Each site's sitemap is built in memory on the first request and reused for `web.sitemap.regenerateEvery` (5 minutes when unset), per site, tenant and origin. It is sent with an `ETag`, `Last-Modified` and the `web.sitemap.cacheControl` header, so a crawler that revalidates gets a `304`. New content appears in the sitemap once the reused copy expires.
+
+Page sitemap suppliers receive `{ site, tenantKey, shared }`. For an indexable dynamic site, `tenantKey` is the `key` your resolver returned for the requesting host. **Scope the rows by it**: a supplier that ignores it lists every tenant's URLs in every tenant's sitemap. Outside production, a supplier that takes no argument logs a warning the first time it builds a tenant's sitemap.
+
+```ts title="src/web/$sites/tenant/listings/[slug].setup.ts"
+export const sitemap = {
+  entries: async ({ tenantKey }) =>
+    (await Listing.list({ tenantId: tenantKey, published: true })).map((listing) => ({
+      path: `/listings/${listing.slug}`,
+    })),
+};
+```
+
+Set `web.tlsAsk` to expose a Caddy on-demand TLS `ask` endpoint. It requires `web.sites`; Warlock allows a domain only when it is a configured fixed host or `resolveHost` claims it. A domain longer than 253 characters is refused with `400`.
+
+<Aside type="caution" title="The ask endpoint is public by default">
+  Any client can call it, learn whether a domain is one of your tenants, and make `resolveHost` run
+  for domains of its choosing. When Caddy runs on the same machine, set `tlsAskAllow: "loopback"`.
+  Use `"private"` for a Caddy on your private network, or a list of exact addresses (`tlsAskAllow:
+  ["10.0.0.5"]`). The check uses the connection's own address, which forwarding headers cannot
+  change. Other callers get `403`. The default, `"any"`, keeps the endpoint open.
+</Aside>
+
+```ts title="src/config/web.ts"
+tlsAsk: "/.well-known/warlock/domain",
+tlsAskAllow: "loopback",
+```
 
 ```text title="Caddyfile"
 {

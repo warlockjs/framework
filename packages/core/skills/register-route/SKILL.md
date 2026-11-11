@@ -281,6 +281,17 @@ counted as they stream), and run the route's `preParsing` hooks. Keys the dev wi
 honour (`schema`, `errorHandler`, `onSend`, `onResponse`, ...) log one boot warning naming the
 route and key. Multipart uploads use `http.fileUploadLimit`, not `bodyLimit`.
 
+### Routes that take uploads
+
+`uploads: true` declares that a route accepts multipart bodies; with
+`http.multipart.routes: "declared"` every other route answers 415 without reading one.
+`uploads: { maxTotalSize }` also sets the whole-request upload cap for that route
+(default `http.multipart.maxTotalSize`, 25 MB).
+
+```ts
+router.post("/avatars", uploadAvatar, { uploads: true });
+```
+
 ## Gotchas
 
 - **Never import `routes.ts`.** The framework auto-loads it. Importing causes a double-registration error.

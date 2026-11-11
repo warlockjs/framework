@@ -73,7 +73,7 @@ describe("queue context", () => {
     });
 
     await withTenant("t1", () => job.dispatch({ a: 1 }));
-    expect(lastData()).toEqual({ __warlock: { v: 1, context: "t1" }, payload: { a: 1 } });
+    expect(lastData()).toEqual({ __warlock: { v: 2, context: "t1" }, payload: { a: 1 } });
 
     await processJob(fakeJob("ctx.roundtrip", lastData()));
     expect(seen).toEqual({ a: 1 });
@@ -82,12 +82,69 @@ describe("queue context", () => {
     expect(seen).toEqual({ a: 2 });
   });
 
-  it("captures at dispatch; undefined adds no envelope", async () => {
+  it("captures at dispatch; no context still writes an envelope without one", async () => {
     const job = defineJob({ name: "ctx.capture", handle: async (_p: { a: number }) => {} });
 
     await job.dispatch({ a: 1 });
     expect(capture).toHaveBeenCalledTimes(1);
-    expect(lastData()).toEqual({ a: 1 });
+    expect(lastData()).toEqual({ __warlock: { v: 2 }, payload: { a: 1 } });
+  });
+
+  it("still restores the context of a job queued before the upgrade", async () => {
+    let inside: string | undefined;
+    defineJob({
+      name: "ctx.legacy",
+      handle: async (_p: {}) => {
+        inside = tenantStore.getStore();
+      },
+    });
+
+    await processJob(fakeJob("ctx.legacy", { __warlock: { v: 1, context: "old" }, payload: {} }));
+    expect(inside).toBe("old");
+  });
+
+  it("never reads a payload shaped like an envelope as one", async () => {
+    const restore = vi.fn((tenant: string, run: () => Promise<unknown>) =>
+      tenantStore.run(tenant, run),
+    );
+    setQueueContext(defineQueueContext({ capture, restore }));
+
+    let seen: unknown;
+    let inside: string | undefined;
+    const job = defineJob({
+      name: "ctx.forged",
+      handle: async (p: unknown, ctx) => {
+        seen = p;
+        inside = tenantStore.getStore();
+        expect(ctx.context).toBeUndefined();
+      },
+    });
+    const forged = { __warlock: { v: 1, context: "evil" }, payload: 1 };
+
+    // Dispatched from outside any context (a public route with no tenant).
+    await job.dispatch(forged);
+    await processJob(fakeJob("ctx.forged", lastData()));
+
+    expect(seen).toEqual(forged);
+    expect(inside).toBeUndefined();
+    expect(restore).not.toHaveBeenCalled();
+  });
+
+  it("never restores a context for a job declared with context: false", async () => {
+    let inside: string | undefined;
+    let ctxValue: unknown = "unset";
+    defineJob({
+      name: "ctx.off.run",
+      context: false,
+      handle: async (_p: {}, ctx) => {
+        inside = tenantStore.getStore();
+        ctxValue = ctx.context;
+      },
+    });
+
+    await processJob(fakeJob("ctx.off.run", { __warlock: { v: 2, context: "evil" }, payload: {} }));
+    expect(inside).toBeUndefined();
+    expect(ctxValue).toBeUndefined();
   });
 
   it("restore wraps handle and exposes ctx.context", async () => {
@@ -163,7 +220,7 @@ describe("queue context", () => {
 
     await withTenant("t4", () => job.dispatch({}));
     expect(capture).not.toHaveBeenCalled();
-    expect(lastData()).toEqual({});
+    expect(lastData()).toEqual({ __warlock: { v: 2 }, payload: {} });
   });
 
   it("infers restore's captured param from capture", () => {

@@ -1,4 +1,4 @@
-import { AsyncLocalStorage } from "async_hooks";
+import { ContextSlot, type ContextStorage } from "./shared-storage";
 
 /**
  * Keys that reach `Object.prototype` instead of the store when assigned.
@@ -49,6 +49,12 @@ function withoutDangerousKeys<T>(updates: T): T {
  * Provides a consistent API for managing context across async operations.
  * All framework contexts (request, storage, database) extend this class.
  *
+ * Every context keeps its store in one `AsyncLocalStorage` shared by all
+ * contexts (each has its own slot in it), so the per-promise cost of async
+ * context tracking is paid once, not once per context. Each context still
+ * behaves as if it had its own storage: running or entering one never
+ * changes another's store.
+ *
  * @template TStore - The type of data stored in context
  *
  * @example
@@ -68,7 +74,11 @@ function withoutDangerousKeys<T>(updates: T): T {
  * ```
  */
 export abstract class Context<TStore extends Record<string, any>> {
-  protected readonly storage: AsyncLocalStorage<TStore> = new AsyncLocalStorage<TStore>();
+  /**
+   * This context's slot in the shared async storage: `run`, `enterWith` and
+   * `getStore` as on `AsyncLocalStorage`, scoped to this context.
+   */
+  protected readonly storage: ContextStorage<TStore> = new ContextSlot<TStore>();
 
   /**
    * Run a callback within a new context

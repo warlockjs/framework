@@ -2,6 +2,7 @@ import { config, type Request, type Response } from "@warlock.js/core";
 import { log } from "@warlock.js/logger";
 import type { CookieDomainResolver, TokenFrom } from "../contracts/types";
 import { AccessToken } from "../models/access-token";
+import { readAuthCookie } from "./auth-cookie-names";
 import { authService } from "./auth.service";
 import { isInvalidCredentialError, jwt } from "./jwt";
 
@@ -58,15 +59,24 @@ function accessTokenRowIsExpired(accessToken: AccessToken): boolean {
   return typeof accessToken.isExpired === "boolean" ? accessToken.isExpired : true;
 }
 
+/**
+ * Whether the token's claims name the user its row was issued to. The row is
+ * what proves the token was issued and not revoked; the user it resolves to
+ * must be that row's user too, never only what the claims say.
+ */
+function claimsMatchRow(decoded: DecodedAccessToken, accessToken: AccessToken): boolean {
+  if (String(decoded.id) !== String(accessToken.userId)) return false;
+
+  return decoded.userType === undefined || decoded.userType === accessToken.userType;
+}
+
 /** Read one credential (access or refresh) from the header or a cookie. */
 export function readCredential(request: Request, tokenFrom: TokenFrom): string {
   if (tokenFrom === "header") {
     return request.authorizationValue;
   }
 
-  const value = request.cookie(tokenFrom.slice("cookie:".length));
-
-  return value ? String(value) : "";
+  return readAuthCookie(request, tokenFrom.slice("cookie:".length));
 }
 
 /**
@@ -138,7 +148,10 @@ export async function resolveRequestUserOutcome(
       decoded = await jwt.verify<DecodedAccessToken>(authorizationValue);
     } catch (error) {
       if (!isInvalidCredentialError(error)) throw error;
-      log.error("http", "auth", error);
+      // An expired or garbage token is an ordinary client error that any
+      // anonymous caller can produce at will: debug, so it cannot flood the
+      // error log.
+      log.debug("http", "auth", error);
       request.locals.user = undefined;
       if (await renew()) continue;
       return fail("invalid");
@@ -156,6 +169,12 @@ export async function resolveRequestUserOutcome(
 
     if (accessTokenRowIsExpired(accessToken)) {
       await accessToken.destroy();
+      request.locals.user = undefined;
+      if (await renew()) continue;
+      return fail("invalid");
+    }
+
+    if (!claimsMatchRow(decoded, accessToken)) {
       request.locals.user = undefined;
       if (await renew()) continue;
       return fail("invalid");

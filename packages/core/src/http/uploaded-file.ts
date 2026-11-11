@@ -6,6 +6,12 @@ import { Image, type ImageFormat, type ImageTransformOptions } from "../image";
 import { storage, type ScopedStorage, type StorageDriverName, type StorageFile } from "../storage";
 import { sanitizePath } from "../utils/paths";
 import { uploadsConfig } from "./uploads-config";
+import {
+  isMarkupMimeType,
+  isRasterImageMimeType,
+  sniffUploadMimeType,
+  UPLOAD_SNIFF_BYTES,
+} from "./uploads/sniff-upload-type";
 import type {
   FileNamingStrategy,
   ImageTransformCallback,
@@ -110,6 +116,12 @@ export class UploadedFile {
    * @internal
    */
   protected bufferedFileContent?: Buffer;
+
+  /**
+   * Sniffed MIME type (`null` once sniffed and unknown)
+   * @internal
+   */
+  protected detectedMimeTypeCache?: string | null;
 
   /**
    * Upload file hash (SHA-256)
@@ -229,12 +241,35 @@ export class UploadedFile {
     return this.bufferedFileContent;
   }
 
+  /**
+   * The MIME type the file's own bytes show (its first bytes are read),
+   * independent of the type and name the client declared: raster images
+   * (jpeg, png, webp, gif, avif, heic/heif, bmp, tiff, ico), svg, pdf, html
+   * and xml. `undefined` when the bytes match none of them.
+   *
+   * Use it, not {@link UploadedFile.mimeType}, to decide what a file really is.
+   *
+   * @example
+   * if ((await file.detectedMimeType()) !== "image/png") throw new Error("PNG only");
+   */
+  public async detectedMimeType(): Promise<string | undefined> {
+    if (this.detectedMimeTypeCache === undefined) {
+      this.detectedMimeTypeCache =
+        sniffUploadMimeType((await this.buffer()).subarray(0, UPLOAD_SNIFF_BYTES)) ?? null;
+    }
+
+    return this.detectedMimeTypeCache ?? undefined;
+  }
+
   // ============================================================
   // File Type Checks
   // ============================================================
 
   /**
-   * Check if file is an image based on MIME type
+   * Check if file is an image based on MIME type.
+   *
+   * This is the client's declared type. `v.file().image()` checks the bytes
+   * instead; see {@link UploadedFile.detectedMimeType}.
    */
   public get isImage(): boolean {
     return this.mimeType.startsWith("image");
@@ -614,7 +649,7 @@ export class UploadedFile {
 
     // Save to storage
     this._storageFile = await storageInstance.put(content, finalLocation, {
-      mimeType: this.getFinalMimeType(),
+      mimeType: this.resolveStoredMimeType(content),
     });
 
     // Store hash from StorageFile
@@ -844,6 +879,32 @@ export class UploadedFile {
     }
 
     return this.mimeType;
+  }
+
+  /**
+   * The content type stored with the file (and served by cloud buckets and
+   * CDNs): the type the stored bytes show for raster images, and
+   * `application/octet-stream` for markup (svg, html, xml, script), whether
+   * the bytes or the client declared it, so the stored object is downloaded
+   * rather than rendered. Other files keep the declared type.
+   *
+   * `uploads.trustClientContentType: true` stores the declared type as-is.
+   * @internal
+   */
+  protected resolveStoredMimeType(content: Buffer): string {
+    const declared = this.getFinalMimeType();
+
+    if (uploadsConfig("trustClientContentType") === true) return declared;
+
+    const sniffed = sniffUploadMimeType(content.subarray(0, UPLOAD_SNIFF_BYTES));
+
+    if (isRasterImageMimeType(sniffed)) return sniffed as string;
+
+    if (isMarkupMimeType(sniffed) || isMarkupMimeType(declared)) {
+      return "application/octet-stream";
+    }
+
+    return declared;
   }
 
   /**

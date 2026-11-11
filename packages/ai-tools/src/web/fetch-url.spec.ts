@@ -419,3 +419,53 @@ describe("fetchUrlTool — UTF-8-safe truncation", () => {
     expect(data?.content).toBe("日本");
   });
 });
+
+describe("fetchUrlTool — the deadline covers the body", () => {
+  /** A response whose body sends one chunk and then never ends. */
+  function drippingResponse(): Response {
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode("<p>partial"));
+      },
+    });
+
+    return {
+      ok: true,
+      status: 200,
+      url: "https://example.com/drip",
+      headers: new Headers(),
+      body,
+    } as unknown as Response;
+  }
+
+  it("fails with a timeout error when the body never finishes", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(drippingResponse()));
+
+    const tool = fetchUrlTool({ extract: "html", timeoutMs: 50 });
+    const { data, error } = await tool.invoke({ url: "https://example.com/drip" });
+
+    expect(data).toBeUndefined();
+    expect(error?.message).toMatch(/timed out after 50ms/);
+    expect(error?.message).toMatch(/timeoutMs/);
+  });
+
+  it("passes the run's abort signal to the request and stops reading when it aborts", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(drippingResponse());
+    vi.stubGlobal("fetch", fetchMock);
+    const controller = new AbortController();
+
+    const tool = fetchUrlTool({ extract: "html", timeoutMs: 60_000 });
+    const pending = tool.invoke(
+      { url: "https://example.com/drip" },
+      { artifacts: {}, signal: controller.signal },
+    );
+    setTimeout(() => controller.abort(new Error("run cancelled")), 20);
+
+    const { data, error } = await pending;
+    const init = fetchMock.mock.calls[0]?.[1] as RequestInit | undefined;
+
+    expect(data).toBeUndefined();
+    expect(error).toBeDefined();
+    expect(init?.signal?.aborted).toBe(true);
+  });
+});

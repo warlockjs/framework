@@ -1,4 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
+import { requestContext } from "../http/context/request-context";
+import { RepositoryManager } from "../repositories/repository.manager";
 import { Restful } from "./restful";
 
 vi.mock("@warlock.js/logger", () => ({
@@ -107,5 +109,105 @@ describe("Restful", () => {
     const output = await b.resource.patch({ request: makeRequest(), response });
     expect(output).toEqual({ status: 403 });
     expect(b.record.save).not.toHaveBeenCalled();
+  });
+});
+
+describe("Restful.list with client controls", () => {
+  /** A real repository over a fake query that "holds" maxPerPage + 1 rows. */
+  function realRepository() {
+    const rows = Array.from({ length: 101 }, (_, index) => ({ id: index + 1 }));
+    const query: any = {
+      where: () => query,
+      applyFilters: () => query,
+      limit: (n: number) => ((query.limited = n), query),
+      orderBy: () => query,
+      sortBy: () => query,
+      select: () => query,
+      get: async () => rows.slice(0, query.limited ?? rows.length),
+      paginate: async (page: number, limit: number) => ({
+        data: rows.slice(0, limit),
+        pagination: { page, limit },
+      }),
+    };
+
+    class Products extends RepositoryManager<any> {}
+
+    const repository: any = Object.create(Products.prototype);
+    Object.assign(repository, {
+      filterBy: {},
+      sortable: [],
+      selectable: [],
+      maxPerPage: 100,
+      defaultOptions: {},
+      isCacheable: false,
+      newQuery: () => query,
+    });
+
+    return repository;
+  }
+
+  it("returns at most maxPerPage records for ?paginate=false, ?perform=1 and ?purgeCache=1", async () => {
+    const repository = realRepository();
+    const input = { paginate: "false", perform: "1", purgeCache: "1", limit: "500" };
+    const request: any = { heavy: () => ({ ...input }), all: () => input };
+    const response = makeResponse();
+
+    class Products extends Restful<any> {
+      protected repository = repository;
+    }
+
+    const resource: any = new Products();
+    resource.cache = false;
+
+    const output: any = await requestContext.run({ request, response }, () =>
+      resource.list({ request, response }),
+    );
+
+    expect(output.status).toBe(200);
+    expect(output.body.records).toHaveLength(100);
+    expect(output.body.pagination).toEqual({ page: 1, limit: 100 });
+  });
+});
+
+describe("Restful.bulkDelete bounds", () => {
+  const bulkRequest = (ids: unknown[]) => ({ input: () => ids }) as any;
+
+  it("refuses more ids than bulkDeleteLimit with 400 before loading records", async () => {
+    const all = vi.fn(async () => []);
+    const { resource, repository } = build({ bulkDeleteLimit: 100 });
+    repository.all = all;
+    const response = makeResponse();
+
+    const ids = Array.from({ length: 1000 }, (_, index) => index + 1);
+    const output = await resource.bulkDelete({ request: bulkRequest(ids), response });
+
+    expect(output.status).toBe(400);
+    expect(String(output.body.error)).toContain("bulkDeleteLimit");
+    expect(all).not.toHaveBeenCalled();
+  });
+
+  it("deletes at most bulkDeleteConcurrency records at the same time", async () => {
+    let inFlight = 0;
+    let peak = 0;
+    const records = Array.from({ length: 25 }, () => ({
+      destroy: vi.fn(async () => {
+        inFlight++;
+        peak = Math.max(peak, inFlight);
+        await new Promise((resolve) => setTimeout(resolve, 1));
+        inFlight--;
+      }),
+    }));
+
+    const { resource, repository } = build({ bulkDeleteConcurrency: 4 });
+    repository.all = vi.fn(async () => records);
+
+    const output = await resource.bulkDelete({
+      request: bulkRequest(records.map((_, index) => index + 1)),
+      response: makeResponse(),
+    });
+
+    expect(output.body).toEqual({ deleted: 25 });
+    expect(records.every((record) => record.destroy.mock.calls.length === 1)).toBe(true);
+    expect(peak).toBeLessThanOrEqual(4);
   });
 });

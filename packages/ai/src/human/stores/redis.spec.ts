@@ -36,6 +36,58 @@ function makeFakeRedis(): RedisClientLike & { store: Map<string, string> } {
   };
 }
 
+/**
+ * {@link makeFakeRedis} plus the camel-case set commands, so the store
+ * keeps its id index as a Redis set. `sAdd` yields before writing so
+ * interleaved callers race like real clients.
+ */
+function makeFakeRedisWithSets(): ReturnType<typeof makeFakeRedis> & {
+  sets: Map<string, Set<string>>;
+  gets: string[];
+  sAdd(key: string, members: string | string[]): Promise<number>;
+  sRem(key: string, members: string | string[]): Promise<number>;
+  sMembers(key: string): Promise<string[]>;
+} {
+  const base = makeFakeRedis();
+  const sets = new Map<string, Set<string>>();
+  const gets: string[] = [];
+
+  return {
+    ...base,
+    sets,
+    gets,
+    async get(key: string): Promise<string | null> {
+      gets.push(key);
+
+      return base.get(key);
+    },
+    async sAdd(key: string, members: string | string[]): Promise<number> {
+      await Promise.resolve();
+      const set = sets.get(key) ?? new Set<string>();
+
+      for (const member of Array.isArray(members) ? members : [members]) {
+        set.add(member);
+      }
+
+      sets.set(key, set);
+
+      return set.size;
+    },
+    async sRem(key: string, members: string | string[]): Promise<number> {
+      const set = sets.get(key);
+
+      for (const member of Array.isArray(members) ? members : [members]) {
+        set?.delete(member);
+      }
+
+      return set?.size ?? 0;
+    },
+    async sMembers(key: string): Promise<string[]> {
+      return [...(sets.get(key) ?? [])];
+    },
+  };
+}
+
 function makeInterrupt(overrides: Partial<PendingInterrupt> = {}): PendingInterrupt {
   return {
     interruptId: "support.sess-1.0.abc",
@@ -159,6 +211,70 @@ describe("redis interrupt store", () => {
     const store = redis({ client: makeFakeRedis() });
 
     expect(store.schema()).toBe("");
+  });
+
+  it("should hand a pending interrupt to exactly one of several concurrent claims", async () => {
+    const store = redis({ client: makeFakeRedis() });
+
+    await store.save(makeInterrupt());
+
+    const claims = await Promise.all([
+      store.claim?.("support.sess-1.0.abc"),
+      store.claim?.("support.sess-1.0.abc"),
+      store.claim?.("support.sess-1.0.abc"),
+    ]);
+
+    expect(claims.filter((claim) => claim !== undefined)).toHaveLength(1);
+    expect(await store.load("support.sess-1.0.abc")).toBeUndefined();
+    expect(await store.list?.()).toEqual([]);
+  });
+
+  it("should not claim a resolved interrupt", async () => {
+    const store = redis({ client: makeFakeRedis() });
+
+    await store.save(makeInterrupt({ status: "resolved" }));
+
+    expect(await store.claim?.("support.sess-1.0.abc")).toBeUndefined();
+    expect(await store.load("support.sess-1.0.abc")).toBeDefined();
+  });
+
+  it("should keep every id when interrupts are saved concurrently (set index)", async () => {
+    const client = makeFakeRedisWithSets();
+    const store = redis({ client });
+
+    await Promise.all(
+      Array.from({ length: 20 }, (_, index) =>
+        store.save(makeInterrupt({ interruptId: `support.s.${index}.x` })),
+      ),
+    );
+
+    expect(await store.list?.()).toHaveLength(20);
+  });
+
+  it("should not read the index on save when the client has set commands", async () => {
+    const client = makeFakeRedisWithSets();
+    const store = redis({ client });
+
+    await store.save(makeInterrupt({ interruptId: "support.a" }));
+    client.gets.length = 0;
+    await store.save(makeInterrupt({ interruptId: "support.b" }));
+
+    expect(client.gets).toEqual([]);
+  });
+
+  it("should move an earlier JSON-array index into the Redis set", async () => {
+    const client = makeFakeRedisWithSets();
+    client.store.set("warlock:ai-human:interrupt:index", JSON.stringify(["support.old"]));
+    const store = redis({ client });
+
+    await store.save(makeInterrupt({ interruptId: "support.new" }));
+
+    expect((await store.list?.())?.sort()).toEqual(["support.new", "support.old"]);
+    expect(client.store.has("warlock:ai-human:interrupt:index")).toBe(false);
+
+    await store.delete("support.old");
+
+    expect(await store.list?.()).toEqual(["support.new"]);
   });
 
   it("should surface the curated install string when redis is absent", async () => {

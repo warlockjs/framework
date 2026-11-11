@@ -1,7 +1,7 @@
 import { colors } from "@mongez/copper";
 import events from "@mongez/events";
 import { trans, transFrom } from "@mongez/localization";
-import { Random, except, get, only, rtrim, set, unset } from "@mongez/reinforcements";
+import { Random, except, get, only, set, unset } from "@mongez/reinforcements";
 import { isEmpty } from "@mongez/supportive-is";
 import type { LogLevel } from "@warlock.js/logger";
 import { log } from "@warlock.js/logger";
@@ -25,6 +25,7 @@ import { buildRequestLogSnapshot, type RequestLogSnapshot } from "./request-log-
 import { Response } from "./response";
 import { buildTracingContext, deriveTraceId, dispatchPhase, isTracingEnabled } from "./tracing";
 import { tagRequestError } from "./report-request-error";
+import { isTrustedProxyPeer } from "./trusted-proxy";
 import type {
   DecodedAccessToken,
   HttpConfigurations,
@@ -43,6 +44,63 @@ type StandardHeaders = {
 };
 
 type HeaderKeys = keyof StandardHeaders;
+
+/** Options for `request.cookie()` and `request.signedCookie()`. */
+export type RequestCookieOptions = {
+  /**
+   * Parse a value that is valid JSON (`true`), or return the raw string
+   * (`false`).
+   *
+   * @default true (or `http.cookies.json`)
+   */
+  json?: boolean;
+};
+
+/**
+ * What `rtrim(key, "[]")` removed: a `[` followed by one or more `]` at the
+ * end of a key. A literal, so no pattern is compiled per input key.
+ */
+const TRAILING_ARRAY_MARKER = /\[\]+$/;
+
+/**
+ * The middleware list resolved for each route, with the `http.middleware`
+ * object and the list lengths it was resolved from.
+ */
+const resolvedMiddlewares = new WeakMap<
+  object,
+  {
+    configured: unknown;
+    routeMiddleware: unknown;
+    globalCount: number;
+    routeCount: number;
+    list: Middleware[];
+  }
+>();
+
+let requestOnWarned = false;
+
+/**
+ * `request.on()` subscribes to the process-wide event bus, so a listener
+ * added while handling one request stays for the life of the process and runs
+ * for every later request. Said once per process.
+ */
+function warnRequestOnDeprecated(): void {
+  if (requestOnWarned) return;
+
+  requestOnWarned = true;
+
+  log.warn(
+    "request",
+    "on",
+    "request.on() is deprecated: it subscribes to the process-wide event bus, so the listener " +
+      "is never removed and runs for every later request, not just this one. Subscribe once at " +
+      'module scope instead: events.subscribe("request.<event>", callback) from ' +
+      '"@mongez/events" (the request is the last argument).',
+  );
+}
+
+/** Default for `http.input.maxArrayIndex`. */
+const DEFAULT_MAX_INPUT_ARRAY_INDEX = 1000;
 
 /** A request-bound translator: keyword in, translated string out. */
 export type RequestTranslator = (keyword: string, placeholders?: Record<string, unknown>) => string;
@@ -323,8 +381,13 @@ export class Request<RequestValidation = any> {
     const headerName = (requestIdConfig.header || "x-request-id").toLowerCase();
     const incoming = this.baseRequest.headers[headerName];
 
-    if (Request.isValidRequestId(incoming)) {
+    // `request.id` keys per-request bookkeeping (the request-log scope, log
+    // correlation). A client that repeats the id of a request still in
+    // flight would merge its records into that one, so a repeated id gets a
+    // fresh one instead.
+    if (Request.isValidRequestId(incoming) && !Request.isRequestIdInFlight(incoming)) {
       this.id = incoming;
+      this.claimRequestId();
 
       return;
     }
@@ -332,6 +395,51 @@ export class Request<RequestValidation = any> {
     if (typeof requestIdConfig.generator === "function") {
       this.id = requestIdConfig.generator();
     }
+
+    this.claimRequestId();
+  }
+
+  /**
+   * Ids of requests whose responses are still being written, so an inbound
+   * `X-Request-Id` cannot reuse one. Weak references: a finished request is
+   * never kept alive by this map.
+   */
+  private static readonly inFlightIds = new Map<string, WeakRef<Request>>();
+
+  /** Most ids tracked at once; the oldest entries go first past it. */
+  private static readonly MAX_IN_FLIGHT_IDS = 10_000;
+
+  /** Whether another request with this id is still being answered. */
+  protected static isRequestIdInFlight(id: string): boolean {
+    const holder = Request.inFlightIds.get(id)?.deref();
+
+    if (holder && holder.isResponding()) return true;
+
+    Request.inFlightIds.delete(id);
+
+    return false;
+  }
+
+  /** Record this request's id while its response is being written. */
+  protected claimRequestId(): void {
+    if (!this.isResponding()) return;
+
+    const ids = Request.inFlightIds;
+
+    if (ids.size >= Request.MAX_IN_FLIGHT_IDS) {
+      const oldest = ids.keys().next().value;
+
+      if (oldest !== undefined) ids.delete(oldest);
+    }
+
+    ids.set(this.id, new WeakRef(this));
+  }
+
+  /** Whether this request has a bound response that has not finished yet. */
+  protected isResponding(): boolean {
+    const raw = this.response?.baseResponse?.raw;
+
+    return !!raw && !raw.writableEnded && !raw.destroyed;
   }
 
   /**
@@ -499,12 +607,76 @@ export class Request<RequestValidation = any> {
   }
 
   /**
-   * Get a particular cookie value or fallback to default
+   * Get a particular cookie value or fallback to default.
+   *
+   * By default a value that is valid JSON comes back parsed, so the CLIENT
+   * picks its type (`{"a":1}` is an object, `5` a number). Pass
+   * `{ json: false }` (or set `http.cookies.json: false`) to always get the
+   * raw string.
+   *
+   * The value is whatever the client sent. For a value the client must not be
+   * able to change, write it with `response.cookie(name, value, { signed: true })`
+   * and read it with {@link Request.signedCookie}.
    */
-  public cookie(name: string, defaultValue?: any): string | any {
+  public cookie(
+    name: string,
+    defaultValue?: any,
+    options: RequestCookieOptions = {},
+  ): string | any {
     this.assertCookieJarAvailable(name);
 
     const value = this.cookies[name] ?? defaultValue;
+
+    return this.decodeCookieValue(value, options);
+  }
+
+  /**
+   * Read a cookie written with `response.cookie(name, value, { signed: true })`,
+   * verifying its signature with `http.cookies.secret`. A missing cookie, or
+   * one whose value or signature was changed, returns `defaultValue`.
+   *
+   * Decoded like {@link Request.cookie} (JSON unless `json: false`).
+   *
+   * @throws Error when `http.cookies.secret` is not set: without it nothing
+   * can be verified.
+   */
+  public signedCookie(
+    name: string,
+    defaultValue?: any,
+    options: RequestCookieOptions = {},
+  ): string | any {
+    this.assertCookieJarAvailable(name);
+
+    const unsign = (this.baseRequest as { unsignCookie?: unknown }).unsignCookie;
+
+    if (typeof unsign !== "function") {
+      throw new Error(
+        `Cannot verify cookie "${name}": http.cookies.secret is not set. Set it (for example from a COOKIE_SECRET environment variable) to sign and verify cookies.`,
+      );
+    }
+
+    const raw = this.cookies[name];
+
+    if (typeof raw !== "string") return defaultValue;
+
+    const result = (unsign as (value: string) => { valid: boolean; value: string | null }).call(
+      this.baseRequest,
+      raw,
+    );
+
+    if (!result.valid || result.value === null) return defaultValue;
+
+    return this.decodeCookieValue(result.value, options);
+  }
+
+  /**
+   * JSON-decode a cookie value unless the caller (or `http.cookies.json`)
+   * asked for the raw string.
+   */
+  protected decodeCookieValue(value: any, options: RequestCookieOptions) {
+    const json = options.json ?? config.key("http.cookies.json") !== false;
+
+    if (!json) return value;
 
     try {
       return JSON.parse(value);
@@ -638,6 +810,32 @@ export class Request<RequestValidation = any> {
   }
 
   /**
+   * True when any all-digit segment of a dotted path is an array index above
+   * `maxIndex`. `set()` turns such a segment into an array index, so
+   * `a[4294967294]=x` would otherwise create a sparse array whose `length`
+   * every later `map()` or `JSON.stringify()` walks.
+   */
+  protected exceedsArrayIndex(path: string, maxIndex: number): boolean {
+    for (const segment of path.split(".")) {
+      if (/^\d+$/.test(segment) && Number(segment) > maxIndex) return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * The highest array index a query, urlencoded or multipart key may name
+   * (`http.input.maxArrayIndex`, default 1000). Keys above it are dropped.
+   */
+  protected maxInputArrayIndex(): number {
+    const configured = config.key("http.input.maxArrayIndex");
+
+    return typeof configured === "number" && Number.isInteger(configured) && configured >= 0
+      ? configured
+      : DEFAULT_MAX_INPUT_ARRAY_INDEX;
+  }
+
+  /**
    * Apply the `key[]` array marker to a parsed value.
    *
    * The subtlety this exists to remove: a key declared `[]` should ALWAYS be an
@@ -688,6 +886,11 @@ export class Request<RequestValidation = any> {
 
       const arrayOfObjectValues: any = {};
 
+      const maxArrayIndex = this.maxInputArrayIndex();
+
+      // Bound once per body, not once per key.
+      const parseValue = this.parseValue.bind(this);
+
       for (let key in data) {
         const value = data[key];
 
@@ -697,11 +900,15 @@ export class Request<RequestValidation = any> {
           isArrayKey = true;
         }
 
-        key = rtrim(key, "[]");
+        key = key.replace(TRAILING_ARRAY_MARKER, "");
 
         // every path segment this key can write must be safe, whichever
         // branch below ends up writing it (set(), bucket, entry or body)
         if (this.hasUnsafeSegment(key)) continue;
+
+        // every path a branch below can write goes through `set()`, which
+        // turns digit segments into array indices: refuse huge ones up front
+        if (this.exceedsArrayIndex(this.bracketKeyToPath(key), maxArrayIndex)) continue;
 
         // check if the key is has a square brackets, then convert it into object
         // i.e user[email] => user: {email: "value"}
@@ -736,7 +943,7 @@ export class Request<RequestValidation = any> {
               set(
                 body,
                 this.bracketKeyToPath(key),
-                this.arrayValueFor(value, isArrayKey, this.parseValue.bind(this)),
+                this.arrayValueFor(value, isArrayKey, parseValue),
               );
 
               continue;
@@ -747,7 +954,7 @@ export class Request<RequestValidation = any> {
             const index = Number(keyNameParts[0]);
 
             // a crafted huge index would allocate a giant sparse array
-            if (Number.isInteger(index) && index > 1000) continue;
+            if (Number.isInteger(index) && index > maxArrayIndex) continue;
 
             /*
               A NON-NUMERIC first segment is not an array index — it is a deeper
@@ -771,7 +978,7 @@ export class Request<RequestValidation = any> {
               set(
                 body,
                 this.bracketKeyToPath(key),
-                this.arrayValueFor(value, isArrayKey, this.parseValue.bind(this)),
+                this.arrayValueFor(value, isArrayKey, parseValue),
               );
 
               continue;
@@ -820,14 +1027,14 @@ export class Request<RequestValidation = any> {
           set(
             body,
             keyName + "." + keyNameParts[0],
-            this.arrayValueFor(value, isArrayKey, this.parseValue.bind(this)),
+            this.arrayValueFor(value, isArrayKey, parseValue),
           );
 
           continue;
         }
 
         if (Array.isArray(value)) {
-          set(body, key, value.map(this.parseValue.bind(this)));
+          set(body, key, value.map(parseValue));
         } else if (isArrayKey) {
           if (body[key]) {
             body[key].push(this.parseValue(value));
@@ -900,6 +1107,8 @@ export class Request<RequestValidation = any> {
    * Listen to the given event
    */
   public on(eventName: RequestEvent, callback: any) {
+    warnRequestOnDeprecated();
+
     return events.subscribe(`request.${eventName}`, callback);
   }
 
@@ -909,11 +1118,17 @@ export class Request<RequestValidation = any> {
   public log(message: any, level: LogLevel = "info") {
     if (!config.key("http.log")) return;
 
+    const type = phaseLogLevel(level);
+
+    // No channel keeps this level: skip building the entry and its snapshot.
+    // (A partial test double without `isEnabled` keeps every line.)
+    if (log.isEnabled?.(type) === false) return;
+
     log.log({
       module: "request",
       action: this.route.method + " " + this.route.path.replace("/*", "") + `:${this.id}`,
       message,
-      type: phaseLogLevel(level),
+      type,
       context: {
         request: this.toLogSnapshot(),
       },
@@ -935,6 +1150,47 @@ export class Request<RequestValidation = any> {
   public toLogSnapshot(): RequestLogSnapshot {
     const baseRequest = this.baseRequest as FastifyRequest | undefined;
 
+    // One snapshot per request: every phase line logs the same received
+    // input. Rebuilt only if the request was re-pointed (request, route, id,
+    // query or body replaced).
+    const cached = this.logSnapshot;
+
+    if (
+      cached &&
+      cached.baseRequest === baseRequest &&
+      cached.route === this.route &&
+      cached.id === this.id &&
+      cached.query === this.payload?.query &&
+      cached.body === this.payload?.body
+    ) {
+      return cached.snapshot;
+    }
+
+    const snapshot = this.buildLogSnapshot(baseRequest);
+
+    this.logSnapshot = {
+      baseRequest,
+      route: this.route,
+      id: this.id,
+      query: this.payload?.query,
+      body: this.payload?.body,
+      snapshot,
+    };
+
+    return snapshot;
+  }
+
+  /** The memoised {@link toLogSnapshot} and what it was built from. */
+  private logSnapshot?: {
+    baseRequest: FastifyRequest | undefined;
+    route: Route | undefined;
+    id: string;
+    query: unknown;
+    body: unknown;
+    snapshot: RequestLogSnapshot;
+  };
+
+  private buildLogSnapshot(baseRequest: FastifyRequest | undefined): RequestLogSnapshot {
     return buildRequestLogSnapshot({
       id: this.id,
       method: baseRequest?.method ?? this.route?.method ?? "",
@@ -1179,6 +1435,21 @@ export class Request<RequestValidation = any> {
   protected collectMiddlewares(): Middleware[] {
     const route = this.route;
     const configured = config.key("http.middleware") as HttpConfigurations["middleware"];
+    const cached = route ? resolvedMiddlewares.get(route) : undefined;
+    const globalCount = configured?.all?.length ?? 0;
+    const routeCount = route?.middleware?.length ?? 0;
+
+    // The list depends only on the route and `http.middleware`: resolved once
+    // per route, rebuilt when the config object or either list changes.
+    if (
+      cached &&
+      cached.configured === configured &&
+      cached.routeMiddleware === route.middleware &&
+      cached.globalCount === globalCount &&
+      cached.routeCount === routeCount
+    ) {
+      return cached.list;
+    }
 
     const matchesRoute = (target?: PartialMiddleware) =>
       Boolean(
@@ -1198,12 +1469,24 @@ export class Request<RequestValidation = any> {
     const excluded = matchesRoute(configured?.except) ? configured?.except?.middleware || [] : [];
 
     // global first, then route middlewares, deduplicated by reference
-    return [
+    const list = [
       ...new Set([
         ...global.filter((middleware) => !excluded.includes(middleware)),
         ...(route.middleware || []),
       ]),
     ];
+
+    if (route) {
+      resolvedMiddlewares.set(route, {
+        configured,
+        routeMiddleware: route.middleware,
+        globalCount,
+        routeCount,
+        list,
+      });
+    }
+
+    return list;
   }
 
   /**
@@ -1539,30 +1822,33 @@ export class Request<RequestValidation = any> {
    *   predicate — the chain is walked right-to-left and stops at the first hop
    *   that isn't a trusted proxy.
    *
-   * `X-Real-IP` is NOT part of that resolution — Fastify never looks at it,
-   * and unlike `X-Forwarded-For` it carries no chain, so there is nothing to
-   * validate a proxy allowlist against. It is therefore honoured
-   * only under `trustProxy: true` ("everything upstream is mine"), where it is
-   * no weaker than the trust already granted. Under a bounded `trustProxy`
-   * (CIDR / IP list) it is ignored: a trusted-but-passthrough edge that
-   * forwards the client's own `X-Real-IP` verbatim would otherwise hand any
-   * client a way around the bound.
+   * Single-address headers (`X-Real-IP`, `CF-Connecting-IP`) are NOT part of
+   * that resolution. Many edges never set or strip them, so the client's own
+   * value passes through. One is read only when `http.realIpHeader` names it
+   * (for an edge that overwrites that header on every request) and
+   * `http.trustProxy` trusts the socket peer that sent it; otherwise it is
+   * ignored.
    *
    * **Prefer this over `request.ip` for any caller behind a proxy** (load
    * balancer, CDN, reverse proxy, k8s ingress).
    */
   public detectIp() {
-    // Trusting `X-Real-IP` is only sound when the config trusts the entire
-    // upstream chain; bounded shapes get chain-aware resolution instead.
     // Typed as `unknown`: config.get(key, fallback) infers the FALLBACK's type, so
     // the literal `false` narrowed this to `false` and TypeScript called the
     // comparison unreachable. The stored value is genuinely unconstrained at compile
     // time - trustProxy accepts a boolean, a CIDR list or a predicate - so `unknown`
-    // is what it actually is, and the === true check is the narrowing.
+    // is what it actually is.
     const trustProxy: unknown = config.get("http.trustProxy", false);
+    const realIpHeader: unknown = config.get("http.realIpHeader");
 
-    if (trustProxy === true) {
-      const realIp = this.header("x-real-ip");
+    // the header is only as trustworthy as the peer that sent it: a client
+    // that reaches the process directly could set it to anything
+    if (
+      typeof realIpHeader === "string" &&
+      realIpHeader.trim().length > 0 &&
+      isTrustedProxyPeer(this.baseRequest.socket?.remoteAddress, trustProxy)
+    ) {
+      const realIp = this.header(realIpHeader.trim());
 
       if (realIp) {
         // `split` always yields a first element, so `?? ""` changes nothing —

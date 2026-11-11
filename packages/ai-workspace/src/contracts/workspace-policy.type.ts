@@ -138,6 +138,19 @@ export interface WorkspaceShellPolicy {
    */
   allowCommand?: WorkspaceAllowCommand;
   /**
+   * Variables a command line may set although they can make a program run
+   * another one (`PATH`, `NODE_OPTIONS`, `GIT_SSH_COMMAND`, `GIT_PAGER`,
+   * `EDITOR`, `LD_PRELOAD`, `*_ASKPASS`, …). When the policy restricts which
+   * programs run (`allow`, `deny`, `denyPatterns`, `rules` or
+   * `allowCommand`), assigning one of those — `NAME=value cmd`, `env
+   * NAME=value cmd` or `export NAME=value` — is refused (asked with `onAsk`)
+   * unless it is listed here. Default `[]`.
+   *
+   * @example
+   * shell: { interpreter: "sh", allow: ["npm"], allowAssignments: ["NODE_OPTIONS"] }
+   */
+  allowAssignments?: string[];
+  /**
    * How the command line is interpreted. Default `"none"` (argv mode, no
    * shell). `"sh"` is an explicit opt-in to shell syntax — pipes, `&&`,
    * redirections — still checked per simple command (see
@@ -240,6 +253,12 @@ export interface WorkspaceSearchPolicy {
   gitignore?: boolean;
   /** Most files one search looks at before it stops and reports `truncated`. Default `50000`. */
   maxFiles?: number;
+  /**
+   * Largest file, in bytes, `grep` reads. Bigger files (database dumps,
+   * logs, build bundles) are skipped without being read and counted in the
+   * result's `skippedFiles`. Default `2_000_000`.
+   */
+  maxFileBytes?: number;
   /** Directories read at once. Default `16`. */
   concurrency?: number;
 }

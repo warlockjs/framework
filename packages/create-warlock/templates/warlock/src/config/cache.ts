@@ -56,13 +56,18 @@ const cacheConfigurations: CacheConfigurations<"database"> = {
       url: env("REDIS_URL"),
       globalPrefix,
     },
+    // In-memory stores live in the process heap, and cached repository reads
+    // are keyed by request input, so each store keeps at most `maxSize` entries
+    // and evicts the least recently used one past it.
     memory: {
       globalPrefix,
       ttl: 3 * 60 * 60, // 3 hours
+      maxSize: 10_000,
     },
     memoryExtended: {
       globalPrefix,
       ttl: 30 * 60, // 30 minutes
+      maxSize: 10_000,
     },
   },
 };

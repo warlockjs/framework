@@ -59,6 +59,8 @@ See [Customize user type](../guides/customize-user-type.md) for the multi-user-t
 
 The signing key for access tokens. Pull it from `env("JWT_SECRET")` — never hard-code it.
 
+Use at least 32 bytes (`warlock jwt.generate` writes 64). In production, a shorter `accessToken.secret` or `refreshToken.secret` logs a one-time warning at the first token issue: one captured token is enough to guess a short secret offline and forge tokens for any user.
+
 ### `jwt.algorithm`
 
 The signing algorithm passed to `fast-jwt`. Default: `"HS256"`. Accepts any `Algorithm` value from `fast-jwt`. Most apps stay on the default.
@@ -78,7 +80,39 @@ jwt: {
 }
 ```
 
-`NO_EXPIRATION` is `"100y"` — practically forever. Useful for service tokens; almost never right for end-user access tokens.
+`NO_EXPIRATION` is `"100y"` — practically forever. Useful for service tokens; almost never right for end-user access tokens. In production, an access-token lifetime over 30 days logs a one-time warning; prefer a short lifetime with refresh tokens:
+
+```ts
+accessToken: { secret: env("JWT_SECRET"), expiresIn: "1h" },
+refreshToken: { enabled: true, secret: env("JWT_REFRESH_SECRET"), expiresIn: "7d" },
+```
+
+### `accessToken.issuer` / `accessToken.audience` — New in 5.53
+
+```ts
+accessToken: {
+  secret: env("JWT_SECRET"),
+  issuer: "https://api.example.com", // default: unset
+  audience: "web-app",               // default: unset (string or string[])
+}
+```
+
+When set, every access and refresh token this app signs carries the `iss` / `aud` claim, and every token it accepts must carry a matching one. Set them when several apps or services share a signing secret, so a token minted by one is refused by the others. Unset (the default) changes nothing.
+
+Tokens signed before you set either value have no such claim and are refused, so every signed-in user signs in again once. Deploy the change when that is acceptable.
+
+### `hashTokensAtRest` — New in 5.53
+
+```ts
+hashTokensAtRest: true, // default: false
+```
+
+Stores only the SHA-256 digest of each access and refresh token in `access_tokens.token` / `refresh_tokens.token`, never the token itself, so a copied table (a backup, a replica, a read-only SQL injection) cannot be replayed as a login. Turn it on for every new app.
+
+- No migration: the digest goes in the existing `token` column.
+- Lookups accept both forms, so rows issued before the switch keep working until they expire, and turning it off again signs no one out.
+- A row loaded from the database no longer holds the raw token. The row `authService.createRefreshToken()` / `user.generateRefreshToken()` returns exposes it as `row.plainToken`; `login()` and `createTokenPair()` return the raw tokens as before.
+- Automatic cookie renewal keeps its short duplicate window by parking the new pair, encrypted, in the cache for that window. Without a shared cache driver, a duplicate renewal on another server inside the window answers `401` instead of the same pair.
 
 ### `jwt.refresh.secret`
 
@@ -127,6 +161,18 @@ cookie: {
 ```
 
 The cookie name and `Path` attribute `authService.setAuthCookie` / `clearAuthCookie` use by default (a per-call `options.name` / `options.path` overrides either). `HttpOnly`, `SameSite=Lax`, and `Secure` outside development are not configurable here — they come from core's `secureCookieDefaults()` floor. See [Handle login and logout](../guides/handle-login-and-logout.md#cookie-based-sessions--setauthcookie--clearauthcookie).
+
+### `cookie.hostPrefix` — New in 5.53
+
+```ts
+cookie: {
+  hostPrefix: true, // default: false
+}
+```
+
+Writes the auth cookies as `__Host-access_token` / `__Host-refresh_token`. Browsers only accept a `__Host-` cookie that is `Secure`, has `Path=/` and no `Domain`, so a sibling subdomain or a plain-HTTP page cannot plant or overwrite the session cookie. It needs `cookie.path: "/"` and no `cookie.cookieDomain` (nor a `domain` in `http.cookies.options`); a cookie write that breaks either rule throws, naming the setting to change.
+
+While you switch, the unprefixed cookie is still read, so signed-in users stay signed in, and logout clears both names.
 
 ### `csrf.allowedOrigins` — New in 5.12
 

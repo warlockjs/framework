@@ -2,7 +2,11 @@ import type { FocusEvent, MouseEvent } from "react";
 import { requestContext } from "@warlock.js/core";
 import { stringify } from "devalue";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { resetPrefetchCache, takePrefetchedPageData } from "../client/navigation/prefetch";
+import {
+  PREFETCH_HOVER_DELAY_MS,
+  resetPrefetchCache,
+  takePrefetchedPageData,
+} from "../client/navigation/prefetch";
 import { connectSharedStore } from "../shared";
 import { recordCurrentLocale, resetCurrentLocale } from "../routing/current-locale";
 import { publishLocaleRouting } from "../routing/locale-routing";
@@ -643,8 +647,41 @@ describe("Link — prefetch", () => {
 
     onMouseEnter?.({} as MouseEvent<HTMLAnchorElement>);
 
+    // The pointer rests past the hover-intent delay, then the fetch settles.
+    await new Promise((resolve) => {
+      setTimeout(resolve, PREFETCH_HOVER_DELAY_MS + 5);
+    });
     await flush();
   }
+
+  it("sends nothing when the pointer leaves before the hover-intent delay", async () => {
+    const fetchMock = respondWithPayload();
+    const { props } = render({ to: "main.home", prefetch: true });
+    const onMouseEnter = props.onMouseEnter as (event: MouseEvent<HTMLAnchorElement>) => void;
+    const onMouseLeave = props.onMouseLeave as (event: MouseEvent<HTMLAnchorElement>) => void;
+
+    onMouseEnter({} as MouseEvent<HTMLAnchorElement>);
+    onMouseLeave({} as MouseEvent<HTMLAnchorElement>);
+
+    await new Promise((resolve) => {
+      setTimeout(resolve, PREFETCH_HOVER_DELAY_MS + 5);
+    });
+    await flush();
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(takePrefetchedPageData("/")).toBeUndefined();
+  });
+
+  it("still runs the caller's own onMouseLeave", () => {
+    const onMouseLeave = vi.fn();
+    const { props } = render({ to: "main.home", prefetch: true, onMouseLeave });
+
+    (props.onMouseLeave as (event: MouseEvent<HTMLAnchorElement>) => void)(
+      {} as MouseEvent<HTMLAnchorElement>,
+    );
+
+    expect(onMouseLeave).toHaveBeenCalledOnce();
+  });
 
   it("populates the cache on hover", async () => {
     respondWithPayload();

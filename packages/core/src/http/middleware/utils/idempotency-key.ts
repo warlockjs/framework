@@ -80,5 +80,45 @@ export function buildIdempotencyCacheKey(request: Request, idempotencyKey: strin
   const method = (request.route?.method || request.method || "").toUpperCase();
   const routePath = request.route?.path || "";
 
-  return `idem:${userType}:${userId}:${method}:${routePath}:${idempotencyKey}`;
+  // ...and by the concrete target: `/orders/1/cancel` and `/orders/2/cancel`
+  // share a route pattern, but one key must never answer both
+  const target = hashRequestTarget(request.params, request.query);
+
+  return `idem:${userType}:${userId}:${method}:${routePath}${target ? `#${target}` : ""}:${idempotencyKey}`;
+}
+
+/**
+ * Short, order-independent digest of a request's route params and query, or
+ * an empty string when it has neither.
+ */
+function hashRequestTarget(params: unknown, query: unknown): string {
+  const hasParams = isNonEmptyObject(params);
+  const hasQuery = isNonEmptyObject(query);
+
+  if (!hasParams && !hasQuery) return "";
+
+  const serialized = JSON.stringify([
+    hasParams ? sortKeys(params) : {},
+    hasQuery ? sortKeys(query) : {},
+  ]);
+
+  return createHash("sha256").update(serialized).digest("hex").slice(0, 16);
+}
+
+function isNonEmptyObject(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === "object" && Object.keys(value).length > 0;
+}
+
+function sortKeys(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(sortKeys);
+
+  if (!value || typeof value !== "object") return value;
+
+  const sorted: Record<string, unknown> = {};
+
+  for (const key of Object.keys(value).sort()) {
+    sorted[key] = sortKeys((value as Record<string, unknown>)[key]);
+  }
+
+  return sorted;
 }

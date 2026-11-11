@@ -30,6 +30,12 @@ import { isAggregateExpression } from "../../expressions";
 import type { GlobalScopeDefinition } from "../../model/model";
 import { resolveModelClass, tryResolveModelClass, type ModelRef } from "../../model/register-model";
 import { assertLeanCompatible, stripHiddenFromLeanRecords } from "../../query-builder/lean-records";
+import { runChunks, type KeysetPlan } from "../../query-builder/keyset-chunk";
+import {
+  resolvePageLimit,
+  resolvePageNumber,
+  toSafeCount,
+} from "../../query-builder/pagination-limits";
 import { QueryBuilder, type Op } from "../../query-builder/query-builder";
 import {
   inferBelongsToForeignKey,
@@ -40,6 +46,7 @@ import {
 import { attachLoadedRelation, RelationLoader } from "../../relations/relation-loader";
 import type { PostgresDriver } from "./postgres-driver";
 import { PostgresQueryParser, type PostgresParserOperation } from "./postgres-query-parser";
+import { toSqlComparisonOperator } from "./sql-comparison-operator";
 
 // ============================================================================
 // HELPER
@@ -559,8 +566,10 @@ export class PostgresQueryBuilder<T = unknown>
       }
     }
 
-    // Relation-existence ops are rewritten later by `applyHasRelations()`, which
-    // only looks at top-level ops, so they stay outside the groups.
+    // Relation-existence ops become `whereRaw` / `orWhereRaw` EXISTS filters
+    // here, before grouping, so they land inside the user group: left at the
+    // top level, an `orWhereHas` would be ORed with the scope group and match
+    // rows the scopes hide (another tenant's, soft-deleted ones).
     const HAS_OP_TYPES = new Set([
       "has",
       "whereHas",
@@ -568,10 +577,13 @@ export class PostgresQueryBuilder<T = unknown>
       "doesntHave",
       "whereDoesntHave",
     ]);
-    const isFilter = (op: Op): boolean =>
-      /^(or)?where/i.test(op.type) && !HAS_OP_TYPES.has(op.type);
+    const translateHasOps = (ops: Op[]): Op[] =>
+      ops.map((op) => (HAS_OP_TYPES.has(op.type) ? this.translateHasOp(op) : op));
+    const isFilter = (op: Op): boolean => /^(or)?where/i.test(op.type);
 
-    const scopeFilters = [...beforeOps, ...afterOps].filter(isFilter);
+    const scopedBefore = translateHasOps(beforeOps);
+    const scopedAfter = translateHasOps(afterOps);
+    const scopeFilters = [...scopedBefore, ...scopedAfter].filter(isFilter);
 
     // No filtering scope: nothing can be escaped, keep the ops as they are.
     if (scopeFilters.length === 0) {
@@ -580,6 +592,8 @@ export class PostgresQueryBuilder<T = unknown>
       return;
     }
 
+    this.operations = translateHasOps(this.operations);
+
     // `(scopes) AND (user conditions)`: a user `orWhere` must never widen the
     // scopes (tenant, soft delete).
     const userFilters = this.operations.filter(isFilter);
@@ -587,10 +601,10 @@ export class PostgresQueryBuilder<T = unknown>
 
     this.operations = [
       { type: "where", data: { nested: scopeFilters } },
-      ...beforeOps.filter((op) => !isFilter(op)),
+      ...scopedBefore.filter((op) => !isFilter(op)),
       ...(userFilters.length > 0 ? [{ type: "where", data: { nested: userFilters } }] : []),
       ...userRest,
-      ...afterOps.filter((op) => !isFilter(op)),
+      ...scopedAfter.filter((op) => !isFilter(op)),
     ];
     this.scopesApplied = true;
   }
@@ -629,6 +643,11 @@ export class PostgresQueryBuilder<T = unknown>
     });
     return this;
   }
+
+  // ─── JSON / array helpers that build SQL text ────────────────
+  // The base builder splices `path` / `field` / `operator` into raw SQL;
+  // here every identifier is quoted, every JSON key escaped as a literal and
+  // every operator checked against the comparison set.
 
   /** Array field contains a value (or object with key). */
   public whereArrayContains(field: string, value: unknown, key?: string): this {
@@ -1177,32 +1196,95 @@ export class PostgresQueryBuilder<T = unknown>
   /**
    * Process results in memory-efficient chunks.
    *
+   * When the query is not ordered, or ordered by the model's primary key
+   * alone, each chunk continues after the last key seen (keyset paging):
+   * every chunk costs the same, and rows the callback updates or deletes do
+   * not shift later chunks. An unordered query is read in primary-key order.
+   * Any other query (another sort, `limit`/`offset`, grouping, joins, a
+   * top-level `orWhere`, a query with no model) pages by OFFSET.
+   *
    * @example
    * await User.query().chunk(100, async (rows, idx) => { ... })
    */
   public async chunk(size: number, callback: ChunkCallback<T>): Promise<void> {
-    let chunkIndex = 0;
-    let hasMore = true;
+    // Scopes first: a scope's own sort or filters decide the plan too.
+    this.applyPendingScopes();
 
-    while (hasMore) {
-      const chunk = await this.clone()
-        .skip(chunkIndex * size)
-        .limit(size)
-        .get();
-      if (chunk.length === 0) break;
+    const plan = this.keysetChunkPlan();
 
-      const shouldContinue = await callback(chunk, chunkIndex);
-      if (shouldContinue === false) break;
+    await runChunks<T>(size, callback, plan, (page, pageSize) => {
+      const query = this.clone();
 
-      hasMore = chunk.length === size;
-      chunkIndex++;
+      if (plan) {
+        if (page.after !== undefined) {
+          query.where(plan.key, plan.direction === "asc" ? ">" : "<", page.after);
+        }
+
+        if (!plan.sorted) {
+          query.orderBy(plan.key, plan.direction);
+        }
+      }
+
+      if (page.offset !== undefined) {
+        query.skip(page.offset);
+      }
+
+      return query.limit(pageSize).get();
+    });
+  }
+
+  /**
+   * The keyset plan for `chunk()`, or undefined when the query must page by
+   * OFFSET (see {@link chunk}).
+   */
+  private keysetChunkPlan(): KeysetPlan | undefined {
+    const primaryKey = (this.modelClass as { primaryKey?: string } | undefined)?.primaryKey;
+
+    if (!primaryKey) return undefined;
+
+    let sortField: string | undefined;
+    let direction: "asc" | "desc" = "asc";
+
+    for (const op of this.operations) {
+      // A later `where` joins a top-level `orWhere` chain as another OR
+      // branch (AND binds tighter), so the key condition could not narrow it.
+      if (op.type.startsWith("orWhere")) return undefined;
+
+      if (op.type.startsWith("where")) continue;
+
+      if (op.type === "select" || op.type === "selectRaw" || op.type === "deselect") continue;
+
+      if (op.type === "orderBy") {
+        const rawDirection = String(op.data.direction ?? "asc").toLowerCase();
+
+        if (rawDirection !== "asc" && rawDirection !== "desc") return undefined;
+
+        if (
+          sortField !== undefined &&
+          (sortField !== op.data.field || direction !== rawDirection)
+        ) {
+          return undefined;
+        }
+
+        sortField = op.data.field as string;
+        direction = rawDirection;
+        continue;
+      }
+
+      return undefined;
     }
+
+    if (sortField === undefined) {
+      return { key: primaryKey, direction: "asc", sorted: false };
+    }
+
+    return sortField === primaryKey ? { key: sortField, direction, sorted: true } : undefined;
   }
 
   /** Page-based pagination. */
   public async paginate(options?: PaginationOptions): Promise<PaginationResult<T>> {
-    const page = options?.page ?? 1;
-    const limit = options?.limit ?? 10;
+    const page = resolvePageNumber(options?.page);
+    const limit = resolvePageLimit(options?.limit, options?.maxLimit, "paginate");
     const skip = (page - 1) * limit;
 
     const [data, total] = await Promise.all([
@@ -1242,12 +1324,8 @@ export class PostgresQueryBuilder<T = unknown>
     const cursorOp = this.getOps("cursor")[0];
     const recordedCursor = cursorOp?.data.after;
 
-    const {
-      limit = 10,
-      cursor = recordedCursor,
-      column = "id",
-      direction = "next",
-    } = options ?? {};
+    const { cursor = recordedCursor, column = "id", direction = "next" } = options ?? {};
+    const limit = resolvePageLimit(options?.limit, options?.maxLimit, "cursorPaginate");
 
     if (cursor) {
       this.where(column, direction === "next" ? ">" : "<", cursor);
@@ -1735,12 +1813,15 @@ export class PostgresQueryBuilder<T = unknown>
       opType === "has" && ((operator !== undefined && operator !== ">=") || (count ?? 1) !== 1);
 
     if (isCountComparison) {
-      const op = operator ?? ">=";
-      const compareCount = count ?? 1;
+      // Both are often request input (`has("posts", ">=", request.input("min"))`):
+      // the operator is SQL text, so only a comparison token passes, and the
+      // count is bound, never spliced into the statement.
+      const op = toSqlComparisonOperator(operator ?? ">=", "has()");
+      const compareCount = toSafeCount(count ?? 1, 'has(): "count"');
 
       return {
-        expression: `(SELECT COUNT(*) FROM ${fromClause} WHERE ${fullWhere}) ${op} ${compareCount}`,
-        bindings: where.bindings,
+        expression: `((SELECT COUNT(*) FROM ${fromClause} WHERE ${fullWhere}) ${op} ?)`,
+        bindings: [...where.bindings, compareCount],
       };
     }
 
@@ -2020,7 +2101,8 @@ export class PostgresQueryBuilder<T = unknown>
         return operation;
       }
 
-      const operator = (operation.data.operator as string) ?? "=";
+      // The operator lands in SQL text: accept comparison tokens only.
+      const operator = toSqlComparisonOperator(operation.data.operator ?? "=", "having()");
 
       return {
         type: "havingRaw",
@@ -2079,18 +2161,21 @@ export class PostgresQueryBuilder<T = unknown>
     const result = new Map<number, Record<string, unknown>>();
     if (this.joinRelations.size === 0) return result;
 
+    // The layout depends on the query only: sort and split the paths once.
+    // Shallower paths come first so parents exist before children.
+    const layout = Array.from(this.joinRelations.keys())
+      .sort((a, b) => a.split(".").length - b.split(".").length)
+      .map((path) => {
+        const parts = path.split(".");
+        const lastPart = parts.pop()!;
+
+        return { columnName: this.joinRelations.get(path)!.alias, parents: parts, lastPart };
+      });
+
     (records as Record<string, unknown>[]).forEach((record, index) => {
       const relationData: Record<string, unknown> = {};
 
-      // Process shallower paths first so parents exist before children
-      const sortedPaths = Array.from(this.joinRelations.keys()).sort(
-        (a, b) => a.split(".").length - b.split(".").length,
-      );
-
-      for (const path of sortedPaths) {
-        const config = this.joinRelations.get(path)!;
-        const columnName = config.alias;
-
+      for (const { columnName, parents, lastPart } of layout) {
         const relatedData = record[columnName];
         delete record[columnName];
 
@@ -2103,11 +2188,9 @@ export class PostgresQueryBuilder<T = unknown>
             ? relatedData
             : null;
 
-        const parts = path.split(".");
-        const lastPart = parts.pop()!;
         let current = relationData;
 
-        for (const part of parts) {
+        for (const part of parents) {
           if (!current[part]) current[part] = {};
           current = current[part] as Record<string, unknown>;
         }
@@ -2130,6 +2213,29 @@ export class PostgresQueryBuilder<T = unknown>
   ): void {
     if (this.joinRelations.size === 0) return;
 
+    // Child keys per path depend on the query only: computed once per path.
+    const childKeysByPath = new Map<string, string[]>();
+    const childKeysOf = (path: string): string[] => {
+      const cached = childKeysByPath.get(path);
+
+      if (cached) return cached;
+
+      const depth = path.split(".").length;
+      const keys = Array.from(this.joinRelations.keys())
+        .filter((p) => p.startsWith(`${path}.`))
+        .map((p) => p.split(".")[depth])
+        // The `startsWith` filter means the segment at this depth always
+        // exists, so the predicate drops nothing today. It is here so the
+        // keys stay `string[]`: these are used as `delete rowData[key]`, and
+        // an undefined key would delete the literal property "undefined"
+        // while leaving the real child column in the hydrated row.
+        .filter((segment): segment is string => segment !== undefined);
+
+      childKeysByPath.set(path, keys);
+
+      return keys;
+    };
+
     const attachNested = (model: unknown, dataTree: unknown, currentPath = ""): void => {
       if (!dataTree || typeof dataTree !== "object") return;
 
@@ -2146,15 +2252,7 @@ export class PostgresQueryBuilder<T = unknown>
         const RelatedModel = resolveModelClass(config.model as string);
         if (!RelatedModel) continue;
 
-        const childKeys = Array.from(this.joinRelations.keys())
-          .filter((p) => p.startsWith(`${path}.`))
-          .map((p) => p.split(".")[path.split(".").length])
-          // The `startsWith` filter means the segment at this depth always
-          // exists, so the predicate drops nothing today. It is here so the
-          // keys stay `string[]`: these are used as `delete rowData[key]`, and
-          // an undefined key would delete the literal property "undefined"
-          // while leaving the real child column in the hydrated row.
-          .filter((segment): segment is string => segment !== undefined);
+        const childKeys = childKeysOf(path);
 
         if (config.type === "hasMany") {
           const rows = Array.isArray(data) ? data : [];

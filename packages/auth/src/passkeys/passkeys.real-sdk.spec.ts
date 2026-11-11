@@ -116,6 +116,44 @@ describe("passkeys against the real @simplewebauthn/server", () => {
     expect((defined(completeLogin.mock.calls[0], "first call")[0] as User).id).toBe(user.id);
   });
 
+  it("accepts an assertion without user verification under the default (preferred)", async () => {
+    const { authenticator } = await registered();
+    authenticator.counter = 1;
+    authenticator.userVerified = false;
+
+    await expect(login(authenticator)).resolves.toBeDefined();
+  });
+
+  it('refuses an assertion without user verification when userVerification is "required"', async () => {
+    const { authenticator } = await registered();
+    configValues["auth.passkeys"] = {
+      rpID: RP_ID,
+      rpName: "App",
+      origin: ORIGIN,
+      userVerification: "required",
+    };
+    authenticator.counter = 1;
+    authenticator.userVerified = false;
+
+    const error = await login(authenticator).catch((e) => e);
+
+    expect(error).toBeInstanceOf(InvalidPasskeyError);
+    expect(completeLogin).not.toHaveBeenCalled();
+  });
+
+  it('accepts a user-verified assertion when userVerification is "required"', async () => {
+    configValues["auth.passkeys"] = {
+      rpID: RP_ID,
+      rpName: "App",
+      origin: ORIGIN,
+      userVerification: "required",
+    };
+    const { authenticator } = await registered();
+    authenticator.counter = 1;
+
+    await expect(login(authenticator)).resolves.toBeDefined();
+  });
+
   it("rejects a cloned authenticator whose counter did not advance", async () => {
     const { authenticator } = await registered();
     authenticator.counter = 3;

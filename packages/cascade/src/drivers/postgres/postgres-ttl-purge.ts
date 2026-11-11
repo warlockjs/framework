@@ -4,6 +4,18 @@ import type { PostgresDriver } from "./postgres-driver";
 const TTL_PURGE_INTERVAL_MINUTES = 1;
 const TTL_COMMENT_PREFIX = "warlock_ttl:";
 
+/** Rows one purge statement deletes at most. */
+const TTL_PURGE_BATCH_SIZE = 5000;
+
+/**
+ * Statements one purge run issues at most; a larger backlog is finished by
+ * the next runs, so one run never holds the table for long.
+ */
+const TTL_PURGE_MAX_BATCHES_PER_RUN = 100;
+
+/** Purges in progress, by job name: a run that would overlap is skipped. */
+const runningPurges = new Set<string>();
+
 let nextDriverId = 0;
 const driverIds = new WeakMap<object, number>();
 const driverJobs = new WeakMap<object, Set<string>>();
@@ -45,6 +57,12 @@ export function postgresTTLPurgeJobName(driver: object, table: string, column: s
 /**
  * Delete rows which have outlived a PostgreSQL TTL index's retention period.
  *
+ * Rows are deleted in batches of at most 5,000 per statement, up to 100
+ * statements per run, so a large backlog (after downtime, or when TTL is
+ * first added to a big table) never becomes one long transaction; whatever
+ * is left is removed by the next runs. The expiry condition is repeated on
+ * the outer statement, so only expired rows are ever deleted.
+ *
  * Identifiers are produced by the dialect, while the retention interval stays
  * parameterized so a migration value can never become executable SQL.
  */
@@ -56,11 +74,18 @@ export async function purgeExpiredPostgresRows(
 ): Promise<void> {
   const quotedTable = driver.dialect.quoteIdentifier(table);
   const quotedColumn = driver.dialect.quoteIdentifier(column);
+  const expired = `${quotedColumn} < NOW() - ($1 * INTERVAL '1 second')`;
+  const sql =
+    `DELETE FROM ${quotedTable} WHERE ${expired} AND ctid IN ` +
+    `(SELECT ctid FROM ${quotedTable} WHERE ${expired} LIMIT $2)`;
 
-  await driver.query(
-    `DELETE FROM ${quotedTable} WHERE ${quotedColumn} < NOW() - ($1 * INTERVAL '1 second')`,
-    [expireAfterSeconds],
-  );
+  for (let batch = 0; batch < TTL_PURGE_MAX_BATCHES_PER_RUN; batch++) {
+    const result = (await driver.query(sql, [expireAfterSeconds, TTL_PURGE_BATCH_SIZE])) as
+      | { rowCount?: number | null }
+      | undefined;
+
+    if ((result?.rowCount ?? 0) < TTL_PURGE_BATCH_SIZE) return;
+  }
 }
 
 /**
@@ -80,9 +105,19 @@ export function registerPostgresTTLPurgeJob(
 
   scheduler.removeJob(name);
   scheduler.addJob(
-    job(name, () =>
-      purgeExpiredPostgresRows(driver, table, column, expireAfterSeconds),
-    ).everyMinutes(TTL_PURGE_INTERVAL_MINUTES),
+    job(name, async () => {
+      // A run still deleting a backlog when the next tick comes keeps going;
+      // the new run is skipped instead of competing for the same rows.
+      if (runningPurges.has(name)) return;
+
+      runningPurges.add(name);
+
+      try {
+        await purgeExpiredPostgresRows(driver, table, column, expireAfterSeconds);
+      } finally {
+        runningPurges.delete(name);
+      }
+    }).everyMinutes(TTL_PURGE_INTERVAL_MINUTES),
   );
   let names = driverJobs.get(driver);
   if (!names) {

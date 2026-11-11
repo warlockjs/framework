@@ -70,18 +70,20 @@ const encryptionConfig: EncryptionConfigurations = {
   hmacKey: env("APP_HMAC_KEY"), // 64 hex chars — falls back to `key` if absent
   password: {
     salt: 12, // bcrypt rounds. 10–12 is the standard band.
+    rejectLongPasswords: true, // optional: refuse passwords over 72 bytes (default false)
   },
 };
 
 export default encryptionConfig;
 ```
 
-| Field           | Purpose                                                                        |
-| --------------- | ------------------------------------------------------------------------------ |
-| `key`           | 32-byte hex key for `encrypt` / `decrypt`. **Never rotate without migration.** |
-| `algorithm`     | Cipher algorithm. Default `aes-256-gcm`. Other GCM variants work.              |
-| `hmacKey`       | Separate HMAC key for `hmacHash`. Falls back to `key` if not set.              |
-| `password.salt` | bcrypt rounds. Higher = slower = more secure. 10–12 standard.                  |
+| Field                          | Purpose                                                                                       |
+| ------------------------------ | --------------------------------------------------------------------------------------------- |
+| `key`                          | 32-byte hex key for `encrypt` / `decrypt`. **Never rotate without migration.**                |
+| `algorithm`                    | Cipher algorithm. Default `aes-256-gcm`. Other GCM variants work.                             |
+| `hmacKey`                      | Separate HMAC key for `hmacHash`. Falls back to `key` if not set.                             |
+| `password.salt`                | bcrypt rounds. Higher = slower = more secure. 10–12 standard.                                 |
+| `password.rejectLongPasswords` | `true` makes `hashPassword` throw for a password over 72 bytes. Default `false` (warns once). |
 
 The encryption key is a forever decision. Every value you encrypt under it depends on that key for recovery — if you change it, every existing ciphertext becomes garbage. Plan a migration if you ever genuinely need to rotate (decrypt-all + re-encrypt under new key + atomic cutover).
 
@@ -144,9 +146,9 @@ await User.create({ email, password: await hashPassword(password) });
 
 The `@warlock.js/auth` package wires both helpers into its `authService` — `authService.hashPassword(p)` and `authService.verifyPassword(plain, hash)` are thin proxies over these. Use the auth service if you're using `@warlock.js/auth`; use the core helpers directly if you're rolling your own.
 
-### Why bcryptjs (not native bcrypt)
+### bcryptjs, or native `bcrypt` when installed
 
-The framework uses **`bcryptjs`** — pure JS, lazy-loaded. You get a clear install hint if it's missing:
+The framework ships with **`bcryptjs`**: pure JS, lazy-loaded, no native build. You get a clear install hint if it's missing:
 
 ```
 Password encryption requires the bcryptjs package.
@@ -154,9 +156,19 @@ Install it with:
   pnpm add bcryptjs
 ```
 
-Don't swap for native `bcrypt` without a reason — `bcryptjs` is portable across every platform (no native build), and the perf delta isn't meaningful at the verify-on-login frequency. If you're hashing 1000 passwords per second, you have a different problem.
+`bcryptjs` runs its rounds on the event loop in small slices, so each hash at `salt: 12` takes a few hundred milliseconds of the process's CPU. On a busy login endpoint, install the native module and the helpers use it automatically:
 
-Both functions are async because bcrypt is CPU-bound and Node's bcrypt bindings dispatch to a thread pool — never block the event loop with `hashSync`.
+```bash
+pnpm add bcrypt
+```
+
+With `bcrypt` installed, `hashPassword` and `verifyPassword` run on the libuv thread pool instead of the event loop. Nothing else changes: both libraries produce the same `$2b$` hashes, so passwords hashed before keep verifying, and a hash in another bcrypt variant (such as `$2y$`) is still verified by `bcryptjs`. The thread pool has 4 threads by default; raise `UV_THREADPOOL_SIZE` if many logins run at once.
+
+Both functions are async: never block the event loop with `hashSync`.
+
+### The 72-byte limit
+
+bcrypt uses only the first 72 bytes of a password (UTF-8 bytes, so about 18 to 24 characters of a non-Latin script). Everything after byte 72 is ignored, so two passwords that share their first 72 bytes match each other. By default `hashPassword` still hashes such a password and logs a one-time warning. Set `encryption.password.rejectLongPasswords: true` to make it throw instead, and cap password length in your validation rules so users get a clear message before that.
 
 ## `encrypt` / `decrypt` — reversible secrets
 
@@ -222,6 +234,7 @@ await fetch("https://api.openai.com/v1/chat/completions", {
 `decrypt()` throws on:
 
 - Invalid format (not three colon-separated parts).
+- An IV or auth tag that is not exactly 16 bytes (32 hex characters). `encrypt()` always writes 16-byte ones; a shortened tag would make forging a ciphertext far easier, so it is refused.
 - Wrong key (the IV decrypts but the authTag mismatches).
 - Tampered ciphertext (auth tag mismatch).
 - Wrong algorithm vs. the one used to encrypt.

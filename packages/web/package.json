@@ -71,7 +71,7 @@
     "@babel/types": "^7.29.7",
     "@mongez/localization": "^3.5.1",
     "@warlock.js/sitemap": "workspace:^",
-    "devalue": "^5.9.2",
+    "devalue": "^5.9.3",
     "magic-string": "^0.30.21",
     "oxc-parser": "0.154.0"
   },
@@ -132,7 +132,7 @@
     "@warlock.js/core": "workspace:^",
     "@warlock.js/seal": "workspace:^",
     "esbuild": "^0.28.2",
-    "fastify": "^5.12.5",
+    "fastify": "^5.12.6",
     "jsdom": "30.0.1",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",

@@ -221,6 +221,7 @@ class FakePool implements PgClientLike {
     }
 
     // SELECT value FROM <t> WHERE key = $1 AND (expires_at IS NULL OR expires_at > now())
+    // node-postgres parses JSONB per query: every result is a fresh object.
     if (sql.startsWith(`SELECT value FROM ${t}`)) {
       const key = values![0] as string;
       const row = this.store.get(key);
@@ -228,7 +229,32 @@ class FakePool implements PgClientLike {
       if (row.expires_at && row.expires_at <= new Date()) {
         return { rows: [], rowCount: 0 };
       }
-      return { rows: [{ value: row.value }], rowCount: 1 };
+      return { rows: [{ value: structuredClone(row.value) }], rowCount: 1 };
+    }
+
+    // exists: SELECT 1 FROM <t> WHERE key = $1 AND live
+    if (sql.startsWith("/* cache:exists */")) {
+      const row = this.store.get(values![0] as string);
+      return isLive(row) ? { rows: [{ "?column?": 1 }], rowCount: 1 } : { rows: [], rowCount: 0 };
+    }
+
+    // tag sample: members of the JSON array row, random order, LIMIT $2
+    if (sql.startsWith("/* cache:tag-sample */")) {
+      expect(sql).toContain("ORDER BY random()");
+      const [key, limit] = values as [string, number];
+      const row = this.store.get(key);
+      const members = isLive(row) && Array.isArray(row.value) ? (row.value as string[]) : [];
+      const rows = members.slice(0, limit).map((member) => ({ member }));
+      return { rows, rowCount: rows.length };
+    }
+
+    // remove many: DELETE FROM <t> WHERE key = ANY($1::text[])
+    if (sql.startsWith("/* cache:remove-many */")) {
+      let removed = 0;
+      for (const key of values![0] as string[]) {
+        if (this.store.delete(key)) removed++;
+      }
+      return { rows: [], rowCount: removed };
     }
 
     // prune: DELETE FROM <t> WHERE ctid IN (SELECT ctid ... expires_at < now() LIMIT $1)
@@ -1233,5 +1259,69 @@ describe("PgCacheDriver — extend", () => {
 
     expect(pool.queryLog).toHaveLength(1);
     expect(pool.queryLog[0]!.text).toContain("UPDATE");
+  });
+});
+
+describe("PgCacheDriver — fewer reads and round trips", () => {
+  let driver: PgCacheDriver;
+  let pool: FakePool;
+
+  beforeEach(async () => {
+    pool = new FakePool();
+    driver = new PgCacheDriver();
+    driver.setOptions({ client: pool });
+    await driver.connect();
+  });
+
+  afterEach(async () => {
+    vi.restoreAllMocks();
+    await driver.disconnect();
+  });
+
+  it("returns the freshly parsed value from get() without a second deep copy", async () => {
+    await driver.set("user", { name: "Ada" });
+
+    const clone = vi.spyOn(globalThis, "structuredClone");
+    const fetched = await driver.get("user");
+
+    // The only structuredClone is the fake pool's per-query parse.
+    expect(clone).toHaveBeenCalledTimes(1);
+    expect(fetched).toEqual({ name: "Ada" });
+  });
+
+  it("answers exists() with a SELECT 1 and no hit/miss events", async () => {
+    const events = vi.fn();
+
+    await driver.set("a", 1);
+    driver.on("hit", events);
+    driver.on("miss", events);
+
+    await expect(driver.exists("a")).resolves.toBe(true);
+    await expect(driver.exists("missing")).resolves.toBe(false);
+    expect(events).not.toHaveBeenCalled();
+    expect(pool.queryLog.at(-1)?.text).toContain("/* cache:exists */");
+  });
+
+  it("samples tag members in the database", async () => {
+    await driver.tagAdd("cache:tags:t", ["a", "b", "c"]);
+
+    await expect(driver.tagSample("cache:tags:t", 2)).resolves.toHaveLength(2);
+    expect(pool.queryLog.at(-1)?.values).toEqual(["cache.tags.t", 2]);
+  });
+
+  it("removes many keys in one statement and emits removed per key", async () => {
+    const removed = vi.fn();
+
+    await driver.set("a", 1);
+    await driver.set("b", 2);
+    driver.on("removed", removed);
+
+    const before = pool.queryLog.length;
+
+    await driver.removeMany(["a", "b"]);
+
+    expect(pool.queryLog.length - before).toBe(1);
+    expect(removed).toHaveBeenCalledTimes(2);
+    await expect(driver.get("a")).resolves.toBeNull();
   });
 });

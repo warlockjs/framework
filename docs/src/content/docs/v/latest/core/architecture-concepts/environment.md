@@ -85,6 +85,8 @@ The default loader runs with `override: true`, so values it reads are written on
 
 > A subtlety worth knowing: the resolution picks **either** `.env.<NODE_ENV>` **or** `.env` — not both. If you create `.env.production`, the plain `.env` is no longer read in production. `.env.shared` is the place for values you want in every environment regardless of which main file wins.
 
+When a variable already set in the process environment (by pm2, a container or the shell) beats a different value in the loaded file, boot prints one `[env]` line per key on stderr naming both values. Values that may hold credentials are printed as `<redacted>`: keys whose names look secret (`PASSWORD`, `PASS`, `SECRET`, `TOKEN`, `KEY`, `AUTH`, `CREDENTIAL`, `PRIVATE`, `DSN`, …), URL keys (`*_URL`, `*_URI`) whose value contains `@`, and the `user:password@` part of any URL value.
+
 ## env() — reading a value
 
 `env()` is re-exported from `@warlock.js/core` (it originates in `@mongez/dotenv`):

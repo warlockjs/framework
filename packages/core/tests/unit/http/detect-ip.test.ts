@@ -22,8 +22,8 @@ vi.setConfig({ testTimeout: 120_000 });
  * chain tests below run against a live Fastify booted through the framework's
  * own `startHttpServer()` with a real socket peer address — asserting the
  * config value shapes end to end (`true`, CIDR list) rather than a
- * re-implementation of the chain walk. `X-Real-IP` is not part of Fastify's
- * resolution and is asserted against a seeded `baseRequest`.
+ * re-implementation of the chain walk. Single-address headers are read only
+ * through `http.realIpHeader`, from a trusted peer.
  */
 function makeRequest(seed: { headers?: Record<string, string>; ip?: string }): Request {
   const request = new Request();
@@ -44,6 +44,7 @@ function makeRequest(seed: { headers?: Record<string, string>; ip?: string }): R
  */
 function unsetTrustProxy() {
   config.unset("http.trustProxy");
+  config.unset("http.realIpHeader");
 }
 
 /**
@@ -117,7 +118,7 @@ describe("Request.detectIp", () => {
   });
 
   describe("with http.trustProxy: true (whole chain trusted)", () => {
-    it("returns x-real-ip when present (highest priority)", () => {
+    it("ignores x-real-ip unless http.realIpHeader names it", () => {
       config.set("http.trustProxy", true);
 
       const request = makeRequest({
@@ -125,7 +126,22 @@ describe("Request.detectIp", () => {
           "x-real-ip": "198.51.100.5",
           "x-forwarded-for": "203.0.113.9",
         },
-        ip: "10.0.0.1",
+        ip: "203.0.113.9",
+      });
+
+      expect(request.detectIp()).toBe("203.0.113.9");
+    });
+
+    it("returns the http.realIpHeader value when it is set", () => {
+      config.set("http.trustProxy", true);
+      config.set("http.realIpHeader", "x-real-ip");
+
+      const request = makeRequest({
+        headers: {
+          "x-real-ip": "198.51.100.5",
+          "x-forwarded-for": "203.0.113.9",
+        },
+        ip: "203.0.113.9",
       });
 
       expect(request.detectIp()).toBe("198.51.100.5");
@@ -250,6 +266,30 @@ describe("Request.detectIp", () => {
           remoteAddress: "10.0.0.1",
         }),
       ).toBe("203.0.113.9");
+    });
+
+    it("reads http.realIpHeader when the peer is a trusted proxy", async () => {
+      config.set("http.realIpHeader", "cf-connecting-ip");
+
+      expect(
+        await detectIpThroughServer({
+          trustProxy: "10.0.0.0/8",
+          headers: { "cf-connecting-ip": "203.0.113.9" },
+          remoteAddress: "10.0.0.1",
+        }),
+      ).toBe("203.0.113.9");
+    });
+
+    it("ignores http.realIpHeader sent by a peer that is not a trusted proxy", async () => {
+      config.set("http.realIpHeader", "cf-connecting-ip");
+
+      expect(
+        await detectIpThroughServer({
+          trustProxy: "10.0.0.0/8",
+          headers: { "cf-connecting-ip": "203.0.113.9" },
+          remoteAddress: "198.51.100.1",
+        }),
+      ).toBe("198.51.100.1");
     });
 
     it("ignores x-real-ip under a CIDR list", async () => {

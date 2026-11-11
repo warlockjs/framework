@@ -9,6 +9,12 @@ import {
 } from "../../expressions/aggregate-expressions";
 import type { ColumnExpression } from "../../expressions/column-expressions";
 import { escapeRegex } from "../../utils/escape-regex";
+import {
+  assertSafeLikePattern,
+  likePatternText,
+  type LikePatternLimits,
+} from "../../utils/like-pattern-limits";
+import { assertSafeFieldName } from "./mongodb-filter-guards";
 import type { MongoQueryBuilder } from "./mongodb-query-builder";
 import { isPipelineStageObject } from "./pipeline-stage-object";
 import type { Operation, PipelineStage } from "./types";
@@ -62,6 +68,8 @@ export type MongoQueryParserOptions = {
   operations: Operation[];
   /** Factory method for creating sub-builders (used for callbacks) */
   createSubBuilder: () => MongoQueryBuilder;
+  /** Caps applied to string LIKE patterns (the data source's `like` driver option) */
+  likeLimits?: LikePatternLimits;
 };
 
 /**
@@ -69,11 +77,31 @@ export type MongoQueryParserOptions = {
  * `%` matches any run of characters and `_` exactly one. Every other regex
  * metacharacter in a string is escaped, so `a.b*` matches literally. An explicit
  * `RegExp` is developer-authored and used verbatim.
+ *
+ * The regex is unanchored, so a leading or trailing `%` adds nothing but
+ * backtracking work and is dropped (`%term%` compiles to `term`). A string
+ * pattern with more `%` wildcards or characters than `limits` allow is
+ * refused; a number or boolean matches its text form.
+ *
+ * @throws UnsafeFilterError when the pattern is not text or exceeds a cap
  */
-export function resolveMongoLikePattern(pattern: RegExp | string): string {
+export function resolveMongoLikePattern(
+  pattern: RegExp | string,
+  limits?: LikePatternLimits,
+  field?: string,
+): string {
   if (pattern instanceof RegExp) return pattern.source;
 
-  return escapeRegex(pattern).replace(/%+/g, ".*").replace(/_/g, ".");
+  const text = likePatternText(pattern, field);
+
+  assertSafeLikePattern(text, limits, field);
+
+  return escapeRegex(text)
+    .replace(/%+/g, "%")
+    .replace(/^%/, "")
+    .replace(/%$/, "")
+    .replace(/%/g, ".*")
+    .replace(/_/g, ".");
 }
 
 /**
@@ -101,6 +129,11 @@ export class MongoQueryParser {
   private readonly createSubBuilder: () => MongoQueryBuilder;
 
   /**
+   * Caps applied to string LIKE patterns.
+   */
+  private readonly likeLimits?: LikePatternLimits;
+
+  /**
    * Track group field names for automatic _id renaming.
    * Maps pipeline index to field names.
    */
@@ -123,6 +156,7 @@ export class MongoQueryParser {
     this.collection = options.collection;
     this.operations = options.operations;
     this.createSubBuilder = options.createSubBuilder;
+    this.likeLimits = options.likeLimits;
   }
 
   /**
@@ -669,8 +703,18 @@ export class MongoQueryParser {
 
         return first === undefined ? null : { $vectorSearch: first.data };
       }
-      default:
-        return null;
+      default: {
+        // An operation with no stage this parser knows would vanish from the
+        // pipeline; when it is a filter, the query (and any update/delete
+        // built from it) would widen to every document.
+        const type = operations[0]?.type ?? String(stage);
+
+        throw new UnsupportedQueryOperationError(
+          type,
+          "mongodb",
+          `It has no MongoDB pipeline stage, so it was refused rather than silently dropped.`,
+        );
+      }
     }
   }
 
@@ -952,6 +996,10 @@ export class MongoQueryParser {
   private buildWhereCondition(op: Operation): any {
     const { field, operator, value } = op.data;
 
+    // Every helper puts `field` in key position: a `$` name would be an
+    // operator (`$where` runs JavaScript on the update/delete commands).
+    assertSafeFieldName(field);
+
     switch (op.type) {
       case "where":
       case "orWhere":
@@ -994,13 +1042,13 @@ export class MongoQueryParser {
 
       case "whereLike":
         return {
-          [field]: { $regex: this.buildLikeRegexSource(op.data), $options: "i" },
+          [field]: { $regex: this.buildLikeRegexSource(op.data, field), $options: "i" },
         };
 
       case "whereNotLike":
         return {
           [field]: {
-            $not: { $regex: this.buildLikeRegexSource(op.data), $options: "i" },
+            $not: { $regex: this.buildLikeRegexSource(op.data, field), $options: "i" },
           },
         };
 
@@ -1149,9 +1197,124 @@ export class MongoQueryParser {
           return { [field]: op.data.value };
         }
 
+      case "whereArrayNotContains":
+        return this.buildArrayNotContainsCondition(field, op.data.value, op.data.key);
+
+      case "whereArrayHasOrEmpty":
+        return {
+          $or: [
+            op.data.key
+              ? { [field]: { $elemMatch: { [op.data.key]: op.data.value } } }
+              : { [field]: op.data.value },
+            { [field]: { $size: 0 } },
+            { [field]: null },
+          ],
+        };
+
+      // "Does not contain the value, or is empty": an empty or missing array
+      // never contains the value, so this is the same filter as
+      // whereArrayNotContains.
+      case "whereArrayNotHaveOrEmpty":
+        return this.buildArrayNotContainsCondition(field, op.data.value, op.data.key);
+
+      case "whereDateBetween":
+        return this.buildDateRangeCondition(field, op.data.range, false);
+
+      case "whereDateNotBetween":
+        return this.buildDateRangeCondition(field, op.data.range, true);
+
+      // Post-group filters: the `$match` stage these ops sit in is emitted
+      // after the `$group`, so they filter the grouped rows.
+      case "having":
+        return this.buildOperatorCondition(field, operator ?? "=", value);
+
+      case "having:condition":
+        return this.buildHavingCondition(op.data);
+
+      case "havingRaw":
+        return this.resolveRawExpression(op.data.expression as RawExpression, op.data.bindings);
+
+      // Relation-existence filters need a `$lookup` per relation, which the
+      // MongoDB driver does not build; refuse them instead of dropping them.
+      case "has":
+      case "whereHas":
+      case "orWhereHas":
+      case "doesntHave":
+      case "whereDoesntHave":
+        throw new UnsupportedQueryOperationError(
+          op.type,
+          "mongodb",
+          `Filter by the related ids instead, e.g. whereIn("id", await Comment.query().where(...).pluck("postId")).`,
+        );
+
       default:
-        return null;
+        // A filter that vanishes from the pipeline widens the query, and the
+        // write paths (update/delete) reuse this filter: refuse instead.
+        throw new UnsupportedQueryOperationError(
+          op.type,
+          "mongodb",
+          `The filter was refused rather than dropped, since a dropped filter matches every document. Express it with where() clauses or the object form of whereRaw().`,
+        );
     }
+  }
+
+  /**
+   * Array does not contain the value (or, with `key`, no element has
+   * `key === value`). A missing or empty array matches.
+   */
+  private buildArrayNotContainsCondition(field: string, value: unknown, key?: string): any {
+    if (key) {
+      return { [field]: { $not: { $elemMatch: { [key]: value } } } };
+    }
+
+    return { [field]: { $ne: value } };
+  }
+
+  /**
+   * Date range by whole days: from the start of the first day to the end of
+   * the last (UTC), the same day boundaries `whereDate` uses.
+   */
+  private buildDateRangeCondition(field: string, range: unknown, negate: boolean): any {
+    if (!Array.isArray(range) || range.length !== 2) {
+      throw new Error(
+        `whereDateBetween/whereDateNotBetween on "${field}" needs a [from, to] pair.`,
+      );
+    }
+
+    const bounds = {
+      $gte: this.startOfDay(this.normalizeDateInput(range[0])),
+      $lte: this.endOfDay(this.normalizeDateInput(range[1])),
+    };
+
+    return { [field]: negate ? { $not: bounds } : bounds };
+  }
+
+  /**
+   * `having(condition)`: an object of `{ alias: value }` equalities, or a
+   * `[field, value]` / `[field, operator, value]` tuple.
+   */
+  private buildHavingCondition(condition: unknown): any {
+    if (Array.isArray(condition)) {
+      if (condition.length === 2) {
+        return this.buildOperatorCondition(String(condition[0]), "=", condition[1]);
+      }
+
+      if (condition.length === 3) {
+        return this.buildOperatorCondition(String(condition[0]), condition[1], condition[2]);
+      }
+
+      throw new Error(
+        "having() expects an object, a [field, value] pair or a [field, operator, value] tuple.",
+      );
+    }
+
+    if (isPlainObject(condition)) {
+      return condition;
+    }
+
+    throw new Error(
+      "having() expects an object, a [field, value] pair or a [field, operator, value] tuple.",
+    );
   }
 
   /**
@@ -1164,14 +1327,15 @@ export class MongoQueryParser {
    * flags it with `isRegExp`, which is honored here for the same reason.
    *
    * @param data - The operation data (`{ pattern, isRegExp? }`)
+   * @param field - The filtered field, named in a refusal
    * @returns Regex source for `$regex`
    */
-  private buildLikeRegexSource(data: any): string {
+  private buildLikeRegexSource(data: any, field?: string): string {
     if (data.isRegExp === true && typeof data.pattern === "string") {
       return data.pattern;
     }
 
-    return resolveMongoLikePattern(data.pattern);
+    return resolveMongoLikePattern(data.pattern, this.likeLimits, field);
   }
 
   /**
@@ -1205,11 +1369,21 @@ export class MongoQueryParser {
         return { [field]: operator === "between" ? bounds : { $not: bounds } };
       }
       case "like":
-        return { [field]: { $regex: resolveMongoLikePattern(value as string), $options: "i" } };
+        return {
+          [field]: {
+            $regex: resolveMongoLikePattern(value as string, this.likeLimits, field),
+            $options: "i",
+          },
+        };
       case "notLike":
       case "not like":
         return {
-          [field]: { $not: { $regex: resolveMongoLikePattern(value as string), $options: "i" } },
+          [field]: {
+            $not: {
+              $regex: resolveMongoLikePattern(value as string, this.likeLimits, field),
+              $options: "i",
+            },
+          },
         };
       case "startsWith":
         return { [field]: { $regex: `^${escapeRegex(String(value))}`, $options: "i" } };

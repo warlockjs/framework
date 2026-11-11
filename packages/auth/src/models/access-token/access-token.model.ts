@@ -1,5 +1,6 @@
 import { Model } from "@warlock.js/cascade";
 import { v } from "@warlock.js/seal";
+import { plainTokenOf, storedTokenForms } from "../../utils/token-digest";
 import { isNeverExpiring, isUsableExpiry } from "../../utils/token-expiry";
 import type { Auth } from "../auth.model";
 
@@ -40,6 +41,10 @@ export class AccessToken extends Model {
    * only strips it from `toJSON()` / `JSON.stringify(model)` (so
    * `response.json(token)` or a resource cannot leak it); `get("token")`,
    * `findByToken` and every query still read the column.
+   *
+   * With `auth.hashTokensAtRest` on, the column holds the token's SHA-256
+   * digest instead, so a copy of the table cannot be replayed; read the raw
+   * token of a freshly issued row through {@link plainToken}.
    */
   public static hidden = ["token"];
 
@@ -60,6 +65,14 @@ export class AccessToken extends Model {
   /** The user-type slug this token was issued for. */
   public get userType(): string {
     return this.get("user_type");
+  }
+
+  /**
+   * The raw token, when it is known: always for a row stored unhashed, and
+   * for a hashed row only in the process that just issued it.
+   */
+  public get plainToken(): string | undefined {
+    return plainTokenOf(this, this.get("token"));
   }
 
   /**
@@ -96,7 +109,8 @@ export class AccessToken extends Model {
   }
 
   /**
-   * Persist a freshly-signed access token for the user.
+   * Persist a freshly-signed access token for the user. `token` is the value
+   * to store: the raw JWT, or its digest under `auth.hashTokensAtRest`.
    */
   public static issue(user: Auth, token: string, expiresAt: Date, familyId?: string) {
     return this.create({
@@ -109,17 +123,21 @@ export class AccessToken extends Model {
   }
 
   /**
-   * Find an access-token row by its raw token string.
+   * Find an access-token row by its raw token string, whether the row stores
+   * the token hashed or raw (one query).
    */
   public static findByToken(token: string): Promise<AccessToken | null> {
-    return this.first({ token });
+    return this.query().whereIn("token", storedTokenForms(token)).first();
   }
 
   /**
-   * Delete a specific token that belongs to the given user.
+   * Delete a specific token that belongs to the given user, stored hashed or raw.
    */
   public static deleteForUser(user: Auth, token: string) {
-    return this.delete({ token, user_id: user.id });
+    return this.query()
+      .where({ user_id: user.id })
+      .whereIn("token", storedTokenForms(token))
+      .delete();
   }
 
   /**

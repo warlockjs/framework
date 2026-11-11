@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryCacheDriver } from "./drivers/memory-cache-driver";
 import { TaggedCache } from "./tagged-cache";
 
@@ -149,5 +149,106 @@ describe("TaggedCache", () => {
     const bIndex = await driver.tagMembers("cache:tags:b");
     expect(aIndex).toContain("k");
     expect(bIndex).toContain("k");
+  });
+});
+
+describe("TaggedCache on a large tag index", () => {
+  let driver: MemoryCacheDriver;
+
+  beforeEach(() => {
+    driver = new MemoryCacheDriver();
+    driver.setOptions({});
+  });
+
+  afterEach(async () => {
+    vi.restoreAllMocks();
+    await driver.disconnect();
+  });
+
+  it("checks a sample of members by existence on a tagged write, never reading values or the full index", async () => {
+    const members = Array.from({ length: 10_000 }, (_, index) => `page.${index}`);
+
+    await driver.tagAdd("cache:tags:pages", members);
+
+    const get = vi.spyOn(driver, "get");
+    const has = vi.spyOn(driver, "has");
+    const tagMembers = vi.spyOn(driver, "tagMembers");
+    const tagSample = vi.spyOn(driver, "tagSample");
+    const exists = vi.spyOn(driver, "exists");
+
+    await driver.tags(["pages"]).set("page.new", "<html>");
+
+    expect(get).not.toHaveBeenCalled();
+    expect(has).not.toHaveBeenCalled();
+    expect(tagMembers).not.toHaveBeenCalled();
+    expect(tagSample).toHaveBeenCalledTimes(1);
+    expect(exists.mock.calls.length).toBeLessThanOrEqual(20);
+  });
+
+  it("still drops members whose entry is gone", async () => {
+    const tagged = new TaggedCache(["users"], driver);
+
+    await tagged.set("user.1", 1);
+    await driver.remove("user.1");
+    await tagged.set("user.2", 2);
+
+    await expect(driver.tagMembers("cache:tags:users")).resolves.toEqual(["user.2"]);
+  });
+
+  it("does not count pruning checks as cache hits or misses", async () => {
+    const tagged = new TaggedCache(["users"], driver);
+    const misses = vi.fn();
+
+    await tagged.set("user.1", 1);
+    await driver.remove("user.1");
+
+    driver.on("miss", misses);
+    await tagged.set("user.2", 2);
+
+    expect(misses).not.toHaveBeenCalled();
+  });
+
+  it("invalidates through the driver's batched removal", async () => {
+    const tagged = new TaggedCache(["users"], driver);
+
+    for (let index = 0; index < 50; index++) {
+      await tagged.set(`user.${index}`, index);
+    }
+
+    const removeMany = vi.spyOn(driver, "removeMany");
+    const removed = vi.fn();
+
+    driver.on("removed", removed);
+    await tagged.invalidate();
+
+    expect(removeMany).toHaveBeenCalledTimes(1);
+    expect(removed).toHaveBeenCalledTimes(50);
+    await expect(driver.get("user.7")).resolves.toBeNull();
+  });
+
+  it("falls back to has() and remove() for a driver without the primitives", async () => {
+    const plain = {
+      store: new Map<string, unknown>(),
+      async set(key: string, value: unknown) {
+        this.store.set(key, value);
+      },
+      async get(key: string) {
+        return this.store.has(key) ? this.store.get(key) : null;
+      },
+      async has(key: string) {
+        return this.store.has(key);
+      },
+      async remove(key: string) {
+        this.store.delete(key);
+      },
+    };
+    const tagged = new TaggedCache(["t"], plain as never);
+
+    await tagged.set("a", 1);
+    await tagged.set("b", 2);
+    await tagged.invalidate();
+
+    expect(plain.store.has("a")).toBe(false);
+    expect(plain.store.has("b")).toBe(false);
   });
 });

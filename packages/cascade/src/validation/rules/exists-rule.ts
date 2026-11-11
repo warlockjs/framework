@@ -1,5 +1,6 @@
 import { invalidRule, VALID_RULE, type SchemaRule } from "@warlock.js/seal";
 import { requireModelClass } from "../../model/register-model";
+import { recordExists } from "./record-exists";
 import type { ExistsRuleOptions } from "../types";
 
 /**
@@ -31,8 +32,8 @@ export const existsRule: SchemaRule<ExistsRuleOptions> = {
       });
     }
 
-    const document = await dbQuery.first();
+    const found = await recordExists(ResolvedModelClass, dbQuery);
 
-    return document ? VALID_RULE : invalidRule(this, context);
+    return found ? VALID_RULE : invalidRule(this, context);
   },
 };

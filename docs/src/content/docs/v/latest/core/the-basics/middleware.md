@@ -196,9 +196,12 @@ import { Application, env } from "@warlock.js/core";
 
 const httpConfigurations = {
   port: env("HTTP_PORT", 3000),
-  fileUploadLimit: 12 * 1024 * 1024 * 1024,
+  fileUploadLimit: 10 * 1024 * 1024, // largest single file; parts are buffered in memory
   rateLimit: { max: 260, duration: 60 * 1000 },
-  cors: { origin: "*", methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"] },
+  cors: {
+    origin: String(env("CORS_ORIGINS", "")).split(",").filter(Boolean), // empty = same origin only
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+  },
   cookies: {
     secret: env("COOKIE_SECRET", "super-secret-key-change-me"),
     options: { httpOnly: true, secure: Application.isProduction, path: "/" },
@@ -228,10 +231,12 @@ middleware.maxBodySize("2mb");
 | `middleware.maxBodySize("2mb")`           | Per-route `Content-Length` cap (in addition to `http.bodyLimit` global)                              | 413                                 |
 | `middleware.idempotency()`                | Dedupe writes by `Idempotency-Key`; same key + same body → cached replay                             | 409 in flight, 422 on body mismatch |
 | `middleware.maintenance()`                | App-wide 503 toggle via `http.maintenance.enabled` (with allowlist bypass)                           | 503 + `Retry-After`                 |
-| `middleware.ipFilter({ allow })`          | Allowlist / denylist by client IP, IPv4 CIDRs supported, fail-closed                                 | 403                                 |
+| `middleware.ipFilter({ allow })`          | Allowlist / denylist by client IP, IPv4 and IPv6 CIDRs, fail-closed; a bad pattern throws at boot    | 403                                 |
 | `middleware.cache(opts)`                  | Cache + replay successful JSON responses; `tags` opts into `cache.tags([...]).invalidate()` eviction | n/a                                 |
 
-Idempotency reserves the key before your handler runs, so a concurrent duplicate gets **409 + `Retry-After`** instead of running twice. A 5xx frees the key; if the cache is down it fails open. Tune the reservation with `middleware.idempotency({ reservationTtl })` (default 60 seconds). `middleware.rateLimit()` counters are per process — see [Running on multiple servers](../digging-deeper/multiple-servers.md).
+Idempotency reserves the key before your handler runs, so a concurrent duplicate gets **409 + `Retry-After`** instead of running twice. A record belongs to one concrete target: the same key on `/orders/1/cancel` and `/orders/2/cancel` (or with a different query) runs each request, it never replays one for the other. A 5xx frees the key; if the cache is down it fails open.
+
+`middleware.cache()` keys each response by locale (`withLocale`, on by default). Without a declared `app.localeCodes`, a request for any locale other than the default is answered without the cache (a warning is logged once), so arbitrary `?locale=` values cannot fill the cache. Declare `app.localeCodes` to cache every supported locale. Tune the reservation with `middleware.idempotency({ reservationTtl })` (default 60 seconds). `middleware.rateLimit()` counters are per process — see [Running on multiple servers](../digging-deeper/multiple-servers.md).
 
 Composed example — a tight cap on logins, a concurrency cap + idempotency on AI calls:
 

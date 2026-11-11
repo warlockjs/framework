@@ -221,6 +221,95 @@ const SENSITIVE_VARIABLES = new Set([
   "BASH_LOADABLES_PATH",
 ]);
 
+/**
+ * Variables that make an allowed program run another program or load code:
+ * `GIT_EXTERNAL_DIFF='sh -c …' git diff` runs `sh` although only `git` is
+ * allowed. When the policy restricts which programs run, assigning one of
+ * these (as a `NAME=value` prefix, an `env` argument or an `export`) is
+ * refused unless `shell.allowAssignments` lists it.
+ */
+const COMMAND_VARIABLES = new Set([
+  "PATH",
+  "GCONV_PATH",
+  "NODE_OPTIONS",
+  "NODE_PATH",
+  "PAGER",
+  "MANPAGER",
+  "EDITOR",
+  "VISUAL",
+  "BROWSER",
+  "LESSOPEN",
+  "LESSCLOSE",
+  "PERL5OPT",
+  "PERL5LIB",
+  "PERLLIB",
+  "PERL5DB",
+  "PYTHONSTARTUP",
+  "PYTHONPATH",
+  "PYTHONHOME",
+  "RUBYOPT",
+  "RUBYLIB",
+  "JAVA_TOOL_OPTIONS",
+  "_JAVA_OPTIONS",
+  "JDK_JAVA_OPTIONS",
+  "GIT_SSH",
+  "GIT_EXTERNAL_DIFF",
+  "GIT_EXEC_PATH",
+  "GIT_CONFIG_PARAMETERS",
+  "GIT_CONFIG_COUNT",
+  "GIT_CONFIG_GLOBAL",
+  "GIT_CONFIG_SYSTEM",
+]);
+
+/** Name prefixes of {@link COMMAND_VARIABLES} families (compared upper-cased). */
+const COMMAND_VARIABLE_PREFIXES = [
+  "LD_",
+  "DYLD_",
+  "GIT_CONFIG_KEY_",
+  "GIT_CONFIG_VALUE_",
+  "NPM_CONFIG_",
+];
+
+/** Name suffixes of {@link COMMAND_VARIABLES} families (`GIT_SSH_COMMAND`, `SSH_ASKPASS`, …). */
+const COMMAND_VARIABLE_SUFFIXES = ["_COMMAND", "_ASKPASS", "_PAGER", "_EDITOR"];
+
+/** A shell variable name. */
+const VARIABLE_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+/**
+ * The variables a POSIX builtin assigns: `printf -v NAME`, the name operand
+ * of `getopts spec NAME`, and every name-shaped argument of `read` (its
+ * operands and `-a NAME`).
+ */
+function builtinAssignedNames(key: string, argv: readonly string[]): string[] {
+  if (key === "printf") {
+    const at = argv.indexOf("-v");
+
+    return at > 0 && argv[at + 1] !== undefined ? [argv[at + 1] as string] : [];
+  }
+
+  if (key === "getopts") {
+    return argv[2] !== undefined ? [argv[2]] : [];
+  }
+
+  if (key === "read") {
+    return argv.slice(1).filter((argument) => VARIABLE_NAME.test(argument));
+  }
+
+  return [];
+}
+
+/** Whether assigning `name` can make a program run another program or load code. */
+function isCommandVariable(name: string): boolean {
+  const upper = name.toUpperCase();
+
+  return (
+    COMMAND_VARIABLES.has(upper) ||
+    COMMAND_VARIABLE_PREFIXES.some((prefix) => upper.startsWith(prefix)) ||
+    COMMAND_VARIABLE_SUFFIXES.some((suffix) => upper.endsWith(suffix))
+  );
+}
+
 /** Redirection targets that are always fine even though they sit outside the jail. */
 const DEVICE_TARGETS = new Set(["/dev/null", "/dev/stdout", "/dev/stderr"]);
 
@@ -462,6 +551,40 @@ class LineChecker {
       shell.allowCommand !== undefined;
   }
 
+  /**
+   * Refuse (or, with `onAsk`, ask about) assigning a variable that makes a
+   * program run another program, when the policy restricts which programs
+   * run (an `allow` list or any command rule). `argv` is what the refusal
+   * shows and what an ask carries: the assignments, then the command.
+   */
+  public checkAssignedVariables(names: readonly string[], argv: string[]): void {
+    if (!this.hasCommandRules && this.allow.length === 0) {
+      return;
+    }
+
+    const allowed = new Set((this.shell.allowAssignments ?? []).map((name) => name.toUpperCase()));
+    const blocked = names.find(
+      (name) => isCommandVariable(name) && !allowed.has(name.toUpperCase()),
+    );
+
+    if (blocked === undefined) {
+      return;
+    }
+
+    if (this.askMode) {
+      if (!this.isRemembered(argv)) {
+        this.addAsk(argv, "nested");
+      }
+
+      return;
+    }
+
+    throw new Refusal(
+      "nested-command",
+      `Setting \`${blocked}\` can make the command run a program the workspace shell policy cannot check (in ${show(argv.join(" "))}). Run that program directly, or list the variable in shell.allowAssignments.`,
+    );
+  }
+
   /** Whether argument hooks (`denyPatterns` / `allowCommand`) need literal argv. */
   public get hasArgumentHooks(): boolean {
     return this.patterns.length > 0 || this.shell.allowCommand !== undefined;
@@ -691,6 +814,25 @@ class LineChecker {
 
     if (this.shellMode && this.dialect === "posix" && ARITHMETIC_SENSITIVE_BUILTINS.has(key)) {
       this.checkArithmeticSensitive(executable, argv, dynamic);
+      // `read NAME`, `printf -v NAME` and `getopts spec NAME` assign shell
+      // variables too, and an already exported one (`PATH`) reaches every
+      // later command of the line.
+      this.checkAssignedVariables(builtinAssignedNames(key, argv), argv);
+    }
+
+    if (key === "env") {
+      // `env NAME=value cmd` sets variables for the command it runs.
+      const commandAt = unwrapEnv(argv);
+
+      if (commandAt !== null) {
+        this.checkAssignedVariables(
+          argv
+            .slice(1, commandAt)
+            .filter((arg) => /^[^-=][^=]*=/.test(arg))
+            .map((arg) => arg.slice(0, arg.indexOf("="))),
+          argv,
+        );
+      }
     }
 
     const ranges = this.unwrap(key, argv);
@@ -763,6 +905,10 @@ class LineChecker {
           `Changing \`${name}\` is not supported: it changes how the shell runs the commands that follow.`,
           executable,
         );
+      }
+
+      if (executable === "export" || executable === "readonly") {
+        this.checkAssignedVariables([name], argv);
       }
     }
   }
@@ -1307,6 +1453,15 @@ function checkSimpleCommand(
         `Assigning \`${name}\` is not supported: it changes how the shell runs the commands that follow.`,
       );
     }
+  }
+
+  if (simple.assignments.length > 0) {
+    checker.checkAssignedVariables(
+      simple.assignments.map((assignment) => assignment.assignmentName ?? ""),
+      [...simple.assignments, ...simple.words].map((word) =>
+        word.dynamic ? word.raw : word.value,
+      ),
+    );
   }
 
   for (const redirect of simple.redirects) {

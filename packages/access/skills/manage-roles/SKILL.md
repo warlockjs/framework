@@ -38,6 +38,8 @@ await access.flush(user, "tenant-1");
 await access.flush(user, "tenant-1");
 ```
 
+Without a `tenant`, `access.flush(user)` drops the set for the resolver's ambient tenant (`resolveTenant(user)`, what `can(user, …)` reads) plus the no-tenant set. On the memory cache driver a flush only reaches the process that runs it — use redis/pg with more than one instance.
+
 `access.flush(user, tenant)` is per-user — it has no "drop everything" form. For a sweeping catalog change with many holders, flush each affected user, or let the entries expire on their own (`cache.ttl`, default `10m`).
 
 ## Read roles

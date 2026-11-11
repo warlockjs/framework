@@ -25,14 +25,16 @@ router.prefix("/auth", () => {
     public: true,
     rateLimit: { max: 30, timeWindow: 60_000 },
   });
-  // Reset mails: 3 per hour per email and per IP. Reset attempts: 10 failures per 15 minutes.
+  // Reset codes: 3 per hour per email and per IP. Reset attempts: 10 failures per
+  // 15 minutes per email and per IP, so spreading guesses over many addresses
+  // does not help; each code also stops working after 5 wrong tries.
   router.post("/forgot-password", forgotPasswordController, {
     public: true,
     middleware: [tokenIssueThrottleMiddleware()],
   });
   router.post("/reset-password", resetPasswordController, {
     public: true,
-    middleware: [tokenConsumeThrottleMiddleware()],
+    middleware: [tokenConsumeThrottleMiddleware({ by: ["email", "ip"] })],
   });
   guarded(() => {
     router.post("/logout", logoutController);

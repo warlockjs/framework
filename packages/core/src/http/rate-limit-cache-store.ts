@@ -11,8 +11,8 @@ import { createHash } from "node:crypto";
  *
  * Windows are fixed and aligned to the clock: a 60 s window resets on the
  * minute, whichever process saw the first request. Each window has its own
- * key, created atomically with a TTL of two windows and incremented with the
- * driver's atomic increment, so a key cannot expire while its window counts.
+ * key, created with a TTL of two windows by the driver's atomic increment
+ * (one round-trip per request), so a key cannot expire while its window counts.
  *
  * Two drivers are refused, with {@link UnsupportedRateLimitDriverError}:
  *
@@ -76,9 +76,30 @@ function shortHash(value: string): string {
  * prefix stays in front of the hash for debugging.
  */
 function windowKey(namespace: string, group: string, windowIndex: number): string {
-  const readable = namespace.replace(/[^A-Za-z0-9_-]+/g, "_").slice(0, 40);
+  return `${namespacePrefix(namespace)}.${shortHash(group)}.${windowIndex}`;
+}
 
-  return `${KEY_PREFIX}.${readable}-${shortHash(namespace).slice(0, 16)}.${shortHash(group)}.${windowIndex}`;
+/**
+ * Namespaces are few (one per limited route) and fixed for the life of the
+ * process, so their key prefix is computed once instead of per request.
+ */
+const namespacePrefixes = new Map<string, string>();
+
+function namespacePrefix(namespace: string): string {
+  let prefix = namespacePrefixes.get(namespace);
+
+  if (prefix === undefined) {
+    const readable = namespace.replace(/[^A-Za-z0-9_-]+/g, "_").slice(0, 40);
+
+    prefix = `${KEY_PREFIX}.${readable}-${shortHash(namespace).slice(0, 16)}`;
+
+    // bounded: a namespace is a route, never request input
+    if (namespacePrefixes.size >= 10_000) namespacePrefixes.clear();
+
+    namespacePrefixes.set(namespace, prefix);
+  }
+
+  return prefix;
 }
 
 /**
@@ -99,8 +120,8 @@ export async function incrementSharedRateLimit(
   const key = windowKey(namespace, group, windowIndex);
   const ttlSeconds = Math.max(1, Math.ceil((2 * windowMs) / 1000));
 
-  await cache.set(key, 0, { ttl: ttlSeconds, onConflict: "create" });
-
+  // One round-trip: every supported driver's increment creates a missing
+  // counter with this TTL atomically, so the window key cannot outlive it.
   const current = await cache.increment(key, 1, { ttl: ttlSeconds });
 
   return { current, resetAt: (windowIndex + 1) * windowMs };

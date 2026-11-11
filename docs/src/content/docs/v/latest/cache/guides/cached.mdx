@@ -87,7 +87,7 @@ When you use the positional `cached(fn, prefix)` / `cached(fn, prefix, ttl)` for
 | Any args                                                         | `${prefix}.${hash}` — the first 16 hex chars of the sha1 of a stable JSON encoding of the args |
 | `Map`, `Set`, functions, symbols, class instances, circular refs | `CacheConfigurationError`                                                                      |
 
-The hash keeps distinct args on distinct keys: `profile("1.private", "")` and `profile("1", "private")`, or `{ q: "x" }` and `("q", "x")`, never share an entry. Object keys are sorted, `Date` becomes an ISO string, `undefined` and `null` are distinct, and `bigint` is encoded as a decimal string.
+The hash keeps distinct args on distinct keys: `profile("1.private", "")` and `profile("1", "private")`, or `{ q: "x" }` and `("q", "x")`, never share an entry. Object keys are sorted, `Date` becomes an ISO string, `undefined` and `null` are distinct, and `bigint` gets its own marker (`5n` and `"5n"` differ). An argument can never spell one of the internal markers (object keys starting with `$` are escaped), and an own `__proto__` key counts like any other key. Since 5.53, arguments holding a `bigint` or an object key that starts with `$` (such as `{ $gt: 5 }`) get a new key once, so those calls miss once and repopulate.
 
 **Examples:**
 

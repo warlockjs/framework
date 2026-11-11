@@ -122,6 +122,7 @@ await channel.subscribe(handler, {
 
 - **Handler throws** with `retry` configured — herald inspects `x-retry-count` on the AMQP message. Under `maxRetries`, it nacks with requeue (the broker redelivers **immediately** — see the delay caveat below). At or over `maxRetries`, it nacks-without-requeue (→ DLQ if configured) or rejects outright.
 - **`ctx.retry(delayMs?)`** — herald republishes the message with an incremented `x-retry-count` and (if you pass `delayMs`) an `x-delay` header, then acks the original. When `retryCount > maxRetries`, the message is sent to the configured DLQ (or acked away if no DLQ).
+- `x-retry-count` arrives with the message, so the publisher controls it. A value that is not a non-negative integer (`"x"`, `-1`, `1.5`) counts as retries exhausted: the message goes to the DLQ or is dropped, never retried without bound. `message.metadata.retryCount` reports that same parsed number.
 
 :::caution[`retry.delay` does not gate the throw path]
 `RetryOptions.delay` (number or `(attempt) => number`) is **not consulted when a handler throws** — the automatic requeue happens with no wait. A delay only takes effect when you call `ctx.retry(delayMs)` explicitly, and even then it's emitted as an `x-delay` header that requires the [delayed-message exchange plugin](https://github.com/rabbitmq/rabbitmq-delayed-message-exchange); without the plugin the retry is immediate. For real backoff, call `ctx.retry(ms)` inside the handler and install the plugin.
@@ -199,7 +200,7 @@ export class UserCreatedConsumer extends EventConsumer<Payload> {
 What this gets you:
 
 - `eventName` is the channel name — module-level discoverability.
-- `schema` runs before `handle` — invalid payloads are nacked without your handler ever seeing them.
+- `schema` runs before `handle` — an invalid payload is rejected without requeue (dead-lettered by the broker when the queue has a dead-letter exchange) and logged once as a warning with the validation errors; your handler never sees it, and it is never redelivered in a loop.
 - `@Consumable()` registers the class with the broker; if the broker is connected at decoration time, it subscribes immediately. If not, it queues until `connectToBroker` fires. Pass `@Consumable({ broker: "analytics" })` to subscribe to a non-default broker.
 - The class can opt into version filtering via static `minVersion` / `maxVersion` — messages outside that range are acked without processing (silently skipped). Useful for rolling upgrades.
 - `handle` throwing is a **bounded retry**, not an infinite requeue. It goes through the same retry routine as the raw `.subscribe()` throw path — capped at `maxRetries: 3` (there's no per-consumer `retry`/`deadLetter` config yet, so the cap is always the default) — then drops the message with a logged error once exhausted. A message a class-based consumer can't process no longer pins it in a hot ack/nack loop.

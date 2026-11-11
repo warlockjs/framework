@@ -1,38 +1,48 @@
-import { ltrim, rtrim } from "@mongez/reinforcements";
+const LEADING_SLASHES = /^\/+/;
+const TRAILING_SLASHES = /\/+$/;
 
-let baseUrl = "";
+/**
+ * The base url without its trailing slashes, trimmed once in `setBaseUrl`
+ * rather than on every `url()` call (resources build one per url field).
+ */
+let trimmedBaseUrl = "";
+
+/** Remove every leading `/`. */
+function stripLeadingSlashes(value: string): string {
+  return value ? value.replace(LEADING_SLASHES, "") : "";
+}
 
 /**
  * Set base url
  */
 export function setBaseUrl(url: string) {
-  baseUrl = url;
+  trimmedBaseUrl = url ? url.replace(TRAILING_SLASHES, "") : "";
 }
 
 /**
  * Get full path for the given path
  */
 export function url(path = "") {
-  return rtrim(baseUrl, "/") + "/" + ltrim(path, "/");
+  return trimmedBaseUrl + "/" + stripLeadingSlashes(path);
 }
 
 /**
  * Get uploads url
  */
 export function uploadsUrl(path = "") {
-  return url("/uploads/" + ltrim(path, "/"));
+  return url("/uploads/" + stripLeadingSlashes(path));
 }
 
 /**
  * Get full path for the given path related to public route
  */
 export function publicUrl(path = "") {
-  return url("/public/" + ltrim(path, "/"));
+  return url("/public/" + stripLeadingSlashes(path));
 }
 
 /**
  * Assets url
  */
 export function assetsUrl(path = "") {
-  return publicUrl("/assets/" + ltrim(path, "/"));
+  return publicUrl("/assets/" + stripLeadingSlashes(path));
 }

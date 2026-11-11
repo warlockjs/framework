@@ -114,6 +114,12 @@ export class RabbitMQDriver implements BrokerDriverContract {
   private amqpChannel: any = null;
   private _isConnected = false;
 
+  /** Set by `disconnect()`: a close we asked for never triggers a reconnect. */
+  private closing = false;
+
+  /** The pending reconnect attempt, cleared by `disconnect()`. */
+  private reconnectTimer: NodeJS.Timeout | null = null;
+
   /**
    * Create a new RabbitMQ driver
    *
@@ -190,6 +196,8 @@ export class RabbitMQDriver implements BrokerDriverContract {
       throw new Error(`amqplib is not installed.\n\n${AMQPLIB_INSTALL_INSTRUCTIONS}`);
     }
 
+    this.closing = false;
+
     try {
       // Build connection URL
       const url = this.buildConnectionUrl();
@@ -213,6 +221,12 @@ export class RabbitMQDriver implements BrokerDriverContract {
         await this.amqpChannel.prefetch(this.options.prefetch);
       }
 
+      // Channels created before this connection (or bound to the one a broker
+      // restart closed) move to the new AMQP channel and re-attach their consumers.
+      for (const channel of this.channels.values()) {
+        await (channel as RabbitMQChannel<any>).rebind(this.amqpChannel);
+      }
+
       this._isConnected = true;
       this.events.emit("connected");
 
@@ -225,6 +239,10 @@ export class RabbitMQDriver implements BrokerDriverContract {
       // Handle connection close
       this.connection.on("close", () => {
         this._isConnected = false;
+
+        // `disconnect()` emits its own event and must never reconnect.
+        if (this.closing) return;
+
         this.events.emit("disconnected");
 
         if (this.options.reconnect !== false) {
@@ -274,23 +292,34 @@ export class RabbitMQDriver implements BrokerDriverContract {
     let attempt = 0;
 
     const tryReconnect = async () => {
+      this.reconnectTimer = null;
+
+      if (this.closing) return;
+
       attempt++;
       this.events.emit("reconnecting", attempt);
 
       try {
         await this.connect();
       } catch {
-        setTimeout(tryReconnect, delay);
+        if (!this.closing) this.reconnectTimer = setTimeout(tryReconnect, delay);
       }
     };
 
-    setTimeout(tryReconnect, delay);
+    this.reconnectTimer = setTimeout(tryReconnect, delay);
   }
 
   /**
    * Disconnect from RabbitMQ
    */
   public async disconnect(): Promise<void> {
+    this.closing = true;
+
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+
     if (this.amqpChannel) {
       try {
         await this.amqpChannel.close();

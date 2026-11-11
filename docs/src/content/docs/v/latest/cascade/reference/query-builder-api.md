@@ -86,6 +86,8 @@ await User.where({ status: "active", role: "admin" }).get();
 
 :::caution[Equality values reject `$`-prefixed keys]
 The equality forms — `where(field, value)`, `where(field, "=", value)`, and the object form — run the value (and, for the object form, each top-level key) through a check that rejects `$`-prefixed keys, throwing `UnsafeFilterError`. This closes the classic NoSQL operator-injection hole where a request body forwarded straight into a filter — `User.first({ email, password })` with `password: { $ne: null }` — compiled into a live MongoDB operator query instead of an equality match. The same check runs on every filter-accepting model static (`first`, `findFirst`, `findAll`, `count`, `paginate`, `all`, `delete`/`deleteMany`, `deleteOne`, `atomic`, `findAndUpdate`, `findOneAndUpdate`, `findAndReplace`, `findOneAndDelete`). It does **not** apply to explicit operator APIs — `where(field, operator, value)` for non-`=` operators, `whereIn`/`whereNull`/`whereBetween`/…, and the object form of `whereRaw()` — those already express an operator on purpose. Dotted paths (`"profile.name"`) and plain nested-object equality values remain valid. Two helpers, `sanitizeFilter(filter)` and `sanitizeFilterValue(value, field)`, are exported for callers who forward a filter to a driver-level API directly.
+
+On MongoDB the same refusal covers the value of `whereArrayContains` / `whereArrayNotContains` / `whereArrayHasOrEmpty` / `whereArrayNotHaveOrEmpty`, `whereJsonContains` / `whereJsonDoesntContain` and the `filters` of `textSearch()`. Helpers whose value lands inside an aggregation expression accept only a primitive of their type: `whereDay` / `whereMonth` / `whereYear` / `whereJsonLength` / `whereArrayLength` / `whereSize` a finite number, `whereTime` an `"HH:MM"` or `"HH:MM:SS"` string. A field name that starts with `$` or holds a `$` segment (`"$where"`, `"a.$b"`) is refused in every `where*` helper — use `whereRaw({ ... })` for an intentional operator. On PostgreSQL the JSON and array helpers (`whereJsonContainsKey`, `whereJsonLength`, `whereJsonIsArray` / `whereJsonIsObject`, `whereArrayLength`, `selectJson`) quote the column and escape every JSON key, their operator must be one of `=`, `!=`, `<>`, `>`, `>=`, `<`, `<=`, `selectAggregate` accepts only `sum`, `avg`, `min`, `max`, `count`, `first`, `last`, and a `field::type` cast suffix must be a type name (`int`, `numeric(10,2)`, `text[]`, `timestamp with time zone`, a custom type).
 :::
 
 **See also:** [Querying essentials](../the-basics/02-querying.md)
@@ -163,7 +165,9 @@ await User.whereStartsWith("email", "admin@").get();
 ```
 
 :::caution[A `string` pattern is matched LITERALLY]
-`whereLike`, `whereNotLike`, `whereStartsWith`/`whereNotStartsWith`, `whereEndsWith`/`whereNotEndsWith` — and the `$regex` form of `whereSearch` below — escape a `string` argument before matching, so it behaves as a literal substring, not a regex. The one wildcard that still expands is the SQL `LIKE` `%` (runs of `%` collapse into one `.*`); every other regex metacharacter (`.`, `*`, `+`, `^`, `$`, `(`, `)`, …) in the string matches itself. This is what makes it safe to wire `whereSearch("name", req.query.q)` straight to a search box — before this, a raw string compiled directly into a MongoDB `$regex`, so a value like `^.*$` matched everything, `^a`/`^b`/… probed a field back one character at a time, and a pattern with nested quantifiers (`(a+)+$`) triggered catastrophic backtracking (ReDoS) against every scanned document.
+`whereLike`, `whereNotLike`, `whereStartsWith`/`whereNotStartsWith`, `whereEndsWith`/`whereNotEndsWith` — and the `$regex` form of `whereSearch` below — escape a `string` argument before matching, so it behaves as a literal substring, not a regex. The one wildcard that still expands is the SQL `LIKE` `%` (runs of `%` collapse into one `.*`, and a leading or trailing `%` is dropped because the match is a substring match anyway); every other regex metacharacter (`.`, `*`, `+`, `^`, `$`, `(`, `)`, …) in the string matches itself. This is what makes it safe to wire `whereSearch("name", req.query.q)` straight to a search box — before this, a raw string compiled directly into a MongoDB `$regex`, so a value like `^.*$` matched everything, `^a`/`^b`/… probed a field back one character at a time, and a pattern with nested quantifiers (`(a+)+$`) triggered catastrophic backtracking (ReDoS) against every scanned document.
+
+On MongoDB a string pattern may hold at most **two** `%` wildcards and **256** characters, which covers `%term%`, `prefix%` and `%suffix`; each extra wildcard multiplies the matching cost per document, so a longer pattern throws `UnsafeFilterError`. Raise the caps with the `like` driver option (`driverOptions: { like: { maxWildcards, maxLength } }`). A number argument matches its text form.
 
 An explicit **`RegExp`** argument is still used as a real pattern, unescaped — but a `RegExp` can't arrive as JSON, so it only reaches these calls from developer-authored code. **Never construct that `RegExp` from user input.** For a pattern built partly from dynamic data, escape the dynamic parts yourself:
 
@@ -356,6 +360,8 @@ whereJsonContainsKey(path: string): this
 ```ts
 await User.whereJsonContainsKey("profile.avatar").get();
 ```
+
+On PostgreSQL the path of the JSON and array helpers (`whereJsonContainsKey`, `whereJsonLength`, `whereJsonIsArray`, `whereJsonIsObject`, `whereArrayLength`, `selectJson`) is a column followed by keys, with dots (`profile.address.city`) or arrows (`settings->theme`). When the first segment names a table or alias of the query — the base table, a joined table or a join alias, also inside `where()` callbacks — it keeps meaning `table.column`: `whereJsonContainsKey("comments.meta")` on a query joining `comments` tests the `comments.meta` column, and `comments.meta.theme` reads its `theme` key. Otherwise the first segment is the column.
 
 ### `whereJsonLength(path, operator, value)`
 
@@ -968,6 +974,8 @@ const result = await User.query().paginate({ page: 1, limit: 10 });
 // { data, pagination: { total, page, limit, pages } }
 ```
 
+`limit` and `page` must be whole numbers (digit strings are accepted). The page size is capped at `maxLimit` (default **1000**; pass a larger number, or `Infinity`, to raise it): `paginate({ limit: 5000, maxLimit: 10_000 })`. On MongoDB the total is counted without the query's sort, projection and unread left joins, which cannot change it.
+
 **See also:** [Querying essentials](../the-basics/02-querying.md)
 
 ### `cursorPaginate(options)`
@@ -983,6 +991,8 @@ const result = await User.query().cursorPaginate({ limit: 10, cursor: lastId });
 // { data, pagination: { hasMore, nextCursor, ... } }
 ```
 
+`limit` is capped at `maxLimit` (default **1000**), as for `paginate()`.
+
 ### `chunk(size, callback)`
 
 ```ts
@@ -996,6 +1006,8 @@ await User.query().chunk(100, async (users, index) => {
   await processUsers(users);
 });
 ```
+
+When the query has no order, or is ordered only by the primary key (or `_id` on MongoDB), each chunk continues after the last key seen (`where id > last order by id limit size`): every chunk costs the same, and rows the callback updates or deletes do not make later chunks skip or repeat rows. An unordered query is read in primary-key (`_id`) order. Any other query — another sort, `limit`/`skip`, grouping, joins, a top-level `orWhere` — pages by offset as before.
 
 ---
 
@@ -1065,6 +1077,12 @@ havingRaw(expression: RawExpression, bindings?: unknown[]): this
 ```ts
 query.groupBy("category", { total: $agg.sum("amount") }).having("total", ">", 1000);
 ```
+
+On MongoDB the having filters become a `$match` after the `$group`. On PostgreSQL a `having` on an aggregate alias accepts only the comparison operators `=`, `!=`, `<>`, `>`, `>=`, `<`, `<=`.
+
+:::note[MongoDB never drops a filter]
+Every filter helper reaches the MongoDB pipeline or throws `UnsupportedQueryOperationError` — a filter is never silently left out (which would widen the read, or an `update()` / `delete()` built from it, to every document). The relation-existence filters (`has`, `whereHas`, `orWhereHas`, `doesntHave`, `whereDoesntHave`) throw on MongoDB. An `update()` / `delete()` / `increment()` on a query holding a stage its filter cannot carry — a `groupBy`/`having`, an inner join, `unwind`, a vector search — throws instead of writing to every document the plain filter matches.
+:::
 
 ---
 

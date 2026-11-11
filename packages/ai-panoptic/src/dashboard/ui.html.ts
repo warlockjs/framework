@@ -21,6 +21,10 @@ import { WARLOCK_LOGO_DATA_URI } from "./warlock-logo";
  * state — selected trace, selected span, collapsed nodes — lives in JS,
  * NOT the DOM, so the 2s poll never disturbs an open drawer.
  *
+ * The 2s poll reads the newest trace summaries (`api/traces`: no span
+ * tree, no captured content); opening a trace fetches its full tree from
+ * `api/traces/:id` and re-fetches it only when its summary changes.
+ *
  * The list is filterable entirely client-side over the polled traces: a
  * free-text search (name + session), status / type / session filter
  * chips, an "errors only" header toggle, and an optional group-by-session
@@ -327,6 +331,8 @@ export function dashboardHtml(
 
   var state = {
     traces: [], selectedId: null, selectedSpanId: null, collapsed: {}, sig: null,
+    detail: null,                 // full trace of the open drawer (GET /traces/:id)
+    loadingId: null,              // trace id whose full tree is being fetched
     // Client-side filter state (search box + chips + errors-only header toggle).
     filter: { text: "", statuses: {}, types: {}, sessionId: null, promptKey: null, errorsOnly: false },
     groupBySession: false,        // session-grouping list toggle
@@ -432,7 +438,11 @@ export function dashboardHtml(
     for (var i = 0; i < k.length; i++) n += countSpans(k[i]);
     return n;
   }
-  function traceSig(t) { return t.root.status + "|" + countSpans(t.root) + "|" + t.duration + "|" + (t.usage && t.usage.total); }
+  // Works on a list summary (spanCount) and on a full trace (counted).
+  function traceSig(t) {
+    var spans = t.spanCount != null ? t.spanCount : countSpans(t.root);
+    return t.root.status + "|" + spans + "|" + t.duration + "|" + (t.usage && t.usage.total);
+  }
   // Sum every priced lane of a cost object into one USD number.
   function costSumObj(c) {
     if (!c) return 0;
@@ -452,6 +462,7 @@ export function dashboardHtml(
     return sum;
   }
   function traceCost(t) {
+    if (typeof t.totalCost === "number") return t.totalCost; // list summary: computed server-side
     var explicit = costSumObj(t.cost);
     return explicit > 0 ? explicit : rollupCost(t.root);
   }
@@ -1111,8 +1122,12 @@ export function dashboardHtml(
       + (st.result ? evalResultHtml(st.result) : "")
       + "</div>";
   }
+  // The full trace of the open drawer, once it has loaded.
+  function openDetail() {
+    return state.detail && state.detail.traceId === state.selectedId ? state.detail : null;
+  }
   function rerenderDetail() {
-    var t = findTrace(state.selectedId);
+    var t = openDetail();
     if (!t) return;
     var sel = findSpan(t.root, state.selectedSpanId) || t.root;
     document.getElementById("drawer-detail").innerHTML = renderDetail(sel, t);
@@ -1204,14 +1219,14 @@ export function dashboardHtml(
   // Re-render only the left pane (after a view switch) without disturbing
   // the detail panel or scroll position of the detail side.
   function renderLeftPane() {
-    var t = findTrace(state.selectedId);
+    var t = openDetail();
     if (!t) return;
     document.getElementById("drawer-tree").innerHTML = viewSwitcher() + leftPaneHtml(t);
   }
 
   function selectSpan(id) {
     state.selectedSpanId = id;
-    var t = findTrace(state.selectedId);
+    var t = openDetail();
     if (!t) return;
     document.getElementById("drawer-detail").innerHTML = renderDetail(findSpan(t.root, id) || t.root, t);
     // Highlight in whichever left pane is active (tree nodes or Gantt rows).
@@ -1224,7 +1239,7 @@ export function dashboardHtml(
   }
   function toggleSpan(id) {
     state.collapsed[id] = !state.collapsed[id];
-    var t = findTrace(state.selectedId);
+    var t = openDetail();
     if (t) renderLeftPane();
   }
   function setView(v) {
@@ -1233,15 +1248,49 @@ export function dashboardHtml(
     renderLeftPane();
   }
 
+  // Drawer placeholder while the full trace loads, or when it cannot.
+  function renderDrawerMessage(text) {
+    document.getElementById("drawer-head").innerHTML =
+      '<button class="drawer-close" type="button" title="Close (Esc)">✕ Close</button>';
+    document.getElementById("drawer-body").innerHTML = '<div class="empty">' + esc(text) + "</div>";
+  }
+  // Fetch the full trace (span tree + captured content) for the drawer.
+  // The list only carries summaries, so the drawer always reads this.
+  function loadDetail(id, spanId) {
+    state.loadingId = id;
+    fetchAuthed(API + "/traces/" + encodeURIComponent(id)).then(function (r) {
+      return r.json().then(function (data) { return { ok: r.ok, status: r.status, data: data }; });
+    }).then(function (res) {
+      if (state.loadingId === id) state.loadingId = null;
+      if (state.selectedId !== id) return;
+      if (!res.ok) {
+        var code = res.data && res.data.error;
+        renderDrawerMessage(res.status === 404
+          ? "This trace is no longer in the store: older traces are dropped once the store reaches its capacity. Close this panel and pick a recent trace."
+          : "Could not load this trace (" + (code || ("HTTP " + res.status)) + "). Close this panel and try again.");
+        return;
+      }
+      var t = res.data;
+      var wanted = spanId || state.selectedSpanId;
+      state.detail = t;
+      state.selectedSpanId = (wanted && findSpan(t.root, wanted)) ? wanted : t.root.spanId;
+      state.sig = traceSig(t);
+      renderDrawer(t);
+      writeHash();
+    }).catch(function () {
+      if (state.loadingId === id) state.loadingId = null;
+      if (state.selectedId !== id) return;
+      renderDrawerMessage("Could not reach the dashboard server to load this trace. Check that the app is still running, then reopen the trace.");
+    });
+  }
   function openTrace(id, spanId) {
     state.selectedId = id;
-    var t = findTrace(id);
-    if (t) {
-      state.selectedSpanId = (spanId && findSpan(t.root, spanId)) ? spanId : t.root.spanId;
-      state.collapsed = {};
-      renderDrawer(t);
-      state.sig = traceSig(t);
-    }
+    state.selectedSpanId = spanId || null;
+    state.collapsed = {};
+    state.detail = null;
+    state.sig = null;
+    renderDrawerMessage("Loading trace…");
+    loadDetail(id, spanId);
     document.getElementById("drawer").classList.add("open");
     document.getElementById("drawer").setAttribute("aria-hidden", "false");
     document.getElementById("backdrop").classList.add("open");
@@ -1249,7 +1298,7 @@ export function dashboardHtml(
     writeHash();
   }
   function closeDrawer() {
-    state.selectedId = null; state.selectedSpanId = null; state.sig = null;
+    state.selectedId = null; state.selectedSpanId = null; state.sig = null; state.detail = null;
     document.getElementById("drawer").classList.remove("open");
     document.getElementById("drawer").setAttribute("aria-hidden", "true");
     document.getElementById("backdrop").classList.remove("open");
@@ -1289,15 +1338,15 @@ export function dashboardHtml(
     });
     return out;
   }
-  // Open whatever the hash points at, if that trace is loaded. Returns
-  // true when it acted so the caller can mark the one-time load as done.
+  // Open whatever the hash points at. The drawer fetches the trace by id,
+  // so a deep link works even when the trace is past the polled list.
+  // Returns true when it acted so the caller can mark the one-time load as done.
   function applyHash() {
     var h = readHash();
     if (!h.trace) {
       if (state.selectedId) closeDrawer();
       return true;
     }
-    if (!findTrace(h.trace)) return false; // not polled yet — retry next poll
     openTrace(h.trace, h.span || undefined);
     return true;
   }
@@ -1449,9 +1498,10 @@ export function dashboardHtml(
       // has actually arrived in a poll (it may not be in the first batch).
       if (!state.hashApplied) {
         if (applyHash()) state.hashApplied = true;
-      } else if (state.selectedId) {
+      } else if (state.selectedId && openDetail() && state.loadingId === null) {
+        // Re-fetch the open trace only when its summary changed.
         var t = findTrace(state.selectedId);
-        if (t) { var sig = traceSig(t); if (sig !== state.sig) { renderDrawer(t); state.sig = sig; } }
+        if (t && traceSig(t) !== state.sig) loadDetail(state.selectedId);
       }
     }).catch(function (e) {
       document.getElementById("meta").textContent = "disconnected";

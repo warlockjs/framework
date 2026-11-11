@@ -1,6 +1,10 @@
 node_modules
 build
 dist
+# Every env file holds secrets (database, mail, storage, JWT); only the example is tracked.
+# To commit a file without secrets, such as .env.shared, add `!.env.shared` below.
 .env
+.env.*
+!.env.example
 .warlock/
 nohup.out

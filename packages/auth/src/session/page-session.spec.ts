@@ -12,7 +12,7 @@ vi.mock("@warlock.js/core", async () => ({
   t: (key: string) => key,
   resolveCsrfOriginVerdict: (...args: unknown[]) => verdict(...args),
 }));
-vi.mock("@warlock.js/logger", () => ({ log: { error: vi.fn() } }));
+vi.mock("@warlock.js/logger", () => ({ log: { error: vi.fn(), debug: vi.fn() } }));
 vi.mock("../services/resolve-request-user", () => ({
   resolveRequestUser: (...args: unknown[]) => resolveRequestUser(...args),
 }));

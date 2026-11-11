@@ -100,6 +100,13 @@ that fetch fails for an explicitly requested non-default target, the run fails
 visibly and names every target it _could_ determine — it never silently
 guesses.
 
+Every scaffold also writes `agentKit.pick`: the allowlist of packages whose
+skills `agent-kit sync` copies into the agent's skills folder — the
+`@warlock.js/*` and `@mongez/*` packages in the generated `package.json`.
+`warlock add` appends the ones it installs later. Without the allowlist, sync
+would copy the `skills/` folder of every package in `node_modules`, transitive
+ones included.
+
 ## Valid keys
 
 **Database drivers** (`--db`):
@@ -152,13 +159,15 @@ my-app/
 
 The template ships a working auth module (login / logout / logout-all / refresh / me / forgot + reset password via OTP), a `users` module, and a sample `posts` module — all using the current framework surface: schemas via `v` from `@warlock.js/seal`, controllers typed with `GuardedRequestHandler` carrying a `.validation = { schema }`, models on `@warlock.js/cascade`, and declarative migrations via `Migration.create`.
 
+Starter defaults to keep when editing the template: `fileUploadLimit` 10 MB, CORS limited to `CORS_ORIGINS`, `compression: true`, 1-hour access tokens with 7-day rotating refresh tokens (`accessToken` / `refreshToken` keys, never `jwt`) stored as digests (`hashTokensAtRest: true`), a production `ConsoleLog({ minLevel: "info" })`, `maxSize: 10_000` on the memory caches, `.env.*` git-ignored, `/users` behind `adminMiddleware` (`role: "admin"`), post updates limited to the author, and reset codes from `node:crypto` stored as a keyed hash with a 5-attempt cap and an `["email", "ip"]` throttle.
+
 ## Setup steps the scaffolder runs
 
-1. Copy template → substitute name → wire `DB_DRIVER` / `DB_PORT` into `.env` (or, for `--db=none`, remove `src/config/database.ts` and the model-backed modules, see below) → record non-default `--agents` targets into `package.json`'s `agentKit.targets`.
+1. Copy template → substitute name → wire `DB_DRIVER` / `DB_PORT` into `.env` (or, for `--db=none`, remove `src/config/database.ts` and the model-backed modules, see below) → write `agentKit.pick` and any non-default `--agents` targets (`agentKit.targets`) into `package.json`.
 2. Install base dependencies (so the `warlock` binary exists).
-3. `warlock add <driver> <features...> <ai...> --no-install`, then one batched install. The `<driver>` is omitted for `--db=none`.
-4. `git init` (if `--git`).
-5. `jwt` script (if `--jwt`) — otherwise `warlock --warm-cache`.
+3. `npx --no warlock add <driver> <features...> <ai...> --no-install`, then one batched install. The `<driver>` is omitted for `--db=none`. `npx --no` runs the project's own bin and never downloads the unrelated `warlock` package from the registry.
+4. Remove the scaffold-only `minimumReleaseAgeExclude` from `pnpm-workspace.yaml`, then `git init` (if `--git`).
+5. `jwt` script (if `--jwt`) — otherwise `npx --no warlock --warm-cache`.
 6. Print the decisions summary.
 
 Failures surface the error and halt; there is no rollback. After it finishes, `cd my-app` and run the dev server.

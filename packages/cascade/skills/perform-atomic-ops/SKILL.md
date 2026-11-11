@@ -62,6 +62,8 @@ await Post.atomic(
 - `findOneAndUpdate(filter, update, { ...same, returnDocument?: "before" | "after" })`.
 - `findAndUpdate(filter, update, { upsert?, arrayFilters? })`. No `trustedFilter`, because it reads the rows back with `where(filter)`.
 
+**Global scopes pin every write static**, `Model.upsert(filter, data)` included: a visible match is updated by its primary key, and a match hidden by a scope (another tenant's row, a soft-deleted one) throws instead of being updated. When nothing matches, `upsert` inserts like `create()`, so put the tenant column in `data`. A model with no global scope sends the write straight to the driver (no id lookup first).
+
 **Postgres.** An upsert runs as `INSERT … ON CONFLICT (target) DO UPDATE … RETURNING *`. The target is the primary key, or a unique index, whose columns are ALL equality keys of the filter. Other filter conditions become `DO UPDATE … WHERE`. If the row exists and fails them, nothing is written and `findOneAndUpdate` returns `null`. The driver throws `UnsupportedUpdateOperationError` (`.operation`, `.driver`) for:
 
 - pipeline updates

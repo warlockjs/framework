@@ -18,8 +18,220 @@ const STRIPPED_ELEMENTS = ["script", "style", "noscript", "template", "head", "s
  * structure (so the recursive splitter still sees `\n\n` boundaries) instead
  * of collapsing the whole page onto one line.
  */
-const BLOCK_TAGS =
-  /<\/?(?:p|div|section|article|header|footer|main|aside|nav|h[1-6]|ul|ol|li|table|tr|td|th|thead|tbody|blockquote|pre|hr|br)\b[^>]*>/gi;
+const BLOCK_TAGS: ReadonlySet<string> = new Set([
+  "p",
+  "div",
+  "section",
+  "article",
+  "header",
+  "footer",
+  "main",
+  "aside",
+  "nav",
+  "h1",
+  "h2",
+  "h3",
+  "h4",
+  "h5",
+  "h6",
+  "ul",
+  "ol",
+  "li",
+  "table",
+  "tr",
+  "td",
+  "th",
+  "thead",
+  "tbody",
+  "blockquote",
+  "pre",
+  "hr",
+  "br",
+]);
+
+/*
+ * The strip passes below are hand-written scans rather than regular
+ * expressions. Each one walks the input once and stops at the first
+ * opener that can no longer be closed, so markup that never closes
+ * (`<!--`, `<script>`, a bare `<`, repeated a million times) costs linear
+ * time instead of rescanning the rest of the page from every opener.
+ * Tag names compare ASCII case-insensitively, as HTML does.
+ */
+
+/** Whether a UTF-16 code unit is an ASCII word character (`[A-Za-z0-9_]`). */
+function isWordChar(code: number): boolean {
+  return (
+    (code >= 48 && code <= 57) ||
+    (code >= 65 && code <= 90) ||
+    (code >= 97 && code <= 122) ||
+    code === 95
+  );
+}
+
+/** ASCII case-insensitive "does `text` contain `needle` at `at`"; `needle` is lower-case. */
+function matchesAt(text: string, at: number, needle: string): boolean {
+  if (at + needle.length > text.length) {
+    return false;
+  }
+
+  for (let offset = 0; offset < needle.length; offset++) {
+    let code = text.charCodeAt(at + offset);
+
+    if (code >= 65 && code <= 90) {
+      code += 32;
+    }
+
+    if (code !== needle.charCodeAt(offset)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+/** First index of `needle` (lower-case, starting with `<`) at or after `from`, ignoring ASCII case. */
+function indexOfTag(text: string, needle: string, from: number): number {
+  for (let index = text.indexOf("<", from); index !== -1; index = text.indexOf("<", index + 1)) {
+    if (matchesAt(text, index, needle)) {
+      return index;
+    }
+  }
+
+  return -1;
+}
+
+/** Replace every `<!-- … -->` comment with a space. An unclosed comment is left as text. */
+function stripComments(text: string): string {
+  const parts: string[] = [];
+  let position = 0;
+
+  for (;;) {
+    const open = text.indexOf("<!--", position);
+    if (open === -1) break;
+
+    const close = text.indexOf("-->", open + 4);
+    if (close === -1) break;
+
+    parts.push(text.slice(position, open), " ");
+    position = close + 3;
+  }
+
+  parts.push(text.slice(position));
+
+  return parts.join("");
+}
+
+/**
+ * Replace each `<tag …>…</tag>` element (content and all) with a space.
+ * The opener needs its `>`; the element ends at the first `</tag>`.
+ */
+function stripElements(text: string, tag: string): string {
+  const opener = `<${tag}`;
+  const closer = `</${tag}>`;
+  const parts: string[] = [];
+  let position = 0;
+  let search = 0;
+
+  for (;;) {
+    const start = indexOfTag(text, opener, search);
+    if (start === -1) break;
+
+    const nameEnd = start + opener.length;
+    if (nameEnd < text.length && isWordChar(text.charCodeAt(nameEnd))) {
+      // `<scripts>` is a different tag.
+      search = start + 1;
+      continue;
+    }
+
+    const openerEnd = text.indexOf(">", nameEnd);
+    if (openerEnd === -1) break;
+
+    const close = indexOfTag(text, closer, openerEnd + 1);
+    if (close === -1) break;
+
+    parts.push(text.slice(position, start), " ");
+    position = close + closer.length;
+    search = position;
+  }
+
+  parts.push(text.slice(position));
+
+  return parts.join("");
+}
+
+/**
+ * Replace each tag whose name passes `accept` (`<name …>` or `</name …>`)
+ * with `replacement`. The name is the run of word characters after `<` or
+ * `</`; the tag ends at the next `>`.
+ */
+function replaceNamedTags(
+  text: string,
+  accept: (name: string) => boolean,
+  replacement: string,
+): string {
+  const parts: string[] = [];
+  let position = 0;
+  let search = 0;
+
+  for (;;) {
+    const start = text.indexOf("<", search);
+    if (start === -1) break;
+
+    let nameStart = start + 1;
+    if (text.charCodeAt(nameStart) === 47 /* "/" */) {
+      nameStart++;
+    }
+
+    let nameEnd = nameStart;
+    while (nameEnd < text.length && isWordChar(text.charCodeAt(nameEnd))) {
+      nameEnd++;
+    }
+
+    if (nameEnd === nameStart || !accept(text.slice(nameStart, nameEnd).toLowerCase())) {
+      search = start + 1;
+      continue;
+    }
+
+    const end = text.indexOf(">", nameEnd);
+    if (end === -1) break;
+
+    parts.push(text.slice(position, start), replacement);
+    position = end + 1;
+    search = position;
+  }
+
+  parts.push(text.slice(position));
+
+  return parts.join("");
+}
+
+/** Remove every remaining `<…>` tag (at least one character between the brackets). */
+function stripTags(text: string): string {
+  const parts: string[] = [];
+  let position = 0;
+  let search = 0;
+
+  for (;;) {
+    const start = text.indexOf("<", search);
+    if (start === -1 || start + 1 >= text.length) break;
+
+    if (text.charCodeAt(start + 1) === 62 /* ">" */) {
+      search = start + 1;
+      continue;
+    }
+
+    const end = text.indexOf(">", start + 2);
+    if (end === -1) break;
+
+    parts.push(text.slice(position, start));
+    position = end + 1;
+    search = position;
+  }
+
+  parts.push(text.slice(position));
+
+  return parts.join("");
+}
 
 /** Named HTML entities common in prose. Numeric entities are decoded generically. */
 const NAMED_ENTITIES: Record<string, string> = {
@@ -80,13 +292,22 @@ function decodeEntities(text: string): string {
  * `undefined` when there is none. Read BEFORE `<head>` is stripped.
  */
 function extractTitle(html: string): string | undefined {
-  const match = /<title[^>]*>([\s\S]*?)<\/title>/i.exec(html);
-
-  if (!match) {
+  const start = indexOfTag(html, "<title", 0);
+  if (start === -1) {
     return undefined;
   }
 
-  const title = decodeEntities(match[1] ?? "")
+  const openerEnd = html.indexOf(">", start + "<title".length);
+  if (openerEnd === -1) {
+    return undefined;
+  }
+
+  const close = indexOfTag(html, "</title>", openerEnd + 1);
+  if (close === -1) {
+    return undefined;
+  }
+
+  const title = decodeEntities(html.slice(openerEnd + 1, close))
     .replace(/\s+/g, " ")
     .trim();
 
@@ -105,21 +326,20 @@ function htmlToText(html: string): string {
   let text = html;
 
   // 1. Comments first — a commented-out `<script>` must not survive.
-  text = text.replace(/<!--[\s\S]*?-->/g, " ");
+  text = stripComments(text);
 
   // 2. Non-prose elements, content and all.
   for (const tag of STRIPPED_ELEMENTS) {
-    const element = new RegExp(`<${tag}\\b[^>]*>[\\s\\S]*?<\\/${tag}>`, "gi");
-    text = text.replace(element, " ");
+    text = stripElements(text, tag);
     // Defensively drop a self-closing / unterminated open tag too.
-    text = text.replace(new RegExp(`<\\/?${tag}\\b[^>]*>`, "gi"), " ");
+    text = replaceNamedTags(text, (name) => name === tag, " ");
   }
 
   // 3. Block tags → newlines, so paragraph / list structure survives.
-  text = text.replace(BLOCK_TAGS, "\n");
+  text = replaceNamedTags(text, (name) => BLOCK_TAGS.has(name), "\n");
 
   // 4. Every remaining tag → gone.
-  text = text.replace(/<[^>]+>/g, "");
+  text = stripTags(text);
 
   // 5. Entities → characters.
   text = decodeEntities(text);
@@ -140,7 +360,7 @@ function htmlToText(html: string): string {
  * Scripts, styles, and other non-prose elements are dropped content-and-all,
  * block tags become line breaks (so paragraph structure survives for the
  * splitter), remaining tags are stripped, and HTML entities are decoded — a
- * lightweight regex pass, no heavy DOM dependency.
+ * lightweight linear scan, no heavy DOM dependency.
  *
  * The document's `metadata.title` is set from the page's `<title>` (unless
  * the caller overrode it), and `metadata.loader` is `"html"`. The output is

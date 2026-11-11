@@ -58,8 +58,22 @@ export interface GuardOptions {
    * `block` / `flag` only.
    */
   input?: readonly GuardrailDetector[];
-  /** Detectors run on `response.content` at `trip.after`. Support `redact`. */
+  /**
+   * Detectors run on `response.content` at `trip.after`. Support `redact`.
+   * When any are set, a streaming run holds each trip's text until they
+   * approve it, then streams the approved text as one delta (see `stream`).
+   */
   output?: readonly GuardrailDetector[];
+  /**
+   * How a streaming run (`agent.stream()`, `ai.serve`) meets the `output`
+   * detectors. Default `"buffered"`: each trip's text is held until the
+   * detectors approve or redact it and is then streamed as one delta; a
+   * blocked trip streams no text, and reasoning deltas are not streamed.
+   * `"unguarded"` streams deltas as they arrive, before the detectors run,
+   * so a redaction or block only changes `result.text`. Has no effect
+   * without `output` detectors or outside streaming.
+   */
+  stream?: "buffered" | "unguarded";
   /**
    * Detectors run on `JSON.stringify(toolArgs)` at `tool.before`. A
    * `redact` verdict here is treated as a `block` (silently rewriting tool
@@ -131,8 +145,10 @@ export interface TopicFilterOptions {
 export interface InjectionDetectorOptions {
   /**
    * Extra marker phrases beyond the built-in jailbreak / prompt-injection
-   * set. A `string` matches case-insensitively as a substring; a `RegExp`
-   * is tested as-is.
+   * set. A `string` matches as a substring after both it and the text are
+   * normalized (case, NFKC forms, zero-width characters and runs of
+   * whitespace / `_` / `-` / `.` folded). A `RegExp` is tested on the
+   * original text as a copy without its `g` / `y` flags.
    */
   markers?: readonly (string | RegExp)[];
   /**
@@ -140,6 +156,32 @@ export interface InjectionDetectorOptions {
    * `"block"` on the input phase.
    */
   onMatch?: Extract<GuardrailAction, "block" | "flag">;
+}
+
+/**
+ * Options for the built-in external link detector (`ai.guardrail.links`),
+ * an `output` detector that strips image (and optionally link) URLs whose
+ * host is not allowed, so a rendered reply cannot send data to another
+ * host.
+ */
+export interface LinkFilterOptions {
+  /**
+   * Hosts whose URLs may stay. An entry matches its exact host;
+   * `"*.example.com"` matches every subdomain of `example.com`. Relative
+   * URLs always stay. Default: none, so every absolute URL is refused.
+   */
+  allowHosts?: readonly string[];
+  /**
+   * Also check links: Markdown `[text](url)`, `<a href>` and `<scheme:…>`
+   * autolinks. Default `false`: images and reference definitions only
+   * (they load without a click).
+   */
+  links?: boolean;
+  /**
+   * What to do on a hit. Default `"redact"`: strip the URL and keep the
+   * visible text (alt text, link text).
+   */
+  onMatch?: Extract<GuardrailAction, "redact" | "block" | "flag">;
 }
 
 /**

@@ -13,6 +13,7 @@
  */
 import type { HttpContext } from "@warlock.js/core";
 import type { PageRouteHandler } from "../create-page-route-handler";
+import { markLocaleFromPath } from "../page-vary-header";
 
 /**
  * Returns a handler that sets `request.locale = code` (validated through
@@ -25,6 +26,7 @@ export function localePrefixedPageHandler(
 ): PageRouteHandler {
   return (context: HttpContext) => {
     context.request.locale = code;
+    markLocaleFromPath(context.request);
 
     return pageHandler(context);
   };

@@ -93,6 +93,8 @@ export default cacheConfigurations;
 
 The `database` driver uses a `cache` table — it ships with the auth migrations bundle, or you can register your own `cache.migration.ts`. Without the table the first `set` throws on boot.
 
+`removeNamespace("users")` on the `database` driver removes the `users` key and every key under it (`users.id.1`, `users.list.…`), as the other drivers do, so a repository's cache invalidation clears its nested entries. `flush()` waits for the rows to be deleted before it resolves. An index on the `key` column keeps both fast.
+
 ### Driver picks at a glance
 
 | Driver           | When to use                                                                            |

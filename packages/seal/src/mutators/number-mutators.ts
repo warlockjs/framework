@@ -20,23 +20,34 @@ export const booleanMutator: Mutator = async (value) => {
   return Boolean(value);
 };
 
+/**
+ * Whether a value is a number or a numeric string. Anything else (booleans,
+ * arrays such as `[7]`, objects) is left for the type rule to reject.
+ */
+function isNumberLike(value: unknown): value is number | string {
+  return typeof value === "number" || (typeof value === "string" && isNumeric(value));
+}
+
 export const numericMutator: Mutator = async (value) => {
-  if (!isNumeric(value)) return value;
+  if (!isNumberLike(value)) return value;
   return Number(value);
 };
 
 /** Absolute value mutator */
 export const absMutator: Mutator = async (value) => {
+  if (!isNumberLike(value)) return value;
   return Math.abs(Number(value));
 };
 
 /** Ceil mutator */
 export const ceilMutator: Mutator = async (value) => {
+  if (!isNumberLike(value)) return value;
   return Math.ceil(Number(value));
 };
 
 /** Floor mutator */
 export const floorMutator: Mutator = async (value) => {
+  if (!isNumberLike(value)) return value;
   return Math.floor(Number(value));
 };
 
@@ -45,6 +56,7 @@ export const floorMutator: Mutator = async (value) => {
  * Supports decimal precision via options.decimals
  */
 export const roundMutator: Mutator = async (value, context) => {
+  if (!isNumberLike(value)) return value;
   const decimals = context?.options?.decimals ?? 0;
   // If decimals is 0, use standard Math.round for integers
   if (decimals === 0) {
@@ -64,6 +76,7 @@ export const roundMutator: Mutator = async (value, context) => {
  * a number schema to output a string.
  */
 export const toFixedMutator: Mutator = async (value, context) => {
+  if (!isNumberLike(value)) return value;
   const decimals = context?.options?.decimals ?? 2;
   return Number(Number(value).toFixed(decimals));
 };

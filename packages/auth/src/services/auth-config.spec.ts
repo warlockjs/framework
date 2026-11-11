@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const configKey = vi.fn();
 const logWarn = vi.fn();
@@ -136,5 +136,62 @@ describe("authConfig cookie.refreshName", () => {
     );
 
     expect(authConfig.cookie.refreshName()).toBe("rt");
+  });
+});
+
+describe("production configuration warnings", () => {
+  const previousEnv = process.env.NODE_ENV;
+
+  beforeEach(() => {
+    process.env.NODE_ENV = "production";
+  });
+
+  afterEach(() => {
+    process.env.NODE_ENV = previousEnv;
+  });
+
+  it("accepts a 64-character secret silently", () => {
+    configKey.mockImplementation((key: string) =>
+      key === "auth.accessToken.secret" ? "a".repeat(64) : undefined,
+    );
+
+    authConfig.accessToken.secret();
+
+    expect(logWarn).not.toHaveBeenCalled();
+  });
+
+  it("warns once, without throwing, about a secret shorter than 32 bytes", () => {
+    configKey.mockImplementation((key: string) =>
+      key === "auth.accessToken.secret" ? "secret" : undefined,
+    );
+
+    expect(authConfig.accessToken.secret()).toBe("secret");
+    authConfig.accessToken.secret();
+
+    expect(logWarn).toHaveBeenCalledOnce();
+    expect(String(logWarn.mock.calls[0]?.[2])).toContain("jwt.generate");
+  });
+
+  it("warns once about an access-token lifetime over 30 days", () => {
+    configKey.mockImplementation((key: string) =>
+      key === "auth.accessToken.expiresIn" ? NO_EXPIRATION : undefined,
+    );
+
+    authConfig.accessToken.expiresInMs();
+    authConfig.accessToken.expiresInMs();
+
+    expect(logWarn).toHaveBeenCalledOnce();
+    expect(String(logWarn.mock.calls[0]?.[2])).toContain("30 days");
+  });
+
+  it("stays quiet outside production", () => {
+    process.env.NODE_ENV = "development";
+    configKey.mockImplementation((key: string) =>
+      key === "auth.refreshToken.secret" ? "short" : undefined,
+    );
+
+    authConfig.refreshToken.secret();
+
+    expect(logWarn).not.toHaveBeenCalled();
   });
 });

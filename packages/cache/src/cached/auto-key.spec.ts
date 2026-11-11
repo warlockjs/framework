@@ -51,4 +51,17 @@ describe("deriveAutoKey", () => {
 
     expect(() => deriveAutoKey("bad", [circular])).toThrow(CacheConfigurationError);
   });
+
+  it("keeps an own __proto__ key as data", () => {
+    expect(deriveAutoKey("p", [JSON.parse('{"__proto__":{"x":1}}')])).not.toBe(
+      deriveAutoKey("p", [{}]),
+    );
+  });
+
+  it("never lets an argument spell the undefined, bigint or number markers", () => {
+    expect(deriveAutoKey("p", [undefined])).not.toBe(deriveAutoKey("p", [{ $u: 1 }]));
+    expect(deriveAutoKey("p", [5n])).not.toBe(deriveAutoKey("p", ["5n"]));
+    expect(deriveAutoKey("p", [5n])).not.toBe(deriveAutoKey("p", [{ $b: "5" }]));
+    expect(deriveAutoKey("p", [Number.NaN])).not.toBe(deriveAutoKey("p", [{ $n: "NaN" }]));
+  });
 });

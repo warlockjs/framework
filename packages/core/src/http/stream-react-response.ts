@@ -1,4 +1,5 @@
 import type { OutgoingHttpHeaders, ServerResponse } from "node:http";
+import { createFlushingCompressor, type CompressionEncoding } from "./compression";
 
 /**
  * The subset of React's server `PipeableStream` (`react-dom/server`) this
@@ -34,6 +35,12 @@ export type StreamReactResponseOptions = {
   headers: OutgoingHttpHeaders;
   /** The already-ready React server stream (its shell, or the whole tree, resolved by the caller). */
   pipeableStream: PipeableReactStream;
+  /**
+   * Compress the stream with this coding (`http.compression`). The headers
+   * must already say so (`Content-Encoding`, `Vary`); output is flushed after
+   * each burst of writes so the page still streams.
+   */
+  encoding?: CompressionEncoding;
 };
 
 /**
@@ -63,7 +70,7 @@ export type StreamReactResponseOptions = {
  * ```
  */
 export function streamReactResponse(options: StreamReactResponseOptions): Promise<void> {
-  const { raw, statusCode, headers, pipeableStream } = options;
+  const { raw, statusCode, headers, pipeableStream, encoding } = options;
 
   return new Promise<void>((resolve, reject) => {
     raw.writeHead(statusCode, headers);
@@ -83,6 +90,6 @@ export function streamReactResponse(options: StreamReactResponseOptions): Promis
     raw.once("finish", () => resolve());
     raw.once("error", (error) => reject(error));
 
-    pipeableStream.pipe(raw);
+    pipeableStream.pipe(encoding ? createFlushingCompressor(raw, encoding) : raw);
   });
 }

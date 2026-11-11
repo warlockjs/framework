@@ -56,7 +56,7 @@ export default function Contact() {
 - Validation runs on the body only (files included); use `request.validated()`. Failure is a 422 `ActionState`, the action does not run.
 - Return `response.redirect(url)` (relative or `http(s)` only; other schemes throw), data, or a failure helper: `badRequest`, `unauthorized`, `forbidden`, `conflict`, `unprocessableEntity`, `tooManyRequests`, each with optional `{ message, errors }`.
 - Outcomes: no JS redirect is 303; JS redirect is 204 + `x-warlock-redirect`; failure is 422/4xx (page rendered at that status without JS, `actionData` body only with JS).
-- `values` is echoed on failure only, never files, and omits names in `web.forms.redactValues` (default `password`, `password_confirmation`, `*token*`, `*secret*`). `web.forms.redactValues` is a typed config key of `readonly string[]`; set it at boot to replace that list (patterns support `*`).
+- `values` is echoed on failure only, never files, and never secret-looking names: built-in `*password*`, `*passwd*`, `*passcode*`, `*token*`, `*secret*`, `*otp*`, `cvv`, `cvc`, `*card*number*`, `pin` (case-insensitive, `*` wildcard). `web.forms.redactValues` (`readonly string[]`) ADDS patterns to that list, never replaces it. `web.forms.echoValues: false` echoes nothing (default `true`).
 - Same-origin `Origin`/`Referer` is always required (403 otherwise); no opt-out.
 - Actions are never cached and always `private, no-store`; call `invalidatePageCache(tags)` to refresh other visitors' cached page.
 - Redirect after success: a no-JS action that returns data re-POSTs on reload.

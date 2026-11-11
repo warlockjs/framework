@@ -134,7 +134,7 @@ The cost of `connectToBroker` is a TCP handshake plus AMQP channel setup. Doing 
 
 ## Reconnects
 
-When `reconnect: true` (the default), the RabbitMQ driver listens for the connection's `close` event and starts a fixed-interval retry loop — every `reconnectDelay` ms (default 5000) it attempts to reconnect. There's no backoff: the interval stays constant. Failed attempts retry indefinitely; a successful attempt re-emits `connected` and re-registers any pending consumers.
+When `reconnect: true` (the default), the RabbitMQ driver listens for the connection's `close` event and starts a fixed-interval retry loop — every `reconnectDelay` ms (default 5000) it attempts to reconnect. There's no backoff: the interval stays constant. Failed attempts retry indefinitely; a successful attempt re-emits `connected`, moves every channel you already obtained with `channel()` onto the new AMQP channel, and re-attaches their active subscriptions (paused ones stay paused). A deliberate `disconnect()` never reconnects: it also cancels a reconnect that is waiting.
 
 What this means in practice:
 

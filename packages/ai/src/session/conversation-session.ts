@@ -267,8 +267,10 @@ function emptyRecord(id: string, now: string): ConversationSessionRecord {
  * messages (history — compacted when the agent compacted it — the input,
  * every tool round) without the agent's own system prompt, plus the final
  * reply exactly as the model sent it.
+ *
+ * Exported for specs only; not part of the package surface.
  */
-function conversationAfterRun<TOutput>(
+export function conversationAfterRun<TOutput>(
   previous: Message[],
   input: string,
   withAttachments: boolean,
@@ -283,13 +285,7 @@ function conversationAfterRun<TOutput>(
   }
 
   const start = result.report.systemPrompt !== undefined && captured[0]?.role === "system" ? 1 : 0;
-  const multipart = new Map<string, ContentPart[]>();
-
-  for (const message of previous) {
-    if (Array.isArray(message.content)) {
-      multipart.set(JSON.stringify(message.content), message.content);
-    }
-  }
+  const multipart = lazyMultipartLookup(previous);
 
   const messages = captured
     .slice(start)
@@ -314,6 +310,33 @@ function conversationAfterRun<TOutput>(
   return messages;
 }
 
+/** Finds a stored multipart message by the JSON form a captured message carries. */
+type MultipartLookup = (content: string) => ContentPart[] | undefined;
+
+/**
+ * Index the stored multipart messages by their JSON form on first use
+ * only. Captured messages from the agent carry their parts beside the text
+ * (`contentParts`), so a normal turn never needs the index and never
+ * serializes the history's attachments again.
+ */
+function lazyMultipartLookup(previous: Message[]): MultipartLookup {
+  let index: Map<string, ContentPart[]> | undefined;
+
+  return (content) => {
+    if (index === undefined) {
+      index = new Map();
+
+      for (const message of previous) {
+        if (Array.isArray(message.content)) {
+          index.set(JSON.stringify(message.content), message.content);
+        }
+      }
+    }
+
+    return index.get(content);
+  };
+}
+
 /**
  * Captured messages carry text content only; user turns that were
  * multipart (attachments) come back as their JSON form. Restore those that
@@ -321,7 +344,7 @@ function conversationAfterRun<TOutput>(
  */
 function toMessage(
   captured: CapturedMessage,
-  multipart: Map<string, ContentPart[]>,
+  multipart: MultipartLookup,
   attachmentsInput: string | undefined,
 ): Message {
   const message: Message = {
@@ -339,7 +362,7 @@ function toMessage(
 
 function restoreContent(
   captured: CapturedMessage,
-  multipart: Map<string, ContentPart[]>,
+  multipart: MultipartLookup,
   attachmentsInput: string | undefined,
 ): string | ContentPart[] {
   if (captured.contentParts !== undefined) {
@@ -356,7 +379,7 @@ function restoreContent(
     return captured.content;
   }
 
-  const known = multipart.get(captured.content);
+  const known = multipart(captured.content);
 
   if (known) {
     return structuredClone(known);

@@ -9,6 +9,7 @@
  * `import()`s each page's SOURCE file — never reachable in a production
  * build, which is why production always registers its own source first.
  */
+import { environment } from "@warlock.js/core";
 import type { ProductionBundleGlobal } from "../server/production-bundle";
 import type { DiscoverPagesOptions } from "../build/discover-pages";
 import {
@@ -25,6 +26,7 @@ import {
   type SitemapPageOptions,
   type SitemapPageSupplier,
   type SitemapPageUrl,
+  type SitemapSupplierContext,
 } from "./sitemap-page-export";
 import type { SitemapPageSource } from "./sitemap-page-source";
 
@@ -34,6 +36,8 @@ export type CollectSitemapEntriesOptions = DiscoverPagesOptions & {
   readonly site?: string;
   /** Injected page source — bypasses both the production registry and `listRoutablePages`. Primarily for tests. */
   readonly pageSource?: SitemapPageSource;
+  /** Passed to every page's sitemap supplier; `{}` when omitted. */
+  readonly supplierContext?: SitemapSupplierContext;
 };
 
 export type CollectedSitemapEntries = {
@@ -53,8 +57,82 @@ export type CollectedSitemapEntries = {
 const isDynamicRoute = (routePath: string): boolean =>
   routePath.replace(/(^|\/):locale(?=\/|$)/g, "$1").includes(":");
 
-async function resolveSupplier(supplier: SitemapPageSupplier): Promise<SitemapPageUrl[]> {
-  return [...(await supplier())];
+type SupplierStep = {
+  type: "supplier";
+  supplier: SitemapPageSupplier;
+  routePath: string | undefined;
+  pageOptions: SitemapPageOptions | undefined;
+};
+
+/** Suppliers run at most this many at a time; their URLs are still added in page order. */
+const SUPPLIER_CONCURRENCY = 4;
+
+const warnedTenantSuppliers = new WeakSet<SitemapPageSupplier>();
+
+async function resolveSupplier(
+  supplier: SitemapPageSupplier,
+  context: SitemapSupplierContext,
+): Promise<SitemapPageUrl[]> {
+  if (
+    context.tenantKey !== undefined &&
+    supplier.length === 0 &&
+    environment() !== "production" &&
+    !warnedTenantSuppliers.has(supplier)
+  ) {
+    warnedTenantSuppliers.add(supplier);
+    console.warn(
+      `[warlock:web] a sitemap supplier of dynamic site "${context.site ?? ""}" ignores its ` +
+        "argument, so every tenant's sitemap lists the same URLs. Read `tenantKey` from the " +
+        "supplier's argument and return only that tenant's URLs: `entries: ({ tenantKey }) => ...`.",
+    );
+  }
+
+  return [...(await supplier(context))];
+}
+
+/**
+ * Starts each task with at most `limit` running at once and returns one
+ * promise per task, in task order. Every returned promise already has a
+ * rejection handler attached, so a failure the caller never reaches (it
+ * stopped at an earlier one) is not reported as unhandled.
+ */
+function runWithConcurrency<T>(tasks: readonly (() => Promise<T>)[], limit: number): Promise<T>[] {
+  const settlers = tasks.map(() => {
+    let resolve: (value: T) => void = () => undefined;
+    let reject: (reason: unknown) => void = () => undefined;
+    const promise = new Promise<T>((onResolve, onReject) => {
+      resolve = onResolve;
+      reject = onReject;
+    });
+
+    promise.catch(() => undefined);
+
+    return { promise, resolve, reject };
+  });
+  let next = 0;
+  let running = 0;
+
+  const launch = (): void => {
+    while (running < limit && next < tasks.length) {
+      const index = next++;
+      const task = tasks[index];
+      const settler = settlers[index];
+
+      if (task === undefined || settler === undefined) continue;
+
+      running++;
+      task()
+        .then(settler.resolve, settler.reject)
+        .finally(() => {
+          running--;
+          launch();
+        });
+    }
+  };
+
+  launch();
+
+  return settlers.map((settler) => settler.promise);
 }
 
 function collectSupplierUrls(
@@ -130,6 +208,11 @@ export async function collectSitemapEntries(
   const items: CollectedEntry[] = [];
   const declaredRoutes = new Set<string>();
   const models = new Set<SitemapModelLike>();
+  const supplierContext = options.supplierContext ?? {};
+  // Page order decides output order. Each step either adds its entries
+  // directly or adds the URLs of one supplier, whose call is started below
+  // with bounded concurrency and awaited here in order.
+  const steps: Array<{ type: "entries"; add: () => void } | SupplierStep> = [];
 
   for (const page of pages) {
     if (options.site !== undefined && page.site !== options.site) continue;
@@ -163,14 +246,12 @@ export async function collectSitemapEntries(
         for (const model of sitemapExport.invalidateOn ?? []) models.add(model);
       }
 
-      const urls = await resolveSupplier(supplier);
-      collectSupplierUrls(
-        items,
-        urls,
-        page.routePath,
-        isSitemapPageEntriesDeclaration(sitemapExport) ? sitemapExport : undefined,
-        options.locales,
-      );
+      steps.push({
+        type: "supplier",
+        supplier,
+        routePath: page.routePath,
+        pageOptions: isSitemapPageEntriesDeclaration(sitemapExport) ? sitemapExport : undefined,
+      });
 
       continue;
     }
@@ -187,14 +268,12 @@ export async function collectSitemapEntries(
         for (const model of sitemapExport.invalidateOn ?? []) models.add(model);
       }
 
-      const urls = await resolveSupplier(supplier);
-      collectSupplierUrls(
-        items,
-        urls,
-        undefined,
-        isSitemapPageEntriesDeclaration(sitemapExport) ? sitemapExport : undefined,
-        options.locales,
-      );
+      steps.push({
+        type: "supplier",
+        supplier,
+        routePath: undefined,
+        pageOptions: isSitemapPageEntriesDeclaration(sitemapExport) ? sitemapExport : undefined,
+      });
 
       continue;
     }
@@ -204,11 +283,34 @@ export async function collectSitemapEntries(
     const url = toPageUrl(page.routePath, pageOptions);
 
     if (pageOptions.locales === false) {
-      items.push(localeInvariantEntry(url, undefined));
+      steps.push({ type: "entries", add: () => items.push(localeInvariantEntry(url, undefined)) });
       continue;
     }
 
-    items.push(...expandLocaleEntries(url, undefined, options.locales));
+    steps.push({
+      type: "entries",
+      add: () => items.push(...expandLocaleEntries(url, undefined, options.locales)),
+    });
+  }
+
+  const supplierSteps = steps.filter((step): step is SupplierStep => step.type === "supplier");
+  const supplied = runWithConcurrency(
+    supplierSteps.map((step) => () => resolveSupplier(step.supplier, supplierContext)),
+    SUPPLIER_CONCURRENCY,
+  );
+  let suppliedIndex = 0;
+
+  for (const step of steps) {
+    if (step.type === "entries") {
+      step.add();
+      continue;
+    }
+
+    const urls = supplied[suppliedIndex++];
+
+    if (urls === undefined) continue;
+
+    collectSupplierUrls(items, await urls, step.routePath, step.pageOptions, options.locales);
   }
 
   return models.size === 0

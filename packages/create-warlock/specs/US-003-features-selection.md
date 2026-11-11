@@ -22,8 +22,8 @@
 | Feature     | Description                          | Dependencies                                                                                             | Dev Dependencies                                   |
 | ----------- | ------------------------------------ | -------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
 | `react`     | React/ReactDOM for SSR (mails, etc.) | `react@^19.2.3`, `react-dom@^19.2.3`                                                                     | `@types/react@^19.2.7`, `@types/react-dom@^19.2.3` |
-| `image`     | Sharp for image processing           | `sharp@^0.34.5`                                                                                          | -                                                  |
-| `mail`      | Nodemailer for sending emails        | `nodemailer@^6.9.14`                                                                                     | `@types/nodemailer@^7.0.4`                         |
+| `image`     | Sharp for image processing           | `sharp@^0.35.5`                                                                                          | -                                                  |
+| `mail`      | Nodemailer for sending emails        | `nodemailer@^10.1.4`                                                                                     | `@types/nodemailer@^8.0.0`                         |
 | `redis`     | Redis cache driver                   | `redis@^4.6.13`                                                                                          | -                                                  |
 | `scheduler` | Warlock scheduler for tasks          | `@warlock.js/scheduler@~4.0.0`                                                                           | -                                                  |
 | `s3`        | AWS S3 cloud storage                 | `@aws-sdk/client-s3@^3.955.0`, `@aws-sdk/lib-storage@^3.955.0`, `@aws-sdk/s3-request-presigner@^3.955.0` | -                                                  |

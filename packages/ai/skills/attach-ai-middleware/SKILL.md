@@ -1,6 +1,6 @@
 ---
 name: attach-ai-middleware
-description: 'Wire agent middleware — ai.middleware.budget (token / USD caps + SLO/cost contract w/ maxLatencyMs + onViolation fallback), ai.middleware.guardrail (pre / post content checks), ai.middleware.semanticCache (exact + vector cache), supervisor-level middleware, plus authoring custom hooks (execute / trip / tool). Triggers: `onSpend`, `BudgetSpend`, `window: "all"`, `ai.pricing`, `pricingCatalogue`, `PricingCatalogue`, `reserve`, `BudgetReserveOptions`, `estimateInputTokens`, `countInputTokens`, `ai.middleware.budget`, `ai.middleware.guardrail`, `ai.middleware.semanticCache`, `ai.middleware.compose`, `ai.middleware.forTool`, `AgentMiddleware`, `BudgetExceededError`, `GuardrailViolationError`, `BudgetContract`, `maxLatencyMs`, `onViolation`, `readBudgetFallbackSignal`, `supervisor middleware`, `SemanticCacheOptions`, `SemanticCacheScope`; ''cap token cost'', ''SLO budget'', ''block pii in prompts'', ''semantic cache before LLM'', ''supervisor-level middleware'', ''write custom hook'', ''isolate semantic cache per session/tenant''; typical import `import { ai } from "@warlock.js/ai"`. Skip: agent lifecycle — the `run-ai-agent` topic; cache drivers — the `persist-ai-data` topic; competing libs `langchain` callbacks.'
+description: 'Wire agent middleware — ai.middleware.budget (token / USD caps + SLO/cost contract w/ maxLatencyMs + onViolation fallback), ai.middleware.guardrail (pre / post content checks), ai.middleware.semanticCache (exact + vector cache), supervisor-level middleware, plus authoring custom hooks (execute / trip / tool). Triggers: `onSpend`, `BudgetSpend`, `window: "all"`, `ai.pricing`, `pricingCatalogue`, `PricingCatalogue`, `reserve`, `BudgetReserveOptions`, `estimateInputTokens`, `countInputTokens`, `ai.middleware.budget`, `ai.middleware.guardrail`, `ai.middleware.semanticCache`, `ai.middleware.compose`, `ai.middleware.forTool`, `AgentMiddleware`, `BudgetExceededError`, `GuardrailViolationError`, `BudgetContract`, `maxLatencyMs`, `onViolation`, `readBudgetFallbackSignal`, `supervisor middleware`, `SemanticCacheOptions`, `SemanticCacheScope`, `cacheToolRuns`; ''cap token cost'', ''SLO budget'', ''block pii in prompts'', ''semantic cache before LLM'', ''supervisor-level middleware'', ''write custom hook'', ''isolate semantic cache per session/tenant''; typical import `import { ai } from "@warlock.js/ai"`. Skip: agent lifecycle — the `run-ai-agent` topic; cache drivers — the `persist-ai-data` topic; competing libs `langchain` callbacks.'
 ---
 
 # Middleware — agent-level pipeline
@@ -180,6 +180,7 @@ ai.middleware.semanticCache({
   ttlMs: 60 * 60 * 1000,
   namespace: "support-faq",
   // scope: "session" (default) — see below
+  // cacheToolRuns: false (default) — answers of runs that called tools are not stored
 });
 ```
 
@@ -187,11 +188,13 @@ ai.middleware.semanticCache({
 
 **How it works.**
 
-- **Exact-match** — FNV hash over the message list. `store.get(hash)` returns an instant hit.
-- **Vector-match** — embeds the prompt, calls `store.similar(vector, { topK: 1, threshold })`. Driver uses its native ANN index.
+- **Exact-match** — SHA-256 over the message list. `store.get(hash)` returns an instant hit after re-checking the stored prompt hash, scope and context.
+- **Vector-match** — embeds the last user message, calls `store.similar(vector, { topK, threshold })`; a page filled by other scopes / conversations is widened. Driver uses its native ANN index.
+- **Same context only** — every entry records a fingerprint of the agent name, the conversation before the question (system prompt included) and the question's attached media; both paths require it to match. Two agents in one session, or the same "yes, go ahead" at two points of a conversation, never share an answer.
 - **Hits** return a synthetic `ModelResponse` with `usage: { input: 0, output: 0, total: 0 }`.
 - **Writes** happen at `trip.after` on miss.
 - **Trip-zero only** — only first-trip responses are cached. Tool-using loops never serve cached tool-call responses (would infinite-loop).
+- **`cacheToolRuns`** (default `false`) — when the first turn calls tools, the final answer (built from tool results) is not stored. Set `true` for public data, e.g. a KB-search agent.
 - **Never use memory drivers in production** — linear scan per query.
 
 ### Session-scoped by default — `scope` (4.15.0)
@@ -203,11 +206,11 @@ ai.middleware.semanticCache({ embedder, threshold: 0.95, scope: "shared" }); // 
 ai.middleware.semanticCache({ embedder, threshold: 0.95, scope: (ctx) => tenantIdFrom(ctx) }); // custom boundary
 ```
 
-- **`"session"`** (default) — isolated per `sessionId`; a run made _without_ a `sessionId` shares one unscoped pool (unchanged behavior for those calls). Thread `sessionId` through `agent.execute()` to get the isolation — composite primitives (supervisor, orchestrator) already forward their own.
+- **`"session"`** (default) — isolated per `sessionId`; a run made _without_ a `sessionId` skips the cache (no read, no write; warns once). Thread `sessionId` through `agent.execute()` — composite primitives (supervisor, orchestrator) already forward their own.
 - **`"shared"`** — one pool for every caller, regardless of session — the pre-4.15.0 behavior. The explicit opt-in for genuinely public Q&A (docs bot, FAQ) where cross-user hit rate is the point and no response can carry a caller's private context.
-- **`(context) => key | undefined`** — derive your own boundary, e.g. per tenant. Returning `undefined` falls back to the unscoped pool.
+- **`(context) => key | undefined`** — derive your own boundary, e.g. per tenant. Returning `undefined` (or `""`) skips the cache for that run; return a constant to pool such runs on purpose.
 
-Entries written before the upgrade are unscoped and are only read by unscoped (or `"shared"`) runs. The vector lookup overscans before filtering (mirroring the memory tiers) so a noisy foreign scope can't occupy the top-`k` and mask a caller's own hit.
+Entries written before 5.53 carry no context fingerprint and are no longer served (misses, refilled over time). The vector lookup overscans before filtering and widens the page when needed (mirroring the memory tiers), so a noisy foreign scope can't occupy the top-`k` and mask a caller's own hit.
 
 ## Writing your own middleware
 

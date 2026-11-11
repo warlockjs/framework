@@ -1,10 +1,26 @@
-import { ensureDirectoryAsync, fileExistsAsync, getJsonFileAsync } from "@warlock.js/fs";
 import dayjs from "dayjs";
 import fs from "fs";
-import path from "path";
+import { EOL } from "os";
 import type { LogContract, LogMessage, LoggingData } from "../types";
 import { safeJsonStringify } from "../utils/safe-json-stringify";
-import { FileLog } from "./file-log";
+import { withDirectoryRetry } from "../utils/with-directory-retry";
+import { FileLog, type FileLogConfig } from "./file-log";
+
+export type JSONFileLogConfig = FileLogConfig & {
+  /**
+   * How entries are stored.
+   *
+   * - `"json"` — one JSON document per file, `{ "messages": [...] }`. Each
+   *   write reads the file, adds the new entries and writes it back.
+   * - `"jsonl"` — one JSON object per line (JSON Lines) in a `.jsonl` file.
+   *   Each write only appends, so its cost does not grow with the file.
+   *
+   * @default "json"
+   */
+  format?: "json" | "jsonl";
+};
+
+type JsonLogDocument = { messages: unknown[] };
 
 export class JSONFileLog extends FileLog implements LogContract {
   /**
@@ -12,59 +28,22 @@ export class JSONFileLog extends FileLog implements LogContract {
    */
   public name = "fileJson";
 
-  /**
-   * Get file extension
-   */
-  public get extension(): string {
-    return "json";
+  public constructor(configurations?: JSONFileLogConfig) {
+    super(configurations);
   }
 
   /**
-   * Synchronously flush messages
+   * Get file extension: `json`, or `jsonl` with `format: "jsonl"`.
    */
-  public flushSync(): void {
-    if (this.messages.length === 0 && Object.keys(this.groupedMessages).length === 0) return;
+  public get extension(): string {
+    return this.isJsonLines ? "jsonl" : "json";
+  }
 
-    if (this.messagedShouldBeGrouped) {
-      this.prepareGroupedMessages();
-      // `Object.entries` rather than `for...in` + index: under
-      // `noUncheckedIndexedAccess` the index read is `LogMessage[] |
-      // undefined`, and spreading that into `push` is a type error rather than
-      // a runtime one only because the key demonstrably exists. Entries says so
-      // to the compiler instead of asserting it.
-      for (const [key, groupMessages] of Object.entries(this.groupedMessages)) {
-        const directoryPath = path.join(this.storagePath, key);
-        fs.mkdirSync(directoryPath, { recursive: true });
-        const filePath = path.join(directoryPath, `${this.fileName}.${this.extension}`);
-
-        let fileContents = { messages: [] as any[] };
-        if (fs.existsSync(filePath)) {
-          try {
-            fileContents = JSON.parse(fs.readFileSync(filePath, "utf-8"));
-            if (!Array.isArray(fileContents.messages)) fileContents.messages = [];
-          } catch (e) {
-            fileContents = { messages: [] };
-          }
-        }
-        fileContents.messages.push(...groupMessages);
-        fs.writeFileSync(filePath, safeJsonStringify(fileContents, 2));
-      }
-    } else {
-      fs.mkdirSync(this.storagePath, { recursive: true });
-      let fileContents = { messages: [] as any[] };
-      if (fs.existsSync(this.filePath)) {
-        try {
-          fileContents = JSON.parse(fs.readFileSync(this.filePath, "utf-8"));
-          if (!Array.isArray(fileContents.messages)) fileContents.messages = [];
-        } catch (e) {
-          fileContents = { messages: [] };
-        }
-      }
-      fileContents.messages.push(...this.messages);
-      fs.writeFileSync(this.filePath, safeJsonStringify(fileContents, 2));
-    }
-
-    this.onSave();
+  /**
+   * Whether entries are written as JSON Lines.
+   */
+  protected get isJsonLines(): boolean {
+    return (this.channelConfigurations as JSONFileLogConfig).format === "jsonl";
   }
 
   /**
@@ -101,109 +80,120 @@ export class JSONFileLog extends FileLog implements LogContract {
   }
 
   /**
-   * Write messages to the file
+   * {@inheritdoc}
    */
-  protected async writeMessagesToFile(): Promise<void> {
-    if (this.messages.length === 0 || this.isWriting || !this.isInitialized) return;
-
-    this.isWriting = true;
-
-    if (this.messagedShouldBeGrouped) {
-      return await this.writeGroupedMessagesToFile();
-    }
-
-    let filePath: string;
-
-    try {
-      filePath = this.filePath;
-    } catch (error) {
-      console.error("Failed to write log:", error);
-      this.isWriting = false;
+  protected async writeEntries(filePath: string, messages: LogMessage[]): Promise<void> {
+    if (this.isJsonLines) {
+      await this.write(filePath, jsonLines(messages));
       return;
     }
 
-    await this.checkAndRotateFile(filePath); // Ensure file rotation is handled
-
-    let fileContents = { messages: [] as any[] };
-
-    if (await fileExistsAsync(filePath)) {
-      try {
-        fileContents = (await getJsonFileAsync(filePath)) as { messages: any[] };
-      } catch (error) {
-        console.error("Error reading log file, reinitializing:", error);
-        fileContents = { messages: [] }; // Reinitialize the file if corrupted
-      }
-    } else {
-      fileContents = { messages: [] }; // Reinitialize the file if corrupted
-    }
-
-    fileContents.messages.push(...this.messages);
+    let text: string | undefined;
 
     try {
-      await fs.promises.writeFile(filePath, safeJsonStringify(fileContents, 2));
-
-      this.onSave();
+      text = await fs.promises.readFile(filePath, "utf-8");
     } catch (error) {
-      console.error("Failed to write log:", error);
-      // Implement fallback logic here
-      this.isWriting = false;
-      return;
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
     }
 
-    await this.afterWrite();
+    const document = text === undefined ? { messages: [] } : parseJsonLog(text);
+
+    if (!document) {
+      const asidePath = corruptFilePath(filePath);
+
+      await fs.promises.rename(filePath, asidePath);
+      this.reportCorruptFile(filePath, asidePath);
+    }
+
+    const contents = document ?? { messages: [] };
+
+    contents.messages.push(...messages);
+
+    await withDirectoryRetry(filePath, () =>
+      fs.promises.writeFile(filePath, safeJsonStringify(contents, 2)),
+    );
   }
 
   /**
-   * Write grouped messages to the file
+   * {@inheritdoc}
    */
-  protected async writeGroupedMessagesToFile(): Promise<void> {
-    let fileName: string;
-
-    try {
-      fileName = this.fileName;
-    } catch (error) {
-      console.error("Failed to write log:", error);
-      this.isWriting = false;
+  protected writeEntriesSync(filePath: string, messages: LogMessage[]): void {
+    if (this.isJsonLines) {
+      fs.appendFileSync(filePath, jsonLines(messages));
       return;
     }
 
-    // first step, is to group the messages
-    this.prepareGroupedMessages();
+    let document: JsonLogDocument | undefined = { messages: [] };
 
-    // now each key in the grouped messages, represents the directory path that should extend the storage path
-    for (const [key, groupMessages] of Object.entries(this.groupedMessages)) {
-      const directoryPath = path.join(this.storagePath, key);
+    if (fs.existsSync(filePath)) {
+      document = parseJsonLog(fs.readFileSync(filePath, "utf-8"));
 
-      await ensureDirectoryAsync(directoryPath);
+      if (!document) {
+        const asidePath = corruptFilePath(filePath);
 
-      const filePath = path.join(directoryPath, `${fileName}.${this.extension}`);
-
-      await this.checkAndRotateFile(filePath); // Ensure we check file size before writing
-
-      let fileContents: { messages: any[] } = { messages: [] };
-      if (await fileExistsAsync(filePath)) {
-        try {
-          fileContents = (await getJsonFileAsync(filePath)) as { messages: any[] };
-        } catch (error) {
-          console.error("Error reading log file, reinitializing:", error);
-          fileContents = { messages: [] };
-        }
-      } else {
-        fileContents = { messages: [] };
-      }
-
-      fileContents.messages.push(...groupMessages);
-
-      try {
-        await fs.promises.writeFile(filePath, safeJsonStringify(fileContents, 2));
-      } catch (error) {
-        console.error("Failed to write log:", error);
-        this.isWriting = false;
+        fs.renameSync(filePath, asidePath);
+        this.reportCorruptFile(filePath, asidePath);
       }
     }
 
-    this.onSave();
+    const contents = document ?? { messages: [] };
 
-    await this.afterWrite();
+    contents.messages.push(...messages);
+
+    fs.writeFileSync(filePath, safeJsonStringify(contents, 2));
   }
+
+  /**
+   * A file that is not a valid JSON log is moved aside, never overwritten (it
+   * holds earlier entries); tell the channel error handler where it went.
+   */
+  protected reportCorruptFile(filePath: string, asidePath: string): void {
+    this.reportError(
+      new Error(
+        `${filePath} is not a valid JSON log; it was moved to ${asidePath} and a new file was started`,
+      ),
+      {
+        type: "warn",
+        module: "logger",
+        action: "corrupt-file",
+        message: `Corrupt JSON log moved aside: ${asidePath}`,
+      },
+    );
+  }
+}
+
+/**
+ * Parse a JSON log document, or `undefined` when the text is not one (a
+ * truncated write, a hand edit).
+ */
+function parseJsonLog(text: string): JsonLogDocument | undefined {
+  try {
+    const parsed: unknown = JSON.parse(text);
+
+    if (
+      parsed &&
+      typeof parsed === "object" &&
+      Array.isArray((parsed as Partial<JsonLogDocument>).messages)
+    ) {
+      return parsed as JsonLogDocument;
+    }
+  } catch {
+    // Not JSON.
+  }
+
+  return undefined;
+}
+
+/**
+ * Where a corrupt JSON log is kept: next to it, stamped with the time.
+ */
+function corruptFilePath(filePath: string): string {
+  return `${filePath}.corrupt-${Date.now()}`;
+}
+
+/**
+ * One JSON object per line.
+ */
+function jsonLines(messages: LogMessage[]): string {
+  return messages.map((message) => safeJsonStringify(message)).join(EOL) + EOL;
 }

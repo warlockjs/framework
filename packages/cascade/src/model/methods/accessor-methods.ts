@@ -1,5 +1,6 @@
 import { get, merge, only, set, unset } from "@mongez/reinforcements";
 import { pruneEmptyParents } from "../../utils/prune-empty-parents";
+import { assertSafeFieldPath, assertSafeValueKeys } from "../../utils/safe-path";
 import type { Model } from "../model";
 
 /**
@@ -14,6 +15,12 @@ export function getFieldValue(model: Model, field: string, defaultValue?: unknow
 
 export function setFieldValue(model: Model, field: string, value: unknown): Model {
   const path = String(field);
+
+  // Refuse `__proto__` / `constructor` / `prototype` paths before touching
+  // anything: walking one would write into `Object.prototype`.
+  assertSafeFieldPath(path);
+  assertSafeValueKeys(value, path);
+
   set(model.data, path, value);
 
   model.dirtyTracker.setAtPath(path, value);
@@ -52,6 +59,10 @@ export function decrementField(model: Model, field: string, amount?: number): Mo
  * the user stored as `{}` is never touched, and arrays are never pruned.
  */
 export function unsetFields(model: Model, ...fields: string[]): Model {
+  for (const field of fields) {
+    assertSafeFieldPath(field);
+  }
+
   const existing = fields.filter((field) => hasField(model, field));
 
   model.data = unset(model.data, fields);
@@ -134,6 +145,12 @@ export function setFields(model: Model, values: Record<string, unknown>): Model 
 
   const safeValues = stripIdentityColumns(model, values);
 
+  // All or nothing: refuse a reserved key before any entry is written.
+  for (const key of Object.keys(safeValues)) {
+    assertSafeFieldPath(key);
+  }
+
+  assertSafeValueKeys(safeValues);
   assertNoOverlappingKeys(Object.keys(safeValues));
 
   for (const [key, value] of Object.entries(safeValues)) {
@@ -153,6 +170,15 @@ export function setFields(model: Model, values: Record<string, unknown>): Model 
  * request. Never route caller-supplied data through this.
  */
 export function mergeDriverFields(model: Model, values: Record<string, unknown>): Model {
+  // Checked before `model.data` changes, so a refused payload changes nothing.
+  for (const key of Object.keys(values)) {
+    if (key.includes(".")) {
+      assertSafeFieldPath(key);
+    }
+  }
+
+  assertSafeValueKeys(values);
+
   model.data = merge(model.data, values) as any;
   model.dirtyTracker.mergeChanges(values);
   return model;

@@ -3,11 +3,12 @@ import type {
   GuardOptions,
   GuardrailDetector,
   InjectionDetectorOptions,
+  LinkFilterOptions,
   OpenAiModerationOptions,
   PiiDetectorOptions,
   TopicFilterOptions,
 } from "./contracts";
-import { injection, moderation, pii, topic } from "./detectors";
+import { injection, links, moderation, pii, topic } from "./detectors";
 import { guard } from "./guard";
 
 /**
@@ -16,7 +17,7 @@ import { guard } from "./guard";
  * vocabulary lives under one name:
  *
  * - `ai.guardrail(options)` — build the composed middleware.
- * - `ai.guardrail.pii(o?)` / `.topic(o)` / `.injection(o?)` / `.moderation(o?)`
+ * - `ai.guardrail.pii(o?)` / `.topic(o)` / `.injection(o?)` / `.links(o?)` / `.moderation(o?)`
  *   — build a detector to pass into the factory's `input` / `output` / `tool`
  *   arrays.
  *
@@ -34,6 +35,8 @@ export interface GuardrailFactory {
   topic(options: TopicFilterOptions): GuardrailDetector;
   /** Built-in jailbreak / prompt-injection marker detector. */
   injection(options?: InjectionDetectorOptions): GuardrailDetector;
+  /** Built-in external image / link URL filter for rendered output. */
+  links(options?: LinkFilterOptions): GuardrailDetector;
   /** Optional OpenAI-backed moderation detector (lazy `openai` peer). */
   moderation(options?: OpenAiModerationOptions): GuardrailDetector;
 }
@@ -46,6 +49,7 @@ export const guardrail: GuardrailFactory = Object.assign(guard, {
   pii,
   topic,
   injection,
+  links,
   moderation,
 });
 

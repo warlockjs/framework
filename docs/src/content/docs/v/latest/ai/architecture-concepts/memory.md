@@ -136,6 +136,8 @@ await mem.recall("what is my email?"); // only the UNSCOPED pool — omitting sc
 
 Identical text remembered under two different scopes stays two independent entries (including the procedural tier's own reinforcement counter). `clear(tier?)` is scope-agnostic — it drops the tier for every scope.
 
+The driver ranks one index that holds every scope, so a busy scope can fill the first page of nearest entries. When fewer than `k` of that page belong to the recalling scope and the driver has more to give, recall asks again with a wider page (up to 1,000 candidates), so a scope's own memories stay reachable on a shared driver.
+
 `ai.orchestrator({ memory })` sets this automatically, deriving `"session:<id>"` from the turn's own `sessionId` (see `memory.scope` in the next section). Memories written before adopting scoping are unscoped and stay visible only to unscoped (or explicitly `"shared"`-scoped) recalls.
 
 ## Memory in an orchestrator

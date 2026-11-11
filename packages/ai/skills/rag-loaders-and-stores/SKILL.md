@@ -39,7 +39,7 @@ interface VectorStore {
 | Loader                          | Input                                         | Deps                            | Emits                                         |
 | ------------------------------- | --------------------------------------------- | ------------------------------- | --------------------------------------------- |
 | `ai.rag.loadText(input, opts?)` | `string` \| `{ id, text }` \| array of either | none                            | one doc per non-empty item                    |
-| `ai.rag.loadHtml(html, opts?)`  | raw HTML string                               | none (regex strip)              | one doc, `metadata.title` from `<title>`      |
+| `ai.rag.loadHtml(html, opts?)`  | raw HTML string                               | none (linear strip)             | one doc, `metadata.title` from `<title>`      |
 | `ai.rag.loadWeb(url, opts?)`    | absolute URL                                  | none (uses core `guardedFetch`) | one doc, SSRF-safe fetch                      |
 | `ai.rag.loadPdf(bytes, opts?)`  | `Buffer` \| `ArrayBuffer` \| `Uint8Array`     | lazy `pdf-parse` peer           | one doc, or one per page with `perPage: true` |
 
@@ -77,7 +77,7 @@ await kb.index(
 );
 ```
 
-HTML responses run through the same tag-strip pass as `loadHtml`; non-HTML text (`text/plain`, markdown) is used verbatim. `metadata.source` is the resolved URL, `metadata.contentType` the server-reported type. A non-OK response, a policy block, a timeout, or an over-cap body throws `OutboundPolicyError`.
+HTML responses run through the same tag-strip pass as `loadHtml`; non-HTML text (`text/plain`, markdown) is used verbatim. `metadata.source` is the resolved URL, `metadata.contentType` the server-reported type. A non-OK response, a policy block, a timeout (it covers the body download), or an over-cap body throws `OutboundPolicyError`. The strip pass is one linear scan — unclosed `<!--` / `<script>` / `<` cannot make it quadratic.
 
 **Redirects are re-validated per hop, not delegated to the platform (4.15.0).** A page a crawl reaches can `3xx` — `guardedFetch` re-runs each `Location` through the same scheme/host/private-IP checks before following it, capped at `policy.maxRedirects` (default `5`), and strips `authorization`/`cookie`/`proxy-authorization` on a cross-origin hop. So a redirect can never smuggle `loadWeb` into a private/metadata address the original URL couldn't have reached. Full guard detail (including `assertUrlAllowed`, `fetchTextWithPolicy`, and the other call sites sharing it): the `secure-outbound-requests` topic.
 

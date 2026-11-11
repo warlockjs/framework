@@ -7,11 +7,13 @@ import type {
   CacheSetResult,
   CacheSimilarHit,
   CacheSimilarOptions,
+  CacheSwrOptions,
   CacheTtl,
   LRUMemoryCacheOptions,
 } from "../types";
 import { cosineSimilarity, parseTtl } from "../utils";
 import { BaseCacheDriver } from "./base-cache-driver";
+import { cloneValue } from "./clone-value";
 import { MemoryStructuresBackend } from "../structures/memory-structures-backend";
 import type { CacheStructuresBackend, StructuresCapable } from "../structures/types";
 import { InMemoryTagIndex } from "./in-memory-tag-index";
@@ -228,7 +230,7 @@ export class LRUMemoryCacheDriver
     if (onConflict === "create" && exists) {
       const result: CacheSetResult = {
         wasSet: false,
-        existing: existingNode!.value,
+        existing: cloneValue(existingNode!.value),
       };
       return result;
     }
@@ -333,11 +335,31 @@ export class LRUMemoryCacheDriver
       return null;
     }
 
+    // A copy, as `get()` returns: `swr()` hands this value to the caller, and
+    // a caller mutating it must not change the cached entry for everyone.
     return {
-      data: node.value,
+      data: cloneValue(node.value),
       expiresAt: node.expiresAt,
       staleAt: node.staleAt,
     };
+  }
+
+  /**
+   * {@inheritdoc}
+   *
+   * This driver stores the written value by reference, so the callers of a
+   * cold-miss fetch get a copy rather than the stored object itself.
+   */
+  protected async swrFetchAndStore<T>(
+    key: CacheKey,
+    options: CacheSwrOptions,
+    callback: () => Promise<T>,
+    freshSeconds: number,
+    staleSeconds: number,
+  ): Promise<T> {
+    const result = await super.swrFetchAndStore(key, options, callback, freshSeconds, staleSeconds);
+
+    return cloneValue(result);
   }
 
   /**
@@ -567,6 +589,22 @@ export class LRUMemoryCacheDriver
    */
   public async tagDelete(tagKey: CacheKey): Promise<void> {
     this.tagIndex.delete(this.parseKey(tagKey));
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public async tagSample(tagKey: CacheKey, count: number): Promise<string[]> {
+    return this.tagIndex.sample(this.parseKey(tagKey), count);
+  }
+
+  /**
+   * {@inheritdoc}
+   *
+   * A synchronous lookup: no copy, no events, no recency or TTL change.
+   */
+  public async exists(key: CacheKey): Promise<boolean> {
+    return this.liveNode(this.parseKey(key)) !== undefined;
   }
 
   /**

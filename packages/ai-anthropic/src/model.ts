@@ -305,9 +305,34 @@ export class AnthropicModel implements ModelContract {
     messages: Message[],
     options?: ModelCallOptions & { stream?: boolean },
   ): AnthropicRequest {
+    return this.assembleRequest(messages, options, true);
+  }
+
+  /**
+   * Build the request. `detach: true` (the public `buildRequest()`) returns
+   * a deep copy that shares nothing with the caller's messages or options.
+   * The adapter's own calls send the body at once, so they skip that copy —
+   * it would duplicate every string in the history (base64 attachments,
+   * long tool results) on each trip — and copy only the caller's
+   * `providerOptions.anthropic.body` values, which keeps the same
+   * validation for values that cannot be copied.
+   */
+  private assembleRequest(
+    messages: Message[],
+    options: (ModelCallOptions & { stream?: boolean }) | undefined,
+    detach: boolean,
+  ): AnthropicRequest {
+    const anthropic = resolveAnthropicOptions(options);
     const built = this.buildBody(messages, options);
-    const betas = [...new Set([...(resolveAnthropicOptions(options).betas ?? []), ...built.betas])];
-    const body = structuredClone({ ...built.body, stream: options?.stream ?? false });
+    const betas = [...new Set([...(anthropic.betas ?? []), ...built.betas])];
+    const stream = options?.stream ?? false;
+    const body = detach
+      ? structuredClone({ ...built.body, stream })
+      : {
+          ...built.body,
+          ...(anthropic.body === undefined ? {} : structuredClone(anthropic.body)),
+          stream,
+        };
 
     return { endpoint: betas.length > 0 ? "beta.messages" : "messages", body, betas };
   }
@@ -336,7 +361,7 @@ export class AnthropicModel implements ModelContract {
     options: ModelCallOptions & { stream: boolean },
   ): AnthropicRequest {
     try {
-      return this.buildRequest(messages, options);
+      return this.assembleRequest(messages, options, false);
     } catch (thrown) {
       throw this.logAndWrap(
         thrown instanceof AIError

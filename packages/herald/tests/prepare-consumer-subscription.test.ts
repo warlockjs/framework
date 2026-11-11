@@ -14,6 +14,7 @@ type Payload = { value: number };
 function createContext(): MessageContext & {
   ack: ReturnType<typeof vi.fn>;
   nack: ReturnType<typeof vi.fn>;
+  reject: ReturnType<typeof vi.fn>;
 } {
   return {
     ack: vi.fn(async () => undefined),
@@ -85,7 +86,7 @@ describe("prepareConsumerSubscription", () => {
     expect(context.ack).toHaveBeenCalledTimes(1);
   });
 
-  it("nacks and skips the handler when schema validation fails", async () => {
+  it("rejects without requeue and skips the handler when schema validation fails", async () => {
     const handle = vi.fn();
 
     class ValidatingConsumer extends EventConsumer<Payload> {
@@ -109,7 +110,9 @@ describe("prepareConsumerSubscription", () => {
     await callback(createMessage({ payload: { value: 1 } }), context);
 
     expect(handle).not.toHaveBeenCalled();
-    expect(context.nack).toHaveBeenCalledTimes(1);
+    // A bare nack requeues: an invalid message would be redelivered forever.
+    expect(context.nack).not.toHaveBeenCalled();
+    expect(context.reject).toHaveBeenCalledTimes(1);
     expect(context.ack).not.toHaveBeenCalled();
   });
 

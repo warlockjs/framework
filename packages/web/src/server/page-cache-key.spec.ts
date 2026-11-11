@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { computePageCacheKey, type PageCacheKeyInput } from "./page-cache-key";
+import {
+  computePageCacheKey,
+  hasUnkeyedQueryParams,
+  type PageCacheKeyInput,
+} from "./page-cache-key";
 
 const base: PageCacheKeyInput = {
   host: "alpha.test",
@@ -84,5 +88,45 @@ describe("computePageCacheKey — query bounds", () => {
     expect(
       computePageCacheKey({ ...base, query: { x: "random", page: "2" }, queryAllowlist: ["page"] }),
     ).toBe(computePageCacheKey({ ...base, query: { page: "2" }, queryAllowlist: ["page"] }));
+  });
+});
+
+describe("computePageCacheKey — nested query values", () => {
+  const base = { host: "a.test", path: "/posts", locale: "en", variant: "html" } as const;
+
+  it("gives different nested filters different keys", () => {
+    expect(computePageCacheKey({ ...base, query: { filter: { status: "draft" } } })).not.toBe(
+      computePageCacheKey({ ...base, query: { filter: { status: "published" } } }),
+    );
+  });
+
+  it("gives different arrays of objects different keys", () => {
+    expect(computePageCacheKey({ ...base, query: { items: [{ a: 1 }] } })).not.toBe(
+      computePageCacheKey({ ...base, query: { items: [{ a: 2 }] } }),
+    );
+  });
+
+  it("serialises nested keys in sorted order, so their order does not split entries", () => {
+    expect(computePageCacheKey({ ...base, query: { filter: { b: "2", a: "1" } } })).toBe(
+      computePageCacheKey({ ...base, query: { filter: { a: "1", b: "2" } } }),
+    );
+  });
+
+  it("keeps scalar and scalar-array keys exactly as before", () => {
+    expect(computePageCacheKey({ ...base, query: { page: "2", tag: ["x", "y"] } })).toBe(
+      "a.test/posts?page=2&tag=x&tag=y|en|html",
+    );
+  });
+});
+
+describe("hasUnkeyedQueryParams", () => {
+  it("reports a tracking parameter the key drops", () => {
+    expect(hasUnkeyedQueryParams({ utm_source: "x", page: "2" }, undefined)).toBe(true);
+    expect(hasUnkeyedQueryParams({ page: "2" }, undefined)).toBe(false);
+  });
+
+  it("reports a parameter outside the route's allowlist", () => {
+    expect(hasUnkeyedQueryParams({ page: "2", ref: "mail" }, ["page"])).toBe(true);
+    expect(hasUnkeyedQueryParams({ page: "2" }, ["page"])).toBe(false);
   });
 });

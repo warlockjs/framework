@@ -229,6 +229,8 @@ export type WebConnectorViteConfigOptions = {
   hmrServer: HttpServer;
   /** `web.sites`: each per-site hydration entry then imports only its own site's page registry. */
   sites?: SitesConfig;
+  /** `web.devAllowedHosts`: extra hosts the dev server answers; see {@link siteAllowedHosts}. */
+  devAllowedHosts?: true | readonly string[];
   /** `web.moduleBoundary`: what browser code importing a non-browser-safe module file does. */
   moduleBoundary?: "error" | "warn" | "off";
   fonts?: readonly import("../fonts/types").WebFont[];
@@ -339,10 +341,11 @@ export async function createWebConnectorViteConfig(
     ],
     server: {
       middlewareMode: true,
-      // Vite answers 403 to any Host it does not know. A multi-site app is
-      // reached on its configured hostnames (or, with dynamic sites, on hosts
-      // only `web.resolveHost` knows), so those must pass Vite's host check.
-      ...siteAllowedHosts(options.sites),
+      // Vite answers 403 to any Host it does not know, which is what stops a
+      // page whose domain was re-pointed at 127.0.0.1 from reading the dev
+      // server. A multi-site app is reached on its configured hostnames, and
+      // dynamic sites on the hosts listed in `web.devAllowedHosts`.
+      ...siteAllowedHosts(options.sites, options.devAllowedHosts),
       // Vite 8 moved the HMR websocket options to `server.ws`; `server.hmr.server`
       // is deprecated and warns on every boot.
       ws: { server: options.hmrServer },
@@ -544,22 +547,31 @@ export async function createWebConnectorViteConfig(
 }
 
 /**
- * `server.allowedHosts` for a multi-site app: every fixed site's hostnames, or
- * `true` when a dynamic site claims hosts at runtime. Nothing for a single-site
- * app, which keeps Vite's default.
+ * `server.allowedHosts` for the dev server: every fixed site's hostnames plus
+ * `web.devAllowedHosts` (an entry starting with `.` also matches every
+ * subdomain). `localhost`, `*.localhost` and IP addresses always pass. A
+ * dynamic site adds no host of its own: its tenant hosts are only known at
+ * runtime, so they must be listed in `web.devAllowedHosts`. Only an explicit
+ * `devAllowedHosts: true` turns the host check off. Nothing when there is
+ * nothing to add, which keeps the dev server's default.
  */
-export function siteAllowedHosts(sites: SitesConfig | undefined): {
+export function siteAllowedHosts(
+  sites: SitesConfig | undefined,
+  devAllowedHosts?: true | readonly string[],
+): {
   allowedHosts?: true | string[];
 } {
-  if (!sites) return {};
+  if (devAllowedHosts === true) return { allowedHosts: true };
 
   const hosts: string[] = [];
 
-  for (const site of Object.values(sites)) {
-    if ("dynamic" in site) return { allowedHosts: true };
+  for (const site of Object.values(sites ?? {})) {
+    if ("dynamic" in site) continue;
 
     hosts.push(...site.hosts);
   }
 
-  return hosts.length > 0 ? { allowedHosts: hosts } : {};
+  hosts.push(...(devAllowedHosts ?? []));
+
+  return hosts.length > 0 ? { allowedHosts: [...new Set(hosts)] } : {};
 }

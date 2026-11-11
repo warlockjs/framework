@@ -490,14 +490,16 @@ describe("createPageRouteHandler — data requests", () => {
 
     expect(embedded, "the document must embed a payload to compare against").not.toBeNull();
 
-    // ONE field differs on purpose: the page's browser route table. A document
-    // carries it in its own script (`<Scripts/>`, so it ships once), while a
-    // navigation has no such script and receives it in the payload's document
-    // slot. Everything else is the same bytes.
+    // TWO fields differ on purpose: the page's browser route table and the
+    // locale-routing table. A document carries them in their own elements (the
+    // route-table script from `<Scripts/>`, the `warlock-locale-routing` meta
+    // tag from `<Head/>`), so each ships once, while a navigation has no such
+    // elements and receives them in the payload's document slot. Everything
+    // else is the same bytes.
     const sent = parse(asData.written.sent as string) as {
       document?: Record<string, unknown>;
     };
-    const { namedApiRoutes, ...sentDocument } = sent.document ?? {};
+    const { namedApiRoutes, localeRouting: _localeRouting, ...sentDocument } = sent.document ?? {};
 
     expect(namedApiRoutes, "a navigation carries the page's route table").toBeDefined();
     expect(asDocument.written.html).toContain('id="__WARLOCK_NAMED_API_ROUTES__"');

@@ -1,6 +1,8 @@
 import { except } from "@mongez/reinforcements";
 import { cache } from "@warlock.js/cache";
 import { log } from "@warlock.js/logger";
+import { config } from "../../config/config-getter";
+import { resolveLocaleConfiguration } from "../../config/locale-configuration";
 import type { Middleware } from "../../router/types";
 import type { Request } from "./../request";
 import type { Response } from "./../response";
@@ -71,7 +73,23 @@ type ParsedCacheOptions = Required<Omit<CacheMiddlewareOptions, "tags">> & {
   cacheKey: string;
   /** Resolved, concrete tag list — see {@link resolveCacheTags}. */
   tags: string[];
+  /** Answer this request without reading or writing the cache. */
+  bypass?: boolean;
 };
+
+let warnedUndeclaredLocales = false;
+
+function warnUndeclaredLocalesOnce() {
+  if (warnedUndeclaredLocales) return;
+
+  warnedUndeclaredLocales = true;
+
+  log.warn(
+    "cache-middleware",
+    "locale",
+    "A request asked for a locale other than the default while app.localeCodes is not set, so cacheMiddleware answered it without the cache. Declare app.localeCodes to cache every supported locale.",
+  );
+}
 
 /**
  * Resolves `CacheMiddlewareOptions.tags` — a static list or a function of
@@ -112,6 +130,19 @@ async function parseCacheOptions(cacheOptions: CacheMiddlewareOptions | string, 
 
   if (finalCacheOptions.withLocale) {
     const locale = request.getLocaleCode();
+    const { defaultLocaleCode, localeCodes } = resolveLocaleConfiguration(
+      config.key("app.localeCode"),
+      config.key("app.localeCodes"),
+    );
+
+    // Without a declared `app.localeCodes`, any `?locale=` value reaches
+    // here unchanged, and each one would add a cache entry. Such requests are
+    // answered without the cache instead.
+    if (localeCodes === undefined && locale !== defaultLocaleCode) {
+      warnUndeclaredLocalesOnce();
+
+      return { ...finalCacheOptions, bypass: true };
+    }
 
     finalCacheOptions.cacheKey = `${finalCacheOptions.cacheKey}:${locale}`;
   }
@@ -128,10 +159,13 @@ export function cacheMiddleware(responseCacheOptions: CacheMiddlewareOptions | s
   // checks this factory's calling convention, which is how the positional v4
   // shape survived an earlier refactor unnoticed.
   return async function ({ request, response }) {
-    const { ttl, omit, cacheKey, driver, tags } = await parseCacheOptions(
+    const { ttl, omit, cacheKey, driver, tags, bypass } = await parseCacheOptions(
       responseCacheOptions,
       request,
     );
+
+    if (bypass) return;
+
     const cacheDriver = driver ? await cache.use(driver) : cache;
 
     const content = (await cacheDriver.get(cacheKey)) as CachedResponsePayload | null;

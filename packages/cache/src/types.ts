@@ -533,10 +533,10 @@ export type MemoryCacheOptions = {
    */
   ttl?: CacheTtl;
   /**
-   * Maximum number of items in cache
-   * When exceeded, least recently used items will be evicted
+   * Maximum number of entries. When exceeded, the least recently used
+   * entries are evicted. `Infinity` (or `0`) removes the limit.
    *
-   * @default undefined (no limit)
+   * @default 10000
    */
   maxSize?: number;
 };
@@ -1023,6 +1023,22 @@ export interface CacheDriver<ClientType, Options> {
    */
   tagDelete?(tagKey: CacheKey): Promise<void>;
   /**
+   * Tag-index primitive: up to `count` members of `tagKey` picked at random
+   * (every member when the index is smaller). Lets a tagged write check a
+   * sample of the index without reading all of it.
+   */
+  tagSample?(tagKey: CacheKey, count: number): Promise<string[]>;
+  /**
+   * Whether a live (unexpired) entry exists for `key`, without reading its
+   * value, emitting `hit`/`miss` or logging. Used by tag-index pruning.
+   */
+  exists?(key: CacheKey): Promise<boolean>;
+  /**
+   * Remove several keys in as few round trips as the backend allows. Each key
+   * emits `removed`, as `remove()` does. Used by tag invalidation.
+   */
+  removeMany?(keys: CacheKey[]): Promise<void>;
+  /**
    * Similarity retrieval. Returns the nearest stored entries to `vector` by
    * cosine similarity, ordered by descending score.
    *
@@ -1250,9 +1266,12 @@ export type CacheConfigurations<
    */
   default?: DriverName;
   /**
-   * Determine whether to log or not
+   * Log every cache operation (fetching, caching, removing…) at `info` /
+   * `success`. Off by default: the lines cost CPU on every cache call and
+   * put cache keys in the logs. Errors and connection failures are logged
+   * either way.
    *
-   * @default true
+   * @default false
    */
   logging?: boolean;
   /**

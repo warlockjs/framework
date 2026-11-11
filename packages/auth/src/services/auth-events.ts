@@ -29,6 +29,12 @@ export type AuthEventPayloads = {
   "password.changed": [user: Auth];
   "password.resetRequested": [user: Auth, resetToken: string];
   "password.reset": [user: Auth];
+  /** The reset notification failed after `requestPasswordReset` had already answered. */
+  "password.resetDeliveryFailed": [user: Auth, error: unknown];
+
+  // One-time code events
+  /** The login code could not be delivered after `requestOtp` had already answered. */
+  "otp.deliveryFailed": [user: Auth, error: unknown];
 
   // Session events
   "session.created": [user: Auth, refreshToken: RefreshToken, deviceInfo?: DeviceInfo];

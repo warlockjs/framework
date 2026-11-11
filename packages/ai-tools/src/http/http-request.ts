@@ -5,6 +5,7 @@ import type {
   HttpRequestOptions,
   HttpRequestResult,
 } from "../contracts";
+import { createDeadline, type CallDeadline } from "../deadline";
 import { HttpPolicyError } from "../errors";
 import {
   objectSchema,
@@ -29,6 +30,19 @@ const ALL_METHODS: readonly HttpMethod[] = ["GET", "POST", "PUT", "PATCH", "DELE
 /** Methods that conventionally carry no request body — `body` is dropped for these. */
 const BODYLESS_METHODS: ReadonlySet<HttpMethod> = new Set<HttpMethod>(["GET"]);
 
+/** Maximum number of redirect hops followed (each one re-validated). */
+const MAX_REDIRECTS = 5;
+
+/** 3xx statuses whose `Location` is followed. */
+const REDIRECT_STATUSES: ReadonlySet<number> = new Set([301, 302, 303, 307, 308]);
+
+/** Credential headers never sent to a redirect target on another origin. */
+const CREDENTIAL_HEADERS: ReadonlySet<string> = new Set([
+  "authorization",
+  "cookie",
+  "proxy-authorization",
+]);
+
 /**
  * Standard Schema for {@link HttpRequestInput}. `url` is required;
  * `method` is constrained to the canonical HTTP verb set (further
@@ -49,14 +63,25 @@ const httpRequestInputSchema = objectSchema<HttpRequestInput>({
  * an absolute `http(s)` URL. Throws a typed {@link HttpPolicyError} of
  * type `"invalid-url"` when the result cannot be parsed or is not an
  * `http`/`https` URL — surfaced as `{ error }` data, never a crash.
+ *
+ * With a `baseUrl`, the resolved URL must stay on the base URL's origin:
+ * an absolute (`https://other.example/x`) or protocol-relative
+ * (`//other.example/x`) value that points elsewhere is refused with type
+ * `"host-not-allowed"`, unless its host is listed in `allowHosts`. This
+ * keeps the static `headers` (an API key) from being sent to a host the
+ * model names.
  */
-function resolveUrl(rawUrl: string, baseUrl: string | undefined): URL {
+function resolveUrl(
+  rawUrl: string,
+  baseUrl: string | undefined,
+  allowHostSet: ReadonlySet<string> | undefined,
+): URL {
   let resolved: URL;
 
   try {
     // `new URL(input, base)` joins relative paths against `base` and
-    // ignores `base` when `input` is already absolute, which is exactly
-    // the "path vs full URL" behavior the design specifies.
+    // ignores `base` when `input` is already absolute; the origin check
+    // below holds the result to the base URL's origin.
     resolved = baseUrl !== undefined ? new URL(rawUrl, baseUrl) : new URL(rawUrl);
   } catch {
     throw new HttpPolicyError(
@@ -73,7 +98,34 @@ function resolveUrl(rawUrl: string, baseUrl: string | undefined): URL {
     );
   }
 
+  if (baseUrl !== undefined) {
+    const baseOrigin = new URL(baseUrl).origin;
+
+    if (resolved.origin !== baseOrigin && !allowHostSet?.has(resolved.hostname)) {
+      throw new HttpPolicyError(
+        `http_request only sends requests to the base URL origin "${baseOrigin}"; ` +
+          `"${rawUrl}" points to "${resolved.origin}". Pass a path relative to the base URL, ` +
+          `or list the host in the tool's allowHosts option.`,
+        { type: "host-not-allowed" },
+      );
+    }
+  }
+
   return resolved;
+}
+
+/** The base URL's host as a one-entry allowlist; `undefined` without a valid `baseUrl`. */
+function baseHostAllowlist(baseUrl: string | undefined): string[] | undefined {
+  if (baseUrl === undefined) {
+    return undefined;
+  }
+
+  try {
+    return [new URL(baseUrl).hostname];
+  } catch {
+    // An unparseable base URL fails every call with "invalid-url" instead.
+    return undefined;
+  }
 }
 
 /**
@@ -81,11 +133,14 @@ function resolveUrl(rawUrl: string, baseUrl: string | undefined): URL {
  * and whether it was cut off. Streams chunk-by-chunk so an oversized body
  * is abandoned at the cap rather than fully buffered; falls back to
  * `response.text()` (then a post-hoc byte slice) when the body is not a
- * readable stream (e.g. a stubbed `Response` in tests).
+ * readable stream (e.g. a stubbed `Response` in tests). Every read is
+ * raced against the call's `deadline`, so a server that drips its body
+ * cannot hold the call open past `timeoutMs`.
  */
 async function readCappedBody(
   response: Response,
   maxBytes: number,
+  deadline: CallDeadline,
 ): Promise<{ text: string; truncated: boolean }> {
   const body = response.body;
 
@@ -101,7 +156,7 @@ async function readCappedBody(
 
   try {
     for (;;) {
-      const { done, value } = await reader.read();
+      const { done, value } = await deadline.race(reader.read());
 
       if (done) {
         break;
@@ -124,8 +179,8 @@ async function readCappedBody(
       received += value.byteLength;
     }
   } finally {
-    // Release the lock and abandon any unread remainder.
-    await reader.cancel().catch(() => undefined);
+    // Abandon any unread remainder without waiting on a stalled stream.
+    reader.cancel().catch(() => undefined);
     reader.releaseLock();
   }
 
@@ -172,15 +227,19 @@ function isJsonContentType(contentType: string | undefined): boolean {
  * - **`baseUrl` join** — when configured, the model passes a path that
  *   is resolved against `baseUrl`; otherwise it must pass an absolute
  *   `http(s)` URL. An unresolvable URL is rejected
- *   (`type: "invalid-url"`).
+ *   (`type: "invalid-url"`). With `baseUrl` set, a URL on another origin
+ *   is refused (`type: "host-not-allowed"`) unless its host is listed in
+ *   `allowHosts`, and redirects stay on the base host.
  *
  * **Request shaping.** Static `options.headers` are merged under the
- * per-call `headers` (the per-call value wins). An object `body` is
- * JSON-serialized with a `content-type: application/json` default; a
- * string `body` is sent verbatim; `body` is dropped for bodyless methods
- * (`GET`). The call is bounded by `timeoutMs` (default `15_000`) via an
- * `AbortController`, also wired to `ctx.signal` for cooperative
- * cancellation.
+ * per-call `headers` (the per-call value wins). They are sent only to the
+ * origin of the first request: a redirect to another origin drops every
+ * static header (and `authorization` / `cookie` / `proxy-authorization`).
+ * An object `body` is JSON-serialized with a `content-type:
+ * application/json` default; a string `body` is sent verbatim; `body` is
+ * dropped for bodyless methods (`GET`). The whole call — connect,
+ * redirects and reading the body — is bounded by `timeoutMs` (default
+ * `15_000`, `type: "timeout"`), and `ctx.signal` aborts it.
  *
  * **Response shaping.** Headers are returned with lower-cased keys. The
  * body is read up to `maxBytes` (default `1_000_000`) and JSON-parsed
@@ -215,7 +274,10 @@ export function httpRequestTool(
   const allowPrivateNetwork = options.allowPrivateNetwork ?? false;
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const maxBytes = options.maxBytes ?? DEFAULT_MAX_BYTES;
-  const staticHeaders = options.headers;
+  const staticHeaders = options.headers ?? {};
+  const staticHeaderNames = new Set(Object.keys(staticHeaders).map((key) => key.toLowerCase()));
+  // Without an explicit allowlist, a `baseUrl` tool's redirects stay on the base host.
+  const hostAllowlist = options.allowHosts ?? baseHostAllowlist(options.baseUrl);
 
   return tool<HttpRequestInput, HttpRequestResult>({
     name: options.name ?? DEFAULT_NAME,
@@ -242,7 +304,7 @@ export function httpRequestTool(
       }
 
       // 2. URL resolution (baseUrl join when configured).
-      const url = resolveUrl(input.url, options.baseUrl);
+      const url = resolveUrl(input.url, options.baseUrl, allowHostSet);
 
       // 3. Host allowlist — SSRF guardrail, before the fetch.
       if (allowHostSet && !allowHostSet.has(url.hostname)) {
@@ -278,62 +340,157 @@ export function httpRequestTool(
       }
 
       // 6. Issue the request through the shared hardened outbound path:
-      //    private-IP deny by default, per-hop redirect re-validation,
-      //    timeout, and the caller's signal — never a raw fetch.
-      let response: Response;
+      //    private-IP deny by default, per-hop redirect re-validation and
+      //    the caller's signal — never a raw fetch. Redirects are followed
+      //    here so the static headers stay on the first request's origin.
+      //    One deadline covers every hop and the body read below.
+      const timeoutError = (): HttpPolicyError =>
+        new HttpPolicyError(
+          `http_request timed out after ${timeoutMs}ms before the response was complete. ` +
+            `Raise the tool's timeoutMs option if this endpoint is slow.`,
+          { type: "timeout" },
+        );
+      const deadline = createDeadline(timeoutMs, ctx?.signal, timeoutError);
+
+      // Headers for a hop on another origin: no static header and no credential.
+      const offOriginHeaders: Record<string, string> = {};
+
+      for (const [key, value] of Object.entries(headers)) {
+        const name = key.toLowerCase();
+
+        if (!staticHeaderNames.has(name) && !CREDENTIAL_HEADERS.has(name)) {
+          offOriginHeaders[key] = value;
+        }
+      }
+
+      const send = async (hopUrl: URL, hopMethod: string, hopBody?: string): Promise<Response> => {
+        try {
+          return await guardedFetch(
+            hopUrl.toString(),
+            {
+              allowedSchemes: ["http", "https"],
+              hostAllowlist,
+              denyPrivateIPsAfterDNS: !allowPrivateNetwork,
+              timeoutMs,
+              signal: deadline.signal,
+            },
+            {
+              method: hopMethod,
+              headers: hopUrl.origin === url.origin ? headers : offOriginHeaders,
+              body: hopBody,
+              redirect: "manual",
+            },
+          );
+        } catch (cause) {
+          if (deadline.timedOut) {
+            throw deadline.signal.reason;
+          }
+
+          if (cause instanceof OutboundPolicyError) {
+            throw new HttpPolicyError(`http_request blocked: ${cause.message}`, {
+              type: "host-not-allowed",
+              cause,
+            });
+          }
+
+          throw cause;
+        }
+      };
 
       try {
-        response = await guardedFetch(
-          url.toString(),
-          {
-            allowedSchemes: ["http", "https"],
-            hostAllowlist: options.allowHosts,
-            denyPrivateIPsAfterDNS: !allowPrivateNetwork,
-            timeoutMs,
-            signal: ctx?.signal,
-          },
-          { method, headers, body },
-        );
-      } catch (cause) {
-        if (cause instanceof OutboundPolicyError) {
-          throw new HttpPolicyError(`http_request blocked: ${cause.message}`, {
-            type: "host-not-allowed",
-            cause,
-          });
+        let hopUrl = url;
+        let hopMethod: string = method;
+        let hopBody = body;
+
+        for (let hop = 0; ; hop++) {
+          const response = await send(hopUrl, hopMethod, hopBody);
+          const location = response.headers.get("location");
+
+          if (!REDIRECT_STATUSES.has(response.status) || location === null) {
+            return await readResult(response, maxBytes, deadline).catch((cause: unknown) => {
+              // The outbound guard aborts a body still streaming at its own deadline.
+              throw deadline.timedOut || cause instanceof OutboundPolicyError
+                ? timeoutError()
+                : cause;
+            });
+          }
+
+          if (hop >= MAX_REDIRECTS) {
+            throw new HttpPolicyError(
+              `http_request blocked: more than ${MAX_REDIRECTS} redirects starting at "${url.toString()}".`,
+              { type: "host-not-allowed" },
+            );
+          }
+
+          let next: URL;
+
+          try {
+            next = new URL(location, hopUrl);
+          } catch {
+            throw new HttpPolicyError(
+              `http_request received an invalid redirect location "${location}".`,
+              { type: "invalid-url" },
+            );
+          }
+
+          // Discard the interim body so the connection can be reused.
+          response.body?.cancel().catch(() => undefined);
+
+          // 303 — and 301/302 on a non-GET — re-issue as a bodyless GET.
+          if (
+            response.status === 303 ||
+            ((response.status === 301 || response.status === 302) && hopMethod !== "GET")
+          ) {
+            hopMethod = "GET";
+            hopBody = undefined;
+          }
+
+          hopUrl = next;
         }
-
-        throw cause;
+      } finally {
+        deadline.clear();
       }
-
-      // 7. Collect response headers with lower-cased keys.
-      const responseHeaders: Record<string, string> = {};
-      response.headers.forEach((value, key) => {
-        responseHeaders[key.toLowerCase()] = value;
-      });
-
-      // 8. Read the body up to the cap, then parse-or-pass.
-      const { text, truncated } = await readCappedBody(response, maxBytes);
-
-      let parsedBody: unknown = text;
-
-      // A truncated body can no longer be valid JSON, so only attempt a
-      // parse on a complete JSON response; otherwise hand back the raw text.
-      if (!truncated && isJsonContentType(responseHeaders["content-type"]) && text.length > 0) {
-        try {
-          parsedBody = JSON.parse(text);
-        } catch {
-          // Content-type claimed JSON but the body was not — fall back to
-          // the raw text rather than failing the whole call.
-          parsedBody = text;
-        }
-      }
-
-      return {
-        status: response.status,
-        headers: responseHeaders,
-        body: parsedBody,
-        truncated,
-      };
     },
   });
+}
+
+/**
+ * Shape the final response: lower-cased headers, then the body read up
+ * to `maxBytes` (within the call's deadline) and JSON-parsed when the
+ * content-type is JSON.
+ */
+async function readResult(
+  response: Response,
+  maxBytes: number,
+  deadline: CallDeadline,
+): Promise<HttpRequestResult> {
+  // 7. Collect response headers with lower-cased keys.
+  const responseHeaders: Record<string, string> = {};
+  response.headers.forEach((value, key) => {
+    responseHeaders[key.toLowerCase()] = value;
+  });
+
+  // 8. Read the body up to the cap, then parse-or-pass.
+  const { text, truncated } = await readCappedBody(response, maxBytes, deadline);
+
+  let parsedBody: unknown = text;
+
+  // A truncated body can no longer be valid JSON, so only attempt a
+  // parse on a complete JSON response; otherwise hand back the raw text.
+  if (!truncated && isJsonContentType(responseHeaders["content-type"]) && text.length > 0) {
+    try {
+      parsedBody = JSON.parse(text);
+    } catch {
+      // Content-type claimed JSON but the body was not — fall back to
+      // the raw text rather than failing the whole call.
+      parsedBody = text;
+    }
+  }
+
+  return {
+    status: response.status,
+    headers: responseHeaders,
+    body: parsedBody,
+    truncated,
+  };
 }

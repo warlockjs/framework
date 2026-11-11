@@ -114,6 +114,25 @@ export type AccessTokenConfig = {
    * @default "1h"
    */
   expiresIn?: string;
+  /**
+   * Issuer (`iss` claim) stamped on every access and refresh token this app
+   * signs, and required on every token it accepts. Set it when several apps
+   * or services share a signing secret, so a token minted by one is refused
+   * by the others. Unset (the default) ⇒ no `iss` is stamped or checked.
+   *
+   * Tokens signed before it was set carry no `iss` and are refused once it is
+   * set, so every signed-in user signs in again once.
+   * @example "https://api.example.com"
+   */
+  issuer?: string;
+  /**
+   * Audience (`aud` claim) stamped on every token this app signs, and
+   * required on every token it accepts (a token matches when its `aud`
+   * includes one of the values). Unset (the default) ⇒ no `aud` is stamped or
+   * checked. Like `issuer`, setting it signs everyone out once.
+   * @example "web-app"
+   */
+  audience?: string | string[];
 };
 
 /**
@@ -275,6 +294,15 @@ export type PasswordResetConfig = {
    * the stored value with `verifyPassword` either way.
    */
   setPassword?: PasswordSetter;
+  /**
+   * Wait for the reset notification before `requestPasswordReset` resolves,
+   * so a delivery error reaches the caller. Off by default: the notification
+   * is sent in the background, so the response time does not reveal whether
+   * the account exists. A background failure is logged and emitted as
+   * `password.resetDeliveryFailed`.
+   * @default false
+   */
+  awaitDelivery?: boolean;
 };
 
 /**
@@ -313,6 +341,19 @@ export type AuthConfigurations = {
    * @default trim string values, lower-case `email`
    */
   normalizeCredentials?: false | NormalizeCredentials;
+  /**
+   * Store only a SHA-256 digest of each access and refresh token in the
+   * database, never the token itself, so a copy of the token tables (a
+   * backup, a replica, a read-only injection) cannot be replayed as a login.
+   *
+   * No migration is needed: the digest goes in the existing `token` column,
+   * and lookups accept both forms, so rows issued before the switch keep
+   * working until they expire, and turning it off again signs no one out.
+   * A row loaded from storage no longer carries its raw token; a freshly
+   * issued one exposes it as `row.plainToken`.
+   * @default false
+   */
+  hashTokensAtRest?: boolean;
   /**
    * Access-token configuration (secret, expiry, algorithm, model override).
    */
@@ -454,6 +495,18 @@ export type CookieAuthConfig = {
   path?: string;
   /** Select a request-scoped Domain; `undefined` keeps the cookie host-only. */
   cookieDomain?: CookieDomainResolver;
+  /**
+   * Write the auth cookies under a `__Host-` name prefix (`__Host-access_token`,
+   * `__Host-refresh_token`). Browsers accept such a cookie only when it is
+   * Secure, has `Path=/` and no `Domain`, so a subdomain or a plain-HTTP page
+   * cannot plant or overwrite the session cookie. Requires `path: "/"` and no
+   * `cookieDomain`; a write that breaks either rule throws naming the setting.
+   *
+   * While switching, the unprefixed cookie is still read (so signed-in users
+   * stay signed in) and both names are cleared on logout.
+   * @default false
+   */
+  hostPrefix?: boolean;
 };
 
 /**

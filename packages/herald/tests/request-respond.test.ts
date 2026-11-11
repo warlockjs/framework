@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { RabbitMQChannel } from "../src/drivers/rabbitmq/rabbitmq-channel";
 import { FakeAmqpChannel } from "./helpers/fake-amqp";
 
@@ -68,6 +68,81 @@ describe("RabbitMQChannel — request/respond correlation", () => {
     await expect(channel.request({ amount: 1 }, { timeout: 50 })).rejects.toThrow(
       /Request timeout after 50ms/,
     );
+  });
+
+  it("shares one direct reply-to consumer across requests and creates no queue per call", async () => {
+    const amqp = new FakeAmqpChannel();
+    const consume = vi.spyOn(amqp, "consume");
+    const channel = new RabbitMQChannel<TaxRequest>("compute.tax", amqp);
+    const other = new RabbitMQChannel<TaxRequest>("compute.vat", amqp);
+
+    const pending = Array.from({ length: 10 }, (_, index) =>
+      (index % 2 === 0 ? channel : other).request<TaxReply>({ amount: index }, { timeout: 5_000 }),
+    );
+
+    await flush();
+
+    expect(consume).toHaveBeenCalledTimes(1);
+    expect(consume.mock.calls[0]?.[0]).toBe("amq.rabbitmq.reply-to");
+    expect(amqp.assertedQueues.filter((entry) => entry.name.startsWith("amq.gen"))).toEqual([]);
+
+    const requests = amqp.sent.filter((entry) => entry.queue.startsWith("compute."));
+    expect(requests).toHaveLength(10);
+
+    for (const [index, request] of requests.entries()) {
+      expect(request.options.replyTo).toBe("amq.rabbitmq.reply-to");
+      await amqp.deliver({
+        content: Buffer.from(JSON.stringify({ payload: { tax: index } })),
+        properties: { correlationId: request.options.correlationId },
+      });
+    }
+
+    const replies = await Promise.all(pending);
+    expect(replies.map((reply) => reply.tax).sort((a, b) => a - b)).toEqual([
+      0, 1, 2, 3, 4, 5, 6, 7, 8, 9,
+    ]);
+
+    // A second reply for an answered request finds nothing waiting and is dropped.
+    await expect(
+      amqp.deliver({
+        content: Buffer.from(JSON.stringify({ payload: { tax: 1 } })),
+        properties: { correlationId: requests[0]!.options.correlationId },
+      }),
+    ).resolves.toBeUndefined();
+  });
+
+  it("publishes only AMQP properties and keeps its own correlation id", async () => {
+    const amqp = new FakeAmqpChannel();
+    const channel = new RabbitMQChannel<TaxRequest>("compute.tax", amqp);
+
+    const pending = channel.request<TaxReply>(
+      { amount: 1 },
+      { timeout: 50, correlationId: "caller-id", priority: 3 },
+    );
+
+    await flush();
+
+    const options = amqp.sent[0]!.options;
+    expect(options).not.toHaveProperty("timeout");
+    expect(options.correlationId).not.toBe("caller-id");
+    expect(options.priority).toBe(3);
+
+    await expect(pending).rejects.toThrow(/Request timeout after 50ms/);
+  });
+
+  it("rejects when the reply is not valid JSON instead of throwing in the consumer", async () => {
+    const amqp = new FakeAmqpChannel();
+    const channel = new RabbitMQChannel<TaxRequest>("compute.tax", amqp);
+
+    const pending = channel.request<TaxReply>({ amount: 1 }, { timeout: 5_000 });
+    await flush();
+
+    await amqp.deliver({
+      content: Buffer.from("{not json"),
+      properties: { correlationId: amqp.sent[0]!.options.correlationId },
+    });
+
+    await expect(pending).rejects.toThrow(/not valid JSON/);
   });
 
   it("respond replies with the handler's return value", async () => {

@@ -189,6 +189,10 @@ The dirty tracker clears in two places:
 
 That's it. There's no manual `clearDirty()` API — clearing is automatic on the two events that semantically mean "we're now in sync with the database."
 
+## What tracking costs
+
+A loaded model keeps one private copy of its data as the baseline, and loading computes no diff (nothing can be dirty yet). A write copies only the top-level field it reaches into, and records the change; the diff is computed once, on the next read (`isDirty()`, `getDirtyColumns()`, `hasChanges()`, `save()`). So ten `set()` calls followed by a `save()` cost one diff, not ten, and fields you never touched are compared by reference.
+
 ## Going further
 
 - **Lifecycle events** that read the dirty state (`onSaving`, `onUpdating`): [Events and hooks guide](./events-and-hooks.md)

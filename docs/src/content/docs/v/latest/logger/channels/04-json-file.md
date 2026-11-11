@@ -27,7 +27,7 @@ const jsonChannel = log.channel("fileJson");
 
 ## File format
 
-The extension is always `json`, regardless of the `extension` option. Each file is a JSON object with a `messages` array:
+The extension is `json` (or `jsonl` with `format: "jsonl"`), regardless of the `extension` option. By default each file is a JSON object with a `messages` array:
 
 ```json
 {
@@ -55,6 +55,22 @@ The extension is always `json`, regardless of the `extension` option. Each file 
 }
 ```
 
+## JSON Lines — `format: "jsonl"`
+
+With the default `format: "json"`, every write reads the whole file, adds the new entries and writes it back, so a write gets slower as the file grows (up to `maxFileSize`, 10 MB by default). `format: "jsonl"` writes one JSON object per line to a `.jsonl` file and only appends, so each write costs the same however large the file is:
+
+```ts
+new JSONFileLog({ chunk: "daily", format: "jsonl" });
+// storage/logs/2026-11-12.jsonl
+// {"content":"New user created","level":"info","date":"12-11-2026 10:22:01","module":"users","action":"register","timestamp":"..."}
+```
+
+Each line holds the same fields as an entry of the `messages` array. Default: `"json"`.
+
+## Corrupt files
+
+When an existing `.json` file cannot be parsed (for example a write cut short by a crash), it is never overwritten: it is renamed to `<file>.json.corrupt-<epoch ms>` next to it, a new file is started, and the logger's `onChannelError` handler is told where the old file went.
+
 ## Differences from FileLog
 
 | Aspect         | FileLog                               | JSONFileLog                                        |
@@ -62,7 +78,7 @@ The extension is always `json`, regardless of the `extension` option. Each file 
 | Output format  | Plain-text lines                      | JSON object with `messages` array                  |
 | Error stack    | Raw multi-line string after `[trace]` | Split on newlines, stored as `string[]` in `stack` |
 | Message field  | Pre-formatted log line                | `content` field holds the original string          |
-| File extension | Configurable (default `"log"`)        | Always `"json"`                                    |
+| File extension | Configurable (default `"log"`)        | `"json"`, or `"jsonl"` with `format: "jsonl"`      |
 
 :::tip[Error stacks as arrays]
 Storing the stack as `string[]` rather than a raw string makes it trivial to query in aggregators like Elasticsearch, Loki, or Datadog — no string-splitting at query time.

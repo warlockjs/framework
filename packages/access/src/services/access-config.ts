@@ -2,6 +2,7 @@ import type { Auth } from "@warlock.js/auth";
 import type { AccessResolver } from "../contracts/access-resolver";
 import type { AccessConfigurations } from "../contracts/types";
 import { AccessConfigError } from "../utils/access-config-error";
+import { invalidateResolutionMemo } from "./resolution-memo";
 
 /**
  * The active configuration, fed once at boot by the framework's access connector
@@ -30,11 +31,13 @@ export function setAccessConfig(configuration: AccessConfigurations): void {
   }
 
   current = configuration;
+  invalidateResolutionMemo();
 }
 
 /** Clear the active config. Used by the connector on dev-restart and by tests. */
 export function resetAccessConfig(): void {
   current = undefined;
+  invalidateResolutionMemo();
 }
 
 /** Accessors over the active access configuration. */

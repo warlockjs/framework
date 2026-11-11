@@ -52,6 +52,10 @@ class FakePgClient implements PgClientLike {
       return this.handleList(sql, params);
     }
 
+    if (sql.startsWith("DELETE FROM") && sql.includes("RETURNING")) {
+      return this.handleClaim(params);
+    }
+
     if (sql.startsWith("DELETE FROM")) {
       return this.handleDelete(params);
     }
@@ -103,6 +107,21 @@ class FakePgClient implements PgClientLike {
     }
 
     return { rows: ids.map((interrupt_id) => ({ interrupt_id })) };
+  }
+
+  private handleClaim(params: unknown[]): { rows: unknown[] } {
+    const [interruptId] = params as [string];
+    const match = this.rows.find(
+      (row) => row.interrupt_id === interruptId && row.status === "pending",
+    );
+
+    if (!match) {
+      return { rows: [] };
+    }
+
+    this.rows = this.rows.filter((row) => row !== match);
+
+    return { rows: [match] };
   }
 
   private handleDelete(params: unknown[]): { rows: unknown[] } {
@@ -224,6 +243,31 @@ describe("pg interrupt store", () => {
     await store.save(makeInterrupt({ interruptId: "ax1" }));
 
     expect(await store.list?.("a_")).toEqual(["a_1"]);
+  });
+
+  it("should claim a pending interrupt once with a single DELETE ... RETURNING", async () => {
+    const client = new FakePgClient();
+    const store = pg({ client });
+    const record = makeInterrupt();
+
+    await store.save(record);
+
+    const first = await store.claim?.(record.interruptId);
+    const second = await store.claim?.(record.interruptId);
+
+    expect(first?.interruptId).toBe(record.interruptId);
+    expect(first?.request).toEqual(record.request);
+    expect(second).toBeUndefined();
+    expect(client.queries.at(-1)).toMatch(/DELETE FROM[\s\S]*status = 'pending'[\s\S]*RETURNING/);
+  });
+
+  it("should not claim a resolved interrupt", async () => {
+    const store = pg({ client: new FakePgClient() });
+
+    await store.save(makeInterrupt({ status: "resolved" }));
+
+    expect(await store.claim?.("support.sess-1.0.abc")).toBeUndefined();
+    expect(await store.load("support.sess-1.0.abc")).toBeDefined();
   });
 
   it("should surface the curated install string when pg is absent", async () => {

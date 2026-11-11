@@ -159,7 +159,7 @@ export function showPartialScreen(options: {
   console.log(`     ${colors.cyan("cd")} ${projectName}`);
 
   if (missingFeatures.length > 0) {
-    console.log(`     ${colors.cyan(`npx warlock add ${missingFeatures.join(" ")}`)}`);
+    console.log(`     ${colors.cyan(`npx --no warlock add ${missingFeatures.join(" ")}`)}`);
   }
 
   console.log(`     ${colors.cyan(devCommand)}`);

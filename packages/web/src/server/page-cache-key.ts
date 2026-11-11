@@ -16,9 +16,10 @@ export type PageCacheVariant = "html" | "json";
 
 export type PageCacheKeyInput = {
   /**
-   * The request `Host` header, port included. Two hosts serving the same URL
-   * are two tenants until proven otherwise, and a key without the host lets a
-   * render that reflects the host poison every other host's visitors.
+   * The request host, port included: the `Host` header, or the selected
+   * site's host in multi-site mode. Two hosts serving the same URL are two
+   * tenants until proven otherwise, and a key without the host lets a render
+   * that reflects the host poison every other host's visitors.
    */
   host: string;
   /** The raw request path, query string included — `request.path`. */
@@ -62,6 +63,62 @@ function normalisePathname(path: string): string {
   return pathname;
 }
 
+/** Whether a query key enters the cache key under the route's allowlist (or the tracking-param default). */
+function isKeyedQueryParam(key: string, allowlist: readonly string[] | undefined): boolean {
+  return allowlist === undefined ? !IGNORED_TRACKING_PARAMS.test(key) : allowlist.includes(key);
+}
+
+/**
+ * True when the request carries a query parameter that the cache key leaves
+ * out (a tracking parameter, or a key outside `cache.query`). Such a request
+ * may be served a stored entry, but its own render must never be stored: the
+ * page and its loaders see every parameter, so the bytes could reflect a
+ * value that the key does not describe.
+ */
+export function hasUnkeyedQueryParams(
+  query: Record<string, unknown>,
+  allowlist: readonly string[] | undefined,
+): boolean {
+  return Object.keys(query).some(
+    (key) => query[key] !== undefined && !isKeyedQueryParam(key, allowlist),
+  );
+}
+
+/**
+ * Appends one query value. Scalars are written as they are; arrays repeat the
+ * key in their given order; an object (`?filter[status]=draft`, which the
+ * request parser turns into `{ filter: { status: "draft" } }`) is flattened to
+ * bracketed keys with its own keys sorted, so two different nested values
+ * never share an entry.
+ */
+function appendQueryValue(params: URLSearchParams, key: string, value: unknown): void {
+  if (value === undefined) return;
+
+  if (Array.isArray(value)) {
+    value.forEach((item: unknown, index) => {
+      if (item !== null && typeof item === "object") {
+        appendQueryValue(params, `${key}[${index}]`, item);
+      } else {
+        appendQueryValue(params, key, item);
+      }
+    });
+
+    return;
+  }
+
+  if (value !== null && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+
+    for (const nestedKey of Object.keys(record).sort()) {
+      appendQueryValue(params, `${key}[${nestedKey}]`, record[nestedKey]);
+    }
+
+    return;
+  }
+
+  params.append(key, String(value));
+}
+
 /**
  * Sorts query keys and re-serializes them, so two requests differing only in
  * parameter order (`?a=1&b=2` vs `?b=2&a=1`) resolve to the same string.
@@ -73,20 +130,12 @@ function normaliseQuery(
   allowlist: readonly string[] | undefined,
 ): string {
   const keys = Object.keys(query)
-    .filter((key) =>
-      allowlist === undefined ? !IGNORED_TRACKING_PARAMS.test(key) : allowlist.includes(key),
-    )
+    .filter((key) => isKeyedQueryParam(key, allowlist))
     .sort();
   const params = new URLSearchParams();
 
   for (const key of keys) {
-    const value = query[key];
-
-    if (Array.isArray(value)) {
-      for (const item of value) params.append(key, String(item));
-    } else if (value !== undefined) {
-      params.append(key, String(value));
-    }
+    appendQueryValue(params, key, query[key]);
   }
 
   return params.toString();

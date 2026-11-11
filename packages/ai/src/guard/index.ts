@@ -32,6 +32,7 @@ export type {
   GuardrailDetectorContext,
   GuardrailEscalation,
   InjectionDetectorOptions,
+  LinkFilterOptions,
   OpenAiClientLike,
   OpenAiModerationCreateBody,
   OpenAiModerationOptions,
@@ -43,7 +44,7 @@ export type {
 } from "./contracts";
 
 // Detectors
-export { injection, moderation, pii, topic } from "./detectors";
+export { injection, links, moderation, pii, topic } from "./detectors";
 
 // Errors (re-exported `GuardrailViolationError` + the curated install string)
 export { GuardrailViolationError, OPENAI_INSTALL_INSTRUCTIONS } from "./errors";

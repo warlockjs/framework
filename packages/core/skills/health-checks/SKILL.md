@@ -35,6 +35,9 @@ const httpConfigurations: HttpConfigurations = {
     path: "/health", // liveness path
     readinessPath: "/ready", // readiness path
     rateLimit: false, // exempt probes from global client quotas (default)
+    details: false, // list checks in /ready (default: false in production, true elsewhere)
+    checkTimeout: 2000, // ms before a check counts as failed (default)
+    cacheTtl: 1000, // ms a readiness result is reused (default)
   },
 };
 
@@ -71,7 +74,7 @@ health.addCheck("db", async () => {
 health.removeCheck("db"); // unregister later if needed
 ```
 
-A check returns `boolean | Promise<boolean>`. **A thrown error counts as a failed check** (it's surfaced in the `checks` map + the 503, not logged — probes poll often, so a failure is a normal signal, not an error event). Keep checks cheap and fast; they run on every `/ready` poll.
+A check returns `boolean | Promise<boolean>`. **A thrown error counts as a failed check** (it's surfaced in the `checks` map + the 503, not logged — probes poll often, so a failure is a normal signal, not an error event). Concurrent probes share one run of the checks, a result is reused for `http.health.cacheTtl` ms, and a check that does not answer within `http.health.checkTimeout` ms fails. In production `/ready` answers `{ status }` only unless `http.health.details: true`.
 
 ### Routes-registered readiness signal
 

@@ -10,7 +10,9 @@ import { CacheConfigurationError } from "../types";
  * `parseCacheKey` (e.g. `("1.private", "")` vs `("1", "private")`).
  *
  * Encoding rules: object keys are sorted, `Date` → ISO string, `undefined` →
- * `{"$u":1}`, `bigint` → decimal string with an `n` suffix.
+ * `{"$u":1}`, `bigint` → `{"$b":"<decimal>"}`. Object keys that start with
+ * `$` get one more `$`, so an argument can never spell one of those markers,
+ * and an own `__proto__` key is kept as data.
  *
  * No args → the prefix alone.
  *
@@ -66,7 +68,7 @@ function normalize(value: unknown, prefix: string, seen: Set<object>): unknown {
       // NaN / Infinity would collapse to null in JSON
       return Number.isFinite(value) ? value : { $n: String(value) };
     case "bigint":
-      return `${value.toString()}n`;
+      return { $b: value.toString() };
     case "function":
       return unsupported(prefix, "a function argument");
     case "symbol":
@@ -102,10 +104,16 @@ function normalize(value: unknown, prefix: string, seen: Set<object>): unknown {
       unsupported(prefix, "a class instance argument");
     }
 
-    const out: Record<string, unknown> = {};
+    // Null prototype: an own `__proto__` key stays a key instead of setting
+    // the prototype (and vanishing from the encoding).
+    const out: Record<string, unknown> = Object.create(null);
 
     for (const key of Object.keys(obj).sort()) {
-      out[key] = normalize((obj as Record<string, unknown>)[key], prefix, seen);
+      // `$`-keys are doubled so `{ $u: 1 }` from an argument never equals the
+      // `undefined` marker.
+      const encodedKey = key.startsWith("$") ? `$${key}` : key;
+
+      out[encodedKey] = normalize((obj as Record<string, unknown>)[key], prefix, seen);
     }
 
     result = out;

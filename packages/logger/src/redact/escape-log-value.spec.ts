@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { escapeLogValue } from "./escape-log-value";
+import { escapeLogValue, neutralizeTerminalText } from "./escape-log-value";
 
 describe("escapeLogValue", () => {
   it("turns line breaks and tabs into visible escapes so input cannot forge a log line", () => {
@@ -40,5 +40,25 @@ describe("escapeLogValue", () => {
     const started = performance.now();
     escapeLogValue(input);
     expect(performance.now() - started).toBeLessThan(500);
+  });
+});
+
+describe("neutralizeTerminalText", () => {
+  it("keeps colour codes, line breaks and tabs", () => {
+    const text = "\u001b[1m\u001b[38;5;8mbold\u001b[22m\nnext\tcol";
+
+    expect(neutralizeTerminalText(text)).toBe(text);
+  });
+
+  it("removes cursor, screen, title and clipboard sequences and the conceal style", () => {
+    expect(
+      neutralizeTerminalText(
+        "a\u001b[2Jb\u001b[1Ac\u001b]0;title\u0007d\u001b]52;c;eA==\u001b\\e\u001b[8mf\u001bcg",
+      ),
+    ).toBe("abcdefg");
+  });
+
+  it("escapes other control characters and drops a lone ESC", () => {
+    expect(neutralizeTerminalText("x\u0000y\u007fz\u001b")).toBe("x\\u0000y\\u007fz");
   });
 });

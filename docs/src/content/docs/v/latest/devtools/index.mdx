@@ -99,6 +99,29 @@ The document is built in-process, on every request to `GET /__warlock/api/openap
 - Dashboard and API routes answer only loopback clients (`127.0.0.1` and
   `::1`). The check uses the socket address; `X-Forwarded-For` cannot unlock
   it.
+- The request must also be addressed to a loopback host: `localhost`,
+  `*.localhost`, `127.0.0.1` or `[::1]`. A website you visit cannot point its
+  own domain at `127.0.0.1` and read your request history, queries or mail,
+  and a page from another origin cannot call the API.
+- A request that carries `X-Forwarded-For`, `X-Forwarded-Host`, `X-Real-IP` or
+  `Forwarded` is refused, because a local proxy or tunnel (ngrok, cloudflared)
+  makes every visitor look like a loopback client.
+- A refused request gets an empty 404, and the terminal prints one warning per
+  reason naming the option to change.
+
+To open the dashboard on a custom dev hostname, or through a local proxy only
+you can reach, add `src/config/devtools.ts`. It is a plain object, so it does
+not import the package and is safe in production:
+
+```ts title="src/config/devtools.ts"
+export default {
+  // Extra hosts besides localhost; ".app.test" also matches subdomains. Default: [].
+  allowedHosts: ["app.test"],
+  // Answer requests that came through a proxy. Default: false.
+  allowProxied: false,
+};
+```
+
 - Live data is held in memory and disappears when the process restarts. Only
   what core's request log wrote (already redacted) is read back from disk.
 

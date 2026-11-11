@@ -1,10 +1,12 @@
 import { createRootContext } from "../helpers/root-context";
 import { isPlainObject } from "@mongez/supportive-is";
 import { setKeyPath } from "../helpers";
+import { forbiddenKeyRule, isForbiddenKey, maxKeysRule, resolveSealLimit } from "../helpers/limits";
+import { validateItems } from "../helpers/validate-items";
 import { objectRule, plainObjectRule } from "../rules";
 import type { SchemaContext, ValidationResult } from "../types";
 import { BaseValidator } from "./base-validator";
-import { applyNullable } from "../standard-schema/json-schema";
+import { applyNullable, getRuleOptions } from "../standard-schema/json-schema";
 import type { JsonSchemaResult, JsonSchemaTarget } from "../standard-schema/json-schema";
 
 /**
@@ -62,6 +64,21 @@ export class RecordValidator extends BaseValidator {
   }
 
   /**
+   * The record must not hold more than the given number of keys.
+   *
+   * Without it, the `maxRecordKeys` limit of `configureSeal()` applies
+   * (10,000 by default). Pass `Infinity` to lift the cap for this schema.
+   *
+   * @example
+   * ```ts
+   * v.record(v.string()).maxKeys(50)
+   * ```
+   */
+  public maxKeys(count: number, errorMessage?: string) {
+    return this.addRule(maxKeysRule, errorMessage, { maxKeys: count });
+  }
+
+  /**
    * Check if value is a plain object type
    */
   public matchesType(value: any): boolean {
@@ -76,6 +93,12 @@ export class RecordValidator extends BaseValidator {
     cloned.valueValidator = this.valueValidator.clone();
     cloned.keyValidator = this.keyValidator?.clone();
     return cloned;
+  }
+
+  /** @inheritdoc */
+  protected override copyMutated(value: unknown): unknown {
+    // Without mutators the rules have always shared the container's object.
+    return this.mutators.length > 0 && isPlainObject(value) ? { ...(value as object) } : value;
   }
 
   /**
@@ -95,7 +118,10 @@ export class RecordValidator extends BaseValidator {
     const valueForRules = data ?? this.getDefaultValue();
     const mutatedData = await this.mutate(valueForRules, context);
 
-    const result = await this.validateRules(data, context);
+    const result = await this.validateRules(data, context, {
+      source: valueForRules,
+      value: mutatedData,
+    });
 
     if (result.isValid === false) return result;
 
@@ -106,11 +132,30 @@ export class RecordValidator extends BaseValidator {
     // Defensive: type rule (objectRule) should have failed for non-objects.
     if (!isPlainObject(mutatedData)) return result;
 
-    const errors: ValidationResult["errors"] = [];
     const keys = Object.keys(mutatedData);
 
-    // Validate all values in parallel
-    const validationPromises = keys.map(async (key) => {
+    // Default key cap for schemas without their own `.maxKeys()`.
+    if (!this.rules.some((rule) => rule.name === "maxKeys")) {
+      const maxKeys = resolveSealLimit(context, "maxRecordKeys");
+
+      if (keys.length > maxKeys) {
+        const capErrors = await this.checkRule(maxKeysRule, mutatedData, context, { maxKeys });
+
+        if (capErrors) return { isValid: false, errors: capErrors, data: undefined };
+      }
+    }
+
+    // A `__proto__` key would replace the output's prototype when written back.
+    if (keys.some(isForbiddenKey)) {
+      const keyErrors = await this.checkRule(forbiddenKeyRule, mutatedData, context, {});
+
+      if (keyErrors) return { isValid: false, errors: keyErrors, data: undefined };
+    }
+
+    // Values are validated in bounded batches; collection stops once the
+    // `maxErrors` limit is reached.
+    const errors = await validateItems(keys.length, context, async (index, report) => {
+      const key = keys[index] as string;
       const childContext: SchemaContext = {
         ...context,
         parent: mutatedData,
@@ -122,7 +167,7 @@ export class RecordValidator extends BaseValidator {
       if (this.keyValidator) {
         // Keys are checked as supplied; transforms never rename properties.
         const keyResult = await this.keyValidator.validate(key, { ...childContext, value: key });
-        if (!keyResult.isValid) errors.push(...keyResult.errors);
+        if (!keyResult.isValid) report(keyResult.errors);
       }
       const childResult = await this.valueValidator.validate(mutatedData[key], childContext);
 
@@ -130,12 +175,8 @@ export class RecordValidator extends BaseValidator {
       mutatedData[key] = childResult.data;
 
       // Collect errors from this value
-      if (childResult.isValid === false) {
-        errors.push(...childResult.errors);
-      }
+      if (childResult.isValid === false) report(childResult.errors);
     });
-
-    await Promise.all(validationPromises);
 
     return this.refineResult(
       {
@@ -169,6 +210,12 @@ export class RecordValidator extends BaseValidator {
     };
 
     if (this.keyValidator) schema.propertyNames = this.keyValidator.toJsonSchema(target);
+
+    const maxKeysOpts = getRuleOptions(this.rules, "maxKeys");
+    if (typeof maxKeysOpts?.maxKeys === "number" && Number.isFinite(maxKeysOpts.maxKeys)) {
+      schema.maxProperties = maxKeysOpts.maxKeys;
+    }
+
     if (this.isNullable) applyNullable(schema, target);
 
     return schema;

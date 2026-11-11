@@ -125,3 +125,19 @@ describe("Auth delegation to authService", () => {
     expect(authService.attemptLogin).toHaveBeenCalledWith(Model, data);
   });
 });
+
+describe("Auth serialization", () => {
+  it("hides the password hash from serialized output by default", () => {
+    expect(Auth.hidden).toContain("password");
+  });
+
+  it("is inherited by an app's user model that does not set its own list", () => {
+    class AppUser extends Auth {
+      public get userType() {
+        return "user";
+      }
+    }
+
+    expect(AppUser.hidden).toContain("password");
+  });
+});

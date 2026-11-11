@@ -60,7 +60,24 @@ type Bucket = {
   resetAt: number;
 };
 
-const buckets = new Map<string, Bucket>();
+/**
+ * One limiter's in-memory buckets, in two generations.
+ *
+ * A bucket lives for `duration` ms from its first request. Buckets are
+ * created in `current`; once `current` is at least `duration` old it becomes
+ * `previous` and a fresh `current` starts, and the old `previous` is dropped
+ * whole. Every bucket in it was created at least one full generation before,
+ * so it had already expired: limiting is exactly what a per-key expiry gives,
+ * memory holds only the keys seen in the last two windows, and no request
+ * ever pays for a scan of every bucket.
+ */
+type BucketGenerations = {
+  current: Map<string, Bucket>;
+  previous: Map<string, Bucket>;
+  startedAt: number;
+};
+
+const limiters = new Map<number, BucketGenerations>();
 const defaultIpv6Subnet = 64;
 
 /**
@@ -70,20 +87,34 @@ const defaultIpv6Subnet = 64;
  */
 let nextLimiterId = 0;
 
-/**
- * Sweep expired buckets so the Map doesn't grow unbounded with one-shot keys
- * (rare per-user keys, dynamic path parameters in `keyGenerator`, etc.).
- * Called opportunistically, at most once per minute, not on a timer — keeps
- * the module side-effect-free for testing.
- */
-let lastPruneAt = 0;
+/** Retire the current generation once it is a full window old. */
+function rotateGenerations(generations: BucketGenerations, now: number, duration: number) {
+  if (now - generations.startedAt < duration) return;
 
-function pruneExpired(now: number) {
-  for (const [key, bucket] of buckets) {
-    if (bucket.resetAt <= now) {
-      buckets.delete(key);
-    }
+  generations.previous = generations.current;
+  generations.current = new Map();
+  generations.startedAt = now;
+}
+
+/** The live bucket for `key`, from either generation. */
+function liveBucket(generations: BucketGenerations, key: string, now: number): Bucket | undefined {
+  const bucket = generations.current.get(key) ?? generations.previous.get(key);
+
+  return bucket && bucket.resetAt > now ? bucket : undefined;
+}
+
+/**
+ * Number of in-memory buckets held across every limiter.
+ * @internal For specs.
+ */
+export function memoryRateLimitBucketCount(): number {
+  let total = 0;
+
+  for (const generations of limiters.values()) {
+    total += generations.current.size + generations.previous.size;
   }
+
+  return total;
 }
 
 function resolveStore(options: RateLimitOptions): "memory" | "cache" {
@@ -120,11 +151,6 @@ export function rateLimitMiddleware(options: RateLimitOptions): Middleware {
 
   return async ({ request, response }) => {
     const now = Date.now();
-
-    if (now - lastPruneAt > 60_000) {
-      pruneExpired(now);
-      lastPruneAt = now;
-    }
 
     let userKey: string | undefined;
 
@@ -163,11 +189,21 @@ export function rateLimitMiddleware(options: RateLimitOptions): Middleware {
         return undefined;
       }
     } else {
-      bucket = buckets.get(cacheKey);
+      let generations = limiters.get(limiterId);
 
-      if (!bucket || bucket.resetAt <= now) {
+      if (!generations) {
+        generations = { current: new Map(), previous: new Map(), startedAt: now };
+        limiters.set(limiterId, generations);
+      }
+
+      rotateGenerations(generations, now, options.duration);
+
+      bucket = liveBucket(generations, cacheKey, now);
+
+      if (!bucket) {
         bucket = { count: 0, resetAt: now + options.duration };
-        buckets.set(cacheKey, bucket);
+        generations.previous.delete(cacheKey);
+        generations.current.set(cacheKey, bucket);
       }
 
       bucket.count++;

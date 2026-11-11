@@ -1,4 +1,5 @@
 import config from "@mongez/config";
+import { UnsafeFilterError } from "@warlock.js/cascade";
 import { log } from "@warlock.js/logger";
 import { AppError, HttpError } from "./errors";
 import type { Request } from "./request";
@@ -32,7 +33,9 @@ export type HttpErrorMapping = {
  * Called only for errors that are not already an `HttpError` or `AppError`. Return a
  * mapping (or an `HttpError`) to answer with it, or `undefined` to keep the
  * default handling (a model validation error keeps its configured status,
- * anything else is an opaque 500).
+ * anything else is an opaque 500). A filter value the database layer refused
+ * (`UnsafeFilterError`) never reaches the mapper: it answers 400 with its
+ * message.
  *
  * @example
  * ```ts
@@ -67,6 +70,35 @@ export function mapRequestError(error: unknown, request: Request<any>): unknown 
     return error;
   }
 
+  const builtIn = mapBuiltInError(error);
+
+  if (builtIn !== error) return builtIn;
+
+  return applyErrorMapper(error, request);
+}
+
+/**
+ * Errors the framework itself answers with a 4xx, like an `HttpError` (the
+ * app's mapper is not consulted): a filter value the database layer refused
+ * (an operator key in a filter value, a LIKE pattern over the wildcard or
+ * length cap) came from the client, so it is a 400 carrying the refusal's
+ * message, not a 500.
+ */
+function mapBuiltInError(error: unknown): unknown {
+  if (error instanceof UnsafeFilterError) {
+    const mapped = new HttpError(400, error.message);
+
+    mapped.name = error.name;
+    mapped.stack = error.stack;
+    mapped.cause = error;
+
+    return mapped;
+  }
+
+  return error;
+}
+
+function applyErrorMapper(error: unknown, request: Request<any>): unknown {
   const mapper = config.get("http.errorMapper") as HttpErrorMapper | undefined;
 
   if (typeof mapper !== "function") {

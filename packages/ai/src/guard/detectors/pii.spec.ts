@@ -213,4 +213,83 @@ describe("pii detector", () => {
       }
     });
   });
+
+  describe("linear-time scanning", () => {
+    /** The address pattern the detector used before its one-pass scanner. */
+    const referenceEmail = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g;
+
+    function referenceSpans(text: string): Array<[number, number]> {
+      return [...text.matchAll(referenceEmail)].map(
+        (match) => [match.index, match.index + match[0].length - 1] as [number, number],
+      );
+    }
+
+    it("finds exactly the address spans of the reference pattern", () => {
+      const samples = [
+        "mail a@b.com and c.d+e@f-g.co.uk now",
+        "..foo@bar.com",
+        "a@b.com.x@y.io",
+        "x@y.z1 q@w.er",
+        "_x@y.zz",
+        "%a@b.cd @ e@f@g.hi",
+        "joe@example.c0m and joe@example.com.",
+        "a@b.c",
+      ];
+
+      for (const sample of samples) {
+        const verdict = pii({ detect: ["email"], onMatch: "flag" }).check(sample, ctx);
+        const spans = verdict.type === "flag" ? verdict.matches.map((match) => match.span) : [];
+
+        expect(spans, sample).toEqual(referenceSpans(sample));
+      }
+    });
+
+    it("returns on a long run of address-like characters with no address", () => {
+      // Quadratic under a backtracking address regex (minutes of blocked event loop).
+      const verdict = pii().check("a.".repeat(200_000), ctx);
+
+      expect(verdict.type).toBe("allow");
+    });
+
+    it("dedupes and redacts many hits in one pass", () => {
+      const text = "1.1.1.1 ".repeat(50_000);
+      const verdict = pii({ detect: ["ipv4"], mask: "[{label}]" }).check(text, ctx);
+
+      expect(verdict.type).toBe("redact");
+
+      if (verdict.type === "redact") {
+        expect(verdict.matches.length).toBe(50_000);
+        expect(verdict.text).toBe("[ipv4] ".repeat(50_000));
+      }
+    });
+
+    it("redacts a very large number of addresses instead of failing open", () => {
+      // 200,000 hits: spreading them into one `push` call overflowed the stack,
+      // and a throwing detector lets the text through.
+      const text = "a@b.co ".repeat(200_000);
+      const verdict = pii({ detect: ["email"], mask: "[{label}]" }).check(text, ctx);
+
+      expect(verdict.type).toBe("redact");
+
+      if (verdict.type === "redact") {
+        expect(verdict.matches.length).toBe(200_000);
+        expect(verdict.text).toBe("[email] ".repeat(200_000));
+      }
+    });
+
+    it("keeps the earliest, widest span when hits overlap", () => {
+      const verdict = pii({
+        detect: [],
+        dictionary: ["alpha beta", "beta", "alpha", "beta gamma"],
+        mask: "<{label}>",
+      }).check("alpha beta gamma", ctx);
+
+      expect(verdict.type).toBe("redact");
+
+      if (verdict.type === "redact") {
+        expect(verdict.matches.map((match) => match.span)).toEqual([[0, 9]]);
+        expect(verdict.text).toBe("<dictionary> gamma");
+      }
+    });
+  });
 });

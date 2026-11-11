@@ -12,7 +12,7 @@ vi.mock("@warlock.js/core", () => ({
 }));
 
 vi.mock("@warlock.js/logger", () => ({
-  log: { error: vi.fn() },
+  log: { error: vi.fn(), debug: vi.fn() },
 }));
 
 vi.mock("./jwt", async (importOriginal) => {
@@ -50,7 +50,7 @@ function buildRequest(authorizationValue?: string, cookies: Record<string, strin
 }
 
 function liveRow(fields: Record<string, unknown> = {}) {
-  return { isExpired: false, userType: "user", destroy: vi.fn(), ...fields };
+  return { isExpired: false, userId: 1, userType: "user", destroy: vi.fn(), ...fields };
 }
 
 function stubConfig(userModel: unknown) {
@@ -66,6 +66,38 @@ beforeEach(() => {
   vi.clearAllMocks();
   canAuthenticate.mockResolvedValue(true);
   renewAutomaticSession.mockResolvedValue(null);
+});
+
+describe("token row and claims must name the same user", () => {
+  it("refuses a token whose id claim differs from the user its row was issued to", async () => {
+    jwtVerify.mockResolvedValue({ id: 2, userType: "user" });
+    accessTokenFindByToken.mockResolvedValue(liveRow({ userId: 1 }));
+    const find = vi.fn().mockResolvedValue({ id: 2, userType: "user" });
+    stubConfig({ find });
+
+    const outcome = await resolveRequestUserOutcome(buildRequest("token") as never, {} as never);
+
+    expect(outcome).toEqual({ user: null, failure: "invalid" });
+    expect(find).not.toHaveBeenCalled();
+  });
+
+  it("refuses a token whose userType claim differs from its row", async () => {
+    jwtVerify.mockResolvedValue({ id: 1, userType: "admin" });
+    accessTokenFindByToken.mockResolvedValue(liveRow({ userId: 1, userType: "user" }));
+    stubConfig({ find: vi.fn().mockResolvedValue(user) });
+
+    const outcome = await resolveRequestUserOutcome(buildRequest("token") as never, {} as never);
+
+    expect(outcome.failure).toBe("invalid");
+  });
+
+  it("matches ids across number and string forms", async () => {
+    jwtVerify.mockResolvedValue({ id: "1", userType: "user" });
+    accessTokenFindByToken.mockResolvedValue(liveRow({ userId: 1 }));
+    stubConfig({ find: vi.fn().mockResolvedValue(user) });
+
+    expect(await run(buildRequest("token"))).toBe(user);
+  });
 });
 
 describe("resolveRequestUser", () => {
@@ -164,5 +196,45 @@ describe("resolveRequestUser", () => {
       { name: "refresh", domain: ".example.com" },
     );
     expect(accessTokenFindByToken).toHaveBeenCalledWith("next-access");
+  });
+});
+
+describe("auth.cookie.hostPrefix reads", () => {
+  function stubWithHostPrefix(userModel: unknown) {
+    configKey.mockImplementation((key: string, fallback?: unknown) => {
+      if (key === "auth.cookie.hostPrefix") return true;
+
+      return key.startsWith("auth.userType.") ? userModel : fallback;
+    });
+  }
+
+  it("reads the __Host- cookie first", async () => {
+    jwtVerify.mockResolvedValue({ id: 1, userType: "user" });
+    accessTokenFindByToken.mockResolvedValue(liveRow());
+    stubWithHostPrefix({ find: vi.fn().mockResolvedValue(user) });
+    const request = buildRequest(undefined, {
+      "__Host-access_token": "prefixed",
+      access_token: "legacy",
+    });
+
+    await resolveRequestUserOutcome(request as never, {} as never, {
+      tokenFrom: "cookie:access_token",
+    });
+
+    expect(jwtVerify).toHaveBeenCalledWith("prefixed");
+  });
+
+  it("still accepts the unprefixed cookie written before the switch", async () => {
+    jwtVerify.mockResolvedValue({ id: 1, userType: "user" });
+    accessTokenFindByToken.mockResolvedValue(liveRow());
+    stubWithHostPrefix({ find: vi.fn().mockResolvedValue(user) });
+    const request = buildRequest(undefined, { access_token: "legacy" });
+
+    const outcome = await resolveRequestUserOutcome(request as never, {} as never, {
+      tokenFrom: "cookie:access_token",
+    });
+
+    expect(outcome.user).toBe(user);
+    expect(jwtVerify).toHaveBeenCalledWith("legacy");
   });
 });

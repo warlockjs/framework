@@ -18,6 +18,7 @@ import {
   hydrationSiteEntryName,
 } from "../vite/hydration-entries";
 import { CLIENT_ASSET_URL_PREFIX } from "./client-asset-url-prefix";
+import { findManifestKey, readClientManifest as readCachedClientManifest } from "./client-manifest";
 
 export interface ResolveHydrationClientUrlOptions {
   /** Absolute path to the client build output dir: `<outdir>/client`. */
@@ -295,6 +296,68 @@ export function resolveHydrationClientModulePreloadUrls(
   for (const key of importedKeys) visit(key);
 
   return urls;
+}
+
+/**
+ * The hydration entry's own preloads followed by `modulepreload` URLs for ONE
+ * page route's chunks: the manifest entry of each of `sourceFiles` (root, the
+ * matched layouts outer to inner, then the page) and every chunk it
+ * STATICALLY imports. Without them the browser learns of the route's chunks
+ * only after the entry has run and asked for them, one round trip after the
+ * entry itself.
+ *
+ * Same walk and servability rule as
+ * {@link resolveHydrationClientModulePreloadUrls}: `imports` only, never
+ * `dynamicImports`, so no other page is preloaded; a file outside the served
+ * asset directory is dropped. URLs already in `entryPreloadUrls`, and the
+ * entry module itself (`hydrationClientModuleUrl`), are not repeated.
+ *
+ * Never throws: a missing manifest or an unknown source id adds nothing, and
+ * the route still loads its chunks itself.
+ */
+export function routeModulePreloadUrls(options: {
+  clientDir: string;
+  sourceFiles: readonly string[];
+  entryPreloadUrls: readonly string[] | undefined;
+  hydrationClientModuleUrl: string | undefined;
+}): readonly string[] | undefined {
+  const manifest = readCachedClientManifest(options.clientDir);
+  if (manifest === undefined) return options.entryPreloadUrls;
+
+  const urls = [...(options.entryPreloadUrls ?? [])];
+  const seen = new Set(urls);
+  if (options.hydrationClientModuleUrl !== undefined) seen.add(options.hydrationClientModuleUrl);
+  const visited = new Set<string>();
+
+  const visit = (key: string) => {
+    if (visited.has(key)) return;
+    visited.add(key);
+
+    const node = manifest[key];
+    if (node === undefined) return;
+
+    if (typeof node.file === "string") {
+      const url = `/${node.file}`;
+
+      if (url.startsWith(`${CLIENT_ASSET_URL_PREFIX}/`) && !seen.has(url)) {
+        seen.add(url);
+        urls.push(url);
+      }
+    }
+
+    if (Array.isArray(node.imports)) {
+      for (const imported of node.imports) {
+        if (typeof imported === "string") visit(imported);
+      }
+    }
+  };
+
+  for (const sourceFile of options.sourceFiles) {
+    const key = findManifestKey(manifest, sourceFile);
+    if (key !== undefined) visit(key);
+  }
+
+  return urls.length === 0 ? options.entryPreloadUrls : urls;
 }
 
 let siteHydrationUrls: Readonly<Record<string, string>> | undefined;

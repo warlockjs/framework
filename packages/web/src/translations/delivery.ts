@@ -237,24 +237,92 @@ export function pruneKeywordsAgainst(
   table: Readonly<Record<string, unknown>>,
 ): Keywords {
   const pruned: Record<string, unknown> = {};
+  const isUsed = translationKeyMatcher(usage);
 
   for (const [name, value] of Object.entries(keywords)) {
-    const kept = pruneBranchAgainst(value, name, usage, table[name]);
+    const kept = pruneBranchAgainst(value, name, isUsed, table[name]);
     if (kept !== undefined) pruned[name] = kept;
   }
 
   return pruned as Keywords;
 }
 
+/** Whether a usage reaches one key; see {@link translationKeyMatcher}. */
+export type TranslationKeyMatcher = (key: string) => boolean;
+
+const keyMatchers = new WeakMap<TranslationUsage, TranslationKeyMatcher>();
+
+/**
+ * `isTranslationKeyUsed` for one usage, indexed once: a pruning walk asks it
+ * for every leaf of a locale's table, and the plain form scans the whole usage
+ * per key. The answers are the same — a declared key reaches itself, its
+ * subtree and its plural variants; a literal reaches itself and its plural
+ * variants; a trailing-dot entry or a prefix reaches every key starting with
+ * it — found here by looking up the key's own dot-boundary ancestors and
+ * plural bases. Usages are frozen, so the index is kept per usage object.
+ */
+export function translationKeyMatcher(usage: TranslationUsage): TranslationKeyMatcher {
+  const known = keyMatchers.get(usage);
+  if (known !== undefined) return known;
+
+  const matcher = createTranslationKeyMatcher(usage);
+  keyMatchers.set(usage, matcher);
+
+  return matcher;
+}
+
+function createTranslationKeyMatcher(usage: TranslationUsage): TranslationKeyMatcher {
+  if (usage.dynamic) return () => true;
+
+  const declared = new Set<string>();
+  const literals = new Set<string>();
+  const prefixes = [...usage.prefixes, ...usage.literalPrefixes];
+
+  for (const key of usage.keys) {
+    if (key.endsWith(".")) prefixes.push(key);
+    else declared.add(key);
+  }
+
+  for (const literal of usage.literals) {
+    if (literal.endsWith(".")) prefixes.push(literal);
+    else literals.add(literal);
+  }
+
+  return (key) => {
+    if (declared.has(key) || literals.has(key)) return true;
+
+    // A declared key reaches its subtree: `key` sits under one of its
+    // dot-boundary ancestors.
+    for (let dot = key.indexOf("."); dot !== -1; dot = key.indexOf(".", dot + 1)) {
+      if (declared.has(key.slice(0, dot))) return true;
+    }
+
+    // A plural variant is `<base>_<suffix>` with no dot in the suffix, so its
+    // base ends at an underscore of the last segment.
+    const lastDot = key.lastIndexOf(".");
+
+    for (
+      let underscore = key.indexOf("_", lastDot + 1);
+      underscore !== -1;
+      underscore = key.indexOf("_", underscore + 1)
+    ) {
+      const base = key.slice(0, underscore);
+      if (declared.has(base) || literals.has(base)) return true;
+    }
+
+    return prefixes.some((prefix) => key.startsWith(prefix));
+  };
+}
+
 function pruneBranchAgainst(
   value: unknown,
   key: string,
-  usage: TranslationUsage,
+  isUsed: TranslationKeyMatcher,
   tableNode: unknown,
 ): unknown {
   if (typeof value === "string") {
     if (tableNode === value) return undefined;
-    return isTranslationKeyUsed(usage, key) ? value : undefined;
+    return isUsed(key) ? value : undefined;
   }
 
   if (typeof value !== "object" || value === null) return undefined;
@@ -266,7 +334,7 @@ function pruneBranchAgainst(
       : undefined;
 
   for (const [name, child] of Object.entries(value as Record<string, unknown>)) {
-    const kept = pruneBranchAgainst(child, `${key}.${name}`, usage, tableRecord?.[name]);
+    const kept = pruneBranchAgainst(child, `${key}.${name}`, isUsed, tableRecord?.[name]);
     if (kept !== undefined) branch[name] = kept;
   }
 

@@ -109,8 +109,11 @@ describe.skipIf(!enabled)("real Redis login throttles", () => {
     const blocked = response(false);
     await throttle(makeCtx({ request, response: blocked }));
     expect(blocked.tooManyRequests).toHaveBeenCalledOnce();
+    // The lockout rewrites the counter with the lock's TTL, so both end together.
+    expect(await observer.pTTL(counter)).toBeLessThanOrEqual(1000);
     await observer.pExpire(lock, 1);
-    await expect.poll(() => observer.exists(lock), { interval: 5 }).toBe(0);
+    await observer.pExpire(counter, 1);
+    await expect.poll(() => observer.exists([lock, counter]), { interval: 5 }).toBe(0);
     const success = response(true);
     await throttle(makeCtx({ request, response: success }));
     expect(success.tooManyRequests).not.toHaveBeenCalled();

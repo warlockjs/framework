@@ -110,3 +110,36 @@ describe("webSearchTool", () => {
     expect(error?.message).toMatch(/must be a string/);
   });
 });
+
+describe("webSearchTool — timeout and cancellation", () => {
+  it("fails with a timeout error when the provider never answers", async () => {
+    const fetchMock = vi.fn(() => new Promise<Response>(() => undefined));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const tool = webSearchTool({ provider: "tavily", apiKey: "tvly-test", timeoutMs: 50 });
+    const { data, error } = await tool.invoke({ query: "slow" });
+
+    expect(data).toBeUndefined();
+    expect(error?.message).toMatch(/timed out after 50ms/);
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it("passes a signal to the provider request and aborts it with the run", async () => {
+    const fetchMock = vi.fn(
+      (_url: string, _init?: RequestInit) => new Promise<Response>(() => undefined),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const controller = new AbortController();
+
+    const tool = webSearchTool({ provider: "brave", apiKey: "brave-test" });
+    const pending = tool.invoke({ query: "q" }, { artifacts: {}, signal: controller.signal });
+    setTimeout(() => controller.abort(new Error("run cancelled")), 20);
+
+    const { data, error } = await pending;
+    const init = fetchMock.mock.calls[0]?.[1];
+
+    expect(data).toBeUndefined();
+    expect(error).toBeDefined();
+    expect(init?.signal?.aborted).toBe(true);
+  });
+});

@@ -172,7 +172,7 @@ const uploadAvatarSchema = v.object({
 });
 ```
 
-Full file chain: `.image()`, `.accept(extensions)`, `.mimeType(types)`, `.pdf()`, `.excel()`, `.word()`, `.minSize(n)`, `.maxSize(n)`, `.minWidth(px)`, `.maxWidth(px)`, `.minHeight(px)`, `.maxHeight(px)`. Every rule returns `this`, so the field's output type stays `UploadedFile` through the chain; `.saveTo(dir)` switches it to `string` (the saved path). See the `upload-file` topic for the full upload flow.
+Full file chain: `.image()` (checks the bytes; `.image({ svg: true })` — `ImageRuleOptions` — also allows svg), `.accept(extensions)`, `.mimeType(types)`, `.pdf()`, `.excel()`, `.word()`, `.minSize(n)`, `.maxSize(n)`, `.minWidth(px)`, `.maxWidth(px)`, `.minHeight(px)`, `.maxHeight(px)`. Every rule returns `this`, so the field's output type stays `UploadedFile` through the chain; `.saveTo(dir)` switches it to `string` (the saved path). See the `upload-file` topic for the full upload flow.
 
 ### Optional file field
 

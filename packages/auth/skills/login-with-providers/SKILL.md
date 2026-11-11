@@ -1,6 +1,6 @@
 ---
 name: login-with-providers
-description: 'Log in without a password — Google (OIDC code + PKCE + state + nonce, id_token verified with `jose`), GitHub, Discord, LinkedIn, Apple (`form_post` callback), Facebook and X, passkeys (WebAuthn via `@simplewebauthn/server`) and phone one-time codes (delivered through a `@warlock.js/notifications` channel). Every method ends in `authService.completeLogin(user)`, the same tokens, rows and events as password login. `startProviderLogin`, `completeProviderLogin`, `generatePasskeyRegistrationOptions`, `verifyPasskeyRegistration`, `generatePasskeyAuthenticationOptions`, `verifyPasskeyAuthentication`, `requestOtp`, `verifyOtp`, `otpRequestThrottleMiddleware`, `otpVerifyThrottleMiddleware`, `AuthProvider`. Triggers: "login with Google", "sign in with Google", "login with GitHub", "Sign in with Apple", "login with Discord", "login with LinkedIn", "login with Facebook", "login with X", `auth.providers.github`, "OAuth", "OIDC", "passkeys", "WebAuthn", "passwordless", "SMS code login", "WhatsApp OTP", "phone login", `warlock add auth-google`, `warlock add auth-passkeys`, `AuthProviderSdkMissingError`, `InvalidProviderCallbackError`, `ProviderEmailNotVerifiedError`, `InvalidPasskeyError`, `EC009`, `EC010`, `EC011`, `auth.providers`, `auth.passkeys`, `auth.otp`; typical import `import { completeProviderLogin, verifyOtp } from "@warlock.js/auth"`. Skip: password login — the `handle-login-and-logout` topic; email tokens — the `verify-email-and-reset-password` topic; defining an SMS channel — the `define-channel` topic of the `warlock-js-notifications` skill.'
+description: 'Log in without a password — Google (OIDC code + PKCE + state + nonce, id_token verified with `jose`), GitHub, Discord, LinkedIn, Apple (`form_post` callback), Facebook and X, passkeys (WebAuthn via `@simplewebauthn/server`) and phone one-time codes (delivered through a `@warlock.js/notifications` channel). Every method ends in `authService.completeLogin(user)`, the same tokens, rows and events as password login. `startProviderLogin`, `completeProviderLogin`, `generatePasskeyRegistrationOptions`, `verifyPasskeyRegistration`, `generatePasskeyAuthenticationOptions`, `verifyPasskeyAuthentication`, `requestOtp`, `verifyOtp`, `otpRequestThrottleMiddleware`, `otpVerifyThrottleMiddleware`, `AuthProvider`. Triggers: "login with Google", "sign in with Google", "login with GitHub", "Sign in with Apple", "login with Discord", "login with LinkedIn", "login with Facebook", "login with X", `auth.providers.github`, "OAuth", "OIDC", "passkeys", "WebAuthn", "passwordless", "SMS code login", "WhatsApp OTP", "phone login", `warlock add auth-google`, `warlock add auth-passkeys`, `AuthProviderSdkMissingError`, `InvalidProviderCallbackError`, `ProviderEmailNotVerifiedError`, `ProviderAccountLinkBlockedError`, `ProviderLinkExisting`, `InvalidPasskeyError`, `EC009`, `EC010`, `EC011`, `EC012`, `auth.providers`, `auth.passkeys`, `auth.otp`; typical import `import { completeProviderLogin, verifyOtp } from "@warlock.js/auth"`. Skip: password login — the `handle-login-and-logout` topic; email tokens — the `verify-email-and-reset-password` topic; defining an SMS channel — the `define-channel` topic of the `warlock-js-notifications` skill.'
 ---
 
 # Login with an OAuth provider, passkeys, or a phone code
@@ -63,6 +63,7 @@ Client side, the button is just a link. It must be a top-level navigation, not a
 - `state`, `nonce` and the PKCE verifier go into a signed, 10-minute, HttpOnly `auth_provider_state` cookie (SameSite=Lax, so it survives Google's redirect back). The callback clears the cookie, so a started login can complete only once.
 - The callback rejects, with `InvalidProviderCallbackError` (400, `EC009`): a missing, forged or expired cookie, a `state` mismatch, a `?error=` from Google, a failed code exchange, and an id_token with a bad signature, `iss`, `aud`, `exp` or `nonce`. `error.reason` says which. The response message is generic.
 - **Linking.** An existing `provider_accounts` row (provider plus Google `sub`) always decides the user. Without one, the Google email must be verified (`email_verified: true`), or the call throws `ProviderEmailNotVerifiedError` (403, `EC010`) and nothing is linked or created. A verified email links the matching user, or creates one with `{ email, name, emailVerifiedAt: now }`.
+- **Linking an existing account** follows `auth.providers.linkExisting` (type `ProviderLinkExisting`, default `"verified"`): the account found by email is linked only if it verified that address itself (`auth.verification.field` set); otherwise `ProviderAccountLinkBlockedError` (403, `EC012`) is thrown and nothing is linked — this stops a pre-registered account (attacker knows its password) from being merged with the real owner. A user model whose schema has no verification field links as before. `"always"` restores the old behaviour; `"never"` never links by email.
 - Other OIDC providers: implement `AuthProvider` (`authorizationUrl(state)`, `handleCallback({ query, expected })`) and register it under `auth.providers.custom.<name>`.
 
 ### Google request deadlines and controlled providers
@@ -102,6 +103,8 @@ The implementation uses the `jose` 6 `customFetch` and `timeoutDuration` options
 Same shape as Google: a config block under `auth.providers.<name>`, a GET
 route that redirects to `startProviderLogin(response, "<name>")`, and a GET
 callback that calls `completeProviderLogin(User, "<name>", request, response)`.
+Every provider (Apple, Facebook and X too) takes `timeoutMs` (positive integer,
+default `5000`): the deadline for each token, profile and key-set request.
 
 ```ts
 // src/config/auth.ts
@@ -227,8 +230,16 @@ router.get("/auth/x/callback", async ({ request, response }) => {
 ## Passkeys
 
 ```ts
-passkeys: { rpID: "example.com", rpName: "Example", origin: "https://example.com" },
+passkeys: {
+  rpID: "example.com",
+  rpName: "Example",
+  origin: "https://example.com",
+  userVerification: "preferred", // default; "required" refuses assertions without PIN/biometric
+},
 ```
+
+Throttle the anonymous `/auth/passkeys/login/options` route (each call stores
+a challenge row): `loginThrottleMiddleware({ by: ["ip"], isFailure: () => true, max: 30, window: "1m" })`.
 
 ```ts
 // Register (logged in)
@@ -322,7 +333,7 @@ router.post(
 - Codes have 6 digits and are stored in `one_time_tokens` (purpose `otp`) as a salted HMAC keyed from your access-token secret, never as plain SHA-256, which is trivially reversible for 6 digits. A new request invalidates the previous code.
 - Every verify counts an attempt atomically first. After `maxAttempts` the code is invalidated, even if the right code comes next, and even under concurrent guesses.
 - Delivery: `notify.channel(channel).send(phone, { body, code, expiresAt })`. Register that channel in `config/notifications.ts`, or set `auth.otp.send(phone, message, channel)`. `auth.otp.message(code)` changes the text.
-- **Anti-enumeration:** an unknown phone gets the same `requestOtp` result (nothing sent) and the same `InvalidOneTimeTokenError` (400, `EC008`) from `verifyOtp`.
+- **Anti-enumeration:** an unknown phone gets the same `requestOtp` result (nothing sent) and the same `InvalidOneTimeTokenError` (400, `EC008`) from `verifyOtp`. The code is delivered in the background (failures: log + `otp.deliveryFailed` event); `auth.otp.awaitDelivery: true` awaits it instead.
 - CSRF: `verifyOtp` is a POST. If the route uses cookie auth, the 5.12 Origin check applies. Otherwise there is no ambient credential to ride.
 
 ## Gotchas

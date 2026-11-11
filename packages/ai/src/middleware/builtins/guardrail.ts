@@ -30,7 +30,8 @@ export type GuardrailCheck = (
 export type GuardrailOptions = {
   /**
    * Run against the outbound prompt just before the model sees it.
-   * Fires every trip with the concatenated last user-message text.
+   * Fires with the concatenated last user-message text, once per distinct
+   * text per run: a later trip whose text already passed skips it.
    * Rejection aborts the trip with a `GuardrailViolationError` whose
    * `phase === "input"`.
    */
@@ -41,9 +42,18 @@ export type GuardrailOptions = {
    * a `GuardrailViolationError` whose `phase === "output"`.
    *
    * Output checks run BEFORE any tool dispatch — a rejected response
-   * means the tool calls it requested are never invoked.
+   * means the tool calls it requested are never invoked. In a streaming
+   * run each trip's text is held until the check passes (see `stream`).
    */
   outputCheck?: GuardrailCheck;
+  /**
+   * How a streaming run (`agent.stream()`, `ai.serve`) meets `outputCheck`.
+   * Default `"buffered"`: each trip's text is held until the check passes
+   * and is then streamed as one delta; a rejected trip streams no text,
+   * and reasoning deltas are not streamed. `"unguarded"` streams deltas as
+   * they arrive, before the check runs. No effect without `outputCheck`.
+   */
+  stream?: "buffered" | "unguarded";
   /**
    * Override the middleware name — surfaces on
    * `GuardrailViolationError.guardrail` so operators can tell two
@@ -93,9 +103,14 @@ export function guardrail(options: GuardrailOptions): AgentMiddleware {
   const name = options.name ?? "guardrail";
   const { inputCheck, outputCheck } = options;
 
+  // The user text `inputCheck` already passed this run (per-run `state`).
+  const passedInputKey = `${name}.input-check-passed`;
+
   return {
     name,
     trip: {
+      // Hold streamed text until `outputCheck` has passed it.
+      bufferStream: outputCheck !== undefined && options.stream !== "unguarded",
       async before(context) {
         if (!inputCheck) {
           return;
@@ -107,6 +122,12 @@ export function guardrail(options: GuardrailOptions): AgentMiddleware {
           return;
         }
 
+        // The prompt does not change between trips of one run: skip a
+        // re-check of text that already passed.
+        if (context.state.get(passedInputKey) === prompt) {
+          return;
+        }
+
         const verdict = await inputCheck(prompt, context);
 
         if (!verdict.ok) {
@@ -115,6 +136,8 @@ export function guardrail(options: GuardrailOptions): AgentMiddleware {
             { phase: "input", reason: verdict.reason, guardrail: name },
           );
         }
+
+        context.state.set(passedInputKey, prompt);
       },
       async after(context, response: ModelResponse) {
         if (!outputCheck) {

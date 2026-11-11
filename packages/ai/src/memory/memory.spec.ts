@@ -522,6 +522,38 @@ describe("memory — scope isolation (security)", () => {
 
     expect(hits.map((hit) => hit.text)).toEqual(["noisy neighbor note X"]);
   });
+
+  it("scoped recall reaches its own entries beyond the overscan window, in every vector tier", async () => {
+    for (const tier of ["semantic", "episodic", "procedural"] as const) {
+      const tierConfig = { embedder: new DeterministicEmbedder(), store: makeStore() };
+      const mem = memory({
+        working: false,
+        defaultTier: tier,
+        ...(tier === "semantic" ? { semantic: tierConfig } : {}),
+        ...(tier === "episodic" ? { episodic: tierConfig } : {}),
+        ...(tier === "procedural" ? { procedural: tierConfig } : {}),
+        threshold: 0.1,
+      });
+
+      // 300 foreign entries that match the query exactly, so they hold
+      // every slot of the first candidate pages.
+      for (let index = 0; index < 300; index++) {
+        await mem.remember({ id: `b-${index}`, text: "noisy neighbor note", scope: "tenant-b" });
+      }
+
+      for (const suffix of ["one", "two", "six"]) {
+        await mem.remember({ text: `noisy neighbor note ${suffix}`, scope: "tenant-a" });
+      }
+
+      const hits = await mem.recall("noisy neighbor note", { scope: "tenant-a", k: 3 });
+
+      expect(hits.map((hit) => hit.text).sort(), tier).toEqual([
+        "noisy neighbor note one",
+        "noisy neighbor note six",
+        "noisy neighbor note two",
+      ]);
+    }
+  });
 });
 
 /**

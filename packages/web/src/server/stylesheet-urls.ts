@@ -29,6 +29,7 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import type { ModuleGraph, ModuleNode } from "vite";
 import { CLIENT_ASSET_URL_PREFIX } from "./client-asset-url-prefix";
+import { findManifestKey, readClientManifest } from "./client-manifest";
 import { UnknownStylesheetSourceError } from "./unknown-stylesheet-source-error";
 
 /** Stylesheet extensions Vite can serve directly. Mirrors the build's list. */
@@ -234,35 +235,6 @@ type ManifestEntry = {
 };
 
 /**
- * Find the manifest key for an app-root-relative POSIX source id.
- *
- * VITE KEYS BY SOURCE PATH RELATIVE TO ITS OWN `root`, not to the app's
- * `appRoot` — the client build's `root` is the framework's own package
- * (`build-client.ts`), so a key for an app source file carries a `../`-laden
- * prefix (`"../my-app/src/web/root.tsx"`) rather than matching `sourceFile`
- * (`"src/web/root.tsx"`) byte for byte. The two forms always share the same
- * TAIL, though — both are anchored at the same file — so an exact match is
- * tried first (the case where the client build's root IS the app root, which
- * every fixture and every test below uses) and a `/`-boundary suffix match
- * second, rather than trying to reconstruct the build's own root here, which
- * this runtime read has no way to independently confirm.
- */
-function findManifestKey(
-  manifest: Record<string, ManifestEntry | undefined>,
-  sourceFile: string,
-): string | undefined {
-  if (manifest[sourceFile] !== undefined) return sourceFile;
-
-  const suffix = `/${sourceFile}`;
-
-  for (const key of Object.keys(manifest)) {
-    if (key.endsWith(suffix)) return key;
-  }
-
-  return undefined;
-}
-
-/**
  * Every stylesheet reachable from ONE manifest entry: its own recorded `css`,
  * plus the same walk repeated over every chunk it STATICALLY `imports`.
  *
@@ -353,23 +325,6 @@ export function productionStylesheetUrls(
   }
 
   return servableStylesheetUrls(roots);
-}
-
-type ClientManifest = Record<string, ManifestEntry | undefined>;
-
-/** Reads the client build's Vite manifest; `undefined` when missing or malformed. */
-function readClientManifest(clientDir: string): ClientManifest | undefined {
-  const manifestPath = path.join(clientDir, ".vite", "manifest.json");
-
-  try {
-    const manifest = JSON.parse(readFileSync(manifestPath, "utf-8")) as unknown;
-
-    return typeof manifest === "object" && manifest !== null
-      ? (manifest as ClientManifest)
-      : undefined;
-  } catch {
-    return undefined;
-  }
 }
 
 /** Flattens stylesheet graphs into deduped URLs under the one served client asset prefix. */

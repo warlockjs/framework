@@ -1,5 +1,6 @@
 import { Random } from "@mongez/reinforcements";
-import { randomUUID } from "node:crypto";
+import { createCipheriv, createDecipheriv, createHmac, randomBytes, randomUUID } from "node:crypto";
+import { cache } from "@warlock.js/cache";
 import type { ChildModel } from "@warlock.js/cascade";
 import {
   config,
@@ -25,8 +26,21 @@ import { AuthTokenFamily } from "../models/auth-token-family";
 import { OneTimeToken } from "../models/one-time-token";
 import { RefreshToken } from "../models/refresh-token";
 import { authConfig } from "./auth-config";
+import {
+  assertHostPrefixAllowed,
+  authCookieNames,
+  authCookieWriteName,
+  HOST_COOKIE_PREFIX,
+} from "./auth-cookie-names";
 import { type AuthIdentifiers, trimIdentifiers } from "../utils/normalize-credentials";
+import {
+  isTokenDigest,
+  plainTokenOf,
+  rememberPlainToken,
+  tokenDigest,
+} from "../utils/token-digest";
 import { authEvents } from "./auth-events";
+import { log } from "@warlock.js/logger";
 import { isInvalidCredentialError, jwt } from "./jwt";
 import {
   afterTokenFamilyOperation,
@@ -41,6 +55,71 @@ export class CookieDomainRequestRequiredError extends Error {
       `${method} requires the request when auth.cookie.cookieDomain is configured because the cookie Domain must be resolved for that request.`,
     );
     this.name = "CookieDomainRequestRequiredError";
+  }
+}
+
+/**
+ * A hash of a random password, made once with the app's own `hashPassword`
+ * (same algorithm and cost as real users) the first time a login names an
+ * unknown account. Checking a password against it costs what a real check
+ * costs, so the response time does not reveal whether the account exists.
+ */
+let dummyPasswordHash: Promise<string> | undefined;
+
+function dummyHash(): Promise<string> {
+  dummyPasswordHash ??= Promise.resolve()
+    .then(() => hashPassword(randomBytes(16).toString("hex")))
+    .catch((error: unknown) => {
+      dummyPasswordHash = undefined;
+      throw error;
+    });
+
+  return dummyPasswordHash;
+}
+
+/** The value a token row stores for `token` (`auth.hashTokensAtRest`). */
+function storedToken(token: string): string {
+  return authConfig.hashTokensAtRest() ? tokenDigest(token) : token;
+}
+
+/** Whether a row's stored token value is `token`, hashed or raw. */
+function storesToken(stored: unknown, token: unknown): boolean {
+  return typeof token === "string" && (stored === token || stored === tokenDigest(token));
+}
+
+const SUCCESSOR_PREFIX = "auth.renewal.successor.";
+
+/** AES-256-GCM key for successor pairs parked in the cache, derived from the access secret. */
+function successorKey(): Buffer {
+  return createHmac("sha256", authConfig.accessToken.secret())
+    .update("@warlock.js/auth:renewal-successor")
+    .digest();
+}
+
+function sealSuccessor(pair: TokenPair): string {
+  const iv = randomBytes(12);
+  const cipher = createCipheriv("aes-256-gcm", successorKey(), iv);
+  const body = Buffer.concat([cipher.update(JSON.stringify(pair), "utf8"), cipher.final()]);
+
+  return [iv, cipher.getAuthTag(), body].map((part) => part.toString("base64url")).join(".");
+}
+
+function openSuccessor(sealed: unknown): TokenPair | null {
+  if (typeof sealed !== "string") return null;
+
+  const [iv, tag, body] = sealed.split(".").map((part) => Buffer.from(part, "base64url"));
+
+  if (!iv || !tag || !body) return null;
+
+  try {
+    const decipher = createDecipheriv("aes-256-gcm", successorKey(), iv);
+    decipher.setAuthTag(tag);
+
+    return JSON.parse(
+      Buffer.concat([decipher.update(body), decipher.final()]).toString("utf8"),
+    ) as TokenPair;
+  } catch {
+    return null;
   }
 }
 
@@ -96,7 +175,14 @@ class AuthService {
     payload?: Record<string, unknown>,
     familyId?: string,
   ): Promise<AccessTokenOutput> {
-    const data = { ...(payload || this.buildAccessTokenPayload(user)), jti: randomUUID() };
+    // The identity claims always come from the user the row is issued to: a
+    // custom payload may add claims, never point the token at someone else.
+    const data = {
+      ...(payload || this.buildAccessTokenPayload(user)),
+      id: user.id,
+      userType: user.userType,
+      jti: randomUUID(),
+    };
     // Validate before signing so an unusable lifetime cannot mint an immortal token.
     const expiresIn = authConfig.accessToken.expiresInMs();
 
@@ -104,9 +190,9 @@ class AuthService {
     const expiresAt = new Date(Date.now() + expiresIn);
 
     if (familyId) {
-      await this.accessTokenModel.issue(user, token, expiresAt, familyId);
+      await this.accessTokenModel.issue(user, storedToken(token), expiresAt, familyId);
     } else {
-      await this.accessTokenModel.issue(user, token, expiresAt);
+      await this.accessTokenModel.issue(user, storedToken(token), expiresAt);
     }
 
     return { token, expiresAt: expiresAt.toISOString() };
@@ -159,7 +245,15 @@ class AuthService {
 
     const token = await jwt.generateRefreshToken(payload, { expiresIn });
 
-    return this.refreshTokenModel.issue(user, token, { familyId, expiresAt, deviceInfo });
+    const row = await this.refreshTokenModel.issue(user, storedToken(token), {
+      familyId,
+      expiresAt,
+      deviceInfo,
+    });
+
+    rememberPlainToken(row, token);
+
+    return row;
   }
 
   /**
@@ -250,7 +344,7 @@ class AuthService {
       accessToken,
       refreshToken: refreshToken
         ? {
-            token: refreshToken.get("token"),
+            token: plainTokenOf(refreshToken, refreshToken.get("token")) ?? "",
             expiresAt: refreshToken.get("expires_at"),
           }
         : undefined,
@@ -482,6 +576,7 @@ class AuthService {
         },
       );
       if (linked !== 1) throw new Error("Automatic renewal could not link its successor pair");
+      await this.parkAutomaticSuccessor(oldToken, successorAccess, pair, options.overlapMs);
       afterTokenFamilyOperation(() => authEvents.emit("token.refreshed", user, pair, oldToken));
       return pair;
     }).catch((error) => {
@@ -572,10 +667,68 @@ class AuthService {
       return null;
     const accessExpiry = new Date(access.get("expires_at")).getTime();
     if (!Number.isFinite(accessExpiry) || accessExpiry <= Date.now()) return null;
+
+    const storedAccess = access.get<string>("token");
+    const storedRefresh = refresh.get<string>("token");
+
+    if (!isTokenDigest(storedAccess) && !isTokenDigest(storedRefresh)) {
+      return {
+        accessToken: { token: storedAccess, expiresAt: access.get("expires_at") },
+        refreshToken: { token: storedRefresh, expiresAt: refresh.get("expires_at") },
+      };
+    }
+
+    // Hashed rows cannot hand the pair back; it was parked, encrypted, in the
+    // cache for the overlap window. It must still match the linked rows.
+    const parked = await this.readParkedSuccessor(oldToken);
+
+    if (
+      !parked?.refreshToken ||
+      !storesToken(storedAccess, parked.accessToken.token) ||
+      !storesToken(storedRefresh, parked.refreshToken.token)
+    ) {
+      return null;
+    }
+
     return {
-      accessToken: { token: access.get("token"), expiresAt: access.get("expires_at") },
-      refreshToken: { token: refresh.get("token"), expiresAt: refresh.get("expires_at") },
+      accessToken: { token: parked.accessToken.token, expiresAt: access.get("expires_at") },
+      refreshToken: { token: parked.refreshToken.token, expiresAt: refresh.get("expires_at") },
     };
+  }
+
+  /**
+   * With hashed token rows, keep the successor pair (encrypted) in the cache
+   * for the overlap window, so a duplicate renewal inside it can still receive
+   * the same pair. Unhashed rows need nothing: the pair is read from them.
+   * Best-effort: without a cache, a duplicate inside the window fails quietly.
+   */
+  private async parkAutomaticSuccessor(
+    oldToken: RefreshToken,
+    successorAccess: AccessToken,
+    pair: TokenPair,
+    overlapMs: number | undefined,
+  ): Promise<void> {
+    const window = this.automaticOverlapMs(overlapMs);
+
+    if (window <= 0 || !isTokenDigest(successorAccess.get("token"))) return;
+
+    try {
+      await cache.set(`${SUCCESSOR_PREFIX}${String(oldToken.id)}`, sealSuccessor(pair), {
+        ttl: Math.max(1, Math.ceil(window / 1000)),
+      });
+    } catch (error) {
+      log.error("auth", "renewal", error);
+    }
+  }
+
+  private async readParkedSuccessor(oldToken: RefreshToken): Promise<TokenPair | null> {
+    try {
+      return openSuccessor(await cache.get(`${SUCCESSOR_PREFIX}${String(oldToken.id)}`));
+    } catch (error) {
+      log.error("auth", "renewal", error);
+
+      return null;
+    }
   }
 
   /**
@@ -632,14 +785,21 @@ class AuthService {
     authEvents.emit("login.attempt", otherData);
 
     const user = await this.findLoginUser(Model, otherData);
+    const storedHash = user?.string("password");
 
-    if (!user) {
-      authEvents.emit("login.failed", otherData, "User not found");
+    if (!user || !storedHash) {
+      // Spend the same hashing work as a real check, so an unknown account
+      // answers no faster than a wrong password.
+      await dummyHash()
+        .then((hash) => this.verifyPassword(String(password ?? ""), hash))
+        .catch(() => false);
+
+      authEvents.emit("login.failed", otherData, user ? "Invalid password" : "User not found");
 
       return null;
     }
 
-    if (!(await this.verifyPassword(password, user.string("password")!))) {
+    if (!(await this.verifyPassword(password, storedHash))) {
       authEvents.emit("login.failed", otherData, "Invalid password");
 
       return null;
@@ -814,8 +974,12 @@ class AuthService {
     // durable family still needs logout's marker.
     const existingRows = await this.refreshTokenModel.familiesForUser(user);
 
-    for (const token of existingRows) {
-      await AuthTokenFamily.ensure(user, token.familyId);
+    // Every rotation leaves a row behind, so the rows outnumber the families
+    // by far: ensure each family once, not once per row.
+    const familyIds = new Set(existingRows.map((token) => token.familyId));
+
+    for (const familyId of familyIds) {
+      await AuthTokenFamily.ensure(user, familyId);
     }
 
     const families = await AuthTokenFamily.activeFor(user);
@@ -1034,14 +1198,18 @@ class AuthService {
     token: string | AccessTokenOutput,
     options: SetAuthCookieOptions = {},
   ): void {
-    const name = options.name ?? authConfig.cookie.name();
+    const name = authCookieWriteName(options.name ?? authConfig.cookie.name());
     const path = options.path ?? authConfig.cookie.path();
     const tokenValue = typeof token === "string" ? token : token.token;
     const maxAge = options.maxAge ?? this.cookieMaxAgeFromToken(token);
+    const hostOnly = name.startsWith(HOST_COOKIE_PREFIX);
+
+    assertHostPrefixAllowed(name, { path, domain: options.domain });
 
     response.cookie(name, tokenValue, {
       raw: true,
       path,
+      ...(hostOnly ? { secure: true } : {}),
       ...(options.domain !== undefined ? { domain: options.domain } : {}),
       ...(maxAge !== undefined ? { maxAge } : {}),
     });
@@ -1062,15 +1230,21 @@ class AuthService {
     options: ClearAuthCookieOptions = {},
     request?: Request,
   ): void {
-    const name = options.name ?? authConfig.cookie.name();
     const path = options.path ?? authConfig.cookie.path();
     const domain = this.cookieDomainFor("clearAuthCookie", request);
 
-    if (domain !== undefined) {
-      response.clearCookie(name, { path, domain });
-    }
+    for (const name of authCookieNames(options.name ?? authConfig.cookie.name())) {
+      if (name.startsWith(HOST_COOKIE_PREFIX)) {
+        response.clearCookie(name, { path: "/", secure: true });
+        continue;
+      }
 
-    response.clearCookie(name, { path });
+      if (domain !== undefined) {
+        response.clearCookie(name, { path, domain });
+      }
+
+      response.clearCookie(name, { path });
+    }
   }
 
   /**
@@ -1091,18 +1265,22 @@ class AuthService {
   ): void {
     const domain = this.cookieDomainFor("setSessionCookies", request);
     const cookies = [
-      [authConfig.cookie.name(), tokens.accessToken],
-      [authConfig.cookie.refreshName(), tokens.refreshToken],
+      [authCookieWriteName(authConfig.cookie.name()), tokens.accessToken],
+      [authCookieWriteName(authConfig.cookie.refreshName()), tokens.refreshToken],
     ] as const;
 
     for (const [name, token] of cookies) {
       const maxAge = this.cookieMaxAgeFromToken(token);
+      const hostOnly = name.startsWith(HOST_COOKIE_PREFIX);
+
+      assertHostPrefixAllowed(name, { path: "/", domain });
 
       response.cookie(name, token.token, {
         raw: true,
         httpOnly: true,
         sameSite: "lax",
         path: "/",
+        ...(hostOnly ? { secure: true } : {}),
         ...(domain !== undefined ? { domain } : {}),
         ...(maxAge !== undefined ? { maxAge } : {}),
       });
@@ -1118,8 +1296,17 @@ class AuthService {
     request?: Request,
   ): void {
     const domain = this.cookieDomainFor("clearSessionCookies", request);
+    const names = [
+      ...authCookieNames(authConfig.cookie.name()),
+      ...authCookieNames(authConfig.cookie.refreshName()),
+    ];
 
-    for (const name of [authConfig.cookie.name(), authConfig.cookie.refreshName()]) {
+    for (const name of names) {
+      if (name.startsWith(HOST_COOKIE_PREFIX)) {
+        response.clearCookie(name, { path: "/", secure: true });
+        continue;
+      }
+
       if (domain !== undefined) {
         response.clearCookie(name, { path: "/", domain });
       }

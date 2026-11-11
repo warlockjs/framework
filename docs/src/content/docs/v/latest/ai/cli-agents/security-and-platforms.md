@@ -29,7 +29,27 @@ Some CLIs cannot be pointed at a different config directory: Antigravity, Cursor
 
 When the home is not `"inherit"`, the adapter's home variables are stripped from the inherited environment, so a value you exported for yourself cannot override the run's home. Your own `env` option still wins over everything.
 
-Use `inheritEnv: false` to pass only a minimal system set: `PATH`, home and temp directories, locale, proxy and TLS variables, and the Windows system variables. A list of names passes those names on top of the minimal set. This keeps the API keys of other vendors in your process away from the CLI.
+### Environment
+
+By default (`inheritEnv: true`) the CLI inherits every variable of your process: database URLs, signing keys, payment keys and other providers' API keys. A coding CLI runs model-driven shell commands, so a prompt that reaches it can print them. Narrow it with `inheritEnv`:
+
+| Value            | The CLI receives                                                                                                           |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `true` (default) | Every variable except the adapter's home variables.                                                                        |
+| `"curated"`      | The minimal system set plus the adapter's own API key variables (`ANTHROPIC_API_KEY` for Claude Code, and so on).          |
+| `false`          | The minimal system set only: `PATH`, home and temp directories, locale, proxy and TLS variables, Windows system variables. |
+| `["NAME", …]`    | The minimal system set plus those names.                                                                                   |
+
+```ts
+import { cli } from "@warlock.js/ai-cli";
+
+const claude = cli.claudeCode({
+  inheritEnv: "curated", // system variables + ANTHROPIC_API_KEY only
+  env: { GITHUB_TOKEN: process.env.GITHUB_TOKEN ?? "" }, // anything else, explicitly
+});
+```
+
+When `NODE_ENV` is `production` and `inheritEnv` is not set, the first run logs a one-time warning that names the option. Set `inheritEnv: true` explicitly to keep the full environment and silence it.
 
 ## Capability probe
 

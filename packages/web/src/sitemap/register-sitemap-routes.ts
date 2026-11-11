@@ -12,11 +12,15 @@ import { getSitemapServingState } from "./sitemap-lifecycle";
 import { resolveSitemapHttpValidators } from "./sitemap-http-validators";
 import type { SitemapServingState } from "./sitemap-serving-state";
 import {
-  buildSiteSitemapXml,
+  collectSiteSitemapEntries,
+  createRootSiteSelector,
+  createSiteSitemapCache,
   createSitemapSiteSelector,
   isNonIndexableDynamicSite,
   selectSitemapSite,
+  type BuiltSiteSitemap,
 } from "./site-sitemap";
+import { resolveSitemapConfig } from "./resolve-sitemap-config";
 import type { SitemapPageSource } from "./sitemap-page-source";
 
 const NOT_GENERATED_RETRY_AFTER_SECONDS = 30;
@@ -137,6 +141,48 @@ async function serveManifestFile(
   return response.baseResponse.send(artifact) as unknown as ReturnedResponse;
 }
 
+/**
+ * Sends a built per-site sitemap with the same validators the manifest-backed
+ * path uses, so crawlers revalidate with a 304 instead of a full download.
+ */
+async function serveBuiltSiteSitemap(
+  context: SitemapRouteContext,
+  built: BuiltSiteSitemap,
+): Promise<ReturnedResponse> {
+  const { request, response } = context;
+  const ifMatch = request.header("if-match");
+  const ifNoneMatch = request.header("if-none-match");
+  const ifModifiedSince = request.header("if-modified-since");
+  const validators = resolveSitemapHttpValidators({
+    sha256: built.sha256,
+    generatedAt: built.builtAt,
+    ifMatch: typeof ifMatch === "string" ? ifMatch : undefined,
+    ifNoneMatch: typeof ifNoneMatch === "string" ? ifNoneMatch : undefined,
+    ifModifiedSince: typeof ifModifiedSince === "string" ? ifModifiedSince : undefined,
+    method: request.method,
+    cacheControl: resolveSitemapConfig().cacheControl,
+  });
+
+  response
+    .header("ETag", validators.etag)
+    .header("Last-Modified", validators.lastModified)
+    .header("Cache-Control", validators.cacheControl);
+
+  if (validators.notModified) {
+    response.header("Content-Type", "application/xml");
+    return (await response.setStatusCode(304).send()) as unknown as ReturnedResponse;
+  }
+
+  if (validators.preconditionFailed) {
+    response.header("Content-Type", "application/xml");
+    return (await response.setStatusCode(412).send()) as unknown as ReturnedResponse;
+  }
+
+  // `response.text()` would overwrite Content-Type with text/plain; `xml()`
+  // sets application/xml, matching the manifest-backed path.
+  return response.xml(built.xml) as ReturnedResponse;
+}
+
 async function resolveGenerationManifest(
   state: SitemapServingState,
   generationId: string,
@@ -144,6 +190,10 @@ async function resolveGenerationManifest(
   const current = await state.getManifest();
 
   if (current?.generationId === generationId) return current;
+
+  if (state.getManifestByGeneration !== undefined) {
+    return state.getManifestByGeneration(generationId);
+  }
 
   return state.store.readManifestByGeneration(generationId);
 }
@@ -229,23 +279,27 @@ export function registerSitemapRoutes(router: Router, options: RegisterSitemapRo
   const warn = options.warn ?? console.warn;
   const getServingState = options.getServingState ?? getSitemapServingState;
   const siteSelector = createSitemapSiteSelector();
+  const rootSiteSelector = createRootSiteSelector();
+  // Multi-site sitemaps are built in memory per site; this keeps each one for
+  // `web.sitemap.regenerateEvery` (5 minutes when unset) instead of running
+  // every page's sitemap supplier on every request.
+  const siteSitemaps = createSiteSitemapCache();
 
   const currentManifestHandler: SitemapRouteHandler = async (context) => {
-    const selected = await selectSitemapSite(context.request, siteSelector);
+    const selected = await selectSitemapSite(context.request, siteSelector, rootSiteSelector);
     if (selected?.kind === "not-found" || (selected && isNonIndexableDynamicSite(selected))) {
       return context.response.notFound() as ReturnedResponse;
     }
     if (selected) {
-      // `response.text()` would overwrite Content-Type with text/plain; `xml()`
-      // sets application/xml, matching the manifest-backed path.
-      return context.response.xml(
-        await buildSiteSitemapXml({
-          request: context.request,
+      const built = await siteSitemaps.read(context.request, selected, () =>
+        collectSiteSitemapEntries({
           site: selected,
           appRoot: options.appRoot,
           pageSource: options.pageSource,
         }),
-      ) as ReturnedResponse;
+      );
+
+      return serveBuiltSiteSitemap(context, built);
     }
 
     const state = getServingState();

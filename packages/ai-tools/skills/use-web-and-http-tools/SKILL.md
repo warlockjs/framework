@@ -49,6 +49,7 @@ ai.tools.webSearch({ provider: "tavily", apiKey: process.env.TAVILY_API_KEY, max
 - `provider`: `"tavily"` (LLM-ready snippets + a relevance `score`), `"brave"`, or `"serpapi"`. Each is called over the global `fetch` — **no provider SDK is required**.
 - `apiKey` falls back to a per-provider env var: `TAVILY_API_KEY` / `BRAVE_API_KEY` / `SERPAPI_API_KEY`. A missing key is a `WebToolError` of type `"missing-key"`.
 - The model's `maxResults` is clamped into `[1, options.maxResults]` (default `5`).
+- `timeoutMs` (default `15_000`) bounds each provider call, response included (`"request-failed"` on expiry); the run's abort signal cancels it.
 
 ## `fetch_url` — read a page you have the URL for
 
@@ -68,7 +69,8 @@ ai.tools.fetchUrl({
 - `allowHosts` (when set) rejects any other host **before the fetch** (an SSRF guardrail) → `"denied-host"`, and redirect targets are held to the same allowlist.
 - **Private-network deny by default.** Every request — and every redirect hop — now routes through `@warlock.js/ai`'s hardened `guardedFetch` outbound policy instead of a local host check. It refuses private / loopback / link-local / CGNAT / cloud-metadata addresses (`169.254.169.254`, RFC1918, `localhost`, …) by resolving the hostname via DNS and checking every returned address, failing closed on resolution failure — and re-validates every redirect `Location` (scheme, allowlist, private-IP deny) before following it. This applies even with no `allowHosts` set, so a bare `ai.tools.fetchUrl()` is no longer an SSRF primitive; blocks surface as `WebToolError` `type: "denied-host"`.
 - `allowPrivateNetwork` (default `false`) — set `true` to deliberately permit a private/internal target, e.g. a tool that must call a local dev server. Pair with `allowHosts` to scope it rather than opening the whole private range.
-- `maxBytes` caps the body and flags `truncated`; `timeoutMs` aborts via `AbortSignal.timeout`.
+- `maxBytes` caps the body and flags `truncated`. `timeoutMs` (default `15_000`) bounds the whole call — connect, redirects, challenge retry and reading the body — so a server that drips its body fails with `"request-failed"`; the run's abort signal cancels the fetch.
+- The built-in converter is linear in page size; unterminated `<tag` / `<!--` in hostile HTML stays text and is never rescanned.
 
 ## `http_request` — a guarded REST client
 
@@ -88,10 +90,11 @@ All guardrails are enforced **before the network call** and surface as a typed `
 
 - a method outside `allowMethods` → `"method-not-allowed"`;
 - a host outside `allowHosts` → `"host-not-allowed"` (SSRF guardrail);
+- with `baseUrl` set, an absolute or protocol-relative (`//host/x`) URL on another origin → `"host-not-allowed"`, unless `allowHosts` lists its host;
 - an unresolvable URL → `"invalid-url"`.
 - **Private-network deny by default** — like `fetch_url`, every request and redirect hop routes through `guardedFetch`, refusing private/loopback/link-local/CGNAT/cloud-metadata addresses (DNS-resolved and re-checked per redirect hop) even when `allowHosts` isn't set → `"host-not-allowed"`. Set `allowPrivateNetwork: true` (default `false`) to permit a deliberate internal target.
 
-When `baseUrl` is set the model passes a **path** joined against it; otherwise it must pass an absolute `http(s)` URL. Static `headers` merge **under** the per-call headers (per-call wins). An object `body` is JSON-serialized (with a default `content-type: application/json`); a string `body` is sent verbatim; `body` is dropped for `GET`. The response body is JSON-parsed when the `content-type` is JSON, else returned as text.
+When `baseUrl` is set the model passes a **path** joined against it, and the request and its redirects stay on the base host unless `allowHosts` names others; otherwise it must pass an absolute `http(s)` URL. Static `headers` merge **under** the per-call headers (per-call wins) and go **only to the first request's origin** — a cross-origin redirect drops every static header plus `authorization` / `cookie` / `proxy-authorization`. Put credentials in `headers` only with `baseUrl` or `allowHosts`. `timeoutMs` bounds the whole exchange, body included (`"timeout"`). An object `body` is JSON-serialized (with a default `content-type: application/json`); a string `body` is sent verbatim; `body` is dropped for `GET`. The response body is JSON-parsed when the `content-type` is JSON, else returned as text.
 
 ## `calculator` — SAFE arithmetic (never `eval`)
 

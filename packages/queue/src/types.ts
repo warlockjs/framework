@@ -25,9 +25,18 @@ export type JobBackoff =
 
 /**
  * How many finished jobs to keep: `true` removes them immediately, `false`
- * keeps them all, a number keeps the newest N.
+ * keeps them all, a number keeps the newest N, and `{ age, count }` removes
+ * jobs finished longer than `age` ago and keeps at most the newest `count`.
  */
-export type JobRetention = boolean | number;
+export type JobRetention =
+  | boolean
+  | number
+  | {
+      /** Remove jobs finished longer ago than this (milliseconds or a string like `"24h"`). */
+      age?: Duration;
+      /** Keep at most the newest N finished jobs. */
+      count?: number;
+    };
 
 /**
  * Options that shape how a job is retried and retained. Set app-wide in
@@ -38,9 +47,15 @@ export type JobOptions = {
   attempts?: number;
   /** Wait between attempts. */
   backoff?: JobBackoff;
-  /** Retention for completed jobs. Default keeps them. */
+  /**
+   * Retention for completed jobs. Default `{ age: "24h", count: 1000 }`;
+   * `false` keeps every completed job.
+   */
   removeOnComplete?: JobRetention;
-  /** Retention for failed jobs. Default keeps them, so `failedJobs()` can list them. */
+  /**
+   * Retention for failed jobs, which `failedJobs()` lists. Default
+   * `{ age: "7d", count: 5000 }`; `false` keeps every failed job.
+   */
   removeOnFail?: JobRetention;
   /**
    * Longest one attempt may run: milliseconds or a string like `"2m"`. An

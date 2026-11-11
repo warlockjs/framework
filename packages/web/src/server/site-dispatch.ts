@@ -9,7 +9,7 @@
  * routes beat a wildcard. Vite's middleware and the static-asset routes are
  * registered outside the router's registry, so they answer first.
  *
- * Path matching reuses the web's own matcher (`matchClientRoute`); this module
+ * Path matching reuses the web's own matcher (`createClientRouteMatcher`); this module
  * writes no matcher of its own.
  */
 import {
@@ -20,8 +20,8 @@ import {
   type Request,
   type Router,
 } from "@warlock.js/core";
-import { matchClientRoute } from "../client/runtime/matcher";
-import type { ClientPageEntry } from "../client/runtime/types";
+import { createClientRouteMatcher } from "../client/runtime/matcher";
+import type { ClientPageEntry, ClientRouteMatch } from "../client/runtime/types";
 import {
   createSiteSelector,
   validateSitesAtBoot,
@@ -64,7 +64,16 @@ type SiteTable = {
   handlers: Map<string, PageRouteHandler>;
   files: Map<string, string>;
   notFound?: PageRouteHandler;
+  /** The compiled `entries`, built on the first request and dropped whenever an entry is added. */
+  match?: (pathname: string) => ClientRouteMatch | null;
 };
+
+/** The table's compiled matcher: route patterns are parsed once, not on every request. */
+function matchSiteTable(table: SiteTable, pathname: string): ClientRouteMatch | null {
+  table.match ??= createClientRouteMatcher(table.entries);
+
+  return table.match(pathname);
+}
 
 function requestPort(request: Request): string | undefined {
   const host = request.header("host");
@@ -195,7 +204,7 @@ export function createSiteDispatch(options: SiteDispatchOptions): SiteDispatch {
       }
 
       const table = tables.get(selection.site)?.get(method);
-      const match = table === undefined ? null : matchClientRoute(table.entries, pathname);
+      const match = table === undefined ? null : matchSiteTable(table, pathname);
       // A core-level refusal must reach the site's catch-all even when the
       // refused URL happens to match one of its pages.
       const refused = refusalStatusOf(request) !== undefined;
@@ -249,6 +258,7 @@ export function createSiteDispatch(options: SiteDispatchOptions): SiteDispatch {
         load: async () => ({}) as never,
       });
       table.handlers.set(path, handler);
+      table.match = undefined;
       if (sourceFile !== undefined) table.files.set(path, sourceFile);
     },
     setNotFound(site, handler) {

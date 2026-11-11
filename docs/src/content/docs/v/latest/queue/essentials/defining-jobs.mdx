@@ -16,8 +16,8 @@ export const sendInvoice = defineJob({
   queue: "invoices", // default: config.defaultQueue ("default")
   attempts: 5, // total tries including the first; default 1 (no retry)
   backoff: { type: "exponential", delay: 2000 }, // or a plain number = fixed delay
-  removeOnComplete: true, // retention for completed jobs
-  removeOnFail: 100, // keep the newest 100 failed jobs
+  removeOnComplete: true, // retention for completed jobs; default { age: "24h", count: 1000 }
+  removeOnFail: 100, // keep the newest 100 failed jobs; default { age: "7d", count: 5000 }
   async handle(payload: { invoiceId: string }, ctx) {
     await ctx.log(`attempt ${ctx.attempt} of ${ctx.maxAttempts}`);
     await ctx.progress(50);
@@ -30,6 +30,32 @@ export const sendInvoice = defineJob({
 The module must be imported by whatever process runs the workers — in a
 Warlock app, anything under `src/app` loaded at boot, since
 `queueConnector()` starts in the late phase after that import.
+
+## Retention
+
+Finished jobs are pruned out of the box, so Redis or the SQLite file does
+not grow with every job ever run:
+
+| Option             | Default                       | `false`                   |
+| ------------------ | ----------------------------- | ------------------------- |
+| `removeOnComplete` | `{ age: "24h", count: 1000 }` | keeps every completed job |
+| `removeOnFail`     | `{ age: "7d", count: 5000 }`  | keeps every failed job    |
+
+A retention is `true` (remove at once), `false` (keep all), a number
+(keep the newest N), or `{ age?, count? }`: remove jobs finished longer
+than `age` ago (milliseconds or a string like `"12h"`) and keep at most
+the newest `count`. Set it per job or app-wide in
+`queue.defaultJobOptions`:
+
+```ts title="src/config/queue.ts"
+defaultJobOptions: {
+  removeOnComplete: { age: "6h", count: 500 },
+  removeOnFail: false, // keep every failure for inspection
+},
+```
+
+On BullMQ, age-based pruning runs when another job of the same kind
+finishes.
 
 `defineJob` validates at call time: an empty `name`, a missing
 `handle`, or a non-integer `attempts < 1` throws
@@ -65,7 +91,8 @@ setQueueContext(
 ```
 
 - `undefined` from `capture` carries nothing; the value must be JSON-safe. Read it in a handler as `ctx.context` (`unknown`).
-- Jobs dispatched from a restored handler capture the same context. Set `context: false` in `defineJob()` to opt one job out.
+- Jobs dispatched from a restored handler capture the same context. Set `context: false` in `defineJob()` to opt one job out; such a job never runs inside a restored context.
+- The context comes only from what `capture` returned at dispatch. A payload that looks like the queue's internal envelope (for example a request body passed straight to `dispatch()`) is delivered to the handler as plain data and never sets the context.
 - Throw `UnrecoverableJobError` from a handler or `restore` to fail a job without retries.
 
 ## Dispatch

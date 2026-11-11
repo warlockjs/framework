@@ -114,6 +114,14 @@ page.pagination; // { total, page, limit, pages }
 const activePage = await User.where("status", "active").paginate({ page: 2, limit: 20 });
 ```
 
+`limit` and `page` must be whole numbers (a digit string such as `"20"` from a query string is accepted; `"abc"` throws `UnsafeFilterError`). The page size is capped at `maxLimit`, **1000** by default, so a `?limit=10000000` request cannot load a whole table; `pagination.limit` reports the size actually used. Raise the ceiling per call when you mean it:
+
+```ts
+const bigPage = await User.paginate({ page: 1, limit: 5000, maxLimit: 10_000 });
+```
+
+`cursorPaginate()` takes the same `maxLimit`. `limit()` / `skip()` on a query check for whole numbers too, but have no ceiling.
+
 For cursor-based pagination on very large datasets, see the [Paginated search recipe](../recipes/paginated-search.md).
 
 ## Count and existence
@@ -186,20 +194,20 @@ Local scopes are **opt-in** — they only run when you call `.scope("name")`. Gl
 
 Cascade's query builder is deep — around 60 methods covering shapes you'll need eventually. A named list so you know what to reach for:
 
-| Reach for                                                                              | When                                                                                                               |
-| -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| `.whereIn(field, values)` / `.whereNotIn(field, values)`                               | Match against / exclude a list                                                                                     |
-| `.whereNull(field)` / `.whereNotNull(field)`                                           | Nullability checks                                                                                                 |
-| `.whereBetween(field, [a, b])`                                                         | Inclusive range                                                                                                    |
-| `.whereDate(field, value)`, `.whereDateBetween`, `.whereDateBefore`, `.whereDateAfter` | Date helpers                                                                                                       |
-| `.whereLike(field, pattern)` / `.whereStartsWith` / `.whereEndsWith`                   | Pattern matching — a `string` matches literally (safe on a search box), pass a `RegExp` for real pattern semantics |
-| `.whereHas(relation, callback)`                                                        | Filter by conditions on a related model                                                                            |
-| `.firstOrFail()`                                                                       | Throw if no match (when you _know_ it should exist)                                                                |
-| `.sum(field)` / `.avg(field)` / `.min(field)` / `.max(field)`                          | Aggregates                                                                                                         |
-| `.distinct(field)` / `.pluck(field)`                                                   | Single-field reads (distinct values, flat list)                                                                    |
-| `.chunk(size, callback)`                                                               | Stream a large table in batches                                                                                    |
-| `.cursorPaginate({ limit, cursor })`                                                   | Cursor pagination for large datasets                                                                               |
-| `.similarTo(column, embedding)`                                                        | Vector similarity search (Postgres/pgvector)                                                                       |
+| Reach for                                                                              | When                                                                                                                                                                                                                                 |
+| -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `.whereIn(field, values)` / `.whereNotIn(field, values)`                               | Match against / exclude a list                                                                                                                                                                                                       |
+| `.whereNull(field)` / `.whereNotNull(field)`                                           | Nullability checks                                                                                                                                                                                                                   |
+| `.whereBetween(field, [a, b])`                                                         | Inclusive range                                                                                                                                                                                                                      |
+| `.whereDate(field, value)`, `.whereDateBetween`, `.whereDateBefore`, `.whereDateAfter` | Date helpers                                                                                                                                                                                                                         |
+| `.whereLike(field, pattern)` / `.whereStartsWith` / `.whereEndsWith`                   | Pattern matching — a `string` matches literally (safe on a search box), pass a `RegExp` for real pattern semantics. On MongoDB a pattern may hold at most two `%` wildcards and 256 characters by default (the `like` driver option) |
+| `.whereHas(relation, callback)`                                                        | Filter by conditions on a related model (PostgreSQL; MongoDB refuses the `has` family with an error — filter by related ids with `whereIn` instead)                                                                                  |
+| `.firstOrFail()`                                                                       | Throw if no match (when you _know_ it should exist)                                                                                                                                                                                  |
+| `.sum(field)` / `.avg(field)` / `.min(field)` / `.max(field)`                          | Aggregates                                                                                                                                                                                                                           |
+| `.distinct(field)` / `.pluck(field)`                                                   | Single-field reads (distinct values, flat list)                                                                                                                                                                                      |
+| `.chunk(size, callback)`                                                               | Stream a large table in batches. Unordered or primary-key-ordered queries page by key (`where id > last`), so every batch costs the same; other orders page by offset                                                                |
+| `.cursorPaginate({ limit, cursor })`                                                   | Cursor pagination for large datasets                                                                                                                                                                                                 |
+| `.similarTo(column, embedding)`                                                        | Vector similarity search (Postgres/pgvector)                                                                                                                                                                                         |
 
 Each works the same way: chain off `User.where(...)` or `User.query()`, end with the appropriate terminator. The full surface — including joins, group/having, raw expressions, window functions, and JSON helpers — lives in the [Query Builder API reference](../reference/query-builder-api.md).
 

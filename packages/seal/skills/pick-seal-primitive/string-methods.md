@@ -17,20 +17,21 @@ For the picking guide (`v.string` vs `v.scalar` vs `v.literal`), see the `pick-s
 
 ## Format
 
-| Method                           | Pattern                            | JSON Schema          | Example                          |
-| -------------------------------- | ---------------------------------- | -------------------- | -------------------------------- |
-| `.email(msg?)`                   | RFC-flavored regex                 | `format: "email"`    | `v.string().email()`             |
-| `.url(msg?)`                     | http/https URL                     | `format: "uri"`      | `v.string().url()`               |
-| `.pattern(re, msg?)`             | custom regex                       | `pattern: re.source` | `v.string().pattern(/^[A-Z]/)`   |
-| `.alpha(msg?)`                   | letters only                       | —                    | `v.string().alpha()`             |
-| `.alphanumeric(msg?)`            | letters + digits                   | —                    | `v.string().alphanumeric()`      |
-| `.numeric(msg?)`                 | digits only (string)               | —                    | `v.string().numeric()`           |
-| `.withoutWhitespace(msg?)`       | no spaces/tabs/newlines            | —                    | `v.string().withoutWhitespace()` |
-| `.creditCard(msg?)`              | credit-card-shaped                 | —                    | `v.string().creditCard()`        |
-| `.ip(msg?)`                      | IPv4 or IPv6                       | `format: "ipv4"`     | `v.string().ip()`                |
-| `.ip4(msg?)`                     | IPv4 only                          | `format: "ipv4"`     | `v.string().ip4()`               |
-| `.ip6(msg?)`                     | IPv6 only                          | `format: "ipv6"`     | `v.string().ip6()`               |
-| `.strongPassword(minLen?, msg?)` | 8+ chars, upper+lower+digit+symbol | —                    | `v.string().strongPassword(12)`  |
+| Method                           | Pattern                                                        | JSON Schema          | Example                                    |
+| -------------------------------- | -------------------------------------------------------------- | -------------------- | ------------------------------------------ |
+| `.email(msg?)`                   | RFC-flavored regex                                             | `format: "email"`    | `v.string().email()`                       |
+| `.url(msg?)`                     | URL; refuses `javascript:`, `data:`, `vbscript:`, `file:`      | `format: "uri"`      | `v.string().url()`                         |
+| `.url({ protocols }, msg?)`      | URL with only the listed schemes                               | `format: "uri"`      | `v.string().url({ protocols: ["https"] })` |
+| `.pattern(re, msg?)`             | custom regex (`g`/`y` flags are safe: every check starts at 0) | `pattern: re.source` | `v.string().pattern(/^[A-Z]/)`             |
+| `.alpha(msg?)`                   | letters only                                                   | —                    | `v.string().alpha()`                       |
+| `.alphanumeric(msg?)`            | letters + digits                                               | —                    | `v.string().alphanumeric()`                |
+| `.numeric(msg?)`                 | digits only (string)                                           | —                    | `v.string().numeric()`                     |
+| `.withoutWhitespace(msg?)`       | no spaces/tabs/newlines                                        | —                    | `v.string().withoutWhitespace()`           |
+| `.creditCard(msg?)`              | credit-card-shaped                                             | —                    | `v.string().creditCard()`                  |
+| `.ip(msg?)`                      | IPv4 or IPv6                                                   | `format: "ipv4"`     | `v.string().ip()`                          |
+| `.ip4(msg?)`                     | IPv4 only                                                      | `format: "ipv4"`     | `v.string().ip4()`                         |
+| `.ip6(msg?)`                     | IPv6 only                                                      | `format: "ipv6"`     | `v.string().ip6()`                         |
+| `.strongPassword(minLen?, msg?)` | 8+ chars, upper+lower+digit+symbol                             | —                    | `v.string().strongPassword(12)`            |
 
 ## ID formats
 
@@ -125,14 +126,14 @@ JSON Schema: `format: "color"` for `.hexColor()`; the others map to `format: "co
 
 ## Encoding mutators
 
-| Method            | Effect                            |
-| ----------------- | --------------------------------- |
-| `.base64Encode()` | utf8 → base64                     |
-| `.base64Decode()` | base64 → utf8                     |
-| `.urlEncode()`    | percent-encode                    |
-| `.urlDecode()`    | percent-decode                    |
-| `.slug()`         | "Hello World!" → "hello-world"    |
-| `.toString()`     | coerce non-string input to string |
+| Method            | Effect                                                  |
+| ----------------- | ------------------------------------------------------- |
+| `.base64Encode()` | utf8 → base64                                           |
+| `.base64Decode()` | base64 → utf8                                           |
+| `.urlEncode()`    | percent-encode                                          |
+| `.urlDecode()`    | percent-decode (a malformed escape keeps the raw value) |
+| `.slug()`         | "Hello World!" → "hello-world"                          |
+| `.toString()`     | coerce non-string input to string                       |
 
 ## Mutator vs transformer
 

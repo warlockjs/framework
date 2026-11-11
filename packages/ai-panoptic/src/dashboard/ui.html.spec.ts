@@ -117,6 +117,25 @@ describe("dashboardHtml", () => {
     expect(html).toContain("FOLLOW-UP");
   });
 
+  it("ships a client script that parses", () => {
+    const script = html.slice(
+      html.lastIndexOf("<script>") + "<script>".length,
+      html.lastIndexOf("</script>"),
+    );
+
+    expect(() => new Function(script)).not.toThrow();
+  });
+
+  it("lists trace summaries and loads the open trace's full tree by id", () => {
+    // The list poll reads summaries; the drawer fetches the full trace.
+    expect(html).toContain('fetchAuthed(API + "/traces")');
+    expect(html).toContain('fetchAuthed(API + "/traces/" + encodeURIComponent(id))');
+    expect(html).toContain("t.totalCost");
+    expect(html).toContain("t.spanCount");
+    // A trace that is gone says so in the drawer instead of failing silently.
+    expect(html).toContain("This trace is no longer in the store");
+  });
+
   it("honors a non-root base path in the API base", () => {
     const scoped = dashboardHtml("/panoptic/", "Panoptic");
 
