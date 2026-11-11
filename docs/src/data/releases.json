@@ -1,4 +1,21 @@
 {
+  "5.52.0": {
+    "publishedAt": "2026-11-11T17:16:00.373Z",
+    "matrix": "none",
+    "headline": "A shared `locales.json` reaches every site of a multi-site app, email sign-in ignores case, repositories keep their default order, and a page can cover its computed translation lookups with an exhaustive key list.",
+    "highlights": [
+      "Multi-site apps: a `locales.json` above the site folders is delivered to every page of every site, in development, production and server rendering; the build warns about a dictionary that reaches no page.",
+      "Email sign-in trims identifiers and lower-cases `email`, with one retry for accounts stored with capitals; the login throttle uses the same rule. New `auth.normalizeCredentials` option.",
+      "Repository `list()` checks only the caller's options against `sortable`, so a default `orderBy` from the repository or `repository.defaultOptions` always applies; the warning is logged once per repository.",
+      "`config.translations` accepts `{ keys, exhaustive: true }`: the declared keys cover the page's computed lookups, so the page no longer ships every translation group.",
+      "A string literal equal to a group name no longer ships the whole group, and an import aliased to `t` from a non-translator is no longer treated as a translator."
+    ],
+    "upgradeNotes": [
+      "Sign-in now matches email without regard to case; set `auth.normalizeCredentials: false` to keep exact matching.",
+      "Repository `defaultOptions` are trusted: a default `select` or `cursorColumn` is no longer filtered by `selectable` or `sortable`.",
+      "A free-standing string literal now reaches only a key with that exact name; call the translator with the key or declare it in `config.translations` if a page relied on the old reach."
+    ]
+  },
   "5.51.0": {
     "publishedAt": "2026-11-11T00:13:31.843Z",
     "matrix": "none",

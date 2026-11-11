@@ -136,6 +136,125 @@
   ],
   "releases": [
     {
+      "version": "5.52.0",
+      "id": "v5-52-0",
+      "date": "November 11, 2026",
+      "isUnreleased": false,
+      "headlineHtml": "A shared <code>locales.json</code> reaches every site of a multi-site app, email sign-in ignores case, repositories keep their default order, and a page can cover its computed translation lookups with an exhaustive key list.",
+      "highlights": [
+        "Multi-site apps: a <code>locales.json</code> above the site folders is delivered to every page of every site, in development, production and server rendering; the build warns about a dictionary that reaches no page.",
+        "Email sign-in trims identifiers and lower-cases <code>email</code>, with one retry for accounts stored with capitals; the login throttle uses the same rule. New <code>auth.normalizeCredentials</code> option.",
+        "Repository <code>list()</code> checks only the caller's options against <code>sortable</code>, so a default <code>orderBy</code> from the repository or <code>repository.defaultOptions</code> always applies; the warning is logged once per repository.",
+        "<code>config.translations</code> accepts <code>{ keys, exhaustive: true }</code>: the declared keys cover the page's computed lookups, so the page no longer ships every translation group.",
+        "A string literal equal to a group name no longer ships the whole group, and an import aliased to <code>t</code> from a non-translator is no longer treated as a translator."
+      ],
+      "upgradeNotes": [
+        "Sign-in now matches email without regard to case; set <code>auth.normalizeCredentials: false</code> to keep exact matching.",
+        "Repository <code>defaultOptions</code> are trusted: a default <code>select</code> or <code>cursorColumn</code> is no longer filtered by <code>selectable</code> or <code>sortable</code>.",
+        "A free-standing string literal now reaches only a key with that exact name; call the translator with the key or declare it in <code>config.translations</code> if a page relied on the old reach."
+      ],
+      "summaryHtml": null,
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/5.52.0-summary.md",
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 6,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            },
+            {
+              "type": "Fixed",
+              "n": 5
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>config.translations</code> accepts an exhaustive form, <code>{ keys: [\"client.*\", \"errors.title\"], exhaustive: true }</code>, in a page's setup file. The declared keys cover every computed translation lookup in that page's graph (layouts and root included), so the page ships the keys found in code plus the declared ones instead of every translation group, and the build no longer reports its computed lookups. An exhaustive declaration covers the page whose own setup file declares it, and the pages under a layout or the root that declares it; an error or forbidden page's declaration only covers the error pages' own graph, never an unrelated page. The plain array form is unchanged; any other shape is refused with an error naming the setup file. New exports: <code>TranslationDeclaration</code>, <code>readTranslationDeclaration</code>; <code>analyzePageTranslationUsage</code> and <code>analyzeTranslationGraph</code> take <code>keysOnlySetupFiles</code> for setup files whose keys count but whose <code>exhaustive</code> flag does not."
+            },
+            {
+              "type": "Fixed",
+              "html": "Repository default <code>orderBy</code> is no longer dropped. <code>list()</code> now sanitizes only the caller's options and applies the repository's <code>defaultOptions</code> and the app-wide <code>repository.defaultOptions</code> underneath, so a default <code>orderBy</code> always applies, even when its columns are not in <code>sortable</code>. A caller's <code>orderBy</code> that names a non-sortable column is still dropped whole, and the default order now applies instead of none. Defaults written in code are trusted: a default <code>select</code> or <code>cursorColumn</code> is no longer filtered by <code>selectable</code> or <code>sortable</code>."
+            },
+            {
+              "type": "Fixed",
+              "html": "The dropped-<code>orderBy</code> warning is logged once per repository class and dropped column set instead of on every call, and says which order applies instead."
+            },
+            {
+              "type": "Fixed",
+              "html": "A string literal that happens to equal a translation group name (<code>export const site = \"client\"</code>) no longer ships every key in that group. A free-standing literal now reaches only a key of that exact name and its plural variants; a literal ending in <code>.</code> still acts as a prefix. Translator calls and <code>config.translations</code> declarations keep their group reach."
+            },
+            {
+              "type": "Fixed",
+              "html": "A name imported from something that is not a translator (<code>import { translateCopy as t } from \"./copy\"</code>, <code>import t from \"./copy\"</code>) is no longer treated as a translator, so calling it no longer makes the page ship every translation group. <code>import { trans as t }</code> is still a translator, and an aliased <code>transFrom</code> reads its key from the second argument."
+            },
+            {
+              "type": "Fixed",
+              "html": "WL9104 points to the exhaustive <code>config.translations</code> form as the fix for a closed set of keys."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/web",
+          "slug": "web",
+          "total": 3,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 2
+            },
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "The build warns about any <code>locales.json</code> that applies to no page, naming the file and saying to move it next to or above the pages that use it. The build still succeeds."
+            },
+            {
+              "type": "Added",
+              "html": "<code>PageConfig</code>, <code>LayoutConfig</code> and <code>RootConfig</code> type <code>config.translations</code>, including the exhaustive <code>{ keys, exhaustive: true }</code> form. The build log hint for computed translation lookups mentions it."
+            },
+            {
+              "type": "Fixed",
+              "html": "Multi-site apps: a <code>locales.json</code> above the site folders (for example <code>src/web/locales.json</code> or <code>src/web/$sites/locales.json</code>) is delivered to every page of every site, in development, production and server rendering alike. Before, it was typed and counted for key ownership but reached no page, so pages rendered raw keys. It is merged before each site's own dictionaries. A key is still declared in one <code>locales.json</code> in the whole app."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/auth",
+          "slug": "auth",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            },
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>auth.normalizeCredentials</code> config option: a function <code>(identifiers) =&gt; identifiers</code> that rewrites login identifiers before the lookup, or <code>false</code> for exact matching. Exports the <code>NormalizeCredentials</code> type."
+            },
+            {
+              "type": "Fixed",
+              "html": "Email sign-in is no longer case- and whitespace-sensitive. <code>authService.login()</code>, <code>attemptLogin()</code> and <code>loginWithSessionCookies()</code> trim identifier values and lower-case <code>email</code> before the lookup, so <code>Sara@x.io</code> finds <code>sara@x.io</code>. When nothing matches, the lookup is retried once with the value as sent (trimmed), so accounts stored with capitals keep working. The login throttle uses the same normalization, so its bucket and the account lookup always agree."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "5.51.0",
       "id": "v5-51-0",
       "date": "November 11, 2026",
