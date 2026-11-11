@@ -93,7 +93,8 @@ function applies(
 }
 
 function directoryDepth(source: { sourceFile: string }): number {
-  return path.dirname(source.sourceFile).split(path.sep).length;
+  // Both separators: a source path may arrive in either form on Windows.
+  return path.dirname(source.sourceFile).split(/[\\/]/).filter(Boolean).length;
 }
 
 /** The locale files that no page, app root or error page receives. */
