@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { DiscoveredPageGraph } from "./discover-pages";
-import { buildRouteLocaleManifest } from "./build-route-locale-manifest";
+import {
+  buildRouteLocaleManifest,
+  findUnusedRouteLocaleFiles,
+} from "./build-route-locale-manifest";
 import { assertRouteLocaleKeyOwnership } from "./route-locale-key-ownership";
 
 const root = "/app/src/web";
@@ -195,5 +198,93 @@ describe("assertRouteLocaleKeyOwnership", () => {
         { sourceFile: "two", entries: { "a.b": { en: "three" } } },
       ]),
     ).toThrow(/namespace/);
+  });
+
+  describe("multi-site shared dictionaries", () => {
+    const siteA = "/app/src/web/$sites/a";
+    const siteB = "/app/src/web/$sites/b";
+    const shared = "/app/src/web/locales.json";
+    const sharedSites = "/app/src/web/$sites/locales.json";
+    const ownA = `${siteA}/locales.json`;
+    const ownB = `${siteB}/locales.json`;
+    const pageA = `${siteA}/home.page.tsx`;
+    const pageB = `${siteB}/home.page.tsx`;
+    const files = {
+      [shared]: '{"shared":{"en":"S","ar":"S"}}',
+      [sharedSites]: '{"$group":"sites","mid":{"en":"M","ar":"M"}}',
+      [ownA]: '{"$group":"a","own":{"en":"A","ar":"A"}}',
+      [ownB]: '{"$group":"b","own":{"en":"B","ar":"B"}}',
+    };
+    const multi = graph(
+      [
+        { pageFile: pageA, webRoot: siteA },
+        { pageFile: pageB, webRoot: siteB },
+        { pageFile: `${siteB}/error.page.tsx`, webRoot: siteB, type: "error" },
+      ],
+      [
+        { sourceFile: ownA, webRoot: siteA },
+        { sourceFile: ownB, webRoot: siteB },
+        { sourceFile: shared },
+        { sourceFile: sharedSites },
+      ],
+    );
+
+    it("delivers a dictionary above the site folders to every site", () => {
+      const result = buildRouteLocaleManifest(multi, { ...options, readSource: sources(files) });
+
+      expect(result?.pages[pageA]?.translationsByLocale.en).toMatchObject({ shared: "S" });
+      expect(result?.pages[pageB]?.translationsByLocale.en).toMatchObject({ shared: "S" });
+      expect(result?.pages[`${siteB}/error.page.tsx`]?.translationsByLocale.en).toMatchObject({
+        shared: "S",
+      });
+    });
+
+    it("keeps a site dictionary on its own site", () => {
+      const result = buildRouteLocaleManifest(multi, { ...options, readSource: sources(files) });
+
+      expect(result?.pages[pageA]?.sourceFiles).not.toContain(ownB);
+      expect(result?.pages[pageB]?.sourceFiles).not.toContain(ownA);
+      expect(result?.pages[pageA]?.sourceFiles).toContain(ownA);
+    });
+
+    it("orders shallower shared dictionaries before the site's own", () => {
+      const result = buildRouteLocaleManifest(multi, { ...options, readSource: sources(files) });
+
+      expect(result?.pages[pageA]?.sourceFiles).toEqual([shared, sharedSites, ownA]);
+      expect(result?.pages[pageB]?.sourceFiles).toEqual([shared, sharedSites, ownB]);
+    });
+
+    it("lists no unused file when every dictionary reaches a page", () => {
+      expect(findUnusedRouteLocaleFiles(multi)).toEqual([]);
+    });
+  });
+
+  describe("findUnusedRouteLocaleFiles", () => {
+    it("names a dictionary that no page receives", () => {
+      const unused = "/app/src/web/$sites/c/locales.json";
+      const found = findUnusedRouteLocaleFiles(
+        graph(
+          [{ pageFile: "/app/src/web/$sites/a/home.page.tsx", webRoot: "/app/src/web/$sites/a" }],
+          [{ sourceFile: unused, webRoot: "/app/src/web/$sites/c" }],
+        ),
+      );
+
+      expect(found).toEqual([unused]);
+    });
+
+    it("leaves single-site apps unchanged", () => {
+      const found = findUnusedRouteLocaleFiles(
+        graph(
+          [{ pageFile: "/app/src/web/account/page.page.tsx" }],
+          [
+            { sourceFile: "/app/src/web/locales.json" },
+            { sourceFile: "/app/src/web/account/locales.json" },
+            { sourceFile: "/app/src/web/other/locales.json" },
+          ],
+        ),
+      );
+
+      expect(found).toEqual(["/app/src/web/other/locales.json"]);
+    });
   });
 });

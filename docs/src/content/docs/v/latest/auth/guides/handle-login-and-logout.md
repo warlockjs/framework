@@ -65,6 +65,29 @@ authService.login(User, { username, password });
 authService.login(User, { phone, password: hashedOTP });
 ```
 
+### Identifier normalization
+
+Before the lookup, string values are trimmed and the `email` field is lower-cased, so `" Sara@x.io"` finds the account stored as `sara@x.io`. If nothing matches and the normalized value differs from the value as sent (trimmed), the lookup is retried once with the value as sent, so rows stored with capitals before normalization keep working. The login throttle buckets by the same trimmed, lower-cased email.
+
+Change it with `auth.normalizeCredentials`:
+
+```ts
+import type { AuthConfigurations } from "@warlock.js/auth";
+
+const authConfig: AuthConfigurations = {
+  // ...
+  // a function receives the identifiers (everything except `password`) and returns them rewritten
+  normalizeCredentials: (identifiers) => ({
+    ...identifiers,
+    phone: String(identifiers.phone).replace(/\s/g, ""),
+  }),
+  // or `false` for exact matching, no trim, no lower-casing, no retry
+  // normalizeCredentials: false,
+};
+```
+
+Store emails lower-cased when you create users (`email: email.trim().toLowerCase()`) so the first lookup finds them.
+
 This means "any combination of lookup keys works" — no special-case code for phone vs email vs username vs anything you add later.
 
 ## Lower-level — just verify, don't issue

@@ -548,7 +548,7 @@ Category: your code · skill: `warlock-doctor`
 
 ### WL9104
 
-**Translation key is computed at runtime, so the page cannot ship only the keys it uses.** Use a literal key or a static-prefix template such as `statuses.${status}` instead of a computed key. `config.translations` in the setup file only adds keys; it does not resolve a computed lookup, so one dynamic site anywhere in the page's graph (page, layouts, root, error pages) still ships every translation group. Reported as a warning on `src/web` files with the file, line and key text; the build log lists the same sites.
+**Translation key is computed at runtime, so the page cannot ship only the keys it uses.** Use a literal key or a static-prefix template such as `statuses.${status}` instead of a computed key. A plain `config.translations` array only adds keys, so one dynamic site anywhere in the page's graph (page, layouts, root, error pages) still ships every translation group; declare `config.translations = { keys: [...], exhaustive: true }` in the setup file when the key set is closed, and the declared keys cover the computed lookups for that page. Reported as a warning on `src/web` files with the file, line and key text; the build log lists the same sites.
 
 Category: your code · skill: `use-localization`
 

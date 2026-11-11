@@ -20,9 +20,11 @@ export type TranslationUsage = {
   /**
    * Key-shaped string literals written anywhere in the walked modules, outside
    * a recognized lookup (a helper's argument, a constant, an object that maps to
-   * keys, a prop). A literal counts as used when it equals an existing key,
-   * names a group or subtree, or is the base of plural variants
-   * (`"cart.items"` reaches `"cart.items_one"` and `"cart.items_other"`).
+   * keys, a prop). A literal counts as used when it equals an existing key or is
+   * the base of plural variants (`"cart.items"` reaches `"cart.items_one"` and
+   * `"cart.items_other"`). It never reaches a subtree: `"client"` ships a key
+   * named `client`, not every `client.*` key. A literal ending in `.`
+   * (`"statuses."`) is a prefix and reaches every key under it.
    */
   readonly literals: readonly string[];
   /** The static heads of template literals with substitutions, which reach every key that starts with one. */
@@ -123,6 +125,20 @@ export function translationDeclarationUsage(entry: string, file: string): Transl
   return usageOf({ keys: [entry] });
 }
 
+/**
+ * What a setup file's `config.translations` holds. A string array adds keys.
+ * `{ keys, exhaustive: true }` adds the same keys and states that they cover
+ * every computed lookup in the page's graph, so those lookups no longer make
+ * the page ship every key. Entries are a key, a group, `prefix.*` or `*`.
+ */
+export type TranslationDeclaration =
+  | readonly string[]
+  | {
+      readonly keys: readonly string[];
+      /** `true` treats the declared keys as covering every computed lookup in the page's graph. */
+      readonly exhaustive?: boolean;
+    };
+
 /** The union of several usages: a dynamic lookup anywhere makes the union dynamic. */
 export function mergeTranslationUsage(usages: readonly TranslationUsage[]): TranslationUsage {
   return usageOf({
@@ -145,6 +161,22 @@ export function mergeTranslationUsage(usages: readonly TranslationUsage[]): Tran
 function reaches(declared: string, key: string): boolean {
   if (declared.endsWith(".")) return key.startsWith(declared);
   if (key === declared || key.startsWith(`${declared}.`)) return true;
+
+  return reachesVariant(declared, key);
+}
+
+/**
+ * Whether `key` is `literal` itself or one of its plural variants. A free
+ * string literal names a key, not a group, so it never reaches a subtree; only
+ * a trailing-dot literal, which is plainly a prefix, does.
+ */
+function reachesLiteral(literal: string, key: string): boolean {
+  if (literal.endsWith(".")) return key.startsWith(literal);
+
+  return key === literal || reachesVariant(literal, key);
+}
+
+function reachesVariant(declared: string, key: string): boolean {
   if (!key.startsWith(`${declared}_`)) return false;
 
   return !key.includes(".", declared.length);
@@ -154,7 +186,7 @@ function reaches(declared: string, key: string): boolean {
 export function isTranslationKeyUsed(usage: TranslationUsage, key: string): boolean {
   if (usage.dynamic) return true;
   if (usage.keys.some((declared) => reaches(declared, key))) return true;
-  if (usage.literals.some((literal) => reaches(literal, key))) return true;
+  if (usage.literals.some((literal) => reachesLiteral(literal, key))) return true;
 
   return (
     usage.prefixes.some((prefix) => key.startsWith(prefix)) ||
@@ -268,20 +300,47 @@ function moduleConstants(source: ast.SourceFile): Map<string, string> {
   return constants;
 }
 
+type TranslatorNames = {
+  /** Local names bound to the result of a translator factory. */
+  readonly bindings: ReadonlySet<string>;
+  /** Local name to imported name, for an import that renames a translator. */
+  readonly aliases: ReadonlyMap<string, string>;
+  /** Local names that look like a translator but import something else, such as `import { translateCopy as t }`. */
+  readonly notTranslators: ReadonlySet<string>;
+};
+
 /**
  * Local names bound to a translator: the result of `useTrans()`, including an
  * aliased import of it. Calling one of them is a lookup like calling `trans`.
+ * An import whose local name is a translator name but whose imported name is
+ * not (`import { translateCopy as t }`, `import t from "./copy"`) is recorded
+ * as not a translator in this file.
  */
-function translatorBindings(source: ast.SourceFile): Set<string> {
+function translatorNames(source: ast.SourceFile): TranslatorNames {
   const factories = new Set(TRANSLATOR_FACTORIES);
   const bindings = new Set<string>();
+  const aliases = new Map<string, string>();
+  const notTranslators = new Set<string>();
 
   for (const statement of source.body) {
     if (statement.type !== "ImportDeclaration") continue;
     for (const specifier of statement.specifiers) {
-      if (specifier.type !== "ImportSpecifier") continue;
-      const imported = specifier.imported.type === "Identifier" ? specifier.imported.name : "";
-      if (TRANSLATOR_FACTORIES.has(imported)) factories.add(specifier.local.name);
+      const local = specifier.local.name;
+      const imported =
+        specifier.type !== "ImportSpecifier"
+          ? ""
+          : specifier.imported.type === "Identifier"
+            ? specifier.imported.name
+            : "";
+
+      if (TRANSLATOR_FACTORIES.has(imported)) factories.add(local);
+      if (!Object.hasOwn(TRANSLATOR_KEY_ARGUMENT, local)) continue;
+
+      if (Object.hasOwn(TRANSLATOR_KEY_ARGUMENT, imported)) {
+        aliases.set(local, imported);
+      } else if (!TRANSLATOR_FACTORIES.has(imported)) {
+        notTranslators.add(local);
+      }
     }
   }
 
@@ -301,11 +360,16 @@ function translatorBindings(source: ast.SourceFile): Set<string> {
 
   ast.forEachChild(source, visit);
 
-  return bindings;
+  // A name bound to `useTrans()` is a translator whatever else it was imported as.
+  for (const name of bindings) notTranslators.delete(name);
+
+  return { bindings, aliases, notTranslators };
 }
 
-function isTranslatorName(name: string, bindings: ReadonlySet<string>): boolean {
-  return Object.hasOwn(TRANSLATOR_KEY_ARGUMENT, name) || bindings.has(name);
+function isTranslatorName(name: string, names: TranslatorNames): boolean {
+  if (names.notTranslators.has(name)) return false;
+
+  return Object.hasOwn(TRANSLATOR_KEY_ARGUMENT, name) || names.bindings.has(name);
 }
 
 /**
@@ -315,12 +379,13 @@ function isTranslatorName(name: string, bindings: ReadonlySet<string>): boolean 
  * string constant, and choices between those (`a ? "x" : "y"`) all resolve. Any
  * other key expression is `dynamic`, and so is a translator that escapes as a
  * value (passed on, returned, stored): whoever receives it can call it with any
- * key.
+ * key. A translator name imported from something that is not a translator
+ * (`import { translateCopy as t }`) is not a translator in that file.
  */
 export function scanTranslationSource(fileName: string, text: string): TranslationSourceScan {
   const source = ast.parseSourceFile(fileName, text);
   const constants = moduleConstants(source);
-  const bindings = translatorBindings(source);
+  const names = translatorNames(source);
   const keys: string[] = [];
   const prefixes: string[] = [];
   const literals: string[] = [];
@@ -356,8 +421,8 @@ export function scanTranslationSource(fileName: string, text: string): Translati
     } else if (node.type === "CallExpression") {
       const callee = unwrap(node.callee);
 
-      if (callee.type === "Identifier" && isTranslatorName(callee.name, bindings)) {
-        const index = TRANSLATOR_KEY_ARGUMENT[callee.name] ?? 0;
+      if (callee.type === "Identifier" && isTranslatorName(callee.name, names)) {
+        const index = TRANSLATOR_KEY_ARGUMENT[names.aliases.get(callee.name) ?? callee.name] ?? 0;
         const argument = node.arguments[index];
         const resolution =
           argument === undefined
@@ -375,7 +440,7 @@ export function scanTranslationSource(fileName: string, text: string): Translati
           }
         }
       }
-    } else if (node.type === "Identifier" && isTranslatorName(node.name, bindings)) {
+    } else if (node.type === "Identifier" && isTranslatorName(node.name, names)) {
       const parent = ast.parentOf(node);
       if (parent !== undefined && escapesAsValue(parent, node)) markDynamic(node, node.name);
     } else if (node.type === "Literal" && typeof node.value === "string") {
@@ -462,18 +527,61 @@ function sourceText(text: string, node: ast.Node): string {
   return text.slice(node.start, node.end);
 }
 
+/** A parsed `config.translations`: its raw entries and whether they cover every computed lookup. */
+type TranslationDeclarationSource = {
+  readonly entries: readonly string[];
+  readonly exhaustive: boolean;
+};
+
 /**
  * The `config.translations` declaration of a page's setup file, as its raw
  * entries. Read statically, like `config.route`, so the build never runs the
- * file. `undefined` when the file declares none.
+ * file. `undefined` when the file declares none. Accepts the plain array and
+ * the `{ keys, exhaustive }` form; see `readTranslationDeclaration` for the flag.
  */
 export function readTranslationDeclarations(
   fileName: string,
   text: string,
 ): readonly string[] | undefined {
+  return readTranslationDeclaration(fileName, text)?.entries;
+}
+
+/**
+ * Like `readTranslationDeclarations`, plus whether the declaration is
+ * exhaustive: `{ keys: [...], exhaustive: true }` states that the keys cover
+ * every computed lookup in the page's graph.
+ */
+export function readTranslationDeclaration(
+  fileName: string,
+  text: string,
+): TranslationDeclarationSource | undefined {
   const source = ast.parseSourceFile(fileName, text);
   const malformed = (): Error =>
-    new Error(`config.translations in "${fileName}" must be an array of string literals.`);
+    new Error(
+      `config.translations in "${fileName}" must be an array of string literals, or ` +
+        "an object { keys: [string literals], exhaustive: true | false }.",
+    );
+
+  const readEntries = (node: ast.Node): string[] => {
+    const array = unwrap(node);
+    if (array.type !== "ArrayExpression") throw malformed();
+
+    return array.elements.map((element) => {
+      const literal = element === null ? undefined : unwrap(element);
+      if (literal?.type !== "Literal" || typeof literal.value !== "string") throw malformed();
+      return literal.value;
+    });
+  };
+
+  const propertyName = (property: ast.Node): string | undefined => {
+    if (property.type !== "Property" || property.computed) return undefined;
+
+    return property.key.type === "Identifier"
+      ? property.key.name
+      : property.key.type === "Literal" && typeof property.key.value === "string"
+        ? property.key.value
+        : undefined;
+  };
 
   for (const statement of source.body) {
     const declaration =
@@ -488,24 +596,34 @@ export function readTranslationDeclarations(
       if (init.type !== "ObjectExpression") continue;
 
       for (const property of init.properties) {
-        if (property.type !== "Property" || property.computed) continue;
-
-        const name =
-          property.key.type === "Identifier"
-            ? property.key.name
-            : property.key.type === "Literal" && typeof property.key.value === "string"
-              ? property.key.value
-              : undefined;
-        if (name !== "translations") continue;
+        if (property.type !== "Property" || propertyName(property) !== "translations") continue;
 
         const value = unwrap(property.value);
-        if (value.type !== "ArrayExpression") throw malformed();
+        if (value.type !== "ObjectExpression") {
+          return { entries: readEntries(value), exhaustive: false };
+        }
 
-        return value.elements.map((element) => {
-          const literal = element === null ? undefined : unwrap(element);
-          if (literal?.type !== "Literal" || typeof literal.value !== "string") throw malformed();
-          return literal.value;
-        });
+        let entries: string[] | undefined;
+        let exhaustive = false;
+
+        for (const member of value.properties) {
+          const name = propertyName(member);
+          if (member.type !== "Property" || name === undefined) throw malformed();
+
+          if (name === "keys") {
+            entries = readEntries(member.value);
+          } else if (name === "exhaustive") {
+            const flag = unwrap(member.value);
+            if (flag.type !== "Literal" || typeof flag.value !== "boolean") throw malformed();
+            exhaustive = flag.value;
+          } else {
+            throw malformed();
+          }
+        }
+
+        if (entries === undefined) throw malformed();
+
+        return { entries, exhaustive };
       }
     }
   }

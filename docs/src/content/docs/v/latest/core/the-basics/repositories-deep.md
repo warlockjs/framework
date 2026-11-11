@@ -208,17 +208,19 @@ The interesting ones:
 | `orderBy`      | The only ordering field that's honored. Three forms — see below.                                    |
 | `perform`      | Escape hatch — custom query callback. Covered in [Custom queries](#custom-queries-beyond-filterby). |
 
-> **`sortBy` / `sortDirection` are not honored.** The `RepositoryOptions` type still carries them, but `applyOptionsToQuery` only reads `orderBy` — passing `sortBy`/`sortDirection` does nothing. Use `orderBy` for all ordering. Likewise, there is no working `purgeCache` option: invalidation is driven by model events (see [Caching](#caching)), so a `purgeCache` flag on the options object is inert.
+> **`sortBy` / `sortDirection` apply only without `orderBy`.** When no `orderBy` is set, `sortBy` and `sortDirection` (default `"asc"`) become one order clause; an `orderBy` always wins. Prefer `orderBy` for ordering. Note that there is no working `purgeCache` option: invalidation is driven by model events (see [Caching](#caching)), so a `purgeCache` flag on the options object is inert.
 
 > **Changed in 5.21:** `list(request.all())` no longer lets the client pick any sort or page size. A client-supplied sort or page size is honoured only when it is whitelisted by the repository; anything else falls back to the repository defaults. Options passed from application code (`list({ orderBy, limit })`) are unchanged.
 
-**Sortable columns.** A client-supplied `orderBy` is applied only when every column in it is allowed: `id`, the `filterBy` keys, and the columns listed in the repository's `sortable` array. If any requested column is not allowed, the whole `orderBy` is dropped (never partly applied) and a warning is logged that names the dropped column(s) and tells you to add them to `sortable`. To let clients sort by `created_at`, declare it:
+**Sortable columns.** A client-supplied `orderBy` is applied only when every column in it is allowed: `id`, the `filterBy` keys, and the columns listed in the repository's `sortable` array. If any requested column is not allowed, the whole `orderBy` is dropped (never partly applied) and a warning is logged (once per repository and dropped column set) that names the dropped column(s), says which order applies instead, and tells you to add them to `sortable`. To let clients sort by `created_at`, declare it:
 
 ```ts
 class PostsRepository extends RepositoryManager<Post> {
   protected sortable = ["created_at", "title"];
 }
 ```
+
+**Default order.** `sortable` only restricts what a caller may ask for. A default `orderBy` you write in code (the repository's `defaultOptions`) or in config (`repository.defaultOptions`) is trusted and always applied, whether or not its columns are in `sortable`. Precedence is: the caller's allowed `orderBy`, then the repository's `defaultOptions.orderBy`, then `repository.defaultOptions.orderBy` from config. When a caller's `orderBy` is dropped, the default order applies instead of none. `limit`, `perPage` and `defaultLimit` are still capped by `maxPerPage`, defaults included.
 
 `orderBy` has three forms:
 
@@ -857,7 +859,7 @@ What's interesting here:
 - **`defaultLimit` is 15 at the framework level.** Override in `defaultOptions` to change per repository.
 - **Filter rules are not optional.** A caller passing `{ status: "active" }` with no `status` key in `filterBy` gets an unfiltered query and a silent drop. Wire every filter key you accept.
 - **The repository lifecycle hooks are not wired.** `onCreating`, `onCreate`, `onUpdating`, `onUpdate`, `onSaving`, `onSave`, `onDeleting`, `onDelete`, `beforeListing`, and `onList` exist on the base class but are never called. Use Cascade model events or override the action method instead.
-- **`sortBy` / `sortDirection` / `purgeCache` are ignored.** Only `orderBy` controls ordering, and cache invalidation runs off model events — these option fields are inert.
+- **`sortBy` / `sortDirection` apply only without `orderBy`, and `purgeCache` is ignored.** Cache invalidation runs off model events, so a `purgeCache` flag is inert.
 - **Cursor pagination owns the sort order for its `cursorColumn`.** Passing `orderBy` on the same column is silently overridden with a console warning.
 - **`updateMany` / `deleteMany` skip the model lifecycle.** Fast, but no `creating` / `updating` / `deleting` events fire — and therefore no cache invalidation. Call `clearCache()` manually after a bulk write, or accept stale cache until next mutation.
 - **Bulk paginate methods (`listCached`) only support page mode.** Cursor pagination skips the cache entirely.

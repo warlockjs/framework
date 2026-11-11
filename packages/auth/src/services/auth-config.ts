@@ -6,6 +6,7 @@ import ms from "ms";
 import type {
   AuthNotification,
   CanAuthenticate,
+  NormalizeCredentials,
   LogoutWithoutTokenBehavior,
   OneTimeTokenUrlBuilder,
   PasswordSetter,
@@ -24,6 +25,7 @@ import type {
   XProviderConfig,
 } from "../contracts/providers";
 import type { Auth } from "../models/auth.model";
+import { defaultNormalizeCredentials } from "../utils/normalize-credentials";
 
 const warnedLegacyKeys = new Set<string>();
 
@@ -139,6 +141,12 @@ export const authConfig = {
 
     return canAuthenticate(user);
   },
+  /** Login identifier normalizer, or `false` for exact matching. */
+  normalizeCredentials: (): false | NormalizeCredentials =>
+    config.key<false | NormalizeCredentials>(
+      "auth.normalizeCredentials",
+      defaultNormalizeCredentials,
+    ),
   accessToken: {
     /** Signing secret (legacy: `auth.jwt.secret`). Throws if neither is set. */
     secret: (): string => {

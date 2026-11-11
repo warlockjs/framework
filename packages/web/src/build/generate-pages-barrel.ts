@@ -65,6 +65,7 @@ import {
   type EstimateApiRoute,
   type PagePayloadEstimate,
 } from "./payload-budget-estimate";
+import { findUnusedRouteLocaleFiles } from "./build-route-locale-manifest";
 import { serializeRouteLocales } from "./serialize-route-locales";
 import { buildTranslationManifest, type TranslationBuildOptions } from "./translation-manifest";
 import {
@@ -555,6 +556,17 @@ export async function generatePagesBarrel(
   const graph = discoverPageGraph({ appRoot, srcDir: options.srcDir, sites: options.sites });
   const discovered = graph.pages;
   const localeFiles = serializeRouteLocales(graph.localeFiles, appRoot);
+  // An app with no pages yet has nothing for a dictionary to reach: stay quiet.
+  const unusedLocaleFiles = graph.pages.length === 0 ? [] : findUnusedRouteLocaleFiles(graph);
+  if (unusedLocaleFiles.length > 0) {
+    console.warn(
+      [
+        "These locales.json files apply to no page, so their keys render as raw keys:",
+        ...unusedLocaleFiles.map((file) => `  ${toPosix(path.relative(appRoot, file))}`),
+        "A locales.json reaches the pages beside it and below it. Move it next to, or above, the pages that use it.",
+      ].join("\n"),
+    );
+  }
   const routablePages = discovered.filter(isDiscoveredRoutablePage);
   const errorPage = discovered.find((page) => page.type === "error");
   const siteErrorPages =
@@ -836,7 +848,7 @@ export async function generatePagesBarrel(
       [
         "Translation lookups computed at runtime make the pages that render them ship every translation group:",
         ...translations.dynamicSites.map((site) => `  ${site}`),
-        "A config.translations declaration only adds keys; remove the computed lookup (use a static prefix such as `statuses.${status}`) to prune.",
+        "A plain config.translations array only adds keys; remove the computed lookup (use a static prefix such as `statuses.${status}`), or declare config.translations = { keys: [...], exhaustive: true } on the page to cover it.",
       ].join("\n"),
     );
   }

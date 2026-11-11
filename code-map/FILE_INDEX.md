@@ -108,6 +108,8 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 
 - `docs/README.md`
 - `docs/astro.config.mjs` - docsRoot, groupedSectionItems, pkgTopic, fullSections, sitemapSections, coreSections, cascadeSections, webSections
+- `docs/tasks.completed.md`
+- `docs/tasks.md`
 
 ## docs/scripts (6 test files not listed)
 
@@ -1728,7 +1730,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/ai-xai/src/known-pricing.ts` - ai-xai/src/known-pricing.ts, longPrompt, XAI_MODEL_PRICING, XAI_MODEL_PRICING_AS_OF, xaiPricingFor
 - `packages/ai-xai/src/sdk.ts` - XaiSDK, ai-xai/src/sdk.ts, requestsNativeSearch
 
-## packages/auth (48 test files not listed)
+## packages/auth (49 test files not listed)
 
 - `packages/auth/README.md`
 - `packages/auth/domains/backlog.md`
@@ -1753,7 +1755,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/auth/src/contracts/index.ts` - auth/src/contracts/index.ts
 - `packages/auth/src/contracts/providers.ts` - ProviderAuthorizationState, ProviderCallbackParams, ProviderProfile, AuthProvider, GoogleProviderConfig, GitHubProviderConfig, DiscordProviderConfig, LinkedInProviderConfig
 - `packages/auth/src/contracts/request-locals.ts` - RequestUser, RequestLocals, @warlock.js/core
-- `packages/auth/src/contracts/types.ts` - LogoutWithoutTokenBehavior, TokenFrom, AuthCredentialDescriptor, AuthRefreshCredentialDescriptor, AuthMiddlewareOptions, CanAuthenticate, AuthCredentials, AccessTokenConfig
+- `packages/auth/src/contracts/types.ts` - LogoutWithoutTokenBehavior, TokenFrom, AuthCredentialDescriptor, AuthRefreshCredentialDescriptor, AuthMiddlewareOptions, CanAuthenticate, AuthCredentials, NormalizeCredentials
 - `packages/auth/src/errors/auth-provider-sdk-missing.error.ts` - AuthProviderSdkMissingError
 - `packages/auth/src/errors/email-not-verified.error.ts` - EmailNotVerifiedError
 - `packages/auth/src/errors/index.ts` - auth/src/errors/index.ts
@@ -1841,6 +1843,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/auth/src/test-support/software-authenticator.ts` - CborValue, SoftwareAuthenticatorOptions, SoftwareAuthenticator, cborHead, cbor, sha256, b64url
 - `packages/auth/src/utils/auth-error-codes.ts` - AuthErrorCodes, MissingAccessToken, InvalidAccessToken, Unauthorized, TooManyAttempts, InvalidTokenType, CsrfOriginMismatch, EmailNotVerified
 - `packages/auth/src/utils/index.ts` - auth/src/utils/index.ts
+- `packages/auth/src/utils/normalize-credentials.ts` - AuthIdentifiers, normalizeEmailIdentifier, trimIdentifiers, defaultNormalizeCredentials
 - `packages/auth/src/utils/safe-equal.ts` - safeEqual
 - `packages/auth/src/utils/token-expiry.ts` - decodePayload, isUsableExpiry, tokenHasExpClaim, isNeverExpiring
 - `packages/auth/tests/integration/helpers/local-database-harness.ts` - LocalDatabaseHarness, hasLocalMongodb, hasLocalPostgres, requireEnvironmentValue, runMigrations, startLocalMongodb, startLocalPostgres
@@ -2158,7 +2161,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/context/src/index.ts` - context/src/index.ts
 - `packages/context/vitest.config.ts` - context/vitest.config.ts
 
-## packages/core (608 test files not listed)
+## packages/core (609 test files not listed)
 
 - `packages/core/README.md`
 - `packages/core/TODO.md`
@@ -2720,7 +2723,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/core/src/localization/parse-locale-dictionary.ts` - LocaleDictionaryEntries, ParsedLocaleDictionary, JsonValue, JsonObject, LocaleDictionaryError, StrictJsonParser, FORBIDDEN_SEGMENTS, fail
 - `packages/core/src/localization/register-locale-dictionary.ts` - Owner, owners, keysBySource, claim, registerGroupedTranslationKeys, unregisterLocaleDictionary, registerLocaleDictionary
 - `packages/core/src/localization/translation-usage-graph.ts` - TranslationGraphInput, TranslationGraphResult, SOURCE_EXTENSIONS, analyzeTranslationGraph, readDeclarations, unreadable, resolveSourceImport, isFile
-- `packages/core/src/localization/translation-usage.ts` - TranslationUsage, TranslationDynamicSite, TranslationSourceScan, KeyCandidate, KeyResolution, TRANSLATOR_KEY_ARGUMENT, TRANSLATOR_FACTORIES, VALUE_POSITIONS
+- `packages/core/src/localization/translation-usage.ts` - TranslationUsage, TranslationDynamicSite, TranslationSourceScan, TranslationDeclaration, KeyCandidate, KeyResolution, TranslatorNames, TranslationDeclarationSource
 - `packages/core/src/logger/README.md`
 - `packages/core/src/logger/fatal-visibility.ts` - ensureFatalIsVisible
 - `packages/core/src/logger/index.ts` - logger/index.ts

@@ -75,6 +75,14 @@ export type AuthCredentials = Record<string, unknown> & {
 };
 
 /**
+ * Rewrites the identity fields of a login (everything except `password`)
+ * before the user lookup.
+ */
+export type NormalizeCredentials = (
+  identifiers: Omit<AuthCredentials, "password">,
+) => Omit<AuthCredentials, "password">;
+
+/**
  * Access-token configuration.
  *
  * `secret` may also be supplied via the deprecated `jwt.secret` (resolved by a
@@ -292,6 +300,19 @@ export type AuthConfigurations = {
    * @default () => true
    */
   canAuthenticate?: CanAuthenticate;
+  /**
+   * How login identifiers are normalized before the user lookup. Default:
+   * string values are trimmed and the `email` field is lower-cased, so
+   * `" Sara@x.io"` finds the account stored as `sara@x.io`. If that finds no
+   * user and the normalized value differs from what was sent (trimmed), the
+   * lookup is retried once with the value as sent, so rows stored with capitals
+   * keep working. Pass a function to normalize your own way (the retry still
+   * applies), or `false` for exact matching.
+   *
+   * The login throttle buckets `email` by trimmed, lower-cased value either way.
+   * @default trim string values, lower-case `email`
+   */
+  normalizeCredentials?: false | NormalizeCredentials;
   /**
    * Access-token configuration (secret, expiry, algorithm, model override).
    */

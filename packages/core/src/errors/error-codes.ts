@@ -837,7 +837,7 @@ export const ERROR_CODES = {
     area: "convention",
     category: "code",
     title: "Translation key is computed at runtime, so the page cannot ship only the keys it uses",
-    fix: "Use a literal key or a static-prefix template such as `statuses.${status}` instead of a computed key. `config.translations` in the setup file only adds keys; one computed lookup anywhere in the page graph still ships every translation group.",
+    fix: "Use a literal key or a static-prefix template such as `statuses.${status}` instead of a computed key. A plain `config.translations` array only adds keys, so one computed lookup anywhere in the page graph still ships every translation group. When the set of keys really is closed, declare it as `config.translations = { keys: [...], exhaustive: true }` in the page's setup file: the declared keys then cover the computed lookups and the page ships only them plus the keys found statically.",
     skill: "use-localization",
   },
   WL9105: {

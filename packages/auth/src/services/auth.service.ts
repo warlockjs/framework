@@ -25,6 +25,7 @@ import { AuthTokenFamily } from "../models/auth-token-family";
 import { OneTimeToken } from "../models/one-time-token";
 import { RefreshToken } from "../models/refresh-token";
 import { authConfig } from "./auth-config";
+import { type AuthIdentifiers, trimIdentifiers } from "../utils/normalize-credentials";
 import { authEvents } from "./auth-events";
 import { isInvalidCredentialError, jwt } from "./jwt";
 import {
@@ -592,6 +593,33 @@ class AuthService {
   }
 
   /**
+   * Look a user up by login identifiers: normalized first (see
+   * `auth.normalizeCredentials`), then once more with the values as sent
+   * (trimmed) when that differs, so legacy rows stored with capitals still match.
+   */
+  private async findLoginUser<T extends Auth>(
+    Model: ChildModel<T>,
+    identifiers: AuthIdentifiers,
+  ): Promise<T | null> {
+    const normalize = authConfig.normalizeCredentials();
+
+    if (normalize === false) {
+      return (await Model.first(identifiers)) as T | null;
+    }
+
+    const normalized = normalize(identifiers);
+    const user = (await Model.first(normalized)) as T | null;
+
+    if (user) return user;
+
+    const asSent = trimIdentifiers(identifiers);
+
+    if (JSON.stringify(asSent) === JSON.stringify(normalized)) return null;
+
+    return (await Model.first(asSent)) as T | null;
+  }
+
+  /**
    * Resolve a user by credentials, verifying the password. Returns `null` on a
    * missing user or a wrong password, emitting `login.failed` either way.
    */
@@ -603,7 +631,7 @@ class AuthService {
 
     authEvents.emit("login.attempt", otherData);
 
-    const user = (await Model.first(otherData)) as T | null;
+    const user = await this.findLoginUser(Model, otherData);
 
     if (!user) {
       authEvents.emit("login.failed", otherData, "User not found");

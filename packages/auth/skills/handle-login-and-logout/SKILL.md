@@ -81,6 +81,8 @@ authService.login(User, { username: "ada", password: "..." });
 authService.login(User, { phone: "+1...", password: hashedOTP });
 ```
 
+Identifiers are normalized before the lookup: string values are trimmed and `email` is lower-cased (`" Sara@x.io"` finds `sara@x.io`). If that finds no user and the normalized value differs from what was sent (trimmed), the lookup is retried once with the value as sent, so legacy rows stored with capitals still log in. The login throttle buckets by the same trimmed, lower-cased email. Configure with `auth.normalizeCredentials`: a function `(identifiers) => identifiers` (everything except `password`), or `false` for exact matching (the function type is `NormalizeCredentials`). Store new emails lower-cased.
+
 For lower-level credential verification (just check, don't issue tokens), use `authService.attemptLogin(Model, credentials)` — returns the user or null without creating tokens.
 
 ## Device info

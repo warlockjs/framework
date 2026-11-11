@@ -4,6 +4,7 @@ import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   isTranslationKeyUsed,
+  readTranslationDeclaration,
   readTranslationDeclarations,
   scanTranslationSource,
   translationDeclarationUsage,
@@ -413,5 +414,209 @@ describe("analyzePageTranslationUsage", () => {
     expect(
       resolveSourceImport("./data.json", path.join(root, "src/web/a.tsx"), path.join(root, "src")),
     ).toBeUndefined();
+  });
+});
+
+describe("free string literals", () => {
+  it("reaches only the key of that exact name, never a subtree", () => {
+    const { usage } = scanTranslationSource("src/web/a.tsx", `export const site = "client";`);
+
+    expect(usage.dynamic).toBe(false);
+    expect(isTranslationKeyUsed(usage, "client")).toBe(true);
+    expect(isTranslationKeyUsed(usage, "client_other")).toBe(true);
+    expect(isTranslationKeyUsed(usage, "client.title")).toBe(false);
+  });
+
+  it("keeps a trailing-dot literal as a prefix", () => {
+    const { usage } = scanTranslationSource("src/web/a.tsx", `const base = "statuses.";`);
+
+    expect(isTranslationKeyUsed(usage, "statuses.paid")).toBe(true);
+  });
+
+  it("keeps the subtree reach of a translator call with a literal key", () => {
+    const { usage } = scanTranslationSource("src/web/a.tsx", `t("client");`);
+
+    expect(usage.keys).toEqual(["client"]);
+    expect(isTranslationKeyUsed(usage, "client.title")).toBe(true);
+  });
+
+  it("keeps the subtree reach of a declared group", () => {
+    const usage = translationDeclarationUsage("client", "a.setup.ts");
+
+    expect(isTranslationKeyUsed(usage, "client.title")).toBe(true);
+  });
+});
+
+describe("imports that reuse a translator name", () => {
+  it("does not treat an aliased non-translator import as a translator", () => {
+    const { usage } = scanTranslationSource(
+      "src/web/a.tsx",
+      `import { translateCopy as t } from "./copy";
+       export const pick = (key: string) => t(key);
+       show(t);`,
+    );
+
+    expect(usage.dynamic).toBe(false);
+  });
+
+  it("does not treat a default or namespace import as a translator", () => {
+    const byDefault = scanTranslationSource(
+      "src/web/a.tsx",
+      `import t from "./copy"; export const pick = (key: string) => t(key);`,
+    );
+    const byNamespace = scanTranslationSource(
+      "src/web/a.tsx",
+      `import * as trans from "./copy"; export const pick = (key: string) => trans(key);`,
+    );
+
+    expect(byDefault.usage.dynamic).toBe(false);
+    expect(byNamespace.usage.dynamic).toBe(false);
+  });
+
+  it("keeps trans aliased as t, and trans from any module, as translators", () => {
+    const aliased = scanTranslationSource(
+      "src/web/a.tsx",
+      `import { trans as t } from "@warlock.js/core"; t("a.title"); export const pick = (key: string) => t(key);`,
+    );
+    const plain = scanTranslationSource(
+      "src/web/a.tsx",
+      `import { trans } from "./my-i18n"; trans("a.title");`,
+    );
+
+    expect(aliased.usage.keys).toEqual(["a.title"]);
+    expect(aliased.usage.dynamic).toBe(true);
+    expect(plain.usage.keys).toEqual(["a.title"]);
+  });
+
+  it("reads the key argument by the imported name when transFrom is aliased", () => {
+    const { usage } = scanTranslationSource(
+      "src/web/a.tsx",
+      `import { transFrom as t } from "@warlock.js/core"; t("en", "app.title");`,
+    );
+
+    expect(usage.keys).toEqual(["app.title"]);
+  });
+});
+
+describe("exhaustive config.translations", () => {
+  const read = (declaration: string) =>
+    readTranslationDeclaration(
+      "src/web/a.setup.ts",
+      `export const config = { translations: ${declaration} };`,
+    );
+
+  it("reads the object form and its flag", () => {
+    expect(read(`{ keys: ["client.*", "errors.title"], exhaustive: true }`)).toEqual({
+      entries: ["client.*", "errors.title"],
+      exhaustive: true,
+    });
+    expect(read(`{ keys: ["a"], exhaustive: false }`)).toEqual({
+      entries: ["a"],
+      exhaustive: false,
+    });
+    expect(read(`{ keys: ["a"] }`)).toEqual({ entries: ["a"], exhaustive: false });
+    expect(read(`["a", "b"]`)).toEqual({ entries: ["a", "b"], exhaustive: false });
+    expect(
+      readTranslationDeclarations(
+        "src/web/a.setup.ts",
+        `export const config = { translations: { keys: ["a"], exhaustive: true } };`,
+      ),
+    ).toEqual(["a"]);
+  });
+
+  it("refuses any other shape, naming the file", () => {
+    for (const declaration of [
+      `{ exhaustive: true }`,
+      `{ keys: "a", exhaustive: true }`,
+      `{ keys: ["a"], exhaustive: "yes" }`,
+      `{ keys: ["a"], extra: 1 }`,
+      `{ keys: [name] }`,
+      `{ ...base }`,
+      `"a"`,
+    ]) {
+      expect(() => read(declaration)).toThrow(/a\.setup\.ts/);
+    }
+  });
+
+  describe("in the page graph", () => {
+    let root: string;
+
+    const write = (file: string, text: string) => {
+      fs.mkdirSync(path.dirname(path.join(root, file)), { recursive: true });
+      fs.writeFileSync(path.join(root, file), text, "utf8");
+    };
+
+    const analyze = (setup: string) =>
+      analyzePageTranslationUsage({
+        appSrcRoot: path.join(root, "src"),
+        entries: [
+          path.join(root, "src/web/signin/page.tsx"),
+          path.join(root, "src/web/layout.tsx"),
+        ],
+        setupFiles: [path.join(root, setup)],
+      }).usage;
+
+    beforeAll(() => {
+      root = fs.mkdtempSync(path.join(os.tmpdir(), "warlock-translation-exhaustive-"));
+      write("src/web/layout.tsx", `export const pick = (key: string) => trans(key);`);
+      write("src/web/signin/page.tsx", `export default () => trans("signin.title");`);
+      write(
+        "src/web/signin/exhaustive.setup.ts",
+        `export const config = { translations: { keys: ["client.*", "errors.title"], exhaustive: true } };`,
+      );
+      write(
+        "src/web/signin/not-exhaustive.setup.ts",
+        `export const config = { translations: { keys: ["client.*"], exhaustive: false } };`,
+      );
+      write(
+        "src/web/signin/plain.setup.ts",
+        `export const config = { translations: ["client.*"] };`,
+      );
+    });
+
+    afterAll(() => {
+      fs.rmSync(root, { recursive: true, force: true });
+    });
+
+    it("covers computed lookups: static keys plus the declared keys, not dynamic", () => {
+      const usage = analyze("src/web/signin/exhaustive.setup.ts");
+
+      expect(usage.dynamic).toBe(false);
+      expect(usage.dynamicSites).toEqual([]);
+      expect(isTranslationKeyUsed(usage, "signin.title")).toBe(true);
+      expect(isTranslationKeyUsed(usage, "client.title")).toBe(true);
+      expect(isTranslationKeyUsed(usage, "errors.title")).toBe(true);
+      expect(isTranslationKeyUsed(usage, "orders.title")).toBe(false);
+    });
+
+    it("leaves a plain array, and exhaustive: false, dynamic", () => {
+      expect(analyze("src/web/signin/plain.setup.ts").dynamic).toBe(true);
+      expect(analyze("src/web/signin/not-exhaustive.setup.ts").dynamic).toBe(true);
+    });
+
+    it("ignores the exhaustive flag of a keys-only setup file, but keeps its keys", () => {
+      const usage = analyzePageTranslationUsage({
+        appSrcRoot: path.join(root, "src"),
+        entries: [
+          path.join(root, "src/web/signin/page.tsx"),
+          path.join(root, "src/web/layout.tsx"),
+        ],
+        setupFiles: [path.join(root, "src/web/signin/plain.setup.ts")],
+        keysOnlySetupFiles: [path.join(root, "src/web/signin/exhaustive.setup.ts")],
+      }).usage;
+
+      expect(usage.dynamic).toBe(true);
+      expect(isTranslationKeyUsed(usage, "errors.title")).toBe(true);
+    });
+
+    it("stays dynamic when a reachable file cannot be read", () => {
+      const usage = analyzePageTranslationUsage({
+        appSrcRoot: path.join(root, "src"),
+        entries: [path.join(root, "src/web/signin/missing.tsx")],
+        setupFiles: [path.join(root, "src/web/signin/exhaustive.setup.ts")],
+      }).usage;
+
+      expect(usage.dynamic).toBe(true);
+    });
   });
 });

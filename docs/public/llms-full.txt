@@ -9853,8 +9853,8 @@ render changes: server output is the full dictionary, as before.
 
 Run `warlock build`, then `warlock check`. A `WL9104` warning marks a page that
 renders a translation key computed at runtime. Rewrite the lookup with a literal
-key or a static-prefix template; `config.translations` in the setup file only adds
-keys, and one computed lookup anywhere in the page's graph still ships every group.
+key or a static-prefix template. A plain `config.translations` array only adds
+keys; declare `{ keys: [...], exhaustive: true }` to cover the computed lookups.
 
 In development, a warning names a key the page reads but its payload lacks, and
 resolves it from the full table so the page keeps working. In production the
@@ -11050,7 +11050,9 @@ teardown. Module-owned timers/listeners must register their cleanup hooks.
 
 ## Translation keys in pages (5.36)
 
-`warlock check` reports `WL9104` when a page renders a translation key computed at runtime (`trans(key)` with no static prefix, or a translator passed on as a value). Such a page ships every translation group. The report gives the file, line and key text of each site. `config.translations` only adds keys and does not lift the fallback: one dynamic site anywhere in the page's graph (page, layouts, root, error pages) still ships every group, so rewrite the lookup with a literal key or a static-prefix template (``trans(`statuses.${s}`)``). A bare string literal equal to a group name ships the whole group, and hooks should call `useTrans()` themselves rather than receive `t`. The `web` skill `localize-pages` covers the browser side.
+`warlock check` reports `WL9104` when a page renders a translation key computed at runtime (`trans(key)` with no static prefix, or a translator passed on as a value). Such a page ships every translation group. The report gives the file, line and key text of each site. A plain `config.translations` array only adds keys and does not lift the fallback: one dynamic site anywhere in the page's graph (page, layouts, root, error pages) still ships every group, so rewrite the lookup with a literal key or a static-prefix template (``trans(`statuses.${s}`)``). When the key set really is closed, declare it exhaustive in the setup file, `config.translations = { keys: ["client.*", "errors.title"], exhaustive: true }`: the declared keys cover every computed lookup in that page's graph, the page ships the statically found keys plus the declared ones, and the build no longer reports it as dynamic. It covers the page whose setup file declares it, or the pages under the layout or root that declares it; an error or forbidden page's declaration covers only the error pages, never other pages. A bare string literal ships only a key of that exact name (and its plural variants), never a group; hooks should call `useTrans()` themselves rather than receive `t`, and a name imported from a non-translator (`import { translateCopy as t }`) is not a translator. The `web` skill `localize-pages` covers the browser side.
+
+The declaration's type is `TranslationDeclaration`, and `readTranslationDeclaration(file, text)` reads it from a setup file statically.
 
 
 ## use-middleware  `@warlock.js/core/skills/use-middleware/SKILL.md`
@@ -11638,7 +11640,7 @@ Five lines do the heavy lifting:
 1. **`source = Faq`** — Cascade model the repo wraps; auto-instantiates a `CascadeAdapter`.
 2. **`simpleSelectColumns`** — projection used when callers pass `simpleSelect: true`.
 3. **`filterBy`** — filter-key → operator map; powers the auto-applied WHERE clauses.
-4. **`defaultOptions`** — applied to every call (`orderBy`, default `limit`, etc.).
+4. **`defaultOptions`** — applied to every call (`orderBy`, default `limit`, etc.). Defaults are trusted: a default `orderBy` always applies, even on columns missing from `sortable` (which only restricts caller-supplied `orderBy`/`sortBy`/`cursorColumn`). A caller `orderBy` naming a non-sortable column is dropped whole and the default `orderBy` applies instead; the warning is logged once per repository and column set.
 5. **`new FaqsRepository()`** singleton — import this everywhere; never instantiate again.
 
 The class is intentionally private — only the singleton escapes the module. Scaffold with `npx warlock generate.repository <module>/<entity>`.
@@ -12947,7 +12949,7 @@ They parse real TypeScript/JSX syntax with the same oxc-parser adapter as the ex
 | `WL9025` | `merge()` on an object column of a Cascade model keeps the keys the new value omits (warning)      | Use `model.set({ column: value })` or `model.set("column", value)`; there is no automatic fix.                                                                     |
 | `WL9026` | A convention rule used more than its time budget and was skipped for the rest of the run (warning) | Use `--changed`, raise `ruleBudgetMs` in `.warlock-check.json` (0 turns it off), or turn the rule off.                                                             |
 | `WL9024` | Integration spec imports nothing that needs the app (warning)                                      | Move it to the unit project: rename it to `<name>.unit.spec.ts` outside `tests/`.                                                                                  |
-| `WL9104` | Translation key computed at runtime in `src/web` (the page ships every group)                      | Use a literal key or a static-prefix template; `config.translations` only adds keys, it does not lift the fallback.                                                |
+| `WL9104` | Translation key computed at runtime in `src/web` (the page ships every group)                      | Use a literal key or a static-prefix template, or declare `config.translations = { keys, exhaustive: true }` on the page.                                          |
 
 Web rules apply to `src/web/**/*.tsx`. Components are top-level JSX-returning functions
 with a capitalized name (or an anonymous default export). Hook files and ordinary helpers
@@ -28021,6 +28023,8 @@ authService.login(User, { username: "ada", password: "..." });
 authService.login(User, { phone: "+1...", password: hashedOTP });
 ```
 
+Identifiers are normalized before the lookup: string values are trimmed and `email` is lower-cased (`" Sara@x.io"` finds `sara@x.io`). If that finds no user and the normalized value differs from what was sent (trimmed), the lookup is retried once with the value as sent, so legacy rows stored with capitals still log in. The login throttle buckets by the same trimmed, lower-cased email. Configure with `auth.normalizeCredentials`: a function `(identifiers) => identifiers` (everything except `password`), or `false` for exact matching (the function type is `NormalizeCredentials`). Store new emails lower-cased.
+
 For lower-level credential verification (just check, don't issue tokens), use `authService.attemptLogin(Model, credentials)` — returns the user or null without creating tokens.
 
 ## Device info
@@ -34631,18 +34635,20 @@ The build finds each page's keys by reading its client module graph: the page,
 its layouts, the root, error pages and the components they import. Literal
 keys, static-prefix templates (``trans(`statuses.${s}`)`` ships `statuses.*`)
 and module constants are resolved. Any other key-shaped string literal in those
-modules (dotted words, no spaces) that equals a key, a group or a subtree also
-ships, wherever it is written: a constant, an object mapping names to keys, a
-prop or an argument to a helper. A key used with `count` is stored as variants
+modules (dotted words, no spaces) that equals a key also ships, wherever it is
+written: a constant, an object mapping names to keys, a prop or an argument to a
+helper. Such a literal names one key, never a group: `export const site = "client"`
+does not ship `client.*`. A literal that ends in a dot (`"statuses."`) is a prefix.
+A key used with `count` is stored as variants
 (`items_one`, `items_other`, ...) and the call names the base, `t("cart.items",
 { count })`; naming the base ships every variant. A key built at run time that
 no literal names falls back to every group, and `warlock check` reports it as
 `WL9104` with the file, line and key text; the build log lists the same sites.
-`config.translations` only adds keys; it does not resolve a computed lookup. One
-dynamic site anywhere in the page's graph (page, layouts, root, error pages) still
-ships every group, so fix the site itself (a literal key or a static-prefix
-template). Use a declaration for keys the analysis cannot see, such as ones read
-from data:
+A plain `config.translations` array only adds keys; it does not resolve a computed
+lookup. One dynamic site anywhere in the page's graph (page, layouts, root, error
+pages) still ships every group, so fix the site itself (a literal key or a
+static-prefix template). Use a declaration for keys the analysis cannot see, such
+as ones read from data:
 
 ```ts title="src/web/orders/index.setup.ts"
 export const config = {
@@ -34651,14 +34657,32 @@ export const config = {
 };
 ```
 
+When the keys a computed lookup can reach are a closed set you can list, declare
+the list exhaustive. The declared keys then cover every computed lookup in that
+page's graph (a shared layout's included): the page ships the keys found in code
+plus the declared ones, is not dynamic, and the build log does not list its
+computed lookups. A declaration covers the page whose own setup file declares it,
+and the pages under a layout or the root whose setup file declares it; an error or
+forbidden page's declaration covers only the error pages, never other pages.
+`exhaustive: false` or omitting it behaves like the plain array;
+any other shape is refused with an error naming the setup file. A page whose files
+cannot be read or parsed still ships every group.
+
+```ts title="src/web/signin/index.setup.ts"
+export const config = {
+  translations: { keys: ["client.*", "errors.title"], exhaustive: true },
+};
+```
+
 Matching is by name: the result of `useTrans()` under any local name, and the
-names `t`, `trans`, `transX` and `transFrom` (key in the second argument). A hook
-that receives `t` as a parameter is matched only by that name, so give hooks their
-own `useTrans()` call instead of passing `t` in; a translator handed on as a value
-(returned, stored, passed to a non-hook call) is dynamic, but a dependency list
-(`useMemo(..., [t])`, `useEffect(..., [t])`) is not. A bare string literal equal to
-a group or subtree name (`"orders"`) ships that whole group; prefer a longer key
-or a static-prefix template over a short literal that happens to name a group.
+names `t`, `trans`, `transX` and `transFrom` (key in the second argument). A name
+imported from something that is not a translator (`import { translateCopy as t }`,
+`import t from "./copy"`) is not a translator in that file; `import { trans as t }`
+still is. A hook that receives `t` as a parameter is matched only by that name, so
+give hooks their own `useTrans()` call instead of passing `t` in; a translator
+handed on as a value (returned, stored, passed to a non-hook call such as
+`show(t)`) is dynamic, but a dependency list (`useMemo(..., [t])`,
+`useEffect(..., [t])`) is not.
 
 The same applies to the global registry (`extend()` / `register()`, the
 starter's default). The shared groups are copied once, when the web connector
@@ -34693,7 +34717,7 @@ you declare the rest.
 
 ## Scope, errors, and legacy lookups
 
-A page receives only `locales.json` files on its physical ancestor chain. A child file can contribute additional keys for that page. A sibling cannot contribute. Current ownership validation rejects duplicate flattened keys globally, including matching ancestor/child keys; any key that conflicts with a namespace prefix also fails the build.
+A page receives only `locales.json` files on its physical ancestor chain. A child file can contribute additional keys for that page. A sibling cannot contribute. In multi-site mode a `locales.json` above the site folders (`src/web/locales.json`, `src/web/$sites/locales.json`) reaches every page of every site, merged before the site's own dictionaries; a site's own dictionary reaches only that site. Each key is declared in one `locales.json` in the whole app, so put keys shared by several sites in a dictionary above the site folders. The build warns about any `locales.json` that applies to no page (move it next to or above the pages that use it); the build does not fail. Current ownership validation rejects duplicate flattened keys globally, including matching ancestor/child keys; any key that conflicts with a namespace prefix also fails the build.
 
 The server selects one immutable snapshot for route source and locale. The hydration payload contains only that locale's keywords and does not register them globally. `useTrans()` on the client and `t()` from `@warlock.js/core` on the server (loaders, `metadata`) use the same snapshot, so concurrent renders cannot leak copy. A missing scoped key returns the key itself.
 
@@ -35298,6 +35322,10 @@ With sitemap and robots enabled, `/sitemap.xml` and `/robots.txt` are selected p
 Boot fails for an unassigned page, a `$sites` folder without a matching `web.sites` entry, a configured site whose `$sites/<name>` folder is missing, a missing site root, overlapping fixed host plus base path, a page shadowing an `src/app` route, or inconsistent dynamic/resolver configuration. Page cache entries are partitioned by site and tenant key. Fix the declared ownership rather than depending on route order.
 
 Out of scope: path- or session-selected tenants, sharing a root between sites, cross-site prefetch, API host scoping, and automatic Cascade query scoping.
+
+## Route dictionaries across sites
+
+A `locales.json` inside a site folder reaches only that site's pages. A `locales.json` above the site folders (`src/web/locales.json`, `src/web/$sites/locales.json`) reaches every page of every site and is merged before the site's own dictionaries. Each key is declared in one `locales.json` in the whole app, so put keys shared by several sites in a dictionary above the site folders instead of repeating them. The build warns about a `locales.json` that applies to no page; move it next to or above the pages that use it.
 
 ## Example support files
 

@@ -1,3 +1,4 @@
+import type { TranslationDeclaration } from "@warlock.js/core";
 import type { BaseValidator } from "@warlock.js/seal";
 import type { LivePageOptions } from "./live-page-data";
 import type { PageMetadata } from "./metadata";
@@ -84,6 +85,13 @@ export type PageConfig<TLoader extends LoaderFunction | undefined = undefined> =
    * are included automatically; `clientVisible: false` routes never are.
    */
   readonly apiRoutes?: readonly string[];
+  /**
+   * Translation keys the build cannot see in the client code: a key, a group,
+   * `prefix.*` or `*`. A string array adds keys; `{ keys, exhaustive: true }`
+   * also states that the keys cover every computed lookup in this page's
+   * graph, so the page ships the keys found in code plus these.
+   */
+  readonly translations?: TranslationDeclaration;
 };
 
 /**
@@ -104,6 +112,13 @@ export type LayoutConfig<TLoader extends LoaderFunction | undefined = undefined>
   readonly fontPreload?: boolean;
   /** Browser route names for every page that renders this layout (see `PageConfig.apiRoutes`). */
   readonly apiRoutes?: readonly string[];
+  /**
+   * Translation keys the build cannot see in the client code: a key, a group,
+   * `prefix.*` or `*`. A string array adds keys; `{ keys, exhaustive: true }`
+   * also states that the keys cover every computed lookup in this page's
+   * graph, so the page ships the keys found in code plus these.
+   */
+  readonly translations?: TranslationDeclaration;
 };
 
 /**
@@ -120,4 +135,11 @@ export type RootConfig<TLoader extends LoaderFunction | undefined = undefined> =
   readonly fontPreload?: boolean;
   /** Browser route names for every page in the application (see `PageConfig.apiRoutes`). */
   readonly apiRoutes?: readonly string[];
+  /**
+   * Translation keys the build cannot see in the client code: a key, a group,
+   * `prefix.*` or `*`. A string array adds keys; `{ keys, exhaustive: true }`
+   * also states that the keys cover every computed lookup in this page's
+   * graph, so the page ships the keys found in code plus these.
+   */
+  readonly translations?: TranslationDeclaration;
 };

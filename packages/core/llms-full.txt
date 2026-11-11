@@ -9844,8 +9844,8 @@ render changes: server output is the full dictionary, as before.
 
 Run `warlock build`, then `warlock check`. A `WL9104` warning marks a page that
 renders a translation key computed at runtime. Rewrite the lookup with a literal
-key or a static-prefix template; `config.translations` in the setup file only adds
-keys, and one computed lookup anywhere in the page's graph still ships every group.
+key or a static-prefix template. A plain `config.translations` array only adds
+keys; declare `{ keys: [...], exhaustive: true }` to cover the computed lookups.
 
 In development, a warning names a key the page reads but its payload lacks, and
 resolves it from the full table so the page keeps working. In production the
@@ -11041,7 +11041,9 @@ teardown. Module-owned timers/listeners must register their cleanup hooks.
 
 ## Translation keys in pages (5.36)
 
-`warlock check` reports `WL9104` when a page renders a translation key computed at runtime (`trans(key)` with no static prefix, or a translator passed on as a value). Such a page ships every translation group. The report gives the file, line and key text of each site. `config.translations` only adds keys and does not lift the fallback: one dynamic site anywhere in the page's graph (page, layouts, root, error pages) still ships every group, so rewrite the lookup with a literal key or a static-prefix template (``trans(`statuses.${s}`)``). A bare string literal equal to a group name ships the whole group, and hooks should call `useTrans()` themselves rather than receive `t`. The `web` skill `localize-pages` covers the browser side.
+`warlock check` reports `WL9104` when a page renders a translation key computed at runtime (`trans(key)` with no static prefix, or a translator passed on as a value). Such a page ships every translation group. The report gives the file, line and key text of each site. A plain `config.translations` array only adds keys and does not lift the fallback: one dynamic site anywhere in the page's graph (page, layouts, root, error pages) still ships every group, so rewrite the lookup with a literal key or a static-prefix template (``trans(`statuses.${s}`)``). When the key set really is closed, declare it exhaustive in the setup file, `config.translations = { keys: ["client.*", "errors.title"], exhaustive: true }`: the declared keys cover every computed lookup in that page's graph, the page ships the statically found keys plus the declared ones, and the build no longer reports it as dynamic. It covers the page whose setup file declares it, or the pages under the layout or root that declares it; an error or forbidden page's declaration covers only the error pages, never other pages. A bare string literal ships only a key of that exact name (and its plural variants), never a group; hooks should call `useTrans()` themselves rather than receive `t`, and a name imported from a non-translator (`import { translateCopy as t }`) is not a translator. The `web` skill `localize-pages` covers the browser side.
+
+The declaration's type is `TranslationDeclaration`, and `readTranslationDeclaration(file, text)` reads it from a setup file statically.
 
 
 ## use-middleware  `@warlock.js/core/skills/use-middleware/SKILL.md`
@@ -11629,7 +11631,7 @@ Five lines do the heavy lifting:
 1. **`source = Faq`** — Cascade model the repo wraps; auto-instantiates a `CascadeAdapter`.
 2. **`simpleSelectColumns`** — projection used when callers pass `simpleSelect: true`.
 3. **`filterBy`** — filter-key → operator map; powers the auto-applied WHERE clauses.
-4. **`defaultOptions`** — applied to every call (`orderBy`, default `limit`, etc.).
+4. **`defaultOptions`** — applied to every call (`orderBy`, default `limit`, etc.). Defaults are trusted: a default `orderBy` always applies, even on columns missing from `sortable` (which only restricts caller-supplied `orderBy`/`sortBy`/`cursorColumn`). A caller `orderBy` naming a non-sortable column is dropped whole and the default `orderBy` applies instead; the warning is logged once per repository and column set.
 5. **`new FaqsRepository()`** singleton — import this everywhere; never instantiate again.
 
 The class is intentionally private — only the singleton escapes the module. Scaffold with `npx warlock generate.repository <module>/<entity>`.
@@ -12938,7 +12940,7 @@ They parse real TypeScript/JSX syntax with the same oxc-parser adapter as the ex
 | `WL9025` | `merge()` on an object column of a Cascade model keeps the keys the new value omits (warning)      | Use `model.set({ column: value })` or `model.set("column", value)`; there is no automatic fix.                                                                     |
 | `WL9026` | A convention rule used more than its time budget and was skipped for the rest of the run (warning) | Use `--changed`, raise `ruleBudgetMs` in `.warlock-check.json` (0 turns it off), or turn the rule off.                                                             |
 | `WL9024` | Integration spec imports nothing that needs the app (warning)                                      | Move it to the unit project: rename it to `<name>.unit.spec.ts` outside `tests/`.                                                                                  |
-| `WL9104` | Translation key computed at runtime in `src/web` (the page ships every group)                      | Use a literal key or a static-prefix template; `config.translations` only adds keys, it does not lift the fallback.                                                |
+| `WL9104` | Translation key computed at runtime in `src/web` (the page ships every group)                      | Use a literal key or a static-prefix template, or declare `config.translations = { keys, exhaustive: true }` on the page.                                          |
 
 Web rules apply to `src/web/**/*.tsx`. Components are top-level JSX-returning functions
 with a capitalized name (or an anonymous default export). Hook files and ordinary helpers

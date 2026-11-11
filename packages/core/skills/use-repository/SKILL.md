@@ -50,7 +50,7 @@ Five lines do the heavy lifting:
 1. **`source = Faq`** — Cascade model the repo wraps; auto-instantiates a `CascadeAdapter`.
 2. **`simpleSelectColumns`** — projection used when callers pass `simpleSelect: true`.
 3. **`filterBy`** — filter-key → operator map; powers the auto-applied WHERE clauses.
-4. **`defaultOptions`** — applied to every call (`orderBy`, default `limit`, etc.).
+4. **`defaultOptions`** — applied to every call (`orderBy`, default `limit`, etc.). Defaults are trusted: a default `orderBy` always applies, even on columns missing from `sortable` (which only restricts caller-supplied `orderBy`/`sortBy`/`cursorColumn`). A caller `orderBy` naming a non-sortable column is dropped whole and the default `orderBy` applies instead; the warning is logged once per repository and column set.
 5. **`new FaqsRepository()`** singleton — import this everywhere; never instantiate again.
 
 The class is intentionally private — only the singleton escapes the module. Scaffold with `npx warlock generate.repository <module>/<entity>`.

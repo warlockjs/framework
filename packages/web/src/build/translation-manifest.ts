@@ -140,14 +140,21 @@ export function buildTranslationManifest(input: TranslationBuildInput): Translat
       ...(page.appFile === undefined ? [] : [page.appFile]),
       ...errorEntries,
     ];
+    // The page's, layouts' and root's setup files may declare an exhaustive
+    // list; the error pages' setup files only add keys, so an error page's
+    // declaration never covers an unrelated page.
     const setupFiles = [
       ...definedOf([page.setupFile, page.appSetupFile]),
       ...definedOf(page.layoutSetupFiles ?? []),
-      ...errorSetups,
     ];
 
     const analyzed = prune
-      ? analyzePageTranslationUsage({ appSrcRoot: input.srcRoot, entries, setupFiles }).usage
+      ? analyzePageTranslationUsage({
+          appSrcRoot: input.srcRoot,
+          entries,
+          setupFiles,
+          keysOnlySetupFiles: errorSetups,
+        }).usage
       : EVERYTHING_USAGE;
 
     record(page.pageFile, analyzed);

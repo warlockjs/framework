@@ -5,6 +5,7 @@ import { log } from "@warlock.js/logger";
 import ms from "ms";
 import { authConfig } from "../services/auth-config";
 import { AuthErrorCodes } from "../utils/auth-error-codes";
+import { normalizeEmailIdentifier } from "../utils/normalize-credentials";
 
 /**
  * Built-in identifier kinds the throttle knows how to extract from a request.
@@ -126,7 +127,7 @@ function throttleHashKey(): Buffer | undefined {
  * Exported for tests and for apps that inspect throttle keys.
  */
 export function throttleIdentifierHash(kind: string, value: string): string {
-  const normalized = `${kind}:${value.trim().toLowerCase()}`;
+  const normalized = `${kind}:${normalizeEmailIdentifier(value)}`;
   const key = throttleHashKey();
 
   return key

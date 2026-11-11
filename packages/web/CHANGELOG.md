@@ -2,6 +2,17 @@
 
 All notable changes to `@warlock.js/web` are documented here.
 
+## 5.52.0
+
+### Added
+
+- The build warns about any `locales.json` that applies to no page, naming the file and saying to move it next to or above the pages that use it. The build still succeeds.
+- `PageConfig`, `LayoutConfig` and `RootConfig` type `config.translations`, including the exhaustive `{ keys, exhaustive: true }` form. The build log hint for computed translation lookups mentions it.
+
+### Fixed
+
+- Multi-site apps: a `locales.json` above the site folders (for example `src/web/locales.json` or `src/web/$sites/locales.json`) is delivered to every page of every site, in development, production and server rendering alike. Before, it was typed and counted for key ownership but reached no page, so pages rendered raw keys. It is merged before each site's own dictionaries. A key is still declared in one `locales.json` in the whole app.
+
 ## 5.51.0 - 2026-11-11
 
 ### Added

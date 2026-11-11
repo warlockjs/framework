@@ -161,7 +161,7 @@ They parse real TypeScript/JSX syntax with the same oxc-parser adapter as the ex
 | `WL9025` | `merge()` on an object column of a Cascade model keeps the keys the new value omits (warning)      | Use `model.set({ column: value })` or `model.set("column", value)`; there is no automatic fix.                                                                     |
 | `WL9026` | A convention rule used more than its time budget and was skipped for the rest of the run (warning) | Use `--changed`, raise `ruleBudgetMs` in `.warlock-check.json` (0 turns it off), or turn the rule off.                                                             |
 | `WL9024` | Integration spec imports nothing that needs the app (warning)                                      | Move it to the unit project: rename it to `<name>.unit.spec.ts` outside `tests/`.                                                                                  |
-| `WL9104` | Translation key computed at runtime in `src/web` (the page ships every group)                      | Use a literal key or a static-prefix template; `config.translations` only adds keys, it does not lift the fallback.                                                |
+| `WL9104` | Translation key computed at runtime in `src/web` (the page ships every group)                      | Use a literal key or a static-prefix template, or declare `config.translations = { keys, exhaustive: true }` on the page.                                          |
 
 Web rules apply to `src/web/**/*.tsx`. Components are top-level JSX-returning functions
 with a capitalized name (or an anonymous default export). Hook files and ordinary helpers

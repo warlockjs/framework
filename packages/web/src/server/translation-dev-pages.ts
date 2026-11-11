@@ -58,8 +58,9 @@ export function developmentTranslationPages(input: {
         ...existingSetup(page.pageFile),
         ...layouts.flatMap(existingSetup),
         ...rootSetups,
-        ...errorSetups,
       ],
+      // The error pages' setup files add keys but never cover another page.
+      keysOnlySetupFiles: errorSetups,
     };
   });
 }

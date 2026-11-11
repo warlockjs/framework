@@ -959,6 +959,75 @@ describe("authService.attemptLogin", () => {
   });
 });
 
+describe("authService.attemptLogin credential normalization", () => {
+  it("finds the account for a differently cased, padded email", async () => {
+    const user = buildUser();
+    const first = vi.fn().mockResolvedValue(user);
+    verifyPassword.mockResolvedValue(true);
+
+    const result = await authService.attemptLogin({ first } as never, {
+      email: " Sara@X.io ",
+      password: "x",
+    });
+
+    expect(result).toBe(user);
+    expect(first).toHaveBeenCalledTimes(1);
+    expect(first).toHaveBeenCalledWith({ email: "sara@x.io" });
+  });
+
+  it("retries with the value as sent so legacy capitalized rows still log in", async () => {
+    const user = buildUser();
+    const first = vi.fn().mockResolvedValueOnce(null).mockResolvedValueOnce(user);
+    verifyPassword.mockResolvedValue(true);
+
+    const result = await authService.attemptLogin({ first } as never, {
+      email: " Sara@X.io",
+      password: "x",
+    });
+
+    expect(result).toBe(user);
+    expect(first).toHaveBeenNthCalledWith(1, { email: "sara@x.io" });
+    expect(first).toHaveBeenNthCalledWith(2, { email: "Sara@X.io" });
+  });
+
+  it("does not retry when the normalized value equals the value as sent", async () => {
+    const first = vi.fn().mockResolvedValue(null);
+
+    await authService.attemptLogin({ first } as never, { email: "sara@x.io", password: "x" });
+
+    expect(first).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps exact matching when normalizeCredentials is false", async () => {
+    const first = vi.fn().mockResolvedValue(null);
+    configKey.mockImplementation((key: string, fallback?: unknown) =>
+      key === "auth.normalizeCredentials" ? false : fallback,
+    );
+
+    await authService.attemptLogin({ first } as never, { email: " Sara@X.io", password: "x" });
+
+    expect(first).toHaveBeenCalledTimes(1);
+    expect(first).toHaveBeenCalledWith({ email: " Sara@X.io" });
+  });
+
+  it("uses a custom normalizeCredentials function", async () => {
+    const first = vi.fn().mockResolvedValue(null);
+    configKey.mockImplementation((key: string, fallback?: unknown) =>
+      key === "auth.normalizeCredentials"
+        ? (ids: Record<string, unknown>) => ({
+            ...ids,
+            username: String(ids.username).toLowerCase(),
+          })
+        : fallback,
+    );
+
+    await authService.attemptLogin({ first } as never, { username: "ADA", password: "x" });
+
+    expect(first).toHaveBeenNthCalledWith(1, { username: "ada" });
+    expect(first).toHaveBeenNthCalledWith(2, { username: "ADA" });
+  });
+});
+
 describe("authService.login", () => {
   it("returns null on invalid credentials", async () => {
     const Model = { first: vi.fn().mockResolvedValue(null) } as never;

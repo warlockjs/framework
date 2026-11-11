@@ -106,6 +106,8 @@ export type DevelopmentPageEntries = {
   readonly pageFile: string;
   readonly entries: readonly string[];
   readonly setupFiles: readonly string[];
+  /** Setup files that only add keys; their `exhaustive` flag is ignored. */
+  readonly keysOnlySetupFiles?: readonly string[];
 };
 
 /** A cached analysis, valid while every file it read keeps its modification time. */
@@ -136,6 +138,7 @@ export function createDevelopmentUsageAnalyzer(
       appSrcRoot,
       entries: page.entries,
       setupFiles: page.setupFiles,
+      keysOnlySetupFiles: page.keysOnlySetupFiles,
     });
     cache.set(page.pageFile, { usage, files, stamp: fileStamp(files) });
 

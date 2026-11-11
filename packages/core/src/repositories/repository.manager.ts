@@ -67,8 +67,13 @@ export class RepositoryManager<T = unknown, F = Record<string, any>> {
    * Columns a client may sort by (`orderBy` / `sortBy` / `cursorColumn`) when the
    * options come from a request. `id` and the declared `filterBy` keys are always
    * allowed; anything else is ignored. When a requested `orderBy` names a column
-   * that is not listed, the whole `orderBy` is dropped (never partially applied)
-   * and a warning names the column(s): add them here to allow sorting by them.
+   * that is not listed, the whole `orderBy` is dropped (never partially applied),
+   * the default `orderBy` (if any) applies instead, and a warning (once per
+   * dropped column set) names the column(s): add them here to allow sorting by them.
+   *
+   * This only restricts what a caller may ask for. A default `orderBy` written in
+   * code (`defaultOptions`) or in config (`repository.defaultOptions`) is trusted
+   * and always applied, whether or not its columns are listed here.
    * @protected
    */
   protected sortable: string[] = [];
@@ -595,9 +600,7 @@ export class RepositoryManager<T = unknown, F = Record<string, any>> {
     options?: RepositoryOptions,
   ): Promise<PaginationResult<T> | CursorPaginationResult<T>> {
     const query = this.newQuery();
-    const opts = this.sanitizeControls(
-      this.prepareOptions(options as TypedRepositoryOptions<F>),
-    ) as TypedRepositoryOptions<F>;
+    const opts = this.prepareClientOptions(options as TypedRepositoryOptions<F>);
     const paginationMode = opts.paginationMode || "pages";
 
     if (opts.paginate === false) {
@@ -735,6 +738,54 @@ export class RepositoryManager<T = unknown, F = Record<string, any>> {
   }
 
   /**
+   * Prepare options that come from a client (`list()`): sanitize only the
+   * caller's options, then put the trusted defaults (config
+   * `repository.defaultOptions`, then the repository's `defaultOptions`)
+   * underneath. A default `orderBy` is therefore always applied, and it is
+   * what applies when the caller's `orderBy` is dropped.
+   *
+   * `limit` / `perPage` / `defaultLimit` are capped by `maxPerPage` on the
+   * merged result, so defaults are capped exactly as before.
+   */
+  protected prepareClientOptions(options?: TypedRepositoryOptions<F>): TypedRepositoryOptions<F> {
+    const caller = this.sanitizeControls((options || {}) as RepositoryOptions) as Record<
+      string,
+      any
+    >;
+    const defaults: Record<string, any> = {
+      ...((config.get("repository.defaultOptions") as object) || {}),
+      ...(this.defaultOptions || {}),
+    };
+
+    // A caller's valid `sortBy` is a sort request: it must not lose to a
+    // default `orderBy` (an `orderBy` always wins over `sortBy`).
+    if (caller.sortBy !== undefined && caller.orderBy === undefined) {
+      delete defaults.orderBy;
+    }
+
+    // `undefined` values in the caller's options must not hide a default.
+    const defined = Object.fromEntries(
+      Object.entries(caller).filter(([, value]) => value !== undefined),
+    );
+    const merged: Record<string, any> = { ...defaults, ...defined };
+
+    const requested = Number(merged.limit ?? merged.perPage);
+    delete merged.perPage;
+
+    if (Number.isFinite(requested) && requested > 0) {
+      merged.limit = Math.min(Math.floor(requested), this.maxPerPage);
+    } else {
+      delete merged.limit;
+    }
+
+    if (merged.defaultLimit) {
+      merged.defaultLimit = Math.min(merged.defaultLimit, this.maxPerPage);
+    }
+
+    return merged as TypedRepositoryOptions<F>;
+  }
+
+  /**
    * Cast a plain `RepositoryOptions` spread to the typed variant.
    * Used internally when composing options across method calls where the
    * spread breaks the F-generic inference chain.
@@ -776,6 +827,21 @@ export class RepositoryManager<T = unknown, F = Record<string, any>> {
   ]);
 
   /**
+   * Dropped-`orderBy` warnings already logged, per repository class, so a
+   * client that keeps sending the same bad order does not flood the log.
+   */
+  private static readonly warnedDroppedOrder = new WeakMap<object, Set<string>>();
+
+  /**
+   * Whether a trusted default `orderBy` (config or repository) exists.
+   */
+  private hasDefaultOrderBy(): boolean {
+    const configured = (config.get("repository.defaultOptions") as RepositoryOptions) || {};
+
+    return Boolean(configured.orderBy || this.defaultOptions?.orderBy);
+  }
+
+  /**
    * Columns `orderBy` / `sortBy` / `cursorColumn` may target.
    */
   protected getSortableColumns(): Set<string> {
@@ -783,7 +849,9 @@ export class RepositoryManager<T = unknown, F = Record<string, any>> {
   }
 
   /**
-   * Split client-controllable control options from filters: `limit` is capped by
+   * Split client-controllable control options from filters (call it on the
+   * caller's options only, never on trusted defaults; see `prepareClientOptions`):
+   * `limit` is capped by
    * `maxPerPage`, sort / cursor columns must be whitelisted (`sortable`, `filterBy`
    * keys or `id`) and `select` must be within `selectable`. Anything else is
    * dropped, so `list({ ...request.all() })` cannot steer the query.
@@ -829,11 +897,22 @@ export class RepositoryManager<T = unknown, F = Record<string, any>> {
         const names = dropped.map((column) => `"${column}"`).join(", ");
         const pronoun = dropped.length === 1 ? "it" : "them";
 
-        log.warn(
-          "repository",
-          "orderBy",
-          `orderBy was ignored because ${names} ${dropped.length === 1 ? "is" : "are"} not sortable. Add ${pronoun} to the repository's \`sortable\` list to allow client sorting on ${pronoun}.`,
-        );
+        const warnedKey = [...dropped].sort().join("\u0000");
+        const warned =
+          RepositoryManager.warnedDroppedOrder.get(this.constructor) ?? new Set<string>();
+
+        if (!warned.has(warnedKey)) {
+          warned.add(warnedKey);
+          RepositoryManager.warnedDroppedOrder.set(this.constructor, warned);
+
+          const hasDefaultOrder = this.hasDefaultOrderBy();
+
+          log.warn(
+            "repository",
+            "orderBy",
+            `The caller's orderBy was ignored because ${names} ${dropped.length === 1 ? "is" : "are"} not sortable; ${hasDefaultOrder ? "the repository's default orderBy applies instead" : "no order is applied"}. Add ${pronoun} to the repository's \`sortable\` list to allow client sorting on ${pronoun}.`,
+          );
+        }
       }
     }
 

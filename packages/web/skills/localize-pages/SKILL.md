@@ -47,18 +47,20 @@ The build finds each page's keys by reading its client module graph: the page,
 its layouts, the root, error pages and the components they import. Literal
 keys, static-prefix templates (``trans(`statuses.${s}`)`` ships `statuses.*`)
 and module constants are resolved. Any other key-shaped string literal in those
-modules (dotted words, no spaces) that equals a key, a group or a subtree also
-ships, wherever it is written: a constant, an object mapping names to keys, a
-prop or an argument to a helper. A key used with `count` is stored as variants
+modules (dotted words, no spaces) that equals a key also ships, wherever it is
+written: a constant, an object mapping names to keys, a prop or an argument to a
+helper. Such a literal names one key, never a group: `export const site = "client"`
+does not ship `client.*`. A literal that ends in a dot (`"statuses."`) is a prefix.
+A key used with `count` is stored as variants
 (`items_one`, `items_other`, ...) and the call names the base, `t("cart.items",
 { count })`; naming the base ships every variant. A key built at run time that
 no literal names falls back to every group, and `warlock check` reports it as
 `WL9104` with the file, line and key text; the build log lists the same sites.
-`config.translations` only adds keys; it does not resolve a computed lookup. One
-dynamic site anywhere in the page's graph (page, layouts, root, error pages) still
-ships every group, so fix the site itself (a literal key or a static-prefix
-template). Use a declaration for keys the analysis cannot see, such as ones read
-from data:
+A plain `config.translations` array only adds keys; it does not resolve a computed
+lookup. One dynamic site anywhere in the page's graph (page, layouts, root, error
+pages) still ships every group, so fix the site itself (a literal key or a
+static-prefix template). Use a declaration for keys the analysis cannot see, such
+as ones read from data:
 
 ```ts title="src/web/orders/index.setup.ts"
 export const config = {
@@ -67,14 +69,32 @@ export const config = {
 };
 ```
 
+When the keys a computed lookup can reach are a closed set you can list, declare
+the list exhaustive. The declared keys then cover every computed lookup in that
+page's graph (a shared layout's included): the page ships the keys found in code
+plus the declared ones, is not dynamic, and the build log does not list its
+computed lookups. A declaration covers the page whose own setup file declares it,
+and the pages under a layout or the root whose setup file declares it; an error or
+forbidden page's declaration covers only the error pages, never other pages.
+`exhaustive: false` or omitting it behaves like the plain array;
+any other shape is refused with an error naming the setup file. A page whose files
+cannot be read or parsed still ships every group.
+
+```ts title="src/web/signin/index.setup.ts"
+export const config = {
+  translations: { keys: ["client.*", "errors.title"], exhaustive: true },
+};
+```
+
 Matching is by name: the result of `useTrans()` under any local name, and the
-names `t`, `trans`, `transX` and `transFrom` (key in the second argument). A hook
-that receives `t` as a parameter is matched only by that name, so give hooks their
-own `useTrans()` call instead of passing `t` in; a translator handed on as a value
-(returned, stored, passed to a non-hook call) is dynamic, but a dependency list
-(`useMemo(..., [t])`, `useEffect(..., [t])`) is not. A bare string literal equal to
-a group or subtree name (`"orders"`) ships that whole group; prefer a longer key
-or a static-prefix template over a short literal that happens to name a group.
+names `t`, `trans`, `transX` and `transFrom` (key in the second argument). A name
+imported from something that is not a translator (`import { translateCopy as t }`,
+`import t from "./copy"`) is not a translator in that file; `import { trans as t }`
+still is. A hook that receives `t` as a parameter is matched only by that name, so
+give hooks their own `useTrans()` call instead of passing `t` in; a translator
+handed on as a value (returned, stored, passed to a non-hook call such as
+`show(t)`) is dynamic, but a dependency list (`useMemo(..., [t])`,
+`useEffect(..., [t])`) is not.
 
 The same applies to the global registry (`extend()` / `register()`, the
 starter's default). The shared groups are copied once, when the web connector
@@ -109,7 +129,7 @@ you declare the rest.
 
 ## Scope, errors, and legacy lookups
 
-A page receives only `locales.json` files on its physical ancestor chain. A child file can contribute additional keys for that page. A sibling cannot contribute. Current ownership validation rejects duplicate flattened keys globally, including matching ancestor/child keys; any key that conflicts with a namespace prefix also fails the build.
+A page receives only `locales.json` files on its physical ancestor chain. A child file can contribute additional keys for that page. A sibling cannot contribute. In multi-site mode a `locales.json` above the site folders (`src/web/locales.json`, `src/web/$sites/locales.json`) reaches every page of every site, merged before the site's own dictionaries; a site's own dictionary reaches only that site. Each key is declared in one `locales.json` in the whole app, so put keys shared by several sites in a dictionary above the site folders. The build warns about any `locales.json` that applies to no page (move it next to or above the pages that use it); the build does not fail. Current ownership validation rejects duplicate flattened keys globally, including matching ancestor/child keys; any key that conflicts with a namespace prefix also fails the build.
 
 The server selects one immutable snapshot for route source and locale. The hydration payload contains only that locale's keywords and does not register them globally. `useTrans()` on the client and `t()` from `@warlock.js/core` on the server (loaders, `metadata`) use the same snapshot, so concurrent renders cannot leak copy. A missing scoped key returns the key itself.
 

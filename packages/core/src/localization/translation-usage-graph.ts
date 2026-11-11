@@ -3,7 +3,7 @@ import path from "node:path";
 import {
   EMPTY_TRANSLATION_USAGE,
   mergeTranslationUsage,
-  readTranslationDeclarations,
+  readTranslationDeclaration,
   scanTranslationSource,
   translationDeclarationUsage,
   usageOf,
@@ -19,8 +19,18 @@ const SOURCE_EXTENSIONS = [".ts", ".tsx", ".mts", ".js", ".jsx", ".mjs"];
 export type TranslationGraphInput = {
   /** The client entry files a render can execute: the page, its layouts, the root and error pages. */
   readonly entries: readonly string[];
-  /** Setup files whose `config.translations` declare keys static analysis cannot see. */
+  /**
+   * Setup files whose `config.translations` declare keys static analysis cannot
+   * see. An exhaustive declaration (`{ keys, exhaustive: true }`) covers every
+   * computed lookup in the walked files.
+   */
   readonly setupFiles?: readonly string[];
+  /**
+   * Setup files whose `config.translations` only add keys. Their `exhaustive`
+   * flag is ignored: use it for files that belong to other pages' renders, such
+   * as the error pages' setup files, which must not cover unrelated pages.
+   */
+  readonly keysOnlySetupFiles?: readonly string[];
   /** Source text of a file, or `undefined` when it cannot be read. */
   readonly readSource: (file: string) => string | undefined;
   /** Resolves a specifier imported by `importer` to a project file, or `undefined` for a package. */
@@ -48,11 +58,20 @@ export function analyzeTranslationGraph(input: TranslationGraphInput): Translati
   const seen = new Set<string>();
   const files: string[] = [];
   const usages: TranslationUsage[] = [];
+  const scanned: TranslationUsage[] = [];
+  let exhaustive = false;
   const queue = [...input.entries];
 
   for (const setupFile of input.setupFiles ?? []) {
     files.push(setupFile);
-    usages.push(readDeclarations(input, setupFile));
+    const declared = readDeclarations(input, setupFile);
+    usages.push(declared.usage);
+    if (declared.exhaustive) exhaustive = true;
+  }
+
+  for (const setupFile of input.keysOnlySetupFiles ?? []) {
+    files.push(setupFile);
+    usages.push(readDeclarations(input, setupFile).usage);
   }
 
   for (let file = queue.pop(); file !== undefined; file = queue.pop()) {
@@ -69,7 +88,7 @@ export function analyzeTranslationGraph(input: TranslationGraphInput): Translati
 
     try {
       const scan = scanTranslationSource(file, text);
-      usages.push(scan.usage);
+      scanned.push(scan.usage);
 
       for (const specifier of scan.imports) {
         const resolved = input.resolveImport(specifier, file);
@@ -85,19 +104,33 @@ export function analyzeTranslationGraph(input: TranslationGraphInput): Translati
     }
   }
 
-  return { usage: mergeTranslationUsage(usages), files };
+  // Computed lookups are covered by an exhaustive declaration. A file that
+  // could not be read or parsed stays dynamic: its lookups are unknown.
+  const covered = exhaustive
+    ? scanned.map((usage) => usageOf({ ...usage, dynamic: false, dynamicSites: [] }))
+    : scanned;
+
+  return { usage: mergeTranslationUsage([...usages, ...covered]), files };
 }
 
-function readDeclarations(input: TranslationGraphInput, setupFile: string): TranslationUsage {
+function readDeclarations(
+  input: TranslationGraphInput,
+  setupFile: string,
+): { readonly usage: TranslationUsage; readonly exhaustive: boolean } {
   const text = input.readSource(setupFile);
-  if (text === undefined) return unreadable(setupFile, "the setup file could not be read");
+  if (text === undefined) {
+    return { usage: unreadable(setupFile, "the setup file could not be read"), exhaustive: false };
+  }
 
-  const entries = readTranslationDeclarations(setupFile, text);
-  if (entries === undefined) return EMPTY_TRANSLATION_USAGE;
+  const declaration = readTranslationDeclaration(setupFile, text);
+  if (declaration === undefined) return { usage: EMPTY_TRANSLATION_USAGE, exhaustive: false };
 
-  return mergeTranslationUsage(
-    entries.map((entry) => translationDeclarationUsage(entry, setupFile)),
-  );
+  return {
+    usage: mergeTranslationUsage(
+      declaration.entries.map((entry) => translationDeclarationUsage(entry, setupFile)),
+    ),
+    exhaustive: declaration.exhaustive,
+  };
 }
 
 /** A dynamic usage that names the file which forced it. */
@@ -166,10 +199,12 @@ export function analyzePageTranslationUsage(input: {
   readonly appSrcRoot: string;
   readonly entries: readonly string[];
   readonly setupFiles?: readonly string[];
+  readonly keysOnlySetupFiles?: readonly string[];
 }): TranslationGraphResult {
   return analyzeTranslationGraph({
     entries: input.entries,
     setupFiles: input.setupFiles,
+    keysOnlySetupFiles: input.keysOnlySetupFiles,
     readSource: readSourceFile,
     resolveImport: (specifier, importer) =>
       resolveSourceImport(specifier, importer, input.appSrcRoot),

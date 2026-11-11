@@ -165,6 +165,10 @@ Set `web.tlsAsk` to expose a Caddy on-demand TLS `ask` endpoint. It requires `we
 }
 ```
 
+## Route dictionaries
+
+A `locales.json` inside a site folder reaches only that site's pages. A `locales.json` above the site folders (`src/web/locales.json` or `src/web/$sites/locales.json`) reaches every page of every site and is merged before the site's own dictionaries. Each key is declared in one `locales.json` in the whole app, so put keys shared by several sites in a dictionary above the site folders. The build prints a warning naming any `locales.json` that applies to no page; move it next to or above the pages that use it. The build still succeeds.
+
 ## Configuration and boot errors
 
 Multi-site boot checks fail early and name the offending configuration or file. Fix these rather than relying on selection order:

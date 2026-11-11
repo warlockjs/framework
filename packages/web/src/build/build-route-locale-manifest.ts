@@ -75,6 +75,35 @@ function isWithin(directory: string, candidate: string): boolean {
   );
 }
 
+/**
+ * Whether a locale file reaches a page. A file inside the page's own web root
+ * (the site folder in multi-site mode) applies when its folder is on the
+ * page's ancestor chain. A file outside that root applies when its folder is
+ * above the page's web root: the shared dictionary above the site folders
+ * (`src/web/locales.json`, `src/web/$sites/locales.json`). Another site's
+ * dictionary never matches, because its folder is not above this root.
+ */
+function applies(
+  source: { sourceFile: string; webRoot: string },
+  page: { pageFile: string; webRoot: string },
+): boolean {
+  const directory = path.dirname(source.sourceFile);
+  if (!isWithin(directory, page.pageFile)) return false;
+  return source.webRoot === page.webRoot || isWithin(directory, page.webRoot);
+}
+
+function directoryDepth(source: { sourceFile: string }): number {
+  return path.dirname(source.sourceFile).split(path.sep).length;
+}
+
+/** The locale files that no page, app root or error page receives. */
+export function findUnusedRouteLocaleFiles(graph: RouteLocaleManifestGraph): string[] {
+  return graph.localeFiles
+    .filter((source) => !graph.pages.some((page) => applies(source, page)))
+    .map((source) => source.sourceFile)
+    .sort((left, right) => compareSourceFiles({ sourceFile: left }, { sourceFile: right }));
+}
+
 function sourceDepth(source: { sourceFile: string; webRoot: string }): number {
   const relative = path.relative(source.webRoot, path.dirname(source.sourceFile));
   return relative === "" ? 0 : relative.split(path.sep).length;
@@ -142,10 +171,11 @@ export function buildRouteLocaleManifest(
   const pages = safeRecord<RouteLocaleManifest["pages"][string]>();
 
   for (const page of graph.pages) {
-    const applicable = sources.filter(
-      (source) =>
-        source.webRoot === page.webRoot && isWithin(path.dirname(source.sourceFile), page.pageFile),
-    );
+    // Shallower directories first, so a shared dictionary precedes the site's
+    // own; the sort is stable, so equal depths keep the deterministic order.
+    const applicable = sources
+      .filter((source) => applies(source, page))
+      .sort((left, right) => directoryDepth(left) - directoryDepth(right));
     const translationsByLocale = safeRecord<Record<string, unknown>>();
     for (const code of localeCodes) translationsByLocale[code] = safeRecord<unknown>();
 

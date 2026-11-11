@@ -4,6 +4,16 @@ All notable changes to `@warlock.js/auth` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.52.0
+
+### Added
+
+- `auth.normalizeCredentials` config option: a function `(identifiers) => identifiers` that rewrites login identifiers before the lookup, or `false` for exact matching. Exports the `NormalizeCredentials` type.
+
+### Fixed
+
+- Email sign-in is no longer case- and whitespace-sensitive. `authService.login()`, `attemptLogin()` and `loginWithSessionCookies()` trim identifier values and lower-case `email` before the lookup, so `Sara@x.io` finds `sara@x.io`. When nothing matches, the lookup is retried once with the value as sent (trimmed), so accounts stored with capitals keep working. The login throttle uses the same normalization, so its bucket and the account lookup always agree.
+
 ## 5.35.0 - 2026-10-21
 
 ### Fixed

@@ -6,6 +6,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 > ⚠ **Versioning: `@warlock.js/*` does not follow SemVer strictly — breaking changes may ship in a minor.** This is a deliberate decision, not an oversight: the framework is pre-adoption and the cost of a major per behaviour fix currently outweighs the benefit. **Pin an exact version or a tilde range (`~4.13.0`) if you need to opt into changes rather than receive them.** Every breaking change is marked **BREAKING** in its entry and summarised in an _Upgrading_ section at the top of the release. **This policy will change once the framework has consumers beyond its author.**
 
+## 5.52.0
+
+### Added
+
+- `config.translations` accepts an exhaustive form, `{ keys: ["client.*", "errors.title"], exhaustive: true }`, in a page's setup file. The declared keys cover every computed translation lookup in that page's graph (layouts and root included), so the page ships the keys found in code plus the declared ones instead of every translation group, and the build no longer reports its computed lookups. An exhaustive declaration covers the page whose own setup file declares it, and the pages under a layout or the root that declares it; an error or forbidden page's declaration only covers the error pages' own graph, never an unrelated page. The plain array form is unchanged; any other shape is refused with an error naming the setup file. New exports: `TranslationDeclaration`, `readTranslationDeclaration`; `analyzePageTranslationUsage` and `analyzeTranslationGraph` take `keysOnlySetupFiles` for setup files whose keys count but whose `exhaustive` flag does not.
+
+### Fixed
+
+- Repository default `orderBy` is no longer dropped. `list()` now sanitizes only the caller's options and applies the repository's `defaultOptions` and the app-wide `repository.defaultOptions` underneath, so a default `orderBy` always applies, even when its columns are not in `sortable`. A caller's `orderBy` that names a non-sortable column is still dropped whole, and the default order now applies instead of none. Defaults written in code are trusted: a default `select` or `cursorColumn` is no longer filtered by `selectable` or `sortable`.
+- The dropped-`orderBy` warning is logged once per repository class and dropped column set instead of on every call, and says which order applies instead.
+- A string literal that happens to equal a translation group name (`export const site = "client"`) no longer ships every key in that group. A free-standing literal now reaches only a key of that exact name and its plural variants; a literal ending in `.` still acts as a prefix. Translator calls and `config.translations` declarations keep their group reach.
+- A name imported from something that is not a translator (`import { translateCopy as t } from "./copy"`, `import t from "./copy"`) is no longer treated as a translator, so calling it no longer makes the page ship every translation group. `import { trans as t }` is still a translator, and an aliased `transFrom` reads its key from the second argument.
+- WL9104 points to the exhaustive `config.translations` form as the fix for a closed set of keys.
+
+### Documentation
+
+- The repositories page describes `sortBy` / `sortDirection` correctly: they apply when no `orderBy` is set.
+
 ## 5.51.0 - 2026-11-11
 
 ### Added
