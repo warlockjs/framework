@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { PassThrough } from "node:stream";
 import zlib from "node:zlib";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { bootHarness, type HttpHarness } from "../../tests/integration/http/harness";
 import {
   createFlushingCompressor,
@@ -106,10 +106,9 @@ describe("createFlushingCompressor", () => {
 
     destination.write("<html><body>shell");
 
-    await new Promise((resolve) => setTimeout(resolve, 20));
-
-    // The shell is readable while the stream is still open.
-    expect(decoded.join("")).toBe("<html><body>shell");
+    // The shell is readable while the stream is still open. The flush runs on the
+    // zlib thread pool, so wait for it instead of assuming how long it takes.
+    await vi.waitFor(() => expect(decoded.join("")).toBe("<html><body>shell"), { timeout: 5000 });
     expect(raw.writableEnded).toBe(false);
 
     destination.end("<script>deferred</script></body></html>");
