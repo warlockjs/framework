@@ -849,7 +849,7 @@ describe("semanticCache — context isolation (security)", () => {
     const fromSupport = await support.execute("what is my balance?", { sessionId: "user-a" });
 
     expect(fromSupport.text).toBe("support: please contact billing");
-    expect(mockModel.callCount).toBe(2);
+    expect(mockModel?.callCount).toBe(2);
   });
 
   it("does not serve an answer given at another point of a conversation", async () => {
@@ -881,7 +881,7 @@ describe("semanticCache — context isolation (security)", () => {
     });
 
     expect(second.text).toBe("sending the invoice");
-    expect(mockModel.callCount).toBe(2);
+    expect(mockModel?.callCount).toBe(2);
   });
 
   it("neither reads nor writes for a run without a sessionId under the default scope", async () => {
@@ -904,7 +904,7 @@ describe("semanticCache — context isolation (security)", () => {
 
     const second = await ai.execute("what is my current balance?");
     expect(second.text).toBe("answer for B");
-    expect(mockModel.callCount).toBe(2);
+    expect(mockModel?.callCount).toBe(2);
   });
 
   it("skips the cache when a scope resolver returns no key", async () => {
