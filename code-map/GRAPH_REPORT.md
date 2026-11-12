@@ -1,27 +1,27 @@
-# Graph Report - warlock.js  (2026-11-11)
+# Graph Report - warlock.js  (2026-11-12)
 
 ## Corpus Check
-- 6161 files · ~4,566,105 words
+- 6163 files · ~4,571,399 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 157 file(s) not represented in the graph (top: (none) 83, .orig 32, .jsonl 28)
 
 ## Summary
-- 45871 nodes · 116212 edges · 943 communities (813 shown, 130 thin omitted)
-- Extraction: 91% EXTRACTED · 9% INFERRED · 0% AMBIGUOUS · INFERRED: 10505 edges (avg confidence: 0.93)
+- 45893 nodes · 116259 edges · 930 communities (800 shown, 130 thin omitted)
+- Extraction: 91% EXTRACTED · 9% INFERRED · 0% AMBIGUOUS · INFERRED: 10515 edges (avg confidence: 0.93)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `e53d4b62`
+- Built from commit: `0e5683b6`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
 ## Community Hubs (Navigation)
 - supervisor/execution.ts
-- AIError
+- ai/src/errors/index.ts
 - ModelContract
 - agent.ts
 - Model
-- agent-trace-recorder.ts
+- site-config.types.ts
 - install-page-routes.ts
 - postgres-driver.ts
 - SnapshotStore
@@ -29,45 +29,45 @@
 - MongoQueryBuilder
 - orchestrator/execution.ts
 - responses-model.ts
-- router/router.ts
+- router/types.ts
 - ref_mongez_config
-- web/src/shared.ts
+- single-bundle-resolve.ts
 - migrations.ts
-- Response
+- defineResource
 - session-cookies.spec.ts
-- ai/src/errors/index.ts
+- .metrics
 - web-connector.ts
 - ToolContract
 - Restful
-- Observer
+- ai/src/index.ts
 - fs/src/index.ts
-- file-manager.ts
+- services/engine.ts
 - vitest-setup.ts
 - navigation-root.tsx
 - ref_node_net
-- OpenAISDK
-- run-supervisor.md
+- ai-groq/src/sdk.ts
+- Resource
 - 01-primitives.md
 - BaseValidator
-- framework-cli-commands.ts
+- cli-commands.manager.ts
 - ref_vitest
-- human-approval.ts
+- RedisInterruptStore
 - features/index.ts
 - HttpErrorCodes
-- services/engine.ts
+- access.ts
 - cache/src/types.ts
 - ForbiddenError
 - production-builder.ts
 - Usage
 - sitemap/src/index.ts
-- access/scripts/generate-llms.mjs
+- storage.md
 - ai-anthropic/src/model.ts
 - hardening-suite.ts
 - authMiddleware
 - cascade/src/index.ts
 - auth/src/contracts/types.ts
 - web/src/index.ts
-- register-model.ts
+- ChildModel
 - DateValidator
 - generate-image-variants.ts
 - string-validator.ts
@@ -80,17 +80,17 @@
 - FileLog
 - ai-openai/src/utils/index.ts
 - planner-run.ts
-- ai-google/src/sdk.ts
+- event-map.type.ts
 - rootPath
-- locale-routing.ts
+- route-table.ts
 - ai-bedrock/src/model.ts
 - ai-google/src/model.ts
-- Storage
+- StorageFile
 - Ops
 - CacheKey
 - cache/src/index.ts
 - MigrationRunner
-- ops.ts
+- WorkspaceBackend
 - document-context.ts
 - skills/index.ts
 - inspect-app.ts
@@ -98,7 +98,7 @@
 - LoggingData
 - warlockPath
 - CacheManager
-- utils/test-helpers.ts
+- DriverContract
 - BaseValidator
 - .validated
 - track-request-log.ts
@@ -110,10 +110,10 @@
 - ConsoleLog
 - ref_node_crypto
 - Storage
-- fetch-page-data.ts
+- .env
 - PostgresQueryBuilder
 - MockCacheDriver
-- ai/src/index.ts
+- guard/guard.ts
 - ai-xai/src/sdk.ts
 - migrate-action.ts
 - defer
@@ -121,33 +121,33 @@
 - useTrans
 - types/route-types.ts
 - CacheDriver
-- .env
+- production-builder.contributions.test.ts
 - mcp-tools.ts
 - use-cases-deep.md
 - openapi-child-output.ts
-- files-orchestrator.ts
-- FileHealthCheckerContract
+- commands-loader.spec.ts
+- FileManager
 - boot-for-diagnostics.ts
 - security-conventions.ts
 - globalPrefix
 - core/src/validation/types.ts
 - Application
-- budget.ts
+- ai.ts
 - UploadedFile
 - t
-- oxlint-runner.ts
+- rate-limit.middleware.ts
 - rag/index.ts
-- connection-from-env.ts
+- ColumnBuilder
 - migration/migration.ts
 - cli-commands.md
-- generations/stubs.ts
+- notifications.feature.spec.ts
 - Request
 - MongoQueryParser
 - openapi/types.ts
 - QueryBuilder
 - RepositoryManager
 - shell-check.ts
-- prompts-manager.ts
+- PromptsManager
 - WorkspacePolicyError
 - eval.type.ts
 - Image
@@ -156,12 +156,12 @@
 - Always-true facts
 - transport.ts
 - skill-snippet-gate.ts
-- warlock-config.manager.ts
-- gate-a-resolve.ts
+- warlock-config.md
+- ssr-client-view.ts
 - conventions-step.ts
 - Every option, explained
 - router
-- types/page-config.ts
+- SystemPromptContract
 - Mail
 - mail/index.ts
 - fakes.spec.ts
@@ -170,29 +170,29 @@
 - apply-panoptic-config.ts
 - board.ts
 - blog-check.mjs
-- 05-troubleshooting.md
+- host
 - fetch-url.ts
 - SentryLog
 - column-helpers.ts
 - lru
-- hydration-payload.ts
+- runtime/matcher.ts
 - ModelEvents
-- ref_vite
+- dev-server-config.ts
 - redact/redact.ts
 - postgres/sync.test.ts
 - ai-tools/src/index.ts
-- validation/init.ts
+- 01-primitives.md
 - EventConsumer
-- TraceSpan
+- BaseReport
 - confined.ts
 - endpoint.generator.ts
-- file-event-handler.ts
+- files-orchestrator.ts
 - boolean-validator.ts
 - fn
 - defineNotification
 - guardedFetch
 - TypeGenerator
-- build-request-body.ts
+- release-notes.spec.ts
 - Trace
 - conventions-step.ts
 - ref_warlock_js_core
@@ -200,40 +200,40 @@
 - auth/routes.ts
 - prompt/prompt.ts
 - WorkspaceImpl
-- SystemPromptContract
+- RefinedSystemPrompt
 - auth.middleware.spec.ts
-- ai-ollama/src/sdk.ts
+- ai-ollama/src/model.ts
 - ai-tools/src/errors.ts
-- ai-groq/src/sdk.ts
-- build-openapi-document.ts
-- RepositoryAdapterContract
+- OpenAISDK
+- openapi/types.ts
+- HookRepository
 - generation.ts
 - rabbitmq-driver.ts
-- agents-and-prompts.md
+- run-upgrade.ts
 - WL9xxx — conventions and hygiene
-- security-headers.ts
+- http/index.ts
 - unit/cli/issue-command.test.ts
 - repositories-deep.md
 - design-system-mantine-ssr.spec.ts
 - seed-command-action.ts
 - local-registry-gate.ts
 - use-case.ts
-- Resource
+- ResourceFieldBuilder
 - render-agents-md.ts
 - trace-request.ts
 - NumberValidator
-- TraceSpan
+- console-exporter.ts
 - WorkspaceTools
 - ops.ts
 - notifications/src/types.ts
 - json-schemas.ts
 - devtools/src/types.ts
 - create-new-app/index.ts
-- client.ts
+- json-schema-to-standard.ts
 - 01-redaction.md
 - mcp/serve.ts
 - FieldFrame
-- otel-exporter.ts
+- ExporterContract
 - benchmark/index.ts
 - ScopedCacheContract
 - verify-and-reset.spec.ts
@@ -242,9 +242,9 @@
 - best-practices.mdx
 - ref_node_events
 - queue/src/index.ts
-- request.ts
+- Response
 - PostgresQueryParser
-- logger/src/index.ts
+- build-client.ts
 - add-command.action.ts
 - helpers/app.ts
 - BaseValidator
@@ -258,65 +258,65 @@
 - development-server.ts
 - PgCacheDriver
 - logger/domains/backlog.md
-- adapters/index.ts
+- ai-cli/src/cli.ts
 - cli-agent.ts
 - query-builder-api.md
-- eval-runner.ts
+- GroqSDK
 - guarded
 - update-warlock-packages.ts
 - LazyValidator
 - prompts
-- check-upgrade.ts
+- codemods/index.ts
 - projection.ts
-- queue-manager.ts
+- src/dashboard.ts
 - stylesheet-urls.ts
 - strictness-gate.ts
-- parse-imports.ts
+- multi-database.md
 - collect-sitemap-entries.ts
 - generate-changelog.mjs
-- fixture.ts
+- e2e/types.ts
 - zero-edit-generator-gate.ts
 - serve-http.spec.ts
 - MigrationDriverContract
 - startHttpTestServer
-- TaggedCache
-- config
+- TaggedCacheDriver
+- check.types.ts
 - RabbitMQChannel
 - define-notification.ts
 - Job
 - dashboard/serve.ts
-- route-registration-snapshot.ts
+- postman-generator.action.ts
 - request-history.ts
-- DevServerShortcuts
+- Dev-server update check: offline safety + `u` shortcut
 - App
 - published-react-gate.mjs
 - retry.md
-- server.ts
+- router/router.ts
 - stringField
-- reset-password.service.ts
+- exporters/index.ts
 - app.js
 - prepare-fonts.ts
 - job.ts
 - image.tsx
 - ai-cli/src/index.ts
 - auth.service.spec.ts
-- http/request-log-snapshot.ts
+- Warlock — configure the app
 - Code Standards
 - Data & persistence
-- global-translations.ts
-- FilterApplicator
+- gate-a-resolve.ts
+- resource/types.ts
 - shell-parser.ts
 - local-drivers.spec.ts
 - ai-command.action.ts
 - Observability & resilience
-- EmbeddingBatchResult
+- FakeEmbedder
 - request-tracing.md
 - captureAnyUnhandledRejection
 - PosixParser
 - DatabaseDirtyTracker
-- FileManager
+- module-loader.ts
 - move-directory.ts
-- hydration-client-url.ts
+- prompts-manager.ts
 - warlock-versions.ts
 - herald
 - design-system-mantine-controls.spec.ts
@@ -324,7 +324,7 @@
 - register-sitemap-routes.ts
 - defineJob
 - page-registry-plugin.ts
-- queue/src/types.ts
+- drivers/local.ts
 - sitemap-artifact-store.ts
 - expressions.md
 - vector-search.md
@@ -332,71 +332,71 @@
 - `v.date()` — method reference
 - configuration.md
 - sitemap-lifecycle.ts
-- backends/local.ts
+- LocalBackend
 - Scheduler
 - create-warlock-app/index.ts
 - Testing strategy
 - CACHE_FOR
-- parse-locale-dictionary.ts
+- locales-ts-deprecated.check.ts
 - step-runner.ts
 - build-openapi-document.spec.ts
 - scaffolder.spec.ts
 - Sitemap
 - SystemPromptContract
 - src/services/auth.service.ts
-- Tasks
+- generated-notifications-runtime.test.ts
 - serialized.ts
-- `@warlock.js/ai-openai`
+- run-cli-agents.mdx
 - CloudDriver
-- warlock/src/web/home/index.page.tsx
+- contact-section.tsx
 - Warlock — `warlock check`, `typecheck`, `explain`
 - CronParser
 - dispatch-release.ts
 - adapters.spec.ts
 - linear-regex.ts
 - shell-jobs.ts
-- pm2-config.ts
+- route-registration-child.ts
 - run-runtime-acceptance.mjs
-- generate-site-llms.mjs
+- human-approval.ts
 - generated-browser-oracle.mjs
 - Upgrade an application from 5.29
 - Working in the Warlock.js framework monorepo
-- compression.ts
-- request-log-store.ts
-- check.types.ts
+- human/index.ts
+- check-upgrade.ts
+- page-registry-plugin.ts
 - run-pnpm-acceptance.mjs
 - Git workflow
 - Security baseline
 - starter-browser-gate.mjs
 - WorkspaceEditError
 - Basic Operations
-- locales-ts-deprecated.check.ts
-- T
-- page-manifest.ts
+- compiler.ts
+- PendingInterrupt
+- InterruptStore
 - page.spec.ts
 - retention.spec.ts
-- `@warlock.js/notifications` — basics
+- Configure notifications
 - app-singleton.ts
-- Warlock — store a file
+- database-cache-driver.ts
 - payload-budget.ts
 - benchmark.md
 - Context
 - file-log.ts
-- web-connector.spec.ts
-- `@warlock.js/ai-bedrock`
-- http-response.md
+- delete-strategies.md
+- tests/agent-trace.spec.ts
+- Router
 - base-validator.ts
 - Alter a migration
 - features-map.ts
 - release-family.spec.ts
-- EventMessage
+- Behavior bugs / gaps (NOT fixed — changing them alters runtime behavior)
 - JsonStreamGuard
 - serve-http.ts
 - ref_warlock_js_seal
 - LocalDriver
 - gate-a-resolve.spec.ts
 - Module boundaries
-- src/supervisor.ts
+- registry.ts
 - ReleaseFamilyDependencies
 - RabbitMQDriver
 - rabbitmq-channel.ts
@@ -408,9 +408,9 @@
 - generated-output-oracle.mjs
 - auth/scripts/generate-llms.mjs
 - CacheListAccessor
-- ModelInfo
+- ApprovalRejectedError
 - test-setup-reporter.ts
-- ref_mongez_react_form
+- use-contact-form.ts
 - gate-b-secrets.ts
 - bullmq-queue.ts
 - ref_node_url
@@ -419,37 +419,37 @@
 - notifications/scripts/generate-llms.mjs
 - LocalDriver
 - bm25Rank
-- SchemaRegistry
-- config-getter.ts
+- generators.md
+- local-processes.spec.ts
 - windows-helper.ts
 - serve/serve.ts
 - ai-panoptic/src/index.ts
-- model-signal-contract.ts
+- check.md
 - 01-the-context-model.md
-- 02-orchestrating-multiple-contexts.md
+- ContextManager
 - otp.service.ts
 - list-endpoint.ts
 - RedisCheckpointStore
 - Observe notifications
 - Notifiable
-- Cron expressions
+- oxc-toolchain.spec.ts
 - utils/paths.ts
 - routes-command.action.ts
 - inject-request-context.ts
-- json-fields.md
+- 01-crud-basics.md
 - file-log-naming-retention.spec.ts
 - Release the warlock family
-- platform.ts
+- events-and-hooks.md
 - BrowserPage
-- supervisor
+- src/supervisor.ts
 - FakeRedisClient
-- collect-routes.ts
+- .environment
 - single-bundle.test.ts
 - Structural validators — picking guide
-- ai-xai/scripts/generate-llms.mjs
+- core/getting-started/03-configuration.md
 - core/src/index.ts
 - astro.config.mjs
-- ref_warlock_js_web
+- setup-test-lifecycle.test.ts
 - cache.md
 - devtools-connector.ts
 - Queue
@@ -457,235 +457,236 @@
 - chunk.ts
 - budget
 - Warlock — add web to an app
-- password.ts
+- database/utils.ts
 - zero-edit-generator-gate.spec.ts
-- ArrayValidator
-- Warlock — create a controller
+- array-mutators.ts
+- testing.md
 - joins.md
 - notifications/src/types.ts
 - 03-relationships.md
-- matcher-logic.ts
-- JobResult
+- updater/package-manager.ts
+- seeders-manager.test.ts
 - release-command.action.ts
 - repository.manager.ts
-- mailer-pool.ts
+- GuardrailVerdict
 - BaseValidator
 - devtools/scripts/generate-llms.mjs
 - @mongez/pkgist
 - namespaces.mdx
 - ValidationResult
-- what-panoptic-traces.md
+- TraceSpan
 - drop-tables-action.ts
 - guard-unit-project.ts
 - ai-mistral/src/sdk.ts
-- to-bedrock-messages.ts
-- auth-default-translations.spec.ts
+- pg-vector-store.ts
+- auth/src/index.ts
 - Sync System
 - @warlock.js/context
-- TaggedScopedCacheContract
-- e2e/types.ts
+- audit-trail.md
+- links.ts
 - renderReact
 - 📯 Warlock Herald
 - bench-types.mjs
-- warlock-family.ts
+- pkgist-exports-parity.ts
 - check-mdx-in-md.mjs
 - Use transactions
 - prepare-attachment-part.ts
 - LRUMemoryCacheDriver
 - notification-columns.ts
 - restructure-ai-docs.mjs
-- idempotency.middleware.ts
+- queue-manager.ts
 - scheduler/getting-started/introduction.mdx
 - Warlock — use a repository
 - html-to-markdown.ts
 - base-cache-driver.mdx
 - agent-kit-targets.ts
-- promote-dist.rollback.test.ts
+- check-permissions.md
 - sync.md
-- resources.md
+- cascade/the-basics/validation.md
 - migrations.test.ts
 - no-pnpm-in-shipped-docs.ts
 - CascadeAdapter
 - agent
 - bulk-operations.mdx
-- guarded.request.ts
-- check-for-updates.test.ts
+- seeders.manager.ts
+- prompts-validate.ts
 - S3Driver
 - safe-fetch.ts
-- Run auth commands
-- querying-traces.md
-- resolve-sitemap-config.ts
+- responses-model.spec.ts
+- MemoryStore
+- sitemap-local-runtime.ts
 - SitemapRefreshScheduler
 - basic-agent.md
 - Use vector search
 - tags.mdx
-- Warlock — send a mail
+- otel-exporter.ts
 - 01-development-and-production.mdx
 - create-warlock — scaffold a new project
 - match.ts
-- 03-your-first-context.md
-- module-loader.ts
+- warlock-family.ts
+- app-module-importer.ts
 - agent-trace-ui.spec.ts
 - create-new-app.spec.ts
 - check-spec-coverage.mjs
-- Sidebar.astro
-- CacheConfigurationError
+- Header.astro
+- `cached()` — function-memoization helper
 - stampede-prevention.mdx
 - LogContract
-- dev-logger.ts
-- files-watcher.ts
-- define-a-context.md
+- pii.ts
+- SeederDependencyCycleError
+- Warlock — serve styles
 - ui.html.md-links.spec.ts
-- JobResult
-- tests/supervisor.test.ts
-- conditional-request.ts
+- retry-flaky-api.mdx
+- platform.ts
+- Run coding CLIs as agents
 - atomic-operations.md
 - RecordingQuery
 - implement-resolver.md
 - ProcessStartupError
 - recipient-type.test.ts
 - essentials/events.mdx
-- request-stylesheets.ts
+- guard/contracts/index.ts
 - relationships.md
 - generation-manifest.ts
-- design-system-mantine-controls.spec.ts
-- SitemapRegenerationCoordinator
+- mcp.md
+- ai-source.ts
 - atomic-operations.mdx
-- sites.check.ts
+- cached.mdx
 - Warlock — write a use case
-- scheduler.ts
-- BaseValidator
+- @warlock.js/scheduler
+- forbidden-methods.ts
 - ResponseStatus
 - Consuming Events
 - request-locals-isolation.spec.ts
 - projection/root.tsx
 - CacheTraceStore
-- lru-memory.mdx
-- browser-e2e.mdx
-- ref_warlock_js_cascade
+- injection.ts
+- cascade-scoped-budget-store.ts
+- api
 - Consume messages
 - Execution / terminators
-- `Context<TStore>`
-- context/reference/api.md
+- file-rules-and-helpers.test.ts
+- checkDevtoolsInDev
 - Logging — `log` from `@warlock.js/logger`
 - sql-types.ts
 - MongoDbDriver
 - describe-server-address.ts
-- aggregates.md
+- WL7xxx — CLI and checked code
 - banner.ts
 - Cross-cutting modifiers + the pipeline
 - web/scripts/generate-llms.mjs
 - remark-validate-mdx-components.mjs
 - site-metrics.ts
 - log-ai-calls.md
-- StrictJsonParser
-- jwt.ts
+- StagedTransaction
+- Warlock — write a seeder
 - Select / projection
 - finalize-chunk-names.ts
 - events.md
 - react-module-resolution.test.ts
 - ops.spec.ts
 - ai-anthropic/scripts/generate-llms.mjs
-- orchestrate-contexts.md
+- serializeLoaderData
 - Publish messages
 - ai-google/scripts/generate-llms.mjs
-- use-in-workers-and-jobs.md
+- context/scripts/generate-llms.mjs
 - ai-openai/scripts/generate-llms.mjs
 - ai-panoptic/scripts/generate-llms.mjs
 - ai/scripts/generate-llms.mjs
-- app-module-graph-scan.ts
+- Create Warlock
 - ai-workspace/scripts/generate-llms.mjs
 - cache/scripts/generate-llms.mjs
 - Key Exports
 - Define and query relations
 - Config
 - Define a context
-- model/model.ts
-- Warlock — `warlock inspect`
+- query-methods.ts
+- fs/scripts/generate-llms.mjs
 - Warlock — create a module
 - Write a migration
 - Warlock — benchmark code
 - agent-trace.md
 - Warlock — process an image
 - best-practices/memory.md
-- 01-the-request-lifecycle.md
+- add-a-crud-module.md
 - Scheduler — Backlog
 - Detailed Feature Comparison
 - quick-start.mdx
 - secret-store.ts
-- swr.mdx
-- .require
+- seal/scripts/generate-llms.mjs
+- password.ts
 - Tasks
 - DataSource
-- inspect-app.spec.ts
-- Common shapes
+- capability.ts
+- deepseek.mdx
 - pg.mdx
 - Warlock — generate an OpenAPI document
-- The Standard Schema bridge
-- owned-process.ts
+- standard-schema/types.ts
+- devtools/src/index.ts
 - Paginate results
 - check-resolver-boundaries.mjs
-- @warlock.js/context
+- timezone.mdx
 - ai-bedrock/scripts/generate-llms.mjs
-- Header.astro
+- ai-groq/scripts/generate-llms.mjs
 - ai-ollama/scripts/generate-llms.mjs
 - logger/scripts/generate-llms.mjs
-- sitemap/scripts/generate-llms.mjs
+- create-warlock/scripts/generate-llms.mjs
 - scheduler/scripts/generate-llms.mjs
-- safely-overwrite-json-config.md
+- n-plus-one.ts
 - silent-tools.md
-- CacheUnsupportedError
-- cached-list.md
-- format-http-error-response.ts
+- CacheConfigurationError
+- @warlock.js/logger
+- process/scripts/generate-llms.mjs
 - ai-live/scripts/generate-llms.mjs
 - ai-mistral/scripts/generate-llms.mjs
-- list-users.controller.ts
-- `@warlock.js/devtools` — overview
-- Pick an AI provider adapter
+- Use model events
+- query-source.ts
+- Types
 - virtual-pages.contract.ts
-- auth-tokens.check.ts
+- template-pins.spec.ts
 - `cached()` — function-memoization wrapper
 - 2026-05-12 — joinWith — honour where-clauses on hasOne/belongsTo constraints
-- validation-labels.check.ts
+- `v.string()` — method reference
 - Track changes
-- tool-use-contract.md
+- sitemap-model-subscriptions.ts
 - Warlock — framework-wide conventions
 - Priority 1: Developer Experience
-- observability-wire-panoptic.md
-- WL8xxx — this machine
+- Testing — code that logs, and asserting on log output
+- error-codes.md
 - RecordingQuery
 - JsonFileManager
-- config-handlers.ts
+- type-rules.ts
 - @warlock.js/notifications
 - import-package-docs.mjs
 - observability-trace-cost-dashboard.md
 - packages_core_src_index_database
-- Use aggregates and groupBy
-- file-exporter.ts
-- optional-peers.check.ts
-- migrate
-- 2026-04-25 — Phase D: Platform maturity
+- Generate a sitemap and robots.txt
+- `warlock dev` — development server
+- server/guard.ts
+- RefreshToken
+- architecture-concepts/memory.md
 - create.module
 - generate.module
-- sync-design-system.mjs
+- board.md
 - Warlock — `warlock routes`
 - TODO
 - US-002: Database Driver Selection
-- What the UI shows
+- WL2xxx — boot
+- channel.types.ts
 - affected-packages.mjs
 - connection.types.ts
 - import-core-docs.mjs
 - ai-tools/scripts/generate-llms.mjs
 - 04-your-first-agent.md
-- ref_url
+- Configure access
 - case5-fs-chain.page.tsx
 - cascade/domains/backlog.md
 - core-import-graph.spec.ts
 - Stale-while-revalidate — `cache.swr(key, options, fn)`
 - cascade/scripts/generate-llms.mjs
 - Run the cascade CLI / Operations API
-- Warlock — `warlock doctor`
-- core/scripts/generate-llms.mjs
+- guard/guardrail.ts
+- detectors/index.ts
 - Terminal UI & Branding
 - US-001: Project Name Input
 - US-004: Git Repository Initialization
@@ -693,14 +694,14 @@
 - US-006: Final Setup & Installation
 - Request-response over the bus
 - Setup — registering channels at startup
-- BaseNotificationsRepository
+- ForeignKeyBuilder
 - Per-job timezones
 - herald/scripts/generate-llms.mjs
 - queue/scripts/generate-llms.mjs
 - enrich-metadata.ts
-- env-files.check.spec.ts
-- release-hygiene.check.ts
-- command.tsx
+- `warlock start` — run the production bundle
+- merge-web-sitemap-config.ts
+- file-log-naming-retention.spec.ts
 - matrix-verdict-cli.mjs
 - column-dsl-parser.ts
 - toToml
@@ -714,23 +715,23 @@
 - generate.model
 - Warlock — `warlock trace`
 - run-orchestrator.md
-- full-text-search.md
-- Generations
+- Schedule recurring jobs
+- code-map-index.mjs
 - Use Cases
 - OTP
 - JSON Schema generation
 - BaseValidator
 - BoundedTaskQueue
 - set-version.mjs
-- update-check-cache.test.ts
-- Warlock — make an endpoint
-- unregistered-pages.ts
-- CLI reference
+- artifact-entry-points.mjs
+- 02-first-page.mdx
+- strip-source-map-sources.ts
+- dev-server/supervisor.test.ts
 - agent-silent-tools-ui.md
 - supervisor-classifier-fast-path.md
-- production-builder.contributions.test.ts
+- dry-run-no-writes.test.ts
 - Define policies (ABAC)
-- snapshot-response.ts
+- Model defaults — `modelOptions`
 - postgres-transaction-settings.spec.ts
 - development-server-boot-order.test.ts
 - create.controller
@@ -746,17 +747,17 @@
 - locale.controller.ts
 - Warlock web — build RTL and mixed-direction UI
 - Warlock web — preserve feedback and motion
-- Expose tools AS an MCP server (Direction B)
-- generate-jwt-secret.ts
+- ToolContract
+- Schema evolution — `Migration.alter`
 - HighlightFeatures.astro
-- agent-extract-structured-data.md
+- FakePgClient
 - LruCap
-- 2026-05-29 — Context docs review findings
-- agent-vision-document-extraction.md
+- `update` and `merge` — atomic read-modify-write
+- production-entry-graph.test.ts
 - identity.test.ts
-- Use-cases by example
-- extract-json-lenient.ts
-- tools/release — the Warlock.js release runner
+- runBrowserSmoke
+- The three methods
+- moderation-lazy-import.spec.ts
 - @warlock.js/ai
 - HealthRegistry
 - cascade
@@ -765,16 +766,15 @@
 - sleep.ts
 - hash-files.md
 - Warlock — `warlock agents-md`
-- B3 — Part 2: prod entry registers config-declared connectors (core)
-- locale-context-hmr.spec.ts
-- layout-sitemap-pipeline.spec.ts
-- security-and-platforms.md
+- Built-in framework commands
+- to-json.test.ts
+- Common patterns
+- result
 - Completed tasks
-- lower-stage3-decorators.ts
 - specs/package-manager.spec.ts
 - Cdp
 - Write the notifications migration
-- mongodb-replica-set-local-dev.md
+- 2026-05-29 — Auth docs review findings
 - Limiting & pagination
 - AGENTS.md
 - Starlight Starter Kit: Basics
@@ -782,10 +782,10 @@
 - multi-tenant-cache.mdx
 - JSON & array helpers
 - null.mdx
-- `add <features...>`
-- Manage roles
+- Common patterns
+- flush
 - per-environment.mdx
-- semanticCache
+- rag-with-cache-similarity.md
 - Bulk operations — `cache.many` / `cache.setMany`
 - Best Practices
 - create.service
@@ -797,13 +797,13 @@
 - generate.resource
 - Benchmark
 - FakePgClient
-- tool-calling-agent.md
-- Release-prep audit (2026-06-01)
+- 2026-05-29 — Logger docs review findings
+- Socket
 - column-read-guard.ts
 - Lower Stage-3 decorators for Vite/Vitest
-- Warlock — request log
+- `hashPassword` / `verifyPassword` — only for passwords
 - FakeWorker
-- 2026-05-29 — Seal docs review findings
+- idempotent-dispatch.mdx
 - file-backend.spec.ts
 - case8-server-only.page.tsx
 - ordinary-web-file.tsx
@@ -816,16 +816,16 @@
 - test-models.ts
 - Cdp
 - Tips & Tricks
-- dispatch-interceptor.ts
-- route-middleware.ts
+- Configuration & lifecycle
+- DatabaseLogModel
 - tarball-entry-points.mjs
 - Socket
 - pnpm production acceptance app
 - vitest-exit-app/vitest.config.ts
 - Create-Warlock V4 Specifications
 - Technical Details
-- ai/index.mdx
-- Common patterns
+- job-one-server.spec.ts
+- .stopAll
 - case9-outside-web.page.tsx
 - case10-server-folder.page.tsx
 - case11-app-server-folder.page.tsx
@@ -838,15 +838,12 @@
 - FeaturesCatalog.astro
 - skills.mdx
 - web/index.mdx
-- Implement a resolver
+- DefaultAccessResolver
 - Write a CLI adapter
 - @warlock.js/ai-panoptic
 - Error Handling
 - Common Workflows
 - migration-renames.ts
-- router-factory.ts
-- string-similarity.ts
-- KeyringEntry
 - case12-dep-server-dir.page.tsx
 - case13-sibling-server-dir.page.tsx
 - case17-vendor-transitive.page.tsx
@@ -865,7 +862,6 @@
 - PathPicker.astro
 - sitemap/essentials/configuration.mdx
 - package-manifest.spec.ts
-- insert-queue-dashboard-block.ts
 - @warlock.js/core
 - home.page.tsx
 - generate/types.ts
@@ -884,20 +880,11 @@
 - build-budgets/SKILL.md
 - design-system-mantine/SOURCES.md
 - warlock/src/config/tests.ts
-- request-route-cache.spec.ts
 - fixtures/README.md
 - own-error.ts
-- uuid-v5.ts
-- tracing-dispatcher.ts
 - Navigate the code map
-- auth/main.ts
-- Day & time methods
 - internal.ts
-- The launch context
 - collect-pipeable-stream.ts
-- case15-bare-builtin.page.tsx
-- Build output structure
-- Versioning
 
 ## God Nodes (most connected - your core abstractions)
 1. `Model` - 428 edges
@@ -912,31 +899,31 @@
 10. `RepositoryManager` - 144 edges
 
 ## Surprising Connections (you probably didn't know these)
-- ``calculator` — safe arithmetic (never `eval`)` --references--> `CalculatorError`  [INFERRED]
-  docs/src/content/docs/v/latest/ai/tools/use-ai-tools.md → packages/ai-tools/src/errors.ts
-- ``web_search` — pick a provider, supply a key` --references--> `WebToolError`  [INFERRED]
-  docs/src/content/docs/v/latest/ai/tools/use-ai-tools.md → packages/ai-tools/src/errors.ts
-- `Composition — `readonly()` and `scope()`` --references--> `WorkspacePolicyError`  [INFERRED]
+- `Refusal reasons` --references--> `WorkspacePolicyError`  [INFERRED]
   docs/src/content/docs/v/latest/ai/tools/use-workspace.md → packages/ai-workspace/src/errors.ts
 - ``grep` patterns run in linear time` --references--> `WorkspacePolicyError`  [INFERRED]
   docs/src/content/docs/v/latest/ai/tools/use-workspace.md → packages/ai-workspace/src/errors.ts
-- `Refusal reasons` --references--> `WorkspacePolicyError`  [INFERRED]
+- `Several edits at once — `multi_edit`` --references--> `WorkspaceEditError`  [INFERRED]
   docs/src/content/docs/v/latest/ai/tools/use-workspace.md → packages/ai-workspace/src/errors.ts
+- `Finding the text to edit — `edit.matching`` --references--> `WorkspaceEditError`  [INFERRED]
+  docs/src/content/docs/v/latest/ai/tools/use-workspace.md → packages/ai-workspace/src/errors.ts
+- `Live shell output — `hooks.onShellOutput`` --references--> `WorkspaceShellOutputEvent`  [INFERRED]
+  docs/src/content/docs/v/latest/ai/tools/use-workspace.md → packages/ai-workspace/src/contracts/workspace-edit.type.ts
 
 ## Import Cycles
-- 2-file cycle: `packages/web/src/index.ts -> packages/web/src/localization.tsx -> packages/web/src/index.ts`
-- 2-file cycle: `packages/web/src/index.ts -> packages/web/src/shared.ts -> packages/web/src/index.ts`
-- 2-file cycle: `packages/web/src/index.ts -> packages/web/src/routing/route-types.ts -> packages/web/src/index.ts`
 - 2-file cycle: `packages/herald/src/message-managers/event-consumer.ts -> packages/herald/src/message-managers/types.ts -> packages/herald/src/message-managers/event-consumer.ts`
 - 2-file cycle: `packages/core/src/dev-server/file-manager.ts -> packages/core/src/dev-server/file-operations.ts -> packages/core/src/dev-server/file-manager.ts`
-- 2-file cycle: `packages/ai/src/prompts/prompts-manager.ts -> packages/ai/src/system-prompt/system-prompt.ts -> packages/ai/src/prompts/prompts-manager.ts`
+- 2-file cycle: `packages/web/src/index.ts -> packages/web/src/localization.tsx -> packages/web/src/index.ts`
+- 2-file cycle: `packages/web/src/index.ts -> packages/web/src/routing/route-types.ts -> packages/web/src/index.ts`
+- 2-file cycle: `packages/web/src/index.ts -> packages/web/src/shared.ts -> packages/web/src/index.ts`
 - 2-file cycle: `packages/core/src/resource/nullable-resource.ts -> packages/core/src/resource/resource.ts -> packages/core/src/resource/nullable-resource.ts`
 - 2-file cycle: `packages/core/src/resource/resource.ts -> packages/core/src/resource/types.ts -> packages/core/src/resource/resource.ts`
 - 2-file cycle: `packages/core/src/resource/resource-field-builder.ts -> packages/core/src/resource/types.ts -> packages/core/src/resource/resource-field-builder.ts`
 - 2-file cycle: `packages/core/src/http/middleware/inject-request-context.ts -> packages/core/src/http/request.ts -> packages/core/src/http/middleware/inject-request-context.ts`
 - 2-file cycle: `packages/core/src/router/route-builder.ts -> packages/core/src/router/router.ts -> packages/core/src/router/route-builder.ts`
-- 2-file cycle: `packages/core/src/config/config-loader.ts -> packages/core/src/config/config-special-handlers.ts -> packages/core/src/config/config-loader.ts`
 - 2-file cycle: `packages/cascade/src/drivers/mongodb/mongodb-driver.ts -> packages/cascade/src/drivers/mongodb/mongodb-query-builder.ts -> packages/cascade/src/drivers/mongodb/mongodb-driver.ts`
+- 2-file cycle: `packages/core/src/config/config-loader.ts -> packages/core/src/config/config-special-handlers.ts -> packages/core/src/config/config-loader.ts`
+- 2-file cycle: `packages/ai/src/prompts/prompts-manager.ts -> packages/ai/src/system-prompt/system-prompt.ts -> packages/ai/src/prompts/prompts-manager.ts`
 - 2-file cycle: `packages/fs/src/facade/directory.ts -> packages/fs/src/facade/file.ts -> packages/fs/src/facade/directory.ts`
 - 3-file cycle: `packages/web/src/client/navigation/refresh.ts -> packages/web/src/shared.ts -> packages/web/src/index.ts -> packages/web/src/client/navigation/refresh.ts`
 - 3-file cycle: `packages/web/src/client/navigation/change-locale-code.ts -> packages/web/src/shared.ts -> packages/web/src/index.ts -> packages/web/src/client/navigation/change-locale-code.ts`
@@ -945,291 +932,295 @@
 - 3-file cycle: `packages/core/src/resource/resource-field-builder.ts -> packages/core/src/resource/types.ts -> packages/core/src/resource/resource.ts -> packages/core/src/resource/resource-field-builder.ts`
 - 3-file cycle: `packages/core/src/container/index.ts -> packages/core/src/router/index.ts -> packages/core/src/router/router.ts -> packages/core/src/container/index.ts`
 
-## Communities (943 total, 130 thin omitted)
+## Communities (930 total, 130 thin omitted)
 
 ### Community 0 - "supervisor/execution.ts"
 Cohesion: 0.02
-Nodes (239): The team rung — `ai.team` for a managed roster with a quality gate, Skip calls that repeat — route, memoize and dedupe, A custom gate (full escape hatch), `gate: "quality"` — review-then-fix, `gate: "verify"` — test-then-fix, Gates — `"quality"` | `"verify"` | a function, Observability, Related (+231 more)
+Nodes (306): The team rung — `ai.team` for a managed roster with a quality gate, `ai.fanOut()` — voting / self-consistency, `ai.router()` — generate the router agent, `ai.semanticRouter()` — skip the router model for clear-cut requests, LLM-driven — `router` agent, `maxFanOut` — bound how WIDE a routing decision can go (default `10`), A custom gate (full escape hatch), `gate: "quality"` — review-then-fix (+298 more)
 
-### Community 1 - "AIError"
-Cohesion: 0.03
-Nodes (152): The event shape, `ai.middleware.budget`, `ai.middleware.guardrail`, `ai.middleware.semanticCache`, Custom middleware — when to write your own, Four granularities, one object, Ordering matters, Related (+144 more)
+### Community 1 - "ai/src/errors/index.ts"
+Cohesion: 0.02
+Nodes (272): The event shape, Snapshot resume, Branch on the typed `AIError` taxonomy — never string-match the message, Surface errors so the agent can recover — throw a clear message, don't swallow, Two invariants you can count on, Google — Imagen (per-image) and Gemini (per-token), Snapshot resume, `execute()` never throws (+264 more)
 
 ### Community 2 - "ModelContract"
-Cohesion: 0.01
-Nodes (215): Agent events, Model stream chunks, Related, What each provider streams, Basic usage, Only need the final object — `collectStreamObject`, Options, Related (+207 more)
+Cohesion: 0.02
+Nodes (179): Agent events, Model stream chunks, Related, What each provider streams, Basic usage, Only need the final object — `collectStreamObject`, Options, Related (+171 more)
 
 ### Community 3 - "agent.ts"
 Cohesion: 0.02
-Nodes (152): Cancellation, Events — three subscription tiers, One agent, one trip loop, Related, Sessions, Streaming, Structured output, Tool dispatch (+144 more)
+Nodes (145): Cancellation, Events — three subscription tiers, One agent, one trip loop, Related, Sessions, Streaming, Structured output, Tool dispatch (+137 more)
 
 ### Community 4 - "Model"
 Cohesion: 0.01
-Nodes (177): Atomicity beyond increments, What works across data sources — and what doesn't, Lazy loading — `model.load(...)`, Writes honour global scopes too, Where to put the registration, Going further, Get many — `.all(filter?)`, Going further (+169 more)
+Nodes (275): Lazy loading — `model.load(...)`, `.merge(data).save()` — bulk update from an object, Read-only snapshots, Setting a column named at runtime, Investigation note — 2026-05-12, `.id` vs `.uuid` — a TypeScript convenience, same value, Read state — `.id`, `.uuid`, and `.get(field)`, Global listeners — across all models (+267 more)
 
-### Community 5 - "agent-trace-recorder.ts"
-Cohesion: 0.07
-Nodes (49): Agent traces and the tool-use contract, Agent traces (development), computePromptFingerprint(), messageText(), PromptFingerprintOutcome, safeJson(), snapshot(), TripSnapshot (+41 more)
+### Community 5 - "site-config.types.ts"
+Cohesion: 0.04
+Nodes (69): CrawlerDetectionOptions, WebConfigurations, WebFormsConfigurations, WebStreamingConfigurations, NamedApiRouteCandidate, NamedApiRouteContext, NamedApiRoutesConfig, NamedApiRoutesFilter (+61 more)
 
 ### Community 6 - "install-page-routes.ts"
 Cohesion: 0.01
-Nodes (316): container, refusalStatusOf(), Configure locale and URL strategy, clientRegistryNames(), serverName(), stubSpecifier(), temporaryDirectories, toDataUrl() (+308 more)
+Nodes (380): Rendering-layout limit, clientRegistryNames(), serverName(), stubSpecifier(), temporaryDirectories, toDataUrl(), composeRoutePath(), ambiguousMixedRoutePathMessage() (+372 more)
 
 ### Community 7 - "postgres-driver.ts"
 Cohesion: 0.02
-Nodes (89): Atomic upsert with `atomic()` / `findOneAndUpdate()` / `findAndUpdate()`, Postgres upsert, `trustedFilter` — conditional reservations, hasLocalMongodb(), hasLocalPostgres(), LocalDatabaseHarness, requireEnvironmentValue(), runMigrations() (+81 more)
+Nodes (79): hasLocalMongodb(), hasLocalPostgres(), LocalDatabaseHarness, requireEnvironmentValue(), runMigrations(), startLocalMongodb(), startLocalPostgres(), startPostgresHarness() (+71 more)
 
 ### Community 8 - "SnapshotStore"
 Cohesion: 0.01
-Nodes (133): Compaction, Concurrency, Fork and truncate, Related, Resume after a crash, Stores, Streaming, What is stored (+125 more)
+Nodes (156): Compaction, Concurrency, Fork and truncate, Related, Resume after a crash, Stores, Streaming, What is stored (+148 more)
 
 ### Community 9 - "ref_node_path"
 Cohesion: 0.01
-Nodes (208): findRawTables(), htmlFiles(), checkTabCodeFences(), collectMdxFiles(), findCollapsedTabItemFences(), findForeignPackageManagerCommands(), packageManagerCommands, workspaceRoot (+200 more)
+Nodes (230): findRawTables(), htmlFiles(), checkTabCodeFences(), collectMdxFiles(), findCollapsedTabItemFences(), findForeignPackageManagerCommands(), packageManagerCommands, workspaceRoot (+222 more)
 
 ### Community 10 - "MongoQueryBuilder"
 Cohesion: 0.02
-Nodes (11): assertFiniteNumber(), assertSafeFieldName(), assertTimeString(), describe(), MongoQueryBuilder, MongoQueryOperations, stripHiddenFromLeanRecords(), sanitizeFilterValue() (+3 more)
+Nodes (10): assertFiniteNumber(), assertSafeFieldName(), assertTimeString(), describe(), MongoQueryBuilder, MongoQueryOperations, sanitizeFilterValue(), builder() (+2 more)
 
 ### Community 11 - "orchestrator/execution.ts"
 Cohesion: 0.01
-Nodes (286): Automatic compaction inside an agent run, Compaction with thinking, The callback contract, A minimal orchestrator, Commands, Drift detection, History compaction, Memory (+278 more)
+Nodes (228): Automatic compaction inside an agent run, Compaction with thinking, The callback contract, A minimal orchestrator, Commands, Composing — `asTool()`, Drift detection, History compaction (+220 more)
 
 ### Community 12 - "responses-model.ts"
-Cohesion: 0.03
-Nodes (61): Capabilities — what's auto-set, Context window, Embeddings & images, List models, Models, Pricing, Producing a model, Provider body options and token estimates (+53 more)
+Cohesion: 0.04
+Nodes (38): API surface, Capabilities, Embeddings, License, OpenAI-compatible endpoints, Quick start, Tests, @warlock.js/ai-openai (+30 more)
 
-### Community 13 - "router/router.ts"
-Cohesion: 0.01
-Nodes (180): Runtime mode, Step 1 — One routes file, two version blocks, Step 5 — Deprecation, the right way, See also, Guarded routes and the route table, Keep a route out of the browser, Named API route metadata, Offer a route to some sites only (+172 more)
+### Community 13 - "router/types.ts"
+Cohesion: 0.02
+Nodes (93): Guarded routes and the route table, Keep a route out of the browser, Named API route metadata, Offer a route to some sites only, The function shape, The catalog, hoisted, ConditionalRequestInput (+85 more)
 
 ### Community 14 - "ref_mongez_config"
-Cohesion: 0.02
-Nodes (126): cache (priority 4), database (priority 2), http (priority 5), logger (priority 0), notifications (priority 8), Phase 1 — Early-phase connectors, Phase 3 — Late-phase connectors, socket (priority 7) (+118 more)
+Cohesion: 0.01
+Nodes (166): cache (priority 4), logger (priority 0), notifications (priority 8), Phase 1 — Early-phase connectors, Step 1 — Extend `BaseConnector`, storage (priority 6), Early vs Late phases, Restart on config change (dev) (+158 more)
 
-### Community 15 - "web/src/shared.ts"
-Cohesion: 0.08
-Nodes (35): assertClientSafe(), browserSharedListeners, currentStore(), deepFreeze(), enterSharedScope(), freezeBrowserSnapshot(), ImportMeta, ImportMetaEnv (+27 more)
+### Community 15 - "single-bundle-resolve.ts"
+Cohesion: 0.06
+Nodes (37): bundleFrameworkDependencies(), declaredDependenciesOf(), findOwningDependencies(), isBareSpecifier(), packageNameOfSpecifier(), bundle(), clearNativePackageCache(), containsNodeBinary() (+29 more)
 
 ### Community 16 - "migrations.ts"
-Cohesion: 0.06
-Nodes (61): Going further, `confirmRollback(options?)`, `exportMigrationsSQL(options?)`, `freshMigrate()`, `listExecutedMigrations()`, Migration operations, `rollbackMigrations(options?)`, `runMigrations()` (+53 more)
+Cohesion: 0.05
+Nodes (71): Going further, `confirmRollback(options?)`, `exportMigrationsSQL(options?)`, `freshMigrate()`, `listExecutedMigrations()`, Migration operations, `rollbackMigrations(options?)`, `runMigrations()` (+63 more)
 
-### Community 17 - "Response"
+### Community 17 - "defineResource"
 Cohesion: 0.04
-Nodes (36): The report, Throw vs. `response.notFound()`, Response events (static, app-wide), Which events actually fire, Long-lived and high-volume streams, Mental model, Real SSE example — streaming an AI reply, Server-Sent Events (+28 more)
+Nodes (56): A real example end-to-end, Field types, Gotchas, Nested resources — for relations, Next, Picking which columns to serialize, Renaming an input key, See also (+48 more)
 
 ### Community 18 - "session-cookies.spec.ts"
-Cohesion: 0.08
-Nodes (17): Auth events, Browser sessions for Web pages, Device info, Login — `authService.login(Model, credentials, deviceInfo?)`, Login + logout, Logout — `authService.logout(user, accessToken?, refreshToken?)`, Logout-everywhere, Refresh tokens — `authService.refreshTokens(refreshTokenString, deviceInfo?)` (+9 more)
-
-### Community 19 - "ai/src/errors/index.ts"
 Cohesion: 0.04
-Nodes (74): Snapshot resume, Avoid list, Keep intent output slices disjoint for a clean shallow-merge, Keep `maxIterations` low — and alert when you hit the cap, Prefer a deterministic `route` or a `classifier` over a `router` agent, See also, The running scenario, Use `evaluate` as the real stop condition — it outranks the router (+66 more)
+Nodes (38): Auth events, Browser sessions for Web pages, Device info, Login — `authService.login(Model, credentials, deviceInfo?)`, Login + logout, Logout — `authService.logout(user, accessToken?, refreshToken?)`, Logout-everywhere, Refresh tokens — `authService.refreshTokens(refreshTokenString, deviceInfo?)` (+30 more)
+
+### Community 19 - ".metrics"
+Cohesion: 0.05
+Nodes (38): Integration recipes, Latency sampling, Lazy attach, Per-driver breakdown, Plain logging, Prometheus (via prom-client), Related, Reset (+30 more)
 
 ### Community 20 - "web-connector.ts"
-Cohesion: 0.04
-Nodes (49): InstalledPageRoute, classifyPageFileChanges(), hasPageFileChanges(), isErrorPageFilePath(), isPageFilePath(), isPageLayoutFilePath(), isPageSetupFilePath(), isRouteLocaleFilePath() (+41 more)
+Cohesion: 0.02
+Nodes (128): CLIENT_ASSET_URL_PREFIX, BuildErrorMessage, DEV_TRANSFORM_ERROR_BODY, DEV_TRANSFORM_ERROR_STATUS, DevErrorTransportInProductionError, devErrorTransportPlugin(), DevTransformErrorCarrier, formatDevTransformError() (+120 more)
 
 ### Community 21 - "ToolContract"
-Cohesion: 0.02
-Nodes (154): Composing — `asTool()`, Pass system-only data through `ctx.artifacts` — don't round-trip IDs through the model, Tools, Discover tools from a stable catalogue, Images and text parts, Measure the fixed tool cost, Schema size — measure it, send it compact, Tool context — `ctx.artifacts` (+146 more)
+Cohesion: 0.01
+Nodes (239): Interpret USD and diffs, Measure a tool catalogue, Read the report, Use the CLI, Tools, `description` vs `action` — two roles, Discover tools from a stable catalogue, Events (+231 more)
 
 ### Community 22 - "Restful"
-Cohesion: 0.03
-Nodes (69): Convention checks, Going further, Gotchas, Opting out of the scope temporarily, Permanent-only override per call, Putting it together with audit trail, Step 1 — Enable soft delete on the model, Step 2 — Hide soft-deleted rows from normal queries (+61 more)
+Cohesion: 0.05
+Nodes (53): Convention checks, Going further, Gotchas, Opting out of the scope temporarily, Permanent-only override per call, Putting it together with audit trail, Step 1 — Enable soft delete on the model, Step 2 — Hide soft-deleted rows from normal queries (+45 more)
 
-### Community 23 - "Observer"
-Cohesion: 0.02
-Nodes (160): Adapter overview, Cancellation is part of the contract, Capabilities matter, Decision tree, Multi-provider apps, Native input-token preflight, Related, The adapter contract (+152 more)
+### Community 23 - "ai/src/index.ts"
+Cohesion: 0.01
+Nodes (226): The per-model `reasoning` override, Adapter overview, Cancellation is part of the contract, Capabilities matter, Decision tree, Multi-provider apps, Native input-token preflight, Related (+218 more)
 
 ### Community 24 - "fs/src/index.ts"
 Cohesion: 0.01
-Nodes (214): Options ride along the last argument, When plain is fine, Versus the usual suspects, Next, TypeScript, Verifying the install, Where to next, `appendJsonLine(path, value)` — NDJSON logs (+206 more)
+Nodes (232): Options ride along the last argument, When plain is fine, Everything with sane defaults, Next, The `fs` object is the whole story, The two layers, Versus the usual suspects, Where to next (+224 more)
 
-### Community 25 - "file-manager.ts"
-Cohesion: 0.05
-Nodes (17): devLogDim(), DEV_SERVER_EVENTS, getFileAsync, lastModifiedAsync, runInBatches(), manifestPath(), devLogHMRMock, devLogTimingsMock (+9 more)
+### Community 25 - "services/engine.ts"
+Cohesion: 0.08
+Nodes (39): Errors & types, Policies, access (priority 9), AccessConfigurations, AccessContext, PolicyContext, PolicyFn, RolesMap (+31 more)
 
 ### Community 26 - "vitest-setup.ts"
-Cohesion: 0.02
-Nodes (177): Who fills the container, and when, Why top-level access returns `undefined`, Response contracts from declared schemas, A complete unit test, Caveats and trade-offs, Ephemeral ports, Fakes — on by default, In-process server with the production plugins (+169 more)
+Cohesion: 0.04
+Nodes (110): The 30-second look, Who fills the container, and when, Why top-level access returns `undefined`, One runtime per fork, Release gate, Runtime lifetime, unit projects and setup profiling, Worker dictionaries and owned runtime resources, Worker lifetime with the HTTP test server and a database (+102 more)
 
 ### Community 27 - "navigation-root.tsx"
 Cohesion: 0.01
-Nodes (265): RFC-7231, Connect the existing socket client, resolveReactModules(), Live loader dependencies, Checklist of causes, buildHydratedTree(), ActionSubmitOptions, ActionSubmitOutcome (+257 more)
+Nodes (402): RFC-7231, Connect the existing socket client, Session updates after swaps, boundaryOf(), buildHydratedTree(), componentOf(), describeKnownNames(), findEntryByName() (+394 more)
 
 ### Community 28 - "ref_node_net"
 Cohesion: 0.05
-Nodes (48): API-only suites — `startHttpTestServer({ web: false })`, Choosing the port — `startHttpTestServer({ port })`, If startup fails, nothing is left behind, Port `0` — let the OS pick, The bootstrap — `startHttpTestServer` / `stopHttpTestServer`, The port is preflighted, configuredEarlyConnectorNames(), readBoundPort() (+40 more)
+Nodes (45): http (priority 5), Phase 3 — Late-phase connectors, socket (priority 7), Response snapshots — `snapshotResponse()`, Connectors, Dependencies, External, Internal (within `core/src`) (+37 more)
 
-### Community 29 - "OpenAISDK"
-Cohesion: 0.03
-Nodes (78): Context window, Qwen / DashScope, xAI, Hosted-search metering and metadata, API surface, Capabilities, Embeddings & images, License (+70 more)
+### Community 29 - "ai-groq/src/sdk.ts"
+Cohesion: 0.06
+Nodes (32): GroqEmbedderConfig, GroqModelConfig, GroqSDKConfig, inferContextWindow(), KNOWN_WINDOWS, GROQ_MODEL_LIFECYCLE, GROQ_MODEL_LIFECYCLE_AS_OF, groqLifecycleFor() (+24 more)
 
-### Community 30 - "run-supervisor.md"
-Cohesion: 0.12
-Nodes (15): `ack` — fast preamble, `asTool()` — supervisor as a tool, Callback intents — dispatching from inside callbacks, Classifier — `classifier`, Deterministic — `route(ctx)`, Observability, Per-call options, Per-intent `next` — skip the router (+7 more)
+### Community 30 - "Resource"
+Cohesion: 0.06
+Nodes (24): Gotchas, The field builder — fluent API, Dependencies, External, Internal (within `core/src`), Key Exports, Key Files, Resource (+16 more)
 
 ### Community 31 - "01-primitives.md"
-Cohesion: 0.01
-Nodes (180): Booleans, Dates, Escape hatch — `v.any`, Instances, Literals, Numbers — pick by what you accept, Quick map, Related (+172 more)
+Cohesion: 0.02
+Nodes (101): Absent vs empty vs invalid — what comes back, `.catch(fallback)`, `.default(value | callback)`, `.label("Display Name")` — field display name, Membership rules, Mutability — `.mutable` / `.immutable`, `.nullable()` / `.nullish()`, `.omit()` / `.exclude()` (+93 more)
 
 ### Community 32 - "BaseValidator"
-Cohesion: 0.03
-Nodes (103): Step 1 — The anatomy of a rule, resolveModelClass(), useRequestStore(), humanizeSize(), resolveFileSize(), getFieldValue(), isEmptyValue(), invalidRule() (+95 more)
-
-### Community 33 - "framework-cli-commands.ts"
 Cohesion: 0.04
-Nodes (66): createDatabase(), addCommand, agentsMdCommand, aiCommand, boardCommand, buildCommand, buildCommandAction(), state (+58 more)
+Nodes (82): existsExceptCurrentIdRule, existsExceptCurrentUserRule, ExistsExceptCurrentIdRuleOptions, ExistsExceptCurrentUserRuleOptions, UniqueExceptCurrentIdRuleOptions, UniqueExceptCurrentUserRuleOptions, uniqueExceptCurrentIdRule, uniqueExceptCurrentUserRule (+74 more)
+
+### Community 33 - "cli-commands.manager.ts"
+Cohesion: 0.04
+Nodes (52): WL7001, `cli-commands.manager.ts`, CLICommandsManager, CommandRunVerdict, configuredEarlyConnectorNames(), exitAfterFlush(), isRespawnedWorker(), displayBootError() (+44 more)
 
 ### Community 34 - "ref_vitest"
-Cohesion: 0.03
-Nodes (59): RequestLogSchema, schema, ValidatorV, Entry, Out, Scope, Tasks, config (+51 more)
+Cohesion: 0.01
+Nodes (141): Global translation, Patterns beyond `StringValidator`, Configuration, `configureSeal(options)`, `getSealConfig()`, `resetSealConfig()`, `SealConfig`, `v.record(valueValidator?, errorMessage?)` (+133 more)
 
-### Community 35 - "human-approval.ts"
-Cohesion: 0.02
-Nodes (146): Human-in-the-loop, `ai.human.approval(options)`, Decisions — what the reviewer returns, Durable mode — pause, persist, resume, Errors, Interrupt stores — `ai.human.interrupt.{memory,pg,redis}()`, Lifecycle at a glance, Memory (+138 more)
+### Community 35 - "RedisInterruptStore"
+Cohesion: 0.13
+Nodes (12): RedisClientLike, buildRedisClient(), REDIS_INSTALL_INSTRUCTIONS, RedisInterruptStore, RedisModuleLike, makeFakeRedis(), makeFakeRedisWithSets(), CommandFn (+4 more)
 
 ### Community 36 - "features/index.ts"
-Cohesion: 0.06
-Nodes (42): packageJson, aiAnthropicFeature, aiBedrockFeature, aiFeature, aiGoogleFeature, aiOllamaFeature, aiOpenaiFeature, aiPanopticFeature (+34 more)
+Cohesion: 0.04
+Nodes (81): packageJson, accessFeature, aiAnthropicFeature, aiBedrockFeature, aiFeature, aiGoogleFeature, aiOllamaFeature, aiOpenaiFeature (+73 more)
 
 ### Community 37 - "HttpErrorCodes"
 Cohesion: 0.02
-Nodes (84): WL1003, End-to-end: one Redis window across two servers, Rate limiting, app, RuntimeApplication, buildRateLimitOptions(), clientKeyGenerator(), passthroughKeys (+76 more)
+Nodes (92): HttpErrorCodes, BodyTooLarge, ConcurrencyLimitReached, CsrfOriginMismatch, HostNotAllowed, IdempotencyKeyConflict, IdempotencyKeyInvalid, IpForbidden (+84 more)
 
-### Community 38 - "services/engine.ts"
-Cohesion: 0.02
-Nodes (148): Permissions (RBAC) — the grant, Policies (ABAC) — the condition, The combined decision, The litmus test, When it's just RBAC, How the docs are organized, The mental model in one paragraph, The two-stage model (+140 more)
+### Community 38 - "access.ts"
+Cohesion: 0.09
+Nodes (44): `cache.ttl`, Booleans, What it gives you, Decision semantics, Middleware, Permission checks, Role checks, Configure (+36 more)
 
 ### Community 39 - "cache/src/types.ts"
-Cohesion: 0.03
-Nodes (83): 2026-05-29 — Cache docs review findings, Axis 1 — Drift, Axis 2 — Broken links (HIGH, systemic — the dominant problem), Axis 3 — Sidebar & DX (MED), Priority, Phase 1 — TTL parser & options object foundation, Mocking Redis (for driver-level tests, not app code), cache (+75 more)
+Cohesion: 0.04
+Nodes (55): 2026-05-29 — Cache docs review findings, Axis 1 — Drift, Axis 2 — Broken links (HIGH, systemic — the dominant problem), Axis 3 — Sidebar & DX (MED), Priority, Phase 1 — TTL parser & options object foundation, Mocking Redis (for driver-level tests, not app code), messages (+47 more)
 
 ### Community 40 - "ForbiddenError"
 Cohesion: 0.11
-Nodes (22): Where errors live, Reading a code in code, The error classes, The `payload` argument, Gotchas, Phase 1 — guards, Error classes, Phase 2 — guards (+14 more)
+Nodes (23): Where errors live, Reading a code in code, The error classes, The `payload` argument, Gotchas, Phase 1 — guards, Error classes, Phase 2 — guards (+15 more)
 
 ### Community 41 - "production-builder.ts"
 Cohesion: 0.02
-Nodes (113): esbuild settings, The `build` config keys, The output directory is written all-or-nothing, `warlock build`, configKeyFromPath(), clearOwnedRouteTypes(), defaultPorts, isAbsentOptionalWebPackage() (+105 more)
+Nodes (136): The 30-second look, See also, esbuild settings, The `build` config keys, The output directory is written all-or-nothing, `warlock build`, See also, Fix — bake the array at build time (+128 more)
 
 ### Community 42 - "Usage"
-Cohesion: 0.02
-Nodes (166): Set ModelPricing so cost is computed honestly — never zero, Rolling up with `aggregate`, Pricing and usage, Pricing and usage, Prompt-cache hints, Production notes, Setup, Surface the tool-call event stream (+158 more)
+Cohesion: 0.01
+Nodes (234): Set ModelPricing so cost is computed honestly — never zero, Full-history capture — `captureMessages` → `AgentReport.messages`, Rolling up with `aggregate`, When NOT to use a workflow, Pricing and usage, Prompt-cache hints, Production notes, Setup (+226 more)
 
 ### Community 43 - "sitemap/src/index.ts"
 Cohesion: 0.05
-Nodes (68): `saveTo()` owns the whole directory, Sources are factories, `publishTo(outDir, fileName = "sitemap.xml")`, Errors, Errors, `saveTo(outDir)` owns the directory it is given, Errors, `SitemapIndex.saveTo(outDir)` owns the whole directory (+60 more)
+Nodes (68): Sources are factories, Building blocks, Diagnostics and results, Entries, Errors, Options, `Sitemap`, `SitemapIndex` (+60 more)
 
-### Community 44 - "access/scripts/generate-llms.mjs"
-Cohesion: 0.13
-Nodes (11): fullLines, indexLines, llmsFullPath, llmsTxtPath, packageIndexPath, pkgJson, pkgRoot, scriptDir (+3 more)
+### Community 44 - "storage.md"
+Cohesion: 0.05
+Nodes (41): A real save flow, Choosing the storage driver, `save(directory, options?)`, `saveAs(location, options?)`, Saving files, Async data, Common patterns, Content reads (+33 more)
 
 ### Community 45 - "ai-anthropic/src/model.ts"
-Cohesion: 0.03
-Nodes (96): The per-model `reasoning` override, Preserved thinking after client-side compaction, Provider options (`providerOptions.anthropic`), `thinkingMode` override, AnthropicCallOptions, AnthropicClearThinking, AnthropicClearToolUses, AnthropicContextManagement (+88 more)
+Cohesion: 0.02
+Nodes (95): Preserved thinking after client-side compaction, Provider options (`providerOptions.anthropic`), `thinkingMode` override, AnthropicCallOptions, AnthropicClearThinking, AnthropicClearToolUses, AnthropicContextManagement, AnthropicModelConfig (+87 more)
 
 ### Community 46 - "hardening-suite.ts"
 Cohesion: 0.04
-Nodes (81): RFC-8949, Phone code (OTP), Phone code (OTP), AuthProviderSdkMissingError, InvalidOneTimeTokenError, InvalidPasskeyError, OneTimeTokenPurpose, oneTimeTokenSchema (+73 more)
+Nodes (72): RFC-8949, Related, Password reset, Related, T-014 [chore] Run the service-backed integration suites against the 5.53.0 changes, Configuration (`src/config/auth.ts`), Email verification, Gotchas (+64 more)
 
 ### Community 47 - "authMiddleware"
 Cohesion: 0.01
-Nodes (185): 1. Register, 2. Log in, 3. Hit a protected route, 4. Refresh, 5. Log out, Cross-cutting: events, Cross-cutting: persistence, Related (+177 more)
+Nodes (192): 1. Register, 2. Log in, 3. Hit a protected route, 4. Refresh, 5. Log out, Cross-cutting: events, Cross-cutting: persistence, Related (+184 more)
 
 ### Community 48 - "cascade/src/index.ts"
-Cohesion: 0.06
-Nodes (25): getModelDeletedEvent(), getModelEventKey(), getModelUpdatedEvent(), MODEL_EVENT_PREFIX, ModelSyncEventType, ModelSyncEventTypeName, modelSync, ModelSyncFacade (+17 more)
+Cohesion: 0.05
+Nodes (30): getLegacyModelEvent(), getModelDeletedEvent(), getModelEvent(), getModelEventKey(), getModelUpdatedEvent(), MODEL_EVENT_PREFIX, ModelSyncEventType, ModelSyncEventTypeName (+22 more)
 
 ### Community 49 - "auth/src/contracts/types.ts"
 Cohesion: 0.04
-Nodes (77): Apple, GitHub, Discord, LinkedIn, Facebook, X, Google, Google request deadlines and controlled providers, Gotchas, Install, Passkeys, Related (+69 more)
+Nodes (81): Apple, Google, Google request deadlines and controlled providers, Install, Apple, Facebook, GitHub, Discord, LinkedIn, Google (+73 more)
 
 ### Community 50 - "web/src/index.ts"
 Cohesion: 0.01
-Nodes (352): Web and response contract conventions, WL9019, Declare response types with `responseSchema`, Debugging a failed page request, Type loader data into the page, What the page's `data` type says, Type a Link wrapper, `ActionState` and `useActionData` (+344 more)
+Nodes (346): WL9007, Declare response types with `responseSchema`, A complete pair, Browser-reachable API routes, Duplicate declarations and development, Server and browser work, Type loader data into the page, What the page's `data` type says (+338 more)
 
-### Community 51 - "register-model.ts"
+### Community 51 - "ChildModel"
 Cohesion: 0.03
-Nodes (106): T-039 [feature] Batch relation loads issued in the same tick, Relations system (audited 2026-05-12), S1 — Critical, S2 — High, S3 — Medium, S4 — Low, Tasks, Summary (partial — 2026-05-12) (+98 more)
+Nodes (75): What works across data sources — and what doesn't, Where to put the registration, Going further, Recap, Step 5 — The restore endpoint, 2026-05-11 — withCount Implementation (Postgres), Decision: COUNT result type, Decisions (locked in chat) (+67 more)
 
 ### Community 52 - "DateValidator"
 Cohesion: 0.02
-Nodes (60): 3. JSON-Schema-influencing transformers must declare a marker; source-string inspection is forbidden, 2026-05-12 — Replace stringly-inspected transformer detection in date JSON Schema, Decisions to lock with Hasan, Risks, Scope, Skills + docs lockstep, Summary, Tasks (+52 more)
+Nodes (74): 2026-05-12 — Replace stringly-inspected transformer detection in date JSON Schema, Decisions to lock with Hasan, Risks, Scope, Skills + docs lockstep, Summary, Tasks, The fix (+66 more)
 
 ### Community 53 - "generate-image-variants.ts"
 Cohesion: 0.03
-Nodes (143): Variants of other disks, HttpError, UPLOADS_DEFAULTS, uploadsConfig(), ascii(), detectImageFormat(), IMAGE_SIGNATURE_BYTES, isVariantSourceFormat() (+135 more)
+Nodes (145): Bound cache storage and age, Image variant cache, Variants of other disks, Bound the cache and render remote disks, UPLOADS_DEFAULTS, uploadsConfig(), ascii(), detectImageFormat() (+137 more)
 
 ### Community 54 - "string-validator.ts"
 Cohesion: 0.02
-Nodes (75): RFC-4122, `v.string(errorMessage?)`, T-088 [bug] Validation limits, Common chains, Filter mutators, alphanumericOnlyMutator(), alphaOnlyMutator(), appendMutator() (+67 more)
+Nodes (60): RFC-4122, `v.string(errorMessage?)`, T-088 [bug] Validation limits, Common chains, Filter mutators, alphanumericOnlyMutator(), alphaOnlyMutator(), appendMutator() (+52 more)
 
 ### Community 55 - "templates/stubs.ts"
 Cohesion: 0.05
-Nodes (91): Naming transformations, The mental model, generateController(), readEndpointInput(), createMigrationFile(), generateMigration(), generateModel(), generateModule() (+83 more)
+Nodes (96): Naming transformations, The mental model, commonOptions, endpointOptions, generatorOptionsForDispatch, generators, generateController(), isSchemaLike() (+88 more)
 
 ### Community 56 - "core/src/index.ts"
-Cohesion: 0.03
-Nodes (82): Multiple processes, Navigation and unsent forms, Publish after a write, broadcastSocketEvent(), invalidatePageCache(), { invalidate, tags, broadcastSocketEvent }, InvalidPageCacheNamespaceError, PageCacheNamespaceRequiredError (+74 more)
+Cohesion: 0.02
+Nodes (111): Multiple processes, Navigation and unsent forms, Publish after a write, broadcastSocketEvent(), PAGE_INVALIDATED_EVENT, LOCALE_PREFERENCE_COOKIE_NAME, PROVISIONAL_LOCALE_REQUEST_HEADER, PageCacheOptIn (+103 more)
 
 ### Community 57 - "Auth"
-Cohesion: 0.02
-Nodes (97): `AccessTokenOutput`, `Authenticable`, Contracts + types, `DeviceInfo`, `LoginResult<UserType>`, `NO_EXPIRATION`, `TokenPair`, 2026-05-29 — Auth docs review findings (+89 more)
+Cohesion: 0.03
+Nodes (57): Axis 1 — Documentation quality & drift / SOURCE BUGS, `Auth` base — what your subclass inherits, Cross-type behavior, Customize user type (multi-user-type auth), Define a model per user type, Gate routes per user type, Login per user type — pass the right Model, Register them in `config.auth` (+49 more)
 
 ### Community 58 - "provider-login.ts"
-Cohesion: 0.03
-Nodes (109): Passwordless login features, ProviderAccountLinkBlockedError, ProviderEmailNotVerifiedError, User, User, User, callback(), callbackWithResponse() (+101 more)
+Cohesion: 0.02
+Nodes (128): GitHub, Discord, LinkedIn, Facebook, X, Gotchas, Passkeys, Phone code (OTP), Related, `add <features...>`, AI features, Passwordless login features (+120 more)
+
+### Community 59 - "QueryBuilderContract"
+Cohesion: 0.02
+Nodes (6): QueryBuilderContract, FilterApplicator, FilterOptions, FilterRules, apply(), noOptions
 
 ### Community 60 - "storage/storage.ts"
 Cohesion: 0.03
-Nodes (61): Scoped storage — `storage.use(name)`, makeSource(), driver, migrationDriverWrites, writeMethods, storageConfigurations, StorageDriverContext, storageDriverContext (+53 more)
+Nodes (74): Cloud bucket / region, Cloud-only operations, Configuration, Per-environment switching, Presigned URLs, Visibility and storage class, here, here (+66 more)
 
 ### Community 61 - "FileLog"
 Cohesion: 0.03
-Nodes (92): Async drain — `log.flush()`, Graceful shutdown — the easy way, Graceful shutdown — the manual way, Logging is fire-and-forget, See also, Shutdown with captured unhandled errors, What can be lost?, When does a write hit the disk? (+84 more)
+Nodes (85): Async drain — `log.flush()`, Graceful shutdown — the easy way, Graceful shutdown — the manual way, Logging is fire-and-forget, See also, Shutdown with captured unhandled errors, What can be lost?, When does a write hit the disk? (+77 more)
 
 ### Community 62 - "ai-openai/src/utils/index.ts"
-Cohesion: 0.04
-Nodes (63): messages, partsOf(), mergeAdjacentContents(), stringifyContent(), toGoogleContents(), toGooglePart(), toResponseObject(), stringifyContent() (+55 more)
+Cohesion: 0.05
+Nodes (59): mapStopReason(), stopReasonMap, BedrockMessages, getReasoningBlocks(), isRecord(), MEDIA_TYPE_TO_FORMAT, mergeAdjacentTurns(), stringifyContent() (+51 more)
 
 ### Community 63 - "planner-run.ts"
-Cohesion: 0.03
-Nodes (116): Adaptive re-planning — `replan` and `onStep`, Capabilities, DAG execution — `dag` and `maxConcurrency`, Delegating a step with `ai.spawnSubAgent()`, Plan-only and approval — `mode: "plan-only"`, `approvedPlan`, Plan steps and sequential execution, Related, Structured output (+108 more)
-
-### Community 64 - "ai-google/src/sdk.ts"
 Cohesion: 0.04
-Nodes (54): Cost-truth — one rollup, two metering models, Generation options, Observability, OpenAI — gpt-image (token-metered) + DALL·E (per-image), Real-world — catalog thumbnail in a workflow step, Related, Testing, The core API (+46 more)
+Nodes (82): Adaptive re-planning — `replan` and `onStep`, Capabilities, DAG execution — `dag` and `maxConcurrency`, Plan-only and approval — `mode: "plan-only"`, `approvedPlan`, Plan steps and sequential execution, Related, Structured output, The report (+74 more)
+
+### Community 64 - "event-map.type.ts"
+Cohesion: 0.11
+Nodes (46): AgentCacheMissCausePayload, AgentCompletedPayload, AgentContextEditedPayload, AgentErrorPayload, AgentReasoningPayload, AgentStartingPayload, AgentStreamingPayload, AgentToolCalledPayload (+38 more)
 
 ### Community 65 - "rootPath"
-Cohesion: 0.06
-Nodes (82): writeNewFile(), completeAccessInstallation(), registerAccessLocale(), scaffoldAccessFiles(), addDashboardConfigBlock(), bullBoardFeature, completeBullBoardInstallation(), isQueueInstalled() (+74 more)
+Cohesion: 0.05
+Nodes (90): completeAccessInstallation(), registerAccessLocale(), scaffoldAccessFiles(), addDashboardConfigBlock(), bullBoardFeature, completeBullBoardInstallation(), isQueueInstalled(), ProjectPackageJson (+82 more)
 
-### Community 66 - "locale-routing.ts"
-Cohesion: 0.02
-Nodes (121): Rules, What a stopped run looks like, Guard a page, Guest-only pages, Guests and the page cache, Loader form, Prefetch identity, Read the user (+113 more)
+### Community 66 - "route-table.ts"
+Cohesion: 0.01
+Nodes (222): Gotchas, Nothing to configure, What happens automatically, Events remain for analytics, Prefetch on interaction, Programmatic navigation, Refresh triggers and shared shell data, Show pending navigation state (+214 more)
 
 ### Community 67 - "ai-bedrock/src/model.ts"
 Cohesion: 0.04
-Nodes (42): Pricing — built-in Claude prices and registry, Tokens & usage — cost truth, BedrockModelConfig, BedrockSDKConfig, inferPdfCapability(), inferPromptCachingCapability(), inferReasoningCapability(), matchesAny() (+34 more)
+Nodes (46): BedrockEmbedderConfig, BedrockModelConfig, BedrockSDKConfig, BedrockEmbedder, TitanEmbeddingResponse, inferPdfCapability(), inferPromptCachingCapability(), inferReasoningCapability() (+38 more)
 
 ### Community 68 - "ai-google/src/model.ts"
-Cohesion: 0.04
-Nodes (33): inferContextWindow(), WINDOW_1M_PREFIXES, WINDOW_2M_PREFIXES, inferVisionCapability(), VISION_CAPABLE_SUBSTRINGS, EFFORT_THINKING_BUDGET, GoogleModel, messages (+25 more)
+Cohesion: 0.05
+Nodes (26): metadata, model(), inferContextWindow(), WINDOW_1M_PREFIXES, WINDOW_2M_PREFIXES, GOOGLE_SERVER_TOOL_PRICING, inferVisionCapability(), VISION_CAPABLE_SUBSTRINGS (+18 more)
 
-### Community 69 - "Storage"
+### Community 69 - "StorageFile"
 Cohesion: 0.02
-Nodes (44): A real save flow, Choosing the storage driver, Gotchas, Inline validation, Properties, `save(directory, options?)`, `saveAs(location, options?)`, Saving files (+36 more)
+Nodes (41): Gotchas, Scoped storage — `storage.use(name)`, Async data, Cached image variants follow their source, Common patterns, Configuration, Create-only — `putIfAbsent` (5.20.0), Delete / copy / move (+33 more)
 
 ### Community 70 - "Ops"
 Cohesion: 0.04
-Nodes (48): WorkspacePolicyError, assertGlobLength(), compileGrepPattern(), Ops, spilledField(), streamTruncation(), byteLength(), resolveSpillDir() (+40 more)
+Nodes (50): WorkspacePolicyError, assertGlobLength(), compileGrepPattern(), describeAsk(), lowerOf(), Ops, spilledField(), streamTruncation() (+42 more)
 
 ### Community 71 - "CacheKey"
-Cohesion: 0.04
-Nodes (9): Inherited-for-free from `BaseCacheDriver`, 3.2 Behavior, BaseCacheDriver, RedisCacheDriver, ScopedCache, TaggedScopedCache, CacheKey, CacheSwrOptions (+1 more)
+Cohesion: 0.03
+Nodes (18): Inherited-for-free from `BaseCacheDriver`, Cache — Architecture, Core primitives, Responsibility boundaries, Shape, cache / design, 3.2 Behavior, BaseCacheDriver (+10 more)
 
 ### Community 72 - "cache/src/index.ts"
 Cohesion: 0.04
@@ -1237,71 +1228,71 @@ Nodes (45): Facts, drivers, observer, port, BloomFilter, nativeOf(), StructureCo
 
 ### Community 73 - "MigrationRunner"
 Cohesion: 0.04
-Nodes (44): Cascade migration sort-order bug, Fix, Not done, Tests — `tests/unit/migration/sql-grammar-sort.test.ts`, 16 cases, Two things the report understated, Verification, Verification — the report is correct, ./create-users.migration.ts (+36 more)
+Nodes (43): Cascade migration sort-order bug, Fix, Not done, Tests — `tests/unit/migration/sql-grammar-sort.test.ts`, 16 cases, Two things the report understated, Verification, Verification — the report is correct, ./create-users.migration.ts (+35 more)
 
-### Community 74 - "ops.ts"
-Cohesion: 0.05
-Nodes (41): Cancelling a command, Patch several files — `apply_patch`, setup(), createLocalBackend(), createMockBackend(), isMockBackendSeed(), MockBackendSeed, MockExecResult (+33 more)
+### Community 74 - "WorkspaceBackend"
+Cohesion: 0.10
+Nodes (8): Cancelling a command, ancestorsOf(), canonicalize(), MockBackend, WorkspaceBackend, read(), walk(), walk()
 
 ### Community 75 - "document-context.ts"
 Cohesion: 0.02
-Nodes (195): buildHydrationDocument(), describeHydrationMismatch(), formatHydrationMismatch(), HydrationMismatch, BuildHydratedTree, validPayload, hydratePage(), HydratePageOptions (+187 more)
+Nodes (125): `ActionState` and `useActionData`, 1. Connect Auth to Web, 2. Guard the page, load the name, and save it, 3. Render the form and read the safe user data, The idea, Gotchas, applyDocumentMetadata(), createElementFor() (+117 more)
 
 ### Community 76 - "skills/index.ts"
-Cohesion: 0.04
-Nodes (89): `ai.tools` / `ai.workspace` / `ai.mcp` is undefined, Skills, Factory config — `SkillsConfig`, How `loadSkill` works, Injection — `inject` (`SkillInjectMode`), `maxLoadsPerRun`, `MockSkillsStore` — the in-memory store, Phase 2 — self-authoring (inert by default) (+81 more)
+Cohesion: 0.05
+Nodes (84): `ai.tools` / `ai.workspace` / `ai.mcp` is undefined, Skills, Factory config — `SkillsConfig`, How `loadSkill` works, Injection — `inject` (`SkillInjectMode`), `maxLoadsPerRun`, `MockSkillsStore` — the in-memory store, Phase 2 — self-authoring (inert by default) (+76 more)
 
 ### Community 77 - "inspect-app.ts"
 Cohesion: 0.03
-Nodes (111): Programmatic use, getAllModelsFromRegistry(), explainCommand, explainCommandAction(), ExplainedErrorCode, formatCodeList(), formatExplanation(), withDocs() (+103 more)
+Nodes (132): Programmatic use, loadAjv(), getAllModelsFromRegistry(), explainCommand, explainCommandAction(), ExplainedErrorCode, formatCodeList(), formatExplanation() (+124 more)
 
 ### Community 78 - "normalize-page-module.ts"
-Cohesion: 0.11
-Nodes (37): isLivePageOptions(), MODULE_CONFIG_KEYS, MODULE_EXPORT_NAMES, PageModuleKind, ACTION_CONFIG_KEYS, allowedKeySet(), allowedKeySets, assertExactKeys() (+29 more)
+Cohesion: 0.14
+Nodes (31): isLivePageOptions(), MODULE_CONFIG_KEYS, MODULE_EXPORT_NAMES, PageModuleKind, ACTION_CONFIG_KEYS, allowedKeySet(), allowedKeySets, assertExactKeys() (+23 more)
 
 ### Community 79 - "LoggingData"
 Cohesion: 0.03
-Nodes (61): Complete example — SlackLog, `LogChannel` members, `LogContract` vs `LogChannel`, The `init()` hook, Don't let a flaky webhook crash your app, Redact before it leaves your machine, Register it for errors only, See also (+53 more)
+Nodes (54): `LogChannel` members, Don't let a flaky webhook crash your app, Redact before it leaves your machine, Register it for errors only, See also, The Slack channel, CaptureChannel, ThrowingChannel (+46 more)
 
 ### Community 80 - "warlockPath"
-Cohesion: 0.03
-Nodes (75): binDir, bootFromSource(), directoryIndexOf(), resolve(), [nodeMajor, nodeMinor], publishedEntry, Environment note, Final verification (+67 more)
+Cohesion: 0.04
+Nodes (49): binDir, bootFromSource(), directoryIndexOf(), resolve(), [nodeMajor, nodeMinor], publishedEntry, Environment note, Final verification (+41 more)
 
 ### Community 81 - "CacheManager"
 Cohesion: 0.03
-Nodes (60): Basic Example, Configuration Structure, Custom Drivers, Driver Options, Environment-Based Configuration, Inside a Warlock app, Multiple Drivers, Static vs runtime options (+52 more)
+Nodes (47): Conventions and pitfalls, See also, The 80% path, The mental model in one paragraph, @warlock.js/cache, What this package deliberately doesn't do, When to reach for it, cache (+39 more)
 
-### Community 82 - "utils/test-helpers.ts"
-Cohesion: 0.02
-Nodes (94): What runs inside the transaction, Cascade model events → repository cache invalidation, Lifecycle hooks fire on all strategies, Override per-call, Querying soft-deleted records — you filter, Cascade doesn't, Restoring — static, by id, See also, Set the default per-model (+86 more)
+### Community 82 - "DriverContract"
+Cohesion: 0.03
+Nodes (43): What runs inside the transaction, Cascade model events → repository cache invalidation, Lifecycle hooks fire on all strategies, Override per-call, Querying soft-deleted records — you filter, Cascade doesn't, Restoring — static, by id, See also, Set the default per-model (+35 more)
 
 ### Community 83 - "BaseValidator"
-Cohesion: 0.02
-Nodes (70): Server-set fields — declare once, Composing objects, Server-set fields — `.internal()`, `v.object` — fixed-key records, `.extend(schemaOrValidator)` — add fields, keep your config, `.merge(otherValidator)` — combine fields and config, `.partial(...keys?)` / `.requiredFields(...keys?)`, `.pick(...keys)` / `.without(...keys)` (+62 more)
+Cohesion: 0.03
+Nodes (54): Server-set fields — declare once, Composing objects, Server-set fields — `.internal()`, `v.object` — fixed-key records, `.extend(schemaOrValidator)` — add fields, keep your config, `.merge(otherValidator)` — combine fields and config, `.partial(...keys?)` / `.requiredFields(...keys?)`, `.pick(...keys)` / `.without(...keys)` (+46 more)
 
 ### Community 84 - ".validated"
 Cohesion: 0.02
-Nodes (138): WL9005, Accepting uploads only on routes that take them (5.53), Configuring the upload size limit, Image transforms, Mental model, Reading files from the request, Total size per request (5.53), Adding validation to a new controller (+130 more)
+Nodes (106): Phase 3 — The request lands, Step 1 — Router match, Step 2 — Middleware chain, Step 3 — Schema validation, Step 4 — Controller, Step 5 — Use-case pipeline, Step 6 — Repository, Step 7 — Resource (+98 more)
 
 ### Community 85 - "track-request-log.ts"
-Cohesion: 0.05
-Nodes (73): resolveDatabaseConnectionConfig(), buildRequestLogRecord(), limitRequestLogBody(), pickHeaders(), redactDraft(), REQUEST_HEADER_SET, REQUEST_LOG_HEADER_ALLOWLIST, RequestLogInput (+65 more)
+Cohesion: 0.03
+Nodes (135): Gotchas, Privacy rules you can rely on, Read it, Turn it on, Warlock — request log, What a record has, logsCommand, clock() (+127 more)
 
 ### Community 86 - "login-throttle.middleware.ts"
-Cohesion: 0.02
-Nodes (106): Email verification — new in 5.13, Fails open, How attempts are counted, Keep strangers from locking an account, Keys never carry the credential, Options, Related, Throttle the passkey options route (+98 more)
+Cohesion: 0.03
+Nodes (82): Email verification — new in 5.13, Fails open, How attempts are counted, Keep strangers from locking an account, Keys never carry the credential, Options, Related, Throttle the passkey options route (+74 more)
 
 ### Community 87 - "ai-workspace/src/index.ts"
-Cohesion: 0.05
-Nodes (82): WorkspaceCommandDecision, WorkspaceCommandRule, WorkspaceShellAsk, WorkspaceShellAskDecision, WorkspaceShellAskReason, WorkspaceShellAskRequest, WorkspaceShellClassification, WorkspaceShellOnAsk (+74 more)
+Cohesion: 0.04
+Nodes (95): HOST_STOP_SIGNALS, liveProcessKills, SpawnPlan, WorkspaceCommandDecision, WorkspaceCommandRule, WorkspaceShellAsk, WorkspaceShellAskDecision, WorkspaceShellAskReason (+87 more)
 
 ### Community 88 - "EmbedderContract"
 Cohesion: 0.06
-Nodes (38): Memory, resolveDefaultStore(), EpisodicMemoryConfig, MemoryConfig, ProceduralMemoryConfig, SemanticMemoryConfig, WorkingMemoryConfig, MemoryContract (+30 more)
+Nodes (35): Memory, resolveDefaultStore(), EpisodicMemoryConfig, MemoryConfig, ProceduralMemoryConfig, SemanticMemoryConfig, WorkingMemoryConfig, MemoryContract (+27 more)
 
 ### Community 89 - "release-family.ts"
 Cohesion: 0.03
-Nodes (124): assertMatrixScopeAgreesWithRows(), MatrixScope, ARTIFACT_ROOT, ArtifactInspection, assertArtifactHash(), assertEffectiveOrigin(), assertExactVersion(), assertHandoffMatchesArtifacts() (+116 more)
+Nodes (113): Bumping the version does NOT bump every family spec, MatrixScope, ARTIFACT_ROOT, ArtifactInspection, assertArtifactHash(), assertBuiltManifest(), assertEffectiveOrigin(), assertExactVersion() (+105 more)
 
 ### Community 90 - "video.ts"
 Cohesion: 0.04
@@ -1309,31 +1300,31 @@ Nodes (54): A live phone receptionist over a channel, `ai.realtime` — a duplex
 
 ### Community 91 - "ConsoleLog"
 Cohesion: 0.04
-Nodes (47): Built-in channels, Channel initialization, Fan-out, Filtering, Minimum level — `minLevel`, Showing context, Terminal escapes in messages, Terminal output (+39 more)
+Nodes (53): Built-in channels, Channel initialization, Fan-out, Filtering, Minimum level — `minLevel`, Showing context, Terminal escapes in messages, Terminal output (+45 more)
 
 ### Community 92 - "ref_node_crypto"
-Cohesion: 0.05
-Nodes (82): Consistent reads, Durable intent and recovery, Idempotent results, Preconditions and staging, Scope and platform limits, What it doesn't protect against, Multi-file transactions, findOneAndUpdate() (+74 more)
+Cohesion: 0.10
+Nodes (53): Consistent reads, Durable intent and recovery, Idempotent results, Preconditions and staging, Scope and platform limits, Multi-file transactions, Multi-file state transactions, assertDurability() (+45 more)
 
 ### Community 93 - "Storage"
-Cohesion: 0.03
-Nodes (19): storage (priority 6), storageConfig(), registerLocalDiskConfigurations(), makeStorage(), Dependencies, External, Internal (within `core/src`), Key Exports (+11 more)
+Cohesion: 0.06
+Nodes (9): storageConfig(), registerLocalDiskConfigurations(), makeStorage(), create(), TestStorage, Storage, CloudStorageDriverContract, StorageDriverName (+1 more)
 
-### Community 94 - "fetch-page-data.ts"
-Cohesion: 0.05
-Nodes (50): createLineReader(), createNavigationScope(), FetchPageDataOptions, isDeferredNdjsonLine(), isNdjsonResponse(), isPayloadResponse(), isPlainRecord(), Boundary (+42 more)
+### Community 94 - ".env"
+Cohesion: 0.06
+Nodes (40): Framework version, Gotchas, Process timing, See also, The mental model, Auth — uses imports beyond `env`, Composing config — the `Application` references, Database — driver + connection options (+32 more)
 
 ### Community 95 - "PostgresQueryBuilder"
-Cohesion: 0.03
-Nodes (39): 1. `withCount()` emits a correlated subquery, not LEFT JOIN + GROUP BY, 2. `countRelations` storage is `Map<alias, {relation, constraintOps?}>`, 3. `belongsToMany` count is pivot-only when unconstrained, pivot+JOIN when constrained, 4. `parse()` runs the same prelude as `get()` and `apply*` methods are idempotent, 5. Mongo `withCount` override removed; execution remains unimplemented, 6. Foreign-key default inference is centralised (snake_case + Model.primaryKey), 7. Code-organisation discipline — file & method size ceilings, 8. `whereHas` family is translated builder-side into `whereRaw`, not parser-side (+31 more)
+Cohesion: 0.02
+Nodes (71): 1. `withCount()` emits a correlated subquery, not LEFT JOIN + GROUP BY, 2. `countRelations` storage is `Map<alias, {relation, constraintOps?}>`, 3. `belongsToMany` count is pivot-only when unconstrained, pivot+JOIN when constrained, 4. `parse()` runs the same prelude as `get()` and `apply*` methods are idempotent, 5. Mongo `withCount` override removed; execution remains unimplemented, 6. Foreign-key default inference is centralised (snake_case + Model.primaryKey), 7. Code-organisation discipline — file & method size ceilings, 8. `whereHas` family is translated builder-side into `whereRaw`, not parser-side (+63 more)
 
 ### Community 96 - "MockCacheDriver"
 Cohesion: 0.03
 Nodes (59): Build the memory store, Production notes, Related, Setup, Use it across turns, Wire memory into the orchestrator, Build a semantic-only memory, Production notes (+51 more)
 
-### Community 97 - "ai/src/index.ts"
-Cohesion: 0.02
-Nodes (103): RFC-5322, Guardrails, A plain callback by design, Escalate a block to a human, Producing an escalating verdict, See also, The `GuardrailBlockEvent` payload, When `onBlock` fires (+95 more)
+### Community 97 - "guard/guard.ts"
+Cohesion: 0.09
+Nodes (12): ctx, OPENAI_INSTALL_INSTRUCTIONS, flagsKey(), guard(), PhaseOutcome, recordFlag(), runDetectors(), lookup (+4 more)
 
 ### Community 98 - "ai-xai/src/sdk.ts"
 Cohesion: 0.04
@@ -1341,55 +1332,55 @@ Nodes (53): Construct, Embeddings and images, First call, Install, List models, 
 
 ### Community 99 - "migrate-action.ts"
 Cohesion: 0.07
-Nodes (34): Capabilities and the container, PendingMigration, allMigrationsFilesAction(), confirmDestructiveRollback(), listMigrationsAction(), loadAllMigrations(), loadMigrationFile(), migrateAction() (+26 more)
+Nodes (33): Capabilities and the container, PendingMigration, allMigrationsFilesAction(), confirmDestructiveRollback(), listMigrationsAction(), loadAllMigrations(), loadMigrationFile(), migrateAction() (+25 more)
 
 ### Community 100 - "defer"
 Cohesion: 0.02
-Nodes (132): Inline payload budget, Measured at build, Measured at runtime, Gotchas, Page data is now devalue, not plain JSON (`@warlock.js/web`), Abandoned requests — `signal`, Avoiding a circular config type, Environment values (+124 more)
+Nodes (120): Page data is now devalue, not plain JSON (`@warlock.js/web`), Cache public pages explicitly, Catch-all filenames are not supported, Default export failures, Explicit routes, Filesystem routing, Mixed segments, Named wildcard (+112 more)
 
 ### Community 101 - "framework-cli-commands.ts"
 Cohesion: 0.02
-Nodes (111): `CLICommandOptions`, Gotchas, Inside `action` — `CommandActionData`, Options — the flag shape, Output and exit codes, Package-exported commands, Preload — lazy-loaded subsystems, The factory (+103 more)
+Nodes (120): `CLICommandOptions`, Gotchas, Inside `action` — `CommandActionData`, Options — the flag shape, Output and exit codes, Package-exported commands, Preload — lazy-loaded subsystems, The factory (+112 more)
 
 ### Community 102 - "useTrans"
 Cohesion: 0.02
-Nodes (159): Client: `onClientError`, Reporting errors to your own service, Server: `web.errors.report`, Count variants, Declare what static analysis cannot see, Development and production behave differently on a miss, Global-registry apps, Gotchas (+151 more)
+Nodes (144): Count variants, Declare what static analysis cannot see, Development and production behave differently on a miss, Global-registry apps, Gotchas, `Intl` labels and hydration, `lang` and `dir` on `<html>` — new in 5.12, `localeDirection(locale)` (+136 more)
 
 ### Community 103 - "types/route-types.ts"
 Cohesion: 0.02
-Nodes (146): CRUD UI, Forms, Pages, Preview and existing files, Control the route table, Page actions instead, Prefetch cache (5.21), Typed API responses (+138 more)
+Nodes (145): Web and response contract conventions, WL9019, CRUD UI, Forms, Pages, Preview and existing files, Control the route table, Page actions instead (+137 more)
 
 ### Community 104 - "CacheDriver"
 Cohesion: 0.02
-Nodes (64): T-036 [feature] Database cache driver: one upsert per `set`, lean `get`, `ai.middleware.semanticCache(options)`, Session-scoped by default — `scope` (4.15.0), `ai.config({ defaultStore })` — set once at boot, Checkpoint rules, Fresh run vs. resume, Persistence — `@warlock.js/cache` everywhere, Picking a driver (+56 more)
+Nodes (53): `ai.config({ defaultStore })` — set once at boot, Fresh run vs. resume, Persistence — `@warlock.js/cache` everywhere, Picking a driver, Recovery paths, Resolution order — two separate defaults, See also, Semantic cache (+45 more)
 
-### Community 105 - ".env"
+### Community 105 - "production-builder.contributions.test.ts"
 Cohesion: 0.01
-Nodes (206): Branching on environment in a config, Building an absolute path to a static asset, Common patterns, Environment, Framework version, Gotchas, Health check endpoint, Process timing (+198 more)
+Nodes (178): Next, Phase 1 — Bootstrap, Phase 2 — Connectors, See also, The spine, Translation and locale, Boot complete, Build-time contribution (+170 more)
 
 ### Community 106 - "mcp-tools.ts"
-Cohesion: 0.03
-Nodes (106): Errors cross the boundary as one class, Fresh sessions — `sessionScope: "fresh"`, Nest it, or keep it top-level?, Production notes, Related, Setup, Shared sessions — `sessionScope: "shared"`, The boundary is opaque — and the session id is deliberately NOT on it (+98 more)
+Cohesion: 0.04
+Nodes (83): mcpCommand, lazyInspectOptions(), mcpCommandAction(), mcpTransportFromOptions(), routeConsoleToStderr(), stringOption(), InspectSection, CreateMcpContextOptions (+75 more)
 
 ### Community 107 - "use-cases-deep.md"
 Cohesion: 0.05
-Nodes (37): A real example end-to-end, Gotchas, Next, Phase 2 — schema validation, Phase 3 — before middleware, Phase 4 — handler, Phase 5 — after middleware, Phase 6 — lifecycle events (+29 more)
+Nodes (38): A real example end-to-end, Gotchas, Next, Phase 2 — schema validation, Phase 3 — before middleware, Phase 4 — handler, Phase 5 — after middleware, Phase 6 — lifecycle events (+30 more)
 
 ### Community 108 - "openapi-child-output.ts"
-Cohesion: 0.08
-Nodes (36): ../../src/app/posts/resources/post.resource, collectDevelopmentApiRoutes(), warned, AppPackage, buildOpenApiForChild(), BuildOpenApiForChildOptions, readAppPackage(), resolveDefaultServer() (+28 more)
+Cohesion: 0.12
+Nodes (25): ../../src/app/posts/resources/post.resource, warned, collectNamedApiRoutesWithResponses(), collectResourceExportMap(), importResourceNamespaces(), isResourceFile(), NamedApiRoutesWithResponsesOptions, buildResourceMap() (+17 more)
 
-### Community 109 - "files-orchestrator.ts"
-Cohesion: 0.07
-Nodes (23): ../app/orders/tracker.service, cliCommandsLoader, command(), getFilesFromDirectory, load, loadConfigFiles(), getDevelopmentAppModuleRegistry(), parseImportsSpy (+15 more)
+### Community 109 - "commands-loader.spec.ts"
+Cohesion: 0.50
+Nodes (3): command(), getFilesFromDirectory, load
 
-### Community 110 - "FileHealthCheckerContract"
-Cohesion: 0.04
-Nodes (26): BaseHealthChecker, CheckerFile, OxlintHealthChecker, TypescriptHealthChecker, defaultHealthCheckers(), BuiltInHealthCheckerOptions, FileHealthCheckerContract, HealthCheckerFilesStats (+18 more)
+### Community 110 - "FileManager"
+Cohesion: 0.02
+Nodes (98): registerAppConfig(), ConfigLoader, executed, mailSchema, modules, SpecialConfigHandler, ConfigManager, configManager (+90 more)
 
 ### Community 111 - "boot-for-diagnostics.ts"
 Cohesion: 0.09
-Nodes (29): bootForDiagnostics(), bootPhase(), discoverModels(), loadAppModules(), messageOf(), shouldSkipBoot(), ModelModule, ModuleFailure (+21 more)
+Nodes (30): bootForDiagnostics(), bootPhase(), discoverModels(), loadAppModules(), messageOf(), shouldSkipBoot(), comparePageRoutes(), diffPageRoutes() (+22 more)
 
 ### Community 112 - "security-conventions.ts"
 Cohesion: 0.04
@@ -1397,87 +1388,83 @@ Nodes (143): ApiRouteFacts, apiRouteReferenceFindings(), clientHiddenRouteNamesO
 
 ### Community 113 - "globalPrefix"
 Cohesion: 0.02
-Nodes (100): Event Types, Alternatives, Best For, Configuration, Directory Configuration, Example Usage, Expired Cache, File Name Configuration (+92 more)
+Nodes (115): Event Types, Alternatives, Best For, Configuration, Directory Configuration, Example Usage, Expired Cache, File Name Configuration (+107 more)
 
 ### Community 114 - "core/src/validation/types.ts"
-Cohesion: 0.05
-Nodes (13): File validators (`v.file()`), Optional file field, Layer 2 — the translation hook (project-wide + i18n), Gotchas, File rules, Optional file field, LocalizedEntryValidator, ValidationConfiguration (+5 more)
+Cohesion: 0.06
+Nodes (9): File validators (`v.file()`), Optional file field, Layer 2 — the translation hook (project-wide + i18n), Gotchas, File rules, Optional file field, FileValidator, ImageRuleOptions (+1 more)
 
 ### Community 115 - "Application"
-Cohesion: 0.02
-Nodes (96): Boot lifecycle, It's a latch, not an event, Paths, Shutdown — release resources before the app stops, The boot context, What it's for, When it fires, When the uploads path differs from the default (+88 more)
+Cohesion: 0.04
+Nodes (57): Boot lifecycle, It's a latch, not an event, Paths, Shutdown — release resources before the app stops, The boot context, What it's for, When it fires, When the uploads path differs from the default (+49 more)
 
-### Community 116 - "budget.ts"
-Cohesion: 0.02
-Nodes (93): Scoped budgets — a shared cap across executions, Soft fallback — degrade instead of abort, Stores, Caps per run, session and caller, Middleware, SLO / cost budget contracts — `ai.middleware.budget({ contract })`, `ai.middleware.budget(options)`, Prices, spend hook and per-session caps (+85 more)
+### Community 116 - "ai.ts"
+Cohesion: 0.01
+Nodes (211): Skip calls that repeat — route, memoize and dedupe, Cost-truth — one rollup, two metering models, Observability, OpenAI — whisper-1 (per-minute) + gpt-4o-transcribe (per-token), Real-world — inbound voice-message webhook, Related, Testing, The `AudioInput` shape + the two builders (+203 more)
 
 ### Community 117 - "UploadedFile"
-Cohesion: 0.03
-Nodes (53): See also, Gotchas, Multi-file uploads, Private bucket, presigned URLs, Public bucket, public URLs, Public URLs vs presigned URLs, Step 1 — Install the AWS SDK, Step 2 — Configure an S3 disk (+45 more)
+Cohesion: 0.02
+Nodes (76): Accepting uploads only on routes that take them (5.53), Cleanup of orphans, Configuring the upload size limit, Gotchas, Image transforms, Inline validation, Mental model, Properties (+68 more)
 
 ### Community 118 - "t"
-Cohesion: 0.03
-Nodes (83): Adding a localized column to a model, Going further, Gotchas, How locale flows through a request, Placeholders, Setting the locale outside a request, Step 1 — Configure the app locale, Step 2 — How the locale is resolved (+75 more)
+Cohesion: 0.04
+Nodes (65): Adding a localized column to a model, Going further, Gotchas, How locale flows through a request, Placeholders, Setting the locale outside a request, Step 1 — Configure the app locale, Step 2 — How the locale is resolved (+57 more)
 
-### Community 119 - "oxlint-runner.ts"
-Cohesion: 0.08
-Nodes (34): COMMAND_TOO_LONG_CODES, commandLineLimit(), CONFIG_FILES, coordinate(), errorCodeOf(), findOxlint(), hasOxlintConfig(), healthy() (+26 more)
+### Community 119 - "rate-limit.middleware.ts"
+Cohesion: 0.07
+Nodes (30): WL1003, buildRateLimitOptions(), clientKeyGenerator(), passthroughKeys, CustomStore, serve(), subnetOf(), Bucket (+22 more)
 
 ### Community 120 - "rag/index.ts"
-Cohesion: 0.04
-Nodes (72): The retrieval primitive — `ai.rag` for grounding an agent in documents, `ai.rag.keywordReranker(options?)` — free, lexical, `ai.rag.llmReranker(options)` — precise, model-backed, `asTool()` — hand retrieval to an agent loop, Chunkers — `ChunkOptions`, `clear()`, Failure modes (all graceful), `index()` — chunk, embed (batched), store (+64 more)
-
-### Community 121 - "connection-from-env.ts"
 Cohesion: 0.05
-Nodes (45): 9. Postgres `groupBy(fields, aggregates)` — builder-side decompose, dialect-owned aggregate→SQL, parse-time HAVING rewrite, 1. Dialect owns aggregate → SQL (`SqlDialectContract.aggregateToSql`), 2. Postgres QB `groupBy` override + alias map, 3. Parse-time HAVING rewrite (`applyGroupByAggregates`), Design — three parts, Five cross-driver, four MongoDB-only, Primitive spec — `groupBy(fields, aggregates)` on Postgres, `processHavingRaw` consistency fix (+ latent bug) (+37 more)
+Nodes (63): The retrieval primitive — `ai.rag` for grounding an agent in documents, `ai.rag.keywordReranker(options?)` — free, lexical, `ai.rag.llmReranker(options)` — precise, model-backed, `asTool()` — hand retrieval to an agent loop, Chunkers — `ChunkOptions`, `clear()`, Failure modes (all graceful), `index()` — chunk, embed (batched), store (+55 more)
 
 ### Community 122 - "migration/migration.ts"
 Cohesion: 0.02
-Nodes (46): Rollback for `alter`, Rolling back on SQL versus MongoDB, Rolling back safely, Schema evolution — `Migration.alter`, ColumnDefinition, ColumnType, ForeignKeyDefinition, FullTextIndexOptions (+38 more)
+Nodes (55): buildMongoDriver(), buildPostgresDriver(), CliDialect, extractDatabaseFromUrl(), MONGODB_URL_PREFIXES, parsePrimaryKey(), parseUuidStrategy(), POSTGRES_URL_PREFIXES (+47 more)
 
 ### Community 123 - "cli-commands.md"
-Cohesion: 0.02
-Nodes (93): Boundary, barrel and locale conventions, `--changed`, Exit codes, Explain a source file, In an agent loop or CI, Legacy lint selection, Programmatic use, Progress and the per-rule time budget (+85 more)
+Cohesion: 0.06
+Nodes (34): `build`, `dev`, Development, `generate.openapi`, `generate.postman`, `generate.typings`, Generators, Going further (+26 more)
 
-### Community 124 - "generations/stubs.ts"
-Cohesion: 0.04
-Nodes (69): accessFeature, notificationControllers, notificationsFeature, contents, directories, existing, givenFile(), normalize() (+61 more)
+### Community 124 - "notifications.feature.spec.ts"
+Cohesion: 0.28
+Nodes (8): notificationsFeature, contents, directories, existing, givenFile(), normalize(), written, writtenModuleFiles()
 
 ### Community 125 - "Request"
-Cohesion: 0.03
-Nodes (22): Identity, Original path and the trailing slash, T-092 [bug] Responses, errors and request logging, Original path and trailing slash, Request ID correlation, tagRequestError(), Request, warnRequestOnDeprecated() (+14 more)
+Cohesion: 0.01
+Nodes (125): Importing the errors without the framework, Transport & proxy trust, Hide input for a family of URLs, Allowed hosts, Content-Security-Policy — new in 5.12, Cookies, CORS, Protective middleware (+117 more)
 
 ### Community 126 - "MongoQueryParser"
-Cohesion: 0.03
-Nodes (67): `addFields(fields)` — MongoDB only, `crossJoin(table)`, `fullJoin(table, localField, foreignField)` / `fullJoin(options)`, `innerJoin(table, localField, foreignField)` / `innerJoin(options)`, `join(table, localField, foreignField)` / `join(options)`, `joinRaw(expression, bindings?)`, Joins, `lean()` (+59 more)
+Cohesion: 0.04
+Nodes (27): `addFields(fields)` — MongoDB only, `lean()`, Read mode & pipeline stages, `unwind(field, options?)` — MongoDB only, `whereRaw(expression, bindings?)` / `orWhereRaw(expression, bindings?)`, Raw expressions — `.whereRaw()` / `.orWhereRaw()`, UnwindOptions, isPlainObject() (+19 more)
 
 ### Community 127 - "openapi/types.ts"
-Cohesion: 0.07
-Nodes (49): BASE_URL_HOST, buildHeaderParameters(), buildRequestUrl(), parameterValue(), queryRows(), stringifyValue(), withDescription(), buildSavedResponses() (+41 more)
+Cohesion: 0.05
+Nodes (70): DevelopmentOpenApiProvider, DevelopmentPostmanResult, buildRequestBody(), formFields(), isFileSchema(), isJsonContentType(), pickContentType(), RequestBodyParts (+62 more)
 
 ### Community 128 - "QueryBuilder"
 Cohesion: 0.03
-Nodes (16): HavingInput, JoinOptions, LeanDocument, LockForUpdateOptions, OrderDirection, RawExpression, WhereCallback, WhereObject (+8 more)
+Nodes (19): GroupByInput, HavingInput, JoinOptions, LeanDocument, LockForUpdateOptions, OrderDirection, RawExpression, WhereCallback (+11 more)
 
 ### Community 129 - "RepositoryManager"
 Cohesion: 0.04
-Nodes (10): Stage 2 — Automatic invalidation, When automatic invalidation isn't enough, Active-record convenience, Cache keys, Options from the request, The pagination shape — page-based, The `RepositoryOptions` shape, Cached vs uncached (+2 more)
+Nodes (13): Stage 2 — Automatic invalidation, When automatic invalidation isn't enough, Active-record convenience, Cache keys, Caching, Invalidation, Options from the request, Per-repository driver (+5 more)
 
 ### Community 130 - "shell-check.ts"
 Cohesion: 0.04
-Nodes (79): Choosing the shell, `run_shell`/`exec` run argv, NOT a shell, WorkspaceShellRefusalReason, aliasKey(), BY_NAME, canonicalPowerShellArgv(), FAMILIES, Family (+71 more)
+Nodes (77): Choosing the shell, `run_shell`/`exec` run argv, NOT a shell, WorkspaceShellRefusalReason, aliasKey(), BY_NAME, canonicalPowerShellArgv(), FAMILIES, Family (+69 more)
 
-### Community 131 - "prompts-manager.ts"
-Cohesion: 0.07
-Nodes (36): Prompt registry — `ai.prompts`, SystemPromptMergeSource, blocksFromTemplate(), contentSignature(), PromptsManagerContract, PromptsManagerEntry, PromptsManagerRegisterOptions, isBlock() (+28 more)
+### Community 131 - "PromptsManager"
+Cohesion: 0.09
+Nodes (7): contentSignature(), PromptsManagerContract, PromptsManagerEntry, isBlock(), isSystemPromptContract(), promptKey(), PromptsManager
 
 ### Community 132 - "WorkspacePolicyError"
 Cohesion: 0.03
-Nodes (74): A policy jail, NOT OS isolation, A todo list — `todo_write` / `todo_read`, Agent-facing — `ws.tools.*`, Argument rules: `denyPatterns` and `allowCommand`, Background commands, Command rules (allow / ask / deny), Composition — `readonly()` and `scope()`, Diagnostics after an edit — `hooks.afterEdit` (+66 more)
+Nodes (68): A policy jail, NOT OS isolation, A todo list — `todo_write` / `todo_read`, Argument rules: `denyPatterns` and `allowCommand`, Background commands, Command rules (allow / ask / deny), Composition — `readonly()` and `scope()`, Diagnostics after an edit — `hooks.afterEdit`, Errors flow as data, not throws (+60 more)
 
 ### Community 133 - "eval.type.ts"
-Cohesion: 0.04
-Nodes (77): Gate prompt and model changes with `agent.eval` plus an LLM judge, Keep the deterministic and judge suites apart, Write a failing eval case the moment you fix a bug, How scoring resolves, Production notes, Related, Setup, The agent under test and the judge (+69 more)
+Cohesion: 0.02
+Nodes (183): `ai.batch(executable, items, opts?)`, `ai.fallbackModel(models, opts?)`, `ai.router()`, `ai.fanOut()`, `ai.mockRouter()`, `ai.systemPrompt.fromFile(path)`, DX helpers around agents, Evaluation — `agent.eval(...)`, Executables auto-adapt in `tools: [...]`, Avoid list (+175 more)
 
 ### Community 134 - "Image"
 Cohesion: 0.04
@@ -1485,375 +1472,371 @@ Nodes (36): Batch transforms — `apply(options)`, Cloning, Common patterns, Con
 
 ### Community 135 - "consume-message.md"
 Cohesion: 0.03
-Nodes (81): Ack semantics, Broker, Channel, Message, Next, Schema-validated channels, Connect at boot, never in a handler, Graceful shutdown (+73 more)
+Nodes (72): Broker, Channel, Message, Next, Schema-validated channels, Connect at boot, never in a handler, Graceful shutdown, Next (+64 more)
 
 ### Community 136 - "ast.ts"
 Cohesion: 0.03
 Nodes (10): FunctionDeclaration, FunctionExpression, Identifier, isComputedPropertyName(), keyName(), PARENT, parentOf(), sourceOf() (+2 more)
 
 ### Community 137 - "Always-true facts"
-Cohesion: 0.03
-Nodes (81): bcryptjs, or native `bcrypt` when installed, Before and after, Common patterns, Configuration, Empty-string passthrough, `encrypt` / `decrypt` — reversible secrets, Encrypt + fingerprint together, Encryption boundary inside a model accessor (+73 more)
+Cohesion: 0.10
+Nodes (34): Common patterns, Configuration, Empty-string passthrough, `encrypt` / `decrypt` — reversible secrets, Encrypt + fingerprint together, Encryption boundary inside a model accessor, Gotchas, `hmacHash` — deterministic fingerprints (+26 more)
 
 ### Community 138 - "transport.ts"
-Cohesion: 0.05
-Nodes (34): Client options, Direction A — consume an external MCP server, Errors, Long-running calls over http, Response size and body timeout, Selecting one discovered tool, stdio environment, The transport — `stdio` or `http` (+26 more)
+Cohesion: 0.03
+Nodes (48): MCP servers, Options, Client options, Direction A — consume an external MCP server, Errors, Long-running calls over http, Response size and body timeout, Selecting one discovered tool (+40 more)
 
 ### Community 139 - "skill-snippet-gate.ts"
 Cohesion: 0.07
 Nodes (52): ALLOWANCES_PATH, BlockLang, buildPackagePaths(), buildTsconfig(), ClassifiedBlock, classifyBlock(), CompiledFileResult, compileManySkills() (+44 more)
 
-### Community 140 - "warlock-config.manager.ts"
-Cohesion: 0.05
-Nodes (45): Gotchas, The 30-second look, The `defineConfig` helper, WL1006, See also, e2eCommand, e2eCommandAction(), readE2EOptions() (+37 more)
+### Community 140 - "warlock-config.md"
+Cohesion: 0.07
+Nodes (26): `cli` — custom commands, Common patterns, Custom CLI command stack, `database` — package migrations, `devServer` — dev-mode behaviour, Gotchas, HMR reload behaviour, Local TypeScript imports (+18 more)
 
-### Community 141 - "gate-a-resolve.ts"
-Cohesion: 0.04
-Nodes (81): Renaming fields, moduleKey(), toPosix(), BROWSER_GLOBALS, BrowserGlobalAccess, clientModuleSsrWarning(), clientModuleSsrWarningPlugin(), isFunctionBoundary() (+73 more)
+### Community 141 - "ssr-client-view.ts"
+Cohesion: 0.11
+Nodes (34): moduleKey(), toPosix(), BROWSER_GLOBALS, BrowserGlobalAccess, clientModuleSsrWarning(), clientModuleSsrWarningPlugin(), isFunctionBoundary(), transformWith() (+26 more)
 
 ### Community 142 - "conventions-step.ts"
-Cohesion: 0.03
-Nodes (119): checkCommandAction(), isStepName(), parseSkippedSteps(), stringOption(), childTypecheckRunner(), isTypecheckResult(), formatCheckSummary(), formatProblemLines() (+111 more)
+Cohesion: 0.04
+Nodes (106): checkCommandAction(), isStepName(), parseSkippedSteps(), stringOption(), childTypecheckRunner(), isTypecheckResult(), formatCheckSummary(), formatProblemLines() (+98 more)
 
 ### Community 143 - "Every option, explained"
-Cohesion: 0.11
-Nodes (18): `accessToken.issuer` / `accessToken.audience` — New in 5.53, `cookie.hostPrefix` — New in 5.53, `cookie.name` / `cookie.path` — New in 5.12, `csrf.allowedOrigins` — New in 5.12, Every option, explained, `hashTokensAtRest` — New in 5.53, `jwt.algorithm`, `jwt.refresh.enabled` (+10 more)
+Cohesion: 0.04
+Nodes (50): `accessToken.issuer` / `accessToken.audience` — New in 5.53, `cookie.hostPrefix` — New in 5.53, `cookie.name` / `cookie.path` — New in 5.12, `csrf.allowedOrigins` — New in 5.12, Every option, explained, `hashTokensAtRest` — New in 5.53, `jwt.algorithm`, `jwt.expiresIn` (+42 more)
 
 ### Community 144 - "router"
 Cohesion: 0.03
-Nodes (65): Container vs `app` vs the helpers, `get` throws for a missing key — new in 5.12, Gotchas, See also, The 30-second look, The `app` accessor, The container, Typed keys (+57 more)
+Nodes (68): Container vs `app` vs the helpers, `get` throws for a missing key — new in 5.12, Gotchas, See also, The 30-second look, The `app` accessor, The container, Typed keys (+60 more)
 
-### Community 145 - "types/page-config.ts"
-Cohesion: 0.03
-Nodes (65): Content-Security-Policy — new in 5.12, Layout composition, A complete pair, Browser-reachable API routes, Duplicate declarations and development, Server and browser work, Environment variables, The two halves of a page file (+57 more)
+### Community 145 - "SystemPromptContract"
+Cohesion: 0.06
+Nodes (20): `ai.prompts` — the unified prompt registry, Compose registered prompts — `systemPrompt().merge(name, { fromVersion })`, `create()` — build + register in one entry point, `define()` — bulk-register many versions, `diff()` — block-level version diff, `export()` / `import()` — portable JSON round-trip, Identity — `SystemPromptMeta` (`meta.name` / `version` / `description` / `required` / `composedFrom`), Register / resolve — `register` / `get` / `resolve` / `has` / `list` / `versions` (+12 more)
 
 ### Community 146 - "Mail"
 Cohesion: 0.03
-Nodes (70): How each environment gets set, Attachments, AWS SES driver, Common SMTP providers, Configuration, Global event hooks, Gotchas, Mail modes — production / development / test (+62 more)
+Nodes (63): mailer (priority 1), AI tool dispatching mail with org-level config, Attachments, AWS SES driver, Cancel a send when the user opted out, Common patterns, Common SMTP providers, Configuration (+55 more)
 
 ### Community 147 - "mail/index.ts"
-Cohesion: 0.07
-Nodes (52): The test mailbox, Step 5 — Test it without sending, What test mode does _not_ do, Configuration, mockedGetMailer, defaultConfigurations, getDefaultMailConfig(), getExplicitMailMode() (+44 more)
+Cohesion: 0.05
+Nodes (84): How each environment gets set, Mail modes — production / development / test, The test mailbox, Step 5 — Test it without sending, What test mode does _not_ do, Configuration, Mail modes, The shape (+76 more)
 
 ### Community 148 - "fakes.spec.ts"
-Cohesion: 0.05
-Nodes (50): replaceSecretsBackend(), cacheFake, driver(), clockFake, DEFAULT_FAKE_NOW, describeRecorded(), FakeAssertionError, Interceptor (+42 more)
+Cohesion: 0.04
+Nodes (57): previous, touched, secrets, cacheFake, driver(), clockFake, DEFAULT_FAKE_NOW, describeRecorded() (+49 more)
 
 ### Community 149 - "translation-usage.ts"
-Cohesion: 0.09
-Nodes (42): combine(), EMPTY_TRANSLATION_USAGE, escapesAsValue(), analyzePageTranslationUsage(), analyzeTranslationGraph(), isFile(), readDeclarations(), readSourceFile() (+34 more)
+Cohesion: 0.10
+Nodes (38): combine(), EMPTY_TRANSLATION_USAGE, escapesAsValue(), analyzePageTranslationUsage(), analyzeTranslationGraph(), isFile(), readDeclarations(), readSourceFile() (+30 more)
 
 ### Community 150 - "Logger"
 Cohesion: 0.06
-Nodes (45): Bootstrap hook — unhandled rejections, Levels, Mental model, See also, `clearMessage` utility, The `terminal` flag + ANSI stripping, `log` vs `Logger`, `addChannel(channel)` — append one (+37 more)
+Nodes (44): Bootstrap hook — unhandled rejections, Levels, Mental model, See also, `log` vs `Logger`, `addChannel(channel)` — append one, Adding channels, `configure({ channels, autoFlushOn, minLevel, redact })` — object-style setup (+36 more)
 
 ### Community 151 - "apply-panoptic-config.ts"
 Cohesion: 0.05
-Nodes (61): The Panoptic dashboard won't start off-loopback, Exporters at a glance, `panoptic()` — the one-call entry point, Querying traces, Related, The pipeline, Gotchas, How the side-effect import wires it (+53 more)
+Nodes (62): Exporters at a glance, `panoptic()` — the one-call entry point, Querying traces, Related, The pipeline, Gotchas, How the side-effect import wires it, Idempotency (+54 more)
 
 ### Community 152 - "board.ts"
-Cohesion: 0.08
-Nodes (70): agentOf(), BOARD_ACTIONS, BOARD_WATCH_TIMEOUT_EXIT_CODE, boardCommandAction(), BoardInvocation, BoardOutcome, formatBoardItemLine(), formatMessage() (+62 more)
+Cohesion: 0.09
+Nodes (68): agentOf(), BOARD_ACTIONS, BOARD_WATCH_TIMEOUT_EXIT_CODE, boardCommandAction(), BoardInvocation, BoardOutcome, formatBoardItemLine(), formatMessage() (+60 more)
 
 ### Community 153 - "blog-check.mjs"
-Cohesion: 0.06
-Nodes (83): Driving it without the `gh` CLI, Linux traps already fixed (don't re-learn them), Release from GitHub Actions (5.25+), The procedure, The release cycle an agent runs end to end, The workflows, appendOverrides(), assertDevtoolsRefusedInProduction() (+75 more)
+Cohesion: 0.09
+Nodes (51): appendOverrides(), assertDevtoolsRefusedInProduction(), assertDisposableRunner(), assertNoShadowingEnvFiles(), checkProduction(), childEnv(), ensureReleaseAgeExclude(), errorMessage() (+43 more)
 
-### Community 154 - "05-troubleshooting.md"
-Cohesion: 0.22
-Nodes (8): `ai.openai.model is not a function` (or `ai.openai` is undefined), An "install this package" error at first use, "`execute()` never throws" — but I got an exception, My model ignores the output schema, `OrchestratorDriftError` on resume, Passing `attachments` throws at the boundary, Related, `usage.cost` is `undefined`
+### Community 154 - "host"
+Cohesion: 0.05
+Nodes (39): `ai.openai.model is not a function` (or `ai.openai` is undefined), An "install this package" error at first use, "`execute()` never throws" — but I got an exception, My model ignores the output schema, `OrchestratorDriftError` on resume, Passing `attachments` throws at the boundary, Related, The Panoptic dashboard won't start off-loopback (+31 more)
 
 ### Community 155 - "fetch-url.ts"
-Cohesion: 0.03
-Nodes (64): `fetch_url` — read a page you have the URL for, Conventions and pitfalls, The 80% path, @warlock.js/ai-tools, `fetch_url` — read a page you have the URL for, CallDeadline, createDeadline(), WebToolError (+56 more)
+Cohesion: 0.04
+Nodes (50): `fetch_url` — read a page you have the URL for, Conventions and pitfalls, The 80% path, @warlock.js/ai-tools, `fetch_url` — read a page you have the URL for, CallDeadline, createDeadline(), WebToolError (+42 more)
 
 ### Community 156 - "SentryLog"
-Cohesion: 0.03
-Nodes (64): Custom filter predicate, Filter by level, Shared channel options, Timestamp format, Draining on shutdown, How levels map to Sentry, If `@sentry/node` isn't installed, Let the channel initialize Sentry (+56 more)
+Cohesion: 0.05
+Nodes (34): Draining on shutdown, How levels map to Sentry, If `@sentry/node` isn't installed, Let the channel initialize Sentry, Reuse an existing Sentry client, See also, Wiring it up, Channels — which one to pick and how to configure it (+26 more)
 
 ### Community 157 - "column-helpers.ts"
 Cohesion: 0.05
-Nodes (53): Column helpers — the building blocks, arrayBigInt(), arrayBoolean(), arrayDate(), arrayDecimal(), arrayFloat(), arrayInt(), arrayJson() (+45 more)
+Nodes (54): Column helpers — the building blocks, arrayBigInt(), arrayBoolean(), arrayDate(), arrayDecimal(), arrayFloat(), arrayInt(), arrayJson() (+46 more)
 
 ### Community 158 - "lru"
-Cohesion: 0.04
-Nodes (57): Which drivers are atomic across servers, Accepted `ttl` values, Driver behaviour, It resets the deadline, it does not add to it, Works everywhere keys do, API, Basic usage, Bounded sliding window (+49 more)
+Cohesion: 0.03
+Nodes (72): Which drivers are atomic across servers, Accepted `ttl` values, Driver behaviour, It resets the deadline, it does not add to it, Works everywhere keys do, API, Basic usage, Bounded sliding window (+64 more)
 
-### Community 159 - "hydration-payload.ts"
-Cohesion: 0.02
-Nodes (142): Cache public pages explicitly, Catch-all filenames are not supported, Default export failures, Explicit routes, Filesystem routing, Mixed segments, Named wildcard, Page-route grammar (+134 more)
+### Community 159 - "runtime/matcher.ts"
+Cohesion: 0.04
+Nodes (83): Page-route grammar, compareSpecificity(), CompiledRoute, compileRoutes(), createClientRouteMatcher(), decodeParameter(), decodeReservedCharacter(), escapeRegExp() (+75 more)
 
 ### Community 160 - "ModelEvents"
-Cohesion: 0.05
-Nodes (28): Global listeners, Gotchas, 2026-05-12 — Relation lifecycle events, Backward-compat, Decisions to lock, Event scoping — per-model class, Investigation note — 2026-05-12, Key implementation notes (+20 more)
+Cohesion: 0.08
+Nodes (15): Global listeners, Gotchas, 2026-05-12 — Relation lifecycle events, Backward-compat, Decisions to lock, Event scoping — per-model class, Key implementation notes, Recursion risk (+7 more)
 
-### Community 161 - "ref_vite"
-Cohesion: 0.04
-Nodes (53): registry(), AppConventionAlias, appConventionAliases(), coreAppModules(), CoreAppModulesOptions, NativeImport, NativeNamespace, requiresViteToEvaluate() (+45 more)
+### Community 161 - "dev-server-config.ts"
+Cohesion: 0.06
+Nodes (29): cssModulesConfig(), devConfig(), __dirname, WEB_ROOT, aliasMatches(), CORE_OPTIONAL_PEERS, createWebConnectorViteConfig(), discoverWarlockFamilyPackages() (+21 more)
 
 ### Community 162 - "redact/redact.ts"
-Cohesion: 0.06
-Nodes (58): WL9008, What about the `message` field?, `maskEmail(address)` / `maskEmailsInText(text)`, See also, `WL9008` — redacted logs, 2026-05-29 — Logger docs review findings, Axis 1 — Documentation quality & drift, Axis 2 — Broken links (+50 more)
+Cohesion: 0.07
+Nodes (49): WL9008, What about the `message` field?, `maskEmail(address)` / `maskEmailsInText(text)`, `WL9008` — redacted logs, Censor variants, Client text inside a message: `escapeLogValue()`, Email addresses inside strings, Immutability (+41 more)
 
 ### Community 163 - "postgres/sync.test.ts"
-Cohesion: 0.06
-Nodes (56): RegisterModel(), BelongsTo, BelongsToMany, HasMany, HasOne, ARTICLES_TABLE, ORDERS_TABLE, QArticle (+48 more)
+Cohesion: 0.07
+Nodes (45): AnyRelationOptions, BelongsTo, BelongsToMany, buildRelationDefinition(), HasMany, HasOne, makeRelationDecorator(), RELATION_METADATA_KEY (+37 more)
 
 ### Community 164 - "ai-tools/src/index.ts"
-Cohesion: 0.07
-Nodes (72): Authenticated context and call policy, Custom authentication refusals, Extra authenticated HTTP routes, ToolRequestContext, Authenticated context, policy and cancellation, Control discovery, call envelopes and HTTP side routes, Customize HTTP authentication refusals, HttpMethod (+64 more)
+Cohesion: 0.06
+Nodes (79): Authenticated context and call policy, Custom authentication refusals, Extra authenticated HTTP routes, Authenticated context, policy and cancellation, Control discovery, call envelopes and HTTP side routes, Customize HTTP authentication refusals, HttpMethod, HttpRequestInput (+71 more)
 
-### Community 165 - "validation/init.ts"
-Cohesion: 0.03
-Nodes (72): Step 4 — Install the plugin at boot, A larger example — postal codes per country, Introspection, Registering plugins, Related, The plugin shape, Things to avoid, TypeScript — declare the new methods (+64 more)
+### Community 165 - "01-primitives.md"
+Cohesion: 0.02
+Nodes (95): Step 4 — Install the plugin at boot, Booleans, Dates, Derived values — `v.computed` and `v.managed`, Escape hatch — `v.any`, Instances, Literals, Numbers — pick by what you accept (+87 more)
 
 ### Community 166 - "EventConsumer"
-Cohesion: 0.06
-Nodes (25): EventConsumer + `@Consumable` — class-based consumers, Class-based consumers, Decorator-style consumers — `@Consumable` + `EventConsumer`, `defineConsumer` — no-class shorthand, Validation + version gating, Event classes (`EventMessage`) — the typed event layer, Consumable(), ConsumerOptions (+17 more)
-
-### Community 167 - "TraceSpan"
 Cohesion: 0.05
-Nodes (39): Concepts, Exporters, License, Quick start, Tests, @warlock.js/ai-panoptic, Collector, createCollector() (+31 more)
+Nodes (30): Split producer and consumer, EventConsumer + `@Consumable` — class-based consumers, Class-based consumers, Coverage gaps requiring a live broker (skipped — documented), Test coverage, Decorator-style consumers — `@Consumable` + `EventConsumer`, `defineConsumer` — no-class shorthand, Validation + version gating (+22 more)
+
+### Community 167 - "BaseReport"
+Cohesion: 0.12
+Nodes (15): CollectorContract, DEFAULT_COMPLETED_EVENTS, createPanopticMiddleware(), isReport(), PanopticSubscriber, readReport(), readResultError(), RecordingExporter (+7 more)
 
 ### Community 168 - "confined.ts"
-Cohesion: 0.05
-Nodes (51): Errors, Following links that stay inside, Limits, Options, Relation to the AI workspace jail, See also, The reader, What it guarantees (+43 more)
+Cohesion: 0.06
+Nodes (45): Errors, What it guarantees, Choosing the folder, See also, The import, What each guard stops, Following links that stay inside, Handling refusals (+37 more)
 
 ### Community 169 - "endpoint.generator.ts"
-Cohesion: 0.07
-Nodes (61): createEndpointGenerator(), displayPath(), EndpointInputError, fail(), isInside(), isSchemaLike(), logEdit(), METHODS (+53 more)
-
-### Community 170 - "file-event-handler.ts"
 Cohesion: 0.06
-Nodes (13): classifyCycle(), DependencyGraph, FileEventHandler, isEnvFile(), isExternalPath(), runInBatches(), buildHandler(), FileOperations (+5 more)
+Nodes (67): createEndpointGenerator(), displayPath(), EndpointInputError, fail(), generateEndpoint, isInside(), logEdit(), METHODS (+59 more)
+
+### Community 170 - "files-orchestrator.ts"
+Cohesion: 0.02
+Nodes (86): loadConfigFiles(), DevelopmentAppModuleEntry, DevelopmentAppModules, DevelopmentAppModuleRegistry, getDevelopmentAppModuleRegistry(), normalizeKey(), classifyCycle(), DependencyGraph (+78 more)
 
 ### Community 171 - "boolean-validator.ts"
 Cohesion: 0.05
-Nodes (24): booleanCoerceMutator(), formBooleanMutator(), stringMutator(), allowedValuesRule, enumRule, inRule, notAllowedValuesRule, ACCEPTED_VALUES (+16 more)
+Nodes (27): booleanCoerceMutator(), formBooleanMutator(), stringMutator(), allowedValuesRule, enumRule, inRule, notAllowedValuesRule, ACCEPTED_VALUES (+19 more)
 
 ### Community 172 - "fn"
 Cohesion: 0.04
-Nodes (54): 1. Shorthand — prefix only, 2. Shorthand — prefix + TTL, 3. Options form — full control, Three shapes, Across servers, Good to know, In-flight dedupe only: `ttl: 0`, Options (+46 more)
+Nodes (55): Across servers, Good to know, In-flight dedupe only: `ttl: 0`, Options, What each call does, 1. Positional TTL — the common case, 2. Options form — add an `owner` label, 3. Options form — per-call driver override (+47 more)
 
 ### Community 173 - "defineNotification"
 Cohesion: 0.04
-Nodes (53): Next, Routing — a channel concern, not a model concern, When a route can't be resolved, Idempotency, Next, The read API — recipient-scoped by construction, The write side is IDOR-safe too (since 4.15.0), Next (+45 more)
+Nodes (60): Built-in vs custom, Next, Routing — a channel concern, not a model concern, When a route can't be resolved, Idempotency, Next, Recipient types — identities that share an id, The read API — recipient-scoped by construction (+52 more)
 
 ### Community 174 - "guardedFetch"
 Cohesion: 0.04
-Nodes (78): Attachment security, Loaders, `loadWeb` is SSRF-safe — never a raw `fetch`, Related, Security, `assertUrlAllowed(url, resolvedPolicy)`, Enforcing a fetch, Errors (+70 more)
+Nodes (77): Attachment security, `loadWeb` is SSRF-safe — never a raw `fetch`, Related, Security, `assertUrlAllowed(url, resolvedPolicy)`, Enforcing a fetch, Errors, `fetchTextWithPolicy(url, policy, init?)` — the convenience entry (+69 more)
 
 ### Community 175 - "TypeGenerator"
-Cohesion: 0.06
-Nodes (42): ../../src/app/audit/audit.resource, devLogInfo(), devLogSuccess(), devServeLog, assignRegistryKeys(), extractModelResourceEntries(), ExtractModelResourcesInput, ImportBinding (+34 more)
+Cohesion: 0.05
+Nodes (57): ../../src/app/audit/audit.resource, ../../src/app/orders/models/order.model, ../../src/app/orders/resources/order.resource, ../../src/app/users/models/user.model, devLogInfo(), devLogSuccess(), devServeLog, collectFromCall() (+49 more)
 
-### Community 176 - "build-request-body.ts"
-Cohesion: 0.25
-Nodes (19): buildRequestBody(), formFields(), isFileSchema(), isJsonContentType(), pickContentType(), RequestBodyParts, stringifyValue(), exampleFromSchema() (+11 more)
+### Community 176 - "release-notes.spec.ts"
+Cohesion: 0.11
+Nodes (37): releaseNotesCommand, Entry, formatRange(), newerFooter(), Output, Overrides, runReleaseNotesCommand(), text() (+29 more)
 
 ### Community 177 - "Trace"
-Cohesion: 0.08
-Nodes (29): The JSON API, Bounding retention with `capacity`, Correlate traces with HTTP requests, Filtering with `TraceQuery`, Hosted-tool rollups, Persisting across a restart — `createCacheTraceStore`, Query traces — the in-memory queryable store, See also (+21 more)
+Cohesion: 0.09
+Nodes (27): The JSON API, Bounding retention with `capacity`, Correlate traces with HTTP requests, Filtering with `TraceQuery`, Hosted-tool rollups, Persisting across a restart — `createCacheTraceStore`, Query traces — the in-memory queryable store, See also (+19 more)
 
 ### Community 178 - "conventions-step.ts"
-Cohesion: 0.06
-Nodes (61): featureOfLocaleJson(), isModuleLocaleJsonPath(), MODULE_LOCALE_JSON_GLOBS, moduleOfLocaleJson(), normalize(), barrelFindings(), findings(), chainToClientModule() (+53 more)
+Cohesion: 0.05
+Nodes (64): importsForbiddenModule(), listSourceFiles(), sourceRoot, barrelFindings(), findings(), chainToClientModule(), ClientBoundaryCache, clientBoundaryProblems() (+56 more)
 
 ### Community 179 - "ref_warlock_js_core"
 Cohesion: 0.04
-Nodes (21): appConfigurations, httpConfigurations, storageOptions, appConfigurations, cacheConfigurations, httpConfigurations, channels, logConfigurations (+13 more)
+Nodes (25): appConfigurations, httpConfigurations, storageOptions, appConfigurations, cacheConfigurations, httpConfigurations, channels, logConfigurations (+17 more)
 
 ### Community 180 - "web/src/vite/index.ts"
-Cohesion: 0.03
-Nodes (87): bundle(), assertViteVersion(), REQUIRED_VITE_MAJOR, viteMajorOf(), assertBuildOptions(), assertEntryFile(), buildHydrationClient(), BuildHydrationClientOptions (+79 more)
+Cohesion: 0.06
+Nodes (46): bundle(), BuildHydrationClientResult, createEnvironmentClassifier(), EnvironmentClassifier, EnvironmentClassifierOptions, createPublicEnvTracker(), PublicEnvTracker, buildPublicEnvManifest() (+38 more)
 
 ### Community 181 - "auth/routes.ts"
-Cohesion: 0.15
-Nodes (14): loginController(), logoutAllController(), logoutController(), meController(), refreshTokenController(), loginSchema, LoginSchema, LoginCredentials (+6 more)
+Cohesion: 0.06
+Nodes (32): Typing the controller, What gets generated, loginController(), logoutAllController(), logoutController(), meController(), refreshTokenController(), adminMiddleware() (+24 more)
 
 ### Community 182 - "prompt/prompt.ts"
-Cohesion: 0.08
-Nodes (34): PromptNotFoundError, PromptValidationError, buildJudgeAgent(), loadLangfuse(), PROMPT_LANGFUSE_INSTALL_INSTRUCTIONS, resolveClient(), syncLangfusePrompts(), toEntry() (+26 more)
+Cohesion: 0.09
+Nodes (35): `ai.prompt(...)` — now a thin facade (⚠ breaking vs the old registry), PromptNotFoundError, PromptValidationError, buildJudgeAgent(), loadLangfuse(), PROMPT_LANGFUSE_INSTALL_INSTRUCTIONS, resolveClient(), syncLangfusePrompts() (+27 more)
 
 ### Community 183 - "WorkspaceImpl"
 Cohesion: 0.09
-Nodes (7): make(), build(), rules, makeWorkspace(), SHELL_POLICY, workspace(), WorkspaceImpl
+Nodes (6): make(), build(), makeWorkspace(), SHELL_POLICY, workspace(), WorkspaceImpl
 
-### Community 184 - "SystemPromptContract"
-Cohesion: 0.05
-Nodes (34): Editing a refined prompt, Options, Prove it, don't assume it, `refine()` — the compiled string, `refinePrompt()` — the composable artifact, Related, The four trust rules, Chaining and identity (+26 more)
+### Community 184 - "RefinedSystemPrompt"
+Cohesion: 0.11
+Nodes (12): PromptRefineOptions, RefinedSystemPromptOptions, buildRefineInput(), buildRepairInput(), collectPlaceholderTokens(), formatRefineCriteria(), hashString(), parityIssues() (+4 more)
 
 ### Community 185 - "auth.middleware.spec.ts"
 Cohesion: 0.12
 Nodes (11): AUTH_MIDDLEWARE_DESCRIPTOR, accessTokenFindByToken, canAuthenticate, configKey, fakeResolveCsrfOriginVerdict(), jwtVerify, liveRow(), renewAutomaticSession (+3 more)
 
-### Community 186 - "ai-ollama/src/sdk.ts"
-Cohesion: 0.03
-Nodes (49): Capabilities, Construct, First call, Install, List models, Pricing and usage, Provider body options, Set up the daemon (+41 more)
+### Community 186 - "ai-ollama/src/model.ts"
+Cohesion: 0.08
+Nodes (10): inferReasoningCapability(), REASONING_CAPABLE_SUBSTRINGS, inferVisionCapability(), VISION_CAPABLE_SUBSTRINGS, EFFORT_TO_THINK_LEVEL, OllamaModel, positiveInteger(), makeModel() (+2 more)
 
 ### Community 187 - "ai-tools/src/errors.ts"
-Cohesion: 0.06
-Nodes (42): `calculator` — SAFE arithmetic (never `eval`), DateTimeInput, DateTimeOp, DateTimeOptions, DateTimeResult, CalculatorError, DateTimeError, FetchCall (+34 more)
+Cohesion: 0.09
+Nodes (28): `date_time` — clock + calendar, DateTimeError, causeOf(), calculatorTool(), evaluate(), expectError(), assertTimeZone(), Clock (+20 more)
 
-### Community 188 - "ai-groq/src/sdk.ts"
-Cohesion: 0.02
-Nodes (89): Capabilities, Construct, Embeddings and images, First call, Inherited from the OpenAI adapter, Install, List models, Models (+81 more)
+### Community 188 - "OpenAISDK"
+Cohesion: 0.03
+Nodes (60): Context window, Qwen / DashScope, xAI, API surface, Capabilities, Embeddings & images, License, Models (+52 more)
 
-### Community 189 - "build-openapi-document.ts"
-Cohesion: 0.12
-Nodes (27): buildOpenApiDocument(), describeAuth(), OPENAPI_JSON_SCHEMA_DIALECT, sortResponses(), UNSAFE_METHODS, buildCustomValidationFailedResponse(), buildUnauthorizedResponse(), buildValidationFailedResponse() (+19 more)
-
-### Community 190 - "RepositoryAdapterContract"
-Cohesion: 0.06
-Nodes (5): RepositoryAdapterContract, HookRepository, OrdersRepository, Row, TestRepository
+### Community 189 - "openapi/types.ts"
+Cohesion: 0.05
+Nodes (72): buildOpenApiDocument(), describeAuth(), OPENAPI_JSON_SCHEMA_DIALECT, sortResponses(), UNSAFE_METHODS, baseCastSchema(), castToJsonSchema(), DEFAULT_DATE_SCHEMA (+64 more)
 
 ### Community 191 - "generation.ts"
 Cohesion: 0.07
-Nodes (53): applyGeneration(), ApplyGenerationOptions, capDiff(), describeChange(), GeneratedFile, GenerationBackend, GenerationPlan, GenerationPlanOptions (+45 more)
+Nodes (56): From code, applyGeneration(), ApplyGenerationOptions, capDiff(), describeChange(), GeneratedFile, GenerationBackend, GenerationPlan (+48 more)
 
 ### Community 192 - "rabbitmq-driver.ts"
-Cohesion: 0.06
-Nodes (24): Subscribe options, Publish options, BrokerOptions, BrokerDriverContract, ChannelContract, ConsumableOptions, pendingSubscribers, EventMessageClass (+16 more)
+Cohesion: 0.07
+Nodes (23): Health checks, Step 3 — Register the driver, BrokerOptions, brokerRegistry, BrokerDriverContract, Consumable(), ConsumableOptions, pendingSubscribers (+15 more)
 
-### Community 193 - "agents-and-prompts.md"
-Cohesion: 0.25
-Nodes (7): Compose the system prompt — persona, then instructions, then placeholders, Declare a structured output schema when you need typed data — and enable repair, Keep `maxTrips` bounded — it's your circuit breaker, Prefer auto-adapt executables in `tools` over hand-stitched `asTool`, See also, Set `temperature` deliberately — low for extraction, higher for copy, Use attachments for vision — let the agent build the multipart message
+### Community 193 - "run-upgrade.ts"
+Cohesion: 0.08
+Nodes (33): CODEMODS, fixturesRoot, listFiles(), materialize(), roots, viteVitest, diffLines(), formatHunks() (+25 more)
 
 ### Community 194 - "WL9xxx — conventions and hygiene"
-Cohesion: 0.02
-Nodes (101): From code, Kept fresh by `warlock dev`, See also, The markers, What the section contains, Actions, agent-kit, Exit codes and JSON (+93 more)
+Cohesion: 0.07
+Nodes (27): WL9001, WL9002, WL9003, WL9004, WL9009, WL9010, WL9011, WL9012 (+19 more)
 
-### Community 195 - "security-headers.ts"
-Cohesion: 0.06
-Nodes (56): WL1004, `compression` — response compression (5.53.0), `csp` — Content-Security-Policy (5.12.0), `securityHeaders` — security response headers (5.42.0), `serverOptions` — native Fastify/Node server options (5.30.0), The shape, httpConfig(), createHttpApplication() (+48 more)
+### Community 195 - "http/index.ts"
+Cohesion: 0.03
+Nodes (86): `compression` — response compression (5.53.0), `csp` — Content-Security-Policy (5.12.0), `securityHeaders` — security response headers (5.42.0), `serverOptions` — native Fastify/Node server options (5.30.0), The shape, applyEncodingHeaders(), brotliCompress, canCompressResponse() (+78 more)
 
 ### Community 196 - "unit/cli/issue-command.test.ts"
-Cohesion: 0.06
-Nodes (51): Building blocks, Gotchas, Read what changed first, See also, The dev-server update notice, The `u` shortcut, `warlock update`, Warlock — update the framework (+43 more)
+Cohesion: 0.05
+Nodes (53): `whereIn(field, values)` / `whereNotIn(field, values)`, Building blocks, Gotchas, Read what changed first, See also, The dev-server update notice, The `u` shortcut, `warlock update` (+45 more)
 
 ### Community 197 - "repositories-deep.md"
-Cohesion: 0.04
-Nodes (47): Running code around writes, The everyday methods, 1. `perform` callback, 2. A custom method on the repository, 3. Drop to the query builder directly, A real example end-to-end, App-level config, Bulk read (+39 more)
+Cohesion: 0.03
+Nodes (78): A complete cached list endpoint, Going further, Gotchas, How the cache key is built, How the repository reads from cache, Manual invalidation, Measuring the win, Stage 0 — Configure the cache (+70 more)
 
 ### Community 198 - "design-system-mantine-ssr.spec.ts"
-Cohesion: 0.13
-Nodes (38): render(), base, controls, options, CheckboxInput(), DatePickerInput(), DateTimePickerInput(), fromMantine() (+30 more)
+Cohesion: 0.10
+Nodes (40): element(), render(), submit(), base, controls, options, CheckboxInput(), DatePickerInput() (+32 more)
 
 ### Community 199 - "seed-command-action.ts"
-Cohesion: 0.04
-Nodes (67): WL6001, WL6002, WL6xxx — database, `batchSize` — bulk-insert hint, `now` — the injectable clock, Ordering and dependencies, See also, The run context (+59 more)
+Cohesion: 0.14
+Nodes (16): getDatabaseDriver(), transaction(), Auto-discovery, `now` — the injectable clock, clearAllTables(), dropSeedRecords(), listSeedsFiles(), loadSeedFile() (+8 more)
 
 ### Community 200 - "local-registry-gate.ts"
 Cohesion: 0.05
-Nodes (37): assertCandidate(), assertLoopbackRegistry(), assertNpmCommand(), assertOwnedRegistryServer(), canConnect(), CandidateArtifact, CommandRequest, CommandResult (+29 more)
+Nodes (39): assertCandidate(), assertLoopbackRegistry(), assertMatrixScopeAgreesWithRows(), assertNpmCommand(), assertOwnedRegistryServer(), canConnect(), CandidateArtifact, CommandRequest (+31 more)
 
 ### Community 201 - "use-case.ts"
-Cohesion: 0.08
-Nodes (47): The validation-failure envelope, Use-cases: `BadSchemaUseCaseError`, When each fires, App-level config, `$cleanup`, The registry, Global config, Pipeline phases (+39 more)
+Cohesion: 0.09
+Nodes (45): Auto-integration with use-cases, Going further, When each fires, `$cleanup`, The registry, Pipeline phases, Key Exports, Key Files (+37 more)
 
-### Community 202 - "Resource"
-Cohesion: 0.02
-Nodes (132): Gotchas, A real example end-to-end, Field types, Gotchas, Nested resources — for relations, Next, Picking which columns to serialize, Renaming an input key (+124 more)
+### Community 202 - "ResourceFieldBuilder"
+Cohesion: 0.06
+Nodes (25): Dates — three output shapes, T-072 [feature] App-wide date output default for resources, Absolute API URL in a webhook payload, Asset URL in an HTML email, Full inventory, Gotchas, Override per-request for a multi-tenant CDN, Patterns (+17 more)
 
 ### Community 203 - "render-agents-md.ts"
 Cohesion: 0.08
-Nodes (47): AGENTS_MD_SECTIONS, agentsMdCommandAction(), formatWriteStatus(), AGENTS_MD_END, AGENTS_MD_FILE, AGENTS_MD_START, lineBreakOf(), occurrences() (+39 more)
+Nodes (48): AGENTS_MD_SECTIONS, agentsMdCommandAction(), formatWriteStatus(), agentsMdCommand, AGENTS_MD_END, AGENTS_MD_FILE, AGENTS_MD_START, lineBreakOf() (+40 more)
 
 ### Community 204 - "trace-request.ts"
 Cohesion: 0.05
-Nodes (73): traceCommand, collectHeaderValues(), formatTraceSummary(), parseHeaderValues(), parseTraceBody(), stringOption(), traceCommandAction(), traceFailureExitCode() (+65 more)
+Nodes (69): traceCommand, collectHeaderValues(), formatTraceSummary(), parseHeaderValues(), parseTraceBody(), stringOption(), traceCommandAction(), traceFailureExitCode() (+61 more)
 
 ### Community 205 - "NumberValidator"
-Cohesion: 0.03
-Nodes (50): Patterns beyond `StringValidator`, `v.number(errorMessage?)`, Validator classes (for plugin authoring + type narrowing), Co-located configuration tests, fixtures(), Model, referenceParse(), toJson() (+42 more)
+Cohesion: 0.05
+Nodes (29): `v.number(errorMessage?)`, absMutator(), booleanMutator(), ceilMutator(), floorMutator(), isNumberLike(), numberMutator(), numericMutator() (+21 more)
 
-### Community 206 - "TraceSpan"
-Cohesion: 0.06
-Nodes (63): Attach Panoptic to every production run — not just the one you're debugging, Avoid list, Export to OTel or Langfuse in prod; console or file in dev, Read the rolled-up `Usage.cost` to attribute spend per tenant or feature, See also, The running scenario, Use the trace tree — children and lineage — for forensics, Wire tracing before you scale — and flush it on shutdown (+55 more)
+### Community 206 - "console-exporter.ts"
+Cohesion: 0.07
+Nodes (37): Attach Panoptic to every production run — not just the one you're debugging, Avoid list, Export to OTel or Langfuse in prod; console or file in dev, Read the rolled-up `Usage.cost` to attribute spend per tenant or feature, See also, The running scenario, Use the trace tree — children and lineage — for forensics, Wire tracing before you scale — and flush it on shutdown (+29 more)
 
 ### Community 208 - "ops.ts"
-Cohesion: 0.05
-Nodes (23): runAfterEdit(), wrap(), capOutput(), clipUtf8(), DEFAULT_LIST_IGNORE, linePrefix(), lowerOf(), numberWindow() (+15 more)
+Cohesion: 0.03
+Nodes (63): setup(), createLocalBackend(), createMockBackend(), isMockBackendSeed(), MockBackendSeed, MockExecResult, normalizeSeed(), setup() (+55 more)
 
 ### Community 209 - "notifications/src/types.ts"
 Cohesion: 0.06
-Nodes (30): Built-in vs custom, `columnMap` — map roles to columns, Recipient types — identities that share an id, The model, Upgrading an existing table, Read by intent, `BaseNotificationsRepository<TModel>`, `DatabaseNotification` (+22 more)
+Nodes (35): `columnMap` — map roles to columns, The model, The repository — derived from `columnMap`, `BaseNotificationsRepository<TModel>`, `DatabaseNotification`, In-app, `inApp`, addTenantScope() (+27 more)
 
 ### Community 210 - "json-schemas.ts"
-Cohesion: 0.05
-Nodes (58): MAX_MULTI_EDITS, inputSchema, makeApplyPatchTool(), policy, setup(), inputSchema, makeEditFileTool(), globInputSchema (+50 more)
+Cohesion: 0.06
+Nodes (48): WorkspaceOps, inputSchema, globInputSchema, MakeGlobToolOptions, grepInputSchema, makeGrepTool(), MakeGrepToolOptions, seededOps() (+40 more)
 
 ### Community 211 - "devtools/src/types.ts"
-Cohesion: 0.06
-Nodes (49): captureCallerLocation(), normalizePath(), packageDirectory, parseFrame(), shouldSkip(), currentRequestId(), detectNPlusOne(), mostFrequentCaller() (+41 more)
+Cohesion: 0.08
+Nodes (31): currentRequestId(), attachCacheSource(), CacheEventData, EVENT_TYPES, attachLogSource(), DevtoolsLogChannel, toDevtoolsLevel(), addressToString() (+23 more)
 
 ### Community 212 - "create-new-app/index.ts"
 Cohesion: 0.08
 Nodes (48): directoryExists, ProcessExit, getAppPath(), createDefaultInteractive(), createFullWizard(), createNewApp(), createNonInteractive(), resolveAppOptions() (+40 more)
 
-### Community 213 - "client.ts"
-Cohesion: 0.04
-Nodes (34): What `tools()` does, Selecting one discovered tool, What `tools()` does, combineSignals(), IMAGE_MEDIA_TYPES, McpClientImpl, normalizeBlock(), ADD_TOOL (+26 more)
+### Community 213 - "json-schema-to-standard.ts"
+Cohesion: 0.10
+Nodes (16): What `tools()` does, AJV_INSTALL_INSTRUCTIONS, AjvConstructorLike, AjvErrorObject, AjvInstanceLike, AjvModuleLike, AjvValidateFunctionLike, exposeSchema() (+8 more)
 
 ### Community 214 - "01-redaction.md"
 Cohesion: 0.05
-Nodes (39): Merge predefined blocks, Tools, Censor variants, Immutability and edge cases, Layer 0 — the default denylist (no configuration needed), Logger-wide floor, Path syntax, Per-channel additive (+31 more)
+Nodes (41): Merge predefined blocks, Censor variants, Immutability and edge cases, Layer 0 — the default denylist (no configuration needed), Logger-wide floor, Path syntax, Per-channel additive, Performance (+33 more)
 
 ### Community 215 - "mcp/serve.ts"
-Cohesion: 0.10
-Nodes (34): McpServeCallContext, McpServePrompt, McpServeResource, JsonRpcRequest, JsonRpcResponse, assertMcpResult(), isJsonValue(), isMcpResult() (+26 more)
+Cohesion: 0.06
+Nodes (54): Return native MCP results, JsonSchemaTarget, Return native MCP results, McpHttpServeHandle, McpHttpServeTransport, McpServeCallContext, McpServeHandle, McpServeOptions (+46 more)
 
 ### Community 216 - "FieldFrame"
 Cohesion: 0.12
 Nodes (32): element(), submit(), CheckboxInput(), DatePickerInput(), DateTimePickerInput(), EmailInput(), FieldFrame(), FileInput() (+24 more)
 
-### Community 217 - "otel-exporter.ts"
-Cohesion: 0.07
-Nodes (36): Install the optional peers, Production notes, Register both exporters, Related, Reuse a client you already built, Run it — the same trace reaches both backends, Teardown — flush before exit, What lands in each backend (+28 more)
+### Community 217 - "ExporterContract"
+Cohesion: 0.03
+Nodes (58): Failures — `ERROR` status plus a recorded exception, `fileExporter` — JSON-Lines `TraceRecord`, `langfuseExporter` — trace, generation, span, `otelExporter` — `gen_ai.*` / `warlock.*` attributes on an OTel span, See also, A custom `ExporterContract`, Building blocks for custom pipelines, `createCollector()` — the source end by hand (+50 more)
 
 ### Community 218 - "benchmark/index.ts"
 Cohesion: 0.10
 Nodes (28): `BenchmarkChannel` — where stats go, `BenchmarkProfiler` — rolling percentiles, `BenchmarkSnapshots` — raw captures, `BenchmarkProfiler` — rolling percentiles, Custom channel, endpoints, profiler, snapshots (+20 more)
 
 ### Community 220 - "verify-and-reset.spec.ts"
-Cohesion: 0.04
-Nodes (44): Add device info to the refresh token, Don't leak the hash, Hash on the way in — always, Related, Schema enforcement, Side effects via events, The minimal controller, Things to avoid (+36 more)
+Cohesion: 0.05
+Nodes (38): Prerequisites, `AuthErrorCodes`, Utilities, Prerequisites, AuthNotification, OneTimeTokenNotificationData, NotificationsUnavailableError, ProviderAccountLinkBlockedError (+30 more)
 
 ### Community 221 - "redact"
-Cohesion: 0.05
-Nodes (42): `ai.guardrail.injection(options?)`, `ai.guardrail.links(options?)`, `ai.guardrail.moderation(options?)` — optional `openai` peer, `ai.guardrail(options)`, `ai.guardrail.pii(options?)`, `ai.guardrail.topic(options)`, Blocks, errors, and escalation, Built-in detectors (+34 more)
+Cohesion: 0.04
+Nodes (58): `ai.guardrail.injection(options?)`, `ai.guardrail.links(options?)`, `ai.guardrail.moderation(options?)` — optional `openai` peer, `ai.guardrail(options)`, `ai.guardrail.pii(options?)`, `ai.guardrail.topic(options)`, Blocks, errors, and escalation, Built-in detectors (+50 more)
 
 ### Community 222 - "RAG"
 Cohesion: 0.06
-Nodes (52): `ai.rag.cacheVectorStore(driver)` — adapt any cache driver, `ai.rag.pgVectorStore(options)` — production pgvector, `loadPdf` — lazy optional peer, page-precise citations, Real-world — a knowledge base from a website, backed by pgvector, Stores, The two contracts, `ai.rag.cacheVectorStore(driver)` — adapt any `@warlock.js/cache` driver, `ai.rag.pgVectorStore(options)` — production pgvector (+44 more)
+Nodes (52): `ai.rag.cacheVectorStore(driver)` — adapt any cache driver, `ai.rag.pgVectorStore(options)` — production pgvector, Loaders, `loadPdf` — lazy optional peer, page-precise citations, Real-world — a knowledge base from a website, backed by pgvector, Stores, The two contracts, `ai.rag.cacheVectorStore(driver)` — adapt any `@warlock.js/cache` driver (+44 more)
 
 ### Community 223 - "best-practices.mdx"
 Cohesion: 0.04
 Nodes (44): Batch Operations, Choose the Right Driver, Common Patterns, Do's ✅, Don't Cache Everything, Don't Cache Sensitive Data, Don't Cache User-Specific Data in Shared Drivers, Don't Ignore Memory Limits (+36 more)
 
 ### Community 224 - "ref_node_events"
-Cohesion: 0.09
-Nodes (11): Multi-broker, Broker registry, Errors, Top-level functions, Broker, BrokerRegistry, brokerRegistry, MissingBrokerError (+3 more)
+Cohesion: 0.08
+Nodes (16): Multi-broker, `Broker`, Broker registry, Channel options, `ChannelContract<TPayload>`, Errors, Message envelope, Publish options (+8 more)
 
 ### Community 225 - "queue/src/index.ts"
-Cohesion: 0.09
-Nodes (31): Programmatic API, `setQueueConfig` / `getQueueConfig` / `resetQueueConfig`, Delivery, Mental model, Advanced: manual `queueDashboard()`, Dashboard (optional), Failed jobs, resetQueueConfig() (+23 more)
+Cohesion: 0.10
+Nodes (28): Programmatic API, `setQueueConfig` / `getQueueConfig` / `resetQueueConfig`, Delivery, Mental model, resetQueueConfig(), setQueueConfig(), DEFAULT_DASHBOARD_PATH, mountQueueDashboard() (+20 more)
 
-### Community 226 - "request.ts"
-Cohesion: 0.02
-Nodes (103): RFC-5987, RFC-6265, RFC-6266, RFC-7807, WL1001, WL1002, WL1005, WL1008 (+95 more)
+### Community 226 - "Response"
+Cohesion: 0.01
+Nodes (142): RFC-5987, RFC-6265, RFC-6266, RFC-7807, WL1001, WL1002, WL1004, WL1005 (+134 more)
 
 ### Community 227 - "PostgresQueryParser"
 Cohesion: 0.06
-Nodes (15): 2026-05-11 — withCount Implementation (Postgres), Decision: COUNT result type, Decisions (locked in chat), Key implementation notes, Open questions, Pre-existing parser bug noticed (addressed in follow-up commit), Summary, Tasks (+7 more)
+Nodes (11): Pre-existing parser bug noticed (addressed in follow-up commit), escapeSqlLiteral(), isSafeCastType(), PostgresQueryParser, PostgresSQLSerializer, SqlDialectContract, parse(), parse() (+3 more)
 
-### Community 228 - "logger/src/index.ts"
-Cohesion: 0.06
-Nodes (35): Validating outside a request, Ad-hoc validation (outside a controller), adapterSpy, closeSpy, RUNNING_SCHEDULERS_KEY, host, KEY, StoppableScheduler (+27 more)
+### Community 228 - "build-client.ts"
+Cohesion: 0.10
+Nodes (32): assertViteVersion(), REQUIRED_VITE_MAJOR, viteMajorOf(), assertBuildOptions(), assertEntryFile(), buildHydrationClient(), BuildHydrationClientOptions, clientCodeSplitting() (+24 more)
 
 ### Community 229 - "add-command.action.ts"
-Cohesion: 0.07
-Nodes (40): addCommandAction(), allowedFeatures, appendAgentKitPick(), approvePnpmSharpBuild(), installDependencies(), isWarlockPackage(), ProjectPackageJson, recordDependencies() (+32 more)
+Cohesion: 0.06
+Nodes (43): dispatchGenerator(), recorded(), addCommandAction(), allowedFeatures, appendAgentKitPick(), approvePnpmSharpBuild(), installDependencies(), isWarlockPackage() (+35 more)
 
 ### Community 230 - "helpers/app.ts"
 Cohesion: 0.10
@@ -1864,48 +1847,48 @@ Cohesion: 0.04
 Nodes (18): 2026-05-12 — Carry `.nullable()`, `.default()`, and `.nullish()` through `Infer<>`, Brand declarations, Bug 1 — `.nullable()` doesn't widen output, Bug 2 — `.default()` doesn't narrow output, Decisions to lock with Hasan, Hand-test matrix, `Infer<>` rewrite (sketch — actual code will need careful conditional ordering), `nullish()` implementation (+10 more)
 
 ### Community 232 - "FileCacheDriver"
-Cohesion: 0.04
-Nodes (34): `CacheConcurrencyError`, `CacheConfigurationError`, `CacheConnectionError`, `CacheDriverNotInitializedError`, `CacheUnsupportedError`, Catch-all at the application boundary, Driver-missing fallback, Error hierarchy (+26 more)
+Cohesion: 0.09
+Nodes (11): AnyDriver, directories, file(), memory(), delay(), FileCacheDriver, ignoreMissing(), isExpiredEntry() (+3 more)
 
 ### Community 233 - "Continue reading"
-Cohesion: 0.09
-Nodes (35): Continue reading, `reportToTrace()` / `reportToSpan()` — project a finished report, Capturing content — `input` / `output`, `fullHistory` — the complete conversation on `span.input`, The model: `Trace` and `TraceSpan`, Content capture — what reaches the `input` / `output` fields, `fullHistory` — emit the entire `CapturedMessage[]`, CollectorOptions (+27 more)
+Cohesion: 0.08
+Nodes (39): `reportToTrace()` / `reportToSpan()` — project a finished report, Capturing content — `input` / `output`, `fullHistory` — the complete conversation on `span.input`, Content capture — what reaches the `input` / `output` fields, `fullHistory` — emit the entire `CapturedMessage[]`, Security note, CollectorOptions, createCollector() (+31 more)
 
 ### Community 234 - "to-anthropic-messages.ts"
 Cohesion: 0.09
 Nodes (30): Build and send an audited request, Build and send an audited request, mapStopReason(), stopReasonMap, ANTHROPIC_BLOCK_FORMAT, fromProviderBlocks(), isReplayable(), needsVerbatimReplay() (+22 more)
 
 ### Community 235 - "QueryBuilderContract"
-Cohesion: 0.03
-Nodes (23): CascadeQueryBuilder, AggregateExpressionInput, AggregateExpressions, GroupByFields, QueryBuilderContract, AllRepositoryOptions, CachedRepositoryOptions, ChunkCallback (+15 more)
+Cohesion: 0.02
+Nodes (33): The shape, CascadeQueryBuilder, AggregateExpressionInput, AggregateExpressions, GroupByFields, QueryBuilderContract, RepositoryAdapterContract, AllRepositoryOptions (+25 more)
 
 ### Community 236 - "responses-model.spec.ts"
 Cohesion: 0.05
-Nodes (38): Bound Google Search with a budget, Built-in tools and streamed thoughts, Capabilities, Construct, First call, Install, List models, Multimodal input maps to `inlineData` (+30 more)
+Nodes (37): Bound Google Search with a budget, Built-in tools and streamed thoughts, Capabilities, Construct, First call, Install, List models, Multimodal input maps to `inlineData` (+29 more)
 
 ### Community 237 - "02-querying.md"
-Cohesion: 0.06
-Nodes (29): The 30-second look, The mental model, What Cascade is _not_, What you'll get, Where to next, A hint about scopes, By ID — `Model.find(id)`, Compound conditions (+21 more)
+Cohesion: 0.04
+Nodes (44): The 30-second look, The mental model, What Cascade is _not_, What you'll get, Where to next, Adding a relation count, Cursor pagination — when offset breaks down, Going further (+36 more)
 
 ### Community 238 - "dialog.tsx"
-Cohesion: 0.06
-Nodes (11): Components, Button(), buttonVariants, Calendar(), CalendarDayButton(), Checkbox(), DialogContent(), DialogOverlay() (+3 more)
+Cohesion: 0.05
+Nodes (13): Components, Button(), buttonVariants, Calendar(), CalendarDayButton(), Checkbox(), Command(), CommandDialog() (+5 more)
 
 ### Community 239 - "development-server.ts"
-Cohesion: 0.04
-Nodes (65): WL2005, WL8005, Round 4 — the code (all approved items built), Verification, Crash recovery, Default Oxlint file checks, `devServer.*` config knobs, Flags (+57 more)
+Cohesion: 0.02
+Nodes (106): WL8005, Round 2 — Hasan's answers (all three), Round 4 — the code (all approved items built), Verification, pnpm needs esbuild's install script allowed, The supervisor, displayStartupBanner(), getTextColorMethod() (+98 more)
 
 ### Community 240 - "PgCacheDriver"
-Cohesion: 0.05
-Nodes (18): Changed in 5.21, Cluster behavior, Invalidating stored entries, Pages that use `defer()`, See also, The cache key, The `Vary` header, The `x-warlock-cache` header (+10 more)
+Cohesion: 0.08
+Nodes (7): What gets cached, T-084 [bug] Web page cache, multi-site and sitemaps, Testing the `pg` driver without a real Postgres, PgCacheDriver, FakePool, make(), PgCacheOptions
 
 ### Community 241 - "logger/domains/backlog.md"
 Cohesion: 0.04
-Nodes (41): 2026-04-25 — Phase A: Production credibility, A1 — Pluggable buffer store, A2 — Redaction ✅ (shipped 2026-04-25), A3 — Pino-stream compatibility shim, A4 — Sampling decorator, A5 — Self-observability metrics, Critical files, Estimate (+33 more)
+Nodes (44): 2026-04-25 — Phase C: Integrations sprint, Architecture, Critical files, Error tracking, Estimate, Goal, Log aggregators, Messaging / alerting (+36 more)
 
-### Community 242 - "adapters/index.ts"
-Cohesion: 0.13
-Nodes (34): aiderAdapter, BANNER, createAiderParser(), parseAiderCount(), ampAdapter, antigravityAdapter, claudeCodeAdapter, ClaudeStreamUsage (+26 more)
+### Community 242 - "ai-cli/src/cli.ts"
+Cohesion: 0.08
+Nodes (25): context(), fixtures, fullContext(), helpVerified, StreamCase, streamCases, aiderAdapter, parseAiderCount() (+17 more)
 
 ### Community 243 - "cli-agent.ts"
 Cohesion: 0.05
@@ -1913,111 +1896,107 @@ Nodes (50): Windows spawn rules, CliAgent, CliHost, createCliAgent(), currentHos
 
 ### Community 244 - "query-builder-api.md"
 Cohesion: 0.04
-Nodes (46): `clone()`, `explain()`, `extend<R>(extension, ...args)`, `groupBy(fields)` / `groupBy(fields, aggregates)`, `groupByDate(column, unit, aggregates?)`, `groupByRaw(expression, bindings?)`, Grouping & aggregation, `having(...)` / `havingRaw(expression, bindings?)` (+38 more)
+Nodes (55): Audit log of every change, Common patterns, Conditional validation, Direct `model.data` mutation, Fire an event only on a specific change, Going further, Mutating arrays / objects in place, Reading the dirty state (+47 more)
 
-### Community 245 - "eval-runner.ts"
-Cohesion: 0.13
-Nodes (33): EvalCaseResult, EvalCaseRun, EvalInterval, EvalMetricStats, EvalScore, EvalStats, isScorePassing(), mergeOptions() (+25 more)
+### Community 245 - "GroqSDK"
+Cohesion: 0.05
+Nodes (37): Capabilities, Construct, Install, List models, Model lifecycle, OpenAI-compatible wire behavior, Pricing and usage, Provider body options and token estimates (+29 more)
 
 ### Community 246 - "guarded"
 Cohesion: 0.03
-Nodes (78): WL9006, Step 3 — The project-local router helpers, A complete `routes.ts`, API versioning, Gotchas, Middleware groups, Next, Prefix groups (+70 more)
+Nodes (85): Boundary, barrel and locale conventions, Progress and the per-rule time budget, WL9006, Step 3 — The project-local router helpers, A complete `routes.ts`, API versioning, Gotchas, Middleware groups (+77 more)
 
 ### Community 247 - "update-warlock-packages.ts"
-Cohesion: 0.07
-Nodes (46): Findings (verified by reading source), Verification, checkForFrameworkUpdate(), isUpdateCheckEnabled(), offerUpdateShortcut(), printShortcutRetryHint(), printUpdateNotice(), resolveLatestVersion() (+38 more)
+Cohesion: 0.09
+Nodes (32): updateCommand, LockEntry, MIN_NPM_VERSION, NpmLockfile, oldNpmMessage(), packageNameOfKey(), parseNpmVersion(), pruneFamilyLockEntries() (+24 more)
 
 ### Community 248 - "LazyValidator"
-Cohesion: 0.04
-Nodes (49): Action items (not plans), Active, Deferred — revisit when signal appears, Doc drift fixed (verified against source), Fixed (behavior-preserving), Recently closed, Release-polish pass — 2026-06-01 (newest first), Remaining ideas folded from the deleted `FEATURE_COMPARISON.md` (low priority, revisit on signal) (+41 more)
+Cohesion: 0.03
+Nodes (72): Action items (not plans), Active, Deferred — revisit when signal appears, Doc drift fixed (verified against source), Recently closed, Release-polish pass — 2026-06-01 (newest first), Remaining ideas folded from the deleted `FEATURE_COMPARISON.md` (low priority, revisit on signal), Seal backlog (+64 more)
 
 ### Community 249 - "prompts"
 Cohesion: 0.04
-Nodes (51): `ai.prompt` — the facade, `diff` — compare two versions, `export` / `import` — portable snapshots, Isolated registries, Pinning a tag, Registering a prompt, Related, Resolving — `get`, `resolve`, tags (+43 more)
+Nodes (52): `ai.prompt` — the facade, `diff` — compare two versions, `export` / `import` — portable snapshots, Isolated registries, Pinning a tag, Registering a prompt, Related, Resolving — `get`, `resolve`, tags (+44 more)
 
-### Community 250 - "check-upgrade.ts"
-Cohesion: 0.02
-Nodes (179): releaseNotesCommand, Entry, formatRange(), newerFooter(), Output, Overrides, runReleaseNotesCommand(), text() (+171 more)
+### Community 250 - "codemods/index.ts"
+Cohesion: 0.07
+Nodes (41): headViewport, importedLocalNames(), importsFrom(), manualAt(), objectProperty(), objectPropertyNames(), removeNode(), replaceNode() (+33 more)
 
 ### Community 251 - "projection.ts"
-Cohesion: 0.08
-Nodes (30): ALWAYS_SAFE_STATEMENT_TYPES, assertSetupRegisterSurface(), BabelTraverse, collectIdentifierNames(), collectPatternNames(), collectValidationNames(), configValidationRootNames(), DECLARATION_STATEMENT_TYPES (+22 more)
+Cohesion: 0.06
+Nodes (43): ALWAYS_SAFE_STATEMENT_TYPES, assertSetupRegisterSurface(), BabelTraverse, collectIdentifierNames(), collectPatternNames(), collectValidationNames(), context, transform() (+35 more)
 
-### Community 252 - "queue-manager.ts"
-Cohesion: 0.07
-Nodes (40): Install and mount, Optional peers, Options, Protect it yourself, Dashboard, `queueDashboard(server, options?)`, `registeredJobs()` / `queueOf(definition)`, Dashboard (optional) (+32 more)
+### Community 252 - "src/dashboard.ts"
+Cohesion: 0.12
+Nodes (19): Install and mount, Optional peers, Options, Protect it yourself, Dashboard, `queueDashboard(server, options?)`, Advanced: manual `queueDashboard()`, Dashboard (optional) (+11 more)
 
 ### Community 253 - "stylesheet-urls.ts"
-Cohesion: 0.07
-Nodes (41): Development delivery, Diagnose missing or late CSS, Gotchas, Page-local styles, Per-request stylesheets (lazily imported modules), Production delivery, See also, The shape (+33 more)
+Cohesion: 0.06
+Nodes (45): 3. CSS: `linkStylesheetsFor(request, sourceFile)`, See also, 1. Resolve the theme in middleware, publish it through `shared`, 2. Render from the map, 3. CSS: `linkStylesheetsFor(request, sourceFile)`, 4. Page cache, Gotchas, Warlock — one app, a theme per request (+37 more)
 
 ### Community 254 - "strictness-gate.ts"
 Cohesion: 0.04
-Nodes (81): CONSUMER_FLAG_ALLOWLIST, CONSUMER_TSCONFIG_PATH, ConsumerFlag, consumerStrictnessFlags(), __dirname, __filename, REPO_ROOT, readJsonc() (+73 more)
+Nodes (80): CONSUMER_FLAG_ALLOWLIST, CONSUMER_TSCONFIG_PATH, ConsumerFlag, consumerStrictnessFlags(), __dirname, __filename, REPO_ROOT, readJsonc() (+72 more)
 
-### Community 255 - "parse-imports.ts"
-Cohesion: 0.08
-Nodes (27): ConfigAppImport, configAppImportsCheck, findConfigAppImports(), cachedFileExists(), clearFileExistsCache(), extractImportPathsWithRegex(), fileExistsCache, hasRuntimeImports() (+19 more)
+### Community 255 - "multi-database.md"
+Cohesion: 0.05
+Nodes (37): `logging`, `name` and `isDefault`, `queryEvents`, Shared connection config, The shape of `connectToDatabase`, `uri` vs `host`/`port`, Going further, Mental model — the data source registry (+29 more)
 
 ### Community 256 - "collect-sitemap-entries.ts"
 Cohesion: 0.06
-Nodes (44): collectSitemapEntries(), CollectSitemapEntriesOptions, collectSitemapModelDependencies(), collectSupplierUrls(), isDynamicRoute(), readSitemapPages(), resolveSupplier(), runWithConcurrency() (+36 more)
+Nodes (40): Page policy and dynamic URLs, collectSitemapEntries(), CollectSitemapEntriesOptions, collectSitemapModelDependencies(), collectSupplierUrls(), isDynamicRoute(), readSitemapPages(), resolveSupplier() (+32 more)
 
 ### Community 257 - "generate-changelog.mjs"
 Cohesion: 0.08
 Nodes (44): DEFAULT_CHANGELOG_PATH, DOCS_ROOT, errorMessage(), evaluateFreshness(), FreshnessDataError, FreshnessUnreachableError, getLocalNewestVersion(), getRegistryNewestVersion() (+36 more)
 
-### Community 258 - "fixture.ts"
-Cohesion: 0.09
-Nodes (20): CLI, evidence and cleanup, browserCandidates(), findBrowserBinary(), OwnedBrowser, AppFixture, isolatedEnvironment(), linkDependencies(), linkModules() (+12 more)
+### Community 258 - "e2e/types.ts"
+Cohesion: 0.06
+Nodes (47): Connection pooling, browserCandidates(), findBrowserBinary(), OwnedBrowser, AppFixture, isolatedEnvironment(), linkDependencies(), linkModules() (+39 more)
 
 ### Community 259 - "zero-edit-generator-gate.ts"
 Cohesion: 0.08
 Nodes (49): addFeatures(), assertContext(), assertExactCandidatePins(), assertGeneratedAndInstalled(), assertInstalledIdentity(), assertOnePhysicalCore(), walk(), BrowserCertificate (+41 more)
 
 ### Community 260 - "serve-http.spec.ts"
-Cohesion: 0.06
-Nodes (39): Inspect call envelopes and choose protocol errors, Return native MCP results, Return native MCP results, McpHttpServeHandle, McpHttpServeTransport, McpServeHandle, McpServeOptions, McpServer (+31 more)
+Cohesion: 0.05
+Nodes (37): `http_request` — a guarded REST client, `http_request` — a guarded REST client, HttpPolicyError, ALL_METHODS, baseHostAllowlist(), BODYLESS_METHODS, CREDENTIAL_HEADERS, httpRequestInputSchema (+29 more)
 
 ### Community 262 - "startHttpTestServer"
+Cohesion: 0.03
+Nodes (108): Common pitfalls, Running on a port of your own, Common pitfalls, Keep Vitest setup out of development, Response contracts from declared schemas, Running on a port of your own, Signed-in HTTP requests, Step 1 — Install test support (+100 more)
+
+### Community 264 - "check.types.ts"
 Cohesion: 0.02
-Nodes (102): Common pitfalls, Keep Vitest setup out of development, Running on a port of your own, Step 1 — Install test support, Step 2 — Verify the bootstrap, Step 3 — Write the first test, Step 4 — Add a create-and-read flow, Step 5 — Test the validation path (+94 more)
-
-### Community 263 - "TaggedCache"
-Cohesion: 0.04
-Nodes (17): tags(tags), Cache — Architecture, Core primitives, Responsibility boundaries, Shape, 2026-04-23 — Colocated `*.spec.ts` files with a package-local vitest config, 2026-04-23 — Redis driver tests run against a fake client, Cache — Decisions (+9 more)
-
-### Community 264 - "config"
-Cohesion: 0.08
-Nodes (29): DoctorCheck, capabilitiesCheck, compressionCheck, configCheck, REQUIRED_CONFIG_SECTIONS, formatBytes(), isSet(), warnOnError() (+21 more)
+Nodes (117): Running checks yourself, getPublicUrl(), CheckResult, CheckStatus, DoctorBootContext, DoctorCheck, DoctorReport, ModelModule (+109 more)
 
 ### Community 265 - "RabbitMQChannel"
 Cohesion: 0.09
 Nodes (5): RabbitMQChannel, RabbitMQSubscription, readRetryCount(), ReplyRouter, replyRouterFor()
 
 ### Community 266 - "define-notification.ts"
-Cohesion: 0.06
-Nodes (52): Wire it, Errors, Config, `defineChannel<P>(channel): Channel<P>`, `defineNotification<Data>(def): DefinedNotification<Data>`, Dispatch, Errors, `notifications` (+44 more)
+Cohesion: 0.09
+Nodes (39): Errors, `defineChannel<P>(channel): Channel<P>`, `defineNotification<Data>(def): DefinedNotification<Data>`, Dispatch, Errors, `notifications`, `notify`, ChannelMap (+31 more)
 
 ### Community 267 - "Job"
-Cohesion: 0.12
-Nodes (8): Boundary Shortcuts — `beginOf()` / `endOf()`, Interval methods, What it gives you, Cron is an alternative, not an addition, Pick a skill, Job, parseTimeString(), TimeType
+Cohesion: 0.10
+Nodes (10): Boundary Shortcuts — `beginOf()` / `endOf()`, Interval methods, What it gives you, After permanent failure — `nextRun` advances normally, Cron is an alternative, not an addition, Pick a skill, Job, loadCache() (+2 more)
 
 ### Community 268 - "dashboard/serve.ts"
-Cohesion: 0.05
-Nodes (50): Production notes, Related, Setup, The building blocks (scripting it instead of clicking), Using it, Enable it, Evaluate a trace's system prompt from the dashboard, `EvaluateConfig` (+42 more)
-
-### Community 269 - "route-registration-snapshot.ts"
 Cohesion: 0.06
-Nodes (43): DEFAULT_OPENAPI_OUTPUT, generateOpenApiAction(), OptionValue, stringOption(), openApiGeneratorCommand, countRequests(), DEFAULT_POSTMAN_OUTPUT, generatePostmanAction() (+35 more)
+Nodes (44): Enable it, Evaluate a trace's system prompt from the dashboard, `EvaluateConfig`, See also, The building blocks (for embedding elsewhere), The route, The UI, Advanced — build the handler yourself (+36 more)
+
+### Community 269 - "postman-generator.action.ts"
+Cohesion: 0.13
+Nodes (17): WL1006, DEFAULT_OPENAPI_OUTPUT, generateOpenApiAction(), OptionValue, stringOption(), openApiGeneratorCommand, document, hoisted (+9 more)
 
 ### Community 270 - "request-history.ts"
-Cohesion: 0.27
-Nodes (13): RequestLogSummary, FILTER_KEYS, filterFromQuery(), hasFilter(), mergeRequestHistory(), recordToDetail(), rowToSummary(), summaryToRow() (+5 more)
+Cohesion: 0.29
+Nodes (12): FILTER_KEYS, filterFromQuery(), hasFilter(), mergeRequestHistory(), recordToDetail(), rowToSummary(), summaryToRow(), toLogLevel() (+4 more)
 
-### Community 271 - "DevServerShortcuts"
-Cohesion: 0.08
-Nodes (13): Decisions & approvals, Dev-server update check: offline safety + `u` shortcut, Docs done (round 2), Next step, Not done (deliberate), Open questions I asked, Round 2 — Hasan's answers (all three), Round 3 — workspace split + supervisor decision (+5 more)
+### Community 271 - "Dev-server update check: offline safety + `u` shortcut"
+Cohesion: 0.14
+Nodes (13): Decisions & approvals, Dev-server update check: offline safety + `u` shortcut, Docs done (round 2), Findings (verified by reading source), Next step, Not done (deliberate), Open questions I asked, Round 3 — workspace split + supervisor decision (+5 more)
 
 ### Community 272 - "App"
 Cohesion: 0.07
@@ -2031,89 +2010,89 @@ Nodes (48): args, artifactRoot, assertArtifact(), assertion(), assertOutsideWork
 Cohesion: 0.06
 Nodes (30): Cancel a long retry loop, Common patterns, Composing with `measure()`, Exponential backoff with a cap and jitter, Fetch with limited retries, Going further, Gotchas, Optimistic-concurrency DB write (+22 more)
 
-### Community 275 - "server.ts"
-Cohesion: 0.03
-Nodes (86): collectReadyBlockFacts(), factRow(), formatDuration(), printReadyBlock(), ReadyBlockFacts, renderReadyBlock(), urlRow(), isAllowedHost() (+78 more)
+### Community 275 - "router/router.ts"
+Cohesion: 0.02
+Nodes (123): Runtime mode, Runtime strategy, server(), ErrorCodeArea, AREA_DIGIT, packageRoot, repositoryRoot, WarlockErrorCode (+115 more)
 
 ### Community 276 - "stringField"
-Cohesion: 0.21
-Nodes (35): Rules for a good adapter, analyticsUsage(), createAntigravityParser(), stepUsage(), createClaudeStreamParser(), inclusiveUsage(), createCodexParser(), toolCall() (+27 more)
+Cohesion: 0.16
+Nodes (51): Rules for a good adapter, analyticsUsage(), BANNER, createAiderParser(), createAntigravityParser(), stepUsage(), ClaudeStreamUsage, createClaudeStreamParser() (+43 more)
 
-### Community 277 - "reset-password.service.ts"
-Cohesion: 0.20
-Nodes (10): resetPasswordController(), resetPasswordSchema, ResetPasswordSchema, ResetPasswordOptions, resetPasswordService(), AuthErrorCode, OTP_EXPIRED, OTP_INVALID (+2 more)
+### Community 277 - "exporters/index.ts"
+Cohesion: 0.13
+Nodes (27): emitObservation(), emitTrace(), LANGFUSE_INSTALL_INSTRUCTIONS, LANGFUSE_METADATA_OMIT, langfuseExporter(), langfuseMetadata(), loadLangfuse(), ownUsage() (+19 more)
 
 ### Community 278 - "app.js"
-Cohesion: 0.09
-Nodes (61): CI, Client performance budgets, Create Warlock, Developing this package locally, Flags, Grouped custom feature selection, Interactive database and AI choices, License (+53 more)
+Cohesion: 0.16
+Nodes (29): agentRequestDiff(), agentRunSummary(), agentsView(), agentToolCall(), agentTurn(), aiRunSummary(), aiSpan(), aiUsage() (+21 more)
 
 ### Community 279 - "prepare-fonts.ts"
 Cohesion: 0.08
-Nodes (36): fallbackMetrics(), fallbackOverrides(), percent(), criticalFace, declaration, directories, latinWeightings, assetName() (+28 more)
+Nodes (34): fallbackMetrics(), fallbackOverrides(), percent(), criticalFace, declaration, directories, latinWeightings, assetName() (+26 more)
 
 ### Community 280 - "job.ts"
-Cohesion: 0.06
-Nodes (30): `CronFields`, `Day`, Events, `JobIntervals`, `JobResult`, `JobStatus`, `RetryConfig`, `SchedulerEvents` (+22 more)
+Cohesion: 0.08
+Nodes (31): `CronFields`, `Day`, Events, `JobIntervals`, `JobResult`, `JobStatus`, `RetryConfig`, `SchedulerEvents` (+23 more)
 
 ### Community 281 - "image.tsx"
-Cohesion: 0.09
+Cohesion: 0.10
 Nodes (33): Eager generation at upload time, `<Image>`, Object storage and CDNs, See also, The default loader and named variants, The `ImageDescriptor`, A CDN or object storage, Example support files (+25 more)
 
 ### Community 282 - "ai-cli/src/index.ts"
 Cohesion: 0.16
-Nodes (29): CliAdapterVerification, CliLaunchContext, CliLaunchPlan, CliPermission, CliProbeSpec, CliPromptTransport, CliEndStatus, CliErrorEvent (+21 more)
+Nodes (28): Test an adapter, The launch context, CliAdapterVerification, CliLaunchContext, CliLaunchPlan, CliPermission, CliProbeSpec, CliPromptTransport (+20 more)
 
 ### Community 283 - "auth.service.spec.ts"
 Cohesion: 0.04
 Nodes (44): accessTokenDeleteAllForUser, accessTokenDeleteFamilyAndLegacyForUser, accessTokenDeleteForUser, accessTokenFind, accessTokenFindByToken, accessTokenFindNeverExpiring, accessTokenIssue, accessTokenPurgeExpired (+36 more)
 
-### Community 284 - "http/request-log-snapshot.ts"
-Cohesion: 0.05
-Nodes (52): Configuration, Hide input for a family of URLs, Rate limits on served files, Static files, Upgrading to 5.31, Format every JSON error response, Adding a new subsystem, Anatomy of a `src/config/<name>.ts` (+44 more)
+### Community 284 - "Warlock — configure the app"
+Cohesion: 0.12
+Nodes (16): Adding a new subsystem, Anatomy of a `src/config/<name>.ts`, `app.publicUrl` — the app's public origin (5.15.0), Common patterns, `.env` and `env()`, Map domain errors at the HTTP edge, Multi-file or conditional config, Package config (+8 more)
 
 ### Community 285 - "Code Standards"
-Cohesion: 0.04
-Nodes (45): 10. Testing, 11. Tooling, 12. Review checklist, 1.1 `interface` for contracts, `type` for data, 1.2 Access modifiers on every class member, 1.3 No `any`, 1.4 No inline-duplicated unions or literals, 1.5 Constrain generics (+37 more)
+Cohesion: 0.05
+Nodes (38): 10. Testing, 11. Tooling, 12. Review checklist, 2.1 Use the project's path aliases, not deep relatives, 2.2.1 Small types beside the code that uses them, 2.2 Barrel files — optional, sub-folder level, never module level, 2.3 No file extension in import paths, 2. Imports (+30 more)
 
 ### Community 286 - "Data & persistence"
 Cohesion: 0.04
 Nodes (46): 10. Review checklist, 1.1 The rule, 1.2 Why never floats, 1.3 The AI-pricing exception, 1.4 Display formatting at the edge, 1. Money — integer minor units, always, 2.1 Storage, 2.2 Naming — `<verb>At` (+38 more)
 
-### Community 287 - "global-translations.ts"
-Cohesion: 0.04
-Nodes (83): Copy(), dom, sources, createLiveGlobalTranslationDelivery(), createSnapshotGlobalTranslationDelivery(), detachedCopy(), GlobalTranslationDeliveryInput, keywordsOfLocale() (+75 more)
+### Community 287 - "gate-a-resolve.ts"
+Cohesion: 0.07
+Nodes (36): BOUNDARY_DECLARATION_PACKAGES, boundaryDeclarationOf(), BROWSER_SAFE_MODULE_DIRECTORIES, classifyImportKinds(), collectRuntimeSpecifiers(), completeBareLocalModulePath(), completeLocalModulePath(), environmentOf() (+28 more)
 
-### Community 288 - "FilterApplicator"
-Cohesion: 0.08
-Nodes (6): FilterApplicator, FilterOptions, FilterRule, FilterRules, apply(), noOptions
+### Community 288 - "resource/types.ts"
+Cohesion: 0.09
+Nodes (30): DefineResourceOptions, isNullableResource(), nullable(), NULLABLE_RESOURCE, NullableResource, NullableResourceTarget, UserResource, DateOutput (+22 more)
 
 ### Community 289 - "shell-parser.ts"
 Cohesion: 0.14
 Nodes (20): inSet(), parsePowerShellLine(), POWERSHELL_KEYWORDS, PowerShellParser, PowerShellRefusal, unsupported(), CMD_RESERVED_WORDS, PARAMETER_EXPANSION (+12 more)
 
 ### Community 290 - "local-drivers.spec.ts"
-Cohesion: 0.06
-Nodes (23): Durable local jobs, In-memory execution in tests, Leases, crashes, and shutdown, The same job API, Carry request context into jobs, Define and dispatch jobs, Dispatch, Read a job (+15 more)
+Cohesion: 0.10
+Nodes (13): Carry request context into jobs, Define, dispatch, inspect, and retry, Durability and shutdown rules, Local and memory queues, Memory tests and scripts, UnrecoverableJobError, defineQueueContext(), QueueContext (+5 more)
 
 ### Community 291 - "ai-command.action.ts"
-Cohesion: 0.09
-Nodes (35): Measurement, AI_COMMAND_USAGE, aiCommandAction(), AiCommandDependencies, aiMeasureAction(), formatMeasurement(), isMeasureModule(), isModel() (+27 more)
+Cohesion: 0.05
+Nodes (52): AI_COMMAND_USAGE, aiCommandAction(), AiCommandDependencies, aiMeasureAction(), formatMeasurement(), isMeasureModule(), isModel(), isTool() (+44 more)
 
 ### Community 292 - "Observability & resilience"
 Cohesion: 0.04
 Nodes (45): 10. Review checklist, 1.1 One ID per request, 1.2 Include it in every log line, 1.3 Propagate downstream, 1. Request ID propagation, 2.1 HTTP — `@warlock.js/http`, 2.2 AI calls, 2.3 Database queries (+37 more)
 
-### Community 293 - "EmbeddingBatchResult"
-Cohesion: 0.06
-Nodes (23): Related, Embeddings, No embeddings, BedrockEmbedderConfig, BedrockEmbedder, TitanEmbeddingResponse, EmbedderConfig, EmbedderContract (+15 more)
+### Community 293 - "FakeEmbedder"
+Cohesion: 0.38
+Nodes (3): embed(), embedMany(), FakeEmbedder
 
 ### Community 294 - "request-tracing.md"
 Cohesion: 0.04
-Nodes (48): Identity and generated settings, Logger output, Readiness and shutdown, Rolling reloads and sockets, Shared-server operations, Assertions and timers, Auto-flush on shutdown, Channels (+40 more)
+Nodes (44): Identity and generated settings, Logger output, Readiness and shutdown, Rolling reloads and sockets, Shared-server operations, Assertions and timers, Auto-flush on shutdown, Channels (+36 more)
 
 ### Community 295 - "captureAnyUnhandledRejection"
 Cohesion: 0.05
-Nodes (38): Behavior & gotchas, Flushing the fatal entry, Rolling your own, See also, What it does, `applyRedact(data, config)`, `captureAnyUnhandledRejection()`, `clearMessage(message)` (+30 more)
+Nodes (39): Gotchas, Behavior & gotchas, Flushing the fatal entry, Rolling your own, See also, What it does, `clearMessage` utility, The `terminal` flag + ANSI stripping (+31 more)
 
 ### Community 296 - "PosixParser"
 Cohesion: 0.17
@@ -2121,111 +2100,111 @@ Nodes (5): CmdParser, PosixParser, ShellSyntaxRefusal, unbalanced(), unsupported
 
 ### Community 297 - "DatabaseDirtyTracker"
 Cohesion: 0.04
-Nodes (50): A column is not a property, Default values, Dot-notation paths, Exact types from the schema, Going further, `has(field)` — is it present?, `increment` / `decrement` — atomic-style numeric updates, `isFilled(field)` — does it hold a value? (+42 more)
+Nodes (47): A column is not a property, Dot-notation paths, Exact types from the schema, `has(field)` — is it present?, `increment` / `decrement` — atomic-style numeric updates, `isFilled(field)` — does it hold a value?, Reading — `get(field, default?)`, System columns (+39 more)
 
-### Community 298 - "FileManager"
+### Community 298 - "module-loader.ts"
 Cohesion: 0.05
-Nodes (35): ConfigLoader, executed, mailSchema, modules, ConfigManager, configManager, assertValidConfigModules(), CONFIG_SCHEMA_MARKER (+27 more)
+Nodes (32): DevelopmentModelModuleEntry, formatModuleNotFoundError(), CleanupFunction, canonicalPath(), DevelopmentModelModuleRegistry, getDevelopmentModelModuleRegistry(), normalizeInputPath(), temporaryDirectories (+24 more)
 
 ### Community 299 - "move-directory.ts"
-Cohesion: 0.07
-Nodes (39): 30-second tour, Directory moves with concurrent writers, Full documentation, Install, License, One naming convention, Server-only package, Tests (+31 more)
+Cohesion: 0.06
+Nodes (42): Claim an unused destination for a directory move, Copy and move, 30-second tour, Directory moves with concurrent writers, Full documentation, Install, License, One naming convention (+34 more)
 
-### Community 300 - "hydration-client-url.ts"
-Cohesion: 0.08
-Nodes (35): Server: `onPageError` (register at runtime), CLIENT_ASSET_URL_PREFIX, assetUrl(), connectSiteHydrationUrls(), findHydrationEntry(), ManifestEntry, buildFixtureClient(), makeFixtureWebRoot() (+27 more)
+### Community 300 - "prompts-manager.ts"
+Cohesion: 0.16
+Nodes (24): Prompt registry — `ai.prompts`, System prompts, Placeholders, InstructionContract, PersonaContract, RefinedPromptStoreLike, SystemPromptBlockContract, SystemPromptMergeOptions (+16 more)
 
 ### Community 301 - "warlock-versions.ts"
 Cohesion: 0.10
 Nodes (26): create-warlock — backlog, Folded from the old TODO.md, Latent bugs — logged, not fixed (would change behavior / model), Testing notes, executeCommand(), startCommand(), __dirname, __filename (+18 more)
 
 ### Community 302 - "herald"
-Cohesion: 0.05
-Nodes (42): herald (priority 3, message broker), Add styling now or later, Install the Web layer, Next step, Requirements, The generated starting tree, verdict(), tailwind() (+34 more)
+Cohesion: 0.06
+Nodes (34): herald (priority 3, message broker), Available Features, Config Stubs, Implementation Approach, Technical Details, Foundations, Herald basics, Install (+26 more)
 
 ### Community 303 - "design-system-mantine-controls.spec.ts"
-Cohesion: 0.09
-Nodes (15): Confirm dialogs, Forms with Mongez React Form, Install, No hydration mismatch, Paginated table, Switching kits, Theme, PaginatedColumn (+7 more)
+Cohesion: 0.06
+Nodes (23): Choosing a UI kit, Shared design system, Confirm dialogs, Forms with Mongez React Form, Install, No hydration mismatch, Notifications after a submit, Paginated table (+15 more)
 
 ### Community 304 - "ref_fastify"
-Cohesion: 0.09
-Nodes (30): registerAiRoutes(), registerBackgroundRoutes(), isExplainableSql(), registerExplainRoute(), hostnameOf(), isAllowedDevtoolsHost(), isLoopbackAddress(), LOOPBACK_ADDRESSES (+22 more)
+Cohesion: 0.14
+Nodes (20): registerAiRoutes(), registerBackgroundRoutes(), isExplainableSql(), registerExplainRoute(), mountDevtoolsRoutes(), LogsQuery, registerLogRoutes(), registerMailRoutes() (+12 more)
 
 ### Community 305 - "register-sitemap-routes.ts"
-Cohesion: 0.05
-Nodes (47): CollectedSitemapEntries, registerRobotsRoute(), RegisterRobotsRouteOptions, fileFromManifest(), generationRequestHandler(), isGzipped(), latestBareShardHandler(), registerReadableRoute() (+39 more)
+Cohesion: 0.07
+Nodes (52): CollectedSitemapEntries, registerRobotsRoute(), RegisterRobotsRouteOptions, fileFromManifest(), generationRequestHandler(), isGzipped(), latestBareShardHandler(), registerReadableRoute() (+44 more)
 
 ### Community 306 - "defineJob"
-Cohesion: 0.06
-Nodes (31): Backend selection, Dispatch-only process, `QueueConfig`, The connector, Carry request context into jobs, Dispatch, Job context, Read a job (+23 more)
+Cohesion: 0.07
+Nodes (30): Carry request context into jobs, Dispatch, Job context, Read a job, Retention, Rules, Test what was dispatched, Configure and connect (+22 more)
 
 ### Community 307 - "page-registry-plugin.ts"
-Cohesion: 0.05
-Nodes (26): siteFolder(), captureSkeleton(), CLIENT_STRICT_MODE_EXPORT_NAME, ClientPageRegistryPluginOptions, collectIdentifierNames(), componentBodyToMask(), functionBody(), invalidateClientPageRegistry() (+18 more)
+Cohesion: 0.06
+Nodes (20): formatBuildLogMessage(), siteOfHydrationEntryId(), makeApp(), page(), roots, SITES, CLIENT_PAGE_REGISTRY_ID, clientPageRegistry() (+12 more)
 
-### Community 308 - "queue/src/types.ts"
-Cohesion: 0.10
-Nodes (22): DriverDispatch, QueueDriver, BullMQDriver, closeWorker(), toKeepJobs(), toSnapshot(), ActiveJob, LocalWorker (+14 more)
+### Community 308 - "drivers/local.ts"
+Cohesion: 0.06
+Nodes (39): `defineJob(definition)`, `DispatchOptions`, `JobContext`, Jobs, `JobSnapshot<TPayload, TResult>`, `QueueJob<TPayload, TResult>`, `setDispatchInterceptor(interceptor)` / `getDispatchInterceptor()`, DispatchInterceptor (+31 more)
 
 ### Community 309 - "sitemap-artifact-store.ts"
 Cohesion: 0.08
-Nodes (18): compareIdentity(), invalid(), isLower(), safeDigest(), safeDirectory(), safeFileName(), safeGenerationId(), safeNonNegativeInteger() (+10 more)
+Nodes (19): compareIdentity(), createSitemapArtifactStore(), invalid(), isLower(), safeDigest(), safeDirectory(), safeFileName(), safeGenerationId() (+11 more)
 
 ### Community 310 - "expressions.md"
-Cohesion: 0.10
-Nodes (20): A worked example — bringing it together, Driver-agnostic aggregates — `$agg.*`, Driver-specific aggregates — raw expressions inside `groupBy`, Going further, `groupByRaw(expression, bindings?)` / `havingRaw(expression, bindings?)`, `joinRaw(expression, bindings?)`, `orderByRaw(expression, bindings?)`, `raw(builder)` and `selectDriverProjection(callback)` (+12 more)
+Cohesion: 0.06
+Nodes (29): A worked example — bringing it together, Driver-agnostic aggregates — `$agg.*`, Driver-specific aggregates — raw expressions inside `groupBy`, Going further, `groupByRaw(expression, bindings?)` / `havingRaw(expression, bindings?)`, `joinRaw(expression, bindings?)`, `orderByRaw(expression, bindings?)`, `raw(builder)` and `selectDriverProjection(callback)` (+21 more)
 
 ### Community 311 - "vector-search.md"
-Cohesion: 0.06
-Nodes (33): A complete end-to-end example, Going further, MongoDB Atlas note, Score thresholds, Step 1 — Declare the vector column, Step 2 — Generate embeddings, Step 3 — Query with `.similarTo()`, Step 4 — Combine with regular filters (+25 more)
+Cohesion: 0.05
+Nodes (39): A complete end-to-end example, Going further, MongoDB Atlas note, Score thresholds, Step 1 — Declare the vector column, Step 2 — Generate embeddings, Step 3 — Query with `.similarTo()`, Step 4 — Combine with regular filters (+31 more)
 
 ### Community 312 - "job-timeout.spec.ts"
-Cohesion: 0.12
-Nodes (25): `defineJob(definition)`, Errors, Timeouts, assertValidDefinition(), toMilliseconds(), UNIT_MILLISECONDS, FailedJobNotFoundError, InvalidDurationError (+17 more)
+Cohesion: 0.09
+Nodes (30): Errors, Timeouts, assertValidDefinition(), toMilliseconds(), UNIT_MILLISECONDS, InvalidDurationError, InvalidJobDefinitionError, JobTimeoutError (+22 more)
 
 ### Community 313 - "`v.date()` — method reference"
 Cohesion: 0.03
-Nodes (64): What you can rely on at each step, HTTP verbs, Multiple paths, one handler, Path parameters, The basics, Validate page input, Common chains, Conditional variants — accepted (+56 more)
+Nodes (61): What you can rely on at each step, HTTP verbs, Multiple paths, one handler, Path parameters, The basics, Abandoned requests — `signal`, Avoiding a circular config type, Environment values (+53 more)
 
 ### Community 314 - "configuration.md"
-Cohesion: 0.01
-Nodes (195): A complete example — production Postgres config, `autoGenerateId` (MongoDB), Data-source-wide delete defaults, `deleteStrategy` / `trashTable`, Driver-specific options — `driverOptions`, Going further, `idReservationBlockSize` (model static, MongoDB), `logging` (+187 more)
+Cohesion: 0.04
+Nodes (49): A complete example — production Postgres config, Data-source-wide delete defaults, Driver-specific options — `driverOptions`, Going further, Migration defaults — `migrationOptions`, Migration runtime config — `migrations`, MongoDB driver options, Multiple data sources (+41 more)
 
 ### Community 315 - "sitemap-lifecycle.ts"
-Cohesion: 0.06
-Nodes (41): HTTP behavior, Images and robots.txt, Page entries and invalidation, Storage and generation lifecycle, extra(), Example support files, Generate a sitemap and robots.txt, Locales, shards and HTTP caching (+33 more)
+Cohesion: 0.05
+Nodes (34): Not in this package, HTTP behavior, Images and robots.txt, Page entries and invalidation, MissingPublicUrlError, digest, ResolvedSitemapStorage, resolveDuration() (+26 more)
 
-### Community 316 - "backends/local.ts"
-Cohesion: 0.07
-Nodes (23): destroyStreams(), HOST_STOP_SIGNALS, installSignalHooks(), killLiveProcesses(), killTree(), liveProcessKills, LocalBackend, onHostStopSignal() (+15 more)
+### Community 316 - "LocalBackend"
+Cohesion: 0.11
+Nodes (11): destroyStreams(), installSignalHooks(), killLiveProcesses(), killTree(), LocalBackend, onHostStopSignal(), planSpawn(), pushCapped() (+3 more)
 
 ### Community 317 - "Scheduler"
-Cohesion: 0.08
-Nodes (16): Configuration, Getters, Job management, Lifecycle, `Scheduler`, scheduler, 30-second example, Install (+8 more)
+Cohesion: 0.09
+Nodes (12): Configuration, Getters, Job management, Lifecycle, `Scheduler`, scheduler, Recently fixed (moved out of backlog), hasWorkerRole() (+4 more)
 
 ### Community 318 - "create-warlock-app/index.ts"
 Cohesion: 0.08
 Nodes (29): FakeChild, logError, ProcessExit, spawnFn, spawnSync, originalIsTTY, reasonFrom(), ScaffoldOutcome (+21 more)
 
 ### Community 319 - "Testing strategy"
-Cohesion: 0.05
-Nodes (40): 0.1 If testing is enabled, tests are mandatory — not optional, 0.2 If testing is NOT enabled, 0. When this skill applies — and the mandate, 10. File layout, 11. Review checklist, 1.1 Unit — most of the suite, 1.2 Integration — real wiring, 1.3 E2E — critical journeys (+32 more)
+Cohesion: 0.04
+Nodes (45): 0.1 If testing is enabled, tests are mandatory — not optional, 0.2 If testing is NOT enabled, 0. When this skill applies — and the mandate, 10. File layout, 11. Review checklist, 1.1 Unit — most of the suite, 1.2 Integration — real wiring, 1.3 E2E — critical journeys (+37 more)
 
 ### Community 320 - "CACHE_FOR"
-Cohesion: 0.06
-Nodes (28): Expiration Constants, 2026-04-23 — Unit Testing Coverage for @warlock.js/cache, Summary, Tasks, Cross-process stampede protection — distributed lock via `onConflict`, Memoize an expensive function — `remember`, Negative caching, Per-tenant caching (+20 more)
+Cohesion: 0.04
+Nodes (37): Expiration Constants, 2026-04-23 — Colocated `*.spec.ts` files with a package-local vitest config, 2026-04-23 — Redis driver tests run against a fake client, Cache — Decisions, 2026-04-23 — Cache v2 API, Phase 2 — `onConflict` + inline `tags` + per-call overrides, Phase 3 — List sub-API, Phase 4 — Partial update (+29 more)
 
-### Community 321 - "parse-locale-dictionary.ts"
-Cohesion: 0.11
-Nodes (26): WL1007, files, assertNamespaceSegment(), assertSegment(), collectEntries(), defaultGroup(), explicitGroup(), fail() (+18 more)
+### Community 321 - "locales-ts-deprecated.check.ts"
+Cohesion: 0.05
+Nodes (53): WL1007, WL9105, Check that every key has every locale, Client-supplied locales are allow-listed, Declaring translations — module `locales.json`, Every key needs every configured locale, Legacy `groupedTranslations`, Placeholders (+45 more)
 
 ### Community 322 - "step-runner.ts"
-Cohesion: 0.03
-Nodes (124): Per-primitive keys, When to reach for it, Cancellation, Context — input vs context vs state, Events, `execute()` never throws, Execute — two interchangeable shapes, Generics (+116 more)
+Cohesion: 0.05
+Nodes (74): runBatchItem(), RunBatchItemParams, sleep(), WorkflowEventMap, HumanStepContract, NextStepResult, RetryBackoff, RetryConfig (+66 more)
 
 ### Community 323 - "build-openapi-document.spec.ts"
-Cohesion: 0.09
-Nodes (24): Pipeline stages — `.unwind()` / `.addFields()` / pipeline `join()` (MongoDB), AUTH, build(), Builderish, CommentResource, defined(), handler(), HandlerProps (+16 more)
+Cohesion: 0.06
+Nodes (33): `$agg` helpers — six cross-driver, four MongoDB-only, Date-bucketed rollups — `.groupByDate(column, unit, aggregates?)`, Driver-specific escape hatch, Gotchas, Grouped rollups — two-arg `groupBy(fields, aggregates)`, `.having(...)` — filter groups by a computed aggregate, OrderBy on aggregates, Pipeline stages — `.unwind()` / `.addFields()` / pipeline `join()` (MongoDB) (+25 more)
 
 ### Community 324 - "scaffolder.spec.ts"
 Cohesion: 0.13
@@ -2233,71 +2212,71 @@ Nodes (17): main(), main(), createNewApp, oxfmt, oxlint, packageRoot, roots, sca
 
 ### Community 325 - "Sitemap"
 Cohesion: 0.04
-Nodes (57): XML, Next, Options, Serving the result, Also exported, Duplicates are silent, but not hidden, Entries — `add(entry)` / `addMany(entries)`, Images (+49 more)
+Nodes (59): XML, Next, Options, `saveTo()` owns the whole directory, Serving the result, Also exported, Duplicates are silent, but not hidden, Entries — `add(entry)` / `addMany(entries)` (+51 more)
 
 ### Community 326 - "SystemPromptContract"
-Cohesion: 0.08
-Nodes (27): Immutability — safe forking, System prompts, Identity — `SystemPromptMeta` (`meta.name` / `version` / `description` / `required` / `composedFrom`), Immutability — safe forking, Placeholders, InstructionContract, PersonaContract, SystemPromptBlockContract (+19 more)
+Cohesion: 0.13
+Nodes (12): blockFromSnapshot(), blocksFromTemplate(), Instruction, instruction(), Persona, persona(), sourceWithPlaceholders(), lookupPath() (+4 more)
 
 ### Community 327 - "src/services/auth.service.ts"
 Cohesion: 0.02
-Nodes (130): Cookies and lifetime, Header over cookie, In a page action, Login needs an Origin, Multi-instance, Options, `AuthConfigurations`, `LogoutWithoutTokenBehavior` (+122 more)
+Nodes (137): Cookies and lifetime, Header over cookie, In a page action, Login needs an Origin, Multi-instance, Options, `AccessTokenOutput`, `AuthConfigurations` (+129 more)
 
-### Community 328 - "Tasks"
-Cohesion: 0.14
-Nodes (14): 2026-04-25 — Phase E: DX polish, Critical files, E1 — Pretty-print dev mode, E2 — `log.timer()` ✅ (core shipped 2026-04-25), E3 — `log.assert()` ✅ (core shipped 2026-04-25), E4 — `log.when(cond)`, E5 — Crash-dump rescue file, E6 — Environment presets (+6 more)
+### Community 328 - "generated-notifications-runtime.test.ts"
+Cohesion: 0.05
+Nodes (14): common, controllers, evaluate(), fixture, FixtureNotification, FixtureToken, FixtureUser, resolved (+6 more)
 
 ### Community 329 - "serialized.ts"
 Cohesion: 0.05
 Nodes (37): Binary, DataKeys, DevalueNative, Flatten, HasNonPublicMembers, IsAny, IsFunctionValued, IsUndefinable (+29 more)
 
-### Community 330 - "`@warlock.js/ai-openai`"
-Cohesion: 0.04
-Nodes (45): Install, MCP servers, Options, Permissions, Quick start, Resume, cancel, time out, See also, The event model (+37 more)
+### Community 330 - "run-cli-agents.mdx"
+Cohesion: 0.25
+Nodes (7): Install, Permissions, Quick start, Resume, cancel, time out, See also, The event model, The result
 
 ### Community 331 - "CloudDriver"
-Cohesion: 0.12
-Nodes (4): CloudDriver, loadS3(), loadS3Sync(), CloudStorageFileData
+Cohesion: 0.13
+Nodes (4): CloudDriver, loadS3Sync(), CloudStorageFileData, FileVisibility
 
-### Community 332 - "warlock/src/web/home/index.page.tsx"
-Cohesion: 0.12
-Nodes (19): capabilities, getHomeService(), HomePageData, packages, isLocaleCode(), ContentSections(), ContentSectionsProps, HeroSection() (+11 more)
+### Community 332 - "contact-section.tsx"
+Cohesion: 0.05
+Nodes (33): config, loader(), capabilities, getHomeService(), HomePageData, packages, webConfigurations, isLocaleCode() (+25 more)
 
 ### Community 333 - "Warlock — `warlock check`, `typecheck`, `explain`"
-Cohesion: 0.05
-Nodes (39): WL9007, Client-error helpers, Common patterns, Created with link header, Gotchas, Localized error, Redirects, Replaying a cached response (+31 more)
+Cohesion: 0.04
+Nodes (46): Redirect targets from the request, Redirects, AI choice in Customize, App-owned form controls, Client asset limits, Exit codes, Framework conventions, Headless / non-interactive mode (+38 more)
 
 ### Community 334 - "CronParser"
-Cohesion: 0.07
-Nodes (28): CronParser Utility, Cron, `cron(expression)`, `CronParser`, Execution control, Execution options, Factories, Getters (+20 more)
+Cohesion: 0.05
+Nodes (42): CronParser Utility, `at(time)`, `beginOf(type)` / `endOf(type)`, Cron, `cron(expression)`, `CronParser`, Day & time methods, Execution control (+34 more)
 
 ### Community 335 - "dispatch-release.ts"
 Cohesion: 0.24
 Nodes (14): Annotation, dispatch(), DispatchArguments, failedJobs(), github(), JobSummary, main(), parseArguments() (+6 more)
 
 ### Community 336 - "adapters.spec.ts"
-Cohesion: 0.08
-Nodes (21): context(), fixtures, fullContext(), helpVerified, parse(), StreamCase, streamCases, cli (+13 more)
+Cohesion: 0.11
+Nodes (16): parse(), cli, addUsage(), ResultAggregator, buildEnvironment(), BuildEnvironmentInput, MINIMAL_ENV, resetInheritedEnvironmentWarning() (+8 more)
 
 ### Community 337 - "linear-regex.ts"
 Cohesion: 0.09
 Nodes (26): anchoredAtStart(), Assertion, assertionHolds(), canonicalize(), caseVariants(), CharTest, classEscapeTest(), ClassItem (+18 more)
 
 ### Community 338 - "shell-jobs.ts"
-Cohesion: 0.07
-Nodes (22): WorkspaceOutputStream, WorkspaceEditErrorOptions, WorkspaceEditFailure, WorkspaceJobError, WorkspaceJobErrorOptions, WorkspaceJobFailure, WorkspacePolicyErrorOptions, WorkspacePolicyViolation (+14 more)
+Cohesion: 0.08
+Nodes (15): WorkspaceOutputStream, WorkspaceJobError, ShellOutputStreamer, OpsRuntime, DEFAULT_MAX_BACKGROUND_JOBS, delay(), MAX_EXIT_WAIT_MS, MAX_OUTPUT_WAIT_MS (+7 more)
 
-### Community 339 - "pm2-config.ts"
-Cohesion: 0.09
-Nodes (31): Configuration — `src/config/socket.ts`, Multiple servers, AppConfigurations, pm2Command, pm2CommandAction(), runPm2(), state, stringOption() (+23 more)
+### Community 339 - "route-registration-child.ts"
+Cohesion: 0.04
+Nodes (73): Configuration — `src/config/socket.ts`, Multiple servers, AppConfigurations, pm2Command, pm2CommandAction(), runPm2(), state, stringOption() (+65 more)
 
 ### Community 340 - "run-runtime-acceptance.mjs"
 Cohesion: 0.09
 Nodes (35): args, assertOverridesMatch(), buildFamily(), buildsDirectory, cleanEnv(), coreDirectory, dependencyClosure(), evidencePath (+27 more)
 
-### Community 341 - "generate-site-llms.mjs"
-Cohesion: 0.12
-Nodes (11): docsRoot, fullParts, here, indexLines, orderIndex, PACKAGE_ORDER, packageDirs, PACKAGES (+3 more)
+### Community 341 - "human-approval.ts"
+Cohesion: 0.10
+Nodes (23): ApprovalBindingInput, createApprovalBindingKey(), makePending(), stableStringify(), buildRequest(), failedResult(), humanApproval(), entriesFor() (+15 more)
 
 ### Community 342 - "generated-browser-oracle.mjs"
 Cohesion: 0.13
@@ -2305,27 +2284,27 @@ Nodes (37): buildCertificate(), counterAdvancedByOne(), countPrecedingButtons(),
 
 ### Community 343 - "Upgrade an application from 5.29"
 Cohesion: 0.07
-Nodes (26): Documentation, Installation, Optional peer dependencies, @warlock.js/core, What's in the box, 5.30 to 5.31 daily log file names, 5.30 to 5.31 test fakes are on by default, 5.30 to 5.31: `warlock dev` keeps a section of AGENTS.md (+18 more)
+Nodes (27): Documentation, Installation, Optional peer dependencies, @warlock.js/core, What's in the box, 5.30 to 5.31 daily log file names, 5.30 to 5.31 test fakes are on by default, 5.30 to 5.31: `warlock dev` keeps a section of AGENTS.md (+19 more)
 
 ### Community 344 - "Working in the Warlock.js framework monorepo"
 Cohesion: 0.17
 Nodes (11): CWD IS LOAD-BEARING for vitest, Evidence standard, Known events pitfall, Layout, Mirror source copies under `tools/release/sources/`, Oxfmt: say the scope, Redis and HTTP test services, Repo conventions (+3 more)
 
-### Community 345 - "compression.ts"
+### Community 345 - "human/index.ts"
+Cohesion: 0.17
+Nodes (26): Human-in-the-loop, `ResumeOptions` and `ResumeResult`, The three decisions, ApprovalDecision, ApprovalDecisionType, ApprovalHandler, ApprovalRemember, ApprovalRequest (+18 more)
+
+### Community 346 - "check-upgrade.ts"
 Cohesion: 0.09
-Nodes (31): applyEncodingHeaders(), brotliCompress, canCompressResponse(), compressBuffer(), COMPRESSIBLE_TYPES, COMPRESSION_SETTINGS, CompressionEncoding, compressionSettingsFor() (+23 more)
+Nodes (29): releaseNotesPointer(), getInstallCommand(), printReleaseNotesPointer(), CheckCommand, CheckCommandOutcome, childEnv(), collectHits(), commandStep() (+21 more)
 
-### Community 346 - "request-log-store.ts"
-Cohesion: 0.08
-Nodes (38): Read it back, logsCommand, clock(), failure(), formatRequestLogRecord(), formatRequestLogRows(), logsCommandAction(), LogsCommandResult (+30 more)
-
-### Community 347 - "check.types.ts"
-Cohesion: 0.10
-Nodes (21): Running checks yourself, CheckResult, CheckStatus, DoctorBootContext, DoctorReport, defaultDoctorChecks, bootContext, doctorCommandAction() (+13 more)
+### Community 347 - "page-registry-plugin.ts"
+Cohesion: 0.09
+Nodes (19): isLocaleRoutingStrategy(), LocaleRoutingConfig, LocaleRoutingConfigError, resolveClientLocaleRoutingFallback(), resolveLocaleRouting(), STRATEGIES, siteFolder(), captureSkeleton() (+11 more)
 
 ### Community 348 - "run-pnpm-acceptance.mjs"
-Cohesion: 0.09
-Nodes (44): ACCEPTANCE_ENV, appDirectory, asLiteral(), assertArtifactContainsItsEntryPoints(), collectEntries(), assertArtifactIsNotStale(), assertArtifactResolves(), assertBootedInProduction() (+36 more)
+Cohesion: 0.11
+Nodes (36): ACCEPTANCE_ENV, appDirectory, asLiteral(), assertArtifactContainsItsEntryPoints(), collectEntries(), assertArtifactIsNotStale(), assertArtifactResolves(), assertBootedInProduction() (+28 more)
 
 ### Community 349 - "Git workflow"
 Cohesion: 0.05
@@ -2333,83 +2312,83 @@ Nodes (36): 1.1 Format, 1.2 Types, 1.3 Scope, 1.4 Summary, 1.5 Body — explain 
 
 ### Community 350 - "Security baseline"
 Cohesion: 0.05
-Nodes (42): 1.1 What counts as untrusted input, 1.2 Where validation runs, 1.3 File uploads, 1.4 Webhook payloads, 1. Input trust model, 2.1 Identity comes from the session, never the request body, 2.2 Authentication via `@warlock.js/auth`, 2.3 Authorization happens server-side, every endpoint, every time (+34 more)
+Nodes (36): 1.1 What counts as untrusted input, 1.2 Where validation runs, 1.3 File uploads, 1.4 Webhook payloads, 1. Input trust model, 2.1 Identity comes from the session, never the request body, 2.2 Authentication via `@warlock.js/auth`, 2.3 Authorization happens server-side, every endpoint, every time (+28 more)
 
 ### Community 351 - "starter-browser-gate.mjs"
 Cohesion: 0.12
 Nodes (32): assertInside(), assertOutsideCheckout(), assertPortFree(), bindAndClose(), candidate, capture(), checkout, delay() (+24 more)
 
 ### Community 352 - "WorkspaceEditError"
-Cohesion: 0.12
-Nodes (21): WorkspaceEditError, applyHunks(), bare(), findMatch(), loose(), split(), usesCrlf(), readRaw() (+13 more)
+Cohesion: 0.08
+Nodes (32): ApplyPatchInput, ApplyPatchResult, WorkspaceEditError, WorkspaceEditErrorOptions, WorkspaceEditFailure, WorkspaceJobErrorOptions, WorkspaceJobFailure, WorkspacePolicyErrorOptions (+24 more)
 
 ### Community 353 - "Basic Operations"
 Cohesion: 0.06
 Nodes (35): Advanced Features, Basic Operations, Cache Keys, Disconnect, Driver Management, Driver Options, Extend, Flush (+27 more)
 
-### Community 354 - "locales-ts-deprecated.check.ts"
-Cohesion: 0.15
-Nodes (17): WL9105, Check that every key has every locale, Client-supplied locales are allow-listed, fixLocaleSources(), flattenLiteral(), inspect(), inspectLocaleSources(), literalObject() (+9 more)
-
-### Community 355 - "T"
+### Community 354 - "compiler.ts"
 Cohesion: 0.08
-Nodes (24): 1. Cross-field declarative rules are world-class, 2. No `lazy()` — recursive schemas are impossible, 2. Standard Schema + JSON Schema bridge is the right architecture, 3. i18n is first-class, not bolted on, 3. No `discriminatedUnion()` — unions can't disambiguate by tag, 4. Error model is thin and stringly-typed, 4. The mutator/transformer split is a real improvement, 5. Date validator surface is unmatched (+16 more)
+Nodes (21): DeletedFile, DiagnosticMessage, FileCheckResult, SerializedFile, TypeScriptHealthWorker, worker, WorkerMessage, WorkerResponse (+13 more)
 
-### Community 356 - "page-manifest.ts"
-Cohesion: 0.07
-Nodes (28): resolveBuiltClientDir(), appModule, layoutModule, manifest, pageModule, InstalledManifestPageRoute, installProductionPageRoutes(), InstallProductionPageRoutesOptions (+20 more)
+### Community 355 - "PendingInterrupt"
+Cohesion: 0.10
+Nodes (11): PendingInterrupt, PgClientLike, MemoryInterruptStore, buildPgClient(), PG_INSTALL_INSTRUCTIONS, PgInterruptOptions, PgInterruptStore, PgModuleLike (+3 more)
+
+### Community 356 - "InterruptStore"
+Cohesion: 0.08
+Nodes (23): Durable mode — pause, persist, resume, Errors, Interrupt stores — `ai.human.interrupt.{memory,pg,redis}()`, Lifecycle at a glance, Memory, Postgres (lazy optional `pg` peer), Redis (lazy optional `redis` peer), Related (+15 more)
 
 ### Community 357 - "page.spec.ts"
 Cohesion: 0.09
 Nodes (22): CdpConnection, CdpEvents, CdpMethods, CdpTimeoutError, ExceptionDetails, Pending, RemoteObject, cleanups (+14 more)
 
 ### Community 358 - "retention.spec.ts"
-Cohesion: 0.05
-Nodes (19): LocalJob, RetentionWindow, MemoryStore, READY_STATES, DatabaseSync, decode(), SqliteModule, SqliteRow (+11 more)
+Cohesion: 0.09
+Nodes (5): add, capture, tenantContext, tenantStore, add
 
-### Community 359 - "`@warlock.js/notifications` — basics"
-Cohesion: 0.25
-Nodes (7): Minimal end-to-end, Phase 1 vs Phase 2, Recipient = cascade `Model` instance, See also, Server-only package, `@warlock.js/notifications` — basics, What the package is for
+### Community 359 - "Configure notifications"
+Cohesion: 0.07
+Nodes (27): The registry — `NotificationChannels`, Config, Channel keys must match the registry, Configure notifications, Full surface, `inApp.configure({ model | repository })`, Minimal, `preferences` — pre-send opt-in gate (optional) (+19 more)
 
 ### Community 360 - "app-singleton.ts"
-Cohesion: 0.13
-Nodes (20): `appSingleton`, Releasing resources on reload, `supervisor()` from `@warlock.js/process`, Use `appSingleton`, Warlock — module singletons in dev, appSingleton(), AppSingletonOptions, disposeAllAppSingletons() (+12 more)
+Cohesion: 0.11
+Nodes (21): `appSingleton`, Releasing resources on reload, `supervisor()` from `@warlock.js/process`, Rules, Use `appSingleton`, Warlock — module singletons in dev, appSingleton(), AppSingletonOptions (+13 more)
 
-### Community 361 - "Warlock — store a file"
-Cohesion: 0.06
-Nodes (35): Cloud bucket / region, Cloud-only operations, Configuration, Per-environment switching, Presigned URLs, Visibility and storage class, Bound the cache and render remote disks, Cached image variants follow their source (+27 more)
+### Community 361 - "database-cache-driver.ts"
+Cohesion: 0.07
+Nodes (16): Basic Example, Configuration Structure, Custom Drivers, Driver Options, Environment-Based Configuration, Inside a Warlock app, Multiple Drivers, Static vs runtime options (+8 more)
 
 ### Community 362 - "payload-budget.ts"
 Cohesion: 0.10
-Nodes (29): PagePayloadBudget, cachedPayloadBudgetFor(), compiledPatterns, compilePayloadPattern(), DEFAULT_PAYLOAD_BUDGET_BYTES, formatBytes, formatPayloadBudgetReport(), isPlainRecord() (+21 more)
+Nodes (28): NamedApiRouteMetadata, cachedPayloadBudgetFor(), compiledPatterns, compilePayloadPattern(), DEFAULT_PAYLOAD_BUDGET_BYTES, formatBytes, formatPayloadBudgetReport(), isPlainRecord() (+20 more)
 
 ### Community 363 - "benchmark.md"
-Cohesion: 0.07
-Nodes (25): Constructor signature, Fire-and-forget after-hooks, Gotchas, How a flush works, `Queue<T>` — the in-process batching utility, See also, The 30-second look, Where real background work lives (+17 more)
+Cohesion: 0.08
+Nodes (23): Constructor signature, Fire-and-forget after-hooks, Gotchas, How a flush works, `Queue<T>` — the in-process batching utility, See also, The 30-second look, Where real background work lives (+15 more)
 
 ### Community 364 - "Context"
-Cohesion: 0.06
-Nodes (27): Pattern: queue consumer, T-074 [chore] Export the `ContextStorage` type, Context, DANGEROUS_KEYS, withoutDangerousKeys(), contextManager, sharedSlotOf(), ContextFrame (+19 more)
+Cohesion: 0.04
+Nodes (46): `buildStore(payload?)`, `clear()`, `Context<TStore>`, `enter(store)`, `get(key)`, `getStore()`, `hasContext()`, `run(store, callback)` (+38 more)
 
 ### Community 365 - "file-log.ts"
-Cohesion: 0.09
-Nodes (14): DEFAULT_STYLE, LEVEL_STYLES, LevelStyle, assertRetention(), DAILY_FILE_NAME, FileLogRetention, HOURLY_FILE_NAME, InFlightBatch (+6 more)
+Cohesion: 0.08
+Nodes (19): DEFAULT_STYLE, LEVEL_STYLES, LevelStyle, assertRetention(), DAILY_FILE_NAME, FileLogRetention, HOURLY_FILE_NAME, InFlightBatch (+11 more)
 
-### Community 366 - "web-connector.spec.ts"
-Cohesion: 0.07
-Nodes (27): BuildErrorMessage, DEV_TRANSFORM_ERROR_BODY, DEV_TRANSFORM_ERROR_STATUS, DevErrorTransportInProductionError, devErrorTransportPlugin(), DevTransformErrorCarrier, formatDevTransformError(), sendCapturedDevError() (+19 more)
+### Community 366 - "delete-strategies.md"
+Cohesion: 0.06
+Nodes (30): Choosing a strategy — a quick decision guide, Events, Going further, Handling id conflicts on restore, Per-call overrides, `permanent` — the default, Restore all soft-deleted / all from trash, Restore and global scopes (+22 more)
 
-### Community 367 - "`@warlock.js/ai-bedrock`"
-Cohesion: 0.05
-Nodes (35): Adjacent conversation turns, Bedrock API keys, Capabilities, Construct, First call, Hosted-search accounting limit, Install, List models (+27 more)
+### Community 367 - "tests/agent-trace.spec.ts"
+Cohesion: 0.10
+Nodes (22): createCollector(), resolveDevtoolsOptions(), AGENT_TRACE_INSTALL_GUIDANCE, AGENT_TRACES_KEY, attachAgentTraceSource(), DevtoolsAgentTrace, DevtoolsAgentTraceSource, DevtoolsAgentTraceStore (+14 more)
 
-### Community 368 - "http-response.md"
+### Community 368 - "Router"
 Cohesion: 0.02
-Nodes (79): Idempotency, Repository cache, Sockets, Going further, Gotchas, Per-module-version vs flat routing, Picking what to break per version, Step 2 — Folder layout for versioned controllers (+71 more)
+Nodes (105): Configuration, Rate limits on served files, URLs, Going further, Gotchas, Per-module-version vs flat routing, Picking what to break per version, Step 1 — One routes file, two version blocks (+97 more)
 
 ### Community 369 - "base-validator.ts"
 Cohesion: 0.05
-Nodes (37): getSealConfig(), forbiddenKeyRule, isForbiddenKey(), maxDepthRule, maxItemsRule, maxKeysRule, resolveSealLimit(), SealLimitName (+29 more)
+Nodes (40): 7. `Infer<T>` defaults to `Infer.Input<T>`; explicit `Infer.Output<T>` for validated state, getSealConfig(), forbiddenKeyRule, isForbiddenKey(), maxDepthRule, maxItemsRule, maxKeysRule, resolveSealLimit() (+32 more)
 
 ### Community 370 - "Alter a migration"
 Cohesion: 0.06
@@ -2420,40 +2399,40 @@ Cohesion: 0.07
 Nodes (39): components, read(), root, visit(), components, root, shadcnRoot, templates (+31 more)
 
 ### Community 372 - "release-family.spec.ts"
-Cohesion: 0.10
-Nodes (20): defaultRunCommand(), formatCommandFailureOutput(), NPM_ORIGIN, commitFixture(), fakeGitRuntime(), fakeGitRuntimeByRoot(), FAMILY, fixture() (+12 more)
-
-### Community 373 - "EventMessage"
 Cohesion: 0.09
-Nodes (17): Split producer and consumer, 1. `RetryOptions.delay` is dead on the automatic throw path, 2. `prefetch` is channel-global, not per-consumer, 3. `respond()` cannot select a consumer group, 4. `assert()` ignores `deadLetterExchange` wiring nuance, 5. `ChannelOptions.type` / `maxMessageSize` are declared but unused, Accuracy fixes applied this pass (skills + docs), Behavior bugs / gaps (NOT fixed — changing them alters runtime behavior) (+9 more)
+Nodes (26): checkPackageTreeIsClean(), getMemberGitStatus(), isWithinSurface(), normalizeRelative(), NPM_ORIGIN, parseGitPorcelain(), resolveFamilyPackageConfig(), resolvePublishedSurface() (+18 more)
+
+### Community 373 - "Behavior bugs / gaps (NOT fixed — changing them alters runtime behavior)"
+Cohesion: 0.22
+Nodes (8): 1. `RetryOptions.delay` is dead on the automatic throw path, 2. `prefetch` is channel-global, not per-consumer, 3. `respond()` cannot select a consumer group, 4. `assert()` ignores `deadLetterExchange` wiring nuance, 5. `ChannelOptions.type` / `maxMessageSize` are declared but unused, Accuracy fixes applied this pass (skills + docs), Behavior bugs / gaps (NOT fixed — changing them alters runtime behavior), `@warlock.js/herald` — backlog
 
 ### Community 374 - "JsonStreamGuard"
-Cohesion: 0.19
-Nodes (4): JsonStreamGuard, readObject(), readString(), safeParseJson()
+Cohesion: 0.11
+Nodes (11): JsonStreamGuard, JsonStreamGuardOptions, readObject(), readString(), safeParseJson(), Capture, makeCapture(), searchCatalogSchema (+3 more)
 
 ### Community 375 - "serve-http.ts"
-Cohesion: 0.08
-Nodes (44): Authentication, Cancellation, Direction B — expose a Warlock primitive AS an MCP server, Discovery independent of call policy, Driving the protocol yourself, How the protocol maps, Resources and prompts, Serve errors (+36 more)
+Cohesion: 0.12
+Nodes (32): Serve errors, Tool-name collisions, Sources and tool-name collisions, McpServeError, acceptsJson(), AUTH_REFUSAL_HEADERS, Authentication, authorized() (+24 more)
 
 ### Community 376 - "ref_warlock_js_seal"
-Cohesion: 0.12
-Nodes (17): ForbiddenError, ResourceNotFoundError, state, updateRequest(), GuardedRequestHandler, createNewPostController(), updatePostController(), Post (+9 more)
+Cohesion: 0.05
+Nodes (29): 1. The spec, 2. Preview, then generate, 3. What it writes (`src/app/posts/`), 4. Run its test, `--dry-run` and `--json` everywhere, `public: true`, See also, Warlock — make an endpoint (+21 more)
 
 ### Community 377 - "LocalDriver"
 Cohesion: 0.16
 Nodes (3): LocalDriver, StorageFileData, resolveWithinRoot()
 
 ### Community 378 - "gate-a-resolve.spec.ts"
-Cohesion: 0.09
-Nodes (33): warningsFor(), gateAResolve(), boundarySummary(), buildChain(), displayBoundarySource(), isTypeOnlyEdge(), reportModuleBoundary(), shouldPrintWarning() (+25 more)
+Cohesion: 0.06
+Nodes (42): Renaming fields, warningsFor(), APP, buildPage(), __dirname, ERROR, PAGE, ROOT (+34 more)
 
 ### Community 379 - "Module boundaries"
 Cohesion: 0.06
 Nodes (31): 1.1 The rule, 1.2 If the name needs an "and", split it, 1.3 Cross-cutting concerns live in `shared/`, 1.4 Match modules to domain boundaries, 1. One domain noun per module, 2.1 Empty folders are fine to omit, 2.2 No module-root `index.ts`; sub-folder barrels are optional, 2. Standard module layout (+23 more)
 
-### Community 380 - "src/supervisor.ts"
-Cohesion: 0.11
-Nodes (23): Web feature, Observation, parseRegistry(), record(), Registry, RegistryEntry, strings(), Active (+15 more)
+### Community 380 - "registry.ts"
+Cohesion: 0.33
+Nodes (5): parseRegistry(), record(), Registry, RegistryEntry, strings()
 
 ### Community 381 - "ReleaseFamilyDependencies"
 Cohesion: 0.07
@@ -2480,12 +2459,12 @@ Cohesion: 0.12
 Nodes (18): Configure, In CI, `release activate [--preflight] [--dry-run] [--allow-same]`, `release candidate [--commit <sha>] [--allow-dirty]`, `release gate`, `release list`, `release status`, `release prune --keep <n>`, `release migrations [--prove] [--target <name>]`, `release rollback [--dry-run]` (+10 more)
 
 ### Community 387 - "factories.ts"
-Cohesion: 0.08
-Nodes (26): Model factories, Define one per model, Gotchas, See also, The seed, Use it, Warlock — model factories, See also (+18 more)
+Cohesion: 0.05
+Nodes (42): Model factories, Define a model, Delete — `.destroy()`, Fast escape — `static toJsonColumns`, Fields that must never serialize — `static hidden`, `.merge(data).save()` — bulk update from an object, Public output shaping, Remove a field — `.unset(field)` (+34 more)
 
 ### Community 388 - "scheduler/essentials/configuration.mdx"
-Cohesion: 0.07
-Nodes (25): Adding Jobs, Checking Scheduler State, Complete Setup Example, Concurrency Limit, Creating Jobs Inline — `newJob()`, Job Management, Lifecycle Methods, Listing All Jobs (+17 more)
+Cohesion: 0.08
+Nodes (21): Adding Jobs, Checking Scheduler State, Complete Setup Example, Concurrency Limit, Creating Jobs Inline — `newJob()`, Job Management, Lifecycle Methods, Listing All Jobs (+13 more)
 
 ### Community 389 - "generated-output-oracle.mjs"
 Cohesion: 0.16
@@ -2499,85 +2478,85 @@ Nodes (11): fullLines, indexLines, llmsFullPath, llmsTxtPath, packageIndexPath, 
 Cohesion: 0.08
 Nodes (8): Cache — Backlog, Future work, Known issues, Recommended next features (2026-06-01 cache-excellence pass), Resolved, MemoryCacheList, CacheListAccessor, LRUMemoryCacheOptions
 
-### Community 392 - "ModelInfo"
-Cohesion: 0.14
-Nodes (9): kindOfActions(), kindOf(), numberOf(), secondsOf(), toModelInfo(), ListModelsOptions, ModelInfo, ModelKind (+1 more)
+### Community 392 - "ApprovalRejectedError"
+Cohesion: 0.09
+Nodes (19): `ai.human.approval(options)`, Decisions — what the reviewer returns, Options, Per-tool modes, Remember an approval for the session, The `ApprovalRequest` a handler sees, The middleware never throws out of the pipeline, Approve tool calls — the human-in-the-loop gate (+11 more)
 
 ### Community 393 - "test-setup-reporter.ts"
-Cohesion: 0.11
-Nodes (19): BODY_STEP, BootPhase, BootProfile, buildBootProfile(), formatBootProfile(), formatMs(), isConnectorStep(), PHASE_OF_STEP (+11 more)
+Cohesion: 0.10
+Nodes (21): Measure and size CI workers, Measure and size CI workers, BODY_STEP, BootPhase, BootProfile, buildBootProfile(), formatBootProfile(), formatMs() (+13 more)
 
-### Community 394 - "ref_mongez_react_form"
-Cohesion: 0.12
-Nodes (19): contactSchema, ContactField(), ContactSection(), ContactSubmitButton(), useContactField(), ContactErrorBody, ContactResponse, ContactStatus (+11 more)
+### Community 394 - "use-contact-form.ts"
+Cohesion: 0.16
+Nodes (13): contactController(), ContactSchema, contactSchema, ContactErrorBody, ContactResponse, ContactStatus, ContactValues, useContactForm() (+5 more)
 
 ### Community 395 - "gate-b-secrets.ts"
-Cohesion: 0.10
+Cohesion: 0.09
 Nodes (30): AnyNode, buildScope(), collectExcludedIdentifiers(), collectPatternIdentifiers(), collectScope(), expressionText(), findViolation(), checkNode() (+22 more)
 
 ### Community 396 - "bullmq-queue.ts"
-Cohesion: 0.06
-Nodes (36): Behaviour, `bullmqQueue` options, Configure, Notifications, 5.31 to 5.32 notifications with the herald queue, Current limits, Idempotency, Queue notifications (async) (+28 more)
+Cohesion: 0.07
+Nodes (29): Behaviour, `bullmqQueue` options, Configure, Current limits, Idempotency, Queue notifications (async), Run the herald worker, See also (+21 more)
 
 ### Community 397 - "ref_node_url"
 Cohesion: 0.01
-Nodes (141): __dirname, DOCS_ROOT, importPackage(), PLAN, PROJECT_ROOT, transform(), yamlEscape(), CASCADE_DOCS (+133 more)
+Nodes (165): docsRoot, fullParts, here, indexLines, orderIndex, PACKAGE_ORDER, packageDirs, PACKAGES (+157 more)
 
 ### Community 398 - "Warlock — memoize work for one request"
-Cohesion: 0.08
-Nodes (26): Arbitrary properties can no longer be attached to `Request`, `fromRequest()` is removed, After — v5 `requestMemo()`, Before — v4 `fromRequest()`, Gotchas, Key design, Lifetime and isolation, Migrate from v4 to v5 (+18 more)
+Cohesion: 0.07
+Nodes (31): Access no longer chooses the type of `request.user`, Arbitrary properties can no longer be attached to `Request`, `fromRequest()` is removed, Optional Seal fields no longer skip validation for present empty values, Required changes, Route handlers and middleware receive one context object, Use `request.locale`, After — v5 `requestMemo()` (+23 more)
 
 ### Community 399 - "scheduler/essentials/defining-jobs.mdx"
-Cohesion: 0.09
-Nodes (19): Adding Jobs to the Scheduler, Cron Expressions, Custom Intervals, Preset Intervals, Reading Job State, Targeting a Specific Day — `on()`, Targeting a Specific Time — `at()`, Terminating a Job (+11 more)
+Cohesion: 0.10
+Nodes (18): Adding Jobs to the Scheduler, Cron Expressions, Custom Intervals, Preset Intervals, Reading Job State, Targeting a Specific Day — `on()`, Targeting a Specific Time — `at()`, Terminating a Job (+10 more)
 
 ### Community 400 - "notifications/scripts/generate-llms.mjs"
 Cohesion: 0.13
 Nodes (11): fullLines, indexLines, llmsFullPath, llmsTxtPath, packageIndexPath, pkgJson, pkgRoot, scriptDir (+3 more)
 
 ### Community 401 - "LocalDriver"
-Cohesion: 0.17
-Nodes (6): LocalDriver, newestFirst(), ownsLease(), positiveInteger(), LocalStore, validateOptions()
+Cohesion: 0.16
+Nodes (7): LocalDriver, newestFirst(), ownsLease(), positiveInteger(), snapshot(), LocalStore, validateOptions()
 
 ### Community 402 - "bm25Rank"
-Cohesion: 0.26
-Nodes (14): `bm25Rank` — the lexical pass, `hybridRank` — dense + BM25 in one call, `multiQuery` — expand one query into several, `reciprocalRankFusion` — combine ranked lists, Related, When to reach for hybrid, bm25Rank(), LexicalDoc (+6 more)
+Cohesion: 0.19
+Nodes (15): `bm25Rank` — the lexical pass, `hybridRank` — dense + BM25 in one call, `multiQuery` — expand one query into several, `reciprocalRankFusion` — combine ranked lists, Related, When to reach for hybrid, bm25Rank(), LexicalDoc (+7 more)
 
-### Community 403 - "SchemaRegistry"
-Cohesion: 0.16
-Nodes (15): baseCastSchema(), castToJsonSchema(), DEFAULT_DATE_SCHEMA, makeNullable(), bodyValueSchema(), buildDeclaredResponses(), isRecord(), objectSchema() (+7 more)
+### Community 403 - "generators.md"
+Cohesion: 0.06
+Nodes (29): `add <features...>`, Barrels are optional, Best practices, Customizing the stubs, `--dry-run` and `--json` on every generator, `generate.controller <module>/<name>`, `generate <generator> [args...]` (master), `generate.migration <model-path>` (+21 more)
 
-### Community 404 - "config-getter.ts"
-Cohesion: 0.08
-Nodes (14): bootContext, bootContext, jwtSecretCheck, bootContext, bootContext, OtherDriver, bootContext, configure() (+6 more)
+### Community 404 - "local-processes.spec.ts"
+Cohesion: 0.07
+Nodes (18): Backend selection, Dispatch-only process, `QueueConfig`, The connector, Configure the queue, Dashboard, Dispatch-only process, What the connector does (+10 more)
 
 ### Community 405 - "windows-helper.ts"
-Cohesion: 0.12
-Nodes (14): Row, Batch, Flight, helperArguments(), HelperChild, helperScript, HelperSpawn, Snapshot (+6 more)
+Cohesion: 0.10
+Nodes (17): T-095 [bug] A Windows script that awaits a supervisor call exits with code 13, parseWindowsRows(), Row, windowsRows(), Batch, Flight, helperArguments(), HelperChild (+9 more)
 
 ### Community 406 - "serve/serve.ts"
-Cohesion: 0.06
-Nodes (54): Bearer auth, Building blocks, Client disconnects cancel the run, Durable multi-turn serving, Errors, Migrate body-based `toOptions`, Options, Related (+46 more)
+Cohesion: 0.08
+Nodes (42): Client disconnects cancel the run, Serve over SSE, T-082 [bug] AI serve and guardrails, T-009 [decision] Next-major default flips, T-020 [feature] Refuse non-string input inside the agent run, Pattern — serve over HTTP (`ai.serve`), createPublicErrorDescriber(), ServePublicError (+34 more)
 
 ### Community 407 - "ai-panoptic/src/index.ts"
 Cohesion: 0.03
-Nodes (28): The trace list returns summaries, The JSON API, aggregateByType(), costSumObj(), ERROR_STATUSES, filterTraces(), groupByPrompt(), groupBySession() (+20 more)
+Nodes (34): Continue reading, The trace list returns summaries, Theme, search, grouping, deep-links, What the page shows, Deep-links, Filtering & grouping (all client-side over the polled list), Prompt-version linkage, The JSON API (+26 more)
 
-### Community 408 - "model-signal-contract.ts"
-Cohesion: 0.19
-Nodes (16): checkBeforeCall(), checkInFlight(), DEFAULT_MESSAGES, fail(), HangingServer, HeldRequest, ModelSignalContractCheck, ModelSignalContractMethod (+8 more)
+### Community 408 - "check.md"
+Cohesion: 0.07
+Nodes (28): From code, Kept fresh by `warlock dev`, See also, The markers, What the section contains, `--changed`, Exit codes, Explain a source file (+20 more)
 
 ### Community 409 - "01-the-context-model.md"
-Cohesion: 0.11
-Nodes (17): One context per request, Reading: `get`, `getStore`, `hasContext`, Related, `run()` vs `enter()` — the auto-cleanup difference, The rules, summarized, Two requests, zero leaks, What "propagates through awaits" means, What `run()` actually does (+9 more)
+Cohesion: 0.04
+Nodes (52): One context per request, Reading: `get`, `getStore`, `hasContext`, Related, `run()` vs `enter()` — the auto-cleanup difference, The rules, summarized, Two requests, zero leaks, What "propagates through awaits" means, What `run()` actually does (+44 more)
 
-### Community 410 - "02-orchestrating-multiple-contexts.md"
-Cohesion: 0.10
-Nodes (22): `enterAll` — the no-callback escape hatch, One instance, one store per registration name, One storage for every context, Order matters, Related, The pyramid you are avoiding, The two-step flow, What `contextManager` actually is (+14 more)
+### Community 410 - "ContextManager"
+Cohesion: 0.05
+Nodes (47): `enterAll` — the no-callback escape hatch, One instance, one store per registration name, One storage for every context, Order matters, Related, The pyramid you are avoiding, The two-step flow, What `contextManager` actually is (+39 more)
 
 ### Community 411 - "otp.service.ts"
-Cohesion: 0.13
-Nodes (23): BadRequestError, Row, state, forgotPasswordController(), forgotPasswordService(), issuePasswordResetCode(), sendPasswordResetCode(), cleanupOtpService() (+15 more)
+Cohesion: 0.07
+Nodes (35): BadRequestError, Row, state, forgotPasswordController(), resetPasswordController(), resetPasswordSchema, ResetPasswordSchema, forgotPasswordService() (+27 more)
 
 ### Community 412 - "list-endpoint.ts"
 Cohesion: 0.11
@@ -2588,12 +2567,12 @@ Cohesion: 0.29
 Nodes (6): Events, Fan-out emits N events, Handler isolation, Observe notifications, See also, Unsubscribe
 
 ### Community 415 - "Notifiable"
-Cohesion: 0.07
-Nodes (35): The registry — `NotificationChannels`, What you get, What it gives you, Contracts, Channel keys must match the registry, `defineChannel` — custom channels, Minimal — `fetch`-based webhook (no SDK), `route` resolution (+27 more)
+Cohesion: 0.08
+Nodes (32): What you get, What it gives you, Contracts, `defineChannel` — custom channels, Minimal — `fetch`-based webhook (no SDK), `route` resolution, SDK-backed channels — lazy-import the SDK, See also (+24 more)
 
-### Community 416 - "Cron expressions"
-Cohesion: 0.22
-Nodes (8): 5-field syntax, Common recipes, Cron expressions, Day-of-month + day-of-week — Vixie OR semantics, Operators, See also, Timezone interaction, Validation
+### Community 416 - "oxc-toolchain.spec.ts"
+Cohesion: 0.12
+Nodes (21): migrateHealthSwitches(), OXC_SCRIPTS, OXC_VERSIONS, oxcToolchain, oxcToolchainRemoval, OXLINT_RULE_SCHEMAS, CHANGE, OxcConfig (+13 more)
 
 ### Community 417 - "utils/paths.ts"
 Cohesion: 0.07
@@ -2605,139 +2584,143 @@ Nodes (21): cellText(), colorizeMethodCell(), ColumnKey, COLUMNS, columnWidths()
 
 ### Community 419 - "inject-request-context.ts"
 Cohesion: 0.03
-Nodes (44): RequestContext, RequestContextStore, useRequest(), requestMemoStores, applyErrorMapper(), HttpErrorMapping, mapBuiltInError(), mapRequestError() (+36 more)
+Nodes (72): A throwing hook never breaks a request, Enabling it, Example: log phases slower than a threshold, Gotchas, Phase names, Response header: no new one, See also, The `TracingHooks` shape (+64 more)
 
-### Community 420 - "json-fields.md"
-Cohesion: 0.11
-Nodes (18): A complete worked example, A note on indexes, Array-specific helpers, Before you reach for these — `.where()` already does dot-notation, `deselectJson(path)`, Driver translation reference, Filtering with JSON helpers, Going further (+10 more)
+### Community 420 - "01-crud-basics.md"
+Cohesion: 0.05
+Nodes (36): A complete worked example, A note on indexes, Array-specific helpers, Before you reach for these — `.where()` already does dot-notation, `deselectJson(path)`, Driver translation reference, Filtering with JSON helpers, Going further (+28 more)
 
 ### Community 421 - "file-log-naming-retention.spec.ts"
-Cohesion: 0.09
-Nodes (14): dataFor(), NOW, rotateOnce(), TEST_ROOT, waitForCondition(), waitForInit(), TEST_ROOT, waitForCondition() (+6 more)
+Cohesion: 0.13
+Nodes (8): TEST_ROOT, waitForCondition(), waitForFile(), waitForInit(), TEST_ROOT, waitForCondition(), waitForFile(), waitForInit()
 
 ### Community 422 - "Release the warlock family"
-Cohesion: 0.06
-Nodes (31): 0. The family pins itself EXACTLY, so a partial release CANNOT install, 1. A release PUSHES GIT BRANCHES by default, 2. Git runs BEFORE publish, PER PACKAGE, 3. pkgist LEAKS. A full-family release cannot complete in one process., 4. A "dry run" is not source-safe, and compiles nothing, After you release — short npm-origin confirmation, Before you release, Bumping the version does NOT bump every family spec (+23 more)
+Cohesion: 0.07
+Nodes (27): 0. The family pins itself EXACTLY, so a partial release CANNOT install, 1. A release PUSHES GIT BRANCHES by default, 2. Git runs BEFORE publish, PER PACKAGE, 3. pkgist LEAKS. A full-family release cannot complete in one process., 4. A "dry run" is not source-safe, and compiles nothing, After you release — short npm-origin confirmation, Before you release, Docs are part of the release, not after it (+19 more)
 
-### Community 423 - "platform.ts"
-Cohesion: 0.14
-Nodes (21): Command, darwinCommand(), defaultPollIntervalMs(), Execute, OwnershipProof, parseDarwinRows(), parseDarwinStart(), parseWindowsRows() (+13 more)
+### Community 423 - "events-and-hooks.md"
+Cohesion: 0.07
+Nodes (26): Bulk writes don't fire model events, Cleanup linked rows on delete, Common patterns, Diff-aware update logging, Going further, Instance listeners, Listener signature, Reading what changed in `saved` / `updated` (+18 more)
 
 ### Community 424 - "BrowserPage"
-Cohesion: 0.20
-Nodes (8): Page API, Starter browser checks, Interaction and evidence, BrowserPage, probeReason(), errorMessage(), matches(), Starter browser checks
-
-### Community 425 - "supervisor"
-Cohesion: 0.16
-Nodes (27): launchCommand(), owns(), ProcessNotOwnedError, attachCgroup(), cgroupMemory(), cleanCgroup(), launcher(), mountedCgroup() (+19 more)
-
-### Community 427 - "collect-routes.ts"
 Cohesion: 0.11
-Nodes (27): extractPathParamNames(), isBodylessMethod(), buildRequestParts(), BuildRequestPartsInput, describeParameter(), isRecord(), LocatedProperty, ObjectSchemaParts (+19 more)
+Nodes (17): A complete spec, Accessibility checks, CLI, evidence and cleanup, Expected failures and long-lived requests, Page API, Payload checks, Run your production app, Watched development checks (+9 more)
+
+### Community 425 - "src/supervisor.ts"
+Cohesion: 0.09
+Nodes (48): Web feature, executeCommand(), identity(), owns(), ProcessNotOwnedError, defaultSetupTimeoutMs(), supported(), taskkillCommand() (+40 more)
+
+### Community 427 - ".environment"
+Cohesion: 0.08
+Nodes (25): Environment, Setting the environment, Environment detection, Environment selection, `NODE_ENV` and the `.env` file it picks, Pre-deploy checklist, Runtime strategy: dev vs production, `build.*` config knobs (+17 more)
 
 ### Community 428 - "single-bundle.test.ts"
-Cohesion: 0.13
-Nodes (14): makeApp(), SINGLE_BUNDLE_MARKERS, SINGLE_BUNDLE_ROUTE, SingleBundleAppOptions, writeSingleBundleApp(), directories, processes, warlock (+6 more)
+Cohesion: 0.12
+Nodes (16): makeApp(), require, temporaryDirectories, SINGLE_BUNDLE_MARKERS, SINGLE_BUNDLE_ROUTE, SingleBundleAppOptions, writeSingleBundleApp(), directories (+8 more)
 
 ### Community 429 - "Structural validators — picking guide"
 Cohesion: 0.07
-Nodes (25): Common chains, Inner validator notes, JSON Schema mapping, Length, Uniqueness & sort, `v.array(itemValidator)` — method reference, Common chains, Cross-field rules — context (+17 more)
+Nodes (26): Common chains, Inner validator notes, JSON Schema mapping, Length, Mutators (pre-validation reshape), Uniqueness & sort, `v.array(itemValidator)` — method reference, Common chains (+18 more)
 
-### Community 430 - "ai-xai/scripts/generate-llms.mjs"
-Cohesion: 0.14
-Nodes (10): fullLines, indexLines, llmsFullPath, llmsTxtPath, pkgJson, pkgRoot, scriptDir, shortName (+2 more)
+### Community 430 - "core/getting-started/03-configuration.md"
+Cohesion: 0.07
+Nodes (25): Build on Node, Running the CLI from a source checkout, See also, Start on Bun, Start on Deno, The matrix, What the verification covers, Why `dev` is Node only (+17 more)
 
 ### Community 431 - "core/src/index.ts"
 Cohesion: 0.01
-Nodes (424): Mark a key as deferred, requestContext, router, HttpContext, setEnvironment(), Gotchas, The shape, DevErrorPanel() (+416 more)
+Nodes (448): Errors reach the nearest boundary — status 200 already sent, No boundary above `use()`? The page still doesn't go blank, requestContext, HttpContext, setEnvironment(), DefaultApp(), DevErrorPanel(), devErrorPanelElement() (+440 more)
 
 ### Community 432 - "astro.config.mjs"
 Cohesion: 0.08
 Nodes (18): aiBestPracticesGroup, aiRecipesGroup, aiSections, cacheTopic, cascadeSections, contextSections, coreSections, docsRedirects (+10 more)
 
-### Community 433 - "ref_warlock_js_web"
-Cohesion: 0.10
-Nodes (6): config, loader(), webConfigurations, config, config, config
+### Community 433 - "setup-test-lifecycle.test.ts"
+Cohesion: 0.08
+Nodes (20): bootstrapMock, configGetMock, Deferred, filesOrchestratorInitMock, flushAbandonedAttempt(), importFreshLifecycle(), LifecycleModule, loadConfigFilesMock (+12 more)
 
 ### Community 434 - "cache.md"
-Cohesion: 0.06
-Nodes (32): `jwt.expiresIn`, `jwt.refresh.expiresIn`, Cache-aside read, Common patterns, Configuration, Counters, Driver picks at a glance, Events and metrics (+24 more)
+Cohesion: 0.07
+Nodes (26): Cache-aside read, Common patterns, Configuration, Counters, Driver picks at a glance, Events and metrics, `forever`, Gotchas (+18 more)
 
 ### Community 435 - "devtools-connector.ts"
-Cohesion: 0.04
-Nodes (59): Agents tab, Enable collection, JSON API, Requests, background work and retention, What appears, Agent traces, AI runs alongside HTTP requests, createCollector() (+51 more)
+Cohesion: 0.08
+Nodes (16): DEVTOOLS_CONNECTOR_PRIORITY, devtoolsConnector(), DevtoolsConnectorOptions, explainQuery(), findPostmanBuilder(), findRequestLogSource(), getOpenApiDocument(), listRoutes() (+8 more)
 
 ### Community 436 - "Queue"
 Cohesion: 0.07
-Nodes (25): Read by intent, Try it in fifteen lines, `closeQueue(options?)`, Configuration & lifecycle, `getQueue(name)` / `runningWorkers()`, `getQueueDriver()` / `QueueDriver`, `QueueConfig`, `queueConnector(options?)` (+17 more)
+Nodes (22): Durable local jobs, In-memory execution in tests, Leases, crashes, and shutdown, The same job API, Read by intent, Try it in fifteen lines, `getQueue(name)` / `runningWorkers()`, Queue (+14 more)
 
 ### Community 437 - ".preventOverlap"
-Cohesion: 0.06
-Nodes (33): Graceful Shutdown, `scheduler:stopped`, Basic Usage, Checking Run State Programmatically, Checking Skip Events, Disabling Overlap Prevention, Graceful Shutdown and Overlap, Requirements (+25 more)
+Cohesion: 0.08
+Nodes (26): Basic Usage, Checking Run State Programmatically, Checking Skip Events, Disabling Overlap Prevention, Requirements, Running on One Server, Signature, When Overlap Actually Occurs (+18 more)
 
 ### Community 438 - "chunk.ts"
 Cohesion: 0.16
 Nodes (19): chunk(), DEFAULT_CHUNK_OVERLAP, DEFAULT_CHUNK_SIZE, fixedChunk(), markdownChunk(), SectionSpan, splitSections(), AnchoredPiece (+11 more)
 
 ### Community 439 - "budget"
-Cohesion: 0.02
-Nodes (143): Effort → budget buckets, How each adapter maps the option, Reasoning off — and why it unblocks tools, Related, The neutral option, When the model isn't reasoning-capable, `agent.execute(input, options)`, `agent.stream(input, options)` (+135 more)
+Cohesion: 0.01
+Nodes (197): Effort → budget buckets, How each adapter maps the option, Reasoning off — and why it unblocks tools, Related, The neutral option, When the model isn't reasoning-capable, `agent.execute(input, options)`, `agent.stream(input, options)` (+189 more)
 
 ### Community 440 - "Warlock — add web to an app"
-Cohesion: 0.09
-Nodes (22): Collision outcomes, Connector registration, Fewer client files for a desktop or offline app, Gotchas, Keep Vitest setup out of development, Re-running the command, See also, The shape (+14 more)
+Cohesion: 0.07
+Nodes (25): `.client` modules are a client-only boundary, `Intl` output can differ between Node and the browser, Path aliases from tsconfig, Read environment data in a loader, Static assets, The build-time public escape hatch, What browser code may import from an app module, What the build refuses (+17 more)
 
-### Community 441 - "password.ts"
-Cohesion: 0.04
-Nodes (52): Derived values — `v.computed` and `v.managed`, `v.computed` and `v.managed` — derived values, Types, ModelTransformCallback, transformCallbackOptions, useModelTransformer(), See also, Conditional compute (+44 more)
+### Community 441 - "database/utils.ts"
+Cohesion: 0.10
+Nodes (32): useModelTransformer(), Common patterns, Configuration — `src/config/encryption.ts`, Gotchas, `hashPassword` / `verifyPassword`, Installation, Login flow, Rotate a user's password (+24 more)
 
 ### Community 442 - "zero-edit-generator-gate.spec.ts"
 Cohesion: 0.10
 Nodes (12): arg(), BROWSER_ORACLE, FEATURE_ADAPTER, harness(), makeApp(), json(), NPM_CLI, OUTPUT_ORACLE (+4 more)
 
-### Community 443 - "ArrayValidator"
-Cohesion: 0.10
-Nodes (8): Mutators (pre-validation reshape), flipArrayMutator(), removeEmptyArrayElementsMutator(), reverseArrayMutator(), sortArrayMutator(), uniqueArrayMutator(), ArrayValidator, wrapSingleUpload()
+### Community 443 - "array-mutators.ts"
+Cohesion: 0.31
+Nodes (5): flipArrayMutator(), removeEmptyArrayElementsMutator(), reverseArrayMutator(), sortArrayMutator(), uniqueArrayMutator()
 
-### Community 444 - "Warlock — create a controller"
-Cohesion: 0.06
-Nodes (36): Returning output, Gotchas, Success helpers, Passkeys, Returning output, Success helpers, 10. Review checklist, 2. HTTP status codes (+28 more)
+### Community 444 - "testing.md"
+Cohesion: 0.07
+Nodes (25): Keep Vitest setup out of development, Step 1 — Install test support, Step 2 — Verify the bootstrap, Step 3 — Write the first test, Step 4 — Add a create-and-read flow, Step 5 — Test the validation path, Step 6 — Hoist an auth helper, Step 7 — Clean up between tests (+17 more)
 
 ### Community 445 - "joins.md"
-Cohesion: 0.08
-Nodes (23): `.crossJoin()` — Cartesian product, Decision table — which join to reach for, Driver caveats — single reference, `.fullJoin()` — full outer, Going further, `.innerJoin()` — explicit INNER, `.join()` — default, `.joinRaw()` — escape hatch (+15 more)
+Cohesion: 0.04
+Nodes (44): A complete report, `$agg.sumRaw` — the raw escape hatch, `countDistinct` and `distinct`, Date-bucketed grouping — `groupByDate`, Driver-specific aggregates — the raw escape hatch, Empty results return `0`, not `null`, Expression-aware sums — `$agg.sum(expr)` and `$agg.sumRaw`, Filtering grouped results — `having` (+36 more)
 
 ### Community 446 - "notifications/src/types.ts"
-Cohesion: 0.16
-Nodes (12): Types, The renderer's 3rd arg — `RenderContext`, MailChannelConfig, Channel, DefinedNotification, ChannelName, MailPayload, Notifiable (+4 more)
+Cohesion: 0.13
+Nodes (13): Types, The renderer's 3rd arg — `RenderContext`, MailChannelConfig, Channel, QueueDispatcher, DefinedNotification, ChannelName, MailPayload (+5 more)
 
 ### Community 447 - "03-relationships.md"
 Cohesion: 0.11
 Nodes (18): `@BelongsTo` — "this model points at another", `@BelongsToMany` — many-to-many through a pivot, Constraints on the related query, `.doesntHave()` / `.whereDoesntHave()`, Going further, `.has()` — "rows with at least one related record", `@HasMany` — "this model owns many of another", `@HasOne` — "this model owns exactly one of another" (+10 more)
 
-### Community 448 - "matcher-logic.ts"
-Cohesion: 0.17
-Nodes (19): Batch + eval, Vitest matchers + `ai.mockRouter` — test report trees, EvalScorer, asSupervisorReport(), asWorkflowReport(), DataResult, dispatchedIntents(), matchConverge() (+11 more)
+### Community 448 - "updater/package-manager.ts"
+Cohesion: 0.11
+Nodes (20): chooseLockfile(), detectPackageManager(), detectPackageManagerDetails(), findInstallMarkers(), findLockfiles(), FoundLockfile, INSTALL_MARKERS, lockfileCovers() (+12 more)
 
-### Community 449 - "JobResult"
-Cohesion: 0.15
-Nodes (11): Tick Interval — `runEvery()`, All seven events, Inspection at runtime, `JobResult` shape, Lifecycle methods, Observability and lifecycle, Production observer pattern, See also (+3 more)
+### Community 449 - "seeders-manager.test.ts"
+Cohesion: 0.17
+Nodes (14): resetSeedLedger(), seedRecordsTableName, seedsTableName, createInMemoryDriver(), InMemoryDriver, Row, model(), run() (+6 more)
 
 ### Community 450 - "release-command.action.ts"
 Cohesion: 0.06
 Nodes (90): ACTIONS, allowOptions(), asObject(), flag(), openCascadeMigrations(), ReleaseAction, ReleaseActionDependencies, ReleaseActionOutput (+82 more)
 
-### Community 452 - "mailer-pool.ts"
-Cohesion: 0.15
-Nodes (13): closeMailer(), createConfigHash(), getMailer(), getMailerHash(), getPoolStats(), getSesMailer(), isSesConfig(), loadNodemailerModule() (+5 more)
+### Community 451 - "repository.manager.ts"
+Cohesion: 0.04
+Nodes (13): RequestContext, RequestContextStore, useRequest(), requestMemoStores, UPDATE_MANY_BATCH_SIZE, Products, captureTestRouterSnapshot(), flushRealMemoryCache() (+5 more)
+
+### Community 452 - "GuardrailVerdict"
+Cohesion: 0.14
+Nodes (14): The verdict model, OpenAiModerationOptions, OpenAiClientLike, OpenAiModerationCreateBody, OpenAiModerationResponse, OpenAiModerationResult, GuardrailVerdict, loadOpenAi() (+6 more)
 
 ### Community 454 - "devtools/scripts/generate-llms.mjs"
 Cohesion: 0.14
 Nodes (10): fullLines, indexLines, llmsFullPath, llmsTxtPath, pkgJson, pkgRoot, scriptDir, shortName (+2 more)
 
 ### Community 455 - "@mongez/pkgist"
-Cohesion: 0.17
-Nodes (12): Build pipeline (per package), Common flags, Configuration, Developing the bundler itself, Family-level options, Features, Git workflow, Installation (+4 more)
+Cohesion: 0.04
+Nodes (47): `actWhenAsked`, `backstops`, Eval checks, `onToolRefusal`, Related, Seeing what happened, `build` — production bundler, `esmShim` — why a bundled build used to crash at runtime (+39 more)
 
 ### Community 456 - "namespaces.mdx"
 Cohesion: 0.08
@@ -2745,31 +2728,31 @@ Nodes (24): Avoid Colons or Other Separators, Basic Usage, Best Practices, Blog 
 
 ### Community 457 - "ValidationResult"
 Cohesion: 0.02
-Nodes (85): What an invalid save looks like, Attaching to a controller, Custom failure responses, Finding fields without a label, Locale-aware error messages, The error shape, What gets validated, At the framework boundary (+77 more)
+Nodes (77): What an invalid save looks like, Attaching to a controller, Custom failure responses, Finding fields without a label, Locale-aware error messages, The error shape, What gets validated, At the framework boundary (+69 more)
 
-### Community 458 - "what-panoptic-traces.md"
-Cohesion: 0.15
-Nodes (12): (a) An agent with tools, An annotated span tree, Attribute catalog, (b) A workflow, (c) A supervisor, (d) An orchestrator turn — collected via `collect()`, Development request correlation and diagnostics, `gen_ai.*` — OpenTelemetry GenAI semantic conventions (+4 more)
+### Community 458 - "TraceSpan"
+Cohesion: 0.07
+Nodes (25): (a) An agent with tools, An annotated span tree, Attribute catalog, (b) A workflow, (c) A supervisor, (d) An orchestrator turn — collected via `collect()`, Development request correlation and diagnostics, `gen_ai.*` — OpenTelemetry GenAI semantic conventions (+17 more)
 
 ### Community 459 - "drop-tables-action.ts"
 Cohesion: 0.14
 Nodes (12): dropAllTables(), dropTablesCommand, confirm(), select(), dropTablesAction(), Database, Dependencies, External (+4 more)
 
 ### Community 460 - "guard-unit-project.ts"
-Cohesion: 0.18
-Nodes (13): APP_EXPORTS, APP_TEST_EXPORTS, callArguments(), describeUnitGuardViolations(), findUnitGuardViolations(), guardUnitProject(), GuardUnitProjectOptions, importedNames() (+5 more)
+Cohesion: 0.09
+Nodes (23): 5.37 to 5.38 test runtime defaults, resetTestDatabase(), ResetTestDatabaseOptions, driver, get, testWorkerId(), workerDatabaseName(), APP_EXPORTS (+15 more)
 
 ### Community 461 - "ai-mistral/src/sdk.ts"
 Cohesion: 0.05
-Nodes (48): Capabilities, Construct, Install, List models, Model lifecycle, OpenAI-compatible wire behavior, Pricing and usage, Provider body options and token estimates (+40 more)
+Nodes (37): Capabilities, Construct, Install, List models, Model lifecycle, OpenAI-compatible wire behavior, Pricing and usage, Provider body options and token estimates (+29 more)
 
-### Community 462 - "to-bedrock-messages.ts"
-Cohesion: 0.12
-Nodes (18): mapStopReason(), stopReasonMap, BedrockReasoningBlock, fromReasoningMetadata(), isBase64(), isRecord(), toReasoningMetadata(), BedrockMessages (+10 more)
+### Community 462 - "pg-vector-store.ts"
+Cohesion: 0.13
+Nodes (11): buildPgClient(), distanceToScore(), parseValue(), PG_INSTALL_INSTRUCTIONS, PgClientLike, PgModuleLike, PgVectorStore, cosineDistance() (+3 more)
 
-### Community 463 - "auth-default-translations.spec.ts"
-Cohesion: 0.14
-Nodes (9): authArabicTranslations, authDefaultTranslations, inventory, originalLocale, SOURCE_ROOT, AuthErrorTranslations, AuthTranslations, authEnglishTranslations (+1 more)
+### Community 463 - "auth/src/index.ts"
+Cohesion: 0.06
+Nodes (26): Commands, `registerAuthCleanupCommand`, `registerJWTSecretGeneratorCommand`, What you get from `@warlock.js/auth`, registerAuthCleanupCommand(), cleanupExpiredTokens, registerJWTSecretGeneratorCommand(), RequestLocals (+18 more)
 
 ### Community 464 - "Sync System"
 Cohesion: 0.09
@@ -2779,13 +2762,17 @@ Nodes (22): API, Best Practices, Configuration Options, Custom Embed Methods, `.
 Cohesion: 0.09
 Nodes (22): API Reference, Combining with ContextManager, `Context<TStore>` (Abstract Class), `ContextManager`, Creating a Custom Context, Features, Global Context Manager, Installation (+14 more)
 
-### Community 467 - "e2e/types.ts"
+### Community 466 - "audit-trail.md"
+Cohesion: 0.08
+Nodes (21): Don't put side effects in audit listeners, Going further, Querying the trail, Skipping audits for bulk operations, The audit log model, The `auditModel` helper, Wiring it up, Going further (+13 more)
+
+### Community 467 - "links.ts"
 Cohesion: 0.15
-Nodes (21): ClickBox, ViewportReport, WaitOptions, AccessibilityEvidence, AccessibilityOptions, AccessibilityViolation, AppFixtureOptions, BrowserOptions (+13 more)
+Nodes (21): compileHosts(), Destination, Edit, isAllowedUrl(), isWhitespace(), LinkHit, LinkKind, links() (+13 more)
 
 ### Community 468 - "renderReact"
-Cohesion: 0.11
-Nodes (18): createHtmlPage(), renderReactMail(), Dependencies, External, Internal (within `core/src`), ErrorWithCause, ErrorWithCauseConstructor, isModuleMissing() (+10 more)
+Cohesion: 0.09
+Nodes (22): createHtmlPage(), renderReactMail(), Dependencies, External, Internal (within `core/src`), Key Files, Mail, Used By (+14 more)
 
 ### Community 469 - "📯 Warlock Herald"
 Cohesion: 0.09
@@ -2795,24 +2782,24 @@ Nodes (22): 📚 API Reference, 🏗️ Architecture, Brokers, Channel Methods, 
 Cohesion: 0.10
 Nodes (21): args, baselinePath, cleanUp(), entities, entityModule(), flag(), GATED_METRICS, option() (+13 more)
 
-### Community 471 - "warlock-family.ts"
-Cohesion: 0.08
-Nodes (37): ALLOWLIST, AllowlistEntry, BUILDER_ROOT, collectConfiguredPackages(), compareOnePackage(), ConfiguredPackage, DerivedEntry, __dirname (+29 more)
+### Community 471 - "pkgist-exports-parity.ts"
+Cohesion: 0.16
+Nodes (17): ALLOWLIST, AllowlistEntry, BUILDER_ROOT, collectConfiguredPackages(), compareOnePackage(), ConfiguredPackage, DerivedEntry, __dirname (+9 more)
 
 ### Community 472 - "check-mdx-in-md.mjs"
 Cohesion: 0.26
 Nodes (11): checkFile(), collectMarkdownFiles(), CONTENT_DOCS, DOCS_ROOT, here, IMPORT_PATTERNS, lineNumberAt(), main() (+3 more)
 
 ### Community 473 - "Use transactions"
-Cohesion: 0.12
-Nodes (16): Explicit rollback, Isolation level (Postgres), Manual `beginTransaction()`, MongoDB requires a replica set, Nesting, Outside the transaction, Return values, Rollback on throw (+8 more)
+Cohesion: 0.09
+Nodes (18): Explicit rollback, Isolation level (Postgres), Manual `beginTransaction()`, MongoDB requires a replica set, Native-array columns (`JSONB[]` / `TEXT[]` / `INTEGER[]`), Nesting, Outside the transaction, Raw SQL — `Model.raw` / `DataSource.raw` (transaction-aware) (+10 more)
 
 ### Community 474 - "prepare-attachment-part.ts"
-Cohesion: 0.10
-Nodes (31): AgentInputBuildResult, assertModality(), buildAgentInputMessages(), buildUserMessageContent(), resolveStructuredOutput(), AttachmentPolicy, Attachment, AttachmentSource (+23 more)
+Cohesion: 0.17
+Nodes (19): Who consumes this, AttachmentKind, AUDIO_EXTENSIONS_TO_MEDIA_TYPE, enforceLocalPathPolicy(), extractPath(), IMAGE_EXTENSIONS_TO_MEDIA_TYPE, inferAudioMediaType(), inferImageMediaType() (+11 more)
 
 ### Community 475 - "LRUMemoryCacheDriver"
-Cohesion: 0.12
+Cohesion: 0.10
 Nodes (3): cloneValue(), CacheNode, LRUMemoryCacheDriver
 
 ### Community 476 - "notification-columns.ts"
@@ -2823,13 +2810,13 @@ Nodes (13): Configure (once, in `config/notifications.ts`), Custom repository (a
 Cohesion: 0.12
 Nodes (19): AI_ROOT, aiFilesNow, CONTENT_ROOT, __dirname, DOCS_ROOT, edits, failures, mapOldAiPath() (+11 more)
 
-### Community 478 - "idempotency.middleware.ts"
-Cohesion: 0.12
-Nodes (18): CachedResponse, DEFAULT_METHODS, idempotencyMiddleware(), InFlightReservation, createRequest(), createResponse(), run(), buildIdempotencyCacheKey() (+10 more)
+### Community 478 - "queue-manager.ts"
+Cohesion: 0.16
+Nodes (14): defaultQueueName(), getQueueConfig(), BullMQDriver, closeWorker(), toSnapshot(), failedJobs(), FailedJobsOptions, retryFailedJob() (+6 more)
 
 ### Community 479 - "scheduler/getting-started/introduction.mdx"
-Cohesion: 0.10
-Nodes (17): Cron Expressions, Fluent API, Installation, Quick Start, The Scheduler Singleton, Two Scheduling Styles, What's Next, Full Event Types (+9 more)
+Cohesion: 0.07
+Nodes (25): Cron Expressions, Fluent API, Graceful Shutdown, Installation, Quick Start, The Scheduler Singleton, Two Scheduling Styles, What's Next (+17 more)
 
 ### Community 480 - "Warlock — use a repository"
 Cohesion: 0.10
@@ -2847,17 +2834,17 @@ Nodes (14): Core Implemented Methods, Data Storage Format, Example: Custom Drive
 Cohesion: 0.20
 Nodes (17): AGENT_KIT_FETCH_TIMEOUT_MS, BUILTIN_AGENT_KIT_TARGETS, cacheFilePath(), dedupe(), DEFAULT_AGENT_KIT_TARGET, fetchRemoteAgentKitTargets(), getValidAgentKitTargets(), readCache() (+9 more)
 
-### Community 484 - "promote-dist.rollback.test.ts"
-Cohesion: 0.50
-Nodes (3): directoryExistsAsync, removeDirectoryAsync, renameFileAsync
+### Community 484 - "check-permissions.md"
+Cohesion: 0.09
+Nodes (19): Permissions (RBAC) — the grant, Policies (ABAC) — the condition, The combined decision, The litmus test, When it's just RBAC, 1. Gate a route (class-level), 2. Assert on a specific record (instance-level), 3. Branch in code (+11 more)
 
 ### Community 485 - "sync.md"
 Cohesion: 0.12
 Nodes (16): Defining the embed methods, Deletion semantics — `.unsetOnDelete()` / `.removeOnDelete()`, Depth limiting — `.maxDepth(n)`, Filtering — `.watchFields([...])`, Going further, HMR-safe registration, Lightweight author snapshot, `Model.sync(Target, field)` — single embedded document (+8 more)
 
-### Community 486 - "resources.md"
-Cohesion: 0.06
-Nodes (30): Adding a relation count, Cursor pagination — when offset breaks down, Going further, The service, Choosing between the patterns, Computed and formatted fields, Going further, Loaded relations (+22 more)
+### Community 486 - "cascade/the-basics/validation.md"
+Cohesion: 0.12
+Nodes (16): Catching validation in HTTP controllers, Custom query refinement, Database-aware rules — `unique` and `exists`, Excluding the current record on update, Going further, Hooking validation with events, `onValidated` — post-validation hook, `onValidating` — transform input before validation (+8 more)
 
 ### Community 487 - "migrations.test.ts"
 Cohesion: 0.09
@@ -2873,39 +2860,39 @@ Nodes (8): CascadeAdapter, Dependencies, External, Internal (within `core/src`),
 
 ### Community 490 - "agent"
 Cohesion: 0.01
-Nodes (214): `ai.batch(executable, items, opts?)`, `ai.fallbackModel(models, opts?)`, `ai.router()`, `ai.fanOut()`, `ai.mockRouter()`, `ai.systemPrompt.fromFile(path)`, DX helpers around agents, Evaluation — `agent.eval(...)`, Executables auto-adapt in `tools: [...]`, The three primitives compared (+206 more)
+Nodes (253): Intents — five accepted shapes, Iteration model, Per-intent `next` — skip the router, Related, State accumulates across iterations, Streaming, The `ack` preamble, The three primitives compared (+245 more)
 
 ### Community 491 - "bulk-operations.mdx"
 Cohesion: 0.10
 Nodes (19): Basic Usage, Basic Usage, Batch Load Products, Best Practices, Best Practices, Cache Warming on Startup, Comparison, E-Commerce Examples (+11 more)
 
-### Community 492 - "guarded.request.ts"
-Cohesion: 0.12
-Nodes (12): Gotchas, What gets generated, adminMiddleware(), GuardedRequest, createNewUserController(), listUsersController(), User, userSchema (+4 more)
+### Community 492 - "seeders.manager.ts"
+Cohesion: 0.13
+Nodes (12): The shape, The `Seeder` type, The shape, Undo — `seed_records` + `--drop`, SeedRecordsTableMigration, seeder(), SeedersManagerOptions, SeedContext (+4 more)
 
-### Community 493 - "check-for-updates.test.ts"
-Cohesion: 0.12
-Nodes (14): clearCachedLatestVersion, devServer, fetchLatestVersion, getConfig, getWarlockVersion, output, readCachedLatestVersion, register (+6 more)
+### Community 493 - "prompts-validate.ts"
+Cohesion: 0.15
+Nodes (17): Production notes, Related, Setup, The building blocks (scripting it instead of clicking), Using it, buildJudgeAgent(), collectPlaceholders(), findMissingPlaceholders() (+9 more)
 
 ### Community 494 - "S3Driver"
-Cohesion: 0.05
-Nodes (31): Cleanup of orphans, Common patterns, Direct browser upload via presigned URL, Persisting a StorageFile to a model, Switching disk per environment, Uploading a request file, Storing the upload in the database, Conventions and pitfalls (+23 more)
+Cohesion: 0.10
+Nodes (13): makeDriver(), options, makeDriver(), options, base, makeDriver(), S3Driver, baseOptions (+5 more)
 
 ### Community 495 - "safe-fetch.ts"
-Cohesion: 0.07
-Nodes (33): expandIpv6(), extractEmbeddedIpv4(), Ipv4Octets, isPrivateIpv4(), isPrivateIpv6(), isPrivateOrReservedIp(), parseIpv4(), forms() (+25 more)
+Cohesion: 0.08
+Nodes (30): expandIpv6(), extractEmbeddedIpv4(), Ipv4Octets, isPrivateIpv4(), isPrivateIpv6(), isPrivateOrReservedIp(), parseIpv4(), forms() (+22 more)
 
-### Community 496 - "Run auth commands"
-Cohesion: 0.11
-Nodes (16): Custom commands, How often?, Register, Run auth commands, See also, Things NOT to do, Via system cron, Via the scheduler (+8 more)
-
-### Community 497 - "querying-traces.md"
+### Community 496 - "responses-model.spec.ts"
 Cohesion: 0.12
-Nodes (15): A custom `ExporterContract`, A tiny in-process spend monitor, Bounding retention with `capacity`, Building blocks for custom pipelines, `createCollector()` — the source end by hand, Filtering with `TraceQuery`, Hosted-tool usage in aggregates, Persisting traces across restarts (+7 more)
+Nodes (13): completedEvent(), event(), incompleteEvent(), itemDone(), makeResponse(), noise(), objectInput, Params (+5 more)
 
-### Community 498 - "resolve-sitemap-config.ts"
+### Community 497 - "MemoryStore"
+Cohesion: 0.16
+Nodes (4): LocalJob, MemoryStore, decode(), SqliteStore
+
+### Community 498 - "sitemap-local-runtime.ts"
 Cohesion: 0.06
-Nodes (43): `app.publicUrl` — the app's public origin (5.15.0), Per-env knobs, getPublicUrl(), SitemapGenerationManifest, SitemapSetResult, artifactsFor(), assertGenerationId(), buildSitemapGeneration() (+35 more)
+Nodes (35): SitemapGenerationManifest, SitemapSetResult, artifactsFor(), assertGenerationId(), buildSitemapGeneration(), BuildSitemapGenerationOptions, BuiltSitemapGeneration, SitemapGenerationArtifact (+27 more)
 
 ### Community 499 - "SitemapRefreshScheduler"
 Cohesion: 0.16
@@ -2923,33 +2910,33 @@ Nodes (10): Driver support, Filtered similarity, Hybrid search — vector + full
 Cohesion: 0.11
 Nodes (18): Best Practices for Performance, Cart Cache with User Tags, Combine Multiple Tag Levels, Complex Tagging Patterns, E-Commerce Examples, How Tags Work Internally, Limitations, Multi-dimensional User + Product Tags (+10 more)
 
-### Community 503 - "Warlock — send a mail"
-Cohesion: 0.12
-Nodes (14): mailer (priority 1), Cancel via beforeSending (e.g. user has opted out), Common patterns, Connection pooling, Global event hooks, Observe captured development and test mail, Per-tenant SMTP, Preview development mail in devtools (+6 more)
+### Community 503 - "otel-exporter.ts"
+Cohesion: 0.16
+Nodes (15): OtelApiModule, OtelContext, OtelException, OtelSpan, OtelSpanStatus, OtelSpanStatusCode, OtelTimeInput, OtelTracer (+7 more)
 
 ### Community 504 - "01-development-and-production.mdx"
 Cohesion: 0.10
 Nodes (20): Assets and the rate limiter, Browser regression checks, Client asset budgets, Client bundle files, Client file names and the integrity check, Component edits and Fast Refresh, Dev: app modules can load twice, Dev dependency cache (+12 more)
 
 ### Community 505 - "create-warlock — scaffold a new project"
-Cohesion: 0.05
-Nodes (38): Model and effort, Permission behaviour, Stream notes per vendor, Summary, AI choice in Customize, App-owned form controls, Client asset limits, Exit codes (+30 more)
+Cohesion: 0.10
+Nodes (20): Model and effort, Permission behaviour, Stream notes per vendor, Summary, claude(), After scaffolding: the decisions summary, `--agents` and agent-kit targets, create-warlock — scaffold a new project (+12 more)
 
 ### Community 506 - "match.ts"
 Cohesion: 0.19
 Nodes (16): AppliedReplacement, applyReplacement(), clipLine(), describeMiss(), detectEol(), EditLocation, EditRange, findAll() (+8 more)
 
-### Community 507 - "03-your-first-context.md"
-Cohesion: 0.13
-Nodes (13): Install, Prerequisites, Related, Verify, Common follow-ups, Related, Step 1 — Declare the store shape, Step 2 — Extend `Context<TStore>` (+5 more)
+### Community 507 - "warlock-family.ts"
+Cohesion: 0.15
+Nodes (20): BuildProvenance, withDefaults(), canonicalPath(), comparePublishOrder(), compareText(), ConfiguredFamilyMember, deriveWarlockFamily(), DeriveWarlockFamilyOptions (+12 more)
 
-### Community 508 - "module-loader.ts"
-Cohesion: 0.11
-Nodes (17): loadSchemaModuleWithAppLoader(), formatModuleNotFoundError(), collectFromCall(), collectLeaves(), extractTranslationKeys(), getPropertyName(), isGroupedTranslationsCall(), isLeaf() (+9 more)
+### Community 508 - "app-module-importer.ts"
+Cohesion: 0.33
+Nodes (5): importAppModule(), IMPORTER_KEY, ImporterHolder, setAppModuleImporter(), IdentityFixture
 
 ### Community 509 - "agent-trace-ui.spec.ts"
 Cohesion: 0.09
-Nodes (13): registerOpenApiRoutes(), registerUiAssets(), sendFile(), UI_ASSETS, UiAsset, uiFile(), isPackageRoot(), resolveUiRoot() (+5 more)
+Nodes (10): UI_ASSETS, UiAsset, uiFile(), isPackageRoot(), resolveUiRoot(), Element, ui(), Element (+2 more)
 
 ### Community 510 - "create-new-app.spec.ts"
 Cohesion: 0.11
@@ -2959,108 +2946,112 @@ Nodes (15): CANCEL, confirm, createWarlockApp, detectPackageManagers, getAppPath
 Cohesion: 0.19
 Nodes (16): extractBlocks(), extractGlobArrays(), findConfigFiles(), findLeafTestBlocks(), findOrphans(), gitTrackedSpecFiles(), listPackageDirs(), main() (+8 more)
 
-### Community 512 - "Sidebar.astro"
-Cohesion: 0.12
-Nodes (8): isV4, year, byLabel, currentTopic, currentVersionTopics, groupEntries, groups, collections
+### Community 512 - "Header.astro"
+Cohesion: 0.06
+Nodes (18): isV4, year, docRoutes, latestHref, navLinks, normalizePath(), onAiDocs, v4Href (+10 more)
 
-### Community 513 - "CacheConfigurationError"
-Cohesion: 0.02
-Nodes (103): Back-compat, Conditional writes — `onConflict`, Distributed locking recipe, Inline tags, Options reference, Per-call driver override, Related Documentation, The three shapes (+95 more)
+### Community 513 - "`cached()` — function-memoization helper"
+Cohesion: 0.10
+Nodes (19): Args, Auto-key derivation (shorthand form), `cached()` — function-memoization helper, `CachedFn<Args, R>`, `CachedOptions`, Caveats (documented, not bugs), Docs, Driver (+11 more)
 
 ### Community 514 - "stampede-prevention.mdx"
 Cohesion: 0.11
 Nodes (15): Best Practices, Best Practices, Distributed Locking (Cross-Process), Error Handling, How It Works, Lock Mechanism, Other Usage Examples, Performance Benefits (+7 more)
 
 ### Community 515 - "LogContract"
-Cohesion: 0.09
-Nodes (16): Initialization timing, See also, `BasicLogConfigurations`, `DebugMode`, `LogContract`, `LoggingData`, `LogLevel`, `LogMessage` (+8 more)
+Cohesion: 0.07
+Nodes (27): Complete example — SlackLog, `LogContract` vs `LogChannel`, The `init()` hook, Initialization timing, See also, `BasicLogConfigurations`, `DebugMode`, `LogContract` (+19 more)
 
-### Community 516 - "dev-logger.ts"
-Cohesion: 0.13
-Nodes (14): buildDevelopmentOpenApiDocument(), hoisted, warned, devLog(), devLogConfig(), devLogHMR(), devLogReady(), devLogSection() (+6 more)
-
-### Community 517 - "files-watcher.ts"
-Cohesion: 0.09
-Nodes (16): createIgnoredMatcher(), DEFAULT_EXCLUDE, ENV_FILES, expandIncludes(), FileAddCallback, FileAddDirCallback, FileChangeCallback, FileDeleteCallback (+8 more)
-
-### Community 518 - "define-a-context.md"
+### Community 516 - "pii.ts"
 Cohesion: 0.14
-Nodes (13): Branching — let the payload type drive the shape, `buildStore` patterns, Choose `type` for the store shape, Convenience getters, Eager — pull straight from the payload, Lazy — start empty, fill in via middleware, Multiple context instances of the same class, Reading: `get`, `getStore`, `hasContext` (+5 more)
+Nodes (15): RFC-5322, ALL_CATEGORIES, applyMask(), CATEGORY_PATTERNS, escapeRegExp(), isLocalPartChar(), isWordBoundary(), isWordChar() (+7 more)
+
+### Community 517 - "SeederDependencyCycleError"
+Cohesion: 0.13
+Nodes (16): WL6001, WL6002, WL6xxx — database, `batchSize` — bulk-insert hint, Gotchas, `now` — the injectable clock, Ordering and dependencies, See also (+8 more)
+
+### Community 518 - "Warlock — serve styles"
+Cohesion: 0.10
+Nodes (18): Add styling now or later, Install the Web layer, Next step, Requirements, The generated starting tree, tailwind(), Valid keys, Development delivery (+10 more)
 
 ### Community 519 - "ui.html.md-links.spec.ts"
 Cohesion: 0.16
 Nodes (14): dashboardHtml(), encodeForInlineScript(), escapeHtml(), DEL, effectiveHrefSchemes(), EXECUTABLE_SCHEMES, expectNeutralized(), extractMdRuntime() (+6 more)
 
-### Community 520 - "JobResult"
-Cohesion: 0.09
-Nodes (19): Event Reference, `job:complete`, `job:error`, `job:skip`, `job:start`, `scheduler:started`, `scheduler:tick`, Giving up after repeated failures (+11 more)
+### Community 520 - "retry-flaky-api.mdx"
+Cohesion: 0.33
+Nodes (5): Giving up after repeated failures, It will not get stuck retrying forever, Knowing whether it limped or sailed, The job, What the timeline looks like
 
-### Community 521 - "tests/supervisor.test.ts"
-Cohesion: 0.19
-Nodes (18): guardianAddress(), guardianProof(), guardianScript, parseGuardianProof(), execute, executeCommand(), exiting(), Identity (+10 more)
+### Community 521 - "platform.ts"
+Cohesion: 0.10
+Nodes (35): guardianAddress(), guardianProof(), guardianScript, launchCommand(), parseGuardianProof(), execute, exiting(), Identity (+27 more)
 
-### Community 522 - "conditional-request.ts"
-Cohesion: 0.16
-Nodes (20): ConditionalRequestInput, ConditionalRequestOutcome, EntityTag, evaluateConditionalRequest(), isPresent(), matchesIfMatch(), matchesIfNoneMatch(), parseEntityTag() (+12 more)
+### Community 522 - "Run coding CLIs as agents"
+Cohesion: 0.11
+Nodes (16): Documentation, Install, License, Quick start, @warlock.js/ai-cli, What you get, Conventions and pitfalls, The 80% path (+8 more)
 
 ### Community 523 - "atomic-operations.md"
 Cohesion: 0.09
 Nodes (20): Bulk score adjustment, Going further, Inventory decrement with guard, Patterns, Race-safe counter, Rate limiter, The atomic form (query builder), The lost-update problem (instance form) (+12 more)
 
 ### Community 525 - "implement-resolver.md"
-Cohesion: 0.12
-Nodes (14): Roles from a token claim (no database), The contract, The two starting points, Two independent axes, A single role column, permissions in code, Direct permissions per user (role is a label), Hybrid — role permissions plus direct grants, Rules (+6 more)
+Cohesion: 0.06
+Nodes (25): Roles from a token claim (no database), The contract, The two starting points, Two independent axes, How the docs are organized, The mental model in one paragraph, The two-stage model, What it does NOT do (+17 more)
 
 ### Community 526 - "ProcessStartupError"
-Cohesion: 0.10
-Nodes (17): API, Configuration validation and guardian credentials, Launch a worker, Limits and platform support, Platform defaults and Windows notes, Terminals, Verified facilities, ps() (+9 more)
+Cohesion: 0.09
+Nodes (18): API, Configuration validation and guardian credentials, Install and application lifecycle, Launch a worker, Limits and platform support, Platform defaults and Windows notes, Terminals, Verified facilities (+10 more)
 
 ### Community 527 - "recipient-type.test.ts"
-Cohesion: 0.12
+Cohesion: 0.10
 Nodes (7): FakeModel, FakeRepo, customer, makeRepo(), staff, stubModel(), typed
 
 ### Community 528 - "essentials/events.mdx"
 Cohesion: 0.12
 Nodes (16): Advanced Event Handling, Async Event Handlers, Available Events, Best Practices, Comprehensive Monitoring Class, Development Debugging, E-Commerce Monitoring Examples, Error Tracking (+8 more)
 
-### Community 529 - "request-stylesheets.ts"
-Cohesion: 0.12
-Nodes (17): 1. Resolve the theme, publish it through `shared`, 2. Render from the map, 3. CSS: `linkStylesheetsFor(request, sourceFile)`, 4. Page cache: keyed by host, plus `varyBy`, Gotchas, See also, 1. Resolve the theme in middleware, publish it through `shared`, 2. Render from the map (+9 more)
+### Community 529 - "guard/contracts/index.ts"
+Cohesion: 0.32
+Nodes (14): Guardrails, GuardOptions, GuardrailBlockEvent, GuardrailEscalation, InjectionDetectorOptions, LinkFilterOptions, PiiCategory, PiiDetectorOptions (+6 more)
 
 ### Community 530 - "relationships.md"
-Cohesion: 0.09
-Nodes (24): Common pitfalls, Eager-loading the wrong relation in lists, Foreign-key naming surprises, Forgetting to declare the inverse, Going further, N+1 in loops, Nested constraints, Nested eager loading (+16 more)
+Cohesion: 0.08
+Nodes (27): `@BelongsToMany` — the many-to-many shape, Common pitfalls, Eager-loading the wrong relation in lists, Extra columns on the pivot, Foreign-key naming surprises, Forgetting to declare the inverse, Going further, Loading the related models (+19 more)
 
 ### Community 531 - "generation-manifest.ts"
 Cohesion: 0.21
 Nodes (18): artifactPath(), fail(), generatedAt(), GENERATION_MANIFEST_VERSION, generationIdentifier(), InvalidSitemapGenerationManifestError, MANIFEST_FENCE_WIDTH, manifestFile() (+10 more)
 
-### Community 532 - "design-system-mantine-controls.spec.ts"
-Cohesion: 0.12
-Nodes (8): Notifications after a submit, element(), submit(), Message, messageFrom(), notify, notifyOnSubmit(), SubmitMessages
+### Community 532 - "mcp.md"
+Cohesion: 0.11
+Nodes (16): Exit codes, Related, `warlock logs request <id>`, `warlock logs requests`, Connect a client, Error codes, How it boots, HTTP transport (+8 more)
 
-### Community 533 - "SitemapRegenerationCoordinator"
-Cohesion: 0.14
-Nodes (6): RegenerationWaiter, SitemapRegenerationCoordinator, SitemapRegenerationCoordinatorDisposedError, SitemapRegenerationCoordinatorOptions, SitemapRegenerationRunner, Deferred
+### Community 533 - "ai-source.ts"
+Cohesion: 0.16
+Nodes (11): constructorName(), snapshot(), toSafeValue(), AI_INSTALL_GUIDANCE, attachAiSource(), DevtoolsAiSource, snapshotSpan(), context (+3 more)
 
 ### Community 534 - "atomic-operations.mdx"
 Cohesion: 0.11
 Nodes (18): Best practices, Conditional writes — `onConflict`, Distributed lock recipe, Distributed rate limiter — full example, Idempotency keys, Increment and decrement, Memory / file drivers, Performance characteristics (+10 more)
 
-### Community 535 - "sites.check.ts"
-Cohesion: 0.17
-Nodes (14): decodeEntities(), describeFailure(), DevErrorPanelDetails, InjectableServer, listSiteTargets(), parseDevErrorPanel(), renderSiteRoot(), SITE_RENDER_TIMEOUT_MS (+6 more)
+### Community 535 - "cached.mdx"
+Cohesion: 0.11
+Nodes (17): 1. Shorthand — prefix only, 2. Shorthand — prefix + TTL, 3. Options form — full control, Auto-key rules (shorthand only), Bulk invalidation via tags, Cache a remote API call with tags, Caveats, Helpers on the wrapped function (+9 more)
 
 ### Community 536 - "Warlock — write a use case"
-Cohesion: 0.15
-Nodes (12): Before / after middleware, Benchmark, Broadcast, Gotchas, Guards, Lifecycle callbacks, Runtime options, See also (+4 more)
+Cohesion: 0.14
+Nodes (13): Before / after middleware, Benchmark, Broadcast, Global config, Gotchas, Guards, Lifecycle callbacks, Runtime options (+5 more)
 
-### Community 537 - "scheduler.ts"
-Cohesion: 0.18
-Nodes (11): hasWorkerRole(), parsedRoles(), rolesLabel(), RUNNING_SCHEDULERS_KEY, runningSchedulers(), SchedulerHost, Registry, StoppableScheduler (+3 more)
+### Community 537 - "@warlock.js/scheduler"
+Cohesion: 0.11
+Nodes (17): `scheduler:stopped`, Graceful Shutdown and Overlap, Conventions and pitfalls, See also, Server-only package, The 80% path, The mental model in one paragraph, @warlock.js/scheduler (+9 more)
+
+### Community 538 - "forbidden-methods.ts"
+Cohesion: 0.09
+Nodes (15): object(), forbiddenIfEmptyRule, forbiddenIfInRule, forbiddenIfNotEmptyRule, forbiddenIfNotInRule, forbiddenIfNotRule, forbiddenIfRule, forbiddenRule (+7 more)
 
 ### Community 539 - "ResponseStatus"
-Cohesion: 0.08
+Cohesion: 0.09
 Nodes (22): ResponseStatus, ACCEPTED, BAD_REQUEST, CONFLICT, CONTENT_TOO_LARGE, CREATED, FORBIDDEN, FOUND (+14 more)
 
 ### Community 540 - "Consuming Events"
@@ -3068,60 +3059,60 @@ Cohesion: 0.12
 Nodes (16): Boot — How Herald Connects, Consumer with schema validation, Consuming Events, Error Handling, Factory-based consumer (quick one-off), File Placement Conventions, Option 1 — Class-based (recommended for domain events), Option 2 — Factory-based (quick one-off events) (+8 more)
 
 ### Community 541 - "request-locals-isolation.spec.ts"
-Cohesion: 0.15
-Nodes (11): `currentUser`, Step 5 — Read the user inside the controller, CSRF Origin check for cookie auth (`@warlock.js/auth`), New, not breaking, `request.user` moved to `request.locals.user` (BREAKING), Upgrading within v5: 5.11 → 5.12, accessTokenFindByToken, configKey (+3 more)
+Cohesion: 0.10
+Nodes (17): `currentUser`, Step 5 — Read the user inside the controller, Auth, create-warlock, CSRF Origin check for cookie auth (`@warlock.js/auth`), Fifteen-minute checklist, New, not breaking, Nothing to do for the other packages (+9 more)
 
 ### Community 542 - "projection/root.tsx"
 Cohesion: 0.15
 Nodes (7): BlogPage(), config, loader(), loader(), formatTitle(), config, fetchDraftStats()
 
-### Community 544 - "lru-memory.mdx"
-Cohesion: 0.12
-Nodes (15): Best For, Capacity Configuration, Configuration, Example Eviction Scenario, Example Usage, Global Prefix, How LRU Works, Limitations (+7 more)
+### Community 544 - "injection.ts"
+Cohesion: 0.16
+Nodes (9): SyncGuardrailDetector, BUILT_IN_MARKERS, CompiledMarker, compileMarkers(), injection(), InjectionDetector, NormalizedText, normalizeForMatch() (+1 more)
 
-### Community 545 - "browser-e2e.mdx"
-Cohesion: 0.15
-Nodes (10): A complete spec, Accessibility checks, Expected failures and long-lived requests, Payload checks, Run your production app, Watched development checks, Accessibility checks, Browser e2e (+2 more)
+### Community 545 - "cascade-scoped-budget-store.ts"
+Cohesion: 0.18
+Nodes (14): CascadeScopedBudgetModel, cascadeScopedBudgetStore(), change(), initialize(), CascadeScopedBudgetStoreOptions, CascadeScopedBudgetStoreUnavailableError, createLedgerModel(), identity() (+6 more)
 
-### Community 546 - "ref_warlock_js_cascade"
-Cohesion: 0.13
-Nodes (5): OTP, otpSchema, OTPSchema, databaseConfigurations, databaseConfigurations
+### Community 546 - "api"
+Cohesion: 0.29
+Nodes (18): aiGuidance(), aiView(), api(), empty(), errorView(), logsView(), mailView(), processesView() (+10 more)
 
 ### Community 547 - "Consume messages"
-Cohesion: 0.06
-Nodes (28): Stop a subscription, Adding a New Driver (e.g. Kafka), Architecture — How The Pieces Fit, Conventions When Modifying Code, Debugging Tips, Do, Don't, Package Structure (+20 more)
+Cohesion: 0.04
+Nodes (33): Stop a subscription, Publish options, Why, Adding a New Driver (e.g. Kafka), Architecture — How The Pieces Fit, Conventions When Modifying Code, Debugging Tips, Do (+25 more)
 
 ### Community 548 - "Execution / terminators"
 Cohesion: 0.17
 Nodes (12): `count()`, `distinct<T>(field)` / `countDistinct(field)`, Execution / terminators, `exists()` / `notExists()`, `first<Output>()` / `firstOrFail<Output>()`, `get<Output>()`, `increment(field, amount?)` / `decrement(field, amount?)`, `incrementMany(field, amount?)` / `decrementMany(field, amount?)` (+4 more)
 
-### Community 549 - "`Context<TStore>`"
-Cohesion: 0.12
-Nodes (14): `buildStore(payload?)`, `clear()`, `Context<TStore>`, `enter(store)`, `get(key)`, `getStore()`, `hasContext()`, `run(store, callback)` (+6 more)
+### Community 549 - "file-rules-and-helpers.test.ts"
+Cohesion: 0.18
+Nodes (9): humanizeSize(), resolveFileSize(), maxHeightRule, maxWidthRule, minHeightRule, minWidthRule, maxFileSizeRule, minFileSizeRule (+1 more)
 
-### Community 550 - "context/reference/api.md"
-Cohesion: 0.14
-Nodes (13): Related, `buildStores(payload?)`, `ContextManager`, `contextManager`, `enterAll(stores)`, `getContext<T>(name)`, `hasContext(name)`, `register(name, context)` (+5 more)
+### Community 550 - "checkDevtoolsInDev"
+Cohesion: 0.22
+Nodes (18): assertStillRunning(), checkApiDocsInDev(), checkApiRole(), checkDevtoolsInDev(), checkWorkerRole(), escapeRegExp(), explainQuery(), getJson() (+10 more)
 
 ### Community 551 - "Logging — `log` from `@warlock.js/logger`"
 Cohesion: 0.12
 Nodes (15): Agent, Call convention — four positional args, Capture all framework log entries in a test, Events vs. logs — two channels, one source, Installation — configure at boot, Level mapping, Logging — `log` from `@warlock.js/logger`, Patterns (+7 more)
 
 ### Community 552 - "sql-types.ts"
-Cohesion: 0.13
+Cohesion: 0.12
 Nodes (14): SqlAggregateFunction, SqlDeleteOperation, SqlGroupClause, SqlHavingClause, SqlInsertOperation, SqlJoinClause, SqlJoinType, SqlOrderClause (+6 more)
 
 ### Community 553 - "MongoDbDriver"
 Cohesion: 0.02
-Nodes (55): Native client options — `clientOptions`, `afterCommit(fn)`, Bulk operations with all-or-nothing semantics, Driver caveats, Events inside transactions, Explicit rollback, Going further, Patterns (+47 more)
+Nodes (71): Native client options — `clientOptions`, `afterCommit(fn)`, Bulk operations with all-or-nothing semantics, Driver caveats, Events inside transactions, Explicit rollback, Going further, Patterns (+63 more)
 
 ### Community 554 - "describe-server-address.ts"
 Cohesion: 0.23
 Nodes (13): describeServerAddress(), DISPLAY_AS_LOCALHOST, effectivePort(), isLoopback(), isWildcardBind(), isWildcardHost(), LOOPBACK_HOSTS, parseUrl() (+5 more)
 
-### Community 555 - "aggregates.md"
-Cohesion: 0.09
-Nodes (21): A complete report, `$agg.sumRaw` — the raw escape hatch, `countDistinct` and `distinct`, Date-bucketed grouping — `groupByDate`, Driver-specific aggregates — the raw escape hatch, Empty results return `0`, not `null`, Expression-aware sums — `$agg.sum(expr)` and `$agg.sumRaw`, Filtering grouped results — `having` (+13 more)
+### Community 555 - "WL7xxx — CLI and checked code"
+Cohesion: 0.12
+Nodes (17): WL7002, WL7003, WL7004, WL7005, WL7101, WL7102, WL7103, WL7201 (+9 more)
 
 ### Community 556 - "banner.ts"
 Cohesion: 0.26
@@ -3136,8 +3127,8 @@ Cohesion: 0.12
 Nodes (12): fullLines, indexLines, llmsFullPath, llmsTxtPath, packageIndexPath, packageNotes, pkgJson, pkgRoot (+4 more)
 
 ### Community 559 - "remark-validate-mdx-components.mjs"
-Cohesion: 0.23
-Nodes (14): checkEsmOrdering(), checkJsxBindings(), walk(), checkTextParsedEsm(), walk(), collectBindings(), walk(), collectDeclarationNames() (+6 more)
+Cohesion: 0.25
+Nodes (13): checkEsmOrdering(), checkJsxBindings(), walk(), checkTextParsedEsm(), walk(), collectBindings(), walk(), collectDeclarationNames() (+5 more)
 
 ### Community 560 - "site-metrics.ts"
 Cohesion: 0.20
@@ -3147,9 +3138,13 @@ Nodes (8): initChangelog(), stats, ChangelogData, currentVersion, ChangelogData,
 Cohesion: 0.13
 Nodes (14): Agent, Call convention, Capture all framework log entries in a test, Configure at boot, Events vs logs — two channels, one source, Level mapping, Patterns, Provider adapter (+6 more)
 
-### Community 563 - "jwt.ts"
-Cohesion: 0.03
-Nodes (60): 2026-06-01 — Release-polish pass (skills + tests + docs), 2026-08-10 — 🔴 `expiresIn` validation (issue #25), 2026-08-11 — 🔴 the other half of #25: tokens already issued (issue #27), Added — test coverage (priority gap: package had ~2 spec files), Auth — backlog, FIXED — an unparseable or non-positive `expiresIn` minted a token with no `exp` claim, FIXED (issue #27) — nothing ever rejected a token that has no `exp` claim, and the persisted `expires_at` was never enforced, FIXED — refresh-secret fallback now implemented (was: documented but not implemented) (+52 more)
+### Community 562 - "StagedTransaction"
+Cohesion: 0.19
+Nodes (3): StagedTransaction, FileTransaction, TransactionWriteOptions
+
+### Community 563 - "Warlock — write a seeder"
+Cohesion: 0.12
+Nodes (13): `batchSize` — bulk-insert hint, Bulk dev fixtures (no `once`, large batch), CLI flags, Idempotent seed (safe to re-run without `once`), Patterns, Run-once admin user (depends on roles), See also, `track` — register created records (+5 more)
 
 ### Community 564 - "Select / projection"
 Cohesion: 0.13
@@ -3160,8 +3155,8 @@ Cohesion: 0.26
 Nodes (13): ChunkState, createReplacer(), digest(), EmittedChunk, escapeRegExp(), finalizeChunkNames(), FinalizedChunkNames, renameSourceMapFile() (+5 more)
 
 ### Community 566 - "events.md"
-Cohesion: 0.22
-Nodes (11): Global listeners, Gotchas, Mail events, Per-mail listeners, Per-request events, See also, Surfaces at a glance, The 30-second look (+3 more)
+Cohesion: 0.19
+Nodes (12): Global listeners, Gotchas, Mail events, Per-mail listeners, Per-request events, Response events (static, app-wide), See also, Surfaces at a glance (+4 more)
 
 ### Community 567 - "react-module-resolution.test.ts"
 Cohesion: 0.20
@@ -3175,21 +3170,21 @@ Nodes (3): FakeBackend, SlowReadBackend, StatBackend
 Cohesion: 0.13
 Nodes (11): fullLines, indexLines, llmsFullPath, llmsTxtPath, packageIndexPath, pkgJson, pkgRoot, scriptDir (+3 more)
 
-### Community 570 - "orchestrate-contexts.md"
+### Community 570 - "serializeLoaderData"
 Cohesion: 0.20
-Nodes (9): Introspection helpers, Order matters, registered once, Reading from contexts elsewhere, Step 1 — Define the contexts, Step 2 — Register at boot, Step 3 — Build stores at the boundary, Step 4 — `runAll`, The shape of the workflow (+1 more)
+Nodes (9): isDevalueNativeValue(), isPlainObject(), isThenable(), PostOutput, PostResourceLike, serializeItem(), serializeLoaderData(), settleAndSerialize() (+1 more)
 
 ### Community 571 - "Publish messages"
-Cohesion: 0.13
-Nodes (12): Batch publishing, Broadcasting use-case results, Publish messages, Publish options, Publish + transaction (outbox pattern), Schema-validated publish, See also, Single publish (+4 more)
+Cohesion: 0.18
+Nodes (10): Batch publishing, Broadcasting use-case results, Publish messages, Publish options, Publish + transaction (outbox pattern), Schema-validated publish, See also, Single publish (+2 more)
 
 ### Community 572 - "ai-google/scripts/generate-llms.mjs"
 Cohesion: 0.13
 Nodes (11): fullLines, indexLines, llmsFullPath, llmsTxtPath, packageIndexPath, pkgJson, pkgRoot, scriptDir (+3 more)
 
-### Community 573 - "use-in-workers-and-jobs.md"
-Cohesion: 0.25
-Nodes (7): Pattern: HTTP fan-out (cross-service), Pattern: scheduled job, Pattern: worker thread, Related, The boundaries that need a fresh `run()`, Things to avoid, What you cannot do
+### Community 573 - "context/scripts/generate-llms.mjs"
+Cohesion: 0.13
+Nodes (11): fullLines, indexLines, llmsFullPath, llmsTxtPath, packageIndexPath, pkgJson, pkgRoot, scriptDir (+3 more)
 
 ### Community 574 - "ai-openai/scripts/generate-llms.mjs"
 Cohesion: 0.13
@@ -3203,9 +3198,9 @@ Nodes (11): fullLines, indexLines, llmsFullPath, llmsTxtPath, packageIndexPath, 
 Cohesion: 0.13
 Nodes (11): fullLines, indexLines, llmsFullPath, llmsTxtPath, packageIndexPath, pkgJson, pkgRoot, scriptDir (+3 more)
 
-### Community 577 - "app-module-graph-scan.ts"
-Cohesion: 0.19
-Nodes (16): AppModuleGraphScanner, AppModuleGraphScanOptions, createAppModuleGraphScanner(), infoOf(), isInsideWebDirectory(), readInfo(), resolveSpecifier(), walk() (+8 more)
+### Community 577 - "Create Warlock"
+Cohesion: 0.13
+Nodes (14): CI, Client performance budgets, Create Warlock, Developing this package locally, Flags, Grouped custom feature selection, Interactive database and AI choices, License (+6 more)
 
 ### Community 578 - "ai-workspace/scripts/generate-llms.mjs"
 Cohesion: 0.13
@@ -3231,17 +3226,17 @@ Nodes (7): Config, Dependencies, External, Internal (within `core/src`), Key Exp
 Cohesion: 0.13
 Nodes (14): Clearing, Convenience getters via subclass, Define a context, `enter()` — middleware-style, no callback, Install, Reading, `run()` — scoped execution, See also (+6 more)
 
-### Community 584 - "model/model.ts"
-Cohesion: 0.02
-Nodes (137): `where(...)`, Read-only snapshots, Setting a column named at runtime, Gotchas, T-027 [feature] Stamp global-scope values into an upsert's insert, Why three events not one, `batchSize` — chunking (both paths), Bulk insert — `Model.createMany` (+129 more)
+### Community 584 - "query-methods.ts"
+Cohesion: 0.03
+Nodes (86): Atomic upsert with `atomic()` / `findOneAndUpdate()` / `findAndUpdate()`, Atomicity beyond increments, Postgres upsert, `trustedFilter` — conditional reservations, Writes honour global scopes too, `orWhere(...)`, `where(...)`, Where clauses (+78 more)
 
-### Community 585 - "Warlock — `warlock inspect`"
-Cohesion: 0.20
-Nodes (9): Agents: ask through MCP instead of shelling out, Answer questions with jq, From code, See also, Session middleware in groups, Stability (schemaVersion 1), The route entry, Warlock — `warlock inspect` (+1 more)
+### Community 585 - "fs/scripts/generate-llms.mjs"
+Cohesion: 0.13
+Nodes (11): fullLines, indexLines, llmsFullPath, llmsTxtPath, packageIndexPath, pkgJson, pkgRoot, scriptDir (+3 more)
 
 ### Community 586 - "Warlock — create a module"
-Cohesion: 0.09
-Nodes (20): Conventions and pitfalls, The 80% path, @warlock.js/cascade, isRegistryDefault(), onceConnected(), onceDisconnected(), Adding a one-time boot hook, Auto-loaded files (+12 more)
+Cohesion: 0.13
+Nodes (14): Adding a one-time boot hook, Auto-loaded files, Common patterns, Full CRUD bootstrap, Gotchas, Notification translation defaults, Path alias, Per-component generators (+6 more)
 
 ### Community 587 - "Write a migration"
 Cohesion: 0.12
@@ -3263,13 +3258,13 @@ Nodes (15): Batch transforms via `apply()`, Common patterns, Composition with `U
 Cohesion: 0.29
 Nodes (6): Don't treat memory as a dumping ground, Isolate per user or tenant — a shared store must never leak, Remember durable facts and preferences, not raw transcripts, See also, Separate working scratch from semantic recall, Tune `k` and `threshold` for signal, not recall volume
 
-### Community 592 - "01-the-request-lifecycle.md"
-Cohesion: 0.06
-Nodes (32): Next, Phase 1 — Bootstrap, Phase 2 — Connectors, Phase 3 — The request lands, See also, Step 1 — Router match, Step 2 — Middleware chain, Step 3 — Schema validation (+24 more)
+### Community 592 - "add-a-crud-module.md"
+Cohesion: 0.07
+Nodes (24): The 30-second look, The mental model, What Warlock is _not_, Where to next, Read by intent, Gotchas, Step 1 — Scaffold the module, Step 2 — Generate the model with a resource (+16 more)
 
 ### Community 593 - "Scheduler — Backlog"
 Cohesion: 0.12
-Nodes (15): 11. 6-field cron with seconds, 12. Job groups / tags, 13. Built-in metrics adapter (OpenTelemetry / Prometheus), 14. Dead-letter / failure log, 15. AbortSignal support in callbacks, 1. Distributed locking / leader election, 2. Per-job execution timeout, 3. Manual trigger — `runJobNow(name)` (+7 more)
+Nodes (16): 11. 6-field cron with seconds, 12. Job groups / tags, 13. Built-in metrics adapter (OpenTelemetry / Prometheus), 14. Dead-letter / failure log, 15. AbortSignal support in callbacks, 1. Distributed locking / leader election, 2. Per-job execution timeout, 3. Manual trigger — `runJobNow(name)` (+8 more)
 
 ### Community 594 - "Detailed Feature Comparison"
 Cohesion: 0.14
@@ -3280,68 +3275,68 @@ Cohesion: 0.14
 Nodes (13): Advanced: conditional writes, Core Patterns, Duration strings, Installation, Invalidate — `remove` / `removeNamespace`, Key Concepts, Next Steps, remember (get or compute) (+5 more)
 
 ### Community 596 - "secret-store.ts"
-Cohesion: 0.07
-Nodes (28): Application secret store, Built-app tests with the memory driver, Configuration and backend decisions, Error and logging contract, Isolated tests and explicit stores, SecretStoreError, SecretStoreErrorCode, digest() (+20 more)
+Cohesion: 0.06
+Nodes (29): Application secret store, Built-app tests with the memory driver, Configuration and backend decisions, Error and logging contract, Isolated tests and explicit stores, SecretStoreError, SecretStoreErrorCode, digest() (+21 more)
 
-### Community 597 - "swr.mdx"
+### Community 597 - "seal/scripts/generate-llms.mjs"
 Cohesion: 0.13
-Nodes (14): Background refresh failures don't break callers, Common patterns, Concurrent callers share one refresh, Driver support, Expensive aggregations / dashboards, Per-call driver override, Product detail pages, Related (+6 more)
+Nodes (11): fullLines, indexLines, llmsFullPath, llmsTxtPath, packageIndexPath, pkgJson, pkgRoot, scriptDir (+3 more)
 
-### Community 598 - ".require"
-Cohesion: 0.33
-Nodes (6): `actWhenAsked`, `build` — production bundler, `esmShim` — why a bundled build used to crash at runtime, `singleBundle` — one file you can just run, Source files and reachability, Source files and reachability
+### Community 598 - "password.ts"
+Cohesion: 0.20
+Nodes (10): BcryptBackend, BCRYPTJS_INSTALL_INSTRUCTIONS, bcryptjsLoading, guardPasswordLength(), hashPassword(), loadBcryptjs(), loadNativeBcrypt(), verifyPassword() (+2 more)
 
 ### Community 599 - "Tasks"
 Cohesion: 0.03
-Nodes (59): Open tasks, Owner decisions waiting, T-007 [decision] Coding-CLI adapters inherit the whole host environment by default, T-008 [decision] Release workflow: provenance, unprivileged gate job, write token out of the test step, T-012 [feature] Page-level `uploads` option for web page actions, T-013 [feature] Coding-CLI adapters declare the extra variables they need, T-014 [chore] Run the service-backed integration suites against the 5.53.0 changes, T-015 [chore] Template: the `trustProxy` comment still recommends `true` (+51 more)
+Nodes (59): Open tasks, Owner decisions waiting, T-007 [decision] Coding-CLI adapters inherit the whole host environment by default, T-008 [decision] Release workflow: provenance, unprivileged gate job, write token out of the test step, T-010 [decision] Encryption-key and JWT-secret rotation, T-012 [feature] Page-level `uploads` option for web page actions, T-013 [feature] Coding-CLI adapters declare the extra variables they need, T-015 [chore] Template: the `trustProxy` comment still recommends `true` (+51 more)
 
 ### Community 600 - "DataSource"
 Cohesion: 0.02
-Nodes (96): Gotchas, How core boots the database, How to reach the connection, See also, The 30-second look, The normal access path, mockDriver(), PostgresHarness (+88 more)
+Nodes (114): database (priority 2), Gotchas, How core boots the database, How to reach the connection, See also, The 30-second look, The normal access path, mockDriver() (+106 more)
 
-### Community 601 - "inspect-app.spec.ts"
-Cohesion: 0.05
-Nodes (51): Declare, provide, use, In tests, Seeing and checking the wiring, The API, When to provide, Gotchas, Providing at the right time, Seeing and checking the wiring (+43 more)
+### Community 601 - "capability.ts"
+Cohesion: 0.04
+Nodes (68): Deployment settings, Going further, Gotchas, How a check is shaped, Lint and format checks, Multi-site render, Statuses and exit code, What it checks (+60 more)
 
-### Community 602 - "Common shapes"
-Cohesion: 0.40
-Nodes (5): Bust a CDN cache when a build artifact changes, Cache key from request input, Common shapes, Compare two files for equality, Skip work if content hasn't changed
+### Community 602 - "deepseek.mdx"
+Cohesion: 0.14
+Nodes (13): Capabilities, Construct, Embeddings and images, First call, Inherited from the OpenAI adapter, Install, List models, Models (+5 more)
 
 ### Community 603 - "pg.mdx"
 Cohesion: 0.13
 Nodes (14): Alternative — pass the pool at `cache.use()` time, Configuration, Errors you might hit, How it works under the hood, Installation, KV-only, Limitations, One-time schema setup (+6 more)
 
 ### Community 604 - "Warlock — generate an OpenAPI document"
-Cohesion: 0.10
-Nodes (20): Custom validation failure bodies, Gotchas, Live in development, Options, Postman, Programmatic use, Responses from `responseSchema`, See also (+12 more)
+Cohesion: 0.07
+Nodes (29): Custom validation failure bodies, Gotchas, Live in development, Options, Postman, Programmatic use, Responses from `responseSchema`, See also (+21 more)
 
-### Community 605 - "The Standard Schema bridge"
-Cohesion: 0.17
-Nodes (11): 1. An annotation discarded schema details, 2. The schema's inferred shape doesn't match the target type, 3. The error says `Result<unknown>`, Compiler budget, `Infer<typeof schema>` vs hand-rolled types, The shape of the bridge, The Standard Schema bridge, Union and record outputs (+3 more)
+### Community 605 - "standard-schema/types.ts"
+Cohesion: 0.06
+Nodes (29): Why seal forks the Standard Schema types, `schema["~standard"]`, Standard Schema, `StandardJSONSchemaV1`, `StandardSchemaV1<Input, Output>`, 1. An annotation discarded schema details, 2. The schema's inferred shape doesn't match the target type, 3. The error says `Result<unknown>` (+21 more)
 
-### Community 606 - "owned-process.ts"
-Cohesion: 0.25
-Nodes (7): Connection pooling, commandLineOwns(), OwnedProcess, identity, utility(), Command, ProcessEvidence
+### Community 606 - "devtools/src/index.ts"
+Cohesion: 0.20
+Nodes (12): Agents tab, Enable collection, JSON API, Requests, background work and retention, What appears, Agent traces, AI runs alongside HTTP requests, DevtoolsAgentRun (+4 more)
 
 ### Community 607 - "Paginate results"
-Cohesion: 0.22
-Nodes (8): Chunked processing — `.chunk(size, callback)`, Cursor pagination — `.cursorPaginate({ limit, cursor? })`, Offset pagination — `.paginate({ page, limit })`, Paginate results, Pagination + relations, Pagination shape, See also, Things NOT to do
+Cohesion: 0.25
+Nodes (7): Chunked processing — `.chunk(size, callback)`, Cursor pagination — `.cursorPaginate({ limit, cursor? })`, Paginate results, Pagination + relations, Pagination shape, See also, Things NOT to do
 
 ### Community 608 - "check-resolver-boundaries.mjs"
 Cohesion: 0.33
 Nodes (10): addViolation(), aliasTargets(), filesInPackage(), findResolverBoundaryViolations(), IGNORED_DIRECTORIES, isInside(), main(), packageRoots() (+2 more)
 
-### Community 609 - "@warlock.js/context"
-Cohesion: 0.22
-Nodes (8): Conventions and pitfalls, See also, The 80% path, Two operating modes — when to pick which, @warlock.js/context, What it is in one sentence, What this package deliberately doesn't do, When to reach for it
+### Community 609 - "timezone.mdx"
+Cohesion: 0.14
+Nodes (11): Basic Usage, Common IANA Timezone Strings, Interaction with `at()` and `on()`, Per-Job Timezones, Signature, Read by intent, Try it in fifteen lines, A note on long-lived processes (+3 more)
 
 ### Community 610 - "ai-bedrock/scripts/generate-llms.mjs"
 Cohesion: 0.13
 Nodes (11): fullLines, indexLines, llmsFullPath, llmsTxtPath, packageIndexPath, pkgJson, pkgRoot, scriptDir (+3 more)
 
-### Community 611 - "Header.astro"
-Cohesion: 0.24
-Nodes (7): docRoutes, latestHref, navLinks, normalizePath(), onAiDocs, v4Href, versionHref()
+### Community 611 - "ai-groq/scripts/generate-llms.mjs"
+Cohesion: 0.14
+Nodes (10): fullLines, indexLines, llmsFullPath, llmsTxtPath, pkgJson, pkgRoot, scriptDir, shortName (+2 more)
 
 ### Community 612 - "ai-ollama/scripts/generate-llms.mjs"
 Cohesion: 0.13
@@ -3351,7 +3346,7 @@ Nodes (11): fullLines, indexLines, llmsFullPath, llmsTxtPath, packageIndexPath, 
 Cohesion: 0.13
 Nodes (11): fullLines, indexLines, llmsFullPath, llmsTxtPath, packageIndexPath, pkgJson, pkgRoot, scriptDir (+3 more)
 
-### Community 614 - "sitemap/scripts/generate-llms.mjs"
+### Community 614 - "create-warlock/scripts/generate-llms.mjs"
 Cohesion: 0.14
 Nodes (10): fullLines, indexLines, llmsFullPath, llmsTxtPath, pkgJson, pkgRoot, scriptDir, shortName (+2 more)
 
@@ -3359,25 +3354,25 @@ Nodes (10): fullLines, indexLines, llmsFullPath, llmsTxtPath, pkgJson, pkgRoot, 
 Cohesion: 0.13
 Nodes (11): fullLines, indexLines, llmsFullPath, llmsTxtPath, packageIndexPath, pkgJson, pkgRoot, scriptDir (+3 more)
 
-### Community 616 - "safely-overwrite-json-config.md"
-Cohesion: 0.20
-Nodes (8): Computed update, Deep merge, Related, Shallow patch, Related, The recipe, What atomic does _not_ do, When the change isn't a simple patch
+### Community 616 - "n-plus-one.ts"
+Cohesion: 0.25
+Nodes (10): detectNPlusOne(), mostFrequentCaller(), truncate(), isMongoLeaf(), normalizeMongoValue(), queryShape(), QueryShapeInput, DevtoolsQuery (+2 more)
 
 ### Community 617 - "silent-tools.md"
 Cohesion: 0.14
 Nodes (13): Constraints for silent tool authors, How it works, MUST be cheap and fast, Pattern 1 (recommended) — Silent piggybacks on a feedback tool, Pattern 2 (use carefully) — Silent-only background ops with no user reply, Pattern 3 (avoid) — Silent-only WITH expected prose acknowledgement, Provider behavior (empirical), Quick start (+5 more)
 
-### Community 618 - "CacheUnsupportedError"
-Cohesion: 0.02
-Nodes (100): Capability matrix, Errors you might hit, Filter by tag, Production warning — memory drivers, Putting it together, Query with a vector, See also, Set with a vector (+92 more)
+### Community 618 - "CacheConfigurationError"
+Cohesion: 0.01
+Nodes (176): `CacheConcurrencyError`, `CacheConfigurationError`, `CacheConnectionError`, `CacheDriverNotInitializedError`, `CacheUnsupportedError`, Catch-all at the application boundary, Driver-missing fallback, Error hierarchy (+168 more)
 
-### Community 619 - "cached-list.md"
+### Community 619 - "@warlock.js/logger"
 Cohesion: 0.14
-Nodes (13): A complete cached list endpoint, Going further, Gotchas, How the cache key is built, How the repository reads from cache, Manual invalidation, Measuring the win, Stage 0 — Configure the cache (+5 more)
+Nodes (13): 30-second tour, Built-in channels, Capturing unhandled errors, Custom channels, Full documentation, Graceful shutdown, Install, License (+5 more)
 
-### Community 620 - "format-http-error-response.ts"
-Cohesion: 0.29
-Nodes (6): DomainFailure, formatHttpErrorResponse(), isRecord(), statusCodes, text(), httpConfigurations
+### Community 620 - "process/scripts/generate-llms.mjs"
+Cohesion: 0.14
+Nodes (10): fullLines, indexLines, llmsFullPath, llmsTxtPath, pkgJson, pkgRoot, scriptDir, shortName (+2 more)
 
 ### Community 621 - "ai-live/scripts/generate-llms.mjs"
 Cohesion: 0.14
@@ -3387,25 +3382,25 @@ Nodes (10): fullLines, indexLines, llmsFullPath, llmsTxtPath, pkgJson, pkgRoot, 
 Cohesion: 0.14
 Nodes (10): fullLines, indexLines, llmsFullPath, llmsTxtPath, pkgJson, pkgRoot, scriptDir, shortName (+2 more)
 
-### Community 623 - "list-users.controller.ts"
-Cohesion: 0.24
-Nodes (6): UserFilter, UsersListOptions, UsersRepository, usersRepository, listUsersSchema, ListUsersSchema
-
-### Community 624 - "`@warlock.js/devtools` — overview"
-Cohesion: 0.14
-Nodes (12): Install, License, Safe by construction, @warlock.js/devtools, From the terminal (agents), Install: one command, no config, Options, Process supervision panel (+4 more)
-
-### Community 625 - "Pick an AI provider adapter"
+### Community 623 - "Use model events"
 Cohesion: 0.15
-Nodes (12): Available adapters, Count the exact request when supported, Decision tree, Embeddings, Multi-provider apps, Native input-token preflight, OpenAI adapter — usage, Per-model overrides (+4 more)
+Nodes (12): Audit log (combined with dirty tracking), Cache invalidation, Common patterns, Listener signature, `off()` to unsubscribe, See also, Side effects that must only fire after commit, Subscribing — per-model (+4 more)
+
+### Community 624 - "query-source.ts"
+Cohesion: 0.24
+Nodes (9): captureCallerLocation(), normalizePath(), packageDirectory, parseFrame(), shouldSkip(), attachQuerySource(), QueryEvent, redactBindings() (+1 more)
+
+### Community 625 - "Types"
+Cohesion: 0.18
+Nodes (10): Step 1 — The anatomy of a rule, Types, AttributeTranslation, ContextualizedTransformer, SimpleTransformerCallback, AttributeValue, ContextualSchemaRule, RuleResult (+2 more)
 
 ### Community 626 - "virtual-pages.contract.ts"
 Cohesion: 0.15
 Nodes (12): WarlockAssertLocaleRoutingExportName, WarlockAssertRegistryExportName, WarlockAssertRegistryId, WarlockAssertStrictModeExportName, WarlockClientLocaleRoutingExportName, WarlockClientPageRegistryId, WarlockClientRegistryExportName, WarlockClientStrictModeExportName (+4 more)
 
-### Community 627 - "auth-tokens.check.ts"
-Cohesion: 0.27
-Nodes (10): authSetting(), authTokensCheck, lifetimeFinding(), parseDurationMs(), secretFinding(), bootContext, STRONG, text() (+2 more)
+### Community 627 - "template-pins.spec.ts"
+Cohesion: 0.20
+Nodes (9): featuresMap, PackageManifest, template, TEMPLATE_PEERS, DELIBERATE_OMISSIONS, isKeyedList(), KeyedOption, main() (+1 more)
 
 ### Community 628 - "`cached()` — function-memoization wrapper"
 Cohesion: 0.17
@@ -3415,17 +3410,17 @@ Nodes (11): Auto-key rules (shorthand only), Cached DB lookup with write-side in
 Cohesion: 0.17
 Nodes (11): 2026-05-12 — joinWith — honour where-clauses on hasOne/belongsTo constraints, Alternative: subquery target, Decisions to lock, Key implementation notes, Param plumbing, Scope, Summary, Tasks (+3 more)
 
-### Community 630 - "validation-labels.check.ts"
-Cohesion: 0.21
-Nodes (8): collectFields(), definesKey(), hasLabel(), objectShape(), requestSchemaFields(), SchemaLike, bootContext, validationLabelsCheck
+### Community 630 - "`v.string()` — method reference"
+Cohesion: 0.17
+Nodes (12): Case mutators (pre-validation), Color, Content, Encoding mutators, Format, ID formats, Length, Mutator vs transformer (+4 more)
 
 ### Community 631 - "Track changes"
 Cohesion: 0.15
 Nodes (12): After save — tracker resets, After the save, Conditional logic before save, Diff for an audit log, How a merge decides what changed, Multi-field check, Removed keys survive a merge, See also (+4 more)
 
-### Community 632 - "tool-use-contract.md"
-Cohesion: 0.33
-Nodes (5): `backstops`, Eval checks, `onToolRefusal`, Related, Seeing what happened
+### Community 632 - "sitemap-model-subscriptions.ts"
+Cohesion: 0.27
+Nodes (9): afterCommitFrom(), loadAfterCommit(), SitemapAfterCommit, SitemapAfterCommitLoader, SitemapAfterCommitUnavailableError, SitemapModelSubscriptions, SitemapModelSubscriptionsDependencies, subscribeSitemapModels() (+1 more)
 
 ### Community 633 - "Warlock — framework-wide conventions"
 Cohesion: 0.17
@@ -3435,25 +3430,21 @@ Nodes (11): Barrels are optional, `.client.*` is a client-only boundary, Decorat
 Cohesion: 0.17
 Nodes (12): 1.1 Auto-completion Support, 1.2 Verbose/Debug Mode, 1.3 Command Timing Breakdown, 2.1 Graceful Shutdown, 2.2 Execute Validation, 3.1 Parallel Preloading, 3.2 Cache Version String, 3.3 Binary Compilation (+4 more)
 
-### Community 635 - "observability-wire-panoptic.md"
-Cohesion: 0.22
-Nodes (8): Other primitives, same shape, Production notes, Query the store after the fact, Related, Run it — capture happens automatically, Setup, Teardown, The agent, plus one attach
+### Community 635 - "Testing — code that logs, and asserting on log output"
+Cohesion: 0.18
+Nodes (10): Assert on log output — use a capturing channel, Silence the logger during tests, Test against the singleton, Test an isolated logger (avoid touching the singleton), Testing a custom channel, Testing `captureAnyUnhandledRejection`, Testing — code that logs, and asserting on log output, Testing `FileLog` and `JSONFileLog` (+2 more)
 
-### Community 636 - "WL8xxx — this machine"
-Cohesion: 0.20
-Nodes (10): WL8001, WL8002, WL8003, WL8004, WL8006, WL8007, WL8008, WL8009 (+2 more)
+### Community 636 - "error-codes.md"
+Cohesion: 0.07
+Nodes (28): Stability, The scheme, WL3001, WL3002, WL3003, WL3004, WL3005, WL3006 (+20 more)
 
-### Community 637 - "RecordingQuery"
-Cohesion: 0.13
-Nodes (6): The shape, RepositoryOptions, RepositoryOptionsWithCursor, RepositoryOptionsWithPages, RecordingQuery, TestRepository
-
-### Community 639 - "config-handlers.ts"
-Cohesion: 0.26
-Nodes (6): registerAppConfig(), SpecialConfigHandler, ConfigSpecialHandlers, configSpecialHandlers, AppConfigurations, Preload
+### Community 639 - "type-rules.ts"
+Cohesion: 0.35
+Nodes (9): arrayRule, booleanRule, floatRule, intRule, numberRule, objectRule, plainObjectRule, scalarRule (+1 more)
 
 ### Community 640 - "@warlock.js/notifications"
-Cohesion: 0.18
-Nodes (9): License, Quick start, Server-only package, Skills, @warlock.js/notifications, Conventions and pitfalls, The 80% path, @warlock.js/notifications (+1 more)
+Cohesion: 0.22
+Nodes (7): License, Quick start, Server-only package, Skills, @warlock.js/notifications, The 80% path, @warlock.js/notifications
 
 ### Community 641 - "import-package-docs.mjs"
 Cohesion: 0.22
@@ -3463,25 +3454,25 @@ Nodes (10): copySection(), DEST_ROOT, __dirname, DOCS_ROOT, PROJECT_ROOT, rootFi
 Cohesion: 0.18
 Nodes (10): Collect from both an agent and an orchestrator, Drill into one expensive session, Failure cost — the question finance actually asked next, Production notes, Related, Setup, The dashboard query layer, The per-run table (with p95 latency) (+2 more)
 
-### Community 644 - "Use aggregates and groupBy"
-Cohesion: 0.17
-Nodes (11): `$agg` helpers — six cross-driver, four MongoDB-only, Date-bucketed rollups — `.groupByDate(column, unit, aggregates?)`, Driver-specific escape hatch, Gotchas, Grouped rollups — two-arg `groupBy(fields, aggregates)`, `.having(...)` — filter groups by a computed aggregate, OrderBy on aggregates, Scalar aggregates (+3 more)
+### Community 644 - "Generate a sitemap and robots.txt"
+Cohesion: 0.20
+Nodes (8): Storage and generation lifecycle, extra(), Example support files, Generate a sitemap and robots.txt, Locales, shards and HTTP caching, Refreshing after changes, robots.txt, Storage, restarts and multiple instances
 
-### Community 645 - "file-exporter.ts"
-Cohesion: 0.11
-Nodes (17): Seed eval datasets from real Panoptic traces, `fileExporter` — JSON-Lines `TraceRecord`, 1. Attach to the event stream, 2. Wire it as agent middleware, 3. Collect a report directly, Bring your own collector or store, Failure isolation, Imperative — `panoptic(...)`, the one-call subscriber (+9 more)
+### Community 645 - "`warlock dev` — development server"
+Cohesion: 0.20
+Nodes (10): Crash recovery, Default Oxlint file checks, `devServer.*` config knobs, Flags, Keyboard shortcuts, Restart on config change, The generated loader hook, `warlock dev` — development server (+2 more)
 
-### Community 646 - "optional-peers.check.ts"
-Cohesion: 0.30
-Nodes (10): cachePeer(), databasePeer(), mailPeer(), optionalPeersCheck, projectRequire, RequiredPeer, requiredPeers(), socketPeer() (+2 more)
+### Community 646 - "server/guard.ts"
+Cohesion: 0.31
+Nodes (9): hostnameOf(), isAllowedDevtoolsHost(), isLoopbackAddress(), LOOPBACK_ADDRESSES, LOOPBACK_HOSTS, originHostname(), PROXY_HEADERS, refusalReason() (+1 more)
 
-### Community 647 - "migrate"
-Cohesion: 0.05
-Nodes (31): `AccessToken`, `Auth<Schema>`, `authMigrations`, `AuthTokenFamily`, Models, `RefreshToken`, Checking what will run next, `create-database <name>` (+23 more)
+### Community 647 - "RefreshToken"
+Cohesion: 0.02
+Nodes (90): `AccessToken`, `Auth<Schema>`, `authMigrations`, `AuthTokenFamily`, Models, `RefreshToken`, Checking what will run next, `create-database <name>` (+82 more)
 
-### Community 648 - "2026-04-25 — Phase D: Platform maturity"
-Cohesion: 0.17
-Nodes (12): 2026-04-25 — Phase D: Platform maturity, Critical files, D1 — Pluggable formatters, D2 — Custom levels, D3 — OpenTelemetry bridge, D5 — Deduplication, D6 — Hot-reload of configuration, Estimate (+4 more)
+### Community 648 - "architecture-concepts/memory.md"
+Cohesion: 0.22
+Nodes (8): Configuration, Delegated, not reinvented, Episodic & procedural tiers, Isolation — `scope`, Memory in an orchestrator, Related, The contract, The working tier is size-bounded
 
 ### Community 649 - "create.module"
 Cohesion: 0.18
@@ -3491,9 +3482,9 @@ Nodes (11): Arguments, create.module, Example, Generated Files, Generated Struct
 Cohesion: 0.18
 Nodes (11): Arguments, Example, generate.module, Generated Files, Generated Structure, `main.ts`, Next Steps, Options (+3 more)
 
-### Community 651 - "sync-design-system.mjs"
-Cohesion: 0.33
-Nodes (6): collect(), mantine, packageRoot, payloadFor(), shadcn, SHARED_FILES
+### Community 651 - "board.md"
+Cohesion: 0.22
+Nodes (8): Actions, agent-kit, Exit codes and JSON, Files, From code, Message format, States, The two-agent protocol
 
 ### Community 652 - "Warlock — `warlock routes`"
 Cohesion: 0.18
@@ -3507,9 +3498,13 @@ Nodes (10): Auth, Cascade, Commands, Connectors, Mail, Notifications, Repository
 Cohesion: 0.18
 Nodes (11): Acceptance Criteria, Database Options, Dependencies, Environment Variables Updated, Files Modified, Notes, Tasks, Technical Details (+3 more)
 
-### Community 655 - "What the UI shows"
+### Community 655 - "WL2xxx — boot"
 Cohesion: 0.22
-Nodes (11): Theme, search, grouping, deep-links, What the page shows, `@BelongsToMany` — the many-to-many shape, Extra columns on the pivot, Loading the related models, Pivot operations — `model.pivot(relation)`, Deep-links, Filtering & grouping (all client-side over the polled list) (+3 more)
+Nodes (9): WL2001, WL2002, WL2003, WL2004, WL2005, WL2006, WL2007, WL2008 (+1 more)
+
+### Community 656 - "channel.types.ts"
+Cohesion: 0.28
+Nodes (5): Ack semantics, Subscribe options, ChannelStats, DeadLetterOptions, SubscribeOptions
 
 ### Community 657 - "affected-packages.mjs"
 Cohesion: 0.29
@@ -3531,9 +3526,9 @@ Nodes (11): fullLines, indexLines, llmsFullPath, llmsTxtPath, packageIndexPath, 
 Cohesion: 0.20
 Nodes (9): 1. Install, 2. The smallest possible agent, 3. Add a system prompt, 4. Stream tokens to stdout, 5. Branch on the result, 6. Add a tool, 7. Add structured output, Related (+1 more)
 
-### Community 662 - "ref_url"
-Cohesion: 0.18
-Nodes (5): here, here, here, here, here
+### Community 662 - "Configure access"
+Cohesion: 0.22
+Nodes (8): Caching, Configure access, Quickstart — a fixed, code-defined catalog, Real apps — dynamic, DB-backed roles, See also, `strictPolicies`, Tenant, The full shape
 
 ### Community 663 - "case5-fs-chain.page.tsx"
 Cohesion: 0.60
@@ -3541,11 +3536,11 @@ Nodes (3): BlogPage(), route, readConfig()
 
 ### Community 664 - "cascade/domains/backlog.md"
 Cohesion: 0.02
-Nodes (82): Cascade — Backlog, Docs initiative, Migrations & CLI (open — documented as shipped), Pre-existing backlog, S4 — Low, 2026-05-12 — Centralise relation foreign-key defaults, Backward-compatibility, Decisions to lock (+74 more)
+Nodes (112): Cascade — Backlog, Docs initiative, Migrations & CLI (open — documented as shipped), Notes / no-change-required (documented for accuracy), Pre-existing backlog, Relations system (audited 2026-05-12), Release-prep audit (2026-06-01), Roadmap consolidation (2026-06-01) (+104 more)
 
 ### Community 665 - "core-import-graph.spec.ts"
-Cohesion: 0.15
-Nodes (15): aiRoot, collectGraph(), coreRoot, coreRootEntry, Edge, resolveCore(), resolveRelative(), runtimeSpecifiers() (+7 more)
+Cohesion: 0.24
+Nodes (8): aiRoot, collectGraph(), coreRoot, coreRootEntry, Edge, resolveCore(), resolveRelative(), runtimeSpecifiers()
 
 ### Community 666 - "Stale-while-revalidate — `cache.swr(key, options, fn)`"
 Cohesion: 0.20
@@ -3559,13 +3554,9 @@ Nodes (11): fullLines, indexLines, llmsFullPath, llmsTxtPath, packageIndexPath, 
 Cohesion: 0.18
 Nodes (10): CLI commands, Common task → command, Configuration — env vars only, Diagnose first: "foreign key constraint … cannot be implemented", Migration file discovery, Operations API — programmatic equivalents, Run the cascade CLI / Operations API, See also (+2 more)
 
-### Community 669 - "Warlock — `warlock doctor`"
-Cohesion: 0.18
-Nodes (10): CI / pre-release gate, Diagnosing a silent 404 surface, Error codes and `--json`, Exit code, Gotchas, Lint and format checks, Patterns, See also (+2 more)
-
-### Community 670 - "core/scripts/generate-llms.mjs"
-Cohesion: 0.13
-Nodes (11): fullLines, indexLines, llmsFullPath, llmsTxtPath, packageIndexPath, pkgJson, pkgRoot, scriptDir (+3 more)
+### Community 670 - "detectors/index.ts"
+Cohesion: 0.28
+Nodes (4): ctx, topic(), verdict(), Running it in CI, and how the release runner reads the verdict
 
 ### Community 671 - "Terminal UI & Branding"
 Cohesion: 0.20
@@ -3595,10 +3586,6 @@ Nodes (9): Correlation across replies, Multiple responders, Request-response ove
 Cohesion: 0.20
 Nodes (9): Combining everything, Creating an isolated Logger, Order matters — ANSI stripping across channels, Recommended pattern — one dedicated file, See also, Setup — registering channels at startup, The three channel-registration methods, What `configure({ autoFlushOn })` does (+1 more)
 
-### Community 678 - "BaseNotificationsRepository"
-Cohesion: 0.16
-Nodes (10): The repository — derived from `columnMap`, Behind the scenes — `columnMap` drives everything, `columnMap` — map logical roles → your columns, `createFor` write side — no IDOR either (since 4.15.0), BaseNotificationsRepository, InApp, RecipientInput, DatabasePayload (+2 more)
-
 ### Community 679 - "Per-job timezones"
 Cohesion: 0.18
 Nodes (10): Basic usage, Common IANA strings, DST is automatic, Interaction with `at()`, `on()`, cron, Multi-region fan-out, Per-job timezones, See also, Server-side caveats (+2 more)
@@ -3612,16 +3599,20 @@ Cohesion: 0.13
 Nodes (11): fullLines, indexLines, llmsFullPath, llmsTxtPath, packageIndexPath, pkgJson, pkgRoot, scriptDir (+3 more)
 
 ### Community 682 - "enrich-metadata.ts"
-Cohesion: 0.10
-Nodes (17): Building blocks, Diagnostics and results, Entries, Not in this package, Options, `Sitemap`, `SitemapIndex`, joinOrigin() (+9 more)
+Cohesion: 0.15
+Nodes (10): joinOrigin(), absolutize(), absolutizeImage(), enrichMetadata(), EnrichMetadataContext, formatOgLocale(), isNoindex(), pathnameOf() (+2 more)
 
-### Community 683 - "env-files.check.spec.ts"
-Cohesion: 0.24
-Nodes (6): envFiles(), envFilesCheck, findCommittableEnvFiles(), bootContext, GIT_ENV_KEYS, savedEnv
+### Community 683 - "`warlock start` — run the production bundle"
+Cohesion: 0.22
+Nodes (9): Behavior, Deploy one build in parts, It refuses a `dist` no successful build produced (5.2), Output streams — what a supervisor may trust, Reading a failed start (5.2), Signal handling, Source maps, `warlock start` — run the production bundle (+1 more)
 
-### Community 684 - "release-hygiene.check.ts"
-Cohesion: 0.20
-Nodes (5): ChangelogHeading, ProjectManifest, releaseHygieneCheck, FsMock, importCheck()
+### Community 684 - "merge-web-sitemap-config.ts"
+Cohesion: 0.39
+Nodes (7): findExportedConfigObjectLiteral(), hasSyntaxErrors(), hasTopLevelSitemapProperty(), lastPropertyEnd(), mergeWebSitemapConfig(), propertyKeyName(), WebSitemapMergeResult
+
+### Community 685 - "file-log-naming-retention.spec.ts"
+Cohesion: 0.31
+Nodes (6): dataFor(), NOW, rotateOnce(), TEST_ROOT, waitForCondition(), waitForInit()
 
 ### Community 686 - "matrix-verdict-cli.mjs"
 Cohesion: 0.18
@@ -3632,16 +3623,16 @@ Cohesion: 0.47
 Nodes (3): parseColumnDsl(), ParsedColumn, typeMapping
 
 ### Community 688 - "toToml"
-Cohesion: 0.25
-Nodes (13): codexAdapter, codexMcpOverrides(), codexMcpTable(), tomlString(), TOOL_ITEMS, grokMcp(), unsupportedOption(), inlineValue() (+5 more)
+Cohesion: 0.22
+Nodes (14): codexAdapter, codexMcpOverrides(), codexMcpTable(), tomlString(), TOOL_ITEMS, toolCall(), grokMcp(), unsupportedOption() (+6 more)
 
 ### Community 689 - "ai-deepseek/scripts/generate-llms.mjs"
 Cohesion: 0.14
 Nodes (10): fullLines, indexLines, llmsFullPath, llmsTxtPath, pkgJson, pkgRoot, scriptDir, shortName (+2 more)
 
 ### Community 690 - "Migration"
-Cohesion: 0.02
-Nodes (10): ColumnBuilder, AlterMigration, down(), isAddOnlyAlter(), Migration, MigrationContract, resolveSoftDeleteColumn(), up() (+2 more)
+Cohesion: 0.03
+Nodes (12): S3 — Medium, AlterMigration, down(), isAddOnlyAlter(), Migration, resolveSoftDeleteColumn(), up(), wireColumns() (+4 more)
 
 ### Community 691 - "Cascade Tests"
 Cohesion: 0.22
@@ -3672,16 +3663,16 @@ Cohesion: 0.22
 Nodes (8): Answer questions with jq, Errors, From code, Gotchas, How the request is matched, See also, The report (schemaVersion 1), Warlock — `warlock trace`
 
 ### Community 698 - "run-orchestrator.md"
-Cohesion: 0.20
-Nodes (9): Author-time validation, Compaction in depth, Drift detection and recovery, `iterate` and `resume`, Production lifecycle, Related, Running a turn, The full config (+1 more)
+Cohesion: 0.11
+Nodes (15): Author-time validation, Compaction in depth, Drift detection and recovery, `iterate` and `resume`, Production lifecycle, Related, Running a turn, The full config (+7 more)
 
-### Community 699 - "full-text-search.md"
-Cohesion: 0.20
-Nodes (9): Combining with vector search, Common shapes, "Exact phrase" search, Excluding stop words, Going further, Ranked results — driver-specific scoring, Stemming, The search service (+1 more)
-
-### Community 700 - "Generations"
+### Community 699 - "Schedule recurring jobs"
 Cohesion: 0.22
-Nodes (8): Dependencies, External, Generations, Internal (within `core/src`), Key Exports, Key Files, Notes, Used By
+Nodes (7): 30-second example, Install, Package structure, Run scheduled jobs inside a context, Schedule recurring jobs, The 2-primitive surface, When NOT to use this skill
+
+### Community 700 - "code-map-index.mjs"
+Cohesion: 0.22
+Nodes (5): files, graph, groups, out, testCounts
 
 ### Community 701 - "Use Cases"
 Cohesion: 0.33
@@ -3695,21 +3686,21 @@ Nodes (8): Cost note, JSON Schema generation, OpenAI structured outputs (`openai
 Cohesion: 0.29
 Nodes (11): bumpFamilyPins(), bumpManifest(), compareVersions(), escapeVersion(), fail(), main(), PKGIST_CONFIG, readMemberDirs() (+3 more)
 
-### Community 707 - "update-check-cache.test.ts"
-Cohesion: 0.33
-Nodes (5): ensureDirectoryAsync, fileExistsAsync, getJsonFileAsync, putJsonFileAsync, unlinkAsync
+### Community 707 - "artifact-entry-points.mjs"
+Cohesion: 0.44
+Nodes (8): assertArtifactContainsItsEntryPoints(), collectArtifactEntryPoints(), collectExportPaths(), collectManifestPath(), isLocalPathTarget(), normalizeEntry(), normalizeTarget(), wildcardTargetExpression()
 
-### Community 708 - "Warlock — make an endpoint"
-Cohesion: 0.22
-Nodes (8): 1. The spec, 2. Preview, then generate, 3. What it writes (`src/app/posts/`), 4. Run its test, `--dry-run` and `--json` everywhere, `public: true`, See also, Warlock — make an endpoint
+### Community 708 - "02-first-page.mdx"
+Cohesion: 0.25
+Nodes (7): A runtime default export is required, Avoiding a circular config type, Create a route from the filename, Declare a stable route name, Keep registration outside the component file, Link between pages, Next steps
 
-### Community 709 - "unregistered-pages.ts"
-Cohesion: 0.10
-Nodes (20): aboutPage, appRoot, appSrcRoot, webRoot, createUnregisteredPageReporter(), unregisteredPages(), describeUnregisteredPages(), DiscoveredGlobalPage (+12 more)
+### Community 709 - "strip-source-map-sources.ts"
+Cohesion: 0.39
+Nodes (7): T-096 [bug] Published source maps point at files an installed app does not have, assertSourceMapsSelfContained(), decodeSourcePath(), isFile(), isSourceMap(), SourceMapShape, sourcesWithoutContent()
 
-### Community 710 - "CLI reference"
-Cohesion: 0.33
-Nodes (6): `build`, `build:all`, `build:family`, CLI reference, `list`, `validate`
+### Community 710 - "dev-server/supervisor.test.ts"
+Cohesion: 0.25
+Nodes (3): devLogError, devLogWarn, spawn
 
 ### Community 711 - "agent-silent-tools-ui.md"
 Cohesion: 0.25
@@ -3719,17 +3710,17 @@ Nodes (7): Production notes, Run it — collect the artifacts at the call site, 
 Cohesion: 0.25
 Nodes (7): Production notes, Run it, Setup, The classifier agent, The specialists, The supervisor, When the classifier is deterministic
 
-### Community 713 - "production-builder.contributions.test.ts"
-Cohesion: 0.04
-Nodes (47): Build-time contribution, Build-time contribution, Build-time contribution, Build-time contribution, Optional production-build contribution, ConnectorBuildContext, ConnectorBuildContribution, ALLOWED_CONTRIBUTION_KEYS (+39 more)
+### Community 713 - "dry-run-no-writes.test.ts"
+Cohesion: 0.25
+Nodes (4): makeSource(), driver, migrationDriverWrites, writeMethods
 
 ### Community 714 - "Define policies (ABAC)"
 Cohesion: 0.25
 Nodes (7): Define policies (ABAC), Gotchas, It runs ONLY on an instance check, Register a condition, See also, The decision = grant AND policy, The policy context
 
-### Community 715 - "snapshot-response.ts"
-Cohesion: 0.31
-Nodes (6): Response snapshots — `snapshotResponse()`, REDACTED, redactPath(), ResponseSnapshot, snapshotResponse(), SnapshotResponseOptions
+### Community 715 - "Model defaults — `modelOptions`"
+Cohesion: 0.29
+Nodes (7): `autoGenerateId` (MongoDB), `deleteStrategy` / `trashTable`, `idReservationBlockSize` (model static, MongoDB), Model defaults — `modelOptions`, `namingConvention`, `strictMode`, `timestamps`
 
 ### Community 716 - "postgres-transaction-settings.spec.ts"
 Cohesion: 0.29
@@ -3791,45 +3782,41 @@ Nodes (7): Content direction is separate, Dates, times and numbers, Direction co
 Cohesion: 0.25
 Nodes (7): Clean up timers and observers, Field errors stay with fields, Full loads are a lifecycle boundary, Model the request lifecycle explicitly, Motion, Mutation failure is not a failed refresh, Warlock web — preserve feedback and motion
 
-### Community 731 - "Expose tools AS an MCP server (Direction B)"
-Cohesion: 0.06
-Nodes (30): `ai.tools.measure` — what the tool belt costs per call, `calculator` — safe arithmetic (never `eval`), `date_time` — clock + calendar, Errors flow as data, not throws, `http_request` — a guarded REST client, See also, The five tools, `web_search` — pick a provider, supply a key (+22 more)
+### Community 731 - "ToolContract"
+Cohesion: 0.04
+Nodes (56): `ai.tools.measure` — what the tool belt costs per call, `calculator` — safe arithmetic (never `eval`), `date_time` — clock + calendar, Errors flow as data, not throws, See also, The five tools, `web_search` — pick a provider, supply a key, Agent-facing — `ws.tools.*` (+48 more)
 
-### Community 732 - "generate-jwt-secret.ts"
-Cohesion: 0.13
-Nodes (14): Commands, `registerAuthCleanupCommand`, `registerJWTSecretGeneratorCommand`, What you get from `@warlock.js/auth`, registerAuthCleanupCommand(), cleanupExpiredTokens, registerJWTSecretGeneratorCommand(), generateJWTSecret() (+6 more)
+### Community 732 - "Schema evolution — `Migration.alter`"
+Cohesion: 0.29
+Nodes (7): Rollback for `alter`, Rolling back on SQL versus MongoDB, Rolling back safely, Schema evolution — `Migration.alter`, AlterSchema, ColumnMap, Template drift — fixed
 
 ### Community 733 - "HighlightFeatures.astro"
 Cohesion: 0.29
 Nodes (5): Feature, { kicker, title, subtitle, features }, Props, packages, ../../../../../components/HighlightFeatures.astro
 
-### Community 734 - "agent-extract-structured-data.md"
-Cohesion: 0.29
-Nodes (6): Production notes, Run it, Setup, The agent, The schema, What self-repair actually does
-
 ### Community 735 - "LruCap"
 Cohesion: 0.22
 Nodes (3): createLruCap(), DEFAULT_LRU_CAPACITY, LruCap
 
-### Community 736 - "2026-05-29 — Context docs review findings"
-Cohesion: 0.40
-Nodes (4): 2026-05-29 — Context docs review findings, Axis 2 — Broken links, Axis 3 — Sidebar & DX, Priority
+### Community 736 - "`update` and `merge` — atomic read-modify-write"
+Cohesion: 0.29
+Nodes (6): Concurrent-in-process correctness, `merge(key, partial, options?)`, `update` and `merge` — atomic read-modify-write, `update(key, fn, options?)`, What you can't do, When to reach for what
 
-### Community 737 - "agent-vision-document-extraction.md"
-Cohesion: 0.25
-Nodes (7): Production notes, Run it — from a file path, Run it — from inline bytes, Setup, The agent, The capability error you'll hit if you get the model wrong, The schema
+### Community 737 - "production-entry-graph.test.ts"
+Cohesion: 0.29
+Nodes (4): coreRoot, DEV_ONLY_DIRECTORIES, GraphInput, productionEntry
 
-### Community 739 - "Use-cases by example"
-Cohesion: 0.25
-Nodes (8): Forwarding everything plus an injected field, Mixing validated + extra, Reading a header for tracing, Reading a typed param, Reading every field from a typed schema, Reading one field, Reading user identity on a guarded route, Use-cases by example
+### Community 739 - "runBrowserSmoke"
+Cohesion: 0.43
+Nodes (7): checkAnonymousGuards(), checkClientNavigation(), checkResponsiveForms(), pathOf(), runBrowserSmoke(), visitPage(), watchBrowserErrors()
 
-### Community 740 - "extract-json-lenient.ts"
-Cohesion: 0.46
-Nodes (4): extractJsonLenient(), firstOpenerIndex(), sliceFirstBalanced(), extractJsonPayload()
+### Community 740 - "The three methods"
+Cohesion: 0.33
+Nodes (6): `clear(tier?)`, Isolation — `scope` (4.15.0), `recall(query, options?)`, `remember(items)`, The three methods, Working-memory cap — `working: { maxItems }` (4.15.0)
 
-### Community 741 - "tools/release — the Warlock.js release runner"
-Cohesion: 0.50
-Nodes (3): Dispatching a release from automation, Repository history, tools/release — the Warlock.js release runner
+### Community 741 - "moderation-lazy-import.spec.ts"
+Cohesion: 0.33
+Nodes (4): constructed, create, CTX, FakeOpenAI
 
 ### Community 742 - "@warlock.js/ai"
 Cohesion: 0.29
@@ -3852,36 +3839,28 @@ Cohesion: 0.29
 Nodes (7): Arguments, Basic Validation, Examples, generate.validation, Options, Syntax, Validation with Request Type
 
 ### Community 748 - "hash-files.md"
-Cohesion: 0.03
-Nodes (70): Async-first — the one naming rule, "I want to…" → use, Next, The shape of `fs`, What `fs` will not do for you, A quick decision tree, Next, The last-write-wins caveat (+62 more)
+Cohesion: 0.02
+Nodes (101): Async-first — the one naming rule, "I want to…" → use, Next, The shape of `fs`, What `fs` will not do for you, A quick decision tree, Next, The last-write-wins caveat (+93 more)
 
 ### Community 749 - "Warlock — `warlock agents-md`"
 Cohesion: 0.29
 Nodes (6): From code, Rules, See also, `warlock dev` keeps it fresh, Warlock — `warlock agents-md`, What it writes
 
-### Community 750 - "B3 — Part 2: prod entry registers config-declared connectors (core)"
-Cohesion: 0.25
-Nodes (7): B3 — Part 2: prod entry registers config-declared connectors (core), NEW src/connectors/register-configured-connectors.ts, src/connectors/connectors-manager.ts, src/connectors/index.ts, src/production/production-builder.ts, Tests, Verification
+### Community 750 - "Built-in framework commands"
+Cohesion: 0.33
+Nodes (6): AI input measurement, AI tool lint and agent traces, Built-in framework commands, Database + migrations, Misc, Scaffolding
 
-### Community 751 - "locale-context-hmr.spec.ts"
-Cohesion: 0.29
-Nodes (7): devHarness(), PageModule, RendererModule, RootModule, SOURCE_ROOT, toPosix(), WEB_ROOT
+### Community 752 - "Common patterns"
+Cohesion: 0.40
+Nodes (5): Branching on environment in a config, Building an absolute path to a static asset, Common patterns, Health check endpoint, Reporting framework version at boot
 
-### Community 752 - "layout-sitemap-pipeline.spec.ts"
-Cohesion: 0.29
-Nodes (4): locales, page(), policyManifest(), temporaryDirectories
-
-### Community 753 - "security-and-platforms.md"
-Cohesion: 0.29
-Nodes (6): Cancellation and timeouts, Capability probe, Config homes, Environment, Exit codes and errors, Secrets never travel in argv
+### Community 753 - "result"
+Cohesion: 0.09
+Nodes (22): Bearer auth, Building blocks, Durable multi-turn serving, Errors, Related, Request and size contract, SSE response, The shape (+14 more)
 
 ### Community 754 - "Completed tasks"
-Cohesion: 0.03
-Nodes (63): WL5001, WL5002, WL5003, WL5004, WL5005, WL5xxx — http, Importing the errors without the framework, Transport & proxy trust (+55 more)
-
-### Community 755 - "lower-stage3-decorators.ts"
-Cohesion: 0.43
-Nodes (3): DecoratorLoweringPlugin, lowerStage3Decorators(), nextPluginName()
+Cohesion: 0.09
+Nodes (23): Completed tasks, T-001 [bug] Multi-site: a `locales.json` above the site folders reaches no page, T-002 [bug] Email sign-in is case-sensitive, T-003 [bug] Repository default `orderBy` is dropped with the caller's, T-004 [feature] `config.translations` cannot cover a computed lookup, T-005 [bug] A string equal to a group name ships the whole group, T-006 [bug] An unrelated import aliased as `t` counts as a translator, T-078 [feature] Deployment checks in `warlock doctor` (+15 more)
 
 ### Community 756 - "specs/package-manager.spec.ts"
 Cohesion: 0.29
@@ -3891,9 +3870,9 @@ Nodes (5): ExecCallback, execMock, execSyncMock, loadModule(), whichPmMock
 Cohesion: 0.29
 Nodes (6): Column naming follows `columnMap`, Common case — one line, Match your app's identifier type, See also, With extras — spread + extend, Write the notifications migration
 
-### Community 759 - "mongodb-replica-set-local-dev.md"
-Cohesion: 0.29
-Nodes (6): Cascade connection string, Docker Compose — the easiest path, Going further, Production replica sets, Testing it works, Without Docker — bare `mongod`
+### Community 759 - "2026-05-29 — Auth docs review findings"
+Cohesion: 0.40
+Nodes (4): 2026-05-29 — Auth docs review findings, Axis 2 — Broken links, Axis 3 — Sidebar & DX, Priority
 
 ### Community 760 - "Limiting & pagination"
 Cohesion: 0.29
@@ -3923,21 +3902,21 @@ Nodes (7): JSON & array helpers, `whereArrayContains` / `whereArrayNotContains` 
 Cohesion: 0.33
 Nodes (5): Behavior, Configuration, Example Usage, Options, When to Use
 
-### Community 767 - "`add <features...>`"
-Cohesion: 0.29
-Nodes (7): `add <features...>`, AI features, Choosing a UI kit, Installation and packages, Shared design system, `update`, `upgrade`
+### Community 767 - "Common patterns"
+Cohesion: 0.40
+Nodes (5): Audit log without leaking the secret, Common patterns, Encrypt before persisting via a model accessor, Encrypt + fingerprint together (the canonical pattern), Idempotency keys
 
-### Community 768 - "Manage roles"
-Cohesion: 0.29
-Nodes (6): Manage roles, Read roles, Roles stored elsewhere?, See also, The catalog (the `Role` table), The model (overridable)
+### Community 768 - "flush"
+Cohesion: 0.12
+Nodes (15): Assign per tenant, Checks are automatically tenant-scoped, Combine with a tenant-isolation policy, Setup, Cache, Assign / revoke, Manage roles, Read roles (+7 more)
 
 ### Community 769 - "per-environment.mdx"
 Cohesion: 0.33
 Nodes (5): Branch the cadence, Drive it from a table when there are many, Register a job only in some environments, Tune the tick interval too, Why no built-in environment switch?
 
-### Community 770 - "semanticCache"
-Cohesion: 0.04
-Nodes (51): Configuration, Delegated, not reinvented, Episodic & procedural tiers, Isolation — `scope`, Memory in an orchestrator, Related, The contract, The working tier is size-bounded (+43 more)
+### Community 770 - "rag-with-cache-similarity.md"
+Cohesion: 0.20
+Nodes (9): Add semantic response caching, Build the retrieval tool, Index your documents, Related, Setup, The agent, Use it, What's NOT here (+1 more)
 
 ### Community 771 - "Bulk operations — `cache.many` / `cache.setMany`"
 Cohesion: 0.33
@@ -3979,13 +3958,9 @@ Nodes (6): Arguments, Example, generate.resource, Options, Syntax, Usage in Mode
 Cohesion: 0.33
 Nodes (5): Benchmark, Dependencies, External, Internal (within `core/src`), Used By
 
-### Community 782 - "tool-calling-agent.md"
-Cohesion: 0.25
-Nodes (7): Inject context via artifacts, Related, Run it, Setup, The agent, The tools, Tool error handling
-
-### Community 783 - "Release-prep audit (2026-06-01)"
-Cohesion: 0.29
-Nodes (7): Notes / no-change-required (documented for accuracy), Release-prep audit (2026-06-01), Roadmap consolidation (2026-06-01), S1 — Critical (blocks a clean release), S2 — High, S3 — Medium, statement()
+### Community 782 - "2026-05-29 — Logger docs review findings"
+Cohesion: 0.40
+Nodes (4): 2026-05-29 — Logger docs review findings, Axis 2 — Broken links, Axis 3 — Sidebar & DX, Priority
 
 ### Community 784 - "column-read-guard.ts"
 Cohesion: 0.29
@@ -3995,13 +3970,13 @@ Nodes (4): columnReadGuardEnabled, GuardedModelClass, guardedModels, warnedColum
 Cohesion: 0.29
 Nodes (6): Lower Stage-3 decorators for Vite/Vitest, See also, Things NOT to do, Use it, Why it works, With Vitest 5 projects
 
-### Community 786 - "Warlock — request log"
-Cohesion: 0.29
-Nodes (6): Gotchas, Privacy rules you can rely on, Read it, Turn it on, Warlock — request log, What a record has
+### Community 786 - "`hashPassword` / `verifyPassword` — only for passwords"
+Cohesion: 0.50
+Nodes (4): bcryptjs, or native `bcrypt` when installed, Before and after, `hashPassword` / `verifyPassword` — only for passwords, The 72-byte limit
 
-### Community 788 - "2026-05-29 — Seal docs review findings"
-Cohesion: 0.33
-Nodes (5): 2026-05-29 — Seal docs review findings, Axis 1 — Documentation quality & drift, Axis 2 — Broken links, Axis 3 — Sidebar & DX, Priority
+### Community 788 - "idempotent-dispatch.mdx"
+Cohesion: 0.50
+Nodes (3): Checking whether it actually ran twice, Combine with delay for debounced work, Why this works
 
 ### Community 789 - "file-backend.spec.ts"
 Cohesion: 0.43
@@ -4043,17 +4018,13 @@ Nodes (3): Comment, Post, User
 Cohesion: 0.40
 Nodes (5): 1. Use Short Flags, 2. Combine Options, 3. Generate Multiple Components at Once, 4. Verify Before Overwriting, Tips & Tricks
 
-### Community 801 - "dispatch-interceptor.ts"
-Cohesion: 0.09
-Nodes (19): Checking whether it actually ran twice, Combine with delay for debounced work, Why this works, `DispatchOptions`, Failed jobs, `failedJobs(options?)`, `JobContext`, Jobs (+11 more)
-
-### Community 802 - "route-middleware.ts"
-Cohesion: 0.67
-Nodes (3): countEntries(), onRequest, TocEntry
+### Community 801 - "Configuration & lifecycle"
+Cohesion: 0.15
+Nodes (12): `closeQueue(options?)`, Configuration & lifecycle, Failed jobs, `failedJobs(options?)`, `getQueueDriver()` / `QueueDriver`, Notifications, `QueueConfig`, `queueConnector(options?)` (+4 more)
 
 ### Community 803 - "tarball-entry-points.mjs"
-Cohesion: 0.62
-Nodes (6): addBinTargets(), addExportTargets(), addPathTarget(), assertTarballContainsItsEntryPoints(), collectTarballEntryTargets(), normalize()
+Cohesion: 0.36
+Nodes (9): inspectArtifact(), normalizeTarEntry(), tarText(), addBinTargets(), addExportTargets(), addPathTarget(), assertTarballContainsItsEntryPoints(), collectTarballEntryTargets() (+1 more)
 
 ### Community 804 - "Socket"
 Cohesion: 0.40
@@ -4075,13 +4046,9 @@ Nodes (5): Create-Warlock V4 Specifications, Error Handling Policy, Overview, Te
 Cohesion: 0.40
 Nodes (5): Commands Executed, Final Message, Installation Flow, Package Manager Detection, Technical Details
 
-### Community 809 - "ai/index.mdx"
-Cohesion: 0.33
-Nodes (5): A 30-second example, The 4-primitive ladder, What's in this section, Where to go after, Why a separate package
-
-### Community 810 - "Common patterns"
-Cohesion: 0.33
-Nodes (6): AI tool dispatching mail with org-level config, Cancel a send when the user opted out, Common patterns, Password reset with OTP, Per-tenant SMTP with the functional API, Welcome email after signup
+### Community 809 - "job-one-server.spec.ts"
+Cohesion: 0.50
+Nodes (3): held, lockKeys, NOW
 
 ### Community 811 - "case9-outside-web.page.tsx"
 Cohesion: 0.60
@@ -4119,9 +4086,9 @@ Nodes (3): Authoring package guidance, How they sync, Package skill catalog
 Cohesion: 0.50
 Nodes (3): A page and its setup, Choose your starting point, Learn Web by task
 
-### Community 823 - "Implement a resolver"
-Cohesion: 0.33
-Nodes (5): Implement a resolver, Other recipes, Rules, See also, The default: dynamic, DB-backed (ejected)
+### Community 823 - "DefaultAccessResolver"
+Cohesion: 0.07
+Nodes (23): Tenant resolution, Roles, Show the edit button only when allowed, The policy, The route + service, Resolvers, T-029 [feature] Access resolvers may skip the shared cache, Implement a resolver (+15 more)
 
 ### Community 824 - "Write a CLI adapter"
 Cohesion: 0.50
@@ -4139,14 +4106,6 @@ Nodes (4): Error Handling, File Already Exists, Invalid Module Path, Module Does
 Cohesion: 0.50
 Nodes (4): Adding Validation to Existing Controller, Common Workflows, Creating a Complete CRUD Module, Creating a Simple Feature
 
-### Community 829 - "router-factory.ts"
-Cohesion: 0.40
-Nodes (5): buildRoutingSystemPrompt(), resolveIntentDescription(), resolvePrefix(), RouterConfig, routerOutputSchema()
-
-### Community 830 - "string-similarity.ts"
-Cohesion: 0.60
-Nodes (4): findSimilar(), levenshteinDistance(), startsWithAny(), Suggestion
-
 ### Community 841 - "case39-decorated-class.tsx"
 Cohesion: 0.83
 Nodes (3): Case39Component(), Entity(), Widget
@@ -4163,10 +4122,6 @@ Nodes (3): alias, exactAlias(), workspaceSource()
 Cohesion: 0.50
 Nodes (3): PackageExport, PackageJson, packageJson
 
-### Community 850 - "insert-queue-dashboard-block.ts"
-Cohesion: 0.47
-Nodes (4): DashboardBlockInsertion, findMatchingBraceIndex(), insertQueueDashboardBlock(), queueConfigStub
-
 ### Community 851 - "@warlock.js/core"
 Cohesion: 0.40
 Nodes (4): Conventions and pitfalls, The 80% path, Topics by area, @warlock.js/core
@@ -4175,49 +4130,29 @@ Nodes (4): Conventions and pitfalls, The 80% path, Topics by area, @warlock.js/c
 Cohesion: 0.40
 Nodes (3): Generator, GeneratorOptions, ParsedName
 
-### Community 932 - "uuid-v5.ts"
-Cohesion: 0.50
-Nodes (3): POSTMAN_ID_NAMESPACE, RFC-4122, uuidV5()
-
-### Community 933 - "tracing-dispatcher.ts"
-Cohesion: 0.07
-Nodes (36): A throwing hook never breaks a request, Enabling it, Example: log phases slower than a threshold, Gotchas, Phase names, Response header: no new one, See also, The `TracingHooks` shape (+28 more)
-
 ### Community 934 - "Navigate the code map"
 Cohesion: 0.33
 Nodes (5): Navigate the code map, Query the graph, Read in this order, Regenerate, What it covers and what it does not
 
-### Community 936 - "Day & time methods"
-Cohesion: 0.50
-Nodes (4): `at(time)`, `beginOf(type)` / `endOf(type)`, Day & time methods, `on(day)`
-
-### Community 941 - "Build output structure"
-Cohesion: 0.67
-Nodes (3): Build output structure, With `preserveModules: false`, With `preserveModules: true` (default)
-
-### Community 942 - "Versioning"
-Cohesion: 0.67
-Nodes (3): Family packages, Standalone packages, Versioning
-
 ## Knowledge Gaps
-- **106 isolated node(s):** `RFC-5322`, `RFC-8949`, `MissingAccessToken`, `InvalidAccessToken`, `Unauthorized` (+101 more)
-  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 16758 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
+- **106 isolated node(s):** `../../src/app/posts/resources/post.resource`, `../app/orders/tracker.service`, `RFC-9110`, `Early`, `Late` (+101 more)
+  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 16767 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
 - **130 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `Request` connect `Request` to `router/router.ts`, `Warlock — memoize work for one request`, `Response`, `session-cookies.spec.ts`, `server.ts`, `types/page-config.ts`, `Restful`, `http/request-log-snapshot.ts`, `list-endpoint.ts`, `global-translations.ts`, `inject-request-context.ts`, `HttpErrorCodes`, `tracing-dispatcher.ts`, `ForbiddenError`, `hardening-suite.ts`, `core/src/index.ts`, `authMiddleware`, `web/src/index.ts`, `generate-image-variants.ts`, ``v.date()` — method reference`, `provider-login.ts`, `locale-routing.ts`, `security-headers.ts`, `src/services/auth.service.ts`, `document-context.ts`, `.validated`, `track-request-log.ts`, `idempotency.middleware.ts`, `request.ts`, `logger/src/index.ts`, `useTrans`, `request-route-cache.spec.ts`, `Completed tasks`, `UploadedFile`, `t`?**
-  _High betweenness centrality (0.038) - this node is a cross-community bridge._
-- **What connects `RFC-5322`, `RFC-8949`, `MissingAccessToken` to the rest of the system?**
+- **Why does `Model` connect `Model` to `factories.ts`, `RefreshToken`, `ai-panoptic/src/index.ts`, `ModelEvents`, `cascade-scoped-budget-store.ts`, `ref_vitest`, `postgres/sync.test.ts`, `DatabaseLogModel`, `BaseValidator`, `events-and-hooks.md`, `DatabaseDirtyTracker`, `MongoDbDriver`, `hardening-suite.ts`, `cascade/src/index.ts`, `Migration`, `ChildModel`, `web/src/index.ts`, `Auth`, `database/utils.ts`, `http/index.ts`, `query-methods.ts`, `serialized.ts`, `inspect-app.ts`, `LoggingData`, `notifications/src/types.ts`, `DriverContract`, `DataSource`, `Use transactions`, `PostgresQueryBuilder`, `QueryBuilderContract`, `migration/migration.ts`?**
+  _High betweenness centrality (0.022) - this node is a cross-community bridge._
+- **What connects `../../src/app/posts/resources/post.resource`, `../app/orders/tracker.service`, `RFC-9110` to the rest of the system?**
   _106 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `supervisor/execution.ts` be split into smaller, more focused modules?**
-  _Cohesion score 0.020239028213166144 - nodes in this community are weakly interconnected._
-- **Why does `Model` connect `Model` to `factories.ts`, `LogContract`, `migrate`, `postgres-driver.ts`, `What the UI shows`, `ModelEvents`, `dispatch-interceptor.ts`, `ref_vitest`, `postgres/sync.test.ts`, `validation/init.ts`, `DatabaseDirtyTracker`, `hardening-suite.ts`, `cascade/src/index.ts`, `Migration`, `register-model.ts`, `password.ts`, `configuration.md`, `Auth`, `model/model.ts`, `serialized.ts`, `inspect-app.ts`, `notifications/src/types.ts`, `utils/test-helpers.ts`, `DataSource`, `inspect-app.spec.ts`, `PostgresQueryBuilder`, `request.ts`, `PostgresQueryParser`, `defer`, `QueryBuilderContract`, `core/src/validation/types.ts`, `budget.ts`, `migration/migration.ts`?**
-  _High betweenness centrality (0.033) - this node is a cross-community bridge._
-- **Should `AIError` be split into smaller, more focused modules?**
-  _Cohesion score 0.028547809313860566 - nodes in this community are weakly interconnected._
-- **Why does `SchemaContext` connect `password.ts` to `BaseValidator`, ``v.date()` — method reference`, `ref_vitest`, `base-validator.ts`?**
-  _High betweenness centrality (0.017) - this node is a cross-community bridge._
+  _Cohesion score 0.015922263893624274 - nodes in this community are weakly interconnected._
+- **Why does `Migration` connect `Migration` to `Model`, `MigrationDriverContract`, `Always-true facts`, `warlock-config.md`, `migrations.ts`, `column-helpers.ts`, `postgres/sync.test.ts`, `ForeignKeyBuilder`, `ChildModel`, `Warlock — write a seeder`, `configuration.md`, `seeders-manager.test.ts`, `MigrationRunner`, `Write a migration`, `@warlock.js/core`, `DataSource`, `migrations.test.ts`, `seeders.manager.ts`, `Alter a migration`, `ColumnBuilder`, `migration/migration.ts`?**
+  _High betweenness centrality (0.016) - this node is a cross-community bridge._
+- **Should `ai/src/errors/index.ts` be split into smaller, more focused modules?**
+  _Cohesion score 0.016089933136205013 - nodes in this community are weakly interconnected._
+- **Why does `CLICommand` connect `framework-cli-commands.ts` to `cli-commands.manager.ts`, `Always-true facts`, `files-orchestrator.ts`, `.environment`, `warlock-config.md`, `ref_node_path`, `production-builder.ts`, `authMiddleware`, `cli-commands.md`?**
+  _High betweenness centrality (0.015) - this node is a cross-community bridge._
 - **Should `ModelContract` be split into smaller, more focused modules?**
-  _Cohesion score 0.013798042492241584 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.015826843792945487 - nodes in this community are weakly interconnected._

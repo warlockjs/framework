@@ -183,6 +183,10 @@ export class WindowsProcessHelper {
       return;
     }
     clearTimeout(flight.timer);
+    // The helper process and its pipes are unreferenced, so this timer is the only
+    // thing keeping the event loop alive while a caller awaits the answer. It stays
+    // referenced and is cleared on every reply, retry and failure; an idle helper
+    // still never keeps the host process alive.
     flight.timer = setTimeout(() => {
       // A wedged helper is replaced, never trusted for the next request.
       this.discard();
@@ -193,7 +197,6 @@ export class WindowsProcessHelper {
         ),
       );
     }, this.timeoutMs);
-    flight.timer.unref?.();
   }
 
   private ensure(): HelperChild {

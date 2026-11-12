@@ -178,6 +178,53 @@ describe("runRegistrationChild", () => {
     expect(child.kill).toHaveBeenCalledOnce();
   });
 
+  it("names the config key and the variable, with an example value, when it times out", async () => {
+    vi.useFakeTimers();
+    const child = new FakeChild();
+    const result = run(child, { timeoutMs: 25 });
+    const assertion = expect(result).rejects.toThrow(
+      /No route module finished registering within 25ms\. Raise build\.routeRegistrationTimeoutMs in warlock\.config\.ts \(for example routeRegistrationTimeoutMs: 120000\) or set WARLOCK_ROUTE_REGISTRATION_TIMEOUT_MS \(for example WARLOCK_ROUTE_REGISTRATION_TIMEOUT_MS=120000\)/,
+    );
+
+    await vi.advanceTimersByTimeAsync(25);
+    await assertion;
+  });
+
+  it("restarts the limit each time the child starts another module", async () => {
+    vi.useFakeTimers();
+    const child = new FakeChild();
+    const result = run(child, { timeoutMs: 100 });
+
+    // 240ms in total, never more than 80ms between two modules
+    for (const module of ["a.ts", "b.ts", "c.ts"]) {
+      child.emit("message", { type: "route-registration:progress", module });
+      await vi.advanceTimersByTimeAsync(80);
+    }
+
+    child.emit("message", { type: RESULT, payload: "ok" });
+    child.emit("close", 0);
+
+    await expect(result).resolves.toEqual({ value: "ok" });
+    expect(child.kill).not.toHaveBeenCalled();
+  });
+
+  it("still times out when one module runs longer than the limit", async () => {
+    vi.useFakeTimers();
+    const child = new FakeChild();
+    const result = run(child, { timeoutMs: 100 });
+
+    child.emit("message", { type: "route-registration:progress", module: "a.ts" });
+    await vi.advanceTimersByTimeAsync(80);
+    child.emit("message", { type: "route-registration:progress", module: "b.ts" });
+
+    const assertion = expect(result).rejects.toThrow(
+      "timed out after 180ms while registering b.ts.",
+    );
+
+    await vi.advanceTimersByTimeAsync(100);
+    await assertion;
+  });
+
   it("rejects a child without an IPC send channel", async () => {
     const child = new FakeChild();
 

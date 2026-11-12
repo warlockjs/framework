@@ -573,7 +573,7 @@ class LineChecker {
 
     if (this.askMode) {
       if (!this.isRemembered(argv)) {
-        this.addAsk(argv, "nested");
+        this.addAsk(argv, "assignment", undefined, blocked);
       }
 
       return;
@@ -616,6 +616,7 @@ class LineChecker {
     argv: string[],
     reason: WorkspaceShellAsk["reason"],
     rule?: WorkspaceCommandRule,
+    variable?: string,
   ): void {
     const key = `${reason}\u0000${argv.join("\u0000")}`;
 
@@ -623,7 +624,12 @@ class LineChecker {
       return;
     }
 
-    this.asks.push({ argv: [...argv], reason, ...(rule !== undefined ? { rule } : {}) });
+    this.asks.push({
+      argv: [...argv],
+      reason,
+      ...(rule !== undefined ? { rule } : {}),
+      ...(variable !== undefined ? { variable } : {}),
+    });
   }
 
   /** Refuse when the matching rule denies. */
@@ -1709,11 +1715,15 @@ function runCheck(
       const first = checker.asks[0] as WorkspaceShellAsk;
       const shown = show(first.argv.join(" "));
       const why = first.rule?.reason !== undefined ? ` ${first.rule.reason}` : "";
+      const sets =
+        first.variable !== undefined
+          ? ` (it sets \`${first.variable}\`, which can make the command run a program the policy cannot check)`
+          : "";
 
       return {
         allowed: false,
         reason: "approval-required",
-        message: `${shown} needs approval, and the workspace shell policy has no approval handler (shell.onAsk).${why}`,
+        message: `${shown}${sets} needs approval, and the workspace shell policy has no approval handler (shell.onAsk).${why}`,
         asks: checker.asks,
         commands: checker.commands,
         paths: checker.paths,

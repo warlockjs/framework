@@ -2,6 +2,136 @@
 
 Newest first. Each entry records the release that shipped it and how it was verified.
 
+### T-099 [chore] Upgrade notes miss the route-hook typing change
+
+- Source: application upgrade report of 2026-11-12.
+- What and why: since the fastify floor moved in 5.53, installs resolve fastify 5.12.8, which types route hooks with
+  `this: FastifyInstance`. A spec that calls a `RouteOptions["serverOptions"]` hook directly fails with TS2740, and
+  nothing in the upgrade notes said so. The route options page and the integration-test pitfalls now explain the fix
+  (`hook.call(fastify, request, reply)`), and the 5.53.1 changelog, release summary and release entry carry it as an
+  upgrade note.
+- Evidence: `node_modules/fastify/types/hooks.d.ts:40` (the `this` typing);
+  `docs/src/content/docs/v/latest/core/the-basics/routing-deep.md`;
+  `docs/src/content/docs/v/latest/core/testing/integration-tests.md`; `packages/core/CHANGELOG.md` (5.53.1).
+- Acceptance: the note is in the docs pages and the 5.53.1 upgrade notes.
+- Shipped: 5.53.1 (tag `v5.53.1`).
+- Verified: the typing was read in the installed fastify types; documentation only, covered by the docs build and the
+  public-text gate of the release.
+
+### T-098 [bug] Route registration fails a large app at the 30-second limit
+
+- Source: application upgrade report of 2026-11-12.
+- What and why: the route-registration child had one 30-second limit for the whole step (default
+  `build.routeRegistrationTimeoutMs`, or `WARLOCK_ROUTE_REGISTRATION_TIMEOUT_MS`). A large app whose modules
+  were each fast still failed a build with "Route registration child timed out after 30015ms", and the message did not
+  say how to raise the limit. The limit now restarts each time the child finishes a route module, so it measures
+  time without progress; a single module longer than the limit still fails. The default stays 30000 ms. The error
+  now names both settings with an example (`routeRegistrationTimeoutMs: 120000`,
+  `WARLOCK_ROUTE_REGISTRATION_TIMEOUT_MS=120000`). A value an app set now means the longest time one module may take.
+- Evidence: `packages/core/src/production/registration-child-runner.ts:108-124` (timer and message), `:153-156`
+  (restart on progress); `packages/core/src/production/resolve-build-config.ts:121` (the variable);
+  `packages/core/src/warlock-config/default-configurations.ts:7`; `packages/core/src/warlock-config/types.ts`
+  (setting documentation); `docs/src/content/docs/v/latest/core/architecture-concepts/warlock-config.md`;
+  `packages/core/skills/run-app/SKILL.md`.
+- Acceptance: a child that keeps finishing modules is not cut off at the limit; a single module longer than the limit
+  still fails; the message names the setting and the variable.
+- Shipped: 5.53.1 (tag `v5.53.1`).
+- Verified: new specs in `packages/core/src/production/registration-child-runner.spec.ts` (message text, restart across
+  modules, one long module still times out) and `route-registration-snapshot.spec.ts` pass; the core typecheck is
+  clean; workspace typecheck, unit tests, lint, format and gates ran on the release tree. Time spent before the first
+  progress message (child start, file scan) still counts against one window. Not confirmed on the reporting app: if
+  one module alone takes longer than the limit, the setting still needs raising, and the message now says how.
+
+### T-097 [bug] Shell assignment refusals reuse the `"nested"` ask reason
+
+- Source: application upgrade report of 2026-11-12.
+- What and why: a command that sets a variable which steers which program runs (`NODE_OPTIONS=`, `PATH=`, `PAGER=`,
+  `GIT_*_COMMAND`, `*_ASKPASS`, `LD_*`, also through `env`, `export`, `read`, `printf -v`, `getopts`) reached
+  `shell.onAsk` with `reason: "nested"`, the reason `bash -c` uses, so an approval handler could not tell the model
+  which rule it hit. It now arrives as `reason: "assignment"` with the variable name in the new optional `variable`
+  field, and the text the model reads names the variable. A PowerShell `$env:NAME = value` was already refused as
+  `"unsupported-syntax"` (asked as `"unparsed"` with `onAsk`); it is not parsed as an assignment, there is no
+  PowerShell assignment grammar to attach a check to, and the docs now describe that behaviour.
+- Evidence: `packages/ai-workspace/src/contracts/shell-approval.type.ts:38,53`;
+  `packages/ai-workspace/src/policy/shell-check.ts:576`; `packages/ai-workspace/src/ops.ts:126`;
+  `docs/src/content/docs/v/latest/ai/tools/use-workspace.md`; `packages/ai-workspace/skills/use-a-workspace/SKILL.md`.
+- Acceptance: every assignment form asks with `"assignment"` and its variable; real runner asks stay `"nested"`
+  without `variable`; the refusal text names the variable.
+- Shipped: 5.53.1 (tag `v5.53.1`).
+- Verified: `shell-check.spec.ts` and `shell-rules.spec.ts` (end to end through `onAsk`) pass, and the package
+  typecheck passes; the PowerShell behaviour is pinned by a new spec; workspace typecheck, unit tests, lint, format
+  and gates ran on the release tree. Behaviour change for apps: a handler that matches `"nested"` exactly no longer
+  sees these asks (listed under Upgrading in the changelog).
+
+### T-096 [bug] Published source maps point at files an installed app does not have
+
+- Source: application upgrade report of 2026-11-12.
+- What and why: 5.53.0 removed `sourcesContent` from the published source maps to shrink tarballs, but their
+  `sources` still name files in the framework's own repository. The dev server's bundler looked each one up on disk
+  and logged "Sourcemap for … points to a source file outside its package" (225 warnings per start in the report),
+  burying real warnings. The tarballs ship no source files, so there is no content-free form that avoids the lookup
+  and keeps stack traces readable. The release step now keeps `sourcesContent` (the 5.52 map shape, which did not
+  warn) and checks every code map before packing: a map whose sources have no embedded content and do not resolve
+  inside the package refuses to pack, naming the package and the first maps. Tarballs are back to their 5.52 size
+  (`@warlock.js/core` about 3.5 MB instead of 2.4 MB).
+- Evidence: `tools/release/scripts/strip-source-map-sources.ts:27` (`assertSourceMapsSelfContained`);
+  `tools/release/scripts/release-family.ts:33,800`;
+  `tools/release/scripts/__tests__/strip-source-map-sources.spec.ts`.
+- Acceptance: published maps carry `sourcesContent`; a build that would publish maps without it stops at the
+  release step.
+- Shipped: 5.53.1 (tag `v5.53.1`).
+- Verified: the check's spec (9 cases) passes. Run read-only against the published tarballs, it passes all 31 packages
+  of 5.52.0 (for example core 711 maps, web 324) and refuses the 5.53.0 tarballs of web (327 maps) and core (731).
+  Not run in an app: that `warlock dev` shows no source-map warnings with the 5.53.1 tarballs is inferred from 5.52.0
+  having the same map shape and from the bundler's lookup rule. The check tests existence in the build directory and
+  does not check that `files` in `package.json` would leave a package-internal source out of the tarball. The file
+  keeps its old name; renaming it is a cosmetic follow-up.
+
+### T-095 [bug] A Windows script that awaits a supervisor call exits with code 13
+
+- Source: application upgrade report of 2026-11-12.
+- What and why: on Windows, `await supervisor(...).recover()` at the top level of a script with nothing else keeping
+  Node running exited with code 13 ("unsettled top-level await") about 20 ms in. Every supervisor call first asks the
+  PowerShell process-query helper who owns a pid. The helper, its pipes and the timer guarding its answer were all
+  unreferenced, so nothing held Node open while PowerShell started (about a second). The answer timer now stays
+  referenced while a caller waits (cleared on reply, retry, failure and close, and bounded by
+  `observationTimeoutMs`); an idle helper still never keeps the host alive. `recover()` with no registry file yet
+  resolves with an empty recovery on every platform. `spawn()` and `list()` had the same exposure; in an app, the
+  server kept Node alive, so only a bare script showed it. A pending query can now delay a natural exit by up to
+  `observationTimeoutMs`.
+- Evidence: `packages/process/src/windows-helper.ts:185-199` (`send()`), `:56-63` (unreferenced child and pipes);
+  `packages/process/src/supervisor.ts:164-197`; `packages/process/src/registry.ts:81-123`;
+  `packages/process/tests/host-exit.test.ts`; `docs/src/content/docs/v/latest/process/index.mdx`.
+- Acceptance: a top-level `await processes.recover()` settles on Windows with an empty recovery when the registry
+  file does not exist.
+- Shipped: 5.53.1 (tag `v5.53.1`).
+- Verified: not run on Windows locally (no Windows machine). The report's repro settles on Linux because the helper is
+  Windows-only. The mechanism was reproduced on Linux by driving the real `WindowsProcessHelper` with a stand-in helper
+  that answers after 300 ms: before the fix the script exited 13 after 33 ms ("Detected unsettled top-level await"),
+  after it the script exited 0 after 336 ms with the rows. `host-exit.test.ts` (3 cases; two fail before the fix on
+  Linux and pass after), `windows-helper.test.ts`, `windows-supervisor.test.ts` and `observation.test.ts` pass, and the
+  package typecheck is clean (it covers `src` only). The third case runs the real PowerShell path on the Windows CI
+  job (`windows.yml`, matrix entry `process`), which is the first real Windows run of the fix.
+
+### T-094 [bug] The global rate-limit key answers 500 for a client that disconnected
+
+- Source: application upgrade report of 2026-11-12.
+- What and why: the global `http.rateLimit` key (new in 5.53.0) called `normalizeIP(request.ip)`. When the client's
+  socket is already gone, `request.ip` is `undefined` and the call throws `TypeError: Cannot read properties of
+  undefined (reading 'toLowerCase')`, so the request answered 500 and recorded an error (about 13 times in one dev
+  session on a long-lived stream route the browser reopens and drops). The key now falls back to the socket's remote
+  address, then to the shared `unknown` bucket that `middleware.rateLimit()` uses, and only passes a string to
+  `normalizeIP`. `request.detectIp()` returns an empty string in that case instead of `undefined`; `ipFilter` already
+  refused a falsy address and the idempotency scope already used `"unknown"`.
+- Evidence: `packages/core/src/http/build-rate-limit-options.ts:13,25-38`; `packages/core/src/http/trusted-proxy.ts:89-111`;
+  `packages/core/src/http/trusted-proxy.spec.ts`; `packages/core/src/http/build-rate-limit-options.spec.ts`.
+- Acceptance: a request without a client address is counted in the `unknown` bucket and answers normally.
+- Shipped: 5.53.1 (tag `v5.53.1`).
+- Verified: the plugin's throw on an undefined address was confirmed by running the installed rate-limit plugin.
+  `build-rate-limit-options.spec.ts` (the real plugin with `ip` set to undefined answers 200, 200, 429; direct cases for
+  the socket fallback and `unknown`) and the new `trusted-proxy.spec.ts` pass; the core typecheck is clean. The new
+  specs were not run against the pre-fix code.
+
 ### T-093 [bug] HTTP request handling hardening
 
 - Source: security and performance audit of 2026-11-11.

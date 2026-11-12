@@ -4,6 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const DEFAULT_TIMEOUT_MS = 30_000;
+const ROUTE_REGISTRATION_TIMEOUT_ENV = "WARLOCK_ROUTE_REGISTRATION_TIMEOUT_MS";
 const MAX_DIAGNOSTIC_BYTES = 16_384;
 
 /** Message a registration child sends when it fails. Shared by every result kind. */
@@ -48,8 +49,10 @@ export type RegistrationChildRunOptions<TResult> = Readonly<{
  *
  * This is the fork / IPC / timeout / diagnostics plumbing shared by the route snapshot and
  * the OpenAPI document: the child is forked, sent one request, and must answer with exactly
- * one result message (or an error message) and exit 0. The timeout names the module the
- * child was still importing; the last 16 KiB of child stdout/stderr are attached to failures.
+ * one result message (or an error message) and exit 0. The timeout limits inactivity: it
+ * restarts each time the child reports that it starts a further module (so the previous one
+ * finished), and the error names the module the child was still importing. The last 16 KiB
+ * of child stdout/stderr are attached to failures.
  */
 export function runRegistrationChild<TResult>(
   options: RegistrationChildRunOptions<TResult>,
@@ -102,16 +105,23 @@ export function runRegistrationChild<TResult>(
       stderr = append(stderr, chunk);
     });
 
-    const timeout = setTimeout(() => {
-      const elapsedMs = Date.now() - startedAt;
+    const startTimeout = () => {
+      const handle = setTimeout(() => {
+        const elapsedMs = Date.now() - startedAt;
 
-      finish(
-        new Error(
-          `Route registration child timed out after ${elapsedMs}ms${pendingModule ? ` while registering ${pendingModule}` : ""}.${formatDiagnostics(stdout, stderr)}`,
-        ),
-      );
-    }, timeoutMs);
-    timeout.unref?.();
+        finish(
+          new Error(
+            `Route registration child timed out after ${elapsedMs}ms${pendingModule ? ` while registering ${pendingModule}` : ""}. No route module finished registering within ${timeoutMs}ms. Raise build.routeRegistrationTimeoutMs in warlock.config.ts (for example routeRegistrationTimeoutMs: 120000) or set ${ROUTE_REGISTRATION_TIMEOUT_ENV} (for example ${ROUTE_REGISTRATION_TIMEOUT_ENV}=120000).${formatDiagnostics(stdout, stderr)}`,
+          ),
+        );
+      }, timeoutMs);
+
+      handle.unref?.();
+
+      return handle;
+    };
+
+    let timeout = startTimeout();
 
     child.on("error", (error) => {
       finish(
@@ -138,6 +148,13 @@ export function runRegistrationChild<TResult>(
 
       if (message.type === REGISTRATION_PROGRESS_MESSAGE) {
         pendingModule = String(message.module);
+
+        // The child starts a module only after the previous one finished, so
+        // each report is progress: the limit applies to inactivity.
+        if (!settled) {
+          clearTimeout(timeout);
+          timeout = startTimeout();
+        }
 
         return;
       }

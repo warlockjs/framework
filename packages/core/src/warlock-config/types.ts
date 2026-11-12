@@ -71,8 +71,10 @@ export type WarlockConfig = {
      */
     outFile?: string;
     /**
-     * Maximum time to wait for the isolated route-registration process during
-     * `warlock build`. `WARLOCK_ROUTE_REGISTRATION_TIMEOUT_MS` overrides it.
+     * Maximum time the isolated route-registration process may go without
+     * finishing a route module during `warlock build` (and the other commands
+     * that load routes). The limit restarts each time the process moves on to
+     * the next module. `WARLOCK_ROUTE_REGISTRATION_TIMEOUT_MS` overrides it.
      *
      * @default 30000
      */

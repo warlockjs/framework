@@ -173,6 +173,8 @@ queries over stdin/stdout, so observing many processes does not start a PowerShe
 PID. Observations made together share one query, and a poll accepts a process-table
 snapshot up to one `pollIntervalMs` old; signals and ownership checks before a stop
 always read fresh. The helper restarts if it dies and shuts down with `stopAll()`.
+An idle helper never keeps your process alive, but a call waiting for its answer
+does, so a script can `await processes.recover()` (or any other call) at top level.
 The guardian replies to the resume request before it starts the workload, so a slow
 program start never counts against the timeout. Windows tree stops use
 `taskkill /PID <pid> /T /F`; no native addon is involved.

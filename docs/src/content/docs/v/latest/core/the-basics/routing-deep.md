@@ -114,6 +114,17 @@ A body over the route's limit gets Fastify's `413` (`FST_ERR_CTP_BODY_TOO_LARGE`
 
 Some `serverOptions` keys are read only when a route is registered and cannot be honoured by the dev wildcard: `schema`, `attachValidation`, `validatorCompiler`, `serializerCompiler`, `errorHandler`, `constraints`, `preSerialization`, `onSend`, `onResponse`, `onError`, `onTimeout`, `onRequestAbort` and `handler`. The dev server logs one warning per route and key when it boots, so the difference with production is visible.
 
+**Hooks in `serverOptions` are typed with `this`.** From fastify 5.12.8, which a fresh install or a lockfile update resolves (for example while upgrading Warlock.js), a route hook such as `onRequest` or `preHandler` is typed with `this: FastifyInstance`. Fastify binds `this` when it runs the hook, but a spec that calls the hook straight off the route options no longer typechecks (TS2740). Pass the instance yourself:
+
+```ts
+const hook = route.serverOptions?.preHandler as (
+  this: FastifyInstance,
+  ...args: unknown[]
+) => unknown;
+
+await hook.call(fastify, request, reply);
+```
+
 ## The `RouteBuilder` chain
 
 `router.route(path)` returns a `RouteBuilder` — a chainable builder that registers multiple verbs against the same path:

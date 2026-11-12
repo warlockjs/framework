@@ -123,7 +123,7 @@ That's the real default the reference project ships with — 260 requests per IP
 | `max`      | `number` | Maximum requests allowed within the window            |
 | `duration` | `number` | Window length in **milliseconds** (60_000 = 1 minute) |
 
-The keying is by client IP by default — every IP gets its own bucket. When an IP exceeds `max` requests within `duration` ms, every subsequent request inside that window comes back as a `429 Too Many Requests` until the window resets.
+The keying is by client IP by default — every IP gets its own bucket. When an IP exceeds `max` requests within `duration` ms, every subsequent request inside that window comes back as a `429 Too Many Requests` until the window resets. A request whose client has already disconnected has no address to key on: it uses the socket's remote address when there is one, and otherwise one shared `unknown` bucket, instead of failing.
 
 ### Picking sensible numbers
 

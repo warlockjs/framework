@@ -7,12 +7,20 @@ import { resolveClientIp } from "./trusted-proxy";
 const DEFAULT_IPV6_SUBNET = 64;
 
 /**
+ * The one bucket requests share when no client address can be resolved (the
+ * socket is already gone). Matches `middleware.rateLimit()`.
+ */
+const NO_CLIENT_ADDRESS_KEY = "unknown";
+
+/**
  * The global limiter's default key: the client address `request.detectIp()`
  * and `middleware.rateLimit()` use (the `http.realIpHeader` value from a
  * trusted proxy, else `request.ip`), grouped like the plugin groups IPv6
  * clients (the route's `rateLimit.ipv6Subnet`, else the global one). The
  * plugin's own default reads `request.ip` only, which under
  * `trustProxy: true` is the client-writable leftmost `X-Forwarded-For` entry.
+ * A request with no resolvable address (the client already disconnected)
+ * falls back to the socket's remote address, then to one shared bucket.
  */
 function clientKeyGenerator(globalIpv6Subnet: unknown) {
   return (request: FastifyRequest): string => {
@@ -20,7 +28,13 @@ function clientKeyGenerator(globalIpv6Subnet: unknown) {
       request.routeOptions?.config as { rateLimit?: { ipv6Subnet?: unknown } } | undefined
     )?.rateLimit?.ipv6Subnet;
 
-    return normalizeIP(resolveClientIp(request), subnetOf(routeSubnet ?? globalIpv6Subnet));
+    const address = resolveClientIp(request);
+
+    // `normalizeIP` throws on a non-string, which would answer the request
+    // with a 500 once the client has disconnected.
+    if (typeof address !== "string" || address.length === 0) return NO_CLIENT_ADDRESS_KEY;
+
+    return normalizeIP(address, subnetOf(routeSubnet ?? globalIpv6Subnet));
   };
 }
 

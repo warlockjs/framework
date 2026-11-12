@@ -119,6 +119,13 @@ const GREP_STEPS_PER_SLICE = 2_000_000;
 /** Most states a compiled `grep` pattern may have (bounded repeats expand). */
 const MAX_GREP_PATTERN_STATES = 4000;
 
+/** One ask as the refusal shows it: the command, plus the variable an `"assignment"` ask is about. */
+function describeAsk(ask: WorkspaceShellAsk): string {
+  const command = `\`${ask.argv.join(" ")}\``;
+
+  return ask.variable !== undefined ? `${command} (sets \`${ask.variable}\`)` : command;
+}
+
 /** The `cat -n` prefix for a line: right-aligned number (min width 6) and a tab. */
 function linePrefix(lineNumber: number): string {
   return `${String(lineNumber).padStart(6, " ")}\t`;
@@ -706,7 +713,7 @@ class Ops implements WorkspaceOps {
       const reason = refusalReason(decision?.reason);
 
       throw new WorkspacePolicyError(
-        `Running ${asks.map((ask) => `\`${ask.argv.join(" ")}\``).join(", ")} was not approved${reason}`,
+        `Running ${asks.map(describeAsk).join(", ")} was not approved${reason}`,
         { type: "denied-command", reason: "approval-denied", command },
       );
     }

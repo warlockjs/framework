@@ -530,6 +530,70 @@ describe("checkShellCommand — variables that run another program", () => {
 
     expect(verdict.allowed).toBe(false);
     expect(verdict.reason).toBe("approval-required");
-    expect(verdict.asks).toEqual([{ argv: ["GIT_PAGER=x", "git", "log"], reason: "nested" }]);
+    expect(verdict.asks).toEqual([
+      { argv: ["GIT_PAGER=x", "git", "log"], reason: "assignment", variable: "GIT_PAGER" },
+    ]);
+    expect(verdict.message).toContain("`GIT_PAGER`");
+  });
+
+  it("asks with the assignment reason and the variable for every assignment form", () => {
+    const asking = policy({
+      interpreter: "sh",
+      allow: ["git", "env", "export", "read", "printf", "getopts"],
+      onAsk: async () => ({ allow: false }),
+    });
+
+    for (const [line, variable] of [
+      ["NODE_OPTIONS=--require=./x.js git status", "NODE_OPTIONS"],
+      ["env GIT_SSH_COMMAND=x git fetch", "GIT_SSH_COMMAND"],
+      ["export GIT_PAGER=x; git log", "GIT_PAGER"],
+      ["read PATH < x.txt; git status", "PATH"],
+      ["printf -v PATH '%s' /tmp/evil; git status", "PATH"],
+      ["getopts ab GIT_PAGER; git log", "GIT_PAGER"],
+    ] as const) {
+      const asks = checkShellCommand(asking, line).asks;
+
+      expect(asks.length, line).toBeGreaterThan(0);
+      expect(
+        asks.map((ask) => [ask.reason, ask.variable]),
+        line,
+      ).toContainEqual(["assignment", variable]);
+      expect(
+        asks.filter((ask) => ask.reason === "nested"),
+        line,
+      ).toEqual([]);
+    }
+  });
+
+  it("keeps the nested reason for a runner and gives it no variable", () => {
+    const asking = policy({
+      interpreter: "sh",
+      rules: [{ match: "git push", effect: "ask" }],
+      onAsk: async () => ({ allow: false }),
+    });
+    const asks = checkShellCommand(asking, "bash -c 'git status'").asks;
+
+    expect(asks[0]).toMatchObject({ reason: "nested" });
+    expect(asks[0]).not.toHaveProperty("variable");
+  });
+
+  it("refuses and asks about a PowerShell variable assignment as unparsed", () => {
+    const line = '$env:PATH = "C:\\evil"; git status';
+    const refusing: WorkspacePolicy = {
+      cwd: "/srv/jail",
+      shell: { interpreter: "powershell", allow: ["git"] },
+    };
+    const asking: WorkspacePolicy = {
+      cwd: "/srv/jail",
+      shell: { interpreter: "powershell", allow: ["git"], onAsk: async () => ({ allow: false }) },
+    };
+
+    expect(checkShellCommandInDialect(refusing, line, "powershell")).toMatchObject({
+      allowed: false,
+      reason: "unsupported-syntax",
+    });
+    expect(checkShellCommandInDialect(asking, line, "powershell").asks[0]).toMatchObject({
+      reason: "unparsed",
+    });
   });
 });

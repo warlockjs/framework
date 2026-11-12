@@ -225,6 +225,17 @@ describe("shell rules (allow / ask / deny)", () => {
     expect(unreadable.asks[0]?.reason).toBe("unparsed");
   });
 
+  it("hands onAsk an assignment ask with the variable and names it in the refusal", async () => {
+    const onAsk = vi.fn<WorkspaceShellOnAsk>(async () => ({ allow: false }));
+    const ws = build({ rules, onAsk });
+
+    await expect(ws.exec("GIT_PAGER=x git status")).rejects.toThrow("sets `GIT_PAGER`");
+    expect(onAsk.mock.calls[0]?.[0].asks[0]).toMatchObject({
+      reason: "assignment",
+      variable: "GIT_PAGER",
+    });
+  });
+
   it("asks about a runner it cannot see into as nested", () => {
     const verdict = checkShellCommand(
       { cwd, shell: { interpreter: "sh", rules, onAsk: async () => ({ allow: true }) } },

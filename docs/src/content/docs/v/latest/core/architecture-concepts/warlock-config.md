@@ -92,14 +92,17 @@ build: {
 }
 ```
 
-| Field          | Default      | Purpose                                                              |
-| -------------- | ------------ | -------------------------------------------------------------------- |
-| `outdir`       | `<cwd>/dist` | Where the bundled output goes (alias: `outDirectory`)                |
-| `outFile`      | `"app.js"`   | The name of the bundled file                                         |
-| `minify`       | `true`       | Whether the production bundle is minified                            |
-| `sourcemap`    | `true`       | Sourcemap mode — `true`, `false`, `"inline"`, or `"linked"`          |
-| `singleBundle` | `false`      | Inline dependencies into one runnable file — see below               |
-| `esmShim`      | `true`       | Recreate `require` / `__filename` / `__dirname` for bundled CommonJS |
+| Field                        | Default      | Purpose                                                                                   |
+| ---------------------------- | ------------ | ----------------------------------------------------------------------------------------- |
+| `outdir`                     | `<cwd>/dist` | Where the bundled output goes (alias: `outDirectory`)                                     |
+| `outFile`                    | `"app.js"`   | The name of the bundled file                                                              |
+| `minify`                     | `true`       | Whether the production bundle is minified                                                 |
+| `sourcemap`                  | `true`       | Sourcemap mode — `true`, `false`, `"inline"`, or `"linked"`                               |
+| `singleBundle`               | `false`      | Inline dependencies into one runnable file — see below                                    |
+| `esmShim`                    | `true`       | Recreate `require` / `__filename` / `__dirname` for bundled CommonJS                      |
+| `routeRegistrationTimeoutMs` | `30000`      | How long the route-registration child may go without finishing a route module — see below |
+
+`routeRegistrationTimeoutMs` limits inactivity, not the whole step. `warlock build`, `warlock generate.typings`, `warlock openapi` and the Postman generator load your route modules in an isolated child process, and the limit restarts each time the child moves on to the next module, so a large app that keeps making progress is not cut off. The build fails only when the child goes longer than the limit without moving on: one module that takes that long, or the start-up before the first module (environment, config, bootstrap); the error names the module it was on and both ways to raise it: `routeRegistrationTimeoutMs: 120000` under `build` in `warlock.config.ts`, or the `WARLOCK_ROUTE_REGISTRATION_TIMEOUT_MS=120000` environment variable (which wins over the config). Invalid values warn and use 30000.
 
 `outDirectory` is accepted as an alias for `outdir`. Earlier docs used that name while the code only ever read `outdir`, so configs written from them were silently ignored — both work now, and `outdir` wins if you set both.
 

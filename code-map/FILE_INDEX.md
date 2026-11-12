@@ -1690,7 +1690,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/ai-workspace/src/hooks/after-edit.ts` - wrap, runAfterEdit
 - `packages/ai-workspace/src/hooks/shell-output.ts` - ShellOutputSource, ShellOutputStreamer, hooks/shell-output.ts
 - `packages/ai-workspace/src/index.ts` - ai-workspace/src/index.ts
-- `packages/ai-workspace/src/ops.ts` - OpsRuntime, Ops, DEFAULT_LIST_IGNORE, MAX_MULTI_EDITS, TOO_LARGE, linePrefix, clipUtf8, numberWindow
+- `packages/ai-workspace/src/ops.ts` - OpsRuntime, Ops, DEFAULT_LIST_IGNORE, MAX_MULTI_EDITS, TOO_LARGE, describeAsk, linePrefix, clipUtf8
 - `packages/ai-workspace/src/output/spill-dir.ts` - resolveSpillDir
 - `packages/ai-workspace/src/output/spill.ts` - SpilledText, SpilledList, OutputSpiller, byteLength, headOf, tailOf, splitLines, takeHead
 - `packages/ai-workspace/src/patch/apply-hunks.ts` - bare, loose, split, usesCrlf, findMatch, applyHunks
@@ -2189,7 +2189,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/context/src/shared-storage.ts` - ContextFrame, ContextStorage, ContextSlot, sharedStorage, runWithSlots, withSlots
 - `packages/context/vitest.config.ts` - context/vitest.config.ts
 
-## packages/core (646 test files not listed)
+## packages/core (647 test files not listed)
 
 - `packages/core/README.md`
 - `packages/core/TODO.md`
@@ -3690,7 +3690,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/notifications/src/types.ts` - Notifiable, Id, RecipientRef, MailPayload, NotificationInput, DatabasePayload, NotificationChannels, ChannelName
 - `packages/notifications/vitest.config.ts` - notifications/vitest.config.ts
 
-## packages/process (9 test files not listed)
+## packages/process (10 test files not listed)
 
 - `packages/process/README.md`
 - `packages/process/scripts/generate-llms.mjs` - process/scripts/generate-llms.mjs, scriptDir, pkgRoot, skillsDir, llmsTxtPath, llmsFullPath, pkgJson, shortName
@@ -4394,7 +4394,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `tools/release/scripts/skill-path-refs.ts` - SkillPathRef, SkillLayoutIssue, __filename, __dirname, REPO_ROOT, PACKAGES_ROOT, isDirectory, toPosix
 - `tools/release/scripts/skill-snippet-gate.ts` - WorkspacePackage, DiscoveredSkill, BlockLang, ExtractedBlock, ClassifiedBlock, CompiledFileResult, SkillCompileResult, TypePathConflict
 - `tools/release/scripts/strictness-gate.ts` - WorkspacePackage, OwnedDiagnostic, Measurement, StrictnessPackageResult, StrictnessGateRunResult, __filename, __dirname, REPO_ROOT
-- `tools/release/scripts/strip-source-map-sources.ts` - stripSourceMapSources
+- `tools/release/scripts/strip-source-map-sources.ts` - SourceMapShape, assertSourceMapsSelfContained, isSourceMap, sourcesWithoutContent, decodeSourcePath, isFile
 - `tools/release/scripts/tarball-entry-points.d.mts`
 - `tools/release/scripts/tarball-entry-points.mjs` - collectTarballEntryTargets, addPathTarget, addBinTargets, addExportTargets, normalize, assertTarballContainsItsEntryPoints
 - `tools/release/scripts/warlock-family.ts` - ConfiguredFamilyMember, WarlockFamilyDeclaration, PublishableManifest, WarlockFamilyMember, WarlockFamily, DeriveWarlockFamilyOptions, PackageManifest, WARLOCK_FAMILY_NAME

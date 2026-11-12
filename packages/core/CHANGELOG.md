@@ -6,6 +6,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 > ⚠ **Versioning: `@warlock.js/*` does not follow SemVer strictly — breaking changes may ship in a minor.** This is a deliberate decision, not an oversight: the framework is pre-adoption and the cost of a major per behaviour fix currently outweighs the benefit. **Pin an exact version or a tilde range (`~4.13.0`) if you need to opt into changes rather than receive them.** Every breaking change is marked **BREAKING** in its entry and summarised in an _Upgrading_ section at the top of the release. **This policy will change once the framework has consumers beyond its author.**
 
+## 5.53.1 - 2026-11-12
+
+### Upgrading
+
+- The route-registration timeout (`build.routeRegistrationTimeoutMs`, or `WARLOCK_ROUTE_REGISTRATION_TIMEOUT_MS`) now limits the time without progress, not the whole step: the limit restarts each time the registration child finishes a route module. A value you set now means "the longest time without finishing a route module"; the default stays 30000 ms. A build that failed at 30 seconds only because the app is large now passes without a change; a single module that takes longer than the limit still fails, and so does a start-up (before the first module) or a finishing step (after the last one) that takes longer.
+- `request.detectIp()` returns an empty string, not `undefined`, when the client's socket is already gone and no address is left. Code that tested `=== undefined` should test for a falsy value.
+- The 5.53.0 change that removed `sourcesContent` from published source maps is reverted for every `@warlock.js/*` package and `create-warlock`: tarballs are back to their 5.52 size (`@warlock.js/core` about 3.5 MB instead of 2.4 MB). Apps need no change.
+- Hooks in `RouteOptions["serverOptions"]` are typed with `this: FastifyInstance` by fastify 5.12.8, which a fresh install or a lockfile update resolves, so a spec that calls one directly fails to typecheck (TS2740). Call it as `hook.call(fastify, request, reply)`.
+
+### Fixed
+
+- The global `http.rateLimit` key no longer throws when the client has already disconnected. In 5.53.0 a request whose socket was gone (`request.ip` undefined, common on long-lived stream routes the browser reopens and drops) failed with `TypeError: Cannot read properties of undefined (reading 'toLowerCase')` and answered 500. The key now falls back to the socket's remote address and then to one shared `unknown` key, the fallback `middleware.rateLimit()` already used. In that case `request.detectIp()` returns an empty string, `ipFilter` refuses the request and the idempotency scope uses `"unknown"`.
+- A large app no longer fails a build at the 30-second route-registration limit while it keeps registering route modules (see Upgrading). The error for a timeout now names both ways to raise the limit, with an example: `routeRegistrationTimeoutMs: 120000` in `warlock.config.ts`, or `WARLOCK_ROUTE_REGISTRATION_TIMEOUT_MS=120000`.
+- Published source maps embed their original sources again (`sourcesContent`). Since 5.53.0 every package shipped maps without them, and their `sources` paths name files in the framework's own repository, which an installed app does not have. The dev server logged a warning for each package module it loaded ("Sourcemap for … points to a source file outside its package" or "… points to missing source files"), often hundreds per start, and real warnings were lost among them. With the sources embedded, as in 5.52, the bundler has nothing to look up on disk. Stack traces keep every file name and line, and debuggers show the original TypeScript again. The release now refuses to pack a package whose source maps would bring the warnings back.
+
+### Documentation
+
+- The route options page and the integration-test pitfalls explain calling a hook typed with `this` as `hook.call(fastify, request, reply)`.
+- The `routeRegistrationTimeoutMs` documentation (warlock config page, `run-app` skill) describes the no-progress meaning, and the rate-limit recipe and `use-middleware` skill describe the no-address case.
+
 ## 5.53.0 - 2026-11-11
 
 ### Upgrading

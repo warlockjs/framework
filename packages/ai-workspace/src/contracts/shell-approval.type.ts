@@ -29,7 +29,13 @@ export type WorkspaceShellAskReason =
   /** The line uses syntax the policy cannot read, so no command in it can be checked. */
   | "unparsed"
   /** It runs another command the policy cannot see into (`bash -c`, `xargs`, `iex`, …). */
-  | "nested";
+  | "nested"
+  /**
+   * It sets a variable that can make an allowed program run another program or
+   * load code (`NODE_OPTIONS=… cmd`, `env PATH=… cmd`, `export GIT_PAGER=…`,
+   * `read PATH`, `printf -v PATH`, `getopts spec PATH`). `variable` names it.
+   */
+  | "assignment";
 
 /** One command (or unreadable line) `shell.onAsk` is asked about. */
 export interface WorkspaceShellAsk {
@@ -39,6 +45,12 @@ export interface WorkspaceShellAsk {
   rule?: WorkspaceCommandRule;
   /** Why it is being asked about. */
   reason: WorkspaceShellAskReason;
+  /**
+   * The variable the command sets, exactly as written. Present only when
+   * `reason` is `"assignment"`; add it to `shell.allowAssignments` to stop
+   * asking about it.
+   */
+  variable?: string;
 }
 
 /** What `shell.onAsk` is told: one call per line, covering every ask in it. */

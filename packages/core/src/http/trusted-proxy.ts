@@ -87,7 +87,8 @@ export function isTrustedProxyPeer(address: string | undefined, trustProxy: unkn
 
 /** What {@link resolveClientIp} reads from a Fastify request. */
 export type ClientIpSource = {
-  ip: string;
+  /** Undefined once the client's socket is gone (a dropped stream, a reset connection). */
+  ip?: string;
   headers: Record<string, string | string[] | undefined>;
   socket?: { remoteAddress?: string };
 };
@@ -100,6 +101,12 @@ export type ClientIpSource = {
  *
  * The one rule behind `request.detectIp()`, `middleware.rateLimit()` and the
  * global `http.rateLimit` key, so every consumer agrees on who the client is.
+ *
+ * When the client's socket is already gone, `request.ip` is undefined: the
+ * socket's remote address is used, and when that is missing too the result is
+ * an empty string, never `undefined`. Callers treat an empty address as "no
+ * client address" (`ipFilter` refuses it, the rate limiters use one shared
+ * bucket, the idempotency scope falls back to `"unknown"`).
  */
 export function resolveClientIp(request: ClientIpSource): string {
   // `unknown`: trustProxy accepts a boolean, a CIDR list or a predicate.
@@ -124,5 +131,7 @@ export function resolveClientIp(request: ClientIpSource): string {
     }
   }
 
-  return request.ip;
+  return typeof request.ip === "string" && request.ip.length > 0
+    ? request.ip
+    : (request.socket?.remoteAddress ?? "");
 }

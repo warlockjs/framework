@@ -810,3 +810,49 @@ Ordered by value: security first, then performance, then features and bugs. Line
 - Acceptance: the refusal names `web.devAllowedHosts` (a pre-middleware with the same host check, or a rewritten
   403 body); spec.
 - Status: open.
+
+### T-100 [bug] `warlock generate.typings` reported to hang on Windows
+
+- Source: application upgrade report of 2026-11-12 (Windows 11, Node 24.15.0); the same report says it happened before
+  and after 5.53.
+- What and why: on Windows, the package scripts that run `warlock generate.typings` (the typecheck and the build) stop
+  at that step. The team typechecks with `tsc --noEmit` directly and builds without the step. No further detail came
+  with the report. Not confirmed from the source: the command does not reach the supervisor code fixed in 5.53.1
+  (T-095). It runs `filesOrchestrator.initializeAll()`, `typeGenerator.generateAll()` and the connectors' typings
+  (which fork the route-registration child and run web's `build.typings` hook). The scaffolded `recover()` call runs
+  only in `Application.onValidateBoot`, which `generate.typings` never runs. Every step on the path is bounded or
+  shared with paths that work on the reporting machine (`warlock build` and `warlock dev`), and a successful run ends
+  through `exitAfterFlush(0)`, so a lingering handle cannot keep it open.
+- Evidence: `packages/core/src/cli/commands/typings-generator.command.ts:30-52` (the action);
+  `packages/core/src/production/registration-child-runner.ts:108-124,153-156` (timeout and restart on progress);
+  `packages/core/src/cli/cli-commands.manager.ts:52,326` (`exitAfterFlush`);
+  `packages/web/src/build/contribution.ts:382-411` (web's `typings` hook);
+  `packages/web/src/build/load-web-build-config.ts:70` (`loadWebBuildConfig`);
+  `packages/core/src/dev-server/type-generator.ts:51` (`listRouteLocaleKeysForTypeGeneration`);
+  `packages/core/src/generations/features/process.feature.ts:27` (the scaffolded `recover()` call).
+- Candidate causes, most likely first:
+  1. The registration child is slow and the command prints nothing while it waits. The same app needed a 180-second
+     limit for route registration (T-098), the limit now restarts on every module, so with a raised limit the total
+     time is unbounded, and the child's output is shown only on failure. A run of several minutes with no output reads
+     as a hang.
+  2. Web's `build.typings` hook, which only `generate.typings` runs. `loadWebBuildConfig()` bundles `src/config/web.ts`
+     with its app imports and imports the result in the CLI process; app code that runs at import (a database or cache
+     client, a top-level await) can block it there. `warlock build` loads it too, so this ranks lower.
+  3. `listRouteLocaleKeysForTypeGeneration()` imports `@warlock.js/web/build` into the CLI process. `warlock dev`
+     does the same, so it is the least likely.
+- How to settle it on a Windows machine, in the app:
+  - Watch which files change. `generateAll` writes `.warlock/typings/*.d.ts`; web's hook writes
+    `.warlock/typings/web-routes.d.ts` last. If the first group updates and the last never does, the hang is in the
+    connector step. In Task Manager, a second `node.exe` child with CPU time still moving means the registration child is
+    still importing (candidate 1).
+  - Run `set WARLOCK_ROUTE_REGISTRATION_TIMEOUT_MS=30000` and then `npx warlock generate.typings`. A timeout error that
+    names a module confirms candidate 1.
+  - Run `node --inspect node_modules/@warlock.js/core/bin/warlock.js generate.typings`, attach the Chrome DevTools
+    inspector, pause after a minute and read the stack. Or preload
+    `--import data:text/javascript,setInterval(()=>console.error(Date.now(),process.getActiveResourcesInfo()),10000)`
+    to print what the process is waiting on: a `ChildProcess` or `Pipe` points to candidate 1, a `TCPWrap` points to
+    app code in candidate 2.
+- Acceptance: the cause is identified on a Windows machine and either fixed with a spec (or, for candidate 1, the
+  command prints progress and the child's output while it waits), or closed as an app-side import.
+- Status: open. Not confirmed from the source; no code changed in 5.53.1.
+- Owner decision: none; needs someone with a Windows machine to run the steps above.

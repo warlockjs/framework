@@ -1,5 +1,15 @@
 # Changelog — @warlock.js/process
 
+## 5.53.1 - 2026-11-12
+
+### Changed
+
+- On Windows, a supervisor call that is waiting for the process-query helper's answer now keeps Node running until the answer arrives (normally milliseconds; at most `observationTimeoutMs`). An idle helper still never keeps the process alive. A pending query, including one started by the monitor's background poll, can therefore delay a natural exit by that long.
+
+### Fixed
+
+- On Windows, a script that awaited `supervisor().recover()`, `spawn()`, `list()` or any other supervisor call at top level, with nothing else keeping Node running, exited with code 13 ("unsettled top-level await") about 20 ms into the call. The process-query helper (one PowerShell per supervisor) and its pipes do not hold the process open, and the timer guarding its answer did not either, so Node exited before PowerShell could reply. The timer now keeps the process alive while a call waits for the answer, so the call settles. `recover()` with no registry file yet resolves with an empty recovery (`{ adopted: [], stopped: [], cleared: [] }`) on every platform. Apps whose server already kept Node running were not affected.
+
 ## 5.45.0 - 2026-11-05
 
 ### Added

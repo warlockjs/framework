@@ -4,6 +4,21 @@ All notable changes to `@warlock.js/ai-workspace` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.53.1 - 2026-11-12
+
+### Upgrading
+
+- A command that sets a variable which can make an allowed program run another program (`NODE_OPTIONS=… cmd`, `env PATH=… cmd`, `export GIT_PAGER=…`, `read PATH`, `printf -v PATH`, `getopts spec PATH`) now reaches `shell.onAsk` with `reason: "assignment"` instead of `"nested"`. `"nested"` is now only for commands that run another command the policy cannot see into (`bash -c`, `xargs`, `iex`, …). If your `onAsk` switches on `asks[i].reason`, add the `"assignment"` case: a handler that treated unknown reasons like `"nested"` keeps working, but one that matches `"nested"` exactly no longer sees these asks.
+
+### Added
+
+- `WorkspaceShellAskReason` gains `"assignment"`, and `WorkspaceShellAsk` gains an optional `variable` field with the variable name (present only for this reason), so an approval handler can tell the model which rule it hit. Add the name to `shell.allowAssignments` to stop the ask.
+
+### Changed
+
+- The text the model reads names the variable: the "needs approval" message says ``(it sets `NAME`, …)`` and the "was not approved" refusal says ``(sets `NAME`)``. The direct refusal (without `onAsk`) already named it and is unchanged.
+- A PowerShell assignment such as `$env:NAME = value` is refused as `"unsupported-syntax"`, or asked with `reason: "unparsed"` when `onAsk` is set. This is how it already behaved; the workspace page and the `use-a-workspace` skill now say so.
+
 ## 5.53.0 - 2026-11-11
 
 ### Upgrading

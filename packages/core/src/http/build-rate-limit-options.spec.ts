@@ -1,6 +1,6 @@
 import fastifyRateLimit from "@fastify/rate-limit";
 import config from "@mongez/config";
-import Fastify from "fastify";
+import Fastify, { type FastifyRequest } from "fastify";
 import { afterEach, describe, expect, it } from "vitest";
 import { buildRateLimitOptions } from "./build-rate-limit-options";
 import { CacheRateLimitStore } from "./rate-limit-cache-store";
@@ -161,6 +161,44 @@ describe("global rate limiter client key", () => {
     } finally {
       await server.close();
     }
+  });
+
+  it("keys a request with no client address without throwing", async () => {
+    const server = Fastify();
+
+    // the client's socket is already gone: Fastify reports no address
+    server.addHook("onRequest", async (request) => {
+      Object.defineProperty(request, "ip", { value: undefined, configurable: true });
+    });
+    await server.register(fastifyRateLimit, buildRateLimitOptions({ max: 2 })!);
+    server.get("/", async () => "ok");
+    await server.ready();
+
+    try {
+      const statuses: number[] = [];
+
+      for (let attempt = 0; attempt < 3; attempt++) {
+        statuses.push((await server.inject({ url: "/" })).statusCode);
+      }
+
+      expect(statuses).toEqual([200, 200, 429]);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("falls back to the socket address, then to one shared key", () => {
+    const keyGenerator = buildRateLimitOptions({})!.keyGenerator as (
+      request: FastifyRequest,
+    ) => string;
+    const request = (ip: string | undefined, remoteAddress: string | undefined) =>
+      ({ ip, headers: {}, socket: { remoteAddress } }) as unknown as FastifyRequest;
+
+    expect(keyGenerator(request(undefined, "198.51.100.9"))).toBe("198.51.100.9");
+    expect(keyGenerator(request(undefined, undefined))).toBe("unknown");
+    expect(keyGenerator({ ip: undefined, headers: {} } as unknown as FastifyRequest)).toBe(
+      "unknown",
+    );
   });
 
   it("keeps an app's own keyGenerator", async () => {

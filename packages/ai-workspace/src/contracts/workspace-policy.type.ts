@@ -143,8 +143,8 @@ export interface WorkspaceShellPolicy {
    * `EDITOR`, `LD_PRELOAD`, `*_ASKPASS`, …). When the policy restricts which
    * programs run (`allow`, `deny`, `denyPatterns`, `rules` or
    * `allowCommand`), assigning one of those — `NAME=value cmd`, `env
-   * NAME=value cmd` or `export NAME=value` — is refused (asked with `onAsk`)
-   * unless it is listed here. Default `[]`.
+   * NAME=value cmd` or `export NAME=value` — is refused (asked with `onAsk`, with
+   * reason `"assignment"`) unless it is listed here. Default `[]`.
    *
    * @example
    * shell: { interpreter: "sh", allow: ["npm"], allowAssignments: ["NODE_OPTIONS"] }

@@ -5423,7 +5423,7 @@ export default defineConfig({
     sourcemap: true, // default — true | false | "inline" | "linked"
     singleBundle: false, // default — one runnable file, deps inlined
     esmShim: true, // default — require/__filename/__dirname for bundled CJS
-    routeRegistrationTimeoutMs: 30_000, // default — route-registration child deadline
+    routeRegistrationTimeoutMs: 30_000, // default — route-registration child inactivity limit
   },
 });
 ```
@@ -5437,7 +5437,7 @@ Defaults are sensible for the typical "Node service" deployment. Knobs to actual
 - **`sourcemap: false`** — skip source maps entirely. Smaller artifact, but stack traces in production logs lose their file:line precision (and `warlock start` will not enable `--enable-source-maps` since there's nothing to map).
 - **`singleBundle: true`** — inline dependencies so `node dist/app.js` runs with no `node_modules` and no launcher. Sets `packages: "bundle"` + `splitting: false` as **defaults you can override**. Works with `@warlock.js/web` pages (`dist/client/` next to `app.js`). Optional integrations the app does not declare (S3, database drivers, `jiti`, mail) stay lazy runtime imports with no `external` list, and native packages are copied to `dist/node_modules/<package>` automatically — "single bundle" is one JS file _plus_ `client/` and any native addons. The build prints the file count and size of `dist/`. Do NOT reach for it as the default: keeping deps external is right when you deploy the folder.
 - **`esmShim: false`** — only if you are certain nothing in the graph is CommonJS. Leave it on.
-- **`routeRegistrationTimeoutMs`** — increase on busy CI runners when static route registration needs more than 30 seconds. `WARLOCK_ROUTE_REGISTRATION_TIMEOUT_MS` overrides this value for a build; invalid values warn and use 30,000ms.
+- **`routeRegistrationTimeoutMs`** — the route-registration child may go this long without finishing a route module (the limit restarts after every module, so a large app that keeps progressing is not cut off). Increase it when one route module alone takes more than 30 seconds to import, for example on busy CI runners. The timeout error names the module and shows `routeRegistrationTimeoutMs: 120000` and `WARLOCK_ROUTE_REGISTRATION_TIMEOUT_MS=120000` as examples. `WARLOCK_ROUTE_REGISTRATION_TIMEOUT_MS` overrides this value for a build; invalid values warn and use 30,000ms.
 
 ⚠ **The trap this replaced.** Setting `packages: "bundle"` by hand used to produce a clean build whose process died on start with `Error: Dynamic require of "node:assert" is not supported`. The output is ESM; bundled CJS deps call `require(...)` and read `__dirname`, and neither exists in an ES module, so the bundler substitutes a throwing stub. **A green `warlock build` was not evidence the bundle ran.** `esmShim` now injects `createRequire(import.meta.url)` and friends automatically for any ESM build, so both `singleBundle` and a hand-written `packages: "bundle"` work. An existing hand-written `banner` is preserved — the shim is prepended, not substituted.
 
@@ -11251,7 +11251,7 @@ export default {
 
 ## `ipFilter` — fail-closed
 
-`deny` wins over `allow`. If the IP can't be read (empty / unparseable), the request is rejected with 403. Reads via `request.detectIp()`.
+`deny` wins over `allow`. If the IP can't be read (empty / unparseable), the request is rejected with 403. Reads via `request.detectIp()`. `detectIp()` returns an empty string, never `undefined`, when the client has already disconnected and no address is left; the global `http.rateLimit` and `middleware.rateLimit()` then each count such requests under one shared `unknown` key.
 
 ⚠ **Since 4.13.0 `http.trustProxy` defaults to `false`**, so `request.detectIp()` returns the socket address and **`X-Real-IP` / `X-Forwarded-For` are ignored unless you opt in.** Before 4.13.0 the default was `true`, which meant any client could set its own forwarding header and be believed.
 

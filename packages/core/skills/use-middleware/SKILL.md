@@ -120,7 +120,7 @@ export default {
 
 ## `ipFilter` — fail-closed
 
-`deny` wins over `allow`. If the IP can't be read (empty / unparseable), the request is rejected with 403. Reads via `request.detectIp()`.
+`deny` wins over `allow`. If the IP can't be read (empty / unparseable), the request is rejected with 403. Reads via `request.detectIp()`. `detectIp()` returns an empty string, never `undefined`, when the client has already disconnected and no address is left; the global `http.rateLimit` and `middleware.rateLimit()` then each count such requests under one shared `unknown` key.
 
 ⚠ **Since 4.13.0 `http.trustProxy` defaults to `false`**, so `request.detectIp()` returns the socket address and **`X-Real-IP` / `X-Forwarded-For` are ignored unless you opt in.** Before 4.13.0 the default was `true`, which meant any client could set its own forwarding header and be believed.
 
