@@ -1,4 +1,23 @@
 {
+  "5.53.1": {
+    "publishedAt": "2026-11-12T14:36:28.330Z",
+    "matrix": "none",
+    "headline": "A patch for the 5.53.0 upgrade report: the global rate-limit key no longer answers 500 for a client that disconnects, large apps pass route registration, source-map warnings are gone, and Windows scripts no longer exit early.",
+    "highlights": [
+      "The global `http.rateLimit` key falls back to the socket address and then a shared `unknown` bucket, instead of throwing and answering 500 when the client has already disconnected.",
+      "`build.routeRegistrationTimeoutMs` (and `WARLOCK_ROUTE_REGISTRATION_TIMEOUT_MS`) now limits the time without progress, so a large app that keeps registering route modules no longer fails at 30 seconds; the error names both ways to raise it.",
+      "Published source maps embed their sources again, so `warlock dev` stops logging a warning for each package module; tarballs are back to their 5.52 size.",
+      "On Windows, a script that awaits `supervisor().recover()` or another supervisor call at top level no longer exits with code 13 before PowerShell answers.",
+      "`shell.onAsk` receives `reason: \"assignment\"` with the variable name for a command that sets `NODE_OPTIONS`, `PATH` and similar variables, instead of `\"nested\"`."
+    ],
+    "upgradeNotes": [
+      "If your `shell.onAsk` handler matches `reason === \"nested\"` exactly, add the `\"assignment\"` case; asks carry the variable name in `variable`.",
+      "A route-registration timeout you set now means the longest time without finishing a route module, not the whole step.",
+      "`request.detectIp()` returns an empty string, not `undefined`, when no address is left.",
+      "Route hooks in `serverOptions` are typed with `this: FastifyInstance`; a spec that calls one directly fails with TS2740, so call it as `hook.call(fastify, request, reply)`.",
+      "The 5.53.0 change that removed embedded sources from source maps is reverted; apps need no change."
+    ]
+  },
   "5.53.0": {
     "publishedAt": "2026-11-11T19:37:07.564Z",
     "matrix": "none",

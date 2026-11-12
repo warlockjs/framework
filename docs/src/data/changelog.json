@@ -136,6 +136,111 @@
   ],
   "releases": [
     {
+      "version": "5.53.1",
+      "id": "v5-53-1",
+      "date": "November 12, 2026",
+      "isUnreleased": false,
+      "headlineHtml": "A patch for the 5.53.0 upgrade report: the global rate-limit key no longer answers 500 for a client that disconnects, large apps pass route registration, source-map warnings are gone, and Windows scripts no longer exit early.",
+      "highlights": [
+        "The global <code>http.rateLimit</code> key falls back to the socket address and then a shared <code>unknown</code> bucket, instead of throwing and answering 500 when the client has already disconnected.",
+        "<code>build.routeRegistrationTimeoutMs</code> (and <code>WARLOCK_ROUTE_REGISTRATION_TIMEOUT_MS</code>) now limits the time without progress, so a large app that keeps registering route modules no longer fails at 30 seconds; the error names both ways to raise it.",
+        "Published source maps embed their sources again, so <code>warlock dev</code> stops logging a warning for each package module; tarballs are back to their 5.52 size.",
+        "On Windows, a script that awaits <code>supervisor().recover()</code> or another supervisor call at top level no longer exits with code 13 before PowerShell answers.",
+        "<code>shell.onAsk</code> receives <code>reason: \"assignment\"</code> with the variable name for a command that sets <code>NODE_OPTIONS</code>, <code>PATH</code> and similar variables, instead of <code>\"nested\"</code>."
+      ],
+      "upgradeNotes": [
+        "If your <code>shell.onAsk</code> handler matches <code>reason === \"nested\"</code> exactly, add the <code>\"assignment\"</code> case; asks carry the variable name in <code>variable</code>.",
+        "A route-registration timeout you set now means the longest time without finishing a route module, not the whole step.",
+        "<code>request.detectIp()</code> returns an empty string, not <code>undefined</code>, when no address is left.",
+        "Route hooks in <code>serverOptions</code> are typed with <code>this: FastifyInstance</code>; a spec that calls one directly fails with TS2740, so call it as <code>hook.call(fastify, request, reply)</code>.",
+        "The 5.53.0 change that removed embedded sources from source maps is reverted; apps need no change."
+      ],
+      "summaryHtml": null,
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/5.53.1-summary.md",
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/ai-workspace",
+          "slug": "ai-workspace",
+          "total": 3,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            },
+            {
+              "type": "Changed",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>WorkspaceShellAskReason</code> gains <code>\"assignment\"</code>, and <code>WorkspaceShellAsk</code> gains an optional <code>variable</code> field with the variable name (present only for this reason), so an approval handler can tell the model which rule it hit. Add the name to <code>shell.allowAssignments</code> to stop the ask."
+            },
+            {
+              "type": "Changed",
+              "html": "The text the model reads names the variable: the \"needs approval\" message says `<code>(it sets </code>NAME<code>, …)</code><code> and the \"was not approved\" refusal says </code><code>(sets </code>NAME<code>)</code><code>. The direct refusal (without </code>onAsk`) already named it and is unchanged."
+            },
+            {
+              "type": "Changed",
+              "html": "A PowerShell assignment such as <code>$env:NAME = value</code> is refused as <code>\"unsupported-syntax\"</code>, or asked with <code>reason: \"unparsed\"</code> when <code>onAsk</code> is set. This is how it already behaved; the workspace page and the <code>use-a-workspace</code> skill now say so."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 3,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 3
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "The global <code>http.rateLimit</code> key no longer throws when the client has already disconnected. In 5.53.0 a request whose socket was gone (<code>request.ip</code> undefined, common on long-lived stream routes the browser reopens and drops) failed with <code>TypeError: Cannot read properties of undefined (reading 'toLowerCase')</code> and answered 500. The key now falls back to the socket's remote address and then to one shared <code>unknown</code> key, the fallback <code>middleware.rateLimit()</code> already used. In that case <code>request.detectIp()</code> returns an empty string, <code>ipFilter</code> refuses the request and the idempotency scope uses <code>\"unknown\"</code>."
+            },
+            {
+              "type": "Fixed",
+              "html": "A large app no longer fails a build at the 30-second route-registration limit while it keeps registering route modules (see Upgrading). The error for a timeout now names both ways to raise the limit, with an example: <code>routeRegistrationTimeoutMs: 120000</code> in <code>warlock.config.ts</code>, or <code>WARLOCK_ROUTE_REGISTRATION_TIMEOUT_MS=120000</code>."
+            },
+            {
+              "type": "Fixed",
+              "html": "Published source maps embed their original sources again (<code>sourcesContent</code>). Since 5.53.0 every package shipped maps without them, and their <code>sources</code> paths name files in the framework's own repository, which an installed app does not have. The dev server logged a warning for each package module it loaded (\"Sourcemap for … points to a source file outside its package\" or \"… points to missing source files\"), often hundreds per start, and real warnings were lost among them. With the sources embedded, as in 5.52, the bundler has nothing to look up on disk. Stack traces keep every file name and line, and debuggers show the original TypeScript again. The release now refuses to pack a package whose source maps would bring the warnings back."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/process",
+          "slug": "process",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            },
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "On Windows, a supervisor call that is waiting for the process-query helper's answer now keeps Node running until the answer arrives (normally milliseconds; at most <code>observationTimeoutMs</code>). An idle helper still never keeps the process alive. A pending query, including one started by the monitor's background poll, can therefore delay a natural exit by that long."
+            },
+            {
+              "type": "Fixed",
+              "html": "On Windows, a script that awaited <code>supervisor().recover()</code>, <code>spawn()</code>, <code>list()</code> or any other supervisor call at top level, with nothing else keeping Node running, exited with code 13 (\"unsettled top-level await\") about 20 ms into the call. The process-query helper (one PowerShell per supervisor) and its pipes do not hold the process open, and the timer guarding its answer did not either, so Node exited before PowerShell could reply. The timer now keeps the process alive while a call waits for the answer, so the call settles. <code>recover()</code> with no registry file yet resolves with an empty recovery (<code>{ adopted: [], stopped: [], cleared: [] }</code>) on every platform. Apps whose server already kept Node running were not affected."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "5.53.0",
       "id": "v5-53-0",
       "date": "November 11, 2026",
