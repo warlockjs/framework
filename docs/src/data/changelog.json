@@ -136,6 +136,968 @@
   ],
   "releases": [
     {
+      "version": "5.54.0",
+      "id": "v5-54-0",
+      "date": "November 16, 2026",
+      "isUnreleased": false,
+      "headlineHtml": "Batched model loading, mass-assignment protection and MongoDB relation filters in <code>cascade</code>, key rotation and password rehashing in <code>auth</code>, a lighter page render in <code>web</code>, and warnings for the defaults that change in 6.0.",
+      "highlights": [
+        "<code>static guarded</code> columns are never written by <code>merge()</code>, <code>create()</code>, <code>upsert()</code> and friends, global scopes can <code>stamp</code> tenant values into inserts, and merging raw request input into a model warns in development.",
+        "Same-tick <code>find()</code> and <code>load()</code> calls run as one query, grouped per model and per <code>@warlock.js/context</code> scope; MongoDB now supports <code>has()</code>, <code>whereHas()</code>, <code>doesntHave()</code> and <code>withCount()</code>.",
+        "<code>encryption.previousKeys</code> and <code>auth.jwt.previousSecrets</code> rotate keys without logging users out, passwords are rehashed on sign-in, and <code>warlock doctor</code> names every deployment warning with a stable <code>WL</code> code.",
+        "AI providers report a caller's abort as a <code>cancelled</code> <code>ProviderAbortError</code>, tool results pass through guardrails, and RAG stores clear by exact namespace.",
+        "Pages render with less work per request, error and forbidden pages load on demand, and core refusals on a page host render the site's own error page.",
+        "The release workflow runs its gate without a write token and every package is published with npm provenance."
+      ],
+      "upgradeNotes": [
+        "Same-tick <code>Model.find()</code> / <code>load()</code> calls share one query; set <code>static batchLoads = false</code> on a model whose global scope reads its own <code>AsyncLocalStorage</code>.",
+        "Password-reset and OTP delivery runs after the response; set <code>auth.passwordReset.awaitDelivery: true</code> (or <code>auth.otp.awaitDelivery</code>) to wait for it.",
+        "Local-disk temporary URL tokens from earlier versions are refused; issue the links again.",
+        "A <code>locale</code> header now wins over a <code>locale</code> cookie, and the API 404 body's <code>error</code> text is translated; switch on <code>code: \"route_not_found\"</code>.",
+        "<code>ai-google</code> and <code>ai-ollama</code> raise <code>ProviderAbortError</code> for a caller's abort instead of <code>ProviderTimeoutError</code>.",
+        "<code>http.input.maxDepth</code> (32) is on: deeper JSON bodies answer 400 <code>EC111</code>; raise the setting for endpoints that need it.",
+        "<code>@mongez/react-form</code> 4.1 renders control ids as <code>&lt;formId&gt;-&lt;name&gt;</code> and forms as <code>method=\"post\"</code>; <code>@mongez/dotenv</code> 2 reads <code>.env</code> files with a stricter grammar."
+      ],
+      "summaryHtml": null,
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/5.54.0-summary.md",
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 37,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 20
+            },
+            {
+              "type": "Changed",
+              "n": 12
+            },
+            {
+              "type": "Fixed",
+              "n": 5
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>http.input.maxDepth</code> (default 32) bounds the nesting of query, urlencoded and multipart keys (deeper keys are dropped) and of JSON bodies (a deeper body is refused with a 400, <code>code: \"EC111\"</code>), so validation, logging and cloning cannot recurse without bound."
+            },
+            {
+              "type": "Added",
+              "html": "<code>http.multipart.memoryLimit</code> streams file parts above it to a temporary file instead of memory. <code>UploadedFile</code> keeps its whole public surface: <code>size()</code> and <code>detectedMimeType()</code> read the size and first bytes without loading the file, <code>buffer()</code> reads it back on demand, and <code>save()</code> streams a spooled file to storage. The file is deleted when the response closes and every remaining one when the process exits. <code>file.keep()</code> holds the copy past the response (for a queued job) and <code>file.discard()</code> deletes it now."
+            },
+            {
+              "type": "Added",
+              "html": "<code>http.compileResponseSchemas</code> (and a per-route <code>compileResponseSchema</code>) serializes a route's declared <code>responseSchema</code> statuses through a compiled serializer, which drops any field the schema does not name. A missing declared field is omitted, never an error. Off by default; production builds and the in-process test server apply it."
+            },
+            {
+              "type": "Added",
+              "html": "<code>resource.dateOutput</code> sets the default date output of every resource date field (<code>\"iso\"</code>, <code>\"timestamp\"</code>, and the other <code>dateOptions()</code> values). A field's own <code>dateOptions()</code> still wins, and unset keeps the full date object."
+            },
+            {
+              "type": "Added",
+              "html": "In development, <code>request.validated()</code> on a route with no validation schema logs one warning per route and still returns <code>{}</code>; the warning points at <code>request.input()</code> and <code>request.all()</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<code>warlock check --test-timeout &lt;seconds&gt;</code> and the <code>WARLOCK_CHECK_TEST_TIMEOUT</code> environment variable set how long one vitest run may take before the check stops it (default 600 s, <code>0</code> for no limit)."
+            },
+            {
+              "type": "Added",
+              "html": "<code>warlock generate.typings</code> prints each stage (<code>scanning the project</code>, <code>writing typings</code>, <code>running connector typings</code>) with its duration to stderr, and a line every 15 seconds while a stage is still running. <code>WARLOCK_DEBUG_TYPINGS=1</code> adds what the process is waiting on to those lines. A spec runs the command in a child Node process with a time limit, so every CI platform shows whether it returns by itself."
+            },
+            {
+              "type": "Added",
+              "html": "The deployment warnings of <code>warlock doctor</code> carry stable codes, listed on the error-codes page: <code>WL1011</code> (upload limits), <code>WL1012</code> (CORS), <code>WL1013</code> (token settings), <code>WL1014</code> (trust proxy), <code>WL1015</code> (request timeout), <code>WL1016</code> (production logging), <code>WL1017</code> (env files), <code>WL1018</code> (memory cache). <code>compression</code> only informs and never warns, so its line carries <code>WL1020</code> only to say that response compression is off."
+            },
+            {
+              "type": "Added",
+              "html": "Repositories can invalidate their cache in constant time. Set <code>repository.cacheInvalidation: \"generation\"</code> (or the protected <code>cacheInvalidation</code> property on one repository) and entries are stored under a generation id that a write replaces, instead of removing every key under the repository namespace (a keyspace scan on Redis). Entries written in this mode expire after <code>repository.cacheGenerationTtl</code> (default <code>\"1d\"</code>) so replaced generations clean themselves up. The default stays <code>\"namespace\"</code>."
+            },
+            {
+              "type": "Added",
+              "html": "The <code>database</code> cache driver accepts <code>upsert: true</code>: each <code>set</code> becomes one upsert on <code>key</code> (<code>conflictColumns: [\"key\"]</code>) instead of a read followed by an insert or update. Turn it on once the cache table has a unique index on <code>key</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<code>encryption.previousKeys</code> (<code>string[]</code>, newest first) rotates the encryption key without losing stored ciphertexts. <code>encrypt()</code> always uses <code>key</code>; <code>decrypt()</code> tries <code>key</code> first and the retired keys, in order, only when the value does not open with the current one. A value no configured key opens, or one that was tampered with, still throws <code>Decryption failed</code>, and a malformed retired key throws without printing the key. Move the old key into <code>previousKeys</code>, set a new <code>key</code>, re-encrypt stored values, then remove the old key."
+            },
+            {
+              "type": "Added",
+              "html": "<code>needsRehash(hash)</code> reports whether a stored password hash was made with another algorithm or cost than <code>encryption.password</code> asks for (another bcrypt <code>salt</code>, another driver, other scrypt parameters). A value in no known format answers <code>false</code>, so it is never rewritten."
+            },
+            {
+              "type": "Added",
+              "html": "<code>encryption.password.driver: \"scrypt\"</code> hashes new passwords with scrypt from <code>node:crypto</code>: it runs on the thread pool, needs no extra dependency and has no 72-byte limit. Parameters come from <code>encryption.password.scrypt</code> (<code>cost</code> 32768, <code>blockSize</code> 8, <code>parallelization</code> 1 by default). <code>verifyPassword()</code> checks bcrypt and scrypt hashes whatever the driver is, so switching in either direction never locks anyone out. The default driver stays <code>\"bcrypt\"</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<code>warlock doctor</code> has a <code>key-rotation</code> check (<code>WL1019</code>) that warns while <code>encryption.previousKeys</code>, <code>auth.accessToken.previousSecrets</code> or <code>auth.refreshToken.previousSecrets</code> still hold entries, so retired keys are removed once nothing depends on them."
+            },
+            {
+              "type": "Added",
+              "html": "<code>cacheMigration</code> creates the <code>cache</code> table the <code>database</code> cache driver uses, with a unique index on <code>key</code>, which the driver's <code>upsert: true</code> option needs. Add it to <code>database.migrations</code> in <code>warlock.config.ts</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<code>WARLOCK_DEBUG_TYPINGS=1</code> prints the output of the route registration child as it arrives instead of only when it fails."
+            },
+            {
+              "type": "Added",
+              "html": "<code>bumpTranslationsRevision()</code> and <code>getTranslationsRevision()</code> expose a number that changes whenever translations are registered. Module dictionaries, <code>groupedTranslations()</code>, <code>extend()</code> and <code>setTranslationsList()</code> move it, whether they are imported from <code>@warlock.js/core</code> or <code>@mongez/localization</code>; call <code>bumpTranslationsRevision()</code> only for changes the library cannot report."
+            },
+            {
+              "type": "Added",
+              "html": "A route's <code>uploads</code> option takes <code>maxFileSize</code> and <code>maxFiles</code>, enforced by the framework's own multipart code in <code>warlock dev</code>, the test server and production alike (413, <code>EC108</code>). They can only be stricter than <code>http.fileUploadLimit</code> and <code>http.multipart.files</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<code>request.all()</code>, <code>allExceptParams()</code>, <code>only()</code>, <code>except()</code>, <code>heavy()</code> and <code>request.body</code> mark their result as raw input, so passing it to a model's <code>merge()</code> or <code>set()</code> warns once in development."
+            },
+            {
+              "type": "Added",
+              "html": "A translation key passed as <code>errorMessage</code> to any Seal rule is translated for the request locale."
+            },
+            {
+              "type": "Changed",
+              "html": "The unsupported-server-options warning of the development and test servers now also names a route's <code>serverOptions.config</code>, which Fastify plugins read per route (for example a per-route <code>multipartOptions</code> file limit) and the dev wildcard cannot forward. The route-level <code>uploads</code> option works in both modes."
+            },
+            {
+              "type": "Changed",
+              "html": "The rate limiter keeps each limiter's buckets inside its middleware instead of a process-wide map that was never pruned, so a limiter built per request or left behind by a hot reload is released with its middleware."
+            },
+            {
+              "type": "Changed",
+              "html": "The core refusal page route is found once per route-table change instead of by a scan per refusal, and middleware log lines build their coloured text only when a log channel keeps the line."
+            },
+            {
+              "type": "Changed",
+              "html": "Cloud storage disks store markup files (svg, html, xml, script, by the stored type or the key's extension) with <code>Content-Disposition: attachment</code> by default on <code>put</code>, <code>putIfAbsent</code> and <code>putStream</code>, so a public bucket URL downloads them instead of rendering them. Pass <code>contentDisposition</code> in the put options to choose another value."
+            },
+            {
+              "type": "Changed",
+              "html": "The <code>database</code> cache driver's <code>get</code> reads a plain row instead of building a model."
+            },
+            {
+              "type": "Changed",
+              "html": "Downloads from <code>storage.putFromUrl</code> keep the connect options of the app's own <code>Agent</code> dispatcher (private CA, client certificate, timeouts) when connections are pinned to the checked address, and log one warning per reason when pinning is skipped (an injected <code>fetch</code>, a proxy or mock dispatcher, a custom <code>connect</code> function)."
+            },
+            {
+              "type": "Changed",
+              "html": "The dev server logs one warning when <code>http.compileResponseSchemas</code>, or a route's <code>compileResponseSchema</code>, is set, since the dev dispatcher does not apply compiled response schemas."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>warlock add mail</code> no longer installs <code>@types/nodemailer</code>: the <code>nodemailer</code> version it installs ships its own type declarations."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>glob</code> moves to <code>^14.0.3</code>; 13.x has a moderate advisory (GHSA-3g3m-2fjr-6pw4) with no patched 13 release. Only the <code>e2e</code> command uses it."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>getTranslationsRevision()</code> now follows the <code>@mongez/localization</code> <code>translations</code> change event, so the revision also moves when an app calls <code>extend</code>, <code>groupedTranslations</code> or <code>setTranslationsList</code> from <code>@mongez/localization</code> directly. The three functions exported from <code>@warlock.js/core</code> are now the library functions themselves and each write is counted once; <code>bumpTranslationsRevision()</code> remains for changes the library cannot report."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>warlock add web</code> pins <code>@mongez/react-localization</code> 3.6.0 (the exact peer of <code>@mongez/localization</code> 3.6.0) and installs <code>@mongez/react-form</code> <code>^4.1.0</code> and <code>@mongez/http</code> <code>^3.5.2</code>."
+            },
+            {
+              "type": "Changed",
+              "html": "Raised the <code>@mongez</code> dependency ranges to the 2026-11-16 releases (dotenv 2.0.0, localization 3.6.0, reinforcements 4.1.0, supportive-is 3.0.1, copper 2.1.4, events 2.2.10, http 3.5.2)."
+            },
+            {
+              "type": "Fixed",
+              "html": "The <code>http.errorResponse</code> formatter returns the payload untouched when the reply was already sent or its headers were written, and the refusal dispatcher no longer treats a reply whose <code>send()</code> ran (but whose async <code>onSend</code> is still pending) as unsent, so a late failure cannot trigger a second write."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>v.file().mimeType()</code> fills <code>:types</code> with the allowed list joined with \", \", and a translation key passed as the error message of a core file rule is translated for the request locale."
+            },
+            {
+              "type": "Fixed",
+              "html": "The <code>http.bodyLimit</code> type comment now states the real default (Fastify's 1 MiB) and points per-route limits at <code>serverOptions.bodyLimit</code>."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>warlock update</code> puts <code>package.json</code> (and <code>package-lock.json</code> when it had pruned it) back exactly as it was when the install fails, and prints how to apply the new versions anyway (<code>warlock update --no-install</code>, then your install). Before, a failed install left the new versions in <code>package.json</code> next to an old lockfile."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>warlock check</code> reports a test run it stopped for taking too long as <code>The tests timed out after N s</code> with how to raise the limit, instead of <code>vitest exited with 143</code>. vitest exits 143 when it receives the SIGTERM the check sends at its 10-minute limit; a 143 that did not come from the check is now described as a SIGTERM from outside (for example a memory-capped wrapper)."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/cascade",
+          "slug": "cascade",
+          "total": 27,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 12
+            },
+            {
+              "type": "Changed",
+              "n": 11
+            },
+            {
+              "type": "Fixed",
+              "n": 4
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>query.stream(batchSize?)</code> is an async iterator on both drivers: <code>for await (const user of User.query().stream(500))</code> reads and hydrates one batch per round trip, pages like <code>chunk()</code>, and stops reading when you leave the loop."
+            },
+            {
+              "type": "Added",
+              "html": "MongoDB now supports the relation-existence filters <code>has()</code>, <code>whereHas()</code>, <code>orWhereHas()</code>, <code>doesntHave()</code> and <code>whereDoesntHave()</code> for hasMany, hasOne, belongsTo and belongsToMany, in reads, counts and pagination. Each filter becomes a <code>$lookup</code> ahead of the <code>$match</code>, and <code>orWhereHas</code> joins the same <code>$or</code> as the other conditions. A write (<code>update()</code>, <code>delete()</code>, <code>unset()</code>, <code>increment()</code>) on a query holding such a filter, and a <code>whereHas</code> callback that filters by another relation, still throw <code>UnsupportedQueryOperationError</code>; resolve the ids with <code>pluck()</code> and write with <code>whereIn()</code>."
+            },
+            {
+              "type": "Added",
+              "html": "MongoDB <code>withCount()</code> now adds the related count (<code>postsCount</code>, or the <code>as</code> alias) from a <code>$lookup</code> with a <code>$count</code>, with the same alias and constraint-callback forms as PostgreSQL. The counts run after your filters (and after a <code>limit()</code>), or before them when a <code>where()</code> or <code>orderBy()</code> reads the count field."
+            },
+            {
+              "type": "Added",
+              "html": "<code>query.atomic(operations, options?)</code> on both builders applies update operators to every matching row in one statement, with the builder's filters and the model's global scopes inside it. <code>Model.atomic()</code> uses it for models with global scopes, so a scoped atomic write is one round trip instead of an id lookup followed by the write. Models with <code>fetching</code>, <code>hydrating</code> or <code>fetched</code> listeners keep the lookup."
+            },
+            {
+              "type": "Added",
+              "html": "PostgreSQL <code>query.prepare(name)</code> runs a read as a named prepared statement, so the server plans a hot query once per connection. The statement name carries a hash of the SQL text, so reusing a name on a query of another shape never collides."
+            },
+            {
+              "type": "Added",
+              "html": "<code>PostgresPoolConfig</code> types <code>statement_timeout</code> and <code>query_timeout</code>; the documentation recommends setting a statement timeout so one runaway query cannot hold a pool connection indefinitely."
+            },
+            {
+              "type": "Added",
+              "html": "<code>static guarded</code> on a model lists columns that mass assignment never writes. <code>merge()</code>, the object form of <code>set()</code>, <code>create()</code>, <code>createMany()</code>, <code>save({ merge })</code> and the data of <code>findOrCreate()</code> / <code>upsert()</code> skip them (and dot paths inside them), so <code>user.merge(request.all())</code> can no longer set <code>role</code> or <code>isAdmin</code>. <code>forceMerge()</code> and <code>Model.forceCreate()</code> write guarded columns on purpose from trusted code. The default is an empty list, so existing models behave as before."
+            },
+            {
+              "type": "Added",
+              "html": "Outside production, the first skipped write of a guarded column logs a warning naming the model and column. <code>markRawInput(object)</code> flags an object as raw request input; merging a flagged object into a model logs a one-time reminder to merge validated input."
+            },
+            {
+              "type": "Added",
+              "html": "Global scopes take a <code>stamp</code> option (<code>addGlobalScope(name, callback, { stamp: { tenantId } })</code>, or a function evaluated at each insert). The values are written into inserts made by <code>create()</code>, <code>createMany()</code>, <code>save()</code> of a new record and <code>upsert()</code> when the caller left the column unset, so a forgotten tenant column no longer creates a row outside every tenant. An upsert writes stamped columns only when it inserts."
+            },
+            {
+              "type": "Added",
+              "html": "<code>model.load(...)</code> calls and <code>Model.find(id)</code> calls made in the same tick are batched per model class: <code>Promise.all(posts.map((post) =&gt; post.load(\"author\")))</code> runs one relation query, and several <code>find()</code> calls run one <code>whereIn</code> on the primary key. A lone call, a repeated id and any call inside a transaction run exactly as before. Only calls made under the same <code>@warlock.js/context</code> stores are grouped (one request, one <code>run()</code>), so a tenant global scope always sees its own caller's tenant. <code>static batchLoads = false</code> opts a model out."
+            },
+            {
+              "type": "Added",
+              "html": "<code>configureSyncFanout({ concurrency })</code> lets sync jobs for different source documents run side by side; jobs for one document always keep their order. The default stays one job at a time. <code>flushSyncFanout()</code> waits for queued jobs."
+            },
+            {
+              "type": "Added",
+              "html": "<code>Model.hydrate(row, driver?)</code> accepts the driver, so a caller hydrating a whole result set resolves it once."
+            },
+            {
+              "type": "Changed",
+              "html": "A MongoDB upsert (<code>Model.atomic()</code> / <code>Model.findOneAndUpdate()</code> with <code>upsert: true</code>) generates its <code>id</code> only when it inserted a document, in a second write keyed on <code>_id</code> right after the insert. An upsert that updates an existing document no longer reserves an id (no counter round trip, no skipped numbers). Supply <code>id</code> in <code>$set</code> or <code>$setOnInsert</code> to choose it yourself, as before."
+            },
+            {
+              "type": "Changed",
+              "html": "MongoDB <code>joinWith()</code> now loads the relations (with the same batched queries as <code>with()</code>) instead of recording them and doing nothing, and accepts names, an array, the <code>\"id,name\"</code> column shorthand and constraint callbacks."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>UpdateResult</code> carries <code>upsertedId</code> on MongoDB, and the driver atomic options accept <code>idOnInsert</code>."
+            },
+            {
+              "type": "Changed",
+              "html": "A failing sync-event listener is retried on its own (3 attempts) and reported once; the other listeners of the event are no longer run again, and a listener failing for good no longer stops the ones after it."
+            },
+            {
+              "type": "Changed",
+              "html": "A save, delete or restore of a model that has no sync listeners queues no fan-out job."
+            },
+            {
+              "type": "Changed",
+              "html": "Hydrating a row resolves the model's data source once instead of twice, computes the schema's date columns once per model class, and only keeps the strings that could have been turned into dates."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>QueryBuilderContract.stream()</code> is optional in the contract. The MongoDB and PostgreSQL builders implement it; a custom builder or test double that does not stream keeps compiling."
+            },
+            {
+              "type": "Changed",
+              "html": "Query builders hydrating a result set resolve the driver once per set and pass it to the hydrate callback (a new optional third argument) and on to <code>Model.hydrate(row, driver)</code>, instead of resolving the data source for every row."
+            },
+            {
+              "type": "Changed",
+              "html": "PostgreSQL attaches the result's column types once per result when a builder hydrates it, not as one entry per row. Rows read through <code>driver.query()</code> directly behave as before."
+            },
+            {
+              "type": "Changed",
+              "html": "The MongoDB <code>cursor()</code> error now points to <code>cursorPaginate()</code> and <code>stream()</code>."
+            },
+            {
+              "type": "Changed",
+              "html": "Raised the <code>@mongez</code> dependency ranges to the 2026-11-16 releases (copper 2.1.4, dotenv 2.0.0, events 2.2.10, reinforcements 4.1.0, supportive-is 3.0.1)."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>cursorPaginate()</code> on both drivers read the cursor column as a model property, so any cursor column that was not a model member (<code>createdAt</code>, for example) produced <code>undefined</code> cursors. The cursors are now read with <code>model.get(column)</code> (lean rows as properties)."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>findAndUpdate(filter, ops, { upsert: true })</code> updated only the first matching row. It now updates every matching row and inserts only when none matches."
+            },
+            {
+              "type": "Fixed",
+              "html": "MongoDB <code>withCount()</code> and <code>joinWith()</code> no longer succeed silently without doing anything."
+            },
+            {
+              "type": "Fixed",
+              "html": "MongoDB query clones keep <code>withCount()</code> entries, so <code>paginate()</code> and <code>chunk()</code> return the counts."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/web",
+          "slug": "web",
+          "total": 22,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 10
+            },
+            {
+              "type": "Changed",
+              "n": 6
+            },
+            {
+              "type": "Fixed",
+              "n": 6
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>web.shellTimeout</code> bounds how long a document shell may wait to become ready (default 30000 ms, 90000 in development, <code>0</code> turns it off). A shell that is not ready in time is aborted and the request gets <code>error.page.tsx</code> with status 504."
+            },
+            {
+              "type": "Added",
+              "html": "<code>web.earlyHints</code> (off by default) sends a <code>103 Early Hints</code> response with <code>Link</code> preloads for the hydration entry, its module preloads and the page's stylesheets before the loaders run, so the browser starts fetching them while the server works. Clients and runtimes that cannot receive an interim response get none."
+            },
+            {
+              "type": "Added",
+              "html": "A page can declare multipart uploads with <code>config.uploads: true</code> or <code>config.uploads: { maxTotalSize: 10 * 1024 * 1024 }</code> (a literal, read at build time). It marks the page's POST route, so page actions that take a file work with <code>http.multipart.routes: \"declared\"</code> in development and in production. In a multi-site app all sites share one POST route, so one page's declaration opens it to multipart bodies for every site. <code>PageUploadsOption</code> is exported."
+            },
+            {
+              "type": "Added",
+              "html": "<code>web.sites.&lt;key&gt;.robots</code> (and <code>robots</code> on a <code>resolveHost</code> result) gives a site its own <code>/robots.txt</code> policy, merged over <code>web.robots</code> key by key (<code>groups</code> and <code>extra</code> are replaced whole). A site without <code>robots</code> gets the global policy, a merged <code>enabled: false</code> answers 404, and a site can enable robots while the global policy is off."
+            },
+            {
+              "type": "Added",
+              "html": "<code>web.resolveCache.negativeTtl</code> sets how many seconds a host the resolver answered <code>null</code> for is remembered (default: <code>ttl</code>; <code>0</code> never remembers it), so a tenant host added at runtime starts resolving sooner."
+            },
+            {
+              "type": "Added",
+              "html": "Page-cache HITs carry a weak <code>ETag</code> and answer <code>304</code> to a matching <code>If-None-Match</code>. With <code>http.compression</code> on, entries are compressed once when stored (gzip, and brotli unless disabled) and a HIT sends the stored form the request accepts, with <code>Vary: Accept-Encoding</code>, instead of compressing on every response. Entries stored by an earlier version keep working and are served as before."
+            },
+            {
+              "type": "Added",
+              "html": "Requests that match no route and do not ask for a document are answered with <code>{ error, code: \"route_not_found\", path, method, requestId }</code> from one helper, in single-site and multi-site mode. <code>error</code> is the message from <code>request.t(\"web.errors.routeNotFound\")</code>, with built-in English and Arabic text when the app does not define the key."
+            },
+            {
+              "type": "Added",
+              "html": "The production translation delivery reuses a route's pruned dictionary per locale until the translations revision of <code>@warlock.js/core</code> changes, instead of pruning the dictionaries on every request."
+            },
+            {
+              "type": "Added",
+              "html": "A page's <code>config.uploads</code> accepts <code>maxFileSize</code> and <code>maxFiles</code> beside <code>maxTotalSize</code>; in multi-site apps the shared POST route keeps each limit only when every page sets it, at the largest value."
+            },
+            {
+              "type": "Added",
+              "html": "Refusal pages (403 and the like) render inside the site's root and the layout beside it in the web root, falling back to the framework document when they fail to load."
+            },
+            {
+              "type": "Changed",
+              "html": "The error and forbidden pages are separate lazy chunks in the browser. A route's bundle no longer carries them; hydration loads one only when the payload carries an error page, and a client error boundary loads it when it first shows a failure."
+            },
+            {
+              "type": "Changed",
+              "html": "The inline hydration payload is smaller: stylesheet and preload URLs, <code>hreflang</code> alternates, the hydration entry URL and the site key are no longer written a second time."
+            },
+            {
+              "type": "Changed",
+              "html": "A core-level refusal page (a dot-segment path, a malformed URL) receives the request id as <code>error.errorCode</code> in production (in development it is <code>debug.requestId</code>), so the site's page can show it."
+            },
+            {
+              "type": "Changed",
+              "html": "The stored JSON variant of a cached page is serialised once through <code>serializeHydrationPayload</code>, instead of building and checking the payload twice."
+            },
+            {
+              "type": "Changed",
+              "html": "The development server's host-refusal 403 now names <code>web.devAllowedHosts</code> instead of the bundler's <code>server.allowedHosts</code>."
+            },
+            {
+              "type": "Changed",
+              "html": "Raised the <code>@mongez</code> dependency ranges to the 2026-11-16 releases (localization 3.6.0, react-form 4.1.0, http 3.5.2)."
+            },
+            {
+              "type": "Fixed",
+              "html": "A page that sets <code>robots: \"noindex\"</code>, and the not-found page, no longer emit <code>&lt;link rel=\"alternate\" hreflang&gt;</code> tags. Under prefix locale routing, <code>/en/missing</code> used to answer 404 with a <code>noindex</code> meta tag and alternates pointing at URLs that do not exist."
+            },
+            {
+              "type": "Fixed",
+              "html": "The page for a core-level refusal now answers in the locale named by the URL prefix (<code>/ar/...</code> renders in <code>ar</code>) and renders inside the site's root and layouts when they load, falling back to the framework document when they do not."
+            },
+            {
+              "type": "Fixed",
+              "html": "A failure page for a <code>cache</code> route now sends the same <code>Vary</code> value as the page (<code>Cookie</code>, <code>locale</code> and <code>cache.varyHeaders</code> included) instead of the older shorter one."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>config.translations</code> is accepted in the <code>config</code> of a page, a layout and the root. Before, discovery failed with `<code>config key </code>translations<code> is not allowed in a page module</code>` although the type, the docs and the build analyzer supported it."
+            },
+            {
+              "type": "Fixed",
+              "html": "A refusal page that fails after it began writing no longer sends a second reply through the framework fallback."
+            },
+            {
+              "type": "Fixed",
+              "html": "Production page translations computed per route and locale are refreshed after a translation registration made once the server is running."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai",
+          "slug": "ai",
+          "total": 18,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 8
+            },
+            {
+              "type": "Changed",
+              "n": 7
+            },
+            {
+              "type": "Fixed",
+              "n": 3
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>ai.guardrail</code> has a <code>toolResult</code> phase. Detectors listed under <code>toolResult</code> run on what a tool returned (a string as is, anything else as JSON) before the model reads it, which is the usual path for indirect prompt injection from fetched pages and files. <code>block</code> fails that tool call with a <code>GuardrailViolationError</code> (phase <code>\"toolResult\"</code>), <code>redact</code> replaces the result data with the rewritten text, and <code>flag</code> records the match. <code>toolNames</code> scopes it like the <code>tool</code> phase. <code>GuardrailPhase</code> gains the <code>\"toolResult\"</code> value."
+            },
+            {
+              "type": "Added",
+              "html": "<code>ai.guardrail({ wrapToolResults: true })</code> wraps each successful tool result in <code>&lt;untrusted-tool-result tool=\"name\"&gt;…&lt;/untrusted-tool-result&gt;</code> so the model is told it is data, not instructions (a closing tag inside the data is neutralised). It works with or without <code>toolResult</code> detectors."
+            },
+            {
+              "type": "Added",
+              "html": "<code>fallbackModel</code> takes <code>alsoRetryOn</code> (a code list or predicate) that adds failover reasons on top of <code>retryOn</code> or the default set. <code>isDefaultFallbackRetryable(error)</code> and <code>DEFAULT_FALLBACK_RETRY_CODES</code> are exported so a custom <code>retryOn</code> predicate can compose with the standard failover instead of copying the list."
+            },
+            {
+              "type": "Added",
+              "html": "Snapshot stores may implement <code>markPending(runId, pending)</code>, which sets the <code>pending</code> field of the stored snapshot in place. The <code>memory</code>, <code>pg</code> (<code>jsonb_set</code>) and <code>sqlite</code> stores implement it."
+            },
+            {
+              "type": "Added",
+              "html": "Guarded outbound fetches warn once per reason (<code>[warlock-ai] outbound address pinning is off ...</code>) when connection pinning cannot apply: an injected <code>fetch</code>, a proxy or mock global dispatcher, an <code>Agent</code> with a function <code>connect</code>, or a runtime without a default dispatcher."
+            },
+            {
+              "type": "Added",
+              "html": "<code>ProviderAbortError</code>: the error an adapter raises when the caller aborts a provider call through its own <code>AbortSignal</code>. Its <code>name</code> is <code>AbortError</code>, its category is <code>cancelled</code>, and it is never retryable, so <code>retryModel</code> and <code>fallbackModel</code> stop on it."
+            },
+            {
+              "type": "Added",
+              "html": "<code>ai.rag({ store })</code> accepts a <code>VectorStore</code> directly (for example <code>ai.rag.pgVectorStore({ client: pool })</code>) as well as a cache driver. A cache driver is wrapped for you; a <code>VectorStore</code> is used as is."
+            },
+            {
+              "type": "Added",
+              "html": "<code>VectorStore</code> gains an optional <code>list(namespace)</code>, and <code>query()</code> takes an optional <code>filter</code>. <code>cacheVectorStore</code> offers <code>list()</code> when the cache driver can list its keys, and <code>ai.rag.pgVectorStore</code> offers <code>remove(key)</code> and <code>list(namespace)</code>."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>ai.session</code> writes the stored record once per turn on stores with <code>markPending</code> (the pending mark is a small in-place update; the full record is saved when the turn settles). Other stores, and the first turn of a new session, behave as before; crash recovery is unchanged."
+            },
+            {
+              "type": "Changed",
+              "html": "The pinned dispatcher for guarded outbound fetches is built from the app's own global <code>Agent</code>, so it keeps that agent's connect options (private CA, client certificate, timeouts) and replaces only the address resolution."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>ai.serve</code> logs that it will refuse to start without <code>authToken</code>, <code>authorize</code> or <code>public: true</code> in 6.0 (the production warning is unchanged otherwise; nothing changes in 5.x)."
+            },
+            {
+              "type": "Changed",
+              "html": "The injection detector also folds combining marks, look-alike Cyrillic and Greek letters, and the separators <code>, ; : | / \\ *</code>, Unicode spaces, dashes and connector punctuation, so those tricks no longer hide a phrase. Matching stays linear. Caller string markers are folded the same way."
+            },
+            {
+              "type": "Changed",
+              "html": "The internal scoped-similarity helper passes its accept predicate to the query callback, so a store that filters before it ranks can answer a scoped recall with one query."
+            },
+            {
+              "type": "Changed",
+              "html": "Scoped recalls are one query on stores that filter before ranking: semantic, episodic and procedural memory recall, the <code>semanticCache</code> middleware and <code>rag.retrieve()</code> hand their scope / namespace check to the store as the <code>similar()</code> <code>filter</code>. A store that ignores the filter still gets the widening of the candidate page."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>rag.clear()</code> lists the namespace and deletes exactly this rag's chunks when the store can list its keys (no probe embedding, no similarity sweeps); a store that cannot list keeps the sweep. <code>ai.rag.pgVectorStore</code> now also clears only the rag's own chunks, so a nested namespace survives."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>fallbackModel</code>: a caller's own cancellation (an aborted <code>options.signal</code>, an <code>AbortError</code>, or a <code>cancelled</code> error) never advances the chain, so the backup model is no longer called with an already-aborted signal and the abort error is what surfaces."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>rag.clear()</code> removes only its own namespace's chunks; a nested namespace (<code>kb.acme.private</code>) and siblings on the same driver are kept."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>agent.execute()</code> and <code>agent.stream()</code> refuse a non-string <code>input</code> with an <code>InvalidRequestError</code> that says to pass the prompt text (<code>execute()</code> rejects, <code>stream()</code> throws) instead of passing an object into the prompt."
+            }
+          ]
+        },
+        {
+          "name": "create-warlock",
+          "slug": "create-warlock",
+          "total": 7,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            },
+            {
+              "type": "Changed",
+              "n": 5
+            },
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "The feature picker and <code>--features</code> offer <code>process</code> (Tooling): it runs <code>warlock add process</code>, which installs <code>@warlock.js/process</code> and creates the supervisor config, the recovery and shutdown hooks and the development process panel."
+            },
+            {
+              "type": "Changed",
+              "html": "The generated app sets the safe values that 6.0 makes the defaults: <code>http.multipart.routes: \"declared\"</code> (the starter's file-taking routes, <code>POST /users</code>, <code>POST /posts</code> and <code>PUT /posts/:id</code>, are marked <code>uploads: true</code>), <code>loginThrottleMiddleware({ emailLock: \"pair\" })</code>, and commented notes for passkey <code>userVerification: \"required\"</code>, JWT secrets of at least 32 bytes and <code>format: \"jsonl\"</code> JSON file logs."
+            },
+            {
+              "type": "Changed",
+              "html": "The generated <code>http.ts</code> recommends the proxy's IP addresses or CIDR blocks (or <code>http.realIpHeader</code>) for <code>trustProxy</code> instead of <code>true</code>."
+            },
+            {
+              "type": "Changed",
+              "html": "The generated <code>User</code> model sets <code>guarded = [\"role\"]</code>, so mass assignment never writes <code>role</code>; promote an account with <code>forceMerge()</code> / <code>forceCreate()</code>."
+            },
+            {
+              "type": "Changed",
+              "html": "The generated PostgreSQL config sets <code>statement_timeout: 30_000</code> on the pool, so a runaway query cannot hold a connection forever."
+            },
+            {
+              "type": "Changed",
+              "html": "Raised the <code>@mongez</code> dependency ranges to the 2026-11-16 releases (localization 3.6.0, react-form 4.1.0, copper 2.1.4, reinforcements 4.1.0, supportive-is 3.0.1, agent-kit 1.4.0)."
+            },
+            {
+              "type": "Fixed",
+              "html": "The generated users list and lookup no longer filter on a <code>status</code> column the <code>User</code> model does not have: the repository config drops <code>isActiveColumn</code>/<code>isActiveValue</code> and the services use <code>listCached</code> and <code>firstCached</code>."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/cache",
+          "slug": "cache",
+          "total": 6,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 4
+            },
+            {
+              "type": "Changed",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>ttlJitter</code> on <code>set()</code>, <code>remember()</code> and <code>swr()</code> options spreads a relative TTL by up to that many percent either way for each write (<code>{ ttl: \"1h\", ttlJitter: 10 }</code> expires in 54 to 66 minutes), so entries written together no longer expire and miss together. It is skipped for <code>expiresAt</code>, <code>Infinity</code> and <code>0</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<code>swr({ failSafe: true })</code> returns the stale value when the refresh throws. A caller in the stale window then waits for the refresh (callers of one key share it); the failure is logged and emitted as an <code>error</code> event, and the next read tries again."
+            },
+            {
+              "type": "Added",
+              "html": "<code>similar()</code> accepts a <code>filter({ key, value })</code> predicate that runs before <code>threshold</code> and <code>topK</code>, so <code>topK</code> counts only in-scope entries and a recall needs one query. The memory, LRU and memory-extended drivers honour it; <code>pg</code> ignores it, so callers that need a guarantee keep checking the returned hits. <code>cache.namespace(...)</code> scopes pass their prefix as the filter."
+            },
+            {
+              "type": "Added",
+              "html": "<code>listKeys(namespace)</code> on the <code>memory</code>, <code>lru</code>, <code>memoryExtended</code>, <code>file</code>, <code>pg</code>, <code>redis</code>, <code>mock</code> and <code>null</code> drivers (optional on the <code>CacheDriver</code> interface): the live keys under a namespace, in the form <code>get()</code> and <code>remove()</code> accept, <code>globalPrefix</code> removed. <code>CacheManager</code> forwards it and adds <code>supportsListKeys()</code>. Custom drivers can ship it and use the new protected <code>unprefixKey()</code> and <code>inNamespace()</code> helpers."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>has()</code> uses the driver's <code>exists()</code>, so no value is read or parsed. The <code>hit</code> and <code>miss</code> events it emits now carry the key only, without <code>value</code>; a listener that read <code>event.value</code> for <code>has()</code> calls gets <code>undefined</code>."
+            },
+            {
+              "type": "Changed",
+              "html": "Raised the <code>@mongez</code> dependency ranges to the 2026-11-16 releases (reinforcements 4.1.0)."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/auth",
+          "slug": "auth",
+          "total": 5,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 2
+            },
+            {
+              "type": "Changed",
+              "n": 2
+            },
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>auth.accessToken.previousSecrets</code> and <code>auth.refreshToken.previousSecrets</code> rotate JWT secrets without signing users out. A token whose signature the current secret rejects is checked against each retired secret; every other failure (expired, wrong issuer or audience, wrong token type, malformed) stays final, and a key passed explicitly to <code>jwt.verify()</code> ignores them. New tokens are always signed with the current secret. With no <code>refreshToken.secret</code>, the retired access secrets apply to refresh tokens too. Retired secrets get the same 32-byte production warning."
+            },
+            {
+              "type": "Added",
+              "html": "<code>auth.rehashPasswords</code> (default <code>true</code>), see Upgrading."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>authService.revokeAllTokens()</code> (\"sign out everywhere\") does its work in bulk: the distinct token families are ensured with one read and one insert, revoked with one update (<code>AuthTokenFamily.revokeAllFor()</code>), and every refresh token with one update, instead of a transaction per family. <code>token.familyRevoked</code> still fires per family, <code>token.revoked</code> for tokens outside any durable family, and <code>logout.all</code> once. <code>RefreshToken.revokeAllFor()</code> now revokes with one update instead of saving each row."
+            },
+            {
+              "type": "Changed",
+              "html": "Raised the <code>@mongez</code> dependency ranges to the 2026-11-16 releases (copper 2.1.4, events 2.2.10, reinforcements 4.1.0)."
+            },
+            {
+              "type": "Fixed",
+              "html": "A password-reset or OTP request for a known account no longer answers slower than for an unknown one because of the token writes (see Upgrading)."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/seal",
+          "slug": "seal",
+          "total": 4,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            },
+            {
+              "type": "Changed",
+              "n": 3
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>configureSeal({ translateMessageKey })</code> translates an <code>errorMessage</code> that is a dotted translation key; a key without a translation, and any literal sentence, is left as written."
+            },
+            {
+              "type": "Changed",
+              "html": "The output of nested objects is cleaned of <code>undefined</code> values once. A parent object reuses the cleaned result of a nested object validator instead of walking it again, so the cost no longer grows with the nesting depth. The rule: an object a validator produced is not changed in place to hold <code>undefined</code> values before its parent sees it; a transformer that returns a new object is still cleaned, and <code>maxDepth</code> is still enforced across levels."
+            },
+            {
+              "type": "Changed",
+              "html": "A rule or mutator that answers without a promise is used as it is, skipping a microtask hop. Public types are unchanged; the rule and mutator types that allow a non-promise result, and synchronous built-in rules, are planned for 6.0."
+            },
+            {
+              "type": "Changed",
+              "html": "Raised the <code>@mongez</code> dependency ranges to the 2026-11-16 releases (reinforcements 4.1.0, supportive-is 3.0.1)."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-workspace",
+          "slug": "ai-workspace",
+          "total": 3,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 2
+            },
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "<code>grep</code> patterns may expand to at most 1000 states (was 4000), which bounds how long one line can hold the event loop. Patterns with very large bounded repeats that used to compile may now be refused as <code>unsafe-pattern</code>."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>glob</code> and <code>grep</code>'s <code>glob</code> option yield to the event loop between entries when a wildcard glob is matched over many long paths, and honour the abort signal there."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>grep</code> with <code>ignoreCase</code> now matches classes like the built-in <code>RegExp</code> <code>i</code> flag for letters that share a canonical form through a third code unit (for example <code>µ</code> and <code>μ</code>)."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-openai",
+          "slug": "ai-openai",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "A 429 (or any status) whose error <code>type</code> is <code>insufficient_quota</code>, or whose <code>code</code> is <code>credit_balance_exhausted</code>, <code>billing_hard_limit_reached</code> or <code>billing_not_active</code>, now maps to <code>QuotaExceededError</code> instead of the retryable <code>ProviderRateLimitError</code>, so retries and workflow retry stop repeating a call that cannot succeed. A plain 429 is still a rate limit. The default fallback chain still does not advance on <code>PROVIDER_QUOTA_EXCEEDED</code>; add it through <code>alsoRetryOn</code> to switch providers when credit runs out. DeepSeek, Groq, xAI and Mistral use the same mapping."
+            },
+            {
+              "type": "Fixed",
+              "html": "A caller's own abort (the SDK's <code>APIUserAbortError</code>) is raised as a <code>ProviderAbortError</code> (name <code>AbortError</code>, category <code>cancelled</code>) instead of a plain <code>ProviderError</code>, so a fallback chain no longer treats it as a provider failure."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/context",
+          "slug": "context",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>ContextStorage</code> is exported as a type, so a context subclass can name the type of its protected <code>storage</code> slot."
+            },
+            {
+              "type": "Added",
+              "html": "<code>currentContextScope()</code> returns an object that identifies the current scope's context stores: the same object for two callers only when every context has the same store for both. Code that collects work from several callers and runs it once groups them by it, so the work never runs under another request's or tenant's stores."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/logger",
+          "slug": "logger",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "A <code>JSONFileLog</code> created without <code>format</code> prints one warning per process (not under test) saying the default becomes <code>\"jsonl\"</code> in 6.0. Nothing changes in 5.54: set <code>format: \"json\"</code> to keep the current layout or <code>format: \"jsonl\"</code> to switch now."
+            },
+            {
+              "type": "Changed",
+              "html": "Raised the <code>@mongez</code> dependency ranges to the 2026-11-16 releases (copper 2.1.4, reinforcements 4.1.0)."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/access",
+          "slug": "access",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>AccessResolver.cacheable</code> (optional, default <code>true</code>): a resolver that sets <code>readonly cacheable = false</code> is never cached by the engine. Checks on one user object within a request still share a single resolution."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-anthropic",
+          "slug": "ai-anthropic",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "A caller's own abort (the SDK's <code>APIUserAbortError</code>) is raised as a <code>ProviderAbortError</code> (name <code>AbortError</code>, category <code>cancelled</code>) instead of a plain <code>ProviderError</code>."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-bedrock",
+          "slug": "ai-bedrock",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "An <code>AbortError</code> is raised as a <code>ProviderAbortError</code> (category <code>cancelled</code>) instead of a plain <code>ProviderError</code>."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-cli",
+          "slug": "ai-cli",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>CliAdapter</code> has an optional <code>passEnv</code> list: extra variables the CLI needs (base URLs, provider keys, auth tokens beyond <code>apiKeyEnv</code>). <code>inheritEnv: \"curated\"</code> passes them from the host together with <code>apiKeyEnv</code>. Every built-in adapter declares its list, so <code>\"curated\"</code> works out of the box for the usual setups; custom adapters can declare their own."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-google",
+          "slug": "ai-google",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "A spent quota or billing allowance (\"check your plan and billing details\") is raised as a <code>QuotaExceededError</code>, which is not retried, instead of a rate limit. Per-minute and per-day request limits stay <code>ProviderRateLimitError</code>."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-panoptic",
+          "slug": "ai-panoptic",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>GET api/traces</code> in the local dashboard sends an <code>ETag</code> and answers <code>304</code> without a body when <code>If-None-Match</code> matches; the dashboard page sends the tag on each poll, so an idle dashboard transfers almost nothing."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-tools",
+          "slug": "ai-tools",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "Building <code>http_request</code> with static <code>headers</code> but neither <code>baseUrl</code> nor <code>allowHosts</code> logs a warning, because the headers (usually credentials) would go to whatever host the model names."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/herald",
+          "slug": "herald",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Raised the <code>@mongez</code> dependency ranges to the 2026-11-16 releases (copper 2.1.4, events 2.2.10, reinforcements 4.1.0)."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/queue",
+          "slug": "queue",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "The local queue stores handle large retention better: the SQLite store has an index on the finish time used by pruning (created when an existing database opens), and the memory store polls only the jobs that can still run, so kept completed and failed jobs add nothing to a poll."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/scheduler",
+          "slug": "scheduler",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "A <code>job:*</code> or <code>scheduler:tick</code> listener that throws no longer leaves an unhandled rejection or stops the run loop: the error is logged with <code>console.error</code> and the next job still starts."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-ollama",
+          "slug": "ai-ollama",
+          "total": 0,
+          "counts": [],
+          "items": []
+        }
+      ]
+    },
+    {
       "version": "5.53.1",
       "id": "v5-53-1",
       "date": "November 12, 2026",

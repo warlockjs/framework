@@ -1,4 +1,26 @@
 {
+  "5.54.0": {
+    "publishedAt": "2026-11-16T16:00:38.046Z",
+    "matrix": "none",
+    "headline": "Batched model loading, mass-assignment protection and MongoDB relation filters in `cascade`, key rotation and password rehashing in `auth`, a lighter page render in `web`, and warnings for the defaults that change in 6.0.",
+    "highlights": [
+      "`static guarded` columns are never written by `merge()`, `create()`, `upsert()` and friends, global scopes can `stamp` tenant values into inserts, and merging raw request input into a model warns in development.",
+      "Same-tick `find()` and `load()` calls run as one query, grouped per model and per `@warlock.js/context` scope; MongoDB now supports `has()`, `whereHas()`, `doesntHave()` and `withCount()`.",
+      "`encryption.previousKeys` and `auth.jwt.previousSecrets` rotate keys without logging users out, passwords are rehashed on sign-in, and `warlock doctor` names every deployment warning with a stable `WL` code.",
+      "AI providers report a caller's abort as a `cancelled` `ProviderAbortError`, tool results pass through guardrails, and RAG stores clear by exact namespace.",
+      "Pages render with less work per request, error and forbidden pages load on demand, and core refusals on a page host render the site's own error page.",
+      "The release workflow runs its gate without a write token and every package is published with npm provenance."
+    ],
+    "upgradeNotes": [
+      "Same-tick `Model.find()` / `load()` calls share one query; set `static batchLoads = false` on a model whose global scope reads its own `AsyncLocalStorage`.",
+      "Password-reset and OTP delivery runs after the response; set `auth.passwordReset.awaitDelivery: true` (or `auth.otp.awaitDelivery`) to wait for it.",
+      "Local-disk temporary URL tokens from earlier versions are refused; issue the links again.",
+      "A `locale` header now wins over a `locale` cookie, and the API 404 body's `error` text is translated; switch on `code: \"route_not_found\"`.",
+      "`ai-google` and `ai-ollama` raise `ProviderAbortError` for a caller's abort instead of `ProviderTimeoutError`.",
+      "`http.input.maxDepth` (32) is on: deeper JSON bodies answer 400 `EC111`; raise the setting for endpoints that need it.",
+      "`@mongez/react-form` 4.1 renders control ids as `<formId>-<name>` and forms as `method=\"post\"`; `@mongez/dotenv` 2 reads `.env` files with a stricter grammar."
+    ]
+  },
   "5.53.1": {
     "publishedAt": "2026-11-12T14:36:28.330Z",
     "matrix": "none",
