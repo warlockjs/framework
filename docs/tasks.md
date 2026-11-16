@@ -4,8 +4,7 @@ Open work for the framework repository. Finished entries move to `tasks.complete
 
 ## Owner decisions waiting
 
-- **T-137 Grimoire open points**: experimental or stable label in 5.55.0; who writes the release number and date into
-  feature changelogs; how mobile screens are listed when navigation is defined in code. See T-137.
+None.
 
 ## 5.55.0: Grimoire
 
@@ -187,8 +186,8 @@ verification pass, one review, and the release.
   `grimoire/releases/<version>.md`. `warlock grimoire release <version>` collects the unreleased changelog entries of
   every feature into the release file under the agent's brief (committed, since it is history). Document how an app
   that keeps a single tasks file moves to the folder.
-- Acceptance: specs for collection and for re-running a release (no duplicates); the stamping behaviour follows the
-  owner's decision in T-137.
+- Acceptance: specs for collection and for re-running a release (no duplicates); the command never edits a feature
+  changelog (the agent writes the release and date there, see T-137).
 - Depends on: T-126, T-130.
 - Status: open.
 
@@ -258,18 +257,19 @@ verification pass, one review, and the release.
 - Depends on: T-121 to T-135.
 - Status: open.
 
-### T-137 [decision] Grimoire: three open points
+### T-137 [decision] Grimoire: label, changelog stamping, mobile screens (decided)
 
-- Source: design sessions of 2026-11-16.
-- Decisions needed:
-  1. Label in 5.55.0. Options: (a) experimental, so the written-file structure can still change after the pilot, and
-     stable in 6.0; (b) stable from 5.55.0. Recommendation: (a).
-  2. Who writes the release number and date into feature changelog entries. Options: (a) the `release` command (the
-     one place Warlock would edit an agent-written file); (b) the agent, with the check reporting a mismatch.
-     Recommendation: (b), which keeps "Warlock never edits".
-  3. Mobile screens when navigation is defined in code, not by files. Options: (a) declared by the agent in the app's
-     folder; (b) not listed in 5.55.0. Recommendation: (a).
-- Status: open. T-131 and T-132 follow the recommendation unless the owner says otherwise.
+- Source: design sessions of 2026-11-16; decided by the owner the same day.
+- Decisions:
+  1. **Label:** Grimoire is **experimental** in 5.55.0 (docs, changelog, release notes and the package README say so),
+     so the written-file structure can still change after the pilot. Stable in 6.0.
+  2. **Release number and date in feature changelogs:** written by the **agent**. Warlock never edits an
+     agent-written file; `warlock grimoire release` only writes the collected list in the release file, and
+     `warlock grimoire check` reports a changelog entry that a release lists without a matching release and date.
+  3. **Mobile screens when navigation is defined in code:** **declared by the agent** in the app's folder. Screens
+     are listed from the file structure only when the mobile app uses file-based routing.
+- Applies to: T-125 and T-135 (label), T-129 and T-131 (changelog), T-132 (screens).
+- Status: decided 2026-11-16. Moves to the completed file with 5.55.0.
 
 ## Tasks
 
