@@ -10,7 +10,7 @@ import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildEntries } from "../src/book/render";
 import { GrimoireError } from "../src/codes";
-import type { ScryQuery } from "../src/contracts/scry";
+import type { ScryQuery, ScryResult } from "../src/contracts/scry";
 import type { GrimoireSnapshot } from "../src/contracts/snapshot";
 import { formatScryResult, scry } from "../src/scry";
 import { openGrimoire } from "../src/workspace";
@@ -210,6 +210,77 @@ describe("scry over the shop fixture", () => {
     expect(formatScryResult(scry(snapshot, { type: "search", text: "zzz-nothing" }))).toEqual([
       'no match for "zzz-nothing"',
     ]);
+  });
+});
+
+describe("scry search ranking and impact caps", () => {
+  const scoresOf = (text: string) => {
+    const result = scry(snapshot, { type: "search", text, limit: 200 });
+
+    return result.type === "search" ? result.hits : [];
+  };
+
+  it("ranks exact, prefix, whole word, substring, then fuzzy matches", () => {
+    expect(new Set(scoresOf("new arrivals").map((hit) => hit.score))).toContain(7);
+    expect(scoresOf("new-arr").every((hit) => hit.score <= 6)).toBe(true);
+    expect(scoresOf("arrivals").find((hit) => hit.id === "catalog/new-arrivals")?.score).toBe(5);
+    expect(scoresOf("arrival").find((hit) => hit.id === "catalog/new-arrivals")?.score).toBe(4);
+    expect(scoresOf("newarr").find((hit) => hit.id === "catalog/new-arrivals")?.score).toBe(2);
+    expect(scoresOf("ne")).not.toContainEqual(expect.objectContaining({ score: 2 }));
+
+    for (const text of ["arrivals", "products", "new arrivals"]) {
+      const scores = scoresOf(text).map((hit) => hit.score);
+
+      expect(scores).toEqual([...scores].sort((left, right) => right - left));
+    }
+  });
+
+  it("orders equal scores by type: flow, block, route, file, task", () => {
+    const hits = scoresOf("new arrivals").filter((hit) => hit.score === 7);
+    const order = ["feature", "flow", "block", "page", "screen", "route", "file", "export", "task"];
+    const ranks = hits.map((hit) => order.indexOf(hit.type));
+
+    expect(ranks).toEqual([...ranks].sort((left, right) => left - right));
+    expect(hits[0]?.type).toBe("flow");
+  });
+
+  function bigImpact(): ScryResult {
+    const routes = Array.from({ length: 30 }, (_, index) => ({
+      method: "GET",
+      path: `/api/r${index}`,
+      name: null,
+      handlerFile: null,
+    }));
+
+    return {
+      type: "impact",
+      file: "src/a.ts",
+      notes: [],
+      importers: { direct: ["src/b.ts"], all: ["src/b.ts", "src/c.ts"] },
+      routes,
+      pages: [],
+      flows: [],
+      features: [],
+      tests: Array.from({ length: 21 }, (_, index) => `src/t${index}.test.ts`),
+    };
+  }
+
+  it("counts each impact section and stops long lists at 20 lines", () => {
+    const lines = formatScryResult(bigImpact());
+
+    expect(lines.filter((line) => line.includes("/api/r"))).toHaveLength(20);
+    expect(lines.some((line) => line.startsWith("routes (30)"))).toBe(true);
+    expect(lines).toContain("              … and 10 more (--all lists every one)");
+    expect(lines.some((line) => line.startsWith("tests (21)"))).toBe(true);
+    expect(lines.some((line) => line.includes("… and 1 more"))).toBe(true);
+    expect(lines.some((line) => line.startsWith("pages"))).toBe(false);
+  });
+
+  it("prints every line with all", () => {
+    const lines = formatScryResult(bigImpact(), { all: true });
+
+    expect(lines.filter((line) => line.includes("/api/r"))).toHaveLength(30);
+    expect(lines.some((line) => line.includes("more"))).toBe(false);
   });
 });
 

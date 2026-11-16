@@ -61,7 +61,52 @@ export function appendGitignoreLines(source: string, lines: readonly string[]): 
 }
 
 /**
+ * The exported root object of a config file, when it is written as a literal:
+ * `export default { ... }` or `export default someCall({ ... })`. Any other shape
+ * (a variable, a function, a merge of several objects) gives `null`, because the
+ * object that is edited might not be the one the tool reads.
+ */
+function exportedObject(code: string): { open: number; close: number } | null {
+  const match = /\bexport\s+default\s+(?:[\w$.]+\s*\(\s*)?\{/.exec(code);
+
+  if (!match) {
+    return null;
+  }
+
+  const open = match.index + match[0].length - 1;
+  const close = matchingBracket(code, open);
+
+  return close === -1 ? null : { open, close };
+}
+
+/** The text of an object's body with everything inside nested brackets blanked, so only its own keys remain. */
+function ownKeys(code: string, open: number, close: number): string {
+  let depth = 0;
+  let masked = "";
+
+  for (let index = open + 1; index < close; index++) {
+    const char = code[index] ?? "";
+    const opens = char === "{" || char === "[" || char === "(";
+    const closes = char === "}" || char === "]" || char === ")";
+
+    if (closes) depth--;
+
+    masked += depth > 0 && char !== "\n" && char !== "\r" ? " " : char;
+
+    if (opens) depth++;
+  }
+
+  return masked;
+}
+
+/**
  * Add a reporter call to the Vitest `reporters` list of a Vitest config text.
+ *
+ * Only the root `test` object of the exported config is edited, and only when it is
+ * written as a literal (`defineConfig({ test: { ... } })` or `export default { test: { ... } }`;
+ * a `projects` list inside it is fine). Reporters are a root-level option, so a `test` object
+ * elsewhere in the file (a shared variable, an entry of `projects`, a factory) would have no effect. In those shapes the
+ * result is `unrecognised` and nothing is changed.
  *
  * - A `reporters: [...]` list gets the call at its end.
  * - A `test: { ... }` block without `reporters` gets `reporters: ["default", call]`.
@@ -80,62 +125,83 @@ export function insertVitestReporter(source: string, reporterCall: string): Conn
     return { status: "already-present" };
   }
 
-  const reporters = /\breporters:\s*\[/.exec(code);
+  const root = exportedObject(code);
 
-  if (reporters) {
-    const open = reporters.index + reporters[0].length;
-    const close = matchingBracket(code, open - 1);
+  if (!root) {
+    return { status: "unrecognised" };
+  }
 
-    if (close === -1) {
+  const rootKeys = ownKeys(code, root.open, root.close);
+  const testKey = /\btest\s*:\s*\{/.exec(rootKeys);
+
+  if (!testKey || /\.\.\./.test(rootKeys)) {
+    return { status: "unrecognised" };
+  }
+
+  const bodyStart = root.open + 1 + testKey.index + testKey[0].length;
+  const bodyEnd = matchingBracket(code, bodyStart - 1);
+
+  if (bodyEnd === -1) {
+    return { status: "unrecognised" };
+  }
+
+  const testKeys = ownKeys(code, bodyStart - 1, bodyEnd);
+
+  if (/\.\.\./.test(testKeys)) {
+    return { status: "unrecognised" };
+  }
+
+  const reporters = /\breporters\s*:\s*\[/.exec(testKeys);
+
+  if (!reporters) {
+    if (/\breporters\b/.test(testKeys)) {
       return { status: "unrecognised" };
-    }
-
-    const inner = source.slice(open, close);
-    const lastEntry = inner.replace(/[\s,]+$/, "");
-
-    if (lastEntry.trim() === "") {
-      return {
-        status: "added",
-        next: `${source.slice(0, open)}${reporterCall}${source.slice(close)}`,
-      };
-    }
-
-    if (inner.includes("\n")) {
-      const indent = /\n([ \t]*)[^\n]*$/.exec(lastEntry)?.[1] ?? "    ";
-      const closeIndent = /\n([ \t]*)$/.exec(inner)?.[1] ?? "";
-
-      return {
-        status: "added",
-        next: `${source.slice(0, open)}${lastEntry},\n${indent}${reporterCall},\n${closeIndent}${source.slice(close)}`,
-      };
     }
 
     return {
       status: "added",
-      next: `${source.slice(0, open)}${lastEntry}, ${reporterCall}${source.slice(close)}`,
+      next: addProperty(source, bodyStart, `reporters: ["default", ${reporterCall}]`),
     };
   }
 
-  const testBlock = /\btest:\s*\{/.exec(code);
+  const open = bodyStart + reporters.index + reporters[0].length;
+  const close = matchingBracket(code, open - 1);
 
-  if (!testBlock || /\breporters\b/.test(code)) {
+  if (close === -1) {
     return { status: "unrecognised" };
   }
 
-  const bodyStart = testBlock.index + testBlock[0].length;
+  const inner = source.slice(open, close);
+  const lastEntry = inner.replace(/[\s,]+$/, "");
 
-  if (matchingBracket(code, bodyStart - 1) === -1) {
-    return { status: "unrecognised" };
+  if (lastEntry.trim() === "") {
+    return {
+      status: "added",
+      next: `${source.slice(0, open)}${reporterCall}${source.slice(close)}`,
+    };
+  }
+
+  if (inner.includes("\n")) {
+    const indent = /\n([ \t]*)[^\n]*$/.exec(lastEntry)?.[1] ?? "    ";
+    const closeIndent = /\n([ \t]*)$/.exec(inner)?.[1] ?? "";
+
+    return {
+      status: "added",
+      next: `${source.slice(0, open)}${lastEntry},\n${indent}${reporterCall},\n${closeIndent}${source.slice(close)}`,
+    };
   }
 
   return {
     status: "added",
-    next: addProperty(source, bodyStart, `reporters: ["default", ${reporterCall}]`),
+    next: `${source.slice(0, open)}${lastEntry}, ${reporterCall}${source.slice(close)}`,
   };
 }
 
 /**
  * Add a panel specifier to the `panels` list of an app's `src/config/devtools.ts`.
+ *
+ * Only the exported root object is edited, and only when it is a literal
+ * (`export default { ... }`). A settings variable or function gives `unrecognised`.
  *
  * @param source The config file's text.
  * @param panel The specifier, e.g. `"@warlock.js/grimoire/devtools"` (quotes added here).
@@ -148,26 +214,27 @@ export function insertDevtoolsPanel(source: string, panel: string): ConnectorIns
 
   const entry = JSON.stringify(panel);
   const code = codeOnly(source);
-  const panels = /\bpanels:\s*\[/.exec(code);
+  const root = exportedObject(code);
 
-  if (panels) {
-    return insertIntoArray(source, panels.index + panels[0].length, entry);
+  if (!root) {
+    return { status: "unrecognised" };
   }
 
-  const object = /(?:export\s+default\s*|=\s*)\{/.exec(code);
+  const keys = ownKeys(code, root.open, root.close);
+  const panels = /\bpanels\s*:\s*\[/.exec(keys);
 
-  // `panels` set some other way (a variable) would be replaced by a second key.
-  if (
-    !object ||
-    /\bpanels\b/.test(code) ||
-    matchingBracket(code, object.index + object[0].length - 1) === -1
-  ) {
+  if (panels) {
+    return insertIntoArray(source, root.open + 1 + panels.index + panels[0].length, entry);
+  }
+
+  // `panels` set some other way (a variable, a spread) would be replaced by a second key.
+  if (/\bpanels\b|\.\.\./.test(keys)) {
     return { status: "unrecognised" };
   }
 
   return {
     status: "added",
-    next: addProperty(source, object.index + object[0].length, `panels: [${entry}]`),
+    next: addProperty(source, root.open + 1, `panels: [${entry}]`),
   };
 }
 

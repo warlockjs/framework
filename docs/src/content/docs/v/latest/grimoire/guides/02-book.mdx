@@ -211,12 +211,12 @@ Each mobile app in the repository gets `grimoire/book/mobile/<app>.screens.json`
 ## Freshness
 
 `manifest.json` is the fingerprint of the sources the book was built from. It records the Grimoire version, the
-adapter name and version (for Warlock, the framework version), the source roots, and for every file under the
+adapter name and version (for Warlock, the framework version), the source roots, and for every code file under the
 source roots its size, modification time and sha256 hash. It also records the hash of each test file.
 
 Before anything else, every command does this:
 
-1. Stat every file under the source roots: `src/` and the top-level folders of each mobile app, except its native
+1. Stat every code file under the source roots (images, fonts, certificates and other non-code files are not in the book): `src/` and the top-level folders of each mobile app, except its native
    projects and build output (`android/`, `ios/`, `build/`, `dist/`, `web-build/`, `coverage/`). `node_modules` and
    dot folders are skipped. Code files directly in a mobile app's folder (such as `App.tsx`) are not in the book.
 2. Hash only the files whose size or modification time differ from the manifest. A file that was only touched keeps

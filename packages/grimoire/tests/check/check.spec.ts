@@ -98,6 +98,7 @@ describe("checkGrimoire on the shop fixture", () => {
 
     matchGolden("report.json", `${JSON.stringify({ ...report, root: "<root>" }, null, 2)}\n`);
     matchGolden("report.txt", `${formatCheckReport(report).join("\n")}\n`);
+    matchGolden("report.all.txt", `${formatCheckReport(report, { all: true }).join("\n")}\n`);
   });
 
   it("matches route steps the way scry --route does: [id] for :id, a trailing slash ignored", async () => {

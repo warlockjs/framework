@@ -16,6 +16,7 @@ only reads. It never changes a written file or a source file.
 
 ```bash
 npx warlock grimoire check
+npx warlock grimoire check --all     # list every finding
 npx warlock grimoire check --json
 ```
 
@@ -38,7 +39,12 @@ grimoire/features/catalog/flows/wishlist.md:30  GR4001  warning  catalog/wishlis
 - Problems come first: errors, then warnings, each by file and line. Expected findings come last.
 - The last line counts the errors and warnings that are not expected, and the expected findings. It also says how
   fresh the route facts were.
-- `--json` prints the report object: `findings` (each with `code`, `severity`, `message`, `at`, `expected`,
+- Errors always print in full. When a code has more than five warnings, the text shows the first five of that code,
+  then `… GR3001: 6547 findings in all, 6542 not shown`, and a line says how many findings were not listed. A
+  project with no written files yet therefore prints a few lines per code, not thousands. `--all` lists every
+  finding.
+- The last lines are the book state and the time, after any output the app printed while it booted.
+- `--json` is always complete. It prints the report object: `findings` (each with `code`, `severity`, `message`, `at`, `expected`,
   `subject` and `hint`), `counts`, `ok` and `routes`.
 
 The command exits with code 1 when there is an error that is not expected, and 0 otherwise. Warnings never fail it.

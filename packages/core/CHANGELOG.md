@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## 5.55.0
 
+### Upgrading
+
+- Upgrading from 5.53 or earlier: the peer minimums were raised in 5.54.0. Raise `@mongez/http` to `^3.5.2` and `@mongez/localization` to `^3.6.0` (and, for web apps, `@mongez/react-form` to `^4.1.0`) in your app's `package.json` before you install, or `npm install` stops with an `ERESOLVE` error.
+
 ### Added
 
 - `warlock inspect` files report `lines` (code files only), `about` (the file's header comment or `@fileoverview`), `tags` (header `@tag` values, such as `tags.feature`) and `exportDocs` (the first sentence of each export's JSDoc).
@@ -19,7 +23,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - A registered MCP tool is checked like a built-in one. A tool name that is already taken stops the server with a message that names the tool.
 - `cli.commands` accepts arrays of commands (`CLICommandEntry`), so one register function can return several commands.
 - `withExplainCodes()` lets a package answer `warlock explain <code>` for its own codes, without booting the app.
-- `warlock add grimoire` (experimental) installs `@warlock.js/grimoire`, registers its commands in `cli.commands` of `warlock.config.ts`, adds the generated files to `.gitignore`, adds the devtools panel to `src/config/devtools.ts` and, when the app has a `vite.config.ts`, the Vitest reporter. Comments and strings in those files are skipped. When `cli`, `commands`, `reporters` or `panels` is set from a variable, it changes nothing there and prints the line to add. Running it twice changes nothing.
+- `warlock add grimoire` (experimental) installs `@warlock.js/grimoire`, registers its commands in `cli.commands` of `warlock.config.ts`, adds the generated files to `.gitignore`, adds the devtools panel to `src/config/devtools.ts` when `@warlock.js/devtools` is a dependency of the app (otherwise it prints that the tab needs `warlock add devtools`) and, when the app has a `vite.config.ts`, the Vitest reporter. Comments and strings in those files are skipped. It edits the root `test` object of the exported Vitest config and the exported devtools settings object only when they are written as literals. When `cli`, `commands`, `reporters` or `panels` is set from a variable, a function or a `projects` factory, it changes nothing there and prints the line to add and where (for example, add `grimoireReporter()` to `test.reporters` of the root config). Running it twice changes nothing.
 - `warlock add test` adds `grimoireReporter()` to the Vitest config it creates when the app uses Grimoire.
 
 ### Changed

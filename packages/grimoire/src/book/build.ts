@@ -18,7 +18,7 @@ import {
 import type { RouteFreshness } from "../contracts/findings";
 import { GrimoireError } from "../codes";
 import { importClosure, fileGraph } from "../graph";
-import { GRIMOIRE_PATHS, isInsideFolder } from "../paths";
+import { GRIMOIRE_PATHS, isCodeFile, isInsideFolder } from "../paths";
 import {
   cleanFolder,
   hashFile,
@@ -87,14 +87,14 @@ async function readStoredBook(root: string): Promise<StoredBook | null> {
   return { manifest, facts: cache.facts };
 }
 
-/** The current state of every file under the source roots. */
+/** The current state of every code file under the source roots (images, fonts and certificates are not part of the book). */
 type Scan = {
   files: Record<string, Omit<BookManifestFile, "entry">>;
   /** A file kept its hash but its size or mtime moved: the manifest needs the new stat. */
   statMoved: boolean;
 };
 
-/** Stat every file; hash only those whose size or mtime differ from the previous manifest. */
+/** Stat every code file; hash only those whose size or mtime differ from the previous manifest. */
 async function scanSourceRoots(
   root: string,
   sourceRoots: readonly string[],
@@ -103,7 +103,7 @@ async function scanSourceRoots(
   let files: string[];
 
   try {
-    files = await listFiles(root, sourceRoots);
+    files = (await listFiles(root, sourceRoots)).filter(isCodeFile);
   } catch (error) {
     throw new GrimoireError(
       "GR8001",
@@ -155,7 +155,11 @@ async function hashFiles(
     const scanned = scan[file];
 
     if (scanned !== undefined) return [file, scanned.hash] as const;
-    if (sourceRoots.some((folder) => folder === "." || isInsideFolder(file, folder)))
+    // A code file inside a source root that the scan did not find is gone; any other input (a JSON config) is read.
+    if (
+      isCodeFile(file) &&
+      sourceRoots.some((folder) => folder === "." || isInsideFolder(file, folder))
+    )
       return [file, ""] as const;
 
     return [file, await hashIfExists(root, file)] as const;

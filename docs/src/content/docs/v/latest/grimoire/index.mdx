@@ -35,10 +35,13 @@ npx warlock grimoire build
 
 `warlock add grimoire` installs `@warlock.js/grimoire`, registers `registerGrimoireCommands()` in
 `cli.commands` of `warlock.config.ts` (it creates the `cli` block when there is none), adds the
-generated files to `.gitignore`, adds the Grimoire tab to `src/config/devtools.ts`, and adds
-`grimoireReporter()` to `vite.config.ts` when the app runs Vitest. Running it twice changes nothing.
-When one of those settings comes from a variable (`cli: cliSettings`), it leaves the file as it is and
-prints the line to add yourself.
+generated files to `.gitignore`, adds the Grimoire tab to `src/config/devtools.ts` when
+`@warlock.js/devtools` is a dependency of the app (otherwise run `warlock add devtools` first, then this command
+again), and adds `grimoireReporter()` to `vite.config.ts` when the app runs Vitest. Running it twice changes nothing.
+Vitest reads `reporters` from the root `test` object, so Warlock edits it only when the exported config is a
+literal (`defineConfig({ test: { ... } })`). When a setting comes from a variable (`cli: cliSettings`), a function
+or a `projects` factory, it leaves the file as it is and prints the line to add yourself, for example "add
+`grimoireReporter()` to `test.reporters` of the root config".
 
 ## Who writes what
 

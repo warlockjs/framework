@@ -65,8 +65,33 @@ async function ignoreGeneratedFiles(): Promise<void> {
   }
 }
 
-/** Show the Grimoire tab in devtools (read only in development, only when devtools is installed). */
+/** True when the app lists `@warlock.js/devtools` as a dependency. */
+async function hasDevtools(): Promise<boolean> {
+  try {
+    const packageJson = JSON.parse(await getFileAsync(rootPath("package.json"))) as {
+      dependencies?: Record<string, string>;
+      devDependencies?: Record<string, string>;
+    };
+
+    return Boolean(
+      packageJson.dependencies?.["@warlock.js/devtools"] ||
+      packageJson.devDependencies?.["@warlock.js/devtools"],
+    );
+  } catch {
+    return false;
+  }
+}
+
+/** Show the Grimoire tab in devtools (read only in development), only when the app has devtools. */
 async function mountDevtoolsPanel(): Promise<void> {
+  if (!(await hasDevtools())) {
+    console.log(
+      `Grimoire's devtools tab needs ${colors.cyan("warlock add devtools")}; run it, then ${colors.cyan("warlock add grimoire")} again to mount the tab.`,
+    );
+
+    return;
+  }
+
   const configPath = srcPath("config/devtools.ts");
 
   if (!(await fileExistsAsync(configPath))) {
@@ -86,8 +111,8 @@ async function mountDevtoolsPanel(): Promise<void> {
     console.log(`${colors.green("✓")} Added the Grimoire panel to src/config/devtools.ts`);
   } else if (insertion.status === "unrecognised") {
     console.log(
-      `${colors.yellowBright("src/config/devtools.ts")} has no recognisable settings object — ` +
-        'add `panels: ["@warlock.js/grimoire/devtools"]` yourself.',
+      `${colors.yellowBright("src/config/devtools.ts")} is not a literal \`export default { ... }\` object, so it was not changed. ` +
+        'Add `"@warlock.js/grimoire/devtools"` to the `panels` list of the exported settings yourself.',
     );
   }
 }
@@ -110,8 +135,9 @@ async function registerReporter(): Promise<void> {
     console.log(`${colors.green("✓")} Added grimoireReporter() to vite.config.ts`);
   } else if (insertion.status === "unrecognised") {
     console.log(
-      `${colors.yellowBright("vite.config.ts")} has no recognisable test block — add ` +
-        '`reporters: ["default", grimoireReporter()]` (from "@warlock.js/grimoire/vitest") yourself.',
+      `${colors.yellowBright("vite.config.ts")} was not changed: its root \`test\` object is not a plain literal (a variable, a function or \`projects\`). ` +
+        'Add `grimoireReporter()` (from "@warlock.js/grimoire/vitest") to `test.reporters` of the root config yourself, for example ' +
+        '`reporters: ["default", grimoireReporter()]`.',
     );
   }
 }

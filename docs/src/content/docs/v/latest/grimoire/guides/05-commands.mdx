@@ -74,9 +74,10 @@ npx warlock grimoire build --json
 ```
 book      35 files (46 written, 0 removed), routes fresh
 features  3 (bookmaps written: 9)   tasks  1 open, 1 waiting, 1 done
+time      0.4s
 ```
 
-A run with nothing to do prints `book      up to date`. A task waiting for the owner is counted under `waiting`
+The summary is always the last lines, after any output the app prints while it boots. A run with nothing to do prints `book      up to date`. A task waiting for the owner is counted under `waiting`
 only, not under `open`. `--site` writes the same view as the devtools tab as one
 static `index.html` (see [Devtools](/v/latest/grimoire/guides/09-devtools/)); `--out` takes a folder inside the
 project; a folder outside it, or the project folder itself, stops the command with `GR9006`. `--json` prints `{ rebuilt, changed, written, removed, routes, site, problems }`.
@@ -85,15 +86,24 @@ project; a folder outside it, or the project folder itself, stops the command wi
 
 ```bash
 npx warlock grimoire check
+npx warlock grimoire check --all     # list every finding
 npx warlock grimoire check --json
 ```
 
 ```
 grimoire/features/catalog/flows/browse-products.md:26  GR4001  warning  catalog/browse-products AC-1 has no test
 …
+    … GR4001: 12 findings in all, 7 not shown
 grimoire/features/catalog/flows/wishlist.md:12  GR2001  error  route step "POST /api/wishlist" matches no route  (expected)
+7 findings not listed; run with --all to list every finding.
 0 errors, 8 warnings, 8 expected  (routes: fresh)
+book      up to date
+time      0.3s
 ```
+
+Errors always print in full. When a code has more than five warnings, the text shows the first five, then how many
+are left. `--all` prints every finding; `--json` is always complete. The last two lines (the book state and the
+time) come after the app's own boot output.
 
 The command exits 1 only when the report holds an error that is not expected. Findings on proposed features and
 flows are expected and never fail it. [The check](/v/latest/grimoire/guides/04-check/) lists every code.
@@ -149,13 +159,26 @@ npx warlock scry --impact src/app/catalog/models/product.model.ts
 
 ```
 impact of src/app/catalog/models/product.model.ts
-importers  1 direct, 14 in all
-routes     GET /api/products  GET /api/products/new-arrivals  GET /api/products/:id  POST /api/orders
-pages      web-client /  web-client /products/:id
-flows      catalog/browse-products  catalog/new-arrivals  catalog/wishlist  orders/place-order
-features   catalog (owner)  orders (borrower)
-tests      e2e/checkout.e2e.ts  src/app/catalog/tests/new-arrivals.test.ts  src/app/orders/tests/place-order.test.ts
+importers     1 direct, 14 in all
+routes (4)    GET /api/products
+              GET /api/products/new-arrivals
+              GET /api/products/:id
+              POST /api/orders
+pages (2)     web-client /
+              web-client /products/:id
+flows (4)     catalog/browse-products
+              catalog/new-arrivals
+              catalog/wishlist
+              orders/place-order
+features (2)  catalog (owner)
+              orders (borrower)
+tests (3)     e2e/checkout.e2e.ts
+              src/app/catalog/tests/new-arrivals.test.ts
+              src/app/orders/tests/place-order.test.ts
 ```
+
+Each heading carries the count of its list. A list longer than 20 stops there and ends with `… and N more`; add
+`--all` to print every line. `--json` always holds the full lists.
 
 `routes` lists API routes whose handler file (or routes file, when the handler file is unknown) reaches the file
 through imports; pages and screens are listed under `pages`. `features` lists the owner of the file and every
@@ -251,8 +274,11 @@ file     src/app/catalog/services/new-arrivals.service.ts  Lists the newest prod
 ```
 
 Search looks at features, flows, blocks, pages, screens, API routes, file paths, export names, header sentences and
-tasks. Case does not matter, and every word must appear, in any order. An exact id comes first, then an id that
-starts with the text, then ids that hold every word, then the rest. `--limit` defaults to 20.
+tasks. Case does not matter, and every word must appear, in any order. Hits are ranked: an exact name or
+path first, then a name or path that starts with the text, then one that holds the words as whole words, then a
+substring, then a match found only in the header sentence, and last a fuzzy match (the letters in order, for texts of
+four letters or more). Within a rank the type decides: feature, flow, block, page, screen, route, file, export, task.
+`--limit` defaults to 20.
 
 ### Errors
 

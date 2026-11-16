@@ -87,6 +87,7 @@ describe("add grimoire", () => {
   it("ignores the generated files, mounts the devtools panel and adds the reporter", async () => {
     files.set("warlock.config.ts", TEMPLATE_CONFIG);
     files.set(".gitignore", "node_modules\n");
+    files.set("package.json", '{"devDependencies":{"@warlock.js/devtools":"5.55.0"}}');
     files.set(
       "vite.config.ts",
       'export default defineConfig({ test: { reporters: ["default"] } });\n',
@@ -98,6 +99,31 @@ describe("add grimoire", () => {
     expect(files.get("devtools.ts")).toContain('"@warlock.js/grimoire/devtools"');
     expect(files.get("vite.config.ts")).toContain('reporters: ["default", grimoireReporter()]');
     expect(files.get("vite.config.ts")).toContain('from "@warlock.js/grimoire/vitest"');
+  });
+
+  it("does not mount the devtools panel when devtools is not installed", async () => {
+    files.set("warlock.config.ts", TEMPLATE_CONFIG);
+    files.set("package.json", '{"dependencies":{"@warlock.js/core":"5.55.0"}}');
+
+    await grimoireFeature.onExecuting?.({} as never);
+
+    expect(files.has("devtools.ts")).toBe(false);
+    expect(vi.mocked(console.log).mock.calls.flat().join("\n")).toContain("warlock add devtools");
+  });
+
+  it("leaves a vite config alone when its root test is built from projects", async () => {
+    files.set("warlock.config.ts", TEMPLATE_CONFIG);
+    const vite =
+      "const single = { test: { globals: true } };\nexport default defineConfig(() => process.env.VITEST ? { ...single, test: { projects: [] } } : single);\n";
+
+    files.set("vite.config.ts", vite);
+
+    await grimoireFeature.onExecuting?.({} as never);
+
+    expect(files.get("vite.config.ts")).toBe(vite);
+    expect(vi.mocked(console.log).mock.calls.flat().join("\n")).toContain(
+      "test.reporters` of the root config",
+    );
   });
 
   it("creates no vite config when the app does not run Vitest", async () => {

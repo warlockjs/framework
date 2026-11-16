@@ -40,32 +40,39 @@ describe("appendGitignoreLines", () => {
 
 describe("insertVitestReporter", () => {
   const call = "grimoireReporter()";
+  const wrap = (test: string) => `export default defineConfig({ ${test} });`;
 
   it("appends to a single-line reporters list", () => {
-    const result = insertVitestReporter('test: { reporters: ["default", new A()], x: 1 }', call);
+    const result = insertVitestReporter(
+      wrap('test: { reporters: ["default", new A()], x: 1 }'),
+      call,
+    );
 
     expect(result).toEqual({
       status: "added",
-      next: 'test: { reporters: ["default", new A(), grimoireReporter()], x: 1 }',
+      next: wrap('test: { reporters: ["default", new A(), grimoireReporter()], x: 1 }'),
     });
   });
 
   it("appends to a multi-line list", () => {
     const result = insertVitestReporter(
-      ["test: {", "  reporters: [", '    "default",', "    new A(),", "  ],", "}"].join("\n"),
-      call,
-    );
-
-    expect(result.status === "added" && result.next).toBe(
       [
+        "export default defineConfig({",
         "test: {",
         "  reporters: [",
         '    "default",',
         "    new A(),",
-        "    grimoireReporter(),",
         "  ],",
         "}",
+        "});",
       ].join("\n"),
+      call,
+    );
+
+    expect(result.status === "added" && result.next).toContain(
+      ["  reporters: [", '    "default",', "    new A(),", "    grimoireReporter(),", "  ],"].join(
+        "\n",
+      ),
     );
   });
 
@@ -80,37 +87,65 @@ describe("insertVitestReporter", () => {
     );
   });
 
+  it("edits the root test, not the test of a project inside it", () => {
+    const result = insertVitestReporter(
+      wrap("test: { projects: [{ test: { name: 'unit' } }], globals: true }"),
+      call,
+    );
+
+    expect(result.status === "added" && result.next).toBe(
+      wrap(
+        "test: { reporters: [\"default\", grimoireReporter()], projects: [{ test: { name: 'unit' } }], globals: true }",
+      ),
+    );
+  });
+
+  it("edits the root test of a plain exported object", () => {
+    const result = insertVitestReporter("export default { test: { globals: true } };", call);
+
+    expect(result.status === "added" && result.next).toBe(
+      'export default { test: { reporters: ["default", grimoireReporter()], globals: true } };',
+    );
+  });
+
   it("appends after a reporter given with options, not inside it", () => {
     const single = insertVitestReporter(
-      'test: { reporters: [["json", { outputFile: "r.json" }], "default"] }',
+      wrap('test: { reporters: [["json", { outputFile: "r.json" }], "default"] }'),
       call,
     );
 
     expect(single.status === "added" && single.next).toBe(
-      'test: { reporters: [["json", { outputFile: "r.json" }], "default", grimoireReporter()] }',
-    );
-
-    const multi = insertVitestReporter(
-      [
-        "test: {",
-        "  reporters: [",
-        '    "default",',
-        '    ["junit", { outputFile: "j.xml" }],',
-        "  ],",
-        "}",
-      ].join("\n"),
-      call,
-    );
-
-    expect(multi.status === "added" && multi.next).toContain(
-      '    ["junit", { outputFile: "j.xml" }],\n    grimoireReporter(),\n  ],',
+      wrap(
+        'test: { reporters: [["json", { outputFile: "r.json" }], "default", grimoireReporter()] }',
+      ),
     );
   });
 
   it("leaves reporters set without a list alone", () => {
-    expect(insertVitestReporter('test: { reporters: "verbose" }', call)).toEqual({
+    expect(insertVitestReporter(wrap('test: { reporters: "verbose" }'), call)).toEqual({
       status: "unrecognised",
     });
+  });
+
+  it("changes nothing when the root test is not a literal in the exported config", () => {
+    const shapes = [
+      // a factory
+      "const single = { test: { globals: true } };\nexport default defineConfig(() => process.env.VITEST ? projects() : single);",
+      // a variable
+      "const config = { test: { globals: true } };\nexport default config;",
+      // a config built from a projects factory
+      "const base = { test: { globals: true } };\nexport default defineConfig(() => ({ ...base, test: { projects: [base] } }));",
+      // a spread may hide the test block
+      "export default defineConfig({ ...base, test: { globals: true } });",
+      // a nested test object only
+      "export default defineConfig({ plugins: [{ test: { a: 1 } }] });",
+      // a merge
+      "export default mergeConfig(base, { test: { globals: true } });",
+    ];
+
+    for (const shape of shapes) {
+      expect(insertVitestReporter(shape, call)).toEqual({ status: "unrecognised" });
+    }
   });
 
   it("is idempotent and reports an unknown file", () => {
@@ -140,16 +175,17 @@ describe("insertDevtoolsPanel", () => {
     );
   });
 
-  it("adds to a typed settings object and leaves panels from a variable alone", () => {
-    const typed = insertDevtoolsPanel(
-      "const settings: DevtoolsOptions = {\n  maxRequests: 50,\n};\nexport default settings;\n",
-      panel,
-    );
-
-    expect(typed.status === "added" && typed.next).toContain(
-      '= {\n  panels: ["@warlock.js/grimoire/devtools"],\n  maxRequests: 50,',
-    );
+  it("leaves a settings variable and panels from a variable alone", () => {
+    expect(
+      insertDevtoolsPanel(
+        "const settings = {\n  maxRequests: 50,\n};\nexport default settings;\n",
+        panel,
+      ),
+    ).toEqual({ status: "unrecognised" });
     expect(insertDevtoolsPanel("export default { panels: myPanels };", panel)).toEqual({
+      status: "unrecognised",
+    });
+    expect(insertDevtoolsPanel("export default defineSettings(() => ({}));", panel)).toEqual({
       status: "unrecognised",
     });
   });

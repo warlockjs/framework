@@ -4,6 +4,10 @@ All notable changes to `@warlock.js/web` are documented here.
 
 ## 5.55.0
 
+### Upgrading
+
+- Upgrading from 5.53 or earlier: the peer minimums were raised in 5.54.0. Raise `@mongez/http` to `^3.5.2`, `@mongez/react-form` to `^4.1.0` and `@mongez/localization` to `^3.6.0` in your app's `package.json` before you install, or `npm install` stops with an `ERESOLVE` error.
+
 ### Added
 
 - `@warlock.js/web/build` exports `discoverPageGraph()`, `layoutChainFor()` and the page-graph types.

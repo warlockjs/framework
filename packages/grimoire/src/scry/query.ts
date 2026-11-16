@@ -571,7 +571,27 @@ function candidates(snapshot: GrimoireSnapshot): Candidate[] {
   return list;
 }
 
-/** Score of a candidate for the query words, or 0 when a word is missing. */
+/** Whether every character of `needle` appears in `text` in order. */
+function isSubsequence(needle: string, text: string): boolean {
+  let position = 0;
+
+  for (const char of text) {
+    if (char === needle[position]) position++;
+
+    if (position === needle.length) return true;
+  }
+
+  return needle.length === 0;
+}
+
+/** Shortest query that may match by fuzzy (in-order letters), so short queries stay precise. */
+const FUZZY_MIN = 4;
+
+/**
+ * Score of a candidate for the query words, or 0 when it does not match. From best
+ * to worst: exact name or path (7), prefix (6), whole-word match (5), substring of
+ * the name or path (4), the words found only in the detail (3), fuzzy (2).
+ */
 function scoreOf(candidate: Candidate, query: string, tokens: readonly string[]): number {
   const id = words(
     candidate.type === "export" ? (candidate.id.split("#")[1] ?? candidate.id) : candidate.id,
@@ -579,12 +599,23 @@ function scoreOf(candidate: Candidate, query: string, tokens: readonly string[])
   const last = words(lastSegment(candidate.id));
   const all = `${id} ${words(candidate.detail ?? "")}`;
 
-  if (!tokens.every((token) => all.includes(token))) return 0;
-  if (id === query || last === query) return 4;
-  if (id.startsWith(query) || last.startsWith(query)) return 3;
-  if (tokens.every((token) => id.includes(token))) return 2;
+  if (!tokens.every((token) => all.includes(token))) {
+    const squeezed = id.replace(/ /g, "");
 
-  return 1;
+    return query.length >= FUZZY_MIN && tokens.every((token) => isSubsequence(token, squeezed))
+      ? 2
+      : 0;
+  }
+
+  if (id === query || last === query) return 7;
+  if (id.startsWith(query) || last.startsWith(query)) return 6;
+
+  const idWords = id.split(" ");
+
+  if (tokens.every((token) => idWords.includes(token))) return 5;
+  if (tokens.every((token) => id.includes(token))) return 4;
+
+  return 3;
 }
 
 function scrySearch(

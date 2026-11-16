@@ -205,9 +205,15 @@ function siteFolder(root: string, out: string): string {
   return folder;
 }
 
+/** `time      4.2s`, the last line of `build` and `check`. */
+function elapsedLine(started: number): string {
+  return `time      ${((Date.now() - started) / 1000).toFixed(1)}s`;
+}
+
 /** `warlock grimoire build [--force] [--site [--out <dir>]] [--json]`. */
 export async function runBuild(context: CommandContext, options: Options = {}): Promise<number> {
   const { root, adapter, io } = context;
+  const started = Date.now();
 
   try {
     const force = options.force === true;
@@ -243,14 +249,18 @@ export async function runBuild(context: CommandContext, options: Options = {}): 
 
     const summary = buildSummary(run);
 
-    io.out(summary.book);
-    io.out(summary.collected);
-
-    if (site !== null) io.out(`site      ${site}/index.html`);
+    // The app's own boot output comes before this point; the summary is always the last lines.
     if (bootProblem !== null) {
       io.err(`${bootProblem.code}  ${bootProblem.message}`);
       io.err(`  fix: ${bootProblem.hint}`);
     }
+
+    io.out(summary.book);
+    io.out(summary.collected);
+
+    if (site !== null) io.out(`site      ${site}/index.html`);
+
+    io.out(elapsedLine(started));
 
     return 0;
   } catch (error) {
@@ -277,18 +287,25 @@ function withProblem(
   };
 }
 
-/** `warlock grimoire check [--json]`: exit 1 only when the report is not ok. */
+/** `warlock grimoire check [--all] [--json]`: exit 1 only when the report is not ok. */
 export async function runCheck(context: CommandContext, options: Options = {}): Promise<number> {
   const { root, adapter, io } = context;
+  const started = Date.now();
 
   try {
-    const { value: snapshot, bootProblem } = await withFreshRoutes((routes) =>
-      openGrimoire(root, adapter, { routes }),
+    const { value: run, bootProblem } = await withFreshRoutes((routes) =>
+      runGrimoire(root, adapter, { routes }),
     );
-    const report = withProblem(checkGrimoire(snapshot), bootProblem);
+    const report = withProblem(checkGrimoire(run.snapshot), bootProblem);
 
     if (options.json === true) printJson(io, report);
-    else for (const line of formatCheckReport(report)) io.out(line);
+    else {
+      for (const line of formatCheckReport(report, { all: options.all === true })) io.out(line);
+
+      // The app's own boot output comes before the report; the summary is always the last lines.
+      io.out(buildSummary(run).book);
+      io.out(elapsedLine(started));
+    }
 
     return report.ok ? 0 : 1;
   } catch (error) {
@@ -371,7 +388,7 @@ export async function answer(
   return scry(await openForScry(root, adapter, query), query);
 }
 
-/** `warlock scry <file> | --impact … | --route … | --feature … | --flow … | --search … [--limit n] [--json]`. */
+/** `warlock scry <file> | --impact … | --route … | --feature … | --flow … | --search … [--limit n] [--all] [--json]`. */
 export async function runScry(
   context: CommandContext,
   args: readonly string[],
@@ -384,7 +401,7 @@ export async function runScry(
     const result = await answer(root, adapter, query);
 
     if (options.json === true) printJson(io, result);
-    else for (const line of formatScryResult(result)) io.out(line);
+    else for (const line of formatScryResult(result, { all: options.all === true })) io.out(line);
 
     return 0;
   } catch (error) {

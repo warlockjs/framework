@@ -60,7 +60,8 @@ npx warlock scry --flow catalog/new-arrivals                        # one flow, 
 ```
 
 Add `--json` for machine-readable output. `--impact` lists API routes, pages, flows and features,
-including features that only borrow the file. Read the flows it names and run their tests after
+including features that only borrow the file; each list has a count and stops at 20 lines, and `--all`
+prints every line. `--search` ranks exact matches first. Read the flows it names and run their tests after
 your change.
 
 A file's entry is also at a fixed path: `src/app/auth/controllers/login.controller.ts` is described
@@ -72,7 +73,7 @@ in `grimoire/book/app/auth/controllers/login.controller.json`.
 | ------------------------------------------- | -------------------------------------------------------------------------------- |
 | `warlock grimoire build`                    | Builds or refreshes the book. `scry` and `check` do it when it is stale          |
 | `warlock grimoire build --site [--out dir]` | Also writes the book as a static site (default `grimoire/book/site`)             |
-| `warlock grimoire check`                    | Reports broken names, untested criteria, files with no owner. Exit 1 on an error |
+| `warlock grimoire check`                    | Reports broken names, untested criteria, files with no owner. Exit 1 on an error; `--all` lists every warning |
 | `warlock grimoire release <release>`        | Writes the collected list into `grimoire/releases/<release>.md`                  |
 | `warlock explain GR2001`                    | Explains a finding code                                                          |
 

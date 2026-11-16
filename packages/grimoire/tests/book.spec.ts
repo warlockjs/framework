@@ -175,6 +175,20 @@ describe("the book of the shop fixture", () => {
     expect(JSON.parse(copy.read("grimoire/book/.cache/facts.json")).facts.routes).toHaveLength(9);
   });
 
+  it("fingerprints code files only: images, fonts and certificates are not in the manifest", async () => {
+    const copy = fixture();
+
+    writeFileSync(path.join(copy.root, "mobile", "logo.png"), "not code");
+    writeFileSync(path.join(copy.root, "mobile", "certificate.pem"), "-----BEGIN-----");
+    writeFileSync(path.join(copy.root, "src", "font.woff2"), "font");
+
+    const { book } = await buildAndWrite(copy, createShopAdapter(), { routes: "fresh" });
+    const files = Object.keys(book.manifest.files);
+
+    expect(files.filter((file) => !/\.(?:[cm]?[jt]s|[jt]sx)$/.test(file))).toEqual([]);
+    expect(files).toHaveLength(shopFacts.files.length);
+  });
+
   it("computes in memory only when asked not to write", async () => {
     const copy = fixture();
     const options = { routes: "fresh", now: fixedNow, write: false } as Parameters<

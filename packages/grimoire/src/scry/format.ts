@@ -29,6 +29,34 @@ function section(label: string, values: readonly string[], width = LABEL): strin
   );
 }
 
+/** Longest list a text section prints before it says how many more there are. */
+const SECTION_CAP = 20;
+
+/** What the text formatters may be told. */
+export type FormatScryOptions = {
+  /** Print every line of every section, not the first 20. */
+  all?: boolean;
+};
+
+/** A section whose heading carries the count (`routes (3)`) and whose list stops at the cap. */
+function countedSection(
+  label: string,
+  values: readonly string[],
+  options: FormatScryOptions,
+  width: number,
+): string[] {
+  const shown = options.all === true ? values : values.slice(0, SECTION_CAP);
+  const lines = section(`${label} (${values.length})`, shown, width);
+
+  if (shown.length < values.length) {
+    lines.push(
+      `${" ".repeat(Math.max(width, label.length + 1))}… and ${values.length - shown.length} more (--all lists every one)`,
+    );
+  }
+
+  return lines;
+}
+
 const plural = (count: number, word: string): string => `${count} ${word}${count === 1 ? "" : "s"}`;
 
 /** Cut text at a word so it fits `max` characters, ending with ` …`. */
@@ -113,33 +141,32 @@ function formatFile(result: ScryFileResult): string[] {
   ];
 }
 
-function formatImpact(result: ScryImpactResult): string[] {
+function formatImpact(result: ScryImpactResult, options: FormatScryOptions): string[] {
+  const width = 14;
+
   return [
     `impact of ${result.file}`,
-    `${"importers".padEnd(11)}${result.importers.direct.length} direct, ${result.importers.all.length} in all`,
-    ...section(
+    `${"importers".padEnd(width)}${result.importers.direct.length} direct, ${result.importers.all.length} in all`,
+    ...countedSection(
       "routes",
-      result.routes.length > 0
-        ? [result.routes.map((route) => `${route.method} ${route.path}`).join("  ")]
-        : [],
-      11,
+      result.routes.map((route) => `${route.method} ${route.path}`),
+      options,
+      width,
     ),
-    ...section(
+    ...countedSection(
       "pages",
-      result.pages.length > 0
-        ? [result.pages.map((page) => `${page.app} ${page.route}`).join("  ")]
-        : [],
-      11,
+      result.pages.map((page) => `${page.app} ${page.route}`),
+      options,
+      width,
     ),
-    ...section("flows", result.flows.length > 0 ? [result.flows.join("  ")] : [], 11),
-    ...section(
+    ...countedSection("flows", result.flows, options, width),
+    ...countedSection(
       "features",
-      result.features.length > 0
-        ? [result.features.map((feature) => `${feature.id} (${feature.via})`).join("  ")]
-        : [],
-      11,
+      result.features.map((feature) => `${feature.id} (${feature.via})`),
+      options,
+      width,
     ),
-    ...section("tests", result.tests.length > 0 ? [result.tests.join("  ")] : [], 11),
+    ...countedSection("tests", result.tests, options, width),
     ...notes(result),
   ];
 }
@@ -344,13 +371,16 @@ function formatSearch(result: ScrySearchResult): string[] {
   ];
 }
 
-/** The compact text of a result (formats in the commands guide). */
-export function formatScryResult(result: ScryResult): string[] {
+/**
+ * The compact text of a result (formats in the commands guide). Long lists in an
+ * impact answer stop after 20 lines with a count; `options.all` prints them all.
+ */
+export function formatScryResult(result: ScryResult, options: FormatScryOptions = {}): string[] {
   switch (result.type) {
     case "file":
       return formatFile(result);
     case "impact":
-      return formatImpact(result);
+      return formatImpact(result, options);
     case "route":
       return formatRoute(result);
     case "feature":

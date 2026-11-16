@@ -8,85 +8,85 @@
       "type": "flow",
       "id": "catalog/new-arrivals",
       "detail": "New arrivals",
-      "score": 4
+      "score": 7
     },
     {
       "type": "block",
       "id": "mobile/home/new-arrivals",
       "detail": "catalog/new-arrivals",
-      "score": 4
+      "score": 7
     },
     {
       "type": "block",
       "id": "web-client/home/new-arrivals",
       "detail": "catalog/new-arrivals",
-      "score": 4
+      "score": 7
     },
     {
       "type": "route",
       "id": "GET /api/products/new-arrivals",
       "detail": "catalog.new-arrivals",
-      "score": 4
+      "score": 7
     },
     {
       "type": "file",
       "id": "src/app/catalog/controllers/new-arrivals.controller.ts",
       "detail": "Answers the new arrivals request.",
-      "score": 3
+      "score": 6
     },
     {
       "type": "file",
       "id": "src/app/catalog/services/new-arrivals.service.ts",
       "detail": "Lists the newest products sold in the customer's country.",
-      "score": 3
+      "score": 6
     },
     {
       "type": "file",
       "id": "src/app/catalog/tests/new-arrivals.test.ts",
       "detail": "Proves the new arrivals rules.",
-      "score": 3
+      "score": 6
     },
     {
       "type": "export",
       "id": "src/app/catalog/controllers/new-arrivals.controller.ts#NewArrivalsController",
       "detail": "Returns the new arrivals for the customer's country.",
-      "score": 3
+      "score": 6
     },
     {
       "type": "export",
       "id": "src/app/catalog/services/new-arrivals.service.ts#listNewArrivals",
       "detail": "Returns up to 20 products, newest first.",
-      "score": 2
+      "score": 5
     },
     {
       "type": "file",
       "id": "mobile/app/index.tsx",
       "detail": "The home screen with new arrivals.",
-      "score": 1
+      "score": 3
     },
     {
       "type": "file",
       "id": "src/web/$sites/client/home.page.tsx",
       "detail": "The home page with featured products and new arrivals.",
-      "score": 1
+      "score": 3
     },
     {
       "type": "file",
       "id": "src/web/$sites/client/home.setup.ts",
       "detail": "Loads featured products and new arrivals for the home page.",
-      "score": 1
+      "score": 3
     },
     {
       "type": "export",
       "id": "src/web/$sites/client/home.setup.ts#loader",
       "detail": "Returns featured products and up to 20 new arrivals.",
-      "score": 1
+      "score": 3
     },
     {
       "type": "task",
       "id": "T-010",
       "detail": "New arrivals were empty for customers with no country",
-      "score": 1
+      "score": 3
     }
   ]
 }

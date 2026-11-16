@@ -104,7 +104,7 @@ export function registerGrimoireCommands(options: WarlockAdapterOptions = {}): C
   const grimoire: CLICommand = command({
     name: "grimoire <action> [release]",
     description:
-      "Grimoire (experimental): build the book (build [--force] [--site [--out <dir>]]), check the written files (check), collect a release (release <version>); --json for JSON",
+      "Grimoire (experimental): build the book (build [--force] [--site [--out <dir>]]), check the written files (check [--all]), collect a release (release <version>); --json for JSON",
     preAction: async ({ args, options: flags }) => {
       grimoire.commandPreload = undefined;
 
@@ -149,6 +149,11 @@ export function registerGrimoireCommands(options: WarlockAdapterOptions = {}): C
     },
     options: [
       { text: "--json, -j", description: "Print the result as JSON", type: "boolean" },
+      {
+        text: "--all",
+        description: "check: list every finding (text output groups warnings by code)",
+        type: "boolean",
+      },
       {
         text: "--force, -f",
         description: "build: rebuild every book entry and read the routes again",
@@ -195,6 +200,11 @@ export function registerGrimoireCommands(options: WarlockAdapterOptions = {}): C
       { text: "--flow", description: "One flow: <feature>/<flow>", type: "string" },
       { text: "--search", description: "Search by words", type: "string" },
       { text: "--limit", description: "--search: most hits (default 20)", type: "number" },
+      {
+        text: "--all",
+        description: "--impact: print every line of every list (text output stops at 20)",
+        type: "boolean",
+      },
       { text: "--json, -j", description: "Print the answer as JSON", type: "boolean" },
     ],
   });
