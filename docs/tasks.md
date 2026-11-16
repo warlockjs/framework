@@ -10,10 +10,15 @@ Open work for the framework repository. Finished entries move to `tasks.complete
 - T-010: encryption-key and JWT-secret rotation (previous keys accepted for reading): build it, and in which shape?
 - T-011: model-level protected columns against mass assignment: which design?
 - T-033: should `CapturedMessage.content` become text-only for multipart messages?
+- T-111: request locale order: should the explicit `locale` header win over a `locale` cookie?
+- T-112: `request.validated()` on a route with no schema: keep the silent `{}`, warn, or throw?
+- T-113: `web.robots`: allow a per-site policy, and in which shape?
+- T-114: unknown API routes: answer the app's error shape (code, translated message, request id) instead of a fixed English body?
 
 ## Tasks
 
-Ordered by value: security first, then performance, then features and bugs. Line numbers are as of 5.53.0.
+Ordered by value: security first, then performance, then features and bugs. Line numbers are as of 5.53.0; entries
+T-100 and later are checked against 5.53.1.
 
 ### T-007 [decision] Coding-CLI adapters inherit the whole host environment by default
 
@@ -856,3 +861,364 @@ Ordered by value: security first, then performance, then features and bugs. Line
   command prints progress and the child's output while it waits), or closed as an app-side import.
 - Status: open. Not confirmed from the source; no code changed in 5.53.1.
 - Owner decision: none; needs someone with a Windows machine to run the steps above.
+
+### T-101 [bug] `fallbackModel({ retryOn })` replaces the default failover codes; docs call it additive
+
+- Source: application upgrade and integration report of 2026-11-12, re-checked against 5.53.1 on 2026-11-13.
+- What and why: both forms of `retryOn` (a code list and a predicate) replace the built-in set instead of adding to
+  it. `ai.fallbackModel([a, b], { retryOn: (error) => error instanceof MyError })` stops failing over on rate limits,
+  overloaded, timeout and 5xx provider errors, so `b` is never tried when `a` is down. The type comment and the recipe
+  page say both forms are "additive over the default", and the default set is not exported, so an app cannot compose
+  with it and has to copy the list (it already grew once, with `PROVIDER_OVERLOADED` in 5.53.0). The type comment also
+  lists the default without `PROVIDER_OVERLOADED`, and the resilience page contradicts itself ("widening `retryOn`").
+- Evidence: `packages/ai/src/model/fallback-model.ts:95-104` (`resolveShouldRetry`: a function is returned as is, a
+  list replaces `DEFAULT_RETRYABLE_CODES`); `:29-34` (the default, module-private, not exported from
+  `packages/ai/src/model/index.ts`); `:207` and `:263` (the gate `isLast || !this.shouldRetry(error)`);
+  `packages/ai/src/contracts/fallback-model.contract.ts:19-23` ("additive") and `:29` (default list without
+  `PROVIDER_OVERLOADED`); `docs/src/content/docs/v/latest/ai/recipes/cost-provider-fallback.md:96` ("additive over
+  the default"); `docs/src/content/docs/v/latest/ai/best-practices/resilience.md:165` and `:359`;
+  `packages/ai/skills/ai-dx-helpers/SKILL.md:106-107` (both forms shown, replacement never stated).
+- Workaround: write the default set in the app and combine it with the extra reason:
+  `retryOn: (e) => (e instanceof AIError && ["PROVIDER_RATE_LIMIT", "PROVIDER_OVERLOADED", "PROVIDER_TIMEOUT", "PROVIDER_ERROR"].includes(e.code)) || isMyReason(e)`.
+  The list must be kept in step by hand.
+- Smallest fix: export the default set (or a `defaultFallbackRetryOn(error)` predicate) from the model barrel; say
+  "replaces" in the contract comment, the recipe and the skill, and add `PROVIDER_OVERLOADED` to the comment's list.
+  Optionally accept an additive form (`retryOn: { also: fn }`).
+- Acceptance: the default is importable from `@warlock.js/ai`; a spec shows a predicate and a list each replace the
+  default and that composing with the exported default keeps the standard failover; the contract comment, recipe,
+  resilience page and `ai-dx-helpers` skill say "replaces" and name the export; `packages/ai/CHANGELOG.md` entry
+  (skill-coverage gate passes for the new export).
+- Status: open.
+
+### T-102 [bug] A caller's own abort starts the fallback chain
+
+- Source: application upgrade and integration report of 2026-11-12, re-checked against 5.53.1 on 2026-11-13.
+- What and why: when the caller aborts a call, the OpenAI and Anthropic adapters reject with a plain `ProviderError`
+  (`PROVIDER_ERROR`, which is in the default failover set) because neither mapper recognises the SDK's user-abort
+  error. `fallbackModel` records it in `lastAttempts` and calls the next model with the same already-aborted signal.
+  Adapters that honour the signal contract then fail at once, so the visible damage is a spurious attempt and a final
+  error that comes from the backup model instead of the abort; an adapter or mock that ignores the signal makes a real
+  wasted call. `retryModel` already stops on a cancel (`isAbortError` or `category === "cancelled"`); `fallbackModel`
+  has no equivalent and the adapters never mark the abort as cancelled.
+- Evidence: `packages/ai/src/model/fallback-model.ts:207` and `:263` (no look at `options.signal`);
+  `packages/ai/src/model/retry-model.ts:141` (the cancel check `fallbackModel` lacks);
+  `packages/ai-openai/src/utils/wrap-openai-error.ts:111` and `packages/ai-anthropic/src/utils/wrap-anthropic-error.ts:108`
+  (the abort falls through to `new ProviderError`); `packages/ai-openai/src/model.ts:175`, `:268`;
+  `packages/ai-anthropic/src/model.ts:1349`; `packages/ai-openai/src/responses-model.spec.ts:1474-1507` (pins the
+  `ProviderError` result for an aborted stream, `cause` an `APIUserAbortError`).
+- Workaround: build the `fallbackModel` per request and close over that request's signal in `retryOn` (re-adding the
+  default codes, see T-101): `retryOn: (e) => !signal.aborted && isDefaultFailover(e)`. A shared long-lived chain
+  cannot do this because the predicate does not receive the call options.
+- Smallest fix: in `FallbackRun.complete` and `FallbackRun.stream`, rethrow when `options?.signal?.aborted` before
+  consulting `shouldRetry`; in both adapter mappers, detect the SDK's user-abort error and return an error with
+  `category: "cancelled"` carrying the `AbortError` name.
+- Acceptance: a spec aborts the first model mid-call and shows one attempt, no second call, and the abort error
+  surfacing; adapter specs map the SDK abort to the cancelled category; the spec at `responses-model.spec.ts:1474-1507`
+  is updated; `retryModel` and workflow retry still stop on it; changelog entries in `@warlock.js/ai`,
+  `@warlock.js/ai-openai`, `@warlock.js/ai-anthropic`.
+- Status: open.
+
+### T-103 [bug] OpenAI quota exhaustion on a 429 is mapped to a retryable rate limit
+
+- Source: application upgrade and integration report of 2026-11-12, re-checked against 5.53.1 on 2026-11-13.
+- What and why: the OpenAI error mapper treats only `code === "insufficient_quota"` as spent credit. A 429 whose body
+  has `type: "insufficient_quota"` but another `code` (for example `credit_balance_exhausted`) falls through to the
+  status-429 branch and becomes `ProviderRateLimitError`, which is retryable. `retryModel` and workflow retry then
+  repeat a call that cannot succeed, and the error no longer says the account is out of credit. `billing_hard_limit_reached`
+  is never `QuotaExceededError` (a 400 gives `InvalidRequestError`, a 429 gives the rate-limit error). `type` is read
+  and stored in `error.context.type` but never used for the decision. The Anthropic mapper already decides on
+  `type === "billing_error"` before the 429 branch.
+- Evidence: `packages/ai-openai/src/utils/wrap-openai-error.ts:71-73` (quota branch on `code` only), `:75-81` (429
+  branch); `packages/ai-anthropic/src/utils/wrap-anthropic-error.ts:78-80` (the type-based check, before the 429
+  branch); `packages/ai-openai/src/utils/wrap-openai-error.spec.ts:101-112` (only `status: 429, code: "insufficient_quota"`
+  is covered); `packages/ai/src/errors/quota-exceeded-error.ts:8` (documented as not retryable).
+- Workaround: read `error.context.type` / `error.context.code` in the app's own `retryOn` predicate and treat
+  `insufficient_quota` as fatal. The class and the `retryable` flag stay wrong for framework-level retry.
+- Smallest fix: before the 429 branch, map to `QuotaExceededError` when `shape.code === "insufficient_quota"`,
+  `shape.type === "insufficient_quota"` or the code is one of `credit_balance_exhausted`, `billing_hard_limit_reached`,
+  `billing_not_active`.
+- Acceptance: specs for a 429 with `type: "insufficient_quota"` and another code, and for `billing_hard_limit_reached`
+  on 400 and 429, all giving `QuotaExceededError`; the existing rate-limit cases still give `ProviderRateLimitError`;
+  `packages/ai-openai/CHANGELOG.md` entry. Whether the default fallback chain should advance on exhausted credit stays
+  as today (`PROVIDER_QUOTA_EXCEEDED` is not in the default set); note it in the changelog.
+- Status: open.
+
+### T-104 [bug] `config.translations` is rejected by the page-module key list
+
+- Source: application upgrade and integration report of 2026-11-12, re-checked against 5.53.1 on 2026-11-13.
+- What and why: the `translations` declaration is typed (`PageConfig`, `LayoutConfig`, `RootConfig`), documented in
+  the localization page and the `localize-pages` skill, and read by the translation analyzer, but the module-config
+  reader's allow-list has no `translations` key for a page, layout or root. A page file or its `*.setup.ts` with
+  `export const config = { route: "/x", translations: ["a.*"] }` fails discovery with
+  ``config key `translations` is not allowed in a page module``. The only spec that uses a setup-file declaration
+  calls the analyzer directly, so nothing caught the mismatch.
+- Evidence: `packages/web/src/module-config-schema.ts:14-37` (`MODULE_CONFIG_KEYS`, no `translations`);
+  `packages/web/src/build/read-module-config.ts:54-58`, `:236-239` (the thrown message);
+  `packages/web/src/build/discover-pages.ts:773`, `:800-810` (page file and setup companion both checked);
+  `packages/web/src/page-config.ts:94`, `:121`, `:144` (the type accepts it);
+  `packages/core/src/localization/translation-usage-graph.ts:65-74`, `:118-130` and
+  `packages/web/src/build/translation-manifest.ts:143-148` (the analyzer accepts it);
+  `packages/web/skills/localize-pages/SKILL.md:59-70`; `docs/src/content/docs/v/latest/web/essentials/09-localization.mdx:309`,
+  `:324`.
+- Workaround: list dynamically read keys as key-shaped string literals in a constant inside a component the page
+  imports (a literal ending in a dot is a prefix); or set `build.translations.prune: false` to ship every group.
+- Smallest fix: add `"translations"` to the page, layout and root lists in `MODULE_CONFIG_KEYS`.
+- Acceptance: `read-module-config.spec.ts` reads a page, a layout and a root setup file with the array form and the
+  `{ keys, exhaustive }` form; a discovery-level spec shows the declared keys reach the manifest; `packages/web/CHANGELOG.md`
+  entry.
+- Status: open.
+
+### T-105 [bug] Development and test servers drop a route's `serverOptions.config` without a warning
+
+- Source: application upgrade and integration report of 2026-11-12, re-checked against 5.53.1 on 2026-11-13.
+- What and why: the production scan merges `route.serverOptions.config` into each route's Fastify config. The
+  development scan registers one wildcard route per verb with `config: { rateLimit: false }` only, so the route's
+  config never reaches Fastify plugins that read it, for example `multipartOptions` (a per-route file-size limit).
+  Under `warlock dev` and the HTTP test server started by the test global setup (both use the development scan), a
+  route that raises its per-file limit this way gets 413 from the global `http.fileUploadLimit` while the production
+  build accepts the file. The dev refusal list of unsupported options does not include `config`, so no boot warning
+  appears, and the `serverOptions` doc comment does not list it among the options not applied in dev.
+  The in-process helpers (`createTestHttpServer`, the integration harness) use the production scan and are not affected.
+  The route-level `uploads: { maxTotalSize }` option works in dev; it covers only the total size, not per-file, file
+  count or field limits.
+- Evidence: `packages/core/src/router/router.ts:1213-1224` (production merge), `:1249` (`scanDevServer`), `:1431`
+  (dev config); `packages/core/src/router/dev-body-limit.ts:148-162` (`UNSUPPORTED_DEV_SERVER_OPTIONS`, no `config`);
+  `packages/core/src/router/types.ts:232-264` (doc comment); `packages/core/src/connectors/http-connector.ts:195-199`
+  (dev scan chosen for the development runtime); `packages/core/src/tests/start-http-development-server.ts`;
+  `docs/src/content/docs/v/latest/core/testing/integration-tests.md:332`; `packages/core/src/http/multipart.ts:82-97`
+  (plugin limits set once from `http.fileUploadLimit` and `http.multipart.*`).
+- Workaround: raise `http.fileUploadLimit` globally for development and enforce the stricter per-route size in the
+  schema (`v.file().size(...)`); use `uploads: { maxTotalSize }` for the total.
+- Smallest fix: add `config` to `UNSUPPORTED_DEV_SERVER_OPTIONS` (one warning per route) and name it in the doc comment;
+  better, extend `uploads` with per-file size and count limits and apply them in the dev dispatcher too.
+- Acceptance: a spec in `dev-body-limit.spec.ts` shows the warning for a route with `serverOptions.config`; the
+  `serverOptions` doc comment, the routing page and the integration-test page list it (or, if the option is
+  implemented, a spec shows a per-route per-file limit working under the dev dispatcher); changelog entry.
+- Status: open.
+
+### T-106 [bug] The error-response hook and the refusal dispatcher have no guard for a reply already sent
+
+- Source: application upgrade and integration report of 2026-11-12, re-checked against 5.53.1 on 2026-11-13.
+- What and why: with `http.errorResponse` set, a refused browser request on a page host (for example a path-traversal
+  `GET` with `Accept: text/html`) was reported to end in `ERR_HTTP_HEADERS_SENT`. The mechanism could not be
+  reproduced: the HTML refusal reply is not JSON, so the formatter returns it untouched, and returning `reply` from
+  the route error handler is safe. What the code does show is a missing guard in two places: the `onSend` formatter
+  never checks `reply.sent`, `reply.raw.headersSent` or `writableEnded`, and `Router.dispatchRefusal` decides "nothing
+  was sent" from `reply.sent` alone, which stays `false` while an async `onSend` hook is pending. A throw after
+  `response.html()` has been called is then treated as unsent, and the caller sends a second reply through the root
+  error handler. No spec combines `http.errorResponse` with a refusal; the specs for each side use a bare Fastify.
+- Evidence: `packages/core/src/http/error-response.ts:39-48` (hook, no sent check);
+  `packages/core/src/router/router.ts:1481-1510` (`dispatchRefusal`, the `catch` at `:1499-1504`);
+  `packages/core/src/http/lazy-static.ts:244-260` (the error handler that calls it);
+  `packages/web/src/server/core-refusal-page.ts:48-71` (writes the page); `packages/core/src/http/error-response.integration.spec.ts`,
+  `packages/core/src/router/refusal-route.spec.ts`, `packages/core/src/http/refusal-dispatch.spec.ts` (each one side only).
+- Workaround: none needed if it does not reproduce; if it does, serve the JSON refusal (the formatter then formats it)
+  by not registering a page that handles refusals.
+- Smallest fix: return the payload at the top of the hook when `reply.sent || reply.raw.headersSent || reply.raw.writableEnded`;
+  in `dispatchRefusal`'s catch test `fastifyReply.sent || fastifyReply.raw.headersSent`.
+- Acceptance: an integration spec over a real socket (a bare `inject` normalises dot segments away) with
+  `Accept: text/html`, `http.errorResponse` set and a refusal-handling route registered, answering 403 once with the
+  page body; a spec for each guard; changelog entry. If the reported error still occurs on 5.53.1, capture the first
+  stack frame and update this entry before fixing.
+- Status: open. The reported mechanism is not confirmed; the guards are defensive.
+
+### T-107 [bug] Refusal pages render without layout and root, without the URL locale, and without a request id
+
+- Source: application upgrade and integration report of 2026-11-12, re-checked against 5.53.1 on 2026-11-13.
+- What and why: since 5.39.0 a refused browser request (403/400 from core, such as a traversal path) gets the site's
+  `forbidden`/`error` page instead of raw JSON. That page is rendered through the failure renderer, outside the page
+  pipeline: it is wrapped in the default app only, so the app's root and the nearest layouts (header, footer) are
+  missing; the locale comes from core's lazy resolution (query, cookies, header, default) and ignores the URL prefix, so
+  `/ar/...` is answered in the default locale (the not-found path pins the prefix locale, the refusal branch returns
+  before that); and the request id reaches the visitor only on the last-resort boundary, not on a site error page
+  (a refusal is a visitor-safe 4xx, so no id is carried in the props).
+- Evidence: `packages/web/src/server/core-refusal-page.ts:44-75`; `packages/web/src/server/render-page.ts:1770` (`renderPageFailure`),
+  `:1840-1856` and `:1870-1877` (default app only; the id only on the framework boundary); `packages/web/src/server/not-found-page.ts:350-397`
+  (refusal branch) and `:426-432` (prefix locale pinned only afterwards); `packages/web/src/server/error-page.ts:131-138`
+  (id carried only for non-visitor-safe errors).
+- Workaround: make the site's `forbidden.page.tsx` / `error.page.tsx` render its own shell and read the locale with
+  `useLocale()`. There is no public way to put the request id into that page for a 4xx.
+- Smallest fix: pin the URL-prefix locale in the refusal branch (reuse the not-found code), carry `request.id` in the
+  serialized props for 4xx failures, and render the failure through the root and the nearest layouts when they load.
+- Acceptance: specs for a refusal on a prefixed URL (locale from the prefix), a site with a layout (layout markup
+  present around the forbidden page) and a site error page (request id available to the page); docs for
+  special pages and the `localize-pages`/special-pages skill say what a refusal page receives; changelog entry.
+- Status: open.
+
+### T-108 [bug] A noindex 404 page still emits `hreflang` alternates
+
+- Source: application upgrade and integration report of 2026-11-12, re-checked against 5.53.1 on 2026-11-13.
+- What and why: the not-found page is rendered with `robots: noindex`, and `enrichMetadata` already skips canonical,
+  `og:url` and `og:locale` for a noindex page. The locale alternates are computed separately, without looking at
+  `robots`, so with prefix locale routing a request to `/en/missing` answers 404 with `<meta name="robots" content="noindex">`
+  and `<link rel="alternate" hreflang="en|ar|x-default">` pointing at non-existent URLs. A page that sets `robots: "noindex"`
+  itself does the same. Search engines are told a page is not to be indexed and also that it has translations.
+- Evidence: `packages/web/src/server/render-page.ts:1301-1303` (noindex set), `:1313-1318` (alternates computed
+  without the robots value), `:1343-1345` (an empty `metadata.alternates` does not suppress the generated set);
+  `packages/web/src/metadata/enrich-metadata.ts:53-65` (`isNoindex`, not exported, gates only the metadata path);
+  `packages/web/src/components/head.ts:98-105` (renders one link per alternate);
+  `packages/web/src/server/resolve-locale-alternates.ts:95-125` (gates on strategy, origin and codes only).
+- Workaround: none short of locale strategy `none`, which removes hreflang everywhere.
+- Smallest fix: export `isNoindex` and pass no alternates when the resolved `robots` is noindex.
+- Acceptance: a spec renders the not-found page and a page with `robots: "noindex"` under prefix routing and finds no
+  `hreflang` link, while an indexable page keeps them (`render-page-metadata-alternates.spec.ts`); the metadata page and
+  `set-page-metadata` skill state it; changelog entry.
+- Status: open.
+
+### T-109 [bug] Docs and skill describe a request-locale order the code does not use
+
+- Source: application upgrade and integration report of 2026-11-12, re-checked against 5.53.1 on 2026-11-13.
+- What and why: several pages say the locale is read first from a `translation-locale-code` header, then the `locale`
+  header, then `?locale=`, then the default, and show a getter that reads that header. No source file reads
+  `translation-locale-code`. The real order in `Request.resolveLocale` is: `?locale=` query, the `warlock.locale-preference`
+  cookie (only when it is in `app.localeCodes`), the `locale` cookie, the `locale` header, then `app.localeCode`
+  (a value outside a declared `app.localeCodes` falls back to the default). Cookies are not mentioned in any of these
+  pages. An app that follows the docs and sends the documented header gets no effect. (Whether the order itself should
+  change is T-111.)
+- Evidence: `packages/core/src/http/request.ts:508-529` (the real order); stale text in
+  `docs/src/content/docs/v/latest/core/the-basics/http-request.md:346-350`,
+  `docs/src/content/docs/v/latest/core/the-basics/localization.md:30-79`, `:283`, `:294`, `:336`,
+  `docs/src/content/docs/v/latest/core/upgrade-to-v5.mdx:212`, `docs/src/content/docs/v/latest/core/recipes/localized-responses.md:51-54`
+  (omits cookies and the preference cookie), `packages/core/skills/use-localization/SKILL.md:170-175`.
+- Workaround: follow the order in `resolveLocale`, not the pages; to force a locale, send `?locale=<code>` or call
+  `request.setLocaleCode(...)` early.
+- Smallest fix: rewrite each passage to the five-step order above (or, if T-111 changes the order, to the new one),
+  remove the `translation-locale-code` header and the getter listing, and state the `app.localeCodes` allow-list.
+- Acceptance: the pages and the skill agree with `resolveLocale`; no remaining mention of `translation-locale-code`
+  outside a changelog; a spec pins the order (query, preference cookie, locale cookie, header, default) so the docs
+  cannot drift again; core changelog entry under documentation.
+- Status: open.
+
+### T-110 [bug] The `http.bodyLimit` type comment still says the default is 200 GB
+
+- Source: application upgrade and integration report of 2026-11-12, re-checked against 5.53.1 on 2026-11-13.
+- What and why: the doc comment editors show on hover for `http.bodyLimit` says `@default 200 * 1024 * 1024 * 1024`
+  ("200GB, historical default") and points per-route limits at the `maxBodySize()` middleware. The server passes
+  `bodyLimit` to Fastify only when configured, so an unconfigured app gets Fastify's own 1 MiB (the dev dispatcher uses
+  the same fallback), and per-route limits belong to `serverOptions.bodyLimit` (`maxBodySize()` runs after parsing and
+  does not bound chunked bodies). The docs pages and the scaffold are already right.
+- Evidence: `packages/core/src/http/types.ts:415-425` (comment); `packages/core/src/http/server.ts:91`, `:116-119`
+  (the real behaviour); `packages/core/src/router/router.ts:1314` (dev fallback);
+  `docs/src/content/docs/v/latest/core/digging-deeper/security.md:378` (correct).
+- Workaround: set `bodyLimit` explicitly in `src/config/http.ts` and ignore the hover text.
+- Smallest fix: change the comment to "@default Fastify's own 1 MiB (1048576)" and point per-route limits at
+  `serverOptions.bodyLimit`.
+- Acceptance: the comment matches the runtime; `packages/core/CHANGELOG.md` entry; the docs-text gate passes.
+- Status: open.
+
+### T-111 [decision] Request locale order: a stale `locale` cookie wins over an explicit `locale` header
+
+- Source: application upgrade and integration report of 2026-11-12, re-checked against 5.53.1 on 2026-11-13.
+- What and why: the locale is resolved as query, preference cookie, `locale` cookie, `locale` header, default. A client
+  that keeps a cookie jar and also sends a `locale` header (a native app on an HTTP client) gets the cookie's locale:
+  `Cookie: locale=en` with `locale: ar` and `app.localeCodes: ["en","ar"]` gives `request.locale === "en"`. The cookie is
+  server-persisted state; the header is an explicit per-request signal. No setting changes the order.
+- Evidence: `packages/core/src/http/request.ts:508-529` (`resolveLocale`), `:534` (cached getter), `:543-552`
+  (`setLocaleCode`); `packages/core/src/config/locale-configuration.ts:10` (cookie name);
+  `packages/web/src/locale-preference.ts`; `packages/web/src/server/page-route-handler/persist-requested-locale.ts`
+  (reads `request.locale`, no order of its own).
+- Options: (a) move the `locale` header before the `locale` cookie (the preference cookie stays ahead of both, or goes
+  after the header too, to decide); (b) keep the order and add `http.locale.sources`, an ordered list the app sets;
+  (c) keep as is and only document it (T-109).
+- Recommendation: (a) for the `locale` cookie vs `locale` header pair, with an upgrade note; it changes behaviour only
+  for requests that send both with different values. Add (b) later only if an app needs another order.
+- Acceptance: the chosen order ships with a spec pinning every pair, the corrected pages from T-109, a skill update and
+  a changelog upgrade note.
+- Status: open.
+- Owner decision: which option, and whether the preference cookie also moves behind the header.
+
+### T-112 [decision] `request.validated()` returns `{}` on a route with no schema
+
+- Source: application upgrade and integration report of 2026-11-12, re-checked against 5.53.1 on 2026-11-13.
+- What and why: `validated()` returns the validated data when validation ran, otherwise an empty object, with no log
+  and no error. A webhook handler that calls `request.validated()` on a route without a schema sees `{}` for a real JSON
+  body and gets no signal that the schema is missing. The behaviour is documented ("returns `{}`"), so this is a choice,
+  not a defect.
+- Evidence: `packages/core/src/http/request.ts:1308-1319`; `packages/core/src/validation/validateAll.ts:187-188` (the
+  only place the data is set); `docs/src/content/docs/v/latest/core/the-basics/http-request.md:88`.
+- Options: (a) keep, no change; (b) log one development warning per route when `validated()` is called on a route
+  with no schema, and return `{}` as today; (c) throw in development and test, return `{}` in production; (d) add a
+  strict variant (`request.validatedOrFail()`) and leave `validated()` alone.
+- Recommendation: (b): it catches the mistake early without breaking handlers that rely on `{}` (for example optional
+  validation). Document `input()` / `all()` as the reads for schema-less routes.
+- Acceptance: the chosen behaviour with a spec (warning once per route, none when a schema exists), the docs line
+  updated, changelog entry.
+- Status: open.
+- Owner decision: which option.
+
+### T-113 [decision] `web.robots` is one policy for every site
+
+- Source: application upgrade and integration report of 2026-11-12, re-checked against 5.53.1 on 2026-11-13.
+- What and why: `web.robots` holds one set of groups and extra lines, served unchanged for every host. Only the
+  `Sitemap:` line and the "dynamic site that is not indexable" answer vary per site. Two fixed sites that need different
+  crawl rules (one with `Disallow: /admin`, the other open) cannot be expressed; a hand-written `public/robots.txt` is
+  also one file for all hosts and makes web register no route.
+- Evidence: `packages/web/src/configurations.ts:62` (`robots?: RobotsConfig`);
+  `packages/web/src/sitemap/robots-config-types.ts:17-26` (`enabled`, `referenceSitemap`, `groups`, `extra`);
+  `packages/web/src/sites/site-config.types.ts` (no `robots` key); `packages/web/src/sitemap/register-robots-route.ts:57-81`
+  (config read once, same groups for every host; per-site only the sitemap URL and the non-indexable answer).
+- Options: (a) keep one policy and document the app-route workaround; (b) accept `robots` under each site in `sites`
+  (and in `resolveHost` results) and merge it over `web.robots` inside the `/robots.txt` handler; (c) accept a
+  function `robots(site)` returning a `RobotsConfig`.
+- Workaround today: leave `web.robots.enabled` false and register an app route `GET /robots.txt` that switches on the
+  request host or `request.site` (not tested).
+- Recommendation: (b): the site is already selected in that handler, and the merge is small.
+- Acceptance: the chosen shape with specs (two sites, different groups; a site without `robots` gets the global one),
+  docs on sites and sitemap/robots, the `generate-sitemap` skill and a changelog entry.
+- Status: open.
+- Owner decision: which option.
+
+### T-114 [decision] Unknown API routes answer a fixed English body with no error code
+
+- Source: application upgrade and integration report of 2026-11-12, re-checked against 5.53.1 on 2026-11-13.
+- What and why: a request that matches no route and does not ask for HTML gets
+  `{"error":"Route not found","path":"...","method":"GET"}` with status 404 (also in multi-site mode, where the status
+  is the refusal status when there is one). The body is a literal in the catch-all: no error code, no translated
+  message, no request id, and `web.errors` / `http.errorMapper` are not consulted. An API client that switches on error
+  codes cannot tell it from other 404s, and an app with its own error shape gets a second shape for this one case. The
+  response event cannot change the body.
+- Evidence: `packages/web/src/server/not-found-page.ts:414-424` (and `classifyUnmatchedRequest` at `:201`);
+  `packages/web/src/server/site-dispatch.ts:198-200`, `:217-219`; `packages/core/src/http/response.ts:622-624`;
+  `packages/web/src/server/not-found-page.ts:85` (the catch-all is the last route, so an app `/api/*` catch-all route
+  would win, not tested).
+- Options: (a) keep the shape for compatibility and document the workaround; (b) send the shape the rest of the API
+  uses (a code such as `route_not_found`, a message through `request.t`, the request id) from one shared helper used by
+  all three sites, keeping `path` and `method`; (c) route it through `http.errorMapper` so the app owns the shape.
+- Recommendation: (b), and (c) later if apps need to replace it entirely. Keep `error` as the human message so existing
+  clients that read it keep working; add `code` and `requestId` as new fields.
+- Acceptance: the chosen body from one helper at all three sites; specs in single-site and multi-site mode, with a
+  translated message per locale; docs and changelog (upgrade note if `error` text changes).
+- Status: open.
+- Owner decision: which option.
+
+### T-115 [chore] Three defects live in the libraries the web package depends on
+
+- Source: application upgrade and integration report of 2026-11-12, re-checked against 5.53.1 on 2026-11-13.
+- What and why: three behaviours reported against the framework are in dependencies and are fixed in those libraries'
+  own repositories, not here. Installed versions: `@mongez/localization` 3.5.1 and `@mongez/react-form` 4.0.0. Keep this
+  entry until the fixed versions are released and the framework's ranges are raised.
+  1. Placeholder names swallow a following hyphen (localization): the colon pattern is `/:([a-zA-Z0-9_-]+)/g`, so
+     `:minutes-min` is one placeholder named `minutes-min`, no value is found, and the template is left unchanged (`_x`
+     joins too). Workaround: avoid `-` or `_` right after a placeholder (`":minutes min"`), pass the joined name as the
+     key (`{ "minutes-min": 5 }`), or set `setLocalizationConfigurations({ placeholderPattern: "doubleCurly" })`, which
+     switches every colon message in the process (framework messages included), or a custom pattern such as
+     `/:([a-zA-Z0-9_]+)/g` (loses hyphenated names). Files: `esm/placeholder-pattern-config.mjs:2-8`, `esm/converters.mjs:5-11`
+     in the installed package.
+  2. Plural fallback order (localization, global-registry path): for a count the library tries the current locale's
+     specific variant, then the fallback locale's specific variant, then the current locale's `_other`. A locale that
+     defines only `_other` shows the fallback locale's `_one` text for count 1. Route dictionaries (`transFromKeywords`,
+     used by `useTrans` and the request route translations) have no fallback locale and are not affected.
+     Workaround: define every variant the locale's rules can select in each locale (Arabic: `_zero`, `_one`, `_two`,
+     `_few`, `_many`, `_other`), or use route dictionaries. File: `esm/translator.mjs:156-181`. Framework call sites:
+     `packages/web/src/localization.tsx:105-117`, `:136-144`; `packages/web/src/server/request-route-translations.ts:19-30`.
+  3. Form control ids collide across forms (react-form): the default id is `input-<name>` and the error id
+     `input-<name>-error`, derived from the field name only, so two forms on one page with a field `email` duplicate the
+     ids (broken `label for`, `aria-describedby`, anchors); a nameless control uses a random id that differs between
+     server and client. Workaround: pass an explicit `id` per control (for example from a per-form `useId()`); the error
+     id follows. Files: `esm/hooks/form-hooks.mjs:12-18`, `esm/hooks/useFormControl.mjs:43-47`.
+- Evidence: the files above under `node_modules/.pnpm/@mongez+localization@3.5.1/node_modules/@mongez/localization/`
+  and `node_modules/.pnpm/@mongez+react-form@4.0.0_react@19.2.8/node_modules/@mongez/react-form/`.
+- Acceptance: once the libraries release fixes, raise the dependency ranges, remove the workarounds from the docs and
+  skills that mention them, and add a changelog line; until then the docs for placeholders, plurals and form ids should
+  name the workaround above.
+- Status: open (waiting on the libraries).
