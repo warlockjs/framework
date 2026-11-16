@@ -6,24 +6,6 @@ Open work for the framework repository. Finished entries move to `tasks.complete
 
 None.
 
-## 5.55.0: Grimoire
-
-Grimoire shipped as experimental in 5.55.0 (2026-11-16). The finished entries moved to `tasks.completed.md`; T-136 (the pilot and measurement) is the last open item of this release.
-
-### T-136 [chore] Pilot and measurement before publishing 5.55.0
-
-- Source: owner decision of 2026-11-16 (pilot on the owner's chosen application).
-- What and why: install the packed 5.55.0 into a copy of the pilot application, build its book, backfill its
-  features with the `backfill-a-grimoire` skill (features marked inferred), and fix what the pilot shows in the
-  package and the skills. Then run ten real tasks twice with the same model, with and without Grimoire, recording
-  tokens in and out, tool calls, wall time, tests passing and reviewer findings.
-- Acceptance: the pilot's `warlock grimoire check` is clean or its remaining findings are real; the measured numbers
-  are in the release summary as measured, whatever they are.
-- Depends on: T-121 to T-135.
-- Status: in progress: pilot copy upgraded to 5.55.0, book built (11,087 files, 52 s cold, 3.7 s no-change),
-  backfilled (23 features, 110 flows, 4 apps, check 0 errors); two rounds of fixes from the pilot are in; the
-  with/without measurement is running.
-
 ## After 5.55.0: Grimoire follow-ups
 
 ### T-138 [chore] Build a book of the release gate's blog app in CI

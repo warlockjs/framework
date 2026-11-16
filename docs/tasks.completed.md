@@ -6,6 +6,27 @@ Newest first. Each entry records the release that shipped it and how it was veri
 
 Final gate and fixes after the pilot: `findings/5.55/reports/FIX-VERIFY.md` (typecheck, strictness, lint, format), `POST-REVIEW.md` (the `kind` to `type` rename), `PILOT-FIXES.md` and `PILOT-FIXES-2.md` (grimoire suite at 460 tests on the last run).
 
+### T-136 [chore] Pilot and measurement before publishing 5.55.0
+
+- Source: owner decision of 2026-11-16 (pilot on the owner's chosen application).
+- What and why: install the packed 5.55.0 into a copy of the pilot application, build its book, backfill its
+  features with the `backfill-a-grimoire` skill (features marked inferred), and fix what the pilot shows in the
+  package and the skills. Then run ten real tasks twice with the same model, with and without Grimoire, recording
+  tokens in and out, tool calls, wall time, tests passing and reviewer findings.
+- Acceptance: the pilot's `warlock grimoire check` is clean or its remaining findings are real; the measured numbers
+  are in the release summary as measured, whatever they are.
+- Depends on: T-121 to T-135.
+- Shipped: 5.55.0. Verified: a private copy of the pilot application upgraded to the packed 5.55.0 tarballs;
+  `warlock add grimoire`, book built (11,087 files, 52 s cold, 3.7 s with no change), backfilled with the
+  `backfill-a-grimoire` skill (23 features, 110 flows, 4 apps, 42 owner questions as tasks; check 0 errors,
+  remaining warnings are real: files without header sentences, untested criteria). The pilot's setup and backfill
+  findings were fixed in two rounds (bounded `check`/`scry` output, ranked search, code-only book, safer
+  `add grimoire`, app-scoped page steps, file entries in `folders`, mail/job names from registries). Ten tasks run
+  twice with the same model (20 headless runs, hidden acceptance specs calibrated and encrypted, blind diff review);
+  the numbers are in the 5.55.0 release summary as measured: more tokens and tool calls with Grimoire (+39% tokens
+  in, +24% tool calls, +20% cost), 7/8 hidden checks passed against 6/8. Private results: the pilot folder's
+  `measure/RESULTS.md`.
+
 ### T-137 [decision] Grimoire: label, changelog stamping, mobile screens (decided)
 
 - Source: design sessions of 2026-11-16; decided by the owner the same day.
