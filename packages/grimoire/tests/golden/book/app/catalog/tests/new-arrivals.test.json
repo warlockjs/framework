@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "file": "src/app/catalog/tests/new-arrivals.test.ts",
+  "module": "src/app/catalog",
+  "type": "spec",
+  "lines": 20,
+  "about": "Proves the new arrivals rules.",
+  "feature": "catalog",
+  "borrowedBy": [],
+  "flows": [],
+  "exports": [],
+  "packages": [
+    "vitest"
+  ],
+  "imports": [
+    "src/app/catalog/services/new-arrivals.service.ts"
+  ],
+  "importedBy": [],
+  "routes": [],
+  "pages": [],
+  "screens": []
+}

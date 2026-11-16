@@ -140,6 +140,31 @@ export default defineConfig({
 });
 ```
 
+A register function may return an array of commands. An entry of `cli.commands` is a `CLICommandEntry`: a command or an array of commands, and arrays are flattened.
+
+### Explaining a package's error codes
+
+`withExplainCodes(command, explainer)` attaches a `CodeExplainer` to a command. When that command is in `cli.commands`, `warlock explain <code>` asks the explainer for any code that is not a `WL` code (for example `GR2001`), reading only `warlock.config.ts` and never booting the app. The explainer returns an `ExplainableCode` (`code`, `title`, `area`, `fix`, `skill`, `docs`) or `undefined` when the code is not the package's. `explainersOf(command)` lists the attached explainers and `explainRegisteredCode(entries, code)` asks them all; the first answer wins.
+
+```ts
+import { command, withExplainCodes } from "@warlock.js/core";
+
+export function registerReportCommands() {
+  return withExplainCodes(command({ name: "report", action: () => undefined }), (code) =>
+    code === "RP1001"
+      ? {
+          code,
+          title: "Report is empty",
+          area: "report",
+          fix: "Run the report with a wider date range.",
+          skill: "reports",
+          docs: "https://example.com/docs/RP1001",
+        }
+      : undefined,
+  );
+}
+```
+
 ## Output and exit codes
 
 By default, the framework prints `Executing <name>…`, runs your `action`, then prints `Done in <ms>ms` and `process.exit(0)`. Throwing exits with `1` and prints the error. If `persistent: true`, the framework keeps the process alive (no auto-exit on success; errors are logged but don't crash).
@@ -214,6 +239,7 @@ warlock generate                         (alias: g)      — interactive picker
 | `web`         | Warlock Web + React stack; scaffolds the application page, localization, contact endpoint, and Web configuration                                                                       |
 | `react`       | `react` + `react-dom` + types                                                                                                                                                          |
 | `bull-board`  | `@bull-board/api` + `@bull-board/fastify`; writes a `dashboard` block to `src/config/queue.ts`. `requires: ["queue"]` — adds the `queue` feature first automatically when it's missing |
+| `grimoire`    | `@warlock.js/grimoire` (experimental); registers `registerGrimoireCommands()` in `cli.commands` (creates the `cli` block when missing), adds `.gitignore` lines, the devtools panel and `grimoireReporter()`; idempotent |
 | `image`       | `sharp` (for the `Image` class)                                                                                                                                                        |
 | `mail`        | `nodemailer` + types                                                                                                                                                                   |
 | `ses`         | `@aws-sdk/client-sesv2`                                                                                                                                                                |

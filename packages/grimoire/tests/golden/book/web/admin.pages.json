@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "site": {
+    "id": "admin",
+    "root": "src/web/$sites/admin",
+    "basePath": "/admin"
+  },
+  "pages": [
+    {
+      "site": "admin",
+      "route": "/admin/orders",
+      "name": "orders",
+      "file": "src/web/$sites/admin/orders.page.tsx",
+      "setupFile": null,
+      "layouts": [
+        "src/web/$sites/admin/layout.tsx"
+      ],
+      "loaders": [],
+      "actions": [],
+      "requires": [
+        "user"
+      ],
+      "reachedFrom": null
+    }
+  ]
+}

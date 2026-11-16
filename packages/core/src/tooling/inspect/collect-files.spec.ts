@@ -261,3 +261,30 @@ describe("source file inspection", () => {
     expect(find("src/styles.css")?.lines).toBeUndefined();
   });
 });
+
+describe("collectFiles dirs", () => {
+  it("scans every given folder and resolves imports across them", () => {
+    write("src/a.ts", 'import { x } from "../mobile/app/x"; export const a = x;');
+    write("mobile/app/x.tsx", "export const x = 1;");
+    write("mobile/index.ts", "export {};");
+    write("mobile/app/products/[id].tsx", "export {};");
+
+    const files = collectFiles(root, [], { dirs: ["src", "mobile", "missing"] });
+    const names = files.map((file) => file.file);
+
+    expect(names).toEqual([...names].sort());
+    expect(files.find((file) => file.file === "src/a.ts")?.imports).toEqual([
+      { specifier: "../mobile/app/x", file: "mobile/app/x.tsx" },
+    ]);
+    expect(files.find((file) => file.file === "mobile/app/x.tsx")?.importedBy).toEqual(["src/a.ts"]);
+    expect(files.find((file) => file.file === "mobile/index.ts")?.module).toBe("mobile");
+    // Only `src/app/<module>` splits by module; a mobile app's `app/` folder is one module.
+    expect(files.find((file) => file.file === "mobile/app/products/[id].tsx")?.module).toBe("mobile/app");
+  });
+
+  it("scans only src by default", () => {
+    write("mobile/app/x.tsx", "export const x = 1;");
+
+    expect(collectFiles(root).some((file) => file.file.startsWith("mobile/"))).toBe(false);
+  });
+});

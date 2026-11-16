@@ -1,0 +1,92 @@
+---
+title: The devtools tab
+description: Browse the Grimoire in the devtools dashboard (search, features, flows, pages, tasks, releases, the check report and small graphs), and export it as a static folder for people without the app running.
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+<Aside type="caution" title="Experimental">
+  Grimoire is experimental in 5.55. The structure of the written files and the commands may still
+  change before they are declared stable.
+</Aside>
+
+The Grimoire tab shows the book and the written files in the devtools dashboard at `/__warlock`. It only reads.
+
+## Turn it on
+
+List the panel in `src/config/devtools.ts`:
+
+```ts title="src/config/devtools.ts"
+export default {
+  panels: ["@warlock.js/grimoire/devtools"],
+};
+```
+
+Devtools imports it in development only. See [Registering a panel](/v/latest/devtools/panels/) for how panels load.
+
+## What it shows
+
+One search box at the top of every view looks across flows, blocks, pages, routes, files, exports and tasks. Each hit
+opens its view. Views link to each other with hash links such as `#grimoire/flow/catalog/new-arrivals`, so you can
+copy the address of what you are looking at.
+
+| View | What it shows |
+| --- | --- |
+| Home | The check counts, open tasks, the size of the book, and the features with their status. |
+| Feature | The README header, its flows, owned and borrowed files, routes, pages, files no flow reaches, open tasks, recent changes, findings, and a graph of the feature and its neighbours. |
+| Flow | The steps with the files behind each, the acceptance criteria with their tests and last results, the pages that show the flow, the cases and unknowns, and its history from the changelog. |
+| Page or screen | Its blocks (with the layout's), who sees each, what each changes with, the files in the book, and a graph of the page and its blocks. |
+| Apps | Every written app with its pages and screens. |
+| Tasks, Releases | The task lists from the index, and each release with what it collected. |
+| Check | The same findings as `warlock grimoire check`. |
+| File | The book entry: exports, imports, importers, owner, flows, routes, and a graph of the file's neighbours. |
+| Modules | Module coupling as a graph. |
+
+The graphs are plain SVG with at most 60 nodes. Click a node to open it.
+
+With no features written, the tab still works from the book: search, files, routes and the module graph. The home view
+says that no features are written yet.
+
+## It never boots your app
+
+The tab opens the snapshot with `routes: "cached"`. It keeps the snapshot in memory and opens it again when the book
+manifest changes, or after a short time when the written files change. If the cached routes are old or missing, the
+home view says so; run `warlock grimoire build` to refresh them.
+
+Every route sits behind the devtools guard, so only a local browser reaches it.
+
+## Data routes
+
+Served at `/__warlock/api/grimoire`, all `GET`:
+
+| Route | Answer |
+| --- | --- |
+| `/summary` | Route freshness, the features and tasks indexes, the check counts, the size of the book. |
+| `/search?q=&limit=` | Ranked hits, as `warlock scry --search`. |
+| `/file?path=`, `/impact?path=`, `/route?method=&path=` | Answers of `warlock scry`. |
+| `/features/:feature`, `/flows/:feature/:flow` | The feature or flow with its book map, changes and findings. |
+| `/apps`, `/apps/:app/pages/:page` | Written apps; one page (by id or route) with its layout and book facts. |
+| `/tasks`, `/releases`, `/releases/:release`, `/check` | Tasks index, releases, one release, the check report. |
+| `/graph/file?path=`, `/graph/feature/:feature`, `/graph/page?app=&page=`, `/graph/modules` | `{ nodes, edges }`, at most 60 nodes. |
+
+An unknown item answers `404` with a message, and a missing parameter `400`.
+
+## Export a static folder
+
+For people without the app running, export the tab:
+
+```ts
+import { exportGrimoireSite } from "@warlock.js/grimoire/devtools";
+
+const folder = await exportGrimoireSite(process.cwd());
+// "grimoire/book/site"
+```
+
+The folder holds one `index.html`. The view, its styles and the answers (as JSON) are inside it, so it opens straight
+from disk or from any static host. The default folder, `grimoire/book/site`, is inside the book folder: the book writer
+leaves it alone, and git ignores it. Pass `outDir` (project-relative) to write elsewhere.
+
+The static page answers everything in the table above except impact and route views, which need the running app and say
+so in place. Search runs in the page over the exported names. Per-file answers cover the 3000 most imported files.
+
+The export function takes the same adapter as the rest of the package; with no `adapter` option it uses the Warlock one.

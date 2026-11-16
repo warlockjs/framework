@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "file": "src/app/auth/controllers/login.controller.ts",
+  "module": "src/app/auth",
+  "type": "controller",
+  "lines": 8,
+  "about": "Answers a login request.",
+  "feature": "auth",
+  "borrowedBy": [],
+  "flows": [],
+  "exports": [
+    {
+      "name": "LoginController",
+      "about": "Opens a session for valid credentials."
+    }
+  ],
+  "packages": [],
+  "imports": [
+    "src/app/auth/services/login.service.ts"
+  ],
+  "importedBy": [
+    "src/app/auth/routes.ts"
+  ],
+  "routes": [
+    {
+      "method": "POST",
+      "path": "/api/login",
+      "name": "auth.login",
+      "via": "handles"
+    }
+  ],
+  "pages": [],
+  "screens": []
+}

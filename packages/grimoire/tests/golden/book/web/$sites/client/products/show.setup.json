@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "file": "src/web/$sites/client/products/show.setup.ts",
+  "module": "src/web",
+  "type": "setup",
+  "lines": 10,
+  "about": "Loads one product for its page.",
+  "feature": null,
+  "borrowedBy": [],
+  "flows": [],
+  "exports": [
+    {
+      "name": "loader",
+      "about": "Returns the product, or a 404 when it does not exist."
+    }
+  ],
+  "packages": [],
+  "imports": [
+    "src/app/catalog/repositories/products.repository.ts"
+  ],
+  "importedBy": [
+    "src/web/$sites/client/products/show.page.tsx"
+  ],
+  "routes": [],
+  "pages": [
+    {
+      "site": "client",
+      "route": "/products/:id",
+      "via": "setup"
+    }
+  ],
+  "screens": []
+}

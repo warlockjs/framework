@@ -19,7 +19,7 @@ import { Template, template } from "./paths";
  * Returns `false` as soon as a step fails, and leaves that step's captured
  * output where the caller can claim it with `takeLastCommandOutput()`. It used
  * to `return true` unconditionally, which meant a machine without git printed
- * "Grimoire initialized!" over a directory that was not a repository.
+ * "Git repository initialized!" over a directory that was not a repository.
  */
 export async function initializeGitRepository(appPath: string) {
   const steps: string[][] = [

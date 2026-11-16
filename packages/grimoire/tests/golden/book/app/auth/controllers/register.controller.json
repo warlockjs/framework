@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "file": "src/app/auth/controllers/register.controller.ts",
+  "module": "src/app/auth",
+  "type": "controller",
+  "lines": 8,
+  "about": "Answers a sign-up request.",
+  "feature": "auth",
+  "borrowedBy": [],
+  "flows": [],
+  "exports": [
+    {
+      "name": "RegisterController",
+      "about": "Creates the account and sends the verification email."
+    }
+  ],
+  "packages": [],
+  "imports": [
+    "src/app/auth/services/register.service.ts"
+  ],
+  "importedBy": [
+    "src/app/auth/routes.ts"
+  ],
+  "routes": [
+    {
+      "method": "POST",
+      "path": "/api/register",
+      "name": "auth.register",
+      "via": "handles"
+    }
+  ],
+  "pages": [],
+  "screens": []
+}

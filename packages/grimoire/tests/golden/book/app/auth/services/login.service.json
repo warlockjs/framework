@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "file": "src/app/auth/services/login.service.ts",
+  "module": "src/app/auth",
+  "type": "service",
+  "lines": 6,
+  "about": "Checks a customer's email and password and opens a session.",
+  "feature": "auth",
+  "borrowedBy": [],
+  "flows": [],
+  "exports": [
+    {
+      "name": "login",
+      "about": "Returns the session, or null for wrong credentials."
+    }
+  ],
+  "packages": [],
+  "imports": [],
+  "importedBy": [
+    "src/app/auth/controllers/login.controller.ts"
+  ],
+  "routes": [],
+  "pages": [],
+  "screens": []
+}

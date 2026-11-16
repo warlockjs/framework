@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "feature": "catalog",
+  "own": [
+    "src/app/catalog/controllers/new-arrivals.controller.ts",
+    "src/app/catalog/controllers/products.controller.ts",
+    "src/app/catalog/models/product.model.ts",
+    "src/app/catalog/repositories/products.repository.ts",
+    "src/app/catalog/routes.ts",
+    "src/app/catalog/services/new-arrivals.service.ts",
+    "src/web/$sites/client/products/show.page.tsx",
+    "src/web/$sites/client/products/show.setup.ts"
+  ],
+  "borrowed": [
+    {
+      "file": "src/app/shared/utils/money.ts",
+      "owner": null,
+      "by": [
+        "src/app/catalog/controllers/products.controller.ts"
+      ]
+    }
+  ],
+  "routes": [
+    {
+      "method": "GET",
+      "path": "/api/products",
+      "name": "catalog.products.index",
+      "file": "src/app/catalog/controllers/products.controller.ts"
+    },
+    {
+      "method": "GET",
+      "path": "/api/products/new-arrivals",
+      "name": "catalog.new-arrivals",
+      "file": "src/app/catalog/controllers/new-arrivals.controller.ts"
+    },
+    {
+      "method": "GET",
+      "path": "/api/products/:id",
+      "name": "catalog.products.show",
+      "file": "src/app/catalog/controllers/products.controller.ts"
+    }
+  ],
+  "pages": {
+    "web-client": [
+      {
+        "route": "/products/:id",
+        "file": "src/web/$sites/client/products/show.page.tsx",
+        "type": "page"
+      }
+    ]
+  },
+  "unreached": []
+}

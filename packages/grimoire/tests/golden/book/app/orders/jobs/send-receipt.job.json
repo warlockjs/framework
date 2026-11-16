@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "file": "src/app/orders/jobs/send-receipt.job.ts",
+  "module": "src/app/orders",
+  "type": "job",
+  "lines": 10,
+  "about": "Sends the receipt after the payment settles.",
+  "feature": "orders",
+  "borrowedBy": [],
+  "flows": [],
+  "exports": [
+    {
+      "name": "sendReceiptJob",
+      "about": "Retries three times, one minute apart."
+    }
+  ],
+  "packages": [
+    "@warlock.js/queue"
+  ],
+  "imports": [],
+  "importedBy": [
+    "src/app/orders/services/place-order.service.ts"
+  ],
+  "routes": [],
+  "pages": [],
+  "screens": []
+}

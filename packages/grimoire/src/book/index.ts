@@ -16,57 +16,6 @@
  *   `BookManifest.boot`); with `cached` the old ones are kept and reported
  *   `stale`.
  */
-import type { BookAdapter } from "../contracts/adapter";
-import type {
-  BookAnnotations,
-  BookModuleSummary,
-  BuildBookOptions,
-  BuildBookResult,
-  LoadedBook,
-  WriteBookResult,
-} from "../contracts/book";
-
-/**
- * Bring the book's facts up to date and write `manifest.json` and
- * `.cache/facts.json`. Does not write entries (see `writeBook`).
- *
- * @param root Absolute project root.
- */
-export async function buildBook(
-  root: string,
-  adapter: BookAdapter,
-  options: BuildBookOptions = {},
-): Promise<BuildBookResult> {
-  void root;
-  void adapter;
-  void options;
-  throw new Error("not implemented");
-}
-
-/** Read the book from disk without calling an adapter; `null` when it was never built. */
-export async function loadBook(root: string): Promise<LoadedBook | null> {
-  void root;
-  throw new Error("not implemented");
-}
-
-/**
- * Write the book files that depend on the written files too: one entry per
- * code file, `index.md` per module, `app/routes.json`, the page and screen
- * lists. Rewrites only files whose content changed, removes entries whose
- * source is gone, and stores `annotations.writtenHash` and `tests` in the
- * manifest.
- */
-export async function writeBook(
-  book: LoadedBook,
-  annotations: BookAnnotations,
-): Promise<WriteBookResult> {
-  void book;
-  void annotations;
-  throw new Error("not implemented");
-}
-
-/** The Markdown of one module summary (format in `BookModuleSummary`). */
-export function renderModuleSummary(summary: BookModuleSummary): string {
-  void summary;
-  throw new Error("not implemented");
-}
+export { buildBook, defaultRouteInputs, loadBook } from "./build";
+export { renderModuleSummary } from "./render";
+export { writeBook } from "./write";

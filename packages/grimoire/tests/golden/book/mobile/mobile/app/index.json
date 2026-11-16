@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "file": "mobile/app/index.tsx",
+  "module": "mobile/app",
+  "type": "component",
+  "lines": 5,
+  "about": "The home screen with new arrivals.",
+  "feature": null,
+  "borrowedBy": [],
+  "flows": [],
+  "exports": [
+    {
+      "name": "default",
+      "about": null
+    }
+  ],
+  "packages": [],
+  "imports": [],
+  "importedBy": [],
+  "routes": [],
+  "pages": [],
+  "screens": [
+    {
+      "app": "mobile",
+      "route": "/",
+      "via": "screen"
+    }
+  ]
+}

@@ -405,7 +405,7 @@ export class CLICommandsManager {
 
     if (warlockConfigManager.isLoaded) {
       this.register(
-        ...(warlockConfigManager.get("cli")?.commands || []).map((command) => {
+        ...(warlockConfigManager.get("cli")?.commands ?? []).flat().map((command) => {
           if (!command.commandSource) {
             command.commandSource = "plugin";
           }

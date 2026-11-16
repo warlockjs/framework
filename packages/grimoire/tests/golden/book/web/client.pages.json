@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "site": {
+    "id": "client",
+    "root": "src/web/$sites/client",
+    "basePath": null
+  },
+  "pages": [
+    {
+      "site": "client",
+      "route": "/",
+      "name": "home",
+      "file": "src/web/$sites/client/home.page.tsx",
+      "setupFile": "src/web/$sites/client/home.setup.ts",
+      "layouts": [
+        "src/web/$sites/client/layout.tsx"
+      ],
+      "loaders": [
+        "src/web/$sites/client/home.setup.ts"
+      ],
+      "actions": [],
+      "requires": [],
+      "reachedFrom": []
+    },
+    {
+      "site": "client",
+      "route": "/products/:id",
+      "name": "products.show",
+      "file": "src/web/$sites/client/products/show.page.tsx",
+      "setupFile": "src/web/$sites/client/products/show.setup.ts",
+      "layouts": [
+        "src/web/$sites/client/layout.tsx"
+      ],
+      "loaders": [
+        "src/web/$sites/client/products/show.setup.ts"
+      ],
+      "actions": [],
+      "requires": [],
+      "reachedFrom": [
+        {
+          "type": "link",
+          "from": "src/web/$sites/client/home.page.tsx",
+          "line": 7
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+src/app/catalog/services/new-arrivals.service.ts  service  10 lines
+about     Lists the newest products sold in the customer's country.
+feature   catalog
+flows     catalog/new-arrivals
+exports   listNewArrivals  Returns up to 20 products, newest first.
+imports   src/app/catalog/repositories/products.repository.ts
+used by   src/app/catalog/controllers/new-arrivals.controller.ts
+          src/app/catalog/tests/new-arrivals.test.ts
+          src/web/$sites/client/home.setup.ts
+entry     grimoire/book/app/catalog/services/new-arrivals.service.json

@@ -16,6 +16,8 @@ With a terminal, that command asks for the project name (if you did not pass one
 
 What lands is a ready-to-run app: the `src/app` (one folder per feature) + `src/config` (one file per subsystem) layout, a `warlock.config.ts`, decorators already enabled in `tsconfig.json`, and a dev server you start with `npm run dev`.
 
+Every new app also includes [Grimoire](/v/latest/grimoire/) (experimental): `@warlock.js/grimoire` is a dependency, `warlock.config.ts` registers its `grimoire` and `scry` commands, `.gitignore` lists the files it generates, and `src/config/devtools.ts` adds its devtools tab. With `--features=test`, the generated Vitest config records test results for it. Existing apps add it with `warlock add grimoire`.
+
 ## Headless / non-interactive mode
 
 `create-warlock` is fully headless: every prompt has a flag that answers it, `--yes` takes the default for anything you leave unset, and it works with **no terminal at all** — CI, a script, an agent. There are three modes:

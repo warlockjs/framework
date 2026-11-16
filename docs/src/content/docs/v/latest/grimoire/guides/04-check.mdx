@@ -1,0 +1,827 @@
+---
+title: The check
+description: What `warlock grimoire check` reports, how findings on proposed work are shown as expected, and every GR code with its severity and what to do.
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+<Aside type="caution" title="Experimental">
+  Grimoire is experimental in 5.55. The structure of the written files and the commands may still
+  change before they are declared stable.
+</Aside>
+
+`warlock grimoire check` reads the written files, the book and the tests, and reports every place where they
+disagree: a step that names a route that does not exist, a criterion no test proves, a file no feature owns. It
+only reads. It never changes a written file or a source file.
+
+```bash
+npx warlock grimoire check
+npx warlock grimoire check --json
+```
+
+## The output
+
+One line per finding, then the counts:
+
+```text
+grimoire/features/auth/flows/login.md:29  GR4001  warning  auth/login AC-1 has no test
+grimoire/features/catalog/flows/browse-products.md:26  GR4001  warning  catalog/browse-products AC-1 has no test
+grimoire/features/catalog/flows/new-arrivals.md:30  GR4001  warning  catalog/new-arrivals AC-3 has no test
+grimoire/features/catalog/flows/wishlist.md:12  GR2001  error  route step "POST /api/wishlist" matches no route  (expected)
+grimoire/features/catalog/flows/wishlist.md:13  GR2004  error  notification step "wishlist-price-drop" matches no notification  (expected)
+grimoire/features/catalog/flows/wishlist.md:30  GR4001  warning  catalog/wishlist AC-1 has no test  (expected)
+0 errors, 3 warnings, 3 expected  (routes: fresh)
+```
+
+- Each line is `<file>:<line>  <code>  <severity>  <message>`. A finding with no single place shows `-`.
+- Under each error that is not expected, a line `    fix: …` says what to do.
+- Problems come first: errors, then warnings, each by file and line. Expected findings come last.
+- The last line counts the errors and warnings that are not expected, and the expected findings. It also says how
+  fresh the route facts were.
+- `--json` prints the report object: `findings` (each with `code`, `severity`, `message`, `at`, `expected`,
+  `subject` and `hint`), `counts`, `ok` and `routes`.
+
+The command exits with code 1 when there is an error that is not expected, and 0 otherwise. Warnings never fail it.
+
+## Expected findings
+
+A feature or flow with `status: proposed` describes work that is not built yet, so its routes, pages and tests do
+not exist. Every finding about it is marked `(expected)`: it is listed so you can see what is still to build, and it
+never fails the check. Once the code exists, set the status to `building` or `shipped`; from then on the same
+findings are problems.
+
+## Route facts
+
+Route steps, and mail, job, event and notification steps, are checked against facts that need the app to boot. The
+check refreshes them when the routes files changed (`routes: fresh`).
+
+- When they are older than the routes files (`routes: stale`), the steps are checked against the cached facts and
+  the report adds `GR8003`.
+- When there are none (`routes: missing`, the app did not boot), those steps are not checked. `GR8002` says why.
+  Page steps and `affects` steps are always checked.
+
+## What it checks
+
+| Area | It reports | Codes |
+| --- | --- | --- |
+| Written files | a file that does not follow its template | `GR1001`–`GR1028` |
+| Steps | a route, page, mail, notification, job, event or flow that does not exist | `GR2001`–`GR2007` |
+| App names | a feature, flow, criterion or task naming an app with no folder, or one its feature does not list | `GR2008`, `GR2009` |
+| References | a changelog entry or README relation naming a flow or criterion that does not exist | `GR2010`–`GR2012` |
+| Source files | no header sentence, no feature, two owners, a wrong `@feature` tag or folder, a file no flow reaches | `GR3001`–`GR3006` |
+| Tests | a criterion with no test, a `@proves` line that names nothing or has the wrong form, failed or old results | `GR4001`–`GR4008` |
+| Apps | blocks, conditions, pages, layouts and screens that point at nothing | `GR5001`–`GR5009` |
+| Versions | the README version or date out of step with the changelog, a release that does not match | `GR6001`–`GR6008` |
+| Tasks | a task naming a feature or flow that does not exist, or in the wrong folder | `GR7001`–`GR7005` |
+
+Steps and criteria of a `retired` flow are not looked up: its code is gone on purpose.
+
+A test proves a criterion with a line comment directly above it:
+
+```ts
+// @proves catalog/new-arrivals AC-2
+it("returns the global list when the customer has no country", async () => {
+  // …
+});
+```
+
+The check reads these lines from the test files the book lists: spec files under the source roots,
+`e2e/**/*.e2e.ts` and `tests/**/*.{test,spec}.ts` at the project root. Lines inside block comments are ignored. See
+[Test results](/v/latest/grimoire/guides/08-test-results/) for the reporter that records their last results.
+
+## Look up a code
+
+```bash
+npx warlock explain GR2001
+```
+
+It prints the title, the fix and the skill for the code. Every code is listed below.
+
+## From code
+
+```ts
+import { checkGrimoire, formatCheckReport, openGrimoire } from "@warlock.js/grimoire";
+import { createWarlockAdapter } from "@warlock.js/grimoire/warlock";
+
+const snapshot = await openGrimoire(process.cwd(), createWarlockAdapter(), { routes: "cached" });
+const report = checkGrimoire(snapshot);
+
+console.log(formatCheckReport(report).join("\n"));
+```
+
+`scanProofsInText(text, file)` reads the `@proves` lines of one test file's text, and `scanProofs(root, files)` reads
+them from a list of project-relative test files. Both return the proof lines and the `GR4003`–`GR4005` findings.
+
+## Codes
+
+Each code keeps its meaning across releases. An error fails the check unless it is expected; a warning never does.
+
+{/* codes:start (generated from GRIMOIRE_CODE_LIST by packages/grimoire/tests/check/codes-docs.spec.ts) */}
+
+## GR1xxx: written files
+
+### GR1001
+
+A written file has no front matter.
+
+- **Severity:** error
+- **What to do:** Start the file with the front matter block its template shows, between two `---` lines.
+- **Skill:** `write-a-feature`
+
+### GR1002
+
+The front matter cannot be read.
+
+- **Severity:** error
+- **What to do:** Write one `key: value` per line; lists as `[a, b]` or as `- item` lines under the key; close the block with `---`.
+- **Skill:** `write-a-feature`
+
+### GR1003
+
+A required front matter key is missing.
+
+- **Severity:** error
+- **What to do:** Add the key named in the message; the template of that file lists every required key.
+- **Skill:** `write-a-feature`
+
+### GR1004
+
+A front matter value has the wrong form.
+
+- **Severity:** error
+- **What to do:** Use the form the message names: dates as yyyy-mm-dd, versions as 2.1, ids in lower-case-with-dashes, a status from the list.
+- **Skill:** `write-a-feature`
+
+### GR1005
+
+A front matter key is not part of the template.
+
+- **Severity:** warning
+- **What to do:** Remove the key, or move what it says into the body of the file.
+- **Skill:** `write-a-feature`
+
+### GR1006
+
+A required heading is missing.
+
+- **Severity:** error
+- **What to do:** Add the heading named in the message, spelled as in the template.
+- **Skill:** `write-a-feature`
+
+### GR1007
+
+A heading is not part of the template.
+
+- **Severity:** warning
+- **What to do:** Use the template's headings; put the text under one of them or remove it.
+- **Skill:** `write-a-feature`
+
+### GR1008
+
+A step line has the wrong form.
+
+- **Severity:** error
+- **What to do:** Write steps as `1. route   POST /wishlist`: a number, a kind, then the name used in code.
+- **Skill:** `write-a-feature`
+
+### GR1009
+
+A step names an unknown kind.
+
+- **Severity:** error
+- **What to do:** Use one of: page, route, mail, notification, job, event, outside service, affects.
+- **Skill:** `write-a-feature`
+
+### GR1010
+
+Steps are not numbered 1, 2, 3 in order.
+
+- **Severity:** error
+- **What to do:** Number the steps from 1 without gaps, in the order a user meets them.
+- **Skill:** `write-a-feature`
+
+### GR1011
+
+A case line has the wrong form.
+
+- **Severity:** error
+- **What to do:** Write cases as `- double submit   two taps save once`: the question, two spaces, the answer.
+- **Skill:** `write-a-feature`
+
+### GR1012
+
+A case question is not answered.
+
+- **Severity:** warning
+- **What to do:** Answer the question under Cases (or `does not apply` and why), or list it under Not handled.
+- **Skill:** `write-a-feature`
+
+### GR1013
+
+A criterion line has the wrong form.
+
+- **Severity:** error
+- **What to do:** Write criteria as `- AC-3   a guest is sent to sign in`, optionally `- AC-4 [mobile]   …`.
+- **Skill:** `write-a-feature`
+
+### GR1014
+
+A criterion id is used twice in one flow.
+
+- **Severity:** error
+- **What to do:** Give the new criterion the next free number. Never renumber existing criteria.
+- **Skill:** `write-a-feature`
+
+### GR1015
+
+A changelog line has the wrong form.
+
+- **Severity:** error
+- **What to do:** Write entries as `- 2.1  fixed   new-arrivals: what changed (AC-2)`.
+- **Skill:** `record-a-change`
+
+### GR1016
+
+A changelog entry uses an unknown word.
+
+- **Severity:** error
+- **What to do:** Use one of: added, changed, fixed, removed.
+- **Skill:** `record-a-change`
+
+### GR1017
+
+A changelog heading has the wrong form.
+
+- **Severity:** error
+- **What to do:** Use `## Unreleased`, or `## <release> (<yyyy-mm-dd>)` for entries of a release.
+- **Skill:** `record-a-change`
+
+### GR1018
+
+A blocks table has the wrong form.
+
+- **Severity:** error
+- **What to do:** Use the columns Block, Flow, Who sees it, Changes with; one row per part of the page.
+- **Skill:** `describe-an-app`
+
+### GR1019
+
+An id does not match its folder or file name.
+
+- **Severity:** error
+- **What to do:** Make the front matter `id` (or `release`) equal the folder or file name.
+- **Skill:** `write-a-feature`
+
+### GR1020
+
+A file in the grimoire folder is not part of the layout.
+
+- **Severity:** warning
+- **What to do:** Move the file to where the layout expects it, or remove it.
+- **Skill:** `use-the-grimoire`
+
+### GR1021
+
+A feature, app, page or screen folder has no README.md.
+
+- **Severity:** error
+- **What to do:** Add README.md with the front matter of its template.
+- **Skill:** `write-a-feature`
+
+### GR1022
+
+Two files use the same id.
+
+- **Severity:** error
+- **What to do:** Give each feature, app or task its own id.
+- **Skill:** `write-a-feature`
+
+### GR1023
+
+A task file is misnamed or misplaced.
+
+- **Severity:** error
+- **What to do:** Name tasks `T-<n>-<slug>.md`, in `tasks/open/` or `tasks/done/<yyyy-mm>/`.
+- **Skill:** `record-a-change`
+
+### GR1024
+
+The collected-list markers of a release file are broken.
+
+- **Severity:** error
+- **What to do:** Keep the start and end markers in pairs, or remove both and run `warlock grimoire release` again.
+- **Skill:** `record-a-change`
+
+### GR1025
+
+A written file cannot be read.
+
+- **Severity:** error
+- **What to do:** Save the file as UTF-8 text.
+- **Skill:** `use-the-grimoire`
+
+### GR1026
+
+The feature README lists a flow that has no file.
+
+- **Severity:** error
+- **What to do:** Add `flows/<flow>.md`, or remove the flow from the README's Flows list.
+- **Skill:** `write-a-feature`
+
+### GR1027
+
+A flow file is not listed in the feature README.
+
+- **Severity:** warning
+- **What to do:** Add the flow to the README's Flows list.
+- **Skill:** `write-a-feature`
+
+### GR1028
+
+A list line has the wrong form.
+
+- **Severity:** error
+- **What to do:** Write list lines as `- name   text`: the name, two or more spaces, the text.
+- **Skill:** `write-a-feature`
+
+## GR2xxx: names that point at nothing
+
+### GR2001
+
+A route step names a route that does not exist.
+
+- **Severity:** error
+- **What to do:** Fix the method and path in the flow, or add the route in code.
+- **Skill:** `record-a-change`
+
+### GR2002
+
+A page step names a page that does not exist.
+
+- **Severity:** error
+- **What to do:** Fix the route path in the flow, or add the page to one of the feature's apps.
+- **Skill:** `record-a-change`
+
+### GR2003
+
+A mail step names a mail that does not exist.
+
+- **Severity:** error
+- **What to do:** Use the mail's name as code defines it, or add the mail.
+- **Skill:** `record-a-change`
+
+### GR2004
+
+A notification step names a notification that does not exist.
+
+- **Severity:** error
+- **What to do:** Use the notification's name as code defines it, or add it.
+- **Skill:** `record-a-change`
+
+### GR2005
+
+A job step names a job that does not exist.
+
+- **Severity:** error
+- **What to do:** Use the job's name as code defines it, or add the job.
+- **Skill:** `record-a-change`
+
+### GR2006
+
+An event step names an event that does not exist.
+
+- **Severity:** error
+- **What to do:** Use the event's name as code emits it, or add the event.
+- **Skill:** `record-a-change`
+
+### GR2007
+
+An affects step names a feature or flow that does not exist.
+
+- **Severity:** error
+- **What to do:** Write `affects   <feature>/<flow>` with an existing feature and flow.
+- **Skill:** `write-a-feature`
+
+### GR2008
+
+A name refers to an app with no folder.
+
+- **Severity:** error
+- **What to do:** Add `grimoire/apps/<app>/README.md`, or fix the app id.
+- **Skill:** `describe-an-app`
+
+### GR2009
+
+A flow names an app its feature does not list.
+
+- **Severity:** warning
+- **What to do:** Add the app to the feature's `apps`, or fix the app id in Differs by app or the criterion.
+- **Skill:** `write-a-feature`
+
+### GR2010
+
+A changelog entry names a flow that does not exist.
+
+- **Severity:** error
+- **What to do:** Fix the flow id before the `:`, or add the flow.
+- **Skill:** `record-a-change`
+
+### GR2011
+
+A changelog entry names a criterion the flow does not have.
+
+- **Severity:** error
+- **What to do:** Fix the criterion id, or add the criterion to the flow.
+- **Skill:** `record-a-change`
+
+### GR2012
+
+A README relation names a flow that does not exist.
+
+- **Severity:** error
+- **What to do:** Fix the `<feature>/<flow>` reference in Affects and affected by.
+- **Skill:** `write-a-feature`
+
+## GR3xxx: source files
+
+### GR3001
+
+A source file has no header sentence.
+
+- **Severity:** warning
+- **What to do:** Start the file with a one-sentence comment saying why it exists.
+- **Skill:** `document-a-file`
+
+### GR3002
+
+A source file belongs to no feature.
+
+- **Severity:** warning
+- **What to do:** Add its folder to a feature's `folders`, or tag it `@feature <id>` in its header.
+- **Skill:** `document-a-file`
+
+### GR3003
+
+A source file has two owners.
+
+- **Severity:** error
+- **What to do:** Keep one owner: remove the duplicate folder from one feature, or keep one `@feature` tag.
+- **Skill:** `document-a-file`
+
+### GR3004
+
+A `@feature` tag names a feature that does not exist.
+
+- **Severity:** error
+- **What to do:** Fix the tag, or write the feature.
+- **Skill:** `document-a-file`
+
+### GR3005
+
+A feature's `folders` entry does not exist.
+
+- **Severity:** error
+- **What to do:** Fix the folder path, or remove it from `folders`.
+- **Skill:** `write-a-feature`
+
+### GR3006
+
+A file in a feature's folders is reached by no flow.
+
+- **Severity:** warning
+- **What to do:** Describe the behaviour in a flow, or delete dead code.
+- **Skill:** `record-a-change`
+
+## GR4xxx: criteria and tests
+
+### GR4001
+
+A criterion has no test.
+
+- **Severity:** warning
+- **What to do:** Write a test with `// @proves <feature>/<flow> AC-<n>` above it, or say in the task why not.
+- **Skill:** `record-a-change`
+
+### GR4002
+
+A `@proves` line names a flow or criterion that does not exist.
+
+- **Severity:** error
+- **What to do:** Fix the `@proves` line to name an existing `<feature>/<flow> AC-<n>`.
+- **Skill:** `record-a-change`
+
+### GR4003
+
+A `@proves` line has the wrong form.
+
+- **Severity:** error
+- **What to do:** Write `// @proves <feature>/<flow> AC-<n>` on its own line.
+- **Skill:** `record-a-change`
+
+### GR4004
+
+A `@proves` line is not directly above a test.
+
+- **Severity:** error
+- **What to do:** Move the line right above the `it(…)` or `test(…)` it describes.
+- **Skill:** `record-a-change`
+
+### GR4005
+
+One test proves two criteria.
+
+- **Severity:** warning
+- **What to do:** Split the test so each proves one criterion.
+- **Skill:** `record-a-change`
+
+### GR4006
+
+A test proving a criterion failed in its last run.
+
+- **Severity:** error
+- **What to do:** Fix the code or the test, then run the tests again.
+- **Skill:** `record-a-change`
+
+### GR4007
+
+A criterion's test result is older than the test file.
+
+- **Severity:** warning
+- **What to do:** Run the tests again.
+- **Skill:** `record-a-change`
+
+### GR4008
+
+A criterion's test did not run in the last run.
+
+- **Severity:** warning
+- **What to do:** Run the tests that prove the criterion.
+- **Skill:** `record-a-change`
+
+## GR5xxx: apps, pages and blocks
+
+### GR5001
+
+A block points to a flow that does not exist.
+
+- **Severity:** error
+- **What to do:** Fix the `<feature>/<flow>` in the Flow column or the block file.
+- **Skill:** `describe-an-app`
+
+### GR5002
+
+A condition is not declared in the app README.
+
+- **Severity:** error
+- **What to do:** Add the condition under Conditions in the app README, or use a declared one.
+- **Skill:** `describe-an-app`
+
+### GR5003
+
+A page's route does not exist in its site.
+
+- **Severity:** error
+- **What to do:** Fix the `route` of the page file, or remove the page file if the page is gone.
+- **Skill:** `describe-an-app`
+
+### GR5004
+
+A page names a layout with no file.
+
+- **Severity:** error
+- **What to do:** Add `layouts/<layout>.md` to the app, or fix the page's `layout`.
+- **Skill:** `describe-an-app`
+
+### GR5005
+
+An app's root matches no site or mobile app.
+
+- **Severity:** error
+- **What to do:** Set `root` to the site folder (`src/web/$sites/<site>`) or the mobile app folder.
+- **Skill:** `describe-an-app`
+
+### GR5006
+
+A screen's route does not exist in the mobile app.
+
+- **Severity:** error
+- **What to do:** Fix the `route` of the screen file, or remove it if the screen is gone.
+- **Skill:** `describe-an-app`
+
+### GR5007
+
+A block file has no row in its page's Blocks table.
+
+- **Severity:** warning
+- **What to do:** Add the block to the page's Blocks table, or remove the block file.
+- **Skill:** `describe-an-app`
+
+### GR5008
+
+An entry point in Also reached from does not exist.
+
+- **Severity:** error
+- **What to do:** Fix the mail, notification or page name.
+- **Skill:** `describe-an-app`
+
+### GR5009
+
+A site or mobile app has no folder in grimoire/apps.
+
+- **Severity:** warning
+- **What to do:** Add `grimoire/apps/<app>/README.md` for it.
+- **Skill:** `describe-an-app`
+
+## GR6xxx: versions, changelogs and releases
+
+### GR6001
+
+A release lists a changelog entry that is not stamped with it.
+
+- **Severity:** error
+- **What to do:** Move the entry under `## <release> (<date>)` in the feature's CHANGELOG.md.
+- **Skill:** `record-a-change`
+
+### GR6002
+
+A changelog release section has no release file.
+
+- **Severity:** error
+- **What to do:** Write `grimoire/releases/<release>.md`, or fix the release in the heading.
+- **Skill:** `record-a-change`
+
+### GR6003
+
+A changelog release date differs from the release file.
+
+- **Severity:** error
+- **What to do:** Use the date in the release file's front matter.
+- **Skill:** `record-a-change`
+
+### GR6004
+
+The README `updated` is older than the newest changelog entry.
+
+- **Severity:** error
+- **What to do:** Reshape the README to describe the feature as it is now, and set `updated`.
+- **Skill:** `record-a-change`
+
+### GR6005
+
+The README `version` differs from the newest changelog entry.
+
+- **Severity:** error
+- **What to do:** Set `version` to the newest entry's version.
+- **Skill:** `record-a-change`
+
+### GR6006
+
+A changelog word does not match its version step.
+
+- **Severity:** warning
+- **What to do:** Use a whole-number version for added and removed, a decimal for changed and fixed.
+- **Skill:** `record-a-change`
+
+### GR6007
+
+A flow's `since` is newer than its feature's version.
+
+- **Severity:** error
+- **What to do:** Fix `since`, or the feature `version`.
+- **Skill:** `write-a-feature`
+
+### GR6008
+
+A new whole-number version has no brief.
+
+- **Severity:** warning
+- **What to do:** Write `versions/v<n>.md` before building it.
+- **Skill:** `write-a-feature`
+
+## GR7xxx: tasks
+
+### GR7001
+
+A task names a feature that does not exist.
+
+- **Severity:** error
+- **What to do:** Fix the task's `feature`, or write the feature first.
+- **Skill:** `write-a-feature`
+
+### GR7002
+
+A task names a flow that does not exist.
+
+- **Severity:** error
+- **What to do:** Fix the task's `flow`, or write the flow first.
+- **Skill:** `write-a-feature`
+
+### GR7003
+
+A task's status does not match its folder.
+
+- **Severity:** error
+- **What to do:** Done tasks live in `tasks/done/<yyyy-mm>/` with `status: done` and `shipped`; open tasks in `tasks/open/`.
+- **Skill:** `record-a-change`
+
+### GR7004
+
+A task's `shipped` names a version the changelog does not have.
+
+- **Severity:** error
+- **What to do:** Fix `shipped: <feature> <version>`, or add the changelog entry.
+- **Skill:** `record-a-change`
+
+### GR7005
+
+A task's brief does not exist.
+
+- **Severity:** warning
+- **What to do:** Fix the `Brief:` path, or write the brief.
+- **Skill:** `write-a-feature`
+
+## GR8xxx: building the book
+
+### GR8001
+
+The project's source files could not be read.
+
+- **Severity:** error
+- **What to do:** Read the message; fix the file or folder it names, then build again.
+- **Skill:** `use-the-grimoire`
+
+### GR8002
+
+Route facts could not be read because the app did not boot.
+
+- **Severity:** warning
+- **What to do:** Run `warlock doctor`, fix what stops the app from booting, then `warlock grimoire build`.
+- **Skill:** `use-the-grimoire`
+
+### GR8003
+
+Route facts are older than the routes files.
+
+- **Severity:** warning
+- **What to do:** Run `warlock grimoire build` to refresh them.
+- **Skill:** `use-the-grimoire`
+
+### GR8004
+
+Pages or screens could not be read.
+
+- **Severity:** warning
+- **What to do:** Read the message; fix the page file it names, then build again.
+- **Skill:** `use-the-grimoire`
+
+## GR9xxx: commands and queries
+
+### GR9001
+
+The file is not in the book.
+
+- **Severity:** error
+- **What to do:** Pass a code file under the source roots, as a project-relative path.
+- **Skill:** `use-the-grimoire`
+
+### GR9002
+
+No route matches.
+
+- **Severity:** error
+- **What to do:** Pass `"<METHOD> <path>"` as the route is registered; `warlock routes` lists them.
+- **Skill:** `use-the-grimoire`
+
+### GR9003
+
+No feature has that id.
+
+- **Severity:** error
+- **What to do:** Use an id from `grimoire/features/`.
+- **Skill:** `use-the-grimoire`
+
+### GR9004
+
+No flow has that id.
+
+- **Severity:** error
+- **What to do:** Use `<feature>/<flow>` with a file in `grimoire/features/<feature>/flows/`.
+- **Skill:** `use-the-grimoire`
+
+### GR9005
+
+The release file has no brief yet.
+
+- **Severity:** error
+- **What to do:** Write `grimoire/releases/<release>.md` with `release` and `date` front matter and the brief, then run the command again.
+- **Skill:** `record-a-change`
+
+### GR9006
+
+A query argument has the wrong form.
+
+- **Severity:** error
+- **What to do:** Read the command's help (`warlock scry --help`) and pass the argument in that form.
+- **Skill:** `use-the-grimoire`
+
+{/* codes:end */}

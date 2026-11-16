@@ -1,55 +1,25 @@
 /**
  * Book maps and collected indexes (owned by T-128).
- */
-import type { BookFacts, BookManifest } from "../contracts";
-import type { BookAnnotations } from "../contracts/book";
-import type { CollectedFiles, Ownership } from "../contracts/bookmap";
-import type { AppMatch } from "../contracts/snapshot";
-import type { ProofLine, TestResultsStore } from "../contracts/test-results";
-import type { WrittenGrimoire } from "../contracts/written";
-
-/** Everything the book maps are computed from. */
-export type CollectedInput = {
-  written: WrittenGrimoire;
-  facts: BookFacts;
-  ownership: Ownership;
-  apps: Record<string, AppMatch>;
-  proofs: ProofLine[];
-  results: TestResultsStore | null;
-  /** Test file → current sha256 (a result with another hash is stale). */
-  testHashes: Record<string, string>;
-};
-
-/** Every feature and flow book map, `features/index.json` and `tasks/index.json`. Pure. */
-export function buildCollectedFiles(input: CollectedInput): CollectedFiles {
-  void input;
-  throw new Error("not implemented");
-}
-
-/** The per-file owner, borrowers and flows the book entries show. Pure. */
-export function annotationsFrom(
-  input: CollectedInput,
-  collected: CollectedFiles,
-  manifest: Pick<BookManifest, "tests">,
-): BookAnnotations {
-  void input;
-  void collected;
-  void manifest;
-  throw new Error("not implemented");
-}
-
-/**
- * Write the collected files under `grimoire/features` and `grimoire/tasks`,
- * only those whose content changed, and remove book maps of features and flows
- * that no longer exist.
  *
- * @returns Project-relative files written and removed.
+ * - `features/<feature>/bookmap.json`: own and borrowed files, routes, pages
+ *   per app, own files no flow reaches.
+ * - `features/<feature>/flows/<flow>.bookmap.json`: the files behind each
+ *   step, the tests of each criterion with their last result, and the blocks
+ *   that show the flow.
+ * - `features/index.json` and `tasks/index.json`.
+ *
+ * Rules for the files behind a step:
+ * - `route`: routes with the same path and method (`ALL` matches any); the
+ *   entry is the handler file (else the routes file); files are the handler's
+ *   import closure plus the routes file alone. No route facts → `found: null`.
+ * - `page`: pages of the sites and screens of the mobile apps matched to the
+ *   feature's apps, compared with params written one way (`:id` ≡ `[id]`) and
+ *   no trailing `/`; the entry is the first page or screen file; files are the
+ *   import closures of the page and setup files (layouts left out).
+ * - `mail`, `job`, `event`, `notification`: the named thing's file and its closure.
+ * - `outside service`: `found: null`. `affects`: found when the feature (and
+ *   flow) exists; no files.
  */
-export async function writeCollectedFiles(
-  root: string,
-  collected: CollectedFiles,
-): Promise<{ written: string[]; removed: string[] }> {
-  void root;
-  void collected;
-  throw new Error("not implemented");
-}
+export { annotationsFrom, buildCollectedFiles, flowFileId, type CollectedInput } from "./build";
+export { normalizeRoutePath } from "./steps";
+export { writeCollectedFiles } from "./write";

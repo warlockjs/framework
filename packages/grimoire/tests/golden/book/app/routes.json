@@ -1,0 +1,67 @@
+{
+  "schemaVersion": 1,
+  "modules": {
+    "(none)": [
+      {
+        "method": "GET",
+        "path": "/",
+        "name": "home",
+        "handlerFile": "src/web/$sites/client/home.page.tsx"
+      },
+      {
+        "method": "GET",
+        "path": "/products/:id",
+        "name": "products.show",
+        "handlerFile": "src/web/$sites/client/products/show.page.tsx"
+      },
+      {
+        "method": "GET",
+        "path": "/admin/orders",
+        "name": "orders",
+        "handlerFile": "src/web/$sites/admin/orders.page.tsx"
+      }
+    ],
+    "src/app/auth": [
+      {
+        "method": "POST",
+        "path": "/api/register",
+        "name": "auth.register",
+        "handlerFile": "src/app/auth/controllers/register.controller.ts"
+      },
+      {
+        "method": "POST",
+        "path": "/api/login",
+        "name": "auth.login",
+        "handlerFile": "src/app/auth/controllers/login.controller.ts"
+      }
+    ],
+    "src/app/catalog": [
+      {
+        "method": "GET",
+        "path": "/api/products",
+        "name": "catalog.products.index",
+        "handlerFile": "src/app/catalog/controllers/products.controller.ts"
+      },
+      {
+        "method": "GET",
+        "path": "/api/products/new-arrivals",
+        "name": "catalog.new-arrivals",
+        "handlerFile": "src/app/catalog/controllers/new-arrivals.controller.ts"
+      },
+      {
+        "method": "GET",
+        "path": "/api/products/:id",
+        "name": "catalog.products.show",
+        "handlerFile": "src/app/catalog/controllers/products.controller.ts"
+      }
+    ],
+    "src/app/orders": [
+      {
+        "method": "POST",
+        "path": "/api/orders",
+        "name": "orders.place",
+        "handlerFile": "src/app/orders/controllers/place-order.controller.ts"
+      }
+    ]
+  }
+}

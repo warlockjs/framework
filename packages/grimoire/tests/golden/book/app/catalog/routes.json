@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "file": "src/app/catalog/routes.ts",
+  "module": "src/app/catalog",
+  "type": "routes",
+  "lines": 7,
+  "about": "Registers the catalog's HTTP routes.",
+  "feature": "catalog",
+  "borrowedBy": [],
+  "flows": [],
+  "exports": [],
+  "packages": [
+    "@warlock.js/core"
+  ],
+  "imports": [
+    "src/app/catalog/controllers/new-arrivals.controller.ts",
+    "src/app/catalog/controllers/products.controller.ts"
+  ],
+  "importedBy": [],
+  "routes": [
+    {
+      "method": "GET",
+      "path": "/api/products",
+      "name": "catalog.products.index",
+      "via": "registers"
+    },
+    {
+      "method": "GET",
+      "path": "/api/products/new-arrivals",
+      "name": "catalog.new-arrivals",
+      "via": "registers"
+    },
+    {
+      "method": "GET",
+      "path": "/api/products/:id",
+      "name": "catalog.products.show",
+      "via": "registers"
+    }
+  ],
+  "pages": [],
+  "screens": []
+}

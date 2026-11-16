@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "file": "src/app/orders/routes.ts",
+  "module": "src/app/orders",
+  "type": "routes",
+  "lines": 6,
+  "about": "Registers the orders' HTTP routes.",
+  "feature": "orders",
+  "borrowedBy": [],
+  "flows": [],
+  "exports": [],
+  "packages": [
+    "@warlock.js/core"
+  ],
+  "imports": [
+    "src/app/orders/controllers/place-order.controller.ts"
+  ],
+  "importedBy": [],
+  "routes": [
+    {
+      "method": "POST",
+      "path": "/api/orders",
+      "name": "orders.place",
+      "via": "registers"
+    }
+  ],
+  "pages": [],
+  "screens": []
+}

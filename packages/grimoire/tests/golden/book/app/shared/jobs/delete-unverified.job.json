@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "file": "src/app/shared/jobs/delete-unverified.job.ts",
+  "module": "src/app/shared",
+  "type": "job",
+  "lines": 13,
+  "about": "Deletes accounts that were never verified, seven days after sign-up.",
+  "feature": "auth",
+  "borrowedBy": [],
+  "flows": [],
+  "exports": [
+    {
+      "name": "deleteUnverifiedJob",
+      "about": "Runs daily."
+    }
+  ],
+  "packages": [
+    "@warlock.js/queue"
+  ],
+  "imports": [],
+  "importedBy": [],
+  "routes": [],
+  "pages": [],
+  "screens": []
+}

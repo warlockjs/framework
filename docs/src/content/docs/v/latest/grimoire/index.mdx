@@ -24,6 +24,31 @@ what a change will touch.
 
 Warlock never edits a file an agent wrote.
 
+## Install
+
+New Warlock.js apps include Grimoire. In an existing app:
+
+```sh
+npx warlock add grimoire
+npx warlock grimoire build
+```
+
+`warlock add grimoire` installs `@warlock.js/grimoire`, registers `registerGrimoireCommands()` in
+`cli.commands` of `warlock.config.ts` (it creates the `cli` block when there is none), adds the
+generated files to `.gitignore`, adds the Grimoire tab to `src/config/devtools.ts`, and adds
+`grimoireReporter()` to `vite.config.ts` when the app runs Vitest. Running it twice changes nothing.
+
+## Who writes what
+
+| | Written by |
+| --- | --- |
+| `grimoire/book/`, `index.json`, `bookmap.json`, `*.bookmap.json` | Warlock. Not in git. Never edit |
+| Features, flows, apps, tasks, changelogs, release briefs | The agent |
+| The collected list in `grimoire/releases/<release>.md` | `warlock grimoire release`, between two markers |
+
+The agent writes the release number and date into each feature changelog and writes the release
+brief first. `warlock grimoire release` then writes only the collected list.
+
 ## The folder
 
 ```text
@@ -59,3 +84,18 @@ npx warlock scry <file>         # what is this file?
 npx warlock scry --impact <file>
 npx warlock scry --search "new arrivals"
 ```
+
+## Guides
+
+1. [Written files](/v/latest/grimoire/guides/01-written-files/): the fixed structure of every file agents write.
+2. [The book](/v/latest/grimoire/guides/02-book/): layout, entries, freshness.
+3. [Features and book maps](/v/latest/grimoire/guides/03-features-and-book-maps/): ownership, borrowing, indexes.
+4. [Check](/v/latest/grimoire/guides/04-check/): `warlock grimoire check` and every finding code.
+5. [Commands](/v/latest/grimoire/guides/05-commands/): `warlock grimoire`, `warlock scry`, MCP tools.
+6. [Tasks and releases](/v/latest/grimoire/guides/06-tasks-and-releases/)
+7. [Apps](/v/latest/grimoire/guides/07-apps/): sites, pages, blocks, mobile screens.
+8. [Test results](/v/latest/grimoire/guides/08-test-results/): `@proves` and the Vitest reporter.
+9. [Devtools](/v/latest/grimoire/guides/09-devtools/): the tab and the static export.
+
+Agents learn the workflow from the package's skills: `use-the-grimoire`, `write-a-feature`,
+`record-a-change`, `describe-an-app`, `document-a-file` and `backfill-a-grimoire`.

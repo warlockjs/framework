@@ -1,0 +1,219 @@
+---
+title: Features and book maps
+description: How the Grimoire decides which feature owns each source file, which files a feature borrows, and what the collected book maps and indexes hold.
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+<Aside type="caution" title="Experimental">
+  Grimoire is experimental in 5.55. The structure of the written files and the commands may still
+  change before they are declared stable.
+</Aside>
+
+A feature README names the folders the feature lives in, and each flow names its steps. From these two things and
+the book, Warlock works out which files belong to each feature, which files each flow reaches, and which tests prove
+each criterion. It writes the answers as **book maps** next to the agent's files, plus two indexes. You never write
+or list these files yourself.
+
+## Who owns a file
+
+Every source file has at most one owner.
+
+1. A `@feature <id>` line in the file's header comment wins:
+
+   ```ts
+   /**
+    * Deletes accounts that were never verified, seven days after sign-up.
+    * @feature auth
+    */
+   ```
+
+2. Otherwise the feature whose `folders` entry holds the file owns it. When two entries hold it (`src/web` and
+   `src/web/$sites/client/products`), the deepest folder wins.
+
+A file nobody claims has no owner. Two claims of the same strength are a conflict, and the file gets no owner:
+
+| Case | Reported as |
+| --- | --- |
+| Two different `@feature` tags in one file | [`GR3003`](../04-check/#gr3003) |
+| Two features list the same folder | [`GR3003`](../04-check/#gr3003) |
+| A `@feature` tag names no feature | [`GR3004`](../04-check/#gr3004) (the folders then decide) |
+| A file under `src/app/**` with no owner | [`GR3002`](../04-check/#gr3002) |
+
+Test files (`*.test.ts`, `*.spec.ts`) get an owner too, but they never count as a feature's own, borrowed or
+unreached files.
+
+## Borrowed files
+
+A feature **borrows** a file it does not own when one of its own files imports it directly. In the example shop,
+`orders` places an order through the catalog's products repository, so `orders` borrows
+`src/app/catalog/repositories/products.repository.ts`. The book entry of that file shows `feature: "catalog"` and
+`borrowedBy: ["orders"]`, and `warlock scry --impact` lists both features.
+
+## The files behind a step
+
+Each step of a flow points at something in the book. The flow's book map lists the file the step starts from (the
+**entry**) and every project file the entry imports, directly or not.
+
+| Step | Matches | Entry | Files |
+| --- | --- | --- | --- |
+| `route   POST /api/orders` | routes with the same method and path (`ALL` matches any method) | the handler's file, else the routes file | the handler's imports, plus the routes file alone |
+| `page   /products/:id` | pages of the sites and screens of the mobile apps the feature lists; `:id` and `[id]` are the same, a trailing `/` is ignored | the first page or screen file | the imports of the page and its setup file (layouts are left out) |
+| `mail`, `job`, `event`, `notification` | the thing with that name | its file | its imports |
+| `affects   catalog/browse-products` | the feature and flow exist | none | none |
+| `outside service   payment gateway` | not checked | none | none |
+
+`found` is `true` when the step matched, `false` when it did not, and `null` when the book cannot tell (an outside
+service, or a route step before the routes were ever read).
+
+The files behind a route are every file the handler can reach through imports. That is not the exact call path:
+open the handler to see which ones it really uses.
+
+## Feature book map
+
+`grimoire/features/<feature>/bookmap.json`:
+
+```json
+{
+  "schemaVersion": 1,
+  "feature": "catalog",
+  "own": [
+    "src/app/catalog/controllers/new-arrivals.controller.ts",
+    "src/app/catalog/controllers/products.controller.ts",
+    "..."
+  ],
+  "borrowed": [
+    {
+      "file": "src/app/shared/utils/money.ts",
+      "owner": null,
+      "by": ["src/app/catalog/controllers/products.controller.ts"]
+    }
+  ],
+  "routes": [
+    {
+      "method": "GET",
+      "path": "/api/products",
+      "name": "catalog.products.index",
+      "file": "src/app/catalog/controllers/products.controller.ts"
+    }
+  ],
+  "pages": {
+    "web-client": [
+      { "route": "/products/:id", "file": "src/web/$sites/client/products/show.page.tsx", "type": "page" }
+    ]
+  },
+  "unreached": []
+}
+```
+
+- `own`: the files the feature owns.
+- `borrowed`: files of other features, or of no feature, that its own files import directly, with the importing
+  files under `by`.
+- `routes`: API routes whose handler file or routes file the feature owns. Pages are listed under `pages`.
+- `pages`: by app, the pages and screens whose page, setup or screen file the feature owns. The key is the app id
+  under `grimoire/apps/`; when no app folder matches a site, the site id is used.
+- `unreached`: own files that no step of any of the feature's flows reaches. Each one is either behaviour no flow
+  describes yet, or dead code ([`GR3006`](../04-check/#gr3006)).
+
+## Flow book map
+
+`grimoire/features/<feature>/flows/<flow>.bookmap.json`:
+
+```json
+{
+  "schemaVersion": 1,
+  "feature": "catalog",
+  "flow": "new-arrivals",
+  "ref": "catalog/new-arrivals",
+  "steps": [
+    {
+      "index": 2,
+      "kind": "route",
+      "target": "GET /api/products/new-arrivals",
+      "found": true,
+      "entry": "src/app/catalog/controllers/new-arrivals.controller.ts",
+      "files": ["src/app/catalog/controllers/new-arrivals.controller.ts", "..."]
+    }
+  ],
+  "criteria": [
+    {
+      "id": "AC-2",
+      "app": null,
+      "text": "a customer with no country sees the global list",
+      "tests": [
+        {
+          "file": "src/app/catalog/tests/new-arrivals.test.ts",
+          "line": 17,
+          "name": "returns the global list when the customer has no country",
+          "result": "pass",
+          "stale": false
+        }
+      ],
+      "status": "pass"
+    }
+  ],
+  "shownBy": [
+    {
+      "app": "web-client",
+      "type": "page",
+      "id": "home",
+      "block": "New arrivals",
+      "file": "grimoire/apps/web-client/pages/home/README.md"
+    }
+  ]
+}
+```
+
+- `criteria[].tests`: every test with a `// @proves <feature>/<flow> AC-<n>` line above it, and its last result
+  from the [test results](../08-test-results/). `result` is `pass`, `fail`, `skip` or `not-run`; `stale` is `true`
+  when the test file changed after that result.
+- `criteria[].status`: `pass`, `fail`, `stale`, `not-run`, or `no-test` when no test proves the criterion.
+- `shownBy`: the rows of page, screen and layout blocks tables whose Flow column names this flow.
+
+## Indexes
+
+`grimoire/features/index.json` lists every feature that has a README, by id: its title, status, version, `updated`
+date, apps, origin, flows (id, status, since) and the versions it released. Release numbers and dates come from the
+dated sections of the feature's `CHANGELOG.md` (`## 1.0.0 (2026-10-01)`), newest first.
+
+```json
+{
+  "id": "catalog",
+  "title": "Product catalog",
+  "status": "shipped",
+  "version": "2.1",
+  "updated": "2026-11-10",
+  "apps": ["web-client", "mobile"],
+  "origin": null,
+  "flows": [{ "id": "new-arrivals", "status": "shipped", "since": "2.0" }],
+  "releases": [
+    { "version": "2.0", "release": "1.0.0", "date": "2026-10-01" },
+    { "version": "1.0", "release": "1.0.0", "date": "2026-10-01" }
+  ]
+}
+```
+
+`grimoire/tasks/index.json` has three lists, each sorted by task number:
+
+- `open`: tasks in `grimoire/tasks/open/`;
+- `waiting`: the open tasks that wait for the owner, with status `waiting for approval` or a `Decision needed:`
+  line;
+- `done`: tasks in `grimoire/tasks/done/<yyyy-mm>/`.
+
+## When they are written
+
+Every command that opens the Grimoire (`warlock grimoire build`, `check`, `warlock scry`, the MCP tools and the
+devtools tab) brings these files up to date first:
+
+- a file whose content did not change is not rewritten;
+- the book maps of a deleted feature or flow are removed;
+- they carry no timestamps, so an unchanged project gives the same files.
+
+Warlock writes only `index.json` and `*.bookmap.json` files under `grimoire/features/` and `grimoire/tasks/`. It
+never edits a file an agent wrote. All of them are ignored by git (see `GRIMOIRE_IGNORE_RULES`).
+
+## From code
+
+`openGrimoire(root, adapter, options)` from `@warlock.js/grimoire` runs the whole pipeline and returns a snapshot
+with `ownership` (from `resolveOwnership`) and `collected` (from `buildCollectedFiles`). Pass `write: false` to
+compute everything in memory. `writeCollectedFiles(root, collected)` writes the collected files on their own.

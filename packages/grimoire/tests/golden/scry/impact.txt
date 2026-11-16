@@ -1,0 +1,7 @@
+impact of src/app/catalog/models/product.model.ts
+importers  1 direct, 14 in all
+routes     GET /api/products  GET /api/products/new-arrivals  GET /api/products/:id  POST /api/orders
+pages      web-client /  web-client /products/:id
+flows      catalog/browse-products  catalog/new-arrivals  catalog/wishlist  orders/place-order
+features   catalog (owner)  orders (borrower)
+tests      e2e/checkout.e2e.ts  src/app/catalog/tests/new-arrivals.test.ts  src/app/orders/tests/place-order.test.ts

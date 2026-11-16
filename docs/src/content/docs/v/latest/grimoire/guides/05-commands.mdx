@@ -1,0 +1,331 @@
+---
+title: Commands
+description: warlock grimoire build, check and release, warlock scry for files, impact, routes, features, flows and search, the Grimoire MCP tools, and warlock explain for GR codes.
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+<Aside type="caution" title="Experimental">
+  Grimoire is experimental in 5.55. The structure of the written files and the commands may still
+  change before they are declared stable.
+</Aside>
+
+Grimoire adds two commands to the Warlock CLI, `warlock grimoire` and `warlock scry`, and the same questions as MCP
+tools for coding agents.
+
+## Register the commands
+
+Add one line to `warlock.config.ts`:
+
+```ts title="warlock.config.ts"
+import { defineConfig } from "@warlock.js/core";
+import { registerGrimoireCommands } from "@warlock.js/grimoire/warlock";
+
+export default defineConfig({
+  cli: {
+    commands: [registerGrimoireCommands()],
+  },
+});
+```
+
+`registerGrimoireCommands()` returns two commands (`grimoire` and `scry`). An entry of `cli.commands` may be an
+array, so the call sits next to your other commands as one entry. The same line brings the MCP tools and lets
+`warlock explain` describe `GR` codes.
+
+The module is light: it loads the book builder, the check and `@warlock.js/core/tooling` only when a command or tool
+runs, so `warlock.config.ts` stays fast to load.
+
+### Options
+
+`registerGrimoireCommands(options)` and `createWarlockAdapter(options)` take:
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `mobile` | every top-level folder with `app.json` or `app.config.*` | Mobile apps in the repository: `{ root, id?, routing? }`. An app is file-routed when its `package.json` lists `expo-router` (screens come from its files), and code-navigated otherwise (you declare its screens in `grimoire/apps/<app>/screens/`). |
+| `inspect` | the `warlock inspect` boot pass | How the facts that need the app booted (routes, events, jobs) are read. |
+
+## When the app boots
+
+Every command first makes sure the book exists and is fresh. Only changed files are read again; an unchanged
+project reads nothing and writes nothing.
+
+Route facts (routes, events and jobs) need the app booted, the way `warlock inspect` boots it: connectors boot, none
+starts, no database connection opens and no port is bound. They are cached in the book and read again only when a
+routes file, a file it imports, a config file, a mail, job, event or notification file, `warlock.config.ts` or
+`package.json` changed.
+
+- `warlock grimoire build` and `warlock grimoire check` boot the app only when the route facts are stale or missing.
+  When the app does not boot, they go on with the cached route facts and print a `GR8002` warning.
+- `warlock scry` and the MCP tools never boot the app. They use the cached route facts and add a note when they are
+  stale. The first `warlock scry --route` of a project with no route facts reads them once.
+- An app with several sites (`src/web/$sites/<site>`) loads only `src/config/web.ts` for file questions, because the
+  sites' base paths shape the page routes.
+
+## `warlock grimoire build`
+
+```bash
+npx warlock grimoire build            # bring the book up to date
+npx warlock grimoire build --force    # rebuild every entry and read the routes again
+npx warlock grimoire build --site     # also write the static site to grimoire/book/site
+npx warlock grimoire build --site --out public/grimoire
+npx warlock grimoire build --json
+```
+
+```
+book      35 files (46 written, 0 removed), routes fresh
+features  3 (bookmaps written: 9)   tasks  2 open, 1 waiting, 1 done
+```
+
+A run with nothing to do prints `book      up to date`. `--site` writes the same view as the devtools tab as one
+static `index.html` (see [Devtools](/v/latest/grimoire/guides/09-devtools/)); `--out` takes a project-relative
+folder. `--json` prints `{ rebuilt, changed, written, removed, routes, site, problems }`.
+
+## `warlock grimoire check`
+
+```bash
+npx warlock grimoire check
+npx warlock grimoire check --json
+```
+
+```
+grimoire/features/catalog/flows/browse-products.md:26  GR4001  warning  catalog/browse-products AC-1 has no test
+…
+grimoire/features/catalog/flows/wishlist.md:12  GR2001  error  route step "POST /api/wishlist" matches no route  (expected)
+0 errors, 8 warnings, 8 expected  (routes: fresh)
+```
+
+The command exits 1 only when the report holds an error that is not expected. Findings on proposed features and
+flows are expected and never fail it. [The check](/v/latest/grimoire/guides/04-check/) lists every code.
+
+## `warlock grimoire release <release>`
+
+```bash
+npx warlock grimoire release 1.1.0
+```
+
+```
+grimoire/releases/1.1.0.md: 1 entry collected (catalog 2.1 fixed)
+note: 1 entry is still unreleased: orders 3.0. To ship them in 1.1.0, move them under "## 1.1.0 (2026-11-20)" in each feature's CHANGELOG.md and run this command again.
+```
+
+It writes the list of the changelog entries stamped with that release between the markers of
+`grimoire/releases/<release>.md`, and changes nothing else. Write the release file (front matter `release` and
+`date`, and the brief) first: without it the command stops with `GR9005`. Broken markers stop it with `GR1024`. See
+[Tasks and releases](/v/latest/grimoire/guides/06-tasks-and-releases/).
+
+## `warlock scry`
+
+One question at a time. Text by default, `--json` for the result object. Paths may use either separator and may be
+absolute.
+
+### A file
+
+```bash
+npx warlock scry src/app/catalog/services/new-arrivals.service.ts
+```
+
+```
+src/app/catalog/services/new-arrivals.service.ts  service  10 lines
+about     Lists the newest products sold in the customer's country.
+feature   catalog
+flows     catalog/new-arrivals
+exports   listNewArrivals  Returns up to 20 products, newest first.
+imports   src/app/catalog/repositories/products.repository.ts
+used by   src/app/catalog/controllers/new-arrivals.controller.ts
+          src/app/catalog/tests/new-arrivals.test.ts
+          src/web/$sites/client/home.setup.ts
+entry     grimoire/book/app/catalog/services/new-arrivals.service.json
+```
+
+`feature` shows `(borrowed by: orders)` when other features import the file. `routes`, `pages` and `screens` lines
+appear when the file registers or handles a route, or is a page, setup, layout or screen file.
+
+### What a change reaches: `--impact`
+
+```bash
+npx warlock scry --impact src/app/catalog/models/product.model.ts
+```
+
+```
+impact of src/app/catalog/models/product.model.ts
+importers  1 direct, 14 in all
+routes     GET /api/products  GET /api/products/new-arrivals  GET /api/products/:id  POST /api/orders
+pages      web-client /  web-client /products/:id
+flows      catalog/browse-products  catalog/new-arrivals  catalog/wishlist  orders/place-order
+features   catalog (owner)  orders (borrower)
+tests      e2e/checkout.e2e.ts  src/app/catalog/tests/new-arrivals.test.ts  src/app/orders/tests/place-order.test.ts
+```
+
+`routes` lists API routes whose handler file (or routes file, when the handler file is unknown) reaches the file
+through imports; pages and screens are listed under `pages`. `features` lists the owner of the file and every
+feature whose files import it (borrowers). `tests` lists the test files among the importers and the tests that prove
+the flows above.
+
+### A route: `--route`
+
+```bash
+npx warlock scry --route "POST /api/orders"
+```
+
+```
+POST /api/orders  orders.place
+handler     PlaceOrderController.store  src/app/orders/controllers/place-order.controller.ts
+registered  src/app/orders/routes.ts
+middleware  authMiddleware
+auth        required (customer)
+files       src/app/catalog/models/product.model.ts
+            src/app/catalog/repositories/products.repository.ts
+            src/app/orders/controllers/place-order.controller.ts
+            src/app/orders/events/order-placed.event.ts
+            src/app/orders/jobs/send-receipt.job.ts
+            src/app/orders/mails/order-confirmation.mail.ts
+            src/app/orders/services/place-order.service.ts
+steps       orders/place-order step 2
+```
+
+`files` is the handler file and everything it imports. Route params match written either way (`:id` or `[id]`), and
+a trailing `/` is ignored.
+
+### A feature: `--feature`
+
+```bash
+npx warlock scry --feature catalog
+```
+
+```
+catalog  Product catalog  shipped 2.1  updated 2026-11-10  apps web-client, mobile
+flows     browse-products  shipped  since 1.0
+          new-arrivals     shipped  since 2.0
+          wishlist         proposed since 3.0
+own       8 files  (unreached: none)
+borrows   src/app/shared/utils/money.ts
+routes    GET /api/products  GET /api/products/new-arrivals  GET /api/products/:id
+pages     web-client /products/:id
+changes   2.1 fixed new-arrivals: a customer with no country saw an empty list … (unreleased)
+          2.0 added new-arrivals: customers see the newest products sold in … (1.0.0, 2026-10-01)
+          1.0 added browse-products: customers list products and open one (1.0.0, 2026-10-01)
+tasks     T-014 waiting for approval  Let customers save products to a wishlist
+check     0 errors, 4 warnings, 8 expected
+```
+
+### A flow: `--flow`
+
+```bash
+npx warlock scry --flow catalog/new-arrivals
+```
+
+```
+catalog/new-arrivals  New arrivals  shipped since 2.0  who everyone
+1. page   /                              src/web/$sites/client/home.page.tsx (+5 files)
+2. route  GET /api/products/new-arrivals src/app/catalog/controllers/new-arrivals.controller.ts (+4 files)
+differs   mobile: uses the device's country when the customer has none
+AC-1          not run   the newest products come first       src/app/catalog/tests/new-arrivals.test.ts:12
+AC-2          not run   a customer with no country sees …    src/app/catalog/tests/new-arrivals.test.ts:17
+AC-3 [mobile] no test   the device's country is used when …
+shown on  mobile home: New arrivals   web-client home: New arrivals
+history   2.1 fixed (unreleased)   2.0 added (1.0.0, 2026-10-01)
+check     0 errors, 1 warning, 0 expected
+```
+
+Each step shows the file it starts from and how many more files are behind it. A page step takes every page and
+screen of the feature's apps that matches the route, so the count includes the mobile screen here. A step that names
+nothing shows `not found`. Each criterion shows its status from the last test run: `pass`, `fail`, `stale` (the test
+changed since it ran), `not run` or `no test` (see [Test results](/v/latest/grimoire/guides/08-test-results/)).
+
+### Search: `--search`
+
+```bash
+npx warlock scry --search "new arrivals"
+npx warlock scry --search "order" --limit 5
+```
+
+```
+flow     catalog/new-arrivals              New arrivals
+block    mobile/home/new-arrivals          catalog/new-arrivals
+block    web-client/home/new-arrivals      catalog/new-arrivals
+route    GET /api/products/new-arrivals    catalog.new-arrivals
+file     src/app/catalog/services/new-arrivals.service.ts  Lists the newest products sold in the customer's country.
+…
+```
+
+Search looks at features, flows, blocks, pages, screens, API routes, file paths, export names, header sentences and
+tasks. Case does not matter, and every word must appear, in any order. An exact id comes first, then an id that
+starts with the text, then ids that hold every word, then the rest. `--limit` defaults to 20.
+
+### Errors
+
+Every error prints its code, what failed and what to do, and the command exits 1:
+
+```
+GR9003  No feature has the id "billing". Features: auth, catalog, orders.
+  fix: Use an id from `grimoire/features/`.
+```
+
+| Code | When |
+| --- | --- |
+| `GR9001` | The file is not in the book (not a code file under the source roots, or new since the last build). |
+| `GR9002` | No route matches, or there are no route facts yet. |
+| `GR9003` | No feature has that id. |
+| `GR9004` | No flow has that id. |
+| `GR9006` | The question is missing, asks two things at once, or has the wrong form. |
+
+## MCP tools
+
+`warlock mcp` and `warlock dev --mcp` serve these tools next to the built-in ones. They answer with the same objects
+`--json` prints. The read tools never boot the app; they use the cached route facts.
+
+| Tool | Input | Answer | Writes |
+| --- | --- | --- | --- |
+| `grimoire_file` | `{ file }` | the file answer | no |
+| `grimoire_impact` | `{ file }` | the impact answer | no |
+| `grimoire_route` | `{ method, path }` | the route answer | no |
+| `grimoire_feature` | `{ feature }` | the feature answer | no |
+| `grimoire_flow` | `{ flow }` (`<feature>/<flow>`) | the flow answer | no |
+| `grimoire_search` | `{ text, limit? }` | the search answer | no |
+| `grimoire_check` | `{}` | the check report | no |
+| `grimoire_build` | `{ force? }` | `{ rebuilt, written, removed, routes }` | no |
+| `grimoire_release` | `{ release }` | the release file, its list and whether it changed | yes |
+| `grimoire_explain` | `{ code }` | the code's title, fix, skill and docs link | no |
+
+The read tools and `grimoire_build` may refresh the book, which is a git-ignored cache, so they do not count as
+writes. `grimoire_build` reads the routes again when they changed (under `warlock mcp` this boots the app once, the
+`warlock inspect` way). `grimoire_release` writes a project file, so the server refuses it unless it runs with
+`--allow-writes`.
+
+## `warlock explain GR2001`
+
+```bash
+npx warlock explain GR2001
+npx warlock explain GR2001 --json
+```
+
+```
+GR2001  A route step names a route that does not exist
+
+  Area:     links
+  Fix:      Fix the method and path in the flow, or add the route in code.
+  Skill:    record-a-change
+  Docs:     https://warlock.js.org/v/latest/grimoire/guides/04-check/#gr2001
+```
+
+`warlock explain` reads only `warlock.config.ts` for a `GR` code and never boots the app. The answer comes from the
+Grimoire commands registered in `cli.commands`.
+
+## From code
+
+```ts
+import { createWarlockAdapter, collectMobileFacts } from "@warlock.js/grimoire/warlock";
+import { openGrimoire, scry, formatScryResult } from "@warlock.js/grimoire";
+
+const root = process.cwd();
+const snapshot = await openGrimoire(root, createWarlockAdapter(), { routes: "cached" });
+
+console.log(formatScryResult(scry(snapshot, { type: "flow", feature: "catalog", flow: "new-arrivals" })).join("\n"));
+console.log(await collectMobileFacts(root));
+```
+
+`createWarlockAdapter(options)` turns the inspect report into the book's facts: files from `collectFiles()` of
+`@warlock.js/core/tooling` (over `src` and each mobile app's folder), routes, events and jobs from `inspectApp()`
+after the boot pass, pages from the web page graph, and mobile apps from their folders (`collectMobileFacts()`).
+`reachedFrom` of a page is `null` (unknown) for now. Mails are files named `*.mail.ts`, notifications files named
+`*.notification.ts`; jobs come from the queue's registry when it knows any, else from `*.job.ts` file names.

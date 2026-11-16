@@ -240,6 +240,8 @@ export default defineConfig({
 });
 ```
 
+An entry of `cli.commands` may also be an array of commands, for a register function that returns several. Arrays are flattened.
+
 Two reasons to prefer factories for package commands:
 
 1. **The package can't know if you want the command.** Some projects don't need `auth.cleanup`. The factory pattern means "import nothing until you opt in."

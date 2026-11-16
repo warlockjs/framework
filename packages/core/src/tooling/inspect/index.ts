@@ -4,7 +4,7 @@ export {
   wiringFilesFromBoot,
   type InspectBootResult,
 } from "./boot-for-inspect";
-export { collectFiles, fileRole } from "./collect-files";
+export { collectFiles, fileRole, type CollectFilesOptions } from "./collect-files";
 export { collectWiring, wiringFilesFromScan, type WiringSourceFile } from "./collect-wiring";
 export { EventRecorder, groupListeners, type RecordedListener } from "./event-recorder";
 export {

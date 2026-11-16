@@ -1,0 +1,10 @@
+catalog/new-arrivals  New arrivals  shipped since 2.0  who everyone
+1. page   /                              src/web/$sites/client/home.page.tsx (+5 files)
+2. route  GET /api/products/new-arrivals src/app/catalog/controllers/new-arrivals.controller.ts (+4 files)
+differs   mobile: uses the device's country when the customer has none
+AC-1          not run   the newest products come first       src/app/catalog/tests/new-arrivals.test.ts:12
+AC-2          not run   a customer with no country sees …    src/app/catalog/tests/new-arrivals.test.ts:17
+AC-3 [mobile] no test   the device's country is used when …
+shown on  mobile home: New arrivals   web-client home: New arrivals
+history   2.1 fixed (unreleased)   2.0 added (1.0.0, 2026-10-01)
+check     0 errors, 1 warning, 0 expected

@@ -210,7 +210,10 @@ export function collectIssueConfig(cwd: string): IssueConfigSummary {
       commands?.type === "ArrayExpression" &&
       !commands.elements.some((item) => item?.type === "SpreadElement")
     ) {
-      summary.customCommands = commands.elements.length;
+      summary.customCommands = commands.elements.reduce(
+        (total, item) => total + (item?.type === "ArrayExpression" ? item.elements.length : 1),
+        0,
+      );
     }
     return summary;
   } catch {

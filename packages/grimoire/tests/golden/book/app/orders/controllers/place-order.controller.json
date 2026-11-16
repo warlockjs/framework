@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "file": "src/app/orders/controllers/place-order.controller.ts",
+  "module": "src/app/orders",
+  "type": "controller",
+  "lines": 8,
+  "about": "Answers a customer's request to place an order.",
+  "feature": "orders",
+  "borrowedBy": [],
+  "flows": [
+    "orders/place-order"
+  ],
+  "exports": [
+    {
+      "name": "PlaceOrderController",
+      "about": "Places the order in the request body."
+    }
+  ],
+  "packages": [],
+  "imports": [
+    "src/app/orders/services/place-order.service.ts"
+  ],
+  "importedBy": [
+    "src/app/orders/routes.ts"
+  ],
+  "routes": [
+    {
+      "method": "POST",
+      "path": "/api/orders",
+      "name": "orders.place",
+      "via": "handles"
+    }
+  ],
+  "pages": [],
+  "screens": []
+}

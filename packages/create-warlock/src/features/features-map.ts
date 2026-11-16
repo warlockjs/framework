@@ -228,6 +228,12 @@ export const features: FeatureOption[] = [
     hint: "App-owned CLI workers and terminals with crash recovery and graceful shutdown",
     group: "Tooling",
   },
+  {
+    key: "grimoire",
+    label: "Grimoire (experimental)",
+    hint: "Project map for AI agents: a book of the code, features, flows, tasks and a check. Already part of every new app; selecting it again changes nothing",
+    group: "Tooling",
+  },
 ];
 
 export type AiProviderOption = {

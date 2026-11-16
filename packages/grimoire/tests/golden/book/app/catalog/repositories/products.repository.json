@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "file": "src/app/catalog/repositories/products.repository.ts",
+  "module": "src/app/catalog",
+  "type": "repository",
+  "lines": 11,
+  "about": "Reads and updates products.",
+  "feature": "catalog",
+  "borrowedBy": [
+    "orders"
+  ],
+  "flows": [
+    "catalog/browse-products",
+    "catalog/new-arrivals"
+  ],
+  "exports": [
+    {
+      "name": "productsRepository",
+      "about": "Finds products and lowers their stock."
+    }
+  ],
+  "packages": [
+    "@warlock.js/cascade"
+  ],
+  "imports": [
+    "src/app/catalog/models/product.model.ts"
+  ],
+  "importedBy": [
+    "src/app/catalog/controllers/products.controller.ts",
+    "src/app/catalog/services/new-arrivals.service.ts",
+    "src/app/orders/services/place-order.service.ts",
+    "src/web/$sites/client/products/show.setup.ts"
+  ],
+  "routes": [],
+  "pages": [],
+  "screens": []
+}

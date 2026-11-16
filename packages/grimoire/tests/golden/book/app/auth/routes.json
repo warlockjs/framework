@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "file": "src/app/auth/routes.ts",
+  "module": "src/app/auth",
+  "type": "routes",
+  "lines": 7,
+  "about": "Registers the sign-up and login routes.",
+  "feature": "auth",
+  "borrowedBy": [],
+  "flows": [],
+  "exports": [],
+  "packages": [
+    "@warlock.js/core"
+  ],
+  "imports": [
+    "src/app/auth/controllers/login.controller.ts",
+    "src/app/auth/controllers/register.controller.ts"
+  ],
+  "importedBy": [],
+  "routes": [
+    {
+      "method": "POST",
+      "path": "/api/register",
+      "name": "auth.register",
+      "via": "registers"
+    },
+    {
+      "method": "POST",
+      "path": "/api/login",
+      "name": "auth.login",
+      "via": "registers"
+    }
+  ],
+  "pages": [],
+  "screens": []
+}

@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "file": "src/app/orders/tests/place-order.test.ts",
+  "module": "src/app/orders",
+  "type": "spec",
+  "lines": 20,
+  "about": "Proves the place-order rules.",
+  "feature": "orders",
+  "borrowedBy": [],
+  "flows": [],
+  "exports": [],
+  "packages": [
+    "vitest"
+  ],
+  "imports": [
+    "src/app/orders/services/place-order.service.ts"
+  ],
+  "importedBy": [],
+  "routes": [],
+  "pages": [],
+  "screens": []
+}

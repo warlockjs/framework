@@ -3,6 +3,8 @@ import { inspectApp } from "../../../tooling/inspect/inspect-app";
 import { explainFile, formatFileExplanation } from "../../../tooling/inspect/explain-file";
 import { withConsoleOnStderr } from "../routes/with-console-on-stderr";
 import { colors } from "@mongez/copper";
+import { explainRegisteredCode, type ExplainableCode } from "../../../commands/explain-codes";
+import { warlockConfigManager } from "../../../warlock-config/warlock-config.manager";
 import type { CommandActionData } from "../../../commands/types";
 import {
   ERROR_CODES,
@@ -41,6 +43,53 @@ export function formatExplanation(definition: ErrorCodeDefinition): string[] {
   ];
 }
 
+/**
+ * The lines `warlock explain <code>` prints for a code a package explains,
+ * uncolored, so they are testable.
+ *
+ * @param code The package's answer.
+ */
+export function formatRegisteredExplanation(code: ExplainableCode): string[] {
+  return [
+    `${code.code}  ${code.title}`,
+    "",
+    `  Area:     ${code.area}`,
+    `  Fix:      ${code.fix}`,
+    `  Skill:    ${code.skill}`,
+    `  Docs:     ${code.docs}`,
+  ];
+}
+
+/** Ask the explainers of the commands in `cli.commands`; never boots the app. */
+async function explainPackageCode(requested: string, json: boolean): Promise<void> {
+  let answer: ExplainableCode | undefined;
+
+  try {
+    if (!warlockConfigManager.isLoaded) await warlockConfigManager.load();
+
+    answer = explainRegisteredCode(warlockConfigManager.get("cli")?.commands, requested);
+  } catch {
+    answer = undefined;
+  }
+
+  if (!answer) {
+    throw new Error(
+      `Unknown error code ${JSON.stringify(requested)}. No installed package explains it: register the package's commands in cli.commands of warlock.config.ts, or run \`warlock explain\` to list the Warlock codes.`,
+    );
+  }
+
+  if (json) {
+    console.log(JSON.stringify(answer, null, 2));
+    return;
+  }
+
+  const [heading, ...rest] = formatRegisteredExplanation(answer);
+
+  console.log(colors.bold(heading ?? answer.code));
+
+  for (const line of rest) console.log(line);
+}
+
 /** One line per registered code, for `warlock explain` without an argument. */
 export function formatCodeList(): string[] {
   return Object.values(ERROR_CODES).map(
@@ -70,6 +119,11 @@ export async function explainCommandAction({ args, options }: CommandActionData)
       console.log(line);
     }
 
+    return;
+  }
+
+  if (!/^WL\d+$/i.test(requested.trim()) && /^[A-Z]{2}\d{4}$/i.test(requested.trim())) {
+    await explainPackageCode(requested.trim(), Boolean(options.json));
     return;
   }
 

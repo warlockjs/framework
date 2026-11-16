@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "file": "mobile/app/products/[id].tsx",
+  "module": "mobile/app",
+  "type": "component",
+  "lines": 5,
+  "about": "Shows one product with a save button.",
+  "feature": null,
+  "borrowedBy": [],
+  "flows": [],
+  "exports": [
+    {
+      "name": "default",
+      "about": null
+    }
+  ],
+  "packages": [],
+  "imports": [],
+  "importedBy": [],
+  "routes": [],
+  "pages": [],
+  "screens": [
+    {
+      "app": "mobile",
+      "route": "/products/[id]",
+      "via": "screen"
+    }
+  ]
+}

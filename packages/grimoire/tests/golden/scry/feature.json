@@ -1,0 +1,526 @@
+{
+  "type": "feature",
+  "routes": "fresh",
+  "notes": [],
+  "readme": {
+    "file": "grimoire/features/catalog/README.md",
+    "id": {
+      "value": "catalog",
+      "at": {
+        "file": "grimoire/features/catalog/README.md",
+        "line": 2,
+        "column": null
+      }
+    },
+    "title": {
+      "value": "Product catalog",
+      "at": {
+        "file": "grimoire/features/catalog/README.md",
+        "line": 3,
+        "column": null
+      }
+    },
+    "status": {
+      "value": "shipped",
+      "at": {
+        "file": "grimoire/features/catalog/README.md",
+        "line": 4,
+        "column": null
+      }
+    },
+    "version": {
+      "value": "2.1",
+      "at": {
+        "file": "grimoire/features/catalog/README.md",
+        "line": 5,
+        "column": null
+      }
+    },
+    "updated": {
+      "value": "2026-11-10",
+      "at": {
+        "file": "grimoire/features/catalog/README.md",
+        "line": 6,
+        "column": null
+      }
+    },
+    "apps": [
+      {
+        "value": "web-client",
+        "at": {
+          "file": "grimoire/features/catalog/README.md",
+          "line": 7,
+          "column": null
+        }
+      },
+      {
+        "value": "mobile",
+        "at": {
+          "file": "grimoire/features/catalog/README.md",
+          "line": 7,
+          "column": null
+        }
+      }
+    ],
+    "folders": [
+      {
+        "value": "src/app/catalog",
+        "at": {
+          "file": "grimoire/features/catalog/README.md",
+          "line": 8,
+          "column": null
+        }
+      },
+      {
+        "value": "src/web/$sites/client/products",
+        "at": {
+          "file": "grimoire/features/catalog/README.md",
+          "line": 8,
+          "column": null
+        }
+      }
+    ],
+    "origin": null,
+    "heading": {
+      "value": "Product catalog",
+      "at": {
+        "file": "grimoire/features/catalog/README.md",
+        "line": 11,
+        "column": null
+      }
+    },
+    "summary": "Customers browse products, see what is new in their country, and will save products for later.",
+    "flows": [
+      {
+        "name": "browse-products",
+        "text": "list products and open one",
+        "at": {
+          "file": "grimoire/features/catalog/README.md",
+          "line": 16,
+          "column": null
+        }
+      },
+      {
+        "name": "new-arrivals",
+        "text": "the newest products sold in the customer's country",
+        "at": {
+          "file": "grimoire/features/catalog/README.md",
+          "line": 17,
+          "column": null
+        }
+      },
+      {
+        "name": "wishlist",
+        "text": "save a product for later",
+        "at": {
+          "file": "grimoire/features/catalog/README.md",
+          "line": 18,
+          "column": null
+        }
+      }
+    ],
+    "relations": [
+      {
+        "text": "affected by orders/place-order (lowers stock)",
+        "refs": [
+          "orders/place-order"
+        ],
+        "at": {
+          "file": "grimoire/features/catalog/README.md",
+          "line": 21,
+          "column": null
+        }
+      }
+    ]
+  },
+  "flows": [
+    {
+      "id": "browse-products",
+      "status": "shipped",
+      "since": "1.0",
+      "heading": "Browse products"
+    },
+    {
+      "id": "new-arrivals",
+      "status": "shipped",
+      "since": "2.0",
+      "heading": "New arrivals"
+    },
+    {
+      "id": "wishlist",
+      "status": "proposed",
+      "since": "3.0",
+      "heading": "Save a product to the wishlist"
+    }
+  ],
+  "bookmap": {
+    "schemaVersion": 1,
+    "feature": "catalog",
+    "own": [
+      "src/app/catalog/controllers/new-arrivals.controller.ts",
+      "src/app/catalog/controllers/products.controller.ts",
+      "src/app/catalog/models/product.model.ts",
+      "src/app/catalog/repositories/products.repository.ts",
+      "src/app/catalog/routes.ts",
+      "src/app/catalog/services/new-arrivals.service.ts",
+      "src/web/$sites/client/products/show.page.tsx",
+      "src/web/$sites/client/products/show.setup.ts"
+    ],
+    "borrowed": [
+      {
+        "file": "src/app/shared/utils/money.ts",
+        "owner": null,
+        "by": [
+          "src/app/catalog/controllers/products.controller.ts"
+        ]
+      }
+    ],
+    "routes": [
+      {
+        "method": "GET",
+        "path": "/api/products",
+        "name": "catalog.products.index",
+        "file": "src/app/catalog/controllers/products.controller.ts"
+      },
+      {
+        "method": "GET",
+        "path": "/api/products/new-arrivals",
+        "name": "catalog.new-arrivals",
+        "file": "src/app/catalog/controllers/new-arrivals.controller.ts"
+      },
+      {
+        "method": "GET",
+        "path": "/api/products/:id",
+        "name": "catalog.products.show",
+        "file": "src/app/catalog/controllers/products.controller.ts"
+      }
+    ],
+    "pages": {
+      "web-client": [
+        {
+          "route": "/products/:id",
+          "file": "src/web/$sites/client/products/show.page.tsx",
+          "type": "page"
+        }
+      ]
+    },
+    "unreached": []
+  },
+  "changes": [
+    {
+      "feature": "catalog",
+      "version": {
+        "value": "2.1",
+        "at": {
+          "file": "grimoire/features/catalog/CHANGELOG.md",
+          "line": 2,
+          "column": null
+        }
+      },
+      "word": "fixed",
+      "flow": "new-arrivals",
+      "criteria": [
+        "AC-2"
+      ],
+      "text": "a customer with no country saw an empty list instead of the global one",
+      "release": null,
+      "date": null,
+      "at": {
+        "file": "grimoire/features/catalog/CHANGELOG.md",
+        "line": 2,
+        "column": null
+      }
+    },
+    {
+      "feature": "catalog",
+      "version": {
+        "value": "2.0",
+        "at": {
+          "file": "grimoire/features/catalog/CHANGELOG.md",
+          "line": 6,
+          "column": null
+        }
+      },
+      "word": "added",
+      "flow": "new-arrivals",
+      "criteria": [],
+      "text": "customers see the newest products sold in their country",
+      "release": "1.0.0",
+      "date": "2026-10-01",
+      "at": {
+        "file": "grimoire/features/catalog/CHANGELOG.md",
+        "line": 6,
+        "column": null
+      }
+    },
+    {
+      "feature": "catalog",
+      "version": {
+        "value": "1.0",
+        "at": {
+          "file": "grimoire/features/catalog/CHANGELOG.md",
+          "line": 7,
+          "column": null
+        }
+      },
+      "word": "added",
+      "flow": "browse-products",
+      "criteria": [],
+      "text": "customers list products and open one",
+      "release": "1.0.0",
+      "date": "2026-10-01",
+      "at": {
+        "file": "grimoire/features/catalog/CHANGELOG.md",
+        "line": 7,
+        "column": null
+      }
+    }
+  ],
+  "tasks": [
+    {
+      "id": "T-014",
+      "title": "Let customers save products to a wishlist",
+      "type": "feature",
+      "status": "waiting for approval",
+      "feature": "catalog",
+      "flow": "wishlist",
+      "apps": [
+        "web-client",
+        "mobile"
+      ],
+      "file": "grimoire/tasks/open/T-014-wishlist.md",
+      "shipped": null,
+      "decisionNeeded": "one wishlist per customer, or several named lists?"
+    }
+  ],
+  "findings": [
+    {
+      "code": "GR4001",
+      "severity": "warning",
+      "message": "catalog/browse-products AC-1 has no test",
+      "at": {
+        "file": "grimoire/features/catalog/flows/browse-products.md",
+        "line": 26,
+        "column": null
+      },
+      "expected": false,
+      "subject": {
+        "feature": "catalog",
+        "flow": "catalog/browse-products",
+        "app": null,
+        "task": null,
+        "file": "grimoire/features/catalog/flows/browse-products.md"
+      },
+      "hint": "Write a test with `// @proves <feature>/<flow> AC-<n>` above it, or say in the task why not."
+    },
+    {
+      "code": "GR4001",
+      "severity": "warning",
+      "message": "catalog/browse-products AC-2 has no test",
+      "at": {
+        "file": "grimoire/features/catalog/flows/browse-products.md",
+        "line": 27,
+        "column": null
+      },
+      "expected": false,
+      "subject": {
+        "feature": "catalog",
+        "flow": "catalog/browse-products",
+        "app": null,
+        "task": null,
+        "file": "grimoire/features/catalog/flows/browse-products.md"
+      },
+      "hint": "Write a test with `// @proves <feature>/<flow> AC-<n>` above it, or say in the task why not."
+    },
+    {
+      "code": "GR4001",
+      "severity": "warning",
+      "message": "catalog/browse-products AC-3 has no test",
+      "at": {
+        "file": "grimoire/features/catalog/flows/browse-products.md",
+        "line": 28,
+        "column": null
+      },
+      "expected": false,
+      "subject": {
+        "feature": "catalog",
+        "flow": "catalog/browse-products",
+        "app": null,
+        "task": null,
+        "file": "grimoire/features/catalog/flows/browse-products.md"
+      },
+      "hint": "Write a test with `// @proves <feature>/<flow> AC-<n>` above it, or say in the task why not."
+    },
+    {
+      "code": "GR4001",
+      "severity": "warning",
+      "message": "catalog/new-arrivals AC-3 has no test",
+      "at": {
+        "file": "grimoire/features/catalog/flows/new-arrivals.md",
+        "line": 30,
+        "column": null
+      },
+      "expected": false,
+      "subject": {
+        "feature": "catalog",
+        "flow": "catalog/new-arrivals",
+        "app": null,
+        "task": null,
+        "file": "grimoire/features/catalog/flows/new-arrivals.md"
+      },
+      "hint": "Write a test with `// @proves <feature>/<flow> AC-<n>` above it, or say in the task why not."
+    },
+    {
+      "code": "GR6007",
+      "severity": "error",
+      "message": "catalog/wishlist is since 3.0, newer than catalog 2.1",
+      "at": {
+        "file": "grimoire/features/catalog/flows/wishlist.md",
+        "line": 3,
+        "column": null
+      },
+      "expected": true,
+      "subject": {
+        "feature": "catalog",
+        "flow": "catalog/wishlist",
+        "app": null,
+        "task": null,
+        "file": "grimoire/features/catalog/flows/wishlist.md"
+      },
+      "hint": "Fix `since`, or the feature `version`."
+    },
+    {
+      "code": "GR2001",
+      "severity": "error",
+      "message": "route step \"POST /api/wishlist\" matches no route",
+      "at": {
+        "file": "grimoire/features/catalog/flows/wishlist.md",
+        "line": 12,
+        "column": null
+      },
+      "expected": true,
+      "subject": {
+        "feature": "catalog",
+        "flow": "catalog/wishlist",
+        "app": null,
+        "task": null,
+        "file": "grimoire/features/catalog/flows/wishlist.md"
+      },
+      "hint": "Fix the method and path in the flow, or add the route in code."
+    },
+    {
+      "code": "GR2004",
+      "severity": "error",
+      "message": "notification step \"wishlist-price-drop\" matches no notification",
+      "at": {
+        "file": "grimoire/features/catalog/flows/wishlist.md",
+        "line": 13,
+        "column": null
+      },
+      "expected": true,
+      "subject": {
+        "feature": "catalog",
+        "flow": "catalog/wishlist",
+        "app": null,
+        "task": null,
+        "file": "grimoire/features/catalog/flows/wishlist.md"
+      },
+      "hint": "Use the notification's name as code defines it, or add it."
+    },
+    {
+      "code": "GR2002",
+      "severity": "error",
+      "message": "page step \"/wishlist\" matches no page or screen of the feature's apps",
+      "at": {
+        "file": "grimoire/features/catalog/flows/wishlist.md",
+        "line": 14,
+        "column": null
+      },
+      "expected": true,
+      "subject": {
+        "feature": "catalog",
+        "flow": "catalog/wishlist",
+        "app": null,
+        "task": null,
+        "file": "grimoire/features/catalog/flows/wishlist.md"
+      },
+      "hint": "Fix the route path in the flow, or add the page to one of the feature's apps."
+    },
+    {
+      "code": "GR4001",
+      "severity": "warning",
+      "message": "catalog/wishlist AC-1 has no test",
+      "at": {
+        "file": "grimoire/features/catalog/flows/wishlist.md",
+        "line": 30,
+        "column": null
+      },
+      "expected": true,
+      "subject": {
+        "feature": "catalog",
+        "flow": "catalog/wishlist",
+        "app": null,
+        "task": null,
+        "file": "grimoire/features/catalog/flows/wishlist.md"
+      },
+      "hint": "Write a test with `// @proves <feature>/<flow> AC-<n>` above it, or say in the task why not."
+    },
+    {
+      "code": "GR4001",
+      "severity": "warning",
+      "message": "catalog/wishlist AC-2 has no test",
+      "at": {
+        "file": "grimoire/features/catalog/flows/wishlist.md",
+        "line": 31,
+        "column": null
+      },
+      "expected": true,
+      "subject": {
+        "feature": "catalog",
+        "flow": "catalog/wishlist",
+        "app": null,
+        "task": null,
+        "file": "grimoire/features/catalog/flows/wishlist.md"
+      },
+      "hint": "Write a test with `// @proves <feature>/<flow> AC-<n>` above it, or say in the task why not."
+    },
+    {
+      "code": "GR4001",
+      "severity": "warning",
+      "message": "catalog/wishlist AC-3 has no test",
+      "at": {
+        "file": "grimoire/features/catalog/flows/wishlist.md",
+        "line": 32,
+        "column": null
+      },
+      "expected": true,
+      "subject": {
+        "feature": "catalog",
+        "flow": "catalog/wishlist",
+        "app": null,
+        "task": null,
+        "file": "grimoire/features/catalog/flows/wishlist.md"
+      },
+      "hint": "Write a test with `// @proves <feature>/<flow> AC-<n>` above it, or say in the task why not."
+    },
+    {
+      "code": "GR4001",
+      "severity": "warning",
+      "message": "catalog/wishlist AC-4 has no test",
+      "at": {
+        "file": "grimoire/features/catalog/flows/wishlist.md",
+        "line": 33,
+        "column": null
+      },
+      "expected": true,
+      "subject": {
+        "feature": "catalog",
+        "flow": "catalog/wishlist",
+        "app": null,
+        "task": null,
+        "file": "grimoire/features/catalog/flows/wishlist.md"
+      },
+      "hint": "Write a test with `// @proves <feature>/<flow> AC-<n>` above it, or say in the task why not."
+    }
+  ]
+}

@@ -38,6 +38,7 @@
     "@warlock.js/scheduler": "0.0.0-set-by-scaffolder",
     "@warlock.js/core": "0.0.0-set-by-scaffolder",
     "@warlock.js/fs": "0.0.0-set-by-scaffolder",
+    "@warlock.js/grimoire": "0.0.0-set-by-scaffolder",
     "@warlock.js/logger": "0.0.0-set-by-scaffolder",
     "@warlock.js/seal": "0.0.0-set-by-scaffolder",
     "dayjs": "^1.11.19"

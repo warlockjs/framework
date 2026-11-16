@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "file": "src/app/orders/events/order-placed.event.ts",
+  "module": "src/app/orders",
+  "type": "event",
+  "lines": 6,
+  "about": "Announces that an order was placed.",
+  "feature": "orders",
+  "borrowedBy": [],
+  "flows": [],
+  "exports": [
+    {
+      "name": "orderPlaced",
+      "about": "Emits order.placed with the order id."
+    }
+  ],
+  "packages": [],
+  "imports": [],
+  "importedBy": [
+    "src/app/orders/services/place-order.service.ts"
+  ],
+  "routes": [],
+  "pages": [],
+  "screens": []
+}

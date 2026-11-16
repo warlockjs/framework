@@ -1,0 +1,317 @@
+{
+  "schemaVersion": 1,
+  "root": "<root>",
+  "findings": [
+    {
+      "code": "GR4001",
+      "severity": "warning",
+      "message": "auth/login AC-1 has no test",
+      "at": {
+        "file": "grimoire/features/auth/flows/login.md",
+        "line": 29,
+        "column": null
+      },
+      "expected": false,
+      "subject": {
+        "feature": "auth",
+        "flow": "auth/login",
+        "app": null,
+        "task": null,
+        "file": "grimoire/features/auth/flows/login.md"
+      },
+      "hint": "Write a test with `// @proves <feature>/<flow> AC-<n>` above it, or say in the task why not."
+    },
+    {
+      "code": "GR4001",
+      "severity": "warning",
+      "message": "auth/sign-up AC-1 has no test",
+      "at": {
+        "file": "grimoire/features/auth/flows/sign-up.md",
+        "line": 28,
+        "column": null
+      },
+      "expected": false,
+      "subject": {
+        "feature": "auth",
+        "flow": "auth/sign-up",
+        "app": null,
+        "task": null,
+        "file": "grimoire/features/auth/flows/sign-up.md"
+      },
+      "hint": "Write a test with `// @proves <feature>/<flow> AC-<n>` above it, or say in the task why not."
+    },
+    {
+      "code": "GR4001",
+      "severity": "warning",
+      "message": "auth/sign-up AC-2 has no test",
+      "at": {
+        "file": "grimoire/features/auth/flows/sign-up.md",
+        "line": 29,
+        "column": null
+      },
+      "expected": false,
+      "subject": {
+        "feature": "auth",
+        "flow": "auth/sign-up",
+        "app": null,
+        "task": null,
+        "file": "grimoire/features/auth/flows/sign-up.md"
+      },
+      "hint": "Write a test with `// @proves <feature>/<flow> AC-<n>` above it, or say in the task why not."
+    },
+    {
+      "code": "GR4001",
+      "severity": "warning",
+      "message": "catalog/browse-products AC-1 has no test",
+      "at": {
+        "file": "grimoire/features/catalog/flows/browse-products.md",
+        "line": 26,
+        "column": null
+      },
+      "expected": false,
+      "subject": {
+        "feature": "catalog",
+        "flow": "catalog/browse-products",
+        "app": null,
+        "task": null,
+        "file": "grimoire/features/catalog/flows/browse-products.md"
+      },
+      "hint": "Write a test with `// @proves <feature>/<flow> AC-<n>` above it, or say in the task why not."
+    },
+    {
+      "code": "GR4001",
+      "severity": "warning",
+      "message": "catalog/browse-products AC-2 has no test",
+      "at": {
+        "file": "grimoire/features/catalog/flows/browse-products.md",
+        "line": 27,
+        "column": null
+      },
+      "expected": false,
+      "subject": {
+        "feature": "catalog",
+        "flow": "catalog/browse-products",
+        "app": null,
+        "task": null,
+        "file": "grimoire/features/catalog/flows/browse-products.md"
+      },
+      "hint": "Write a test with `// @proves <feature>/<flow> AC-<n>` above it, or say in the task why not."
+    },
+    {
+      "code": "GR4001",
+      "severity": "warning",
+      "message": "catalog/browse-products AC-3 has no test",
+      "at": {
+        "file": "grimoire/features/catalog/flows/browse-products.md",
+        "line": 28,
+        "column": null
+      },
+      "expected": false,
+      "subject": {
+        "feature": "catalog",
+        "flow": "catalog/browse-products",
+        "app": null,
+        "task": null,
+        "file": "grimoire/features/catalog/flows/browse-products.md"
+      },
+      "hint": "Write a test with `// @proves <feature>/<flow> AC-<n>` above it, or say in the task why not."
+    },
+    {
+      "code": "GR4001",
+      "severity": "warning",
+      "message": "catalog/new-arrivals AC-3 has no test",
+      "at": {
+        "file": "grimoire/features/catalog/flows/new-arrivals.md",
+        "line": 30,
+        "column": null
+      },
+      "expected": false,
+      "subject": {
+        "feature": "catalog",
+        "flow": "catalog/new-arrivals",
+        "app": null,
+        "task": null,
+        "file": "grimoire/features/catalog/flows/new-arrivals.md"
+      },
+      "hint": "Write a test with `// @proves <feature>/<flow> AC-<n>` above it, or say in the task why not."
+    },
+    {
+      "code": "GR4001",
+      "severity": "warning",
+      "message": "orders/place-order AC-4 has no test",
+      "at": {
+        "file": "grimoire/features/orders/flows/place-order.md",
+        "line": 42,
+        "column": null
+      },
+      "expected": false,
+      "subject": {
+        "feature": "orders",
+        "flow": "orders/place-order",
+        "app": null,
+        "task": null,
+        "file": "grimoire/features/orders/flows/place-order.md"
+      },
+      "hint": "Write a test with `// @proves <feature>/<flow> AC-<n>` above it, or say in the task why not."
+    },
+    {
+      "code": "GR6007",
+      "severity": "error",
+      "message": "catalog/wishlist is since 3.0, newer than catalog 2.1",
+      "at": {
+        "file": "grimoire/features/catalog/flows/wishlist.md",
+        "line": 3,
+        "column": null
+      },
+      "expected": true,
+      "subject": {
+        "feature": "catalog",
+        "flow": "catalog/wishlist",
+        "app": null,
+        "task": null,
+        "file": "grimoire/features/catalog/flows/wishlist.md"
+      },
+      "hint": "Fix `since`, or the feature `version`."
+    },
+    {
+      "code": "GR2001",
+      "severity": "error",
+      "message": "route step \"POST /api/wishlist\" matches no route",
+      "at": {
+        "file": "grimoire/features/catalog/flows/wishlist.md",
+        "line": 12,
+        "column": null
+      },
+      "expected": true,
+      "subject": {
+        "feature": "catalog",
+        "flow": "catalog/wishlist",
+        "app": null,
+        "task": null,
+        "file": "grimoire/features/catalog/flows/wishlist.md"
+      },
+      "hint": "Fix the method and path in the flow, or add the route in code."
+    },
+    {
+      "code": "GR2004",
+      "severity": "error",
+      "message": "notification step \"wishlist-price-drop\" matches no notification",
+      "at": {
+        "file": "grimoire/features/catalog/flows/wishlist.md",
+        "line": 13,
+        "column": null
+      },
+      "expected": true,
+      "subject": {
+        "feature": "catalog",
+        "flow": "catalog/wishlist",
+        "app": null,
+        "task": null,
+        "file": "grimoire/features/catalog/flows/wishlist.md"
+      },
+      "hint": "Use the notification's name as code defines it, or add it."
+    },
+    {
+      "code": "GR2002",
+      "severity": "error",
+      "message": "page step \"/wishlist\" matches no page or screen of the feature's apps",
+      "at": {
+        "file": "grimoire/features/catalog/flows/wishlist.md",
+        "line": 14,
+        "column": null
+      },
+      "expected": true,
+      "subject": {
+        "feature": "catalog",
+        "flow": "catalog/wishlist",
+        "app": null,
+        "task": null,
+        "file": "grimoire/features/catalog/flows/wishlist.md"
+      },
+      "hint": "Fix the route path in the flow, or add the page to one of the feature's apps."
+    },
+    {
+      "code": "GR4001",
+      "severity": "warning",
+      "message": "catalog/wishlist AC-1 has no test",
+      "at": {
+        "file": "grimoire/features/catalog/flows/wishlist.md",
+        "line": 30,
+        "column": null
+      },
+      "expected": true,
+      "subject": {
+        "feature": "catalog",
+        "flow": "catalog/wishlist",
+        "app": null,
+        "task": null,
+        "file": "grimoire/features/catalog/flows/wishlist.md"
+      },
+      "hint": "Write a test with `// @proves <feature>/<flow> AC-<n>` above it, or say in the task why not."
+    },
+    {
+      "code": "GR4001",
+      "severity": "warning",
+      "message": "catalog/wishlist AC-2 has no test",
+      "at": {
+        "file": "grimoire/features/catalog/flows/wishlist.md",
+        "line": 31,
+        "column": null
+      },
+      "expected": true,
+      "subject": {
+        "feature": "catalog",
+        "flow": "catalog/wishlist",
+        "app": null,
+        "task": null,
+        "file": "grimoire/features/catalog/flows/wishlist.md"
+      },
+      "hint": "Write a test with `// @proves <feature>/<flow> AC-<n>` above it, or say in the task why not."
+    },
+    {
+      "code": "GR4001",
+      "severity": "warning",
+      "message": "catalog/wishlist AC-3 has no test",
+      "at": {
+        "file": "grimoire/features/catalog/flows/wishlist.md",
+        "line": 32,
+        "column": null
+      },
+      "expected": true,
+      "subject": {
+        "feature": "catalog",
+        "flow": "catalog/wishlist",
+        "app": null,
+        "task": null,
+        "file": "grimoire/features/catalog/flows/wishlist.md"
+      },
+      "hint": "Write a test with `// @proves <feature>/<flow> AC-<n>` above it, or say in the task why not."
+    },
+    {
+      "code": "GR4001",
+      "severity": "warning",
+      "message": "catalog/wishlist AC-4 has no test",
+      "at": {
+        "file": "grimoire/features/catalog/flows/wishlist.md",
+        "line": 33,
+        "column": null
+      },
+      "expected": true,
+      "subject": {
+        "feature": "catalog",
+        "flow": "catalog/wishlist",
+        "app": null,
+        "task": null,
+        "file": "grimoire/features/catalog/flows/wishlist.md"
+      },
+      "hint": "Write a test with `// @proves <feature>/<flow> AC-<n>` above it, or say in the task why not."
+    }
+  ],
+  "counts": {
+    "errors": 0,
+    "warnings": 8,
+    "expected": 8
+  },
+  "ok": true,
+  "routes": "fresh"
+}

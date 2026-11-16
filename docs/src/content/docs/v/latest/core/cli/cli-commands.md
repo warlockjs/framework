@@ -476,6 +476,8 @@ preserves app-owned files and adds no duplicate import. The output explains how
 to set per-instance ownership and use `processes.spawn()`; terminals require
 optional peer `node-pty`. See [process supervision](/v/latest/process/).
 
+`warlock add grimoire` installs `@warlock.js/grimoire` (experimental), registers `registerGrimoireCommands()` in `cli.commands` of `warlock.config.ts` (creating the `cli` block when there is none), adds the generated files to `.gitignore`, adds the Grimoire tab to `src/config/devtools.ts`, and adds `grimoireReporter()` to an existing `vite.config.ts`. A second run changes nothing. See [Grimoire](/v/latest/grimoire/).
+
 `warlock add web` creates `root.tsx` + `root.setup.ts` and `index.page.tsx` +
 `index.setup.ts`. Setup files own configuration and universal `register()`
 logic; UI files own components. Warlock composes the pairs on the server and
@@ -739,6 +741,8 @@ warlock explain
 
 Every code is on the [Error codes](./error-codes.md) page.
 
+A package can explain its own codes. When the package's commands are listed in `cli.commands`, `warlock explain GR2001` (a code of `@warlock.js/grimoire`) prints the package's answer: area, fix, skill and docs link. It reads only `warlock.config.ts` and never boots the app. A code that no registered package explains exits with an error that says to register the package's commands.
+
 ---
 
 ## Generators
@@ -921,6 +925,8 @@ export default defineConfig({
   },
 });
 ```
+
+An entry of `cli.commands` can also be an array, for a package whose register function returns several commands: `commands: [registerJWTSecretGeneratorCommand(), registerGrimoireCommands()]`. Arrays are flattened.
 
 Why a factory and not the instance directly? Two reasons. It defers side effects (config loading, import work) until the command is wired in. And each project decides which commands it wants — listing the factory is opt-in.
 

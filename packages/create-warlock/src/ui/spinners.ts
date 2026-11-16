@@ -10,8 +10,8 @@ export const spinnerMessages = {
   depsInstalled: "Dependencies materialized!",
   depsFailed: "Dependencies could not be installed",
 
-  initializingGit: "Initializing grimoire (git)...",
-  gitInitialized: "Grimoire initialized!",
+  initializingGit: "Initializing git repository...",
+  gitInitialized: "Git repository initialized!",
   gitFailed: "Git repository was not initialized",
 
   generatingJwt: "Forging secret keys...",

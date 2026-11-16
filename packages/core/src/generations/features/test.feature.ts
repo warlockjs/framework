@@ -1,8 +1,9 @@
 import { colors } from "@mongez/copper";
-import { fileExistsAsync, putFileAsync, recordSkippedFile } from "../generation-fs";
+import { fileExistsAsync, getFileAsync, putFileAsync, recordSkippedFile } from "../generation-fs";
 import type { CommandActionData } from "../../commands/types";
 import { rootPath, srcPath } from "../../utils";
 import type { FeatureDefinition } from "./types";
+import { ensureImportLine, insertVitestReporter } from "./shared/insert-grimoire-wiring";
 import { VITE_RANGE } from "./web.feature";
 
 /**
@@ -13,6 +14,15 @@ import { VITE_RANGE } from "./web.feature";
  * and the template parity spec in this folder fails when the two differ.
  */
 const VITEST_VERSION = "5.0.5";
+
+/** True when the app lists `@warlock.js/grimoire`, so its reporter belongs in the new Vitest config. */
+async function usesGrimoire(): Promise<boolean> {
+  try {
+    return (await getFileAsync(rootPath("package.json"))).includes('"@warlock.js/grimoire"');
+  } catch {
+    return false;
+  }
+}
 
 async function completeTestInstallation(options: CommandActionData) {
   // Create test-global-setup.ts (runs once before all tests)
@@ -152,9 +162,7 @@ export default class WarlockTestRunner extends TestRunner {
   const viteConfigExists = await fileExistsAsync(viteConfigPath);
 
   if (!viteConfigExists) {
-    await putFileAsync(
-      viteConfigPath,
-      `import {
+    let viteConfig = `import {
   guardUnitProject,
   lowerStage3Decorators,
   recommendedTestWorkers,
@@ -205,8 +213,20 @@ export default defineConfig({
     ],
   },
 });
-`,
-    );
+`;
+
+    if (await usesGrimoire()) {
+      const withReporter = insertVitestReporter(viteConfig, "grimoireReporter()");
+
+      if (withReporter.status === "added") {
+        viteConfig = ensureImportLine(
+          withReporter.next,
+          'import { grimoireReporter } from "@warlock.js/grimoire/vitest";',
+        );
+      }
+    }
+
+    await putFileAsync(viteConfigPath, viteConfig);
     console.log(`${colors.green("✓")} Created vite.config.ts`);
   } else {
     recordSkippedFile(viteConfigPath, "exists");

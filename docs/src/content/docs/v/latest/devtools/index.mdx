@@ -83,6 +83,13 @@ line in `src/config/devtools.ts` (`panels: ["<package>/devtools"]`). The
 Processes tab is registered the same way. See
 [Registering a panel](/v/latest/devtools/panels/).
 
+### Grimoire tab
+
+With [Grimoire](/v/latest/grimoire/) in the project, `panels: ["@warlock.js/grimoire/devtools"]` adds a **Grimoire** tab:
+search across flows, blocks, routes, files and tasks, and views for features, flows, pages, tasks, releases and the check
+report. It reads the cached book and never boots the app, and it can be exported as a static folder. See
+[The devtools tab](/v/latest/grimoire/guides/09-devtools/).
+
 ## API docs
 
 The dashboard has an **API** tab, and the same page is served on its own at `/__warlock/docs`. It renders the app's OpenAPI 3.1 document with [Scalar](https://github.com/scalar/scalar): every API route with its parameters, request body, responses and security.

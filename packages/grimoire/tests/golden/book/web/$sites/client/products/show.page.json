@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "file": "src/web/$sites/client/products/show.page.tsx",
+  "module": "src/web",
+  "type": "page",
+  "lines": 9,
+  "about": "Shows one product with its price and stock.",
+  "feature": null,
+  "borrowedBy": [],
+  "flows": [],
+  "exports": [
+    {
+      "name": "default",
+      "about": null
+    }
+  ],
+  "packages": [],
+  "imports": [
+    "src/web/$sites/client/products/show.setup.ts"
+  ],
+  "importedBy": [],
+  "routes": [
+    {
+      "method": "GET",
+      "path": "/products/:id",
+      "name": "products.show",
+      "via": "handles"
+    }
+  ],
+  "pages": [
+    {
+      "site": "client",
+      "route": "/products/:id",
+      "via": "page"
+    }
+  ],
+  "screens": []
+}

@@ -65,7 +65,7 @@ Use themed spinner messages with emojis:
 | Step            | Spinner Message                   |
 | --------------- | --------------------------------- |
 | Installing deps | 📦 Summoning dependencies...      |
-| Git init        | 📂 Initializing grimoire (git)... |
+| Git init        | 📂 Initializing git repository... |
 | JWT generation  | 🔐 Forging secret keys...         |
 | Warm cache      | ⚡ Charging magical circuits...   |
 | Config setup    | 🔧 Configuring enchantments...    |

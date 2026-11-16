@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "app": {
+    "id": "mobile",
+    "root": "mobile",
+    "routing": "files",
+    "routesDir": "mobile/app"
+  },
+  "screens": [
+    {
+      "route": "/",
+      "file": "mobile/app/index.tsx",
+      "layouts": [
+        "mobile/app/_layout.tsx"
+      ]
+    },
+    {
+      "route": "/products/[id]",
+      "file": "mobile/app/products/[id].tsx",
+      "layouts": [
+        "mobile/app/_layout.tsx"
+      ]
+    }
+  ]
+}

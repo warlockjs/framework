@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "file": "mobile/app/_layout.tsx",
+  "module": "mobile/app",
+  "type": "component",
+  "lines": 5,
+  "about": "The tab bar of the mobile app.",
+  "feature": null,
+  "borrowedBy": [],
+  "flows": [],
+  "exports": [
+    {
+      "name": "default",
+      "about": null
+    }
+  ],
+  "packages": [],
+  "imports": [],
+  "importedBy": [],
+  "routes": [],
+  "pages": [],
+  "screens": [
+    {
+      "app": "mobile",
+      "route": "/",
+      "via": "layout"
+    },
+    {
+      "app": "mobile",
+      "route": "/products/[id]",
+      "via": "layout"
+    }
+  ]
+}

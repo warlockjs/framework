@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "file": "src/web/$sites/client/home.page.tsx",
+  "module": "src/web",
+  "type": "page",
+  "lines": 11,
+  "about": "The home page with featured products and new arrivals.",
+  "feature": null,
+  "borrowedBy": [],
+  "flows": [],
+  "exports": [
+    {
+      "name": "default",
+      "about": null
+    }
+  ],
+  "packages": [],
+  "imports": [
+    "src/web/$sites/client/home.setup.ts"
+  ],
+  "importedBy": [],
+  "routes": [
+    {
+      "method": "GET",
+      "path": "/",
+      "name": "home",
+      "via": "handles"
+    }
+  ],
+  "pages": [
+    {
+      "site": "client",
+      "route": "/",
+      "via": "page"
+    }
+  ],
+  "screens": []
+}

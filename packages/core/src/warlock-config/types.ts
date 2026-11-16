@@ -1,7 +1,7 @@
 import type { BuildBudgets } from "../production/build-budgets";
 import type { ReleaseConfig } from "../release/types";
 import type { MigrationConstructor } from "@warlock.js/cascade";
-import type { CLICommand } from "../commands/cli-command";
+import type { CLICommandEntry } from "../commands/cli-command";
 import type { Connector } from "../connectors/types";
 import type {
   BuiltInHealthCheckerOptions,
@@ -178,10 +178,19 @@ export type WarlockConfig = {
   };
 
   /**
-   * CLI configuration
+   * CLI configuration.
+   *
+   * `commands` lists extra commands. An entry is a command, or an array of
+   * commands (what a package's register function may return); arrays are
+   * flattened.
+   *
+   * @example
+   * ```typescript
+   * cli: { commands: [registerJWTSecretGeneratorCommand(), registerGrimoireCommands()] }
+   * ```
    */
   cli?: {
-    commands?: CLICommand[];
+    commands?: CLICommandEntry[];
   };
 
   /**

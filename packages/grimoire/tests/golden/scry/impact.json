@@ -1,0 +1,87 @@
+{
+  "type": "impact",
+  "routes": [
+    {
+      "method": "GET",
+      "path": "/api/products",
+      "name": "catalog.products.index",
+      "handlerFile": "src/app/catalog/controllers/products.controller.ts"
+    },
+    {
+      "method": "GET",
+      "path": "/api/products/new-arrivals",
+      "name": "catalog.new-arrivals",
+      "handlerFile": "src/app/catalog/controllers/new-arrivals.controller.ts"
+    },
+    {
+      "method": "GET",
+      "path": "/api/products/:id",
+      "name": "catalog.products.show",
+      "handlerFile": "src/app/catalog/controllers/products.controller.ts"
+    },
+    {
+      "method": "POST",
+      "path": "/api/orders",
+      "name": "orders.place",
+      "handlerFile": "src/app/orders/controllers/place-order.controller.ts"
+    }
+  ],
+  "notes": [],
+  "file": "src/app/catalog/models/product.model.ts",
+  "importers": {
+    "direct": [
+      "src/app/catalog/repositories/products.repository.ts"
+    ],
+    "all": [
+      "src/app/catalog/controllers/new-arrivals.controller.ts",
+      "src/app/catalog/controllers/products.controller.ts",
+      "src/app/catalog/repositories/products.repository.ts",
+      "src/app/catalog/routes.ts",
+      "src/app/catalog/services/new-arrivals.service.ts",
+      "src/app/catalog/tests/new-arrivals.test.ts",
+      "src/app/orders/controllers/place-order.controller.ts",
+      "src/app/orders/routes.ts",
+      "src/app/orders/services/place-order.service.ts",
+      "src/app/orders/tests/place-order.test.ts",
+      "src/web/$sites/client/home.page.tsx",
+      "src/web/$sites/client/home.setup.ts",
+      "src/web/$sites/client/products/show.page.tsx",
+      "src/web/$sites/client/products/show.setup.ts"
+    ]
+  },
+  "pages": [
+    {
+      "app": "web-client",
+      "route": "/",
+      "file": "src/web/$sites/client/home.page.tsx",
+      "type": "page"
+    },
+    {
+      "app": "web-client",
+      "route": "/products/:id",
+      "file": "src/web/$sites/client/products/show.page.tsx",
+      "type": "page"
+    }
+  ],
+  "flows": [
+    "catalog/browse-products",
+    "catalog/new-arrivals",
+    "catalog/wishlist",
+    "orders/place-order"
+  ],
+  "features": [
+    {
+      "id": "catalog",
+      "via": "owner"
+    },
+    {
+      "id": "orders",
+      "via": "borrower"
+    }
+  ],
+  "tests": [
+    "e2e/checkout.e2e.ts",
+    "src/app/catalog/tests/new-arrivals.test.ts",
+    "src/app/orders/tests/place-order.test.ts"
+  ]
+}

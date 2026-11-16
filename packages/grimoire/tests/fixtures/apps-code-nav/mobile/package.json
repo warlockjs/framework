@@ -1,0 +1,1 @@
+{ "name": "rider", "dependencies": { "expo": "*", "@react-navigation/native": "*" } }

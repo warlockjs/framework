@@ -1,0 +1,1960 @@
+[
+  {
+    "id": "auth",
+    "dir": "grimoire/features/auth",
+    "readme": {
+      "file": "grimoire/features/auth/README.md",
+      "id": {
+        "value": "auth",
+        "at": {
+          "file": "grimoire/features/auth/README.md",
+          "line": 2,
+          "column": null
+        }
+      },
+      "title": {
+        "value": "Accounts and sign-in",
+        "at": {
+          "file": "grimoire/features/auth/README.md",
+          "line": 3,
+          "column": null
+        }
+      },
+      "status": {
+        "value": "shipped",
+        "at": {
+          "file": "grimoire/features/auth/README.md",
+          "line": 4,
+          "column": null
+        }
+      },
+      "version": {
+        "value": "1.0",
+        "at": {
+          "file": "grimoire/features/auth/README.md",
+          "line": 6,
+          "column": null
+        }
+      },
+      "updated": {
+        "value": "2026-10-01",
+        "at": {
+          "file": "grimoire/features/auth/README.md",
+          "line": 7,
+          "column": null
+        }
+      },
+      "apps": [
+        {
+          "value": "web-client",
+          "at": {
+            "file": "grimoire/features/auth/README.md",
+            "line": 8,
+            "column": null
+          }
+        },
+        {
+          "value": "mobile",
+          "at": {
+            "file": "grimoire/features/auth/README.md",
+            "line": 8,
+            "column": null
+          }
+        }
+      ],
+      "folders": [
+        {
+          "value": "src/app/auth",
+          "at": {
+            "file": "grimoire/features/auth/README.md",
+            "line": 9,
+            "column": null
+          }
+        }
+      ],
+      "origin": {
+        "value": "inferred",
+        "at": {
+          "file": "grimoire/features/auth/README.md",
+          "line": 5,
+          "column": null
+        }
+      },
+      "heading": {
+        "value": "Accounts and sign-in",
+        "at": {
+          "file": "grimoire/features/auth/README.md",
+          "line": 12,
+          "column": null
+        }
+      },
+      "summary": "Customers create an account, verify their email and sign in.",
+      "flows": [
+        {
+          "name": "sign-up",
+          "text": "create an account and verify the email",
+          "at": {
+            "file": "grimoire/features/auth/README.md",
+            "line": 17,
+            "column": null
+          }
+        },
+        {
+          "name": "login",
+          "text": "sign in with email and password",
+          "at": {
+            "file": "grimoire/features/auth/README.md",
+            "line": 18,
+            "column": null
+          }
+        }
+      ],
+      "relations": []
+    },
+    "changelog": {
+      "file": "grimoire/features/auth/CHANGELOG.md",
+      "sections": [
+        {
+          "release": null,
+          "date": null,
+          "at": {
+            "file": "grimoire/features/auth/CHANGELOG.md",
+            "line": 1,
+            "column": null
+          }
+        },
+        {
+          "release": "1.0.0",
+          "date": "2026-10-01",
+          "at": {
+            "file": "grimoire/features/auth/CHANGELOG.md",
+            "line": 3,
+            "column": null
+          }
+        }
+      ],
+      "entries": [
+        {
+          "feature": "auth",
+          "version": {
+            "value": "1.0",
+            "at": {
+              "file": "grimoire/features/auth/CHANGELOG.md",
+              "line": 4,
+              "column": null
+            }
+          },
+          "word": "added",
+          "flow": null,
+          "criteria": [],
+          "text": "described from the existing code",
+          "release": "1.0.0",
+          "date": "2026-10-01",
+          "at": {
+            "file": "grimoire/features/auth/CHANGELOG.md",
+            "line": 4,
+            "column": null
+          }
+        }
+      ]
+    },
+    "flows": [
+      {
+        "file": "grimoire/features/auth/flows/login.md",
+        "feature": "auth",
+        "id": {
+          "value": "login",
+          "at": {
+            "file": "grimoire/features/auth/flows/login.md",
+            "line": 2,
+            "column": null
+          }
+        },
+        "ref": "auth/login",
+        "since": {
+          "value": "1.0",
+          "at": {
+            "file": "grimoire/features/auth/flows/login.md",
+            "line": 3,
+            "column": null
+          }
+        },
+        "status": {
+          "value": "shipped",
+          "at": {
+            "file": "grimoire/features/auth/flows/login.md",
+            "line": 4,
+            "column": null
+          }
+        },
+        "who": {
+          "value": "guest",
+          "at": {
+            "file": "grimoire/features/auth/flows/login.md",
+            "line": 5,
+            "column": null
+          }
+        },
+        "origin": {
+          "value": "inferred",
+          "at": {
+            "file": "grimoire/features/auth/flows/login.md",
+            "line": 6,
+            "column": null
+          }
+        },
+        "heading": {
+          "value": "Log in",
+          "at": {
+            "file": "grimoire/features/auth/flows/login.md",
+            "line": 9,
+            "column": null
+          }
+        },
+        "steps": [
+          {
+            "index": 1,
+            "kind": "route",
+            "target": "POST /api/login",
+            "route": {
+              "method": "POST",
+              "path": "/api/login"
+            },
+            "affects": null,
+            "note": null,
+            "at": {
+              "file": "grimoire/features/auth/flows/login.md",
+              "line": 12,
+              "column": null
+            }
+          }
+        ],
+        "differs": [],
+        "cases": [
+          {
+            "question": "invalid input",
+            "fixed": true,
+            "answer": "a missing password → 422",
+            "doesNotApply": false,
+            "at": {
+              "file": "grimoire/features/auth/flows/login.md",
+              "line": 15,
+              "column": null
+            }
+          },
+          {
+            "question": "not allowed",
+            "fixed": true,
+            "answer": "an unverified account → 403",
+            "doesNotApply": false,
+            "at": {
+              "file": "grimoire/features/auth/flows/login.md",
+              "line": 16,
+              "column": null
+            }
+          },
+          {
+            "question": "not found",
+            "fixed": true,
+            "answer": "an unknown email → the same message as a wrong password",
+            "doesNotApply": false,
+            "at": {
+              "file": "grimoire/features/auth/flows/login.md",
+              "line": 17,
+              "column": null
+            }
+          }
+        ],
+        "notHandled": [
+          {
+            "name": "duplicate",
+            "text": "does not apply: no record is created",
+            "at": {
+              "file": "grimoire/features/auth/flows/login.md",
+              "line": 20,
+              "column": null
+            }
+          },
+          {
+            "name": "limits",
+            "text": "no limit on attempts",
+            "at": {
+              "file": "grimoire/features/auth/flows/login.md",
+              "line": 21,
+              "column": null
+            }
+          },
+          {
+            "name": "expiry",
+            "text": "sessions never expire",
+            "at": {
+              "file": "grimoire/features/auth/flows/login.md",
+              "line": 22,
+              "column": null
+            }
+          },
+          {
+            "name": "double submit",
+            "text": "does not apply: idempotent",
+            "at": {
+              "file": "grimoire/features/auth/flows/login.md",
+              "line": 23,
+              "column": null
+            }
+          },
+          {
+            "name": "outside service down",
+            "text": "does not apply: no outside service",
+            "at": {
+              "file": "grimoire/features/auth/flows/login.md",
+              "line": 24,
+              "column": null
+            }
+          }
+        ],
+        "unknowns": [
+          {
+            "text": "should sessions expire?",
+            "at": {
+              "file": "grimoire/features/auth/flows/login.md",
+              "line": 26,
+              "column": null
+            }
+          }
+        ],
+        "criteria": [
+          {
+            "id": "AC-1",
+            "number": 1,
+            "app": null,
+            "text": "valid credentials open a session",
+            "at": {
+              "file": "grimoire/features/auth/flows/login.md",
+              "line": 29,
+              "column": null
+            }
+          }
+        ]
+      },
+      {
+        "file": "grimoire/features/auth/flows/sign-up.md",
+        "feature": "auth",
+        "id": {
+          "value": "sign-up",
+          "at": {
+            "file": "grimoire/features/auth/flows/sign-up.md",
+            "line": 2,
+            "column": null
+          }
+        },
+        "ref": "auth/sign-up",
+        "since": {
+          "value": "1.0",
+          "at": {
+            "file": "grimoire/features/auth/flows/sign-up.md",
+            "line": 3,
+            "column": null
+          }
+        },
+        "status": {
+          "value": "shipped",
+          "at": {
+            "file": "grimoire/features/auth/flows/sign-up.md",
+            "line": 4,
+            "column": null
+          }
+        },
+        "who": {
+          "value": "guest",
+          "at": {
+            "file": "grimoire/features/auth/flows/sign-up.md",
+            "line": 5,
+            "column": null
+          }
+        },
+        "origin": {
+          "value": "inferred",
+          "at": {
+            "file": "grimoire/features/auth/flows/sign-up.md",
+            "line": 6,
+            "column": null
+          }
+        },
+        "heading": {
+          "value": "Sign up",
+          "at": {
+            "file": "grimoire/features/auth/flows/sign-up.md",
+            "line": 9,
+            "column": null
+          }
+        },
+        "steps": [
+          {
+            "index": 1,
+            "kind": "route",
+            "target": "POST /api/register",
+            "route": {
+              "method": "POST",
+              "path": "/api/register"
+            },
+            "affects": null,
+            "note": null,
+            "at": {
+              "file": "grimoire/features/auth/flows/sign-up.md",
+              "line": 12,
+              "column": null
+            }
+          },
+          {
+            "index": 2,
+            "kind": "job",
+            "target": "delete-unverified",
+            "route": null,
+            "affects": null,
+            "note": "seven days later, if never verified",
+            "at": {
+              "file": "grimoire/features/auth/flows/sign-up.md",
+              "line": 13,
+              "column": null
+            }
+          }
+        ],
+        "differs": [],
+        "cases": [
+          {
+            "question": "invalid input",
+            "fixed": true,
+            "answer": "a bad email → 422",
+            "doesNotApply": false,
+            "at": {
+              "file": "grimoire/features/auth/flows/sign-up.md",
+              "line": 16,
+              "column": null
+            }
+          },
+          {
+            "question": "not allowed",
+            "fixed": true,
+            "answer": "does not apply: guests only",
+            "doesNotApply": true,
+            "at": {
+              "file": "grimoire/features/auth/flows/sign-up.md",
+              "line": 17,
+              "column": null
+            }
+          },
+          {
+            "question": "duplicate",
+            "fixed": true,
+            "answer": "an email already used → 409",
+            "doesNotApply": false,
+            "at": {
+              "file": "grimoire/features/auth/flows/sign-up.md",
+              "line": 18,
+              "column": null
+            }
+          },
+          {
+            "question": "expiry",
+            "fixed": true,
+            "answer": "an unverified account is deleted after seven days",
+            "doesNotApply": false,
+            "at": {
+              "file": "grimoire/features/auth/flows/sign-up.md",
+              "line": 19,
+              "column": null
+            }
+          }
+        ],
+        "notHandled": [
+          {
+            "name": "not found",
+            "text": "does not apply to the code as written",
+            "at": {
+              "file": "grimoire/features/auth/flows/sign-up.md",
+              "line": 22,
+              "column": null
+            }
+          },
+          {
+            "name": "limits",
+            "text": "no limit on sign-ups per address",
+            "at": {
+              "file": "grimoire/features/auth/flows/sign-up.md",
+              "line": 23,
+              "column": null
+            }
+          },
+          {
+            "name": "double submit",
+            "text": "two quick submits create two accounts",
+            "at": {
+              "file": "grimoire/features/auth/flows/sign-up.md",
+              "line": 24,
+              "column": null
+            }
+          },
+          {
+            "name": "outside service down",
+            "text": "the mail service down is not handled",
+            "at": {
+              "file": "grimoire/features/auth/flows/sign-up.md",
+              "line": 25,
+              "column": null
+            }
+          }
+        ],
+        "unknowns": [],
+        "criteria": [
+          {
+            "id": "AC-1",
+            "number": 1,
+            "app": null,
+            "text": "a new account waits for email verification",
+            "at": {
+              "file": "grimoire/features/auth/flows/sign-up.md",
+              "line": 28,
+              "column": null
+            }
+          },
+          {
+            "id": "AC-2",
+            "number": 2,
+            "app": null,
+            "text": "an unverified account is deleted after seven days",
+            "at": {
+              "file": "grimoire/features/auth/flows/sign-up.md",
+              "line": 29,
+              "column": null
+            }
+          }
+        ]
+      }
+    ],
+    "versions": []
+  },
+  {
+    "id": "catalog",
+    "dir": "grimoire/features/catalog",
+    "readme": {
+      "file": "grimoire/features/catalog/README.md",
+      "id": {
+        "value": "catalog",
+        "at": {
+          "file": "grimoire/features/catalog/README.md",
+          "line": 2,
+          "column": null
+        }
+      },
+      "title": {
+        "value": "Product catalog",
+        "at": {
+          "file": "grimoire/features/catalog/README.md",
+          "line": 3,
+          "column": null
+        }
+      },
+      "status": {
+        "value": "shipped",
+        "at": {
+          "file": "grimoire/features/catalog/README.md",
+          "line": 4,
+          "column": null
+        }
+      },
+      "version": {
+        "value": "2.1",
+        "at": {
+          "file": "grimoire/features/catalog/README.md",
+          "line": 5,
+          "column": null
+        }
+      },
+      "updated": {
+        "value": "2026-11-10",
+        "at": {
+          "file": "grimoire/features/catalog/README.md",
+          "line": 6,
+          "column": null
+        }
+      },
+      "apps": [
+        {
+          "value": "web-client",
+          "at": {
+            "file": "grimoire/features/catalog/README.md",
+            "line": 7,
+            "column": null
+          }
+        },
+        {
+          "value": "mobile",
+          "at": {
+            "file": "grimoire/features/catalog/README.md",
+            "line": 7,
+            "column": null
+          }
+        }
+      ],
+      "folders": [
+        {
+          "value": "src/app/catalog",
+          "at": {
+            "file": "grimoire/features/catalog/README.md",
+            "line": 8,
+            "column": null
+          }
+        },
+        {
+          "value": "src/web/$sites/client/products",
+          "at": {
+            "file": "grimoire/features/catalog/README.md",
+            "line": 8,
+            "column": null
+          }
+        }
+      ],
+      "origin": null,
+      "heading": {
+        "value": "Product catalog",
+        "at": {
+          "file": "grimoire/features/catalog/README.md",
+          "line": 11,
+          "column": null
+        }
+      },
+      "summary": "Customers browse products, see what is new in their country, and will save products for later.",
+      "flows": [
+        {
+          "name": "browse-products",
+          "text": "list products and open one",
+          "at": {
+            "file": "grimoire/features/catalog/README.md",
+            "line": 16,
+            "column": null
+          }
+        },
+        {
+          "name": "new-arrivals",
+          "text": "the newest products sold in the customer's country",
+          "at": {
+            "file": "grimoire/features/catalog/README.md",
+            "line": 17,
+            "column": null
+          }
+        },
+        {
+          "name": "wishlist",
+          "text": "save a product for later",
+          "at": {
+            "file": "grimoire/features/catalog/README.md",
+            "line": 18,
+            "column": null
+          }
+        }
+      ],
+      "relations": [
+        {
+          "text": "affected by orders/place-order (lowers stock)",
+          "refs": [
+            "orders/place-order"
+          ],
+          "at": {
+            "file": "grimoire/features/catalog/README.md",
+            "line": 21,
+            "column": null
+          }
+        }
+      ]
+    },
+    "changelog": {
+      "file": "grimoire/features/catalog/CHANGELOG.md",
+      "sections": [
+        {
+          "release": null,
+          "date": null,
+          "at": {
+            "file": "grimoire/features/catalog/CHANGELOG.md",
+            "line": 1,
+            "column": null
+          }
+        },
+        {
+          "release": "1.0.0",
+          "date": "2026-10-01",
+          "at": {
+            "file": "grimoire/features/catalog/CHANGELOG.md",
+            "line": 5,
+            "column": null
+          }
+        }
+      ],
+      "entries": [
+        {
+          "feature": "catalog",
+          "version": {
+            "value": "2.1",
+            "at": {
+              "file": "grimoire/features/catalog/CHANGELOG.md",
+              "line": 2,
+              "column": null
+            }
+          },
+          "word": "fixed",
+          "flow": "new-arrivals",
+          "criteria": [
+            "AC-2"
+          ],
+          "text": "a customer with no country saw an empty list instead of the global one",
+          "release": null,
+          "date": null,
+          "at": {
+            "file": "grimoire/features/catalog/CHANGELOG.md",
+            "line": 2,
+            "column": null
+          }
+        },
+        {
+          "feature": "catalog",
+          "version": {
+            "value": "2.0",
+            "at": {
+              "file": "grimoire/features/catalog/CHANGELOG.md",
+              "line": 6,
+              "column": null
+            }
+          },
+          "word": "added",
+          "flow": "new-arrivals",
+          "criteria": [],
+          "text": "customers see the newest products sold in their country",
+          "release": "1.0.0",
+          "date": "2026-10-01",
+          "at": {
+            "file": "grimoire/features/catalog/CHANGELOG.md",
+            "line": 6,
+            "column": null
+          }
+        },
+        {
+          "feature": "catalog",
+          "version": {
+            "value": "1.0",
+            "at": {
+              "file": "grimoire/features/catalog/CHANGELOG.md",
+              "line": 7,
+              "column": null
+            }
+          },
+          "word": "added",
+          "flow": "browse-products",
+          "criteria": [],
+          "text": "customers list products and open one",
+          "release": "1.0.0",
+          "date": "2026-10-01",
+          "at": {
+            "file": "grimoire/features/catalog/CHANGELOG.md",
+            "line": 7,
+            "column": null
+          }
+        }
+      ]
+    },
+    "flows": [
+      {
+        "file": "grimoire/features/catalog/flows/browse-products.md",
+        "feature": "catalog",
+        "id": {
+          "value": "browse-products",
+          "at": {
+            "file": "grimoire/features/catalog/flows/browse-products.md",
+            "line": 2,
+            "column": null
+          }
+        },
+        "ref": "catalog/browse-products",
+        "since": {
+          "value": "1.0",
+          "at": {
+            "file": "grimoire/features/catalog/flows/browse-products.md",
+            "line": 3,
+            "column": null
+          }
+        },
+        "status": {
+          "value": "shipped",
+          "at": {
+            "file": "grimoire/features/catalog/flows/browse-products.md",
+            "line": 4,
+            "column": null
+          }
+        },
+        "who": {
+          "value": "everyone",
+          "at": {
+            "file": "grimoire/features/catalog/flows/browse-products.md",
+            "line": 5,
+            "column": null
+          }
+        },
+        "origin": null,
+        "heading": {
+          "value": "Browse products",
+          "at": {
+            "file": "grimoire/features/catalog/flows/browse-products.md",
+            "line": 8,
+            "column": null
+          }
+        },
+        "steps": [
+          {
+            "index": 1,
+            "kind": "route",
+            "target": "GET /api/products",
+            "route": {
+              "method": "GET",
+              "path": "/api/products"
+            },
+            "affects": null,
+            "note": null,
+            "at": {
+              "file": "grimoire/features/catalog/flows/browse-products.md",
+              "line": 11,
+              "column": null
+            }
+          },
+          {
+            "index": 2,
+            "kind": "page",
+            "target": "/products/:id",
+            "route": null,
+            "affects": null,
+            "note": null,
+            "at": {
+              "file": "grimoire/features/catalog/flows/browse-products.md",
+              "line": 12,
+              "column": null
+            }
+          },
+          {
+            "index": 3,
+            "kind": "route",
+            "target": "GET /api/products/:id",
+            "route": {
+              "method": "GET",
+              "path": "/api/products/:id"
+            },
+            "affects": null,
+            "note": "the page loads it through its setup file",
+            "at": {
+              "file": "grimoire/features/catalog/flows/browse-products.md",
+              "line": 13,
+              "column": null
+            }
+          }
+        ],
+        "differs": [],
+        "cases": [
+          {
+            "question": "invalid input",
+            "fixed": true,
+            "answer": "an unknown filter is ignored",
+            "doesNotApply": false,
+            "at": {
+              "file": "grimoire/features/catalog/flows/browse-products.md",
+              "line": 16,
+              "column": null
+            }
+          },
+          {
+            "question": "not allowed",
+            "fixed": true,
+            "answer": "does not apply: every product is public",
+            "doesNotApply": true,
+            "at": {
+              "file": "grimoire/features/catalog/flows/browse-products.md",
+              "line": 17,
+              "column": null
+            }
+          },
+          {
+            "question": "not found",
+            "fixed": true,
+            "answer": "an unknown product id → 404 page",
+            "doesNotApply": false,
+            "at": {
+              "file": "grimoire/features/catalog/flows/browse-products.md",
+              "line": 18,
+              "column": null
+            }
+          },
+          {
+            "question": "duplicate",
+            "fixed": true,
+            "answer": "does not apply: nothing is created",
+            "doesNotApply": true,
+            "at": {
+              "file": "grimoire/features/catalog/flows/browse-products.md",
+              "line": 19,
+              "column": null
+            }
+          },
+          {
+            "question": "limits",
+            "fixed": true,
+            "answer": "50 products per page",
+            "doesNotApply": false,
+            "at": {
+              "file": "grimoire/features/catalog/flows/browse-products.md",
+              "line": 20,
+              "column": null
+            }
+          },
+          {
+            "question": "expiry",
+            "fixed": true,
+            "answer": "does not apply: products do not expire",
+            "doesNotApply": true,
+            "at": {
+              "file": "grimoire/features/catalog/flows/browse-products.md",
+              "line": 21,
+              "column": null
+            }
+          },
+          {
+            "question": "double submit",
+            "fixed": true,
+            "answer": "does not apply: reading only",
+            "doesNotApply": true,
+            "at": {
+              "file": "grimoire/features/catalog/flows/browse-products.md",
+              "line": 22,
+              "column": null
+            }
+          },
+          {
+            "question": "outside service down",
+            "fixed": true,
+            "answer": "does not apply: no outside service",
+            "doesNotApply": true,
+            "at": {
+              "file": "grimoire/features/catalog/flows/browse-products.md",
+              "line": 23,
+              "column": null
+            }
+          }
+        ],
+        "notHandled": [],
+        "unknowns": [],
+        "criteria": [
+          {
+            "id": "AC-1",
+            "number": 1,
+            "app": null,
+            "text": "the list shows 50 products per page",
+            "at": {
+              "file": "grimoire/features/catalog/flows/browse-products.md",
+              "line": 26,
+              "column": null
+            }
+          },
+          {
+            "id": "AC-2",
+            "number": 2,
+            "app": null,
+            "text": "an unknown product id shows the 404 page",
+            "at": {
+              "file": "grimoire/features/catalog/flows/browse-products.md",
+              "line": 27,
+              "column": null
+            }
+          },
+          {
+            "id": "AC-3",
+            "number": 3,
+            "app": "mobile",
+            "text": "the product screen shows the price in the device currency",
+            "at": {
+              "file": "grimoire/features/catalog/flows/browse-products.md",
+              "line": 28,
+              "column": null
+            }
+          }
+        ]
+      },
+      {
+        "file": "grimoire/features/catalog/flows/new-arrivals.md",
+        "feature": "catalog",
+        "id": {
+          "value": "new-arrivals",
+          "at": {
+            "file": "grimoire/features/catalog/flows/new-arrivals.md",
+            "line": 2,
+            "column": null
+          }
+        },
+        "ref": "catalog/new-arrivals",
+        "since": {
+          "value": "2.0",
+          "at": {
+            "file": "grimoire/features/catalog/flows/new-arrivals.md",
+            "line": 3,
+            "column": null
+          }
+        },
+        "status": {
+          "value": "shipped",
+          "at": {
+            "file": "grimoire/features/catalog/flows/new-arrivals.md",
+            "line": 4,
+            "column": null
+          }
+        },
+        "who": {
+          "value": "everyone",
+          "at": {
+            "file": "grimoire/features/catalog/flows/new-arrivals.md",
+            "line": 5,
+            "column": null
+          }
+        },
+        "origin": null,
+        "heading": {
+          "value": "New arrivals",
+          "at": {
+            "file": "grimoire/features/catalog/flows/new-arrivals.md",
+            "line": 8,
+            "column": null
+          }
+        },
+        "steps": [
+          {
+            "index": 1,
+            "kind": "page",
+            "target": "/",
+            "route": null,
+            "affects": null,
+            "note": null,
+            "at": {
+              "file": "grimoire/features/catalog/flows/new-arrivals.md",
+              "line": 11,
+              "column": null
+            }
+          },
+          {
+            "index": 2,
+            "kind": "route",
+            "target": "GET /api/products/new-arrivals",
+            "route": {
+              "method": "GET",
+              "path": "/api/products/new-arrivals"
+            },
+            "affects": null,
+            "note": null,
+            "at": {
+              "file": "grimoire/features/catalog/flows/new-arrivals.md",
+              "line": 12,
+              "column": null
+            }
+          }
+        ],
+        "differs": [
+          {
+            "name": "mobile",
+            "text": "uses the device's country when the customer has none",
+            "at": {
+              "file": "grimoire/features/catalog/flows/new-arrivals.md",
+              "line": 15,
+              "column": null
+            }
+          }
+        ],
+        "cases": [
+          {
+            "question": "invalid input",
+            "fixed": true,
+            "answer": "an unknown country code → the global list",
+            "doesNotApply": false,
+            "at": {
+              "file": "grimoire/features/catalog/flows/new-arrivals.md",
+              "line": 18,
+              "column": null
+            }
+          },
+          {
+            "question": "not allowed",
+            "fixed": true,
+            "answer": "does not apply: public",
+            "doesNotApply": true,
+            "at": {
+              "file": "grimoire/features/catalog/flows/new-arrivals.md",
+              "line": 19,
+              "column": null
+            }
+          },
+          {
+            "question": "not found",
+            "fixed": true,
+            "answer": "no product in the country → the global list",
+            "doesNotApply": false,
+            "at": {
+              "file": "grimoire/features/catalog/flows/new-arrivals.md",
+              "line": 20,
+              "column": null
+            }
+          },
+          {
+            "question": "duplicate",
+            "fixed": true,
+            "answer": "does not apply: reading only",
+            "doesNotApply": true,
+            "at": {
+              "file": "grimoire/features/catalog/flows/new-arrivals.md",
+              "line": 21,
+              "column": null
+            }
+          },
+          {
+            "question": "limits",
+            "fixed": true,
+            "answer": "at most 20 products",
+            "doesNotApply": false,
+            "at": {
+              "file": "grimoire/features/catalog/flows/new-arrivals.md",
+              "line": 22,
+              "column": null
+            }
+          },
+          {
+            "question": "expiry",
+            "fixed": true,
+            "answer": "a product stays new for 30 days",
+            "doesNotApply": false,
+            "at": {
+              "file": "grimoire/features/catalog/flows/new-arrivals.md",
+              "line": 23,
+              "column": null
+            }
+          },
+          {
+            "question": "double submit",
+            "fixed": true,
+            "answer": "does not apply: reading only",
+            "doesNotApply": true,
+            "at": {
+              "file": "grimoire/features/catalog/flows/new-arrivals.md",
+              "line": 24,
+              "column": null
+            }
+          },
+          {
+            "question": "outside service down",
+            "fixed": true,
+            "answer": "does not apply: no outside service",
+            "doesNotApply": true,
+            "at": {
+              "file": "grimoire/features/catalog/flows/new-arrivals.md",
+              "line": 25,
+              "column": null
+            }
+          }
+        ],
+        "notHandled": [],
+        "unknowns": [],
+        "criteria": [
+          {
+            "id": "AC-1",
+            "number": 1,
+            "app": null,
+            "text": "the newest products come first",
+            "at": {
+              "file": "grimoire/features/catalog/flows/new-arrivals.md",
+              "line": 28,
+              "column": null
+            }
+          },
+          {
+            "id": "AC-2",
+            "number": 2,
+            "app": null,
+            "text": "a customer with no country sees the global list",
+            "at": {
+              "file": "grimoire/features/catalog/flows/new-arrivals.md",
+              "line": 29,
+              "column": null
+            }
+          },
+          {
+            "id": "AC-3",
+            "number": 3,
+            "app": "mobile",
+            "text": "the device's country is used when the customer has none",
+            "at": {
+              "file": "grimoire/features/catalog/flows/new-arrivals.md",
+              "line": 30,
+              "column": null
+            }
+          }
+        ]
+      },
+      {
+        "file": "grimoire/features/catalog/flows/wishlist.md",
+        "feature": "catalog",
+        "id": {
+          "value": "wishlist",
+          "at": {
+            "file": "grimoire/features/catalog/flows/wishlist.md",
+            "line": 2,
+            "column": null
+          }
+        },
+        "ref": "catalog/wishlist",
+        "since": {
+          "value": "3.0",
+          "at": {
+            "file": "grimoire/features/catalog/flows/wishlist.md",
+            "line": 3,
+            "column": null
+          }
+        },
+        "status": {
+          "value": "proposed",
+          "at": {
+            "file": "grimoire/features/catalog/flows/wishlist.md",
+            "line": 4,
+            "column": null
+          }
+        },
+        "who": {
+          "value": "customer",
+          "at": {
+            "file": "grimoire/features/catalog/flows/wishlist.md",
+            "line": 5,
+            "column": null
+          }
+        },
+        "origin": null,
+        "heading": {
+          "value": "Save a product to the wishlist",
+          "at": {
+            "file": "grimoire/features/catalog/flows/wishlist.md",
+            "line": 8,
+            "column": null
+          }
+        },
+        "steps": [
+          {
+            "index": 1,
+            "kind": "page",
+            "target": "/products/:id",
+            "route": null,
+            "affects": null,
+            "note": null,
+            "at": {
+              "file": "grimoire/features/catalog/flows/wishlist.md",
+              "line": 11,
+              "column": null
+            }
+          },
+          {
+            "index": 2,
+            "kind": "route",
+            "target": "POST /api/wishlist",
+            "route": {
+              "method": "POST",
+              "path": "/api/wishlist"
+            },
+            "affects": null,
+            "note": null,
+            "at": {
+              "file": "grimoire/features/catalog/flows/wishlist.md",
+              "line": 12,
+              "column": null
+            }
+          },
+          {
+            "index": 3,
+            "kind": "notification",
+            "target": "wishlist-price-drop",
+            "route": null,
+            "affects": null,
+            "note": null,
+            "at": {
+              "file": "grimoire/features/catalog/flows/wishlist.md",
+              "line": 13,
+              "column": null
+            }
+          },
+          {
+            "index": 4,
+            "kind": "page",
+            "target": "/wishlist",
+            "route": null,
+            "affects": null,
+            "note": null,
+            "at": {
+              "file": "grimoire/features/catalog/flows/wishlist.md",
+              "line": 14,
+              "column": null
+            }
+          }
+        ],
+        "differs": [
+          {
+            "name": "mobile",
+            "text": "the save button is also on the product card in lists",
+            "at": {
+              "file": "grimoire/features/catalog/flows/wishlist.md",
+              "line": 17,
+              "column": null
+            }
+          }
+        ],
+        "cases": [
+          {
+            "question": "invalid input",
+            "fixed": true,
+            "answer": "the product does not exist → 404",
+            "doesNotApply": false,
+            "at": {
+              "file": "grimoire/features/catalog/flows/wishlist.md",
+              "line": 20,
+              "column": null
+            }
+          },
+          {
+            "question": "not allowed",
+            "fixed": true,
+            "answer": "guest → sent to sign in, then back to the product",
+            "doesNotApply": false,
+            "at": {
+              "file": "grimoire/features/catalog/flows/wishlist.md",
+              "line": 21,
+              "column": null
+            }
+          },
+          {
+            "question": "duplicate",
+            "fixed": true,
+            "answer": "already saved → stays saved, no error",
+            "doesNotApply": false,
+            "at": {
+              "file": "grimoire/features/catalog/flows/wishlist.md",
+              "line": 22,
+              "column": null
+            }
+          },
+          {
+            "question": "limits",
+            "fixed": true,
+            "answer": "at most 200 products",
+            "doesNotApply": false,
+            "at": {
+              "file": "grimoire/features/catalog/flows/wishlist.md",
+              "line": 23,
+              "column": null
+            }
+          },
+          {
+            "question": "expiry",
+            "fixed": true,
+            "answer": "does not apply: saved products do not expire",
+            "doesNotApply": true,
+            "at": {
+              "file": "grimoire/features/catalog/flows/wishlist.md",
+              "line": 24,
+              "column": null
+            }
+          },
+          {
+            "question": "double submit",
+            "fixed": true,
+            "answer": "two taps save once",
+            "doesNotApply": false,
+            "at": {
+              "file": "grimoire/features/catalog/flows/wishlist.md",
+              "line": 25,
+              "column": null
+            }
+          },
+          {
+            "question": "outside service down",
+            "fixed": true,
+            "answer": "does not apply: no outside service",
+            "doesNotApply": true,
+            "at": {
+              "file": "grimoire/features/catalog/flows/wishlist.md",
+              "line": 26,
+              "column": null
+            }
+          },
+          {
+            "question": "not found",
+            "fixed": true,
+            "answer": "a removed product disappears from the list",
+            "doesNotApply": false,
+            "at": {
+              "file": "grimoire/features/catalog/flows/wishlist.md",
+              "line": 27,
+              "column": null
+            }
+          }
+        ],
+        "notHandled": [],
+        "unknowns": [],
+        "criteria": [
+          {
+            "id": "AC-1",
+            "number": 1,
+            "app": null,
+            "text": "a saved product appears on /wishlist",
+            "at": {
+              "file": "grimoire/features/catalog/flows/wishlist.md",
+              "line": 30,
+              "column": null
+            }
+          },
+          {
+            "id": "AC-2",
+            "number": 2,
+            "app": null,
+            "text": "saving twice keeps one entry",
+            "at": {
+              "file": "grimoire/features/catalog/flows/wishlist.md",
+              "line": 31,
+              "column": null
+            }
+          },
+          {
+            "id": "AC-3",
+            "number": 3,
+            "app": null,
+            "text": "a guest is sent to sign in and returns to the product",
+            "at": {
+              "file": "grimoire/features/catalog/flows/wishlist.md",
+              "line": 32,
+              "column": null
+            }
+          },
+          {
+            "id": "AC-4",
+            "number": 4,
+            "app": "mobile",
+            "text": "the product card has a save button",
+            "at": {
+              "file": "grimoire/features/catalog/flows/wishlist.md",
+              "line": 33,
+              "column": null
+            }
+          }
+        ]
+      }
+    ],
+    "versions": [
+      {
+        "file": "grimoire/features/catalog/versions/v3.md",
+        "feature": "catalog",
+        "major": 3,
+        "heading": {
+          "value": "Catalog 3.0: the wishlist",
+          "at": {
+            "file": "grimoire/features/catalog/versions/v3.md",
+            "line": 1,
+            "column": null
+          }
+        }
+      }
+    ]
+  },
+  {
+    "id": "orders",
+    "dir": "grimoire/features/orders",
+    "readme": {
+      "file": "grimoire/features/orders/README.md",
+      "id": {
+        "value": "orders",
+        "at": {
+          "file": "grimoire/features/orders/README.md",
+          "line": 2,
+          "column": null
+        }
+      },
+      "title": {
+        "value": "Orders",
+        "at": {
+          "file": "grimoire/features/orders/README.md",
+          "line": 3,
+          "column": null
+        }
+      },
+      "status": {
+        "value": "shipped",
+        "at": {
+          "file": "grimoire/features/orders/README.md",
+          "line": 4,
+          "column": null
+        }
+      },
+      "version": {
+        "value": "1.0",
+        "at": {
+          "file": "grimoire/features/orders/README.md",
+          "line": 5,
+          "column": null
+        }
+      },
+      "updated": {
+        "value": "2026-10-01",
+        "at": {
+          "file": "grimoire/features/orders/README.md",
+          "line": 6,
+          "column": null
+        }
+      },
+      "apps": [
+        {
+          "value": "web-client",
+          "at": {
+            "file": "grimoire/features/orders/README.md",
+            "line": 7,
+            "column": null
+          }
+        },
+        {
+          "value": "web-admin",
+          "at": {
+            "file": "grimoire/features/orders/README.md",
+            "line": 7,
+            "column": null
+          }
+        },
+        {
+          "value": "mobile",
+          "at": {
+            "file": "grimoire/features/orders/README.md",
+            "line": 7,
+            "column": null
+          }
+        }
+      ],
+      "folders": [
+        {
+          "value": "src/app/orders",
+          "at": {
+            "file": "grimoire/features/orders/README.md",
+            "line": 8,
+            "column": null
+          }
+        }
+      ],
+      "origin": null,
+      "heading": {
+        "value": "Orders",
+        "at": {
+          "file": "grimoire/features/orders/README.md",
+          "line": 11,
+          "column": null
+        }
+      },
+      "summary": "Customers place orders; staff see them in the admin site.",
+      "flows": [
+        {
+          "name": "place-order",
+          "text": "pay for the products in the cart",
+          "at": {
+            "file": "grimoire/features/orders/README.md",
+            "line": 16,
+            "column": null
+          }
+        }
+      ],
+      "relations": [
+        {
+          "text": "affects catalog/browse-products (lowers stock)",
+          "refs": [
+            "catalog/browse-products"
+          ],
+          "at": {
+            "file": "grimoire/features/orders/README.md",
+            "line": 19,
+            "column": null
+          }
+        }
+      ]
+    },
+    "changelog": {
+      "file": "grimoire/features/orders/CHANGELOG.md",
+      "sections": [
+        {
+          "release": null,
+          "date": null,
+          "at": {
+            "file": "grimoire/features/orders/CHANGELOG.md",
+            "line": 1,
+            "column": null
+          }
+        },
+        {
+          "release": "1.0.0",
+          "date": "2026-10-01",
+          "at": {
+            "file": "grimoire/features/orders/CHANGELOG.md",
+            "line": 3,
+            "column": null
+          }
+        }
+      ],
+      "entries": [
+        {
+          "feature": "orders",
+          "version": {
+            "value": "1.0",
+            "at": {
+              "file": "grimoire/features/orders/CHANGELOG.md",
+              "line": 4,
+              "column": null
+            }
+          },
+          "word": "added",
+          "flow": "place-order",
+          "criteria": [],
+          "text": "customers pay for their cart and get a confirmation email",
+          "release": "1.0.0",
+          "date": "2026-10-01",
+          "at": {
+            "file": "grimoire/features/orders/CHANGELOG.md",
+            "line": 4,
+            "column": null
+          }
+        }
+      ]
+    },
+    "flows": [
+      {
+        "file": "grimoire/features/orders/flows/place-order.md",
+        "feature": "orders",
+        "id": {
+          "value": "place-order",
+          "at": {
+            "file": "grimoire/features/orders/flows/place-order.md",
+            "line": 2,
+            "column": null
+          }
+        },
+        "ref": "orders/place-order",
+        "since": {
+          "value": "1.0",
+          "at": {
+            "file": "grimoire/features/orders/flows/place-order.md",
+            "line": 3,
+            "column": null
+          }
+        },
+        "status": {
+          "value": "shipped",
+          "at": {
+            "file": "grimoire/features/orders/flows/place-order.md",
+            "line": 4,
+            "column": null
+          }
+        },
+        "who": {
+          "value": "customer",
+          "at": {
+            "file": "grimoire/features/orders/flows/place-order.md",
+            "line": 5,
+            "column": null
+          }
+        },
+        "origin": null,
+        "heading": {
+          "value": "Place an order",
+          "at": {
+            "file": "grimoire/features/orders/flows/place-order.md",
+            "line": 8,
+            "column": null
+          }
+        },
+        "steps": [
+          {
+            "index": 1,
+            "kind": "page",
+            "target": "/products/:id",
+            "route": null,
+            "affects": null,
+            "note": null,
+            "at": {
+              "file": "grimoire/features/orders/flows/place-order.md",
+              "line": 11,
+              "column": null
+            }
+          },
+          {
+            "index": 2,
+            "kind": "route",
+            "target": "POST /api/orders",
+            "route": {
+              "method": "POST",
+              "path": "/api/orders"
+            },
+            "affects": null,
+            "note": null,
+            "at": {
+              "file": "grimoire/features/orders/flows/place-order.md",
+              "line": 12,
+              "column": null
+            }
+          },
+          {
+            "index": 3,
+            "kind": "outside service",
+            "target": "payment gateway",
+            "route": null,
+            "affects": null,
+            "note": null,
+            "at": {
+              "file": "grimoire/features/orders/flows/place-order.md",
+              "line": 13,
+              "column": null
+            }
+          },
+          {
+            "index": 4,
+            "kind": "event",
+            "target": "order.placed",
+            "route": null,
+            "affects": null,
+            "note": null,
+            "at": {
+              "file": "grimoire/features/orders/flows/place-order.md",
+              "line": 14,
+              "column": null
+            }
+          },
+          {
+            "index": 5,
+            "kind": "affects",
+            "target": "catalog/browse-products",
+            "route": null,
+            "affects": {
+              "feature": "catalog",
+              "flow": "browse-products"
+            },
+            "note": "stock goes down",
+            "at": {
+              "file": "grimoire/features/orders/flows/place-order.md",
+              "line": 15,
+              "column": null
+            }
+          },
+          {
+            "index": 6,
+            "kind": "mail",
+            "target": "order-confirmation",
+            "route": null,
+            "affects": null,
+            "note": null,
+            "at": {
+              "file": "grimoire/features/orders/flows/place-order.md",
+              "line": 16,
+              "column": null
+            }
+          },
+          {
+            "index": 7,
+            "kind": "job",
+            "target": "send-receipt",
+            "route": null,
+            "affects": null,
+            "note": null,
+            "at": {
+              "file": "grimoire/features/orders/flows/place-order.md",
+              "line": 17,
+              "column": null
+            }
+          },
+          {
+            "index": 8,
+            "kind": "notification",
+            "target": "order-shipped",
+            "route": null,
+            "affects": null,
+            "note": null,
+            "at": {
+              "file": "grimoire/features/orders/flows/place-order.md",
+              "line": 18,
+              "column": null
+            }
+          }
+        ],
+        "differs": [
+          {
+            "name": "mobile",
+            "text": "pays with the device wallet",
+            "at": {
+              "file": "grimoire/features/orders/flows/place-order.md",
+              "line": 21,
+              "column": null
+            }
+          },
+          {
+            "name": "web-admin",
+            "text": "staff see the order in the orders list",
+            "at": {
+              "file": "grimoire/features/orders/flows/place-order.md",
+              "line": 22,
+              "column": null
+            }
+          }
+        ],
+        "cases": [
+          {
+            "question": "invalid input",
+            "fixed": true,
+            "answer": "an empty cart → 422 with the reason",
+            "doesNotApply": false,
+            "at": {
+              "file": "grimoire/features/orders/flows/place-order.md",
+              "line": 25,
+              "column": null
+            }
+          },
+          {
+            "question": "not allowed",
+            "fixed": true,
+            "answer": "guest → sent to sign in",
+            "doesNotApply": false,
+            "at": {
+              "file": "grimoire/features/orders/flows/place-order.md",
+              "line": 26,
+              "column": null
+            }
+          },
+          {
+            "question": "not found",
+            "fixed": true,
+            "answer": "a product removed meanwhile → the order is refused",
+            "doesNotApply": false,
+            "at": {
+              "file": "grimoire/features/orders/flows/place-order.md",
+              "line": 27,
+              "column": null
+            }
+          },
+          {
+            "question": "duplicate",
+            "fixed": true,
+            "answer": "does not apply: each submit is a new order",
+            "doesNotApply": true,
+            "at": {
+              "file": "grimoire/features/orders/flows/place-order.md",
+              "line": 28,
+              "column": null
+            }
+          },
+          {
+            "question": "limits",
+            "fixed": true,
+            "answer": "at most 50 products per order",
+            "doesNotApply": false,
+            "at": {
+              "file": "grimoire/features/orders/flows/place-order.md",
+              "line": 29,
+              "column": null
+            }
+          },
+          {
+            "question": "expiry",
+            "fixed": true,
+            "answer": "a payment session expires after 15 minutes",
+            "doesNotApply": false,
+            "at": {
+              "file": "grimoire/features/orders/flows/place-order.md",
+              "line": 30,
+              "column": null
+            }
+          },
+          {
+            "question": "outside service down",
+            "fixed": true,
+            "answer": "the payment gateway is down → the order waits, the customer is told",
+            "doesNotApply": false,
+            "at": {
+              "file": "grimoire/features/orders/flows/place-order.md",
+              "line": 31,
+              "column": null
+            }
+          }
+        ],
+        "notHandled": [
+          {
+            "name": "double submit",
+            "text": "two quick submits can place two orders",
+            "at": {
+              "file": "grimoire/features/orders/flows/place-order.md",
+              "line": 34,
+              "column": null
+            }
+          }
+        ],
+        "unknowns": [
+          {
+            "text": "why does a vip skip the stock check?",
+            "at": {
+              "file": "grimoire/features/orders/flows/place-order.md",
+              "line": 36,
+              "column": null
+            }
+          }
+        ],
+        "criteria": [
+          {
+            "id": "AC-1",
+            "number": 1,
+            "app": null,
+            "text": "the order is saved and the stock goes down",
+            "at": {
+              "file": "grimoire/features/orders/flows/place-order.md",
+              "line": 39,
+              "column": null
+            }
+          },
+          {
+            "id": "AC-2",
+            "number": 2,
+            "app": null,
+            "text": "a product out of stock is refused",
+            "at": {
+              "file": "grimoire/features/orders/flows/place-order.md",
+              "line": 40,
+              "column": null
+            }
+          },
+          {
+            "id": "AC-3",
+            "number": 3,
+            "app": null,
+            "text": "a customer places an order from the product page",
+            "at": {
+              "file": "grimoire/features/orders/flows/place-order.md",
+              "line": 41,
+              "column": null
+            }
+          },
+          {
+            "id": "AC-4",
+            "number": 4,
+            "app": "web-admin",
+            "text": "a new order appears first in the orders list",
+            "at": {
+              "file": "grimoire/features/orders/flows/place-order.md",
+              "line": 42,
+              "column": null
+            }
+          }
+        ]
+      }
+    ],
+    "versions": []
+  }
+]

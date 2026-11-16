@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "file": "src/app/catalog/services/new-arrivals.service.ts",
+  "module": "src/app/catalog",
+  "type": "service",
+  "lines": 10,
+  "about": "Lists the newest products sold in the customer's country.",
+  "feature": "catalog",
+  "borrowedBy": [],
+  "flows": [
+    "catalog/new-arrivals"
+  ],
+  "exports": [
+    {
+      "name": "listNewArrivals",
+      "about": "Returns up to 20 products, newest first."
+    }
+  ],
+  "packages": [],
+  "imports": [
+    "src/app/catalog/repositories/products.repository.ts"
+  ],
+  "importedBy": [
+    "src/app/catalog/controllers/new-arrivals.controller.ts",
+    "src/app/catalog/tests/new-arrivals.test.ts",
+    "src/web/$sites/client/home.setup.ts"
+  ],
+  "routes": [],
+  "pages": [],
+  "screens": []
+}

@@ -1,0 +1,13 @@
+POST /api/orders  orders.place
+handler     PlaceOrderController.store  src/app/orders/controllers/place-order.controller.ts
+registered  src/app/orders/routes.ts
+middleware  authMiddleware
+auth        required (customer)
+files       src/app/catalog/models/product.model.ts
+            src/app/catalog/repositories/products.repository.ts
+            src/app/orders/controllers/place-order.controller.ts
+            src/app/orders/events/order-placed.event.ts
+            src/app/orders/jobs/send-receipt.job.ts
+            src/app/orders/mails/order-confirmation.mail.ts
+            src/app/orders/services/place-order.service.ts
+steps       orders/place-order step 2

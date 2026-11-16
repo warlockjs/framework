@@ -16,24 +16,95 @@ things are, what a feature is meant to do, and what a change will touch.
 | `grimoire/features/` | What the product does: features, flows, cases, criteria | You and other agents |
 | `grimoire/apps/` | Where users meet it: sites, mobile apps, pages, blocks | You and other agents |
 | `grimoire/tasks/` | Open and finished work | You and other agents |
-| `grimoire/releases/` | What each release shipped | You, with a list Warlock collects |
+| `grimoire/releases/` | What each release shipped | You write the brief, Warlock collects the list |
 
-Files named `index.json` or ending in `.bookmap.json` are Warlock's. Never edit them.
+Files named `index.json`, `bookmap.json` or ending in `.bookmap.json` are Warlock's. A feature's
+`bookmap.json` says what the feature owns and borrows, and each flow's `*.bookmap.json` says which
+files sit behind each step and which tests prove each criterion. They are rebuilt on demand and are
+not in git. Never edit them; change the code or the written files and they follow. Warlock never
+edits a file you wrote either.
 
 ## Start of every task
 
+1. Find the feature and flow the task is about.
+
+   ```bash
+   npx warlock scry --search "new arrivals"
+   ```
+
+   ```text
+   flow     catalog/new-arrivals          New arrivals
+   block    web-client/home/new-arrivals  catalog/new-arrivals
+   route    GET /api/products/new-arrivals
+   file     src/app/catalog/services/new-arrivals.service.ts  Lists the newest products sold in the customer's country.
+   ```
+
+2. Read the feature's `README.md`, then the flow file. They say what the behaviour should be.
+3. Ask for the flow's book map. It lists the files behind each step, the tests that prove each
+   criterion and the pages that show the flow.
+
+   ```bash
+   npx warlock scry --flow catalog/new-arrivals
+   ```
+
+4. Read only those files. Do not read a whole module to find one function.
+
+## Questions the book answers
+
 ```bash
-npx warlock scry --search "new arrivals"
-npx warlock scry --flow catalog/new-arrivals
-npx warlock scry --impact src/app/catalog/models/product.model.ts
+npx warlock scry src/app/catalog/services/new-arrivals.service.ts   # what is this file?
+npx warlock scry --impact src/app/catalog/models/product.model.ts   # what breaks if I change it?
+npx warlock scry --route "POST /api/orders"                         # what is behind this URL?
+npx warlock scry --feature catalog                                  # the whole feature
+npx warlock scry --flow catalog/new-arrivals                        # one flow, step by step
 ```
 
-Read the feature's `README.md` and the flow file, then only the files the flow's book map lists.
+Add `--json` for machine-readable output. `--impact` lists API routes, pages, flows and features,
+including features that only borrow the file. Read the flows it names and run their tests after
+your change.
+
+A file's entry is also at a fixed path: `src/app/auth/controllers/login.controller.ts` is described
+in `grimoire/book/app/auth/controllers/login.controller.json`.
+
+## Commands
+
+| Command | Does |
+| --- | --- |
+| `warlock grimoire build` | Builds or refreshes the book. `scry` and `check` do it when it is stale |
+| `warlock grimoire check` | Reports broken names, untested criteria, files with no owner. Exit 1 on an error |
+| `warlock grimoire release <release>` | Writes the collected list into `grimoire/releases/<release>.md` |
+| `warlock grimoire export [dir]` | Writes the book as a static site |
+| `warlock explain GR2001` | Explains a finding code |
+
+Every finding has a code (`GR2001`) and a fix hint. A finding marked `(expected)` belongs to work
+that is still `proposed`; it does not fail the check.
+
+## What to trust
+
+- **Exports, imports, importers, routes, middleware, pages:** read from the code. Trust them.
+- **Files behind a route:** every file the handler can reach through imports. It is not the exact
+  call path; open the handler to see which ones it really uses.
+- **Reached from:** only links and redirects written as plain values. `unknown` means look.
+- **Written files:** they say what should happen. When the code disagrees with a flow, do not
+  pick one silently. Say which is wrong, and fix it or ask the owner.
+
+## When there is nothing to find
+
+- No flow matches the task: the behaviour is undescribed. Describe it first with
+  `write-a-feature`, then change the code.
+- The command says the book is missing or stale: it rebuilds on its own. If it reports problems,
+  read them; `npx warlock grimoire check` prints the same list.
+- The project has code but no `grimoire/` folder: use `backfill-a-grimoire`.
+
+## See also
+
+`write-a-feature`, `record-a-change`, `describe-an-app`, `document-a-file`, `backfill-a-grimoire`.
 
 ## From code
 
-The same answers are available as functions from `@warlock.js/grimoire`, for tools that build on
-the Grimoire:
+The same answers are available as functions, for tools that build on the Grimoire.
+
+From `@warlock.js/grimoire` (no dependency on core or web):
 
 - `openGrimoire` loads everything once (it runs `parseGrimoire`, `buildBook`, `matchApps`,
   `resolveOwnership`, `scanProofs`, `readTestResults`, `buildCollectedFiles`, then `writeBook`
@@ -50,4 +121,16 @@ the Grimoire:
   results into a criterion's status; `CASE_QUESTIONS` lists the questions every flow answers.
 - Helpers: `loadBook`, `readFrontMatter`, `fileGraph`, `importClosure`, `importerClosure`,
   `bookEntryPath`, `bookEntryPaths`, `toPosixPath`, `GRIMOIRE_DIR`, `GRIMOIRE_PATHS`,
-  `GRIMOIRE_IGNORE_RULES` and `BOOK_SCHEMA_VERSION`.
+  `GRIMOIRE_IGNORE_RULES` (the `.gitignore` lines) and `BOOK_SCHEMA_VERSION`.
+
+From `@warlock.js/grimoire/warlock` (needs `@warlock.js/core`): `registerGrimoireCommands` returns
+the `grimoire` and `scry` commands for `cli.commands` in `warlock.config.ts`;
+`createWarlockAdapter` builds the adapter that feeds the book from the inspect report;
+`collectMobileFacts` lists mobile screens from Expo Router file names.
+
+From `@warlock.js/grimoire/vitest`: `grimoireReporter` records the last result of every test marked
+`// @proves` into `grimoire/book/test-results.json`. Add it to the Vitest `reporters` list.
+
+From `@warlock.js/grimoire/devtools`: `grimoireDevtoolsPanel` (the default export) is the Grimoire
+tab for `@warlock.js/devtools`, listed in `panels` of `src/config/devtools.ts`;
+`exportGrimoireSite` writes the same view as a static site.

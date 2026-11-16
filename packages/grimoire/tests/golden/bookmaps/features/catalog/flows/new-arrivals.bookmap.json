@@ -1,0 +1,92 @@
+{
+  "schemaVersion": 1,
+  "feature": "catalog",
+  "flow": "new-arrivals",
+  "ref": "catalog/new-arrivals",
+  "steps": [
+    {
+      "index": 1,
+      "kind": "page",
+      "target": "/",
+      "found": true,
+      "entry": "src/web/$sites/client/home.page.tsx",
+      "files": [
+        "mobile/app/index.tsx",
+        "src/app/catalog/models/product.model.ts",
+        "src/app/catalog/repositories/products.repository.ts",
+        "src/app/catalog/services/new-arrivals.service.ts",
+        "src/web/$sites/client/home.page.tsx",
+        "src/web/$sites/client/home.setup.ts"
+      ]
+    },
+    {
+      "index": 2,
+      "kind": "route",
+      "target": "GET /api/products/new-arrivals",
+      "found": true,
+      "entry": "src/app/catalog/controllers/new-arrivals.controller.ts",
+      "files": [
+        "src/app/catalog/controllers/new-arrivals.controller.ts",
+        "src/app/catalog/models/product.model.ts",
+        "src/app/catalog/repositories/products.repository.ts",
+        "src/app/catalog/routes.ts",
+        "src/app/catalog/services/new-arrivals.service.ts"
+      ]
+    }
+  ],
+  "criteria": [
+    {
+      "id": "AC-1",
+      "app": null,
+      "text": "the newest products come first",
+      "tests": [
+        {
+          "file": "src/app/catalog/tests/new-arrivals.test.ts",
+          "line": 12,
+          "name": "lists the newest products first",
+          "result": "not-run",
+          "stale": false
+        }
+      ],
+      "status": "not-run"
+    },
+    {
+      "id": "AC-2",
+      "app": null,
+      "text": "a customer with no country sees the global list",
+      "tests": [
+        {
+          "file": "src/app/catalog/tests/new-arrivals.test.ts",
+          "line": 17,
+          "name": "returns the global list when the customer has no country",
+          "result": "not-run",
+          "stale": false
+        }
+      ],
+      "status": "not-run"
+    },
+    {
+      "id": "AC-3",
+      "app": "mobile",
+      "text": "the device's country is used when the customer has none",
+      "tests": [],
+      "status": "no-test"
+    }
+  ],
+  "shownBy": [
+    {
+      "app": "mobile",
+      "type": "screen",
+      "id": "home",
+      "block": "New arrivals",
+      "file": "grimoire/apps/mobile/screens/home/README.md"
+    },
+    {
+      "app": "web-client",
+      "type": "page",
+      "id": "home",
+      "block": "New arrivals",
+      "file": "grimoire/apps/web-client/pages/home/README.md"
+    }
+  ]
+}

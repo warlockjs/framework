@@ -1,0 +1,89 @@
+{
+  "schemaVersion": 1,
+  "feature": "catalog",
+  "flow": "browse-products",
+  "ref": "catalog/browse-products",
+  "steps": [
+    {
+      "index": 1,
+      "kind": "route",
+      "target": "GET /api/products",
+      "found": true,
+      "entry": "src/app/catalog/controllers/products.controller.ts",
+      "files": [
+        "src/app/catalog/controllers/products.controller.ts",
+        "src/app/catalog/models/product.model.ts",
+        "src/app/catalog/repositories/products.repository.ts",
+        "src/app/catalog/routes.ts",
+        "src/app/shared/utils/money.ts"
+      ]
+    },
+    {
+      "index": 2,
+      "kind": "page",
+      "target": "/products/:id",
+      "found": true,
+      "entry": "src/web/$sites/client/products/show.page.tsx",
+      "files": [
+        "mobile/app/products/[id].tsx",
+        "src/app/catalog/models/product.model.ts",
+        "src/app/catalog/repositories/products.repository.ts",
+        "src/web/$sites/client/products/show.page.tsx",
+        "src/web/$sites/client/products/show.setup.ts"
+      ]
+    },
+    {
+      "index": 3,
+      "kind": "route",
+      "target": "GET /api/products/:id",
+      "found": true,
+      "entry": "src/app/catalog/controllers/products.controller.ts",
+      "files": [
+        "src/app/catalog/controllers/products.controller.ts",
+        "src/app/catalog/models/product.model.ts",
+        "src/app/catalog/repositories/products.repository.ts",
+        "src/app/catalog/routes.ts",
+        "src/app/shared/utils/money.ts"
+      ]
+    }
+  ],
+  "criteria": [
+    {
+      "id": "AC-1",
+      "app": null,
+      "text": "the list shows 50 products per page",
+      "tests": [],
+      "status": "no-test"
+    },
+    {
+      "id": "AC-2",
+      "app": null,
+      "text": "an unknown product id shows the 404 page",
+      "tests": [],
+      "status": "no-test"
+    },
+    {
+      "id": "AC-3",
+      "app": "mobile",
+      "text": "the product screen shows the price in the device currency",
+      "tests": [],
+      "status": "no-test"
+    }
+  ],
+  "shownBy": [
+    {
+      "app": "web-client",
+      "type": "page",
+      "id": "home",
+      "block": "Featured products",
+      "file": "grimoire/apps/web-client/pages/home/README.md"
+    },
+    {
+      "app": "web-client",
+      "type": "page",
+      "id": "product",
+      "block": "Details",
+      "file": "grimoire/apps/web-client/pages/product/README.md"
+    }
+  ]
+}

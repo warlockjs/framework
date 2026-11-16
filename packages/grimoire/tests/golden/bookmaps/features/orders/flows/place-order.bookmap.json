@@ -1,0 +1,179 @@
+{
+  "schemaVersion": 1,
+  "feature": "orders",
+  "flow": "place-order",
+  "ref": "orders/place-order",
+  "steps": [
+    {
+      "index": 1,
+      "kind": "page",
+      "target": "/products/:id",
+      "found": true,
+      "entry": "src/web/$sites/client/products/show.page.tsx",
+      "files": [
+        "mobile/app/products/[id].tsx",
+        "src/app/catalog/models/product.model.ts",
+        "src/app/catalog/repositories/products.repository.ts",
+        "src/web/$sites/client/products/show.page.tsx",
+        "src/web/$sites/client/products/show.setup.ts"
+      ]
+    },
+    {
+      "index": 2,
+      "kind": "route",
+      "target": "POST /api/orders",
+      "found": true,
+      "entry": "src/app/orders/controllers/place-order.controller.ts",
+      "files": [
+        "src/app/catalog/models/product.model.ts",
+        "src/app/catalog/repositories/products.repository.ts",
+        "src/app/orders/controllers/place-order.controller.ts",
+        "src/app/orders/events/order-placed.event.ts",
+        "src/app/orders/jobs/send-receipt.job.ts",
+        "src/app/orders/mails/order-confirmation.mail.ts",
+        "src/app/orders/routes.ts",
+        "src/app/orders/services/place-order.service.ts"
+      ]
+    },
+    {
+      "index": 3,
+      "kind": "outside service",
+      "target": "payment gateway",
+      "found": null,
+      "entry": null,
+      "files": []
+    },
+    {
+      "index": 4,
+      "kind": "event",
+      "target": "order.placed",
+      "found": true,
+      "entry": "src/app/orders/events/order-placed.event.ts",
+      "files": [
+        "src/app/orders/events/order-placed.event.ts"
+      ]
+    },
+    {
+      "index": 5,
+      "kind": "affects",
+      "target": "catalog/browse-products",
+      "found": true,
+      "entry": null,
+      "files": []
+    },
+    {
+      "index": 6,
+      "kind": "mail",
+      "target": "order-confirmation",
+      "found": true,
+      "entry": "src/app/orders/mails/order-confirmation.mail.ts",
+      "files": [
+        "src/app/orders/mails/order-confirmation.mail.ts"
+      ]
+    },
+    {
+      "index": 7,
+      "kind": "job",
+      "target": "send-receipt",
+      "found": true,
+      "entry": "src/app/orders/jobs/send-receipt.job.ts",
+      "files": [
+        "src/app/orders/jobs/send-receipt.job.ts"
+      ]
+    },
+    {
+      "index": 8,
+      "kind": "notification",
+      "target": "order-shipped",
+      "found": true,
+      "entry": "src/app/orders/notifications/order-shipped.notification.ts",
+      "files": [
+        "src/app/orders/notifications/order-shipped.notification.ts"
+      ]
+    }
+  ],
+  "criteria": [
+    {
+      "id": "AC-1",
+      "app": null,
+      "text": "the order is saved and the stock goes down",
+      "tests": [
+        {
+          "file": "src/app/orders/tests/place-order.test.ts",
+          "line": 12,
+          "name": "saves the order and lowers the stock",
+          "result": "not-run",
+          "stale": false
+        }
+      ],
+      "status": "not-run"
+    },
+    {
+      "id": "AC-2",
+      "app": null,
+      "text": "a product out of stock is refused",
+      "tests": [
+        {
+          "file": "src/app/orders/tests/place-order.test.ts",
+          "line": 17,
+          "name": "refuses a product that is out of stock",
+          "result": "not-run",
+          "stale": false
+        }
+      ],
+      "status": "not-run"
+    },
+    {
+      "id": "AC-3",
+      "app": null,
+      "text": "a customer places an order from the product page",
+      "tests": [
+        {
+          "file": "e2e/checkout.e2e.ts",
+          "line": 6,
+          "name": "a customer places an order from the product page",
+          "result": "not-run",
+          "stale": false
+        }
+      ],
+      "status": "not-run"
+    },
+    {
+      "id": "AC-4",
+      "app": "web-admin",
+      "text": "a new order appears first in the orders list",
+      "tests": [],
+      "status": "no-test"
+    }
+  ],
+  "shownBy": [
+    {
+      "app": "web-admin",
+      "type": "page",
+      "id": "orders",
+      "block": "Orders list",
+      "file": "grimoire/apps/web-admin/pages/orders/README.md"
+    },
+    {
+      "app": "web-client",
+      "type": "layout",
+      "id": "site",
+      "block": "Cart count",
+      "file": "grimoire/apps/web-client/layouts/site.md"
+    },
+    {
+      "app": "web-client",
+      "type": "page",
+      "id": "home",
+      "block": "Recent orders",
+      "file": "grimoire/apps/web-client/pages/home/README.md"
+    },
+    {
+      "app": "web-client",
+      "type": "page",
+      "id": "product",
+      "block": "Order button",
+      "file": "grimoire/apps/web-client/pages/product/README.md"
+    }
+  ]
+}

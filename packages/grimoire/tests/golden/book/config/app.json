@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "file": "src/config/app.ts",
+  "module": "src/config",
+  "type": "config",
+  "lines": 5,
+  "about": "Names the app and its locales.",
+  "feature": null,
+  "borrowedBy": [],
+  "flows": [],
+  "exports": [
+    {
+      "name": "default",
+      "about": null
+    }
+  ],
+  "packages": [],
+  "imports": [],
+  "importedBy": [],
+  "routes": [],
+  "pages": [],
+  "screens": []
+}

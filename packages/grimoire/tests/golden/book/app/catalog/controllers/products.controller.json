@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "file": "src/app/catalog/controllers/products.controller.ts",
+  "module": "src/app/catalog",
+  "type": "controller",
+  "lines": 9,
+  "about": "Answers the product list and product detail requests.",
+  "feature": "catalog",
+  "borrowedBy": [],
+  "flows": [],
+  "exports": [
+    {
+      "name": "ProductsController",
+      "about": "Lists products and shows one product."
+    }
+  ],
+  "packages": [],
+  "imports": [
+    "src/app/catalog/repositories/products.repository.ts",
+    "src/app/shared/utils/money.ts"
+  ],
+  "importedBy": [
+    "src/app/catalog/routes.ts"
+  ],
+  "routes": [
+    {
+      "method": "GET",
+      "path": "/api/products",
+      "name": "catalog.products.index",
+      "via": "handles"
+    },
+    {
+      "method": "GET",
+      "path": "/api/products/:id",
+      "name": "catalog.products.show",
+      "via": "handles"
+    }
+  ],
+  "pages": [],
+  "screens": []
+}

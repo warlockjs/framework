@@ -1,35 +1,15 @@
 /**
- * `scry` (owned by T-130): answers a query from a snapshot, and prints it.
+ * `scry`: answers a question about the project from a snapshot, and prints
+ * it. The CLI (`warlock scry`), the MCP tools and the devtools tab share it.
+ *
+ * - `file`: the file's book entry (owner, flows, exports, imports, importers).
+ * - `impact`: everything that reaches the file through imports (routes,
+ *   pages, flows, features including borrowers, tests).
+ * - `route`: a route's handler, guard and the files behind it.
+ * - `feature` / `flow`: the written description with its book map.
+ * - `search`: words over ids, paths, export names, header sentences, routes,
+ *   flows, blocks and tasks.
  */
-import type { ScryQuery, ScryResult } from "../contracts/scry";
-import type { GrimoireSnapshot } from "../contracts/snapshot";
-
-/**
- * Answer one query. Throws a `GrimoireError`: `GR9001` for a file not in the
- * book, `GR9002` no route, `GR9003` no feature, `GR9004` no flow. Pure.
- */
-export function scry(snapshot: GrimoireSnapshot, query: ScryQuery): ScryResult {
-  void snapshot;
-  void query;
-  throw new Error("not implemented");
-}
-
-/** The compact text of a result (formats in ARCHITECTURE.md). */
-export function formatScryResult(result: ScryResult): string[] {
-  void result;
-  throw new Error("not implemented");
-}
-
-/**
- * The query of `warlock scry` arguments: a positional file, or one of the
- * options `impact`, `route`, `feature`, `flow`, `search` (with `limit`).
- * Throws `GrimoireError` `GR9006` for none, several, or a malformed value.
- */
-export function parseScryQuery(
-  args: readonly string[],
-  options: Readonly<Record<string, string | boolean | number>>,
-): ScryQuery {
-  void args;
-  void options;
-  throw new Error("not implemented");
-}
+export { formatScryResult } from "./format";
+export { parseFeatureText, parseFlowText, parseLimit, parseRouteText, parseScryQuery } from "./parse";
+export { scry, type ScryFileAnswer } from "./query";

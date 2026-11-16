@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "file": "src/app/orders/notifications/order-shipped.notification.ts",
+  "module": "src/app/orders",
+  "type": "source",
+  "lines": 10,
+  "about": "Tells the customer the order has shipped.",
+  "feature": "orders",
+  "borrowedBy": [],
+  "flows": [],
+  "exports": [
+    {
+      "name": "orderShipped",
+      "about": "Pushes a notification with the tracking link."
+    }
+  ],
+  "packages": [
+    "@warlock.js/notifications"
+  ],
+  "imports": [],
+  "importedBy": [],
+  "routes": [],
+  "pages": [],
+  "screens": []
+}

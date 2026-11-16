@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "file": "src/web/$sites/admin/orders.page.tsx",
+  "module": "src/web",
+  "type": "page",
+  "lines": 5,
+  "about": "Lists recent orders for staff.",
+  "feature": null,
+  "borrowedBy": [],
+  "flows": [],
+  "exports": [
+    {
+      "name": "default",
+      "about": null
+    }
+  ],
+  "packages": [],
+  "imports": [],
+  "importedBy": [],
+  "routes": [
+    {
+      "method": "GET",
+      "path": "/admin/orders",
+      "name": "orders",
+      "via": "handles"
+    }
+  ],
+  "pages": [
+    {
+      "site": "admin",
+      "route": "/admin/orders",
+      "via": "page"
+    }
+  ],
+  "screens": []
+}

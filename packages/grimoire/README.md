@@ -10,6 +10,10 @@ meet it (**apps**: sites, mobile apps, pages and blocks) and the work (**tasks**
 **releases**), all in a visible `grimoire/` folder. The written files point into the book by name,
 and a read-only check reports every name that no longer exists.
 
+New Warlock.js apps include Grimoire already. In an existing app, `warlock add grimoire` installs the
+package, registers the commands in `warlock.config.ts`, adds the generated files to `.gitignore`,
+mounts the devtools tab and, when the app runs Vitest, adds `grimoireReporter()`.
+
 ```sh
 npx warlock add grimoire
 npx warlock grimoire build
@@ -34,3 +38,19 @@ Entries:
 - `@warlock.js/grimoire/devtools`: the Grimoire tab of the devtools dashboard.
 
 Docs: https://warlock.js.org/v/latest/grimoire/
+
+## Who writes what
+
+| | Written by |
+| --- | --- |
+| `grimoire/book/`, `index.json`, `bookmap.json`, `*.bookmap.json` | Warlock. Never edit; not in git |
+| Features, flows, apps, tasks, release briefs, changelogs | The agent (or you) |
+| The collected list in a release file | `warlock grimoire release <version>`, between two markers |
+
+Warlock never edits a file an agent wrote. The agent writes release numbers and dates into the
+feature changelogs and the release brief, then runs the release command.
+
+## Skills
+
+The package ships skills for agents: `use-the-grimoire`, `write-a-feature`, `record-a-change`,
+`describe-an-app`, `document-a-file` and `backfill-a-grimoire`.

@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "file": "src/app/orders/mails/order-confirmation.mail.ts",
+  "module": "src/app/orders",
+  "type": "mail",
+  "lines": 10,
+  "about": "Sends the order confirmation email.",
+  "feature": "orders",
+  "borrowedBy": [],
+  "flows": [],
+  "exports": [
+    {
+      "name": "sendOrderConfirmation",
+      "about": "Emails the customer the order number and total."
+    }
+  ],
+  "packages": [
+    "@warlock.js/core"
+  ],
+  "imports": [],
+  "importedBy": [
+    "src/app/orders/services/place-order.service.ts"
+  ],
+  "routes": [],
+  "pages": [],
+  "screens": []
+}

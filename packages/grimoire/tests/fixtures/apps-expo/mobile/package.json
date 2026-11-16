@@ -1,0 +1,1 @@
+{ "name": "expo-fixture", "dependencies": { "expo": "*", "expo-router": "*" } }

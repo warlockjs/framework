@@ -1,0 +1,13 @@
+catalog  Product catalog  shipped 2.1  updated 2026-11-10  apps web-client, mobile
+flows     browse-products  shipped  since 1.0
+          new-arrivals     shipped  since 2.0
+          wishlist         proposed since 3.0
+own       8 files  (unreached: none)
+borrows   src/app/shared/utils/money.ts
+routes    GET /api/products  GET /api/products/new-arrivals  GET /api/products/:id
+pages     web-client /products/:id
+changes   2.1 fixed new-arrivals: a customer with no country saw an empty list … (unreleased)
+          2.0 added new-arrivals: customers see the newest products sold in … (1.0.0, 2026-10-01)
+          1.0 added browse-products: customers list products and open one (1.0.0, 2026-10-01)
+tasks     T-014 waiting for approval  Let customers save products to a wishlist
+check     0 errors, 4 warnings, 8 expected

@@ -1,0 +1,492 @@
+---
+title: Written files
+description: The fixed structure of every file agents write under grimoire/ (features, changelogs, flows, apps, pages, blocks, tasks and releases), the grammar of each line, and the structure codes the check reports.
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+<Aside type="caution" title="Experimental">
+  Grimoire is experimental in 5.55. The structure of the written files and the commands may still
+  change before they are declared stable.
+</Aside>
+
+Agents write the files under `grimoire/features/`, `grimoire/apps/`, `grimoire/tasks/` and `grimoire/releases/`.
+Each kind of file has a fixed template. Warlock reads these files and never edits them. The one exception is the
+collected list of a release file, between its two markers, which `warlock grimoire release` writes.
+
+A file that does not follow its template gives a structure finding (`GR1001` to `GR1028`) with the file and line.
+Warlock still reads everything else in the file, so the other checks keep working. The full list of codes is at the
+[end of this page](#structure-codes).
+
+## The layout
+
+```text
+grimoire/
+  features/
+    <feature>/
+      README.md                    the feature as it is now
+      CHANGELOG.md                 one entry per feature version
+      flows/<flow>.md              one path through the feature
+      versions/v<n>.md             the brief written before a whole-number version
+  apps/
+    <app>/
+      README.md                    one site or mobile app and its conditions
+      layouts/<layout>.md          blocks every page of a layout shares
+      pages/<page>/README.md       a page of a site
+      pages/<page>/blocks/<block>.md
+      screens/<screen>/README.md   a screen of a mobile app
+      screens/<screen>/blocks/<block>.md
+  tasks/
+    open/T-<n>-<slug>.md
+    done/<yyyy-mm>/T-<n>-<slug>.md
+  releases/<release>.md
+```
+
+Warlock's own files are skipped: everything under `grimoire/book/`, `features/index.json`, `tasks/index.json`, any
+`.json` file in a feature folder and `flows/*.bookmap.json`. Files whose name starts with a dot (`.gitkeep`) are
+skipped too. Any other file in these folders is reported as not part of the layout (`GR1020`, a warning).
+
+## Rules for every file
+
+- **Text.** Files are UTF-8. Line endings may be LF or CRLF. Trailing spaces and extra blank lines are ignored.
+- **Front matter.** Files that have one start with a `---` line and end it with another. Each line is
+  `key: value`. Quotes around a value are removed. A list is written inline, `apps: [web-client, mobile]`, or as
+  `- item` lines under the key. A file whose template has no front matter (a changelog, a layout, a version brief)
+  must not have one.
+- **Values.**
+
+  | Value | Form | Example |
+  | --- | --- | --- |
+  | id (feature, flow, app, layout) | lower-case words joined by `-` | `new-arrivals` |
+  | feature version | `<whole>.<decimal>` | `2.1` |
+  | date | `yyyy-mm-dd`, a real day | `2026-11-10` |
+  | task id | `T-<n>` | `T-14` |
+  | flow reference | `<feature>/<flow>` | `catalog/new-arrivals` |
+  | folder | relative to the project root; `\` is read as `/`, `./` and a trailing `/` are dropped | `src/app/catalog` |
+
+- **Headings.** The `# ` title and the `## ` headings are compared without case and extra spaces, so
+  `## Acceptance Criteria` matches `## Acceptance criteria`. A `## ` heading the template does not have is a warning
+  (`GR1007`). Deeper headings and text between the lines of a section are free.
+- **List lines.** A list line is a `-` or `*` bullet, a name, **two or more spaces** (or a tab), then the text:
+
+  ```md
+  - outside service down   the payment gateway is down → the order waits
+  ```
+
+  A longer text goes on indented lines right below; they are joined with one space:
+
+  ```md
+  - 2.1  fixed   new-arrivals: a customer with no country saw an empty list
+                 instead of the global one (AC-2)
+  ```
+
+- **Code fences.** Lines inside a fenced code block (three backticks or `~~~`) are never read as headings, steps or `Unknown:` lines.
+
+## Features
+
+### `features/<feature>/README.md`
+
+```md
+---
+id: catalog
+title: Product catalog
+status: shipped
+version: 2.1
+updated: 2026-11-10
+apps: [web-client, mobile]
+folders: [src/app/catalog, src/web/$sites/client/products]
+---
+
+# Product catalog
+
+Customers browse products, see what is new in their country, and will save products for later.
+
+## Flows
+- browse-products   list products and open one
+- new-arrivals      the newest products sold in the customer's country
+- wishlist          save a product for later
+
+## Affects and affected by
+- affected by orders/place-order (lowers stock)
+```
+
+| Key | Required | Value |
+| --- | --- | --- |
+| `id` | yes | an id, equal to the folder name |
+| `title` | yes | free text |
+| `status` | yes | `proposed`, `building`, `shipped` or `retired` |
+| `version` | yes | the feature version |
+| `updated` | yes | the date the README last changed |
+| `apps` | yes | app ids under `grimoire/apps/` (may be empty) |
+| `folders` | yes | the folders whose files belong to the feature (may be empty) |
+| `origin` | no | `inferred` (described from the code) or `confirmed` (the default) |
+
+Headings: the `# ` title is required. `## Flows` and `## Affects and affected by` are optional.
+
+- `## Flows` lists each flow as `- <flow-id>   <what it does>`. Each listed flow needs its file
+  `flows/<flow-id>.md` (`GR1026`), and each flow file should be listed (`GR1027`, a warning).
+- `## Affects and affected by` is free text. Every `<feature>/<flow>` written in it is read as a reference.
+
+### `features/<feature>/CHANGELOG.md`
+
+No front matter. Sections, newest first:
+
+```md
+## Unreleased
+- 2.1  fixed     new-arrivals: a customer with no country saw an empty list
+                 instead of the global one (AC-2)
+
+## 1.0.0 (2026-10-01)
+- 2.0  added     new-arrivals: customers see the newest products sold in their country
+- 1.0  added     browse-products: customers list products and open one
+```
+
+- A section heading is `## Unreleased` or `## <release> (<yyyy-mm-dd>)`. Anything else at `##` or below is
+  `GR1017`. A `# ` title line is allowed and skipped.
+- An entry is `- <version>  <word>  <text>`, with two or more spaces between the parts (`GR1015`). The word is
+  `added`, `changed`, `fixed` or `removed` (`GR1016`).
+- The text may start with the flow id and a colon (`new-arrivals: …`) and end with the criteria it concerns in
+  parentheses (`(AC-2)`, `(AC-1, AC-3)`).
+- Every other line must be blank or a continuation of an entry.
+
+**Releasing.** New entries go under `## Unreleased`, with no date and no release number. At release time the agent
+writes the release file, moves the entries the release ships into a new section `## <release> (<yyyy-mm-dd>)` with
+the release file's date, then runs `warlock grimoire release <release>`. The command collects only the entries
+under that section; entries still under `## Unreleased` are left out and named in a note. Warlock never edits the
+changelog. The check reports a listed entry with no matching release and date, and a release section with no release
+file or a different date.
+
+### `features/<feature>/flows/<flow>.md`
+
+```md
+---
+id: wishlist
+since: 3.0
+status: proposed
+who: customer
+---
+
+# Save a product to the wishlist
+
+## Steps
+1. page           /products/:id
+2. route          POST /api/wishlist
+3. notification   wishlist-price-drop
+4. page           /wishlist
+
+## Differs by app
+- mobile   the save button is also on the product card in lists
+
+## Cases
+- invalid input         the product does not exist → 404
+- not allowed           guest → sent to sign in, then back to the product
+- not found             a removed product disappears from the list
+- duplicate             already saved → stays saved, no error
+- limits                at most 200 products
+- expiry                does not apply: saved products do not expire
+- double submit         two taps save once
+- outside service down  does not apply: no outside service
+
+## Acceptance criteria
+- AC-1            a saved product appears on /wishlist
+- AC-2            saving twice keeps one entry
+- AC-3            a guest is sent to sign in and returns to the product
+- AC-4 [mobile]   the product card has a save button
+```
+
+| Key | Required | Value |
+| --- | --- | --- |
+| `id` | yes | an id, equal to the file name without `.md` |
+| `since` | yes | the feature version that introduced the flow |
+| `status` | yes | `proposed`, `building`, `shipped` or `retired` |
+| `who` | yes | who walks the flow: `customer`, `guest`, `admin`, `system`, … |
+| `origin` | no | `inferred` or `confirmed` |
+
+Headings: the `# ` title, `## Steps`, `## Cases` and `## Acceptance criteria` are required. `## Differs by app`
+and `## Not handled` are optional.
+
+A flow is named `<feature>/<flow>` everywhere else: in blocks, tasks, `affects` steps and `@proves` lines.
+
+**Steps** are numbered `1.`, `2.`, `3.` in order (`GR1010`). Each is `<n>. <kind>   <name>`, with two or more spaces
+after the kind (`GR1008`), and an optional note after ` — ` or ` -- `:
+
+```md
+3. route   GET /api/products/:id — the page loads it through its setup file
+```
+
+| Kind | The name is | Example |
+| --- | --- | --- |
+| `page` | the route path of a page or screen | `/products/:id` |
+| `route` | `<METHOD> /path`; the method is one of `GET POST PUT PATCH DELETE HEAD OPTIONS ALL` | `POST /api/orders` |
+| `mail` | the mail's name in code | `order-confirmation` |
+| `notification` | the notification's name in code | `order-shipped` |
+| `job` | the job's name in code | `send-receipt` |
+| `event` | the event's name in code | `order.placed` |
+| `outside service` | free text naming the service | `payment gateway` |
+| `affects` | another feature, or `<feature>/<flow>` | `catalog/browse-products` |
+
+Any other kind is `GR1009`.
+
+**Cases** are `- <question>   <answer>` lines (`GR1011`). Every flow answers these eight questions, under
+`## Cases` or under `## Not handled` (`GR1012`, a warning):
+
+`invalid input`, `not allowed`, `not found`, `duplicate`, `limits`, `expiry`, `double submit`,
+`outside service down`.
+
+An answer that starts with `does not apply` marks the question as not relevant; say why after it. A case with
+another question is read as the owner's own case.
+
+**Not handled** lists the questions the code does not handle yet, in the same `- <question>   <reason>` form.
+
+**Unknown lines.** A line that starts with `Unknown:` anywhere in the flow records an open question:
+
+```md
+Unknown: why does a vip skip the stock check?
+```
+
+**Acceptance criteria** are `- AC-<n>   <text>`, or `- AC-<n> [<app-id>]   <text>` for a criterion that holds in
+one app only (`GR1013`). Number them from `AC-1` and never renumber; a number used twice in one flow is `GR1014`.
+
+**Differs by app** lines are `- <app-id>   <what differs>` (`GR1028`).
+
+### `features/<feature>/versions/v<n>.md`
+
+The brief written before a whole-number version (`v3.md` before `3.0`): no front matter, a `# ` title, then free
+text (why, what changes, what is out of scope). A file in `versions/` with another name is not part of the layout.
+
+## Apps
+
+### `apps/<app>/README.md`
+
+```md
+---
+id: web-client
+type: site
+root: src/web/$sites/client
+---
+
+# The shop website
+
+## Conditions
+- guest               not signed in
+- customer            signed in
+- vip                 customer with the vip membership
+- pref:personalised   the customer left personalised content on
+```
+
+| Key | Required | Value |
+| --- | --- | --- |
+| `id` | yes | an id, equal to the folder name |
+| `type` | yes | `site` or `mobile` |
+| `root` | yes | the folder of the site or mobile app, relative to the project root |
+
+Headings: `## Conditions` is required. Each condition is `- <name>   <meaning>`. Pages and blocks of this app use
+only these names.
+
+### The blocks table
+
+Layouts, pages and screens describe their parts in a `## Blocks` table:
+
+```md
+## Blocks
+| Block             | Flow                     | Who sees it | Changes with                                  |
+| ----------------- | ------------------------ | ----------- | --------------------------------------------- |
+| Featured products | catalog/browse-products  | everyone    | vip: member prices; pref:personalised: picks |
+| New arrivals      | catalog/new-arrivals     | everyone    | the customer's country                        |
+| Recent orders     | orders/place-order       | customer    | —                                             |
+```
+
+- The header row is exactly `Block | Flow | Who sees it | Changes with` (any case), then a separator row. Outer
+  pipes are optional. Text before the table is allowed; the table ends at the first line without a `|`.
+- **Block**: the name of the part. Required.
+- **Flow**: `<feature>/<flow>`, or `—` (or `-`, or empty) when the part shows no flow.
+- **Who sees it**: `everyone`, or condition names separated by `,`.
+- **Changes with**: items separated by `;`. An item `<condition>: <text>` names a condition; any other item is free
+  text. `—` means nothing changes.
+- A `|` inside a cell is written `\|`.
+
+Any other shape is `GR1018`.
+
+### `apps/<app>/layouts/<layout>.md`
+
+No front matter. A `# ` title and a required `## Blocks` table with the parts every page of the layout shares.
+
+### `apps/<app>/pages/<page>/README.md` and `apps/<app>/screens/<screen>/README.md`
+
+```md
+---
+route: /products/:id
+layout: site
+---
+
+# Product
+
+One product with its price, stock and the order button.
+
+## Blocks
+| Block        | Flow                     | Who sees it | Changes with      |
+| ------------ | ------------------------ | ----------- | ----------------- |
+| Details      | catalog/browse-products  | everyone    | vip: member price |
+| Order button | orders/place-order       | customer    | —                 |
+
+## Also reached from
+- mail   order-confirmation
+```
+
+| Key | Required | Value |
+| --- | --- | --- |
+| `route` | yes for a page | the page's route path, starting with `/` |
+| `screen` | for a screen, `route` or `screen` | the screen's name, when the mobile app defines navigation in code |
+| `layout` | no | a layout id of this app |
+
+Headings: the `# ` title is required, and the paragraph under it is the page's purpose. `## Blocks` and
+`## Also reached from` are optional. Entry points are `- <kind>   <name>` (`mail`, `notification`, `page`,
+`screen`, `outside service`).
+
+A mobile app with file-based routing gives each screen a `route`. A mobile app that defines its navigation in code
+gives each screen its `screen` name.
+
+### `apps/<app>/pages/<page>/blocks/<block>.md`
+
+Only when a block has something to say about this page in particular:
+
+```md
+---
+flow: catalog/new-arrivals
+---
+
+# New arrivals on the home page
+
+- position   second row, under Featured products
+- shows      a grid of up to 20 products
+- on phones  one row that scrolls sideways
+```
+
+`flow` is required. Detail lines are `- <name>   <text>`; other text is free.
+
+## Tasks
+
+`tasks/open/T-<n>-<slug>.md` while open, `tasks/done/<yyyy-mm>/T-<n>-<slug>.md` once done. A task file elsewhere,
+or with another name, is `GR1023`. Two files with one id are `GR1022`.
+
+```md
+---
+id: T-014
+type: feature
+feature: catalog
+flow: wishlist
+apps: [web-client, mobile]
+status: waiting for approval
+---
+
+# Let customers save products to a wishlist
+
+- Asked by: the owner, 2026-11-16
+- Why: customers ask to keep products for later
+- Brief: features/catalog/versions/v3.md
+- Decision needed: one wishlist per customer, or several named lists?
+```
+
+| Key | Required | Value |
+| --- | --- | --- |
+| `id` | yes | `T-<n>`, equal to the start of the file name |
+| `type` | yes | `bug`, `feature`, `decision` or `chore` |
+| `status` | yes | `open`, `waiting for approval`, `approved`, `in progress`, `blocked`, `done` or `dropped` |
+| `feature` | no | a feature id |
+| `flow` | no | a flow id of `feature`, or `<feature>/<flow>` |
+| `apps` | no | app ids |
+| `shipped` | in `done/` | `<feature> <version>`, like `catalog 2.1` |
+
+The body is free text. Lines `- <Key>: <value>` are read as fields; `Brief:` paths are relative to `grimoire/`, and a
+`Decision needed:` field puts the task on the list of tasks waiting for the owner.
+
+## Releases
+
+`releases/<release>.md`. The agent writes the front matter, the title and a short brief, and moves the shipped
+changelog entries under `## <release> (<date>)` in each feature's changelog. Then `warlock grimoire release <release>`
+writes the collected list below the brief, between two markers, and rewrites only that part when run again.
+
+```md
+---
+release: 1.0.0
+date: 2026-10-01
+---
+
+# Release 1.0.0
+
+The first release: customers browse products, see new arrivals, sign up and place orders.
+
+<!-- grimoire:collected:start -->
+## Changes
+
+### catalog
+- 2.0  added  new-arrivals: customers see the newest products sold in their country
+- 1.0  added  browse-products: customers list products and open one
+<!-- grimoire:collected:end -->
+```
+
+| Key | Required | Value |
+| --- | --- | --- |
+| `release` | yes | the release number, equal to the file name without `.md` |
+| `date` | yes | the release date |
+
+The `# ` title is required. Everything between the title and the start marker is the brief. The markers come in one
+pair, start first (`GR1024`). Between them: `## Changes`, a `### <feature>` heading per feature, entry lines in the
+changelog grammar (single spaces are allowed here), or `No feature changes.`.
+
+## Structure codes
+
+Every code links to its entry on [the check page](/v/latest/grimoire/guides/04-check/), with what to do.
+
+| Code | Severity | Reported when |
+| --- | --- | --- |
+| [`GR1001`](/v/latest/grimoire/guides/04-check/#gr1001) | error | a file whose template has front matter does not start with `---` |
+| [`GR1002`](/v/latest/grimoire/guides/04-check/#gr1002) | error | a front matter line is not `key: value`, a key is written twice, or the block is never closed |
+| [`GR1003`](/v/latest/grimoire/guides/04-check/#gr1003) | error | a required key is missing |
+| [`GR1004`](/v/latest/grimoire/guides/04-check/#gr1004) | error | a value has the wrong form: not an id, version, date or listed word, or a folder outside the project |
+| [`GR1005`](/v/latest/grimoire/guides/04-check/#gr1005) | warning | a key is not in the template, or a file whose template has no front matter has one |
+| [`GR1006`](/v/latest/grimoire/guides/04-check/#gr1006) | error | the `# ` title or a required `## ` heading is missing |
+| [`GR1007`](/v/latest/grimoire/guides/04-check/#gr1007) | warning | a `## ` heading is not in the template, or is written twice |
+| [`GR1008`](/v/latest/grimoire/guides/04-check/#gr1008) | error | a step is not `<n>. <kind>   <name>`, or its route or affects name has the wrong form |
+| [`GR1009`](/v/latest/grimoire/guides/04-check/#gr1009) | error | a step's kind is not one of the eight kinds |
+| [`GR1010`](/v/latest/grimoire/guides/04-check/#gr1010) | error | steps are not numbered 1, 2, 3 in order |
+| [`GR1011`](/v/latest/grimoire/guides/04-check/#gr1011) | error | a case is not `- <question>   <answer>` |
+| [`GR1012`](/v/latest/grimoire/guides/04-check/#gr1012) | warning | one of the eight questions is answered neither under Cases nor under Not handled |
+| [`GR1013`](/v/latest/grimoire/guides/04-check/#gr1013) | error | a criterion is not `- AC-<n>[ [app]]   <text>` |
+| [`GR1014`](/v/latest/grimoire/guides/04-check/#gr1014) | error | a criterion number is used twice in one flow |
+| [`GR1015`](/v/latest/grimoire/guides/04-check/#gr1015) | error | a changelog line, or a line of a release's collected list, is not an entry |
+| [`GR1016`](/v/latest/grimoire/guides/04-check/#gr1016) | error | an entry's word is not `added`, `changed`, `fixed` or `removed` |
+| [`GR1017`](/v/latest/grimoire/guides/04-check/#gr1017) | error | a changelog heading is not `## Unreleased` or `## <release> (<yyyy-mm-dd>)`, or is written twice |
+| [`GR1018`](/v/latest/grimoire/guides/04-check/#gr1018) | error | a Blocks section has no table, a wrong header or separator, or a bad row |
+| [`GR1019`](/v/latest/grimoire/guides/04-check/#gr1019) | error | an `id` (or `release`) differs from its folder or file name |
+| [`GR1020`](/v/latest/grimoire/guides/04-check/#gr1020) | warning | a file is where the layout has no place for it |
+| [`GR1021`](/v/latest/grimoire/guides/04-check/#gr1021) | error | a feature, app, page or screen folder has no `README.md` |
+| [`GR1022`](/v/latest/grimoire/guides/04-check/#gr1022) | error | two tasks, or two apps, use the same id |
+| [`GR1023`](/v/latest/grimoire/guides/04-check/#gr1023) | error | a task file is not named `T-<n>-<slug>.md`, or is not in `tasks/open/` or `tasks/done/<yyyy-mm>/` (it is then not read) |
+| [`GR1024`](/v/latest/grimoire/guides/04-check/#gr1024) | error | a release file's markers are not one start/end pair |
+| [`GR1025`](/v/latest/grimoire/guides/04-check/#gr1025) | error | a file cannot be read, or is not UTF-8 |
+| [`GR1026`](/v/latest/grimoire/guides/04-check/#gr1026) | error | the README lists a flow with no file |
+| [`GR1027`](/v/latest/grimoire/guides/04-check/#gr1027) | warning | a flow file is not listed in the README |
+| [`GR1028`](/v/latest/grimoire/guides/04-check/#gr1028) | error | another list line (Flows, Conditions, Differs by app, Not handled, Also reached from, block details) is not `- name   text` |
+
+## Reading the files from code
+
+`parseGrimoire(root)` from `@warlock.js/grimoire` reads every written file of a project and returns the parsed
+files with the structure findings. It never throws on a malformed file, and every value keeps the file and line it
+was read from.
+
+```ts
+import { parseGrimoire } from "@warlock.js/grimoire";
+
+const { written, findings } = await parseGrimoire(process.cwd());
+
+for (const finding of findings) {
+  console.log(`${finding.at?.file}:${finding.at?.line}  ${finding.code}  ${finding.message}`);
+}
+
+const wishlist = written.features
+  .find((feature) => feature.id === "catalog")
+  ?.flows.find((flow) => flow.ref === "catalog/wishlist");
+```
+
+A project without a `grimoire/` folder gives `written.exists === false` and no findings.

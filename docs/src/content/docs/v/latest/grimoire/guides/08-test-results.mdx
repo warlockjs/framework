@@ -1,0 +1,91 @@
+---
+title: Test results
+description: Prove an acceptance criterion with a test, and see its last result in the Grimoire with the Vitest reporter.
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+<Aside type="caution" title="Experimental">
+  Grimoire is experimental in 5.55. The structure of the written files and the commands may still
+  change before they are declared stable.
+</Aside>
+
+Every flow lists acceptance criteria (`AC-1`, `AC-2`, ...). A test proves a criterion when the line directly above
+it says so. The Vitest reporter records the last result of each proving test, so the Grimoire can tell you which
+criteria pass, which fail and which no test covers.
+
+## Prove a criterion
+
+Put a `@proves` comment on the line directly above the test:
+
+```ts
+// @proves catalog/wishlist AC-1
+it("adds a product to the wishlist", async () => {
+  // ...
+});
+```
+
+The format is `// @proves <feature>/<flow> AC-<n>`. One test proves one criterion. A criterion may have several
+proving tests.
+
+## Add the reporter
+
+Add it to the project's `vitest.config.ts`:
+
+```ts
+import { defineConfig } from "vitest/config";
+import { grimoireReporter } from "@warlock.js/grimoire/vitest";
+
+export default defineConfig({
+  test: {
+    reporters: ["default", grimoireReporter()],
+  },
+});
+```
+
+The reporter works with Vitest 5. It turns on Vitest's `includeTaskLocation` option itself, so a test is matched to
+its `@proves` line by position. If you run Vitest in a way that ignores that option, the reporter falls back to the
+test name.
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `root` | Vitest's `root`, else the current folder | Project root that holds `grimoire/`. |
+
+At the end of each run the reporter writes `grimoire/book/test-results.json` once, atomically. It never fails the
+run and adds no work while tests run. When it cannot write the file, it prints one warning and the run goes on.
+The reporter does not import `@warlock.js/core`.
+
+## What is recorded
+
+For each proving test: the feature, flow and criterion, the test file, the full test name, the line, the outcome
+(`pass`, `fail` or `skip`), the duration, the time of the run and a hash of the test file.
+
+- A partial run (one file, `--related`, a test name filter) replaces the results of the files it ran and keeps the
+  results of every other file.
+- A skipped test keeps the last real result when the test file has not changed since.
+- A run that was cut short leaves the results of unfinished files as they were.
+- `test-results.json` is not committed. The book builder never deletes it.
+
+## Criterion status
+
+| Status | Meaning |
+| --- | --- |
+| `pass` | Every proving test passed, and the test files have not changed since. |
+| `fail` | A proving test failed in its last run. |
+| `stale` | No test failed, but a result is older than its test file (the file changed after the run). |
+| `not-run` | A proving test has no result, or was skipped. |
+| `no-test` | No `@proves` line names the criterion. |
+
+Book maps, `warlock scry --flow` and the devtools tab show these statuses.
+
+## Check
+
+`warlock grimoire check` reads the results. It reports nothing until a run has written them.
+
+| Code | Severity | Meaning |
+| --- | --- | --- |
+| `GR4006` | error | A test proving a criterion failed in its last run. |
+| `GR4007` | warning | A criterion's result is older than its test file. Run the tests again. |
+| `GR4008` | warning | A criterion's test did not run (or was skipped) in the last run. |
+
+Findings of a flow whose status is `proposed` are shown as expected and never fail the check.

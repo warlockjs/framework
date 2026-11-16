@@ -62,7 +62,7 @@ export const GRIMOIRE_CODE_LIST = [
   define("GR1018", "structure", "error", "A blocks table has the wrong form", "Use the columns Block, Flow, Who sees it, Changes with; one row per part of the page.", APP),
   define("GR1019", "structure", "error", "An id does not match its folder or file name", "Make the front matter `id` (or `release`) equal the folder or file name.", WRITE),
   define("GR1020", "structure", "warning", "A file in the grimoire folder is not part of the layout", "Move the file to where the layout expects it, or remove it.", USE),
-  define("GR1021", "structure", "error", "A feature or app folder has no README.md", "Add README.md with the front matter of its template.", WRITE),
+  define("GR1021", "structure", "error", "A feature, app, page or screen folder has no README.md", "Add README.md with the front matter of its template.", WRITE),
   define("GR1022", "structure", "error", "Two files use the same id", "Give each feature, app or task its own id.", WRITE),
   define("GR1023", "structure", "error", "A task file is misnamed or misplaced", "Name tasks `T-<n>-<slug>.md`, in `tasks/open/` or `tasks/done/<yyyy-mm>/`.", RECORD),
   define("GR1024", "structure", "error", "The collected-list markers of a release file are broken", "Keep the start and end markers in pairs, or remove both and run `warlock grimoire release` again.", RECORD),

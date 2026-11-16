@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "file": "src/app/shared/utils/money.ts",
+  "module": "src/app/shared",
+  "type": "util",
+  "lines": 6,
+  "about": "Formats prices in the customer's currency.",
+  "feature": null,
+  "borrowedBy": [
+    "catalog"
+  ],
+  "flows": [],
+  "exports": [
+    {
+      "name": "formatMoney",
+      "about": "Returns the price with its currency sign, two decimals."
+    }
+  ],
+  "packages": [],
+  "imports": [],
+  "importedBy": [
+    "src/app/catalog/controllers/products.controller.ts"
+  ],
+  "routes": [],
+  "pages": [],
+  "screens": []
+}

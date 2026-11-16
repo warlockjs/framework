@@ -83,6 +83,15 @@ single skills with `agentKit.omit`.
 - **testing-strategy** — Vitest test pyramid with co-located `*.unit.spec.ts` unit files and `*.test.ts` integration files.
 - **git-workflow** — conventional commits, branching, PRs, and CI gates.
 
+## Project map (Grimoire, experimental)
+
+`grimoire/` describes what this app does and where things are. Before you search the code,
+read the **`use-the-grimoire`** skill and ask the map: `npx warlock scry --search "<words>"`,
+`npx warlock scry <file>` or `npx warlock scry --impact <file>`. When you add or change
+behaviour, follow its sibling skills (`write-a-feature`, `record-a-change`, `describe-an-app`,
+`document-a-file`, `backfill-a-grimoire`). Never edit files Warlock generates
+(`grimoire/book/`, `index.json`, `*.bookmap.json`).
+
 ## Commands
 
 - `npm run dev` — start the dev server (`warlock dev`)

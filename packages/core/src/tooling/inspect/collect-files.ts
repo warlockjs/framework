@@ -21,11 +21,14 @@ export function projectFile(cwd: string, file: string): string {
   return path.relative(cwd, path.resolve(cwd, file)).split(path.sep).join("/");
 }
 
-/** `src/app/<module>`, or the containing top-level `src` directory, of a project-relative file. */
+/**
+ * `src/app/<module>`, or the first two folders of the file's path (`src/config`,
+ * `mobile/app`; `mobile` for a file at the top of a scanned folder).
+ */
 export function fileModule(file: string): string {
   const parts = file.split("/");
 
-  return parts[1] === "app" && parts.length > 3
+  return parts[0] === "src" && parts[1] === "app" && parts.length > 3
     ? parts.slice(0, 3).join("/")
     : path.posix.dirname(file).split("/").slice(0, 2).join("/");
 }
@@ -103,8 +106,18 @@ function bindingNames(node: Node): string[] {
   return [];
 }
 
+/** Options of {@link collectFiles}. */
+export type CollectFilesOptions = {
+  /** Project-relative folders to scan. Default `["src"]`. */
+  dirs?: readonly string[];
+};
+
 /** Read each source module once; never import or execute application code. */
-export function collectFiles(cwd: string, warnings: InspectWarning[] = []): InspectFile[] {
+export function collectFiles(
+  cwd: string,
+  warnings: InspectWarning[] = [],
+  options: CollectFilesOptions = {},
+): InspectFile[] {
   cwd = path.resolve(cwd);
   const paths: string[] = [];
   const scan = (directory: string): void => {
@@ -119,9 +132,10 @@ export function collectFiles(cwd: string, warnings: InspectWarning[] = []): Insp
       warnings.push({ code: null, source: projectFile(cwd, directory), message: String(error) });
     }
   };
-  scan(path.join(cwd, "src"));
-  paths.sort();
+  for (const dir of options.dirs ?? ["src"]) scan(path.join(cwd, dir));
   const known = new Set(paths);
+  paths.length = 0;
+  paths.push(...[...known].sort());
   let tsconfig: ReturnType<typeof readTsconfig> | undefined;
   try {
     if (existsSync(path.join(cwd, "tsconfig.json")))

@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "file": "src/web/$sites/client/layout.tsx",
+  "module": "src/web",
+  "type": "layout",
+  "lines": 5,
+  "about": "The header, cart count and footer of every client page.",
+  "feature": null,
+  "borrowedBy": [],
+  "flows": [],
+  "exports": [
+    {
+      "name": "default",
+      "about": null
+    }
+  ],
+  "packages": [],
+  "imports": [],
+  "importedBy": [],
+  "routes": [],
+  "pages": [
+    {
+      "site": "client",
+      "route": "/",
+      "via": "layout"
+    },
+    {
+      "site": "client",
+      "route": "/products/:id",
+      "via": "layout"
+    }
+  ],
+  "screens": []
+}

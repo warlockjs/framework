@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "feature": "auth",
+  "flow": "sign-up",
+  "ref": "auth/sign-up",
+  "steps": [
+    {
+      "index": 1,
+      "kind": "route",
+      "target": "POST /api/register",
+      "found": true,
+      "entry": "src/app/auth/controllers/register.controller.ts",
+      "files": [
+        "src/app/auth/controllers/register.controller.ts",
+        "src/app/auth/routes.ts",
+        "src/app/auth/services/register.service.ts"
+      ]
+    },
+    {
+      "index": 2,
+      "kind": "job",
+      "target": "delete-unverified",
+      "found": true,
+      "entry": "src/app/shared/jobs/delete-unverified.job.ts",
+      "files": [
+        "src/app/shared/jobs/delete-unverified.job.ts"
+      ]
+    }
+  ],
+  "criteria": [
+    {
+      "id": "AC-1",
+      "app": null,
+      "text": "a new account waits for email verification",
+      "tests": [],
+      "status": "no-test"
+    },
+    {
+      "id": "AC-2",
+      "app": null,
+      "text": "an unverified account is deleted after seven days",
+      "tests": [],
+      "status": "no-test"
+    }
+  ],
+  "shownBy": []
+}

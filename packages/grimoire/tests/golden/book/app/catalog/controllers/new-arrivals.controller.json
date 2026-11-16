@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "file": "src/app/catalog/controllers/new-arrivals.controller.ts",
+  "module": "src/app/catalog",
+  "type": "controller",
+  "lines": 8,
+  "about": "Answers the new arrivals request.",
+  "feature": "catalog",
+  "borrowedBy": [],
+  "flows": [
+    "catalog/new-arrivals"
+  ],
+  "exports": [
+    {
+      "name": "NewArrivalsController",
+      "about": "Returns the new arrivals for the customer's country."
+    }
+  ],
+  "packages": [],
+  "imports": [
+    "src/app/catalog/services/new-arrivals.service.ts"
+  ],
+  "importedBy": [
+    "src/app/catalog/routes.ts"
+  ],
+  "routes": [
+    {
+      "method": "GET",
+      "path": "/api/products/new-arrivals",
+      "name": "catalog.new-arrivals",
+      "via": "handles"
+    }
+  ],
+  "pages": [],
+  "screens": []
+}

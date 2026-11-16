@@ -1,0 +1,265 @@
+---
+title: The book
+description: What Warlock writes under grimoire/book/, the shape of each file entry, module summaries, the routes and page lists, and how the book stays fresh without booting the app.
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+<Aside type="caution" title="Experimental">
+  Grimoire is experimental in 5.55. The structure of the written files and the commands may still
+  change before they are declared stable.
+</Aside>
+
+The book is the part of the Grimoire that Warlock writes. It describes the code as it is: one entry per source file,
+a summary per module, every route, the pages of each site and the screens of a mobile app. It lives in
+`grimoire/book/`, is ignored by git, and is rebuilt when the sources change.
+
+Never edit a book file. Change the code, or the written files under `grimoire/features/` and `grimoire/apps/`, and
+the book follows.
+
+The book is built from the report Warlock already gives about your project (`inspectApp()` from
+`@warlock.js/core/tooling`). It never parses your source a second time.
+
+## Building it
+
+```bash
+npx warlock grimoire build           # refresh what changed
+npx warlock grimoire build --force   # collect everything again and restore edited or deleted entries
+```
+
+You rarely run this yourself. `warlock grimoire check`, `warlock scry`, the MCP tools and the devtools tab all check
+that the book is fresh first and refresh it when it is not.
+
+## Layout
+
+```text
+grimoire/book/
+  manifest.json                      The freshness fingerprint.
+  app/
+    routes.json                      Every route, by module.
+    catalog/
+      index.md                       Summary of src/app/catalog.
+      routes.json                    Entry of src/app/catalog/routes.ts.
+      services/
+        new-arrivals.service.json    Entry of src/app/catalog/services/new-arrivals.service.ts.
+  config/
+    index.md
+    app.json
+  web/
+    index.md                         Summary of src/web.
+    client.pages.json                Pages of the `client` site.
+    $sites/client/home.page.json     Entry of src/web/$sites/client/home.page.tsx.
+  mobile/
+    mobile.screens.json              The `mobile` app and its screens.
+    mobile/app/index.json            Entry of mobile/app/index.tsx.
+  test-results.json                  Written by the test reporter.
+  .cache/                            Machine use only.
+```
+
+### Where a file's entry is
+
+The entry of a source file sits at the same path as the file, with `src/` dropped and the extension replaced by
+`.json`:
+
+| Source file | Entry |
+| --- | --- |
+| `src/app/auth/controllers/login.controller.ts` | `grimoire/book/app/auth/controllers/login.controller.json` |
+| `src/web/$sites/client/home.page.tsx` | `grimoire/book/web/$sites/client/home.page.json` |
+| `mobile/app/products/[id].tsx` (mobile app `mobile`) | `grimoire/book/mobile/mobile/app/products/[id].json` |
+
+Files of a mobile app go under `mobile/<app id>/`. Two cases keep the full file name instead:
+
+- two files would share an entry (`a.ts` and `a.tsx` become `a.ts.json` and `a.tsx.json`);
+- the entry would take the place of a list the book writes (`src/app/routes.ts` becomes `app/routes.ts.json`, so
+  it does not replace `app/routes.json`).
+
+## A file entry
+
+```json title="grimoire/book/app/catalog/services/new-arrivals.service.json"
+{
+  "schemaVersion": 1,
+  "file": "src/app/catalog/services/new-arrivals.service.ts",
+  "module": "src/app/catalog",
+  "type": "service",
+  "lines": 10,
+  "about": "Lists the newest products sold in the customer's country.",
+  "feature": "catalog",
+  "borrowedBy": [],
+  "flows": ["catalog/new-arrivals"],
+  "exports": [
+    { "name": "listNewArrivals", "about": "Returns up to 20 products, newest first." }
+  ],
+  "packages": [],
+  "imports": ["src/app/catalog/repositories/products.repository.ts"],
+  "importedBy": [
+    "src/app/catalog/controllers/new-arrivals.controller.ts",
+    "src/app/catalog/tests/new-arrivals.test.ts",
+    "src/web/$sites/client/home.setup.ts"
+  ],
+  "routes": [],
+  "pages": [],
+  "screens": []
+}
+```
+
+| Field | Holds |
+| --- | --- |
+| `schemaVersion` | The version of the book's JSON shapes. It changes only for a breaking change. |
+| `file` | The source file, project-relative, with `/`. |
+| `module` | `src/app/<module>` for application code, otherwise the top folder (`src/config`, `src/web`, `mobile/app`). |
+| `type` | The file's role from its name: `controller`, `service`, `repository`, `model`, `mail`, `job`, `page`, `setup`, `layout`, `routes`, `spec` and so on. |
+| `lines` | Line count. |
+| `about` | The first sentence of the comment at the top of the file, or `null`. |
+| `feature` | The feature that owns the file, or `null`. See [Features and book maps](/v/latest/grimoire/guides/03-features-and-book-maps/). |
+| `borrowedBy` | Features that import the file without owning it. Sorted. |
+| `flows` | `<feature>/<flow>` of every flow whose steps reach the file. Sorted. |
+| `exports` | Each export with the first sentence of the comment above it (`about`, or `null`). `default` and `*` stand for default and star exports. |
+| `packages` | External packages the file imports, by package name (`@warlock.js/core`, `dayjs`). Node built-ins are left out. Sorted. |
+| `imports` | Project files it imports. Sorted. |
+| `importedBy` | Project files that import it. Sorted. |
+| `routes` | Routes the file registers (`"via": "registers"`, a routes file) or handles (`"via": "handles"`, the controller or page that answers). Each has `method`, `path` and `name`. |
+| `pages` | Pages the file is the page, setup or layout file of: `site`, `route`, `via` (`page`, `setup`, `layout`). |
+| `screens` | Mobile screens the file is the screen or layout file of: `app`, `route`, `via` (`screen`, `layout`). |
+
+Absent values are `null`, never left out. A route that only reaches the file through imports is not listed in
+`routes`; `warlock scry --impact <file>` answers that.
+
+## Module summaries
+
+Each module gets an `index.md`: `src/app/catalog` is summarised in `grimoire/book/app/catalog/index.md`.
+
+```md title="grimoire/book/app/catalog/index.md"
+# src/app/catalog
+
+Feature: catalog. 7 files, 73 lines.
+
+## Files
+- controllers/new-arrivals.controller.ts  controller  Answers the new arrivals request.
+- services/new-arrivals.service.ts  service  Lists the newest products sold in the customer's country.
+
+## Routes
+- GET /api/products/new-arrivals
+
+## Used by
+- src/web (2 files)
+- src/app/orders (1 file)
+```
+
+- The first line names the features that own the module's files, the one with most files first.
+- **Files** lists every file by its path inside the module, then its type and its header sentence.
+- **Routes** lists routes whose routes file (or, for a page, its page file) is in the module.
+- **Used by** lists other modules that import files of this one, with how many of their files do.
+
+A section with nothing in it is left out.
+
+## Routes
+
+`grimoire/book/app/routes.json` lists every route, grouped by the module of the file that registered it, in
+registration order. Page routes have no routes file and are listed under `(none)`.
+
+```json title="grimoire/book/app/routes.json"
+{
+  "schemaVersion": 1,
+  "modules": {
+    "(none)": [
+      { "method": "GET", "path": "/", "name": "home", "handlerFile": "src/web/$sites/client/home.page.tsx" }
+    ],
+    "src/app/orders": [
+      {
+        "method": "POST",
+        "path": "/api/orders",
+        "name": "orders.place",
+        "handlerFile": "src/app/orders/controllers/place-order.controller.ts"
+      }
+    ]
+  }
+}
+```
+
+The file is not written until routes have been read once (see [The route cache](#the-route-cache)).
+
+## Pages and screens
+
+Each site gets `grimoire/book/web/<site>.pages.json` with the site (`id`, `root`, `basePath`) and its pages. A
+single-site app has one site, `default`, rooted at `src/web`.
+
+| Page field | Holds |
+| --- | --- |
+| `site` | The site id. |
+| `route` | The route path (`/products/:id`). |
+| `name` | The route name, or `null`. |
+| `file` | The `*.page.tsx` file. |
+| `setupFile` | The `*.setup.ts` file that holds the page's logic, or `null`. |
+| `layouts` | Layout files, outermost first. |
+| `loaders` | Files on the chain that export a loader. |
+| `actions` | Action names (`default` for `action`). |
+| `requires` | What the page needs before it renders (`user`, middleware names). Empty when nothing. |
+| `reachedFrom` | Links and redirects that point at the page, read as plain values. `null` means unknown. |
+
+Each mobile app in the repository gets `grimoire/book/mobile/<app>.screens.json`: the app (`id`, `root`,
+`routing`, `routesDir`) and its screens (`route`, `file`, `layouts`). When the app uses file-based routing
+(`routing: "files"`), screens come from the files under `routesDir`. When navigation is defined in code
+(`routing: "code"`), the list is empty and the screens are the ones agents describe in
+`grimoire/apps/<app>/screens/`.
+
+## Freshness
+
+`manifest.json` is the fingerprint of the sources the book was built from. It records the Grimoire version, the
+adapter name and version (for Warlock, the framework version), the source roots, and for every file under the
+source roots its size, modification time and sha256 hash. It also records the hash of each test file.
+
+Before anything else, every command does this:
+
+1. Stat every file under the source roots (`src/` and any mobile app root). `node_modules` and dot folders are
+   skipped.
+2. Hash only the files whose size or modification time differ from the manifest. A file that was only touched keeps
+   its hash.
+3. If the set of files, every hash, the test file hashes and the versions all match, the book is fresh. Nothing is
+   collected and nothing is written.
+4. Otherwise the file facts, sites, pages, mobile apps and test list are collected again. Entries are rewritten only
+   when their content changed, and the entries of deleted files are removed.
+
+The book never removes `test-results.json`, the static export under `site/`, or `.cache/`.
+
+Writes are atomic: each file is written to a temporary file next to it and renamed into place, so a reader never sees
+half a file. Nothing is ever written outside `grimoire/book/`.
+
+## The route cache
+
+Reading routes registers them, and that loads the application. So the routes, together with the names of mails,
+jobs, events and notifications, are cached and read again only when something they depend on changed. The inputs
+are:
+
+- every routes file and every file it imports, directly or not;
+- every config file, `warlock.config.ts` and `package.json`;
+- every mail, job, event and notification file.
+
+When one of them changes (or is added or removed), the cached routes are **stale**. What happens next depends on the
+command:
+
+| Command | Stale routes |
+| --- | --- |
+| `warlock grimoire build`, `warlock grimoire check` | Read again (the app boots once). |
+| `warlock scry`, the MCP tools, the devtools tab | Not read. The cached routes are used and reported as stale. |
+
+So a question about a file never boots the app. `warlock scry --route` reads routes once when none were ever cached.
+When a command answers from stale routes, it says so and tells you to run `warlock grimoire build`.
+
+Route freshness is reported as one of:
+
+| Value | Means |
+| --- | --- |
+| `fresh` | The routes match the current sources. |
+| `stale` | Cached routes are used, but an input changed since they were read. |
+| `missing` | Routes were never read (for example, only file questions were asked so far). |
+| `cached` | Read from disk without checking the sources. |
+
+## What to trust
+
+- **Exports, imports, importers, routes, middleware and pages** are read from the code. Trust them.
+- **Files behind a route** are every file the handler can reach through imports. That is not the exact call path;
+  open the handler to see which ones it really uses.
+- **Reached from** lists only links and redirects written as plain values. `null` (shown as "unknown") means look.
+- **Feature, borrowers and flows** come from the written files. When the code disagrees with a flow, the written
+  file may be out of date; say which is wrong.
+- **Routes** may be stale when a command says so. Run `warlock grimoire build` before relying on them.

@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "file": "src/app/auth/services/register.service.ts",
+  "module": "src/app/auth",
+  "type": "service",
+  "lines": 6,
+  "about": "Creates a customer account waiting for email verification.",
+  "feature": "auth",
+  "borrowedBy": [],
+  "flows": [],
+  "exports": [
+    {
+      "name": "register",
+      "about": "Creates the account; it stays unverified until the email link is used."
+    }
+  ],
+  "packages": [],
+  "imports": [],
+  "importedBy": [
+    "src/app/auth/controllers/register.controller.ts"
+  ],
+  "routes": [],
+  "pages": [],
+  "screens": []
+}

@@ -78,7 +78,7 @@ export function mcpToolsFromConfig(
   if (!config) return [];
 
   return [
-    ...(config.cli?.commands ?? []).flatMap((command) => mcpToolsOf(command)),
+    ...(config.cli?.commands ?? []).flat().flatMap((command) => mcpToolsOf(command)),
     ...(config.mcp?.tools ?? []),
   ];
 }

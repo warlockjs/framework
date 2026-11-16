@@ -1,0 +1,104 @@
+{
+  "schemaVersion": 1,
+  "features": [
+    {
+      "id": "auth",
+      "title": "Accounts and sign-in",
+      "status": "shipped",
+      "version": "1.0",
+      "updated": "2026-10-01",
+      "apps": [
+        "web-client",
+        "mobile"
+      ],
+      "origin": "inferred",
+      "flows": [
+        {
+          "id": "login",
+          "status": "shipped",
+          "since": "1.0"
+        },
+        {
+          "id": "sign-up",
+          "status": "shipped",
+          "since": "1.0"
+        }
+      ],
+      "releases": [
+        {
+          "version": "1.0",
+          "release": "1.0.0",
+          "date": "2026-10-01"
+        }
+      ]
+    },
+    {
+      "id": "catalog",
+      "title": "Product catalog",
+      "status": "shipped",
+      "version": "2.1",
+      "updated": "2026-11-10",
+      "apps": [
+        "web-client",
+        "mobile"
+      ],
+      "origin": null,
+      "flows": [
+        {
+          "id": "browse-products",
+          "status": "shipped",
+          "since": "1.0"
+        },
+        {
+          "id": "new-arrivals",
+          "status": "shipped",
+          "since": "2.0"
+        },
+        {
+          "id": "wishlist",
+          "status": "proposed",
+          "since": "3.0"
+        }
+      ],
+      "releases": [
+        {
+          "version": "2.0",
+          "release": "1.0.0",
+          "date": "2026-10-01"
+        },
+        {
+          "version": "1.0",
+          "release": "1.0.0",
+          "date": "2026-10-01"
+        }
+      ]
+    },
+    {
+      "id": "orders",
+      "title": "Orders",
+      "status": "shipped",
+      "version": "1.0",
+      "updated": "2026-10-01",
+      "apps": [
+        "web-client",
+        "web-admin",
+        "mobile"
+      ],
+      "origin": null,
+      "flows": [
+        {
+          "id": "place-order",
+          "status": "shipped",
+          "since": "1.0"
+        }
+      ],
+      "releases": [
+        {
+          "version": "1.0",
+          "release": "1.0.0",
+          "date": "2026-10-01"
+        }
+      ]
+    }
+  ]
+}

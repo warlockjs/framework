@@ -216,6 +216,24 @@ describe("registration from warlock.config.ts", () => {
     expect(mcpToolsFromConfig(undefined)).toEqual([]);
   });
 
+  it("collects the tools of commands inside a nested array, in order", () => {
+    const one = withMcpTools(command({ name: "acme.one", action: () => undefined }), [
+      echoTool("acme_one"),
+    ]);
+    const two = withMcpTools(command({ name: "acme.two", action: () => undefined }), [
+      echoTool("acme_two"),
+    ]);
+    const three = withMcpTools(command({ name: "acme.three", action: () => undefined }), [
+      echoTool("acme_three"),
+    ]);
+
+    expect(
+      mcpToolsFromConfig({ cli: { commands: [one, [two, three]] } }).map((tool) =>
+        typeof tool === "function" ? "factory" : tool.name,
+      ),
+    ).toEqual(["acme_one", "acme_two", "acme_three"]);
+  });
+
   it("reads the tools of the loaded config (the mcp command and warlock dev --mcp)", async () => {
     const scry = withMcpTools(command({ name: "acme.scry", action: () => undefined }), [
       echoTool("acme_scry"),

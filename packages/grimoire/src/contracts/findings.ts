@@ -85,7 +85,7 @@ export type GrimoireCheckReport = {
   schemaVersion: 1;
   /** Absolute project root. */
   root: string;
-  /** Errors first, then warnings; within each, by file and line. */
+  /** Unexpected findings first, expected ones last; within each, errors then warnings, then by file and line. */
   findings: GrimoireFinding[];
   counts: { errors: number; warnings: number; expected: number };
   /** `true` when no finding is an unexpected error. The command exits 1 otherwise. */

@@ -13,6 +13,7 @@ import { authPasskeysFeature } from "./auth-passkeys.feature";
 import { bullBoardFeature } from "./bull-board.feature";
 import { designSystemFeature } from "./design-system.feature";
 import { devtoolsFeature } from "./devtools.feature";
+import { grimoireFeature } from "./grimoire.feature";
 import { heraldFeature } from "./herald.feature";
 import { imageFeature } from "./image.feature";
 import { mailFeature } from "./mail.feature";
@@ -82,6 +83,7 @@ export const featuresMap: Record<string, FeatureDefinition> = {
   sitemap: sitemapFeature,
   devtools: devtoolsFeature,
   process: processFeature,
+  grimoire: grimoireFeature,
   herald: heraldFeature,
   queue: queueFeature,
   // Directly after `queue`, for the same reason `tailwind` follows `web`: it

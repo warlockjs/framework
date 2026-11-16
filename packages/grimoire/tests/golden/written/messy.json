@@ -1,0 +1,653 @@
+{
+  "exists": true,
+  "features": [
+    {
+      "id": "search",
+      "dir": "grimoire/features/search",
+      "readme": {
+        "file": "grimoire/features/search/README.md",
+        "id": {
+          "value": "search",
+          "at": {
+            "file": "grimoire/features/search/README.md",
+            "line": 2,
+            "column": null
+          }
+        },
+        "title": {
+          "value": "Product search",
+          "at": {
+            "file": "grimoire/features/search/README.md",
+            "line": 3,
+            "column": null
+          }
+        },
+        "status": {
+          "value": "building",
+          "at": {
+            "file": "grimoire/features/search/README.md",
+            "line": 4,
+            "column": null
+          }
+        },
+        "version": {
+          "value": "1.1",
+          "at": {
+            "file": "grimoire/features/search/README.md",
+            "line": 5,
+            "column": null
+          }
+        },
+        "updated": {
+          "value": "2026-11-12",
+          "at": {
+            "file": "grimoire/features/search/README.md",
+            "line": 6,
+            "column": null
+          }
+        },
+        "apps": [
+          {
+            "value": "site",
+            "at": {
+              "file": "grimoire/features/search/README.md",
+              "line": 9,
+              "column": null
+            }
+          }
+        ],
+        "folders": [
+          {
+            "value": "src/app/search",
+            "at": {
+              "file": "grimoire/features/search/README.md",
+              "line": 11,
+              "column": null
+            }
+          },
+          {
+            "value": "src/app/shared/search",
+            "at": {
+              "file": "grimoire/features/search/README.md",
+              "line": 12,
+              "column": null
+            }
+          }
+        ],
+        "origin": {
+          "value": "confirmed",
+          "at": {
+            "file": "grimoire/features/search/README.md",
+            "line": 7,
+            "column": null
+          }
+        },
+        "heading": {
+          "value": "Product search",
+          "at": {
+            "file": "grimoire/features/search/README.md",
+            "line": 16,
+            "column": null
+          }
+        },
+        "summary": "Customers find products by name. A second line of the same paragraph.",
+        "flows": [
+          {
+            "name": "find",
+            "text": "search by name and see results",
+            "at": {
+              "file": "grimoire/features/search/README.md",
+              "line": 24,
+              "column": null
+            }
+          }
+        ],
+        "relations": [
+          {
+            "text": "Reads catalog/browse-products data; nothing else.",
+            "refs": [
+              "catalog/browse-products"
+            ],
+            "at": {
+              "file": "grimoire/features/search/README.md",
+              "line": 27,
+              "column": null
+            }
+          }
+        ]
+      },
+      "changelog": {
+        "file": "grimoire/features/search/CHANGELOG.md",
+        "sections": [
+          {
+            "release": null,
+            "date": null,
+            "at": {
+              "file": "grimoire/features/search/CHANGELOG.md",
+              "line": 3,
+              "column": null
+            }
+          },
+          {
+            "release": "2.0.0",
+            "date": "2026-11-01",
+            "at": {
+              "file": "grimoire/features/search/CHANGELOG.md",
+              "line": 6,
+              "column": null
+            }
+          }
+        ],
+        "entries": [
+          {
+            "feature": "search",
+            "version": {
+              "value": "1.1",
+              "at": {
+                "file": "grimoire/features/search/CHANGELOG.md",
+                "line": 4,
+                "column": null
+              }
+            },
+            "word": "changed",
+            "flow": "find",
+            "criteria": [
+              "AC-1",
+              "AC-2"
+            ],
+            "text": "results show the count",
+            "release": null,
+            "date": null,
+            "at": {
+              "file": "grimoire/features/search/CHANGELOG.md",
+              "line": 4,
+              "column": null
+            }
+          },
+          {
+            "feature": "search",
+            "version": {
+              "value": "1.0",
+              "at": {
+                "file": "grimoire/features/search/CHANGELOG.md",
+                "line": 7,
+                "column": null
+              }
+            },
+            "word": "added",
+            "flow": "find",
+            "criteria": [],
+            "text": "customers search products by name",
+            "release": "2.0.0",
+            "date": "2026-11-01",
+            "at": {
+              "file": "grimoire/features/search/CHANGELOG.md",
+              "line": 7,
+              "column": null
+            }
+          }
+        ]
+      },
+      "flows": [
+        {
+          "file": "grimoire/features/search/flows/find.md",
+          "feature": "search",
+          "id": {
+            "value": "find",
+            "at": {
+              "file": "grimoire/features/search/flows/find.md",
+              "line": 2,
+              "column": null
+            }
+          },
+          "ref": "search/find",
+          "since": {
+            "value": "1.0",
+            "at": {
+              "file": "grimoire/features/search/flows/find.md",
+              "line": 3,
+              "column": null
+            }
+          },
+          "status": {
+            "value": "building",
+            "at": {
+              "file": "grimoire/features/search/flows/find.md",
+              "line": 4,
+              "column": null
+            }
+          },
+          "who": {
+            "value": "customer",
+            "at": {
+              "file": "grimoire/features/search/flows/find.md",
+              "line": 5,
+              "column": null
+            }
+          },
+          "origin": null,
+          "heading": {
+            "value": "Find a product",
+            "at": {
+              "file": "grimoire/features/search/flows/find.md",
+              "line": 8,
+              "column": null
+            }
+          },
+          "steps": [
+            {
+              "index": 1,
+              "kind": "page",
+              "target": "/search",
+              "route": null,
+              "affects": null,
+              "note": null,
+              "at": {
+                "file": "grimoire/features/search/flows/find.md",
+                "line": 12,
+                "column": null
+              }
+            },
+            {
+              "index": 2,
+              "kind": "route",
+              "target": "get /api/search",
+              "route": {
+                "method": "GET",
+                "path": "/api/search"
+              },
+              "affects": null,
+              "note": "the page calls it on every key press",
+              "at": {
+                "file": "grimoire/features/search/flows/find.md",
+                "line": 13,
+                "column": null
+              }
+            },
+            {
+              "index": 3,
+              "kind": "affects",
+              "target": "catalog",
+              "route": null,
+              "affects": {
+                "feature": "catalog",
+                "flow": null
+              },
+              "note": null,
+              "at": {
+                "file": "grimoire/features/search/flows/find.md",
+                "line": 14,
+                "column": null
+              }
+            }
+          ],
+          "differs": [],
+          "cases": [
+            {
+              "question": "invalid input",
+              "fixed": true,
+              "answer": "an empty query shows nothing",
+              "doesNotApply": false,
+              "at": {
+                "file": "grimoire/features/search/flows/find.md",
+                "line": 17,
+                "column": null
+              }
+            },
+            {
+              "question": "not allowed",
+              "fixed": true,
+              "answer": "does not apply: search is public",
+              "doesNotApply": true,
+              "at": {
+                "file": "grimoire/features/search/flows/find.md",
+                "line": 18,
+                "column": null
+              }
+            },
+            {
+              "question": "not found",
+              "fixed": true,
+              "answer": "no match shows \"nothing found\"",
+              "doesNotApply": false,
+              "at": {
+                "file": "grimoire/features/search/flows/find.md",
+                "line": 19,
+                "column": null
+              }
+            },
+            {
+              "question": "limits",
+              "fixed": true,
+              "answer": "at most 50 results, shown 10 at a time",
+              "doesNotApply": false,
+              "at": {
+                "file": "grimoire/features/search/flows/find.md",
+                "line": 20,
+                "column": null
+              }
+            }
+          ],
+          "notHandled": [
+            {
+              "name": "duplicate",
+              "text": "does not apply: reading only",
+              "at": {
+                "file": "grimoire/features/search/flows/find.md",
+                "line": 24,
+                "column": null
+              }
+            },
+            {
+              "name": "expiry",
+              "text": "does not apply: nothing expires",
+              "at": {
+                "file": "grimoire/features/search/flows/find.md",
+                "line": 25,
+                "column": null
+              }
+            },
+            {
+              "name": "double submit",
+              "text": "does not apply: reading only",
+              "at": {
+                "file": "grimoire/features/search/flows/find.md",
+                "line": 26,
+                "column": null
+              }
+            },
+            {
+              "name": "outside service down",
+              "text": "does not apply: no outside service",
+              "at": {
+                "file": "grimoire/features/search/flows/find.md",
+                "line": 27,
+                "column": null
+              }
+            }
+          ],
+          "unknowns": [
+            {
+              "text": "ranking by popularity or by date?",
+              "at": {
+                "file": "grimoire/features/search/flows/find.md",
+                "line": 37,
+                "column": null
+              }
+            }
+          ],
+          "criteria": [
+            {
+              "id": "AC-1",
+              "number": 1,
+              "app": null,
+              "text": "results list matching products first by name",
+              "at": {
+                "file": "grimoire/features/search/flows/find.md",
+                "line": 40,
+                "column": null
+              }
+            },
+            {
+              "id": "AC-2",
+              "number": 2,
+              "app": "site",
+              "text": "the result count is shown",
+              "at": {
+                "file": "grimoire/features/search/flows/find.md",
+                "line": 42,
+                "column": null
+              }
+            }
+          ]
+        }
+      ],
+      "versions": []
+    }
+  ],
+  "apps": [
+    {
+      "dir": "grimoire/apps/site",
+      "file": "grimoire/apps/site/README.md",
+      "id": {
+        "value": "site",
+        "at": {
+          "file": "grimoire/apps/site/README.md",
+          "line": 2,
+          "column": null
+        }
+      },
+      "type": {
+        "value": "site",
+        "at": {
+          "file": "grimoire/apps/site/README.md",
+          "line": 3,
+          "column": null
+        }
+      },
+      "root": {
+        "value": "src/web",
+        "at": {
+          "file": "grimoire/apps/site/README.md",
+          "line": 4,
+          "column": null
+        }
+      },
+      "heading": {
+        "value": "The website",
+        "at": {
+          "file": "grimoire/apps/site/README.md",
+          "line": 7,
+          "column": null
+        }
+      },
+      "conditions": [
+        {
+          "name": "guest",
+          "text": "not signed in",
+          "at": {
+            "file": "grimoire/apps/site/README.md",
+            "line": 10,
+            "column": null
+          }
+        },
+        {
+          "name": "customer",
+          "text": "signed in",
+          "at": {
+            "file": "grimoire/apps/site/README.md",
+            "line": 11,
+            "column": null
+          }
+        }
+      ],
+      "layouts": [],
+      "pages": [
+        {
+          "file": "grimoire/apps/site/pages/results/README.md",
+          "app": "site",
+          "type": "page",
+          "id": "results",
+          "route": {
+            "value": "/search",
+            "at": {
+              "file": "grimoire/apps/site/pages/results/README.md",
+              "line": 2,
+              "column": null
+            }
+          },
+          "screen": null,
+          "layout": null,
+          "heading": {
+            "value": "Search results",
+            "at": {
+              "file": "grimoire/apps/site/pages/results/README.md",
+              "line": 5,
+              "column": null
+            }
+          },
+          "purpose": "What a customer sees after typing a query.",
+          "blocks": [
+            {
+              "block": "Result list",
+              "flow": "search/find",
+              "who": {
+                "everyone": false,
+                "conditions": [
+                  "guest",
+                  "customer"
+                ]
+              },
+              "changesWith": [
+                {
+                  "condition": "customer",
+                  "text": "past orders first"
+                },
+                {
+                  "condition": null,
+                  "text": "the query"
+                }
+              ],
+              "at": {
+                "file": "grimoire/apps/site/pages/results/README.md",
+                "line": 15,
+                "column": null
+              }
+            },
+            {
+              "block": "Count | total",
+              "flow": null,
+              "who": {
+                "everyone": true,
+                "conditions": []
+              },
+              "changesWith": [],
+              "at": {
+                "file": "grimoire/apps/site/pages/results/README.md",
+                "line": 16,
+                "column": null
+              }
+            }
+          ],
+          "alsoReachedFrom": [
+            {
+              "kind": "outside service",
+              "name": "the partner site's search box",
+              "at": {
+                "file": "grimoire/apps/site/pages/results/README.md",
+                "line": 19,
+                "column": null
+              }
+            }
+          ],
+          "blockFiles": [
+            {
+              "file": "grimoire/apps/site/pages/results/blocks/result-list.md",
+              "app": "site",
+              "page": "results",
+              "id": "result-list",
+              "flow": {
+                "value": "search/find",
+                "at": {
+                  "file": "grimoire/apps/site/pages/results/blocks/result-list.md",
+                  "line": 2,
+                  "column": null
+                }
+              },
+              "heading": {
+                "value": "The result list",
+                "at": {
+                  "file": "grimoire/apps/site/pages/results/blocks/result-list.md",
+                  "line": 5,
+                  "column": null
+                }
+              },
+              "details": [
+                {
+                  "name": "layout",
+                  "text": "one column on phones, a grid on wide screens",
+                  "at": {
+                    "file": "grimoire/apps/site/pages/results/blocks/result-list.md",
+                    "line": 7,
+                    "column": null
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "screens": []
+    }
+  ],
+  "tasks": [
+    {
+      "file": "grimoire/tasks/open/T-2-tune-ranking.md",
+      "folder": "open",
+      "month": null,
+      "id": {
+        "value": "T-2",
+        "at": {
+          "file": "grimoire/tasks/open/T-2-tune-ranking.md",
+          "line": 2,
+          "column": null
+        }
+      },
+      "type": {
+        "value": "decision",
+        "at": {
+          "file": "grimoire/tasks/open/T-2-tune-ranking.md",
+          "line": 3,
+          "column": null
+        }
+      },
+      "feature": {
+        "value": "search",
+        "at": {
+          "file": "grimoire/tasks/open/T-2-tune-ranking.md",
+          "line": 4,
+          "column": null
+        }
+      },
+      "flow": {
+        "value": "search/find",
+        "at": {
+          "file": "grimoire/tasks/open/T-2-tune-ranking.md",
+          "line": 5,
+          "column": null
+        }
+      },
+      "apps": [],
+      "status": {
+        "value": "open",
+        "at": {
+          "file": "grimoire/tasks/open/T-2-tune-ranking.md",
+          "line": 6,
+          "column": null
+        }
+      },
+      "shipped": null,
+      "heading": {
+        "value": "Choose how results are ranked",
+        "at": {
+          "file": "grimoire/tasks/open/T-2-tune-ranking.md",
+          "line": 9,
+          "column": null
+        }
+      },
+      "fields": [
+        {
+          "key": "Decision needed",
+          "value": "popularity or date? Both are cheap to build.",
+          "at": {
+            "file": "grimoire/tasks/open/T-2-tune-ranking.md",
+            "line": 11,
+            "column": null
+          }
+        }
+      ],
+      "decisionNeeded": "popularity or date? Both are cheap to build."
+    }
+  ],
+  "releases": []
+}

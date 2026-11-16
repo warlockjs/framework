@@ -196,6 +196,8 @@ export type BuildBookOptions = {
   force?: boolean;
   /** Clock for `builtAt`. */
   now?: () => Date;
+  /** `false` computes the book in memory only and writes nothing. Default `true`. */
+  write?: boolean;
 };
 
 /** What `buildBook()` did. */

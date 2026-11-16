@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "file": "src/web/$sites/admin/layout.tsx",
+  "module": "src/web",
+  "type": "layout",
+  "lines": 5,
+  "about": "The staff menu around every admin page.",
+  "feature": null,
+  "borrowedBy": [],
+  "flows": [],
+  "exports": [
+    {
+      "name": "default",
+      "about": null
+    }
+  ],
+  "packages": [],
+  "imports": [],
+  "importedBy": [],
+  "routes": [],
+  "pages": [
+    {
+      "site": "admin",
+      "route": "/admin/orders",
+      "via": "layout"
+    }
+  ],
+  "screens": []
+}

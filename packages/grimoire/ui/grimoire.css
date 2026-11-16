@@ -1,0 +1,88 @@
+/* The Grimoire tab. Colours come from the dashboard's variables. */
+.grimoire-header {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.grimoire-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+.grimoire-nav a {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 600;
+}
+.grimoire-search {
+  width: 100%;
+  max-width: 640px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+}
+.grimoire-results:empty {
+  display: none;
+}
+.grimoire-results {
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  max-width: 640px;
+}
+.grimoire-view h2 {
+  margin: 0 0 6px;
+}
+.grimoire-view h3,
+.grimoire-view h4 {
+  margin: 12px 0 6px;
+}
+.grimoire-view a,
+.grimoire-results a {
+  color: var(--accent);
+}
+.grimoire-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.grimoire-list {
+  margin: 0;
+  padding-left: 18px;
+}
+.grimoire-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.grimoire-table th,
+.grimoire-table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+.grimoire-table td ul {
+  margin: 0;
+  padding-left: 16px;
+}
+.grimoire-view .card {
+  margin-bottom: 12px;
+}
+.grimoire-view .badge.good {
+  color: var(--good);
+}
+.grimoire-view .badge.bad {
+  color: var(--bad);
+}
+.grimoire-view .muted {
+  color: var(--muted);
+}
+.grimoire-svg {
+  width: 100%;
+  max-height: 460px;
+}

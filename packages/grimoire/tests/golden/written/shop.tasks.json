@@ -1,0 +1,318 @@
+[
+  {
+    "file": "grimoire/tasks/done/2026-11/T-010-new-arrivals-no-country.md",
+    "folder": "done",
+    "month": "2026-11",
+    "id": {
+      "value": "T-010",
+      "at": {
+        "file": "grimoire/tasks/done/2026-11/T-010-new-arrivals-no-country.md",
+        "line": 2,
+        "column": null
+      }
+    },
+    "type": {
+      "value": "bug",
+      "at": {
+        "file": "grimoire/tasks/done/2026-11/T-010-new-arrivals-no-country.md",
+        "line": 3,
+        "column": null
+      }
+    },
+    "feature": {
+      "value": "catalog",
+      "at": {
+        "file": "grimoire/tasks/done/2026-11/T-010-new-arrivals-no-country.md",
+        "line": 4,
+        "column": null
+      }
+    },
+    "flow": {
+      "value": "new-arrivals",
+      "at": {
+        "file": "grimoire/tasks/done/2026-11/T-010-new-arrivals-no-country.md",
+        "line": 5,
+        "column": null
+      }
+    },
+    "apps": [
+      {
+        "value": "web-client",
+        "at": {
+          "file": "grimoire/tasks/done/2026-11/T-010-new-arrivals-no-country.md",
+          "line": 6,
+          "column": null
+        }
+      },
+      {
+        "value": "mobile",
+        "at": {
+          "file": "grimoire/tasks/done/2026-11/T-010-new-arrivals-no-country.md",
+          "line": 6,
+          "column": null
+        }
+      }
+    ],
+    "status": {
+      "value": "done",
+      "at": {
+        "file": "grimoire/tasks/done/2026-11/T-010-new-arrivals-no-country.md",
+        "line": 7,
+        "column": null
+      }
+    },
+    "shipped": {
+      "value": {
+        "feature": "catalog",
+        "version": "2.1"
+      },
+      "at": {
+        "file": "grimoire/tasks/done/2026-11/T-010-new-arrivals-no-country.md",
+        "line": 8,
+        "column": null
+      }
+    },
+    "heading": {
+      "value": "New arrivals were empty for customers with no country",
+      "at": {
+        "file": "grimoire/tasks/done/2026-11/T-010-new-arrivals-no-country.md",
+        "line": 11,
+        "column": null
+      }
+    },
+    "fields": [
+      {
+        "key": "Asked by",
+        "value": "the owner, 2026-11-08",
+        "at": {
+          "file": "grimoire/tasks/done/2026-11/T-010-new-arrivals-no-country.md",
+          "line": 13,
+          "column": null
+        }
+      },
+      {
+        "key": "Verified",
+        "value": "src/app/catalog/tests/new-arrivals.test.ts proves AC-2",
+        "at": {
+          "file": "grimoire/tasks/done/2026-11/T-010-new-arrivals-no-country.md",
+          "line": 14,
+          "column": null
+        }
+      },
+      {
+        "key": "Left open",
+        "value": "nothing",
+        "at": {
+          "file": "grimoire/tasks/done/2026-11/T-010-new-arrivals-no-country.md",
+          "line": 15,
+          "column": null
+        }
+      }
+    ],
+    "decisionNeeded": null
+  },
+  {
+    "file": "grimoire/tasks/open/T-014-wishlist.md",
+    "folder": "open",
+    "month": null,
+    "id": {
+      "value": "T-014",
+      "at": {
+        "file": "grimoire/tasks/open/T-014-wishlist.md",
+        "line": 2,
+        "column": null
+      }
+    },
+    "type": {
+      "value": "feature",
+      "at": {
+        "file": "grimoire/tasks/open/T-014-wishlist.md",
+        "line": 3,
+        "column": null
+      }
+    },
+    "feature": {
+      "value": "catalog",
+      "at": {
+        "file": "grimoire/tasks/open/T-014-wishlist.md",
+        "line": 4,
+        "column": null
+      }
+    },
+    "flow": {
+      "value": "wishlist",
+      "at": {
+        "file": "grimoire/tasks/open/T-014-wishlist.md",
+        "line": 5,
+        "column": null
+      }
+    },
+    "apps": [
+      {
+        "value": "web-client",
+        "at": {
+          "file": "grimoire/tasks/open/T-014-wishlist.md",
+          "line": 6,
+          "column": null
+        }
+      },
+      {
+        "value": "mobile",
+        "at": {
+          "file": "grimoire/tasks/open/T-014-wishlist.md",
+          "line": 6,
+          "column": null
+        }
+      }
+    ],
+    "status": {
+      "value": "waiting for approval",
+      "at": {
+        "file": "grimoire/tasks/open/T-014-wishlist.md",
+        "line": 7,
+        "column": null
+      }
+    },
+    "shipped": null,
+    "heading": {
+      "value": "Let customers save products to a wishlist",
+      "at": {
+        "file": "grimoire/tasks/open/T-014-wishlist.md",
+        "line": 10,
+        "column": null
+      }
+    },
+    "fields": [
+      {
+        "key": "Asked by",
+        "value": "the owner, 2026-11-16",
+        "at": {
+          "file": "grimoire/tasks/open/T-014-wishlist.md",
+          "line": 12,
+          "column": null
+        }
+      },
+      {
+        "key": "Why",
+        "value": "customers ask to keep products for later",
+        "at": {
+          "file": "grimoire/tasks/open/T-014-wishlist.md",
+          "line": 13,
+          "column": null
+        }
+      },
+      {
+        "key": "Brief",
+        "value": "features/catalog/versions/v3.md",
+        "at": {
+          "file": "grimoire/tasks/open/T-014-wishlist.md",
+          "line": 14,
+          "column": null
+        }
+      },
+      {
+        "key": "Decision needed",
+        "value": "one wishlist per customer, or several named lists?",
+        "at": {
+          "file": "grimoire/tasks/open/T-014-wishlist.md",
+          "line": 15,
+          "column": null
+        }
+      }
+    ],
+    "decisionNeeded": "one wishlist per customer, or several named lists?"
+  },
+  {
+    "file": "grimoire/tasks/open/T-015-double-order.md",
+    "folder": "open",
+    "month": null,
+    "id": {
+      "value": "T-015",
+      "at": {
+        "file": "grimoire/tasks/open/T-015-double-order.md",
+        "line": 2,
+        "column": null
+      }
+    },
+    "type": {
+      "value": "bug",
+      "at": {
+        "file": "grimoire/tasks/open/T-015-double-order.md",
+        "line": 3,
+        "column": null
+      }
+    },
+    "feature": {
+      "value": "orders",
+      "at": {
+        "file": "grimoire/tasks/open/T-015-double-order.md",
+        "line": 4,
+        "column": null
+      }
+    },
+    "flow": {
+      "value": "place-order",
+      "at": {
+        "file": "grimoire/tasks/open/T-015-double-order.md",
+        "line": 5,
+        "column": null
+      }
+    },
+    "apps": [
+      {
+        "value": "web-client",
+        "at": {
+          "file": "grimoire/tasks/open/T-015-double-order.md",
+          "line": 6,
+          "column": null
+        }
+      },
+      {
+        "value": "mobile",
+        "at": {
+          "file": "grimoire/tasks/open/T-015-double-order.md",
+          "line": 6,
+          "column": null
+        }
+      }
+    ],
+    "status": {
+      "value": "in progress",
+      "at": {
+        "file": "grimoire/tasks/open/T-015-double-order.md",
+        "line": 7,
+        "column": null
+      }
+    },
+    "shipped": null,
+    "heading": {
+      "value": "Two quick submits place two orders",
+      "at": {
+        "file": "grimoire/tasks/open/T-015-double-order.md",
+        "line": 10,
+        "column": null
+      }
+    },
+    "fields": [
+      {
+        "key": "Asked by",
+        "value": "support, 2026-11-12",
+        "at": {
+          "file": "grimoire/tasks/open/T-015-double-order.md",
+          "line": 12,
+          "column": null
+        }
+      },
+      {
+        "key": "Why",
+        "value": "customers were charged twice",
+        "at": {
+          "file": "grimoire/tasks/open/T-015-double-order.md",
+          "line": 13,
+          "column": null
+        }
+      }
+    ],
+    "decisionNeeded": null
+  }
+]

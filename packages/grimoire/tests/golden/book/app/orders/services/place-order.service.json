@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "file": "src/app/orders/services/place-order.service.ts",
+  "module": "src/app/orders",
+  "type": "service",
+  "lines": 13,
+  "about": "Places an order and lowers the stock of its products.",
+  "feature": "orders",
+  "borrowedBy": [],
+  "flows": [],
+  "exports": [
+    {
+      "name": "placeOrder",
+      "about": "Saves the order, lowers stock, then sends the confirmation."
+    }
+  ],
+  "packages": [],
+  "imports": [
+    "src/app/catalog/repositories/products.repository.ts",
+    "src/app/orders/events/order-placed.event.ts",
+    "src/app/orders/jobs/send-receipt.job.ts",
+    "src/app/orders/mails/order-confirmation.mail.ts"
+  ],
+  "importedBy": [
+    "src/app/orders/controllers/place-order.controller.ts",
+    "src/app/orders/tests/place-order.test.ts"
+  ],
+  "routes": [],
+  "pages": [],
+  "screens": []
+}

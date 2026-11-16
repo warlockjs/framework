@@ -1,0 +1,587 @@
+[
+  {
+    "dir": "grimoire/apps/mobile",
+    "file": "grimoire/apps/mobile/README.md",
+    "id": {
+      "value": "mobile",
+      "at": {
+        "file": "grimoire/apps/mobile/README.md",
+        "line": 2,
+        "column": null
+      }
+    },
+    "type": {
+      "value": "mobile",
+      "at": {
+        "file": "grimoire/apps/mobile/README.md",
+        "line": 3,
+        "column": null
+      }
+    },
+    "root": {
+      "value": "mobile",
+      "at": {
+        "file": "grimoire/apps/mobile/README.md",
+        "line": 4,
+        "column": null
+      }
+    },
+    "heading": {
+      "value": "The shop mobile app",
+      "at": {
+        "file": "grimoire/apps/mobile/README.md",
+        "line": 7,
+        "column": null
+      }
+    },
+    "conditions": [
+      {
+        "name": "guest",
+        "text": "not signed in",
+        "at": {
+          "file": "grimoire/apps/mobile/README.md",
+          "line": 10,
+          "column": null
+        }
+      },
+      {
+        "name": "customer",
+        "text": "signed in",
+        "at": {
+          "file": "grimoire/apps/mobile/README.md",
+          "line": 11,
+          "column": null
+        }
+      }
+    ],
+    "layouts": [],
+    "pages": [],
+    "screens": [
+      {
+        "file": "grimoire/apps/mobile/screens/home/README.md",
+        "app": "mobile",
+        "type": "screen",
+        "id": "home",
+        "route": {
+          "value": "/",
+          "at": {
+            "file": "grimoire/apps/mobile/screens/home/README.md",
+            "line": 2,
+            "column": null
+          }
+        },
+        "screen": null,
+        "layout": null,
+        "heading": {
+          "value": "Home screen",
+          "at": {
+            "file": "grimoire/apps/mobile/screens/home/README.md",
+            "line": 5,
+            "column": null
+          }
+        },
+        "purpose": null,
+        "blocks": [
+          {
+            "block": "New arrivals",
+            "flow": "catalog/new-arrivals",
+            "who": {
+              "everyone": true,
+              "conditions": []
+            },
+            "changesWith": [
+              {
+                "condition": null,
+                "text": "the device's country"
+              }
+            ],
+            "at": {
+              "file": "grimoire/apps/mobile/screens/home/README.md",
+              "line": 10,
+              "column": null
+            }
+          }
+        ],
+        "alsoReachedFrom": [],
+        "blockFiles": []
+      }
+    ]
+  },
+  {
+    "dir": "grimoire/apps/web-admin",
+    "file": "grimoire/apps/web-admin/README.md",
+    "id": {
+      "value": "web-admin",
+      "at": {
+        "file": "grimoire/apps/web-admin/README.md",
+        "line": 2,
+        "column": null
+      }
+    },
+    "type": {
+      "value": "site",
+      "at": {
+        "file": "grimoire/apps/web-admin/README.md",
+        "line": 3,
+        "column": null
+      }
+    },
+    "root": {
+      "value": "src/web/$sites/admin",
+      "at": {
+        "file": "grimoire/apps/web-admin/README.md",
+        "line": 4,
+        "column": null
+      }
+    },
+    "heading": {
+      "value": "The admin site",
+      "at": {
+        "file": "grimoire/apps/web-admin/README.md",
+        "line": 7,
+        "column": null
+      }
+    },
+    "conditions": [
+      {
+        "name": "admin",
+        "text": "staff signed in to the admin site",
+        "at": {
+          "file": "grimoire/apps/web-admin/README.md",
+          "line": 10,
+          "column": null
+        }
+      }
+    ],
+    "layouts": [],
+    "pages": [
+      {
+        "file": "grimoire/apps/web-admin/pages/orders/README.md",
+        "app": "web-admin",
+        "type": "page",
+        "id": "orders",
+        "route": {
+          "value": "/admin/orders",
+          "at": {
+            "file": "grimoire/apps/web-admin/pages/orders/README.md",
+            "line": 2,
+            "column": null
+          }
+        },
+        "screen": null,
+        "layout": null,
+        "heading": {
+          "value": "Orders",
+          "at": {
+            "file": "grimoire/apps/web-admin/pages/orders/README.md",
+            "line": 5,
+            "column": null
+          }
+        },
+        "purpose": "Staff see the newest orders first.",
+        "blocks": [
+          {
+            "block": "Orders list",
+            "flow": "orders/place-order",
+            "who": {
+              "everyone": false,
+              "conditions": [
+                "admin"
+              ]
+            },
+            "changesWith": [],
+            "at": {
+              "file": "grimoire/apps/web-admin/pages/orders/README.md",
+              "line": 12,
+              "column": null
+            }
+          }
+        ],
+        "alsoReachedFrom": [],
+        "blockFiles": []
+      }
+    ],
+    "screens": []
+  },
+  {
+    "dir": "grimoire/apps/web-client",
+    "file": "grimoire/apps/web-client/README.md",
+    "id": {
+      "value": "web-client",
+      "at": {
+        "file": "grimoire/apps/web-client/README.md",
+        "line": 2,
+        "column": null
+      }
+    },
+    "type": {
+      "value": "site",
+      "at": {
+        "file": "grimoire/apps/web-client/README.md",
+        "line": 3,
+        "column": null
+      }
+    },
+    "root": {
+      "value": "src/web/$sites/client",
+      "at": {
+        "file": "grimoire/apps/web-client/README.md",
+        "line": 4,
+        "column": null
+      }
+    },
+    "heading": {
+      "value": "The shop website",
+      "at": {
+        "file": "grimoire/apps/web-client/README.md",
+        "line": 7,
+        "column": null
+      }
+    },
+    "conditions": [
+      {
+        "name": "guest",
+        "text": "not signed in",
+        "at": {
+          "file": "grimoire/apps/web-client/README.md",
+          "line": 10,
+          "column": null
+        }
+      },
+      {
+        "name": "customer",
+        "text": "signed in",
+        "at": {
+          "file": "grimoire/apps/web-client/README.md",
+          "line": 11,
+          "column": null
+        }
+      },
+      {
+        "name": "vip",
+        "text": "customer with the vip membership",
+        "at": {
+          "file": "grimoire/apps/web-client/README.md",
+          "line": 12,
+          "column": null
+        }
+      },
+      {
+        "name": "pref:personalised",
+        "text": "the customer left personalised content on",
+        "at": {
+          "file": "grimoire/apps/web-client/README.md",
+          "line": 13,
+          "column": null
+        }
+      }
+    ],
+    "layouts": [
+      {
+        "file": "grimoire/apps/web-client/layouts/site.md",
+        "app": "web-client",
+        "id": "site",
+        "heading": {
+          "value": "The site layout",
+          "at": {
+            "file": "grimoire/apps/web-client/layouts/site.md",
+            "line": 1,
+            "column": null
+          }
+        },
+        "blocks": [
+          {
+            "block": "Header",
+            "flow": null,
+            "who": {
+              "everyone": true,
+              "conditions": []
+            },
+            "changesWith": [],
+            "at": {
+              "file": "grimoire/apps/web-client/layouts/site.md",
+              "line": 6,
+              "column": null
+            }
+          },
+          {
+            "block": "Cart count",
+            "flow": "orders/place-order",
+            "who": {
+              "everyone": false,
+              "conditions": [
+                "customer"
+              ]
+            },
+            "changesWith": [],
+            "at": {
+              "file": "grimoire/apps/web-client/layouts/site.md",
+              "line": 7,
+              "column": null
+            }
+          },
+          {
+            "block": "Footer",
+            "flow": null,
+            "who": {
+              "everyone": true,
+              "conditions": []
+            },
+            "changesWith": [],
+            "at": {
+              "file": "grimoire/apps/web-client/layouts/site.md",
+              "line": 8,
+              "column": null
+            }
+          }
+        ]
+      }
+    ],
+    "pages": [
+      {
+        "file": "grimoire/apps/web-client/pages/home/README.md",
+        "app": "web-client",
+        "type": "page",
+        "id": "home",
+        "route": {
+          "value": "/",
+          "at": {
+            "file": "grimoire/apps/web-client/pages/home/README.md",
+            "line": 2,
+            "column": null
+          }
+        },
+        "screen": null,
+        "layout": {
+          "value": "site",
+          "at": {
+            "file": "grimoire/apps/web-client/pages/home/README.md",
+            "line": 3,
+            "column": null
+          }
+        },
+        "heading": {
+          "value": "Home",
+          "at": {
+            "file": "grimoire/apps/web-client/pages/home/README.md",
+            "line": 6,
+            "column": null
+          }
+        },
+        "purpose": "The first page a visitor sees.",
+        "blocks": [
+          {
+            "block": "Featured products",
+            "flow": "catalog/browse-products",
+            "who": {
+              "everyone": true,
+              "conditions": []
+            },
+            "changesWith": [
+              {
+                "condition": "vip",
+                "text": "member prices"
+              },
+              {
+                "condition": "pref:personalised",
+                "text": "picks"
+              }
+            ],
+            "at": {
+              "file": "grimoire/apps/web-client/pages/home/README.md",
+              "line": 13,
+              "column": null
+            }
+          },
+          {
+            "block": "New arrivals",
+            "flow": "catalog/new-arrivals",
+            "who": {
+              "everyone": true,
+              "conditions": []
+            },
+            "changesWith": [
+              {
+                "condition": null,
+                "text": "the customer's country"
+              }
+            ],
+            "at": {
+              "file": "grimoire/apps/web-client/pages/home/README.md",
+              "line": 14,
+              "column": null
+            }
+          },
+          {
+            "block": "Recent orders",
+            "flow": "orders/place-order",
+            "who": {
+              "everyone": false,
+              "conditions": [
+                "customer"
+              ]
+            },
+            "changesWith": [],
+            "at": {
+              "file": "grimoire/apps/web-client/pages/home/README.md",
+              "line": 15,
+              "column": null
+            }
+          }
+        ],
+        "alsoReachedFrom": [],
+        "blockFiles": [
+          {
+            "file": "grimoire/apps/web-client/pages/home/blocks/new-arrivals.md",
+            "app": "web-client",
+            "page": "home",
+            "id": "new-arrivals",
+            "flow": {
+              "value": "catalog/new-arrivals",
+              "at": {
+                "file": "grimoire/apps/web-client/pages/home/blocks/new-arrivals.md",
+                "line": 2,
+                "column": null
+              }
+            },
+            "heading": {
+              "value": "New arrivals on the home page",
+              "at": {
+                "file": "grimoire/apps/web-client/pages/home/blocks/new-arrivals.md",
+                "line": 5,
+                "column": null
+              }
+            },
+            "details": [
+              {
+                "name": "position",
+                "text": "second row, under Featured products",
+                "at": {
+                  "file": "grimoire/apps/web-client/pages/home/blocks/new-arrivals.md",
+                  "line": 7,
+                  "column": null
+                }
+              },
+              {
+                "name": "shows",
+                "text": "a grid of up to 20 products",
+                "at": {
+                  "file": "grimoire/apps/web-client/pages/home/blocks/new-arrivals.md",
+                  "line": 8,
+                  "column": null
+                }
+              },
+              {
+                "name": "on phones",
+                "text": "one row that scrolls sideways",
+                "at": {
+                  "file": "grimoire/apps/web-client/pages/home/blocks/new-arrivals.md",
+                  "line": 9,
+                  "column": null
+                }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "file": "grimoire/apps/web-client/pages/product/README.md",
+        "app": "web-client",
+        "type": "page",
+        "id": "product",
+        "route": {
+          "value": "/products/:id",
+          "at": {
+            "file": "grimoire/apps/web-client/pages/product/README.md",
+            "line": 2,
+            "column": null
+          }
+        },
+        "screen": null,
+        "layout": {
+          "value": "site",
+          "at": {
+            "file": "grimoire/apps/web-client/pages/product/README.md",
+            "line": 3,
+            "column": null
+          }
+        },
+        "heading": {
+          "value": "Product",
+          "at": {
+            "file": "grimoire/apps/web-client/pages/product/README.md",
+            "line": 6,
+            "column": null
+          }
+        },
+        "purpose": "One product with its price, stock and the order button.",
+        "blocks": [
+          {
+            "block": "Details",
+            "flow": "catalog/browse-products",
+            "who": {
+              "everyone": true,
+              "conditions": []
+            },
+            "changesWith": [
+              {
+                "condition": "vip",
+                "text": "member price"
+              }
+            ],
+            "at": {
+              "file": "grimoire/apps/web-client/pages/product/README.md",
+              "line": 13,
+              "column": null
+            }
+          },
+          {
+            "block": "Order button",
+            "flow": "orders/place-order",
+            "who": {
+              "everyone": false,
+              "conditions": [
+                "customer"
+              ]
+            },
+            "changesWith": [],
+            "at": {
+              "file": "grimoire/apps/web-client/pages/product/README.md",
+              "line": 14,
+              "column": null
+            }
+          },
+          {
+            "block": "Sign in hint",
+            "flow": null,
+            "who": {
+              "everyone": false,
+              "conditions": [
+                "guest"
+              ]
+            },
+            "changesWith": [],
+            "at": {
+              "file": "grimoire/apps/web-client/pages/product/README.md",
+              "line": 15,
+              "column": null
+            }
+          }
+        ],
+        "alsoReachedFrom": [
+          {
+            "kind": "mail",
+            "name": "order-confirmation",
+            "at": {
+              "file": "grimoire/apps/web-client/pages/product/README.md",
+              "line": 18,
+              "column": null
+            }
+          }
+        ],
+        "blockFiles": []
+      }
+    ],
+    "screens": []
+  }
+]

@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "feature": "auth",
+  "own": [
+    "src/app/auth/controllers/login.controller.ts",
+    "src/app/auth/controllers/register.controller.ts",
+    "src/app/auth/routes.ts",
+    "src/app/auth/services/login.service.ts",
+    "src/app/auth/services/register.service.ts",
+    "src/app/shared/jobs/delete-unverified.job.ts"
+  ],
+  "borrowed": [],
+  "routes": [
+    {
+      "method": "POST",
+      "path": "/api/register",
+      "name": "auth.register",
+      "file": "src/app/auth/controllers/register.controller.ts"
+    },
+    {
+      "method": "POST",
+      "path": "/api/login",
+      "name": "auth.login",
+      "file": "src/app/auth/controllers/login.controller.ts"
+    }
+  ],
+  "pages": {},
+  "unreached": []
+}

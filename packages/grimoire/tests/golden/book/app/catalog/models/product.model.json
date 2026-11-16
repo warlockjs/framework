@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "file": "src/app/catalog/models/product.model.ts",
+  "module": "src/app/catalog",
+  "type": "model",
+  "lines": 8,
+  "about": "A product customers can buy.",
+  "feature": "catalog",
+  "borrowedBy": [],
+  "flows": [],
+  "exports": [
+    {
+      "name": "Product",
+      "about": "A product with its price, stock and country."
+    }
+  ],
+  "packages": [
+    "@warlock.js/cascade"
+  ],
+  "imports": [],
+  "importedBy": [
+    "src/app/catalog/repositories/products.repository.ts"
+  ],
+  "routes": [],
+  "pages": [],
+  "screens": []
+}

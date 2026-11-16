@@ -1,0 +1,331 @@
+/**
+ * What `warlock grimoire …` and `warlock scry …` do, as functions that write
+ * to an `io` and return the exit code, so specs run them without a process.
+ * Loaded lazily by the commands: it pulls in every Grimoire module.
+ */
+import { createHash } from "node:crypto";
+import { readdir, readFile } from "node:fs/promises";
+import path from "node:path";
+import { checkGrimoire, formatCheckReport } from "../check";
+import { createFinding, explainGrimoireCode, GrimoireError } from "../codes";
+import type { BookAdapter } from "../contracts/adapter";
+import type { GrimoireCheckReport, GrimoireFinding } from "../contracts/findings";
+import type { ScryQuery, ScryResult } from "../contracts/scry";
+import type { GrimoireSnapshot } from "../contracts/snapshot";
+import { loadBook } from "../book";
+import { projectPath } from "../paths";
+import { writeRelease } from "../releases";
+import { formatScryResult, parseScryQuery, scry } from "../scry";
+import { openGrimoire } from "../workspace";
+import { parseGrimoire } from "../written";
+import { runGrimoire, type GrimoireRun } from "./pipeline";
+
+/** Where a command writes: `out` for its answer, `err` for problems. */
+export type CommandIO = {
+  out(line: string): void;
+  err(line: string): void;
+};
+
+/** The project and adapter a command runs against. */
+export type CommandContext = {
+  /** Absolute project root. */
+  root: string;
+  adapter: BookAdapter;
+  io: CommandIO;
+};
+
+type Options = Readonly<Record<string, string | boolean | number>>;
+
+const plural = (count: number, word: string, many = `${word}s`): string => `${count} ${count === 1 ? word : many}`;
+
+/** Print a Grimoire error the way every command does, and return exit code 1. */
+export function reportError(io: CommandIO, error: unknown): number {
+  if (error instanceof GrimoireError) {
+    io.err(`${error.code}  ${error.message}`);
+
+    const fix = explainGrimoireCode(error.code)?.fix;
+
+    if (fix) io.err(`  fix: ${fix}`);
+
+    return 1;
+  }
+
+  throw error;
+}
+
+function printJson(io: CommandIO, value: unknown): void {
+  io.out(JSON.stringify(value, null, 2));
+}
+
+/**
+ * Open with fresh routes; when the app does not boot (`GR8002`), open again
+ * with the cached ones and return the boot problem as a warning finding.
+ */
+async function withFreshRoutes<T>(
+  open: (routes: "fresh" | "cached") => Promise<T>,
+): Promise<{ value: T; bootProblem: GrimoireFinding | null }> {
+  try {
+    return { value: await open("fresh"), bootProblem: null };
+  } catch (error) {
+    if (!(error instanceof GrimoireError) || error.code !== "GR8002") throw error;
+
+    return {
+      value: await open("cached"),
+      bootProblem: createFinding({ code: "GR8002", message: error.message }),
+    };
+  }
+}
+
+/** Whether the book holds route facts already (a `--route` question with none boots once). */
+export async function hasRouteFacts(root: string): Promise<boolean> {
+  return (await loadBook(root))?.facts.routes != null;
+}
+
+/** sha256 of a project file, `""` when it is missing (the book's boot-cache rule). */
+async function inputHash(root: string, file: string): Promise<string> {
+  try {
+    return createHash("sha256")
+      .update(await readFile(path.join(root, ...file.split("/"))))
+      .digest("hex");
+  } catch {
+    return "";
+  }
+}
+
+/** File names whose appearance makes the route facts stale: routes files and named mails, jobs, events, notifications. */
+const BOOT_INPUT = /^(?:routes|.+\.(?:mail|job|event|notification))\.[cm]?[jt]sx?$/;
+
+/** Every boot-cache candidate under `src/`: a new one makes the route facts stale. */
+async function routesFiles(root: string, dir = "src"): Promise<string[]> {
+  let entries;
+
+  try {
+    entries = await readdir(path.join(root, ...dir.split("/")), { withFileTypes: true });
+  } catch {
+    return [];
+  }
+
+  const found: string[] = [];
+
+  for (const entry of entries) {
+    if (entry.name === "node_modules" || entry.name.startsWith(".")) continue;
+
+    const file = `${dir}/${entry.name}`;
+
+    if (entry.isDirectory()) found.push(...(await routesFiles(root, file)));
+    else if (BOOT_INPUT.test(entry.name) || (file.startsWith("src/config/") && /\.[cm]?[jt]sx?$/.test(entry.name))) found.push(file);
+  }
+
+  return found;
+}
+
+/**
+ * Whether `build` or `check` will have to boot the app: `force`, no book, no
+ * route facts yet, or a route-cache input changed, appeared or went away.
+ * Reads files only and never calls the adapter, so it runs before anything
+ * is loaded.
+ */
+export async function needsBoot(root: string, force: boolean): Promise<boolean> {
+  if (force) return true;
+
+  const book = await loadBook(root);
+
+  if (!book || book.facts.routes === null || book.manifest.boot.collectedAt === null) return true;
+
+  const inputs = book.manifest.boot.inputs;
+
+  for (const [file, hash] of Object.entries(inputs)) {
+    if ((await inputHash(root, file)) !== hash) return true;
+  }
+
+  return (await routesFiles(root)).some((file) => inputs[file] === undefined);
+}
+
+/** Whether the app has several sites, whose page routes need `src/config/web.ts` loaded. */
+export async function isMultiSite(root: string): Promise<boolean> {
+  try {
+    return (await readdir(path.join(root, "src", "web", "$sites"), { withFileTypes: true })).some((entry) =>
+      entry.isDirectory(),
+    );
+  } catch {
+    return false;
+  }
+}
+
+function buildSummary(run: GrimoireRun): { book: string; collected: string } {
+  const snapshot = run.snapshot;
+  const tasks = snapshot.collected.tasksIndex;
+  const bookmaps = run.collected.written.filter((file) => file.endsWith("bookmap.json")).length;
+  const nothing =
+    !run.rebuilt &&
+    run.book.written.length + run.book.removed.length + run.collected.written.length + run.collected.removed.length === 0;
+  const book = nothing
+    ? "book      up to date"
+    : `book      ${plural(snapshot.book.facts.files.length, "file")} (${run.book.written.length} written, ${run.book.removed.length} removed), routes ${snapshot.routes}`;
+
+  return {
+    book,
+    collected: `features  ${snapshot.collected.featuresIndex.features.length} (bookmaps written: ${bookmaps})   tasks  ${tasks.open.length} open, ${tasks.waiting.length} waiting, ${tasks.done.length} done`,
+  };
+}
+
+/** `warlock grimoire build [--force] [--site [--out <dir>]] [--json]`. */
+export async function runBuild(context: CommandContext, options: Options = {}): Promise<number> {
+  const { root, adapter, io } = context;
+
+  try {
+    const force = options.force === true;
+    const { value: run, bootProblem } = await withFreshRoutes((routes) =>
+      runGrimoire(root, adapter, { routes, force }),
+    );
+    let site: string | null = null;
+
+    if (options.site === true || typeof options.out === "string") {
+      const { exportGrimoireSite } = await import("../devtools");
+      const outDir = typeof options.out === "string" ? projectPath(root, options.out) : undefined;
+
+      site = await exportGrimoireSite(root, {
+        adapter,
+        snapshot: run.snapshot,
+        ...(outDir === undefined ? {} : { outDir }),
+      });
+    }
+
+    if (options.json === true) {
+      printJson(io, {
+        rebuilt: run.rebuilt,
+        changed: run.changed,
+        written: [...run.book.written, ...run.collected.written],
+        removed: [...run.book.removed, ...run.collected.removed],
+        routes: run.snapshot.routes,
+        site,
+        problems: bootProblem === null ? [] : [bootProblem],
+      });
+
+      return 0;
+    }
+
+    const summary = buildSummary(run);
+
+    io.out(summary.book);
+    io.out(summary.collected);
+
+    if (site !== null) io.out(`site      ${site}/index.html`);
+    if (bootProblem !== null) {
+      io.err(`${bootProblem.code}  ${bootProblem.message}`);
+      io.err(`  fix: ${bootProblem.hint}`);
+    }
+
+    return 0;
+  } catch (error) {
+    return reportError(io, error);
+  }
+}
+
+/** Add a boot problem to a check report as an unexpected warning. */
+function withProblem(report: GrimoireCheckReport, problem: GrimoireFinding | null): GrimoireCheckReport {
+  if (problem === null) return report;
+
+  const firstExpected = report.findings.findIndex((finding) => finding.expected);
+  const findings = [...report.findings];
+
+  findings.splice(firstExpected === -1 ? findings.length : firstExpected, 0, problem);
+
+  return { ...report, findings, counts: { ...report.counts, warnings: report.counts.warnings + 1 } };
+}
+
+/** `warlock grimoire check [--json]`: exit 1 only when the report is not ok. */
+export async function runCheck(context: CommandContext, options: Options = {}): Promise<number> {
+  const { root, adapter, io } = context;
+
+  try {
+    const { value: snapshot, bootProblem } = await withFreshRoutes((routes) =>
+      openGrimoire(root, adapter, { routes }),
+    );
+    const report = withProblem(checkGrimoire(snapshot), bootProblem);
+
+    if (options.json === true) printJson(io, report);
+    else for (const line of formatCheckReport(report)) io.out(line);
+
+    return report.ok ? 0 : 1;
+  } catch (error) {
+    return reportError(io, error);
+  }
+}
+
+/** `warlock grimoire release <release> [--json]`. */
+export async function runRelease(context: CommandContext, release: string | undefined, options: Options = {}): Promise<number> {
+  const { root, io } = context;
+
+  try {
+    const name = release?.trim() ?? "";
+
+    if (name === "" || /[\\/]/.test(name) || name.startsWith(".")) {
+      throw new GrimoireError(
+        "GR9006",
+        `Pass the release name, like warlock grimoire release 1.1.0 (got ${JSON.stringify(release ?? "")}). It must match a file in grimoire/releases/.`,
+      );
+    }
+
+    const { written } = await parseGrimoire(root);
+    const outcome = await writeRelease(root, written, name);
+
+    if (options.json === true) {
+      printJson(io, outcome);
+      return 0;
+    }
+
+    const entries = outcome.collection.entries;
+    const listed = entries.map((entry) => `${entry.feature} ${entry.version} ${entry.word}`).join(", ");
+
+    io.out(
+      `${outcome.file}: ${plural(entries.length, "entry", "entries")} collected${
+        entries.length > 0 ? ` (${listed})` : ""
+      }${outcome.changed ? "" : ", file unchanged"}`,
+    );
+
+    const unreleased = outcome.unreleased;
+
+    if (unreleased.length > 0) {
+      const names = unreleased.map((entry) => `${entry.feature} ${entry.version}`).join(", ");
+      const verb = unreleased.length === 1 ? "entry is" : "entries are";
+
+      io.out(
+        `note: ${unreleased.length} ${verb} still unreleased: ${names}. To ship them in ${name}, move them under "## ${name} (${outcome.collection.date})" in each feature's CHANGELOG.md and run this command again.`,
+      );
+    }
+
+    return 0;
+  } catch (error) {
+    return reportError(io, error);
+  }
+}
+
+/** Open the snapshot for a scry question: cached routes, fresh once when a route question finds none. */
+async function openForScry(root: string, adapter: BookAdapter, query: ScryQuery): Promise<GrimoireSnapshot> {
+  const routes: "fresh" | "cached" = query.type === "route" && !(await hasRouteFacts(root)) ? "fresh" : "cached";
+
+  return openGrimoire(root, adapter, { routes });
+}
+
+/** Answer a parsed query (shared by the CLI and the MCP tools). */
+export async function answer(root: string, adapter: BookAdapter, query: ScryQuery): Promise<ScryResult> {
+  return scry(await openForScry(root, adapter, query), query);
+}
+
+/** `warlock scry <file> | --impact … | --route … | --feature … | --flow … | --search … [--limit n] [--json]`. */
+export async function runScry(context: CommandContext, args: readonly string[], options: Options = {}): Promise<number> {
+  const { root, adapter, io } = context;
+
+  try {
+    const query = parseScryQuery(args, options);
+    const result = await answer(root, adapter, query);
+
+    if (options.json === true) printJson(io, result);
+    else for (const line of formatScryResult(result)) io.out(line);
+
+    return 0;
+  } catch (error) {
+    return reportError(io, error);
+  }
+}

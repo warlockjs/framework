@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "feature": "auth",
+  "flow": "login",
+  "ref": "auth/login",
+  "steps": [
+    {
+      "index": 1,
+      "kind": "route",
+      "target": "POST /api/login",
+      "found": true,
+      "entry": "src/app/auth/controllers/login.controller.ts",
+      "files": [
+        "src/app/auth/controllers/login.controller.ts",
+        "src/app/auth/routes.ts",
+        "src/app/auth/services/login.service.ts"
+      ]
+    }
+  ],
+  "criteria": [
+    {
+      "id": "AC-1",
+      "app": null,
+      "text": "valid credentials open a session",
+      "tests": [],
+      "status": "no-test"
+    }
+  ],
+  "shownBy": []
+}

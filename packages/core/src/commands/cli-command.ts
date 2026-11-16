@@ -9,6 +9,9 @@ import type {
   ResolvedCLICommandOption,
 } from "./types";
 
+/** One `cli.commands` entry: a command, or a list of commands a package's register function returns. */
+export type CLICommandEntry = CLICommand | readonly CLICommand[];
+
 export class CLICommand {
   /**
    * Command source

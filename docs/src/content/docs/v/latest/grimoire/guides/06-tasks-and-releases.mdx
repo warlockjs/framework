@@ -1,0 +1,172 @@
+---
+title: Tasks and releases
+description: One file per task, one file per release, and how a release collects the changelog entries the agent stamped.
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+<Aside type="caution" title="Experimental">
+  Grimoire is experimental in 5.55. The structure of the written files and the commands may still
+  change before they are declared stable.
+</Aside>
+
+Tasks and releases are written by agents and committed with the code, because they are the history of the
+project. Warlock reads them and checks them. It never edits an agent-written file. The only text Warlock writes
+inside one is the collected list between the markers of a release file.
+
+## Tasks
+
+```text
+grimoire/tasks/
+  open/T-014-wishlist.md
+  done/2026-11/T-010-new-arrivals-no-country.md
+  index.json                 Warlock. Not in git.
+```
+
+One file per task, named `T-<n>-<slug>.md`. Open tasks live in `open/`. A finished task moves to
+`done/<yyyy-mm>/`, the month it shipped.
+
+```md
+---
+id: T-014
+type: feature
+feature: catalog
+flow: wishlist
+apps: [web-client, mobile]
+status: waiting for approval
+---
+
+# Let customers save products to a wishlist
+
+- Asked by: the owner, 2026-11-16
+- Why: customers ask to keep products for later
+- Brief: features/catalog/versions/v3.md
+- Decision needed: one wishlist per customer, or several named lists?
+```
+
+- `type` is `bug`, `feature`, `decision` or `chore`.
+- `status` is one of `open`, `waiting for approval`, `approved`, `in progress`, `blocked`, `done`, `dropped`.
+- `feature` and `flow` are optional. `flow` is a flow id inside `feature`, or `<feature>/<flow>`.
+- `Brief:` is a path relative to `grimoire/`.
+- A done task has `status: done` and `shipped: <feature> <version>` (`shipped: catalog 2.1`).
+
+### Move a single tasks file to the folder
+
+If your app keeps one file of tasks (for example `docs/tasks.md` with `T-nnn` entries), move it once:
+
+1. Create `grimoire/tasks/open/` and `grimoire/tasks/done/`.
+2. Make one file per entry. Name it `T-<n>-<slug>.md` and keep the id. `### T-131 [feature] Grimoire tasks`
+   becomes `id: T-131`, `type: feature` and the heading `# Grimoire tasks`.
+3. Put the entry's other lines in the body as `- Key: value` lines (`Source` becomes `Asked by`, `What and why`
+   becomes `Why`).
+4. Give each entry its status. An entry that waits for the owner's decision gets
+   `status: waiting for approval`, and the question goes in `- Decision needed: ...`. An entry being worked on
+   gets `in progress`. A new one gets `open`.
+5. Move finished entries to `done/<yyyy-mm>/` with `status: done` and `shipped: <feature> <version>`, using the
+   month they shipped.
+6. Link a task to its feature with `feature` and `flow` when it has one, so the check can follow it.
+7. Delete the old file once every entry has moved, and point your agent notes at `grimoire/tasks/`.
+
+`warlock grimoire check` tells you what is left to fix: a misnamed or misplaced file, a duplicate id, a done
+task without `shipped`.
+
+## Releases
+
+A release file is `grimoire/releases/<release>.md`. The agent writes it first: the front matter, a heading and a
+brief of two or three sentences on what the release means to users.
+
+```md
+---
+release: 1.4.1
+date: 2026-11-20
+---
+
+# Release 1.4.1
+
+Customers with no country now see new arrivals again, and orders can be paid later.
+```
+
+### Who writes what
+
+| Step | Who |
+| --- | --- |
+| Move the entries from `## Unreleased` under `## <release> (<yyyy-mm-dd>)` in each feature changelog | The agent |
+| Write the release file's front matter and brief | The agent |
+| `warlock grimoire release 1.4.1` | Warlock writes the collected list between the markers |
+
+Feature changelogs and the brief are never edited by Warlock. A spec of the package asserts that their bytes are
+unchanged after a release run.
+
+### Collect the list
+
+```bash
+npx warlock grimoire release 1.4.1
+```
+
+The command collects only the entries the agent stamped with that release, and writes them between the markers:
+
+```md
+<!-- grimoire:collected:start -->
+## Changes
+
+### catalog
+- 2.1  fixed  new-arrivals: a customer with no country saw an empty list (AC-2)
+
+### orders
+- 3.0  added  pay-later: customers can pay within 14 days
+<!-- grimoire:collected:end -->
+```
+
+- Entries are grouped by feature, newest version first.
+- When the file has no markers, the command adds them at the end. When it has them, only the text between them
+  changes.
+- With no stamped entries the list says `No feature changes.`
+- Running the command again, for this release or an older one, gives the same file byte for byte.
+- Entries still under `## Unreleased` are not collected. The command prints a note, for example
+  `2 entries are still unreleased: catalog 2.2, orders 3.1`, so you can stamp them first.
+- When the release file does not exist, has no `release` and `date`, or has no brief, the command stops with
+  `GR9005` and changes nothing. Write the brief, then run it again.
+
+## Codes
+
+`warlock grimoire check` reports these. `warlock explain GR6001` prints the fix.
+
+### GR6001
+
+A release file lists an entry that no feature changelog has under `## <release> (<yyyy-mm-dd>)`. Move the entry
+under the release section, or run the command again so the list matches the changelog.
+
+### GR6002
+
+A feature changelog has a section for a release that has no `grimoire/releases/<release>.md`. Write the release
+file, or fix the release in the heading.
+
+### GR6003
+
+The date in a changelog heading differs from the `date` in the release file. Use the date of the release file.
+
+### GR7001
+
+A task names a `feature` that has no folder under `grimoire/features/`.
+
+### GR7002
+
+A task names a flow that has no file, or a flow with no feature to look it up in.
+
+### GR7003
+
+A task's status does not match its folder. `done/` holds tasks with `status: done` and `shipped`; `open/` holds the
+rest.
+
+### GR7004
+
+A task's `shipped: <feature> <version>` names a version the feature's changelog does not have.
+
+### GR7005
+
+A task's `Brief:` path does not exist under `grimoire/`.
+
+### GR9005
+
+The release file has no brief yet. Write `grimoire/releases/<release>.md` with `release` and `date` front matter
+and the brief, then run the command again.

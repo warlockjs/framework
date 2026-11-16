@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "file": "src/web/$sites/client/root.tsx",
+  "module": "src/web",
+  "type": "root",
+  "lines": 5,
+  "about": "The client site's document shell.",
+  "feature": null,
+  "borrowedBy": [],
+  "flows": [],
+  "exports": [
+    {
+      "name": "default",
+      "about": null
+    }
+  ],
+  "packages": [],
+  "imports": [],
+  "importedBy": [],
+  "routes": [],
+  "pages": [],
+  "screens": []
+}

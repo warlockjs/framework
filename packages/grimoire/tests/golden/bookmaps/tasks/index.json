@@ -1,0 +1,72 @@
+{
+  "schemaVersion": 1,
+  "open": [
+    {
+      "id": "T-014",
+      "title": "Let customers save products to a wishlist",
+      "type": "feature",
+      "status": "waiting for approval",
+      "feature": "catalog",
+      "flow": "wishlist",
+      "apps": [
+        "web-client",
+        "mobile"
+      ],
+      "file": "grimoire/tasks/open/T-014-wishlist.md",
+      "shipped": null,
+      "decisionNeeded": "one wishlist per customer, or several named lists?"
+    },
+    {
+      "id": "T-015",
+      "title": "Two quick submits place two orders",
+      "type": "bug",
+      "status": "in progress",
+      "feature": "orders",
+      "flow": "place-order",
+      "apps": [
+        "web-client",
+        "mobile"
+      ],
+      "file": "grimoire/tasks/open/T-015-double-order.md",
+      "shipped": null,
+      "decisionNeeded": null
+    }
+  ],
+  "waiting": [
+    {
+      "id": "T-014",
+      "title": "Let customers save products to a wishlist",
+      "type": "feature",
+      "status": "waiting for approval",
+      "feature": "catalog",
+      "flow": "wishlist",
+      "apps": [
+        "web-client",
+        "mobile"
+      ],
+      "file": "grimoire/tasks/open/T-014-wishlist.md",
+      "shipped": null,
+      "decisionNeeded": "one wishlist per customer, or several named lists?"
+    }
+  ],
+  "done": [
+    {
+      "id": "T-010",
+      "title": "New arrivals were empty for customers with no country",
+      "type": "bug",
+      "status": "done",
+      "feature": "catalog",
+      "flow": "new-arrivals",
+      "apps": [
+        "web-client",
+        "mobile"
+      ],
+      "file": "grimoire/tasks/done/2026-11/T-010-new-arrivals-no-country.md",
+      "shipped": {
+        "feature": "catalog",
+        "version": "2.1"
+      },
+      "decisionNeeded": null
+    }
+  ]
+}

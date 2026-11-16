@@ -175,6 +175,13 @@ async function main() {
       return;
     }
 
+    // Every new app ships Grimoire: its warlock.config.ts imports it, so a scaffold
+    // without the package could not run any warlock command.
+    if (!existsSync(path.join(appPath, "node_modules", "@warlock.js", "grimoire"))) {
+      failure = "the scaffold has no @warlock.js/grimoire installed — the template dependency did not land";
+      return;
+    }
+
     const expectedTypeScript = "7.0.2";
     const installedTypeScript = JSON.parse(
       readFileSync(path.join(appPath, "node_modules", "typescript", "package.json"), "utf8"),

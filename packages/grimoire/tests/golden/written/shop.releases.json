@@ -1,0 +1,96 @@
+[
+  {
+    "file": "grimoire/releases/1.0.0.md",
+    "release": {
+      "value": "1.0.0",
+      "at": {
+        "file": "grimoire/releases/1.0.0.md",
+        "line": 2,
+        "column": null
+      }
+    },
+    "date": {
+      "value": "2026-10-01",
+      "at": {
+        "file": "grimoire/releases/1.0.0.md",
+        "line": 3,
+        "column": null
+      }
+    },
+    "heading": {
+      "value": "Release 1.0.0",
+      "at": {
+        "file": "grimoire/releases/1.0.0.md",
+        "line": 6,
+        "column": null
+      }
+    },
+    "brief": "The first release: customers browse products, see new arrivals, sign up and place orders.",
+    "collected": {
+      "start": {
+        "file": "grimoire/releases/1.0.0.md",
+        "line": 10,
+        "column": null
+      },
+      "end": {
+        "file": "grimoire/releases/1.0.0.md",
+        "line": 22,
+        "column": null
+      },
+      "entries": [
+        {
+          "feature": "auth",
+          "version": "1.0",
+          "word": "added",
+          "flow": null,
+          "criteria": [],
+          "text": "described from the existing code",
+          "at": {
+            "file": "grimoire/releases/1.0.0.md",
+            "line": 14,
+            "column": null
+          }
+        },
+        {
+          "feature": "catalog",
+          "version": "2.0",
+          "word": "added",
+          "flow": "new-arrivals",
+          "criteria": [],
+          "text": "customers see the newest products sold in their country",
+          "at": {
+            "file": "grimoire/releases/1.0.0.md",
+            "line": 17,
+            "column": null
+          }
+        },
+        {
+          "feature": "catalog",
+          "version": "1.0",
+          "word": "added",
+          "flow": "browse-products",
+          "criteria": [],
+          "text": "customers list products and open one",
+          "at": {
+            "file": "grimoire/releases/1.0.0.md",
+            "line": 18,
+            "column": null
+          }
+        },
+        {
+          "feature": "orders",
+          "version": "1.0",
+          "word": "added",
+          "flow": "place-order",
+          "criteria": [],
+          "text": "customers pay for their cart and get a confirmation email",
+          "at": {
+            "file": "grimoire/releases/1.0.0.md",
+            "line": 21,
+            "column": null
+          }
+        }
+      ]
+    }
+  }
+]

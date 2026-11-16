@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "feature": "orders",
+  "own": [
+    "src/app/orders/controllers/place-order.controller.ts",
+    "src/app/orders/events/order-placed.event.ts",
+    "src/app/orders/jobs/send-receipt.job.ts",
+    "src/app/orders/mails/order-confirmation.mail.ts",
+    "src/app/orders/notifications/order-shipped.notification.ts",
+    "src/app/orders/routes.ts",
+    "src/app/orders/services/place-order.service.ts"
+  ],
+  "borrowed": [
+    {
+      "file": "src/app/catalog/repositories/products.repository.ts",
+      "owner": "catalog",
+      "by": [
+        "src/app/orders/services/place-order.service.ts"
+      ]
+    }
+  ],
+  "routes": [
+    {
+      "method": "POST",
+      "path": "/api/orders",
+      "name": "orders.place",
+      "file": "src/app/orders/controllers/place-order.controller.ts"
+    }
+  ],
+  "pages": {},
+  "unreached": []
+}

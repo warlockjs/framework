@@ -1,0 +1,131 @@
+---
+title: Apps, pages and blocks
+description: How agents describe sites and mobile apps under grimoire/apps, with named conditions, layouts, pages, screens and blocks, and the app codes the check reports.
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+<Aside type="caution" title="Experimental">
+  Grimoire is experimental in 5.55. The structure of the written files and the commands may still
+  change before they are declared stable.
+</Aside>
+
+`grimoire/apps/` describes where people meet the product: one folder per site or mobile app. Each page or screen
+lists its **blocks**, and each block points to a feature flow. The flow says what happens. The app folder says
+where it is shown and to whom.
+
+## An app
+
+```md
+---
+id: web-client
+type: site
+root: src/web/$sites/client
+---
+
+# The shop website
+
+## Conditions
+- guest      not signed in
+- customer   signed in
+- vip        customer with the vip membership
+```
+
+- `type` is `site` or `mobile`.
+- `root` is the project folder of the site (`src/web/$sites/client`, or `src/web` in a single-site app) or of the
+  mobile app (`mobile`). Warlock matches the app to the site or mobile app the code reports by this folder.
+- `## Conditions` declares every named condition the app uses: who is looking (`guest`, `customer`), a membership
+  (`vip`), or a setting (`pref:personalised`). A block can name only declared conditions.
+
+## Layouts
+
+`layouts/<layout>.md` holds the blocks that every page of a layout shares (a header, a footer). It has the same
+`## Blocks` table as a page. A page names its layout in the front matter: `layout: site`.
+
+## Pages and the Blocks table
+
+```md
+---
+route: /products/:id
+layout: site
+---
+
+# Product
+
+One product with its price, stock and the order button.
+
+## Blocks
+| Block        | Flow                    | Who sees it | Changes with      |
+| ------------ | ----------------------- | ----------- | ----------------- |
+| Details      | catalog/browse-products | everyone    | vip: member price |
+| Order button | orders/place-order      | customer    | —                 |
+| Sign in hint | —                       | guest       | —                 |
+
+## Also reached from
+- mail   order-confirmation
+```
+
+| Column | Meaning |
+| --- | --- |
+| Block | The name of the block on the page. |
+| Flow | The `<feature>/<flow>` the block shows, or `—` when it belongs to no flow (a header). |
+| Who sees it | `everyone`, or condition names of the app. |
+| Changes with | `—`, or items separated by `;`. An item is `<condition>: <text>` or free text. |
+
+`route` is the route of the page in its site. A page whose route is not in the site any more is reported.
+
+### Block files
+
+Put a block in its own file, `pages/<page>/blocks/<block>.md`, when how it looks or where it sits differs by app.
+The file name is the block name in lower case with dashes (`new-arrivals` for `New arrivals`). The file points to
+its flow in the front matter (`flow: catalog/new-arrivals`) and lists details such as `position` and `shows`.
+Every block file needs a row in the page's Blocks table.
+
+## Screens: file-based or declared
+
+A mobile app has screens instead of pages, in `screens/<screen>/README.md`.
+
+- **File-based routing** (Expo Router). Warlock lists the screens from the file names under `app/`. A group folder
+  such as `(tabs)` is not part of the route, `index` is the route of its folder, and `[id]` stays as written.
+  `_layout`, `+not-found`, `+html` and `+api` files are not screens. Write the route of the screen in the front
+  matter (`route: /products/[id]`); Warlock reports a route that has no file.
+- **Navigation defined in code.** Warlock does not read your source, so it lists no screens. Declare each screen
+  in `screens/<screen>/README.md` with its name: `screen: Orders`. Nothing is compared with files.
+
+## Differs by app
+
+What the user gets can differ by app (a phone uses the device location, a site uses the account's country). Write
+that difference in the flow, under `## Differs by app`. How a block looks or where it sits differs by app too: write
+that in the app's block file. Never copy the flow into the app.
+
+## How a page is reached, and what it requires
+
+Do not write these. The book lists how a page is reached (the links and redirects Warlock can read) and what it
+requires (middleware and permissions). Write an entry point yourself only when the book cannot see it, such as a
+link in an email:
+
+```md
+## Also reached from
+- mail   order-confirmation
+```
+
+Kinds `mail`, `notification`, `page` and `screen` are checked against the code; other kinds are free text.
+
+## App codes
+
+The check reports these. Each code is described on the [check page](../04-check/).
+
+| Code | Severity | Meaning |
+| --- | --- | --- |
+| `GR5001` | error | A block row or block file points to a flow that does not exist. |
+| `GR5002` | error | A condition is used in a block but not declared in the app README. |
+| `GR5003` | error | A page's route is not a page of its site. |
+| `GR5004` | error | A page names a layout with no file. |
+| `GR5005` | error | An app's `root` matches no site or mobile app. |
+| `GR5006` | error | A screen has no route, or its route is not a screen of a file-routed app. |
+| `GR5007` | warning | A block file has no row in its page's Blocks table. |
+| `GR5008` | error | An entry point in Also reached from names no mail, notification, page or screen. |
+| `GR5009` | warning | A site or mobile app has no folder in `grimoire/apps` (only once the folder has apps). |
+
+A finding about a block or page fills its flow, so a proposed flow's findings are shown as expected.
+A flow or feature that names an app with no folder is `GR2008`.
