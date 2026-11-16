@@ -160,3 +160,17 @@ T-100 and later are checked against 5.53.1.
   command prints progress and the child's output while it waits), or closed as an app-side import.
 - Status: open (partly). 5.54.0 adds stage progress, a 15-second heartbeat, `WARLOCK_DEBUG_TYPINGS=1` with live child output, and a child-process spec. The cause is not found in source; it still needs a run on a Windows machine (the steps above).
 - Owner decision: none; needs someone with a Windows machine to run the steps above.
+
+### T-120 [bug] Windows CI: the development e2e test times out waiting for a hot update
+
+- Source: main CI, Windows workflow, 2026-11-14 and 2026-11-16 (runs on commits with no web change also failed).
+- What and why: `packages/core/tests/integration/e2e/web-development.test.ts` ("development regression: shared") fails on
+  Windows about one run in four: `waitFor {"selector":"h1","text":"Revision 2"}` or `{"selector":"button","text":"Count 1"}`
+  times out after 30 s, so an edit is not reflected in the browser in time. A re-run passes. Each failure emails the owner
+  and makes main look red after a release.
+- Evidence: Windows job logs of runs on f1af13d90 (2026-11-14), df75c43e5, ba5bf3e6a and 9c57b53a9 (2026-11-16); the
+  evidence screenshots the test writes under `.warlock/e2e/web-development/shared/run-*`.
+- Acceptance: the cause is named (file-watch latency on Windows, a missed update, or the wait itself); the test passes in
+  20 consecutive Windows runs, or waits on the update event instead of a fixed timeout.
+- Status: open.
+

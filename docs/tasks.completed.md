@@ -1188,7 +1188,7 @@ Newest first. Each entry records the release that shipped it and how it was veri
   provenance on npm; one dry-run release succeeds end to end.
 - Owner decision (2026-11-16): the owner asked for every open task to be completed in 5.54.0; (a) + (c) shipped.
 - Shipped: 5.54.0 (2026-11-16).
-- Verified: release-family.spec.ts (97 pass) and the new provenance and gate-job checks; the Actions run itself was not dispatched in this release, so the first run is the check; typecheck, lint and the full release gate green (verify and review passes).
+- Verified: release-family.spec.ts (97 pass) and the new provenance and gate-job checks; the 5.54.0 release ran on the new jobs (gate run 43885559928, publish run 43897306289): the tarball handoff worked and every package carries an SLSA provenance attestation on npm.
 
 ### T-099 [chore] Upgrade notes miss the route-hook typing change
 
