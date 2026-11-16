@@ -1,0 +1,15 @@
+# Warlock Grimoire
+
+> Package: `@warlock.js/grimoire`
+
+> Experimental project map for Warlock.js apps: a generated book of the code, agent-written features, flows, apps, tasks and releases, a read-only check, and scry queries for agents.
+
+## Skills
+
+- [Package orientation](@warlock.js/grimoire/skills/index.md): Grimoire (experimental), the project map for Warlock.js apps: `warlock scry` and `warlock grimoire build|check|release` over a `grimoire/` folder of generated book entries and agent-written features, flows, apps, tasks and releases. Topics: use the map before searching code, write a feature, record a change and release, describe sites and mobile screens, document a file, backfill an existing app. Use at the start of every task in a project that has `grimoire/`.
+- [backfill-a-grimoire](@warlock.js/grimoire/skills/backfill-a-grimoire/SKILL.md): Write the Grimoire for a project that already has code but no `grimoire/` folder: build the book, propose features from the modules and routes, write them as inferred, and bring the owner the questions only they can answer. Use once per existing project, or when a large undescribed area is found.
+- [describe-an-app](@warlock.js/grimoire/skills/describe-an-app/SKILL.md): Describe where users meet the product in `grimoire/apps/`: one folder per site or mobile app, its named conditions (guest, customer, membership, preferences), shared layouts, and the pages or screens whose blocks point to feature flows. Use when adding a page, a screen or a block, or when what a page shows depends on who is looking.
+- [document-a-file](@warlock.js/grimoire/skills/document-a-file/SKILL.md): Write the one-sentence header and the public-export comments the Grimoire copies into its book, and tag a file with `@feature` when it lives outside its feature's folders. Use whenever you create a source file or change what one is for.
+- [record-a-change](@warlock.js/grimoire/skills/record-a-change/SKILL.md): Finish a change the Grimoire way: tie each test to the acceptance criterion it proves, reshape the feature README, add the changelog entry with the right version, move the task to done, run `warlock grimoire check`, and write the release brief. Use after building any change, including a bug fix.
+- [use-the-grimoire](@warlock.js/grimoire/skills/use-the-grimoire/SKILL.md): Find the right files before changing a Warlock.js project by asking the Grimoire (experimental): `warlock scry` for a file, a route, a feature, a flow or the impact of a change, and the `grimoire/` folder for what the product does. Use at the start of every task, before searching the code.
+- [write-a-feature](@warlock.js/grimoire/skills/write-a-feature/SKILL.md): Describe a new feature, or a new version of one, in `grimoire/features/` before writing code: the task, the brief, the README front matter, each flow with its steps, cases and acceptance criteria. Use when the owner asks for something the product does not do yet.

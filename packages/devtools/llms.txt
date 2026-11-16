@@ -6,4 +6,4 @@
 
 ## Skills
 
-- [devtools](@warlock.js/devtools/skills/SKILL.md): Development dashboard for Warlock apps via `devtoolsConnector`. Inspect request timelines, middleware, validation, queries, N+1 warnings, logs, cache, mail, AI runs, routes and configuration. Use for "debug a slow endpoint", "inspect this request", "view captured mail" or "open devtools". Not this package → @warlock.js/core for `warlock trace`, CLI route inspection and OpenAPI; @warlock.js/ai-panoptic for AI tracing.
+- [devtools](@warlock.js/devtools/skills/SKILL.md): Development dashboard for Warlock apps via `devtoolsConnector`. Inspect request timelines, middleware, validation, queries, N+1 warnings, logs, cache, mail, AI runs, routes and configuration. Use for "debug a slow endpoint", "inspect this request", "view captured mail", "open devtools" or "add a devtools panel". Not this package → @warlock.js/core for `warlock trace`, CLI route inspection and OpenAPI; @warlock.js/ai-panoptic for AI tracing.

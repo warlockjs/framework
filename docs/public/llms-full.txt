@@ -905,6 +905,7 @@ router.restfulResource("/orders", new OrdersRestful());
 
 - **`router.restfulResource` wraps `prefix(path, ...)` internally** — register inside `guarded(...)` to guard the whole set, or pass middleware via the options. Avoid registering the same prefix twice.
 - **`Restful.update` is `PUT`, `Restful.patch` is `PATCH`.** They differ — `update` uses `request.allExceptParams()`, `patch` uses `request.heavyExceptParams()`. Don't conflate them.
+- **`Restful.list` rethrows failures** (a refused filter answers 400, anything else is a 5xx the request funnel records once) instead of answering `serverError` itself.
 - **`cache = true` reuses repository cache.** If the repository isn't cacheable, the cached methods silently fall through to the live query — set `cache = false` explicitly if you want to make that visible.
 - **`bulkDelete` reads `id` as an array.** The route is `DELETE /path` (no `:id`); send `id: ["1", "2", "3"]` in the body. Returns 400 if the value isn't an array.
 - **Validation hooks on `Restful`** are bound to the instance — call `this.repository` freely inside `validate()`. Plain controller validators don't get `this`.
@@ -1487,13 +1488,14 @@ Same shape — TS validates the union; runtime picks the `default` key.
 
 - `http.rateLimit` — `@fastify/rate-limit` options (`nameSpace`, ...); `store: "cache"` counts in `@warlock.js/cache` so every server shares the limit (per-route `middleware.rateLimit()` follows it; `skipOnError` defaults to `true`, so a cache outage fails open; the `null` and `file` cache drivers are refused); `redis` needs an ioredis client; `enabled: false` disables. Static files (public folder, `router.directory()` mounts, `router.file()` routes, web build assets) are exempt unless `staticFiles: true`.
 - `socket.adapter` — adapter factory for cross-server broadcast.
+- `database` cache driver: register `cacheMigration` (from `@warlock.js/core`) in `database.migrations` to create its `cache` table with the unique index on `key` that the `upsert` option needs.
 - `cache.silenceSingleServerWarning`, `storage.silenceSingleServerWarning`, `socket.silenceSingleServerWarning` — silence the production warnings for in-memory cache, local storage, and adapter-less sockets.
 
 `http.modelValidationErrorStatus` sets the status for a Cascade model-write validation failure (a model failing its own schema on save). It defaults to `500` with an opaque body, because request input is already validated with a `422` before the model is touched. Set a `4xx` (e.g. `422`) to treat it as a client error instead; the response then carries `{ errors }`.
 
 `http.errorMapper(error, request)` maps errors that are not an `HttpError` to `{ status, message?, payload? }` (return `undefined` to keep the default opaque `500`). A mapped 5xx keeps the opaque message unless the mapper sets one.
 
-Request input limits: `http.input.maxArrayIndex` (default 1000) drops keys naming a larger array index (`a[99999]`); `http.urlencoded.maxFields` (default 1000) answers 413 (`EC107`) past it. `http.cookies.secret` only signs cookies written with `{ signed: true }` (read with `request.signedCookie()`). `/ready` hides its check list in production unless `http.health.details: true`.
+Request input limits: `http.input.maxArrayIndex` (default 1000) drops keys naming a larger array index (`a[99999]`); `http.input.maxDepth` (default 32) drops deeper keys and refuses a deeper JSON body (400, `EC111`); `http.multipart.memoryLimit` spools larger file parts to temporary files; `http.compileResponseSchemas` serializes declared `responseSchema` statuses and drops undeclared fields; `resource.dateOutput` sets the default date output of resource fields (`"iso"`, ...); `http.urlencoded.maxFields` (default 1000) answers 413 (`EC107`) past it. `http.cookies.secret` only signs cookies written with `{ signed: true }` (read with `request.signedCookie()`). `/ready` hides its check list in production unless `http.health.details: true`.
 
 `http.logging` controls what request log entries carry: `{ body?: boolean, query?: boolean, redactQueryParams?: string[] }` (body/query default `true`). A route's `logging` option overrides it — use `logging: { body: false, query: false }` on routes that accept secrets or arbitrary text. Entries carry `request.toLogSnapshot()`, never the `Request` object, with credential query values masked in the URL.
 
@@ -2350,7 +2352,7 @@ If no locale is set on the request, the first entry wins as a fallback.
 
 ## Date output options
 
-Default date cast emits an object — `{ format, timestamp, humanTime, iso }`. To shape output globally use the static `parsedSchema` field after defining, or override via a subclass. For most APIs, the default is fine.
+Default date cast emits an object — `{ format, timestamp, humanTime, iso }`. Set `resource.dateOutput` in `src/config/resource.ts` (`"iso"`, `"timestamp"`, `"format"`, `"humanTime"`, `"locale"` or an options object) to change every date field at once; a field's own `dateOptions()` wins, and unset keeps the object. For most APIs, the default is fine.
 
 ## Computed fields (resolver functions)
 
@@ -2724,7 +2726,7 @@ Generate the keys once (Node REPL):
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
 
-Put both in `.env` and **never rotate the encryption key without a migration** — every value encrypted under the old key becomes garbage. The HMAC key can rotate if you accept that fingerprints recomputed under the new key won't match historical ones.
+Put both in `.env`. **Rotate the encryption key with `previousKeys`**: set the new `key` and list the old one in `previousKeys: [...]` (newest first). `encrypt()` uses only `key`; `decrypt()` tries `key`, then each retired key, only when the value does not open. Re-encrypt stored values, then drop the old key. Swapping `key` alone makes every old ciphertext garbage. The HMAC key can rotate if you accept that fingerprints recomputed under the new key won't match historical ones.
 
 ## `encrypt` / `decrypt` — reversible secrets
 
@@ -2872,7 +2874,7 @@ Same payload → same key → returns the cached result. Different keys (because
 - **Empty key value is fatal.** If `env("APP_ENCRYPTION_KEY")` returns `undefined`, the first `encrypt()` call throws "Missing encryption key" at runtime, not boot. Cover this in your startup health check.
 - **HMAC falls back to the encryption key.** If `hmacKey` isn't set, `hmacHash` uses `key`. Convenient, but slightly weakens your isolation — best practice is two separate keys.
 - **Don't reuse the same value across encrypt and password.** A bcrypt hash of a value isn't comparable to an encryption of that value. They're different domains.
-- **Rotating the encryption key requires a migration.** Every existing ciphertext becomes unrecoverable under a new key. Plan rotation as: keep the old key as `OLD_APP_ENCRYPTION_KEY`, decrypt each row with old, encrypt with new, retire old key once the table is clean.
+- **Don't just swap the encryption key.** Move the old key to `encryption.previousKeys`, set the new `key`, re-encrypt rows (`encrypt(decrypt(value))`), then retire the old key once the table is clean.
 
 ## Installation
 
@@ -3167,6 +3169,8 @@ const valid = await verifyPassword("user-password-123", hashed);
 ```
 
 Both are async because bcrypt is CPU-bound. The framework uses `bcryptjs` (pure JS — portable across every platform, no native build) under the hood. When the app installs the native `bcrypt` package, both helpers use it automatically: hashing then runs on the libuv thread pool instead of the event loop (worth it on busy login endpoints; raise `UV_THREADPOOL_SIZE` for many concurrent logins). Hashes are the same `$2b$` format either way, so existing hashes keep verifying.
+
+`needsRehash(hash)` is `true` when a stored hash was made with another algorithm or cost than the config asks for (and `false` for an unknown format); `authService.attemptLogin()` uses it to rehash after a correct login (`auth.rehashPasswords`, default `true`). `password.driver: "scrypt"` (with optional `password.scrypt: { cost, blockSize, parallelization }`) hashes new passwords with `node:crypto` scrypt on the thread pool; both formats always verify.
 
 bcrypt reads only the first 72 bytes (UTF-8) of a password. A longer one is hashed with a one-time warning; set `password.rejectLongPasswords: true` to make `hashPassword` throw instead, and cap password length in validation.
 
@@ -4231,7 +4235,17 @@ router.get("/webhooks/status", webhookStatusController, { rateLimit: false });
 route like production (declared `Content-Length` refused before reading, chunked bodies
 counted as they stream), and run the route's `preParsing` hooks. Keys the dev wildcard cannot
 honour (`schema`, `errorHandler`, `onSend`, `onResponse`, ...) log one boot warning naming the
-route and key. Multipart uploads use `http.fileUploadLimit`, not `bodyLimit`.
+route and key. Multipart uploads use `http.fileUploadLimit`, not `bodyLimit`. `serverOptions.config`
+(the per-route config Fastify plugins read, e.g. a per-route `multipartOptions` file limit) is also not
+applied by the dev wildcard and logs the same warning; the route-level `uploads` option works in dev.
+
+### Serializing through `responseSchema`
+
+`http.compileResponseSchemas: true` (or `compileResponseSchema: true` on one route, `false` to opt
+out) writes the declared statuses with a compiled serializer and drops fields the schema does not
+name. A missing declared field is omitted, `date` fields stay open, and a route that sets its own
+`serverOptions.schema.response` keeps it. Production builds and the in-process test server apply it;
+the dev server does not. It also warns once at boot when `http.compileResponseSchemas` or a route's `compileResponseSchema` is set, since the dev dispatcher does not apply compiled response schemas.
 
 ### Routes that take uploads
 
@@ -7092,7 +7106,7 @@ await storage.putFromBase64("data:image/png;base64,iVBORw0KGgo...", "uploads/pho
 await storage.put(request.file("image")!, "uploads/avatar.jpg"); // validate the upload first
 ```
 
-`putFromUrl` / `putFromBase64` store the MIME type of the location's extension, never the type the remote server or data URL declares (pass `{ mimeType }` to set it yourself). `putFromUrl` also pins each connection to the address that passed the private-host check, so DNS rebinding is refused.
+`putFromUrl` / `putFromBase64` store the MIME type of the location's extension, never the type the remote server or data URL declares (pass `{ mimeType }` to set it yourself). `putFromUrl` also pins each connection to the address that passed the private-host check, so DNS rebinding is refused (the one-time "pinning skipped" warnings can be re-armed in a test with `resetPinSkipWarnings()`).
 
 Every `put*` returns a `StorageFile`.
 
@@ -7323,7 +7337,7 @@ export const temporaryFileController: RequestHandler = async ({ request, respons
 
 Cloud drivers always return `{ valid: false }` from `validateTemporaryToken` — they validate via presigned URL on the cloud side.
 
-A token is bound to the storage prefix (tenant) in effect when it was issued: under another tenant's prefix it is refused with `invalid_token`. Tokens from versions before 5.53 are refused too. Give each local disk its own `signatureKey`.
+A token is bound to the storage prefix (tenant) in effect when it was issued: under another tenant's prefix it is refused with `invalid_token`. Tokens from versions before 5.54 are refused too. A token also names the disk that issued it, so two local disks sharing one `signatureKey` do not accept each other's tokens.
 
 ## Runtime driver registration
 
@@ -9263,7 +9277,7 @@ Re-running on an already-current project is a no-op: nothing resolves as newer, 
 ⚠ Could not reach the npm registry — no versions were changed. Check your connection and try again.
 ```
 
-If the install fails after the versions were rewritten, `package.json` keeps the new versions (re-run your package manager to finish) and the CLI exits non-zero.
+If the install fails after the versions were rewritten, `package.json` (and `package-lock.json`, when it was pruned) is put back as it was and the CLI exits non-zero; run `warlock update --no-install` and then your install to apply the versions anyway. With npm older than 11.6.2 the command refuses before changing anything and names the version it found.
 
 ## The dev-server update notice
 
@@ -10326,8 +10340,8 @@ The reverse direction — sending a stored file back via `response.sendFile(...)
 - **`save()` rewrites the extension on format change.** `file.format("webp").save("avatars")` produces `avatars/<name>.webp` regardless of the upload's original extension.
 - **`.use(driver)` mutates the instance.** It returns `this`; subsequent saves on the same instance keep the driver. Re-instantiate or call `.use("local")` to reset.
 - **Multipart parsing needs `fileUploadLimit` headroom.** Default is `10MB` (configurable via `http.fileUploadLimit` in `src/config/http.ts`). Schema `maxSize` is checked after parsing, so set the multipart limit at least as high.
-- **Declared types are the client's word.** `mimeType`, `extension` and `isImage` come from the request. `image()` sniffs the bytes (svg only with `{ svg: true }`); `mimeType()`/`accept()` also refuse markup bytes (svg, html, xml) unless listed. `save()` stores raster images with their sniffed type and markup as `application/octet-stream`; `uploads.trustClientContentType: true` stores the declared type instead.
-- **Total size and route opt-in.** `http.multipart.maxTotalSize` (default 25 MB) caps a whole request (413, `EC108`); `uploads: { maxTotalSize }` on a route overrides it. `http.multipart.routes: "declared"` parses multipart only on routes with `uploads: true` (others answer 415, `EC109`); the default `"all"` warns once in production.
+- **Declared types are the client's word.** `mimeType`, `extension` and `isImage` come from the request. `image()` sniffs the bytes (svg only with `{ svg: true }`); `mimeType()`/`accept()` also refuse markup bytes (svg, html, xml) unless listed. `save()` stores raster images with their sniffed type and markup as `application/octet-stream`; `uploads.trustClientContentType: true` stores the declared type instead. Cloud disks also store markup with `Content-Disposition: attachment` unless the put options pass `contentDisposition`.
+- **Total size and route opt-in.** `http.multipart.maxTotalSize` (default 25 MB) caps a whole request (413, `EC108`); `uploads: { maxTotalSize }` on a route overrides it, and `uploads: { maxFileSize, maxFiles }` cap one file and the file count for that route (413, `EC108`, in dev and production alike; only stricter than `http.fileUploadLimit` / `http.multipart.files`). `http.multipart.routes: "declared"` parses multipart only on routes with `uploads: true` (others answer 415, `EC109`); the default `"all"` warns once in production and changes to `"declared"` in 6.0. `http.multipart.memoryLimit` streams a part above it to a temporary file (deleted when the response closes): `UploadedFile` is unchanged, `save()` streams it to storage, `file.keep()` holds the copy for a queued job until `file.discard()` or process exit. `v.file().mimeType(types, msg)` fills `:types` with the allowed list, and a translation key passed as `msg` is translated.
 
   ```ts
   router.post("/avatars", uploadAvatar, { uploads: true });
@@ -10747,6 +10761,8 @@ Both pivot on **the request's locale** — auto-detected from headers / query st
 
 ## The shape
 
+Core keeps a translations revision that web's production page delivery reads to refresh its memoised dictionaries. `groupedTranslations`, `extend` and `setTranslationsList` move it whether they are imported from `@warlock.js/core` or `@mongez/localization` (core listens to the library's `translations` change event); call `bumpTranslationsRevision()` only for changes the library cannot report; `getTranslationsRevision()` reads the current number.
+
 ```ts
 // 1. Declare keys (auto-loaded from src/app/<module>/utils/locales.json)
 import { groupedTranslations } from "@mongez/localization";
@@ -10902,10 +10918,11 @@ Use when you want a value in a specific locale — e.g. sending a notification t
 
 The framework reads the locale from the incoming request in this order:
 
-1. **`translation-locale-code` header** (first priority).
-2. **`locale` header**.
-3. **`locale` query string param**.
-4. **Default** — `config.key("app.localeCode")` falling back to `"en"`.
+1. **`locale` query string param**.
+2. **`warlock.locale-preference` cookie** (only when its value is in `app.localeCodes`).
+3. **`locale` header** (outranks the `locale` cookie).
+4. **`locale` cookie**.
+5. **Default** — `config.key("app.localeCode")` falling back to `"en"`. A value outside a declared `app.localeCodes` counts as absent.
 
 ```ts
 const locale = request.getLocaleCode();
@@ -12102,6 +12119,7 @@ The third arg is a context object — `{ allValues, dateFormat, ... }` — for f
 - **`create`/`update`/`delete` clear cache on every write.** That's why `listCached` is usually safe. If you write outside the repository (raw query, bulk insert), the cache won't invalidate — call `repo.clearCache()` manually.
 - **The repository owns `clearCache` per repo + per model.** It doesn't reach into other repositories. If a write in one module affects another's cache, invalidate explicitly from a service.
 - **Adapter init is `setTimeout(0)` delayed.** Don't call repository methods synchronously inside the constructor — they'll fire before the adapter is ready.
+- Cache invalidation cost: by default a write removes the repository namespace (a keyspace scan on Redis). Set `repository.cacheInvalidation: "generation"` (or the protected `cacheInvalidation` property) so a write replaces a generation id instead (constant cost, one extra read per cache lookup); entries then expire after `repository.cacheGenerationTtl` (default `"1d"`).
 
 ## See also
 
@@ -12332,6 +12350,8 @@ Two pieces, always:
 
 1. **Schema file in `schema/`** — exports both the value (`createProductSchema`) and the inferred type (`CreateProductSchema`). One file, one source of truth.
 2. **Controller typed as `RequestHandler<Request<TSchema>>`** (or `GuardedRequestHandler<TSchema>` for auth'd routes) — pulls `TSchema` from the schema file and `controller.validation = { schema }` registers it with the framework.
+
+`request.all()`, `allExceptParams()`, `only()`, `except()` and `request.body` return raw input; passing one to a model's `merge()` or `set()` warns once in development. Pass `request.validated()` instead.
 
 No separate `*.request.ts` alias file. `RequestHandler<Request<TSchema>>` types `request.validated()` directly off the schema's inferred type.
 
@@ -12638,7 +12658,7 @@ updateProductController.validation = {
 - **`v.url(...)` does not exist on the factory.** Use `v.string().url(...)`. Same goes for any other rule that's not in the table above — check `BaseValidator` / `StringValidator` first.
 - **`.optional()` and `.required()` are not symmetric.** `.optional()` brands the field as absent-allowed. `.required()` clears the optional flag _and_ replaces any prior required rule — read seal's `BaseValidator` source if you need conditional required.
 - **`uniqueExceptCurrentId` reads `request.input("id")`.** It only works inside an HTTP context — useless in CLI/job code.
-- **`request.validated()` is empty until the framework runs validation.** If you forgot the `controller.validation = { schema }` line, `validated()` returns `{}` (or the input from `setValidatedData` if you set it manually). Always pair the schema with the assignment.
+- **`request.validated()` is empty until the framework runs validation.** If you forgot the `controller.validation = { schema }` line, `validated()` returns `{}` (or the input from `setValidatedData` if you set it manually). Always pair the schema with the assignment. On a route with no schema, development logs one warning per route; read such routes with `request.input()` / `request.all()`.
 - **Import `v`/`Infer` from `@warlock.js/seal`.** Core does not re-export them — `@warlock.js/seal` is the canonical and only home.
 - **DB rules trigger queries on every validation pass.** For high-throughput endpoints, prefer enforcing uniqueness at the DB layer (`UNIQUE` index) and catch the conflict in the controller.
 
@@ -13009,6 +13029,7 @@ const types = runTypecheck({ files: ["src/app/posts/services/publish.service.ts"
 - `check` boots nothing — no config, no connection, no port — so it runs the same with or without services; only tests that need them fail, and those report `WL8003`/`WL8004`.
 - Lint defaults to Oxlint (an app-root config + the app-installed package). No Oxlint config skips lint. A missing package reports `WL8002`. ESLint support was removed in 5.34.0; see `upgrade-from-5-29`.
 - Tests use the app's own vitest (`vitest run`, or `vitest related <files> --run` with `--changed`). Test files without vitest installed → `WL8002`.
+- A vitest run longer than 10 minutes is stopped and reported as `WL8007` (`The tests timed out after 600 s`); raise the limit with `--test-timeout <seconds>` or `WARLOCK_CHECK_TEST_TIMEOUT` (`0` = no limit). Exit 143 without that message means something outside `check` (a memory-capped wrapper) sent SIGTERM.
 - The typecheck runs in a child `warlock typecheck` process; running out of memory is reported as `WL8007` instead of ending the run.
 - The convention checks are the framework's own and run the same with Oxlint or no linter. A deliberate exception gets `// warlock-check-ignore WL9006 -- why` on the problem's line or the line above (no code = every code on that line).
 
@@ -13431,7 +13452,7 @@ Summary: 5 ok, 1 warn, 0 fail
 
 ## Error codes and `--json`
 
-Every `warn`/`fail` finding except the deployment-settings warnings (below, which name the setting instead) carries a stable error code (`WL1001`, `WL2001`, …), printed after the detail and explained by `warlock explain <code>`. `--json` prints the report with the same `code` / `hint` / `skill` / `docs` fields `warlock check --json` uses (boot output goes to stderr):
+Every `warn`/`fail` finding carries a stable error code (the deployment-settings warnings use `WL1011` to `WL1020`, one per check; `compression` never warns, so `WL1020` is printed on its `ok` line when compression is off) (`WL1001`, `WL2001`, …), printed after the detail and explained by `warlock explain <code>`. `--json` prints the report with the same `code` / `hint` / `skill` / `docs` fields `warlock check --json` uses (boot output goes to stderr):
 
 ```bash
 npx warlock doctor --json | jq '.results[] | select(.status != "ok") | "\(.code) \(.detail)"'
@@ -13497,9 +13518,10 @@ An app keeps the config files it was generated with, so safer defaults in a newe
 | `trust-proxy`        | `http.trustProxy: true` without `http.realIpHeader`                                                                                                                                                  | proxy addresses/CIDR in `http.trustProxy`, or `http.realIpHeader`                                 |
 | `request-timeout`    | `http.requestTimeout` (or `http.serverOptions.requestTimeout`) is `0`                                                                                                                                | remove it (default 5 minutes) or set a bound                                                      |
 | `production-logging` | a production console channel prints `debug` lines                                                                                                                                                    | `new ConsoleLog({ minLevel: "info" })`                                                            |
-| `compression`        | never — `ok` line notes when it is off (unneeded behind a compressing proxy/CDN)                                                                                                                     | `http.compression: true`                                                                          |
+| `compression`        | never — `ok` line (`WL1020`) notes when it is off (unneeded behind a compressing proxy/CDN)                                                                                                          | `http.compression: true`                                                                          |
 | `env-files`          | a root `.env` / `.env.*` file (not `.env.example`) is not ignored by git, or is committed (`git check-ignore`)                                                                                       | `.env`, `.env.*`, `!.env.example` in `.gitignore`                                                 |
 | `memory-cache`       | the default cache store is a memory driver with `maxSize: Infinity` / `0` / `null`                                                                                                                   | `cache.options.<store>.maxSize`                                                                   |
+| `key-rotation`       | `encryption.previousKeys` / `auth.accessToken.previousSecrets` / `auth.refreshToken.previousSecrets` still configured                                                                                | remove the retired entries (`WL1019`)                                                             |
 
 `auth-tokens` runs only when `auth.userType` is set and `@warlock.js/auth` is installed in a `node_modules` the project's lookup walks (core never imports or resolves it: its `exports` offer only an `import` entry); it reads `auth.accessToken.*` / `auth.refreshToken.*`, then the older `auth.jwt.*`. Values are read as the config resolves on the machine running `doctor`.
 
@@ -16993,6 +17015,8 @@ The everyday case. Service takes `Partial<UserSchema>` from a request body, merg
 
 **Safe against id-retargeting by design.** `model.merge(req.body); await model.save();` is the canonical update-my-profile shape — and `req.body` is attacker-controlled. On an already-persisted model, `merge()` drops identity columns (`id`, `_id`, the configured primary key) instead of applying them, so a body carrying `{ id: "<victim-id>", role: "admin" }` cannot redirect the write onto someone else's row: `update()`/`replace()`/`destroy()` build their filter from `model.trustedPrimaryKey` — the id captured when the instance became persisted (hydration, or right after an insert), never the current in-memory value. Identity columns are also excluded from the `$set`/`$unset` payload, so an explicit `.set("id", …)` on a loaded record doesn't rewrite the key of the row it's pinned to either. This only applies to an _existing_ record — `User.create({ id, ... })` with an explicit id is unchanged, since there's no row to retarget yet. If you deliberately need to change a primary key, do it through the atomic/raw APIs (see the `perform-atomic-ops` topic), not `merge()`.
 
+**Guarded columns.** `static guarded = ["role", "isAdmin"]` makes `merge()`, the object form of `set()`, `create()`, `createMany()`, `save({ merge })` and the data of `findOrCreate()` / `upsert()` skip those columns (and dot paths inside them); write them on purpose with `forceMerge(values)` / `Model.forceCreate(data)`. Single-column `set("role", v)` and `new User({...})` are not guarded. Outside production a skipped column logs a one-time warning, and merging an object marked with `markRawInput()` (`isRawInput(value)` tells) logs a reminder to use `request.validated()`.
+
 **Unknown and nested fields follow `static strictMode`.** On insert and update alike, a field the schema doesn't declare is dropped (`"strip"`, default), rejected (`"fail"`), or written (`"allow"`); this covers nested objects too (`merge({ permissions: { all: true } })` writes nothing under `"strip"`). A nested change is validated through its top-level field and only the changed leaves are written. A path segment `__proto__` / `constructor` / `prototype` in `set()` / `unset()`, or a `__proto__` key inside a `set()` / `merge()` value, throws before anything is written.
 
 ### `.save()` after manual mutation — when changes are spread
@@ -17113,6 +17137,7 @@ Mark a column the server alone sets with `.internal()` (`authorId: v.int().requi
 - Don't redeclare server-set fields on a request schema; mark them `.internal()` on the model schema and use `Model.requestSchema()`.
 - Don't `await user.save()` and forget the `await` — your changes live only on the instance and never reach the DB.
 - Don't `.merge()` an object column when the value is the complete new one: nested plain objects are deep-merged, so omitted keys stay stored. Use `.set({ column })` or `.set("column", value)` (`warlock check` warns with `WL9025`).
+- Don't `merge(request.all())` on a model with privileged columns (`role`, `isAdmin`) unless they are listed in `static guarded`; merge `request.validated()`.
 - Don't expect schema defaults to apply on `.merge()` — defaults fire on `.create()` only.
 
 ## See also
@@ -17261,7 +17286,7 @@ const usersWithPublishedPosts = await User.whereHas("posts", (query) => {
 }).get();
 ```
 
-`.whereHas(relation, callback)` runs the callback on a query builder scoped to the related model. Use when "find Xs that have at least one Y matching Z." The `has` family runs on PostgreSQL (the `has()` count is bound; its operator must be `=`, `!=`, `<>`, `>`, `>=`, `<`, `<=`); on MongoDB it throws `UnsupportedQueryOperationError` — filter by `whereIn("id", await Post.query().where(...).pluck("authorId"))` instead.
+`.whereHas(relation, callback)` runs the callback on a query builder scoped to the related model. Use when "find Xs that have at least one Y matching Z." The `has` family (`has`, `whereHas`, `orWhereHas`, `doesntHave`, `whereDoesntHave`) works on both drivers for hasMany, hasOne, belongsTo and belongsToMany (the `has()` count is bound; its operator must be `=`, `!=`, `<>`, `>`, `>=`, `<`, `<=`). On MongoDB each filter is a `$lookup` ahead of the `$match`, and `orWhereHas` joins the same `$or`. A write (`update()`, `delete()`, `increment()`) on a query holding one throws `UnsupportedQueryOperationError` on MongoDB, and so does a constraint callback that filters by another relation: resolve ids first with `whereIn("id", await Post.query().whereHas(...).pluck("id"))`. `.withCount("posts")` (or `"posts as total"`, or `{ posts: cb }`) adds `postsCount` on both drivers.
 
 ## Setting a relation on save — `setRelation`
 
@@ -17289,7 +17314,7 @@ await post.load("author");
 const author = post.getRelation("author");
 ```
 
-`getRelation("name")` returns the loaded relation (or null if not loaded). `post.load("relation", ...)` lazy-loads one or more relations onto the instance and returns the model (`this`) — read the value back with `getRelation` afterward. Useful when you didn't `.with()` upfront and need a relation conditionally.
+`getRelation("name")` returns the loaded relation (or null if not loaded). `post.load("relation", ...)` lazy-loads one or more relations onto the instance and returns the model (`this`) — read the value back with `getRelation` afterward. Useful when you didn't `.with()` upfront and need a relation conditionally. `load()` calls (and `Model.find(id)` calls) made in the same tick are batched per model class into one query, so `await Promise.all(posts.map((post) => post.load("author")))` runs one author query; a lone call, and calls inside a transaction, run as before. Only calls under the same context stores (`@warlock.js/context`: one request, one `run()`) are grouped, so tenant scopes never mix. Set `static batchLoads = false` on a model to opt out (do so when a global scope reads its own `AsyncLocalStorage`).
 
 ## Joins — when eager loading isn't enough
 
@@ -17299,16 +17324,16 @@ const author = post.getRelation("author");
 const result = await User.joinWith("posts").where("posts.status", "published").get();
 ```
 
-Use `.joinWith` when you need conditions across both tables in a single query. Use `.with` when you want hydrated relation models without joining.
+Use `.joinWith` when you need conditions across both tables in a single query. On MongoDB `.joinWith(...)` loads the relations with the same batched queries as `.with()` (names, arrays, `"id,name"` shorthand or a callback), so it hydrates the same way. Use `.with` when you want hydrated relation models without joining.
 
 ## Sync — embedded relations stay fresh
 
-For embedded/denormalized relations (cached `author_name` on posts, etc.), Cascade's sync system keeps the embedded copy in step with the source-of-truth via `Model.sync(Target, field)` and the `@warlock.js/cascade` sync helpers.
+For embedded/denormalized relations (cached `author_name` on posts, etc.), Cascade's sync system keeps the embedded copy in step with the source-of-truth via `Model.sync(Target, field)` and the `@warlock.js/cascade` sync helpers. Sync jobs run after commit, one at a time by default (`configureSyncFanout({ concurrency })` raises it; jobs for one source document keep their order), a failing event listener is retried alone, and a model nobody syncs from queues no job.
 
 ## Things NOT to do
 
 - Don't `post.set("author", user)`. Use `setRelation("author", user)`. `set` treats the value as a column write; `setRelation` picks the right foreign key.
-- Don't load all parents and iterate to fetch each child — that's the N+1 problem. Eager-load with `.with(...)` (or load specific children with `.load(...)` after the parent fetch).
+- Don't load all parents and iterate to fetch each child — that's the N+1 problem. Eager-load with `.with(...)` (or start the `.load(...)` calls together under `Promise.all`, which batches them; awaiting them one by one in a loop does not).
 - Don't define a relation on only one side. Both ends of `BelongsTo`/`HasMany` and both sides of `BelongsToMany` need the decorator for queries to work bidirectionally.
 - Don't import the related class for `@BelongsTo` if it would create a circular dependency. Use the string form (`@BelongsTo("User")`) or `lazy(() => User)`.
 
@@ -17504,6 +17529,8 @@ the data). Pick another zone with `clientOptions: { timezone: "Africa/Cairo" }`
 (or `driverOptions.timezone`), or `timezone: false` to keep the server's zone.
 An app-supplied `-c TimeZone=…` in `clientOptions.options` or the connection
 string wins. MongoDB date helpers already default to UTC.
+
+Set `clientOptions.statement_timeout` (milliseconds) on PostgreSQL so a runaway statement is cancelled by the server instead of holding a pool connection forever; `query_timeout` is the client-side counterpart. `0` or unset means no limit.
 
 `resolvePostgresStartupOptions(config)` returns the `options` startup string the driver sends (the merged `-c TimeZone=…` and any app options), for checking what a configuration resolves to.
 
@@ -17820,7 +17847,7 @@ const next = await User.query()
   .cursorPaginate({ limit: 20, cursor: first.pagination.nextCursor });
 ```
 
-The cursor fields live under `pagination` (`{ hasMore, nextCursor?, hasPrev?, prevCursor? }`), not at the top level. `cursorPaginate` and `orderBy` are query-builder methods, so start the chain with `User.query()` (or any static that returns a builder, like `User.where(...)`).
+`column` can be any column of the model (`cursorPaginate({ limit: 20, column: "createdAt" })`); the cursors are read with `model.get(column)`, not as properties. The cursor fields live under `pagination` (`{ hasMore, nextCursor?, hasPrev?, prevCursor? }`), not at the top level. `cursorPaginate` and `orderBy` are query-builder methods, so start the chain with `User.query()` (or any static that returns a builder, like `User.where(...)`).
 
 **Cost characteristic.** Constant time per page regardless of how far in. The cursor encodes the last record's sort key — the next query is "give me records after this point," indexed.
 
@@ -17854,6 +17881,16 @@ await User.query().chunk(500, async (users) => {
 ```
 
 `chunk` is a query-builder method — start from `User.query()` (or `User.where(...)`) before chaining it.
+
+## Row-by-row iteration — `.stream(batchSize?)`
+
+```ts
+for await (const user of User.query().where("status", "active").stream(500)) {
+  await sendDigest(user);
+}
+```
+
+`.stream()` is an async iterator on both drivers: it reads and hydrates `batchSize` rows (default 100) per round trip, pages exactly like `chunk()`, and stops reading when you `break` out of the loop. Use it instead of `chunk()` when you want one model at a time without a callback.
 
 ## Pagination + relations
 
@@ -17962,7 +17999,9 @@ await Post.atomic(
 - `findOneAndUpdate(filter, update, { ...same, returnDocument?: "before" | "after" })`.
 - `findAndUpdate(filter, update, { upsert?, arrayFilters? })`. No `trustedFilter`, because it reads the rows back with `where(filter)`.
 
-**Global scopes pin every write static**, `Model.upsert(filter, data)` included: a visible match is updated by its primary key, and a match hidden by a scope (another tenant's row, a soft-deleted one) throws instead of being updated. When nothing matches, `upsert` inserts like `create()`, so put the tenant column in `data`. A model with no global scope sends the write straight to the driver (no id lookup first).
+**Global scopes pin every write static**, `Model.upsert(filter, data)` included: a visible match is updated by its primary key, and a match hidden by a scope (another tenant's row, a soft-deleted one) throws instead of being updated. When nothing matches, `upsert` inserts like `create()`; give the scope a `stamp` (`addGlobalScope(name, cb, { stamp: () => ({ tenantId }) })`) so the insert writes the tenant column (only when it inserts, a value you pass wins), or put the column in `data`. `create()`, `createMany()` and a new record's `save()` stamp too. A model with no global scope sends the write straight to the driver (no id lookup first). A model with global scopes writes through the scoped builder (`query.atomic(ops)`) in one statement, with the scopes inside the filter; a `fetching` / `hydrating` / `fetched` listener on the model keeps the id lookup.
+
+**MongoDB upsert ids.** The generated `id` is written only when the upsert inserted (a second write keyed on `_id`); an upsert that updates spends no id. Supply `id` yourself to skip generation. The id write follows the insert as a separate write, so a crash between them leaves a document without `id`; supply `id` in `$setOnInsert` or use a transaction when that matters. `findAndUpdate(filter, ops, { upsert: true })` updates every matching row and inserts only when none matches.
 
 **Postgres.** An upsert runs as `INSERT … ON CONFLICT (target) DO UPDATE … RETURNING *`. The target is the primary key, or a unique index, whose columns are ALL equality keys of the filter. Other filter conditions become `DO UPDATE … WHERE`. If the row exists and fails them, nothing is written and `findOneAndUpdate` returns `null`. The driver throws `UnsupportedUpdateOperationError` (`.operation`, `.driver`) for:
 
@@ -18203,20 +18242,22 @@ const activeUsers = await User.all({ status: "active" });
 
 Cascade's query builder has around 60 methods. Reach for these as the need arises:
 
-| Reach for                                                                                                           | When                                                                                                                                   |
-| ------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| `.whereIn(field, values)` / `.whereNotIn(field, values)`                                                            | Match against / exclude a list                                                                                                         |
-| `.whereNot(field, value)` / `.whereNot(field, op, value)` / `.whereNot({ ... })` / `.whereNot(cb)` (+ `orWhereNot`) | Negate a condition or a group                                                                                                          |
-| `.whereNull(field)` / `.whereNotNull(field)`                                                                        | Nullability checks                                                                                                                     |
-| `.whereBetween(field, [a, b])`                                                                                      | Inclusive range                                                                                                                        |
-| `.whereDate(field, value)`, `.whereDateBetween`, `.whereDateBefore`, `.whereDateAfter`                              | Date helpers                                                                                                                           |
-| `.whereLike(field, pattern)` / `.whereStartsWith` / `.whereEndsWith` / `.whereSearch`                               | Pattern matching — see below for literal-vs-regex semantics                                                                            |
-| `.whereHas(relation, callback)`                                                                                     | Filter by conditions on a related model (PostgreSQL; MongoDB throws `UnsupportedQueryOperationError` — use `whereIn` with related ids) |
-| `.sum(field)` / `.avg(field)` / `.min(field)` / `.max(field)`                                                       | Aggregates — the `aggregate-data` topic                                                                                                |
-| `.distinct(field)` / `.pluck(field)`                                                                                | Single-field reads (distinct values, flat list)                                                                                        |
-| `.chunk(size, callback)`                                                                                            | Stream a large table in batches                                                                                                        |
-| `.cursorPaginate({ limit, cursor })`                                                                                | Cursor pagination — the `paginate-results` topic                                                                                       |
-| `.similarTo(column, embedding)`                                                                                     | Vector similarity — the `search-by-vector` topic                                                                                       |
+| Reach for                                                                                                           | When                                                                                                                                                                                       |
+| ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `.whereIn(field, values)` / `.whereNotIn(field, values)`                                                            | Match against / exclude a list                                                                                                                                                             |
+| `.whereNot(field, value)` / `.whereNot(field, op, value)` / `.whereNot({ ... })` / `.whereNot(cb)` (+ `orWhereNot`) | Negate a condition or a group                                                                                                                                                              |
+| `.whereNull(field)` / `.whereNotNull(field)`                                                                        | Nullability checks                                                                                                                                                                         |
+| `.whereBetween(field, [a, b])`                                                                                      | Inclusive range                                                                                                                                                                            |
+| `.whereDate(field, value)`, `.whereDateBetween`, `.whereDateBefore`, `.whereDateAfter`                              | Date helpers                                                                                                                                                                               |
+| `.whereLike(field, pattern)` / `.whereStartsWith` / `.whereEndsWith` / `.whereSearch`                               | Pattern matching — see below for literal-vs-regex semantics                                                                                                                                |
+| `.whereHas(relation, callback)`                                                                                     | Filter by conditions on a related model (both drivers; on MongoDB a write cannot carry a relation filter — `pluck` the ids first)                                                          |
+| `.sum(field)` / `.avg(field)` / `.min(field)` / `.max(field)`                                                       | Aggregates — the `aggregate-data` topic                                                                                                                                                    |
+| `.distinct(field)` / `.pluck(field)`                                                                                | Single-field reads (distinct values, flat list)                                                                                                                                            |
+| `.chunk(size, callback)`                                                                                            | Stream a large table in batches                                                                                                                                                            |
+| `.stream(batchSize?)`                                                                                               | `for await (const row of query.stream())` — one hydrated model at a time, one batch per round trip                                                                                         |
+| `.prepare(name)`                                                                                                    | PostgreSQL only: run the read as a named prepared statement (plan reused per connection; `resolveStatement(sql, values, name)` builds the pg value and adds a hash of the SQL to the name) |
+| `.cursorPaginate({ limit, cursor })`                                                                                | Cursor pagination — the `paginate-results` topic                                                                                                                                           |
+| `.similarTo(column, embedding)`                                                                                     | Vector similarity — the `search-by-vector` topic                                                                                                                                           |
 
 Each chains off `User.where(...)` or `User.query()` and ends with the appropriate terminator. (`where`, `with`, `joinWith`, `first`, `count`, `find`, `all`, `paginate` are static shortcuts on the model; the rest live on the query builder, so reach them via `User.query()` or by chaining off a static `where`.)
 
@@ -18258,7 +18299,7 @@ const activeUsers = await User.query().scope("active").get();
 ```
 
 **Local scopes** (`addScope`) — opt-in, only when you call `.scope("name")`.
-**Global scopes** (`addGlobalScope`) — run on every query for that model. Useful for multi-tenancy or default soft-delete filtering. Bypass per-query with `.withoutGlobalScope("name")` / `.withoutGlobalScopes()`.
+**Global scopes** (`addGlobalScope`) — run on every query for that model. Useful for multi-tenancy or default soft-delete filtering. Bypass per-query with `.withoutGlobalScope("name")` / `.withoutGlobalScopes()`. A scope may carry `{ stamp: { tenantId } }` (or a function returning it): the values are written into inserts by `create()`, `createMany()`, a new record's `save()` and `upsert()` when the caller left the column unset.
 
 ## Things NOT to do
 
@@ -20556,7 +20597,7 @@ v.string().email("Please enter a valid email address").required("Email is requir
 //                per-rule override                                  per-rule override
 ```
 
-Each chain method takes an optional `errorMessage` as its last argument. That overrides the rule's `defaultErrorMessage`. Use it when a single rule needs a tailored message in a specific schema.
+Each chain method takes an optional `errorMessage` as its last argument. That overrides the rule's `defaultErrorMessage`. Use it when a single rule needs a tailored message in a specific schema. A dotted translation key (`forms.emailInvalid`, no spaces) is translated when `translateMessageKey` is set in `configureSeal()` (Warlock.js sets it); a key without a translation stays as written.
 
 For project-wide message overrides, hook into the translation layer (the framework calls `resolveTranslation` with the rule context — wire up your own `t()` function via `SealConfig`).
 
@@ -21797,6 +21838,7 @@ const user = await cache.remember("user.1", "1h", async () => db.users.find(1));
 - Don't run `cache.similar()` against memory drivers in production with large datasets — O(N) brute force.
 - Don't auto-migrate the `pg` table from app code. The driver exposes `driver.schema()` returning DDL.
 - Don't switch embedders without re-embedding the entire vector index.
+- `has(key)` uses the driver `exists()` (no value read) and emits `hit` / `miss` with the key only, without `value`.
 
 
 ## configure-pg-cache  `@warlock.js/cache/skills/configure-pg-cache/SKILL.md`
@@ -22023,6 +22065,8 @@ await cache.set("k", v); // no TTL — driver default
 await cache.set("k", v, 3600); // seconds
 await cache.set("k", v, undefined); // same as no TTL
 ```
+
+- `ttlJitter: <percent>` spreads the TTL by up to that many percent either way per write (`{ ttl: "1h", ttlJitter: 10 }` expires in 54-66 minutes) so entries written together do not expire together; ignored for `expiresAt` / `Infinity`; also accepted by `remember()` and `swr()` options. `applyTtlJitter(ttl, percent, expiresAt?)` is the helper that computes it.
 
 
 ## handle-cache-errors  `@warlock.js/cache/skills/handle-cache-errors/SKILL.md`
@@ -23000,6 +23044,7 @@ await chat.set("messages.10", msg); // chats.<id>.messages.10, 30d, user.<userId
 await chat.set("draft", d, { ttl: "1h" }); // per-call ttl wins
 await chat.tags(["unread"]).set("ping", p); // tags merge: user.<userId> + unread
 await chat.clear(); // sugar for removeNamespace
+const keys = await cache.listKeys("chats.7"); // live keys under a prefix, ready for get() / remove(); optional on custom drivers
 ```
 
 Scopes are pure views — same connection, same driver, no extra state. Per-call options always win over scope defaults; tags merge additively.
@@ -23167,6 +23212,7 @@ See the `configure-pg-cache` topic.
 - Don't mix vector dimensions in the same driver — re-embed when models change.
 - Don't expect `similar()` to surface a missing vector (`set` without the `vector` option). Plain KV entries stay out of the similarity index.
 - Don't use `topK: 0` or negative — `pg` rejects with `CacheConfigurationError`; memory drivers return `[]` but it's a code smell.
+- `filter: ({ key, value }) => boolean` runs before `threshold` / `topK`, so `topK` counts in-scope entries only (one query). Honoured by the memory, LRU and memory-extended drivers; `pg` ignores it, so re-check hits when you need a guarantee. A `cache.namespace()` scope passes its prefix as the filter.
 
 
 ## use-cache-structures  `@warlock.js/cache/skills/use-cache-structures/SKILL.md`
@@ -23706,6 +23752,7 @@ await feed.swr("home", { freshTtl: "30s", staleTtl: "10m", tags: ["computed"] },
 - Don't pick `freshTtl` to be the _same_ as `staleTtl` thinking it disables the stale window — that throws. Pick a tight `freshTtl` and wider `staleTtl` that reflects how stale your product can tolerate being.
 - Don't ignore `error` events. A persistent stream of refresh failures means upstream is broken and the cache is masking it.
 - Don't reach for SWR on the null driver — it caches nothing, so SWR always blocks.
+- `failSafe: true` makes a stale-window caller wait for the refresh (callers of one key share it) and return the stale value when the callback throws; the failure is logged and emitted as an `error` event. Default (off): stale value at once, refresh in the background.
 
 
 ================================================================================
@@ -25430,7 +25477,7 @@ Differences from `FileLog`:
 - Error `stack` is stored as `string[]` (split on newlines) — easy to query in aggregators
 - `content` holds the original user-supplied `message` (not a pre-formatted line)
 - Corrupted existing file → renamed to `<file>.json.corrupt-<epoch ms>` (never overwritten), a new file is started and `onChannelError` is told
-- `format: "jsonl"` (type `JSONFileLogConfig`) → one JSON object per line in a `.jsonl` file, append-only writes; the default `"json"` rewrites the whole file on each write
+- `format: "jsonl"` (type `JSONFileLogConfig`) → one JSON object per line in a `.jsonl` file, append-only writes; the default `"json"` rewrites the whole file on each write, and becomes `"jsonl"` in 6.0 (a channel without `format` warns once per process; set it explicitly)
 - **Safe serialization by construction.** All writes go through `safe-stable-stringify` with a custom `Error` replacer — circular refs become `"[Circular]"`, BigInt is stringified, functions/symbols are dropped, nested `Error` instances expand to `{ name, message, stack, ...enumerable }`. A context payload with a class graph or circular reference will never throw during the write.
 
 ## `SentryLog`
@@ -27761,7 +27808,7 @@ export default {
 - `hashTokensAtRest: true` (default `false`) — `access_tokens.token` / `refresh_tokens.token` hold the SHA-256 digest, never the JWT, so a copied table cannot be replayed. No migration; lookups accept both forms, so switching it on or off signs no one out. A row loaded from the DB has no raw token any more; a freshly issued row exposes it as `row.plainToken`. Automatic cookie renewal parks the successor pair encrypted in the cache for the overlap window.
 - `accessToken.issuer` / `accessToken.audience` (default unset) — stamped as `iss` / `aud` on every token signed and required on every token accepted. Setting either signs everyone out once (old tokens lack the claim).
 - `cookie.hostPrefix: true` (default `false`) — auth cookies become `__Host-access_token` / `__Host-refresh_token` (Secure, `Path=/`, no Domain; a write with another path or a Domain throws naming the setting). The unprefixed cookie is still read during the switch, and both are cleared on logout.
-- In production a signing secret under 32 bytes, or an access-token lifetime over 30 days, logs a one-time warning.
+- In production a signing secret under 32 bytes, or an access-token lifetime over 30 days, logs a one-time warning (a secret under 32 bytes becomes a boot error in 6.0). `auth.rehashPasswords` (default `true`) re-hashes a stored password after a correct login when `encryption.password` asks for another algorithm or cost.
 - `Auth` hides `password` from serialized output (`static hidden = ["password"]`); a model that sets its own `hidden` must keep `"password"` in it.
 
 ### Token lifetimes are validated — a bad one throws
@@ -28583,7 +28630,7 @@ passkeys: {
   rpID: "example.com",
   rpName: "Example",
   origin: "https://example.com",
-  userVerification: "preferred", // default; "required" refuses assertions without PIN/biometric
+  userVerification: "required", // "preferred" (default until 6.0, warns if unset) also accepts possession only
 },
 ```
 
@@ -28682,7 +28729,7 @@ router.post(
 - Codes have 6 digits and are stored in `one_time_tokens` (purpose `otp`) as a salted HMAC keyed from your access-token secret, never as plain SHA-256, which is trivially reversible for 6 digits. A new request invalidates the previous code.
 - Every verify counts an attempt atomically first. After `maxAttempts` the code is invalidated, even if the right code comes next, and even under concurrent guesses.
 - Delivery: `notify.channel(channel).send(phone, { body, code, expiresAt })`. Register that channel in `config/notifications.ts`, or set `auth.otp.send(phone, message, channel)`. `auth.otp.message(code)` changes the text.
-- **Anti-enumeration:** an unknown phone gets the same `requestOtp` result (nothing sent) and the same `InvalidOneTimeTokenError` (400, `EC008`) from `verifyOtp`. The code is delivered in the background (failures: log + `otp.deliveryFailed` event); `auth.otp.awaitDelivery: true` awaits it instead.
+- **Anti-enumeration:** an unknown phone gets the same `requestOtp` result (nothing sent) and the same `InvalidOneTimeTokenError` (400, `EC008`) from `verifyOtp`. The lookup, the code writes and the delivery run in the background (failures: log + `otp.deliveryFailed` event); `auth.otp.awaitDelivery: true` awaits it instead.
 - CSRF: `verifyOtp` is a POST. If the route uses cookie auth, the 5.12 Origin check applies. Otherwise there is no ambient credential to ride.
 
 ## Gotchas
@@ -28890,6 +28937,8 @@ If tokens minted before 4.12.0 may lack an `exp`, see `warlock auth.purge-never-
 `config.auth.accessToken.issuer` / `audience` (optional) are stamped as `iss` / `aud` on every token `jwt.generate` / `generateRefreshToken` sign and **required** by `jwt.verify` / `verifyRefreshToken` — tokens signed before they were set are refused. The verifier and signer are prepared once per settings and reused (no per-request key parsing); passing your own extra options builds a fresh one.
 
 The package signs access and refresh tokens with independent secrets — `config.auth.accessToken.secret` and `config.auth.refreshToken.secret`. Setting a distinct `refresh.secret` is recommended: it prevents an access-token compromise from forging refresh tokens (and vice versa). The refresh secret is **optional** — when `config.auth.refreshToken.secret` is unset, refresh tokens fall back to the main `config.auth.accessToken.secret`, so refresh works out of the box without a second secret.
+
+**Rotating a secret:** set the new `accessToken.secret` / `refreshToken.secret` and list the old ones in `accessToken.previousSecrets` / `refreshToken.previousSecrets`. Tokens signed with a retired secret still verify (only on a signature miss; expiry and claim checks stay final), new tokens always use the current secret, and without a refresh secret the retired access secrets apply to refresh tokens too. Remove a retired secret once its tokens have expired.
 
 ## Things NOT to do
 
@@ -29676,10 +29725,10 @@ loginThrottleMiddleware({
 | `errorMessage`    | i18n `auth.errors.tooManyAttempts` | 429 message override                                                  |
 | `isFailure`       | `(res) => !res.isOk`               | What counts as a failed attempt                                       |
 | `identify`        | built-in email + ip extraction     | Custom identifier list                                                |
-| `emailLock`       | `"global"`                         | `"pair"` locks the (email, IP) pair instead of the email for everyone |
+| `emailLock`       | `"global"` (`"pair"` in 6.0)       | `"pair"` locks the (email, IP) pair instead of the email for everyone |
 | `accountMax`      | `max * 10`                         | Email-wide limit across all IPs when `emailLock: "pair"`              |
 
-`emailLock: "pair"` stops a stranger from locking a known account out: their `max` failures lock only their own (email, IP) pair, while the email-wide bucket (`accountMax`) still stops guessing spread over many IPs. It applies when `by` tracks both `"email"` and `"ip"` and no `identify` is set.
+`emailLock: "pair"` stops a stranger from locking a known account out: their `max` failures lock only their own (email, IP) pair, while the email-wide bucket (`accountMax`) still stops guessing spread over many IPs. It applies when `by` tracks both `"email"` and `"ip"` and no `identify` is set. Leaving it unset in that case logs a one-time warning because the default changes in 6.0: set it explicitly. A successful login clears the account buckets only; the shared IP bucket expires with its window (with `by: ["ip"]` alone a success still resets it).
 
 Throttle the anonymous passkey options route the same way, counting every request: `loginThrottleMiddleware({ by: ["ip"], isFailure: () => true, max: 30, window: "1m" })`.
 
@@ -29826,7 +29875,7 @@ router.post("/auth/reset-password", resetPasswordController, {
 });
 ```
 
-`requestPasswordReset` sends the notification **in the background**, so a known account answers as fast as an unknown one (no SMTP round trip on the response path). A failed send is logged and emitted as `password.resetDeliveryFailed` (`(user, error)`); set `auth.passwordReset.awaitDelivery: true` (default `false`) to await it and get its error instead.
+`requestPasswordReset` runs the account lookup, the token writes and the notification **in the background**, so a known account answers as fast as an unknown one (no database write or SMTP round trip on the response path). A failed send is logged and emitted as `password.resetDeliveryFailed` (`(user, error)`); set `auth.passwordReset.awaitDelivery: true` (default `false`) to await all of it and get its error instead.
 
 `resetPassword` writes the password, then calls `authService.revokeAllTokens(user)`: every refresh token is revoked and every access token deleted, which also kills cookie sessions (a cookie holds an access token). It emits `password.reset`; `requestPasswordReset` emits `password.resetRequested`.
 
@@ -30292,6 +30341,7 @@ class DirectResolver implements AccessResolver {
 
 ## Rules
 
+- **Opt out of the engine cache with `readonly cacheable = false`** when the sets are a cheap function of the loaded user (`DefaultAccessResolver` does): every check then reads the resolver, so a role change shows at once. Omitted, results are cached.
 - **Only fetch — never cache inside the resolver.** The engine caches per `(user, tenant)`; caching twice causes stale grants. Invalidate with `access.flush(user, tenant)` when your data changes.
 - Return plain `string[]`. Wildcards (`orders.*`, `*`) in the returned permissions are honored by the engine.
 - `resolveRoles` and `resolvePermissions` may read **different** sources — roles and permissions are independent axes (a role can be a pure label with permissions granted directly).
@@ -30493,6 +30543,10 @@ export const userContext = new UserContext();
 ```
 
 `buildStore` is the **only** abstract method. Everything else is provided by `Context<TStore>`.
+
+A subclass can name the type of the protected `storage` slot with `import type { ContextStorage } from "@warlock.js/context"` (`run`, `enterWith`, `getStore`).
+
+`currentContextScope()` returns an object that is the same for two callers only when every context has the same store for both (same request, same `run()`). Group work collected from several callers by it (a batch, a debounce) so one caller's work never runs under another request's or tenant's stores.
 
 ## Usage modes
 
@@ -33305,6 +33359,7 @@ export const config = {
 - `tags` is a static list, or a function `(data, { shared }) => string[]` of the
   resolved page data and the request's sealed `shared` payload, evaluated right
   before the entry is stored — e.g. ``[`theme:${shared.theme}`]``.
+- A HIT carries a weak `ETag` of the stored body and answers `304` to a matching `If-None-Match`. With `http.compression` on, entries are compressed once at store time and a HIT sends the stored gzip or brotli form with `Vary: Accept-Encoding`. In multi-site mode a CDN must key on the same host the origin selects from; if it keys on `Host` but forwards a client `X-Forwarded-Host`, it can store one site's page under another's URL, so overwrite or strip that header at the edge.
 - `ttl` is the server cache's own freshness window in seconds, independent of
   the CDN-facing `maxAge`; omit it to reuse `maxAge`.
 - `varyBy?: (request) => string` adds a request-derived component to the key,
@@ -33345,7 +33400,7 @@ writes the crawler-specific render).
 **Response headers**: `x-warlock-cache: hit | miss | bypass`, alongside the
 usual `Cache-Control`. A `cache` route's `Vary` lists `x-warlock-data`, then
 `Cookie, locale` unless the URL pinned the locale or the app has one locale,
-`User-Agent` when the page defers, and `cache.varyHeaders`.
+`User-Agent` when the page defers, and `cache.varyHeaders`. A failure page for that route carries the same value.
 
 **Variant ceiling**: `pageCache.maxEntriesPerRoute` (default `1_000`, `false`
 removes it) caps the stored query variants per route and process; a new
@@ -33487,6 +33542,7 @@ export default function NotFoundPage() {
 }
 ```
 
+- **API requests never get this page.** A request that matches no route and does not explicitly accept `text/html` (or is not `GET`/`HEAD`) is answered `404` JSON `{ error, code: "route_not_found", path, method, requestId }`; `error` is `request.t("web.errors.routeNotFound")` (built-in English and Arabic text when the key is not defined).
 - **No `config.route`.** It has no URL of its own and answers every URL nothing else matched. Declaring a route on it is a build error, and a second `404.page.tsx` is a build error naming both files.
 - **Props.** The default component receives the usual `{ data, shared, params }`: `shared` is the sealed payload, `params` is empty, and there is no page data because its own `loader` never runs. Its `register()` and `config.middleware` still run and `config.metadata` still applies. Keep the metadata static, since there is no `data` to read.
 - **No loader.** A `loader` export on it is ignored. The `root.setup.ts` app loader still runs on a 404, so keep it cheap.
@@ -33555,7 +33611,14 @@ export default function ForbiddenPage({ status }: ErrorPageProps) {
 }
 ```
 
-Pair it with `forbidden.setup.ts` for `config.metadata`. It follows the same rules as `error.page.tsx`: no `config.route`, a second `forbidden.page.tsx` is a build error naming both files, `robots: noindex` by default, and it receives the same `{ error, status }` props (plus `debug` outside production). In multi-site mode each site folder (`$sites/<name>/forbidden.page.tsx`) owns its own. The page that renders for a refusal is picked in this order: the site's (or the app's) `forbidden.page.tsx`, then its `error.page.tsx` with the 401/403 status, then the framework default. The framework default is a plain accessible page with the request id, the development details outside production and a "Back to home" link. Hydration uses the same pick, so the page the server rendered is the page the browser hydrates.
+Pair it with `forbidden.setup.ts` for `config.metadata`. It follows the same rules as `error.page.tsx`: no `config.route`, a second `forbidden.page.tsx` is a build error naming both files, `robots: noindex` by default, and it receives the same `{ error, status }` props (plus `debug` outside production). In multi-site mode each site folder (`$sites/<name>/forbidden.page.tsx`) owns its own. The page that renders for a refusal is picked in this order: the site's (or the app's) `forbidden.page.tsx`, then its `error.page.tsx` with the 401/403 status, then the framework default. The framework default is a plain accessible page with the request id, the development details outside production and a "Back to home" link. Hydration uses the same pick, so the page the server rendered is the page the browser hydrates. The refusal page renders inside the site's root and the layout beside it in the web root, and falls back to the framework document if those fail to load or render.
+
+A refusal core raises before routing (a dot-segment path, a malformed URL) renders this same page inside the web root's `root.tsx` and layouts when they load (and in the framework document when they do not or throw), with the URL's locale prefix selecting the locale under locale routing, and, in production, `error.errorCode` set to the request id (`debug.requestId` in development) so the page can show it to the visitor.
+
+## Config that bounds and speeds up a document
+
+- `web.shellTimeout` (ms, default 30000, 90000 in `warlock dev`, `0` off): a document shell that suspends outside every `<Suspense>` and is not ready in time is aborted and answers `error.page.tsx` with status 504.
+- `web.earlyHints` (default `false`): sends a `103 Early Hints` with `Link` preloads for the hydration entry, its module preloads and the page's stylesheets before the loaders run. Document requests only; a client, runtime or proxy without support ignores it.
 
 ## The `register()` hook
 
@@ -33868,6 +33931,8 @@ with `sitemap.cacheControl`. Versioned generation URLs use immutable caching.
 sitemap URL when enabled and an origin exists. A hand-written
 `public/robots.txt` wins; maintain its Sitemap line yourself.
 
+In multi-site mode set `robots` on a site in `web.sites` (or on a `resolveHost` result) to give that host its own policy. It is merged over `web.robots` key by key (`groups` and `extra` are replaced whole); a site without it gets the global policy; a merged `enabled: false` answers 404; a site may enable robots while the global one is off. A non-indexable dynamic site still answers `Disallow: /`. `sitemap.gzip` stays `false` by default; with `http.compression` on, a served sitemap is compressed on the wire anyway.
+
 ## Example support files
 
 The sample data below makes the example runnable. Replace it with the app's persistence or domain service when integrating.
@@ -33953,6 +34018,7 @@ export default function Contact() {
 - Actions are never cached and always `private, no-store`; call `invalidatePageCache(tags)` to refresh other visitors' cached page.
 - Redirect after success: a no-JS action that returns data re-POSTs on reload.
 - `<Form>` defaults to `multipart/form-data`, so file inputs work; read them with `request.file(name)`.
+- Under `http.multipart.routes: "declared"` a multipart POST answers 415 unless the page declares `config.uploads: true` (or `{ maxTotalSize: 10 * 1024 * 1024, maxFileSize: 2 * 1024 * 1024, maxFiles: 3 }`, number literals); it marks the page's POST route and covers all its actions. It must be a literal, read at build time. In multi-site mode all sites share one POST route, so one declaration opens it for every site.
 - Per-user limit: `config.action.middleware: [middleware.rateLimit({ max: 5, duration: 60_000, key: "user", guests: "ip" })]` (`import { middleware } from "@warlock.js/core"`). Keyed on `request.locals.user.id`, so it needs `pageSession()` from `@warlock.js/auth`. `guests`: `"ip"` (default) or `"skip"`. Over the limit: 429, action not run.
 - With `@mongez/react-form`, use `useSubmitAction` from `@warlock.js/web/form` and alias one of the two `Form`s.
 
@@ -34909,7 +34975,7 @@ A key used with `count` is stored as variants
 no literal names falls back to every group, and `warlock check` reports it as
 `WL9104` with the file, line and key text; the build log lists the same sites.
 A plain `config.translations` array only adds keys; it does not resolve a computed
-lookup. One dynamic site anywhere in the page's graph (page, layouts, root, error
+lookup. The key is accepted in the `config` of a page, a layout and the root (in the module or its setup file). One dynamic site anywhere in the page's graph (page, layouts, root, error
 pages) still ships every group, so fix the site itself (a literal key or a
 static-prefix template). Use a declaration for keys the analysis cannot see, such
 as ones read from data:
@@ -35061,6 +35127,8 @@ export default web;
 | `"prefix-except-default"`                     | `/about` (default locale), `/ar/about`; `/en/about` answers a 301 to `/about`        | the path prefix, else the default locale                                                                                             |
 
 Any other value, an empty `app.localeCodes`, or an `app.localeCode` that is not in `app.localeCodes` throws a `LocaleRoutingConfigError` at boot. A multi-site app can override the strategy per site with `sites.<key>.localeRouting` (see the `multi-site` topic). A page whose filesystem route begins with `[locale]` carries its own locale segment and cannot be combined with a non-`none` strategy (`LocaleParamRoutingConflictError` at boot). To build a locale-correct URL by hand, for a canonical link for example, use `localizedPath(path, locale?)` from `@warlock.js/web`; `<Link>` prefixes literal in-app paths itself (see the `navigate-on-the-client` topic for its `locale` prop).
+
+The not-found page and the page for a core-level refusal (for example `/ar/public/../x`) answer in the locale a leading URL prefix names; a refusal page's `error.errorCode` is the request id.
 
 ## Worked example: an en/ar routed page with a switcher
 
@@ -35542,9 +35610,9 @@ Upgrade: move each `src/web/(group)` site folder to `src/web/$sites/<key>` and d
 
 `resolveHost` receives a normalized `{ host, request }` and returns `{ site, key, indexable?, shared? } | null`. Its `site` must name a dynamic site. `null` is a 404; a throw is a 500. `key` partitions tenant state and cache identity, so use a durable tenant identifier rather than a display name.
 
-`resolveCache.ttl` is measured in seconds and caches by host only. It is disabled by default because a resolver that reads cookies or headers cannot be safely shared across visitors. Enable it only for host-only lookup results. `resolveCache.maxEntries` (default `10_000`) bounds how many hosts are remembered (expired first, then least recently used); a host over 253 characters never reaches the resolver.
+`resolveCache.ttl` is measured in seconds and caches by host only. It is disabled by default because a resolver that reads cookies or headers cannot be safely shared across visitors. Enable it only for host-only lookup results. `resolveCache.negativeTtl` (seconds, default `ttl`; `0` never remembers) shortens the memory of hosts the resolver answered `null` for, so a host added at runtime resolves sooner. `resolveCache.maxEntries` (default `10_000`) bounds how many hosts are remembered (expired first, then least recently used); a host over 253 characters never reaches the resolver.
 
-`basePath` selects a site below a path prefix; the longest matching prefix wins. `unknownHost` is `"not-found"` by default, or may name a configured fallback site. During development use hosts such as `acme.localhost:2030`. `warlock dev` answers only `localhost`, `*.localhost`, IP addresses, fixed sites' `hosts` and `web.devAllowedHosts` (default none; `".tenant.test"` also matches subdomains) — list dynamic tenants' dev hosts there, or they get a 403 "Blocked request". `devAllowedHosts: true` disables the host check (DNS-rebinding exposure; avoid).
+`basePath` selects a site below a path prefix; the longest matching prefix wins. `unknownHost` is `"not-found"` by default, or may name a configured fallback site. During development use hosts such as `acme.localhost:2030`. `warlock dev` answers only `localhost`, `*.localhost`, IP addresses, fixed sites' `hosts` and `web.devAllowedHosts` (default none; `".tenant.test"` also matches subdomains) — list dynamic tenants' dev hosts there, or they get a 403 "Blocked request" whose text names `web.devAllowedHosts`. `devAllowedHosts: true` disables the host check (DNS-rebinding exposure; avoid).
 
 `localeRouting` on a site replaces global `web.localeRouting`; omit it to inherit, and use `{}` to disable it for one site. Locale codes and the default locale still come from `app.localeCodes` and `app.localeCode`.
 
@@ -35573,7 +35641,7 @@ const originAndMount = siteUrl();
 
 `<Link to="platform.home">` and `navigateTo()` take the same names; a link to another site loads that site in full. `src/config/web.ts` may import the resolver from `app/...`: `warlock build` resolves the alias when it reads `web.sites`.
 
-With sitemap and robots enabled, `/sitemap.xml` and `/robots.txt` are selected per site. A dynamic site is indexable only when its resolver result says `indexable: true`; otherwise its sitemap is a 404 and robots disallows crawling. Set `web.tlsAsk` to expose Caddy's domain check endpoint; it requires `web.sites` and permits configured fixed hosts or domains claimed by `resolveHost`. It is public by default (`tlsAskAllow: "any"`); set `tlsAskAllow: "loopback"` when Caddy runs on the same machine, `"private"` for a private network, or a list of exact caller IPs — other callers get 403. Each site's sitemap is reused for `web.sitemap.regenerateEvery` (5 minutes when unset) with an `ETag`. Page sitemap suppliers receive `{ site, tenantKey, shared }`: a dynamic site's supplier must filter its rows by `tenantKey`, or every tenant's sitemap lists every tenant's URLs.
+A site (and a `resolveHost` result) may carry `robots`, merged over `web.robots` for that host (`groups`/`extra` replaced whole). With sitemap and robots enabled, `/sitemap.xml` and `/robots.txt` are selected per site. A dynamic site is indexable only when its resolver result says `indexable: true`; otherwise its sitemap is a 404 and robots disallows crawling. Set `web.tlsAsk` to expose Caddy's domain check endpoint; it requires `web.sites` and permits configured fixed hosts or domains claimed by `resolveHost`. It is public by default (`tlsAskAllow: "any"`); set `tlsAskAllow: "loopback"` when Caddy runs on the same machine, `"private"` for a private network, or a list of exact caller IPs — other callers get 403. Each site's sitemap is reused for `web.sitemap.regenerateEvery` (5 minutes when unset) with an `ETag`. Page sitemap suppliers receive `{ site, tenantKey, shared }`: a dynamic site's supplier must filter its rows by `tenantKey`, or every tenant's sitemap lists every tenant's URLs.
 
 ```caddyfile
 {
@@ -35742,7 +35810,7 @@ description: 'Navigate hydrated pages with `<Link>`, resolve named URLs with `hr
 
 # Warlock — navigate on the client
 
-`<Link>` renders a real anchor for progressive enhancement and intercepts a plain in-app click after hydration. The server remains the only route matcher; client navigation fetches the page-data representation of the URL and swaps the Layout + Page tree.
+`<Link>` renders a real anchor for progressive enhancement and intercepts a plain in-app click after hydration. The server remains the only route matcher; client navigation fetches the page-data representation of the URL and swaps the Layout + Page tree. The server runs the middleware and loaders for that request but does not render the page: a loader, guard or validation failure still answers with its status and error record, while a component that throws while rendering is shown by the nearest client error boundary and reported by the client (`web.errors`, `onClientError`). The app's `error.page.tsx` and `forbidden.page.tsx` load as lazy chunks, only when a failure needs them.
 
 Every behaviour on this page depends on hydration having mounted. See the `write-the-root` topic (section "`#vessel` is the hydration boundary").
 
@@ -37488,7 +37556,7 @@ When the app has a public URL configured (`app.publicUrl`; under multi-site, the
 - `canonical` defaults to the public URL plus the request path (query string and hash ignored). Set a string to override it, or `false` for no canonical link and no automatic `og:url`.
 - A root-relative `canonical`, `openGraph.url`, any image URL and every `alternates` value are made absolute against the public URL. An absolute URL is left as is.
 - Without a public URL nothing is absolutized and no canonical is derived.
-- A page whose `robots` contains `noindex` skips all of this (no derived canonical, `og:url` or locale). The error page and the `404.page.tsx` page are `noindex` by framework default.
+- A page whose `robots` contains `noindex` skips all of this (no derived canonical, `og:url` or locale) and emits no generated `hreflang` alternates either. The error page and the `404.page.tsx` page are `noindex` by framework default.
 
 ## Root, layout and page merge order
 
@@ -37949,7 +38017,7 @@ description: "Submit a @mongez/react-form through a named Core API route or expl
 
 # Submit a form
 
-Import the optional form integration from `@warlock.js/web/form`, not the Web root barrel. It requires peer packages `@mongez/http:^3.5.0` and `@mongez/react-form:^4.0.0`.
+Import the optional form integration from `@warlock.js/web/form`, not the Web root barrel. It requires peer packages `@mongez/http:^3.5.2` and `@mongez/react-form:^4.1.0`.
 
 ```tsx
 import { Form } from "@mongez/react-form";
@@ -39565,9 +39633,15 @@ const agent = ai.agent({ model }); // hand it anywhere a model goes
 // custom retry predicate or code list:
 ai.fallbackModel([primary, backup], { retryOn: ["PROVIDER_RATE_LIMIT", "PROVIDER_TIMEOUT"] });
 ai.fallbackModel([primary, backup], { retryOn: (error) => error instanceof ProviderError });
+
+// retryOn REPLACES the default set (both forms). To keep the default and add a reason:
+ai.fallbackModel([primary, backup], { alsoRetryOn: (error) => error instanceof MyQuotaError });
+ai.fallbackModel([primary, backup], {
+  retryOn: (error) => isDefaultFallbackRetryable(error) || error instanceof MyQuotaError,
+});
 ```
 
-Default retryable codes: `PROVIDER_RATE_LIMIT`, `PROVIDER_OVERLOADED`, `PROVIDER_TIMEOUT`, `PROVIDER_ERROR`. Auth / invalid-request / context-length / content-filter re-throw immediately (they'd fail identically downstream — retrying only burns budget). Identity/capabilities/pricing front the primary model. Usage aggregates across attempted models. Inspect `model.lastAttempts` for the failed models of the most recent call.
+Default retryable codes (exported as `DEFAULT_FALLBACK_RETRY_CODES`; `isDefaultFallbackRetryable(error)` tests them): `PROVIDER_RATE_LIMIT`, `PROVIDER_OVERLOADED`, `PROVIDER_TIMEOUT`, `PROVIDER_ERROR`. Auth / invalid-request / context-length / content-filter re-throw immediately (they'd fail identically downstream — retrying only burns budget). Identity/capabilities/pricing front the primary model. Usage aggregates across attempted models. A caller's own abort (aborted `signal`, abort error, `cancelled` category) never advances the chain. Inspect `model.lastAttempts` for the failed models of the most recent call.
 
 **Streaming caveat:** `stream()` can only fail over while no chunk has been emitted yet — once the first `delta` / `tool-call` reaches the consumer, a mid-stream failure propagates instead of restarting. It advances _instantly_ (no backoff) — pair with a backoff middleware if you want delay.
 
@@ -41806,7 +41880,7 @@ Scripting `[{ error: new ProviderRateLimitError("slow down") }]` drives the neve
 
 ---
 name: guard-input-output
-description: 'Build the composed guardrail middleware with @warlock.js/ai and wire it into an agent — `ai.guardrail({ input, output, tool, toolNames, escalation })`. Triggers: `ai.guardrail`, `guard`, `GuardOptions`, `GuardrailVerdict`, `GuardrailDetector`, `GuardrailPhase`, `GuardrailMatch`, `GuardrailViolationError`, `ai.guardrail.topic`, `ai.guardrail.injection`, `ai.guardrail.links`, `bufferStream`, `topicFilter`, `injectionDetector`, `toolNames`, `forTool`; ''add a guardrail to my agent'', ''block prompt injection'', ''filter banned topics'', ''guard agent input and output'', ''stop the model leaking data into a tool call'', ''scope a detector to one tool'', ''strip external images from model replies'', ''guardrails with streaming''; typical import `import { ai } from "@warlock.js/ai"` (`ai.guardrail` ships in core) or `import { guard } from "@warlock.js/ai"`. Skip: PII detection/redaction specifically — the `detect-and-redact-pii` topic; routing a block to a human — the `escalate-block-to-human` topic; the core middleware pipeline / hook contract — the `run-ai-agent` topic.'
+description: 'Build the composed guardrail middleware with @warlock.js/ai and wire it into an agent — `ai.guardrail({ input, output, tool, toolResult, wrapToolResults, toolNames, escalation })`. Triggers: `ai.guardrail`, `guard`, `GuardOptions`, `GuardrailVerdict`, `GuardrailDetector`, `GuardrailPhase`, `GuardrailMatch`, `GuardrailViolationError`, `ai.guardrail.topic`, `ai.guardrail.injection`, `ai.guardrail.links`, `bufferStream`, `topicFilter`, `injectionDetector`, `toolNames`, `forTool`; ''add a guardrail to my agent'', ''block prompt injection'', ''filter banned topics'', ''guard agent input and output'', ''stop the model leaking data into a tool call'', ''scope a detector to one tool'', ''strip external images from model replies'', ''guardrails with streaming''; typical import `import { ai } from "@warlock.js/ai"` (`ai.guardrail` ships in core) or `import { guard } from "@warlock.js/ai"`. Skip: PII detection/redaction specifically — the `detect-and-redact-pii` topic; routing a block to a human — the `escalate-block-to-human` topic; the core middleware pipeline / hook contract — the `run-ai-agent` topic.'
 ---
 
 # Guard agent input, output, and tool args
@@ -41837,15 +41911,22 @@ const policy = guard({ input: [injection({ onMatch: "block" })] });
 
 ## The three phases
 
-| Phase      | Hook          | Inspected text                                        | Set with        |
-| ---------- | ------------- | ----------------------------------------------------- | --------------- |
-| **input**  | `trip.before` | the outbound prompt (`extractUserText(ctx.messages)`) | `input: [...]`  |
-| **output** | `trip.after`  | `response.content`                                    | `output: [...]` |
-| **tool**   | `tool.before` | `JSON.stringify(toolArgs)`                            | `tool: [...]`   |
+| Phase          | Hook          | Inspected text                                        | Set with            |
+| -------------- | ------------- | ----------------------------------------------------- | ------------------- |
+| **input**      | `trip.before` | the outbound prompt (`extractUserText(ctx.messages)`) | `input: [...]`      |
+| **output**     | `trip.after`  | `response.content`                                    | `output: [...]`     |
+| **tool**       | `tool.before` | `JSON.stringify(toolArgs)`                            | `tool: [...]`       |
+| **toolResult** | `tool.after`  | what the tool returned (string, else JSON)            | `toolResult: [...]` |
 
 Each phase array runs its detectors in **registration order**; the first non-`allow` verdict decides the action for that phase (short-circuit). A phase you don't configure is inert — a guard with no detectors is a no-op middleware.
 
 `input` detectors run **once per distinct user text per run**: later trips of a tool-using run with the same prompt skip them (one moderation call, not one per trip). A detector that faulted runs again next trip.
+
+`toolResult` detectors are the defence against indirect prompt injection (text a tool fetched). `block` fails that tool call (the model never sees the data), `redact` replaces the result data with the rewritten text, `flag` records. `wrapToolResults: true` wraps each successful result in `<untrusted-tool-result tool="name">…</untrusted-tool-result>` so the model treats it as data:
+
+```ts
+ai.guardrail({ toolResult: [ai.guardrail.injection({ onMatch: "block" })], wrapToolResults: true });
+```
 
 ## Streaming (`agent.stream()`, `ai.serve`)
 
@@ -41883,7 +41964,7 @@ if (result.error instanceof ai.errors.GuardrailViolationError) {
 
 Four zero-dependency detectors ship (a fifth, `moderation`, is an optional `openai` peer — see the `detect-and-redact-pii` topic):
 
-- **`ai.guardrail.injection(options?)`** — jailbreak / prompt-injection marker phrases, matched on normalized text (case, NFKC forms, zero-width characters, and runs of whitespace / `_` / `-` / `.` folded, so `"Ignore  previous\ninstructions"` matches). Extra `markers` (string, normalized the same way | RegExp, run on the original text without `g` / `y`); `onMatch` defaults to `"flag"`, callers commonly use `"block"` on input. Heuristic only; it does not see tool results.
+- **`ai.guardrail.injection(options?)`** — jailbreak / prompt-injection marker phrases, matched on normalized text (case, compatibility forms, zero-width characters, combining marks, look-alike Cyrillic / Greek letters, and runs of whitespace / dashes / `_` / `.` / `,` / `;` / `:` / `|` / `/` / `*` folded, so `"Ignore  previous\ninstructions"` matches). Extra `markers` (string, normalized the same way | RegExp, run on the original text without `g` / `y`); `onMatch` defaults to `"flag"`, callers commonly use `"block"` on input. Heuristic only; it sees tool results only through `toolResult`.
 - **`ai.guardrail.topic(options)`** — `deny` (string substring | RegExp) and/or `allow` (allow-list miss triggers `onMatch`). `onMatch` is `"block" | "flag"`, default `"block"`.
 - **`ai.guardrail.pii(options?)`** — PII regex + dictionary (its own skill).
 - **`ai.guardrail.links(options?)`** — `output` detector against exfiltration through rendered replies: strips Markdown images, reference definitions, `<img src|srcset>` and `<image src|href>` whose host is not on `allowHosts` (`"cdn.example.com"`, `"*.example.org"`); `links: true` also strips Markdown links, `<a href>` and `<https://…>` autolinks. Relative URLs stay; `data:` / `javascript:` / entity-encoded URLs are refused. `onMatch` default `"redact"` (keeps alt / link text), or `"block"` / `"flag"`. Not an HTML sanitizer.
@@ -42111,6 +42192,7 @@ AIError  (base — code, category, message, cause?, context?)
 │   ├── ProviderOverloadedError  PROVIDER_OVERLOADED        { retryAfter? } — provider busy (529 / 503), retryable
 │   ├── QuotaExceededError       PROVIDER_QUOTA_EXCEEDED    — NOT retryable (billing cap)
 │   ├── ProviderTimeoutError     PROVIDER_TIMEOUT
+│   ├── ProviderAbortError       PROVIDER_ERROR             — caller aborted (name AbortError, category cancelled)
 │   ├── ContextLengthExceededError CONTEXT_LENGTH_EXCEEDED  { limit?, actual?, modelName? }
 │   ├── ContentFilterError       CONTENT_FILTER             { reason?, categories? }
 │   ├── InvalidRequestError      PROVIDER_INVALID_REQUEST
@@ -42167,6 +42249,7 @@ async function settle(error: unknown, retry: () => Promise<void>): Promise<void>
 | `ProviderRateLimitError`                                                                                       | Yes — back off by `retryAfter` ms                                                       |
 | `ProviderOverloadedError`                                                                                      | Yes — back off (`retryAfter` when sent) or fail over                                    |
 | `ProviderTimeoutError`                                                                                         | Yes — short delay                                                                       |
+| `ProviderAbortError`                                                                                           | **No** — the caller cancelled the call; do not retry or fail over                       |
 | `ProviderError` (generic)                                                                                      | Read `error.retryable` (true for 5xx / 408 / 409)                                       |
 | `QuotaExceededError`                                                                                           | **No** — needs human intervention                                                       |
 | `ProviderAuthError`                                                                                            | **No** — fix config / rotate key                                                        |
@@ -42272,7 +42355,7 @@ const result = await chat.send("What is my name?"); // AgentResult, history incl
 
 What `send(input, options)` does, under a per-session lock:
 
-1. Load the record stored under `session:<id>`, mark it `pending: { runId, input }`.
+1. Load the record stored under `session:<id>`, mark it `pending: { runId, input }` (stores with the optional `markPending(runId, pending)` — memory, pg, sqlite — update only that field in place; others save the record).
 2. Run `agent.execute(input, { ...options, history, captureMessages: true, sessionId: id })`.
 3. On success, store the run's messages (without the agent's system prompt) plus the final reply with its `blocks`; on a failed / cancelled run keep the old history. Clear `pending`.
 
@@ -43608,6 +43691,8 @@ await pool.query(store.ensureSchema());
 
 `query()` runs the cosine floor (`threshold`) and `tags` overlap filter **in SQL** (a below-floor row never crosses the wire), orders by `embedding <=> $vec`, caps at `topK`, and maps the pgvector distance back to a `[0,1]` cosine-similarity `score` — the same scale the cache store emits. `removeNamespace()` is a prefix DELETE that escapes `_` / `%` so dropping `ai.rag.docs` never also catches `ai.rag.docs2`.
 
+`ai.rag({ store: pgVectorStore(...) })` takes the store directly (a `VectorStore` is used as is; a cache driver is wrapped). The store also offers `remove(key)` and `list(namespace)`, so `rag.clear()` drops only its own chunks.
+
 ## Pattern — a knowledge base from a website, backed by pgvector
 
 ```ts
@@ -43924,6 +44009,8 @@ Same config across process restarts → same synthetic name. Keeps workflow sign
 agent.execute(input: string, options?: AgentExecuteOptions): Promise<AgentResult<T>>;
 agent.stream(input: string, options?: AgentExecuteOptions): StreamContract<AgentResult<T>>;
 ```
+
+A non-string `input` is refused with an `InvalidRequestError` (`execute()` rejects, `stream()` throws); run failures still land on `result.error`.
 
 `AgentExecuteOptions` — every field optional:
 
@@ -44250,7 +44337,7 @@ function throwUnauthorized(): never {
 - Errors on the wire are `{ code, message, reference }` (fixed message per error kind); the full error is logged as `ai.serve` / `run.failed` under `reference`.
 - Default `toInput` requires a string `body.input` (else `400 invalid_input`); map a structured body with `toInput`.
 - A throwing callback answers `500 internal_error` (or the `ServeHttpError` status) and never crashes the process.
-- No `authToken` / `authorize` and no `public: true` → one-time warning in production.
+- No `authToken` / `authorize` and no `public: true` → one-time warning in production; `ai.serve` will refuse to start in 6.0, so set one now.
 - `streamToSSE(stream, { mapEvent, mapResult, mapError })` is the transport-agnostic building block; without options it is verbatim (trusted sinks only).
 
 ## Pattern — cancellation
@@ -44647,7 +44734,8 @@ const kb = ai.rag({
 Resolution is **loud at construction** (mirrors `ai.memory`):
 
 - `embedder` is **required** — a provider with no embedder must be caught here, not at first `index()`.
-- `store` falls back to `ai.config({ defaultStore })`; if neither resolves, the factory throws.
+- `store` is a vector-capable cache driver or a `VectorStore` (for example `ai.rag.pgVectorStore({ client: pool })`, used as is). It falls back to `ai.config({ defaultStore })`; if neither resolves, the factory throws.
+- `clear()` lists the namespace (`listKeys()` on the cache drivers that have it, `list()` on a `VectorStore`) and deletes exactly this rag's chunks; a store that cannot list falls back to similarity sweeps.
 
 ## Surface — `Rag`
 
@@ -44744,7 +44832,7 @@ Input is `{ query: string }`; output is the `RetrieveResult`. Default tool name 
 await kb.clear(); // drops every entry written under this rag's namespace
 ```
 
-`clear()` deletes by key prefix, so on a shared driver it also clears a nested namespace (`kb.acme` clears `kb.acme.private`) — give rags on one driver sibling names.
+`clear()` deletes only this rag's own chunks (a nested namespace such as `kb.acme.private` and siblings stay). It finds them with similarity queries, widening up to 5,000 candidates, so on a driver shared with far more unrelated entries give the rag its own driver; pre-5.53 chunks with a dotted document id stay until re-indexed.
 
 ## Namespace isolation (5.53)
 
@@ -45974,7 +46062,7 @@ Every field is optional; `resolveOutboundPolicy` fills safe defaults, so an untu
 
 Every violation throws `OutboundPolicyError` with `context` carrying the offending URL/host/address — never a silent fallback.
 
-**Address pinning (5.53).** With `denyPrivateIPsAfterDNS` on and the global `fetch`, every connection (first request and each redirect hop) resolves its host through a checked lookup and connects only to the addresses that passed — a DNS-rebinding host flipping to `127.0.0.1` / `169.254.169.254` after the pre-check is refused at connect time (`OutboundPolicyError`, message ends "when connecting"). TLS still verifies against the URL's host name. An injected `policy.fetch`, or an app-installed non-`Agent` global dispatcher (proxy, mock), keeps the pre-check only.
+**Address pinning (5.53).** With `denyPrivateIPsAfterDNS` on and the global `fetch`, every connection (first request and each redirect hop) resolves its host through a checked lookup and connects only to the addresses that passed — a DNS-rebinding host flipping to `127.0.0.1` / `169.254.169.254` after the pre-check is refused at connect time (`OutboundPolicyError`, message ends "when connecting"). TLS still verifies against the URL's host name. The pinned dispatcher inherits the connect options of the app's own global `Agent` (private CA, client certificate). An injected `policy.fetch`, an app-installed non-`Agent` global dispatcher (proxy, mock), an `Agent` whose `connect` is a function, or a runtime without a dispatcher keeps the pre-check only, with one `[warlock-ai] outbound address pinning is off` warning per reason.
 
 ## Redirects are never delegated to the platform (4.15.0)
 
@@ -47159,6 +47247,8 @@ On the direct `"openai"` provider a call carrying the hosted `web_search` tool i
 
 The direct OpenAI provider reports `capabilities.contextWindow` for the gpt-3.5/4/4o/4.1/5.x/6 and o-series ids (400K for gpt-5.x and gpt-6, conservative); `openai.model({ name, contextWindow })` wins and is the only source for OpenAI-compatible endpoints.
 
+**Spent credit.** A response whose error `code` is `insufficient_quota`, `credit_balance_exhausted`, `billing_hard_limit_reached` or `billing_not_active`, or whose `type` is `insufficient_quota`, maps to `QuotaExceededError` (`PROVIDER_QUOTA_EXCEEDED`, not retryable) on any status, including 429. A plain 429 stays `ProviderRateLimitError`. The default fallback chain does not advance on spent credit; add `PROVIDER_QUOTA_EXCEEDED` through `alsoRetryOn`. DeepSeek, Groq, xAI and Mistral share this mapping.
+
 
 ================================================================================
 # @warlock.js/ai-anthropic
@@ -47886,10 +47976,12 @@ const { vectors } = await embedder.embedMany(["a", "b"]); // single batched call
 Wrapped into the typed `@warlock.js/ai` `AIError` hierarchy. Gemini has no machine error code — dispatch keys on HTTP `status` + canonical status phrase in the message:
 
 - 401/403 / `PERMISSION_DENIED` / "API key not valid" → `ProviderAuthError`
+- spent billing or free-tier allowance ("check your plan and billing details", with no per-minute / per-day / retry hint) → `QuotaExceededError` (not retried)
 - 429 / `RESOURCE_EXHAUSTED` → `ProviderRateLimitError`
 - 400 with token/context phrasing → `ContextLengthExceededError`, else `InvalidRequestError`
 - 404 / any other 4xx → `InvalidRequestError`
-- 504 / `DEADLINE_EXCEEDED` / `ETIMEDOUT` / `ECONNABORTED` / `AbortError` → `ProviderTimeoutError`
+- `AbortError` while the call's own `signal` is aborted → `ProviderAbortError` (category `cancelled`, never retried)
+- 504 / `DEADLINE_EXCEEDED` / `ETIMEDOUT` / `ECONNABORTED` / any other `AbortError` (the SDK's own `httpOptions.timeout`) → `ProviderTimeoutError`
 - 503 / `UNAVAILABLE` / "overloaded" → `ProviderOverloadedError` (`code: "PROVIDER_OVERLOADED"`, `retryable: true`) — Gemini documents 503 as "temporarily overloaded or down" (https://ai.google.dev/gemini-api/docs/api-errors)
 - anything else (5xx and status-less) → `ProviderError`
 
@@ -47909,7 +48001,7 @@ if (result.error instanceof ProviderOverloadedError) {
 }
 ```
 
-Timeout is checked first, so an aborted/`AbortError` request always classifies as `ProviderTimeoutError` regardless of status. `AIError` instances pass through unwrapped (no double-wrap).
+The abort and timeout checks run first, so an `AbortError` classifies as `ProviderAbortError` (caller cancelled) or `ProviderTimeoutError` regardless of status. `AIError` instances pass through unwrapped (no double-wrap).
 
 ## Token counting
 
@@ -49200,7 +49292,8 @@ const truncated = ollama.embedder({ name: "mxbai-embed-large", dimensions: 512 }
 Wrapped into the typed `@warlock.js/ai` `AIError` hierarchy. The `ollama` client throws an internal `ResponseError` (`status_code` + message); transport failures surface as `fetch` `TypeError` with `ECONNREFUSED` cause:
 
 - **Daemon-down (`ECONNREFUSED` / "fetch failed") → `ProviderError`** (operational "is Ollama running?", not a request defect)
-- Timeouts → `ProviderTimeoutError`
+- Timeouts (`TimeoutError`, `ETIMEDOUT`) → `ProviderTimeoutError`
+- `AbortError` (the call's `signal`, `ollama.abort()`) → `ProviderAbortError` (category `cancelled`, never retried)
 - 401/403 → `ProviderAuthError`
 - 429 → `ProviderRateLimitError`
 - 4xx with context phrasing → `ContextLengthExceededError`, else `InvalidRequestError`
@@ -50208,7 +50301,7 @@ All guardrails are enforced **before the network call** and surface as a typed `
 - an unresolvable URL → `"invalid-url"`.
 - **Private-network deny by default** — like `fetch_url`, every request and redirect hop routes through `guardedFetch`, refusing private/loopback/link-local/CGNAT/cloud-metadata addresses (DNS-resolved and re-checked per redirect hop) even when `allowHosts` isn't set → `"host-not-allowed"`. Set `allowPrivateNetwork: true` (default `false`) to permit a deliberate internal target.
 
-When `baseUrl` is set the model passes a **path** joined against it, and the request and its redirects stay on the base host unless `allowHosts` names others; otherwise it must pass an absolute `http(s)` URL. Static `headers` merge **under** the per-call headers (per-call wins) and go **only to the first request's origin** — a cross-origin redirect drops every static header plus `authorization` / `cookie` / `proxy-authorization`. Put credentials in `headers` only with `baseUrl` or `allowHosts`. `timeoutMs` bounds the whole exchange, body included (`"timeout"`). An object `body` is JSON-serialized (with a default `content-type: application/json`); a string `body` is sent verbatim; `body` is dropped for `GET`. The response body is JSON-parsed when the `content-type` is JSON, else returned as text.
+When `baseUrl` is set the model passes a **path** joined against it, and the request and its redirects stay on the base host unless `allowHosts` names others; otherwise it must pass an absolute `http(s)` URL. Static `headers` merge **under** the per-call headers (per-call wins) and go **only to the first request's origin** — a cross-origin redirect drops every static header plus `authorization` / `cookie` / `proxy-authorization`. Put credentials in `headers` only with `baseUrl` or `allowHosts`; without either, building the tool logs a warning. `timeoutMs` bounds the whole exchange, body included (`"timeout"`). An object `body` is JSON-serialized (with a default `content-type: application/json`); a string `body` is sent verbatim; `body` is dropped for `GET`. The response body is JSON-parsed when the `content-type` is JSON, else returned as text.
 
 ## `calculator` — SAFE arithmetic (never `eval`)
 
@@ -50640,7 +50733,7 @@ export async function devLoop(cwd: string) {
 
 `grep` never hands the model's pattern to a backtracking engine: it compiles the usual JavaScript regex syntax (literals, classes, `\d \w \s`, anchors, `\b`, groups, alternation, all quantifiers, `ignoreCase`) into a matcher that costs at most pattern size × line length per line, with the same results as `RegExp#test`. `((a)+)+$`-style patterns finish at once.
 
-- Lookarounds and backreferences, patterns over 200 characters, and patterns expanding past 4000 states → `WorkspacePolicyError` `type: "unsafe-pattern"` naming the cause.
+- Lookarounds and backreferences, patterns over 200 characters, and patterns expanding past 1000 states → `WorkspacePolicyError` `type: "unsafe-pattern"` naming the cause.
 - A pattern that needs too much work per scanned character is stopped with `"unsafe-pattern"` (simplify it or narrow `path` / `glob`).
 - Lines over 2000 characters are skipped; files over `search.maxFileBytes` (default 2 MB) are skipped unread and counted in `skippedFiles`.
 - Globs (`glob`, `grep`'s `glob`, `list_dir`'s `ignore`, `denyPaths`, `skipDirs`, `.gitignore`) are matched without backtracking and compiled once; a model glob over 512 characters → `"unsafe-pattern"`, a longer `.gitignore` line is ignored.
@@ -51013,7 +51106,7 @@ console.log((await session.done()).text);
 
 The adapter's home variable (`CLAUDE_CONFIG_DIR`, `CODEX_HOME`, `COPILOT_HOME`, `GROK_HOME`, …) is pointed at it.
 
-**Environment.** `inheritEnv` decides which server variables the CLI sees. `true` (default) passes everything, so a model-driven CLI can read database URLs and signing keys. `"curated"` passes the minimal system set plus the adapter's own API key variables (`apiKeyEnv`); `false` passes the minimal set only; a list passes the minimal set plus those names. Prefer `"curated"` and add anything else through `env`. In production an unset `inheritEnv` logs a one-time warning; set `true` explicitly to keep the old behaviour without it.
+**Environment.** `inheritEnv` decides which server variables the CLI sees. `true` (default) passes everything, so a model-driven CLI can read database URLs and signing keys. `"curated"` passes the minimal system set plus the adapter's own API key variables (`apiKeyEnv`) and the extra variables it declares in `passEnv` (base URLs, provider keys); `false` passes the minimal set only; a list passes the minimal set plus those names. Prefer `"curated"` and add anything else through `env`. In production an unset `inheritEnv` logs a one-time warning; set `true` explicitly to keep the old behaviour without it. The default changes to `"curated"` in 6.0, so set it explicitly now.
 
 ## Use a CLI as an `ai.agent` model
 
@@ -51079,6 +51172,7 @@ export const acmeAdapter: CliAdapter = {
   title: "Acme Agent",
   command: "acme",
   apiKeyEnv: ["ACME_API_KEY"],
+  passEnv: ["ACME_BASE_URL"], // extra variables "curated" passes from the host
   homeEnv: ["ACME_HOME"],
   transports: ["argv", "stdin"],
   effort: false,
@@ -52198,13 +52292,13 @@ type DashboardHandle = {
 
 Every route is **`GET`-only and read-only** (non-`GET` → `405`), mounted under `basePath` — EXCEPT the one opt-in `POST .../spans/:spanId/evaluate` route `DashboardOptions.evaluate` enables (see the `evaluate-system-prompt` topic); absent that config, it 405s like everything else. The page polls the `GET` routes; you can curl them too. Store shapes are already JSON-safe, so responses are a plain `JSON.stringify`.
 
-| Route                                              | Returns                                                                                                                                                                                                                                                                                                                               |
-| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET /api/traces`                                  | `store.query(...)` — the newest `?limit=` (default 200) matches as `TraceSummary` entries (root is a `TraceSpanSummary`: no span tree, no captured content; `spanCount` + `totalCost` added), filtered by the query string (`traceId` / `sessionId` / `status` / time window, parsed by `parseQuery`). `?full=1` returns full traces. |
-| `GET /api/traces/:id`                              | `store.get(id)` — one full trace, `404 { error: "trace_not_found" }`, or `400 { error: "bad_trace_id" }` for a malformed id.                                                                                                                                                                                                          |
-| `GET /api/aggregate`                               | `store.aggregate(...)` — the usage + cost + status rollup over the same query filter.                                                                                                                                                                                                                                                 |
-| `GET /` (basePath)                                 | the self-contained HTML page.                                                                                                                                                                                                                                                                                                         |
-| `POST /api/traces/:traceId/spans/:spanId/evaluate` | grades the span's last captured system prompt — only when `evaluate` is configured.                                                                                                                                                                                                                                                   |
+| Route                                              | Returns                                                                                                                                                                                                                                                                                                                                                                                                         |
+| -------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/traces`                                  | `store.query(...)` — the newest `?limit=` (default 200) matches as `TraceSummary` entries (root is a `TraceSpanSummary`: no span tree, no captured content; `spanCount` + `totalCost` added), filtered by the query string (`traceId` / `sessionId` / `status` / time window, parsed by `parseQuery`). `?full=1` returns full traces. Carries an `ETag`; a matching `If-None-Match` answers `304` with no body. |
+| `GET /api/traces/:id`                              | `store.get(id)` — one full trace, `404 { error: "trace_not_found" }`, or `400 { error: "bad_trace_id" }` for a malformed id.                                                                                                                                                                                                                                                                                    |
+| `GET /api/aggregate`                               | `store.aggregate(...)` — the usage + cost + status rollup over the same query filter.                                                                                                                                                                                                                                                                                                                           |
+| `GET /` (basePath)                                 | the self-contained HTML page.                                                                                                                                                                                                                                                                                                                                                                                   |
+| `POST /api/traces/:traceId/spans/:spanId/evaluate` | grades the span's last captured system prompt — only when `evaluate` is configured.                                                                                                                                                                                                                                                                                                                             |
 
 Query-string filters map 1:1 onto `TraceQuery`:
 
@@ -52271,6 +52365,813 @@ not the standalone dashboard's persisted cache store. Clear/restart discards
 only that view. HTTP request identity is captured from the collecting async
 context; missing identities remain background runs. Devtools never mounts in
 production and retains its socket-loopback guard.
+
+
+================================================================================
+# @warlock.js/grimoire
+================================================================================
+
+# Warlock Grimoire — full skills
+
+> Package: `@warlock.js/grimoire`
+
+> Generated artifact. Concatenates every SKILL.md and reference file under `@warlock.js/grimoire/skills/`. Re-run `node scripts/generate-llms.mjs` after any change.
+
+## Package orientation
+
+---
+description: 'Grimoire (experimental), the project map for Warlock.js apps: `warlock scry` and `warlock grimoire build|check|release` over a `grimoire/` folder of generated book entries and agent-written features, flows, apps, tasks and releases. Topics: use the map before searching code, write a feature, record a change and release, describe sites and mobile screens, document a file, backfill an existing app. Use at the start of every task in a project that has `grimoire/`.'
+---
+
+# @warlock.js/grimoire
+
+The Grimoire is experimental: its file structure and commands may still change.
+
+`grimoire/` is the map of a Warlock.js project. Warlock writes the **book** (one entry per source file, the routes, the pages and the mobile screens, in `grimoire/book/`, not in git). Agents write what the product does (`grimoire/features/`), where users meet it (`grimoire/apps/`), the work (`grimoire/tasks/`) and the releases (`grimoire/releases/`). Warlock never edits a file an agent wrote.
+
+## The 80% path
+
+1. Before searching the code, ask the map: `use-the-grimoire.md`.
+2. A new behaviour starts as a task, a brief, a feature README and a flow, before code: `write-a-feature.md`.
+3. After the change, tie tests to criteria, reshape the README, add the changelog entry, close the task, run the check, and at release time stamp the changelogs and write the brief: `record-a-change.md`.
+4. Pages, blocks, conditions and mobile screens: `describe-an-app.md`.
+5. The header and export comments the book copies from a file: `document-a-file.md`.
+6. A project with code but no `grimoire/` folder: `backfill-a-grimoire.md`.
+
+## Conventions and pitfalls
+
+- Never edit `grimoire/book/`, `index.json`, `bookmap.json` or `*.bookmap.json`.
+- You write release numbers and dates into changelogs and the release brief; `warlock grimoire release` only writes the collected list.
+- A finding marked `(expected)` belongs to `proposed` work and does not fail `warlock grimoire check`.
+- Mobile screens are listed from file names only with file-based routing; declare them when navigation is in code.
+- Do not invent intent: write `Unknown:` and ask the owner.
+
+
+## backfill-a-grimoire  `@warlock.js/grimoire/skills/backfill-a-grimoire/SKILL.md`
+
+---
+name: backfill-a-grimoire
+description: 'Write the Grimoire for a project that already has code but no `grimoire/` folder: build the book, propose features from the modules and routes, write them as inferred, and bring the owner the questions only they can answer. Use once per existing project, or when a large undescribed area is found.'
+---
+
+# Backfill a Grimoire
+
+The Grimoire is experimental: its file structure and commands may still change.
+
+The code exists; the description does not. You will infer intent from code, and inference can be
+plausible and wrong. So everything you write here is marked **inferred** until the owner confirms
+it, and you bring them questions instead of guessing.
+
+## 1. Build the book
+
+```bash
+npx warlock grimoire build
+```
+
+It needs no writing. Read the module summaries (`grimoire/book/app/<module>/index.md`), the
+route list (`grimoire/book/app/routes.json`) and each site's page list.
+
+## 2. Propose the features
+
+Start from the modules: a module is usually one feature. Then adjust.
+
+- Two modules that cannot be described without each other → one feature with both `folders`.
+- A module that does two unrelated things → two features; tag the files of the smaller one.
+- Plumbing (config, shared utilities, the base layout) → no feature.
+- Mail, notifications, search: the machinery is a feature; each mail or notification belongs to
+  the feature that sends it.
+
+Write the proposal as a table for the owner **before** writing files:
+
+| Feature | Folders | Flows you see | Apps | Unsure about |
+| --- | --- | --- | --- | --- |
+| auth | src/app/auth | sign-up, login, reset-password | web-client, mobile | is phone login still used? |
+
+Wait for the owner's answer on the list. Features are the frame for everything else; a wrong
+frame costs the most to fix.
+
+## 3. Write each feature as inferred
+
+Follow `write-a-feature` for the shapes, with these differences:
+
+```md
+---
+id: auth
+status: shipped
+origin: inferred
+version: 1.0
+---
+```
+
+- `origin: inferred` on the README and on each flow. The owner changes it to `confirmed`.
+- Start every feature at `1.0`. Do not reconstruct history; the changelog gets one line under `## Unreleased`:
+  `- 1.0  added  described from the existing code`.
+- **Steps:** take them from the routes and pages, in the order a user meets them.
+- **Cases:** write only the cases the code handles. For a question the code does not handle
+  (a double submit, an expired code), do not write a case. List it under `## Not handled` so
+  the owner sees the gap.
+- **Criteria:** one per case. Tag the existing tests with `@proves` where a test clearly proves
+  one. Do not write new tests during a backfill.
+- **Intent you cannot see:** write `Unknown: why does a VIP skip the stock check?` in the flow.
+  Never invent a reason.
+
+## 4. Describe the apps
+
+One folder per site and mobile app (`describe-an-app`). Declare the conditions you find in the
+code (roles, permissions, membership checks). Write page files only for pages that combine
+several features or change with the user. When the mobile app defines navigation in code, declare
+its screens yourself; they are listed from file names only with file-based routing.
+
+## 5. Check and hand over
+
+```bash
+npx warlock grimoire check
+```
+
+Fix what it reports about your own files. A backfilled project reports many warnings (criteria with
+no test, files with no header); fix errors first and list the warnings for the owner. Then give the owner one list:
+
+- features and flows written, all inferred;
+- every `Unknown:` and `Not handled` line, as questions;
+- files that belong to no feature;
+- files inside a feature that no flow reaches (undescribed behaviour or dead code);
+- criteria with no test.
+
+Open one task per question that needs a decision. Do not fix code during a backfill; open a task
+for each bug you notice.
+
+## Size
+
+Work one feature at a time and finish it before starting the next. A large project takes several
+sessions; the task list says where you stopped.
+
+
+## describe-an-app  `@warlock.js/grimoire/skills/describe-an-app/SKILL.md`
+
+---
+name: describe-an-app
+description: 'Describe where users meet the product in `grimoire/apps/`: one folder per site or mobile app, its named conditions (guest, customer, membership, preferences), shared layouts, and the pages or screens whose blocks point to feature flows. Use when adding a page, a screen or a block, or when what a page shows depends on who is looking.'
+---
+
+# Describe an app
+
+The Grimoire is experimental: its file structure and commands may still change.
+
+Features say what the product does. Apps say where a user sees it. One folder per site or mobile
+app:
+
+```
+grimoire/apps/
+  web-client/
+    README.md              the app and its conditions
+    layouts/site.md        blocks every page of this layout shares
+    pages/home/README.md   purpose, layout, blocks
+    pages/home/blocks/new-arrivals.md   only when the block has page-specific detail
+  web-admin/
+  mobile/
+    screens/home/README.md      declared by you when navigation is in code
+```
+
+Write a file only when it says something the code or a feature flow does not already say. A page
+with one purpose, no variation and no blocks from other features needs no file.
+
+## The app README
+
+```md
+---
+id: web-client
+type: site
+root: src/web/$sites/client
+---
+
+# The shop website
+
+## Conditions
+- guest               not signed in
+- customer            signed in
+- vip                 customer with the vip membership
+- pref:personalised   the customer left personalised content on
+```
+
+Every page and block of this app uses these names and no others. Add a condition here before
+using it. Name roles and permissions exactly as the access configuration does, so they can be
+checked.
+
+A mobile app in the same repository is one more app: `type: mobile`, `root: mobile`.
+
+## Mobile screens
+
+How a screen gets into the book depends on how the app navigates:
+
+| The mobile app | Screens come from | You write |
+| --- | --- | --- |
+| File-based routing (Expo Router) | The route file names under its `app` folder (`collectMobileFacts`) | A screen file only when it says something the route does not |
+| Navigation defined in code | Nowhere: the book cannot read it | One file per screen you describe, in `grimoire/apps/<app>/screens/<screen>/README.md` |
+
+A declared screen has a `route` (or a `screen` name) in its front matter:
+
+```md
+---
+screen: order-tracking
+---
+
+# Order tracking
+
+## Blocks
+| Block         | Flow                | Who sees it | Changes with |
+| ------------- | ------------------- | ----------- | ------------ |
+| Courier stage | orders/track-order  | customer    | —            |
+```
+
+When the app uses file-based routing, `warlock grimoire check` reports a screen whose route has no
+file. When navigation is in code, declare every screen a flow names; the check cannot verify it.
+
+## A page or screen
+
+```md
+---
+route: /
+layout: site
+---
+
+# Home
+
+The first page a visitor sees.
+
+## Blocks
+| Block             | Flow                     | Who sees it | Changes with            |
+| ----------------- | ------------------------ | ----------- | ----------------------- |
+| Featured products | catalog/browse-products  | everyone    | vip: member prices      |
+| New arrivals      | catalog/new-arrivals     | everyone    | the customer's country  |
+| Recent orders     | orders/place-order       | customer    | —                       |
+```
+
+- **One row per part of the page**, not one description per kind of user. Three roles and two
+  preferences are a few rows, not six pages.
+- **Flow** is `feature/flow`. The rule for what the block shows lives there. Do not restate it.
+- **Who sees it** and **Changes with** use the app's condition names.
+- Do not list blocks that come from the layout.
+
+## A layout
+
+`layouts/site.md` has the same Blocks table for what every page of that layout shares (header,
+cart count, notifications bell, footer). Write it once; pages inherit it.
+
+## A block file
+
+Only when the block has something to say about this page in particular:
+
+```md
+---
+flow: catalog/new-arrivals
+---
+
+# New arrivals on the home page
+
+- position   second row, under Featured products
+- shows      a grid of up to 20 products
+- on phones  one row that scrolls sideways
+```
+
+## Where a difference between apps goes
+
+| The difference | Goes in |
+| --- | --- |
+| What the user gets (mobile uses the device location) | The flow, under `## Differs by app` |
+| How it looks or where it sits (a row on mobile, a grid on web) | That app's block file |
+
+## How a page is reached, and what it requires
+
+Do not write these. The book lists how a page is reached (links and redirects it can read) and
+what it requires (middleware and permissions). Write an entry point yourself only when the book
+cannot see it, such as a link in an email:
+
+```md
+## Also reached from
+- mail   order-confirmation
+```
+
+## Check
+
+```bash
+npx warlock grimoire check
+```
+
+It reports a block that points to a flow that does not exist, a condition that is not declared in
+the app README, a page whose route is gone, a screen with no route (file-based apps), and a
+feature that lists an app with no folder here. Its codes are `GR5001` to `GR5009`;
+`npx warlock explain GR5003` describes one.
+
+
+## document-a-file  `@warlock.js/grimoire/skills/document-a-file/SKILL.md`
+
+---
+name: document-a-file
+description: 'Write the one-sentence header and the public-export comments the Grimoire copies into its book, and tag a file with `@feature` when it lives outside its feature''s folders. Use whenever you create a source file or change what one is for.'
+---
+
+# Document a file
+
+The Grimoire is experimental: its file structure and commands may still change.
+
+Warlock copies two things from each source file into the book: the sentence at the top, and the
+comment above each public export. They are the only words in the book that you write, and they
+are what another agent reads to decide whether to open the file.
+
+## The header: one sentence, first thing in the file
+
+Say why the file exists, from the product's side.
+
+```ts
+/** Lists the newest products sold in the customer's country. */
+
+export const NEW_ARRIVALS_LIMIT = 20;
+```
+
+- One sentence. If you need two, the file probably does two things.
+- Say what it is for, not what kind of file it is. The book already knows it is a service.
+- Change it when the file's purpose changes. A stale header misleads every reader after you.
+
+| Write | Not |
+| --- | --- |
+| `Creates a post for the signed-in author.` | `Controller for posts.` |
+| `Sends the order confirmation email.` | `This file contains the mail class.` |
+| `Decides the price a VIP customer pays.` | `Helper functions.` |
+
+## Public exports: one line each
+
+```ts
+/** Returns up to 20 products, newest first. */
+export async function listNewArrivals(country?: string) {
+  // …
+}
+```
+
+- Comment only what other files import. Private helpers need no comment.
+- Say what the caller gets or what happens. Do not repeat the name ("Lists new arrivals").
+- Put limits and units in the line when they exist ("up to 20", "in minutes").
+
+## The feature tag: only for exceptions
+
+A file belongs to the feature whose `folders` contain it. Add a tag only when the file lives
+somewhere else:
+
+```ts
+/**
+ * Deletes accounts that were never verified, seven days after sign-up.
+ * @feature auth
+ */
+```
+
+One feature per file. A file used by several features still has one owner; the book lists the
+others as borrowing it. Do not tag shared plumbing (config, generic utilities, the base layout).
+
+## Check your work
+
+```bash
+npx warlock scry src/app/catalog/services/new-arrivals.service.ts
+```
+
+The `about` line and each export's line should read well on their own, without the code beside
+them. `npx warlock grimoire check` reports a file with no header and a file with no feature.
+
+## Do not
+
+- Do not write a comment on every function, field or parameter.
+- Do not describe the implementation ("uses a loop to…").
+- Do not copy the flow's text into the file. The flow lives in `grimoire/features/`.
+
+
+## record-a-change  `@warlock.js/grimoire/skills/record-a-change/SKILL.md`
+
+---
+name: record-a-change
+description: 'Finish a change the Grimoire way: tie each test to the acceptance criterion it proves, reshape the feature README, add the changelog entry with the right version, move the task to done, run `warlock grimoire check`, and write the release brief. Use after building any change, including a bug fix.'
+---
+
+# Record a change
+
+The Grimoire is experimental: its file structure and commands may still change.
+
+A change is finished when the code, the tests and the description agree. Do these in order.
+
+## 1. Tie tests to criteria
+
+Put a line above each test that proves a criterion:
+
+```ts
+// @proves catalog/new-arrivals AC-2
+it("returns the global list when the customer has no country", async () => {
+  // …
+});
+```
+
+- End-to-end tests prove a flow's steps. Unit tests prove a business rule ("a reset code expires
+  after 10 minutes").
+- One test may prove one criterion. If it needs two tags, split the test.
+- A bug fix gets a test that fails without the fix. If no criterion covers the bug, the flow was
+  missing a case: add the case and the criterion first.
+
+## 2. Reshape the README and the flow
+
+Edit them so they describe the feature **as it is now**, as if it had always been this way. Do
+not append "Update:" notes; history goes in the changelog. Set `updated` to today and `version`
+to the new version. Set a flow's `status` to `shipped` once its code and tests exist.
+
+## 3. Add the changelog entry
+
+`grimoire/features/catalog/CHANGELOG.md`, newest first, under `## Unreleased`. Warlock never edits
+this file; you write every line of it, including the release number and date when the release ships
+(step 6):
+
+```md
+## Unreleased
+- 2.1  fixed   new-arrivals: a customer with no country saw an empty list
+               instead of the global one (AC-2)
+```
+
+| The change | Version | Word |
+| --- | --- | --- |
+| A new flow or a new capability | next whole number (`3.0`) | `added` |
+| Behaviour of an existing flow changes | next decimal (`2.1`) | `changed` |
+| The code did not match the flow | next decimal (`2.1`) | `fixed` |
+| A flow is retired | next whole number | `removed` |
+
+One line per change, written for someone who uses the product. Name the flow, and the criterion
+when there is one. While the change is unreleased, write no date and no release number.
+
+## 4. Close the task
+
+Move the file from `grimoire/tasks/open/` to `grimoire/tasks/done/<yyyy-mm>/` and set:
+
+```md
+status: done
+shipped: catalog 2.1
+```
+
+Add two lines: how it was verified (which tests, which criteria) and anything left open. If
+something is left open, open a new task for it; do not leave it only in the done file.
+
+## 5. Check
+
+```bash
+npx warlock grimoire check
+```
+
+| It reports | Do |
+| --- | --- |
+| A step names a route, page, mail or job that does not exist | Fix the name in the flow, or the code |
+| A criterion has no test | Write the test, or say in the task why not |
+| A test points at a criterion that does not exist | Fix the `@proves` line |
+| A file has no header, or no feature | `document-a-file` |
+| A file in the feature's folders that no flow reaches | Describe the behaviour in a flow, or delete dead code |
+| A README `updated` older than its newest changelog entry | Reshape the README |
+| A changelog version that does not fit the word (`added` with `2.1`) | Fix the version |
+
+Fix every line it prints. Do not finish with problems you caused. Findings on a flow or feature
+with `status: proposed` print with `(expected)` and do not fail the check: leave them until the
+code exists.
+
+## 6. At release time
+
+Warlock does not edit your files at release. You do three things, in this order:
+
+1. **Stamp the changelogs.** In each feature that changed, move the `## Unreleased` entries under a
+   heading with the release number and date:
+
+   ```md
+   ## Unreleased
+
+   ## 1.4.1 (2026-11-20)
+   - 2.1  fixed   new-arrivals: a customer with no country saw an empty list
+                  instead of the global one (AC-2)
+   ```
+
+2. **Write the release brief.** Create `grimoire/releases/1.4.1.md`:
+
+   ```md
+   ---
+   release: 1.4.1
+   date: 2026-11-20
+   ---
+
+   # Release 1.4.1
+
+   Customers with no country on their account see new arrivals again.
+   ```
+
+   Two or three sentences on what the release means to users.
+
+3. **Collect the list.**
+
+   ```bash
+   npx warlock grimoire release 1.4.1
+   ```
+
+   It writes the entries you stamped with that release between the markers under your brief, and
+   changes nothing else. It also says how many entries are still unreleased. Do not write that list
+   yourself, and run the command again after any change to a changelog: the result is the same
+   every time.
+
+`npx warlock grimoire check` reports a listed entry that has no changelog entry stamped with that
+release and date, and a release section with no release file.
+
+## Report to the owner
+
+Say what changed in plain words, the feature version, which criteria are proven, what the check
+reported, and what is left open with its task id.
+
+
+## use-the-grimoire  `@warlock.js/grimoire/skills/use-the-grimoire/SKILL.md`
+
+---
+name: use-the-grimoire
+description: 'Find the right files before changing a Warlock.js project by asking the Grimoire (experimental): `warlock scry` for a file, a route, a feature, a flow or the impact of a change, and the `grimoire/` folder for what the product does. Use at the start of every task, before searching the code.'
+---
+
+# Use the Grimoire
+
+The Grimoire is experimental: its file structure and commands may still change.
+
+`grimoire/` is the map of this project. Read it before you search the code: it tells you where
+things are, what a feature is meant to do, and what a change will touch.
+
+| Folder | Holds | Written by |
+| --- | --- | --- |
+| `grimoire/book/` | One entry per source file, plus routes and pages | Warlock (never edit) |
+| `grimoire/features/` | What the product does: features, flows, cases, criteria | You and other agents |
+| `grimoire/apps/` | Where users meet it: sites, mobile apps, pages, blocks | You and other agents |
+| `grimoire/tasks/` | Open and finished work | You and other agents |
+| `grimoire/releases/` | What each release shipped | You write the brief, Warlock collects the list |
+
+Files named `index.json`, `bookmap.json` or ending in `.bookmap.json` are Warlock's. A feature's
+`bookmap.json` says what the feature owns and borrows, and each flow's `*.bookmap.json` says which
+files sit behind each step and which tests prove each criterion. They are rebuilt on demand and are
+not in git. Never edit them; change the code or the written files and they follow. Warlock never
+edits a file you wrote either.
+
+## Start of every task
+
+1. Find the feature and flow the task is about.
+
+   ```bash
+   npx warlock scry --search "new arrivals"
+   ```
+
+   ```text
+   flow     catalog/new-arrivals          New arrivals
+   block    web-client/home/new-arrivals  catalog/new-arrivals
+   route    GET /api/products/new-arrivals
+   file     src/app/catalog/services/new-arrivals.service.ts  Lists the newest products sold in the customer's country.
+   ```
+
+2. Read the feature's `README.md`, then the flow file. They say what the behaviour should be.
+3. Ask for the flow's book map. It lists the files behind each step, the tests that prove each
+   criterion and the pages that show the flow.
+
+   ```bash
+   npx warlock scry --flow catalog/new-arrivals
+   ```
+
+4. Read only those files. Do not read a whole module to find one function.
+
+## Questions the book answers
+
+```bash
+npx warlock scry src/app/catalog/services/new-arrivals.service.ts   # what is this file?
+npx warlock scry --impact src/app/catalog/models/product.model.ts   # what breaks if I change it?
+npx warlock scry --route "POST /api/orders"                         # what is behind this URL?
+npx warlock scry --feature catalog                                  # the whole feature
+npx warlock scry --flow catalog/new-arrivals                        # one flow, step by step
+```
+
+Add `--json` for machine-readable output. `--impact` lists API routes, pages, flows and features,
+including features that only borrow the file. Read the flows it names and run their tests after
+your change.
+
+A file's entry is also at a fixed path: `src/app/auth/controllers/login.controller.ts` is described
+in `grimoire/book/app/auth/controllers/login.controller.json`.
+
+## Commands
+
+| Command | Does |
+| --- | --- |
+| `warlock grimoire build` | Builds or refreshes the book. `scry` and `check` do it when it is stale |
+| `warlock grimoire check` | Reports broken names, untested criteria, files with no owner. Exit 1 on an error |
+| `warlock grimoire release <release>` | Writes the collected list into `grimoire/releases/<release>.md` |
+| `warlock grimoire export [dir]` | Writes the book as a static site |
+| `warlock explain GR2001` | Explains a finding code |
+
+Every finding has a code (`GR2001`) and a fix hint. A finding marked `(expected)` belongs to work
+that is still `proposed`; it does not fail the check.
+
+## What to trust
+
+- **Exports, imports, importers, routes, middleware, pages:** read from the code. Trust them.
+- **Files behind a route:** every file the handler can reach through imports. It is not the exact
+  call path; open the handler to see which ones it really uses.
+- **Reached from:** only links and redirects written as plain values. `unknown` means look.
+- **Written files:** they say what should happen. When the code disagrees with a flow, do not
+  pick one silently. Say which is wrong, and fix it or ask the owner.
+
+## When there is nothing to find
+
+- No flow matches the task: the behaviour is undescribed. Describe it first with
+  `write-a-feature`, then change the code.
+- The command says the book is missing or stale: it rebuilds on its own. If it reports problems,
+  read them; `npx warlock grimoire check` prints the same list.
+- The project has code but no `grimoire/` folder: use `backfill-a-grimoire`.
+
+## See also
+
+`write-a-feature`, `record-a-change`, `describe-an-app`, `document-a-file`, `backfill-a-grimoire`.
+
+## From code
+
+The same answers are available as functions, for tools that build on the Grimoire.
+
+From `@warlock.js/grimoire` (no dependency on core or web):
+
+- `openGrimoire` loads everything once (it runs `parseGrimoire`, `buildBook`, `matchApps`,
+  `resolveOwnership`, `scanProofs`, `readTestResults`, `buildCollectedFiles`, then `writeBook`
+  and `writeCollectedFiles`), and returns a snapshot.
+- `scry` answers a query from the snapshot; `formatScryResult` prints it; `parseScryQuery` reads
+  CLI arguments into a query.
+- `checkGrimoire` runs every rule; `formatCheckReport` prints the report. Each finding has a code
+  from `GRIMOIRE_CODES` (also `GRIMOIRE_CODE_LIST`); `explainGrimoireCode`, `isGrimoireCode` and
+  `grimoireCodeDocsUrl` (based on `GRIMOIRE_CODES_DOCS_URL`) describe it, and rules build
+  findings with `createFinding`. Commands throw `GrimoireError` with a code.
+- `collectRelease`, `renderCollectedList` and `writeRelease` gather the changelog entries of a
+  release between `COLLECTED_START_MARKER` and `COLLECTED_END_MARKER`.
+- `scanProofs` and `scanProofsInText` read `// @proves` lines; `criterionStatus` turns test
+  results into a criterion's status; `CASE_QUESTIONS` lists the questions every flow answers.
+- Helpers: `loadBook`, `readFrontMatter`, `fileGraph`, `importClosure`, `importerClosure`,
+  `bookEntryPath`, `bookEntryPaths`, `toPosixPath`, `GRIMOIRE_DIR`, `GRIMOIRE_PATHS`,
+  `GRIMOIRE_IGNORE_RULES` (the `.gitignore` lines) and `BOOK_SCHEMA_VERSION`.
+
+From `@warlock.js/grimoire/warlock` (needs `@warlock.js/core`): `registerGrimoireCommands` returns
+the `grimoire` and `scry` commands for `cli.commands` in `warlock.config.ts`;
+`createWarlockAdapter` builds the adapter that feeds the book from the inspect report;
+`collectMobileFacts` lists mobile screens from Expo Router file names.
+
+From `@warlock.js/grimoire/vitest`: `grimoireReporter` records the last result of every test marked
+`// @proves` into `grimoire/book/test-results.json`. Add it to the Vitest `reporters` list.
+
+From `@warlock.js/grimoire/devtools`: `grimoireDevtoolsPanel` (the default export) is the Grimoire
+tab for `@warlock.js/devtools`, listed in `panels` of `src/config/devtools.ts`;
+`exportGrimoireSite` writes the same view as a static site.
+
+
+## write-a-feature  `@warlock.js/grimoire/skills/write-a-feature/SKILL.md`
+
+---
+name: write-a-feature
+description: 'Describe a new feature, or a new version of one, in `grimoire/features/` before writing code: the task, the brief, the README front matter, each flow with its steps, cases and acceptance criteria. Use when the owner asks for something the product does not do yet.'
+---
+
+# Write a feature
+
+The Grimoire is experimental: its file structure and commands may still change.
+
+Describe the behaviour first, then build it. The description is the brief the owner approves and
+the thing your tests will prove.
+
+## Is it a feature, a flow, or a change?
+
+- **A feature** is something a user or another system can do, named from their side (`auth`,
+  `catalog`, `orders`). It has roughly two to ten flows.
+- **A flow** is one path through it (`sign-up`, `google-login`, `new-arrivals`).
+- **A new capability** in an existing feature is a new whole-number version (`2.0`) with its
+  own brief. **A small change or a fix** is a decimal (`2.1`) and needs no brief: go to
+  `record-a-change`.
+- A notification, mail or job belongs to the feature whose business reason creates it. "Your
+  order shipped" belongs to `orders`, not to `notifications`.
+
+## 1. Open a task
+
+`grimoire/tasks/open/T-014-wishlist.md`:
+
+```md
+---
+id: T-014
+type: feature
+feature: catalog
+apps: [web-client, mobile]
+status: waiting for approval
+---
+
+# Let customers save products to a wishlist
+
+- Asked by: the owner, 2026-11-16
+- Why: customers ask to keep products for later
+- Brief: features/catalog/versions/v3.md
+- Decision needed: one wishlist per customer, or several named lists?
+```
+
+## 2. Write the brief
+
+`grimoire/features/catalog/versions/v3.md`: why, what changes (which flows are new or changed),
+and what is out of scope. Keep it to one screen.
+
+## 3. Write or update the feature README
+
+```md
+---
+id: catalog
+title: Product catalog
+status: proposed
+version: 3.0
+updated: 2026-11-16
+apps: [web-client, mobile]
+folders: [src/app/catalog, src/web/$sites/client/products]
+---
+
+# Product catalog
+
+Customers browse products, search them and see what is new.
+
+## Flows
+- browse-products   list and filter products
+- wishlist          save a product for later
+
+## Affects and affected by
+- affected by orders/place-order (lowers stock)
+```
+
+`id` never changes. `folders` are the folders whose files belong to this feature. `apps` must
+exist under `grimoire/apps/`. A feature whose folders hold no file yet is fine while it is
+`proposed`.
+
+## 4. Write each flow
+
+`grimoire/features/catalog/flows/wishlist.md`:
+
+```md
+---
+id: wishlist
+since: 3.0
+status: proposed
+who: customer
+---
+
+# Save a product to the wishlist
+
+## Steps
+1. page           /products/:id
+2. route          POST /wishlist
+3. notification   wishlist-price-drop
+4. page           /wishlist
+
+## Differs by app
+- mobile   the save button is also on the product card in lists
+
+## Cases
+- invalid input         a product id that is not an id → 422
+- not allowed           guest → sent to sign in, then back to the product
+- not found             the product does not exist → 404
+- duplicate             already saved → stays saved, no error
+- limits                at most 200 products
+- expiry                does not apply: saved products do not expire
+- double submit         two taps save once
+- outside service down  does not apply
+
+## Acceptance criteria
+- AC-1            a saved product appears on /wishlist
+- AC-2            saving twice keeps one entry
+- AC-3            a guest is sent to sign in and returns to the product
+- AC-4 [mobile]   the product card has a save button
+```
+
+**Steps.** Each step has a kind and the name used in code: `page`, `route`, `mail`,
+`notification`, `job`, `event`, `outside service`. Use `affects` for an effect on another
+feature (`affects   catalog/stock`). Warlock checks every name exists.
+
+**Cases.** Answer all eight questions (invalid input, not allowed, not found, duplicate, limits,
+expiry, double submit, outside service down), each with a case or "does not apply" and the
+reason. A flow that skips one gets a finding. Do not invent cases beyond the questions unless the owner described one.
+
+**Criteria.** One per case that changes what the user gets. Number them `AC-1`, `AC-2`, … and
+never renumber. Scope one to an app with `[app-id]`.
+
+**App differences.** What the user gets differs → here, under the app's name. How it looks or
+where it sits → the app's block file (`describe-an-app`).
+
+## 5. Stop for approval
+
+For a new feature or a whole-number version, stop here. Tell the owner the task id and the brief
+path, list the decisions you need, and wait. Do not write code first.
+
+## 6. Check
+
+```bash
+npx warlock grimoire check
+```
+
+Until the code exists it reports the routes and pages you named as missing. Findings on a flow or
+feature with `status: proposed` print with `(expected)` and do not fail the check; everything else
+it reports must be fixed.
+
+Then build, and follow `record-a-change`.
 
 
 ================================================================================
@@ -52405,7 +53306,7 @@ ones included.
 | `mysql`    | 3306         | coming soon (disabled in the wizard)                                     |
 | `none`     | —            | opt out — no driver, no driver package, `src/config/database.ts` removed |
 
-**Features** (`--features`): `react`, `react-email`, `mail`, `ses`, `image`, `s3`, `redis`, `scheduler`, `herald`, `socket`, `test`, `access`, `web`, `tailwind`, `shadcn`, `mantine`, `notifications`.
+**Features** (`--features`): `react`, `react-email`, `mail`, `ses`, `image`, `s3`, `redis`, `scheduler`, `herald`, `socket`, `test`, `access`, `web`, `tailwind`, `shadcn`, `mantine`, `notifications`, `process`.
 
 **AI providers / packages** (`--ai`): `ai-openai`, `ai-google`, `ai-anthropic`, `ai-bedrock`, `ai-ollama`, plus the capability packages `ai-tools`, `ai-panoptic`, `ai-workspace`. Any pick auto-pulls the core `@warlock.js/ai` package.
 

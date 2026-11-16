@@ -8,7 +8,7 @@
 
 ---
 name: warlock-js-devtools
-description: 'Development dashboard for Warlock apps via `devtoolsConnector`. Inspect request timelines, middleware, validation, queries, N+1 warnings, logs, cache, mail, AI runs, routes and configuration. Use for "debug a slow endpoint", "inspect this request", "view captured mail" or "open devtools". Not this package → @warlock.js/core for `warlock trace`, CLI route inspection and OpenAPI; @warlock.js/ai-panoptic for AI tracing.'
+description: 'Development dashboard for Warlock apps via `devtoolsConnector`. Inspect request timelines, middleware, validation, queries, N+1 warnings, logs, cache, mail, AI runs, routes and configuration. Use for "debug a slow endpoint", "inspect this request", "view captured mail", "open devtools" or "add a devtools panel". Not this package → @warlock.js/core for `warlock trace`, CLI route inspection and OpenAPI; @warlock.js/ai-panoptic for AI tracing.'
 ---
 
 # `@warlock.js/devtools` — overview
@@ -232,5 +232,56 @@ It excludes ownership tokens. Without registration the list is empty. The
 endpoint retains development/loopback guards and provides no stop action.
 Use the `warlock-js-process` skill for launch,
 recovery and stop APIs; configure one owner/registry per application instance.
+
+## Registering a panel
+
+A package or the app adds a tab with one line in `src/config/devtools.ts`:
+
+```ts
+export default {
+  panels: ["@acme/queue/devtools"], // or "./src/devtools/queue-panel.ts"
+};
+```
+
+Devtools imports each entry only in development (a package export resolves
+from the app root, a `./` path is relative to it). The module's default export
+is a `DevtoolsPanelExport`: a `DevtoolsPanel`, a list, or a function (sync or
+async) receiving `{ root }` that returns either. Use `import type` so the
+module never needs devtools at runtime.
+
+```ts
+import type { DevtoolsPanelExport } from "@warlock.js/devtools";
+
+const queuePanel: DevtoolsPanelExport = ({ root }) => ({
+  id: "queue", // lower-case letters, digits, dashes
+  title: "Queue", // the tab label
+  view: new URL("./queue-view.js", import.meta.url), // served at /__warlock/panels/queue/view.js
+  assets: { "chart.js": new URL("./queue-chart.js", import.meta.url) }, // /__warlock/panels/queue/chart.js
+  routes: [
+    { path: "", handler: () => ({ root, jobs: [] }) }, // GET /__warlock/api/queue
+    { path: "/jobs/:id", handler: ({ params }) => ({ id: params.id }) },
+    { method: "POST", path: "/retry", handler: ({ body }) => ({ retried: body }) },
+  ],
+});
+
+export default queuePanel;
+```
+
+- A handler (`DevtoolsPanelRoute`) receives a `DevtoolsPanelRequest`
+  (`{ params, query, body }`); its return value is sent as JSON with
+  `Cache-Control: no-store`, `undefined` sends `204`, and a thrown error with a
+  `statusCode` answers that status with `{ error: message }`.
+- The view module is browser JavaScript. Its default export receives
+  `{ id, root, api, route, href, navigate, refresh, asset, el, svg, empty }`
+  and fills `root` or returns an element. `api("search?q=a")` fetches
+  `api/<id>/search?q=a` as JSON; `href("jobs/7")` is `#queue/jobs/7`, a link
+  that opens that view (`route` is then `"jobs/7"`); `svg()` builds SVG
+  elements for small graphs. Build text with `text`, never `innerHTML`.
+- Every panel route, view and asset sits behind the devtools guard
+  (development only, loopback socket and host, no foreign `Origin`, no proxy
+  headers). A reused id (the built-in `processes` included) or a dashboard id
+  such as `mail` is refused; devtools logs why and leaves the panel out.
+
+Full reference: the "Registering a panel" page of the devtools docs.
 
 

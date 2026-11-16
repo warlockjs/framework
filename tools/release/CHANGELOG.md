@@ -1,6 +1,6 @@
 ﻿# Changelog — release tooling
 
-## 5.55.0
+## 5.55.0 - 2026-11-17
 
 ### Changed
 

@@ -2,7 +2,7 @@
 
 Newest first. Each entry records the release that shipped it and how it was verified.
 
-## 5.55.0 (2026-11-16)
+## 5.55.0 (2026-11-17)
 
 Final gate and fixes after the pilot: `findings/5.55/reports/FIX-VERIFY.md` (typecheck, strictness, lint, format), `POST-REVIEW.md` (the `kind` to `type` rename), `PILOT-FIXES.md` and `PILOT-FIXES-2.md` (grimoire suite at 460 tests on the last run).
 
