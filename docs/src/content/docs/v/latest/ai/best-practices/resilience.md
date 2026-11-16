@@ -155,7 +155,7 @@ for (const attempt of resilientModel.lastAttempts) {
 }
 ```
 
-**Avoid this — failing over on non-transient errors, or leaning on the fallback as a normal model.** A bad API key, an oversized prompt, or a content-filter block fails _identically_ on every downstream model, so failing over on them only burns the backup's budget on input that can't succeed. The default already excludes them — don't widen `retryOn` to catch them.
+**Avoid this — failing over on non-transient errors, or leaning on the fallback as a normal model.** A bad API key, an oversized prompt, or a content-filter block fails _identically_ on every downstream model, so failing over on them only burns the backup's budget on input that can't succeed. The default already excludes them — don't replace `retryOn` with a predicate that catches them.
 
 ```ts
 // Anti-pattern: retrying everything sends a bad key / oversized prompt down
@@ -356,7 +356,7 @@ The short version — the resilience mistakes that turn a recoverable blip into 
 - **Don't `try/catch` `execute()` and trust `result.data`.** The framework never throws from `execute()`; the `catch` is dead code and an unchecked failure flows through as success. Branch on `result.error` first.
 - **Don't string-match `error.message` to decide retry policy.** It breaks when a provider rewords an error and can't reach typed fields like `retryAfter` / `limit`. Branch on `instanceof` or `error.code`; chart on `error.category`.
 - **Don't treat `ai.fallbackModel` as a default or a quality fix.** It only fires on transient provider failures and does nothing on the happy path. Order it primary-first and leave the default `retryOn` (transient-only) in place.
-- **Don't fail over on non-transient errors.** A bad key, oversized prompt, or content-filter block fails identically downstream — widening `retryOn` just burns the backup's budget.
+- **Don't fail over on non-transient errors.** A bad key, oversized prompt, or content-filter block fails identically downstream — replacing `retryOn` with `() => true` just burns the backup's budget.
 - **Don't retry every step error with no backoff.** Retrying a permanent failure delays the inevitable and hammers the upstream. Keep `retryOn` to transient signals; use exponential backoff.
 - **Don't ship a tool-using agent with no budget.** A runaway tool loop is the one failure mode that costs real money — cap it with `ai.middleware.budget`.
 - **Don't retry on cancellation, and don't run without a signal.** A cancel is a decision, not a transient failure; re-running it wastes the work the caller stopped. Thread an `AbortSignal` and branch the cancellation class away from real errors.

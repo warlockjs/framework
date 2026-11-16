@@ -253,8 +253,10 @@ export interface RouteOptions {
    *
    * **Not applied in dev:** `schema`, `attachValidation`, `validatorCompiler`,
    * `serializerCompiler`, `errorHandler`, `constraints`, `preSerialization`,
-   * `onSend`, `onResponse`, `onError`, `onTimeout`, `onRequestAbort` and
-   * `handler`. The dev server logs one warning per route and key at boot (and
+   * `onSend`, `onResponse`, `onError`, `onTimeout`, `onRequestAbort`,
+   * `handler` and `config` (the per-route config Fastify plugins read, such
+   * as a per-route `multipartOptions` file limit; the route's `uploads` option
+   * does work in dev). The dev server logs one warning per route and key at boot (and
    * for routes added by a reload), so the difference is visible. For a hook
    * that must run in both modes, register a server-level hook through
    * `router.beforeScanning((_router, server) => server.addHook(...))`. That
@@ -336,6 +338,17 @@ export interface RouteOptions {
    * router.post("/videos", uploadVideo, { uploads: { maxTotalSize: 200 * 1024 * 1024 } });
    */
   uploads?: RouteUploadsOption;
+  /**
+   * Serialize this route's responses through its handler's `responseSchema`:
+   * the declared fields are written with a compiled serializer and any field
+   * the schema does not name is dropped. Overrides `http.compileResponseSchemas`
+   * for this route (`false` opts out). Applied in production builds and in the
+   * in-process test server; the dev server serializes without it.
+   *
+   * @example
+   * router.get("/users/:id", showUser, { compileResponseSchema: true });
+   */
+  compileResponseSchema?: boolean;
   /**
    * Override `http.securityHeaders` for this route. An object is merged over
    * the app-wide config key by key; `false` sends none of the security

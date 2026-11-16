@@ -120,7 +120,7 @@ On Anthropic models, server-side compaction (`providerOptions.anthropic.serverCo
 
 ## Resume after a crash
 
-Before running, `send` marks the record `pending` with the run id; it clears the mark when the turn is saved. A process that stops mid-run leaves the mark behind. With a [durable agent](/v/latest/ai/reliability/durable-execution/), `chat.resume()` continues that run from its last checkpoint through `agent.resume(runId)` and saves the turn:
+Before running, `send` marks the record `pending` with the run id; it clears the mark when the turn is saved. On the `memory`, `pg` and `sqlite` snapshot stores the mark is a small in-place update of the stored record (the optional `markPending(runId, pending)` method of a snapshot store), so a turn sends the whole record once, when it settles; the `file` and `redis` stores, a custom store without `markPending`, and the first turn of a new session save the full record for the mark. A process that stops mid-run leaves the mark behind. With a [durable agent](/v/latest/ai/reliability/durable-execution/), `chat.resume()` continues that run from its last checkpoint through `agent.resume(runId)` and saves the turn:
 
 ```ts
 const assistant = ai.agent({

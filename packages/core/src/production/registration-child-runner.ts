@@ -32,6 +32,11 @@ export type RegistrationChildRunOptions<TResult> = Readonly<{
    * compiled child is not resolved when it is set.
    */
   forkProcess?: RegistrationChildForker;
+  /**
+   * Print the child's stdout and stderr as they arrive instead of only attaching
+   * them to a failure. Defaults to on when `WARLOCK_DEBUG_TYPINGS=1`.
+   */
+  streamOutput?: boolean;
   /** The single IPC request the child receives after it starts. */
   request: Serializable;
   /** `type` of the one message that carries the result (for example `route-registration:snapshot`). */
@@ -59,6 +64,7 @@ export function runRegistrationChild<TResult>(
 ): Promise<TResult> {
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const startedAt = Date.now();
+  const streamOutput = options.streamOutput ?? process.env.WARLOCK_DEBUG_TYPINGS === "1";
   const forkProcess = options.forkProcess ?? defaultForkProcess;
   const entry =
     options.childEntry ??
@@ -100,9 +106,13 @@ export function runRegistrationChild<TResult>(
 
     child.stdout?.on("data", (chunk: Buffer) => {
       stdout = append(stdout, chunk);
+
+      if (streamOutput) process.stdout.write(chunk);
     });
     child.stderr?.on("data", (chunk: Buffer) => {
       stderr = append(stderr, chunk);
+
+      if (streamOutput) process.stderr.write(chunk);
     });
 
     const startTimeout = () => {

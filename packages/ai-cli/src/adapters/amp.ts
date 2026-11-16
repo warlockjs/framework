@@ -35,6 +35,7 @@ export const ampAdapter: CliAdapter = {
   title: "Amp",
   command: "amp",
   apiKeyEnv: ["AMP_API_KEY"],
+  passEnv: ["AMP_URL"],
   homeEnv: ["XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME", "XDG_CACHE_HOME"],
   transports: ["argv", "stdin"],
   effort: true,

@@ -260,6 +260,28 @@ export class CacheManager implements CacheDriver<any, any> {
 
   /**
    * {@inheritdoc}
+   *
+   * Reports an empty list when the current driver cannot enumerate its keys,
+   * so check `supportsListKeys()` first when the difference matters.
+   */
+  public async listKeys(namespace: string): Promise<string[]> {
+    this.ensureDriverInitialized();
+
+    return this.currentDriver!.listKeys?.(namespace) ?? [];
+  }
+
+  /**
+   * Whether the current driver can list the keys of a namespace
+   * ({@link listKeys}).
+   */
+  public supportsListKeys(): boolean {
+    this.ensureDriverInitialized();
+
+    return typeof this.currentDriver!.listKeys === "function";
+  }
+
+  /**
+   * {@inheritdoc}
    */
   public async flush() {
     this.ensureDriverInitialized();

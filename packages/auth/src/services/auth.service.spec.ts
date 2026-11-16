@@ -67,6 +67,8 @@ vi.mock("../models/refresh-token", () => ({
 const authTokenFamilyFindByFamilyId = vi.fn();
 const authTokenFamilyIssue = vi.fn();
 const authTokenFamilyEnsure = vi.fn();
+const authTokenFamilyEnsureMany = vi.fn();
+const authTokenFamilyRevokeAllFor = vi.fn();
 const authTokenFamilyActiveFor = vi.fn();
 const authTokenFamilyRevoke = vi.fn();
 
@@ -75,6 +77,8 @@ vi.mock("../models/auth-token-family", () => ({
     findByFamilyId: (...args: unknown[]) => authTokenFamilyFindByFamilyId(...args),
     issue: (...args: unknown[]) => authTokenFamilyIssue(...args),
     ensure: (...args: unknown[]) => authTokenFamilyEnsure(...args),
+    ensureMany: (...args: unknown[]) => authTokenFamilyEnsureMany(...args),
+    revokeAllFor: (...args: unknown[]) => authTokenFamilyRevokeAllFor(...args),
     activeFor: (...args: unknown[]) => authTokenFamilyActiveFor(...args),
     revoke: (...args: unknown[]) => authTokenFamilyRevoke(...args),
   },
@@ -131,6 +135,7 @@ const configKey = vi.fn();
 const configGet = vi.fn();
 const hashPassword = vi.fn();
 const verifyPassword = vi.fn();
+const needsRehash = vi.fn(() => false);
 
 vi.mock("@warlock.js/core", () => ({
   config: {
@@ -139,6 +144,7 @@ vi.mock("@warlock.js/core", () => ({
   },
   hashPassword: (...args: unknown[]) => hashPassword(...args),
   verifyPassword: (...args: unknown[]) => verifyPassword(...args),
+  needsRehash: (...args: unknown[]) => (needsRehash as (...a: unknown[]) => boolean)(...args),
   ForbiddenError: class extends Error {
     public status = 403;
   },
@@ -241,6 +247,8 @@ beforeEach(() => {
   });
   authTokenFamilyIssue.mockResolvedValue({});
   authTokenFamilyEnsure.mockResolvedValue({ isRevoked: false });
+  authTokenFamilyEnsureMany.mockResolvedValue(undefined);
+  authTokenFamilyRevokeAllFor.mockResolvedValue(0);
   authTokenFamilyActiveFor.mockResolvedValue([]);
   authTokenFamilyRevoke.mockResolvedValue(1);
   runTokenFamilyOperation.mockImplementation(
@@ -997,6 +1005,58 @@ describe("authService.attemptLogin", () => {
     expect(emit).toHaveBeenCalledWith("login.failed", { email: "a@b.c" }, "Invalid password");
   });
 
+  it("rehashes a stale hash after a correct password and saves it", async () => {
+    const save = vi.fn().mockResolvedValue(undefined);
+    const merge = vi.fn().mockReturnValue({ save });
+    const user = Object.assign(buildUser() as object, { merge });
+    const Model = { first: vi.fn().mockResolvedValue(user) } as never;
+    verifyPassword.mockResolvedValue(true);
+    hashPassword.mockResolvedValue("fresh-hash");
+    needsRehash.mockReturnValueOnce(true);
+
+    expect(await authService.attemptLogin(Model, { email: "a@b.c", password: "x" })).toBe(user);
+
+    expect(merge).toHaveBeenCalledWith({ password: "fresh-hash" });
+    expect(save).toHaveBeenCalledOnce();
+  });
+
+  it("does not rehash when the hash is current, the option is off, or the password is wrong", async () => {
+    const save = vi.fn().mockResolvedValue(undefined);
+    const merge = vi.fn().mockReturnValue({ save });
+    const user = Object.assign(buildUser() as object, { merge });
+    const Model = { first: vi.fn().mockResolvedValue(user) } as never;
+
+    verifyPassword.mockResolvedValue(true);
+    needsRehash.mockReturnValue(false);
+    await authService.attemptLogin(Model, { email: "a@b.c", password: "x" });
+
+    needsRehash.mockReturnValue(true);
+    configKey.mockImplementation((key: string, fallback?: unknown) =>
+      key === "auth.rehashPasswords" ? false : fallback,
+    );
+    await authService.attemptLogin(Model, { email: "a@b.c", password: "x" });
+
+    configKey.mockImplementation((_key: string, fallback?: unknown) => fallback);
+    verifyPassword.mockResolvedValue(false);
+    await authService.attemptLogin(Model, { email: "a@b.c", password: "bad" });
+
+    needsRehash.mockReturnValue(false);
+    expect(merge).not.toHaveBeenCalled();
+  });
+
+  it("still logs the user in when saving the fresh hash fails", async () => {
+    const merge = vi
+      .fn()
+      .mockReturnValue({ save: vi.fn().mockRejectedValue(new Error("db down")) });
+    const user = Object.assign(buildUser() as object, { merge });
+    const Model = { first: vi.fn().mockResolvedValue(user) } as never;
+    verifyPassword.mockResolvedValue(true);
+    hashPassword.mockResolvedValue("fresh-hash");
+    needsRehash.mockReturnValueOnce(true);
+
+    expect(await authService.attemptLogin(Model, { email: "a@b.c", password: "x" })).toBe(user);
+  });
+
   it("returns the user on a correct password", async () => {
     const user = buildUser();
     const Model = { first: vi.fn().mockResolvedValue(user) } as never;
@@ -1273,6 +1333,10 @@ describe("authService token removal helpers", () => {
 });
 
 describe("authService.revokeAllTokens", () => {
+  const family = (familyId: string) => ({
+    get: (key: string) => (key === "family_id" ? familyId : undefined),
+  });
+
   it("bulk-revokes refresh tokens, emits per-token + logout.all, and clears access tokens", async () => {
     const rows = [buildRefreshTokenRow({ id: "a" }), buildRefreshTokenRow({ id: "b" })];
     refreshTokenRevokeAllFor.mockResolvedValue(rows);
@@ -1287,42 +1351,25 @@ describe("authService.revokeAllTokens", () => {
     expect(emit).toHaveBeenCalledWith("logout.all", user);
   });
 
-  it("marks every durable family before removing all access tokens", async () => {
+  it("revokes every durable family with one update and emits token.familyRevoked per family", async () => {
     const user = buildUser({ id: 7 });
-    authTokenFamilyActiveFor.mockResolvedValue([
-      { get: (key: string) => (key === "family_id" ? "family-a" : undefined) },
-      { get: (key: string) => (key === "family_id" ? "family-b" : undefined) },
-    ]);
+    const rowA = buildRefreshTokenRow({ id: "a", family_id: "family-a" });
+    const rowB = buildRefreshTokenRow({ id: "b", family_id: "family-b" });
+    authTokenFamilyActiveFor.mockResolvedValue([family("family-a"), family("family-b")]);
+    refreshTokenRevokeAllFor.mockResolvedValue([rowA, rowB]);
 
     await authService.revokeAllTokens(user);
 
-    expect(runTokenFamilyOperation.mock.calls.map(([familyId]) => familyId)).toEqual(
-      expect.arrayContaining(["family-a", "family-b"]),
-    );
+    expect(authTokenFamilyRevokeAllFor).toHaveBeenCalledOnce();
+    expect(authTokenFamilyRevokeAllFor).toHaveBeenCalledWith(user);
+    expect(runTokenFamilyOperation).not.toHaveBeenCalled();
+    expect(emit).toHaveBeenCalledWith("token.familyRevoked", "family-a", [rowA]);
+    expect(emit).toHaveBeenCalledWith("token.familyRevoked", "family-b", [rowB]);
+    expect(emit).not.toHaveBeenCalledWith("token.revoked", user, rowA);
     expect(accessTokenDeleteAllForUser).toHaveBeenCalledWith(user);
   });
 
-  it("bootstraps pre-upgrade lineages, including a rotated predecessor, before family revocation", async () => {
-    const user = buildUser({ id: 7 });
-    refreshTokenFamiliesForUser.mockResolvedValue([
-      buildRefreshTokenRow({ family_id: "legacy-active" }),
-      buildRefreshTokenRow({ family_id: "legacy-rotated" }),
-    ]);
-    authTokenFamilyActiveFor.mockResolvedValue([
-      { get: (key: string) => (key === "family_id" ? "legacy-active" : undefined) },
-      { get: (key: string) => (key === "family_id" ? "legacy-rotated" : undefined) },
-    ]);
-
-    await authService.revokeAllTokens(user);
-
-    expect(authTokenFamilyEnsure).toHaveBeenCalledWith(user, "legacy-active");
-    expect(authTokenFamilyEnsure).toHaveBeenCalledWith(user, "legacy-rotated");
-    expect(runTokenFamilyOperation.mock.calls.map(([familyId]) => familyId)).toEqual(
-      expect.arrayContaining(["legacy-active", "legacy-rotated"]),
-    );
-  });
-
-  it("ensures each family once, however many rotated rows it has", async () => {
+  it("ensures pre-upgrade lineages together, each distinct family once, before revoking", async () => {
     const user = buildUser({ id: 7 });
     refreshTokenFamiliesForUser.mockResolvedValue(
       Array.from({ length: 50 }, (_, index) =>
@@ -1332,7 +1379,16 @@ describe("authService.revokeAllTokens", () => {
 
     await authService.revokeAllTokens(user);
 
-    expect(authTokenFamilyEnsure).toHaveBeenCalledTimes(2);
+    expect(authTokenFamilyEnsureMany).toHaveBeenCalledOnce();
+    expect(authTokenFamilyEnsureMany).toHaveBeenCalledWith(user, ["family-a", "family-b"]);
+    expect(authTokenFamilyEnsure).not.toHaveBeenCalled();
+  });
+
+  it("skips the family update when the user has no active family", async () => {
+    await authService.revokeAllTokens(buildUser({ id: 7 }));
+
+    expect(authTokenFamilyRevokeAllFor).not.toHaveBeenCalled();
+    expect(accessTokenDeleteAllForUser).toHaveBeenCalled();
   });
 });
 

@@ -25,6 +25,7 @@ import {
 } from "./positional-handler-diagnostics";
 import { isRequiredGuardRoute, reportUnguardedMutatingRoutes } from "./unguarded-route-diagnostics";
 import { config as configAccessor } from "../config/config-getter";
+import { buildSerializerSchemas } from "../openapi/serializer-schemas";
 import { normalizeRoutePath } from "./normalize-route-path";
 import { RouteBuilder } from "./route-builder";
 import { resolveRouteRateLimit, resolveStaticRateLimit } from "./resolve-route-rate-limit";
@@ -1210,8 +1211,13 @@ export class Router {
       const requestMethod = route.method.toLowerCase();
       const requestMethodFunction = server[requestMethod].bind(server);
 
+      const serializerSchemas = this.compiledResponseSchemas(route);
+
       const options = {
         ...route.serverOptions,
+        ...(serializerSchemas && {
+          schema: { ...route.serverOptions?.schema, response: serializerSchemas },
+        }),
         ...(requestMethod === "get" &&
           explicitHeadPaths.has(route.path) && { exposeHeadRoute: false }),
         config: {
@@ -1269,7 +1275,9 @@ export class Router {
     // One line per route and key the dev server cannot honour, logged once
     // each, at boot and again for routes a hot reload adds.
     const warnUnsupportedServerOptions = () => {
-      for (const { key, message } of describeUnsupportedServerOptions(this.routes)) {
+      for (const { key, message } of describeUnsupportedServerOptions(this.routes, {
+        compileResponseSchemas: configAccessor.key("http.compileResponseSchemas") === true,
+      })) {
         if (warnedServerOptions.has(key)) continue;
 
         warnedServerOptions.add(key);
@@ -1489,25 +1497,90 @@ export class Router {
 
     if (!requestAcceptsHtml(fastifyRequest.headers.accept)) return false;
 
-    const route = this.routes.find((candidate) => candidate.handlesRefusals === true);
+    const route = this.refusalRoute();
 
     if (route === undefined) return false;
 
     (fastifyRequest as unknown as Record<symbol, unknown>)[REFUSAL_STATUS] = status;
 
+    // `reply.sent` stays false while an async `onSend` hook is pending, so a
+    // throw after the page was handed to `send()` would look unsent. Note the
+    // call, and ask the socket too.
+    const send = fastifyReply.send;
+    let sendCalled = false;
+
+    fastifyReply.send = function (this: FastifyReply, ...args: Parameters<FastifyReply["send"]>) {
+      sendCalled = true;
+
+      return send.apply(this, args);
+    } as FastifyReply["send"];
+
     try {
       await this.routeHandler(route)(fastifyRequest, fastifyReply);
     } catch (error) {
-      if (!fastifyReply.sent) {
+      if (!sendCalled && !fastifyReply.sent && !fastifyReply.raw.headersSent) {
         delete (fastifyRequest as unknown as Record<symbol, unknown>)[REFUSAL_STATUS];
 
         return false;
       }
 
       log.error("router", "refusal-dispatch", error as Error);
+    } finally {
+      fastifyReply.send = send;
     }
 
     return true;
+  }
+
+  /**
+   * Serializer schemas for a route's declared `responseSchema` when the app
+   * (or the route) asked for them. A route whose own `serverOptions.schema`
+   * already declares `response` keeps it.
+   */
+  private compiledResponseSchemas(route: Route) {
+    const enabled =
+      route.compileResponseSchema ?? configAccessor.key("http.compileResponseSchemas") === true;
+
+    if (!enabled || !route.handler?.responseSchema) return undefined;
+
+    if (route.serverOptions?.schema?.response !== undefined) return undefined;
+
+    return buildSerializerSchemas(route.handler.responseSchema);
+  }
+
+  private refusalRouteCache?: {
+    version: number;
+    routes: Route[];
+    size: number;
+    route: Route | undefined;
+  };
+
+  /**
+   * The route marked `handlesRefusals`, found by a scan once per route-table
+   * change instead of once per refusal.
+   */
+  private refusalRoute(): Route | undefined {
+    const cache = this.refusalRouteCache;
+
+    if (
+      cache &&
+      cache.version === this.routesVersion &&
+      cache.routes === this.routes &&
+      cache.size === this.routes.length
+    ) {
+      return cache.route;
+    }
+
+    const route = this.routes.find((candidate) => candidate.handlesRefusals === true);
+
+    this.refusalRouteCache = {
+      version: this.routesVersion,
+      routes: this.routes,
+      size: this.routes.length,
+      route,
+    };
+
+    return route;
   }
 
   /** {@link handleRoute}'s handler for each route, built once per route. */

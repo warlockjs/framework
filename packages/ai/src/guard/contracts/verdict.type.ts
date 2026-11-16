@@ -1,11 +1,12 @@
 /**
  * Where a detector is running. Widens the core guardrail phase
- * (`"input" | "output"`) with a third value, `"tool"`, for detectors that
- * inspect the arguments the model produced for a tool call. Reused on the
+ * (`"input" | "output"`) with `"tool"` (the arguments the model produced for
+ * a tool call) and `"toolResult"` (the data a tool returned, before the
+ * model reads it). Reused on the
  * `GuardrailViolationError.phase` surfaced to callers and on any emitted
  * escalation event.
  */
-export type GuardrailPhase = "input" | "output" | "tool";
+export type GuardrailPhase = "input" | "output" | "tool" | "toolResult";
 
 /**
  * The four actions a detector can return, the discriminator of

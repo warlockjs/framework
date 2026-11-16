@@ -12,6 +12,13 @@ const getAudience = () => authConfig.accessToken.audience();
 // the access-token secret (the documented optional behavior).
 const getRefreshSecretKey = () => authConfig.refreshToken.secret() || getSecretKey();
 
+// Retired refresh secrets; when the refresh secret falls back to the access
+// secret, the retired access secrets are the retired refresh secrets too.
+const getPreviousRefreshSecrets = () =>
+  authConfig.refreshToken.secret()
+    ? authConfig.refreshToken.previousSecrets()
+    : [...authConfig.refreshToken.previousSecrets(), ...authConfig.accessToken.previousSecrets()];
+
 /**
  * Token class. Stamped as the `tokenType` claim on every signed token and
  * checked on verify so an access token can never be accepted where a refresh
@@ -121,6 +128,37 @@ function withRequiredClaims(callerClaims?: string[]): string[] {
   return [...new Set([...callerClaims, ...REQUIRED_CLAIMS])];
 }
 
+/**
+ * Run `attempt` with the current key, then with each retired key, but only
+ * when the previous attempt failed on the signature itself. Any other failure
+ * (expired, wrong claims, malformed) is final. A rejected credential of a
+ * retired key (an expired token it signed) is reported as it is; any other
+ * failure of a retired key (a malformed key) is not echoed, the error of the
+ * current key is reported instead.
+ */
+async function verifyWithKeys<T>(
+  keys: string[],
+  attempt: (key: string, index: number) => Promise<T>,
+): Promise<T> {
+  let firstError: unknown;
+
+  for (const [index, key] of keys.entries()) {
+    try {
+      return await attempt(key, index);
+    } catch (error) {
+      if (index === 0) firstError = error;
+
+      const code = (error as { code?: unknown } | null | undefined)?.code;
+      const isSignatureMiss = code === "FAST_JWT_INVALID_SIGNATURE";
+
+      if (!isSignatureMiss && index > 0 && isInvalidCredentialError(error)) throw error;
+      if (!isSignatureMiss || index === keys.length - 1) throw firstError;
+    }
+  }
+
+  throw firstError;
+}
+
 type Sign = (payload: Record<string, unknown>) => Promise<string> | string;
 type Verify = (token: string) => Promise<unknown> | unknown;
 
@@ -217,27 +255,35 @@ export const jwt = {
   async verify<T = unknown>(
     token: string,
     {
-      key = getSecretKey(),
+      key: givenKey,
       algorithms = [getAlgorithm()],
       requiredClaims,
       ...options
     }: VerifierOptions & { key?: string } = {},
   ): Promise<T> {
     const { required, ...expected } = expectedClaims();
-    const build = () =>
-      createVerifier({
-        key,
-        ...expected,
-        ...options,
-        algorithms,
-        requiredClaims: withRequiredClaims([...(requiredClaims ?? []), ...required]),
-      }) as Verify;
-    const verify =
-      requiredClaims === undefined && onlyKeyedOptions(options)
-        ? preparedFor("verify:access", { key, algorithms, expected, required }, build)
-        : build();
+    // Retired secrets apply only to the configured secret, never to a key the caller passed.
+    const keys =
+      givenKey !== undefined
+        ? [givenKey]
+        : [getSecretKey(), ...authConfig.accessToken.previousSecrets()];
 
-    const decoded = (await verify(token)) as T;
+    const decoded = await verifyWithKeys(keys, async (key, index) => {
+      const build = () =>
+        createVerifier({
+          key,
+          ...expected,
+          ...options,
+          algorithms,
+          requiredClaims: withRequiredClaims([...(requiredClaims ?? []), ...required]),
+        }) as Verify;
+      const verify =
+        requiredClaims === undefined && onlyKeyedOptions(options)
+          ? preparedFor(`verify:access:${index}`, { key, algorithms, expected, required }, build)
+          : build();
+
+      return (await verify(token)) as T;
+    });
 
     assertTokenType(decoded, ACCESS_TOKEN_TYPE);
 
@@ -271,27 +317,32 @@ export const jwt = {
   async verifyRefreshToken<T = unknown>(
     token: string,
     {
-      key = getRefreshSecretKey(),
+      key: givenKey,
       algorithms = [getAlgorithm()],
       requiredClaims,
       ...options
     }: VerifierOptions & { key?: string } = {},
   ): Promise<T> {
     const { required, ...expected } = expectedClaims();
-    const build = () =>
-      createVerifier({
-        key,
-        algorithms,
-        ...expected,
-        ...options,
-        requiredClaims: withRequiredClaims([...(requiredClaims ?? []), ...required]),
-      }) as Verify;
-    const verify =
-      requiredClaims === undefined && onlyKeyedOptions(options)
-        ? preparedFor("verify:refresh", { key, algorithms, expected, required }, build)
-        : build();
+    const keys =
+      givenKey !== undefined ? [givenKey] : [getRefreshSecretKey(), ...getPreviousRefreshSecrets()];
 
-    const decoded = (await verify(token)) as T;
+    const decoded = await verifyWithKeys(keys, async (key, index) => {
+      const build = () =>
+        createVerifier({
+          key,
+          algorithms,
+          ...expected,
+          ...options,
+          requiredClaims: withRequiredClaims([...(requiredClaims ?? []), ...required]),
+        }) as Verify;
+      const verify =
+        requiredClaims === undefined && onlyKeyedOptions(options)
+          ? preparedFor(`verify:refresh:${index}`, { key, algorithms, expected, required }, build)
+          : build();
+
+      return (await verify(token)) as T;
+    });
 
     assertTokenType(decoded, REFRESH_TOKEN_TYPE);
 

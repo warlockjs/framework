@@ -109,7 +109,9 @@ await authService.removeRefreshToken(user, refreshTokenString);
 // All access tokens for a user (rows deleted)
 await authService.removeAllAccessTokens(user);
 
-// Everything — access rows deleted + every active refresh token revoked
+// Everything — access rows deleted + every active refresh token revoked.
+// Families are ensured together and revoked with one update, refresh tokens
+// with another, however many sessions the user holds.
 await authService.revokeAllTokens(user);
 
 // One whole family

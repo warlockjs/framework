@@ -21,14 +21,13 @@ const httpConfigurations: HttpConfigurations = {
   // the route's validation schema.
   fileUploadLimit: 10 * 1024 * 1024, // 10 MB
   multipart: {
-    // Which routes read multipart (file upload) bodies. "all" reads them on
-    // every route, before route middleware (auth included) runs. To read them
-    // only where files are expected, set "declared" and add `uploads: true` to
-    // each route that takes files (in the starter: POST /users, POST /posts and
-    // PUT /posts/:id);
-    // every other route then answers 415. Web page actions cannot declare
-    // `uploads` yet, so keep "all" if a page action accepts files.
-    routes: "all",
+    // Which routes read multipart (file upload) bodies. "declared" reads them
+    // only on routes marked `uploads: true` (in the starter: POST /users,
+    // POST /posts and PUT /posts/:id); every other route answers 415. The
+    // default stays "all" until 6.0, which reads them on every route before
+    // route middleware (auth included) runs. Keep "all" if a web page action
+    // accepts files.
+    routes: "declared",
   },
   rateLimit: {
     max: 260,
@@ -48,9 +47,13 @@ const httpConfigurations: HttpConfigurations = {
   },
   // Safe for local dev: `false` trusts nothing in front of this process, so
   // request.ip/protocol/hostname read the raw socket. Behind a proxy/LB/CDN
-  // in production, set this to `true`, a trusted IP/CIDR string, or a list
-  // of trusted proxy IPs/CIDRs — otherwise rate limiting, ip-filter
-  // allowlists, and absolute URLs (e.g. the sitemap) trust the wrong client.
+  // in production, set this to the proxy's own IP/CIDR or a list of them, for
+  // example `["10.0.0.0/8", "203.0.113.7"]`. Avoid `true`: it trusts whatever
+  // forwarded address a client sends when the edge appends to the header
+  // instead of replacing it. If the edge sets a header you can rely on (for
+  // example Cloudflare's), name it in `realIpHeader`. A wrong value makes rate
+  // limiting, ip-filter allowlists, and absolute URLs (e.g. the sitemap) trust
+  // the wrong client.
   trustProxy: false,
   // Opt-in, nonce-based Content-Security-Policy — off by default, zero
   // behaviour change. Flip `enabled: true` to turn it on; the framework

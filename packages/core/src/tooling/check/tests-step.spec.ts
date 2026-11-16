@@ -1,9 +1,15 @@
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   environmentCodeOf,
   MAX_VITEST_ARGUMENT_CHARS,
   parseVitestReport,
+  runVitest,
   runVitestBatches,
+  TEST_TIMEOUT_ENV,
+  testTimeoutMs,
   vitestArgumentBatches,
   type VitestRun,
   vitestArguments,
@@ -83,6 +89,67 @@ describe("vitest report", () => {
         report: undefined,
       })[0]?.code,
     ).toBe("WL7302");
+  });
+
+  it("reports a run the check stopped as timed out, with the limit and how to raise it", () => {
+    const [problem] = vitestRunFailure({
+      code: 143,
+      signal: null,
+      timedOut: true,
+      timeoutMs: 600_000,
+      stdout: "",
+      stderr: "",
+      report: undefined,
+    });
+
+    expect(problem?.code).toBe("WL8007");
+    expect(problem?.message).toContain("timed out after 600 s");
+    expect(problem?.message).toContain("WARLOCK_CHECK_TEST_TIMEOUT");
+    expect(problem?.message).toContain("--test-timeout");
+  });
+
+  it("names an outside SIGTERM (exit 143) instead of calling it a plain exit", () => {
+    const [problem] = vitestRunFailure({
+      code: 143,
+      signal: null,
+      stdout: "",
+      stderr: "",
+      report: undefined,
+    });
+
+    expect(problem?.message).toContain("stopped by SIGTERM");
+  });
+
+  it("reads the time limit from the environment, in seconds", () => {
+    expect(testTimeoutMs({})).toBe(600_000);
+    expect(testTimeoutMs({ [TEST_TIMEOUT_ENV]: "1800" })).toBe(1_800_000);
+    expect(testTimeoutMs({ [TEST_TIMEOUT_ENV]: "0" })).toBe(0);
+    expect(testTimeoutMs({ [TEST_TIMEOUT_ENV]: "abc" })).toBe(600_000);
+  });
+
+  it("marks a child killed by the limit as timed out (a vitest that exits 143 on SIGTERM)", async () => {
+    const directory = mkdtempSync(path.join(os.tmpdir(), "warlock-fake-vitest-"));
+    const binary = path.join(directory, "vitest.mjs");
+
+    writeFileSync(
+      binary,
+      "process.on('SIGTERM', () => process.exit(143)); setInterval(() => {}, 1000);",
+    );
+
+    const previous = process.env[TEST_TIMEOUT_ENV];
+    process.env[TEST_TIMEOUT_ENV] = "1";
+
+    try {
+      const run = await runVitest(binary, [], directory);
+
+      expect(run.timedOut).toBe(true);
+      expect(run.timeoutMs).toBe(1000);
+      expect(vitestRunFailure(run)[0]?.message).toContain("timed out after 1 s");
+    } finally {
+      if (previous === undefined) delete process.env[TEST_TIMEOUT_ENV];
+      else process.env[TEST_TIMEOUT_ENV] = previous;
+      rmSync(directory, { recursive: true, force: true });
+    }
   });
 
   it("runs the whole suite, or only the tests related to the changed files", () => {

@@ -173,6 +173,11 @@ export type RememberOptions = {
    */
   tags?: string[];
   /**
+   * Spread the TTL by up to this many percent, either way, so entries written
+   * together do not all expire together. Same semantics as `CacheSetOptions.ttlJitter`.
+   */
+  ttlJitter?: number;
+  /**
    * Per-call driver override. Routes this remember call (both read and write)
    * to the named driver without mutating `currentDriver`.
    */
@@ -198,6 +203,14 @@ export type CacheSetOptions = {
    * Absolute expiration as a Unix epoch in milliseconds or a Date. Mutually exclusive with `ttl`.
    */
   expiresAt?: number | Date;
+  /**
+   * Spread the TTL by up to this many percent, either way (a random factor per
+   * write), so entries written together do not all expire together. `10` turns
+   * a one-hour TTL into 54 to 66 minutes. Applies to relative TTLs only (`ttl`
+   * or the driver default), never to `expiresAt` or `Infinity`. `0` or omitted
+   * disables it; values are clamped to 0..100.
+   */
+  ttlJitter?: number;
   /**
    * Tags attached to this entry for tag-based invalidation. Inline equivalent of
    * `cache.tags([...]).set(key, value)`.
@@ -295,6 +308,20 @@ export type CacheSwrOptions = {
    */
   staleTtl: CacheTtl;
   /**
+   * Serve the stale value when the refresh throws. With `failSafe: true` a
+   * caller that finds the entry in its stale window waits for the refresh
+   * (callers of the same key share one) and gets the stale value back if the
+   * callback throws; the failure is logged and emitted as an `error` event.
+   * Without it the stale value is returned at once and the refresh runs in the
+   * background.
+   */
+  failSafe?: boolean;
+  /**
+   * Spread `staleTtl` and `freshTtl` by up to this many percent, either way.
+   * Same semantics as `CacheSetOptions.ttlJitter`.
+   */
+  ttlJitter?: number;
+  /**
    * Optional tags applied on the first miss-fetch and on every successful
    * background refresh. Same semantics as `CacheSetOptions.tags`.
    */
@@ -327,6 +354,18 @@ export type CacheSimilarOptions = {
    * tags are considered (matches the union semantics elsewhere in the package).
    */
   tags?: string[];
+  /**
+   * Keep only the entries this predicate accepts, before `threshold` and `topK`
+   * apply, so `topK` counts in-scope entries only (one query, no widening). It
+   * receives the parsed key and the stored value, and runs in process: the
+   * memory and LRU drivers honour it; a driver that searches in the
+   * database (`pg`) ignores it, so callers that need a hard guarantee keep
+   * checking the returned hits too.
+   *
+   * @example
+   * await cache.similar(vector, { topK: 5, filter: (hit) => hit.key.startsWith("tenant.7.") });
+   */
+  filter?: (hit: { key: string; value: any }) => boolean;
 };
 
 /**
@@ -761,6 +800,17 @@ export interface CacheDriver<ClientType, Options> {
    *  Remove all cached items by namespace
    */
   removeNamespace(namespace: string): Promise<any>;
+  /**
+   * List the live keys stored under `namespace` (the namespace key itself and
+   * every `<namespace>.*` key; an empty namespace lists everything), in the
+   * form `get()` and `remove()` accept, so a caller can delete or read exactly
+   * the entries it owns instead of sweeping with `similar()`.
+   *
+   * Optional: a driver that cannot enumerate its keys leaves it out, and
+   * callers fall back to what they did before. Shipped by the memory, LRU
+   * memory, extended memory, file, Postgres, Redis, mock and null drivers.
+   */
+  listKeys?(namespace: string): Promise<string[]>;
   /**
    * Set the cache driver options
    */

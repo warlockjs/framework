@@ -65,7 +65,7 @@ new JSONFileLog({ chunk: "daily", format: "jsonl" });
 // {"content":"New user created","level":"info","date":"12-11-2026 10:22:01","module":"users","action":"register","timestamp":"..."}
 ```
 
-Each line holds the same fields as an entry of the `messages` array. Default: `"json"`.
+Each line holds the same fields as an entry of the `messages` array. Default: `"json"`, which becomes `"jsonl"` in 6.0. Until then a channel created without `format` prints one warning per process; set `format: "json"` to keep the current layout or `format: "jsonl"` to switch now.
 
 ## Corrupt files
 

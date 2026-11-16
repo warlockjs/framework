@@ -7,6 +7,7 @@ import {
 } from "../metadata/metadata-descriptors";
 import { useDocumentContext } from "./document-context";
 import { translationPreloadLinks } from "./translation-preload";
+import { DOCUMENT_SLOT, DOCUMENT_SLOT_ATTRIBUTE } from "./document-slot-marker";
 import { LOCALE_ROUTING_META_NAME } from "../routing/locale-routing-meta-name";
 
 function renderDescriptor(descriptor: MetadataDescriptor): ReactElement {
@@ -76,7 +77,12 @@ export function Head(): ReactElement {
     // rather than only after parsing that script far enough to see its
     // `import` statement. See `DocumentContextValue.hydrationClientModulePreloadUrls`.
     ...(hydrationClientModulePreloadUrls ?? []).map((url) =>
-      createElement("link", { key: `modulepreload-${url}`, rel: "modulepreload", href: url }),
+      createElement("link", {
+        key: `modulepreload-${url}`,
+        rel: "modulepreload",
+        href: url,
+        [DOCUMENT_SLOT_ATTRIBUTE]: DOCUMENT_SLOT.modulePreload,
+      }),
     ),
     // The shared translation table the client fetches before hydrating.
     ...translationPreloadLinks(payload?.translationAssets),
@@ -88,6 +94,7 @@ export function Head(): ReactElement {
         type: face.type,
         href: face.href,
         crossOrigin: "anonymous",
+        [DOCUMENT_SLOT_ATTRIBUTE]: DOCUMENT_SLOT.fontPreload,
       }),
     ),
     ...resolveMetadataDescriptors(metadata).map(renderDescriptor),
@@ -101,6 +108,7 @@ export function Head(): ReactElement {
         rel: "alternate",
         hrefLang: alternate.hreflang,
         href: alternate.href,
+        [DOCUMENT_SLOT_ATTRIBUTE]: DOCUMENT_SLOT.alternate,
       }),
     ),
     // RELEASE BLOCKER fix: carries the SERVER's runtime `LocaleRouting`
@@ -124,7 +132,12 @@ export function Head(): ReactElement {
     // document already put there) — see `stylesheetUrls` on
     // `DocumentContextValue`.
     ...(stylesheetUrls ?? []).map((url) =>
-      createElement("link", { key: url, rel: "stylesheet", href: url }),
+      createElement("link", {
+        key: url,
+        rel: "stylesheet",
+        href: url,
+        [DOCUMENT_SLOT_ATTRIBUTE]: DOCUMENT_SLOT.stylesheet,
+      }),
     ),
   );
 }

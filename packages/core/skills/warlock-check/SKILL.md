@@ -128,6 +128,7 @@ const types = runTypecheck({ files: ["src/app/posts/services/publish.service.ts"
 - `check` boots nothing — no config, no connection, no port — so it runs the same with or without services; only tests that need them fail, and those report `WL8003`/`WL8004`.
 - Lint defaults to Oxlint (an app-root config + the app-installed package). No Oxlint config skips lint. A missing package reports `WL8002`. ESLint support was removed in 5.34.0; see `upgrade-from-5-29`.
 - Tests use the app's own vitest (`vitest run`, or `vitest related <files> --run` with `--changed`). Test files without vitest installed → `WL8002`.
+- A vitest run longer than 10 minutes is stopped and reported as `WL8007` (`The tests timed out after 600 s`); raise the limit with `--test-timeout <seconds>` or `WARLOCK_CHECK_TEST_TIMEOUT` (`0` = no limit). Exit 143 without that message means something outside `check` (a memory-capped wrapper) sent SIGTERM.
 - The typecheck runs in a child `warlock typecheck` process; running out of memory is reported as `WL8007` instead of ending the run.
 - The convention checks are the framework's own and run the same with Oxlint or no linter. A deliberate exception gets `// warlock-check-ignore WL9006 -- why` on the problem's line or the line above (no code = every code on that line).
 

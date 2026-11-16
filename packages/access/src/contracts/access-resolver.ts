@@ -35,4 +35,15 @@ export interface AccessResolver {
    * for single-tenant apps.
    */
   resolveTenant?(user: Auth): string | undefined;
+
+  /**
+   * Optional. Set to `false` to keep the engine from storing this resolver's
+   * roles and permissions in the shared cache: every check then reads them
+   * from the resolver (checks on one user object within a request still share
+   * one resolution). Use it when the sets are a cheap function of the loaded
+   * user, so a role change shows up at once instead of after the cache entry
+   * expires. Omitted or `true`, results are cached.
+   * @default true
+   */
+  readonly cacheable?: boolean;
 }

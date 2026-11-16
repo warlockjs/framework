@@ -94,10 +94,10 @@ loginThrottleMiddleware({
 | `errorMessage`    | i18n `auth.errors.tooManyAttempts` | 429 message override                                                  |
 | `isFailure`       | `(res) => !res.isOk`               | What counts as a failed attempt                                       |
 | `identify`        | built-in email + ip extraction     | Custom identifier list                                                |
-| `emailLock`       | `"global"`                         | `"pair"` locks the (email, IP) pair instead of the email for everyone |
+| `emailLock`       | `"global"` (`"pair"` in 6.0)       | `"pair"` locks the (email, IP) pair instead of the email for everyone |
 | `accountMax`      | `max * 10`                         | Email-wide limit across all IPs when `emailLock: "pair"`              |
 
-`emailLock: "pair"` stops a stranger from locking a known account out: their `max` failures lock only their own (email, IP) pair, while the email-wide bucket (`accountMax`) still stops guessing spread over many IPs. It applies when `by` tracks both `"email"` and `"ip"` and no `identify` is set.
+`emailLock: "pair"` stops a stranger from locking a known account out: their `max` failures lock only their own (email, IP) pair, while the email-wide bucket (`accountMax`) still stops guessing spread over many IPs. It applies when `by` tracks both `"email"` and `"ip"` and no `identify` is set. Leaving it unset in that case logs a one-time warning because the default changes in 6.0: set it explicitly. A successful login clears the account buckets only; the shared IP bucket expires with its window (with `by: ["ip"]` alone a success still resets it).
 
 Throttle the anonymous passkey options route the same way, counting every request: `loginThrottleMiddleware({ by: ["ip"], isFailure: () => true, max: 30, window: "1m" })`.
 

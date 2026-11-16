@@ -211,4 +211,32 @@ describe("render-page — metadata.alternates replaces generated locale alternat
       { hreflang: "ar", href: "https://app.test/loader-ar-slug" },
     ]);
   });
+
+  it('a page that sets `robots: "noindex"` emits no hreflang alternates', async () => {
+    const { request, response } = createHttp();
+
+    const rendered = await renderPageRequest("/posts/x", {
+      routes: [entryWithMetadata({ robots: "noindex" })],
+      createHttp: () => ({ request, response }),
+    });
+
+    if (rendered instanceof Response) throw new Error("unexpected terminal Response");
+
+    expect(alternateLinks(rendered.html)).toEqual([]);
+    expect(rendered.html).toContain("noindex");
+  });
+
+  it("a page rendered with the `noindex` option (the not-found page) emits no hreflang alternates", async () => {
+    const { request, response } = createHttp();
+
+    const rendered = await renderPageRequest("/posts/x", {
+      routes: [entryWithMetadata({})],
+      createHttp: () => ({ request, response }),
+      noindex: true,
+    });
+
+    if (rendered instanceof Response) throw new Error("unexpected terminal Response");
+
+    expect(alternateLinks(rendered.html)).toEqual([]);
+  });
 });

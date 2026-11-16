@@ -3,12 +3,17 @@ import path from "node:path";
 import type { Router } from "@warlock.js/core";
 import { resolveLocaleRouting } from "../server/locale-routing/resolve-locale-routing";
 import { buildRobotsTxt } from "./build-robots-txt";
-import { resolveRobotsConfig, resolveSitemapReferenceUrl } from "./resolve-robots-config";
+import {
+  resolveRobotsConfig,
+  resolveSiteRobotsConfig,
+  resolveSitemapReferenceUrl,
+} from "./resolve-robots-config";
 import { resolveSitemapConfig } from "./resolve-sitemap-config";
 import { joinOrigin } from "@warlock.js/sitemap";
 import {
   createRootSiteSelector,
   createSitemapSiteSelector,
+  multiSiteConfig,
   isNonIndexableDynamicSite,
   selectSitemapSite,
   sitemapSiteBaseUrl,
@@ -54,7 +59,13 @@ export function registerRobotsRoute(router: Router, options: RegisterRobotsRoute
 
   const robotsConfig = resolveRobotsConfig();
 
-  if (!robotsConfig.enabled) return;
+  // A site may switch robots on for itself while the global policy is off.
+  const web = multiSiteConfig();
+  const sitesDeclareRobots = Object.values(web?.sites ?? {}).some(
+    (site) => site.robots !== undefined,
+  );
+
+  if (!robotsConfig.enabled && !sitesDeclareRobots) return;
 
   const sitemapUrl = resolveSitemapReferenceUrl();
   const siteSelector = createSitemapSiteSelector();
@@ -78,6 +89,17 @@ export function registerRobotsRoute(router: Router, options: RegisterRobotsRoute
         ? joinOrigin(sitemapSiteBaseUrl(request, selected), sitemapConfig.path)
         : undefined
       : sitemapUrl;
-    return response.text(buildRobotsTxt(robotsConfig, selectedSitemapUrl, localeRouting));
+    const effective =
+      selected?.kind === "site"
+        ? resolveSiteRobotsConfig(
+            robotsConfig,
+            web?.sites?.[selected.site]?.robots,
+            selected.resolution?.robots,
+          )
+        : robotsConfig;
+
+    if (!effective.enabled) return response.notFound();
+
+    return response.text(buildRobotsTxt(effective, selectedSitemapUrl, localeRouting));
   });
 }

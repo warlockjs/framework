@@ -5,7 +5,7 @@ description: "Submit a @mongez/react-form through a named Core API route or expl
 
 # Submit a form
 
-Import the optional form integration from `@warlock.js/web/form`, not the Web root barrel. It requires peer packages `@mongez/http:^3.5.0` and `@mongez/react-form:^4.0.0`.
+Import the optional form integration from `@warlock.js/web/form`, not the Web root barrel. It requires peer packages `@mongez/http:^3.5.2` and `@mongez/react-form:^4.1.0`.
 
 ```tsx
 import { Form } from "@mongez/react-form";

@@ -40,7 +40,7 @@ Every field is optional; `resolveOutboundPolicy` fills safe defaults, so an untu
 
 Every violation throws `OutboundPolicyError` with `context` carrying the offending URL/host/address — never a silent fallback.
 
-**Address pinning (5.53).** With `denyPrivateIPsAfterDNS` on and the global `fetch`, every connection (first request and each redirect hop) resolves its host through a checked lookup and connects only to the addresses that passed — a DNS-rebinding host flipping to `127.0.0.1` / `169.254.169.254` after the pre-check is refused at connect time (`OutboundPolicyError`, message ends "when connecting"). TLS still verifies against the URL's host name. An injected `policy.fetch`, or an app-installed non-`Agent` global dispatcher (proxy, mock), keeps the pre-check only.
+**Address pinning (5.53).** With `denyPrivateIPsAfterDNS` on and the global `fetch`, every connection (first request and each redirect hop) resolves its host through a checked lookup and connects only to the addresses that passed — a DNS-rebinding host flipping to `127.0.0.1` / `169.254.169.254` after the pre-check is refused at connect time (`OutboundPolicyError`, message ends "when connecting"). TLS still verifies against the URL's host name. The pinned dispatcher inherits the connect options of the app's own global `Agent` (private CA, client certificate). An injected `policy.fetch`, an app-installed non-`Agent` global dispatcher (proxy, mock), an `Agent` whose `connect` is a function, or a runtime without a dispatcher keeps the pre-check only, with one `[warlock-ai] outbound address pinning is off` warning per reason.
 
 ## Redirects are never delegated to the platform (4.15.0)
 

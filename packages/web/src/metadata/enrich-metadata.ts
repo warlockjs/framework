@@ -50,7 +50,8 @@ function absolutizeImage(publicUrl: string | undefined, image: string | Metadata
     : { ...image, url: absolutize(publicUrl, image.url) };
 }
 
-function isNoindex(robots: string | undefined): boolean {
+/** True when a `robots` value tells search engines not to index the page. */
+export function isNoindex(robots: string | undefined): boolean {
   return robots !== undefined && /\bnoindex\b/i.test(robots);
 }
 

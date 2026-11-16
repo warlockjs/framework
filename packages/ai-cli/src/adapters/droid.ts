@@ -39,6 +39,7 @@ export const droidAdapter: CliAdapter = {
   title: "Factory Droid",
   command: "droid",
   apiKeyEnv: ["FACTORY_API_KEY"],
+  passEnv: [],
   homeEnv: ["FACTORY_HOME_OVERRIDE"],
   transports: ["argv", "file"],
   effort: true,

@@ -53,12 +53,24 @@ const CONFIRMATION_WINDOW_MS = 30 * 60_000;
 const CONFIRMATION_INITIAL_DELAY_MS = 3_000;
 const CONFIRMATION_MAX_DELAY_MS = 60_000;
 
-export type ReleaseMode = "gate" | "publish" | "confirm";
+export type ReleaseMode = "gate" | "publish" | "confirm" | "tag";
 
 export interface ReleaseOptions {
   mode: ReleaseMode;
   version: string;
   handoffPath?: string;
+  /**
+   * `publish` only: pass `--provenance` to `npm publish`, so every tarball
+   * carries a signed provenance statement. Needs an OIDC-capable CI job
+   * (`id-token: write`); outside one npm refuses the publish.
+   */
+  provenance?: boolean;
+  /**
+   * `confirm` only: stop after the origin confirmation and leave the tag and
+   * the push to the separate `tag` mode, so the step that installs and runs
+   * the published packages never holds a credential that can push.
+   */
+  skipTag?: boolean;
   /**
    * Opt-in: reuse previously built tarballs for the SAME version instead of
    * rebuilding, but only when every one of them re-hashes to its recorded
@@ -223,6 +235,11 @@ export interface ReleaseFamilyDependencies {
   fileExists?(filePath: string): Promise<boolean>;
   writeHandoff?(filePath: string, handoff: ReleaseHandoff): Promise<void>;
   sha256File?(filePath: string): Promise<string>;
+  /**
+   * Check (and fix) that a built package's source maps carry their own
+   * sources, before it is packed. Injectable so a spec can pin the call.
+   */
+  assertSourceMapsSelfContained?(buildDirectory: string): Promise<number>;
   resolvePkgistCli?(): string;
   resolveNpmCli?(): string;
   resolvePnpmCli?(): string;
@@ -316,7 +333,12 @@ export async function runReleaseFamily(
   await verifyAllArtifactHashes(handoff.artifacts, runtime.sha256File);
 
   if (options.mode === "publish") {
-    await publishHandoff(handoff, runtime);
+    await publishHandoff(handoff, runtime, options.provenance === true);
+    return;
+  }
+
+  if (options.mode === "tag") {
+    await tagAndPushFamilyOrPreserve(family, handoff, options.version, runtime);
     return;
   }
 
@@ -324,8 +346,18 @@ export async function runReleaseFamily(
   // succeeded (see `tagAndPushFamily`) -- a tag or push that exists
   // before the registry confirms is a claim the release has not earned.
   await confirmAtOrigin(handoff, runtime);
+  if (options.skipTag) return;
+  await tagAndPushFamilyOrPreserve(family, handoff, options.version, runtime);
+}
+
+async function tagAndPushFamilyOrPreserve(
+  family: WarlockFamily,
+  handoff: ReleaseHandoff,
+  version: string,
+  runtime: Runtime,
+): Promise<void> {
   try {
-    await tagAndPushFamily(family, handoff, options.version, runtime);
+    await tagAndPushFamily(family, handoff, version, runtime);
   } catch (error) {
     // Every package is already live at origin here, so the release commit must
     // survive the runner: a failed tag or push (even a partial one, tag pushed
@@ -797,7 +829,7 @@ async function buildAndPackAllMembers(
     // Source maps ship with their embedded sources: their `sources` paths name
     // files in this repository, which an installed app does not have, and a
     // dev server warns for every map it cannot fill from `sourcesContent`.
-    await assertSourceMapsSelfContained(buildDirectory);
+    await runtime.assertSourceMapsSelfContained(buildDirectory);
     const packed = await runtime.runCommand({
       command: process.execPath,
       args: [
@@ -1911,7 +1943,11 @@ function resolveNpmAuthToken(): string | undefined {
   return match ? match[1] : undefined;
 }
 
-async function publishHandoff(handoff: ReleaseHandoff, runtime: Runtime): Promise<void> {
+async function publishHandoff(
+  handoff: ReleaseHandoff,
+  runtime: Runtime,
+  provenance = false,
+): Promise<void> {
   // Printed, not silently carried: an operator running `publish` reads this
   // handoff's own report, not the gate's console output from a possibly
   // earlier, possibly different terminal session. A handoff written before
@@ -1996,6 +2032,7 @@ async function publishHandoff(handoff: ReleaseHandoff, runtime: Runtime): Promis
             "--access",
             "public",
             "--ignore-scripts",
+            ...(provenance ? ["--provenance"] : []),
             "--cache",
             cache,
             "--userconfig",
@@ -3119,6 +3156,8 @@ function withDefaults(dependencies: ReleaseFamilyDependencies): Runtime {
     fileExists: dependencies.fileExists ?? (async (filePath) => existsSync(filePath)),
     writeHandoff: dependencies.writeHandoff ?? writeHandoffAtomically,
     sha256File: dependencies.sha256File ?? defaultSha256File,
+    assertSourceMapsSelfContained:
+      dependencies.assertSourceMapsSelfContained ?? assertSourceMapsSelfContained,
     resolvePkgistCli: dependencies.resolvePkgistCli ?? resolvePkgistCli,
     resolveNpmCli: dependencies.resolveNpmCli ?? resolveNpmCli,
     resolvePnpmCli: dependencies.resolvePnpmCli ?? resolvePnpmCli,
@@ -3432,7 +3471,7 @@ export function parseArguments(argv: readonly string[]): ReleaseOptions {
   const values = [...argv];
   const first = values[0];
   const mode: ReleaseMode =
-    first === "publish" || first === "confirm" || first === "gate"
+    first === "publish" || first === "confirm" || first === "gate" || first === "tag"
       ? (values.shift() as ReleaseMode)
       : "gate";
   let version = "";
@@ -3446,6 +3485,8 @@ export function parseArguments(argv: readonly string[]): ReleaseOptions {
   const allowNonDefaultBranchFor: string[] = [];
   let skipStrictness: string | undefined;
   let sawSkipStrictnessFlag = false;
+  let provenance = false;
+  let skipTag = false;
   for (let index = 0; index < values.length; index += 1) {
     const argument = values[index];
     if (argument === "--version") version = values[++index] ?? "";
@@ -3453,6 +3494,8 @@ export function parseArguments(argv: readonly string[]): ReleaseOptions {
     else if (argument === "--handoff") handoffPath = values[++index];
     else if (argument.startsWith("--handoff=")) handoffPath = argument.slice("--handoff=".length);
     else if (argument === "--reuse-artifacts") reuseArtifacts = true;
+    else if (argument === "--provenance") provenance = true;
+    else if (argument === "--no-tag") skipTag = true;
     else if (argument === "--only") only = parseOnlyArgument(values[++index]);
     else if (argument.startsWith("--only="))
       only = parseOnlyArgument(argument.slice("--only=".length));
@@ -3505,6 +3548,8 @@ export function parseArguments(argv: readonly string[]): ReleaseOptions {
     version,
     handoffPath,
     reuseArtifacts: reuseArtifacts || undefined,
+    provenance: provenance || undefined,
+    skipTag: skipTag || undefined,
     matrixScope,
     only,
     matrixAuthorisation,

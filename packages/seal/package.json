@@ -1,6 +1,6 @@
 {
   "name": "@warlock.js/seal",
-  "version": "5.53.1",
+  "version": "5.54.0",
   "type": "module",
   "description": "Comprehensive Validation library",
   "main": "./src/index.ts",
@@ -25,8 +25,8 @@
     "environment": "universal"
   },
   "dependencies": {
-    "@mongez/supportive-is": "^3.0.0",
-    "@mongez/reinforcements": "^4.0.2",
+    "@mongez/supportive-is": "^3.0.1",
+    "@mongez/reinforcements": "^4.1.0",
     "dayjs": "^1.11.9"
   },
   "scripts": {

@@ -25,7 +25,7 @@ import { ModelEvents } from "../events/model-events";
 import type { PivotOperations } from "../relations/pivot-operations";
 import type { ModelSnapshot } from "../relations/relation-hydrator";
 import { inferBelongsToForeignKey } from "../relations/key-conventions";
-import { attachLoadedRelation, RelationLoader } from "../relations/relation-loader";
+import { attachLoadedRelation } from "../relations/relation-loader";
 import type {
   LoadedRelationResult,
   PivotData,
@@ -45,6 +45,7 @@ import {
   hasField,
   incrementField,
   isFieldFilled,
+  forceMergeFields,
   mergeFields,
   setFieldValue,
   setFields,
@@ -62,6 +63,7 @@ import {
   cloneModel,
   deepFreezeObject,
   hydrateModel,
+  takeHydrationDriver,
   modelFromSnapshot,
   modelToSnapshot,
   replaceModelData,
@@ -89,7 +91,6 @@ import {
   findAll,
   findAndReplaceRecord,
   findAndUpdateRecords,
-  findById,
   findFirst,
   findLast,
   findLatest,
@@ -108,6 +109,8 @@ import {
   removeGlobalModelScope,
   removeLocalModelScope,
 } from "./methods/scope-methods";
+export { isRawInput, markRawInput } from "./methods/guarded-columns";
+import { findByIdBatched, loadRelationsBatched } from "./methods/batch-loads";
 import { guardColumnPropertyReads } from "./methods/column-read-guard";
 import { modelToDataSnapshot, modelToJSON } from "./methods/serialization-methods";
 import {
@@ -257,6 +260,44 @@ export abstract class Model<out TSchema extends ModelSchema = ModelSchema> {
    * ```
    */
   public static hidden: string[] = [];
+
+  /**
+   * Columns that mass assignment never writes: `merge()`, the object form of
+   * `set()`, `create()`, `createMany()`, `save({ merge })` and the data of
+   * `findOrCreate()` / `upsert()` skip them (a dot path inside a guarded
+   * column counts too). Trusted code writes them with `forceMerge()` and
+   * `forceCreate()`; `set("role", value)` for a single column and the
+   * constructor are not mass assignment and stay unguarded.
+   *
+   * Outside production the first skipped write of a column logs a warning.
+   *
+   * @default []
+   *
+   * @example
+   * ```typescript
+   * class User extends Model {
+   *   public static guarded = ["role", "isAdmin"];
+   * }
+   *
+   * user.merge(request.all()); // role / isAdmin are skipped
+   * user.forceMerge({ role: "admin" }); // written on purpose
+   * ```
+   */
+  public static guarded: string[] = [];
+
+  /**
+   * Collect `model.load(...)` calls and `Model.find(id)` calls made in the same
+   * tick into one query per model class: `Promise.all(posts.map((post) =>
+   * post.load("author")))` runs one author query, and ten `find()` calls run
+   * one `whereIn` on the primary key.
+   *
+   * A lone call keeps its single query, and calls inside a transaction are
+   * never collected. Set it to `false` on a model to run every call as its own
+   * query.
+   *
+   * @default true
+   */
+  public static batchLoads = true;
 
   /**
    * Data source reference for this model.
@@ -704,7 +745,9 @@ export abstract class Model<out TSchema extends ModelSchema = ModelSchema> {
     guardColumnPropertyReads(this.self());
 
     this.data = initialData as TSchema;
-    this.dirtyTracker = this.self().getDriver().getDirtyTracker(this.data);
+    this.dirtyTracker = (
+      takeHydrationDriver(this.constructor) ?? this.self().getDriver()
+    ).getDirtyTracker(this.data);
   }
 
   /**
@@ -733,9 +776,7 @@ export abstract class Model<out TSchema extends ModelSchema = ModelSchema> {
    * ```
    */
   public async load(...relations: string[]): Promise<this> {
-    const ModelClass = this.constructor as ChildModel<Model>;
-    const loader = new RelationLoader([this], ModelClass);
-    await loader.load(relations);
+    await loadRelationsBatched(this, relations);
     return this;
   }
 
@@ -1173,6 +1214,27 @@ export abstract class Model<out TSchema extends ModelSchema = ModelSchema> {
   public merge(values: Record<string, unknown>): this;
   public merge(values: Record<string, unknown>): this {
     return mergeFields(this, values) as this;
+  }
+
+  /**
+   * {@link Model.merge} without the `guarded` columns check: the explicit way
+   * to write a guarded column such as `role` from trusted code.
+   *
+   * Never pass request input to it. The primary key of a persisted model is
+   * still protected.
+   *
+   * @param values - Partial data to merge into the model
+   * @returns The model instance for method chaining
+   *
+   * @example
+   * ```typescript
+   * user.merge(request.validated()).forceMerge({ role: "editor" });
+   * ```
+   */
+  public forceMerge(values: Partial<TSchema>): this;
+  public forceMerge(values: Record<string, unknown>): this;
+  public forceMerge(values: Record<string, unknown>): this {
+    return forceMergeFields(this, values) as this;
   }
 
   /**
@@ -1933,7 +1995,7 @@ export abstract class Model<out TSchema extends ModelSchema = ModelSchema> {
     this: ChildModel<TModel>,
     id: string | number,
   ): Promise<TModel | null> {
-    return findById(this, id);
+    return findByIdBatched(this, id);
   }
 
   /**
@@ -2394,6 +2456,23 @@ export abstract class Model<out TSchema extends ModelSchema = ModelSchema> {
   }
 
   /**
+   * {@link Model.create} without the `guarded` columns check: the explicit way
+   * to create a record with a guarded column (`role`, `isAdmin`) from trusted
+   * code. Never pass request input to it.
+   *
+   * @example
+   * ```typescript
+   * const admin = await User.forceCreate({ name: "Ann", role: "admin" });
+   * ```
+   */
+  public static async forceCreate<
+    TModel extends Model = Model,
+    TSchema extends ModelSchema = TModel extends Model<infer S> ? S : ModelSchema,
+  >(this: ChildModel<TModel>, data: Partial<TSchema>): Promise<TModel> {
+    return createRecord(this, data, true);
+  }
+
+  /**
    * Create many records and return an array of created models.
    *
    * The work is always chunked into batches of `options.batchSize`
@@ -2840,12 +2919,16 @@ export abstract class Model<out TSchema extends ModelSchema = ModelSchema> {
    * // Query builder internals:
    * const user = User.hydrate(rawRow);
    * ```
+   *
+   * A caller hydrating a whole result set passes the model's driver as the
+   * second argument, so it is resolved once for the set instead of per row.
    */
   public static hydrate<TModel extends Model = Model>(
     this: ChildModel<TModel>,
     data: Record<string, unknown>,
+    driver?: DriverContract,
   ): TModel {
-    return hydrateModel(this, data);
+    return hydrateModel(this, data, driver);
   }
 
   /**

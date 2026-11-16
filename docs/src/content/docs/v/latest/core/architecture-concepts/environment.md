@@ -117,6 +117,17 @@ So `env("PORT")` returns the number `3000` because the parser already turned the
 
 > Quoted values (`"..."`, `'...'`, or backticks) are treated as strings — `PORT="3000"` stays the string `"3000"`. Use unquoted values when you want numeric/boolean coercion.
 
+### The `.env` line grammar
+
+The `.env` parser follows the usual shell and `dotenv` conventions:
+
+- **Single quotes are literal.** `GREETING='Hello ${name}'` is the text `Hello ${name}`; nothing is interpolated.
+- **Double quotes expand escapes** (`\n`, `\r`, `\t`, `\"`, `\\`, `\$`). A Windows path such as `"C:\new"` contains a newline, so write `"C:\\new"` or use single quotes.
+- **A comment after an unquoted value is removed.** `DEBUG=true # debug mode` is the boolean `true`. A `#` only starts a comment after whitespace, so `COLOR=#fff` keeps its `#`.
+- **`${NAME}` that is not a valid name stays literal**, while a valid `${NAME}` that resolves nowhere still throws.
+- **An unterminated quote throws**, naming the key, the line and the file. A quoted value may continue over several lines (a PEM key, for example).
+- **A variable already set in the process wins** over the same key in a file. Core passes this precedence explicitly.
+
 `env.all()` returns the full loaded map if you ever need to inspect everything that was read.
 
 ## Environment detection

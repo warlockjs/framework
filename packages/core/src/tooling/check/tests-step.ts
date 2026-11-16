@@ -10,6 +10,10 @@ import { createProblem, type ToolingProblem } from "../problem";
 export type VitestRun = {
   code: number | null;
   signal: string | null;
+  /** True when the check stopped the run because it passed the time limit. */
+  timedOut?: boolean;
+  /** The limit that applied, in milliseconds (set with `timedOut`). */
+  timeoutMs?: number;
   stdout: string;
   stderr: string;
   /** The `--reporter=json` report, parsed; `undefined` when none was written. */
@@ -23,8 +27,23 @@ export type VitestRunner = (
   cwd: string,
 ) => Promise<VitestRun>;
 
-/** Ten minutes: a suite slower than that is reported as a crashed tool, not a failure. */
-const TEST_TIMEOUT_MS = 10 * 60 * 1000;
+/** Ten minutes: the default limit of one vitest run. */
+const DEFAULT_TEST_TIMEOUT_MS = 10 * 60 * 1000;
+
+/** The environment variable that raises (or lowers) the limit, in seconds. `0` turns it off. */
+export const TEST_TIMEOUT_ENV = "WARLOCK_CHECK_TEST_TIMEOUT";
+
+/**
+ * The time limit of one vitest run in milliseconds (`0` means no limit): the
+ * `WARLOCK_CHECK_TEST_TIMEOUT` variable in seconds, else ten minutes.
+ */
+export function testTimeoutMs(env: NodeJS.ProcessEnv = process.env): number {
+  const seconds = Number(env[TEST_TIMEOUT_ENV]);
+
+  return Number.isFinite(seconds) && seconds >= 0 && env[TEST_TIMEOUT_ENV]?.trim()
+    ? seconds * 1000
+    : DEFAULT_TEST_TIMEOUT_MS;
+}
 
 /**
  * The app's own vitest CLI entry, resolved from the app root — never a global
@@ -63,6 +82,8 @@ export const runVitest: VitestRunner = (binary, args, cwd) => {
   const directory = mkdtempSync(path.join(os.tmpdir(), "warlock-check-vitest-"));
   const outputFile = path.join(directory, "report.json");
 
+  const timeoutMs = testTimeoutMs();
+
   return new Promise((resolve) => {
     execFile(
       process.execPath,
@@ -71,7 +92,7 @@ export const runVitest: VitestRunner = (binary, args, cwd) => {
         cwd,
         encoding: "utf8",
         windowsHide: true,
-        timeout: TEST_TIMEOUT_MS,
+        timeout: timeoutMs,
         maxBuffer: 64 * 1024 * 1024,
         env: { ...process.env, CI: process.env.CI ?? "1" },
       },
@@ -88,6 +109,11 @@ export const runVitest: VitestRunner = (binary, args, cwd) => {
         resolve({
           code: error === null ? 0 : typeof error.code === "number" ? error.code : null,
           signal: error?.signal ?? null,
+          // vitest traps SIGTERM and exits 143, so the kill from our own limit
+          // reaches us as an exit code; `killed` is what tells it apart.
+          ...(error?.killed && timeoutMs > 0 && typeof error.code !== "string"
+            ? { timedOut: true, timeoutMs }
+            : {}),
           stdout,
           stderr,
           report,
@@ -221,6 +247,20 @@ export function parseVitestReport(report: unknown, cwd: string): ToolingProblem[
 export function vitestRunFailure(run: VitestRun): ToolingProblem[] {
   const output = summarize(`${run.stderr}\n${run.stdout}`) || "vitest wrote no report.";
 
+  if (run.timedOut) {
+    const seconds = Math.round((run.timeoutMs ?? 0) / 1000);
+
+    return [
+      createProblem({
+        code: "WL8007",
+        source: "environment",
+        message:
+          `The tests timed out after ${seconds} s and were stopped. ` +
+          `Raise the limit with ${TEST_TIMEOUT_ENV}=<seconds> (0 turns it off) or \`warlock check --test-timeout <seconds>\`.`,
+      }),
+    ];
+  }
+
   if (
     run.signal !== null ||
     run.code === null ||
@@ -231,7 +271,10 @@ export function vitestRunFailure(run: VitestRun): ToolingProblem[] {
       createProblem({
         code: "WL8007",
         source: "environment",
-        message: `vitest ${run.signal ? `was killed (${run.signal})` : `exited with ${run.code ?? "no code"}`}: ${output}`,
+        message:
+          run.code === 143 && run.signal === null
+            ? `vitest was stopped by SIGTERM (exit 143) by something other than the check, such as a memory-capped wrapper or the operating system: ${output}`
+            : `vitest ${run.signal ? `was killed (${run.signal})` : `exited with ${run.code ?? "no code"}`}: ${output}`,
       }),
     ];
   }

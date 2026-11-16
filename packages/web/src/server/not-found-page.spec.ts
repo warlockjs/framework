@@ -144,7 +144,12 @@ describe("createNotFoundRouteHandler — the three answers", () => {
       {
         kind: "json",
         status: 404,
-        body: { error: "Route not found", path: "/api/uzers", method: "GET" },
+        body: {
+          error: "Route not found",
+          code: "route_not_found",
+          path: "/api/uzers",
+          method: "GET",
+        },
       },
     ]);
     // No HTML anywhere in the answer — the whole point.
@@ -285,5 +290,53 @@ describe("the framework default document", () => {
 
     expect(sent[0]).toMatchObject({ kind: "html", status: 404 });
     expect(String(sent[0].body).match(/<html [^>]+>/)?.[0]).toBe('<html lang="ar" dir="rtl">');
+  });
+});
+
+describe("createNotFoundRouteHandler — a refusal page that fails after sending", () => {
+  const refuse = (context: HttpContext) => {
+    (context.request as unknown as Record<symbol, number>)[
+      Symbol.for("warlock.http.refusal-status")
+    ] = 403;
+  };
+
+  it("does not send a second reply once the first was committed", async () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const { context } = fakeContext("GET", "/..%2f", BROWSER_ACCEPT);
+
+    refuse(context);
+    (context.response as unknown as { sent: boolean }).sent = true;
+
+    const handler = createNotFoundRouteHandler({
+      renderPage: undefined,
+      renderRefusal: async () => {
+        throw new Error("failed after the reply began");
+      },
+    });
+
+    await handler(context);
+
+    expect(context.response.html).not.toHaveBeenCalled();
+    error.mockRestore();
+  });
+
+  it("falls back to the framework page when nothing was sent", async () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const { context, sent } = fakeContext("GET", "/..%2f", BROWSER_ACCEPT);
+
+    refuse(context);
+
+    const handler = createNotFoundRouteHandler({
+      renderPage: undefined,
+      renderRefusal: async () => {
+        throw new Error("failed before sending");
+      },
+    });
+
+    await handler(context);
+
+    expect(sent).toHaveLength(1);
+    expect(sent[0]).toMatchObject({ kind: "html", status: 403 });
+    error.mockRestore();
   });
 });

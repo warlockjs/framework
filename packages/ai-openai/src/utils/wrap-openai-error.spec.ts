@@ -3,6 +3,7 @@ import {
   ContentFilterError,
   ContextLengthExceededError,
   InvalidRequestError,
+  ProviderAbortError,
   ProviderAuthError,
   ProviderError,
   ProviderRateLimitError,
@@ -22,6 +23,7 @@ import { wrapOpenAIError } from "./wrap-openai-error";
 function fakeOpenAIError(shape: {
   status?: number;
   code?: string;
+  type?: string;
   message?: string;
   headers?: Record<string, string>;
   name?: string;
@@ -32,7 +34,7 @@ function fakeOpenAIError(shape: {
     status: shape.status,
     code: shape.code,
     message: shape.message ?? "failed",
-    type: "api_error",
+    type: shape.type ?? "api_error",
     headers: shape.headers,
     request_id: shape.requestId,
   };
@@ -104,6 +106,36 @@ describe("wrapOpenAIError", () => {
     expect(wrapped).toBeInstanceOf(QuotaExceededError);
     expect(wrapped).not.toBeInstanceOf(ProviderRateLimitError);
     expect(wrapped.code).toBe("PROVIDER_QUOTA_EXCEEDED");
+  });
+
+  it("maps a 429 with type insufficient_quota and another code to QuotaExceededError", () => {
+    const wrapped = wrapOpenAIError(
+      fakeOpenAIError({
+        status: 429,
+        code: "credit_balance_exhausted",
+        type: "insufficient_quota",
+      }),
+    );
+
+    expect(wrapped).toBeInstanceOf(QuotaExceededError);
+    expect(wrapped).not.toBeInstanceOf(ProviderRateLimitError);
+  });
+
+  it("maps billing_hard_limit_reached to QuotaExceededError on 400 and 429", () => {
+    for (const status of [400, 429]) {
+      const wrapped = wrapOpenAIError(
+        fakeOpenAIError({ status, code: "billing_hard_limit_reached" }),
+      );
+
+      expect(wrapped, String(status)).toBeInstanceOf(QuotaExceededError);
+    }
+  });
+
+  it("keeps a plain 429 rate limit retryable", () => {
+    const wrapped = wrapOpenAIError(fakeOpenAIError({ status: 429, code: "rate_limit_exceeded" }));
+
+    expect(wrapped).toBeInstanceOf(ProviderRateLimitError);
+    expect(wrapped).not.toBeInstanceOf(QuotaExceededError);
   });
 
   it("insufficient_quota still a ProviderError for broad catches", () => {
@@ -329,5 +361,14 @@ describe("wrapOpenAIError — overload and provider facts", () => {
       billed: "unknown",
       retryable: true,
     });
+  });
+
+  it("maps the SDK's user-abort error to a cancelled AbortError", () => {
+    const wrapped = wrapOpenAIError(new OpenAI.APIUserAbortError());
+
+    expect(wrapped).toBeInstanceOf(ProviderAbortError);
+    expect(wrapped.category).toBe("cancelled");
+    expect(wrapped.name).toBe("AbortError");
+    expect((wrapped as ProviderAbortError).retryable).toBe(false);
   });
 });

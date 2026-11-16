@@ -5,6 +5,7 @@ import { command } from "../../commands/cli-command";
 import { collectRouteRegistrationSnapshot } from "../../production/route-registration-snapshot";
 import { resolveBuildConfig } from "../../production/resolve-build-config";
 import { rootPath } from "../../utils";
+import { createTypingsProgress } from "./typings-progress";
 import { warlockConfigManager } from "../../warlock-config/warlock-config.manager";
 
 /**
@@ -28,27 +29,31 @@ export const typingsGeneratorCommand = command({
   name: "generate.typings",
   description: "Generate type definitions for the project",
   action: async () => {
-    await filesOrchestrator.initializeAll();
+    const progress = createTypingsProgress();
 
-    await typeGenerator.generateAll();
+    await progress.stage("scanning the project", () => filesOrchestrator.initializeAll());
 
-    await runConnectorTypings({
-      connectors: warlockConfigManager.isLoaded
-        ? (warlockConfigManager.get("connectors") ?? [])
-        : [],
-      appRoot: rootPath(),
-      options: resolveBuildConfig,
-      // Same timeout as `warlock build` (build.routeRegistrationTimeoutMs or
-      // WARLOCK_ROUTE_REGISTRATION_TIMEOUT_MS): `generate.typings` runs first in
-      // the usual build script, so a slower default here fails the whole build.
-      collectRoutes: async () =>
-        (
-          await collectRouteRegistrationSnapshot({
-            cwd: rootPath(),
-            timeoutMs: resolveBuildConfig().routeRegistrationTimeoutMs,
-          })
-        ).routes,
-    });
+    await progress.stage("writing typings", () => typeGenerator.generateAll());
+
+    await progress.stage("running connector typings", () =>
+      runConnectorTypings({
+        connectors: warlockConfigManager.isLoaded
+          ? (warlockConfigManager.get("connectors") ?? [])
+          : [],
+        appRoot: rootPath(),
+        options: resolveBuildConfig,
+        // Same timeout as `warlock build` (build.routeRegistrationTimeoutMs or
+        // WARLOCK_ROUTE_REGISTRATION_TIMEOUT_MS): `generate.typings` runs first in
+        // the usual build script, so a slower default here fails the whole build.
+        collectRoutes: async () =>
+          (
+            await collectRouteRegistrationSnapshot({
+              cwd: rootPath(),
+              timeoutMs: resolveBuildConfig().routeRegistrationTimeoutMs,
+            })
+          ).routes,
+      }),
+    );
   },
   preload: {
     warlockConfig: true,

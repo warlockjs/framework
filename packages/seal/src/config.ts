@@ -20,6 +20,13 @@ export type SealConfig = {
    * Translation function for attribute messages
    */
   translateAttribute?: TranslateAttributeCallback;
+  /**
+   * Translates a rule's `errorMessage` when it is a translation key such as
+   * `admin.uploadUnrecognisedMedia` (dotted, no spaces). Return the key
+   * unchanged, or an empty string, when it has no translation: the message
+   * then stays as given. A message that is not key-shaped is never passed here.
+   */
+  translateMessageKey?: (key: string, attributes: RuleTranslation["attributes"]) => string;
 
   /**
    * Default to first error only in validation
@@ -109,6 +116,7 @@ export function getSealConfig(): SealConfig {
 export function resetSealConfig(): void {
   delete config.translateRule;
   delete config.translateAttribute;
+  delete config.translateMessageKey;
 
   config.firstErrorOnly = true;
   Object.assign(config, SEAL_LIMIT_DEFAULTS);

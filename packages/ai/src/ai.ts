@@ -230,7 +230,7 @@ export interface Ai {
   };
   /**
    * Content-intelligence guardrail. `ai.guardrail(options)` builds a composed
-   * input / output / tool middleware; `ai.guardrail.{pii,topic,injection,moderation}`
+   * input / output / tool middleware; `ai.guardrail.{pii,topic,injection,links,moderation}`
    * are the built-in detector factories.
    */
   guardrail: typeof guardrailSuite;

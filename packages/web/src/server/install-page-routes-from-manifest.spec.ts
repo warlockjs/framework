@@ -7,6 +7,7 @@ import { NestedLayoutsNotSupportedError } from "../routing/layout-policy";
 import { href, resetRouteTable, routeTablePublisher } from "../routing/route-table";
 import { toPosix } from "../shared/to-posix";
 import { TRANSLATION_TABLE_ROUTE_PREFIX } from "../translations/types";
+import { createRefusalPageRenderer } from "./core-refusal-page";
 import type { PageRouteHandler, PageRouteHandlerOptions } from "./create-page-route-handler";
 import {
   installPageRoutesFromManifest,
@@ -24,6 +25,12 @@ import {
   createLevelBuffer,
   isLoaderShortCircuit,
 } from "./settle-page-response";
+
+vi.mock("./core-refusal-page", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./core-refusal-page")>();
+
+  return { ...actual, createRefusalPageRenderer: vi.fn(actual.createRefusalPageRenderer) };
+});
 
 type RegisteredRoute = {
   path: string;
@@ -880,6 +887,29 @@ describe("installPageRoutesFromManifest — the not-found page", () => {
     });
   });
 
+  it("hands the refusal renderer the root and the layout beside it, so refusal pages keep the site's chrome", async () => {
+    const App = () => null;
+    const RootLayout = () => null;
+    const pageInRoot: PageManifestPageEntry = {
+      ...homePage,
+      layouts: [{ module: { default: RootLayout }, sourceFile: "src/web/layout.tsx" }],
+    };
+    const manifest: PageManifest = {
+      app: { module: { default: App }, sourceFile: "src/web/root.tsx" },
+      pages: [pageInRoot],
+    };
+    const renderer = vi.mocked(createRefusalPageRenderer);
+
+    renderer.mockClear();
+    install(manifest).run();
+
+    const options = renderer.mock.calls.at(-1)?.[0];
+    const shell = await options?.loadShell?.();
+
+    expect(shell?.app?.default).toBe(App);
+    expect(shell?.layouts?.map((layout) => layout.default)).toEqual([RootLayout]);
+  });
+
   it("keeps the not-found page out of the returned table, so href() cannot point at it", () => {
     const { run } = install(manifestOf([homePage, notFoundPage]));
 
@@ -985,7 +1015,12 @@ describe("installPageRoutesFromManifest — the not-found page", () => {
     expect(sent).toEqual([
       {
         status: 404,
-        body: { error: "Route not found", path: "/api/uzers", method: "GET" },
+        body: {
+          error: "Route not found",
+          code: "route_not_found",
+          path: "/api/uzers",
+          method: "GET",
+        },
       },
     ]);
     expect(headers.get("cache-control")).toBe("no-store");

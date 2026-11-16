@@ -4,6 +4,8 @@ import type { ChildModel, Model, ModelSchema } from "../model";
 import { mergeDriverFields } from "./accessor-methods";
 import { sanitizeFilter } from "../../utils/sanitize-filter";
 import { emitModelEvent } from "./instance-event-methods";
+import { stripGuardedColumns } from "./guarded-columns";
+import { applyScopeStamp } from "./scope-methods";
 import { hasGlobalScopes, scopeUpsertFilter } from "./query-methods";
 
 /**
@@ -51,6 +53,10 @@ export async function saveModel<TModel extends Model>(
   if (options?.merge) {
     model.merge(options.merge);
   }
+  if (model.isNew) {
+    applyScopeStamp(model);
+  }
+
   const writer = new DatabaseWriter(model);
   await writer.save(options);
   return model;
@@ -59,10 +65,22 @@ export async function saveModel<TModel extends Model>(
 export async function createRecord<
   TModel extends Model,
   TSchema extends ModelSchema = TModel extends Model<infer S> ? S : ModelSchema,
->(ModelClass: ChildModel<TModel>, data: Partial<TSchema>): Promise<TModel> {
-  const model = new ModelClass(data);
+>(ModelClass: ChildModel<TModel>, data: Partial<TSchema>, force = false): Promise<TModel> {
+  const model = new ModelClass(
+    force ? data : (stripGuardedColumns(ModelClass, data, "create") as Partial<TSchema>),
+  );
   await model.save();
   return model;
+}
+
+/** A model for a `createMany()` row, with the guarded columns left out. */
+function newGuardedModel<TModel extends Model>(
+  ModelClass: ChildModel<TModel>,
+  row: object,
+): TModel {
+  return new ModelClass(
+    stripGuardedColumns(ModelClass, row as Record<string, unknown>, "createMany") as any,
+  );
 }
 
 /**
@@ -144,7 +162,7 @@ export async function createManyRecords<
   const created: TModel[] = [];
 
   for (const chunk of chunks) {
-    const models = chunk.map((item) => new ModelClass(item)) as TModel[];
+    const models = chunk.map((item) => newGuardedModel(ModelClass, item)) as TModel[];
 
     // Reserve one contiguous id block for the whole chunk (1 counter op instead
     // of N), pre-seeding each id-less model so its per-row save() no-ops id-gen.
@@ -253,12 +271,16 @@ async function createManyBulk<
 
   {
     for (const chunk of chunks) {
-      const models = chunk.map((item) => new ModelClass(item)) as TModel[];
+      const models = chunk.map((item) => newGuardedModel(ModelClass, item)) as TModel[];
 
       // Reserve one contiguous id block for the whole chunk (1 counter op
       // instead of N), pre-seeding each id-less model so the per-row writer's
       // id generation no-ops.
       await assignIdBlock(ModelClass, models);
+
+      for (const model of models) {
+        applyScopeStamp(model);
+      }
 
       // Prep every model through the real writer pipeline. The captured
       // `insert` keeps this off the wire while still mutating each model's
@@ -317,7 +339,14 @@ export async function findOrCreateRecord<
     return existing;
   }
 
-  return await createRecord(ModelClass, { ...filter, ...data } as Partial<TSchema>);
+  // The filter is the caller's own condition; only the data is mass assignment.
+  const guardedData = stripGuardedColumns(
+    ModelClass,
+    data as Record<string, unknown>,
+    "findOrCreate",
+  );
+
+  return await createRecord(ModelClass, { ...filter, ...guardedData } as Partial<TSchema>, true);
 }
 
 export async function upsertRecord<
@@ -339,10 +368,16 @@ export async function upsertRecord<
     ? await scopeUpsertFilter(ModelClass, safeFilter)
     : safeFilter;
 
-  const mergedData = { ...safeFilter, ...data } as Record<string, unknown>;
+  const mergedData = {
+    ...safeFilter,
+    ...stripGuardedColumns(ModelClass, data as Record<string, unknown>, "upsert"),
+  } as Record<string, unknown>;
 
   const tempModel = new ModelClass(mergedData as Partial<TSchema>);
   tempModel.isNew = true;
+
+  // Scope-stamped columns the data left unset are written by the insert only.
+  const stampedColumns = applyScopeStamp(tempModel);
 
   // One `saving` run against the model itself, so listener changes (slug,
   // createdBy, ...) land in the data that is written.
@@ -359,9 +394,9 @@ export async function upsertRecord<
   const setOnInsert: Record<string, unknown> = {};
   const now = new Date();
 
-  // Identity and creation time belong to the insert only; an existing row
-  // keeps its own.
-  for (const key of new Set(["id", "_id", ModelClass.primaryKey])) {
+  // Identity, creation time and stamped columns belong to the insert only; an
+  // existing row keeps its own.
+  for (const key of new Set(["id", "_id", ModelClass.primaryKey, ...stampedColumns])) {
     if (key in setData) {
       setOnInsert[key] = setData[key];
       delete setData[key];

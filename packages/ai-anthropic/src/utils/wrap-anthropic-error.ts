@@ -2,6 +2,7 @@ import {
   AIError,
   ContextLengthExceededError,
   InvalidRequestError,
+  ProviderAbortError,
   ProviderAuthError,
   ProviderError,
   ProviderOverloadedError,
@@ -9,7 +10,7 @@ import {
   ProviderTimeoutError,
   QuotaExceededError,
 } from "@warlock.js/ai";
-import { APIConnectionTimeoutError, APIError } from "@anthropic-ai/sdk";
+import { APIConnectionTimeoutError, APIError, APIUserAbortError } from "@anthropic-ai/sdk";
 
 /**
  * Raw-error fields the wrapper reads off an Anthropic SDK error.
@@ -62,6 +63,10 @@ export function wrapAnthropicError(thrown: unknown): AIError {
   const shape = toShape(thrown);
   const context = buildContext(shape);
   const message = shape.message ?? (thrown instanceof Error ? thrown.message : String(thrown));
+
+  if (thrown instanceof APIUserAbortError || shape.name === "APIUserAbortError") {
+    return new ProviderAbortError(message, { cause: thrown, context });
+  }
 
   if (isTimeout(thrown, shape)) {
     return new ProviderTimeoutError(message, { cause: thrown, context });

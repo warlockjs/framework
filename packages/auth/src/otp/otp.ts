@@ -8,6 +8,7 @@ import type { Auth } from "../models/auth.model";
 import { authConfig } from "../services/auth-config";
 import { authEvents } from "../services/auth-events";
 import { authService } from "../services/auth.service";
+import { runInBackground } from "../services/background-work";
 import { oneTimeTokenModel } from "../services/one-time-tokens";
 import { loadOptionalPeer } from "../services/optional-peer";
 import { safeEqual } from "../utils/safe-equal";
@@ -82,10 +83,11 @@ async function resolveDelivery(channel: string): Promise<OtpSender> {
  * The code is stored only as a keyed hash in `one_time_tokens` (purpose
  * `otp`), expires after `auth.otp.expiresIn` (default 5m), and replaces any
  * earlier unused code. **Anti-enumeration:** an unknown phone resolves the same
- * way and sends nothing, and the code is delivered in the background so the
- * response time does not reveal a known phone. A failed delivery is logged and
- * emitted as `otp.deliveryFailed`; set `auth.otp.awaitDelivery: true` to wait
- * for it (and receive its error) instead. Throttle the route with
+ * way and sends nothing, and the lookup, the code writes and the delivery run
+ * in the background so the response time does not reveal a known phone. A
+ * failure is logged and emitted as `otp.deliveryFailed`; set
+ * `auth.otp.awaitDelivery: true` to wait for all of it (and receive its error)
+ * instead. Throttle the route with
  * `otpRequestThrottleMiddleware()`.
  *
  * @throws AuthProviderSdkMissingError when `@warlock.js/notifications` is not
@@ -101,31 +103,40 @@ export async function requestOtp<T extends Auth>(
 
   if (typeof phone !== "string" || phone.length === 0) return;
 
-  const user = (await Model.first({ [authConfig.otp.phoneField()]: phone })) as T | null;
+  let user: T | null = null;
 
-  if (!user) return;
+  const issueAndDeliver = async (): Promise<void> => {
+    user = (await Model.first({ [authConfig.otp.phoneField()]: phone })) as T | null;
 
-  const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
-  const expiresAt = new Date(Date.now() + authConfig.otp.expiresInMs());
-  const TokenModel = oneTimeTokenModel();
+    if (!user) return;
 
-  await TokenModel.invalidateActiveFor(user, "otp");
-  await TokenModel.issue(user, "otp", storedCodeHash(user, code), expiresAt);
+    const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
+    const expiresAt = new Date(Date.now() + authConfig.otp.expiresInMs());
+    const TokenModel = oneTimeTokenModel();
 
-  const message: OtpMessage = { body: authConfig.otp.message(code), code, expiresAt };
+    await TokenModel.invalidateActiveFor(user, "otp");
+    await TokenModel.issue(user, "otp", storedCodeHash(user, code), expiresAt);
 
-  const delivery = Promise.resolve().then(() => deliver(phone, message, channel));
+    const message: OtpMessage = { body: authConfig.otp.message(code), code, expiresAt };
+
+    await deliver(phone, message, channel);
+  };
 
   if (authConfig.otp.awaitDelivery()) {
-    await delivery;
+    await issueAndDeliver();
 
     return;
   }
 
-  delivery.catch((error: unknown) => {
-    log.error("auth", "otp", error);
-    authEvents.emit("otp.deliveryFailed", user, error);
-  });
+  // The lookup, the code writes and the delivery all run after the response,
+  // so a known and an unknown phone answer in the same time.
+  runInBackground(() =>
+    issueAndDeliver().catch((error: unknown) => {
+      log.error("auth", "otp", error);
+
+      if (user) authEvents.emit("otp.deliveryFailed", user, error);
+    }),
+  );
 }
 
 /**

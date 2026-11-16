@@ -102,6 +102,7 @@ export const envFilesCheck: DoctorCheck = warnOnError({
     return {
       name: "env-files",
       status: "warn",
+      code: "WL1017",
       detail:
         `${found.committable.join(", ")} ${found.committable.length === 1 ? "is" : "are"} not ` +
         "ignored by git — env files hold the app's secrets and would be committed. Add `.env` " +

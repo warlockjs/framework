@@ -2,6 +2,7 @@ import {
   AIError,
   ContextLengthExceededError,
   InvalidRequestError,
+  ProviderAbortError,
   ProviderAuthError,
   ProviderError,
   ProviderRateLimitError,
@@ -35,10 +36,14 @@ describe("wrapOllamaError", () => {
     ).toBeInstanceOf(ProviderError);
   });
 
+  it("maps an AbortError to a cancelled ProviderAbortError", () => {
+    const wrapped = wrapOllamaError({ name: "AbortError", message: "aborted" });
+
+    expect(wrapped).toBeInstanceOf(ProviderAbortError);
+    expect(wrapped.category).toBe("cancelled");
+  });
+
   it("maps timeouts to ProviderTimeoutError", () => {
-    expect(wrapOllamaError({ name: "AbortError", message: "aborted" })).toBeInstanceOf(
-      ProviderTimeoutError,
-    );
     expect(wrapOllamaError({ message: "x", cause: { code: "ETIMEDOUT" } })).toBeInstanceOf(
       ProviderTimeoutError,
     );
@@ -53,10 +58,10 @@ describe("wrapOllamaError", () => {
     );
   });
 
-  it("prefers timeout over connection-refused when both could match", () => {
+  it("prefers the abort over connection-refused when both could match", () => {
     // AbortError name short-circuits before the connection-refused probe.
     expect(wrapOllamaError({ name: "AbortError", message: "fetch failed" })).toBeInstanceOf(
-      ProviderTimeoutError,
+      ProviderAbortError,
     );
   });
 

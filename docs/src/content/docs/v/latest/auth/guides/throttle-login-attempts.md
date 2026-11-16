@@ -72,7 +72,7 @@ router.prefix("/auth", () => {
 | `errorMessage`    | i18n `auth.errors.tooManyAttempts` | 429 message override                                            |
 | `isFailure`       | `(res) => !res.isOk`               | What counts as a failed attempt                                 |
 | `identify`        | built-in email + ip extraction     | Custom identifier list                                          |
-| `emailLock`       | `"global"`                         | `"pair"`: lock the (email, IP) pair, not the email for everyone |
+| `emailLock`       | `"global"` (`"pair"` in 6.0)       | `"pair"`: lock the (email, IP) pair, not the email for everyone |
 | `accountMax`      | `max * 10`                         | Email-wide limit across all IPs under `emailLock: "pair"`       |
 
 ## Keep strangers from locking an account
@@ -85,6 +85,8 @@ router.post("/auth/login", loginController, {
 });
 ```
 
+The default changes to `"pair"` in 6.0. Until then, leaving `emailLock` unset while both `"email"` and `"ip"` are tracked logs a one-time warning; set it explicitly (the project template does) to choose now and silence it.
+
 `emailLock` only applies when `by` tracks both `"email"` and `"ip"` and no custom `identify` is set.
 
 ## How attempts are counted
@@ -94,7 +96,7 @@ Each request is counted before the controller runs, for each tracked identifier:
 1. The first attempt opens the window with a create-only cache write that carries the TTL. An existing window keeps its deadline, so the window is fixed, not sliding.
 2. The counter is bumped with an atomic `cache.increment`.
 3. A request whose count goes past `max` is refused with `429` and writes the lock for `lockoutDuration`.
-4. After the controller responds, a failure (non-2xx by default) that used the last allowed attempt writes the lock, unless a success that finished meanwhile already reset the counter; a 2xx response resets the counter to 0 and clears the lock. A counter that cannot be read back (expired, evicted, a failed read) does not count as reset, so the failure still locks.
+4. After the controller responds, a failure (non-2xx by default) that used the last allowed attempt writes the lock, unless a success that finished meanwhile already reset the counter; a 2xx response resets the counter to 0 and clears the lock of the account buckets (the email, and the email and IP pair). The shared IP bucket is not reset by a success when an account is tracked next to it, so one valid account behind an IP cannot keep clearing that IP's budget between guesses; it expires with its window. With `by: ["ip"]` alone, the IP bucket is the only bound and a success still resets it. A counter that cannot be read back (expired, evicted, a failed read) does not count as reset, so the failure still locks.
 
 When the lock is written, the counter is rewritten with the same TTL, so both end together and the identifier starts a fresh window after the lockout.
 

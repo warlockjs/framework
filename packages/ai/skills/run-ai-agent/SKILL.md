@@ -58,6 +58,8 @@ agent.execute(input: string, options?: AgentExecuteOptions): Promise<AgentResult
 agent.stream(input: string, options?: AgentExecuteOptions): StreamContract<AgentResult<T>>;
 ```
 
+A non-string `input` is refused with an `InvalidRequestError` (`execute()` rejects, `stream()` throws); run failures still land on `result.error`.
+
 `AgentExecuteOptions` — every field optional:
 
 ```ts
@@ -383,7 +385,7 @@ function throwUnauthorized(): never {
 - Errors on the wire are `{ code, message, reference }` (fixed message per error kind); the full error is logged as `ai.serve` / `run.failed` under `reference`.
 - Default `toInput` requires a string `body.input` (else `400 invalid_input`); map a structured body with `toInput`.
 - A throwing callback answers `500 internal_error` (or the `ServeHttpError` status) and never crashes the process.
-- No `authToken` / `authorize` and no `public: true` → one-time warning in production.
+- No `authToken` / `authorize` and no `public: true` → one-time warning in production; `ai.serve` will refuse to start in 6.0, so set one now.
 - `streamToSSE(stream, { mapEvent, mapResult, mapError })` is the transport-agnostic building block; without options it is verbatim (trusted sinks only).
 
 ## Pattern — cancellation

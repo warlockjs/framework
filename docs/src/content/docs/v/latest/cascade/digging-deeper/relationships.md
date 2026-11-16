@@ -134,6 +134,8 @@ console.log(user.organization); // Organization | null
 
 The model loads its missing relations and attaches them to the instance. Calling `load` for a relation that's already loaded is a no-op (Cascade won't re-fetch unless you tell it to).
 
+Calls made in the same tick are batched: `await Promise.all(posts.map((post) => post.load("author")))` runs one author query for all the posts, not one per post. Calls for the same model class and the same relation names are grouped; a lone call loads exactly as before, and calls inside a transaction are never grouped. `Model.find(id)` calls made in the same tick likewise run as one `whereIn` on the primary key. Only calls made under the same context stores are grouped: two requests, or two `tenantContext.run()` scopes, never share a query, so a global scope that reads the current tenant from a `@warlock.js/context` context sees each caller's own tenant. A global scope that reads a plain `AsyncLocalStorage` of its own is not visible to this grouping; set `static batchLoads = false` on such a model (and on any model where every call must stay its own query).
+
 Lazy loading is great when:
 
 - The relation is needed only on certain code paths and you don't want to pay for it upfront.
@@ -142,7 +144,7 @@ Lazy loading is great when:
 
 Lazy loading is **bad** when:
 
-- You're inside a loop. `for (const user of users) await user.load("posts")` is the textbook N+1 problem. Use `.with()` on the original query, or `RelationLoader` (covered in the essentials page) to batch.
+- You're inside a loop. `for (const user of users) await user.load("posts")` is the textbook N+1 problem, because each `await` finishes before the next call starts and nothing can be batched. Use `.with()` on the original query, or start the loads together with `Promise.all`, which batches them.
 
 ## Per-query constraints on `.with()`
 
@@ -281,6 +283,8 @@ Both load related data. They make different tradeoffs:
 | Best for `belongsToMany`        | ✅ Better — pivot indirection           | ❌ Not supported the same way          |
 | Per-relation constraints        | ✅ Full callback support                | Limited                                |
 | Cross-table filters             | ❌ Filter is on the related query only  | ✅ Can `.where()` on joined columns    |
+
+On MongoDB `.joinWith()` is the batched `.with()` loader under another name, so the single-query column above applies to SQL; the other rows hold on both drivers.
 
 The rule of thumb: **default to `.with()`**. Reach for `.joinWith()` when:
 

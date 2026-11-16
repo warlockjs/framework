@@ -125,3 +125,4 @@ const user = await cache.remember("user.1", "1h", async () => db.users.find(1));
 - Don't run `cache.similar()` against memory drivers in production with large datasets — O(N) brute force.
 - Don't auto-migrate the `pg` table from app code. The driver exposes `driver.schema()` returning DDL.
 - Don't switch embedders without re-embedding the entire vector index.
+- `has(key)` uses the driver `exists()` (no value read) and emits `hit` / `miss` with the key only, without `value`.

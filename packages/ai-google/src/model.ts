@@ -160,7 +160,7 @@ export class GoogleModel implements ModelContract {
         config: this.buildConfig(systemInstruction, options),
       });
     } catch (thrown) {
-      throw this.logAndWrap(thrown);
+      throw this.logAndWrap(thrown, options?.signal);
     }
 
     const toolCalls = this.extractToolCalls(response);
@@ -217,7 +217,7 @@ export class GoogleModel implements ModelContract {
         throw new InvalidRequestError("Google countTokens returned no totalTokens.");
       return response.totalTokens;
     } catch (thrown) {
-      throw this.logAndWrap(thrown);
+      throw this.logAndWrap(thrown, options?.signal);
     }
   }
 
@@ -311,7 +311,7 @@ export class GoogleModel implements ModelContract {
         config: this.buildConfig(systemInstruction, options),
       });
     } catch (thrown) {
-      throw this.logAndWrap(thrown);
+      throw this.logAndWrap(thrown, options?.signal);
     }
 
     let rawFinishReason: string | undefined;
@@ -373,7 +373,7 @@ export class GoogleModel implements ModelContract {
         }
       }
     } catch (thrown) {
-      throw this.logAndWrap(thrown);
+      throw this.logAndWrap(thrown, options?.signal);
     }
 
     const finishReason = sawToolCall ? "tool_calls" : mapFinishReason(rawFinishReason);
@@ -588,8 +588,8 @@ export class GoogleModel implements ModelContract {
    * Wrap a thrown provider error into the typed `AIError` hierarchy
    * and emit the standard error log line before it propagates.
    */
-  private logAndWrap(thrown: unknown) {
-    const wrapped = wrapGoogleError(thrown);
+  private logAndWrap(thrown: unknown, signal?: AbortSignal) {
+    const wrapped = wrapGoogleError(thrown, { signal });
 
     this.logger.error(LOG_MODULE, "error", wrapped.message, {
       code: wrapped.code,

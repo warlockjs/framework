@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { cache, type CacheKey, type CacheDriver } from "@warlock.js/cache";
 import { log } from "@warlock.js/logger";
 import { config } from "../config";
@@ -178,6 +179,27 @@ export class RepositoryManager<T = unknown, F = Record<string, any>> {
    * @protected
    */
   protected isCacheable = config.get("repository.isCacheable") ?? true;
+
+  /**
+   * How a write invalidates this repository's cache. `"namespace"` (default)
+   * removes every key under the repository's prefix, which scans the key space
+   * on drivers such as Redis. `"generation"` keys entries under a generation
+   * id and invalidates by replacing that id: a constant number of round trips
+   * per write, one extra read per cache lookup.
+   * @default "namespace"
+   * @protected
+   */
+  protected cacheInvalidation: "namespace" | "generation" =
+    config.get("repository.cacheInvalidation") ?? "namespace";
+
+  /**
+   * Lifetime of entries written in `"generation"` mode, so entries of replaced
+   * generations expire on their own (also on drivers without a default TTL).
+   * @default "1d"
+   * @protected
+   */
+  protected cacheGenerationTtl: number | string =
+    config.get("repository.cacheGenerationTtl") ?? "1d";
 
   /**
    * Cache driver instance
@@ -1616,7 +1638,7 @@ export class RepositoryManager<T = unknown, F = Record<string, any>> {
 
     const opts = this.prepareOptions(options);
 
-    const cacheKey = this.cacheKey("count", opts);
+    const cacheKey = await this.versionedKey(this.cacheKey("count", opts));
 
     // Bypass + refresh the cache when purgeCache is requested.
     if (!opts.purgeCache) {
@@ -1920,7 +1942,11 @@ export class RepositoryManager<T = unknown, F = Record<string, any>> {
     // Swallow cache write failures so a flaky/unreachable remote cache (e.g.
     // Redis) degrades gracefully to a cache miss instead of breaking the read.
     try {
-      await this.cacheDriver.set(key, value);
+      if (this.cacheInvalidation === "generation") {
+        await this.cacheDriver.set(key, value, { ttl: this.cacheGenerationTtl });
+      } else {
+        await this.cacheDriver.set(key, value);
+      }
     } catch (error) {
       console.error(`[Repository] Failed to write cache key "${key}":`, error);
     }
@@ -1960,7 +1986,7 @@ export class RepositoryManager<T = unknown, F = Record<string, any>> {
       return await this.findBy(column, value);
     }
 
-    const cacheKey = this.cacheKey(`${column}.${value}`, cacheKeyOptions);
+    const cacheKey = await this.versionedKey(this.cacheKey(`${column}.${value}`, cacheKeyOptions));
     const cachedData = await this.safeCacheGet(cacheKey);
 
     if (cachedData) {
@@ -1988,7 +2014,7 @@ export class RepositoryManager<T = unknown, F = Record<string, any>> {
 
     const opts = this.prepareOptions(options);
 
-    const cacheKey = this.cacheKey("all", opts);
+    const cacheKey = await this.versionedKey(this.cacheKey("all", opts));
 
     // Bypass + refresh the cache when purgeCache is requested.
     if (!opts.purgeCache) {
@@ -2039,7 +2065,7 @@ export class RepositoryManager<T = unknown, F = Record<string, any>> {
       return (await this._listImpl(options)) as PaginationResult<T>;
     }
 
-    const cacheKey = this.cacheKey("list", this.listCacheKeyOptions(opts));
+    const cacheKey = await this.versionedKey(this.cacheKey("list", this.listCacheKeyOptions(opts)));
 
     // Bypass + refresh the cache when purgeCache is requested.
     if (!opts.purgeCache) {
@@ -2104,7 +2130,7 @@ export class RepositoryManager<T = unknown, F = Record<string, any>> {
     const id = (model as any).id;
     if (!id) return;
 
-    const cacheKey = this.cacheKey(`id.${id}`);
+    const cacheKey = await this.versionedKey(this.cacheKey(`id.${id}`));
     await this.cache(cacheKey, this.adapter.serializeModel(model));
   }
 
@@ -2136,6 +2162,49 @@ export class RepositoryManager<T = unknown, F = Record<string, any>> {
   }
 
   /**
+   * The key to read and write for `key`: unchanged in `"namespace"` mode,
+   * placed under the current generation in `"generation"` mode.
+   * @protected
+   */
+  protected async versionedKey(key: string): Promise<string> {
+    if (this.cacheInvalidation !== "generation" || !this.cacheDriver) return key;
+
+    const prefix = `repositories.${this.getName()}`;
+    const generation = await this.currentGeneration();
+
+    return key === prefix
+      ? `${prefix}.g-${generation}`
+      : key.replace(`${prefix}.`, `${prefix}.g-${generation}.`);
+  }
+
+  private generationKey(): string {
+    return `repositories.${this.getName()}.__generation`;
+  }
+
+  /**
+   * The generation id in use; created on first use. A failing driver counts
+   * as a miss, like every other cache read here.
+   */
+  private async currentGeneration(): Promise<string> {
+    const key = this.generationKey();
+
+    try {
+      const existing = await this.cacheDriver.get<string>(key);
+
+      if (typeof existing === "string" && existing) return existing;
+
+      const created = randomUUID();
+      await this.cacheDriver.set(key, created, { ttl: Infinity });
+
+      return created;
+    } catch (error) {
+      console.error("[Repository] cache generation read failed, treating as miss", error);
+
+      return "unavailable";
+    }
+  }
+
+  /**
    * Cache read that treats a driver failure (e.g. Redis down) as a miss.
    */
   private async safeCacheGet<V = any>(key: string): Promise<V | null | undefined> {
@@ -2154,7 +2223,13 @@ export class RepositoryManager<T = unknown, F = Record<string, any>> {
   public async clearCache(key?: CacheKey): Promise<void> {
     if (!this.isCacheable || !this.cacheDriver) return;
 
-    await this.cacheDriver.removeNamespace(this.cacheKey(key || ""));
+    if (this.cacheInvalidation === "generation" && !key) {
+      // One write replaces the generation: every entry of the old one is unreachable.
+      await this.cacheDriver.set(this.generationKey(), randomUUID(), { ttl: Infinity });
+      return;
+    }
+
+    await this.cacheDriver.removeNamespace(await this.versionedKey(this.cacheKey(key || "")));
   }
 
   /**
@@ -2168,7 +2243,7 @@ export class RepositoryManager<T = unknown, F = Record<string, any>> {
     const id = (model as any).id;
     if (!id) return;
 
-    const cacheKey = this.cacheKey(`id.${id}`);
+    const cacheKey = await this.versionedKey(this.cacheKey(`id.${id}`));
     await this.cacheDriver.removeNamespace(cacheKey);
   }
 

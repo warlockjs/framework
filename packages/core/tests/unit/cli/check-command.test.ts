@@ -75,6 +75,7 @@ describe("warlock check", () => {
       "base",
       "skip",
       "project",
+      "testTimeout",
       "json",
     ]);
     expect(typecheckCommand.commandOptions.map((option) => option.name)).toEqual([

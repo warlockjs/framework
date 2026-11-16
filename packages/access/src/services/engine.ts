@@ -43,6 +43,9 @@ function cacheKey(prefix: string, user: Auth, tenant?: string): string {
  * so the DECISION fails closed in {@link check}.
  */
 async function cached(key: string, loader: () => Promise<string[]>): Promise<string[]> {
+  // A resolver that opts out is the source of truth on every check.
+  if (accessConfig.resolver().cacheable === false) return loader();
+
   try {
     const hit = await cache.get<string[]>(key);
 

@@ -1,6 +1,6 @@
 {
   "dependencies": {
-    "@mongez/react-form": "4.0.0",
+    "@mongez/react-form": "4.1.0",
     "@mantine/core": "9.7.2",
     "@mantine/hooks": "9.7.2",
     "@mantine/dates": "9.7.2",

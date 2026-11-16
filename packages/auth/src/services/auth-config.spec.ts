@@ -195,3 +195,41 @@ describe("production configuration warnings", () => {
     expect(logWarn).not.toHaveBeenCalled();
   });
 });
+
+describe("passkeys.userVerification default", () => {
+  it('warns once that the default changes in 6.0 when it is not set, and keeps "preferred"', () => {
+    expect(authConfig.passkeys.userVerification()).toBe("preferred");
+    expect(authConfig.passkeys.userVerification()).toBe("preferred");
+
+    expect(logWarn).toHaveBeenCalledOnce();
+    expect(logWarn.mock.calls[0]?.[2]).toContain("6.0");
+  });
+
+  it("stays quiet when the value is set explicitly", () => {
+    configKey.mockImplementation((key: string) =>
+      key === "auth.passkeys" ? { userVerification: "preferred" } : undefined,
+    );
+
+    expect(authConfig.passkeys.userVerification()).toBe("preferred");
+    expect(logWarn).not.toHaveBeenCalled();
+  });
+});
+
+describe("previous secrets", () => {
+  it("reads only non-empty strings", () => {
+    configKey.mockImplementation((key: string) =>
+      key === "auth.accessToken.previousSecrets"
+        ? ["a-previous-secret-of-at-least-32-bytes!", "", 5, null]
+        : undefined,
+    );
+
+    expect(authConfig.accessToken.previousSecrets()).toEqual([
+      "a-previous-secret-of-at-least-32-bytes!",
+    ]);
+  });
+
+  it("is empty when nothing is configured", () => {
+    expect(authConfig.accessToken.previousSecrets()).toEqual([]);
+    expect(authConfig.refreshToken.previousSecrets()).toEqual([]);
+  });
+});

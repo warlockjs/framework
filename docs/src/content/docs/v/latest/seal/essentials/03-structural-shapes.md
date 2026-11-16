@@ -40,6 +40,10 @@ const { isValid, data } = await v.validate(publicArticle, record);
 // record had version / authorId / status; data has only id + title
 ```
 
+:::note[Nested objects are cleaned once]
+`undefined` values are removed from the output of an object while it is validated, and the parent objects reuse that cleaned result instead of walking it again, so the cost does not grow with the nesting depth. The rule: an object a validator produced is not changed in place to hold `undefined` values before its parent sees it. A transformer that returns a new object is still cleaned by the parent; the depth limit (`maxDepth`) is still enforced across levels.
+:::
+
 :::caution[`data` is `undefined` when validation fails]
 Always branch on `isValid`. A failed validation returns `data: undefined` — it never hands back the input it rejected. Before 4.9.2 a failing `v.object` returned the raw input, so code that read `data` without checking forwarded exactly the fields the schema existed to exclude.
 :::

@@ -18,7 +18,7 @@ export const updateCommand = command({
 
     // `updateWarlockPackages` resolves on a failed install so the dev-server
     // shortcut can survive it; a one-shot CLI run must still exit non-zero.
-    if (result.outcome === "install-failed") {
+    if (result.outcome === "install-failed" || result.outcome === "npm-too-old") {
       throw result.error ?? new Error("Package manager install failed.");
     }
 

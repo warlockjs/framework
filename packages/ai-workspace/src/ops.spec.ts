@@ -1,7 +1,7 @@
 import { mkdtempSync, realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { hashString } from "@warlock.js/fs";
 import { WorkspaceEditError, WorkspacePolicyError } from "./errors";
 import { createOps } from "./ops";
@@ -620,6 +620,35 @@ describe("createOps.glob", () => {
     const paths = await ops.glob("**/*.ts");
 
     expect(paths.some((p) => p.startsWith(".git/"))).toBe(false);
+  });
+
+  it("yields to the event loop while matching a wildcard glob over many long names", async () => {
+    for (let index = 0; index < 200; index++) {
+      backend.files.set(abs(`long/${"n".repeat(300)}${index}.txt`), "");
+    }
+
+    const ops = createOps(backend, policy());
+    const yields = vi.spyOn(globalThis, "setImmediate");
+    const paths = await ops.glob("**/*n*n*n*n*n*.txt");
+    const count = yields.mock.calls.length;
+
+    yields.mockRestore();
+
+    expect(paths).toHaveLength(200);
+    expect(count).toBeGreaterThan(0);
+  });
+
+  it("stops a wildcard glob walk when the signal aborts", async () => {
+    for (let index = 0; index < 60; index++) {
+      backend.files.set(abs(`long/${"n".repeat(300)}${index}.txt`), "");
+    }
+
+    const ops = createOps(backend, policy());
+    const controller = new AbortController();
+
+    controller.abort();
+
+    await expect(ops.glob("**/*n*n*n*n*n*.txt", { signal: controller.signal })).rejects.toThrow();
   });
 });
 

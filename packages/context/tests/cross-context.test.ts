@@ -3,6 +3,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Context } from "../src/base-context";
 import { ContextManager } from "../src/context-manager";
+import { currentContextScope } from "../src/shared-storage";
 
 type Store = { value: string };
 
@@ -243,5 +244,27 @@ describe("ContextManager.runAll with other contexts", () => {
     );
 
     expect(run).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("currentContextScope", () => {
+  it("is one object inside a run, another in a sibling run, and shared outside every context", async () => {
+    const [first, second] = contexts(2) as [NamedContext, NamedContext];
+    const outside = currentContextScope();
+
+    const [a1, a2] = await first.run({ value: "a" }, async () => {
+      const before = currentContextScope();
+      await delay(1);
+      return [before, currentContextScope()];
+    });
+    const b = first.run({ value: "b" }, () => currentContextScope());
+    const nested = first.run({ value: "a" }, () =>
+      second.run({ value: "x" }, () => currentContextScope()),
+    );
+
+    expect(a1).toBe(a2);
+    expect(b).not.toBe(a1);
+    expect(nested).not.toBe(a1);
+    expect(currentContextScope()).toBe(outside);
   });
 });

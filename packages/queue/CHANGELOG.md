@@ -4,6 +4,12 @@ All notable changes to `@warlock.js/queue` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.54.0 - 2026-11-16
+
+### Changed
+
+- The local queue stores handle large retention better: the SQLite store has an index on the finish time used by pruning (created when an existing database opens), and the memory store polls only the jobs that can still run, so kept completed and failed jobs add nothing to a poll.
+
 ## 5.53.0 - 2026-11-11
 
 ### Upgrading

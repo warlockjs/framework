@@ -93,7 +93,20 @@ return result.text;
 
 ## Narrow or widen the retry policy
 
-`retryOn` is additive over the default. Pass an explicit `AIErrorCode[]` to pin exactly which codes fail over — for example, rate-limit and timeout only, treating generic 5xx as fatal:
+To keep the standard failover and add a reason of your own, use `alsoRetryOn` (same two forms as `retryOn`), or compose with the exported `isDefaultFallbackRetryable(error)` (the codes are exported as `DEFAULT_FALLBACK_RETRY_CODES`):
+
+```ts
+import { isDefaultFallbackRetryable } from "@warlock.js/ai";
+
+ai.fallbackModel([primary, backup], { alsoRetryOn: (error) => error instanceof MyQuotaError });
+ai.fallbackModel([primary, backup], {
+  retryOn: (error) => isDefaultFallbackRetryable(error) || error instanceof MyQuotaError,
+});
+```
+
+A caller's own cancellation (an aborted `signal`, an abort error, a `cancelled` error) never advances the chain, whatever `retryOn` says.
+
+`retryOn` **replaces** the default set (it is not added to it). Pass an explicit `AIErrorCode[]` to pin exactly which codes fail over — for example, rate-limit and timeout only, treating generic 5xx as fatal:
 
 ```ts
 const rateLimitAndTimeoutOnly = ai.fallbackModel(

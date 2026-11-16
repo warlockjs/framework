@@ -643,3 +643,36 @@ describe("memory — working tier size bound (security)", () => {
     );
   });
 });
+
+describe("memory — scoped recall is one query", () => {
+  it("hands each tier's scope check to the store as a filter", async () => {
+    const embedder = new DeterministicEmbedder();
+    const store = makeStore();
+    const filters: unknown[] = [];
+    const original = store.similar.bind(store);
+
+    store.similar = ((vector: number[], options: { filter?: unknown }) => {
+      filters.push(options.filter);
+
+      return original(vector, options as never);
+    }) as typeof store.similar;
+
+    const mem = memory({
+      working: false,
+      defaultTier: "semantic",
+      semantic: { embedder, store, namespace: "sem" },
+      episodic: { embedder, store, namespace: "epi" },
+      procedural: { embedder, store, namespace: "pro" },
+    });
+
+    await mem.remember({ text: "alpha", scope: "a", tier: "semantic" });
+    await mem.remember({ text: "alpha", scope: "b", tier: "semantic" });
+    const hits = await mem.recall("alpha", { scope: "a", threshold: 0 });
+    await mem.recall("alpha", { scope: "a", threshold: 0, tier: "episodic" });
+    await mem.recall("alpha", { scope: "a", threshold: 0, tier: "procedural" });
+
+    expect(hits).toHaveLength(1);
+    expect(filters.length).toBeGreaterThanOrEqual(3);
+    expect(filters.every((filter) => typeof filter === "function")).toBe(true);
+  });
+});

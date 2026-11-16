@@ -68,6 +68,8 @@ handler.responseSchema = { 200: { body: { products: [ProductResource] } } };
 
 `description` and `responseSchema` feed the OpenAPI document ([`warlock generate.openapi`](../cli/openapi.md)), and `responseSchema` also types the client's API responses; see [Declare response types](./03-controllers.md#declare-response-types-with-responseschema).
 
+Set `http.compileResponseSchemas: true` (or `compileResponseSchema: true` on one route) to serialize responses through the declared `responseSchema`: the declared fields are written by a compiled serializer and any field the schema does not name is dropped. See [Declare response types](./03-controllers.md#declare-response-types-with-responseschema).
+
 The router doesn't care if you write the handler as `function`, `const = async`, or `({ request, response }) => ...` — anything callable works. Most projects use named `const` exports for the controller-per-file convention.
 
 ### Route options
@@ -112,7 +114,9 @@ A body over the route's limit gets Fastify's `413` (`FST_ERR_CTP_BODY_TOO_LARGE`
 
 `warlock dev` and the HTTP test server give the same results as a production build. The dev server registers one wildcard route, so it enforces each matched route's limit itself: a declared `Content-Length` above the limit is refused before any byte is read, and a chunked body is counted as it streams and refused as soon as it passes the limit. Changing a route's `bodyLimit` applies on the next hot reload, without a restart. The route's `preParsing` hooks run in dev too.
 
-Some `serverOptions` keys are read only when a route is registered and cannot be honoured by the dev wildcard: `schema`, `attachValidation`, `validatorCompiler`, `serializerCompiler`, `errorHandler`, `constraints`, `preSerialization`, `onSend`, `onResponse`, `onError`, `onTimeout`, `onRequestAbort` and `handler`. The dev server logs one warning per route and key when it boots, so the difference with production is visible.
+Some `serverOptions` keys are read only when a route is registered and cannot be honoured by the dev wildcard: `schema`, `attachValidation`, `validatorCompiler`, `serializerCompiler`, `errorHandler`, `constraints`, `preSerialization`, `onSend`, `onResponse`, `onError`, `onTimeout`, `onRequestAbort`, `handler` and `config`. The dev server logs one warning per route and key when it boots (and once for `http.compileResponseSchemas`, or for a route's `compileResponseSchema`, which the dev dispatcher does not apply), so the difference with production is visible.
+
+`config` is the per-route config that Fastify plugins read for the route they matched, for example a per-route `multipartOptions` file-size limit. The dev wildcard carries none of it, so a route that raises a limit this way gets the global `http.fileUploadLimit` under `warlock dev` and the HTTP test server, while a production build applies the route's value. Raise `http.fileUploadLimit` for development and keep the stricter per-route size in the schema (`v.file().maxSize(...)`); the route-level `uploads: { maxTotalSize }` works in both modes. The in-process helpers (`createTestHttpServer`, the integration harness) use the production scan and apply `config`.
 
 **Hooks in `serverOptions` are typed with `this`.** From fastify 5.12.8, which a fresh install or a lockfile update resolves (for example while upgrading Warlock.js), a route hook such as `onRequest` or `preHandler` is typed with `this: FastifyInstance`. Fastify binds `this` when it runs the hook, but a spec that calls the hook straight off the route options no longer typechecks (TS2740). Pass the instance yourself:
 

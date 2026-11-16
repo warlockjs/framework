@@ -73,3 +73,63 @@ describe("AuthTokenFamily", () => {
     ).rejects.toThrow("Token family belongs to a different user");
   });
 });
+
+describe("AuthTokenFamily bulk helpers", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  const row = (familyId: string, userId = 1) =>
+    ({
+      get: (key: string) => ({ family_id: familyId, user_id: userId, user_type: "user" })[key],
+    }) as never;
+
+  it("ensureMany inserts only the missing lineages, in one call", async () => {
+    vi.spyOn(AuthTokenFamily, "query").mockReturnValue({
+      whereIn: () => ({ get: async () => [row("a")] }),
+    } as never);
+    const createMany = vi.spyOn(AuthTokenFamily, "createMany").mockResolvedValue([] as never);
+
+    await AuthTokenFamily.ensureMany({ id: 1, userType: "user" } as never, ["a", "b", "c"]);
+
+    expect(createMany).toHaveBeenCalledOnce();
+    expect(createMany).toHaveBeenCalledWith([
+      { family_id: "b", user_id: 1, user_type: "user", revision: 0 },
+      { family_id: "c", user_id: 1, user_type: "user", revision: 0 },
+    ]);
+  });
+
+  it("ensureMany refuses a lineage owned by another user", async () => {
+    vi.spyOn(AuthTokenFamily, "query").mockReturnValue({
+      whereIn: () => ({ get: async () => [row("a", 2)] }),
+    } as never);
+
+    await expect(
+      AuthTokenFamily.ensureMany({ id: 1, userType: "user" } as never, ["a"]),
+    ).rejects.toThrow("Token family belongs to a different user");
+  });
+
+  it("ensureMany falls back to ensure() per lineage when the bulk insert races", async () => {
+    vi.spyOn(AuthTokenFamily, "query").mockReturnValue({
+      whereIn: () => ({ get: async () => [] }),
+    } as never);
+    vi.spyOn(AuthTokenFamily, "createMany").mockRejectedValue(new Error("duplicate key"));
+    const ensure = vi.spyOn(AuthTokenFamily, "ensure").mockResolvedValue({} as never);
+
+    await AuthTokenFamily.ensureMany({ id: 1, userType: "user" } as never, ["a", "b"]);
+
+    expect(ensure).toHaveBeenCalledTimes(2);
+  });
+
+  it("revokeAllFor advances the revision and stamps the marker in one update", async () => {
+    const atomic = vi.spyOn(AuthTokenFamily, "atomic").mockResolvedValue(2);
+
+    await expect(AuthTokenFamily.revokeAllFor({ id: 1, userType: "user" } as never)).resolves.toBe(
+      2,
+    );
+
+    expect(atomic).toHaveBeenCalledOnce();
+    expect(atomic).toHaveBeenCalledWith(
+      { user_id: 1, user_type: "user", revoked_at: null },
+      { $inc: { revision: 1 }, $set: { revoked_at: expect.any(Date) } },
+    );
+  });
+});

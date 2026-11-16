@@ -1,4 +1,4 @@
-import { Component, createElement, type ComponentType, type ReactNode } from "react";
+import { Component, createElement, Suspense, type ComponentType, type ReactNode } from "react";
 import type { SerializedErrorPageProps } from "../hydration-payload";
 import { renderBuiltInFallback } from "./built-in-error-fallback";
 
@@ -37,6 +37,13 @@ export class ErrorPageRenderGuard extends Component<
       return renderBuiltInFallback();
     }
 
-    return createElement(this.props.ErrorPage, this.props.errorPageProps);
+    // The page may be a lazy component (its chunk loads when an error is first
+    // shown), so it renders inside a Suspense. A chunk that fails to load
+    // throws into this guard and lands on the built-in fallback above.
+    return createElement(
+      Suspense,
+      { fallback: null },
+      createElement(this.props.ErrorPage, this.props.errorPageProps),
+    );
   }
 }

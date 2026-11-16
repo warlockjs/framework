@@ -5,7 +5,4 @@ export const mailFeature: FeatureDefinition = {
   dependencies: {
     nodemailer: "^10.1.4",
   },
-  devDependencies: {
-    "@types/nodemailer": "^8.0.0",
-  },
 };

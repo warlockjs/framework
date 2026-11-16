@@ -56,6 +56,26 @@ describe("request logging builds nothing no channel keeps", () => {
     expect(channel.entries).toHaveLength(0);
   });
 
+  it("builds a lazy message only when a channel keeps the line", () => {
+    const message = vi.fn(() => "Executing middleware auth");
+    const dropping = new CaptureChannel({ levels: ["error"] });
+    log.setChannels([dropping]);
+
+    const request = makeRequest();
+
+    request.log(message);
+
+    expect(message).not.toHaveBeenCalled();
+
+    const keeping = new CaptureChannel();
+    log.setChannels([keeping]);
+
+    request.log(message);
+
+    expect(message).toHaveBeenCalledTimes(1);
+    expect(keeping.entries.map((entry) => entry.message)).toEqual(["Executing middleware auth"]);
+  });
+
   it("still writes the phase lines a channel keeps", () => {
     const channel = new CaptureChannel();
     log.setChannels([channel]);

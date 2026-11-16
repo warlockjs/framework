@@ -29,6 +29,20 @@ You rarely write a resolver from scratch:
 - **`DatabaseAccessResolver`** (the eject) — reads roles from the `user_roles` table and maps them through the `roles` catalog table. Multi-role, per-tenant, runtime-editable. This is what `npx warlock add access` wires up, and it lives in your app at `src/app/access/services/access-resolver.ts`, so you own it.
 - **`DefaultAccessResolver`** (built into the package) — takes a fixed `{ role: [permissions] }` catalog inline and reads each user's roles from `user.get("roles")` (or a single `user.get("role")`). Zero tables. **Not tenant-aware** — it returns the same roles in every tenant; use the DB-backed resolver for per-tenant roles.
 
+## Skipping the shared cache
+
+By default the engine stores a resolver's results in the shared cache for `cacheTtl`, so a change made without `flush()` (or by another process) stays invisible until the entry expires. A resolver can opt out with `cacheable = false`:
+
+```ts
+class TokenClaimResolver implements AccessResolver {
+  public readonly cacheable = false; // every check reads straight from the resolver
+
+  // resolveRoles / resolvePermissions ...
+}
+```
+
+`DefaultAccessResolver` sets it: its sets are a pure function of the loaded user, so caching them only delayed role changes. Checks on one user object within a request still share a single resolution. **Upgrading:** an app using `DefaultAccessResolver` now sees a role change on the next request instead of after the cache TTL; a custom `readRoles` that is expensive should do its own memoizing. Resolvers that do not set `cacheable` (the database resolver included) keep their cached behaviour.
+
 ## Two independent axes
 
 `resolveRoles` and `resolvePermissions` can read **different** sources. A role can be a pure label (`admin`, `moderator`) while permissions come from somewhere else entirely:

@@ -315,7 +315,7 @@ const post = await Post.joinWith("author").first();
 post.author; // User model instance — pulled in via JOIN
 ```
 
-`.joinWith()` uses `LEFT JOIN` on SQL or `$lookup` on MongoDB, single query, related data hydrated into a proper model instance.
+`.joinWith()` uses `LEFT JOIN` on SQL, single query, related data hydrated into a proper model instance. On MongoDB it loads the relations with the same batched queries as `.with()` (one extra query per relation, never one per document), and accepts the same forms: names, an array of names, a `"id,name"` column shorthand, or a constraint callback.
 
 ### When to reach for which
 
@@ -397,15 +397,23 @@ const drafters = await User.query()
   .get();
 ```
 
-:::caution — MongoDB
-The `has` family (`has`, `whereHas`, `orWhereHas`, `doesntHave`, `whereDoesntHave`) runs on PostgreSQL. On MongoDB the query throws an `UnsupportedQueryOperationError` when it runs, rather than ignoring the condition and returning (or updating, or deleting) every row. Filter by the related ids instead:
+:::note — MongoDB
+The `has` family (`has`, `whereHas`, `orWhereHas`, `doesntHave`, `whereDoesntHave`) works on both drivers for `hasMany`, `hasOne`, `belongsTo` and `belongsToMany`, in reads, counts and pagination. On MongoDB each filter adds a `$lookup` on the related collection ahead of the `$match`, so an `orWhereHas` joins the same `$or` as your other conditions. The lookups run before your other filters, so index the related collection's foreign key, and prefer a selective `where()` on the main collection when the query is hot.
 
-```ts
-const authorIds = await Post.query().where("status", "published").pluck("authorId");
-const users = await User.query().whereIn("id", authorIds).get();
-```
+Two limits apply on MongoDB:
 
-On PostgreSQL the `count` of `has(relation, operator, count)` is bound as a parameter, and the operator must be one of `=`, `!=`, `<>`, `>`, `>=`, `<`, `<=`.
+- A write (`update()`, `delete()`, `unset()`, `increment()`) on a query that holds a relation filter throws `UnsupportedQueryOperationError`, because a write filter cannot carry a `$lookup`. Read the ids first and write with `whereIn`:
+
+  ```ts
+  const ids = await User.query()
+    .whereHas("posts", (q) => q.where("status", "published"))
+    .pluck("id");
+  await User.query().whereIn("id", ids).update({ author: true });
+  ```
+
+- A `whereHas` constraint callback cannot itself filter by another relation (nested `whereHas`); it throws the same error.
+
+The `count` of `has(relation, operator, count)` is bound as a value, never spliced into the query, and the operator must be one of `=`, `!=`, `<>`, `>`, `>=`, `<`, `<=` on both drivers.
 :::
 
 ### `.withCount()` — count without loading
@@ -417,7 +425,7 @@ const users = await User.query().withCount("posts").get();
 users[0].postsCount; // number
 ```
 
-Cascade adds a virtual `{relation}Count` field on each result. Cheaper than `.with()` when you only need the size.
+Cascade adds a virtual `{relation}Count` field on each result. Cheaper than `.with()` when you only need the size. It works on both drivers; on MongoDB the count comes from a `$lookup` with a `$count`, run after your filters (so a `limit()` counts only the page it keeps), or before them when a `where()` or `orderBy()` reads the count field. Give it a name with `withCount("posts as totalPosts")` or constrain it with `withCount({ posts: (q) => q.where("published", true) })`.
 
 ## Recap
 

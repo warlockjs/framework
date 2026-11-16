@@ -208,6 +208,53 @@ describe("loginThrottleMiddleware", () => {
     expect(cacheIncrement).toHaveBeenCalledOnce();
   });
 
+  it("warns once that the emailLock default changes in 6.0, and not when it is set", async () => {
+    vi.resetModules();
+    const fresh = await import("./login-throttle.middleware");
+    const { log: freshLog } = await import("@warlock.js/logger");
+
+    fresh.loginThrottleMiddleware({ emailLock: "pair" });
+    fresh.loginThrottleMiddleware({ by: ["ip"] });
+    expect(freshLog.warn).not.toHaveBeenCalled();
+
+    fresh.loginThrottleMiddleware({});
+    fresh.loginThrottleMiddleware({});
+
+    expect(freshLog.warn).toHaveBeenCalledOnce();
+    expect(vi.mocked(freshLog.warn).mock.calls[0]?.[2]).toContain("6.0");
+  });
+
+  it("keeps the shared IP bucket on a success when the account is tracked too", async () => {
+    cacheGet.mockResolvedValue(null);
+
+    const middleware = loginThrottleMiddleware({ by: ["email", "ip"] });
+    const response = buildResponse(true);
+
+    await middleware(makeCtx({ request: buildRequest(), response }));
+    await response.fireSent();
+
+    expect(cacheSet).toHaveBeenCalledWith(`auth.throttle.count.email.${SARA_KEY}`, 0, {
+      ttl: "15m",
+    });
+    expect(cacheSet).not.toHaveBeenCalledWith(`auth.throttle.count.ip.${IP_KEY}`, 0, {
+      ttl: "15m",
+    });
+    expect(cacheRemove).not.toHaveBeenCalledWith(`auth.throttle.lock.ip.${IP_KEY}`);
+  });
+
+  it("clears the IP bucket on a success when it is the only bucket tracked", async () => {
+    cacheGet.mockResolvedValue(null);
+
+    const middleware = loginThrottleMiddleware({ by: ["ip"] });
+    const response = buildResponse(true);
+
+    await middleware(makeCtx({ request: buildRequest(), response }));
+    await response.fireSent();
+
+    expect(cacheSet).toHaveBeenCalledWith(`auth.throttle.count.ip.${IP_KEY}`, 0, { ttl: "15m" });
+    expect(cacheRemove).toHaveBeenCalledWith(`auth.throttle.lock.ip.${IP_KEY}`);
+  });
+
   it.each([
     ["comes back empty", async () => null],
     ["holds something that is not a count", async () => "garbage"],

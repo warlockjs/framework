@@ -1,9 +1,10 @@
 import fastifyMultipart, { type MultipartFields, type MultipartFile } from "@fastify/multipart";
 import config from "@mongez/config";
 import { log } from "@warlock.js/logger";
-import type { FastifyRequest } from "fastify";
+import type { FastifyReply, FastifyRequest } from "fastify";
 import { environment } from "../utils/environment";
 import { HttpErrorCodes } from "./error-codes";
+import { attachSpool, PartSpooler, removeSpool, type SpooledPart } from "./multipart-spool";
 import { createRequestRefusal } from "./request-refusal";
 import type { FastifyInstance } from "./server";
 
@@ -14,14 +15,37 @@ export const DEFAULT_MULTIPART_MAX_TOTAL_SIZE = 25 * 1024 * 1024;
 export type MultipartRoutesMode = "declared" | "all";
 
 /** A route's `uploads` option. */
-export type RouteUploadsOption = boolean | { maxTotalSize?: number };
+export type RouteUploadsOption =
+  | boolean
+  | {
+      /** Cap on the bytes of all parts together; overrides `http.multipart.maxTotalSize`. */
+      maxTotalSize?: number;
+      /**
+       * Cap on the bytes of any one file on this route. It can only be stricter
+       * than `http.fileUploadLimit`, which the parser enforces for every route.
+       */
+      maxFileSize?: number;
+      /**
+       * Cap on the number of files on this route. It can only be stricter than
+       * `http.multipart.files`, which the parser enforces for every route.
+       */
+      maxFiles?: number;
+    };
 
 type MultipartState = {
   maxTotalSize: number;
   fileBytes: number;
+  /** The route's own per-file cap, when it sets one. */
+  maxFileSize?: number;
+  /** The route's own file count cap, when it sets one. */
+  maxFiles?: number;
+  fileCount: number;
 };
 
 const states = new WeakMap<FastifyRequest, MultipartState>();
+
+/** Temporary files made for one request, removed when its response closes. */
+const requestSpools = new WeakMap<FastifyRequest, SpooledPart[]>();
 
 let warnedAllRoutes = false;
 
@@ -35,6 +59,8 @@ let warnedAllRoutes = false;
  *   refused with 413 as soon as it passes the cap instead of after it is
  *   fully buffered. A declared `Content-Length` above the cap is refused
  *   before a single byte is read;
+ * - a route's `uploads.maxFileSize` and `uploads.maxFiles`, enforced here for
+ *   the matched route, so they apply under `warlock dev` and in production;
  * - `http.multipart.routes: "declared"` parses multipart only on routes that
  *   set `uploads`, and answers 415 everywhere else.
  */
@@ -48,14 +74,23 @@ export function registerMultipart(server: FastifyInstance) {
     log.warn(
       "http",
       "multipart",
-      'Every route accepts multipart uploads, parsed before route middleware (auth included) runs. Set http.multipart.routes to "declared" and add `uploads: true` to the routes that take files.',
+      'Every route accepts multipart uploads, parsed before route middleware (auth included) runs. The default of http.multipart.routes changes from "all" to "declared" in 6.0. Set it to "declared" now and add `uploads: true` to the routes that take files.',
     );
   }
 
   // Runs before the plugin's own parsing hook: registered now, while the
   // plugin itself is only queued.
-  server.addHook("preValidation", async (request: FastifyRequest) => {
+  server.addHook("preValidation", async (request: FastifyRequest, reply: FastifyReply) => {
     if (!isMultipartRequest(request)) return;
+
+    // temporary files of this request go when its response closes
+    reply.raw.once("close", () => {
+      for (const spool of requestSpools.get(request) ?? []) {
+        if (!spool.kept) void removeSpool(spool);
+      }
+
+      requestSpools.delete(request);
+    });
 
     const uploads = routeUploadsOption(request);
 
@@ -69,7 +104,13 @@ export function registerMultipart(server: FastifyInstance) {
 
     const maxTotalSize = resolveMaxTotalSize(uploads);
 
-    states.set(request, { maxTotalSize, fileBytes: 0 });
+    states.set(request, {
+      maxTotalSize,
+      fileBytes: 0,
+      fileCount: 0,
+      maxFileSize: resolveRouteLimit(uploads, "maxFileSize"),
+      maxFiles: resolveRouteLimit(uploads, "maxFiles"),
+    });
 
     const declaredLength = Number(request.headers["content-length"]);
 
@@ -116,37 +157,78 @@ export function registerMultipart(server: FastifyInstance) {
  * through `toBuffer()`), refusing the request once its parts pass the total.
  */
 export async function bufferFilePart(this: FastifyRequest, part: MultipartFile): Promise<void> {
-  const state = states.get(this) ?? { maxTotalSize: resolveMaxTotalSize(undefined), fileBytes: 0 };
+  const state = states.get(this) ?? {
+    maxTotalSize: resolveMaxTotalSize(undefined),
+    fileBytes: 0,
+    fileCount: 0,
+  };
 
   states.set(this, state);
 
-  // fields do not change while a file part streams
-  const fieldsSoFar = fieldBytes(part.fields);
-  const chunks: Buffer[] = [];
+  state.fileCount += 1;
 
-  for await (const chunk of part.file) {
-    state.fileBytes += (chunk as Buffer).length;
-
-    if (state.fileBytes + fieldsSoFar > state.maxTotalSize) {
-      // leaving the loop destroys the part's stream and stops the parse
-      throw multipartTooLarge(state.maxTotalSize);
-    }
-
-    chunks.push(chunk as Buffer);
+  if (state.maxFiles !== undefined && state.fileCount > state.maxFiles) {
+    throw multipartTooManyFiles(state.maxFiles);
   }
 
-  if (part.file.truncated) {
-    const error = new this.server.multipartErrors.RequestFileTooLargeError();
+  // fields do not change while a file part streams
+  const fieldsSoFar = fieldBytes(part.fields);
+  const memoryLimit = resolveMemoryLimit();
+  const spooler = new PartSpooler(memoryLimit ?? Number.POSITIVE_INFINITY);
 
-    (error as { part?: MultipartFile }).part = part;
+  let partBytes = 0;
+
+  try {
+    for await (const chunk of part.file) {
+      state.fileBytes += (chunk as Buffer).length;
+      partBytes += (chunk as Buffer).length;
+
+      if (state.maxFileSize !== undefined && partBytes > state.maxFileSize) {
+        throw multipartFileTooLarge(state.maxFileSize);
+      }
+
+      if (state.fileBytes + fieldsSoFar > state.maxTotalSize) {
+        // leaving the loop destroys the part's stream and stops the parse
+        throw multipartTooLarge(state.maxTotalSize);
+      }
+
+      await spooler.write(chunk as Buffer);
+    }
+
+    if (part.file.truncated) {
+      const error = new this.server.multipartErrors.RequestFileTooLargeError();
+
+      (error as { part?: MultipartFile }).part = part;
+
+      throw error;
+    }
+  } catch (error) {
+    await spooler.abort();
 
     throw error;
   }
 
-  const buffer = Buffer.concat(chunks);
+  const spool = await spooler.finish();
+
+  if (spool) {
+    const spools = requestSpools.get(this) ?? [];
+
+    spools.push(spool);
+    requestSpools.set(this, spools);
+    attachSpool(part, spool);
+
+    return;
+  }
 
   // the plugin's own `toBuffer()` returns this cached buffer
-  (part as MultipartFile & { _buf: Buffer | null })._buf = buffer;
+  (part as MultipartFile & { _buf: Buffer | null })._buf = spooler.memory() ?? Buffer.alloc(0);
+}
+
+/** `http.multipart.memoryLimit`: parts above it are spooled to disk. Off when unset. */
+function resolveMemoryLimit(): number | undefined {
+  const configured = config.get("http.multipart.memoryLimit");
+
+  return isPositiveInteger(configured) ? configured : undefined;
 }
 
 function isMultipartRequest(request: FastifyRequest): boolean {
@@ -179,6 +261,15 @@ function resolveMaxTotalSize(uploads: RouteUploadsOption | undefined): number {
   return isPositiveInteger(configured) ? configured : DEFAULT_MULTIPART_MAX_TOTAL_SIZE;
 }
 
+function resolveRouteLimit(
+  uploads: RouteUploadsOption | undefined,
+  name: "maxFileSize" | "maxFiles",
+): number | undefined {
+  const limit = typeof uploads === "object" && uploads !== null ? uploads[name] : undefined;
+
+  return isPositiveInteger(limit) ? limit : undefined;
+}
+
 function isPositiveInteger(value: unknown): value is number {
   return typeof value === "number" && Number.isInteger(value) && value > 0;
 }
@@ -188,6 +279,22 @@ function multipartTooLarge(maxTotalSize: number) {
     413,
     HttpErrorCodes.MultipartTooLarge,
     `The upload is larger than ${maxTotalSize} bytes in total. Send smaller files, or raise http.multipart.maxTotalSize (or the route's uploads.maxTotalSize).`,
+  );
+}
+
+function multipartFileTooLarge(maxFileSize: number) {
+  return createRequestRefusal(
+    413,
+    HttpErrorCodes.MultipartTooLarge,
+    `A file is larger than ${maxFileSize} bytes. Send a smaller file, or raise the route's uploads.maxFileSize (it cannot exceed http.fileUploadLimit).`,
+  );
+}
+
+function multipartTooManyFiles(maxFiles: number) {
+  return createRequestRefusal(
+    413,
+    HttpErrorCodes.MultipartTooLarge,
+    `The upload has more than ${maxFiles} files. Send fewer files, or raise the route's uploads.maxFiles (it cannot exceed http.multipart.files).`,
   );
 }
 

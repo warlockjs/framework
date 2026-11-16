@@ -304,8 +304,9 @@ allowedHosts: ["example.com", ".example.com"],
 
 - **`http.requestTimeout`** (default `300000`, 5 minutes) bounds how long a client may take to send one request, headers and body. It does not limit the response, so event streams and long downloads are unaffected. `0` turns it off; `serverOptions.requestTimeout` wins over it. Raise it for large uploads on slow connections.
 - **`http.input.maxArrayIndex`** (default `1000`): query, urlencoded and multipart keys that name a larger array index (`a[4294967294]=x`) are dropped, so one short key cannot create a huge sparse array.
+- **`http.input.maxDepth`** (default `32`): query, urlencoded and multipart keys nested deeper (`a[b][c]...`) are dropped, and a JSON body whose objects and arrays nest deeper is refused with 400 (`code: "EC111"`), so later walks over the input (validation, logging, cloning) cannot recurse without bound.
 - **`http.urlencoded.maxFields`** (default `1000`): a form body with more fields is answered 413 (`code: "EC107"`).
-- Multipart limits (`http.multipart.maxTotalSize`, `http.multipart.routes`) are described in [File uploads](./file-uploads.md).
+- Multipart limits (`http.multipart.maxTotalSize`, `http.multipart.memoryLimit`, `http.multipart.routes`, whose default changes to `"declared"` in 6.0) are described in [File uploads](./file-uploads.md).
 
 #### The value is validated at boot (5.2)
 

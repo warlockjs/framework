@@ -8,23 +8,32 @@ import { makeSpan, makeTrace } from "../test-support/make-trace";
 import { DEFAULT_TRACE_LIST_LIMIT } from "./parse-query";
 import { createRequestHandler, type ServeConfig } from "./serve";
 
-function fakeReq(url: string, method = "GET"): IncomingMessage {
+function fakeReq(
+  url: string,
+  method = "GET",
+  extraHeaders: Record<string, string> = {},
+): IncomingMessage {
   return {
     url,
     method,
-    headers: { host: "127.0.0.1:4319" },
+    headers: { host: "127.0.0.1:4319", ...extraHeaders },
   } as unknown as IncomingMessage;
 }
 
-type Captured = { status: number; body: string };
+type Captured = {
+  status: number;
+  body: string;
+  headers: Record<string, string | number | string[]>;
+};
 
 function fakeRes(): ServerResponse & { captured: Captured } {
-  const captured: Captured = { status: 0, body: "" };
+  const captured: Captured = { status: 0, body: "", headers: {} };
   const res = {
     captured,
     headersSent: false,
-    writeHead(status: number) {
+    writeHead(status: number, headers?: Record<string, string | number | string[]>) {
       captured.status = status;
+      captured.headers = headers ?? {};
       res.headersSent = true;
       return res;
     },
@@ -170,5 +179,41 @@ describe("dashboard serve — trace list", () => {
 
     expect(trace.root.output).toBe("a long captured answer");
     expect(trace.root.children).toHaveLength(1);
+  });
+});
+
+describe("dashboard serve — conditional trace list", () => {
+  it("answers 304 without a body when If-None-Match matches, and 200 once the list changes", () => {
+    const store = createInMemoryTraceStore();
+
+    store.add(makeTrace({ traceId: "t1", startedAt: "2026-01-01T00:00:00.000Z" }));
+
+    const first = get(store, "/api/traces");
+    const etag = String(first.headers.etag);
+
+    expect(first.status).toBe(200);
+    expect(etag).toMatch(/^W\/"/);
+
+    const again = fakeRes();
+
+    createRequestHandler(store, baseConfig)(
+      fakeReq("/api/traces", "GET", { "if-none-match": etag }),
+      again,
+    );
+
+    expect(again.captured.status).toBe(304);
+    expect(again.captured.body).toBe("");
+
+    store.add(makeTrace({ traceId: "t2", startedAt: "2026-01-02T00:00:00.000Z" }));
+
+    const changed = fakeRes();
+
+    createRequestHandler(store, baseConfig)(
+      fakeReq("/api/traces", "GET", { "if-none-match": etag }),
+      changed,
+    );
+
+    expect(changed.captured.status).toBe(200);
+    expect(changed.captured.headers.etag).not.toBe(etag);
   });
 });

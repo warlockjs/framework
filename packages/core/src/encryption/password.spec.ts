@@ -2,7 +2,7 @@ import config from "@mongez/config";
 import { log } from "@warlock.js/logger";
 import bcryptjs from "bcryptjs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { hashPassword, verifyPassword } from "./password";
+import { hashPassword, needsRehash, verifyPassword } from "./password";
 
 /**
  * Stands in for the optional native `bcrypt` module (not installed in this
@@ -25,6 +25,8 @@ vi.mock("bcrypt", async () => {
 beforeEach(() => {
   config.set("encryption.password.salt", 4);
   config.set("encryption.password.rejectLongPasswords", false);
+  config.set("encryption.password.driver", undefined);
+  config.set("encryption.password.scrypt", { cost: 1024 });
   native.hash.mockClear();
   native.compare.mockClear();
 });
@@ -77,5 +79,92 @@ describe("passwords longer than 72 bytes", () => {
 
     await expect(hashPassword("é".repeat(40))).rejects.toThrow("Password is too long");
     await expect(hashPassword("a".repeat(72))).resolves.toMatch(/^\$2[ab]\$/);
+  });
+});
+
+describe("scrypt driver", () => {
+  beforeEach(() => {
+    config.set("encryption.password.driver", "scrypt");
+  });
+
+  it("hashes with scrypt and verifies the right password only", async () => {
+    const hash = await hashPassword("s3cret-pass");
+
+    expect(hash).toMatch(/^\$scrypt\$N=1024,r=8,p=1\$/);
+    expect(await verifyPassword("s3cret-pass", hash)).toBe(true);
+    expect(await verifyPassword("s3cret-pasS", hash)).toBe(false);
+    expect(native.hash).not.toHaveBeenCalled();
+  });
+
+  it("salts every hash", async () => {
+    expect(await hashPassword("same")).not.toBe(await hashPassword("same"));
+  });
+
+  it("does not stop at 72 bytes", async () => {
+    const long = "a".repeat(80);
+    const hash = await hashPassword(long);
+
+    expect(await verifyPassword(`${"a".repeat(72)}b`, hash)).toBe(false);
+    expect(await verifyPassword(long, hash)).toBe(true);
+  });
+
+  it("rejects a malformed or tampered scrypt hash", async () => {
+    const hash = await hashPassword("tamper");
+
+    expect(await verifyPassword("tamper", "$scrypt$garbage")).toBe(false);
+    expect(await verifyPassword("tamper", hash.slice(0, -6) + "AAAAAA")).toBe(false);
+    expect(await verifyPassword("tamper", "$scrypt$N=3,r=8,p=1$AAAA$AAAA")).toBe(false);
+  });
+
+  it("verifies a bcrypt hash while scrypt is the driver", async () => {
+    const bcryptHash = await bcryptjs.hash("older", 4);
+
+    expect(await verifyPassword("older", bcryptHash)).toBe(true);
+    expect(await verifyPassword("other", bcryptHash)).toBe(false);
+  });
+
+  it("verifies a scrypt hash after switching back to bcrypt", async () => {
+    const hash = await hashPassword("roundabout");
+
+    config.set("encryption.password.driver", undefined);
+
+    expect(await verifyPassword("roundabout", hash)).toBe(true);
+  });
+});
+
+describe("needsRehash()", () => {
+  it("is false for a bcrypt hash at the configured cost", async () => {
+    expect(needsRehash(await hashPassword("x"))).toBe(false);
+  });
+
+  it("is true for a bcrypt hash at another cost", async () => {
+    expect(needsRehash(await bcryptjs.hash("x", 5))).toBe(true);
+  });
+
+  it("is true for a bcrypt hash when scrypt is the driver, and the other way round", async () => {
+    const bcryptHash = await hashPassword("x");
+
+    config.set("encryption.password.driver", "scrypt");
+    const scryptHash = await hashPassword("x");
+
+    expect(needsRehash(bcryptHash)).toBe(true);
+    expect(needsRehash(scryptHash)).toBe(false);
+
+    config.set("encryption.password.driver", undefined);
+    expect(needsRehash(scryptHash)).toBe(true);
+  });
+
+  it("is true for a scrypt hash made with other parameters", async () => {
+    config.set("encryption.password.driver", "scrypt");
+    const hash = await hashPassword("x");
+
+    config.set("encryption.password.scrypt", { cost: 2048 });
+
+    expect(needsRehash(hash)).toBe(true);
+  });
+
+  it("is false for a value in no known format", () => {
+    expect(needsRehash("not-a-hash")).toBe(false);
+    expect(needsRehash("")).toBe(false);
   });
 });

@@ -47,7 +47,7 @@ const forbiddenPage: DiscoveredPage = {
 };
 
 describe("generateClientRegistry: forbidden page", () => {
-  it("projects the forbidden page into every route's composition next to ErrorPage", async () => {
+  it("projects the forbidden page into every route's composition as an on-demand loader next to the error page's", async () => {
     const contents = generateClientRegistry({
       // No setup file: a data: URL stub cannot carry the `?warlock-setup-register` suffix.
       pages: [page, errorPage, { ...forbiddenPage, setupFile: undefined }],
@@ -56,12 +56,28 @@ describe("generateClientRegistry: forbidden page", () => {
     const [entry] = await evaluate(contents);
     const composition = await entry!.load();
 
-    expect((composition.ErrorPage as { sourceFile: string }).sourceFile).toBe(
+    // Neither page is part of the route's own load; each loads when asked for.
+    expect(Object.prototype.hasOwnProperty.call(composition, "ErrorPage")).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(composition, "ForbiddenPage")).toBe(false);
+
+    expect(((await composition.loadErrorPage!()) as { sourceFile: string }).sourceFile).toBe(
       "C:/app/src/web/error.page.tsx",
     );
-    expect((composition.ForbiddenPage as { sourceFile: string }).sourceFile).toBe(
+    expect(((await composition.loadForbiddenPage!()) as { sourceFile: string }).sourceFile).toBe(
       "C:/app/src/web/forbidden.page.tsx",
     );
+  });
+
+  it("shares one loaded module per special page across every route", async () => {
+    const contents = generateClientRegistry({
+      pages: [page, { ...page, routeName: "staff.other", routePath: "/other" }, errorPage],
+      toImportSpecifier: stubSpecifier,
+    });
+    const [first, second] = await evaluate(contents);
+    const loadedFirst = await (await first!.load()).loadErrorPage!();
+    const loadedSecond = await (await second!.load()).loadErrorPage!();
+
+    expect(loadedFirst).toBe(loadedSecond);
   });
 
   it("registers the forbidden page's setup module the way the error page's is", () => {
@@ -70,16 +86,16 @@ describe("generateClientRegistry: forbidden page", () => {
       toImportSpecifier: (file) => `import:${file}`,
     });
 
-    expect(contents).toContain("ForbiddenPageSetupModule");
+    expect(contents).toContain("loadForbiddenPageModule");
     expect(contents).toContain("import:C:/app/src/web/forbidden.setup.ts?warlock-setup-register");
   });
 
-  it("omits ForbiddenPage entirely when the app has none", async () => {
+  it("omits the forbidden page loader entirely when the app has none", async () => {
     const [entry] = await evaluate(
       generateClientRegistry({ pages: [page, errorPage], toImportSpecifier: stubSpecifier }),
     );
     const composition = await entry!.load();
 
-    expect(Object.prototype.hasOwnProperty.call(composition, "ForbiddenPage")).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(composition, "loadForbiddenPage")).toBe(false);
   });
 });

@@ -177,6 +177,16 @@ An overloaded API (HTTP 503 / `server_is_overloaded`) surfaces as
 `retryable: true`). Every provider error carries `status`, `retryable`
 and `billed` (`false` for 401 / 402 / 403, otherwise `"unknown"`).
 
+An account that is out of credit surfaces as `QuotaExceededError`
+(`code: "PROVIDER_QUOTA_EXCEEDED"`, not retryable), whatever the status. It is
+recognized from the error `code` (`insufficient_quota`,
+`credit_balance_exhausted`, `billing_hard_limit_reached`, `billing_not_active`)
+or from `type: "insufficient_quota"`, so a 429 for spent credit is not retried
+as a rate limit. A plain 429 stays `ProviderRateLimitError`. The default
+fallback chain does not advance on `PROVIDER_QUOTA_EXCEEDED`; pass it in
+`alsoRetryOn` of the fallback model to switch providers when credit runs out. The same mapping covers
+the OpenAI-compatible providers (DeepSeek, Groq, xAI, Mistral).
+
 ### Prompt-cache hints
 
 `openai.model({ name, promptCacheKey, promptCacheRetention })` sends

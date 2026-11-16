@@ -52,6 +52,13 @@ export class User extends Auth<UserSchema> {
   public static embed = ["id", "name"];
 
   /**
+   * Columns that mass assignment (`merge()`, `create()`, ...) never writes.
+   * Promote an account on purpose with `user.forceMerge({ role: "admin" })`
+   * or `User.forceCreate({ ..., role: "admin" })`.
+   */
+  public static guarded = ["role"];
+
+  /**
    * Resource to be used when converting the model to JSON
    */
   public static resource = UserResource;

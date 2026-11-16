@@ -273,6 +273,7 @@ export const config = {
 - `tags` is a static list, or a function `(data, { shared }) => string[]` of the
   resolved page data and the request's sealed `shared` payload, evaluated right
   before the entry is stored — e.g. ``[`theme:${shared.theme}`]``.
+- A HIT carries a weak `ETag` of the stored body and answers `304` to a matching `If-None-Match`. With `http.compression` on, entries are compressed once at store time and a HIT sends the stored gzip or brotli form with `Vary: Accept-Encoding`. In multi-site mode a CDN must key on the same host the origin selects from; if it keys on `Host` but forwards a client `X-Forwarded-Host`, it can store one site's page under another's URL, so overwrite or strip that header at the edge.
 - `ttl` is the server cache's own freshness window in seconds, independent of
   the CDN-facing `maxAge`; omit it to reuse `maxAge`.
 - `varyBy?: (request) => string` adds a request-derived component to the key,
@@ -313,7 +314,7 @@ writes the crawler-specific render).
 **Response headers**: `x-warlock-cache: hit | miss | bypass`, alongside the
 usual `Cache-Control`. A `cache` route's `Vary` lists `x-warlock-data`, then
 `Cookie, locale` unless the URL pinned the locale or the app has one locale,
-`User-Agent` when the page defers, and `cache.varyHeaders`.
+`User-Agent` when the page defers, and `cache.varyHeaders`. A failure page for that route carries the same value.
 
 **Variant ceiling**: `pageCache.maxEntriesPerRoute` (default `1_000`, `false`
 removes it) caps the stored query variants per route and process; a new
@@ -455,6 +456,7 @@ export default function NotFoundPage() {
 }
 ```
 
+- **API requests never get this page.** A request that matches no route and does not explicitly accept `text/html` (or is not `GET`/`HEAD`) is answered `404` JSON `{ error, code: "route_not_found", path, method, requestId }`; `error` is `request.t("web.errors.routeNotFound")` (built-in English and Arabic text when the key is not defined).
 - **No `config.route`.** It has no URL of its own and answers every URL nothing else matched. Declaring a route on it is a build error, and a second `404.page.tsx` is a build error naming both files.
 - **Props.** The default component receives the usual `{ data, shared, params }`: `shared` is the sealed payload, `params` is empty, and there is no page data because its own `loader` never runs. Its `register()` and `config.middleware` still run and `config.metadata` still applies. Keep the metadata static, since there is no `data` to read.
 - **No loader.** A `loader` export on it is ignored. The `root.setup.ts` app loader still runs on a 404, so keep it cheap.
@@ -523,7 +525,14 @@ export default function ForbiddenPage({ status }: ErrorPageProps) {
 }
 ```
 
-Pair it with `forbidden.setup.ts` for `config.metadata`. It follows the same rules as `error.page.tsx`: no `config.route`, a second `forbidden.page.tsx` is a build error naming both files, `robots: noindex` by default, and it receives the same `{ error, status }` props (plus `debug` outside production). In multi-site mode each site folder (`$sites/<name>/forbidden.page.tsx`) owns its own. The page that renders for a refusal is picked in this order: the site's (or the app's) `forbidden.page.tsx`, then its `error.page.tsx` with the 401/403 status, then the framework default. The framework default is a plain accessible page with the request id, the development details outside production and a "Back to home" link. Hydration uses the same pick, so the page the server rendered is the page the browser hydrates.
+Pair it with `forbidden.setup.ts` for `config.metadata`. It follows the same rules as `error.page.tsx`: no `config.route`, a second `forbidden.page.tsx` is a build error naming both files, `robots: noindex` by default, and it receives the same `{ error, status }` props (plus `debug` outside production). In multi-site mode each site folder (`$sites/<name>/forbidden.page.tsx`) owns its own. The page that renders for a refusal is picked in this order: the site's (or the app's) `forbidden.page.tsx`, then its `error.page.tsx` with the 401/403 status, then the framework default. The framework default is a plain accessible page with the request id, the development details outside production and a "Back to home" link. Hydration uses the same pick, so the page the server rendered is the page the browser hydrates. The refusal page renders inside the site's root and the layout beside it in the web root, and falls back to the framework document if those fail to load or render.
+
+A refusal core raises before routing (a dot-segment path, a malformed URL) renders this same page inside the web root's `root.tsx` and layouts when they load (and in the framework document when they do not or throw), with the URL's locale prefix selecting the locale under locale routing, and, in production, `error.errorCode` set to the request id (`debug.requestId` in development) so the page can show it to the visitor.
+
+## Config that bounds and speeds up a document
+
+- `web.shellTimeout` (ms, default 30000, 90000 in `warlock dev`, `0` off): a document shell that suspends outside every `<Suspense>` and is not ready in time is aborted and answers `error.page.tsx` with status 504.
+- `web.earlyHints` (default `false`): sends a `103 Early Hints` with `Link` preloads for the hydration entry, its module preloads and the page's stylesheets before the loaders run. Document requests only; a client, runtime or proxy without support ignores it.
 
 ## The `register()` hook
 

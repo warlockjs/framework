@@ -86,3 +86,16 @@ describe("snapshot memory store", () => {
     expect(store.schema()).toBe("");
   });
 });
+
+describe("memory snapshot store markPending", () => {
+  it("sets pending on a stored snapshot and reports false for a missing one", async () => {
+    const store = memory<{ runId: string; pending?: unknown }>();
+
+    expect(await store.markPending?.("run-1", { runId: "x" })).toBe(false);
+
+    await store.save({ runId: "run-1" });
+
+    expect(await store.markPending?.("run-1", { runId: "x" })).toBe(true);
+    expect(await store.load("run-1")).toEqual({ runId: "run-1", pending: { runId: "x" } });
+  });
+});

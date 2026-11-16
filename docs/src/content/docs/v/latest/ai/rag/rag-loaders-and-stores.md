@@ -143,26 +143,32 @@ Index and query MUST use the same embedding model. The `vector(N)` width is fixe
 
 `query()` runs the cosine floor (`threshold`) and `tags` overlap filter **in SQL** — a below-floor row never crosses the wire — orders by cosine distance, caps at `topK`, and maps the pgvector distance back to a `[0,1]` similarity `score`, the same scale the cache store emits. `removeNamespace()` is a prefix DELETE that escapes `_` / `%`, so dropping `ai.rag.docs` never also catches `ai.rag.docs2`.
 
+:::note
+`ai.rag.pgVectorStore` returns a `VectorStore`. Pass it straight to `ai.rag({ store })` (a cache driver is wrapped for you, a `VectorStore` is used as is), or call `upsert` / `query` / `removeNamespace` on it yourself when you build your own retrieval. `rag.clear()` uses the store's `list()` and `remove()` to drop only the rag's own chunks, so a nested namespace such as `kb.acme.private` survives `kb.acme` being cleared.
+:::
+
 ## Real-world — a knowledge base from a website, backed by pgvector
 
-Crawl a few pages (SSRF-safe) and a spec PDF into one namespace, then retrieve with page-precise citations:
+Crawl a few pages (SSRF-safe) and a spec PDF into one namespace, then retrieve with page-precise citations. `ai.rag({ store })` takes a `@warlock.js/cache` driver or a `VectorStore`. This example uses the `pg` cache driver configured with `vector`; `ai.rag.pgVectorStore({ client: pool })` works in the same place:
 
 ```ts
 import { readFile } from "node:fs/promises";
 import { Pool } from "pg";
 import { ai } from "@warlock.js/ai";
 import { OpenAISDK } from "@warlock.js/ai-openai";
+import { PgCacheDriver } from "@warlock.js/cache";
 
 const openai = new OpenAISDK({ apiKey: process.env.OPENAI_API_KEY! });
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
-const store = ai.rag.pgVectorStore({ client: pool, dimensions: 1536 });
-await pool.query(store.ensureSchema()); // once at boot / migration
+const driver = new PgCacheDriver();
+driver.setOptions({ client: pool, table: "kb_vectors", vector: { dimensions: 1536 } });
+await pool.query(driver.schema()); // once at boot / migration
 
 const kb = ai.rag({
   name: "docs",
   embedder: openai.embedder({ name: "text-embedding-3-small" }), // 1536 dims — matches the DDL
-  store,
+  store: driver,
 });
 
 for (const url of ["https://docs.example.com/intro", "https://docs.example.com/config"]) {

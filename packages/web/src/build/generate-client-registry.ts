@@ -136,9 +136,7 @@ function assertUniqueNames(pages: readonly DiscoveredRoutablePage[]): void {
 function loadSource(
   page: DiscoveredRoutablePage,
   errorPageFile: string | undefined,
-  errorSetupFile: string | undefined,
   forbiddenPageFile: string | undefined,
-  forbiddenSetupFile: string | undefined,
   toImportSpecifier: (file: string) => string,
 ): string[] {
   // These bindings deliberately retain the REAL module namespace objects
@@ -187,40 +185,14 @@ function loadSource(
     }
   }
 
-  let errorModule = "";
-  if (errorPageFile !== undefined) {
-    bindings.push("ErrorPageModule");
-    specifiers.push(toImportSpecifier(errorPageFile));
-    if (errorSetupFile !== undefined) {
-      bindings.push("ErrorPageSetupModule");
-      specifiers.push(`${toImportSpecifier(errorSetupFile)}?warlock-setup-register`);
-      errorModule =
-        "{ ...ErrorPageModule, ...(ErrorPageSetupModule.register === undefined ? {} : { register: ErrorPageSetupModule.register }) }";
-    } else {
-      errorModule = "ErrorPageModule";
-    }
-  }
-
-  let forbiddenModule = "";
-  if (forbiddenPageFile !== undefined) {
-    bindings.push("ForbiddenPageModule");
-    specifiers.push(toImportSpecifier(forbiddenPageFile));
-    if (forbiddenSetupFile !== undefined) {
-      bindings.push("ForbiddenPageSetupModule");
-      specifiers.push(`${toImportSpecifier(forbiddenSetupFile)}?warlock-setup-register`);
-      forbiddenModule =
-        "{ ...ForbiddenPageModule, ...(ForbiddenPageSetupModule.register === undefined ? {} : { register: ForbiddenPageSetupModule.register }) }";
-    } else {
-      forbiddenModule = "ForbiddenPageModule";
-    }
-  }
-
   // `App` is OMITTED, never emitted as `App: undefined`: the runtime validator
   // reads an own `App` key as a promise that a module namespace is behind it.
   const app = page.appFile === undefined ? "" : `, App: ${appModule}`;
-  const errorPage = errorPageFile === undefined ? "" : `, ErrorPage: ${errorModule}`;
+  // The error and forbidden pages are NOT imported here: a page that renders
+  // fine never needs them, so their chunks load only when an error is shown.
+  const errorPage = errorPageFile === undefined ? "" : ", loadErrorPage: loadErrorPageModule";
   const forbiddenPage =
-    forbiddenPageFile === undefined ? "" : `, ForbiddenPage: ${forbiddenModule}`;
+    forbiddenPageFile === undefined ? "" : ", loadForbiddenPage: loadForbiddenPageModule";
 
   const pageModule =
     page.setupFile === undefined
@@ -238,12 +210,49 @@ function loadSource(
   ];
 }
 
+/**
+ * The shared loader of the error or forbidden page, emitted once above the
+ * registry. Every route's composition points at it, so the page's chunk is
+ * requested the first time an error is shown and its setup `register` runs on
+ * one module object. Nothing is emitted when the app has no such page.
+ */
+function specialPageLoaderSource(
+  name: string,
+  pageFile: string | undefined,
+  setupFile: string | undefined,
+  toImportSpecifier: (file: string) => string,
+): string[] {
+  if (pageFile === undefined) return [];
+
+  const imports = [`import(${quote(toImportSpecifier(pageFile))})`];
+
+  if (setupFile !== undefined) {
+    imports.push(`import(${quote(`${toImportSpecifier(setupFile)}?warlock-setup-register`)})`);
+  }
+
+  const merged =
+    setupFile === undefined
+      ? "pageModule"
+      : "{ ...pageModule, ...(setupModule.register === undefined ? {} : { register: setupModule.register }) }";
+
+  return [
+    `let ${name}Promise: Promise<Record<string, unknown>> | undefined;`,
+    `const ${name} = () =>`,
+    `  (${name}Promise ??= Promise.all([${imports.join(", ")}])`,
+    `    .then(([pageModule${setupFile === undefined ? "" : ", setupModule"}]) => (${merged}) as Record<string, unknown>)`,
+    "    .catch((error) => {",
+    "      // A failed load (a dropped connection) is retried by the next error, not cached.",
+    `      ${name}Promise = undefined;`,
+    "      throw error;",
+    "    }));",
+    "",
+  ];
+}
+
 function entrySource(
   page: DiscoveredRoutablePage,
   errorPageFile: string | undefined,
-  errorSetupFile: string | undefined,
   forbiddenPageFile: string | undefined,
-  forbiddenSetupFile: string | undefined,
   toImportSpecifier: (file: string) => string,
 ): string[] {
   return [
@@ -255,14 +264,7 @@ function entrySource(
     // convention waiting to disagree with the server's.
     `    name: ${quote(page.routeName)},`,
     `    path: ${quote(page.routePath)},`,
-    ...loadSource(
-      page,
-      errorPageFile,
-      errorSetupFile,
-      forbiddenPageFile,
-      forbiddenSetupFile,
-      toImportSpecifier,
-    ),
+    ...loadSource(page, errorPageFile, forbiddenPageFile, toImportSpecifier),
     "  },",
   ];
 }
@@ -304,16 +306,21 @@ export function generateClientRegistry(options: GenerateClientRegistryOptions): 
       ? [`${declaration} [];`]
       : [
           ...HEADER,
+          ...specialPageLoaderSource(
+            "loadErrorPageModule",
+            errorPageFile,
+            errorSetupFile,
+            toImportSpecifier,
+          ),
+          ...specialPageLoaderSource(
+            "loadForbiddenPageModule",
+            forbiddenPageFile,
+            forbiddenSetupFile,
+            toImportSpecifier,
+          ),
           `${declaration} [`,
           ...routablePages.flatMap((page) =>
-            entrySource(
-              page,
-              errorPageFile,
-              errorSetupFile,
-              forbiddenPageFile,
-              forbiddenSetupFile,
-              toImportSpecifier,
-            ),
+            entrySource(page, errorPageFile, forbiddenPageFile, toImportSpecifier),
           ),
           "];",
         ];

@@ -85,3 +85,50 @@ export async function runChunks<T>(
     }
   }
 }
+
+/**
+ * Yield the query's rows one at a time, reading `size` rows per batch.
+ *
+ * Pages exactly like {@link runChunks} (by key when a plan exists, by offset
+ * otherwise), but as an async generator: the next batch is read only when the
+ * consumer asks for a row beyond the current one, and leaving the loop early
+ * stops reading.
+ *
+ * @param size - Rows per batch (a whole number of at least 1)
+ * @param plan - The keyset plan, or undefined for offset paging
+ * @param fetchPage - Reads one page of at most `size` rows
+ */
+export async function* streamRows<T>(
+  size: number,
+  plan: KeysetPlan | undefined,
+  fetchPage: (page: ChunkPage, size: number) => Promise<T[]>,
+): AsyncGenerator<T, void, undefined> {
+  const batchSize = toSafeCount(size, "stream(): batchSize", 1);
+  let processed = 0;
+  let after: unknown;
+  let byKey = plan !== undefined;
+
+  while (true) {
+    const rows = await fetchPage(byKey ? { after } : { offset: processed }, batchSize);
+
+    if (rows.length === 0) return;
+
+    for (const row of rows) {
+      yield row;
+    }
+
+    if (rows.length !== batchSize) return;
+
+    processed += rows.length;
+
+    if (byKey && plan) {
+      const last = readRowKey(rows[rows.length - 1], plan.key);
+
+      if (last === undefined || last === null) {
+        byKey = false;
+      } else {
+        after = last;
+      }
+    }
+  }
+}

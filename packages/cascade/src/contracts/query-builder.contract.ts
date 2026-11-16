@@ -124,6 +124,7 @@ export type WhereOperator =
  * Object-based predicate definition.
  */
 import type { GlobalScopeDefinition, LocalScopeCallback } from "../model/model";
+import type { AtomicUpdate, AtomicUpdateOptions, DriverContract } from "./database-driver.contract";
 export type WhereObject = Record<string, unknown>;
 
 /**
@@ -238,7 +239,7 @@ export interface QueryBuilderContract<T = unknown> {
    * Hydrate records after fetching is done successfully
    * Add hydrate callback function
    */
-  hydrate(callback: (data: any, index: number) => any): this;
+  hydrate(callback: (data: any, index: number, driver?: DriverContract) => any): this;
 
   /**
    * Register a callback to be invoked before query execution.
@@ -2066,6 +2067,19 @@ export interface QueryBuilderContract<T = unknown> {
    */
   decrementMany(field: string, amount?: number): Promise<number>;
 
+  /**
+   * Apply atomic update operators (`$set`, `$inc`, `$unset`, ...) to every
+   * matching row in one write. Chained filters and global scopes are part of
+   * that write, so no ids are resolved first. Not available on builders from
+   * integrations that predate it.
+   *
+   * @returns The number of rows modified
+   */
+  atomic?(
+    operations: AtomicUpdate,
+    options?: Pick<AtomicUpdateOptions, "arrayFilters">,
+  ): Promise<number>;
+
   // ============================================================================
   // CHUNKING / PAGINATION
   // ============================================================================
@@ -2081,6 +2095,26 @@ export interface QueryBuilderContract<T = unknown> {
    * });
    */
   chunk(size: number, callback: ChunkCallback<T>): Promise<void>;
+
+  /**
+   * Run the query as a named prepared statement (PostgreSQL). The database
+   * plans it once per connection and reuses the plan. Drivers without prepared
+   * statements do not implement it.
+   */
+  prepare?(name: string): this;
+
+  /**
+   * Iterate the rows one at a time as an async iterator, reading and hydrating
+   * `batchSize` rows per round trip (default 100). Leaving the loop early stops
+   * reading. Paging follows `chunk()`. The built-in drivers implement it; a
+   * custom builder may leave it out.
+   *
+   * @example
+   * for await (const user of User.query().stream(500)) {
+   *   await process(user);
+   * }
+   */
+  stream?(batchSize?: number): AsyncGenerator<T, void, undefined>;
 
   /**
    * Paginate the results with standard page/limit pagination.

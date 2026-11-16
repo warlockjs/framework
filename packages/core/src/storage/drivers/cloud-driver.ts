@@ -15,6 +15,7 @@ import type {
   StorageDriverType,
   StorageFileInfo,
 } from "../types";
+import { isMarkupMimeType } from "../../http/uploads/sniff-upload-type";
 import { getMimeType } from "../utils/mime";
 import { StorageCapabilityError } from "../utils/storage-capability-error";
 
@@ -425,6 +426,23 @@ export abstract class CloudDriver<
   // ============================================================
 
   /**
+   * The `Content-Disposition` stored with an object: the caller's value when
+   * given, otherwise `attachment` for markup (svg, html, xml, script) judged
+   * by the stored type or the key's extension, so a public bucket URL
+   * downloads it instead of rendering it inline.
+   */
+  protected resolveContentDisposition(
+    options: PutOptions | undefined,
+    location: string,
+  ): string | undefined {
+    if (options?.contentDisposition !== undefined) return options.contentDisposition;
+
+    return isMarkupMimeType(options?.mimeType) || isMarkupMimeType(this.guessMimeType(location))
+      ? "attachment"
+      : undefined;
+  }
+
+  /**
    * Put file to cloud storage
    */
   public async put(
@@ -447,7 +465,7 @@ export abstract class CloudDriver<
         Body: file,
         ContentType: mimeType,
         CacheControl: options?.cacheControl,
-        ContentDisposition: options?.contentDisposition,
+        ContentDisposition: this.resolveContentDisposition(options, location),
         Metadata: options?.metadata,
         ACL: this.resolveAcl(options?.visibility),
       });
@@ -498,7 +516,7 @@ export abstract class CloudDriver<
         Body: body,
         ContentType: mimeType,
         CacheControl: options?.cacheControl,
-        ContentDisposition: options?.contentDisposition,
+        ContentDisposition: this.resolveContentDisposition(options, location),
         Metadata: options?.metadata,
         ACL: this.resolveAcl(options?.visibility),
         IfNoneMatch: "*",
@@ -565,7 +583,7 @@ export abstract class CloudDriver<
           Body: stream,
           ContentType: mimeType,
           CacheControl: options?.cacheControl,
-          ContentDisposition: options?.contentDisposition,
+          ContentDisposition: this.resolveContentDisposition(options, location),
           Metadata: options?.metadata,
           ACL: this.resolveAcl(options?.visibility),
         },

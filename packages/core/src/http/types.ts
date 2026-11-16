@@ -324,6 +324,17 @@ export interface HttpConfigurations {
    */
   fileUploadLimit?: number;
   /**
+   * Serialize every route that declares a `responseSchema` through it: the
+   * declared fields are written by a compiled serializer (faster than a plain
+   * `JSON.stringify`) and any field the schema does not name is dropped, a
+   * guard against leaking columns. A route's `compileResponseSchema` option
+   * overrides this per route. Applied in production builds and the in-process
+   * test server; the dev server serializes without it.
+   *
+   * @default false
+   */
+  compileResponseSchemas?: boolean;
+  /**
    * Multipart limits, hitting any of them answers 413.
    * Every uploaded file is buffered in memory, keep these small.
    */
@@ -356,6 +367,18 @@ export interface HttpConfigurations {
      * @default 25MB
      */
     maxTotalSize?: number;
+    /**
+     * Bytes of one file part kept in memory. A part that grows past it is
+     * streamed to a temporary file under the OS temp directory instead, which
+     * lowers peak memory under concurrent uploads. The file is deleted when
+     * the response closes (call `file.keep()` to hold it longer) and every
+     * remaining one is removed when the process exits. `UploadedFile` works the
+     * same either way; `save()` streams a spooled file to storage without
+     * reading it whole. Unset keeps every part in memory.
+     *
+     * @example 2 * 1024 * 1024
+     */
+    memoryLimit?: number;
     /**
      * Which routes parse multipart bodies. `"all"` parses them on every route,
      * before route middleware (auth included) runs, and logs a warning once in
@@ -390,6 +413,16 @@ export interface HttpConfigurations {
      * @default 1000
      */
     maxArrayIndex?: number;
+    /**
+     * The deepest nesting a key or JSON body may have (`a[b][c]...`, or
+     * objects and arrays inside objects and arrays). Query, urlencoded and
+     * multipart keys nested deeper are dropped; a JSON body nested deeper is
+     * refused with a 400 (`code: "EC111"`), so later walks over the input
+     * (validation, logging, cloning) cannot recurse without bound.
+     *
+     * @default 32
+     */
+    maxDepth?: number;
   };
   /**
    * Milliseconds a client may take to send one whole request (headers and
@@ -416,10 +449,11 @@ export interface HttpConfigurations {
    * Global Fastify body size limit in bytes.
    *
    * Applies to every request body (JSON, form-urlencoded, raw). For per-route
-   * limits use the `maxBodySize()` middleware. For multipart uploads use
-   * `fileUploadLimit` (capped by `@fastify/multipart`).
+   * limits use a route's `serverOptions.bodyLimit` (`maxBodySize()` runs after
+   * the body is parsed and does not bound chunked bodies). For multipart
+   * uploads use `fileUploadLimit` (capped by `@fastify/multipart`).
    *
-   * @default 200 * 1024 * 1024 * 1024  // 200GB — historical default; consider lowering for production.
+   * @default Fastify's own limit, 1 MiB (1048576) when not configured.
    */
   bodyLimit?: number;
   /**

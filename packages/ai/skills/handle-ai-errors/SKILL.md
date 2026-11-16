@@ -168,6 +168,7 @@ AIError  (base — code, category, message, cause?, context?)
 │   ├── ProviderOverloadedError  PROVIDER_OVERLOADED        { retryAfter? } — provider busy (529 / 503), retryable
 │   ├── QuotaExceededError       PROVIDER_QUOTA_EXCEEDED    — NOT retryable (billing cap)
 │   ├── ProviderTimeoutError     PROVIDER_TIMEOUT
+│   ├── ProviderAbortError       PROVIDER_ERROR             — caller aborted (name AbortError, category cancelled)
 │   ├── ContextLengthExceededError CONTEXT_LENGTH_EXCEEDED  { limit?, actual?, modelName? }
 │   ├── ContentFilterError       CONTENT_FILTER             { reason?, categories? }
 │   ├── InvalidRequestError      PROVIDER_INVALID_REQUEST
@@ -224,6 +225,7 @@ async function settle(error: unknown, retry: () => Promise<void>): Promise<void>
 | `ProviderRateLimitError`                                                                                       | Yes — back off by `retryAfter` ms                                                       |
 | `ProviderOverloadedError`                                                                                      | Yes — back off (`retryAfter` when sent) or fail over                                    |
 | `ProviderTimeoutError`                                                                                         | Yes — short delay                                                                       |
+| `ProviderAbortError`                                                                                           | **No** — the caller cancelled the call; do not retry or fail over                       |
 | `ProviderError` (generic)                                                                                      | Read `error.retryable` (true for 5xx / 408 / 409)                                       |
 | `QuotaExceededError`                                                                                           | **No** — needs human intervention                                                       |
 | `ProviderAuthError`                                                                                            | **No** — fix config / rotate key                                                        |

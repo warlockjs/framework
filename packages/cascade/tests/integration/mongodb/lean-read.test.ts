@@ -67,9 +67,11 @@ suite("MongoDB lean read mode", () => {
     expect(first?.joinedAt).toBe("2024-01-01T00:00:00.000Z");
     expect((first as { _id?: unknown })._id).toBeInstanceOf(ObjectId);
 
-    // Control: the hydrated read casts the same field.
+    // Control: the hydrated read returns a Model; a date string the schema does not
+    // declare as a date stays a string.
     const hydrated = await Member.query().orderBy("id").first();
-    expect(hydrated?.get("joinedAt")).toBeInstanceOf(Date);
+    expect(hydrated).toBeInstanceOf(Model);
+    expect(hydrated?.get("joinedAt")).toBe("2024-01-01T00:00:00.000Z");
   });
 
   it("where / select / orderBy / limit behave the same as a hydrated read", async () => {

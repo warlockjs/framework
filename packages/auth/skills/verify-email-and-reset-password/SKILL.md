@@ -86,7 +86,7 @@ router.post("/auth/reset-password", resetPasswordController, {
 });
 ```
 
-`requestPasswordReset` sends the notification **in the background**, so a known account answers as fast as an unknown one (no SMTP round trip on the response path). A failed send is logged and emitted as `password.resetDeliveryFailed` (`(user, error)`); set `auth.passwordReset.awaitDelivery: true` (default `false`) to await it and get its error instead.
+`requestPasswordReset` runs the account lookup, the token writes and the notification **in the background**, so a known account answers as fast as an unknown one (no database write or SMTP round trip on the response path). A failed send is logged and emitted as `password.resetDeliveryFailed` (`(user, error)`); set `auth.passwordReset.awaitDelivery: true` (default `false`) to await all of it and get its error instead.
 
 `resetPassword` writes the password, then calls `authService.revokeAllTokens(user)`: every refresh token is revoked and every access token deleted, which also kills cookie sessions (a cookie holds an access token). It emits `password.reset`; `requestPasswordReset` emits `password.resetRequested`.
 

@@ -231,6 +231,9 @@ function isJsonContentType(contentType: string | undefined): boolean {
  *   is refused (`type: "host-not-allowed"`) unless its host is listed in
  *   `allowHosts`, and redirects stay on the base host.
  *
+ * Static `headers` without `baseUrl` or `allowHosts` log a warning when the
+ * tool is built, because they would be sent to any host the model names.
+ *
  * **Request shaping.** Static `options.headers` are merged under the
  * per-call `headers` (the per-call value wins). They are sent only to the
  * origin of the first request: a redirect to another origin drops every
@@ -278,6 +281,22 @@ export function httpRequestTool(
   const staticHeaderNames = new Set(Object.keys(staticHeaders).map((key) => key.toLowerCase()));
   // Without an explicit allowlist, a `baseUrl` tool's redirects stay on the base host.
   const hostAllowlist = options.allowHosts ?? baseHostAllowlist(options.baseUrl);
+
+  if (
+    staticHeaderNames.size > 0 &&
+    options.baseUrl === undefined &&
+    options.allowHosts === undefined
+  ) {
+    // Static headers are usually credentials; without a base URL or host
+    // allowlist they would go to whatever host the model names.
+    console.warn(
+      `[warlock-ai-tools] ${options.name ?? DEFAULT_NAME} sends its static headers ` +
+        "(" +
+        [...staticHeaderNames].join(", ") +
+        ") to any host the model names, " +
+        "because neither `baseUrl` nor `allowHosts` is set. Set one of them to keep the headers on a known host.",
+    );
+  }
 
   return tool<HttpRequestInput, HttpRequestResult>({
     name: options.name ?? DEFAULT_NAME,

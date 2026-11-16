@@ -93,6 +93,8 @@ Each store factory ships three tiers, mirroring the cache drivers:
 
 You pass your own `pg` / `redis` client in — `@warlock.js/ai` takes no peer dependency on either; the same pool can back both the cache and these stores. **Schema is never auto-migrated** — each store exposes `.schema()`, a DDL string you run through your own migration tool.
 
+A snapshot store may also implement `markPending(runId, pending): Promise<boolean>`, which sets the `pending` field of the stored snapshot without sending it again (`memory`, `pg` through `jsonb_set`, and `sqlite` do; it resolves `false` when nothing is stored). `ai.session()` uses it to write the whole record once per turn.
+
 The two local snapshot stores need no server. `ai.snapshot.file({ dir })` writes one JSON file per key (the URI-encoded key plus `.json`, so a key can't name a path outside `dir`), through a temporary file and a rename, so a crash mid-write keeps the previous snapshot. `ai.snapshot.sqlite({ path })` keeps one row per key in an embedded database opened with Node's built-in `node:sqlite` (Node 22.5+; on Node 22.13+ it needs no flag and prints an experimental-feature warning). Because an embedded file has no separate migration step, it runs its `CREATE TABLE IF NOT EXISTS` on first use; pass `createTable: false` to manage the table yourself. On a runtime without `node:sqlite`, pass an open database with the same `exec` / `prepare` surface — `better-sqlite3` fits — and the store never loads the built-in:
 
 ```ts

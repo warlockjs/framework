@@ -64,6 +64,13 @@ captured by client handlers match the SSR attributes, labels and ARIA references
 Repeated instances receive distinct IDs; no global ID replacement or hydration
 warning suppression is needed.
 
+Inside a `@mongez/react-form` `<Form>`, a control without an `id` gets
+`<formId>-<name>`, where the form id is its `id` prop or its own `useId()` value,
+so two forms with a field `email` never share an id. A control without a name
+gets `<formId>-<reactId>`. Outside a form the id stays `input-<name>`. An
+explicit `id` always wins, and the error id follows it. A `<Form>` also renders
+`method="post"` unless you pass a `method`.
+
 Root components now render in the browser too. Keep server-only reads in root
 setup loaders and pass serializable results through `data`. Keep one `#vessel`
 wrapper around the root's `{children}` for client navigation.
@@ -119,6 +126,26 @@ change.
 route of its own and must not declare `config.route`. When no application file exists,
 Warlock still answers unmatched URLs with its built-in `404` response.
 
+A request that matches no route and does not ask for a document (no explicit
+`text/html` in `Accept`, or a method other than `GET` and `HEAD`) is answered
+with JSON and status `404`, never the page:
+
+```json
+{
+  "error": "Route not found",
+  "code": "route_not_found",
+  "path": "/api/uzers",
+  "method": "GET",
+  "requestId": "…"
+}
+```
+
+`error` is the human message, translated through `request.t("web.errors.routeNotFound")`
+(built-in English and Arabic text is used when the app does not define the
+key). `code` is stable for clients to switch on, and `requestId` is the id of
+the request, the value of the request-id header. Multi-site apps answer the
+same body, with the refusal status when core refused the request.
+
 Keep its metadata in the matching setup file:
 
 ```ts title="src/web/404.setup.ts"
@@ -158,6 +185,19 @@ serves pages, a request that accepts HTML (an explicit `text/html` in `Accept`,
 `GET` or `HEAD`) gets the same page a thrown refusal gets — the forbidden page
 for a 401 or 403, otherwise `error.page.tsx`, then the framework default — with
 the refused status. API clients and other requests keep core's JSON answer.
+
+That page is rendered like any other page, with three details worth knowing:
+
+- It sits inside your root and the layouts at the web root when they load, so
+  the header and footer stay. If the root or a layout fails to load or render,
+  the page falls back to the framework document instead of a blank response.
+- Under locale routing, a leading locale code in the URL (`/ar/public/../x`)
+  selects the locale, so the page answers in `ar`. Without a prefix, the locale
+  core resolved is used.
+- In production `error.errorCode` carries the request id (in development it is
+  `debug.requestId`), so the page can show it and a
+  visitor can quote it to support, even though a 4xx refusal is otherwise
+  shown as is.
 
 ```ts title="src/web/forbidden.setup.ts"
 import type { PageConfig } from "@warlock.js/web";

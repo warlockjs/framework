@@ -579,8 +579,8 @@ export default defineConfig({
         versions["@warlock.js/core"] ??
         packageJson.dependencies?.["@warlock.js/core"] ??
         fallbackRange((getJsonFile(packageRoot("package.json")) as { version: string }).version),
-      "@mongez/http": "^3.5.0",
-      "@mongez/react-form": "^4.0.0",
+      "@mongez/http": "^3.5.2",
+      "@mongez/react-form": "^4.1.0",
     };
     // The Mantine kit replaces Tailwind: the starter then carries neither the
     // dependencies nor the PostCSS config nor the stylesheet's Tailwind import,

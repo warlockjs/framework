@@ -256,6 +256,29 @@ Actions are never cached. The POST never reads, stores, or honours `cache.public
 
 Multipart is the default encoding, so `<input type="file">` works with and without JS. Read files with `request.file("avatar")` and validate with Seal file rules in `config.action.validation`. Files are never echoed in `values`. Body-size limits are core's.
 
+When the app sets `http.multipart.routes: "declared"`, only routes that declare uploads read a multipart body; any other route answers `415`. A page declares them in its `config`:
+
+```ts title="src/web/profile/index.setup.ts"
+export const config = {
+  route: "/profile",
+  uploads: true,
+};
+
+// or cap the total upload size for this page's actions
+export const config = {
+  route: "/profile",
+  uploads: { maxTotalSize: 10 * 1024 * 1024 },
+};
+
+// or cap one file and the file count too
+export const config = {
+  route: "/profile",
+  uploads: { maxFileSize: 2 * 1024 * 1024, maxFiles: 3 },
+};
+```
+
+`uploads` marks the page's POST route, so it covers every action of the page. The value is read at build time: use `true` or an object whose `maxTotalSize`, `maxFileSize` and `maxFiles` are number literals (a product of literals such as `10 * 1024 * 1024` is fine). Pages without `uploads` keep answering `415` to multipart bodies under `"declared"`. In a multi-site app every site's page actions share one POST route, so a page that declares `uploads` opens that route to multipart bodies for all sites (each limit is the largest one declared, and stays at its default when one declaration sets none).
+
 ## Redirect after success
 
 A no-JS action that returns data (rather than redirecting) renders at the POST URL, so a browser reload re-submits it. Redirect after success (`return response.redirect(...)`) unless you deliberately want the result shown in place.

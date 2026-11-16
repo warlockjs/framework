@@ -82,6 +82,14 @@ export type PostgresPoolConfig = PostgresConnectionConfig & {
    */
   readonly options?: string;
   /**
+   * Server-side timeout (ms) for any single statement. A statement running
+   * longer is cancelled, so one runaway query cannot hold a pool connection
+   * indefinitely. `0` or unset leaves the server default (no limit).
+   */
+  readonly statement_timeout?: number;
+  /** Client-side timeout (ms) for a query; pg rejects the call when it passes. */
+  readonly query_timeout?: number;
+  /**
    * Column names whose values are native PostgreSQL arrays (e.g. `JSONB[]`,
    * `TEXT[]`, `INTEGER[]`) rather than scalar `json` / `jsonb` columns.
    *

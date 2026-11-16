@@ -159,6 +159,8 @@ warlock generate.typings --files src/config/database.ts,src/config/storage.ts
 | ------------- | ------ | ------------------------------------------------------------------------------------- |
 | `--files, -f` | string | Comma-separated list of files to generate typings for. Omit to regenerate everything. |
 
+The command prints each stage to stderr (`scanning the project`, `writing typings`, `running connector typings`) with its duration, and a line every 15 seconds while a stage is still running, so a slow step on a large app is visible instead of looking like a hang. Set `WARLOCK_DEBUG_TYPINGS=1` to add the kinds of resources the process is waiting on (timers, child processes, sockets) to those lines. Route registration for the connectors' typings honours `WARLOCK_ROUTE_REGISTRATION_TIMEOUT_MS`. With `WARLOCK_DEBUG_TYPINGS=1` the route registration child's own output is also printed as it arrives, not only when it fails.
+
 The dev server runs this automatically on every boot (unless `--skip-typings`). You'd run it manually after editing a config file in a fresh checkout or when the IDE's autocomplete is lying to you.
 
 **New in 5.13.** `.warlock/typings/translations.d.ts` is generated alongside the config types: `warlock dev` scans your app's `groupedTranslations(group, dictionary)` calls and writes the flattened keys as an augmentation of `@warlock.js/web`'s `TranslationKeyRegistry`, so `useTrans()` in page components checks its key argument against your actual dictionary. See [Localization](../the-basics/localization.md#registering-translations).
@@ -589,11 +591,11 @@ The package manager is chosen in this order, and the command always prints which
 
 A stale `pnpm-workspace.yaml` and `pnpm-lock.yaml` left behind after a project moved to another manager therefore never win over the install the project actually uses. Set `packageManager` in `package.json` to choose explicitly. [`add`](#add) and [`upgrade`](./upgrade.md) share the same detection.
 
-With npm, `warlock update` removes the `@warlock.js/*`, `vite`, `vitest`, `@vitest/*` and `@vitejs/*` entries from `package-lock.json` first, so a single `npm install` resolves them together. The family's packages name each other as peers, which npm cannot step one entry at a time. **Use npm 11.6.2 or newer**: npm 10.9 (bundled with Node 22.15) can fail with `ERESOLVE` or an internal error on this step. The command warns when your npm is older; `npx npm@11 install` runs the install with a newer one.
+With npm, `warlock update` removes the `@warlock.js/*`, `vite`, `vitest`, `@vitest/*` and `@vitejs/*` entries from `package-lock.json` first, so a single `npm install` resolves them together. The family's packages name each other as peers, which npm cannot step one entry at a time. **Use npm 11.6.2 or newer**: npm 10.9 (bundled with Node 22.15) can fail with `ERESOLVE` or an internal error on this step. The command refuses an npm older than that before it changes anything, names the version it found, and exits non-zero; `npx npm@11 install` runs the install with a newer one, or run `warlock update --no-install` and install with your own npm.
 
 Because the whole `@warlock.js/*` family is versioned in lockstep, this keeps every framework package on the same release. The [`dev`](#dev) server surfaces a notice when a newer version is published — and lets you apply it with a single `u` keypress — so you rarely need to run this by hand.
 
-Offline runs are honest about it: if none of the registry lookups answer, the command reports that npm was unreachable and changes nothing, rather than claiming everything is up to date. If the install fails after the versions were rewritten, `package.json` keeps them (re-run your package manager to finish) and the command exits non-zero.
+Offline runs are honest about it: if none of the registry lookups answer, the command reports that npm was unreachable and changes nothing, rather than claiming everything is up to date. If the install fails after the versions were rewritten, the command puts `package.json` (and `package-lock.json`, when it pruned it) back exactly as it was, prints how to apply the new versions anyway (`warlock update --no-install`, then your install), and exits non-zero.
 
 ### `upgrade`
 

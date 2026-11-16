@@ -30,6 +30,11 @@ import { installPayloadTranslations } from "./install-payload-translations";
 import { loadTranslationAssets } from "./translation-store";
 import { reportClientError } from "./report-client-error";
 import { loadClientRouteComposition } from "./runtime";
+import {
+  errorPageComponentOf,
+  loadErrorPageModule,
+  loadForbiddenPageModule,
+} from "./runtime/special-page-modules";
 import { sanitizeClientError } from "./sanitize-client-error";
 import type { ClientPageEntry, ClientProjectedModule } from "./runtime/types";
 
@@ -238,12 +243,14 @@ export async function buildHydratedTree(
   const errorPageProps = payload.errorPage;
   // The same rule the server renders by: a 401/403 failure uses the app's
   // forbidden page when it has one, every other failure the error page.
+  // The error and forbidden pages load on demand: only a payload that carries
+  // `errorPage` fetches one, and an ordinary page never does.
   const selectedPageModule =
     errorPageProps === undefined
       ? composition.Page
-      : isForbiddenPageStatus(errorPageProps.status) && composition.ForbiddenPage !== undefined
-        ? composition.ForbiddenPage
-        : composition.ErrorPage;
+      : ((isForbiddenPageStatus(errorPageProps.status)
+          ? await loadForbiddenPageModule(composition)
+          : undefined) ?? (await loadErrorPageModule(composition)));
 
   if (selectedPageModule === undefined) {
     throw new MissingHydrationErrorPageError(payload.name);
@@ -314,10 +321,7 @@ export async function buildHydratedTree(
         resetToken,
         routeName,
         Boundary: boundaryOf(selectedPageModule),
-        ErrorPage:
-          composition.ErrorPage === undefined
-            ? undefined
-            : componentOf<SerializedErrorPageProps>(composition.ErrorPage),
+        ErrorPage: errorPageComponentOf(composition),
       },
       element,
     );

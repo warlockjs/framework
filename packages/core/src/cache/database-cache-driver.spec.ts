@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { DatabaseCacheDriver } from "./database-cache-driver";
 
 describe("DatabaseCacheDriver.set ttl parsing", () => {
@@ -120,15 +120,47 @@ describe("DatabaseCacheDriver expired entries", () => {
     driver.setOptions({
       globalPrefix: "app",
       model: {
-        first: async () => ({
-          get: (column: string) =>
-            ({ data: 1, ttl: 1, expiresAt: Date.now() - 1000 } as Record<string, any>)[column],
-        }),
+        query: () => {
+          const builder: any = {
+            where: () => builder,
+            lean: () => builder,
+            first: async () => ({ data: 1, ttl: 1, expiresAt: Date.now() - 1000 }),
+          };
+          return builder;
+        },
         delete: async (filter: any) => void deleted.push(filter),
       } as any,
     });
 
     expect(await driver.get("users.1")).toBeNull();
     expect(deleted).toEqual([{ key: "app.users.1" }]);
+  });
+});
+
+describe("DatabaseCacheDriver lean get and upsert", () => {
+  it("reads a plain row without building a model", async () => {
+    const first = vi.fn(async () => ({ data: { a: 1 }, ttl: 60, expiresAt: Date.now() + 60_000 }));
+    const builder: any = { where: vi.fn(() => builder), lean: vi.fn(() => builder), first };
+    const modelFirst = vi.fn();
+    const driver = new DatabaseCacheDriver();
+    driver.setOptions({ model: { query: () => builder, first: modelFirst } as any });
+
+    expect(await driver.get("k")).toEqual({ a: 1 });
+    expect(builder.lean).toHaveBeenCalled();
+    expect(modelFirst).not.toHaveBeenCalled();
+  });
+
+  it("writes with one upsert on the key when upsert is on", async () => {
+    const upsert = vi.fn(async (..._args: unknown[]) => ({}));
+    const first = vi.fn();
+    const driver = new DatabaseCacheDriver();
+    driver.setOptions({ upsert: true, model: { upsert, first, create: vi.fn() } as any });
+
+    await driver.set("users.1", "v", 60);
+
+    expect(first).not.toHaveBeenCalled();
+    expect(upsert).toHaveBeenCalledTimes(1);
+    expect(upsert.mock.calls[0]?.[0]).toEqual({ key: "users.1" });
+    expect(upsert.mock.calls[0]?.[2]).toEqual({ conflictColumns: ["key"] });
   });
 });

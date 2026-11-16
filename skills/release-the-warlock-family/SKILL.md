@@ -41,15 +41,23 @@ every member shares one current version and the new one is newer. Then date the
 The workflows live in **`warlockjs/framework`** under `.github/workflows/`.
 Secrets live on its `release` environment: `NPM_TOKEN` (publish) and
 `BLOG_TEST_DEPLOY_KEY` (a read-only deploy key on the private `warlockjs/blog-test`). The
-release commit and tag are pushed with the job's own `GITHUB_TOKEN`
-(`permissions: contents: write` on the release job). The environment has no
+release commit and tag are pushed with the publish job's own `GITHUB_TOKEN`
+(`permissions: contents: write`; the gate job only has `contents: read`). The environment has no
 required reviewer, by owner choice: a green gate authorises the publish.
 
 ### The workflows
 
 - **`release.yml`** (`workflow_dispatch`, inputs `version` and `publish`).
-  One job, on purpose: the handoff records absolute tarball paths and the
-  gate's release commit, so gate, publish and confirm must share one runner.
+  Three jobs, so that no step that runs tests or package scripts holds a write
+  token, and the step that publishes never runs app or test code:
+  `gate` (`contents: read`), `publish` (`needs: gate`, only with `publish: true`;
+  `contents: write` + `id-token: write`) and `registry` (`needs: publish`,
+  `contents: read`). The handoff records absolute tarball paths and the gate's
+  release commit, so the publish job checks out the same commit at the same
+  workspace path and downloads the gate's `warlock-<version>-artifacts` upload
+  into `tools/release`. The gate fails early when the release commit it
+  recorded is not the dispatched commit (commit the release edits first).
+  The gate job:
   1. Checks out this repository (full history and tags, no persisted
      credential), clones the private `warlockjs/blog-test` beside it with
      the `BLOG_TEST_DEPLOY_KEY` deploy key over SSH (key written to
@@ -67,10 +75,29 @@ required reviewer, by owner choice: a green gate authorises the publish.
      phases and queries, plus EXPLAIN), production build + start + Playwright
      smoke (8 pages, 5 forms at 375px, zero errors), `/__warlock` 404 in
      production, then `--role=worker` and `--role=api`.
-  6. With `publish: true` only: npm publish, then confirm at npm origin
-     (install + import + `npm create warlock`), then tag `v<version>` once on
-     the release commit and push the tag and the branch, then the blog again
-     from npm.
+  6. With `publish: true` only, the `publish` job: `npm ci --ignore-scripts` in
+     `tools/release` (the runner's own dependencies, no workspace install),
+     `release-family.ts publish --provenance` (every tarball re-hashed, then
+     published with an npm provenance statement), `confirm --no-tag` at npm
+     origin (install + import + `npm create warlock`, no git credential in
+     that step), then `tag` (tag `v<version>` once on the release commit,
+     push the tag and the branch, with the job token). The `registry` job then
+     runs the blog again from npm.
+  7. Also in the gate: `npm run check:advisories` in `tools/release` fails when
+     a published package's declared range for a direct dependency admits no
+     version without a known advisory. Waive a reviewed advisory in
+     `tools/release/scripts/advisory-allowances.jsonc` with the reason.
+
+  **Trusted publishing (owner's npm-side step, not required yet).** Today the
+  publish job authenticates with `NPM_TOKEN` and signs provenance through the
+  job's OIDC token. To drop the token, the owner adds a trusted publisher on
+  npmjs.com for each of the 32 packages (Settings, Trusted Publisher, GitHub
+  Actions: organization `warlockjs`, repository `framework`, workflow
+  `release.yml`, environment `release`). A new package must exist on npm before
+  it can have an entry, so the first publish of a new family package still needs
+  the token. When every package has its entry, remove `NPM_TOKEN` from the
+  publish step (npm then uses OIDC) and from the `release` environment.
+
 - **`blog-check.yml`** (`version`, `mode` = `tarballs`|`registry`,
   `artifacts_run_id`): the blog check alone, in about 5 minutes. In tarballs
   mode it reuses a release run's uploaded tarballs. Use it to iterate on the

@@ -33,12 +33,12 @@ When the home is not `"inherit"`, the adapter's home variables are stripped from
 
 By default (`inheritEnv: true`) the CLI inherits every variable of your process: database URLs, signing keys, payment keys and other providers' API keys. A coding CLI runs model-driven shell commands, so a prompt that reaches it can print them. Narrow it with `inheritEnv`:
 
-| Value            | The CLI receives                                                                                                           |
-| ---------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| `true` (default) | Every variable except the adapter's home variables.                                                                        |
-| `"curated"`      | The minimal system set plus the adapter's own API key variables (`ANTHROPIC_API_KEY` for Claude Code, and so on).          |
-| `false`          | The minimal system set only: `PATH`, home and temp directories, locale, proxy and TLS variables, Windows system variables. |
-| `["NAME", …]`    | The minimal system set plus those names.                                                                                   |
+| Value            | The CLI receives                                                                                                                                                                              |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `true` (default) | Every variable except the adapter's home variables.                                                                                                                                           |
+| `"curated"`      | The minimal system set plus the adapter's own API key variables (`ANTHROPIC_API_KEY` for Claude Code, and so on) and the extra variables it declares in `passEnv` (base URLs, provider keys). |
+| `false`          | The minimal system set only: `PATH`, home and temp directories, locale, proxy and TLS variables, Windows system variables.                                                                    |
+| `["NAME", …]`    | The minimal system set plus those names.                                                                                                                                                      |
 
 ```ts
 import { cli } from "@warlock.js/ai-cli";
@@ -50,6 +50,8 @@ const claude = cli.claudeCode({
 ```
 
 When `NODE_ENV` is `production` and `inheritEnv` is not set, the first run logs a one-time warning that names the option. Set `inheritEnv: true` explicitly to keep the full environment and silence it.
+
+`true` stays the default in 5.x. The default changes to `"curated"` in 6.0, so set `inheritEnv` explicitly now to choose your behaviour. Every built-in adapter declares the variables it needs, so `"curated"` works without extra configuration for the usual setups; list anything else in `inheritEnv: [...]` or `env`.
 
 ## Capability probe
 

@@ -183,6 +183,8 @@ the data). Pick another zone with `clientOptions: { timezone: "Africa/Cairo" }`
 An app-supplied `-c TimeZone=…` in `clientOptions.options` or the connection
 string wins. MongoDB date helpers already default to UTC.
 
+Set `clientOptions.statement_timeout` (milliseconds) on PostgreSQL so a runaway statement is cancelled by the server instead of holding a pool connection forever; `query_timeout` is the client-side counterpart. `0` or unset means no limit.
+
 `resolvePostgresStartupOptions(config)` returns the `options` startup string the driver sends (the merged `-c TimeZone=…` and any app options), for checking what a configuration resolves to.
 
 ## Things NOT to do

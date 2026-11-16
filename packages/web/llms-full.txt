@@ -624,6 +624,7 @@ export const config = {
 - `tags` is a static list, or a function `(data, { shared }) => string[]` of the
   resolved page data and the request's sealed `shared` payload, evaluated right
   before the entry is stored — e.g. ``[`theme:${shared.theme}`]``.
+- A HIT carries a weak `ETag` of the stored body and answers `304` to a matching `If-None-Match`. With `http.compression` on, entries are compressed once at store time and a HIT sends the stored gzip or brotli form with `Vary: Accept-Encoding`. In multi-site mode a CDN must key on the same host the origin selects from; if it keys on `Host` but forwards a client `X-Forwarded-Host`, it can store one site's page under another's URL, so overwrite or strip that header at the edge.
 - `ttl` is the server cache's own freshness window in seconds, independent of
   the CDN-facing `maxAge`; omit it to reuse `maxAge`.
 - `varyBy?: (request) => string` adds a request-derived component to the key,
@@ -664,7 +665,7 @@ writes the crawler-specific render).
 **Response headers**: `x-warlock-cache: hit | miss | bypass`, alongside the
 usual `Cache-Control`. A `cache` route's `Vary` lists `x-warlock-data`, then
 `Cookie, locale` unless the URL pinned the locale or the app has one locale,
-`User-Agent` when the page defers, and `cache.varyHeaders`.
+`User-Agent` when the page defers, and `cache.varyHeaders`. A failure page for that route carries the same value.
 
 **Variant ceiling**: `pageCache.maxEntriesPerRoute` (default `1_000`, `false`
 removes it) caps the stored query variants per route and process; a new
@@ -806,6 +807,7 @@ export default function NotFoundPage() {
 }
 ```
 
+- **API requests never get this page.** A request that matches no route and does not explicitly accept `text/html` (or is not `GET`/`HEAD`) is answered `404` JSON `{ error, code: "route_not_found", path, method, requestId }`; `error` is `request.t("web.errors.routeNotFound")` (built-in English and Arabic text when the key is not defined).
 - **No `config.route`.** It has no URL of its own and answers every URL nothing else matched. Declaring a route on it is a build error, and a second `404.page.tsx` is a build error naming both files.
 - **Props.** The default component receives the usual `{ data, shared, params }`: `shared` is the sealed payload, `params` is empty, and there is no page data because its own `loader` never runs. Its `register()` and `config.middleware` still run and `config.metadata` still applies. Keep the metadata static, since there is no `data` to read.
 - **No loader.** A `loader` export on it is ignored. The `root.setup.ts` app loader still runs on a 404, so keep it cheap.
@@ -874,7 +876,14 @@ export default function ForbiddenPage({ status }: ErrorPageProps) {
 }
 ```
 
-Pair it with `forbidden.setup.ts` for `config.metadata`. It follows the same rules as `error.page.tsx`: no `config.route`, a second `forbidden.page.tsx` is a build error naming both files, `robots: noindex` by default, and it receives the same `{ error, status }` props (plus `debug` outside production). In multi-site mode each site folder (`$sites/<name>/forbidden.page.tsx`) owns its own. The page that renders for a refusal is picked in this order: the site's (or the app's) `forbidden.page.tsx`, then its `error.page.tsx` with the 401/403 status, then the framework default. The framework default is a plain accessible page with the request id, the development details outside production and a "Back to home" link. Hydration uses the same pick, so the page the server rendered is the page the browser hydrates.
+Pair it with `forbidden.setup.ts` for `config.metadata`. It follows the same rules as `error.page.tsx`: no `config.route`, a second `forbidden.page.tsx` is a build error naming both files, `robots: noindex` by default, and it receives the same `{ error, status }` props (plus `debug` outside production). In multi-site mode each site folder (`$sites/<name>/forbidden.page.tsx`) owns its own. The page that renders for a refusal is picked in this order: the site's (or the app's) `forbidden.page.tsx`, then its `error.page.tsx` with the 401/403 status, then the framework default. The framework default is a plain accessible page with the request id, the development details outside production and a "Back to home" link. Hydration uses the same pick, so the page the server rendered is the page the browser hydrates. The refusal page renders inside the site's root and the layout beside it in the web root, and falls back to the framework document if those fail to load or render.
+
+A refusal core raises before routing (a dot-segment path, a malformed URL) renders this same page inside the web root's `root.tsx` and layouts when they load (and in the framework document when they do not or throw), with the URL's locale prefix selecting the locale under locale routing, and, in production, `error.errorCode` set to the request id (`debug.requestId` in development) so the page can show it to the visitor.
+
+## Config that bounds and speeds up a document
+
+- `web.shellTimeout` (ms, default 30000, 90000 in `warlock dev`, `0` off): a document shell that suspends outside every `<Suspense>` and is not ready in time is aborted and answers `error.page.tsx` with status 504.
+- `web.earlyHints` (default `false`): sends a `103 Early Hints` with `Link` preloads for the hydration entry, its module preloads and the page's stylesheets before the loaders run. Document requests only; a client, runtime or proxy without support ignores it.
 
 ## The `register()` hook
 
@@ -1187,6 +1196,8 @@ with `sitemap.cacheControl`. Versioned generation URLs use immutable caching.
 sitemap URL when enabled and an origin exists. A hand-written
 `public/robots.txt` wins; maintain its Sitemap line yourself.
 
+In multi-site mode set `robots` on a site in `web.sites` (or on a `resolveHost` result) to give that host its own policy. It is merged over `web.robots` key by key (`groups` and `extra` are replaced whole); a site without it gets the global policy; a merged `enabled: false` answers 404; a site may enable robots while the global one is off. A non-indexable dynamic site still answers `Disallow: /`. `sitemap.gzip` stays `false` by default; with `http.compression` on, a served sitemap is compressed on the wire anyway.
+
 ## Example support files
 
 The sample data below makes the example runnable. Replace it with the app's persistence or domain service when integrating.
@@ -1272,6 +1283,7 @@ export default function Contact() {
 - Actions are never cached and always `private, no-store`; call `invalidatePageCache(tags)` to refresh other visitors' cached page.
 - Redirect after success: a no-JS action that returns data re-POSTs on reload.
 - `<Form>` defaults to `multipart/form-data`, so file inputs work; read them with `request.file(name)`.
+- Under `http.multipart.routes: "declared"` a multipart POST answers 415 unless the page declares `config.uploads: true` (or `{ maxTotalSize: 10 * 1024 * 1024, maxFileSize: 2 * 1024 * 1024, maxFiles: 3 }`, number literals); it marks the page's POST route and covers all its actions. It must be a literal, read at build time. In multi-site mode all sites share one POST route, so one declaration opens it for every site.
 - Per-user limit: `config.action.middleware: [middleware.rateLimit({ max: 5, duration: 60_000, key: "user", guests: "ip" })]` (`import { middleware } from "@warlock.js/core"`). Keyed on `request.locals.user.id`, so it needs `pageSession()` from `@warlock.js/auth`. `guests`: `"ip"` (default) or `"skip"`. Over the limit: 429, action not run.
 - With `@mongez/react-form`, use `useSubmitAction` from `@warlock.js/web/form` and alias one of the two `Form`s.
 
@@ -2228,7 +2240,7 @@ A key used with `count` is stored as variants
 no literal names falls back to every group, and `warlock check` reports it as
 `WL9104` with the file, line and key text; the build log lists the same sites.
 A plain `config.translations` array only adds keys; it does not resolve a computed
-lookup. One dynamic site anywhere in the page's graph (page, layouts, root, error
+lookup. The key is accepted in the `config` of a page, a layout and the root (in the module or its setup file). One dynamic site anywhere in the page's graph (page, layouts, root, error
 pages) still ships every group, so fix the site itself (a literal key or a
 static-prefix template). Use a declaration for keys the analysis cannot see, such
 as ones read from data:
@@ -2380,6 +2392,8 @@ export default web;
 | `"prefix-except-default"`                     | `/about` (default locale), `/ar/about`; `/en/about` answers a 301 to `/about`        | the path prefix, else the default locale                                                                                             |
 
 Any other value, an empty `app.localeCodes`, or an `app.localeCode` that is not in `app.localeCodes` throws a `LocaleRoutingConfigError` at boot. A multi-site app can override the strategy per site with `sites.<key>.localeRouting` (see the `multi-site` topic). A page whose filesystem route begins with `[locale]` carries its own locale segment and cannot be combined with a non-`none` strategy (`LocaleParamRoutingConflictError` at boot). To build a locale-correct URL by hand, for a canonical link for example, use `localizedPath(path, locale?)` from `@warlock.js/web`; `<Link>` prefixes literal in-app paths itself (see the `navigate-on-the-client` topic for its `locale` prop).
+
+The not-found page and the page for a core-level refusal (for example `/ar/public/../x`) answer in the locale a leading URL prefix names; a refusal page's `error.errorCode` is the request id.
 
 ## Worked example: an en/ar routed page with a switcher
 
@@ -2861,9 +2875,9 @@ Upgrade: move each `src/web/(group)` site folder to `src/web/$sites/<key>` and d
 
 `resolveHost` receives a normalized `{ host, request }` and returns `{ site, key, indexable?, shared? } | null`. Its `site` must name a dynamic site. `null` is a 404; a throw is a 500. `key` partitions tenant state and cache identity, so use a durable tenant identifier rather than a display name.
 
-`resolveCache.ttl` is measured in seconds and caches by host only. It is disabled by default because a resolver that reads cookies or headers cannot be safely shared across visitors. Enable it only for host-only lookup results. `resolveCache.maxEntries` (default `10_000`) bounds how many hosts are remembered (expired first, then least recently used); a host over 253 characters never reaches the resolver.
+`resolveCache.ttl` is measured in seconds and caches by host only. It is disabled by default because a resolver that reads cookies or headers cannot be safely shared across visitors. Enable it only for host-only lookup results. `resolveCache.negativeTtl` (seconds, default `ttl`; `0` never remembers) shortens the memory of hosts the resolver answered `null` for, so a host added at runtime resolves sooner. `resolveCache.maxEntries` (default `10_000`) bounds how many hosts are remembered (expired first, then least recently used); a host over 253 characters never reaches the resolver.
 
-`basePath` selects a site below a path prefix; the longest matching prefix wins. `unknownHost` is `"not-found"` by default, or may name a configured fallback site. During development use hosts such as `acme.localhost:2030`. `warlock dev` answers only `localhost`, `*.localhost`, IP addresses, fixed sites' `hosts` and `web.devAllowedHosts` (default none; `".tenant.test"` also matches subdomains) — list dynamic tenants' dev hosts there, or they get a 403 "Blocked request". `devAllowedHosts: true` disables the host check (DNS-rebinding exposure; avoid).
+`basePath` selects a site below a path prefix; the longest matching prefix wins. `unknownHost` is `"not-found"` by default, or may name a configured fallback site. During development use hosts such as `acme.localhost:2030`. `warlock dev` answers only `localhost`, `*.localhost`, IP addresses, fixed sites' `hosts` and `web.devAllowedHosts` (default none; `".tenant.test"` also matches subdomains) — list dynamic tenants' dev hosts there, or they get a 403 "Blocked request" whose text names `web.devAllowedHosts`. `devAllowedHosts: true` disables the host check (DNS-rebinding exposure; avoid).
 
 `localeRouting` on a site replaces global `web.localeRouting`; omit it to inherit, and use `{}` to disable it for one site. Locale codes and the default locale still come from `app.localeCodes` and `app.localeCode`.
 
@@ -2892,7 +2906,7 @@ const originAndMount = siteUrl();
 
 `<Link to="platform.home">` and `navigateTo()` take the same names; a link to another site loads that site in full. `src/config/web.ts` may import the resolver from `app/...`: `warlock build` resolves the alias when it reads `web.sites`.
 
-With sitemap and robots enabled, `/sitemap.xml` and `/robots.txt` are selected per site. A dynamic site is indexable only when its resolver result says `indexable: true`; otherwise its sitemap is a 404 and robots disallows crawling. Set `web.tlsAsk` to expose Caddy's domain check endpoint; it requires `web.sites` and permits configured fixed hosts or domains claimed by `resolveHost`. It is public by default (`tlsAskAllow: "any"`); set `tlsAskAllow: "loopback"` when Caddy runs on the same machine, `"private"` for a private network, or a list of exact caller IPs — other callers get 403. Each site's sitemap is reused for `web.sitemap.regenerateEvery` (5 minutes when unset) with an `ETag`. Page sitemap suppliers receive `{ site, tenantKey, shared }`: a dynamic site's supplier must filter its rows by `tenantKey`, or every tenant's sitemap lists every tenant's URLs.
+A site (and a `resolveHost` result) may carry `robots`, merged over `web.robots` for that host (`groups`/`extra` replaced whole). With sitemap and robots enabled, `/sitemap.xml` and `/robots.txt` are selected per site. A dynamic site is indexable only when its resolver result says `indexable: true`; otherwise its sitemap is a 404 and robots disallows crawling. Set `web.tlsAsk` to expose Caddy's domain check endpoint; it requires `web.sites` and permits configured fixed hosts or domains claimed by `resolveHost`. It is public by default (`tlsAskAllow: "any"`); set `tlsAskAllow: "loopback"` when Caddy runs on the same machine, `"private"` for a private network, or a list of exact caller IPs — other callers get 403. Each site's sitemap is reused for `web.sitemap.regenerateEvery` (5 minutes when unset) with an `ETag`. Page sitemap suppliers receive `{ site, tenantKey, shared }`: a dynamic site's supplier must filter its rows by `tenantKey`, or every tenant's sitemap lists every tenant's URLs.
 
 ```caddyfile
 {
@@ -3061,7 +3075,7 @@ description: 'Navigate hydrated pages with `<Link>`, resolve named URLs with `hr
 
 # Warlock — navigate on the client
 
-`<Link>` renders a real anchor for progressive enhancement and intercepts a plain in-app click after hydration. The server remains the only route matcher; client navigation fetches the page-data representation of the URL and swaps the Layout + Page tree.
+`<Link>` renders a real anchor for progressive enhancement and intercepts a plain in-app click after hydration. The server remains the only route matcher; client navigation fetches the page-data representation of the URL and swaps the Layout + Page tree. The server runs the middleware and loaders for that request but does not render the page: a loader, guard or validation failure still answers with its status and error record, while a component that throws while rendering is shown by the nearest client error boundary and reported by the client (`web.errors`, `onClientError`). The app's `error.page.tsx` and `forbidden.page.tsx` load as lazy chunks, only when a failure needs them.
 
 Every behaviour on this page depends on hydration having mounted. See the `write-the-root` topic (section "`#vessel` is the hydration boundary").
 
@@ -4807,7 +4821,7 @@ When the app has a public URL configured (`app.publicUrl`; under multi-site, the
 - `canonical` defaults to the public URL plus the request path (query string and hash ignored). Set a string to override it, or `false` for no canonical link and no automatic `og:url`.
 - A root-relative `canonical`, `openGraph.url`, any image URL and every `alternates` value are made absolute against the public URL. An absolute URL is left as is.
 - Without a public URL nothing is absolutized and no canonical is derived.
-- A page whose `robots` contains `noindex` skips all of this (no derived canonical, `og:url` or locale). The error page and the `404.page.tsx` page are `noindex` by framework default.
+- A page whose `robots` contains `noindex` skips all of this (no derived canonical, `og:url` or locale) and emits no generated `hreflang` alternates either. The error page and the `404.page.tsx` page are `noindex` by framework default.
 
 ## Root, layout and page merge order
 
@@ -5268,7 +5282,7 @@ description: "Submit a @mongez/react-form through a named Core API route or expl
 
 # Submit a form
 
-Import the optional form integration from `@warlock.js/web/form`, not the Web root barrel. It requires peer packages `@mongez/http:^3.5.0` and `@mongez/react-form:^4.0.0`.
+Import the optional form integration from `@warlock.js/web/form`, not the Web root barrel. It requires peer packages `@mongez/http:^3.5.2` and `@mongez/react-form:^4.1.0`.
 
 ```tsx
 import { Form } from "@mongez/react-form";

@@ -163,6 +163,24 @@ describe("discoverPages — the recipe", () => {
     expect(page.routeName).toBe("users.account.settings");
   });
 
+  it("discovers pages, layouts and a root whose setup files declare translations", () => {
+    const appRoot = makeAppTree({
+      "src/web/root.tsx": APP,
+      "src/web/root.setup.ts": 'export const config = { translations: ["app.*"] };',
+      "src/web/layout.tsx": LAYOUT,
+      "src/web/layout.setup.ts":
+        'export const config = { translations: { keys: ["nav.*"], exhaustive: true } };',
+      "src/web/products.page.tsx": pageDeclaring(""),
+      "src/web/products.setup.ts":
+        'export const config = { route: "/products", translations: ["statuses.*"] };',
+    });
+
+    const [page] = discoverPages({ appRoot });
+
+    expect(page!.routePath).toBe("/products");
+    expect(page!.setupFile).toBeDefined();
+  });
+
   it("records optional setup companions without making them UI graph entries", () => {
     const appRoot = makeAppTree({
       "src/web/root.tsx": APP,

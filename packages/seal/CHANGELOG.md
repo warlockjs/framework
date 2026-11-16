@@ -4,6 +4,22 @@ All notable changes to `@warlock.js/seal` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.54.0 - 2026-11-16
+
+### Upgrading
+
+- The `trim`, `ltrim` and `rtrim` string mutators now follow `@mongez/reinforcements` 4.1: a multi-character needle is removed as a whole, repeatedly (`"ababXab"` trimmed with `"ab"` is `"X"`, where it was `"abX"`), and an empty needle leaves the string unchanged. Single-character needles behave as before.
+
+### Added
+
+- `configureSeal({ translateMessageKey })` translates an `errorMessage` that is a dotted translation key; a key without a translation, and any literal sentence, is left as written.
+
+### Changed
+
+- The output of nested objects is cleaned of `undefined` values once. A parent object reuses the cleaned result of a nested object validator instead of walking it again, so the cost no longer grows with the nesting depth. The rule: an object a validator produced is not changed in place to hold `undefined` values before its parent sees it; a transformer that returns a new object is still cleaned, and `maxDepth` is still enforced across levels.
+- A rule or mutator that answers without a promise is used as it is, skipping a microtask hop. Public types are unchanged; the rule and mutator types that allow a non-promise result, and synchronous built-in rules, are planned for 6.0.
+- Raised the `@mongez` dependency ranges to the 2026-11-16 releases (reinforcements 4.1.0, supportive-is 3.0.1).
+
 ## 5.53.0 - 2026-11-11
 
 ### Upgrading

@@ -246,9 +246,14 @@ export class RefreshToken extends Model {
       .where({ user_id: user.id, user_type: user.userType, revoked_at: null })
       .get();
 
-    for (const token of tokens) {
-      await token.revoke();
-    }
+    if (tokens.length === 0) return tokens;
+
+    // One conditional update for the whole user; rows a concurrent request
+    // revoked in between keep their earlier stamp.
+    await this.atomic(
+      { user_id: user.id, user_type: user.userType, revoked_at: null },
+      { $set: { revoked_at: new Date() } },
+    );
 
     return tokens;
   }

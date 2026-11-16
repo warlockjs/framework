@@ -83,6 +83,40 @@ describe("compileLinearRegex — same answers as the built-in engine", () => {
     });
   }
 
+  it("folds case in classes like the i flag, including letters that share a canonical form", () => {
+    const letters = [
+      "µ",
+      "μ",
+      "Μ",
+      "ſ",
+      "s",
+      "S",
+      "K",
+      "k",
+      "\u212a",
+      "ς",
+      "σ",
+      "Σ",
+      "ǅ",
+      "ǆ",
+      "Ǆ",
+      "ǈ",
+      "ǉ",
+      "Ǉ",
+    ];
+
+    for (const member of letters) {
+      for (const pattern of [`[${member}]`, `[^${member}]`, `[a${member}z]`]) {
+        const native = new RegExp(pattern, "i");
+        const linear = compileLinearRegex(pattern, { ignoreCase: true });
+
+        for (const text of letters) {
+          expect(linear.test(text), `/${pattern}/i on ${text}`).toBe(native.test(text));
+        }
+      }
+    }
+  });
+
   it("keeps the built-in syntax errors", () => {
     expect(() => compileLinearRegex("(a")).toThrow(SyntaxError);
     expect(() => compileLinearRegex("*a")).toThrow(SyntaxError);

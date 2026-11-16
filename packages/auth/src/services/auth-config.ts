@@ -52,6 +52,14 @@ function warnOnceInProduction(key: string, message: string): void {
   log.warn("auth", "config", message);
 }
 
+/** Log `message` once per process, in any environment. */
+function warnOnce(key: string, message: string): void {
+  if (warnedProduction.has(key)) return;
+
+  warnedProduction.add(key);
+  log.warn("auth", "config", message);
+}
+
 /** Warn (production, once) when a signing secret is too short to resist offline guessing. */
 function checkSecretStrength(key: string, secret: string): void {
   if (Buffer.byteLength(secret) >= MIN_SECRET_BYTES) return;
@@ -59,8 +67,25 @@ function checkSecretStrength(key: string, secret: string): void {
   warnOnceInProduction(
     `secret:${key}`,
     `auth.${key} is shorter than ${MIN_SECRET_BYTES} bytes, so a captured token lets an attacker ` +
-      `guess it offline and forge tokens. Generate a strong secret with "warlock jwt.generate".`,
+      `guess it offline and forge tokens. Generate a strong secret with "warlock jwt.generate". ` +
+      `From 6.0 a secret this short stops the app from booting.`,
   );
+}
+
+/**
+ * Read a list of retired secrets: non-empty strings only. Each one gets the
+ * same strength warning as an active secret.
+ */
+function readPreviousSecrets(key: string): string[] {
+  const raw = config.key<unknown>(`auth.${key}`);
+
+  if (!Array.isArray(raw)) return [];
+
+  const secrets = raw.filter((value): value is string => typeof value === "string" && value !== "");
+
+  for (const secret of secrets) checkSecretStrength(key, secret);
+
+  return secrets;
 }
 
 const permitAuthentication: CanAuthenticate = (): boolean => true;
@@ -180,6 +205,12 @@ export const authConfig = {
    * (`auth.hashTokensAtRest`). @default false
    */
   hashTokensAtRest: (): boolean => config.key<boolean>("auth.hashTokensAtRest", false) === true,
+  /**
+   * Replace a password hash made with another algorithm or cost than
+   * `encryption.password` asks for, after a successful login
+   * (`auth.rehashPasswords`). @default true
+   */
+  rehashPasswords: (): boolean => config.key<boolean>("auth.rehashPasswords", true) !== false,
   /** Login identifier normalizer, or `false` for exact matching. */
   normalizeCredentials: (): false | NormalizeCredentials =>
     config.key<false | NormalizeCredentials>(
@@ -199,6 +230,11 @@ export const authConfig = {
 
       return secret;
     },
+    /**
+     * Retired signing secrets, tried only when verifying an access token whose
+     * signature the current secret rejects. Never used to sign.
+     */
+    previousSecrets: (): string[] => readPreviousSecrets("accessToken.previousSecrets"),
     /** Signing algorithm (legacy: `auth.jwt.algorithm`). */
     algorithm: (): Algorithm => resolve("accessToken.algorithm", "jwt.algorithm", "HS256"),
     /** `iss` claim stamped on and required of every token; unset ⇒ not used. */
@@ -370,11 +406,19 @@ export const authConfig = {
 
       return Array.isArray(origin) ? origin : [origin];
     },
-    /** User-verification requirement for both ceremonies. @default "preferred" */
-    userVerification: (): "required" | "preferred" =>
-      config.key<PasskeysConfig | undefined>("auth.passkeys")?.userVerification === "required"
-        ? "required"
-        : "preferred",
+    /** User-verification requirement for both ceremonies. @default "preferred" (becomes "required" in 6.0) */
+    userVerification: (): "required" | "preferred" => {
+      const configured = config.key<PasskeysConfig | undefined>("auth.passkeys")?.userVerification;
+
+      if (configured === undefined) {
+        warnOnce(
+          "passkeys.userVerification",
+          'auth.passkeys.userVerification is not set, so "preferred" applies: a passkey proving only possession of the device is accepted. The default changes to "required" in 6.0: set it explicitly to choose now.',
+        );
+      }
+
+      return configured === "required" ? "required" : "preferred";
+    },
     /** Challenge lifetime in ms; throws naming the key when unusable. @default "5m" */
     challengeExpiresInMs: (): number =>
       parseDuration(
@@ -412,6 +456,11 @@ export const authConfig = {
 
       return secret;
     },
+    /**
+     * Retired refresh secrets, tried only when verifying a refresh token whose
+     * signature the current secret rejects. Never used to sign.
+     */
+    previousSecrets: (): string[] => readPreviousSecrets("refreshToken.previousSecrets"),
     /** Whether refresh tokens are enabled (legacy: `auth.jwt.refresh.enabled`). */
     enabled: (): boolean => resolve("refreshToken.enabled", "jwt.refresh.enabled", true),
     /** Lifetime as an `ms`-string (legacy: `auth.jwt.refresh.expiresIn`). */

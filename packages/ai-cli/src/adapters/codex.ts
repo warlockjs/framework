@@ -50,6 +50,7 @@ export const codexAdapter: CliAdapter = {
   title: "Codex CLI",
   command: "codex",
   apiKeyEnv: ["CODEX_API_KEY"],
+  passEnv: ["OPENAI_API_KEY", "OPENAI_BASE_URL"],
   homeEnv: ["CODEX_HOME"],
   transports: ["argv", "stdin"],
   effort: true,

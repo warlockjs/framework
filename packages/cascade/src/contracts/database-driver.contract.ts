@@ -80,6 +80,8 @@ export type UpdateResult = {
   modifiedCount: number;
   /** Documents/rows inserted by an `upsert` (0 or absent when nothing was inserted). */
   upsertedCount?: number;
+  /** `_id` of the document an `upsert` inserted (MongoDB only). */
+  upsertedId?: unknown;
 };
 
 /**
@@ -188,7 +190,22 @@ export type FindOneAndUpdateOptions = AtomicUpdateOptions & {
  * Options a driver receives for atomic updates: the public options plus
  * driver-specific extras (e.g. a transaction session).
  */
-export type DriverAtomicUpdateOptions = FindOneAndUpdateOptions & Record<string, unknown>;
+export type DriverAtomicUpdateOptions = FindOneAndUpdateOptions & {
+  /**
+   * MongoDB only: generate the document's `field` value only when an `upsert`
+   * inserted a document, and write it in a second write keyed on `_id`. An
+   * upsert that updated an existing document generates (and spends) no id.
+   */
+  idOnInsert?: DriverIdOnInsert;
+} & Record<string, unknown>;
+
+/** Id to assign to a document an `upsert` just inserted. */
+export type DriverIdOnInsert = {
+  /** Field that receives the id (usually `id`). */
+  field: string;
+  /** Produces the id; called once, only after an insert. May resolve to `undefined` to skip. */
+  generate: () => Promise<unknown>;
+};
 
 /**
  * Unified driver contract used by the model layer.

@@ -110,6 +110,10 @@ export const userContext = new UserContext();
 
 `buildStore` is the **only** abstract method. Everything else is provided by `Context<TStore>`.
 
+A subclass can name the type of the protected `storage` slot with `import type { ContextStorage } from "@warlock.js/context"` (`run`, `enterWith`, `getStore`).
+
+`currentContextScope()` returns an object that is the same for two callers only when every context has the same store for both (same request, same `run()`). Group work collected from several callers by it (a batch, a debounce) so one caller's work never runs under another request's or tenant's stores.
+
 ## Usage modes
 
 ### `run()` — scoped execution

@@ -4,6 +4,13 @@ All notable changes to `@warlock.js/ai-openai` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.54.0 - 2026-11-16
+
+### Fixed
+
+- A 429 (or any status) whose error `type` is `insufficient_quota`, or whose `code` is `credit_balance_exhausted`, `billing_hard_limit_reached` or `billing_not_active`, now maps to `QuotaExceededError` instead of the retryable `ProviderRateLimitError`, so retries and workflow retry stop repeating a call that cannot succeed. A plain 429 is still a rate limit. The default fallback chain still does not advance on `PROVIDER_QUOTA_EXCEEDED`; add it through `alsoRetryOn` to switch providers when credit runs out. DeepSeek, Groq, xAI and Mistral use the same mapping.
+- A caller's own abort (the SDK's `APIUserAbortError`) is raised as a `ProviderAbortError` (name `AbortError`, category `cancelled`) instead of a plain `ProviderError`, so a fallback chain no longer treats it as a provider failure.
+
 ## 5.47.0 - 2026-11-06
 
 ### Added

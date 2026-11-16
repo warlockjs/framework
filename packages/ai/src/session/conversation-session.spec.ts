@@ -284,6 +284,48 @@ describe("ai.session", () => {
     expect(await chat.resume()).toBeUndefined();
   });
 
+  it("writes the stored record once per turn when the store can mark pending", async () => {
+    const inner = memory<ConversationSessionRecord>();
+    const save = vi.spyOn(inner, "save");
+    const markPending = vi.spyOn(inner, "markPending" as never);
+    const chat = session({
+      id: "once",
+      store: inner,
+      agent: agent({ model: scriptedModel().model }),
+    });
+
+    await chat.send("first"); // new session: record saved with the marker, then settled
+    save.mockClear();
+    await chat.send("second");
+
+    expect(markPending).toHaveBeenCalledTimes(1);
+    expect(save).toHaveBeenCalledTimes(1);
+    expect((await chat.load())?.pending).toBeUndefined();
+    expect(await chat.history()).toHaveLength(4);
+  });
+
+  it("marks pending with a full save when the store has no markPending", async () => {
+    const inner = memory<ConversationSessionRecord>();
+    const plain: SnapshotStore<ConversationSessionRecord> = {
+      load: (runId) => inner.load(runId),
+      save: (snapshot) => inner.save(snapshot),
+      delete: (runId) => inner.delete(runId),
+      schema: () => "",
+    };
+    const save = vi.spyOn(plain, "save");
+    const chat = session({
+      id: "plain",
+      store: plain,
+      agent: agent({ model: scriptedModel().model }),
+    });
+
+    await chat.send("first");
+    save.mockClear();
+    await chat.send("second");
+
+    expect(save).toHaveBeenCalledTimes(2);
+  });
+
   it("works on the SQLite store", async () => {
     let sqliteStore: ReturnType<typeof sqlite<ConversationSessionRecord>>;
     try {

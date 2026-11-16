@@ -105,7 +105,12 @@ export class ProceduralMemory {
 
     // Widen the candidate page when other scopes crowd this one out of it.
     const hits = await similarWithin(
-      (topK) => this.store.similar<StoredProcedure>(vector, { topK, threshold }),
+      (topK, accept) =>
+        this.store.similar<StoredProcedure>(vector, {
+          topK,
+          threshold,
+          filter: (hit) => accept({ ...hit, score: 1 }),
+        }),
       (hit: CacheSimilarHit<StoredProcedure>) =>
         hit.key.startsWith(prefix) && hit.value?.scope === scope,
       { topK: Math.max(k * RECALL_OVERSCAN, k), want: k },

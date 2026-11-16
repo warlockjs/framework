@@ -54,7 +54,7 @@ export type ServeOptions<TInput = unknown> = {
   /**
    * Declare the endpoint deliberately open. Without `authToken`,
    * `authorize` or `public: true`, `serve` logs a one-time warning when
-   * `NODE_ENV` is `production`.
+   * `NODE_ENV` is `production`; in 6.0 it will refuse to start instead.
    */
   public?: boolean;
   /**
@@ -405,7 +405,7 @@ function warnIfOpen(options: Pick<ServeOptions, "authToken" | "authorize" | "pub
   log.warn(
     LOG_MODULE,
     "auth.missing",
-    "ai.serve has no authToken or authorize option, so anyone who can reach the endpoint can run it and spend provider credits; set authToken or authorize, or public: true if it is meant to be open",
+    "ai.serve has no authToken or authorize option, so anyone who can reach the endpoint can run it and spend provider credits; set authToken or authorize, or public: true if it is meant to be open. In 6.0 ai.serve will refuse to start without one of them",
   );
 }
 

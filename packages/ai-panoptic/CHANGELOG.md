@@ -4,6 +4,12 @@ All notable changes to `@warlock.js/ai-panoptic` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.54.0 - 2026-11-16
+
+### Added
+
+- `GET api/traces` in the local dashboard sends an `ETag` and answers `304` without a body when `If-None-Match` matches; the dashboard page sends the tag on each poll, so an idle dashboard transfers almost nothing.
+
 ## 5.53.0 - 2026-11-11
 
 ### Upgrading

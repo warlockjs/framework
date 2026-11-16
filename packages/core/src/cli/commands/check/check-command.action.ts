@@ -1,6 +1,7 @@
 import type { CommandActionData } from "../../../commands/types";
 import { CHECK_STEPS, type CheckStepName } from "../../../tooling/check/check-report.types";
 import { runCheck } from "../../../tooling/check/run-check";
+import { TEST_TIMEOUT_ENV } from "../../../tooling/check/tests-step";
 import { flushAndExit } from "../../flush-and-exit";
 import { childTypecheckRunner } from "./child-typecheck";
 import { formatCheckSummary, printProblems } from "./format-problems";
@@ -56,6 +57,16 @@ export async function checkCommandAction({ options }: CommandActionData): Promis
   const changed = options.changed === true || base !== undefined;
   const project = stringOption(options.project);
   const skip = parseSkippedSteps(stringOption(options.skip));
+  const testTimeout = stringOption(options.testTimeout);
+
+  if (testTimeout !== undefined) {
+    if (!/^\d+$/.test(testTimeout)) {
+      throw new Error("--test-timeout takes a whole number of seconds (0 for no limit).");
+    }
+
+    process.env[TEST_TIMEOUT_ENV] = testTimeout;
+  }
+
   const cliEntry = process.argv[1];
   const flags = [...(changed ? ["--changed"] : []), ...(base ? ["--base", base] : [])];
 

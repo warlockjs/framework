@@ -98,6 +98,7 @@ describe.skipIf(!hasGit)("doctor env-files check", () => {
     const result = await run();
 
     expect(result?.status).toBe("warn");
+    expect(result?.code).toBe("WL1017");
     expect(result?.detail).toContain(".env.production is not ignored");
     expect(result?.detail).not.toContain(".env,");
     expect(result?.detail).toContain(".env.*");

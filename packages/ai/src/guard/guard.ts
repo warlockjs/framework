@@ -6,6 +6,7 @@ import type {
   MiddlewareTripContext,
 } from "../contracts/middleware/middleware-context.type";
 import type { ModelResponse } from "../contracts/model.contract";
+import type { ToolInvokeResult } from "../tool";
 import type {
   GuardOptions,
   GuardrailDetector,
@@ -66,7 +67,7 @@ function recordFlag(ctx: MiddlewareTripContext, name: string, record: FlagRecord
  *
  * - `allow`  — no detector objected; the hook continues untouched.
  * - `redact` — a detector returned rewritten `text`; the hook substitutes it
- *   (output / tool phases only — see {@link runDetectors}).
+ *   (output / toolResult phases only — see {@link runDetectors}).
  * - `block`  — a detector rejected; the hook throws a
  *   {@link GuardrailViolationError} carrying `reason` / `matches` / `escalate`.
  *
@@ -101,6 +102,8 @@ type PhaseOutcome =
  *   response) or throw; it has **no** rewrite-and-continue seam, so an input
  *   `redact` is downgraded to a `block` rather than silently passing the
  *   un-redacted prompt through. (Documented on {@link GuardOptions.input}.)
+ * - `"toolResult"` — the tool's returned data is replaced by the rewritten
+ *   text before the model reads it.
  * - `"tool"`   — silently rewriting tool arguments changes the call's
  *   side-effects unpredictably, so a tool `redact` is downgraded to a `block`
  *   (`tool-arg-redaction-unsupported`) rather than mutating what the tool runs.
@@ -155,7 +158,7 @@ async function runDetectors(
     }
 
     if (verdict.type === "redact") {
-      if (phase === "output") {
+      if (phase === "output" || phase === "toolResult") {
         return { type: "redact", text: verdict.text };
       }
 
@@ -228,6 +231,17 @@ async function block(
 }
 
 /**
+ * Mark a tool result as data, not instructions. A closing tag inside the
+ * data is broken up so the content cannot end the wrapper early.
+ */
+function wrapUntrusted(toolName: string, text: string): string {
+  const safeName = toolName.replace(/[^\w.-]/g, "_");
+  const body = text.replace(/<\/untrusted-tool-result/gi, "<\\/untrusted-tool-result");
+
+  return `<untrusted-tool-result tool="${safeName}">\n${body}\n</untrusted-tool-result>`;
+}
+
+/**
  * Build the composed **guardrail middleware** (surfaced as
  * `ai.guardrail(options)`) — one {@link AgentMiddleware} that runs the
  * configured detectors at three hook points and maps each
@@ -248,6 +262,11 @@ async function block(
  *   `block` / `flag`; a `redact` is downgraded to a `block`
  *   (`tool-arg-redaction-unsupported`). Scoped to `toolNames` via the core
  *   `forTool(toolNames, mw)` helper when set.
+ *
+ * - **`toolResult`** detectors run at `tool.after` over what the tool
+ *   returned, before the model reads it (indirect prompt injection).
+ *   `allow` / `redact` / `block` / `flag`; `wrapToolResults` additionally
+ *   marks the data as untrusted.
  *
  * **Verdict → action.** Detectors run in registration order; the first
  * `redact` / `block` short-circuits the phase. `block` throws a
@@ -278,6 +297,8 @@ export function guard(options: GuardOptions): AgentMiddleware {
   const input = options.input ?? [];
   const output = options.output ?? [];
   const tool = options.tool ?? [];
+  const toolResult = options.toolResult ?? [];
+  const wrapToolResults = options.wrapToolResults === true;
   const escalation = options.escalation;
 
   const middleware: AgentMiddleware = {
@@ -344,25 +365,68 @@ export function guard(options: GuardOptions): AgentMiddleware {
 
   // Only declare the `tool` hook map when there are tool detectors — an empty
   // `tool` array would otherwise make `forTool` scoping a no-op cost.
-  if (tool.length > 0) {
-    middleware.tool = {
-      async before(ctx: MiddlewareToolContext): Promise<void> {
-        const args = JSON.stringify(ctx.request.input);
+  if (tool.length > 0 || toolResult.length > 0 || wrapToolResults) {
+    middleware.tool = {};
+  }
 
-        if (!args) {
-          return;
-        }
+  if (tool.length > 0 && middleware.tool) {
+    middleware.tool.before = async function before(ctx: MiddlewareToolContext): Promise<void> {
+      const args = JSON.stringify(ctx.request.input);
 
-        const outcome = await runDetectors(tool, args, "tool", ctx, name);
+      if (!args) {
+        return;
+      }
+
+      const outcome = await runDetectors(tool, args, "tool", ctx, name);
+
+      if (outcome.type === "block") {
+        await block(outcome, "tool", ctx, name, escalation);
+      }
+
+      // A tool `redact` is downgraded to `block` inside `runDetectors`, so
+      // `redact` is unreachable here; `allow`/`flag` fall through and the
+      // real tool dispatch proceeds.
+    };
+  }
+
+  if (middleware.tool && (toolResult.length > 0 || wrapToolResults)) {
+    middleware.tool.after = async function after(
+      ctx: MiddlewareToolContext,
+      result: ToolInvokeResult<unknown>,
+    ): Promise<void | ToolInvokeResult<unknown>> {
+      if (result.error || result.data === undefined) {
+        return;
+      }
+
+      const text = typeof result.data === "string" ? result.data : JSON.stringify(result.data);
+
+      if (!text) {
+        return;
+      }
+
+      let finalText: string | undefined;
+
+      if (toolResult.length > 0) {
+        const outcome = await runDetectors(toolResult, text, "toolResult", ctx, name);
 
         if (outcome.type === "block") {
-          await block(outcome, "tool", ctx, name, escalation);
+          await block(outcome, "toolResult", ctx, name, escalation);
         }
 
-        // A tool `redact` is downgraded to `block` inside `runDetectors`, so
-        // `redact` is unreachable here; `allow`/`flag` fall through and the
-        // real tool dispatch proceeds.
-      },
+        if (outcome.type === "redact") {
+          finalText = outcome.text;
+        }
+      }
+
+      if (wrapToolResults) {
+        finalText = wrapUntrusted(ctx.tool.name, finalText ?? text);
+      }
+
+      if (finalText === undefined) {
+        return;
+      }
+
+      return { ...result, data: finalText };
     };
   }
 

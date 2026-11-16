@@ -82,7 +82,7 @@ export type LoginThrottleOptions = {
    *
    * Ignored when `identify` is set or `by` does not track both.
    *
-   * @default "global"
+   * @default "global" (changes to `"pair"` in 6.0; set it explicitly to choose now)
    */
   emailLock?: "pair" | "global";
 
@@ -258,14 +258,28 @@ function buildDefaultIdentifiers(
   }
 
   if (ip) {
-    identifiers.push({ key: `ip.${throttleIdentifierHash("ip", ip)}`, max });
+    identifiers.push({
+      key: `ip.${throttleIdentifierHash("ip", ip)}`,
+      max,
+      // Alone, the source bucket is the only bound there is, so a success still clears it.
+      resetOnSuccess: email === undefined,
+    });
   }
 
   return identifiers;
 }
 
 /** One throttle bucket: its cache-key suffix and the attempts it allows. */
-type TrackedIdentifier = { key: string; max: number };
+type TrackedIdentifier = {
+  key: string;
+  max: number;
+  /**
+   * Whether a successful login clears this bucket. `false` for the shared
+   * source bucket when an account bucket is tracked next to it, so one
+   * valid account behind an IP cannot keep resetting that IP's budget.
+   */
+  resetOnSuccess?: boolean;
+};
 
 /**
  * Whether the counter now reads a number below `count`, i.e. a success reset
@@ -287,6 +301,30 @@ async function counterWasReset(identifier: string, count: number): Promise<boole
   if (typeof current === "string" && current.trim() !== "") current = Number(current);
 
   return typeof current === "number" && Number.isFinite(current) && current < count;
+}
+
+/** Whether the default-`emailLock` warning was already logged. */
+let warnedEmailLock = false;
+
+/**
+ * Warn (once) when `emailLock` is left unset while both the account and the
+ * source are tracked: the default locks an email for everyone, so one IP can
+ * lock a victim out, and the default becomes `"pair"` in 6.0.
+ */
+function warnAboutDefaultEmailLock(options: LoginThrottleOptions): void {
+  if (warnedEmailLock || options.emailLock !== undefined || options.identify !== undefined) return;
+
+  const tracked = options.by ?? ["email", "ip"];
+
+  if (!tracked.includes("email") || !tracked.includes("ip")) return;
+
+  warnedEmailLock = true;
+
+  log.warn(
+    "auth",
+    "login-throttle",
+    'loginThrottleMiddleware() locks an email for every source by default (emailLock: "global"), so one IP can lock a victim\'s account. The default changes to "pair" in 6.0: set emailLock explicitly to choose now.',
+  );
 }
 
 /**
@@ -331,6 +369,8 @@ async function counterWasReset(identifier: string, count: number): Promise<boole
  * });
  */
 export function loginThrottleMiddleware(options: LoginThrottleOptions = {}): Middleware {
+  warnAboutDefaultEmailLock(options);
+
   const max = options.max ?? 5;
   const window = options.window ?? "15m";
   const lockoutDuration = options.lockoutDuration ?? "15m";
@@ -429,6 +469,9 @@ export function loginThrottleMiddleware(options: LoginThrottleOptions = {}): Mid
 
         if (!failed) {
           for (const identifier of identifiers) {
+            // The source bucket just expires on its window.
+            if (identifier.resetOnSuccess === false) continue;
+
             // Reset to 0 rather than delete: a failure still in flight reads
             // the 0 as proof that a success reset the window (see below).
             await cache.set(counterKey(identifier.key), 0, { ttl: window });

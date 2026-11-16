@@ -248,16 +248,17 @@ import { ai /* types, errors */ } from "@warlock.js/ai";
 
 ## Persistence stores
 
-| Export                                                    | What it is                                                                                                                                                                         |
-| --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `CheckpointStore` / `CheckpointRecord`                    | Orchestrator session-state store + row shape. `ai.checkpoint.{memory,pg,redis}()`.                                                                                                 |
-| `SnapshotStore<TSnapshot>`                                | Workflow / supervisor / orchestrator run-snapshot store. `ai.snapshot.{memory,pg,redis}()`. `load` / `save` / `delete` / `list?` / `schema`.                                       |
-| `PgClientLike` / `RedisClientLike`                        | Minimal `pg` / `redis` client surfaces the stores depend on (you pass the client in).                                                                                              |
-| `PgCheckpointOptions` / `RedisCheckpointOptions`          | `ai.checkpoint.pg` / `.redis` options.                                                                                                                                             |
-| `PgSnapshotStoreOptions` / `RedisSnapshotStoreOptions`    | `ai.snapshot.pg` / `.redis` options.                                                                                                                                               |
-| `FileSnapshotStoreOptions` / `SqliteSnapshotStoreOptions` | `ai.snapshot.file` (`{ dir }`) / `.sqlite` (`{ path }` or `{ database }`, `table?`, `createTable?`) options. `SqliteDatabaseLike` is the `node:sqlite` / `better-sqlite3` surface. |
-| `ConversationSession` / `ConversationSessionRecord`       | `ai.session()` handle and its stored record (`runId: "session:<id>"`, `messages`, `turns`, `forkedFrom?`, `pending?`).                                                             |
-| `FallbackModelContract`                                   | Returned by `ai.fallbackModel(models, opts?)`.                                                                                                                                     |
+| Export                                                              | What it is                                                                                                                                                                         |
+| ------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `CheckpointStore` / `CheckpointRecord`                              | Orchestrator session-state store + row shape. `ai.checkpoint.{memory,pg,redis}()`.                                                                                                 |
+| `SnapshotStore<TSnapshot>`                                          | Workflow / supervisor / orchestrator run-snapshot store. `ai.snapshot.{memory,pg,redis}()`. `load` / `save` / `delete` / `list?` / `schema`.                                       |
+| `PgClientLike` / `RedisClientLike`                                  | Minimal `pg` / `redis` client surfaces the stores depend on (you pass the client in).                                                                                              |
+| `PgCheckpointOptions` / `RedisCheckpointOptions`                    | `ai.checkpoint.pg` / `.redis` options.                                                                                                                                             |
+| `PgSnapshotStoreOptions` / `RedisSnapshotStoreOptions`              | `ai.snapshot.pg` / `.redis` options.                                                                                                                                               |
+| `FileSnapshotStoreOptions` / `SqliteSnapshotStoreOptions`           | `ai.snapshot.file` (`{ dir }`) / `.sqlite` (`{ path }` or `{ database }`, `table?`, `createTable?`) options. `SqliteDatabaseLike` is the `node:sqlite` / `better-sqlite3` surface. |
+| `ConversationSession` / `ConversationSessionRecord`                 | `ai.session()` handle and its stored record (`runId: "session:<id>"`, `messages`, `turns`, `forkedFrom?`, `pending?`).                                                             |
+| `isDefaultFallbackRetryable(error)`, `DEFAULT_FALLBACK_RETRY_CODES` | The built-in failover decision and its codes; compose them inside a `retryOn` predicate (which replaces the default).                                                              |
+| `FallbackModelContract`                                             | Returned by `ai.fallbackModel(models, opts?)`.                                                                                                                                     |
 
 ## Tools
 
@@ -513,6 +514,7 @@ Every `ProviderError` (and subclass) also carries `status?` (the HTTP status), `
 | `ProviderOverloadedError`    | `PROVIDER_OVERLOADED`       | `provider`       |
 | `QuotaExceededError`         | `PROVIDER_QUOTA_EXCEEDED`   | `quota`          |
 | `ProviderTimeoutError`       | `PROVIDER_TIMEOUT`          | `timeout`        |
+| `ProviderAbortError`         | `PROVIDER_ERROR`            | `cancelled`      |
 | `ContextLengthExceededError` | `CONTEXT_LENGTH_EXCEEDED`   | `context-length` |
 | `ContentFilterError`         | `CONTENT_FILTER`            | `content-filter` |
 | `InvalidRequestError`        | `PROVIDER_INVALID_REQUEST`  | `validation`     |

@@ -2,6 +2,7 @@ import {
   AIError,
   ContextLengthExceededError,
   InvalidRequestError,
+  ProviderAbortError,
   ProviderAuthError,
   ProviderError,
   ProviderOverloadedError,
@@ -62,6 +63,10 @@ export function wrapBedrockError(thrown: unknown): AIError {
   const shape = toShape(thrown);
   const context = buildContext(shape);
   const message = shape.message ?? (thrown instanceof Error ? thrown.message : String(thrown));
+
+  if (shape.name === "AbortError") {
+    return new ProviderAbortError(message, { cause: thrown, context });
+  }
 
   if (isTimeout(shape)) {
     return new ProviderTimeoutError(message, { cause: thrown, context });

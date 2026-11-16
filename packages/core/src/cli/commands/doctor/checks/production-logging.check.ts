@@ -93,6 +93,7 @@ export const productionLoggingCheck: DoctorCheck = warnOnError({
     return {
       name: "production-logging",
       status: "warn",
+      code: "WL1016",
       detail:
         `a console channel in production (${where}) prints debug lines, including the ` +
         "per-phase lines of each request: a console write per line on every request. Create it " +

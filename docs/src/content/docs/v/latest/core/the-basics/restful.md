@@ -467,7 +467,7 @@ The same module via the `Restful` class would collapse the routing file to two l
 
 - **`router.restfulResource(...)` only generates routes for actions the class actually implements.** If `bulkDelete` isn't a method, no `DELETE path` route is wired. The default `Restful` base class implements all seven; subclasses inherit them unless they override.
 - **Returning a response from a lifecycle hook aborts the action.** A truthy return value is treated as the framework's response. Return `undefined` (or just no return) to continue.
-- **`Restful` actions catch errors internally** and log to `log.error`. For a custom error mapping, override the action method or use the chainable builder where the controller catch-all does the work.
+- **`Restful` actions mostly catch errors internally** and log to `log.error`. `list` is the exception: it rethrows every failure (a refused filter answers 400, anything else a recorded 5xx) so the request funnel answers and records it once, like any other controller. For a custom error mapping, override the action method or use the chainable builder where the controller catch-all does the work.
 - **Per-action middleware on `restfulResource` applies to every action.** Per-action middleware on the class (`protected middleware`) runs from inside the handler — narrower scope.
 - **`request.allExceptParams()` and `request.heavyExceptParams()`** strip the route params (`/:id`) from the body, which is what `update` and `patch` use. If you need the params preserved for a custom hook, read them via `request.input("id")` explicitly.
 - **`returnOn: "records"` runs `list()` again** after the write, which means another DB round-trip (or a cache hit). Acceptable for admin UIs, less so for high-traffic APIs.

@@ -226,10 +226,12 @@ describe("streamed document parity — streamed bytes equal the buffered renderT
     expect(rendered.html).toContain('<div id="layout">');
     expect(rendered.html).toContain("Hello streaming");
     // React SSR self-closes void elements — `<link ... />`, not `<link ...>`.
-    expect(rendered.html).toContain(`<link rel="stylesheet" href="${stylesheetUrls[0]}"/>`);
+    expect(rendered.html).toContain(
+      `<link rel="stylesheet" href="${stylesheetUrls[0]}" data-wl="css"/>`,
+    );
     expect(rendered.html).toContain(PAYLOAD_SCRIPT_ID);
     expect(rendered.html).toContain(
-      `<script type="module" nonce="${http.request.nonce}" src="${hydrationClientModuleUrl}">`,
+      `<script type="module" nonce="${http.request.nonce}" src="${hydrationClientModuleUrl}" data-wl="entry">`,
     );
   }, 20_000);
 });

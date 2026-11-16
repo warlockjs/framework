@@ -551,6 +551,21 @@ describe("RedisCacheDriver", () => {
     await expect(driver.get("other")).resolves.toBe("x");
   });
 
+  it("listKeys returns the namespace key and its children without deleting", async () => {
+    const RedisCacheDriver = await importDriver();
+    const driver = new RedisCacheDriver();
+    driver.setLoggingState(false);
+    driver.setOptions({ url: "redis://localhost" });
+    await driver.connect();
+
+    await driver.set("user", "root");
+    await driver.set("user.profile", { name: "John" });
+    await driver.set("users.other", "x");
+
+    expect((await driver.listKeys("user")).sort()).toEqual(["user", "user.profile"]);
+    await expect(driver.get("user.profile")).resolves.toEqual({ name: "John" });
+  });
+
   it("removeNamespace returns early when no keys match", async () => {
     const RedisCacheDriver = await importDriver();
     const driver = new RedisCacheDriver();

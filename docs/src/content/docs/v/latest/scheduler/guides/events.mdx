@@ -38,6 +38,10 @@ scheduler.on("job:error", handleError);
 scheduler.off("job:error", handleError);
 ```
 
+## A throwing listener
+
+A listener that throws never breaks a run or the scheduler: the error is logged with `console.error` and the next job still starts. Handle your own errors inside the listener when you need them reported elsewhere.
+
 ## Event Reference
 
 ### `job:start`

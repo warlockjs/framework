@@ -1,6 +1,6 @@
 import type { Keywords } from "@mongez/localization";
 import { beforeEach, describe, expect, it } from "vitest";
-import { usageOf } from "@warlock.js/core";
+import { groupedTranslations, usageOf } from "@warlock.js/core";
 import { contentHash } from "../translations/delivery";
 import {
   createLiveGlobalTranslationDelivery,
@@ -58,6 +58,36 @@ beforeEach(() => {
 });
 
 describe("snapshot delivery (production)", () => {
+  it("reuses a route's delivery until the registry revision changes", () => {
+    const source = registry({ ...BOOT });
+    let revision = 1;
+    const delivery = createSnapshotGlobalTranslationDelivery(
+      input(source, { revision: () => revision }),
+      ["en"],
+    );
+
+    const first = delivery.deliver("orders", "en");
+
+    expect(delivery.deliver("orders", "en")).toBe(first);
+    expect(delivery.deliver("orders", "ar")).not.toBe(first);
+
+    source.state.lists.en = { ...BOOT.en, orders: { title: "Changed" } };
+    expect(delivery.deliver("orders", "en")).toBe(first);
+
+    revision = 2;
+
+    const second = delivery.deliver("orders", "en");
+
+    expect(second).not.toBe(first);
+    expect(second.keywords).toMatchObject({ orders: { title: "Changed" } });
+  });
+
+  it("rebuilds on every call when no revision is supplied", () => {
+    const delivery = createSnapshotGlobalTranslationDelivery(input(registry(BOOT)), ["en"]);
+
+    expect(delivery.deliver("orders", "en")).not.toBe(delivery.deliver("orders", "en"));
+  });
+
   it("keeps the same table and hash after later registrations, so the hash is fixed for the process", () => {
     const source = registry(BOOT);
     const delivery = createSnapshotGlobalTranslationDelivery(input(source), ["en"]);
@@ -221,6 +251,34 @@ describe("live delivery (development)", () => {
     }
 
     expect(translationTableFor("en", first)).toBeUndefined();
+  });
+});
+
+describe("production revision wiring", () => {
+  it("rebuilds a route's delivery after a registration made through core, with the real registry", () => {
+    groupedTranslations("revisionWiringSpec", { title: { en: "Before" } });
+    registerRouteSourceFile("revision.wiring", "src/web/revision/index.page.tsx");
+    const delivery = createSnapshotGlobalTranslationDelivery(
+      productionGlobalTranslationDeliveryInput({
+        sharedGroups: SHARED,
+        prune: false,
+        usage: {},
+      }),
+      ["en"],
+    );
+
+    const first = delivery.deliver("revision.wiring", "en");
+
+    expect(delivery.deliver("revision.wiring", "en")).toBe(first);
+
+    groupedTranslations("revisionWiringSpec", {
+      later: { en: "Registered after the first request" },
+    });
+
+    const second = delivery.deliver("revision.wiring", "en");
+
+    expect(second).not.toBe(first);
+    expect(JSON.stringify(second.keywords)).toContain("Registered after the first request");
   });
 });
 

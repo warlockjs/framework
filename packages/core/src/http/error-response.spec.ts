@@ -3,7 +3,7 @@ import config from "@mongez/config";
 import { log } from "@warlock.js/logger";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { HttpErrorResponseFormatter } from "./error-response";
+import { registerErrorResponseFormatter, type HttpErrorResponseFormatter } from "./error-response";
 import { startHttpServer, type FastifyInstance } from "./server";
 
 const servers: FastifyInstance[] = [];
@@ -158,5 +158,37 @@ describe("http.errorResponse", () => {
     expect(logger).toHaveBeenCalledWith("http", "error-response", failure, {
       requestId: expect.any(String),
     });
+  });
+
+  it("returns the payload untouched when the reply was already written", async () => {
+    const formatter = vi.fn<HttpErrorResponseFormatter>(() => ({ formatted: true }));
+    vi.spyOn(config, "get").mockImplementation(((key: string, fallback?: unknown) =>
+      key === "http.errorResponse" ? formatter : fallback) as typeof config.get);
+    let hook: (request: unknown, reply: unknown, payload: unknown) => Promise<unknown>;
+    registerErrorResponseFormatter({
+      addHook: (_name: string, callback: typeof hook) => {
+        hook = callback;
+      },
+    } as never);
+    const payload = JSON.stringify({ statusCode: 403 });
+    const replyFor = (raw: Record<string, boolean>, sent = false) => ({
+      sent,
+      raw,
+      statusCode: 403,
+      getHeader: () => "application/json",
+      header: vi.fn(),
+      removeHeader: vi.fn(),
+    });
+
+    for (const reply of [
+      replyFor({}, true),
+      replyFor({ headersSent: true }),
+      replyFor({ writableEnded: true }),
+    ]) {
+      expect(await hook!({ id: "1" }, reply, payload)).toBe(payload);
+      expect(reply.header).not.toHaveBeenCalled();
+    }
+
+    expect(formatter).not.toHaveBeenCalled();
   });
 });

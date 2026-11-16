@@ -197,6 +197,7 @@ export const authTokensCheck: DoctorCheck = warnOnError({
     return {
       name: "auth-tokens",
       status: "warn",
+      code: "WL1013",
       detail:
         findings.length === 1
           ? (findings[0] ?? "")

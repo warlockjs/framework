@@ -15,6 +15,7 @@ import {
   PAGE_CACHE_REPLAY_SKIPPED_HEADERS,
   reportPageCacheFailure,
 } from "./store-page-cache-after-render";
+import { ifNoneMatchSatisfied, pageCacheEtag, pickStoredEncoding } from "../page-cache-encoding";
 import { persistRequestedLocale } from "./persist-requested-locale";
 
 type SelectedPageSite = {
@@ -250,18 +251,46 @@ export async function resolvePageCacheHitOrMiss(options: {
   // comment on why a second call would silently overwrite this one instead of
   // combining with it. A HIT is only ever reached for a
   // `cache.serverCache === true` route, so `cache` is always defined here.
+  const vary = pageVaryHeader({
+    dataRepresentation: pageCacheVariant === "json",
+    cacheOptedIn: true,
+    deferred: hit.usesDefer,
+    request,
+    varyHeaders: cache.varyHeaders,
+  });
+  // Entries stored with compressed forms answer by `Accept-Encoding`, and the
+  // response layer leaves an already-encoded body alone, so the header is set here.
+  const encoding = pickStoredEncoding(request.header("accept-encoding"), hit.encoded);
+
   response.header(
     "Vary",
-    pageVaryHeader({
-      dataRepresentation: pageCacheVariant === "json",
-      cacheOptedIn: true,
-      deferred: hit.usesDefer,
-      request,
-      varyHeaders: cache.varyHeaders,
-    }),
+    hit.encoded === undefined ||
+      (vary !== undefined && /(^|,\s*)accept-encoding\s*(,|$)/i.test(vary))
+      ? vary
+      : vary === undefined
+        ? "Accept-Encoding"
+        : `${vary}, Accept-Encoding`,
   );
 
-  if (pageCacheVariant === "json") {
+  // The tag names the body, not its coding, so a revalidation answers 304
+  // whichever coding the client accepts.
+  const etag = hit.etag ?? pageCacheEtag(hit.body);
+
+  response.header("ETag", etag);
+
+  if (hit.status === 200 && ifNoneMatchSatisfied(request.header("if-none-match"), etag)) {
+    await response.send("", 304);
+
+    return { served: true };
+  }
+
+  if (encoding !== undefined && hit.encoded?.[encoding] !== undefined) {
+    response.header("Content-Encoding", encoding);
+    response.setContentType(
+      pageCacheVariant === "json" ? hit.contentType : "text/html; charset=utf-8",
+    );
+    await response.send(Buffer.from(hit.encoded[encoding]!, "base64"), hit.status);
+  } else if (pageCacheVariant === "json") {
     response.setContentType(hit.contentType);
     await response.send(hit.body, hit.status);
   } else {

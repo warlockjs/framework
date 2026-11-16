@@ -20,6 +20,7 @@ import { replayStashedNavigationFailure } from "./navigation-failure-stash";
 import { reportClientError } from "./report-client-error";
 import { installStreamClosedRejection, prepareDeferredPageData } from "./runtime/defer-registry";
 import { installHydrationSite } from "./hydrate-site";
+import { readDocumentSlots } from "./read-document-slots";
 
 /**
  * Installs the `window`-level floor of card 1db238ca's client error
@@ -269,6 +270,9 @@ export function hydratePage(buildTree: BuildHydratedTree, options: HydratePageOp
   const localeRouting = payload.document?.localeRouting ?? readDocumentLocaleRouting();
 
   const value: DocumentContextValue = {
+    // The slots the inline payload leaves out, rebuilt from the document's own
+    // elements; a payload that still carries one (an older server) wins.
+    ...readDocumentSlots(document),
     ...payload.document,
     ...(namedApiRoutes === undefined ? {} : { namedApiRoutes }),
     ...(localeRouting === undefined ? {} : { localeRouting }),

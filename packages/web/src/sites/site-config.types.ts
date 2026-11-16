@@ -1,6 +1,7 @@
 import type { Request } from "@warlock.js/core";
 import type { SharedContext } from "../index";
 import type { LocaleRoutingStrategy } from "../routing/locale-routing";
+import type { RobotsConfig } from "../sitemap/robots-config-types";
 
 /** What the host resolver receives: the normalised host and the full request. */
 export type HostResolverInput = {
@@ -18,6 +19,8 @@ export type HostResolution = {
   indexable?: boolean;
   /** Merged into the request's `shared`, so the client reads it through `useShared()`. */
   shared?: Partial<SharedContext>;
+  /** This host's `/robots.txt` policy, merged over the site's and over `web.robots`. */
+  robots?: Partial<RobotsConfig>;
 };
 
 /** Returns the resolution, or `null` for a controlled 404. A throw is a 500. */
@@ -35,6 +38,12 @@ export type FixedSiteConfig = {
   basePath?: string;
   /** Overrides the global `web.localeRouting` for this site. */
   localeRouting?: SiteLocaleRouting;
+  /**
+   * This site's `/robots.txt` policy, merged over `web.robots`: each key set
+   * here replaces the global one (`groups` and `extra` are replaced whole,
+   * not concatenated), and a site without `robots` gets the global policy.
+   */
+  robots?: Partial<RobotsConfig>;
 };
 
 /** A site whose hosts are claimed at runtime by `web.resolveHost`. */
@@ -44,6 +53,12 @@ export type DynamicSiteConfig = {
   basePath?: string;
   /** Overrides the global `web.localeRouting` for this site. */
   localeRouting?: SiteLocaleRouting;
+  /**
+   * This site's `/robots.txt` policy, merged over `web.robots`: each key set
+   * here replaces the global one (`groups` and `extra` are replaced whole,
+   * not concatenated), and a site without `robots` gets the global policy.
+   */
+  robots?: Partial<RobotsConfig>;
 };
 
 export type SiteConfig = FixedSiteConfig | DynamicSiteConfig;

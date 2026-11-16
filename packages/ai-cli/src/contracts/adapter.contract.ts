@@ -158,6 +158,12 @@ export type CliAdapter = {
   /** Environment variables that receive an API key (the first is used for the `apiKey` option). */
   readonly apiKeyEnv: readonly string[];
   /**
+   * Further variables the CLI reads to work (base URLs, provider keys, auth
+   * tokens other than `apiKeyEnv`). `inheritEnv: "curated"` passes them from
+   * the host together with `apiKeyEnv`; nothing else from the host reaches the CLI.
+   */
+  readonly passEnv?: readonly string[];
+  /**
    * Environment variables pointed at the config home. Empty when the CLI
    * cannot relocate its config, in which case `home` other than `"inherit"`
    * is refused for it.

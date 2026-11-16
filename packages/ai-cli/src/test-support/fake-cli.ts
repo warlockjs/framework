@@ -68,6 +68,7 @@ const run = (prompt) => {
       key: process.env.FAKE_API_KEY || null,
       keep: process.env.KEEP_ME || null,
       other: process.env.OTHER_SECRET || null,
+      base: process.env.FAKE_BASE_URL || null,
       cwd: process.cwd(),
     }) });
     return;

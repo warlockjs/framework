@@ -222,6 +222,12 @@ export const features: FeatureOption[] = [
     hint: "Vitest + coverage + per-worker DB/cache test setup",
     group: "Tooling",
   },
+  {
+    key: "process",
+    label: "Process supervision",
+    hint: "App-owned CLI workers and terminals with crash recovery and graceful shutdown",
+    group: "Tooling",
+  },
 ];
 
 export type AiProviderOption = {

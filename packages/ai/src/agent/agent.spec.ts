@@ -4,7 +4,12 @@ import type { Message } from "../contracts/conversation-message.type";
 import type { AgentEventMap } from "../contracts/events/event-map.type";
 import type { ToolCall } from "../contracts/result/tool-call.type";
 import type { SystemPromptContract, SystemPromptMeta } from "../contracts/system-prompt.contract";
-import { AgentExecutionError, AIError, SchemaValidationError } from "../errors";
+import {
+  AgentExecutionError,
+  AIError,
+  InvalidRequestError,
+  SchemaValidationError,
+} from "../errors";
 import { MockModel } from "../mock/mock-model";
 import { MockSDK } from "../mock/mock-sdk";
 import { tool } from "../tool/tool";
@@ -124,6 +129,19 @@ function eventCapture() {
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
+
+describe("agent() input check", () => {
+  it("refuses a non-string input in execute() and stream() with a message naming what to pass", async () => {
+    const mock = MockSDK({ responses: [{ content: "ok", finishReason: "stop" }] });
+    const myAgent = agent({ model: mock.model({ name: "mock-gpt" }) });
+
+    await expect(myAgent.execute({ q: "hi" } as never)).rejects.toBeInstanceOf(InvalidRequestError);
+    await expect(myAgent.execute({ q: "hi" } as never)).rejects.toThrow(
+      /expects the input as a string, got object/,
+    );
+    expect(() => myAgent.stream(undefined as never)).toThrow(InvalidRequestError);
+  });
+});
 
 describe("agent()", () => {
   // 1. Single trip, no tools — returns text

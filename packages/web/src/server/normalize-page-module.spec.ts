@@ -330,3 +330,31 @@ describe("normalizePageModule page actions", () => {
     ).toMatchObject({ actionsConfig: { save: { validation: validator } } });
   });
 });
+
+describe("normalizePageModule uploads and translations", () => {
+  it("keeps a page's uploads declaration and validates its size", () => {
+    expect(normalizePageModule(page({ uploads: true }), "page", "a.page.tsx").uploads).toBe(true);
+    expect(
+      normalizePageModule(page({ uploads: { maxTotalSize: 1024 } }), "page", "a.page.tsx").uploads,
+    ).toEqual({ maxTotalSize: 1024 });
+    expect(
+      normalizePageModule(page({ uploads: { maxFiles: 2, maxFileSize: 10 } }), "page", "a.page.tsx")
+        .uploads,
+    ).toEqual({ maxFiles: 2, maxFileSize: 10 });
+    expect(() =>
+      normalizePageModule(page({ uploads: { maxTotalSize: -1 } }), "page", "a.page.tsx"),
+    ).toThrow("maxTotalSize");
+    expect(() => normalizePageModule(page({ uploads: "yes" }), "page", "a.page.tsx")).toThrow(
+      "config.uploads",
+    );
+  });
+
+  it("accepts a translations declaration on a page, a layout and a root", () => {
+    for (const kind of ["page", "layout", "root"] as const) {
+      const raw =
+        kind === "page" ? page({ translations: ["a.*"] }) : { config: { translations: ["a.*"] } };
+
+      expect(() => normalizePageModule(raw, kind, `x.${kind}.tsx`)).not.toThrow();
+    }
+  });
+});

@@ -53,7 +53,7 @@ export type CliAgentOptions = CliRunOptions & {
    * Which of the current process's environment variables the CLI inherits.
    * `true` (default) inherits everything except the adapter's own home
    * variables; `"curated"` passes the minimal system set plus the adapter's
-   * own API key variables (`apiKeyEnv`); `false` passes only the minimal
+   * own API key and extra variables (`apiKeyEnv`, `passEnv`); `false` passes only the minimal
    * system set (PATH, HOME, TEMP, locale, proxy and Windows system
    * variables); a list passes the minimal set plus those names.
    *
@@ -61,6 +61,7 @@ export type CliAgentOptions = CliRunOptions & {
    * signing keys, other providers' keys). Prefer `"curated"` and add what
    * the CLI needs through `env`. In production, leaving this unset logs a
    * one-time warning; set `true` explicitly to keep it and silence the warning.
+   * The default changes to `"curated"` in 6.0.
    */
   inheritEnv?: boolean | "curated" | string[];
   /**

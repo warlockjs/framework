@@ -177,7 +177,12 @@ It takes a **resolved** policy — call `resolveOutboundPolicy` first.
 - A **resolution failure** is itself a block — if the host can't be resolved to verify it is public, the request is denied, not allowed.
 
 :::note
-Pinning works with the runtime's own `fetch` dispatcher. If your app routes `fetch` through a proxy or mock dispatcher (`setGlobalDispatcher(new ProxyAgent(…))`), requests keep going through it — the proxy resolves the name — and the DNS pre-check remains the guard. A `policy.fetch` you inject is used as-is, also with the pre-check only. If your app installed its own `Agent` as the global dispatcher with custom connect options (a private CA, a client certificate), guarded requests go through a separate pinned agent built with the default connect options; to keep your options, inject a `policy.fetch` that uses your dispatcher.
+The pinned dispatcher is built from the app's own global `Agent`, so it keeps that agent's connect options (a private CA, a client certificate, timeouts) and replaces only the address resolution. Remaining limits, each logged once as a `[warlock-ai] outbound address pinning is off ...` warning that names the reason, with the DNS pre-check still guarding the request:
+
+- the app routes `fetch` through a proxy or mock dispatcher (`setGlobalDispatcher(new ProxyAgent(…))`): requests keep going through it and the proxy resolves the name;
+- a `policy.fetch` you inject is used as-is;
+- the installed `Agent` was created with a function as its `connect` option, which cannot take a pinned lookup;
+- the runtime exposes no default dispatcher.
 :::
 
 `isPrivateOrReservedIp(address)` is exported standalone if you want the same private / loopback / link-local / unique-local / metadata classification in your own checks.

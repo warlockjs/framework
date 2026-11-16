@@ -128,7 +128,8 @@ describe("dashboardHtml", () => {
 
   it("lists trace summaries and loads the open trace's full tree by id", () => {
     // The list poll reads summaries; the drawer fetches the full trace.
-    expect(html).toContain('fetchAuthed(API + "/traces")');
+    expect(html).toContain('fetchAuthed(API + "/traces", listEtag');
+    expect(html).toContain('"If-None-Match": listEtag');
     expect(html).toContain('fetchAuthed(API + "/traces/" + encodeURIComponent(id))');
     expect(html).toContain("t.totalCost");
     expect(html).toContain("t.spanCount");

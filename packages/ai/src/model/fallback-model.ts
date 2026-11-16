@@ -16,6 +16,7 @@ import type { Usage } from "../contracts/result/usage.type";
 import { AIError } from "../errors/ai-error";
 import type { AIErrorCode } from "../errors/error-code.type";
 import { mergeUsage } from "../utils/compute-cost";
+import { isAbortError } from "../workflow/retry";
 
 /**
  * Error codes treated as transient — and therefore worth falling over
@@ -26,12 +27,27 @@ import { mergeUsage } from "../utils/compute-cost";
  * context-length, and content-filter: those fail identically on every
  * downstream model, so retrying only burns budget.
  */
-const DEFAULT_RETRYABLE_CODES: readonly AIErrorCode[] = [
+export const DEFAULT_FALLBACK_RETRY_CODES: readonly AIErrorCode[] = [
   "PROVIDER_RATE_LIMIT",
   "PROVIDER_OVERLOADED",
   "PROVIDER_TIMEOUT",
   "PROVIDER_ERROR",
 ];
+
+/**
+ * The built-in failover decision: `true` for an `AIError` whose code is
+ * in {@link DEFAULT_FALLBACK_RETRY_CODES}. Compose it inside a custom
+ * `retryOn` predicate to keep the standard failover and add a reason of
+ * your own (`retryOn` replaces the default; `alsoRetryOn` adds to it).
+ *
+ * @example
+ * fallbackModel([primary, backup], {
+ *   retryOn: (error) => isDefaultFallbackRetryable(error) || error instanceof MyError,
+ * });
+ */
+export function isDefaultFallbackRetryable(error: unknown): boolean {
+  return error instanceof AIError && DEFAULT_FALLBACK_RETRY_CODES.includes(error.code);
+}
 
 /**
  * A `ModelContract` that wraps an ordered list of models and tries each
@@ -83,25 +99,57 @@ export function fallbackModel(
     );
   }
 
-  return new FallbackModel(models, resolveShouldRetry(options?.retryOn));
+  return new FallbackModel(models, resolveShouldRetry(options?.retryOn, options?.alsoRetryOn));
 }
 
 /**
- * Build the chain-advancement predicate from the caller's `retryOn`.
- * An array becomes a code membership test against an `AIError.code`; a
- * function is used verbatim; absence falls back to the transient
- * default set.
+ * Build the chain-advancement predicate from the caller's options.
+ * `retryOn` REPLACES the default set (a code list becomes a membership
+ * test against `AIError.code`; a function is used verbatim); absence
+ * falls back to the transient default. `alsoRetryOn` is OR-ed on top of
+ * whichever base results.
  */
-function resolveShouldRetry(retryOn: FallbackModelOptions["retryOn"]): FallbackRetryPredicate {
-  if (typeof retryOn === "function") {
-    return retryOn;
+function resolveShouldRetry(
+  retryOn: FallbackModelOptions["retryOn"],
+  alsoRetryOn: FallbackModelOptions["alsoRetryOn"],
+): FallbackRetryPredicate {
+  const base = toPredicate(retryOn, DEFAULT_FALLBACK_RETRY_CODES);
+
+  if (alsoRetryOn === undefined) {
+    return base;
   }
 
-  const codes: readonly AIErrorCode[] = retryOn ?? DEFAULT_RETRYABLE_CODES;
+  const extra = toPredicate(alsoRetryOn, []);
+
+  return (error: unknown): boolean => base(error) || extra(error);
+}
+
+function toPredicate(
+  value: AIErrorCode[] | FallbackRetryPredicate | undefined,
+  fallback: readonly AIErrorCode[],
+): FallbackRetryPredicate {
+  if (typeof value === "function") {
+    return value;
+  }
+
+  const codes: readonly AIErrorCode[] = value ?? fallback;
 
   return (error: unknown): boolean => {
     return error instanceof AIError && codes.includes(error.code);
   };
+}
+
+/**
+ * The caller cancelled the call (its own signal aborted, or the error is
+ * an abort / `cancelled` category). Cancellation is never a provider
+ * failure, so it must not advance the chain.
+ */
+function isCallerCancel(error: unknown, options?: ModelCallOptions): boolean {
+  return (
+    options?.signal?.aborted === true ||
+    isAbortError(error) ||
+    (error instanceof AIError && error.category === "cancelled")
+  );
 }
 
 /**
@@ -204,7 +252,7 @@ class FallbackRun {
 
         return { ...response, usage: this.usage };
       } catch (error) {
-        if (isLast || !this.shouldRetry(error)) {
+        if (isLast || isCallerCancel(error, options) || !this.shouldRetry(error)) {
           throw error;
         }
 
@@ -260,7 +308,7 @@ class FallbackRun {
 
           return;
         } catch (error) {
-          if (emitted || isLast || !this.shouldRetry(error)) {
+          if (emitted || isLast || isCallerCancel(error, options) || !this.shouldRetry(error)) {
             throw error;
           }
 

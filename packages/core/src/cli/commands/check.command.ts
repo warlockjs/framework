@@ -46,6 +46,12 @@ export const checkCommand = command({
       type: "string",
     },
     {
+      text: "--test-timeout",
+      description:
+        "Seconds one vitest run may take before the check stops it (default 600, 0 for no limit; also WARLOCK_CHECK_TEST_TIMEOUT)",
+      type: "string",
+    },
+    {
       text: "--json, -j",
       description: "Print the report as JSON",
       type: "boolean",

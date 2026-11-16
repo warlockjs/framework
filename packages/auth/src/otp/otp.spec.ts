@@ -35,7 +35,8 @@ vi.mock("../services/auth.service", () => ({ authService: { completeLogin } }));
 
 import { InvalidOneTimeTokenError } from "../errors/invalid-one-time-token.error";
 import { InMemoryModel, resetTables, tables } from "../test-support/in-memory-cascade";
-import { requestOtp, verifyOtp } from "./otp";
+import { requestOtp as requestOtpNow, verifyOtp } from "./otp";
+import { settleBackgroundWork } from "../services/background-work";
 import { defined } from "../test-support/defined";
 
 class User extends InMemoryModel {
@@ -67,6 +68,12 @@ beforeEach(async () => {
 
   user = (await User.create({ phone: PHONE })) as User;
 });
+
+/** The request, then the background work it started. */
+async function requestOtp(...args: Parameters<typeof requestOtpNow>): Promise<void> {
+  await requestOtpNow(...args);
+  await settleBackgroundWork();
+}
 
 async function issuedCode(): Promise<string> {
   await requestOtp(User as never, PHONE);
@@ -109,11 +116,16 @@ describe("requestOtp", () => {
   });
 
   it("answers without waiting for delivery, so timing does not reveal a known phone", async () => {
-    const send = vi.fn(() => new Promise<never>(() => {}));
+    let finish: () => void = () => {};
+    const send = vi.fn(() => new Promise<void>((resolve) => (finish = resolve)));
     configValues["auth.otp.send"] = send;
 
-    await expect(requestOtp(User as never, PHONE)).resolves.toBeUndefined();
-    expect(send).toHaveBeenCalledOnce();
+    await expect(requestOtpNow(User as never, PHONE)).resolves.toBeUndefined();
+    await vi.waitFor(() => expect(send).toHaveBeenCalledOnce());
+
+    // Let the delivery end so later specs do not wait on it.
+    finish();
+    await settleBackgroundWork();
   });
 
   it("reports a background delivery failure as otp.deliveryFailed", async () => {

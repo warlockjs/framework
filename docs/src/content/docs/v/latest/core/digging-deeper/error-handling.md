@@ -315,12 +315,17 @@ if (response.body?.code === HttpErrorCodes.RateLimitExceeded) {
 | `EC104` | `BodyTooLarge`            | Request `Content-Length` exceeds the per-route body cap.                             |
 | `EC105` | `IpForbidden`             | Client IP failed the `ipFilter()` allow/deny check.                                  |
 | `EC106` | `Maintenance`             | App is in maintenance mode and the request didn't match the allowlist.               |
+| `EC107` | `TooManyFormFields`       | A urlencoded form carries more fields than `http.urlencoded.maxFields`.              |
+| `EC108` | `MultipartTooLarge`       | A multipart body, a file, or a file count passes its cap (413).                      |
+| `EC109` | `MultipartNotAccepted`    | A multipart body reached a route without `uploads` under `routes: "declared"` (415). |
+| `EC110` | `HostNotAllowed`          | The request's host is not listed in `http.allowedHosts`.                             |
+| `EC111` | `InputTooDeep`            | A JSON body nests deeper than `http.input.maxDepth` (400).                           |
 
 ### The numbering convention
 
 The ranges are deliberately partitioned so codes never collide across packages:
 
-- **`EC100`–`EC199`** is reserved for `@warlock.js/core` HTTP middleware. `EC100`–`EC106` are in use today; the rest of the range is held for future core middleware.
+- **`EC100`–`EC199`** is reserved for `@warlock.js/core` HTTP middleware. `EC100`–`EC111` are in use today; the rest of the range is held for future core middleware.
 - **`EC001`–`EC099`** belongs to `@warlock.js/auth` (its `AuthErrorCodes`).
 
 **Clients should branch on the code, not the message.** The enum values are the stable contract. Message text may be reworded, localized, or expanded over time; the `EC###` value will not change meaning. Treat the code the way you'd treat an HTTP status — a machine-readable signal — and reserve the message for humans reading logs.

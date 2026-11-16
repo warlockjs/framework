@@ -284,22 +284,23 @@ export class SimpleMemoryCacheDriver
 
 Your driver must provide:
 
-| Method              | Purpose                                                         |
-| ------------------- | --------------------------------------------------------------- |
-| `name`              | Driver identifier                                               |
-| `set()`             | Store value. Call `this.resolveSetOptions(ttlOrOptions)` first. |
-| `get()`             | Retrieve value or `null`. Emit `hit` / `miss`.                  |
-| `remove()`          | Delete a key. Emit `removed`.                                   |
-| `flush()`           | Clear all data. Emit `flushed`.                                 |
-| `removeNamespace()` | Delete keys under a prefix. Throw if unsupported.               |
-| `connect()`         | Establish backend connection. Emit `connected`.                 |
-| `disconnect()`      | Tear down the connection. Emit `disconnected`.                  |
+| Method              | Purpose                                                                                                                                                                             |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `name`              | Driver identifier                                                                                                                                                                   |
+| `set()`             | Store value. Call `this.resolveSetOptions(ttlOrOptions)` first.                                                                                                                     |
+| `get()`             | Retrieve value or `null`. Emit `hit` / `miss`.                                                                                                                                      |
+| `remove()`          | Delete a key. Emit `removed`.                                                                                                                                                       |
+| `flush()`           | Clear all data. Emit `flushed`.                                                                                                                                                     |
+| `removeNamespace()` | Delete keys under a prefix. Throw if unsupported.                                                                                                                                   |
+| `listKeys()`        | Optional. List the live keys under a namespace, in the form `get()` / `remove()` accept (drop `globalPrefix` with `this.unprefixKey()`). Lets callers delete exactly what they own. |
+| `connect()`         | Establish backend connection. Emit `connected`.                                                                                                                                     |
+| `disconnect()`      | Tear down the connection. Emit `disconnected`.                                                                                                                                      |
 
 ## Inherited-for-free from `BaseCacheDriver`
 
 These come with sensible defaults — you only override them if your backend can offer stronger semantics (Redis-native commands, for instance):
 
-- `has()` — built on `get()`
+- `has()` — built on `exists()` (override `exists()` with a cheap check; `has()` emits `hit` / `miss` without a value)
 - `remember()` — stampede-safe wrapper around `get()` + `set()`
 - `pull()` — `get()` + `remove()`
 - `forever()` — `set(key, value, Infinity)`

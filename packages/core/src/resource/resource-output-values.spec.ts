@@ -1,4 +1,5 @@
 import dayjs from "dayjs";
+import config from "@mongez/config";
 import { afterEach, describe, expect, it } from "vitest";
 import { assetsUrl, publicUrl, setBaseUrl, uploadsUrl, url } from "../utils/urls";
 import { ResourceFieldBuilder } from "./resource-field-builder";
@@ -37,6 +38,41 @@ describe("date fields", () => {
   it("answers bad data with undefined, or null when nullable", () => {
     expect(new ResourceFieldBuilder("date").transform("not a date")).toBeUndefined();
     expect(new ResourceFieldBuilder("date").nullable().transform("")).toBeNull();
+  });
+});
+
+describe("resource.dateOutput default", () => {
+  afterEach(() => config.set("resource", undefined));
+
+  it("applies the app-wide default to fields without their own options", () => {
+    config.set("resource.dateOutput", "iso");
+
+    expect(new ResourceFieldBuilder("date").transform(new Date(value))).toBe(value);
+  });
+
+  it("accepts the object form as the default", () => {
+    config.set("resource.dateOutput", { timestamp: true });
+
+    expect(new ResourceFieldBuilder("date").transform(new Date(value))).toEqual({
+      timestamp: Date.parse(value),
+    });
+  });
+
+  it("lets a field's own dateOptions() win over the default", () => {
+    config.set("resource.dateOutput", "iso");
+
+    expect(
+      new ResourceFieldBuilder("date").dateOptions("timestamp").transform(new Date(value)),
+    ).toBe(Date.parse(value));
+  });
+
+  it("keeps the full date object when no default is set", () => {
+    expect(Object.keys(new ResourceFieldBuilder("date").transform(value))).toEqual([
+      "iso",
+      "format",
+      "timestamp",
+      "humanTime",
+    ]);
   });
 });
 

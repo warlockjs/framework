@@ -1027,3 +1027,32 @@ describe("Scheduler — registered-but-never-started warning", () => {
     expect(warnSpy).not.toHaveBeenCalled();
   });
 });
+
+describe("Scheduler — throwing listeners", () => {
+  it("logs a throwing job listener instead of leaving an unhandled rejection", async () => {
+    const unhandled = vi.fn();
+    process.on("unhandledRejection", unhandled);
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const scheduler = new Scheduler();
+    const ran = vi.fn();
+    scheduler.addJob(
+      job("listener-throws", async () => {
+        ran();
+      }).everySecond(),
+    );
+    scheduler.on("job:start", () => {
+      throw new Error("listener boom");
+    });
+
+    scheduler.start();
+    await vi.advanceTimersByTimeAsync(2_000);
+    await scheduler.stop();
+
+    expect(errorSpy).toHaveBeenCalled();
+    expect(unhandled).not.toHaveBeenCalled();
+
+    process.off("unhandledRejection", unhandled);
+    errorSpy.mockRestore();
+  });
+});

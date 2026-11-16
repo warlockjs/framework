@@ -124,6 +124,8 @@ a matching GET or HEAD returns `304` without reading stored XML. `If-Match`
 compares strongly, so only the exact strong tag passes; otherwise the route
 answers `412`. Gzipped artifacts stream with `Content-Encoding: gzip`.
 
+`sitemap.gzip` defaults to `false`: the stored files stay plain XML. When `http.compression` is on, the response layer already compresses a served sitemap for clients that accept it, so `gzip: true` only changes what is stored (and the size of the stored files).
+
 ## Images and robots.txt
 
 An entry can include up to 1,000 absolute HTTP(S) image URLs. Warlock emits the
@@ -134,6 +136,24 @@ stock, and description.
 `web.robots.enabled` registers `/robots.txt`. `referenceSitemap` defaults
 to true and adds the configured sitemap URL when an origin is available. A
 hand-written `public/robots.txt` takes precedence.
+
+In a multi-site app each site can have its own policy. Set `robots` on a site in `web.sites` (or on the result of `resolveHost` for a tenant host); it is merged over `web.robots` key by key, and `groups` and `extra` are replaced whole:
+
+```ts title="src/config/web.ts"
+const web: WebConfigurations = {
+  sites: {
+    landing: { hosts: ["estates.app"] },
+    admin: {
+      hosts: ["admin.estates.app"],
+      robots: { groups: [{ userAgent: "*", disallow: ["/admin"] }] },
+    },
+    internal: { hosts: ["internal.estates.app"], robots: { enabled: false } },
+  },
+  robots: { enabled: true, groups: [{ userAgent: "*", allow: ["/"] }] },
+};
+```
+
+A site without `robots` gets the global policy. A site whose merged policy has `enabled: false` answers `404` for `/robots.txt`. A site may enable robots while the global policy is off: set `robots: { enabled: true, ... }` on it. A dynamic site that is not indexable still answers `Disallow: /`.
 
 `generateSitemap()` remains the low-level one-shot artifact writer. It does
 not publish a managed manifest or change HTTP serving state; use

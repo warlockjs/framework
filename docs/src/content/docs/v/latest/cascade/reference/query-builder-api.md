@@ -810,10 +810,10 @@ await User.query()
 ### `joinWith(...relations)`
 
 ```ts
-joinWith(...relations: string[]): this
+joinWith(...relations: Array<string | string[] | Record<string, string | ((query: QueryBuilderContract) => void)>>): this
 ```
 
-**What it does:** load relations via JOIN (single query) instead of separate queries. Best for `belongsTo` / `hasOne`.
+**What it does:** load relations via JOIN (single query) instead of separate queries. Best for `belongsTo` / `hasOne`. On MongoDB the relations are loaded with the same batched queries as `with()`, hydrated onto each model.
 
 ```ts
 const post = await Post.joinWith("author").first();
@@ -869,6 +869,8 @@ await User.query()
   .whereHas("posts", (q) => q.where("isPublished", true))
   .get();
 ```
+
+Works on both drivers for `hasMany`, `hasOne`, `belongsTo` and `belongsToMany`, in reads, counts and pagination. On MongoDB each filter is a `$lookup` placed ahead of the `$match`; `orWhereHas` joins the same `$or`. A write (`update()`, `delete()`, `unset()`, `increment()`) on a query holding one of these filters throws `UnsupportedQueryOperationError` on MongoDB: resolve the ids with `pluck()` and write with `whereIn()`. A constraint callback cannot filter by another relation on MongoDB.
 
 ---
 
@@ -991,7 +993,7 @@ const result = await User.query().cursorPaginate({ limit: 10, cursor: lastId });
 // { data, pagination: { hasMore, nextCursor, ... } }
 ```
 
-`limit` is capped at `maxLimit` (default **1000**), as for `paginate()`.
+`limit` is capped at `maxLimit` (default **1000**), as for `paginate()`. The cursors are read from the fetched rows with `model.get(column)`, so any column works as the cursor (`column: "createdAt"`), not only members of the model such as `id`; lean rows are read as properties.
 
 ### `chunk(size, callback)`
 
@@ -1008,6 +1010,20 @@ await User.query().chunk(100, async (users, index) => {
 ```
 
 When the query has no order, or is ordered only by the primary key (or `_id` on MongoDB), each chunk continues after the last key seen (`where id > last order by id limit size`): every chunk costs the same, and rows the callback updates or deletes do not make later chunks skip or repeat rows. An unordered query is read in primary-key (`_id`) order. Any other query — another sort, `limit`/`skip`, grouping, joins, a top-level `orWhere` — pages by offset as before.
+
+### `stream(batchSize?)`
+
+```ts
+stream(batchSize?: number): AsyncGenerator<T, void, undefined>
+```
+
+**What it does:** terminator — iterate the rows one at a time as an async iterator on both drivers. Rows are read and hydrated `batchSize` at a time (default 100) with the same paging as `chunk()`, so memory stays at one batch. Leaving the loop (`break`, `return`, a thrown error) stops reading.
+
+```ts
+for await (const user of User.query().where("isActive", true).stream(500)) {
+  await sendDigest(user);
+}
+```
 
 ---
 
@@ -1081,7 +1097,7 @@ query.groupBy("category", { total: $agg.sum("amount") }).having("total", ">", 10
 On MongoDB the having filters become a `$match` after the `$group`. On PostgreSQL a `having` on an aggregate alias accepts only the comparison operators `=`, `!=`, `<>`, `>`, `>=`, `<`, `<=`.
 
 :::note[MongoDB never drops a filter]
-Every filter helper reaches the MongoDB pipeline or throws `UnsupportedQueryOperationError` — a filter is never silently left out (which would widen the read, or an `update()` / `delete()` built from it, to every document). The relation-existence filters (`has`, `whereHas`, `orWhereHas`, `doesntHave`, `whereDoesntHave`) throw on MongoDB. An `update()` / `delete()` / `increment()` on a query holding a stage its filter cannot carry — a `groupBy`/`having`, an inner join, `unwind`, a vector search — throws instead of writing to every document the plain filter matches.
+Every filter helper reaches the MongoDB pipeline or throws `UnsupportedQueryOperationError` — a filter is never silently left out (which would widen the read, or an `update()` / `delete()` built from it, to every document). The relation-existence filters (`has`, `whereHas`, `orWhereHas`, `doesntHave`, `whereDoesntHave`) become a `$lookup` plus a condition in reads; in an `update()` / `delete()` they throw. An `update()` / `delete()` / `increment()` on a query holding a stage its filter cannot carry — a `groupBy`/`having`, an inner join, `unwind`, a vector search — throws instead of writing to every document the plain filter matches.
 :::
 
 ---
@@ -1209,6 +1225,32 @@ decrement(field: string, amount?: number): Promise<number>
 
 ```ts
 await User.whereId(123).increment("loginCount");
+```
+
+### `atomic(operations, options?)`
+
+```ts
+atomic(operations: AtomicUpdate, options?: { arrayFilters?: Record<string, unknown>[] }): Promise<number>
+```
+
+**What it does:** apply update operators (`$set`, `$unset`, `$inc`, `$dec`; MongoDB also accepts the other operators and pipeline updates) to every matching row in one statement. The builder's filters and the model's global scopes are part of that statement, so no ids are looked up first. `Model.atomic()` uses it when the model has global scopes. Returns the number of rows modified. It does not upsert; use `Model.atomic(filter, ops, { upsert: true })` for that.
+
+```ts
+await Post.query()
+  .where("status", "pending")
+  .atomic({ $set: { status: "done" }, $inc: { revisions: 1 } });
+```
+
+### `prepare(name)` (PostgreSQL)
+
+```ts
+prepare(name: string): this
+```
+
+**What it does:** run the query as a named prepared statement. PostgreSQL parses and plans it once per connection and reuses the plan, which helps a hot query. The name is combined with a hash of the SQL text, so the same name on a query whose shape changes never collides. Applies to the rows read by `get()` / `first()`. MongoDB builders do not have it.
+
+```ts
+const rows = await User.query().where("tenantId", tenantId).prepare("tenant-users").get();
 ```
 
 ### `incrementMany(field, amount?)` / `decrementMany(field, amount?)`

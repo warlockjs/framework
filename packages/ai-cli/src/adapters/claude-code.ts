@@ -32,6 +32,7 @@ export const claudeCodeAdapter: CliAdapter = {
   title: "Claude Code",
   command: "claude",
   apiKeyEnv: ["ANTHROPIC_API_KEY"],
+  passEnv: ["ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL", "CLAUDE_CODE_OAUTH_TOKEN"],
   homeEnv: ["CLAUDE_CONFIG_DIR"],
   transports: ["argv", "stdin"],
   effort: true,

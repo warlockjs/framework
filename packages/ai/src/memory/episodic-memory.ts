@@ -101,7 +101,12 @@ export class EpisodicMemory {
 
     // Widen the candidate page when other scopes crowd this one out of it.
     const hits = await similarWithin(
-      (topK) => this.store.similar<StoredEpisode>(vector, { topK, threshold }),
+      (topK, accept) =>
+        this.store.similar<StoredEpisode>(vector, {
+          topK,
+          threshold,
+          filter: (hit) => accept({ ...hit, score: 1 }),
+        }),
       (hit: CacheSimilarHit<StoredEpisode>) =>
         hit.key.startsWith(prefix) && hit.value?.scope === scope,
       { topK: Math.max(k * RECALL_OVERSCAN, k), want: k },

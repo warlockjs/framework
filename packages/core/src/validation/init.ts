@@ -28,6 +28,11 @@ configureSeal({
     return translateSealRule({ rule, attributes, context, key: translationKey, translate: t });
   },
 
+  // A translation key given as a rule's `errorMessage` is translated for the request locale.
+  translateMessageKey(key, attributes) {
+    return t(key, attributes);
+  },
+
   translateAttribute({ attribute, context, rule }) {
     const translateAttribute = config.key("validation.translateAttribute");
 

@@ -23,6 +23,14 @@ export type DatabaseCacheOptions = {
    * @default Infinity
    */
   ttl?: number;
+  /**
+   * Write each entry with one upsert (`conflictColumns: ["key"]`) instead of a
+   * read followed by an insert or update. Needs a unique index on the `key`
+   * column of the cache table; turn it on once the index exists.
+   *
+   * @default false
+   */
+  upsert?: boolean;
 };
 
 export class CacheModel extends Model {
@@ -92,25 +100,28 @@ export class DatabaseCacheDriver
     const keyParts = parsedKey.split(".");
     const namespace = keyParts.slice(0, -1).join(".") || parsedKey;
 
-    // Find existing cache entry or create new one (upsert pattern)
-    let cacheEntry = await this.model.first({ key: parsedKey });
+    const expiresAt = this.getExpiresAt(ttl) || null;
 
-    if (cacheEntry) {
-      // Update existing entry
-      cacheEntry.set("namespace", namespace);
-      cacheEntry.set("data", value);
-      cacheEntry.set("ttl", ttl);
-      cacheEntry.set("expiresAt", this.getExpiresAt(ttl) || null);
-      await cacheEntry.save();
+    if (this.options.upsert) {
+      // One statement; relies on the unique index on `key`.
+      const row = { key: parsedKey, namespace, data: value, ttl, expiresAt };
+
+      await this.model.upsert({ key: parsedKey }, row, { conflictColumns: ["key"] });
     } else {
-      // Create new entry
-      await this.model.create({
-        key: parsedKey,
-        namespace,
-        data: value,
-        ttl,
-        expiresAt: this.getExpiresAt(ttl) || null,
-      });
+      // Find existing cache entry or create new one (upsert pattern)
+      const cacheEntry = await this.model.first({ key: parsedKey });
+
+      if (cacheEntry) {
+        // Update existing entry
+        cacheEntry.set("namespace", namespace);
+        cacheEntry.set("data", value);
+        cacheEntry.set("ttl", ttl);
+        cacheEntry.set("expiresAt", expiresAt);
+        await cacheEntry.save();
+      } else {
+        // Create new entry
+        await this.model.create({ key: parsedKey, namespace, data: value, ttl, expiresAt });
+      }
     }
 
     if (tags && tags.length > 0) {
@@ -130,19 +141,21 @@ export class DatabaseCacheDriver
 
     this.log("fetching", parsedKey);
 
-    const model = await this.model.first({
-      key: parsedKey,
-    });
+    // A plain row: no model is built for a read.
+    const row = (await this.model.query().where("key", parsedKey).lean().first()) as
+      | Record<string, unknown>
+      | null
+      | undefined;
 
-    if (!model) {
+    if (!row) {
       this.log("notFound", parsedKey);
       return null;
     }
 
     const data: CacheData = {
-      data: model.get("data"),
-      expiresAt: model.get("expiresAt") as number | undefined,
-      ttl: model.get("ttl") as number | undefined,
+      data: row.data,
+      expiresAt: (row.expiresAt ?? undefined) as number | undefined,
+      ttl: (row.ttl ?? undefined) as number | undefined,
     };
 
     return this.parseCachedData(parsedKey, data);

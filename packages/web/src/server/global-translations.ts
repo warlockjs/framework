@@ -24,7 +24,7 @@
  * reach that the table does not already hold) and the reference to the table.
  */
 import { getKeywordsListOf, getTranslationsList, type Keywords } from "@mongez/localization";
-import { type TranslationUsage } from "@warlock.js/core";
+import { getTranslationsRevision, type TranslationUsage } from "@warlock.js/core";
 import {
   canonicalJson,
   EVERYTHING_USAGE,
@@ -60,6 +60,12 @@ export type GlobalTranslationDeliveryInput = {
   usageFor(routeName: string): TranslationUsage | undefined;
   /** The registry's table for a locale. Defaults to `@mongez/localization`'s global list. */
   keywordsOf?(locale: string): Readonly<Keywords> | null;
+  /**
+   * A number that changes whenever the registry is written to. Given, the
+   * production delivery computes a route's pruned dictionary once per locale
+   * and reuses it until the number changes. Absent, it is rebuilt per request.
+   */
+  revision?(): number;
 };
 
 /** The top-level groups of a table, as a new object. */
@@ -143,6 +149,7 @@ export function createSnapshotGlobalTranslationDelivery(
   localesAtBoot: readonly string[],
 ): GlobalTranslationDelivery {
   const snapshots = new Map<string, Snapshot>();
+  const memo = new Map<string, { revision: number; delivered: DeliveredTranslations }>();
 
   for (const locale of localesAtBoot) {
     const tree = detachedCopy(pickGroups(keywordsOfLocale(input, locale), input.sharedGroups));
@@ -152,26 +159,36 @@ export function createSnapshotGlobalTranslationDelivery(
   return {
     sharedGroups: input.sharedGroups,
     deliver(routeName, locale) {
-      const snapshot = snapshots.get(locale) ?? snapshotOf(locale, {});
-      const keywords = keywordsOfLocale(input, locale);
+      const revision = input.revision?.();
+      const memoKey = `${routeName}\0${locale}`;
+      const memoised = revision === undefined ? undefined : memo.get(memoKey);
 
-      const assets: HydrationTranslationAssets = {
-        url: translationTableUrl(locale, snapshot.hash),
-        hash: snapshot.hash,
-        groups: input.sharedGroups,
-        latest: translationLatestUrl(locale),
-      };
+      if (memoised !== undefined && memoised.revision === revision) return memoised.delivered;
 
-      return {
-        keywords: pruneKeywordsAgainst(
-          keywords,
-          usageOrEverything(input, routeName),
-          snapshot.tree,
-        ),
-        assets,
-      };
+      const delivered = buildDelivery(routeName, locale);
+
+      if (revision !== undefined) memo.set(memoKey, { revision, delivered });
+
+      return delivered;
     },
   };
+
+  function buildDelivery(routeName: string, locale: string): DeliveredTranslations {
+    const snapshot = snapshots.get(locale) ?? snapshotOf(locale, {});
+    const keywords = keywordsOfLocale(input, locale);
+
+    const assets: HydrationTranslationAssets = {
+      url: translationTableUrl(locale, snapshot.hash),
+      hash: snapshot.hash,
+      groups: input.sharedGroups,
+      latest: translationLatestUrl(locale),
+    };
+
+    return {
+      keywords: pruneKeywordsAgainst(keywords, usageOrEverything(input, routeName), snapshot.tree),
+      assets,
+    };
+  }
 }
 
 /**
@@ -212,6 +229,7 @@ export function productionGlobalTranslationDeliveryInput(
   return {
     sharedGroups: translations?.sharedGroups ?? DEFAULT_SHARED_TRANSLATION_GROUPS,
     prune: translations?.prune ?? true,
+    revision: getTranslationsRevision,
     usageFor(routeName) {
       const sourceFile = routeSourceFileOf(routeName);
       if (sourceFile === undefined || !Object.hasOwn(usage, sourceFile)) return undefined;

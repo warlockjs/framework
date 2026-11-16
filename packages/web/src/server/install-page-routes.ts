@@ -46,6 +46,7 @@ import {
 } from "../build/discover-pages";
 import { pageSetupFileFor } from "../build/page-setup-file";
 import { readModuleConfig } from "../build/read-module-config";
+import type { PageUploadsOption } from "../page-config";
 import { readPageGuard } from "../build/read-page-guard";
 import { hasMixedSegment, mixedRoutesTie, routerPathOf } from "../routing/mixed-route-segment";
 import { composeRoutePath } from "../routing/compose-route-path";
@@ -81,6 +82,7 @@ import {
 import { composeErrorPageLoader, type ErrorPageModule } from "./error-page";
 import { layoutPrefixesByDirectory } from "./layout-prefixes";
 import { createRefusalPageRenderer } from "./core-refusal-page";
+import type { FailureShell } from "./render-page";
 import { notFoundPageHandlerOptions } from "./not-found-handler-options";
 import { devClientApiRouteNames, type NamedApiRouteRegistry } from "./dev-client-api-route-names";
 import { resolvePayloadBudget, type PayloadBudgetConfig } from "./payload-budget";
@@ -293,6 +295,29 @@ function pageDeclaresAction(pageFile: string): boolean {
     setupCandidate !== undefined && isFile(setupCandidate) ? setupCandidate : undefined;
 
   return declares(pageFile) || (setupFile !== undefined && declares(setupFile));
+}
+
+/** The page's `config.uploads` declaration, from whichever of the page file and its setup file declares `config`. */
+function pageUploadsOption(pageFile: string): PageUploadsOption | undefined {
+  const setupCandidate = pageSetupFileFor(pageFile);
+  const files = [
+    pageFile,
+    ...(setupCandidate !== undefined && isFile(setupCandidate) ? [setupCandidate] : []),
+  ];
+
+  for (const file of files) {
+    try {
+      const read = readModuleConfig(file, readFileSync(file, "utf-8"), "page", {
+        allowMissingDefault: true,
+      });
+
+      if (read.uploads !== undefined) return read.uploads;
+    } catch {
+      // The page's own load reports an unreadable module with its attributed error.
+    }
+  }
+
+  return undefined;
 }
 
 /**
@@ -985,6 +1010,10 @@ async function installDiscoveredPageRoutes(
     const actionHandler = pageDeclaresAction(pageFile)
       ? createPageRouteHandler({ ...handlerOptions, mode: "action" })
       : undefined;
+    // `config.uploads` marks the POST route as taking multipart bodies, which
+    // `http.multipart.routes: "declared"` requires; read statically like the
+    // action probe above.
+    const uploads = actionHandler === undefined ? undefined : pageUploadsOption(pageFile);
 
     // Under an active `web.localeRouting.strategy` this is more than one
     // registration — the base path (possibly rewritten into a locale
@@ -1018,7 +1047,10 @@ async function installDiscoveredPageRoutes(
         localeRouting,
         { pageFile, renderNotFound },
       )) {
-        router.post(routerPathOf(registration.path), registration.handler, { isPage: true });
+        router.post(routerPathOf(registration.path), registration.handler, {
+          isPage: true,
+          ...(uploads === undefined || uploads === false ? {} : { uploads }),
+        });
       }
     });
 
@@ -1107,6 +1139,18 @@ async function installDiscoveredPageRoutes(
         renderPage: notFoundPageHandler,
         localeCodes: localeRouting.strategy === "none" ? undefined : localeRouting.codes,
         renderRefusal: createRefusalPageRenderer({
+          // The site's root and the layout beside it, so a refusal page keeps the site's chrome.
+          loadShell: async () => {
+            const webRoot = path.dirname(appFile);
+            const rootLayouts = layoutChainFor(path.join(webRoot, "refusal.page.tsx"), webRoot);
+
+            return {
+              app: await loadComposedModule(vite, appFile),
+              layouts: await Promise.all(
+                rootLayouts.map((layoutFile) => loadComposedModule(vite, layoutFile)),
+              ),
+            } as FailureShell;
+          },
           name:
             siteScope?.site === undefined
               ? NOT_FOUND_ROUTE_NAME

@@ -196,10 +196,12 @@ const { vectors } = await embedder.embedMany(["a", "b"]); // single batched call
 Wrapped into the typed `@warlock.js/ai` `AIError` hierarchy. Gemini has no machine error code — dispatch keys on HTTP `status` + canonical status phrase in the message:
 
 - 401/403 / `PERMISSION_DENIED` / "API key not valid" → `ProviderAuthError`
+- spent billing or free-tier allowance ("check your plan and billing details", with no per-minute / per-day / retry hint) → `QuotaExceededError` (not retried)
 - 429 / `RESOURCE_EXHAUSTED` → `ProviderRateLimitError`
 - 400 with token/context phrasing → `ContextLengthExceededError`, else `InvalidRequestError`
 - 404 / any other 4xx → `InvalidRequestError`
-- 504 / `DEADLINE_EXCEEDED` / `ETIMEDOUT` / `ECONNABORTED` / `AbortError` → `ProviderTimeoutError`
+- `AbortError` while the call's own `signal` is aborted → `ProviderAbortError` (category `cancelled`, never retried)
+- 504 / `DEADLINE_EXCEEDED` / `ETIMEDOUT` / `ECONNABORTED` / any other `AbortError` (the SDK's own `httpOptions.timeout`) → `ProviderTimeoutError`
 - 503 / `UNAVAILABLE` / "overloaded" → `ProviderOverloadedError` (`code: "PROVIDER_OVERLOADED"`, `retryable: true`) — Gemini documents 503 as "temporarily overloaded or down" (https://ai.google.dev/gemini-api/docs/api-errors)
 - anything else (5xx and status-less) → `ProviderError`
 
@@ -219,7 +221,7 @@ if (result.error instanceof ProviderOverloadedError) {
 }
 ```
 
-Timeout is checked first, so an aborted/`AbortError` request always classifies as `ProviderTimeoutError` regardless of status. `AIError` instances pass through unwrapped (no double-wrap).
+The abort and timeout checks run first, so an `AbortError` classifies as `ProviderAbortError` (caller cancelled) or `ProviderTimeoutError` regardless of status. `AIError` instances pass through unwrapped (no double-wrap).
 
 ## Token counting
 

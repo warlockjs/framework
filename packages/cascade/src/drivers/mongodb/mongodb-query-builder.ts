@@ -3,6 +3,11 @@ import { type GenericObject, get } from "@mongez/reinforcements";
 import type { AggregateOptions, ClientSession, Collection } from "mongodb";
 import { databaseTransactionContext } from "../../context/database-transaction-context";
 import type {
+  AtomicUpdate,
+  AtomicUpdateOptions,
+  DriverContract,
+} from "../../contracts/database-driver.contract";
+import type {
   CursorPaginationOptions,
   CursorPaginationResult,
   DriverQuery,
@@ -30,14 +35,26 @@ import {
   resolvePageNumber,
   toSafeCount,
 } from "../../query-builder/pagination-limits";
-import { runChunks, type KeysetPlan } from "../../query-builder/keyset-chunk";
+import {
+  readRowKey,
+  runChunks,
+  streamRows,
+  type KeysetPlan,
+} from "../../query-builder/keyset-chunk";
 import { QueryBuilder } from "../../query-builder/query-builder";
 import { RelationLoader } from "../../relations/relation-loader";
+import { tryResolveModelClass, type ModelRef } from "../../model/register-model";
 import { assertDefined, sanitizeFilter, sanitizeFilterValue } from "../../utils/sanitize-filter";
 import { type MongoDbDriver } from "./mongodb-driver";
 import { assertFiniteNumber, assertSafeFieldName, assertTimeString } from "./mongodb-filter-guards";
 import { MongoQueryOperations } from "./mongodb-query-operations";
 import { MongoQueryParser } from "./mongodb-query-parser";
+import {
+  compileRelationOperations,
+  hasRelationExistenceOperations,
+  type CompiledRelationOperations,
+  type RelatedModelInfo,
+} from "./mongodb-relation-lookup";
 import { isPipelineStageObject } from "./pipeline-stage-object";
 import type { Operation } from "./types";
 
@@ -67,7 +84,7 @@ export class MongoQueryBuilder<T = unknown>
    */
   protected _operationsHelper?: MongoQueryOperations;
 
-  public hydrateCallback?: (data: any, index: number) => any;
+  public hydrateCallback?: (data: any, index: number, driver?: DriverContract) => any;
 
   private fetchingCallback?: (query: this) => void | Promise<void>;
   private hydratingCallback?: (records: any[], context: any) => void | Promise<void>;
@@ -112,7 +129,7 @@ export class MongoQueryBuilder<T = unknown>
   /**
    * Add hydrate callback function
    */
-  public hydrate(callback: (data: any, index: number) => any): this {
+  public hydrate(callback: (data: any, index: number, driver?: DriverContract) => any): this {
     this.hydrateCallback = callback;
     return this;
   }
@@ -1572,7 +1589,7 @@ export class MongoQueryBuilder<T = unknown>
     void after;
     void before;
     throw new Error(
-      "cursor() is not supported by the MongoDB driver; use where() with limit() instead.",
+      "cursor() is not supported by the MongoDB driver; use cursorPaginate() for pages or stream() to iterate rows.",
     );
   }
 
@@ -1988,6 +2005,7 @@ export class MongoQueryBuilder<T = unknown>
     // Relation state — without it paginate()/chunk() lose `.with(...)`.
     cloned.eagerLoadRelations = new Map(this.eagerLoadRelations);
     cloned.joinRelations = new Map(this.joinRelations);
+    cloned.countRelations = new Map(this.countRelations);
     cloned.relationDefinitions = this.relationDefinitions;
 
     (cloned as any).__operationsHelper = (this as any).__operationsHelper;
@@ -2078,8 +2096,11 @@ export class MongoQueryBuilder<T = unknown>
     }
 
     // Hydrate records
-    const hydratedRecords = this.hydrateCallback
-      ? rawRecords.map(this.hydrateCallback)
+    // The driver is resolved once for the result set, not once per row.
+    const hydrate = this.hydrateCallback;
+    const driver = this.dataSource.driver;
+    const hydratedRecords = hydrate
+      ? rawRecords.map((row, index) => hydrate(row, index, driver))
       : rawRecords;
 
     // Run eager loading for relations registered via with(). Lives in get()
@@ -2427,6 +2448,23 @@ export class MongoQueryBuilder<T = unknown>
   }
 
   /**
+   * Apply atomic update operators (or an update pipeline) to every matching
+   * document in one write. Chained `where*` clauses and global scopes are part
+   * of the write filter, so a scoped write needs no id lookup first.
+   *
+   * @returns The number of documents modified
+   */
+  public async atomic(
+    operations: AtomicUpdate,
+    options?: Pick<AtomicUpdateOptions, "arrayFilters">,
+  ): Promise<number> {
+    const filter = this.buildFilter();
+    const result = await this.dataSource.driver.atomic(this.table, filter, operations, options);
+
+    return result.modifiedCount;
+  }
+
+  /**
    * Unset the given fields from all documents matching the query.
    */
   public async unset(...fields: string[]): Promise<number> {
@@ -2471,6 +2509,46 @@ export class MongoQueryBuilder<T = unknown>
     const plan = this.keysetChunkPlan();
 
     await runChunks<T>(size, callback, plan, (page, pageSize) => {
+      const query = this.clone();
+
+      if (plan) {
+        if (page.after !== undefined) {
+          query.where(plan.key, plan.direction === "asc" ? ">" : "<", page.after);
+        }
+
+        if (!plan.sorted) {
+          query.orderBy(plan.key, plan.direction);
+        }
+      }
+
+      if (page.offset !== undefined) {
+        query.skip(page.offset);
+      }
+
+      return query.limit(pageSize).get();
+    });
+  }
+
+  /**
+   * Iterate the query's rows one at a time without loading them all.
+   *
+   * Rows are read `batchSize` at a time with the same paging as `chunk()`
+   * (by key when the query is unordered or ordered by the key, otherwise by
+   * offset) and hydrated per batch. Leaving the loop early stops reading.
+   *
+   * @example
+   * for await (const user of User.query().where("active", true).stream(500)) {
+   *   await sendDigest(user);
+   * }
+   *
+   * @param batchSize - Rows read per round trip (default 100)
+   */
+  public async *stream(batchSize = 100): AsyncGenerator<T, void, undefined> {
+    this.applyPendingScopes();
+
+    const plan = this.keysetChunkPlan();
+
+    yield* streamRows<T>(batchSize, plan, (page, pageSize) => {
       const query = this.clone();
 
       if (plan) {
@@ -2604,8 +2682,8 @@ export class MongoQueryBuilder<T = unknown>
     let hasPrev = false;
 
     if (data.length > 0) {
-      const firstItem = (data[0] as any)[column];
-      const lastItem = (data[data.length - 1] as any)[column];
+      const firstItem = readRowKey(data[0], column);
+      const lastItem = readRowKey(data[data.length - 1], column);
 
       if (direction === "next") {
         // Forward pagination
@@ -2681,12 +2759,86 @@ export class MongoQueryBuilder<T = unknown>
   protected getParser(): MongoQueryParser {
     this.applyPendingScopes();
 
+    const compiled = this.compileRelationOperations();
+
     return new MongoQueryParser({
       collection: this.collection,
-      operations: this.operations,
+      operations: compiled.operations,
       createSubBuilder: () => new MongoQueryBuilder(this.table, this.dataSource),
       likeLimits: (this.dataSource.driver as MongoDbDriver).likeLimits,
+      trailingStages: compiled.trailingStages,
     });
+  }
+
+  /**
+   * Compile `has()` / `whereHas()` / `doesntHave()` / `withCount()` into
+   * lookup stages and plain conditions. The builder's own operations are left
+   * as recorded; with none of these used, the operations pass through as they are.
+   */
+  protected compileRelationOperations(): CompiledRelationOperations {
+    if (!hasRelationExistenceOperations(this.operations) && this.countRelations.size === 0) {
+      return { operations: this.operations, trailingStages: [] };
+    }
+
+    return compileRelationOperations(
+      this.operations,
+      {
+        relationDefinitions: this.relationDefinitions,
+        modelClass: this.modelClass,
+        conventions: this.dataSource.relationDefaults,
+        resolveRelated: (definition) => {
+          const related = tryResolveModelClass(definition.model as ModelRef | undefined) as
+            | (RelatedModelInfo & { relations?: Record<string, unknown> })
+            | undefined;
+
+          return related?.table ? related : undefined;
+        },
+        constraintFilter: (related, source) => this.relationConstraintFilter(related, source),
+      },
+      this.countRelations,
+    );
+  }
+
+  /**
+   * The match filter of a relation constraint, built on a fresh builder for
+   * the related collection. A constraint that itself filters by a relation is
+   * refused by {@link buildFilter}.
+   */
+  private relationConstraintFilter(
+    related: RelatedModelInfo,
+    source: unknown,
+  ): Record<string, unknown> {
+    const sub = new MongoQueryBuilder(related.table, this.dataSource);
+
+    sub.relationDefinitions = related.relations;
+    sub.modelClass = related;
+
+    if (typeof source === "function") {
+      (source as (query: MongoQueryBuilder) => void)(sub);
+    } else if (Array.isArray(source)) {
+      sub.operations = [...(source as Operation[])];
+      sub.operationsHelper.setOperations(sub.operations);
+    }
+
+    return sub.buildFilter();
+  }
+
+  /**
+   * Record a `withCount()` entry. A constraint callback runs on a MongoDB
+   * builder so its conditions are understood when the count is compiled.
+   */
+  protected override recordCountEntry(spec: string, constraint?: (query: any) => void): void {
+    const { relation, alias } = this.parseCountSpec(spec);
+    let constraintOps: Operation[] | undefined;
+
+    if (constraint) {
+      const sub = new MongoQueryBuilder(this.table, this.dataSource);
+
+      constraint(sub);
+      constraintOps = sub.operations as Operation[];
+    }
+
+    this.countRelations.set(alias, { relation, constraintOps: constraintOps as any });
   }
 
   /**
@@ -2702,13 +2854,17 @@ export class MongoQueryBuilder<T = unknown>
   protected buildCountPipeline(): any[] {
     this.applyPendingScopes();
 
-    const operations = this.operations.filter((op, index) => !this.isCountNeutral(op, index));
+    const compiled = this.compileRelationOperations();
+    const operations = compiled.operations.filter(
+      (op, index) => !this.isCountNeutral(op, index, compiled.operations),
+    );
 
     return new MongoQueryParser({
       collection: this.collection,
       operations,
       createSubBuilder: () => new MongoQueryBuilder(this.table, this.dataSource),
       likeLimits: (this.dataSource.driver as MongoDbDriver).likeLimits,
+      trailingStages: compiled.trailingStages,
     }).parse();
   }
 
@@ -2716,7 +2872,7 @@ export class MongoQueryBuilder<T = unknown>
    * Whether dropping `operations[index]` leaves the number of documents the
    * pipeline yields unchanged (see {@link buildCountPipeline}).
    */
-  private isCountNeutral(op: Operation, index: number): boolean {
+  private isCountNeutral(op: Operation, index: number, operations: Operation[]): boolean {
     if (op.stage === "$sort") {
       return op.type === "orderBy";
     }
@@ -2732,7 +2888,7 @@ export class MongoQueryBuilder<T = unknown>
     // projection, filter in the same segment (those filters run before it).
     let barrierSeen = isLeftJoin || op.stage === "$addFields";
 
-    for (const next of this.operations.slice(index + 1)) {
+    for (const next of operations.slice(index + 1)) {
       const reorderable =
         next.mergeable &&
         (next.stage === "$match" || next.stage === "$project" || next.stage === "$sort");
@@ -2778,6 +2934,16 @@ export class MongoQueryBuilder<T = unknown>
   protected buildFilter(): Record<string, unknown> {
     // Build the pipeline (this applies pending scopes, even with no user filters)
     // and extract the first $match stage
+    // A relation filter needs a `$lookup` ahead of the match, which a write
+    // filter cannot carry: refuse it and point at resolving the ids first.
+    if (hasRelationExistenceOperations(this.operations)) {
+      throw new UnsupportedQueryOperationError(
+        "update/delete with has()/whereHas()/doesntHave()",
+        "mongodb",
+        `A write filter cannot hold a relation filter. Read the ids first and write with whereIn("id", ids), e.g. whereIn("id", await Post.query().whereHas(...).pluck("id")).`,
+      );
+    }
+
     const pipeline = this.buildPipeline();
 
     // Writes send only that first `$match` as the filter. A stage that
@@ -2864,25 +3030,52 @@ export class MongoQueryBuilder<T = unknown>
   declare public modelClass?: any;
 
   /**
-   * Load relations using MongoDB $lookup in a single aggregation query.
+   * Load relations together with the main query.
    *
-   * Unlike `with()` which uses separate queries, `joinWith()` uses
-   * $lookup to fetch related data in a single aggregation pipeline.
+   * On MongoDB the relations are loaded with the same batched queries as
+   * `with()` (one extra query per relation, not one per document), so the
+   * related documents arrive hydrated on each model. Accepts the same forms as
+   * the SQL drivers: names, an array of names, a `"id,name"` column shorthand,
+   * or a callback that constrains the related query.
    *
-   * @param relations - Relation names to load via $lookup
+   * @param args - Relation names, or an object of relation to constraint
    * @returns This builder for chaining
    */
-  public joinWith(...relations: string[]): this {
-    for (const relation of relations) {
-      const def = this.relationDefinitions?.[relation];
-      if (def) {
-        this.joinRelations.set(relation, {
-          alias: `_rel_${relation}`,
-          type: def.type,
-        });
+  public joinWith(...args: unknown[]): this {
+    const entries: Array<
+      string | Record<string, boolean | ((query: QueryBuilderContract) => void)>
+    > = [];
+
+    for (const arg of args) {
+      if (typeof arg === "string") {
+        entries.push(arg);
+      } else if (Array.isArray(arg)) {
+        entries.push(...(arg as string[]));
+      } else if (typeof arg === "object" && arg !== null) {
+        const constraints: Record<string, boolean | ((query: QueryBuilderContract) => void)> = {};
+
+        for (const [relation, constraint] of Object.entries(arg as Record<string, unknown>)) {
+          if (typeof constraint === "function") {
+            constraints[relation] = constraint as (query: QueryBuilderContract) => void;
+          } else if (typeof constraint === "string" && constraint !== "") {
+            const columns = constraint
+              .split(",")
+              .map((column) => column.trim())
+              .filter(Boolean);
+
+            constraints[relation] = (query) => {
+              query.select(columns);
+            };
+          } else {
+            constraints[relation] = true;
+          }
+        }
+
+        entries.push(constraints);
       }
     }
-    return this;
+
+    return this.with(...entries);
   }
 
   /**
@@ -2932,7 +3125,6 @@ export class MongoQueryBuilder<T = unknown>
    * @param count - Optional count to compare against
    */
   public has(relation: string, operator?: string, count?: number): this {
-    // Not translated on MongoDB yet: the parser refuses it when the query runs.
     this.operationsHelper.addMatchOperation("has", { relation, operator, count });
     return this;
   }
@@ -2943,7 +3135,6 @@ export class MongoQueryBuilder<T = unknown>
    * @param callback - Callback to define conditions
    */
   public whereHas(relation: string, callback: (query: QueryBuilderContract) => void): this {
-    // Not translated on MongoDB yet: the parser refuses it when the query runs.
     this.operationsHelper.addMatchOperation("whereHas", { relation, callback });
     return this;
   }
@@ -2957,7 +3148,6 @@ export class MongoQueryBuilder<T = unknown>
     relation: string,
     callback: (query: QueryBuilderContract) => void,
   ): this {
-    // Not translated on MongoDB yet: the parser refuses it when the query runs.
     this.operationsHelper.addMatchOperation("orWhereHas", { relation, callback });
     return this;
   }
@@ -2967,7 +3157,6 @@ export class MongoQueryBuilder<T = unknown>
    * @param relation - Relation name
    */
   public doesntHave(relation: string): this {
-    // Not translated on MongoDB yet: the parser refuses it when the query runs.
     this.operationsHelper.addMatchOperation("doesntHave", { relation });
     return this;
   }
@@ -2978,7 +3167,6 @@ export class MongoQueryBuilder<T = unknown>
    * @param callback - Callback to define conditions
    */
   public whereDoesntHave(relation: string, callback: (query: QueryBuilderContract) => void): this {
-    // Not translated on MongoDB yet: the parser refuses it when the query runs.
     this.operationsHelper.addMatchOperation("whereDoesntHave", { relation, callback });
     return this;
   }

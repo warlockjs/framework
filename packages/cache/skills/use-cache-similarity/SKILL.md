@@ -92,3 +92,4 @@ See the `configure-pg-cache` topic.
 - Don't mix vector dimensions in the same driver — re-embed when models change.
 - Don't expect `similar()` to surface a missing vector (`set` without the `vector` option). Plain KV entries stay out of the similarity index.
 - Don't use `topK: 0` or negative — `pg` rejects with `CacheConfigurationError`; memory drivers return `[]` but it's a code smell.
+- `filter: ({ key, value }) => boolean` runs before `threshold` / `topK`, so `topK` counts in-scope entries only (one query). Honoured by the memory, LRU and memory-extended drivers; `pg` ignores it, so re-check hits when you need a guarantee. A `cache.namespace()` scope passes its prefix as the filter.

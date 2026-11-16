@@ -277,6 +277,76 @@ describe("readModuleConfig — rejected modules", () => {
   });
 });
 
+describe("readModuleConfig — translations declaration", () => {
+  const arrayForm = 'export const config = { translations: ["orders.*", "app.title"] };';
+  const objectForm =
+    'export const config = { translations: { keys: ["orders.*"], exhaustive: true } };';
+
+  it("accepts the array and the object form in a page setup file", () => {
+    for (const source of [arrayForm, objectForm]) {
+      expect(() =>
+        readModuleConfig("orders.setup.ts", source, "page", { allowMissingDefault: true }),
+      ).not.toThrow();
+    }
+    expect(() =>
+      readModuleConfig(
+        "orders.setup.ts",
+        'export const config = { route: "/orders", translations: ["a.*"] };',
+        "page",
+        {
+          allowMissingDefault: true,
+        },
+      ),
+    ).not.toThrow();
+  });
+
+  it("accepts the array and the object form in a layout and a root setup file", () => {
+    for (const kind of ["layout", "root"] as const) {
+      for (const source of [arrayForm, objectForm]) {
+        expect(() =>
+          readModuleConfig(`${kind}.setup.ts`, source, kind, { allowMissingDefault: true }),
+        ).not.toThrow();
+      }
+    }
+  });
+});
+
+describe("readModuleConfig — uploads declaration", () => {
+  const read = (config: string) =>
+    readModuleConfig("a.page.tsx", `export const config = { ${config} };`, "page", {
+      allowMissingDefault: true,
+    });
+
+  it("reads true, false and a size", () => {
+    expect(read("uploads: true").uploads).toBe(true);
+    expect(read("uploads: false").uploads).toBe(false);
+    expect(read("uploads: { maxTotalSize: 10 * 1024 * 1024 }").uploads).toEqual({
+      maxTotalSize: 10485760,
+    });
+    expect(read('route: "/a"').uploads).toBeUndefined();
+  });
+
+  it("reads the per-file and file count limits", () => {
+    expect(read("uploads: { maxFileSize: 2 * 1024 * 1024, maxFiles: 3 }").uploads).toEqual({
+      maxFileSize: 2097152,
+      maxFiles: 3,
+    });
+    expect(() => read("uploads: { maxFiles: 0 }")).toThrow("maxFiles");
+    expect(() => read("uploads: { other: 1 }")).toThrow("config.uploads accepts only");
+  });
+
+  it("refuses a value it cannot read statically", () => {
+    expect(() => read("uploads: LIMIT")).toThrow("config.uploads");
+    expect(() => read("uploads: { maxTotalSize: LIMIT }")).toThrow("positive integer literal");
+  });
+
+  it("is not allowed in a layout module", () => {
+    expect(() =>
+      readModuleConfig("layout.tsx", "export const config = { uploads: true };", "layout"),
+    ).toThrow("not allowed in a layout module");
+  });
+});
+
 describe("readModuleConfig — action names", () => {
   it("reads the keys of an `actions` record", () => {
     const read = readModuleConfig(

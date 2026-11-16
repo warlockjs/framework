@@ -3,6 +3,7 @@ import { parse, stringify } from "devalue";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { HttpContext } from "@warlock.js/core";
 import { escapePayload } from "../../src/components/document-context";
+import { INLINE_PAYLOAD_OMITTED_DOCUMENT_SLOTS } from "../../src/components/document-slot-marker";
 import {
   createPageRouteHandler,
   type PageModuleLoader,
@@ -355,7 +356,8 @@ describe("createPageRouteHandler — constructible without Vite", () => {
     await handler(recorded.context);
 
     const html = recorded.written.html ?? "";
-    const script = '<script type="module" nonce="a&quot;b" src="/@fs/hydration.tsx"></script>';
+    const script =
+      '<script type="module" nonce="a&quot;b" src="/@fs/hydration.tsx" data-wl="entry"></script>';
 
     expect(html).toContain(script);
     // Position is the assertion: inside the document, immediately before the
@@ -490,8 +492,8 @@ describe("createPageRouteHandler — data requests", () => {
 
     expect(embedded, "the document must embed a payload to compare against").not.toBeNull();
 
-    // TWO fields differ on purpose: the page's browser route table and the
-    // locale-routing table. A document carries them in their own elements (the
+    // Some fields differ on purpose: the page's browser route table, the
+    // locale-routing table and the slots the document's elements carry. A document carries them in their own elements (the
     // route-table script from `<Scripts/>`, the `warlock-locale-routing` meta
     // tag from `<Head/>`), so each ships once, while a navigation has no such
     // elements and receives them in the payload's document slot. Everything
@@ -499,7 +501,13 @@ describe("createPageRouteHandler — data requests", () => {
     const sent = parse(asData.written.sent as string) as {
       document?: Record<string, unknown>;
     };
-    const { namedApiRoutes, localeRouting: _localeRouting, ...sentDocument } = sent.document ?? {};
+    const { namedApiRoutes, ...sentWithSlots } = sent.document ?? {};
+    // The inline payload also leaves out the slots the document's own elements carry.
+    const sentDocument = Object.fromEntries(
+      Object.entries(sentWithSlots).filter(
+        ([key]) => !(INLINE_PAYLOAD_OMITTED_DOCUMENT_SLOTS as readonly string[]).includes(key),
+      ),
+    );
 
     expect(namedApiRoutes, "a navigation carries the page's route table").toBeDefined();
     expect(asDocument.written.html).toContain('id="__WARLOCK_NAMED_API_ROUTES__"');

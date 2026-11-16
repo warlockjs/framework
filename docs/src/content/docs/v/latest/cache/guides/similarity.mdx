@@ -103,6 +103,19 @@ const hits = await cache.similar(queryVec, { topK: 10, threshold: 0.8 });
 // May return zero results if nothing clears the floor — that's a feature.
 ```
 
+### Filter by key or value
+
+`filter` is a predicate over `{ key, value }` that runs before `threshold` and `topK`, so `topK` counts only entries it accepts. Use it to confine a query to one scope (a tenant prefix, an agent, a namespace) in a single query, however many other scopes share the cache:
+
+```ts
+const hits = await cache.similar(queryVec, {
+  topK: 5,
+  filter: ({ key }) => key.startsWith("tenant.7."),
+});
+```
+
+The `memory`, `lru-memory` and `memory-extended` drivers honour it. `pg` ranks in the database and ignores it, so keep checking the returned hits when you need a hard guarantee. A scoped cache from `cache.namespace(...)` passes its own scope as the filter.
+
 ## What gets stored, what gets ranked
 
 `similar()` only considers entries written with `set({ vector })`. A plain `set` adds the entry to the cache as KV — it's invisible to similarity queries. This means you can mix vector-indexed and plain entries in the same cache without polluting your similarity results.

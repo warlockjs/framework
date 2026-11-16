@@ -24,7 +24,7 @@ Summary: 5 ok, 1 warn, 0 fail
 
 ## Error codes and `--json`
 
-Every `warn`/`fail` finding except the deployment-settings warnings (below, which name the setting instead) carries a stable error code (`WL1001`, `WL2001`, …), printed after the detail and explained by `warlock explain <code>`. `--json` prints the report with the same `code` / `hint` / `skill` / `docs` fields `warlock check --json` uses (boot output goes to stderr):
+Every `warn`/`fail` finding carries a stable error code (the deployment-settings warnings use `WL1011` to `WL1020`, one per check; `compression` never warns, so `WL1020` is printed on its `ok` line when compression is off) (`WL1001`, `WL2001`, …), printed after the detail and explained by `warlock explain <code>`. `--json` prints the report with the same `code` / `hint` / `skill` / `docs` fields `warlock check --json` uses (boot output goes to stderr):
 
 ```bash
 npx warlock doctor --json | jq '.results[] | select(.status != "ok") | "\(.code) \(.detail)"'
@@ -90,9 +90,10 @@ An app keeps the config files it was generated with, so safer defaults in a newe
 | `trust-proxy`        | `http.trustProxy: true` without `http.realIpHeader`                                                                                                                                                  | proxy addresses/CIDR in `http.trustProxy`, or `http.realIpHeader`                                 |
 | `request-timeout`    | `http.requestTimeout` (or `http.serverOptions.requestTimeout`) is `0`                                                                                                                                | remove it (default 5 minutes) or set a bound                                                      |
 | `production-logging` | a production console channel prints `debug` lines                                                                                                                                                    | `new ConsoleLog({ minLevel: "info" })`                                                            |
-| `compression`        | never — `ok` line notes when it is off (unneeded behind a compressing proxy/CDN)                                                                                                                     | `http.compression: true`                                                                          |
+| `compression`        | never — `ok` line (`WL1020`) notes when it is off (unneeded behind a compressing proxy/CDN)                                                                                                          | `http.compression: true`                                                                          |
 | `env-files`          | a root `.env` / `.env.*` file (not `.env.example`) is not ignored by git, or is committed (`git check-ignore`)                                                                                       | `.env`, `.env.*`, `!.env.example` in `.gitignore`                                                 |
 | `memory-cache`       | the default cache store is a memory driver with `maxSize: Infinity` / `0` / `null`                                                                                                                   | `cache.options.<store>.maxSize`                                                                   |
+| `key-rotation`       | `encryption.previousKeys` / `auth.accessToken.previousSecrets` / `auth.refreshToken.previousSecrets` still configured                                                                                | remove the retired entries (`WL1019`)                                                             |
 
 `auth-tokens` runs only when `auth.userType` is set and `@warlock.js/auth` is installed in a `node_modules` the project's lookup walks (core never imports or resolves it: its `exports` offer only an `import` entry); it reads `auth.accessToken.*` / `auth.refreshToken.*`, then the older `auth.jwt.*`. Values are read as the config resolves on the machine running `doctor`.
 

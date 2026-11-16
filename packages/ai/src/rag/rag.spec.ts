@@ -7,6 +7,8 @@ import type {
 } from "../contracts/embedder.contract";
 import { EmbeddingVectorCountMismatchError } from "../errors";
 import { rag } from "./rag";
+import { cacheVectorStore } from "./store/cache-vector-store";
+import type { VectorStore } from "./store/vector-store.contract";
 import { FakeEmbedder, makeDocs } from "./test-support/make-docs";
 
 function makeStore(): MemoryCacheDriver {
@@ -168,6 +170,104 @@ describe("rag — index → retrieve", () => {
     const result = await kb.retrieve("alpha beta gamma", { topK: 5, threshold: 0 });
 
     expect(result.chunks).toHaveLength(0);
+  });
+
+  it("clear() keeps sibling and nested namespaces on a shared driver", async () => {
+    const driver = makeStore();
+    const make = (namespace: string) =>
+      rag({
+        name: "docs",
+        namespace,
+        embedder: new FakeEmbedder(),
+        store: driver,
+        chunk: { size: 1000 },
+      });
+    const acme = make("kb.acme");
+    const nested = make("kb.acme.private");
+    const sibling = make("kb.beta");
+
+    for (const instance of [acme, nested, sibling]) {
+      await instance.index(makeDocs([{ id: "a", text: "alpha beta gamma" }]));
+    }
+
+    await acme.clear();
+
+    const query = { topK: 5, threshold: 0 };
+
+    expect((await acme.retrieve("alpha beta gamma", query)).chunks).toHaveLength(0);
+    expect((await nested.retrieve("alpha beta gamma", query)).chunks).toHaveLength(1);
+    expect((await sibling.retrieve("alpha beta gamma", query)).chunks).toHaveLength(1);
+  });
+
+  it("accepts a VectorStore directly as the store", async () => {
+    const calls: string[] = [];
+    const inner = cacheVectorStore(makeStore());
+    const store: VectorStore = {
+      upsert: (...args) => (calls.push("upsert"), inner.upsert(...args)),
+      query: (...args) => (calls.push("query"), inner.query(...args)),
+      removeNamespace: (namespace) => inner.removeNamespace(namespace),
+    };
+    const kb = rag({ name: "docs", embedder: new FakeEmbedder(), store, chunk: { size: 1000 } });
+
+    await kb.index(makeDocs([{ id: "a", text: "alpha beta gamma" }]));
+    const result = await kb.retrieve("alpha beta gamma", { topK: 5, threshold: 0 });
+
+    expect(calls).toContain("upsert");
+    expect(calls).toContain("query");
+    expect(result.chunks).toHaveLength(1);
+  });
+
+  it("clear() lists the namespace instead of sweeping with similarity queries", async () => {
+    const driver = makeStore();
+    const inner = cacheVectorStore(driver);
+    let queries = 0;
+    const store: VectorStore = {
+      ...inner,
+      query: (...args) => (queries++, inner.query(...args)),
+    };
+    const make = (namespace: string, target: VectorStore) =>
+      rag({
+        name: "docs",
+        namespace,
+        embedder: new FakeEmbedder(),
+        store: target,
+        chunk: { size: 1000 },
+      });
+    const acme = make("kb.acme", store);
+    const nested = make("kb.acme.private", store);
+
+    for (const instance of [acme, nested]) {
+      await instance.index(makeDocs([{ id: "a", text: "alpha beta gamma" }]));
+    }
+
+    await acme.clear();
+
+    expect(queries).toBe(0);
+    expect(
+      (await make("kb.acme", inner).retrieve("alpha beta gamma", { topK: 5, threshold: 0 })).chunks,
+    ).toHaveLength(0);
+    expect(
+      (await nested.retrieve("alpha beta gamma", { topK: 5, threshold: 0 })).chunks,
+    ).toHaveLength(1);
+  });
+
+  it("clear() falls back to the similarity sweep when the store cannot list", async () => {
+    const driver = makeStore();
+    const inner = cacheVectorStore(driver);
+    const { list: _list, ...withoutList } = inner;
+    const kb = rag({
+      name: "docs",
+      embedder: new FakeEmbedder(),
+      store: withoutList as VectorStore,
+      chunk: { size: 1000 },
+    });
+
+    await kb.index(makeDocs([{ id: "a", text: "alpha beta gamma" }]));
+    await kb.clear();
+
+    expect((await kb.retrieve("alpha beta gamma", { topK: 5, threshold: 0 })).chunks).toHaveLength(
+      0,
+    );
   });
 
   it("throws on a dimension mismatch between index and query embedders", async () => {

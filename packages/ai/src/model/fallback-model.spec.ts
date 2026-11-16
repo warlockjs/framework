@@ -8,7 +8,8 @@ import { ProviderError } from "../errors/provider-error";
 import { ProviderRateLimitError } from "../errors/provider-rate-limit-error";
 import { ProviderTimeoutError } from "../errors/provider-timeout-error";
 import { MockModel } from "../mock/mock-model";
-import { fallbackModel } from "./fallback-model";
+import { ProviderOverloadedError } from "../errors/provider-overloaded-error";
+import { fallbackModel, isDefaultFallbackRetryable } from "./fallback-model";
 
 const userMessage: Message[] = [{ role: "user", content: "hi" }];
 
@@ -364,6 +365,111 @@ describe("fallbackModel.stream — fall-over", () => {
     await expect(
       collect(fallbackModel([thinkingModel, backup]).stream(userMessage)),
     ).rejects.toBeInstanceOf(ProviderTimeoutError);
+    expect(backup.callCount).toBe(0);
+  });
+});
+
+describe("fallbackModel — retryOn replaces, alsoRetryOn adds", () => {
+  class MyError extends Error {}
+
+  it("a predicate replaces the default set", async () => {
+    const backup = okModel("backup");
+    const model = fallbackModel([failingModel("a", new ProviderRateLimitError("slow")), backup], {
+      retryOn: (error) => error instanceof MyError,
+    });
+
+    await expect(model.complete(userMessage)).rejects.toBeInstanceOf(ProviderRateLimitError);
+    expect(backup.callCount).toBe(0);
+  });
+
+  it("a code list replaces the default set", async () => {
+    const backup = okModel("backup");
+    const model = fallbackModel([failingModel("a", new ProviderRateLimitError("slow")), backup], {
+      retryOn: ["PROVIDER_TIMEOUT"],
+    });
+
+    await expect(model.complete(userMessage)).rejects.toBeInstanceOf(ProviderRateLimitError);
+    expect(backup.callCount).toBe(0);
+  });
+
+  it("composing with the exported default keeps the standard failover", async () => {
+    const options = {
+      retryOn: (error: unknown) => isDefaultFallbackRetryable(error) || error instanceof MyError,
+    };
+
+    const viaDefault = fallbackModel(
+      [failingModel("a", new ProviderOverloadedError("busy")), okModel("b", "from-b")],
+      options,
+    );
+    const viaCustom = fallbackModel(
+      [failingModel("a", new MyError("mine")), okModel("b", "from-b")],
+      options,
+    );
+
+    expect((await viaDefault.complete(userMessage)).content).toBe("from-b");
+    expect((await viaCustom.complete(userMessage)).content).toBe("from-b");
+  });
+
+  it("alsoRetryOn adds to the default", async () => {
+    const options = { alsoRetryOn: (error: unknown) => error instanceof MyError };
+
+    const custom = fallbackModel(
+      [failingModel("a", new MyError("mine")), okModel("b", "from-b")],
+      options,
+    );
+    const standard = fallbackModel(
+      [failingModel("a", new ProviderRateLimitError("slow")), okModel("b", "from-b")],
+      options,
+    );
+    const auth = fallbackModel(
+      [failingModel("a", new ProviderAuthError("bad key")), okModel("b")],
+      options,
+    );
+
+    expect((await custom.complete(userMessage)).content).toBe("from-b");
+    expect((await standard.complete(userMessage)).content).toBe("from-b");
+    await expect(auth.complete(userMessage)).rejects.toBeInstanceOf(ProviderAuthError);
+  });
+});
+
+describe("fallbackModel — caller cancellation", () => {
+  it("does not advance the chain when the caller's signal is aborted", async () => {
+    const controller = new AbortController();
+    const backup = okModel("backup");
+    const primaryError = new ProviderError("aborted");
+    const model = fallbackModel([failingModel("a", primaryError), backup]);
+
+    controller.abort();
+
+    // The mock honours the already-aborted signal, so the abort itself is what reaches the caller.
+    await expect(model.complete(userMessage, { signal: controller.signal })).rejects.toMatchObject({
+      name: "AbortError",
+    });
+    expect(backup.callCount).toBe(0);
+    expect(model.lastAttempts).toHaveLength(0);
+  });
+
+  it("does not advance the chain on a stream when the signal is aborted", async () => {
+    const controller = new AbortController();
+    const backup = okModel("backup");
+    const model = fallbackModel([failingModel("a", new ProviderError("aborted")), backup]);
+
+    controller.abort();
+
+    await expect(
+      collect(model.stream(userMessage, { signal: controller.signal })),
+    ).rejects.toMatchObject({
+      name: "AbortError",
+    });
+    expect(backup.callCount).toBe(0);
+  });
+
+  it("does not advance the chain on an AbortError without a signal", async () => {
+    const abort = Object.assign(new Error("aborted"), { name: "AbortError" });
+    const backup = okModel("backup");
+    const model = fallbackModel([failingModel("a", abort), backup], { retryOn: () => true });
+
+    await expect(model.complete(userMessage)).rejects.toBe(abort);
     expect(backup.callCount).toBe(0);
   });
 });

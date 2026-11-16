@@ -402,7 +402,8 @@ export type PutOptions = {
    */
   cacheControl?: string;
   /**
-   * Content-Disposition header (cloud drivers only)
+   * Content-Disposition header (cloud drivers only). Defaults to `attachment`
+   * for markup files (svg, html, xml, script); pass a value to override it.
    */
   contentDisposition?: string;
   /**
@@ -418,9 +419,13 @@ export type PutOptions = {
  */
 export type TemporaryTokenPayload = {
   /**
-   * Token format version. The local driver issues and accepts version 2 only.
+   * Token format version. The local driver issues and accepts version 3 only.
    */
   v?: number;
+  /**
+   * Name of the disk that issued the token. A disk accepts only its own.
+   */
+  disk?: string;
   /**
    * File path relative to the storage root, including the storage prefix
    * (tenant) in effect when the token was issued

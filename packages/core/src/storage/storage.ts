@@ -1251,7 +1251,7 @@ export class Storage extends ScopedStorage implements StorageManagerContract {
 
     switch (config.driver) {
       case "local":
-        driver = new LocalDriver(options as LocalStorageDriverOptions);
+        driver = new LocalDriver(options as LocalStorageDriverOptions, name);
         break;
       case "s3":
         driver = new S3Driver(options as CloudStorageDriverOptions);

@@ -33,9 +33,11 @@ import {
   type ErrorPageModule,
   type ErrorPageModuleLoader,
 } from "./error-page";
-import { enrichMetadata } from "../metadata/enrich-metadata";
+import { enrichMetadata, isNoindex } from "../metadata/enrich-metadata";
 import { ERROR_PAGE_METADATA } from "./resolve-page-metadata";
 import { registerModules, type RegisterableModuleNamespace } from "../register-modules";
+import { PageShellTimeoutError } from "./page-shell-timeout-error";
+import { resolveShellTimeoutMs } from "./streaming-config";
 import { markNonHydrating } from "./page-render-bundle";
 import { resolveDocumentLocaleRouting, resolveLocaleAlternates } from "./resolve-locale-alternates";
 import { readLocaleRouting } from "../routing/locale-routing";
@@ -74,10 +76,9 @@ import type { NamedApiRoutesOption } from "../named-api-routes-config";
 import { publishNamedApiRoutes } from "../routing/named-api-routes";
 import { resolveCachedNamedApiRoutes, type ResolveNamedApiRoutesOptions } from "./named-api-routes";
 import type { NamedApiRouteRegistry } from "./dev-client-api-route-names";
-import { siteHydrationUrl } from "./hydration-client-url";
-import { consumePageManifest, type PagePayloadBudget } from "./page-manifest";
+import { hydrationClientUrlForRequest } from "./request-hydration-client-url";
+import type { PagePayloadBudget } from "./page-manifest";
 import { reportPayloadBudget } from "./payload-budget";
-import { HYDRATION_SITE_QUERY } from "../vite/hydration-entries";
 
 export { escapePayload, PAYLOAD_SCRIPT_ID };
 export type { BufferedCookie };
@@ -94,32 +95,6 @@ function sessionExtras(bundle: PageDataBundle): { session?: { user: unknown } } 
   const session = (bundle as Bundle).session;
 
   return session === undefined ? {} : { session };
-}
-
-/**
- * Select the entry built for this request's site without changing the
- * single-site document. Production barrels record the emitted asset per site;
- * Vite development reuses the source entry and selects its virtual registry
- * through the same query the page-registry plugin consumes.
- */
-function hydrationClientUrlForRequest(
-  url: string | undefined,
-  request: Request,
-): string | undefined {
-  const site = request.site?.key;
-
-  if (site === undefined || url === undefined) return url;
-
-  const resolved = siteHydrationUrl(site);
-
-  if (resolved !== undefined) return resolved;
-
-  const emitted = consumePageManifest()?.sites?.[site]?.hydrationEntry;
-
-  if (emitted !== undefined) return emitted.startsWith("/") ? emitted : `/${emitted}`;
-
-  const separator = url.includes("?") ? "&" : "?";
-  return `${url}${separator}${HYDRATION_SITE_QUERY}=${encodeURIComponent(site)}`;
 }
 
 /** Reads the stage 7 commit into the lowercased header map `RenderedPage` carries. */
@@ -373,6 +348,19 @@ export type RenderPageFailureOptions = {
    * (a 403 or 400 raised before routing) passes its own.
    */
   status?: number;
+  /**
+   * Loads the app root and the layouts to wrap the failure page in, so a
+   * refusal keeps the site's header and footer. A load that throws, or a root
+   * or layout that throws while rendering, falls back to the framework's
+   * default document; the failure page is never lost to its own chrome.
+   */
+  loadShell?: () => Promise<FailureShell | undefined>;
+};
+
+/** The modules a failure page is wrapped in, outermost layout first. */
+export type FailureShell = {
+  app?: PageTripleModule;
+  layouts?: readonly PageTripleModule[];
 };
 
 function requireRegistry(options: RenderPageRequestOptions): RouteRegistry {
@@ -821,6 +809,18 @@ type RenderAttempt = {
   discard: () => void;
 };
 
+/** The attempt a data request gets: no React work was started, so there is nothing to stop. */
+function skippedRenderAttempt(): RenderAttempt {
+  const stream: PipeableStream = {
+    abort: () => undefined,
+    pipe: () => {
+      throw new Error("A data request renders no document stream.");
+    },
+  };
+
+  return { pipeableStream: stream, allReady: Promise.resolve(), discard: () => undefined };
+}
+
 /**
  * The buffered document for a caller that asked for one
  * (`RenderPageRequestOptions.bufferHtml`): `element` rendered to a string.
@@ -918,6 +918,13 @@ async function renderElementToPipeableStream(
 
   signal?.addEventListener("abort", abortBeforeReady, { once: true });
 
+  // A shell that suspends outside every Suspense waits instead of failing; this
+  // bounds the wait for a visitor who stays connected. The abort rejects the
+  // attempt with the timeout error and the escalation loop answers with the
+  // error page, exactly as it does for a throw.
+  const shellTimeoutMs = resolveShellTimeoutMs();
+  let shellTimer: ReturnType<typeof setTimeout> | undefined;
+
   const settled = new Promise<PipeableStream>((resolve, reject) => {
     const options: RenderToPipeableStreamOptions = {
       nonce,
@@ -990,6 +997,13 @@ async function renderElementToPipeableStream(
     }
 
     stream = renderToPipeableStream(element, options);
+
+    if (shellTimeoutMs > 0) {
+      shellTimer = setTimeout(() => {
+        if (!shellSettled) stream.abort(new PageShellTimeoutError(shellTimeoutMs));
+      }, shellTimeoutMs);
+      shellTimer.unref?.();
+    }
   });
 
   let pipeableStream: PipeableStream;
@@ -997,6 +1011,7 @@ async function renderElementToPipeableStream(
   try {
     pipeableStream = await settled;
   } finally {
+    clearTimeout(shellTimer);
     signal?.removeEventListener("abort", abortBeforeReady);
   }
 
@@ -1310,12 +1325,11 @@ async function finishRender(
   // Multi-site: a site's absolute URLs (canonical, og:url, hreflang) use THIS
   // request's site origin; the app has no single public URL across sites.
   const publicUrl = request.site === undefined ? getPublicUrl() : siteOriginFor(request.site.host);
-  const localeAlternates = resolveLocaleAlternates(
-    request.path,
-    bundle.route.path,
-    activeLocaleRouting,
-    publicUrl,
-  );
+  // A noindex page (the not-found page, a page that sets `robots: "noindex"`)
+  // is not a page to point search engines at translations of, so it lists none.
+  const localeAlternates = isNoindex(bundle.metadata?.robots)
+    ? undefined
+    : resolveLocaleAlternates(request.path, bundle.route.path, activeLocaleRouting, publicUrl);
   // RELEASE BLOCKER fix: the runtime table the browser must hydrate with,
   // not the build-time `virtual:warlock/pages` guess — see
   // `DocumentContextValue.localeRouting`.
@@ -1436,6 +1450,13 @@ async function finishRender(
   // error rejects, and the loop below escalates on it exactly as it would on
   // a throw. See `renderElementToPipeableStream`.
   const renderWithContext = (element: ReactNode): Promise<RenderAttempt> => {
+    // A data request answers with its payload only and nobody reads the
+    // markup, so the server does not render at all: a throw while the page
+    // renders is reported and shown by the client's own error boundary when
+    // it renders the navigation. Loader, guard and validation failures were
+    // decided before this point and still travel in the payload.
+    if (dataRequest) return Promise.resolve(skippedRenderAttempt());
+
     finalWrappedElement = wrapWithContext(element);
     return renderElementToPipeableStream(
       finalWrappedElement,
@@ -1620,7 +1641,8 @@ async function finishRender(
         thrown,
         designateBoundary(throwingLevel, triple),
         bundle.route.path,
-        undefined,
+        // A shell that was not ready in time answers 504, like a loader timeout.
+        thrown instanceof PageShellTimeoutError ? thrown.statusCode : undefined,
         {
           phase: "render",
           routeName: bundle.route.name,
@@ -1664,12 +1686,12 @@ async function finishRender(
   // The buffered document (`RenderedPage.html`): the same final element as a
   // string, rendered only for a caller that asked for it. The page route
   // handler streams and never reads it.
-  const html = streamOptions.bufferHtml ? await bufferedDocument(finalWrappedElement) : "";
+  const html =
+    streamOptions.bufferHtml && !dataRequest ? await bufferedDocument(finalWrappedElement) : "";
 
-  // A DATA request answers with its payload only: the render above decided
-  // the outcome (a render-time throw escalated into `errorPage` and the
-  // status), and its bytes have no reader. Stop the remaining work and hand
-  // no stream back.
+  // A DATA request answers with its payload only. The stages before render
+  // decided the outcome (a loader or guard failure became `errorPage` and the
+  // status); nothing was rendered, so hand no stream back.
   if (dataRequest) {
     attempt.discard();
     restoreInlineDeferredForDataWire?.();
@@ -1748,6 +1770,51 @@ async function finishRender(
   };
 }
 
+/** Loads the failure page's root and layouts; a loader that throws means no shell. */
+async function loadFailureShell(
+  load: (() => Promise<FailureShell | undefined>) | undefined,
+): Promise<FailureShell | undefined> {
+  if (load === undefined) return undefined;
+
+  try {
+    const shell = await load();
+
+    if (shell === undefined) return undefined;
+
+    registerModules([
+      ...(shell.app === undefined ? [] : [shell.app]),
+      ...(shell.layouts ?? []),
+    ] as RegisterableModuleNamespace[]);
+
+    return shell;
+  } catch (error) {
+    console.error("[warlock:web] loading the failure page's root or layouts failed:", error);
+
+    return undefined;
+  }
+}
+
+/** `<App><Layout…>{content}</Layout…></App>`, with the framework document when there is no root. */
+function wrapInFailureShell(shell: FailureShell, content: ReactNode): ReactNode {
+  let element = content;
+
+  for (const layout of [...(shell.layouts ?? [])].reverse()) {
+    const Layout = layout.default as ComponentType<LevelProps> | undefined;
+
+    if (Layout !== undefined) {
+      element = createElement(Layout, { data: undefined, shared: undefined, children: element });
+    }
+  }
+
+  const App = shell.app?.default as ComponentType<LevelProps> | undefined;
+
+  if (shell.app !== undefined) element = strictPageTree(shell.app, element);
+
+  return App === undefined
+    ? createElement(DefaultApp, { children: element })
+    : createElement(App, { data: undefined, shared: undefined, children: element });
+}
+
 /**
  * Render failures that happen before the page pipeline has a triple (notably a
  * module-load or registration throw). This deliberately owns one terminal
@@ -1812,6 +1879,23 @@ export async function renderPageFailure(options: RenderPageFailureOptions): Prom
     );
   };
   let body: string;
+  const shell = await loadFailureShell(options.loadShell);
+  // The root and layouts when they load and render; the framework document
+  // otherwise.
+  const renderInShell = (content: ReactNode): string => {
+    if (shell !== undefined) {
+      try {
+        return renderWithContext(wrapInFailureShell(shell, content));
+      } catch (shellThrown) {
+        console.error(
+          "[warlock:web] the failure page's root or layout failed to render:",
+          shellThrown,
+        );
+      }
+    }
+
+    return renderWithContext(createElement(DefaultApp, { children: content }));
+  };
   let errorPageMissing = loadErrorPage === undefined;
 
   try {
@@ -1831,7 +1915,13 @@ export async function renderPageFailure(options: RenderPageFailureOptions): Prom
     );
     registerModules([module as RegisterableModuleNamespace]);
     const failureDetails = describeUnrecordedFailure(thrown, bundle.route, request);
-    const errorPage = hydrationErrorPageProps(props, undefined, request.id, failureDetails);
+    const hydrationProps = hydrationErrorPageProps(props, undefined, request.id, failureDetails);
+    // A visitor-safe 4xx (a refusal) carries no code of its own; the request id
+    // is what the visitor quotes to support, so the page receives it too.
+    const errorPage: SerializedErrorPageProps =
+      hydrationProps.error.errorCode === undefined && request.id
+        ? { ...hydrationProps, error: { ...hydrationProps.error, errorCode: request.id } }
+        : hydrationProps;
     bundle.errorPage = errorPage;
     // Same chokepoint as `renderErrorPage` above: production SSR must render
     // the sanitized error, matching the hydration payload set below.
@@ -1841,15 +1931,13 @@ export async function renderPageFailure(options: RenderPageFailureOptions): Prom
       metadata: resolveErrorPageMetadata(module, ssrProps),
       payload: markNonHydrating({ ...buildHydrationPayload(bundle, slots.locale), errorPage }),
     };
-    body = renderWithContext(
-      createElement(DefaultApp, {
-        children: createElement(
-          Fragment,
-          null,
-          errorPageElement(module, ssrProps),
-          devErrorPanelElement(errorPage.debug),
-        ),
-      }),
+    body = renderInShell(
+      createElement(
+        Fragment,
+        null,
+        errorPageElement(module, ssrProps),
+        devErrorPanelElement(errorPage.debug),
+      ),
     );
   } catch (errorPageThrown) {
     if (!errorPageMissing) {
@@ -1867,13 +1955,11 @@ export async function renderPageFailure(options: RenderPageFailureOptions): Prom
       metadata: bundle.metadata,
       payload: markNonHydrating(buildHydrationPayload(bundle, slots.locale)),
     };
-    body = renderWithContext(
-      createElement(DefaultApp, {
-        children: createElement(FrameworkRootBoundary, {
-          details: describeUnrecordedFailure(thrown, bundle.route, request),
-          status: failureStatus,
-          requestId: request.id,
-        }),
+    body = renderInShell(
+      createElement(FrameworkRootBoundary, {
+        details: describeUnrecordedFailure(thrown, bundle.route, request),
+        status: failureStatus,
+        requestId: request.id,
       }),
     );
   }

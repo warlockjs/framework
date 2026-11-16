@@ -590,7 +590,7 @@ describe("App template emission", () => {
     expect(tsconfig).toContain('"web/*"');
     expect(tsconfig).toContain('"@shared/*"');
     expect(packageJson.dependencies).toMatchObject({
-      "@mongez/react-form": "^4.0.0",
+      "@mongez/react-form": "^4.1.0",
     });
     expect(packageJson.dependencies).not.toHaveProperty("@mongez/react-localization");
     expect(packageJson.dependencies).not.toHaveProperty("class-variance-authority");

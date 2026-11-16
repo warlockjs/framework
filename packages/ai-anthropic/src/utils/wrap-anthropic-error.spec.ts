@@ -2,6 +2,7 @@ import {
   AIError,
   ContextLengthExceededError,
   InvalidRequestError,
+  ProviderAbortError,
   ProviderAuthError,
   ProviderError,
   ProviderOverloadedError,
@@ -9,7 +10,7 @@ import {
   ProviderTimeoutError,
   QuotaExceededError,
 } from "@warlock.js/ai";
-import { APIConnectionTimeoutError, APIError } from "@anthropic-ai/sdk";
+import { APIConnectionTimeoutError, APIError, APIUserAbortError } from "@anthropic-ai/sdk";
 import { describe, expect, it } from "vitest";
 import { wrapAnthropicError } from "./wrap-anthropic-error";
 
@@ -359,5 +360,14 @@ describe("wrapAnthropicError", () => {
     for (const sample of samples) {
       expect(wrapAnthropicError(sample)).toBeInstanceOf(AIError);
     }
+  });
+
+  it("maps the SDK's user-abort error to a cancelled AbortError", () => {
+    const wrapped = wrapAnthropicError(new APIUserAbortError());
+
+    expect(wrapped).toBeInstanceOf(ProviderAbortError);
+    expect(wrapped.category).toBe("cancelled");
+    expect(wrapped.name).toBe("AbortError");
+    expect((wrapped as ProviderAbortError).retryable).toBe(false);
   });
 });

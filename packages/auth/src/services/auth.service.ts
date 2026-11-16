@@ -6,6 +6,7 @@ import {
   config,
   ForbiddenError,
   hashPassword,
+  needsRehash,
   type Request,
   type Response,
   verifyPassword,
@@ -811,7 +812,32 @@ class AuthService {
       return null;
     }
 
+    await this.rehashPassword(user, String(password), storedHash);
+
     return user;
+  }
+
+  /**
+   * After a successful password check, replace a hash that no longer matches
+   * the configured algorithm or cost (`auth.rehashPasswords`, default on) with
+   * a fresh one made from the password just verified. Never fails the login:
+   * a problem is logged and the old hash keeps working.
+   */
+  private async rehashPassword(user: Auth, plainPassword: string, storedHash: string) {
+    try {
+      if (!authConfig.rehashPasswords() || !needsRehash(storedHash)) return;
+
+      // Save a hash first. A model that hashes on save (`useHashedPassword()`)
+      // would hash that again, so check what was stored and, if it no longer
+      // verifies, save the plaintext for the model's own transformer.
+      await user.merge({ password: await this.hashPassword(plainPassword) } as never).save();
+
+      if (await this.verifyPassword(plainPassword, user.string("password") ?? "")) return;
+
+      await user.merge({ password: plainPassword } as never).save();
+    } catch (error) {
+      log.error("auth", "rehash-password", error);
+    }
   }
 
   /**
@@ -965,8 +991,10 @@ class AuthService {
 
   /**
    * Revoke every active refresh token for the user and delete their access
-   * tokens — "log out of all devices". Each durable family is first marked through its revision coordinator; an
-   * event fires per revoked token.
+   * tokens — "log out of all devices". Durable families are ensured together
+   * and revoked with one update, refresh tokens with another; a
+   * `token.familyRevoked` event fires per family (and `token.revoked` for a
+   * token outside any durable family).
    */
   public async revokeAllTokens(user: Auth): Promise<void> {
     // Upgrade existing installations lazily before the family scan. Include
@@ -975,26 +1003,44 @@ class AuthService {
     const existingRows = await this.refreshTokenModel.familiesForUser(user);
 
     // Every rotation leaves a row behind, so the rows outnumber the families
-    // by far: ensure each family once, not once per row.
-    const familyIds = new Set(existingRows.map((token) => token.familyId));
+    // by far: ensure the distinct families together, with one read and one
+    // insert for the missing ones.
+    const familyIds = new Set(existingRows.map((token) => token.familyId).filter(Boolean));
 
-    for (const familyId of familyIds) {
-      await AuthTokenFamily.ensure(user, familyId);
-    }
+    await AuthTokenFamily.ensureMany(user, [...familyIds]);
 
     const families = await AuthTokenFamily.activeFor(user);
+    const revokedFamilyIds = families.map((family) => family.get<string>("family_id"));
 
-    for (const family of families) {
-      await this.revokeTokenFamily(family.get<string>("family_id"));
+    // One update revokes every family, which also fences out a rotation in flight.
+    if (revokedFamilyIds.length > 0) await AuthTokenFamily.revokeAllFor(user);
+
+    // One update revokes every refresh token; the rows read just before it say
+    // which family each belonged to, for the per-family events.
+    const revokedTokens = await this.refreshTokenModel.revokeAllFor(user);
+    const tokensByFamily = new Map<string, RefreshToken[]>();
+    const unfamilied: RefreshToken[] = [];
+
+    for (const token of revokedTokens) {
+      const familyId = token.familyId;
+
+      if (familyId && revokedFamilyIds.includes(familyId)) {
+        tokensByFamily.set(familyId, [...(tokensByFamily.get(familyId) ?? []), token]);
+      } else {
+        unfamilied.push(token);
+      }
     }
 
-    // A deployment can still have rows created before the additive migration
-    // ran; retain the old bulk cleanup as a final conservative backstop.
-    const legacyTokens = await this.refreshTokenModel.revokeAllFor(user);
+    for (const familyId of revokedFamilyIds) {
+      authEvents.emit("token.familyRevoked", familyId, tokensByFamily.get(familyId) ?? []);
+    }
 
-    for (const token of legacyTokens) {
+    // Rows without an active durable family (created before the additive
+    // migration ran) are reported one by one.
+    for (const token of unfamilied) {
       authEvents.emit("token.revoked", user, token);
     }
+
     await this.removeAllAccessTokens(user);
 
     authEvents.emit("logout.all", user);

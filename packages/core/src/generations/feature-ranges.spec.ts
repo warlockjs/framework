@@ -17,6 +17,8 @@ describe("feature dependency ranges", () => {
   it("installs nodemailer 10.1.4 or later", () => {
     expect(mailFeature.dependencies?.nodemailer).toBe("^10.1.4");
     expect(packageJson.peerDependencies.nodemailer).toContain("^10.1.4");
+    // nodemailer 10 ships its own type declarations.
+    expect(mailFeature.devDependencies?.["@types/nodemailer"]).toBeUndefined();
   });
 
   it("installs sharp 0.35.5 or later", () => {

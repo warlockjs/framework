@@ -4,6 +4,12 @@ All notable changes to `@warlock.js/ai-tools` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.54.0 - 2026-11-16
+
+### Added
+
+- Building `http_request` with static `headers` but neither `baseUrl` nor `allowHosts` logs a warning, because the headers (usually credentials) would go to whatever host the model names.
+
 ## 5.53.0 - 2026-11-11
 
 ### Upgrading

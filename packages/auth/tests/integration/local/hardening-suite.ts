@@ -9,7 +9,8 @@ import { OneTimeToken } from "../../../src/models/one-time-token/one-time-token.
 import { RefreshToken } from "../../../src/models/refresh-token/refresh-token.model";
 import { PasskeyCredential } from "../../../src/models/passkey-credential/passkey-credential.model";
 import { ProviderAccount } from "../../../src/models/provider-account/provider-account.model";
-import { requestOtp, verifyOtp } from "../../../src/otp/otp";
+import { requestOtp as requestOtpNow, verifyOtp } from "../../../src/otp/otp";
+import { settleBackgroundWork } from "../../../src/services/background-work";
 import {
   generatePasskeyAuthenticationOptions,
   verifyPasskeyAuthentication,
@@ -22,6 +23,12 @@ import { authService } from "../../../src/services/auth.service";
 import { consumeOneTimeToken, issueOneTimeToken } from "../../../src/services/one-time-tokens";
 import { SoftwareAuthenticator } from "../../../src/test-support/software-authenticator";
 import type { LocalDatabaseHarness } from "../helpers/local-database-harness";
+
+/** The request, then the background token write and delivery it started. */
+async function requestOtp(...args: Parameters<typeof requestOtpNow>): Promise<void> {
+  await requestOtpNow(...args);
+  await settleBackgroundWork();
+}
 
 /**
  * The 5.13 one-time-token / OTP / passkey / provider-link guarantees against a

@@ -45,6 +45,8 @@ Five everyday helpers cover ~90% of what you'll do:
 | `request.allExceptParams()`            | body + query, no route params             | excluding `:id`-style params              |
 | `request.only(keys)` / `.except(keys)` | subset / complement of `.all()`           | partial field passing                     |
 
+`all()`, `allExceptParams()`, `only()`, `except()` and `request.body` return raw, unvalidated input. In development, passing one of those objects to a model's `merge()` or `set()` logs a one-time warning that points at `validated()`, so a column like `role` is not written from what the client sent. Nothing changes in production.
+
 `input()` returns `any`. `validated()` returns the schema's `Infer` type. That's the headline difference — if you have a schema, never go back to `input()` for the validated fields.
 
 ### `validated()` and `validatedExcept()`
@@ -85,7 +87,7 @@ Or use the complement form when you want everything except a few:
 const data = request.validatedExcept("internalNote", "auditTag");
 ```
 
-If validation hasn't happened yet (no schema attached, or validation failed before the handler ran), `validated()` returns `{}`. In practice you only call it from handlers behind a schema — the framework guarantees data is there.
+If validation hasn't happened yet (no schema attached, or validation failed before the handler ran), `validated()` returns `{}`. In practice you only call it from handlers behind a schema — the framework guarantees data is there. On a route with no schema at all (a webhook, say) it also returns `{}` for a real body, so in development it logs one warning per route naming the cause; read such routes with `input()` or `all()` instead.
 
 ### `input()`, `all()`, and friends
 
@@ -345,9 +347,13 @@ const message = t("welcome.greeting", { name: request.locals.user.firstName });
 
 The locale is resolved from (in order):
 
-1. The `translation-locale-code` header
-2. The `locale` header or `?locale=` query string
-3. `config.key("app.localeCode")` (default `"en"`)
+1. The `?locale=` query string
+2. The `warlock.locale-preference` cookie (only when its value is in `app.localeCodes`)
+3. The `locale` header
+4. The `locale` cookie
+5. `config.key("app.localeCode")` (the default)
+
+When `app.localeCodes` is declared, a value outside it counts as absent and the default applies.
 
 You can force a different locale on a single call with `request.transFrom("ar", "welcome.greeting", ...)`, or set the request's locale for downstream code:
 

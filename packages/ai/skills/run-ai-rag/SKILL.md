@@ -30,7 +30,8 @@ const kb = ai.rag({
 Resolution is **loud at construction** (mirrors `ai.memory`):
 
 - `embedder` is **required** — a provider with no embedder must be caught here, not at first `index()`.
-- `store` falls back to `ai.config({ defaultStore })`; if neither resolves, the factory throws.
+- `store` is a vector-capable cache driver or a `VectorStore` (for example `ai.rag.pgVectorStore({ client: pool })`, used as is). It falls back to `ai.config({ defaultStore })`; if neither resolves, the factory throws.
+- `clear()` lists the namespace (`listKeys()` on the cache drivers that have it, `list()` on a `VectorStore`) and deletes exactly this rag's chunks; a store that cannot list falls back to similarity sweeps.
 
 ## Surface — `Rag`
 
@@ -127,7 +128,7 @@ Input is `{ query: string }`; output is the `RetrieveResult`. Default tool name 
 await kb.clear(); // drops every entry written under this rag's namespace
 ```
 
-`clear()` deletes by key prefix, so on a shared driver it also clears a nested namespace (`kb.acme` clears `kb.acme.private`) — give rags on one driver sibling names.
+`clear()` deletes only this rag's own chunks (a nested namespace such as `kb.acme.private` and siblings stay). It finds them with similarity queries, widening up to 5,000 candidates, so on a driver shared with far more unrelated entries give the rag its own driver; pre-5.53 chunks with a dotted document id stay until re-indexed.
 
 ## Namespace isolation (5.53)
 

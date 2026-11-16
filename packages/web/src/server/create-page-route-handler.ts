@@ -63,8 +63,10 @@ import { ensureSetCookieCacheFloorHook, markPageResponse } from "./set-cookie-ca
 import { runPageMiddlewareGate } from "./execute-page-request";
 import type { BufferedCookie, PageRouteEntry, PageTripleModule } from "./execute-page-request";
 import { renderPageRequest, type RenderedPage } from "./render-page";
+import { hydrationClientUrlForRequest } from "./request-hydration-client-url";
 import { ClientDisconnectedError } from "./client-disconnected-error";
 import { NDJSON_CONTENT_TYPE } from "./write-deferred-ndjson-response";
+import { earlyHintLinks, sendEarlyHints } from "./early-hints";
 import { applyCommit } from "./page-route-handler/apply-commit";
 import { resolvePageCacheHitOrMiss } from "./page-route-handler/serve-page-cache-hit";
 import { storePageCacheAfterRender } from "./page-route-handler/store-page-cache-after-render";
@@ -503,6 +505,21 @@ export function createPageRouteHandler(options: PageRouteHandlerOptions): PageRo
     }
 
     const wantsData = isDataRequest(request.header(WARLOCK_DATA_REQUEST_HEADER, undefined));
+
+    // Opt-in (`web.earlyHints`): tell the browser which entry and stylesheets
+    // this document needs before the loaders run, so it fetches them while the
+    // server is still working. A document request only.
+    if (!wantsData && !actionMode) {
+      sendEarlyHints(
+        request,
+        response,
+        earlyHintLinks({
+          hydrationClientModuleUrl: hydrationClientUrlForRequest(hydrationClientModuleUrl, request),
+          hydrationClientModulePreloadUrls,
+          stylesheetUrls,
+        }),
+      );
+    }
 
     // A same-origin base-path crossing can select a different site's root.
     // The hydrated client compares this marker with its bootstrap site before

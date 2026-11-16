@@ -54,7 +54,7 @@ Same config across process restarts → same synthetic name. This matters when w
 
 ## `agent.execute(input, options)`
 
-The blocking call. Returns a promise of `AgentResult<T>`. Never throws.
+The blocking call. Returns a promise of `AgentResult<T>`. A run failure never throws; it lands on `result.error`. The one exception is a programming error: an `input` that is not a string (an object from an untyped request body, for example) is refused up front with an `InvalidRequestError` (`execute()` rejects, `stream()` throws) telling you to pass the prompt text.
 
 ```ts
 const { data, text, report, usage, error } = await myAgent.execute(input);

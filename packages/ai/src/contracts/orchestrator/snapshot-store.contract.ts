@@ -73,6 +73,18 @@ export interface SnapshotStore<TSnapshot extends { runId: string } = SupervisorS
   delete(runId: string): Promise<void>;
 
   /**
+   * Record `pending` as the `pending` field of the snapshot already stored
+   * for `runId` without sending the whole snapshot again, so a caller that
+   * marks work in flight and saves the settled snapshot later writes the
+   * large payload once. Resolves `true` when the marker was recorded, and
+   * `false` when no snapshot exists for `runId` (the caller then `save`s
+   * one). A later `load()` returns the snapshot with that `pending` value;
+   * `save()` replaces the snapshot as usual. Optional: stores without it
+   * are used with a full `save()` for the marker.
+   */
+  markPending?(runId: string, pending: unknown): Promise<boolean>;
+
+  /**
    * List the run ids the store knows, optionally filtered by a prefix.
    * Optional — stores that can't enumerate omit it.
    */

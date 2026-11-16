@@ -38,7 +38,7 @@ import { getMimeType } from "../utils/mime";
  * Format version of local temporary-URL tokens. Version 2 signs the path
  * with the storage prefix it was issued under.
  */
-const TEMPORARY_TOKEN_VERSION = 2;
+const TEMPORARY_TOKEN_VERSION = 3;
 
 /**
  * Local filesystem storage driver
@@ -75,7 +75,17 @@ export class LocalDriver implements StorageDriverContract {
    */
   protected signatureKey?: string;
 
-  public constructor(public options: LocalStorageDriverOptions = {}) {
+  /**
+   * @param options Driver options.
+   * @param diskName The configured name of this disk. It is signed into
+   *   temporary URL tokens, so two disks sharing one `signatureKey` do not
+   *   accept each other's tokens. Disks created through `storage` get it
+   *   automatically; pass it when constructing the driver yourself.
+   */
+  public constructor(
+    public options: LocalStorageDriverOptions = {},
+    protected diskName: string = "",
+  ) {
     // Resolve the root to an absolute, normalized path up front so the
     // path-traversal containment check (resolveWithinRoot) has a stable
     // anchor to compare resolved locations against.
@@ -410,9 +420,15 @@ export class LocalDriver implements StorageDriverContract {
     // Sign the location WITH the storage prefix in effect (the tenant), so the
     // token opens this exact file and not the same relative path elsewhere.
     const path = this.applyPrefix(location);
-    const sig = this.signTemporaryToken(path, exp);
+    const sig = this.signTemporaryToken(path, exp, this.diskName);
 
-    const payload: TemporaryTokenPayload = { v: TEMPORARY_TOKEN_VERSION, path, exp, sig };
+    const payload: TemporaryTokenPayload = {
+      v: TEMPORARY_TOKEN_VERSION,
+      disk: this.diskName,
+      path,
+      exp,
+      sig,
+    };
     const json = JSON.stringify(payload);
 
     // Use base64url encoding (URL-safe base64)
@@ -421,12 +437,12 @@ export class LocalDriver implements StorageDriverContract {
 
   /**
    * HMAC of a temporary token: an unambiguous encoding of the format
-   * version, the prefixed path and the expiry.
+   * version, the disk name, the prefixed path and the expiry.
    */
-  protected signTemporaryToken(path: string, exp: number): string {
+  protected signTemporaryToken(path: string, exp: number, disk: string): string {
     return crypto
       .createHmac("sha256", this.signatureKey!)
-      .update(JSON.stringify([TEMPORARY_TOKEN_VERSION, path, exp]))
+      .update(JSON.stringify([TEMPORARY_TOKEN_VERSION, disk, path, exp]))
       .digest("hex");
   }
 
@@ -437,10 +453,11 @@ export class LocalDriver implements StorageDriverContract {
   protected isTemporaryTokenPayload(payload: unknown): payload is TemporaryTokenPayload {
     if (!payload || typeof payload !== "object") return false;
 
-    const { v, path, exp, sig } = payload as Record<string, unknown>;
+    const { v, disk, path, exp, sig } = payload as Record<string, unknown>;
 
     return (
       v === TEMPORARY_TOKEN_VERSION &&
+      typeof disk === "string" &&
       typeof path === "string" &&
       path.length > 0 &&
       typeof exp === "number" &&
@@ -496,7 +513,7 @@ export class LocalDriver implements StorageDriverContract {
     }
 
     // Verify signature
-    const expectedSig = this.signTemporaryToken(payload.path, payload.exp);
+    const expectedSig = this.signTemporaryToken(payload.path, payload.exp, this.diskName);
 
     const sigBuffer = Buffer.from(payload.sig, "hex");
     const expectedBuffer = Buffer.from(expectedSig, "hex");

@@ -187,6 +187,8 @@ If tokens minted before 4.12.0 may lack an `exp`, see `warlock auth.purge-never-
 
 The package signs access and refresh tokens with independent secrets — `config.auth.accessToken.secret` and `config.auth.refreshToken.secret`. Setting a distinct `refresh.secret` is recommended: it prevents an access-token compromise from forging refresh tokens (and vice versa). The refresh secret is **optional** — when `config.auth.refreshToken.secret` is unset, refresh tokens fall back to the main `config.auth.accessToken.secret`, so refresh works out of the box without a second secret.
 
+**Rotating a secret:** set the new `accessToken.secret` / `refreshToken.secret` and list the old ones in `accessToken.previousSecrets` / `refreshToken.previousSecrets`. Tokens signed with a retired secret still verify (only on a signature miss; expiry and claim checks stay final), new tokens always use the current secret, and without a refresh secret the retired access secrets apply to refresh tokens too. Remove a retired secret once its tokens have expired.
+
 ## Things NOT to do
 
 - Don't use raw JWT libraries directly. The package handles signing, verification, secret loading, and the access/refresh split.

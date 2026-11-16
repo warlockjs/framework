@@ -361,10 +361,17 @@ export class ScopedCache implements ScopedCacheContract {
     vector: number[],
     options: CacheSimilarOptions,
   ): Promise<CacheSimilarHit<T>[]> {
-    const hits = await this.source.similar<T>(vector, options);
     const parsedPrefix = this.source.parseKey(this.prefix);
+    const inScope = (key: string) => key === parsedPrefix || key.startsWith(parsedPrefix + ".");
 
-    return hits.filter((hit) => hit.key === parsedPrefix || hit.key.startsWith(parsedPrefix + "."));
+    // The scope is handed to the store as a filter (drivers that honour it
+    // rank in-scope entries only); the check below covers drivers that do not.
+    const hits = await this.source.similar<T>(vector, {
+      ...options,
+      filter: (hit) => inScope(hit.key) && (options.filter?.(hit) ?? true),
+    });
+
+    return hits.filter((hit) => inScope(hit.key));
   }
 
   /**

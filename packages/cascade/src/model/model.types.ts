@@ -13,7 +13,14 @@ export type ScopeTiming = "before" | "after";
 export type GlobalScopeDefinition = {
   callback: (query: QueryBuilderContract) => void;
   timing: ScopeTiming;
+  stamp?: ScopeStamp;
 };
+
+/**
+ * Column values a global scope writes into every insert of its model: either
+ * a plain object, or a function evaluated at each insert (the current tenant).
+ */
+export type ScopeStamp = Record<string, unknown> | (() => Record<string, unknown>);
 
 /**
  * Local scope callback function
@@ -25,6 +32,22 @@ export type LocalScopeCallback = (query: QueryBuilderContract, ...args: any[]) =
  */
 export type GlobalScopeOptions = {
   timing?: ScopeTiming;
+
+  /**
+   * Column values the scope writes into inserts made by `create()`,
+   * `createMany()`, `save()` of a new record and `upsert()`, so a record
+   * created under the scope is always visible to it (a tenant column cannot be
+   * forgotten). A value the caller already set is kept; `undefined` values
+   * are not written. A function is evaluated at each insert.
+   *
+   * @example
+   * ```typescript
+   * Order.addGlobalScope("tenant", (query) => query.where("tenantId", currentTenant()), {
+   *   stamp: () => ({ tenantId: currentTenant() }),
+   * });
+   * ```
+   */
+  stamp?: ScopeStamp;
 };
 
 /**
@@ -163,6 +186,8 @@ export type ChildModel<TModel extends Model> = (new (...args: any[]) => TModel) 
     | "resourceColumns"
     | "toJsonColumns"
     | "hidden"
+    | "guarded"
+    | "batchLoads"
     | "randomIncrement"
     | "idReservationBlockSize"
     | "getDataSource"

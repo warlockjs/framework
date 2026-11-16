@@ -1,5 +1,6 @@
-import { extend, getKeywordsListOf } from "@mongez/localization";
+import { getKeywordsListOf } from "@mongez/localization";
 import { get, set } from "@mongez/reinforcements";
+import { extend } from "./translations-revision";
 
 /**
  * Key of the CSRF origin refusal text that core owns. An application that

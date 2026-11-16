@@ -79,6 +79,40 @@ export function resolveLoaderTimeoutMs(): number {
   return value;
 }
 
+/** The generous default bound on a document shell becoming ready. */
+const DEFAULT_SHELL_TIMEOUT_MS = 30_000;
+
+/** Development default, for the same first-compile reason as the loader bound. */
+const DEFAULT_DEV_SHELL_TIMEOUT_MS = 90_000;
+
+/** Raised at request time when `web.shellTimeout` is misconfigured. */
+export class ShellTimeoutConfigError extends Error {
+  public constructor(message: string) {
+    super(message);
+    this.name = "ShellTimeoutConfigError";
+  }
+}
+
+/**
+ * Read `web.shellTimeout`, falling back to the default, and validate it: a
+ * non-negative integer of milliseconds, or `0` to disable the bound. Called
+ * once per render attempt, like {@link resolveLoaderTimeoutMs}.
+ */
+export function resolveShellTimeoutMs(): number {
+  const web = config.get("web", {});
+  const value =
+    web.shellTimeout ??
+    (environment() === "development" ? DEFAULT_DEV_SHELL_TIMEOUT_MS : DEFAULT_SHELL_TIMEOUT_MS);
+
+  if (!Number.isInteger(value) || value < 0) {
+    throw new ShellTimeoutConfigError(
+      `web.shellTimeout must be a non-negative integer (milliseconds); received ${JSON.stringify(value)}.`,
+    );
+  }
+
+  return value;
+}
+
 /** How a page's loaders start: one level after another, or all at once. */
 export type LoaderMode = "serial" | "parallel";
 

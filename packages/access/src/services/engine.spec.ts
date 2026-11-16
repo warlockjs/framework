@@ -369,3 +369,28 @@ describe("one resolution per user object", () => {
     expect(await check(fresh, "orders.view")).toBe(true);
   });
 });
+
+describe("a resolver with cacheable: false", () => {
+  const uncached = { resolvePermissions, resolveRoles, cacheable: false as const };
+
+  it("never touches the shared cache and sees a change on the next check", async () => {
+    setAccessConfig({ resolver: uncached });
+
+    expect(await permissionsFor({ id: 5, userType: "user" } as never)).toEqual(["orders.*"]);
+
+    resolvePermissions.mockResolvedValue(["reports.view"]);
+
+    expect(await permissionsFor({ id: 5, userType: "user" } as never)).toEqual(["reports.view"]);
+    expect(await rolesFor({ id: 5, userType: "user" } as never)).toEqual(["editor"]);
+    expect(cacheGet).not.toHaveBeenCalled();
+    expect(cacheSet).not.toHaveBeenCalled();
+  });
+
+  it("keeps caching for a resolver that sets cacheable: true", async () => {
+    setAccessConfig({ resolver: { ...uncached, cacheable: true } });
+
+    await permissionsFor({ id: 6, userType: "user" } as never);
+
+    expect(cacheSet).toHaveBeenCalledOnce();
+  });
+});

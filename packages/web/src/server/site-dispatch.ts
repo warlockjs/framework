@@ -33,8 +33,10 @@ import { connectCurrentSite, type CurrentSite } from "../routing/site-url";
 import type { SitesConfig } from "../sites/site-config.types";
 import type { SharedContext } from "../index";
 import type { PageSite } from "../context";
+import type { PageUploadsOption } from "../page-config";
 import type { PageRouteHandler } from "./create-page-route-handler";
 import { NOT_FOUND_ROUTE_PATH } from "./not-found-page";
+import { sendRouteNotFound } from "./route-not-found-response";
 
 /** What `request.site` carries on a multi-site request. */
 export type RequestSite = PageSite;
@@ -111,6 +113,7 @@ export type SiteDispatch = {
     path: string,
     handler: PageRouteHandler,
     sourceFile?: string,
+    uploads?: PageUploadsOption,
   ): void;
   /** Sets the site's `*` not-found page handler. */
   setNotFound(site: string, handler: PageRouteHandler): void;
@@ -181,10 +184,14 @@ export function createSiteDispatch(options: SiteDispatchOptions): SiteDispatch {
   const selector = createSiteSelector(options);
   const tables = new Map<string, Map<Method, SiteTable>>();
   const notFoundHandlers = new Map<string, PageRouteHandler>();
+  // Every site's page actions share one POST route, so a page that declares
+  // `uploads` opens that route to multipart bodies: `true` unless every
+  // declaration carries a size, then the largest one.
+  const uploadDeclarations: PageUploadsOption[] = [];
 
   const dispatch = (method: Method): PageRouteHandler => {
     return async (context: HttpContext) => {
-      const { request, response } = context;
+      const { request } = context;
       const pathname = request.path.split("?")[0] || "/";
 
       // A resolver throw propagates: core's own error path answers 500.
@@ -195,10 +202,7 @@ export function createSiteDispatch(options: SiteDispatchOptions): SiteDispatch {
       });
 
       if (selection.kind === "not-found") {
-        await response.send(
-          { error: "Route not found", path: request.path, method: request.method },
-          refusalStatusOf(request) ?? 404,
-        );
+        await sendRouteNotFound(context, refusalStatusOf(request) ?? 404);
 
         return;
       }
@@ -214,10 +218,7 @@ export function createSiteDispatch(options: SiteDispatchOptions): SiteDispatch {
           : table.handlers.get(match.entry.path);
 
       if (handler === undefined) {
-        await response.send(
-          { error: "Route not found", path: request.path, method: request.method },
-          refusalStatusOf(request) ?? 404,
-        );
+        await sendRouteNotFound(context, refusalStatusOf(request) ?? 404);
 
         return;
       }
@@ -248,7 +249,11 @@ export function createSiteDispatch(options: SiteDispatchOptions): SiteDispatch {
   };
 
   return {
-    add(site, method, path, handler, sourceFile) {
+    add(site, method, path, handler, sourceFile, uploads) {
+      if (method === "POST" && uploads !== undefined && uploads !== false) {
+        uploadDeclarations.push(uploads);
+      }
+
       const table = tableOf(tables, site, method);
 
       table.entries.push({
@@ -298,9 +303,29 @@ export function createSiteDispatch(options: SiteDispatchOptions): SiteDispatch {
       router.post(SITE_DISPATCH_ROUTE_PATH, dispatch("POST"), {
         name: SITE_DISPATCH_POST_NAME,
         isPage: true,
+        ...(uploadDeclarations.length === 0
+          ? {}
+          : { uploads: sharedUploadsOption(uploadDeclarations) }),
       });
     },
   };
+}
+
+function sharedUploadsOption(declarations: readonly PageUploadsOption[]): PageUploadsOption {
+  const shared: { maxTotalSize?: number; maxFileSize?: number; maxFiles?: number } = {};
+
+  // A limit stays only when every declaration sets it, at the largest value:
+  // the route is shared, so one site without a limit leaves it at the default.
+  for (const name of ["maxTotalSize", "maxFileSize", "maxFiles"] as const) {
+    const values = declarations.map((declaration) =>
+      typeof declaration === "object" ? declaration[name] : undefined,
+    );
+
+    if (values.every((value) => value !== undefined))
+      shared[name] = Math.max(...(values as number[]));
+  }
+
+  return Object.keys(shared).length === 0 ? true : shared;
 }
 
 /**
@@ -342,8 +367,15 @@ export function siteRegistrationRouter(
 
       dispatch.add(site, "GET", composeRoutePath(basePath, path), handler, sourceFile);
     },
-    post(path: string, handler: PageRouteHandler) {
-      dispatch.add(site, "POST", composeRoutePath(basePath, path), handler, sourceFile);
+    post(path: string, handler: PageRouteHandler, options?: { uploads?: PageUploadsOption }) {
+      dispatch.add(
+        site,
+        "POST",
+        composeRoutePath(basePath, path),
+        handler,
+        sourceFile,
+        options?.uploads,
+      );
     },
     withSourceFile<T>(nextSourceFile: string, callback: () => T): T {
       const previousSourceFile = sourceFile;

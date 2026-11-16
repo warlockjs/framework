@@ -19,7 +19,9 @@ router.prefix("/auth", () => {
   // Failed sign-ins lock the account and the IP after 5 tries in 15 minutes.
   router.post("/login", loginController, {
     public: true,
-    middleware: [loginThrottleMiddleware()],
+    // `emailLock: "pair"` locks an email only for the address that failed, so one
+    // client cannot lock a victim out from everywhere. 6.0 makes it the default.
+    middleware: [loginThrottleMiddleware({ emailLock: "pair" })],
   });
   router.post("/refresh-token", refreshTokenController, {
     public: true,

@@ -81,7 +81,26 @@ export interface GuardOptions {
    */
   tool?: readonly GuardrailDetector[];
   /**
-   * The tool names the `tool` detectors apply to. Omit to apply to every
+   * Detectors run on what a tool returned (a string as is, anything else as
+   * `JSON.stringify`) at `tool.after`, before the model reads it. This is
+   * the usual path for indirect prompt injection (fetched pages, file
+   * contents). `block` fails the tool call with a `GuardrailViolationError`
+   * (phase `"toolResult"`; the model sees a failed call, never the data); `redact` replaces the result data with the
+   * rewritten text; `flag` records the match. Failed tool results are not
+   * scanned.
+   */
+  toolResult?: readonly GuardrailDetector[];
+  /**
+   * Wrap each successful tool result that passed the `toolResult`
+   * detectors as untrusted data, so the model is told not to follow
+   * instructions inside it: the data becomes a string inside
+   * `<untrusted-tool-result tool="name">…</untrusted-tool-result>` (a
+   * closing tag inside the data is neutralised). Default `false`. Needs
+   * `toolResult` detectors or runs alone when `toolResult` is empty.
+   */
+  wrapToolResults?: boolean;
+  /**
+   * The tool names the `tool` and `toolResult` detectors apply to. Omit to apply to every
    * tool. When set, the middleware's `tool` hooks are scoped via the core
    * `forTool(toolNames, mw)` helper; `trip` hooks are unaffected.
    */
@@ -146,8 +165,9 @@ export interface InjectionDetectorOptions {
   /**
    * Extra marker phrases beyond the built-in jailbreak / prompt-injection
    * set. A `string` matches as a substring after both it and the text are
-   * normalized (case, NFKC forms, zero-width characters and runs of
-   * whitespace / `_` / `-` / `.` folded). A `RegExp` is tested on the
+   * normalized (case, compatibility forms, zero-width characters,
+   * combining marks, look-alike Cyrillic / Greek letters and runs of
+   * whitespace, dashes, `_`, `.`, `,` and similar separators folded). A `RegExp` is tested on the
    * original text as a copy without its `g` / `y` flags.
    */
   markers?: readonly (string | RegExp)[];

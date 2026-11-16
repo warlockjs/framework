@@ -279,7 +279,17 @@ router.get("/webhooks/status", webhookStatusController, { rateLimit: false });
 route like production (declared `Content-Length` refused before reading, chunked bodies
 counted as they stream), and run the route's `preParsing` hooks. Keys the dev wildcard cannot
 honour (`schema`, `errorHandler`, `onSend`, `onResponse`, ...) log one boot warning naming the
-route and key. Multipart uploads use `http.fileUploadLimit`, not `bodyLimit`.
+route and key. Multipart uploads use `http.fileUploadLimit`, not `bodyLimit`. `serverOptions.config`
+(the per-route config Fastify plugins read, e.g. a per-route `multipartOptions` file limit) is also not
+applied by the dev wildcard and logs the same warning; the route-level `uploads` option works in dev.
+
+### Serializing through `responseSchema`
+
+`http.compileResponseSchemas: true` (or `compileResponseSchema: true` on one route, `false` to opt
+out) writes the declared statuses with a compiled serializer and drops fields the schema does not
+name. A missing declared field is omitted, `date` fields stay open, and a route that sets its own
+`serverOptions.schema.response` keeps it. Production builds and the in-process test server apply it;
+the dev server does not. It also warns once at boot when `http.compileResponseSchemas` or a route's `compileResponseSchema` is set, since the dev dispatcher does not apply compiled response schemas.
 
 ### Routes that take uploads
 

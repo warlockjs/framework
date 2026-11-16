@@ -126,7 +126,7 @@ For application identity, use `authorize`. It receives the request and returns (
 ai.serve(agent, { authorize: async (req) => Boolean(await userFromSession(req)) });
 ```
 
-Every run spends provider credits, so an endpoint without `authToken` or `authorize` is open to anyone who can reach it. When `NODE_ENV` is `production`, such a handler logs a one-time warning (module `ai.serve`, action `auth.missing`). Set `public: true` to declare an open endpoint on purpose and silence it.
+Every run spends provider credits, so an endpoint without `authToken` or `authorize` is open to anyone who can reach it. When `NODE_ENV` is `production`, such a handler logs a one-time warning (module `ai.serve`, action `auth.missing`). Set `public: true` to declare an open endpoint on purpose and silence it. In 6.0 `ai.serve` will refuse to start without `authToken`, `authorize` or `public: true`, so set one now.
 
 ## Server-owned sessions and execution options
 

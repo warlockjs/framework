@@ -1479,7 +1479,7 @@ v.string().email("Please enter a valid email address").required("Email is requir
 //                per-rule override                                  per-rule override
 ```
 
-Each chain method takes an optional `errorMessage` as its last argument. That overrides the rule's `defaultErrorMessage`. Use it when a single rule needs a tailored message in a specific schema.
+Each chain method takes an optional `errorMessage` as its last argument. That overrides the rule's `defaultErrorMessage`. Use it when a single rule needs a tailored message in a specific schema. A dotted translation key (`forms.emailInvalid`, no spaces) is translated when `translateMessageKey` is set in `configureSeal()` (Warlock.js sets it); a key without a translation stays as written.
 
 For project-wide message overrides, hook into the translation layer (the framework calls `resolveTranslation` with the rule context — wire up your own `t()` function via `SealConfig`).
 

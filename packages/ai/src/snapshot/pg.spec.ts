@@ -44,6 +44,22 @@ function makeFakePg(): PgClientLike & {
       return { rows: [] };
     }
 
+    if (text.startsWith("UPDATE")) {
+      const runId = params[0] as string;
+      const row = rows.get(runId);
+
+      if (!row) {
+        return { rows: [] };
+      }
+
+      row.payload = JSON.stringify({
+        ...JSON.parse(row.payload as string),
+        pending: JSON.parse(params[1] as string),
+      });
+
+      return { rows: [{ run_id: runId }] };
+    }
+
     if (text.startsWith("DELETE FROM")) {
       const runId = params[0] as string;
       rows.delete(runId);
@@ -229,5 +245,20 @@ describe("snapshot pg store", () => {
     expect(() => pg({ client: undefined as unknown as PgClientLike })).toThrow(
       /requires a 'client'/,
     );
+  });
+});
+
+describe("pg snapshot store markPending", () => {
+  it("updates only the pending field and reports whether a row existed", async () => {
+    const client = makeFakePg();
+    const store = pg<{ runId: string; pending?: unknown }>({ client });
+
+    expect(await store.markPending?.("run-1", { runId: "x" })).toBe(false);
+
+    await store.save({ runId: "run-1" });
+
+    expect(await store.markPending?.("run-1", { runId: "x" })).toBe(true);
+    expect(await store.load("run-1")).toEqual({ runId: "run-1", pending: { runId: "x" } });
+    expect(client.statements.some((statement) => statement.includes("jsonb_set"))).toBe(true);
   });
 });

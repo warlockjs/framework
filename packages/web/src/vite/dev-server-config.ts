@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import fs from "node:fs";
 import { webFontsPlugin } from "./fonts-plugin";
+import { hostRefusalPlugin } from "./host-refusal-plugin";
 import path from "node:path";
 import type { Alias, HttpServer, InlineConfig, PluginOption } from "vite";
 import type { DevelopmentAppModules, DevelopmentModelModules } from "@warlock.js/core";
@@ -302,6 +303,7 @@ export async function createWebConnectorViteConfig(
       // why the layer has to be registered from a plugin and not from
       // `vite.middlewares.use(...)` after this call returns.
       ...options.leadingPlugins,
+      hostRefusalPlugin(),
       ...(options.fonts?.length
         ? [webFontsPlugin({ appRoot: options.appRoot, fonts: options.fonts })]
         : []),

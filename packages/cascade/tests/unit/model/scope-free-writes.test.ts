@@ -146,7 +146,7 @@ describe("findAndUpdate", () => {
       "posts",
       { id: { $in: [7, 8] } },
       { $set: { status: "live" } },
-      undefined,
+      {},
     );
     expect(get).toHaveBeenCalledTimes(1);
   });

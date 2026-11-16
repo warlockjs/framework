@@ -235,8 +235,56 @@ function pinnedLookup(
   );
 }
 
-/** Dispatcher class the pinned dispatcher was built from, and the instance. */
-let pinned: { from: unknown; dispatcher: object } | undefined;
+/** The installed dispatcher the pinned dispatcher was built from, and the instance. */
+let pinned: { from: object; dispatcher: object } | undefined;
+
+/** Reasons already warned about, so each is logged once per process. */
+const warnedPinSkips = new Set<string>();
+
+/** Test hook: forget which skip reasons were already logged. */
+export function resetPinSkipWarnings(): void {
+  warnedPinSkips.clear();
+}
+
+/**
+ * Log, once per reason, that a guarded request runs without connection
+ * pinning (only the DNS pre-check guards it).
+ */
+function warnPinSkipped(reason: string): void {
+  if (warnedPinSkips.has(reason)) {
+    return;
+  }
+
+  warnedPinSkips.add(reason);
+  console.warn(
+    `[warlock-ai] outbound address pinning is off for guarded requests: ${reason}. ` +
+      "The DNS pre-check still blocks private and reserved addresses, but a DNS answer that changes " +
+      "between the check and the connection is not caught.",
+  );
+}
+
+/**
+ * The connect options the app installed on its own `Agent` dispatcher (a
+ * private CA, a client certificate, timeouts), or `undefined` when they are
+ * not readable. A function-valued `connect` cannot take a `lookup`, so it
+ * reports `"function"`.
+ */
+function installedConnectOptions(dispatcher: object): Record<string, unknown> | "function" {
+  const optionsSymbol = Object.getOwnPropertySymbols(dispatcher).find(
+    (symbol) => symbol.description === "options",
+  );
+  const options = optionsSymbol
+    ? (dispatcher as Record<symbol, unknown>)[optionsSymbol]
+    : undefined;
+  const connect =
+    options && typeof options === "object" ? (options as { connect?: unknown }).connect : undefined;
+
+  if (typeof connect === "function") {
+    return "function";
+  }
+
+  return connect && typeof connect === "object" ? { ...(connect as Record<string, unknown>) } : {};
+}
 
 /**
  * The dispatcher that pins every connection to an address that passed the
@@ -244,8 +292,10 @@ let pinned: { from: unknown; dispatcher: object } | undefined;
  * not available: the runtime exposes no default dispatcher, or the app
  * installed its own non-`Agent` global dispatcher (a proxy or a mock), in
  * which case the request keeps going through it and the DNS pre-check
- * remains the guard. TLS still verifies the certificate against the URL's
- * host name: only the address resolution is replaced.
+ * remains the guard (one warning names the reason). The pinned dispatcher
+ * keeps the connect options of the installed `Agent` (private CA, client
+ * certificate, timeouts) and replaces only the address resolution. TLS
+ * still verifies the certificate against the URL's host name.
  */
 async function pinnedDispatcher(): Promise<object | undefined> {
   const holder = globalThis as unknown as Record<symbol, unknown>;
@@ -255,6 +305,7 @@ async function pinnedDispatcher(): Promise<object | undefined> {
     try {
       await (await runtimeFetch?.("data:,"))?.arrayBuffer();
     } catch {
+      warnPinSkipped("this runtime exposes no default dispatcher to build the pinned one from");
       return undefined;
     }
   }
@@ -265,22 +316,37 @@ async function pinnedDispatcher(): Promise<object | undefined> {
       ? (current as { constructor?: unknown }).constructor
       : undefined;
 
-  if (typeof DispatcherClass !== "function" || DispatcherClass.name !== "Agent") {
+  if (typeof DispatcherClass !== "function") {
+    warnPinSkipped("this runtime exposes no default dispatcher to build the pinned one from");
     return undefined;
   }
 
-  if (pinned?.from !== DispatcherClass) {
-    const Agent = DispatcherClass as new (options: {
-      connect: { lookup: typeof pinnedLookup };
-    }) => object;
+  if (DispatcherClass.name !== "Agent") {
+    warnPinSkipped(
+      `the installed global dispatcher is a ${DispatcherClass.name || "custom dispatcher"}, not an Agent (a proxy or a mock keeps routing the request)`,
+    );
+    return undefined;
+  }
+
+  const installed = installedConnectOptions(current as object);
+
+  if (installed === "function") {
+    warnPinSkipped(
+      "the installed Agent uses a custom connect function that cannot take a pinned lookup",
+    );
+    return undefined;
+  }
+
+  if (pinned?.from !== current) {
+    const Agent = DispatcherClass as new (options: { connect: Record<string, unknown> }) => object;
 
     pinned = {
-      from: DispatcherClass,
-      dispatcher: new Agent({ connect: { lookup: pinnedLookup } }),
+      from: current as object,
+      dispatcher: new Agent({ connect: { ...installed, lookup: pinnedLookup } }),
     };
   }
 
-  return pinned.dispatcher;
+  return pinned?.dispatcher;
 }
 
 /**
@@ -374,7 +440,11 @@ function headersToRecord(headersInit?: RequestInit["headers"]): Record<string, s
  * `fetch`, every connection resolves its host through a checked lookup and
  * connects only to the addresses that passed — a DNS answer that changes
  * between the pre-check and the connection (DNS rebinding) is refused. An
- * injected `policy.fetch` is used as-is (the pre-check still applies).
+ * injected `policy.fetch` is used as-is (the pre-check still applies). The
+ * pinned dispatcher keeps the connect options of the app's own `Agent`
+ * (private CA, client certificate). When pinning cannot apply (an injected
+ * `fetch`, a proxy or mock dispatcher, a runtime without a dispatcher) one
+ * warning per reason names why.
  *
  * **Deadline.** `timeoutMs` covers the whole exchange: the request, every
  * redirect hop, and the body read. The returned response's body stream is
@@ -409,10 +479,15 @@ export async function guardedFetch(
   let method = init?.method ?? "GET";
   let body = init?.body ?? undefined;
 
-  const dispatcher =
-    policy.denyPrivateIPsAfterDNS && policy.fetch === globalThis.fetch
-      ? await pinnedDispatcher()
-      : undefined;
+  let dispatcher: object | undefined;
+
+  if (policy.denyPrivateIPsAfterDNS) {
+    if (policy.fetch === globalThis.fetch) {
+      dispatcher = await pinnedDispatcher();
+    } else {
+      warnPinSkipped("an injected fetch is used, so the connection cannot be pinned");
+    }
+  }
 
   const settle = (response: Response): Response => {
     responseDeadlines.set(response, { signal, release });

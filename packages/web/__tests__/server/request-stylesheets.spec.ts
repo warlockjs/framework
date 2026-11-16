@@ -91,7 +91,7 @@ describe("per-request stylesheets in the SSR head", () => {
 
     expect(resolved).toEqual([["src/web/themes/alpha/alpha-theme.tsx"]]);
     expect(html).toContain(
-      '<link rel="stylesheet" href="/assets/root.css"/><link rel="stylesheet" href="/assets/alpha-theme.css"/>',
+      '<link rel="stylesheet" href="/assets/root.css" data-wl="css"/><link rel="stylesheet" href="/assets/alpha-theme.css" data-wl="css"/>',
     );
     expect(html).not.toContain("beta-theme.css");
   });
@@ -112,7 +112,7 @@ describe("per-request stylesheets in the SSR head", () => {
     const { html, resolved } = await renderStore({});
 
     expect(resolved).toEqual([]);
-    expect(html).toContain('<link rel="stylesheet" href="/assets/root.css"/>');
+    expect(html).toContain('<link rel="stylesheet" href="/assets/root.css" data-wl="css"/>');
     expect(html).not.toContain("-theme.css");
   });
 });

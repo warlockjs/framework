@@ -182,6 +182,20 @@ posixOnly("createCliAgent (real processes, fake CLI)", () => {
     expect(JSON.parse(result.text)).toMatchObject({ other: null, key: "sk-from-host" });
   });
 
+  it("passes the variables the adapter declares in passEnv with inheritEnv: curated", async () => {
+    const cli = createCliAgent(
+      { ...fakeAdapter(fake.file), passEnv: ["FAKE_BASE_URL"] },
+      { inheritEnv: "curated" },
+      hostWith({ FAKE_MODE: "env", FAKE_BASE_URL: "https://llm.internal", OTHER_SECRET: "s3" }),
+    );
+    const result = await (await cli.run("env", { env: { FAKE_MODE: "env" } })).done();
+
+    expect(JSON.parse(result.text)).toMatchObject({
+      other: null,
+      base: "https://llm.internal",
+    });
+  });
+
   it("writes MCP config as a 0600 file in the run directory, never argv", async () => {
     const cli = createCliAgent(fakeAdapter(fake.file), {}, hostWith({ FAKE_MODE: "mcp" }));
     const result = await (

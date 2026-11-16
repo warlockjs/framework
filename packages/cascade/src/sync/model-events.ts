@@ -132,3 +132,21 @@ export async function triggerModelEvent(
     await events.triggerAllAsync(current, ...args);
   }
 }
+
+/**
+ * The listeners a model sync event would reach right now, under both event
+ * names (the deprecated class-name form first). Empty when nobody listens, so
+ * a caller can skip the work.
+ */
+export function getModelEventListeners(
+  modelClass: ChildModel<Model>,
+  eventType: ModelSyncEventTypeName,
+): Array<(...args: unknown[]) => unknown> {
+  const legacy = getLegacyModelEvent(modelClass, eventType);
+  const current = getModelEvent(getModelEventKey(modelClass), eventType);
+  const names = current === legacy ? [legacy] : [legacy, current];
+
+  return names.flatMap((name) =>
+    events.subscriptions(name).map((subscription) => subscription.dispatch.bind(subscription)),
+  );
+}

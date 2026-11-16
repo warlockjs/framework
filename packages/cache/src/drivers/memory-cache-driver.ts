@@ -264,6 +264,22 @@ export class MemoryCacheDriver
 
   /**
    * {@inheritdoc}
+   */
+  public async listKeys(namespace: string): Promise<string[]> {
+    const parsed = this.parseKey(namespace);
+    const keys: string[] = [];
+
+    for (const key of [...this.entries.keys()]) {
+      if (this.inNamespace(key, parsed) && this.readLive(key)) {
+        keys.push(this.unprefixKey(key));
+      }
+    }
+
+    return keys;
+  }
+
+  /**
+   * {@inheritdoc}
    *
    * The conditional check and the write run with no `await` in between, so
    * `onConflict` decisions are atomic within the process.
@@ -639,6 +655,10 @@ export class MemoryCacheDriver
       const entry = this.readLive(parsedKey);
 
       if (!entry) {
+        continue;
+      }
+
+      if (options.filter && !options.filter({ key: parsedKey, value: entry.data })) {
         continue;
       }
 

@@ -2,11 +2,13 @@ import {
   AIError,
   ContextLengthExceededError,
   InvalidRequestError,
+  ProviderAbortError,
   ProviderAuthError,
   ProviderError,
   ProviderOverloadedError,
   ProviderRateLimitError,
   ProviderTimeoutError,
+  QuotaExceededError,
 } from "@warlock.js/ai";
 import { ApiError } from "@google/genai";
 
@@ -44,7 +46,7 @@ type GoogleErrorShape = {
  *   throw wrapGoogleError(thrown);
  * }
  */
-export function wrapGoogleError(thrown: unknown): AIError {
+export function wrapGoogleError(thrown: unknown, options: { signal?: AbortSignal } = {}): AIError {
   if (thrown instanceof AIError) {
     return thrown;
   }
@@ -57,6 +59,13 @@ export function wrapGoogleError(thrown: unknown): AIError {
   // (fetched 2026-10-17). Every other failure keeps the default.
   const billed = shape.status === 400 || shape.status === 500 ? false : undefined;
 
+  // The SDK aborts the request the same way for the caller's signal and for
+  // its own `httpOptions.timeout`, so only an aborted caller signal makes an
+  // `AbortError` a cancellation; any other one is the SDK's timeout.
+  if (shape.name === "AbortError" && options.signal?.aborted === true) {
+    return new ProviderAbortError(message, { cause: thrown, context, billed });
+  }
+
   if (isTimeout(shape)) {
     return new ProviderTimeoutError(message, { cause: thrown, context, billed });
   }
@@ -67,6 +76,12 @@ export function wrapGoogleError(thrown: unknown): AIError {
     /permission_denied|api key not valid|unauthenticated/i.test(message)
   ) {
     return new ProviderAuthError(message, { cause: thrown, context, billed });
+  }
+
+  // Spent quota or billing needs a human (top up, raise the cap): a retry
+  // cannot fix it. A per-minute / per-day rate limit stays a rate limit.
+  if (isSpentQuota(message)) {
+    return new QuotaExceededError(message, { cause: thrown, context, billed });
   }
 
   if (shape.status === 429 || /resource_exhausted|quota/i.test(message)) {
@@ -92,6 +107,23 @@ export function wrapGoogleError(thrown: unknown): AIError {
   }
 
   return new ProviderError(message, { cause: thrown, context, billed });
+}
+
+/**
+ * Whether the message says the project's billing or free-tier allowance is
+ * used up, as opposed to a per-minute / per-day request rate limit. Google
+ * words rate limits as "quota exceeded for metric ... per minute" and spent
+ * billing as "exceeded your current quota, please check your plan and
+ * billing details" or "billing ... not enabled".
+ */
+function isSpentQuota(message: string): boolean {
+  if (/per[ -]?(minute|second|day)|requests? per|retry in|retryDelay/i.test(message)) {
+    return false;
+  }
+
+  return /check your plan and billing|billing (account|details|is not|not )|prepayment credits? (are|is)|exceeded your current quota|free tier.*(exhausted|exceeded)/i.test(
+    message,
+  );
 }
 
 /**
@@ -124,11 +156,16 @@ function toShape(thrown: unknown): GoogleErrorShape {
  * `AbortError` / `ETIMEDOUT` / `ECONNABORTED`.
  */
 function isTimeout(shape: GoogleErrorShape): boolean {
+  // An abort the caller did not ask for: the SDK's `httpOptions.timeout`.
+  if (shape.name === "AbortError" || shape.name === "TimeoutError") {
+    return true;
+  }
+
   if (shape.status === 504) {
     return true;
   }
 
-  if (shape.name === "AbortError" || /deadline_exceeded/i.test(shape.message ?? "")) {
+  if (/deadline_exceeded/i.test(shape.message ?? "")) {
     return true;
   }
 

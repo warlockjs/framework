@@ -189,6 +189,22 @@ export class LRUMemoryCacheDriver
   }
 
   /**
+   * {@inheritdoc}
+   */
+  public async listKeys(namespace: string): Promise<string[]> {
+    const parsed = this.parseKey(namespace);
+    const keys: string[] = [];
+
+    for (const [key, node] of this.cache) {
+      if (this.inNamespace(key, parsed) && !node.isExpired) {
+        keys.push(this.unprefixKey(key));
+      }
+    }
+
+    return keys;
+  }
+
+  /**
    * Backing store of `cache.structures`, created on first use.
    */
   protected structureStore?: MemoryStructuresBackend;
@@ -652,6 +668,7 @@ export class LRUMemoryCacheDriver
       if (!node.vector) continue;
       if (node.isExpired) continue;
       if (tagFilter && !tagFilter.has(parsedKey)) continue;
+      if (options.filter && !options.filter({ key: parsedKey, value: node.value })) continue;
 
       const score = cosineSimilarity(vector, node.vector);
 

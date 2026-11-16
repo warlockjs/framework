@@ -45,7 +45,7 @@ export type BuildEnvironmentInput = {
    * set plus `credentials`; a list — the minimal set plus those names.
    */
   inherit: boolean | "curated" | readonly string[];
-  /** The adapter's own credential variables (`apiKeyEnv`), passed by `"curated"`. */
+  /** The adapter's own credential variables (`apiKeyEnv`, `passEnv`), passed by `"curated"`. */
   credentials?: readonly string[];
   /** Variables the adapter manages (config home); never inherited from `source`. */
   managed: readonly string[];
@@ -139,7 +139,7 @@ export function warnInheritedEnvironment(
 
   warnedInheritedEnvironment = true;
   console.warn(
-    `[warlock-ai-cli] ${title} receives the whole server environment because \`inheritEnv\` is not set (default \`true\`). ` +
+    `[warlock-ai-cli] ${title} receives the whole server environment because \`inheritEnv\` is not set (default \`true\`; the default changes to \`"curated"\` in 6.0). ` +
       'Set `inheritEnv: "curated"` to pass only the system variables and the CLI\'s own API key variable, ' +
       "or `inheritEnv: true` to keep the current behaviour and silence this warning.",
   );

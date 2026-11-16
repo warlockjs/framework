@@ -258,6 +258,7 @@ router.restfulResource("/orders", new OrdersRestful());
 
 - **`router.restfulResource` wraps `prefix(path, ...)` internally** — register inside `guarded(...)` to guard the whole set, or pass middleware via the options. Avoid registering the same prefix twice.
 - **`Restful.update` is `PUT`, `Restful.patch` is `PATCH`.** They differ — `update` uses `request.allExceptParams()`, `patch` uses `request.heavyExceptParams()`. Don't conflate them.
+- **`Restful.list` rethrows failures** (a refused filter answers 400, anything else is a 5xx the request funnel records once) instead of answering `serverError` itself.
 - **`cache = true` reuses repository cache.** If the repository isn't cacheable, the cached methods silently fall through to the live query — set `cache = false` explicitly if you want to make that visible.
 - **`bulkDelete` reads `id` as an array.** The route is `DELETE /path` (no `:id`); send `id: ["1", "2", "3"]` in the body. Returns 400 if the value isn't an array.
 - **Validation hooks on `Restful`** are bound to the instance — call `this.repository` freely inside `validate()`. Plain controller validators don't get `this`.

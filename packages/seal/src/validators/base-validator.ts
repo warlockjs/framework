@@ -713,7 +713,8 @@ export class BaseValidator<TInput = unknown, TOutput = TInput> {
 
     for (const mutator of this.mutators) {
       mutator.context.ctx = context;
-      mutatedData = await mutator.mutate(mutatedData, mutator.context);
+      const outcome = mutator.mutate(mutatedData, mutator.context);
+      mutatedData = outcome instanceof Promise ? await outcome : outcome;
     }
 
     return mutatedData;
@@ -849,7 +850,9 @@ export class BaseValidator<TInput = unknown, TOutput = TInput> {
 
       this.setRuleAttributesList(rule);
 
-      const result = await rule.validate(mutatedData, context);
+      // A rule that answers without a promise skips the microtask hop.
+      const outcome = rule.validate(mutatedData, context);
+      const result = outcome instanceof Promise ? await outcome : outcome;
 
       if (result.isValid && "data" in result) {
         mutatedData = result.data;

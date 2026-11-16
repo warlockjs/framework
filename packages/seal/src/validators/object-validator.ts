@@ -716,16 +716,30 @@ function withoutForbiddenKeys(obj: Record<string, unknown>): Record<string, unkn
 }
 
 /**
+ * Objects already cleaned by `removeUndefinedValues`, with how many container
+ * levels they hold below themselves. A nested object validator cleans its own
+ * output, so the validators above it skip these objects instead of walking
+ * them again. The rule: an object the framework produced is not mutated in
+ * place to hold `undefined` values before an ancestor sees it.
+ */
+const cleanedObjects = new WeakMap<object, number>();
+
+/** Deepest container level reached by the walk in progress */
+type WalkState = { deepest: number };
+
+/**
  * Recursively remove undefined values from an object.
  *
  * `__proto__` keys are dropped: assigning one would set the copy's prototype.
  * Containers nested `maxDepth` levels below `obj` raise `NestingTooDeepError`.
+ * Objects cleaned by an earlier call are reused as they are (see `cleanedObjects`).
  */
 function removeUndefinedValues(
   obj: any,
   maxDepth: number,
   depth = 0,
   visited = new WeakMap<object, any>(),
+  state: WalkState = { deepest: 0 },
 ): any {
   // Handle primitives and null
   if (obj === null) {
@@ -736,11 +750,24 @@ function removeUndefinedValues(
   if (Array.isArray(obj)) {
     if (depth > maxDepth) throw new NestingTooDeepError();
 
-    return obj.map((item) => removeUndefinedValues(item, maxDepth, depth + 1, visited));
+    state.deepest = Math.max(state.deepest, depth);
+
+    return obj.map((item) => removeUndefinedValues(item, maxDepth, depth + 1, visited, state));
   }
 
   // Skip non-plain objects (class instances, Dates, Buffers, etc.)
   if (!isPlainObject(obj)) {
+    return obj;
+  }
+
+  // Already cleaned by a nested validator: only the depth limit can still fail
+  const cachedHeight = cleanedObjects.get(obj);
+
+  if (cachedHeight !== undefined) {
+    if (depth + cachedHeight > maxDepth) throw new NestingTooDeepError();
+
+    state.deepest = Math.max(state.deepest, depth + cachedHeight);
+
     return obj;
   }
 
@@ -755,11 +782,17 @@ function removeUndefinedValues(
   const result: any = {};
   visited.set(obj, result); // Mark as processing BEFORE recursion
 
+  const outerDeepest = state.deepest;
+  state.deepest = depth;
+
   for (const [key, value] of Object.entries(obj)) {
     if (value !== undefined && !isForbiddenKey(key)) {
-      result[key] = removeUndefinedValues(value, maxDepth, depth + 1, visited);
+      result[key] = removeUndefinedValues(value, maxDepth, depth + 1, visited, state);
     }
   }
+
+  cleanedObjects.set(result, state.deepest - depth);
+  state.deepest = Math.max(outerDeepest, state.deepest);
 
   return result;
 }

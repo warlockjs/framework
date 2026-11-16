@@ -32,14 +32,15 @@ src/app/posts/services/publish.service.ts:2:24  WL9003  "../../users/models/user
 
 `check` boots nothing: no config is loaded, no connector starts, no connection opens and no port binds.
 
-| Flag            | Type    | Description                                                                                |
-| --------------- | ------- | ------------------------------------------------------------------------------------------ |
-| `--changed, -c` | boolean | Limit every step to the files changed against `HEAD` plus untracked files.                 |
-| `--base, -b`    | string  | Compare with `git merge-base <ref> HEAD` instead of `HEAD`. Implies `--changed`.           |
-| `--skip, -s`    | string  | Comma-separated steps to skip: `environment`, `typecheck`, `lint`, `tests`, `conventions`. |
-| `--lint`        | string  | `oxlint` (default and only supported value).                                               |
-| `--project, -p` | string  | tsconfig path (default `tsconfig.json`).                                                   |
-| `--json, -j`    | boolean | Print the report as JSON. stdout carries only the JSON; progress lines go to stderr.       |
+| Flag             | Type    | Description                                                                                                                      |
+| ---------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `--changed, -c`  | boolean | Limit every step to the files changed against `HEAD` plus untracked files.                                                       |
+| `--base, -b`     | string  | Compare with `git merge-base <ref> HEAD` instead of `HEAD`. Implies `--changed`.                                                 |
+| `--skip, -s`     | string  | Comma-separated steps to skip: `environment`, `typecheck`, `lint`, `tests`, `conventions`.                                       |
+| `--lint`         | string  | `oxlint` (default and only supported value).                                                                                     |
+| `--project, -p`  | string  | tsconfig path (default `tsconfig.json`).                                                                                         |
+| `--test-timeout` | string  | Seconds one vitest run may take before `check` stops it (default `600`, `0` for no limit). Same as `WARLOCK_CHECK_TEST_TIMEOUT`. |
+| `--json, -j`     | boolean | Print the report as JSON. stdout carries only the JSON; progress lines go to stderr.                                             |
 
 ## Exit codes
 
@@ -59,13 +60,13 @@ Any other exit code means the `check` process itself died — treat it like `2`.
 
 All steps run, even after one fails, so one run lists every problem.
 
-| Step          | What it does                                                                                                                                                                                                                  |
-| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `environment` | Checks the running Node.js against core's minimum (22.15) and the app's own `engines.node` when it is a `>=` range. With `--changed`, lists the changed files with git; if git cannot, every later step is `blocked`.         |
-| `typecheck`   | Runs [`warlock typecheck`](#warlock-typecheck) in a child process, so a heap overflow on a large app is reported as `WL8007` instead of ending `check`.                                                                       |
-| `lint`        | Oxlint when an app-root Oxlint config exists. Lints `src/**` (or changed files). A missing Oxlint package is `WL8002`.                                                                                                        |
-| `tests`       | The app's own vitest (never a global one): `vitest run` for a full check, `vitest related <changed files> --run` with `--changed`, both with `--passWithNoTests` and the JSON reporter. Skipped when there are no test files. |
-| `conventions` | Static checks over `src/**` (or the changed files) and `tsconfig.json`, the same whichever linter the app uses — see [Convention checks](#convention-checks).                                                                 |
+| Step          | What it does                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `environment` | Checks the running Node.js against core's minimum (22.15) and the app's own `engines.node` when it is a `>=` range. With `--changed`, lists the changed files with git; if git cannot, every later step is `blocked`.                                                                                                                                                                                                                                                                                                                                          |
+| `typecheck`   | Runs [`warlock typecheck`](#warlock-typecheck) in a child process, so a heap overflow on a large app is reported as `WL8007` instead of ending `check`.                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `lint`        | Oxlint when an app-root Oxlint config exists. Lints `src/**` (or changed files). A missing Oxlint package is `WL8002`.                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| `tests`       | The app's own vitest (never a global one): `vitest run` for a full check, `vitest related <changed files> --run` with `--changed`, both with `--passWithNoTests` and the JSON reporter. Skipped when there are no test files. A run longer than 10 minutes is stopped and reported as `WL8007` with `The tests timed out after 600 s`; raise the limit with `--test-timeout <seconds>` or `WARLOCK_CHECK_TEST_TIMEOUT`. A vitest ended by something else (a memory-capped wrapper, the operating system) is reported as stopped by SIGTERM (exit 143) instead. |
+| `conventions` | Static checks over `src/**` (or the changed files) and `tsconfig.json`, the same whichever linter the app uses — see [Convention checks](#convention-checks).                                                                                                                                                                                                                                                                                                                                                                                                  |
 
 A step's status is `passed`, `failed`, `skipped` (does not apply, or `--skip`) or `blocked` (this machine kept it from running).
 

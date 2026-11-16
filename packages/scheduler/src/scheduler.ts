@@ -473,12 +473,12 @@ export class Scheduler
    * allows. Never waits for a job.
    */
   private _tick(): void {
-    this.emit("scheduler:tick", new Date());
+    this._emitSafely("scheduler:tick", new Date());
 
     for (const job of this._jobs) {
       // A due job whose previous run is still going is skipped for this tick.
       if (job.isDue() && job.isRunning) {
-        this.emit("job:skip", job.name, "Job is already running");
+        this._emitSafely("job:skip", job.name, "Job is already running");
       }
     }
 
@@ -527,7 +527,7 @@ export class Scheduler
 
       // Started elsewhere (a manual `run()`) while it waited.
       if (job.isRunning) {
-        this.emit("job:skip", job.name, "Job is already running");
+        this._emitSafely("job:skip", job.name, "Job is already running");
         continue;
       }
 
@@ -546,19 +546,34 @@ export class Scheduler
    * Run a single job and emit events
    */
   private async _runJob(job: Job): Promise<JobResult> {
-    this.emit("job:start", job.name);
+    this._emitSafely("job:start", job.name);
 
     const result = await job.run();
 
     if (result.skipped) {
-      this.emit("job:skip", job.name, result.skipReason ?? "Another server holds the lock");
+      this._emitSafely("job:skip", job.name, result.skipReason ?? "Another server holds the lock");
     } else if (result.success) {
-      this.emit("job:complete", job.name, result);
+      this._emitSafely("job:complete", job.name, result);
     } else {
-      this.emit("job:error", job.name, result.error);
+      this._emitSafely("job:error", job.name, result.error);
     }
 
     return result;
+  }
+
+  /**
+   * Emit an event without letting a throwing listener reject the run: the
+   * error is logged and the run (and the scheduler's drain loop) carries on.
+   */
+  private _emitSafely<K extends keyof SchedulerEvents>(
+    event: K,
+    ...args: SchedulerEvents[K]
+  ): void {
+    try {
+      this.emit(event, ...args);
+    } catch (error) {
+      console.error(`scheduler: a "${String(event)}" listener threw`, error);
+    }
   }
 }
 

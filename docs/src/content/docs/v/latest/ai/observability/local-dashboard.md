@@ -128,7 +128,7 @@ curl 'http://127.0.0.1:4319/api/aggregate?sessionId=session-42'
 
 ### The trace list returns summaries
 
-`GET api/traces` returns at most `?limit=` entries (default `200`), each a `TraceSummary`: the trace's ids, timings, usage and root span (name, type, status, attributes, error type and message) plus `spanCount` and `totalCost`, but no span tree and no captured `input` / `output`. A poll therefore stays small however much content the traces carry. Fetch `api/traces/:id` for the full trace, or add `?full=1` to get full traces in the list (the shape before 5.53).
+`GET api/traces` returns at most `?limit=` entries (default `200`), each a `TraceSummary`: the trace's ids, timings, usage and root span (name, type, status, attributes, error type and message) plus `spanCount` and `totalCost`, but no span tree and no captured `input` / `output`. A poll therefore stays small however much content the traces carry. The response carries an `ETag`; the page sends it back as `If-None-Match` and the server answers `304` with no body while nothing changed, so an idle dashboard transfers almost nothing. Fetch `api/traces/:id` for the full trace, or add `?full=1` to get full traces in the list (the shape before 5.53).
 
 To page back, pass `startedBefore` set to the `startedAt` of the last entry you received (the bound is inclusive, so skip the ids you already have):
 

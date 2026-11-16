@@ -59,6 +59,25 @@ export const resolveTranslation = ({
 // Internal alias — invalidRule uses the same function without re-importing config
 const resolveAttribute = resolveTranslation;
 
+/** A dotted translation key such as `admin.uploadUnrecognisedMedia` (no spaces). */
+const TRANSLATION_KEY = /^[A-Za-z0-9_-]+(\.[A-Za-z0-9_-]+)+$/;
+
+/**
+ * A rule's `errorMessage`, translated when it is a translation key and the app
+ * configured `translateMessageKey`. Any other message, and a key with no
+ * translation, is returned as given.
+ */
+function translateMessageKey(
+  message: string | undefined,
+  attributes: RuleTranslation["attributes"],
+): string | undefined {
+  if (!message || !TRANSLATION_KEY.test(message)) return message;
+
+  const translated = getSealConfig().translateMessageKey?.(message, attributes);
+
+  return translated && translated !== message ? translated : message;
+}
+
 export const invalidRule = (rule: ContextualSchemaRule, context: SchemaContext): RuleResult => {
   // `input` is always translatable — rules may add more (e.g., field references in sameAs)
   // Rule-defined translatableParams override the default input if the key matches
@@ -97,7 +116,7 @@ export const invalidRule = (rule: ContextualSchemaRule, context: SchemaContext):
   };
 
   const rawError =
-    rule.context.errorMessage ||
+    translateMessageKey(rule.context.errorMessage, attributes) ||
     rule.errorMessage ||
     context.translateRule?.({ rule, context, attributes }) ||
     rule.defaultErrorMessage!;

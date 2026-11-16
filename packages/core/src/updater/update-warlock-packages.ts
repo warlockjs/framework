@@ -1,6 +1,7 @@
 import { colors } from "@mongez/copper";
 import { fileExistsAsync, getJsonFileAsync, putJsonFileAsync } from "@warlock.js/fs";
 import { execSync } from "node:child_process";
+import { readFile, writeFile } from "node:fs/promises";
 import { releaseNotesPointer } from "../release-notes/release-notes";
 import { rootPath } from "../utils";
 import { fetchLatestVersion } from "../utils/npm-registry";
@@ -85,15 +86,17 @@ export type UpdateOutcome =
   | "outdated"
   /** Versions were rewritten (and installed, unless `install: false`). */
   | "updated"
-  /** Versions were rewritten but the package manager install failed. */
-  | "install-failed";
+  /** Versions were rewritten but the package manager install failed; `package.json` was put back. */
+  | "install-failed"
+  /** The npm on PATH is older than the install needs; nothing was changed. */
+  | "npm-too-old";
 
 /** The result of an update run. */
 export type UpdateWarlockPackagesResult = {
   outcome: UpdateOutcome;
   /** The bumps written to package.json — empty unless `outcome` wrote any. */
   updates: PackageUpdate[];
-  /** The install failure, present only for `install-failed`. */
+  /** The failure, present for `install-failed` and `npm-too-old`. */
   error?: Error;
 };
 
@@ -172,6 +175,29 @@ export async function updateWarlockPackages(
     return { outcome: "outdated", updates };
   }
 
+  // Refuse before touching anything: an npm that cannot re-resolve the family
+  // fails the install after package.json was already rewritten.
+  if (runInstall) {
+    const detection = await detectPackageManagerDetails();
+    const npmVersion = detection.packageManager === "npm" ? readNpmVersion() : undefined;
+
+    if (npmVersion && isNewerVersion(MIN_NPM_VERSION, npmVersion)) {
+      const message =
+        `${oldNpmMessage(npmVersion)} Nothing was changed. ` +
+        `Or run \`warlock update --no-install\` and install with a newer npm yourself.`;
+
+      console.log(`${colors.red("✖")} ${message}`);
+      return { outcome: "npm-too-old", updates: [], error: new Error(message) };
+    }
+  }
+
+  // Raw copies, so a failed install leaves the project exactly as it was.
+  const originalPackageJson = await readFile(packageJsonPath, "utf8");
+  const lockfilePath = rootPath("package-lock.json");
+  const originalLockfile = (await fileExistsAsync(lockfilePath))
+    ? await readFile(lockfilePath, "utf8")
+    : undefined;
+
   applyUpdates(packageJson, updates);
   await putJsonFileAsync(packageJsonPath, packageJson);
 
@@ -192,9 +218,14 @@ export async function updateWarlockPackages(
   try {
     await installDependencies();
   } catch (error) {
+    await writeFile(packageJsonPath, originalPackageJson);
+
+    if (originalLockfile !== undefined) await writeFile(lockfilePath, originalLockfile);
+
     console.log(
-      `${colors.red("✖")} The install failed. package.json is already updated — ` +
-        `re-run ${getInstallCommand(await detectPackageManager())} to finish.`,
+      `${colors.red("✖")} The install failed. package.json${originalLockfile === undefined ? "" : " and package-lock.json"} ` +
+        `${originalLockfile === undefined ? "was" : "were"} put back as they were. ` +
+        `To apply the new versions anyway, run warlock update --no-install and then ${getInstallCommand(await detectPackageManager())}.`,
     );
     return { outcome: "install-failed", updates, error: error as Error };
   }

@@ -47,6 +47,7 @@ export const kimiAdapter: CliAdapter = {
   title: "Kimi Code",
   command: "kimi",
   apiKeyEnv: ["KIMI_MODEL_API_KEY"],
+  passEnv: ["KIMI_MODEL_NAME", "KIMI_MODEL_PROVIDER_TYPE", "KIMI_MODEL_BASE_URL"],
   homeEnv: ["KIMI_CODE_HOME"],
   transports: ["argv"],
   effort: false,

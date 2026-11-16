@@ -46,6 +46,7 @@ describe.each(["postgres", "mongodb"] as const)("lean read mode (%s builder)", (
 
     if (driverName === "postgres") {
       driver.dialect = new PostgresDialect();
+      driver.withColumnTypes = (_result: unknown, hydrate: () => unknown) => hydrate();
       driver.query = vi.fn(async () => ({ rows: await rawRows(), rowCount: 2 }));
       driver.queryBuilder = (table: string) => new PostgresQueryBuilder(table, dataSource);
     } else {

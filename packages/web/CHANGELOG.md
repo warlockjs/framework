@@ -2,6 +2,54 @@
 
 All notable changes to `@warlock.js/web` are documented here.
 
+## 5.54.0 - 2026-11-16
+
+### Upgrading
+
+- A client navigation no longer renders the page on the server. A loader, guard or validation failure still answers with its status and error record, but a component that throws while rendering is now found by the browser: the nearest error boundary shows it and it is reported through `web.errors` and `onClientError` (with the route name) instead of from the server. Pages that never throw while rendering see no change.
+- The inline hydration payload no longer repeats the stylesheet, preload, `hreflang` alternate, hydration entry and site-key slots; the browser rebuilds them from the document's own elements, which now carry a `data-wl` attribute. Code that read those slots out of `#__WARLOCK_DATA__` should read the document's `<link>` and `<script>` elements instead.
+- A page that suspends outside every `<Suspense>` boundary and stays pending for more than 30 seconds (90 seconds under `warlock dev`) now answers the error page with status 504. Raise or disable the bound with `web.shellTimeout`.
+- A generated client registry now exposes the error and forbidden pages as `loadErrorPage` and `loadForbiddenPage` loaders on each route's composition, in place of the `ErrorPage` and `ForbiddenPage` modules. Hand-written registries that still pass the modules keep working.
+- The JSON body for a request that matches no route gains `code: "route_not_found"` and `requestId`, and its `error` text is now translated: an app that defines `web.errors.routeNotFound` gets its own text, and an Arabic request gets the built-in Arabic text instead of "Route not found". English requests read as before. Clients that compared `error` with "Route not found" should switch on `code`.
+- Inputs built with `@mongez/react-form` 4.1 inside a `<Form>` get the default id `<formId>-<name>` instead of `input-<name>`. Update CSS selectors, tests or anchors that used `#input-<name>`, or pass an explicit `id`. A nameless control gets an id derived from React's `useId()`, which matches between the server render and hydration. A `@mongez/react-form` `<Form>` now renders `method="post"` unless you pass a `method`.
+
+### Added
+
+- `web.shellTimeout` bounds how long a document shell may wait to become ready (default 30000 ms, 90000 in development, `0` turns it off). A shell that is not ready in time is aborted and the request gets `error.page.tsx` with status 504.
+- `web.earlyHints` (off by default) sends a `103 Early Hints` response with `Link` preloads for the hydration entry, its module preloads and the page's stylesheets before the loaders run, so the browser starts fetching them while the server works. Clients and runtimes that cannot receive an interim response get none.
+- A page can declare multipart uploads with `config.uploads: true` or `config.uploads: { maxTotalSize: 10 * 1024 * 1024 }` (a literal, read at build time). It marks the page's POST route, so page actions that take a file work with `http.multipart.routes: "declared"` in development and in production. In a multi-site app all sites share one POST route, so one page's declaration opens it to multipart bodies for every site. `PageUploadsOption` is exported.
+- `web.sites.<key>.robots` (and `robots` on a `resolveHost` result) gives a site its own `/robots.txt` policy, merged over `web.robots` key by key (`groups` and `extra` are replaced whole). A site without `robots` gets the global policy, a merged `enabled: false` answers 404, and a site can enable robots while the global policy is off.
+- `web.resolveCache.negativeTtl` sets how many seconds a host the resolver answered `null` for is remembered (default: `ttl`; `0` never remembers it), so a tenant host added at runtime starts resolving sooner.
+- Page-cache HITs carry a weak `ETag` and answer `304` to a matching `If-None-Match`. With `http.compression` on, entries are compressed once when stored (gzip, and brotli unless disabled) and a HIT sends the stored form the request accepts, with `Vary: Accept-Encoding`, instead of compressing on every response. Entries stored by an earlier version keep working and are served as before.
+- Requests that match no route and do not ask for a document are answered with `{ error, code: "route_not_found", path, method, requestId }` from one helper, in single-site and multi-site mode. `error` is the message from `request.t("web.errors.routeNotFound")`, with built-in English and Arabic text when the app does not define the key.
+- The production translation delivery reuses a route's pruned dictionary per locale until the translations revision of `@warlock.js/core` changes, instead of pruning the dictionaries on every request.
+- A page's `config.uploads` accepts `maxFileSize` and `maxFiles` beside `maxTotalSize`; in multi-site apps the shared POST route keeps each limit only when every page sets it, at the largest value.
+- Refusal pages (403 and the like) render inside the site's root and the layout beside it in the web root, falling back to the framework document when they fail to load.
+
+### Changed
+
+- The error and forbidden pages are separate lazy chunks in the browser. A route's bundle no longer carries them; hydration loads one only when the payload carries an error page, and a client error boundary loads it when it first shows a failure.
+- The inline hydration payload is smaller: stylesheet and preload URLs, `hreflang` alternates, the hydration entry URL and the site key are no longer written a second time.
+- A core-level refusal page (a dot-segment path, a malformed URL) receives the request id as `error.errorCode` in production (in development it is `debug.requestId`), so the site's page can show it.
+- The stored JSON variant of a cached page is serialised once through `serializeHydrationPayload`, instead of building and checking the payload twice.
+- The development server's host-refusal 403 now names `web.devAllowedHosts` instead of the bundler's `server.allowedHosts`.
+- Raised the `@mongez` dependency ranges to the 2026-11-16 releases (localization 3.6.0, react-form 4.1.0, http 3.5.2).
+
+### Fixed
+
+- A page that sets `robots: "noindex"`, and the not-found page, no longer emit `<link rel="alternate" hreflang>` tags. Under prefix locale routing, `/en/missing` used to answer 404 with a `noindex` meta tag and alternates pointing at URLs that do not exist.
+- The page for a core-level refusal now answers in the locale named by the URL prefix (`/ar/...` renders in `ar`) and renders inside the site's root and layouts when they load, falling back to the framework document when they do not.
+- A failure page for a `cache` route now sends the same `Vary` value as the page (`Cookie`, `locale` and `cache.varyHeaders` included) instead of the older shorter one.
+- `config.translations` is accepted in the `config` of a page, a layout and the root. Before, discovery failed with ``config key `translations` is not allowed in a page module`` although the type, the docs and the build analyzer supported it.
+- A refusal page that fails after it began writing no longer sends a second reply through the framework fallback.
+- Production page translations computed per route and locale are refreshed after a translation registration made once the server is running.
+
+### Documentation
+
+- Documented `web.shellTimeout`, `web.earlyHints` (including proxy support), the data request behaviour, lazy error pages, what a refusal page receives, the `noindex` and `hreflang` rule and the inline payload's contents, in the loaders, special pages, client navigation, page caching and development guides, and in the `create-a-page`, `navigate-on-the-client`, `set-page-metadata` and `localize-pages` skills.
+- Page actions: declaring `uploads`. Page caching: revalidation, stored encodings, and the CDN rule for a cache keyed on `Host` with a forwarded `X-Forwarded-Host`. Multiple sites: `negativeTtl`, per-site `robots`, and the dev host-refusal text. Sitemap and robots.txt: per-site policy and the `gzip` default. Layouts and special pages: the unmatched-route JSON body. Localization: where `translations` may be declared. The `handle-a-form-action`, `create-a-page`, `multi-site`, `generate-sitemap` and `localize-pages` skills carry the same.
+- The layouts page describes the default form control ids and the native `method="post"` default.
+
 ## 5.53.0 - 2026-11-11
 
 ### Upgrading

@@ -6,8 +6,7 @@ import type {
 } from "../contracts/database-remover.contract";
 import type { OnDeletedEventContext } from "../events/model-events";
 import type { ChildModel, Model } from "../model/model";
-import { enqueueSyncFanout } from "../sync/sync-fanout";
-import { triggerModelEvent } from "../sync/model-events";
+import { enqueueModelEventFanout } from "../sync/sync-fanout";
 import { afterCommit } from "../transactions/after-commit";
 import type { DataSource } from "./../data-source/data-source";
 
@@ -285,10 +284,11 @@ export class DatabaseRemover implements RemoverContract {
    * @private
    */
   private triggerSync(): void {
-    enqueueSyncFanout({
-      sourceModel: this.ctor.name,
+    enqueueModelEventFanout({
       operation: "delete",
-      execute: () => triggerModelEvent(this.ctor, "deleted", this.model),
+      modelClass: this.ctor,
+      eventType: "deleted",
+      model: this.model,
     });
   }
 }

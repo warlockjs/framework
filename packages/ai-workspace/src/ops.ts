@@ -116,8 +116,38 @@ const GREP_STEPS_PER_CHARACTER = 64;
  */
 const GREP_STEPS_PER_SLICE = 2_000_000;
 
-/** Most states a compiled `grep` pattern may have (bounded repeats expand). */
-const MAX_GREP_PATTERN_STATES = 4000;
+/**
+ * Most states a compiled `grep` pattern may have (bounded repeats expand).
+ * A line is scanned in one synchronous slice of at most `states × characters`
+ * steps, so the cap together with {@link MAX_GREP_LINE_SCAN_LENGTH} bounds
+ * how long one line can hold the event loop.
+ */
+const MAX_GREP_PATTERN_STATES = 1000;
+
+/**
+ * Estimated glob-matching work (glob length × path length) after which the
+ * walk yields to the event loop. Keeps a long wildcard glob over many long
+ * names from running as one synchronous block.
+ */
+const GLOB_WORK_PER_SLICE = 500_000;
+
+/** Tracks glob-matching work and yields to the event loop once a slice is used up. */
+function createGlobPacer(
+  glob: string,
+  signal: AbortSignal | undefined,
+): (path: string) => Promise<void> {
+  let work = 0;
+
+  return async (relativePath) => {
+    work += (glob.length + 1) * (relativePath.length + 1);
+
+    if (work > GLOB_WORK_PER_SLICE) {
+      work = 0;
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      signal?.throwIfAborted();
+    }
+  };
+}
 
 /** One ask as the refusal shows it: the command, plus the variable an `"assignment"` ask is about. */
 function describeAsk(ask: WorkspaceShellAsk): string {
@@ -1079,9 +1109,14 @@ class Ops implements WorkspaceOps {
         : await this.searchFiles(jailRoot, opts?.glob, opts?.signal, within);
     const files = walked.files.sort();
     const candidates: { absFile: string; relativePath: string }[] = [];
+    const pace = createGlobPacer(opts?.glob ?? "", opts?.signal);
 
     for (const absFile of files) {
       const relativePath = path.relative(jailRoot, absFile).split(path.sep).join("/");
+
+      if (globMatcher) {
+        await pace(relativePath);
+      }
 
       if (globMatcher && !globMatcher.test(relativePath)) {
         continue;
@@ -1248,9 +1283,12 @@ class Ops implements WorkspaceOps {
     const matcher = compileGlob(pattern);
     const walked = await this.searchFiles(jailRoot, pattern, signal);
     const matched: string[] = [];
+    const pace = createGlobPacer(pattern, signal);
 
     for (const absFile of walked.files) {
       const relativePath = path.relative(jailRoot, absFile).split(path.sep).join("/");
+
+      await pace(relativePath);
 
       if (this.isDenied(relativePath)) {
         continue;

@@ -7,6 +7,13 @@ const getJsonFileAsync = vi.fn();
 const putJsonFileAsync = vi.fn(async () => undefined);
 const fetchLatestVersion = vi.fn();
 const execSync = vi.fn();
+const readFile = vi.fn(async () => "{}");
+const writeFile = vi.fn(async () => undefined);
+
+vi.mock("node:fs/promises", () => ({
+  readFile: (...args: unknown[]) => readFile(...(args as [])),
+  writeFile: (...args: unknown[]) => writeFile(...(args as [])),
+}));
 
 vi.mock("@warlock.js/fs", () => ({
   fileExistsAsync: (...args: unknown[]) => fileExistsAsync(...(args as [])),
@@ -130,8 +137,9 @@ describe("updateWarlockPackages", () => {
 
     expect(result.outcome).toBe("install-failed");
     expect(result.error?.message).toContain("npm ERR!");
-    // The rewritten package.json is kept — the developer only has to re-install.
+    // The original package.json is put back, so the project is left as it was.
     expect(putJsonFileAsync).toHaveBeenCalledOnce();
+    expect(writeFile).toHaveBeenCalledWith("/project/package.json", "{}");
   });
 
   describe("dry run", () => {

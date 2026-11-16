@@ -66,6 +66,16 @@ A per-file limit above 25 MB also needs a larger total cap (`http.multipart.maxT
 
 This is a Fastify plugin limit — the multipart parser rejects bodies that exceed it before the request ever hits a controller. Set it generously above your largest expected file, then validate stricter limits in the schema per-field.
 
+### Spooling large files to disk (5.54)
+
+Every file part is held in memory by default. Set `http.multipart.memoryLimit` (for example `2 * 1024 * 1024`) and a part that grows past it is streamed to a temporary file under the OS temp directory, which lowers peak memory under concurrent uploads:
+
+```ts title="src/config/http.ts"
+multipart: { memoryLimit: 2 * 1024 * 1024 },
+```
+
+`UploadedFile` works the same either way. `size()` and `detectedMimeType()` read the file's size and first bytes without loading it, `buffer()` reads it back on demand, and `save()` streams a spooled file to storage (`storage.putStream`) unless an image transform is queued. The temporary file is deleted when the response closes. To hand an upload to a queued job, call `file.keep()` first: the copy then stays until `file.discard()` or until the process exits, so save the file to storage for anything longer-lived.
+
 ### Total size per request (5.53)
 
 `http.multipart.maxTotalSize` (default **25 MB**) caps all parts of one request together, files and fields. The bytes are counted as they arrive, so a request is answered **413** (`code: "EC108"`) as soon as it passes the cap, and a declared `Content-Length` above it is refused before a single byte is read. A route that takes bigger uploads raises the cap for itself with `uploads.maxTotalSize`:
@@ -78,11 +88,17 @@ multipart: { maxTotalSize: 25 * 1024 * 1024 },
 router.post("/videos", uploadVideo, { uploads: { maxTotalSize: 500 * 1024 * 1024 } });
 ```
 
+A route can also cap one file and the file count for itself with `uploads.maxFileSize` and `uploads.maxFiles`. They are enforced by Warlock.js while the parts stream in, so they apply under `warlock dev`, the test server and a production build alike, and a request over either limit is answered **413** (`code: "EC108"`). They can only be stricter than the global parser limits (`http.fileUploadLimit` for a file, `http.multipart.files` for the count); raise those to allow more on a route.
+
+```ts
+router.post("/avatars", uploadAvatar, { uploads: { maxFileSize: 2 * 1024 * 1024, maxFiles: 1 } });
+```
+
 Files are held in memory until the handler saves them, so keep these caps close to what your routes really need.
 
 ### Accepting uploads only on routes that take them (5.53)
 
-Multipart bodies are parsed before route middleware runs, auth included. By default (`http.multipart.routes: "all"`) every route parses them, and a production boot logs a warning while the option is unset. Set it to `"declared"` and mark the routes that take files with `uploads`: every other route answers **415** (`code: "EC109"`) without reading the body.
+Multipart bodies are parsed before route middleware runs, auth included. By default (`http.multipart.routes: "all"`) every route parses them, and a production boot logs a warning while the option is unset. The default changes to `"declared"` in 6.0. Set it to `"declared"` now and mark the routes that take files with `uploads`: every other route answers **415** (`code: "EC109"`) without reading the body.
 
 ```ts title="src/config/http.ts"
 multipart: { routes: "declared" },
@@ -188,6 +204,8 @@ The `UploadedFile` surface is split into properties, type-checks, transforms, an
 | `await file.detectedMimeType()` | `Promise<string \| undefined>` | the type the bytes show (see below)         |
 
 `mimeType`, `extension` and the `is*` checks come from what the client declared, and a client can declare anything. `detectedMimeType()` reads the file's first bytes instead and returns the type they show: raster images (jpeg, png, webp, gif, avif, heic/heif, bmp, tiff, ico), `image/svg+xml`, `application/pdf`, `text/html` or `application/xml`, or `undefined` for anything else. Use it to decide what a file really is.
+
+**Cloud disks.** An object stored under a markup type or a `.svg`, `.html`, `.xml` or script extension also gets `Content-Disposition: attachment` by default, so a public bucket URL downloads it even where a client would render the type. Pass `contentDisposition` in the put options to choose another value.
 
 **Stored content type.** `save()` stores the type the bytes show for raster images, and stores markup (svg, html, xml, script) as `application/octet-stream`, whether the bytes or the client declared it, so a bucket or CDN serving the object makes the browser download it instead of rendering it on your domain. Other files keep the declared type. Set `uploads.trustClientContentType: true` to store the declared type as-is (only when every upload comes from a trusted source).
 
@@ -389,7 +407,8 @@ v.file().image(); // must be a raster image, judged by its bytes
 v.file().image({ svg: true }); // svg allowed too
 v.file().accept(["jpg", "png"]); // allowed extensions
 v.file().mimeType("application/pdf"); // single MIME
-v.file().mimeType(["image/png", "image/jpeg"]); // many MIMEs
+v.file().mimeType(["image/png", "image/jpeg"]); // many MIMEs; the message lists them
+v.file().mimeType("application/pdf", "docs.mustBePdf"); // a translation key is translated for the request locale
 v.file().pdf(); // shortcut for application/pdf
 v.file().excel(); // .xls + .xlsx
 v.file().word(); // .doc + .docx

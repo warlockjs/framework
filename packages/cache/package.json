@@ -1,6 +1,6 @@
 {
   "name": "@warlock.js/cache",
-  "version": "5.53.1",
+  "version": "5.54.0",
   "type": "module",
   "description": "A Robust Cache Manager for Nodejs",
   "main": "./src/index.ts",
@@ -14,7 +14,7 @@
   },
   "dependencies": {
     "@warlock.js/fs": "workspace:^",
-    "@mongez/reinforcements": "^4.0.2",
+    "@mongez/reinforcements": "^4.1.0",
     "@warlock.js/logger": "workspace:^",
     "ms": "^2.1.3"
   },

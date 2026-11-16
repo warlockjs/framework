@@ -37,6 +37,7 @@ import {
   AgentIncompleteError,
   AgentMaxTripsError,
   AIError,
+  InvalidRequestError,
   SchemaValidationError,
   type AgentIncompleteReason,
 } from "../errors";
@@ -286,6 +287,20 @@ function resolveJudgeConfig(judge: boolean | JudgeConfig | undefined): JudgeConf
 }
 
 /**
+ * The type says `string`, but nothing stops a caller that bypasses it (an
+ * untyped request body, a cast) from handing the agent an object, which would
+ * be stringified into the prompt unseen. Refuse it with a message that names
+ * what to pass.
+ */
+function assertStringInput(input: unknown, method: "execute" | "stream"): void {
+  if (typeof input !== "string") {
+    throw new InvalidRequestError(
+      `agent.${method}() expects the input as a string, got ${input === null ? "null" : typeof input}. Pass the prompt text (use JSON.stringify for structured data).`,
+    );
+  }
+}
+
+/**
  * Creates an executable AI agent from the given configuration.
  *
  * The agent runs a bounded trip loop: each trip calls the model, dispatches
@@ -293,8 +308,10 @@ function resolveJudgeConfig(judge: boolean | JudgeConfig | undefined): JudgeConf
  * is reached. Each `execute()` / `stream()` call spawns a fresh internal
  * `Execution` instance — the factory itself holds no state across calls.
  *
- * `execute()` never throws — any error is attached to the returned result
- * under `result.error`. `stream()` surfaces errors both on the terminal
+ * `execute()` never throws for a run failure — the error is attached to the
+ * returned result under `result.error`. A non-string `input` is a programming
+ * error and is refused up front with an `InvalidRequestError` (`execute()`
+ * rejects, `stream()` throws). `stream()` surfaces errors both on the terminal
  * `error` stream event and via the `stream.result` promise.
  *
  * @example
@@ -422,6 +439,8 @@ export function agent<TOutput = unknown>(config: AgentConfig<TOutput>): AgentCon
       input: string,
       options?: AgentExecuteOptions<TOutput>,
     ): Promise<AgentResult<TOutput>> {
+      assertStringInput(input, "execute");
+
       return new Execution<TOutput>(
         resolvedConfig,
         input,
@@ -435,6 +454,8 @@ export function agent<TOutput = unknown>(config: AgentConfig<TOutput>): AgentCon
       input: string,
       options?: AgentExecuteOptions<TOutput>,
     ): StreamContract<AgentResult<TOutput>> {
+      assertStringInput(input, "stream");
+
       const { controller, stream } = createAgentStream<AgentResult<TOutput>>();
 
       const execution = new Execution<TOutput>(

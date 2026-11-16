@@ -9,7 +9,7 @@ import type { BufferedCookie } from "../execute-page-request";
 import type { ErrorPageModuleLoader } from "../error-page";
 import type { RouteTranslations } from "../route-translations";
 import { pageVaryHeader } from "../page-vary-header";
-import { renderPageFailure } from "../render-page";
+import { renderPageFailure, type FailureShell } from "../render-page";
 import { applyCommit } from "./apply-commit";
 
 /**
@@ -41,6 +41,8 @@ export async function writePageFailureResponse(options: {
   wantsData: boolean;
   /** The status to answer with; defaults to 500 (a pipeline failure). */
   status?: number;
+  /** Loads the root and layouts the failure page renders inside; see `RenderPageFailureOptions.loadShell`. */
+  loadShell?: () => Promise<FailureShell | undefined>;
   applyBufferedCookie: (response: Response, cookie: BufferedCookie) => void;
 }): Promise<void> {
   const {
@@ -58,6 +60,7 @@ export async function writePageFailureResponse(options: {
     cache,
     wantsData,
     status = 500,
+    loadShell,
     applyBufferedCookie,
   } = options;
 
@@ -75,6 +78,7 @@ export async function writePageFailureResponse(options: {
     stylesheetUrls,
     hydrationClientModuleUrl,
     status,
+    loadShell,
   });
 
   applyCommit(response, rendered, applyBufferedCookie);
@@ -88,6 +92,8 @@ export async function writePageFailureResponse(options: {
     dataRepresentation: wantsData,
     cacheOptedIn: cache !== undefined,
     deferred: false,
+    request,
+    varyHeaders: cache?.varyHeaders,
   });
 
   if (errorVaryHeader !== undefined) {

@@ -4,6 +4,17 @@ All notable changes to `@warlock.js/ai-workspace` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.54.0 - 2026-11-16
+
+### Changed
+
+- `grep` patterns may expand to at most 1000 states (was 4000), which bounds how long one line can hold the event loop. Patterns with very large bounded repeats that used to compile may now be refused as `unsafe-pattern`.
+- `glob` and `grep`'s `glob` option yield to the event loop between entries when a wildcard glob is matched over many long paths, and honour the abort signal there.
+
+### Fixed
+
+- `grep` with `ignoreCase` now matches classes like the built-in `RegExp` `i` flag for letters that share a canonical form through a third code unit (for example `µ` and `μ`).
+
 ## 5.53.1 - 2026-11-12
 
 ### Upgrading

@@ -7,8 +7,7 @@ import type {
 import type { DataSource } from "../data-source/data-source";
 import type { GlobalScopeDefinition, Model } from "../model/model";
 import type { DeleteStrategy } from "../types";
-import { enqueueSyncFanout } from "../sync/sync-fanout";
-import { triggerModelEvent } from "../sync/model-events";
+import { enqueueModelEventFanout } from "../sync/sync-fanout";
 import { DatabaseWriter } from "../writer/database-writer";
 
 /**
@@ -680,16 +679,12 @@ export class DatabaseRestorer implements RestorerContract {
    * @private
    */
   private triggerSync(model: Model): void {
-    enqueueSyncFanout({
-      sourceModel: this.ctor.name,
+    enqueueModelEventFanout({
       operation: "restore",
-      execute: () =>
-        triggerModelEvent(
-          this.ctor as any,
-          "updated",
-          model,
-          Object.keys(model.data as Record<string, unknown>),
-        ),
+      modelClass: this.ctor as any,
+      eventType: "updated",
+      model,
+      args: [Object.keys(model.data as Record<string, unknown>)],
     });
   }
 }

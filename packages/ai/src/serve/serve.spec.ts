@@ -485,5 +485,6 @@ describe("serve: access control", () => {
     serve(mockAgent);
     expect(warn).toHaveBeenCalledTimes(1);
     expect(String(warn.mock.calls[0]?.[2])).toContain("authToken");
+    expect(String(warn.mock.calls[0]?.[2])).toContain("6.0");
   });
 });

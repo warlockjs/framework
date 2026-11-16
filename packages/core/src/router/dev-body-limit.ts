@@ -159,6 +159,9 @@ const UNSUPPORTED_DEV_SERVER_OPTIONS = [
   "onTimeout",
   "onRequestAbort",
   "handler",
+  // Fastify plugins read it per request from the route they matched (for
+  // example a per-route `multipartOptions`); the wildcard carries none of it.
+  "config",
 ] as const;
 
 /**
@@ -167,11 +170,27 @@ const UNSUPPORTED_DEV_SERVER_OPTIONS = [
  * dev/production difference is visible at boot instead of found in production.
  */
 export function describeUnsupportedServerOptions(
-  routes: readonly Pick<Route, "method" | "path" | "serverOptions">[],
+  routes: readonly Pick<Route, "method" | "path" | "serverOptions" | "compileResponseSchema">[],
+  settings: { compileResponseSchemas?: boolean } = {},
 ): { key: string; message: string }[] {
   const found: { key: string; message: string }[] = [];
 
+  if (settings.compileResponseSchemas === true) {
+    found.push({
+      key: "http.compileResponseSchemas",
+      message:
+        "http.compileResponseSchemas is set, but the dev server does not apply compiled response schemas (responses are not stripped or serialized by them); a production build does.",
+    });
+  }
+
   for (const route of routes) {
+    if (route.compileResponseSchema === true) {
+      found.push({
+        key: `${route.method} ${route.path} compileResponseSchema`,
+        message: `${route.method.toUpperCase()} ${route.path}: compileResponseSchema is not applied by the dev server (it is applied in a production build).`,
+      });
+    }
+
     const options = route.serverOptions as Record<string, unknown> | undefined;
 
     if (!options) continue;

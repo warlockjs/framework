@@ -98,6 +98,56 @@ describe("registerRobotsRoute", () => {
     );
   });
 
+  it("serves each site its own robots policy over the global one", async () => {
+    config.set("web", {
+      sites: {
+        landing: { hosts: ["landing.test"] },
+        admin: {
+          hosts: ["admin.test"],
+          robots: { groups: [{ userAgent: "*", disallow: ["/admin"] }] },
+        },
+        hidden: { hosts: ["hidden.test"], robots: { enabled: false } },
+      },
+      robots: { enabled: true, groups: [{ userAgent: "*", allow: ["/"] }] },
+    });
+
+    const { router, routes } = capturingRouter();
+    registerRobotsRoute(router, { publicDir: publicDir() });
+
+    const ask = async (host: string) => {
+      const response = { text: vi.fn(), notFound: vi.fn() };
+
+      await routes.get("/robots.txt")!({
+        request: {
+          protocol: "https",
+          path: "/robots.txt",
+          header: () => host,
+          baseRequest: { hostname: host },
+        } as never,
+        response: response as never,
+      });
+
+      return response;
+    };
+
+    expect((await ask("landing.test")).text).toHaveBeenCalledWith("User-agent: *\nAllow: /\n");
+    expect((await ask("admin.test")).text).toHaveBeenCalledWith(
+      "User-agent: *\nDisallow: /admin\n",
+    );
+    expect((await ask("hidden.test")).notFound).toHaveBeenCalled();
+  });
+
+  it("registers the route when only a site enables robots", () => {
+    config.set("web", {
+      sites: { landing: { hosts: ["landing.test"], robots: { enabled: true } } },
+    });
+    const { router, routes } = capturingRouter();
+
+    registerRobotsRoute(router, { publicDir: publicDir() });
+
+    expect(routes.has("/robots.txt")).toBe(true);
+  });
+
   it("disallows non-indexable dynamic sites without exposing a sitemap", async () => {
     config.set("web", {
       sites: { tenant: { dynamic: true } },

@@ -74,6 +74,22 @@ describe("runRegistrationChild", () => {
     expect(fork).toHaveBeenCalledWith("custom-child.mjs", { cwd: "C:/app" });
   });
 
+  it("streams the child's output live when streamOutput is on", async () => {
+    const out = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    const err = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    const child = new FakeChild();
+    const result = run(child, { streamOutput: true });
+
+    child.stdout.emit("data", Buffer.from("loading users"));
+    child.stderr.emit("data", Buffer.from("slow module"));
+    child.emit("message", { type: RESULT, payload: "ok" });
+    child.emit("close", 0);
+
+    await expect(result).resolves.toEqual({ value: "ok" });
+    expect(out).toHaveBeenCalledWith(Buffer.from("loading users"));
+    expect(err).toHaveBeenCalledWith(Buffer.from("slow module"));
+  });
+
   it("rejects a result the caller refuses and cleans up its child", async () => {
     const child = new FakeChild();
     const result = run(child);

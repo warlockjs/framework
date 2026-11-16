@@ -29,6 +29,7 @@
  */
 import { stringify } from "devalue";
 import type { HydrationDocumentPayloadSource } from "../components/document-context";
+import { INLINE_PAYLOAD_OMITTED_DOCUMENT_SLOTS } from "../components/document-slot-marker";
 import type { NamedApiRouteMetadata } from "../routing/named-api-routes";
 import type { PagePayloadBudget } from "./page-manifest";
 
@@ -129,7 +130,10 @@ export function measureDocumentPayload(
     if (!SECTION_KEYS.has(key)) other[key] = value;
   }
   if (isPlainRecord(other.document)) {
-    other.document = withoutKey(withoutKey(other.document, "namedApiRoutes"), "localeRouting");
+    other.document = INLINE_PAYLOAD_OMITTED_DOCUMENT_SLOTS.reduce<Record<string, unknown>>(
+      (document, key) => withoutKey(document, key),
+      other.document,
+    );
   }
   sections.other = serializedBytes(other);
 

@@ -53,6 +53,7 @@ export const mistralVibeAdapter: CliAdapter = {
   title: "Mistral Vibe",
   command: "vibe",
   apiKeyEnv: ["MISTRAL_API_KEY"],
+  passEnv: [],
   homeEnv: ["VIBE_HOME"],
   transports: ["argv", "file", "stdin"],
   effort: false,

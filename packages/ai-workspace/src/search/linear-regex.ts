@@ -133,26 +133,36 @@ function canonicalize(code: number): number {
   return result;
 }
 
-/** The code units that fold to the same canonical form as `code` and may sit in a class. */
-function caseVariants(code: number): number[] {
-  const canonical = canonicalize(code);
-  const variants = [code];
+let caseGroups: Map<number, number[]> | undefined;
 
-  if (canonical !== code) {
-    variants.push(canonical);
-  }
+/** Every code unit, grouped by canonical form. Built once, on the first ignore-case class. */
+function canonicalGroups(): Map<number, number[]> {
+  if (caseGroups === undefined) {
+    caseGroups = new Map();
 
-  const lower = String.fromCharCode(code).toLowerCase();
+    for (let code = 0; code <= 0xffff; code++) {
+      const canonical = canonicalize(code);
+      const group = caseGroups.get(canonical);
 
-  if (lower.length === 1) {
-    const lowerCode = lower.charCodeAt(0);
-
-    if (lowerCode !== code && canonicalize(lowerCode) === canonical) {
-      variants.push(lowerCode);
+      if (group === undefined) {
+        caseGroups.set(canonical, [code]);
+      } else {
+        group.push(code);
+      }
     }
   }
 
-  return variants;
+  return caseGroups;
+}
+
+/**
+ * Every code unit that folds to the same canonical form as `code` (itself
+ * included). A class matches when any of them is a member, which is how the
+ * built-in `RegExp` with the `i` flag decides, so letters that share a
+ * canonical form through a third code unit (`µ` and `μ`) match too.
+ */
+function caseVariants(code: number): number[] {
+  return canonicalGroups().get(canonicalize(code)) ?? [code];
 }
 
 // ============================================================

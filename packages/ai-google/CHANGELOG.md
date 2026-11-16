@@ -4,6 +4,16 @@ All notable changes to `@warlock.js/ai-google` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.54.0 - 2026-11-16
+
+### Upgrading
+
+- A call cancelled through its own `signal` now fails with a `ProviderAbortError` (category `cancelled`, never retried) instead of a `ProviderTimeoutError`. Code that caught `ProviderTimeoutError` to notice a user's cancel should catch `ProviderAbortError` (or check `category === "cancelled"`). An abort the caller did not ask for, such as the SDK's own `httpOptions.timeout`, stays a `ProviderTimeoutError`, as do `504`, `DEADLINE_EXCEEDED` and `ETIMEDOUT`; a `TimeoutError` (from `AbortSignal.timeout()`) is now one too instead of a plain `ProviderError`.
+
+### Fixed
+
+- A spent quota or billing allowance ("check your plan and billing details") is raised as a `QuotaExceededError`, which is not retried, instead of a rate limit. Per-minute and per-day request limits stay `ProviderRateLimitError`.
+
 ## 5.47.0 - 2026-11-06
 
 ### Added

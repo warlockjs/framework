@@ -1,4 +1,4 @@
-import { timingSafeEqual } from "node:crypto";
+import { createHash, timingSafeEqual } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { EvaluateConfig } from "../evaluate/evaluate.type";
 import { evaluateSystemPrompt } from "../evaluate/evaluate-system-prompt";
@@ -115,7 +115,10 @@ function isAuthorized(
  *
  * - `GET api/traces`        → the newest `?limit=` (default 200) matches of
  *   `store.query(parseQuery(searchParams))`, as {@link TraceSummary}
- *   entries (no span tree or captured content); `?full=1` returns full traces
+ *   entries (no span tree or captured content); `?full=1` returns full traces.
+ *   The response carries an `ETag`; a request whose `If-None-Match` matches it
+ *   answers `304` without a body, so the dashboard's poll costs nothing while
+ *   nothing changed
  * - `GET api/traces/:id`    → `store.get(id)` or `404` (`400` for a malformed id)
  * - `GET api/aggregate`     → `store.aggregate(parseQuery(searchParams))`
  * - `GET {basePath}`        → the self-contained HTML page
@@ -205,7 +208,7 @@ export function createRequestHandler(
       const { limit, full } = parseListOptions(url.searchParams);
       const traces = store.query(parseQuery(url.searchParams)).slice(0, limit);
 
-      sendJson(res, 200, full ? traces : traces.map(toTraceSummary));
+      sendJsonWithEtag(req, res, full ? traces : traces.map(toTraceSummary));
 
       return;
     }
@@ -289,6 +292,34 @@ function sendJson(res: ServerResponse, status: number, body: unknown): void {
     ...SECURITY_HEADERS,
   });
   res.end(JSON.stringify(body));
+}
+
+/**
+ * Write a JSON response with a weak `ETag` over its body. A request whose
+ * `If-None-Match` lists that tag gets `304` with no body.
+ */
+function sendJsonWithEtag(req: IncomingMessage, res: ServerResponse, body: unknown): void {
+  const json = JSON.stringify(body);
+  const etag = `W/"${createHash("sha1").update(json).digest("base64url")}"`;
+  const header = req.headers["if-none-match"];
+  const candidates = (Array.isArray(header) ? header.join(",") : (header ?? ""))
+    .split(",")
+    .map((value) => value.trim().replace(/^W\//, ""));
+
+  if (candidates.includes("*") || candidates.includes(etag.slice(2))) {
+    res.writeHead(304, { etag, "cache-control": "no-cache", ...SECURITY_HEADERS });
+    res.end();
+
+    return;
+  }
+
+  res.writeHead(200, {
+    "content-type": "application/json; charset=utf-8",
+    etag,
+    "cache-control": "no-cache",
+    ...SECURITY_HEADERS,
+  });
+  res.end(json);
 }
 
 /**

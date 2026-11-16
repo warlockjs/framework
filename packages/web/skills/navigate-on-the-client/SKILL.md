@@ -5,7 +5,7 @@ description: 'Navigate hydrated pages with `<Link>`, resolve named URLs with `hr
 
 # Warlock — navigate on the client
 
-`<Link>` renders a real anchor for progressive enhancement and intercepts a plain in-app click after hydration. The server remains the only route matcher; client navigation fetches the page-data representation of the URL and swaps the Layout + Page tree.
+`<Link>` renders a real anchor for progressive enhancement and intercepts a plain in-app click after hydration. The server remains the only route matcher; client navigation fetches the page-data representation of the URL and swaps the Layout + Page tree. The server runs the middleware and loaders for that request but does not render the page: a loader, guard or validation failure still answers with its status and error record, while a component that throws while rendering is shown by the nearest client error boundary and reported by the client (`web.errors`, `onClientError`). The app's `error.page.tsx` and `forbidden.page.tsx` load as lazy chunks, only when a failure needs them.
 
 Every behaviour on this page depends on hydration having mounted. See the `write-the-root` topic (section "`#vessel` is the hydration boundary").
 

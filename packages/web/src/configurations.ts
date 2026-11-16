@@ -51,6 +51,20 @@ export type WebConfigurations = {
    */
   loaderTimeout?: number;
   /**
+   * Milliseconds a document shell may wait to become ready; `0` disables the bound. A shell
+   * that suspends outside every `<Suspense>` (a pending `use()`, a lazy component that never
+   * loads) waits instead of failing; once the bound passes, the render is aborted and the page
+   * answers with the error page and status 504. Defaults to 30000 (90000 in development).
+   */
+  shellTimeout?: number;
+  /**
+   * Opt-in 103 Early Hints: send the hydration entry, its module preloads and the page's
+   * stylesheets as `Link` preloads before the loaders run, so the browser starts fetching
+   * them while the server still works. `false` (default) sends none. Needs HTTP/2 or
+   * HTTP/1.1 clients and proxies that pass interim responses through; see the performance docs.
+   */
+  earlyHints?: boolean;
+  /**
    * How the app, layout and page loaders start. `"serial"` (default) starts each
    * level after the one above it settled. `"parallel"` starts them together and
    * settles them in the same order: the first level that throws or ends the

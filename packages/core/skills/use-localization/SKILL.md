@@ -14,6 +14,8 @@ Both pivot on **the request's locale** — auto-detected from headers / query st
 
 ## The shape
 
+Core keeps a translations revision that web's production page delivery reads to refresh its memoised dictionaries. `groupedTranslations`, `extend` and `setTranslationsList` move it whether they are imported from `@warlock.js/core` or `@mongez/localization` (core listens to the library's `translations` change event); call `bumpTranslationsRevision()` only for changes the library cannot report; `getTranslationsRevision()` reads the current number.
+
 ```ts
 // 1. Declare keys (auto-loaded from src/app/<module>/utils/locales.json)
 import { groupedTranslations } from "@mongez/localization";
@@ -169,10 +171,11 @@ Use when you want a value in a specific locale — e.g. sending a notification t
 
 The framework reads the locale from the incoming request in this order:
 
-1. **`translation-locale-code` header** (first priority).
-2. **`locale` header**.
-3. **`locale` query string param**.
-4. **Default** — `config.key("app.localeCode")` falling back to `"en"`.
+1. **`locale` query string param**.
+2. **`warlock.locale-preference` cookie** (only when its value is in `app.localeCodes`).
+3. **`locale` header** (outranks the `locale` cookie).
+4. **`locale` cookie**.
+5. **Default** — `config.key("app.localeCode")` falling back to `"en"`. A value outside a declared `app.localeCodes` counts as absent.
 
 ```ts
 const locale = request.getLocaleCode();

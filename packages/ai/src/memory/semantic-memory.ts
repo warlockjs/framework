@@ -91,7 +91,12 @@ export class SemanticMemory {
     // scopes and starve this one. Pull extra candidates, filter, then cap;
     // when foreign entries still fill the page, widen it.
     const hits = await similarWithin(
-      (topK) => this.store.similar<StoredMemory>(vector, { topK, threshold }),
+      (topK, accept) =>
+        this.store.similar<StoredMemory>(vector, {
+          topK,
+          threshold,
+          filter: (hit) => accept({ ...hit, score: 1 }),
+        }),
       (hit: CacheSimilarHit<StoredMemory>) =>
         hit.key.startsWith(prefix) && hit.value?.scope === scope,
       { topK: scope === undefined ? k : Math.max(k * RECALL_OVERSCAN, k), want: k },

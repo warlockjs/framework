@@ -16,6 +16,30 @@ export function resolveRobotsConfig(): RobotsConfig {
 }
 
 /**
+ * The policy for one request in multi-site mode: `web.robots`, then the
+ * selected site's `robots`, then the resolver's `robots` for a dynamic host.
+ * Keys that are `undefined` never override.
+ */
+export function resolveSiteRobotsConfig(
+  base: RobotsConfig,
+  ...overrides: readonly (Partial<RobotsConfig> | undefined)[]
+): RobotsConfig {
+  let merged = base;
+
+  for (const override of overrides) {
+    if (override === undefined) continue;
+
+    const defined = Object.fromEntries(
+      Object.entries(override).filter(([, value]) => value !== undefined),
+    );
+
+    merged = { ...merged, ...defined };
+  }
+
+  return merged;
+}
+
+/**
  * The absolute URL the `Sitemap:` line should point at, or `undefined` when
  * there is nothing to point at — `web.sitemap.enabled` is `false`, or the
  * sitemap has no origin configured. Never throws: an app that has not wired

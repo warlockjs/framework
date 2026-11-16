@@ -35,6 +35,21 @@ class MemorySnapshotStore<TSnapshot extends { runId: string }> implements Snapsh
   }
 
   /**
+   * Set the `pending` field of the stored snapshot; `false` when none is stored.
+   */
+  public async markPending(runId: string, pending: unknown): Promise<boolean> {
+    const existing = this.snapshots.get(runId);
+
+    if (!existing) {
+      return false;
+    }
+
+    this.snapshots.set(runId, { ...existing, pending });
+
+    return true;
+  }
+
+  /**
    * Drop the snapshot for a `runId`.
    */
   public async delete(runId: string): Promise<void> {

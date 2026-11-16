@@ -48,6 +48,7 @@ export const opencodeAdapter: CliAdapter = {
   title: "OpenCode",
   command: "opencode",
   apiKeyEnv: [],
+  passEnv: ["ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GEMINI_API_KEY", "OPENROUTER_API_KEY"],
   homeEnv: ["XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME", "XDG_CACHE_HOME"],
   transports: ["argv", "stdin"],
   effort: true,

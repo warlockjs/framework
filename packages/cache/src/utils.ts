@@ -247,6 +247,25 @@ export function resolveTtl(
 }
 
 /**
+ * Spread a relative TTL by up to `jitterPercent` percent either way. An
+ * absolute deadline (`expiresAt`), an infinite or zero TTL, and a missing or
+ * non-positive percentage leave the TTL as it is. The result is at least 1.
+ */
+export function applyTtlJitter(
+  ttl: number,
+  jitterPercent: number | undefined,
+  expiresAt?: number | Date,
+): number {
+  if (!jitterPercent || jitterPercent <= 0 || expiresAt !== undefined) return ttl;
+  if (!Number.isFinite(ttl) || ttl <= 0) return ttl;
+
+  const spread = Math.min(jitterPercent, 100) / 100;
+  const factor = 1 + (Math.random() * 2 - 1) * spread;
+
+  return Math.max(1, Math.round(ttl * factor));
+}
+
+/**
  * Combine any number of tag lists into a single deduped array, dropping
  * `undefined`/empty entries. Returns `undefined` when no tags survive — lets
  * callers skip emitting empty `tags: []` into option payloads.

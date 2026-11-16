@@ -50,6 +50,7 @@ export const cursorAdapter: CliAdapter = {
   title: "Cursor CLI",
   command: "cursor-agent",
   apiKeyEnv: ["CURSOR_API_KEY"],
+  passEnv: [],
   homeEnv: ["HOME", "USERPROFILE", "CURSOR_CONFIG_DIR", "CURSOR_DATA_DIR"],
   transports: ["argv", "stdin"],
   effort: false,

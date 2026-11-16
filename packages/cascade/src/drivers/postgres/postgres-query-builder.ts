@@ -10,6 +10,11 @@
 import type { GenericObject } from "@mongez/reinforcements";
 import { log } from "@warlock.js/logger";
 import type {
+  AtomicUpdate,
+  AtomicUpdateOptions,
+  DriverContract,
+} from "../../contracts/database-driver.contract";
+import type {
   ChunkCallback,
   CursorPaginationOptions,
   CursorPaginationResult,
@@ -30,7 +35,12 @@ import { isAggregateExpression } from "../../expressions";
 import type { GlobalScopeDefinition } from "../../model/model";
 import { resolveModelClass, tryResolveModelClass, type ModelRef } from "../../model/register-model";
 import { assertLeanCompatible, stripHiddenFromLeanRecords } from "../../query-builder/lean-records";
-import { runChunks, type KeysetPlan } from "../../query-builder/keyset-chunk";
+import {
+  readRowKey,
+  runChunks,
+  streamRows,
+  type KeysetPlan,
+} from "../../query-builder/keyset-chunk";
 import {
   resolvePageLimit,
   resolvePageNumber,
@@ -161,7 +171,7 @@ export class PostgresQueryBuilder<T = unknown>
   }
 
   /** Hydration callback for transforming result rows into model instances. */
-  public hydrateCallback?: (data: unknown, index: number) => unknown;
+  public hydrateCallback?: (data: unknown, index: number, driver?: DriverContract) => unknown;
 
   /** Invoked before query execution. */
   private fetchingCallback?: (query: this) => void | Promise<void>;
@@ -184,6 +194,7 @@ export class PostgresQueryBuilder<T = unknown>
    * operations.
    */
   private joinRelationsApplied = false;
+  private preparedName?: string;
 
   /**
    * Idempotency guard for `applyCountRelations()` — see `joinRelationsApplied`.
@@ -244,6 +255,23 @@ export class PostgresQueryBuilder<T = unknown>
     return this as unknown as PostgresQueryBuilder<LeanDocument<T>>;
   }
 
+  /**
+   * Run this query as a named prepared statement.
+   *
+   * PostgreSQL parses and plans a named statement once per connection and
+   * reuses the plan on later calls, which helps a hot query that runs often.
+   * The name is combined with a hash of the SQL text, so the same name on a
+   * query whose shape changes never collides with an earlier statement.
+   * Applies to the rows read by `get()` / `first()`.
+   *
+   * @example
+   * await User.query().where("active", true).prepare("active-users").get();
+   */
+  public prepare(name: string): this {
+    this.preparedName = name;
+    return this;
+  }
+
   // ──────────────────────────────────────────────────────────────
   // CLONE
   // ──────────────────────────────────────────────────────────────
@@ -262,6 +290,7 @@ export class PostgresQueryBuilder<T = unknown>
     cloned.relationDefinitions = this.relationDefinitions;
     cloned.modelClass = this.modelClass;
     cloned.isLean = this.isLean;
+    cloned.preparedName = this.preparedName;
 
     // Copy PG-specific state
     cloned.hydrateCallback = this.hydrateCallback;
@@ -506,7 +535,9 @@ export class PostgresQueryBuilder<T = unknown>
   }
 
   /** Set a hydration callback that transforms each result row. */
-  public hydrate(callback: (data: unknown, index: number) => unknown): this {
+  public hydrate(
+    callback: (data: unknown, index: number, driver?: DriverContract) => unknown,
+  ): this {
     this.hydrateCallback = callback;
     return this;
   }
@@ -887,7 +918,10 @@ export class PostgresQueryBuilder<T = unknown>
     const { query = "", bindings = [] } = parser.parse();
 
     try {
-      const result = await this.driver.query<TResult>(query, bindings);
+      const result = await this.driver.query<TResult>(query, bindings, {
+        statementName: this.preparedName,
+        deferColumnTypes: !this.isLean && !!this.hydrateCallback,
+      });
       let records = result.rows;
 
       if (this.isLean) {
@@ -902,7 +936,13 @@ export class PostgresQueryBuilder<T = unknown>
       }
 
       if (this.hydrateCallback) {
-        records = records.map((row, index) => this.hydrateCallback!(row, index)) as TResult[];
+        // The driver and the column types are resolved once for the result set.
+        const driver = this.driver;
+        const hydrate = this.hydrateCallback;
+
+        records = driver.withColumnTypes(result, () =>
+          records.map((row, index) => hydrate(row, index, driver)),
+        ) as TResult[];
       }
 
       this.attachJoinedRelations(records, joinedData);
@@ -1234,6 +1274,46 @@ export class PostgresQueryBuilder<T = unknown>
   }
 
   /**
+   * Iterate the query's rows one at a time without loading them all.
+   *
+   * Rows are read `batchSize` at a time with the same paging as `chunk()`
+   * (by key when the query is unordered or ordered by the key, otherwise by
+   * offset) and hydrated per batch. Leaving the loop early stops reading.
+   *
+   * @example
+   * for await (const user of User.query().where("active", true).stream(500)) {
+   *   await sendDigest(user);
+   * }
+   *
+   * @param batchSize - Rows read per round trip (default 100)
+   */
+  public async *stream(batchSize = 100): AsyncGenerator<T, void, undefined> {
+    this.applyPendingScopes();
+
+    const plan = this.keysetChunkPlan();
+
+    yield* streamRows<T>(batchSize, plan, (page, pageSize) => {
+      const query = this.clone();
+
+      if (plan) {
+        if (page.after !== undefined) {
+          query.where(plan.key, plan.direction === "asc" ? ">" : "<", page.after);
+        }
+
+        if (!plan.sorted) {
+          query.orderBy(plan.key, plan.direction);
+        }
+      }
+
+      if (page.offset !== undefined) {
+        query.skip(page.offset);
+      }
+
+      return query.limit(pageSize).get();
+    });
+  }
+
+  /**
    * The keyset plan for `chunk()`, or undefined when the query must page by
    * OFFSET (see {@link chunk}).
    */
@@ -1342,8 +1422,8 @@ export class PostgresQueryBuilder<T = unknown>
     let hasPrev = false;
 
     if (data.length > 0) {
-      const firstItem = (data[0] as Record<string, unknown>)[column];
-      const lastItem = (data[data.length - 1] as Record<string, unknown>)[column];
+      const firstItem = readRowKey(data[0], column);
+      const lastItem = readRowKey(data[data.length - 1], column);
 
       if (direction === "next") {
         nextCursor = hasMore ? lastItem : undefined;
@@ -1420,6 +1500,29 @@ export class PostgresQueryBuilder<T = unknown>
       (filterSql ? ` ${filterSql}` : "");
     const result = await this.driver.query(updateSql, [...filterParams, ...setParams]);
     return result.rowCount ?? 0;
+  }
+
+  /**
+   * Apply atomic update operators (`$set`, `$unset`, `$inc`, `$dec`) to every
+   * matching row in one statement. Chained `where*` clauses and global scopes
+   * are part of that statement, so a scoped write needs no id lookup first.
+   *
+   * @returns The number of rows updated
+   */
+  public async atomic(
+    operations: AtomicUpdate,
+    options?: Pick<AtomicUpdateOptions, "arrayFilters">,
+  ): Promise<number> {
+    this.applyPendingScopes();
+
+    const result = await this.driver.atomicWhere(
+      this.table,
+      this.buildFilter(),
+      operations,
+      options,
+    );
+
+    return result.modifiedCount;
   }
 
   /**

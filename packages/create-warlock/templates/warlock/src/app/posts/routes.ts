@@ -4,5 +4,8 @@ import { createNewPostController } from "./controllers/create-new-post.controlle
 import { updatePostController } from "./controllers/update-post.controller";
 
 guarded(() => {
-  router.route("/posts").create(createNewPostController).update(updatePostController);
+  router
+    .route("/posts")
+    .create(createNewPostController, { uploads: true })
+    .update(updatePostController, { uploads: true });
 });

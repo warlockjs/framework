@@ -44,7 +44,7 @@ const next = await User.query()
   .cursorPaginate({ limit: 20, cursor: first.pagination.nextCursor });
 ```
 
-The cursor fields live under `pagination` (`{ hasMore, nextCursor?, hasPrev?, prevCursor? }`), not at the top level. `cursorPaginate` and `orderBy` are query-builder methods, so start the chain with `User.query()` (or any static that returns a builder, like `User.where(...)`).
+`column` can be any column of the model (`cursorPaginate({ limit: 20, column: "createdAt" })`); the cursors are read with `model.get(column)`, not as properties. The cursor fields live under `pagination` (`{ hasMore, nextCursor?, hasPrev?, prevCursor? }`), not at the top level. `cursorPaginate` and `orderBy` are query-builder methods, so start the chain with `User.query()` (or any static that returns a builder, like `User.where(...)`).
 
 **Cost characteristic.** Constant time per page regardless of how far in. The cursor encodes the last record's sort key — the next query is "give me records after this point," indexed.
 
@@ -78,6 +78,16 @@ await User.query().chunk(500, async (users) => {
 ```
 
 `chunk` is a query-builder method — start from `User.query()` (or `User.where(...)`) before chaining it.
+
+## Row-by-row iteration — `.stream(batchSize?)`
+
+```ts
+for await (const user of User.query().where("status", "active").stream(500)) {
+  await sendDigest(user);
+}
+```
+
+`.stream()` is an async iterator on both drivers: it reads and hydrates `batchSize` rows (default 100) per round trip, pages exactly like `chunk()`, and stops reading when you `break` out of the loop. Use it instead of `chunk()` when you want one model at a time without a callback.
 
 ## Pagination + relations
 

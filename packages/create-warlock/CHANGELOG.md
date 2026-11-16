@@ -4,6 +4,28 @@ All notable changes to `create-warlock` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.54.0 - 2026-11-16
+
+### Added
+
+- The feature picker and `--features` offer `process` (Tooling): it runs `warlock add process`, which installs `@warlock.js/process` and creates the supervisor config, the recovery and shutdown hooks and the development process panel.
+
+### Changed
+
+- The generated app sets the safe values that 6.0 makes the defaults: `http.multipart.routes: "declared"` (the starter's file-taking routes, `POST /users`, `POST /posts` and `PUT /posts/:id`, are marked `uploads: true`), `loginThrottleMiddleware({ emailLock: "pair" })`, and commented notes for passkey `userVerification: "required"`, JWT secrets of at least 32 bytes and `format: "jsonl"` JSON file logs.
+- The generated `http.ts` recommends the proxy's IP addresses or CIDR blocks (or `http.realIpHeader`) for `trustProxy` instead of `true`.
+- The generated `User` model sets `guarded = ["role"]`, so mass assignment never writes `role`; promote an account with `forceMerge()` / `forceCreate()`.
+- The generated PostgreSQL config sets `statement_timeout: 30_000` on the pool, so a runaway query cannot hold a connection forever.
+- Raised the `@mongez` dependency ranges to the 2026-11-16 releases (localization 3.6.0, react-form 4.1.0, copper 2.1.4, reinforcements 4.1.0, supportive-is 3.0.1, agent-kit 1.4.0).
+
+### Fixed
+
+- The generated users list and lookup no longer filter on a `status` column the `User` model does not have: the repository config drops `isActiveColumn`/`isActiveValue` and the services use `listCached` and `firstCached`.
+
+### Upgrading
+
+- Scaffolded apps pin `@mongez/localization` 3.6.0 and `@mongez/react-form` 4.1.0 (the design-system templates too). Default control ids inside a form are now `<formId>-<name>` and a `<Form>` posts natively by default.
+
 ## 5.53.0 - 2026-11-11
 
 ### Upgrading

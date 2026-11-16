@@ -86,21 +86,25 @@ describe("<head> alternates — prefix-except-default", () => {
   it("renders en bare, ar prefixed, and x-default bare on the default-locale request", async () => {
     const { html } = await renderRequest("/posts/x");
 
-    expect(html).toContain('<link rel="alternate" hrefLang="en" href="https://app.test/posts/x"/>');
     expect(html).toContain(
-      '<link rel="alternate" hrefLang="ar" href="https://app.test/ar/posts/x"/>',
+      '<link rel="alternate" hrefLang="en" href="https://app.test/posts/x" data-wl="alt"/>',
     );
     expect(html).toContain(
-      '<link rel="alternate" hrefLang="x-default" href="https://app.test/posts/x"/>',
+      '<link rel="alternate" hrefLang="ar" href="https://app.test/ar/posts/x" data-wl="alt"/>',
+    );
+    expect(html).toContain(
+      '<link rel="alternate" hrefLang="x-default" href="https://app.test/posts/x" data-wl="alt"/>',
     );
   });
 
   it("renders the same alternate set from the ar-prefixed request", async () => {
     const { html } = await renderRequest("/ar/posts/x");
 
-    expect(html).toContain('<link rel="alternate" hrefLang="en" href="https://app.test/posts/x"/>');
     expect(html).toContain(
-      '<link rel="alternate" hrefLang="ar" href="https://app.test/ar/posts/x"/>',
+      '<link rel="alternate" hrefLang="en" href="https://app.test/posts/x" data-wl="alt"/>',
+    );
+    expect(html).toContain(
+      '<link rel="alternate" hrefLang="ar" href="https://app.test/ar/posts/x" data-wl="alt"/>',
     );
   });
 });
@@ -194,10 +198,10 @@ describe("<head> alternates — a :locale route, strategy none", () => {
     const { html } = await renderRequest("/en/about");
 
     expect(html).toContain(
-      '<link rel="alternate" hrefLang="en" href="https://app.test/en/about"/>',
+      '<link rel="alternate" hrefLang="en" href="https://app.test/en/about" data-wl="alt"/>',
     );
     expect(html).toContain(
-      '<link rel="alternate" hrefLang="ar" href="https://app.test/ar/about"/>',
+      '<link rel="alternate" hrefLang="ar" href="https://app.test/ar/about" data-wl="alt"/>',
     );
   });
 });

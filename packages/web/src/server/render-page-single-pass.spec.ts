@@ -11,6 +11,7 @@ import { Writable } from "node:stream";
 import { createElement, lazy, Suspense, use } from "react";
 import type { PipeableStream } from "react-dom/server";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import config from "@mongez/config";
 import { Response } from "@warlock.js/core";
 import { createCoreHttp, requestContext } from "./__fixtures__/core-http";
 import * as App from "../../__tests__/server/fixtures/root";
@@ -209,17 +210,50 @@ describe("a shell that waits on a component", () => {
   });
 });
 
-describe("a data request renders once and keeps no stream", () => {
-  it("decides the outcome from one render and returns no pipeable stream", async () => {
+describe("web.shellTimeout", () => {
+  const neverReady = () => use(new Promise<never>(() => undefined)) as never;
+
+  afterEach(() => {
+    config.set("web", {});
+  });
+
+  it("aborts a shell that never becomes ready and answers with the error page and status 504", async () => {
+    config.set("web", { shellTimeout: 40 });
+
+    const rendered = await render(
+      "/shell-hangs",
+      { default: neverReady },
+      { loadErrorPage: async () => errorPageModule() },
+    );
+
+    expect(rendered.status).toBe(504);
+    expect(await drain(rendered.pipeableStream!)).toContain("Sorry about that.");
+  });
+
+  it("does not abort a shell that is ready in time", async () => {
+    config.set("web", { shellTimeout: 5_000 });
+
+    const rendered = await render("/shell-fast", {
+      default: () => createElement("main", null, "ok"),
+    });
+
+    expect(rendered.status).toBe(200);
+    expect(await drain(rendered.pipeableStream!)).toContain("ok");
+  });
+});
+
+describe("a data request does not render the page on the server", () => {
+  it("answers with the payload, no stream and no server render", async () => {
     const counter = { renders: 0 };
     const rendered = await render("/data-once", countingPage(counter), { dataRequest: true });
 
     expect(rendered.status).toBe(200);
     expect(rendered.pipeableStream).toBeUndefined();
-    expect(counter.renders).toBe(1);
+    expect(rendered.html).toBe("");
+    expect(counter.renders).toBe(0);
   });
 
-  it("still escalates a render-time throw into the error page payload", async () => {
+  it("leaves a render-time throw to the client: status 200, no error page in the payload", async () => {
     const rendered = await render(
       "/data-boom",
       {
@@ -230,9 +264,26 @@ describe("a data request renders once and keeps no stream", () => {
       { dataRequest: true, loadErrorPage: async () => errorPageModule() },
     );
 
-    expect(rendered.status).toBe(500);
+    expect(rendered.status).toBe(200);
     expect(rendered.pipeableStream).toBeUndefined();
-    expect(rendered.bundle?.errorPage).toBeDefined();
+    expect(rendered.bundle?.errorPage).toBeUndefined();
+    expect(rendered.bundle?.error).toBeUndefined();
+  });
+
+  it("still answers a loader failure with its error record and status", async () => {
+    const rendered = await render(
+      "/data-loader-boom",
+      {
+        default: () => createElement("main", null, "never rendered"),
+        loader: () => {
+          throw new Error("loader exploded");
+        },
+      },
+      { dataRequest: true, loadErrorPage: async () => errorPageModule() },
+    );
+
+    expect(rendered.status).toBe(500);
+    expect(rendered.bundle?.error).toBeDefined();
   });
 });
 
@@ -299,14 +350,14 @@ describe("loader data is serialized once before render", () => {
     expect(stringifyCalls.filter(carriesPageData)).toHaveLength(1);
   });
 
-  it("a data request checks the page data once and renders its payload once", async () => {
+  it("a data request checks the page data once and renders no document that embeds it", async () => {
     await render("/count-data", countingPage({ renders: 0 }), {
       dataRequest: true,
       payloadBudget: resolvePayloadBudget({ page: "64kb" }),
     });
 
     expect(stringifyCalls.filter(isPageData)).toHaveLength(1);
-    expect(stringifyCalls.filter(carriesPageData)).toHaveLength(1);
+    expect(stringifyCalls.filter(carriesPageData)).toHaveLength(0);
   });
 });
 

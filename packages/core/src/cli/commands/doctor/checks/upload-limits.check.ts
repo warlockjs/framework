@@ -64,6 +64,7 @@ export const uploadLimitsCheck: DoctorCheck = warnOnError({
       return {
         name: "upload-limits",
         status: "warn",
+        code: "WL1011",
         detail:
           `${found} — one multipart request may hold that much in memory before auth runs. ` +
           `Lower ${settings} to the largest upload the app accepts, and raise the cap only on ` +

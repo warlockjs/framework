@@ -49,6 +49,7 @@ export const antigravityAdapter: CliAdapter = {
   title: "Antigravity CLI",
   command: "agy",
   apiKeyEnv: ["GEMINI_API_KEY"],
+  passEnv: [],
   homeEnv: ["HOME", "USERPROFILE"],
   transports: ["argv", "stdin"],
   effort: true,

@@ -222,7 +222,7 @@ export type PasskeysConfig = {
    * - `"required"` — refuse an assertion without user verification, so a
    *   passkey login is two factors (the device plus the PIN or biometric).
    *   Users whose authenticator cannot verify them cannot register or sign in.
-   * @default "preferred"
+   * @default "preferred" (changes to `"required"` in 6.0; set it explicitly to choose now)
    */
   userVerification?: "required" | "preferred";
 };

@@ -26,6 +26,10 @@ export type StoredPageCacheEntry = {
    * written before this field existed.
    */
   headers?: Record<string, string>;
+  /** Weak entity tag of `body`, answered on a HIT and compared with `If-None-Match`. */
+  etag?: string;
+  /** `body` compressed once at store time (base64), when `http.compression` is on. */
+  encoded?: { gzip?: string; br?: string };
 };
 
 /**

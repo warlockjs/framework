@@ -75,6 +75,22 @@ await user.set({ "filters.status": "closed" }).save(); // only that leaf changes
 Before 4.9.1, merging a `Date` over a column that **already held a `Date`** was silently dropped — the column never went dirty and `.save()` returned `{ success: true, modifiedCount: 0 }` without issuing an `UPDATE`. Writing into an empty column always worked, so only overwrites were affected.
 :::
 
+### Guarded columns — `static guarded`
+
+`merge()` writes any column it is given, so a request body carrying `{ role: "admin" }` would set the role. List the columns a request must never write in `static guarded`:
+
+```ts
+class User extends Model<UserSchema> {
+  public static guarded = ["role", "isAdmin"];
+}
+
+await user.merge(request.all()).save(); // role and isAdmin are skipped
+await user.forceMerge({ role: "editor" }).save(); // written on purpose, from trusted code
+const admin = await User.forceCreate({ name: "Ada", role: "admin" });
+```
+
+`merge()`, the object form of `set()`, `create()`, `createMany()`, `save({ merge })` and the data argument of `findOrCreate()` / `upsert()` skip guarded columns (and dot paths inside them). `forceMerge()` and `forceCreate()` are the explicit ways to write them. `set("role", value)` for one column and `new User({ ... })` are not mass assignment and stay unguarded. Outside production, the first skipped write of a column logs a warning that names the model and column, and merging an object marked with `markRawInput()` (raw request input) into any model logs a one-time reminder to merge validated input instead. Validated input (`request.validated()`) remains the recommended source for `merge()`.
+
 ### `.save()` after manual mutation — when you've already changed state
 
 Sometimes the mutations are spread across branches and an object form would be awkward. `.save()` with no args flushes whatever's pending:

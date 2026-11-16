@@ -57,6 +57,17 @@ export type PageErrorBoundaryProps = {
  * Every field is read on the server or during build. The client receives
  * resolved metadata and route data, not this object.
  */
+/** A page's `uploads` declaration; the same shape as a route's `uploads` option. */
+export type PageUploadsOption =
+  | boolean
+  | {
+      readonly maxTotalSize?: number;
+      /** Largest single file, in bytes; only stricter than `http.fileUploadLimit`. */
+      readonly maxFileSize?: number;
+      /** Most files in one request; only stricter than `http.multipart.files`. */
+      readonly maxFiles?: number;
+    };
+
 export type PageConfig<TLoader extends LoaderFunction | undefined = undefined> = {
   /** An explicit literal URL declaration; omission uses the filesystem route. */
   readonly route?: RouteDeclaration;
@@ -92,6 +103,15 @@ export type PageConfig<TLoader extends LoaderFunction | undefined = undefined> =
    * graph, so the page ships the keys found in code plus these.
    */
   readonly translations?: TranslationDeclaration;
+  /**
+   * Declare that this page's actions take multipart uploads. The page's POST
+   * route is marked `uploads`, which `http.multipart.routes: "declared"`
+   * requires: without it a multipart body answers 415. An object also sets the
+   * total upload size (`maxTotalSize`), the largest file (`maxFileSize`) and the
+   * file count (`maxFiles`) for this page alone. Must be a literal (`true` or
+   * `{ maxTotalSize: 10 * 1024 * 1024, maxFiles: 3 }`), read at build time.
+   */
+  readonly uploads?: PageUploadsOption;
 };
 
 /**

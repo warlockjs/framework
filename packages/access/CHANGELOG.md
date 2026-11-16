@@ -4,6 +4,20 @@ All notable changes to `@warlock.js/access` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.54.0 - 2026-11-16
+
+### Upgrading
+
+- `DefaultAccessResolver` no longer has its roles and permissions stored in the shared cache: they are read from the loaded user on every check, so a role change shows on the next request instead of after `access.cacheTtl`. A custom `readRoles` that is expensive should memoize itself. Other resolvers keep their cached behaviour.
+
+### Added
+
+- `AccessResolver.cacheable` (optional, default `true`): a resolver that sets `readonly cacheable = false` is never cached by the engine. Checks on one user object within a request still share a single resolution.
+
+### Documentation
+
+- The resolver page and the `implement-resolver` skill describe `cacheable`.
+
 ## 5.53.0 - 2026-11-11
 
 ### Upgrading

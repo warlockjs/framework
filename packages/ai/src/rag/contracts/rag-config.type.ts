@@ -2,6 +2,7 @@ import type { CacheDriver } from "@warlock.js/cache";
 import type { EmbedderContract } from "../../contracts/embedder.contract";
 import type { ToolContract } from "../../tool/tool";
 import type { RagReranker } from "../rerank/reranker.contract";
+import type { VectorStore } from "../store/vector-store.contract";
 import type { ChunkOptions } from "./chunk-options.type";
 import type { RetrieveOptions, RetrieveResult } from "./citation.type";
 import type { RagDocument } from "./rag-document.type";
@@ -23,11 +24,12 @@ export type RagConfig = {
   /** Embedder for both indexing and query embedding. Required. */
   embedder: EmbedderContract;
   /**
-   * Vector-capable cache driver = the vector store. Falls back to
+   * The vector store: a vector-capable cache driver, or a `VectorStore`
+   * such as `ai.rag.pgVectorStore(...)` used as is. Falls back to
    * `ai.config({ defaultStore })` when omitted; throws at construction if
    * neither resolves (same rule as `SemanticMemoryConfig.store`).
    */
-  store?: CacheDriver<any, any>;
+  store?: CacheDriver<any, any> | VectorStore;
   /** Namespace prefix for every key written. Default `"ai.rag." + name`. */
   namespace?: string;
   /** Chunking defaults for `index()`. Overridable per `index()` call. */

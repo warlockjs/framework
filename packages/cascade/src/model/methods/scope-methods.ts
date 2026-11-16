@@ -1,5 +1,5 @@
 import type { QueryBuilderContract } from "../../contracts";
-import type { GlobalScopeOptions, LocalScopeCallback, ChildModel } from "../model";
+import type { GlobalScopeOptions, LocalScopeCallback, ChildModel, Model } from "../model";
 
 /**
  * Give the model class its OWN scope map before mutating.
@@ -31,6 +31,7 @@ export function addGlobalModelScope(
   ownScopeMap(ModelClass, "globalScopes").set(name, {
     callback,
     timing: options.timing || "before",
+    stamp: options.stamp,
   });
 }
 
@@ -48,4 +49,57 @@ export function addLocalModelScope(
 
 export function removeLocalModelScope(ModelClass: ChildModel<any>, name: string): void {
   ownScopeMap(ModelClass, "localScopes").delete(name);
+}
+
+/**
+ * The column values the model's global scopes stamp into inserts. A scope
+ * registered on the subclass wins over the base `Model` for the same column.
+ */
+export function collectScopeStamp(ModelClass: ChildModel<any>): Record<string, unknown> {
+  const stamp: Record<string, unknown> = {};
+
+  const scopes = [...rootGlobalScopes(ModelClass), ...ModelClass.globalScopes.values()];
+
+  for (const scope of scopes) {
+    if (!scope.stamp) continue;
+
+    const values = typeof scope.stamp === "function" ? scope.stamp() : scope.stamp;
+
+    for (const [column, value] of Object.entries(values ?? {})) {
+      if (value !== undefined) {
+        stamp[column] = value;
+      }
+    }
+  }
+
+  return stamp;
+}
+
+/** Global scopes registered on the base `Model` (the root of the class chain). */
+function rootGlobalScopes(ModelClass: ChildModel<any>) {
+  let root: any = ModelClass;
+
+  while (Object.getPrototypeOf(root) && Object.getPrototypeOf(root) !== Function.prototype) {
+    root = Object.getPrototypeOf(root);
+  }
+
+  return root === ModelClass ? [] : [...(root.globalScopes as Map<string, any>).values()];
+}
+
+/**
+ * Fill the stamped columns of a NEW record that the caller left unset.
+ * Returns the columns it wrote.
+ */
+export function applyScopeStamp(model: Model): string[] {
+  const stamp = collectScopeStamp(model.self());
+  const written: string[] = [];
+
+  for (const [column, value] of Object.entries(stamp)) {
+    if (!model.isFilled(column)) {
+      model.set(column, value);
+      written.push(column);
+    }
+  }
+
+  return written;
 }

@@ -77,7 +77,12 @@ type BucketGenerations = {
   startedAt: number;
 };
 
-const limiters = new Map<number, BucketGenerations>();
+/**
+ * Every live limiter's buckets, held weakly. Each middleware keeps its own
+ * buckets in its closure, so a limiter built per request, or left behind by a
+ * hot reload, is collected with its middleware instead of piling up here.
+ */
+const limiters = new Set<WeakRef<BucketGenerations>>();
 const defaultIpv6Subnet = 64;
 
 /**
@@ -110,7 +115,15 @@ function liveBucket(generations: BucketGenerations, key: string, now: number): B
 export function memoryRateLimitBucketCount(): number {
   let total = 0;
 
-  for (const generations of limiters.values()) {
+  for (const reference of limiters) {
+    const generations = reference.deref();
+
+    if (!generations) {
+      limiters.delete(reference);
+
+      continue;
+    }
+
     total += generations.current.size + generations.previous.size;
   }
 
@@ -148,6 +161,8 @@ function resolveStore(options: RateLimitOptions): "memory" | "cache" {
  */
 export function rateLimitMiddleware(options: RateLimitOptions): Middleware {
   const limiterId = nextLimiterId++;
+
+  let generations: BucketGenerations | undefined;
 
   return async ({ request, response }) => {
     const now = Date.now();
@@ -189,11 +204,9 @@ export function rateLimitMiddleware(options: RateLimitOptions): Middleware {
         return undefined;
       }
     } else {
-      let generations = limiters.get(limiterId);
-
       if (!generations) {
         generations = { current: new Map(), previous: new Map(), startedAt: now };
-        limiters.set(limiterId, generations);
+        limiters.add(new WeakRef(generations));
       }
 
       rotateGenerations(generations, now, options.duration);

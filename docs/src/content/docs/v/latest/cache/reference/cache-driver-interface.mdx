@@ -78,7 +78,7 @@ if (product === null) {
 
 ## has(key)
 
-Check if a key exists in cache without retrieving its value. Returns `true` if key exists and is not expired, `false` otherwise.
+Check if a key exists in cache without retrieving its value. Returns `true` if key exists and is not expired, `false` otherwise. It uses the driver's `exists()`, so no value is read or parsed, and it emits `hit` or `miss` with the key only (the event carries no `value`, unlike `get()`).
 
 ```ts
 has(key: string | GenericObject): Promise<boolean>;
@@ -131,6 +131,21 @@ Example:
 ```ts
 // Removes all keys like "product.123", "product.456", etc.
 await cache.removeNamespace("product");
+```
+
+## listKeys(namespace)
+
+List the live keys under a namespace: the namespace key itself and every `<namespace>.*` key (an empty namespace lists everything). The keys come back in the form `get()` and `remove()` accept, with the `globalPrefix` already removed, so you can read or delete exactly the entries you own instead of sweeping with `similar()`.
+
+```ts
+listKeys?(namespace: string): Promise<string[]>;
+```
+
+The method is optional. The `memory`, `lru`, `memoryExtended`, `file`, `pg`, `redis`, `mock` and `null` drivers ship it (`null` always answers an empty list); `file` can list a key whose entry expired but was not read since, and `get()` reports it missing. On a `CacheManager`, call `supportsListKeys()` to learn whether the current driver has it.
+
+```ts
+const keys = await cache.listKeys("product");
+await Promise.all(keys.map((key) => cache.remove(key)));
 ```
 
 ## remember(key, ttl, callback)

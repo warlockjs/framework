@@ -89,6 +89,13 @@ export class NullCacheDriver
   }
 
   /**
+   * {@inheritdoc}
+   */
+  public async listKeys(_namespace: string): Promise<string[]> {
+    return [];
+  }
+
+  /**
    * The key as it may appear in a log line: parsed, with email addresses masked
    */
   protected loggableKey(key: CacheKey): string {

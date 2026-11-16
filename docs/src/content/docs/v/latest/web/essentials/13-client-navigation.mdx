@@ -12,6 +12,20 @@ after hydration a plain in-app click fetches page data and swaps the page tree.
 Use `navigateTo()` for a path, `href()` to resolve a named route, and `refresh()`
 to fetch the current App, Layout, and Page loaders again without pushing history.
 
+## Data requests do not render the page on the server
+
+A client navigation asks the server for the page's data, not its markup, so the
+server runs the middleware and loaders and answers with the payload without
+rendering the page. A loader, guard or validation failure still answers with its
+status and error record. A component that throws while rendering is no longer
+found on the server: the browser renders it, the nearest error boundary shows
+the failure, and the client reports it through `web.errors` and `onClientError`
+with the route name.
+
+The app's error and forbidden pages are separate lazy chunks. A route's bundle
+does not carry them: the browser fetches the error page the first time a
+failure needs it, or when the server rendered the document with it.
+
 ## Prefetch on interaction
 
 `<Link prefetch>` fetches the destination's page data before the click. On

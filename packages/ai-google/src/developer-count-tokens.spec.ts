@@ -4,7 +4,7 @@ import {
   ProviderAuthError,
   ProviderError,
   ProviderRateLimitError,
-  ProviderTimeoutError,
+  ProviderAbortError,
   type Message,
 } from "@warlock.js/ai";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -163,7 +163,7 @@ describe("Gemini Developer API full-request counting", () => {
     controller.abort();
     await expect(
       model.countTokens?.(messages, { tools, signal: controller.signal }),
-    ).rejects.toBeInstanceOf(ProviderTimeoutError);
+    ).rejects.toBeInstanceOf(ProviderAbortError);
     expect(fetch).not.toHaveBeenCalled();
   });
 
@@ -187,7 +187,7 @@ describe("Gemini Developer API full-request counting", () => {
       });
     });
     const result = model.countTokens?.(messages, { tools, signal: controller.signal });
-    const rejected = expect(result).rejects.toBeInstanceOf(ProviderTimeoutError);
+    const rejected = expect(result).rejects.toBeInstanceOf(ProviderAbortError);
     await started;
     controller.abort();
     await rejected;

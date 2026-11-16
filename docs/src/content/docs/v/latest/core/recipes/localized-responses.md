@@ -48,19 +48,17 @@ export default {
 
 ## Step 2 — How the locale is resolved
 
-The framework's `Request` class resolves the locale at construction time. Three sources, in order:
+The framework's `Request` class resolves the locale lazily on first read. Five sources, in order:
 
-1. **`locale` header** — `locale: ar`
-2. **`locale` query param** — `?locale=ar`
-3. **The configured default** — `config.key("app.localeCode")`
+1. **`locale` query param** — `?locale=ar`
+2. **`warlock.locale-preference` cookie** — only when its value is in `app.localeCodes`
+3. **`locale` header** — `locale: ar`
+4. **`locale` cookie**
+5. **The configured default** — `config.key("app.localeCode")`
 
-```ts title="How the request resolves locale"
-public get localized() {
-  if (this._locale) return this._locale;
+A value outside a declared `app.localeCodes` counts as absent. Assign `request.locale = code` (or call `request.setLocaleCode(code)`) to override the result for the rest of the request.
 
-  return (this._locale = this.header("locale") || this.query["locale"]);
-}
-
+```ts title="Reading the resolved locale"
 public getLocaleCode(defaultLocaleCode: string = config.key("app.localeCode") || "en") {
   return this.locale || defaultLocaleCode;
 }

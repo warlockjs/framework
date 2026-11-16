@@ -24,6 +24,7 @@ import { flushAfterCommit } from "../../transactions/after-commit";
 import type {
   AtomicUpdate,
   DriverAtomicUpdateOptions,
+  DriverIdOnInsert,
   DriverBlueprintContract,
   DriverContract,
   DriverEvent,
@@ -587,15 +588,36 @@ export class MongoDbDriver implements DriverContract {
     options?: DriverAtomicUpdateOptions,
   ): Promise<T | null> {
     const collection = this.getDatabaseInstance().collection(table);
-    const mongoOptions = this.withSession<FindOneAndUpdateOptions>(options);
-    const result = await collection.findOneAndUpdate(
-      filter,
-      toMongoUpdate(update) as UpdateFilter<Record<string, unknown>>,
-      {
+    const { idOnInsert, ...driverOptions } = options ?? {};
+    const mongoOptions = this.withSession<FindOneAndUpdateOptions>(driverOptions);
+    const updateDocument = toMongoUpdate(update) as UpdateFilter<Record<string, unknown>>;
+
+    if (idOnInsert && options?.upsert) {
+      // The result metadata tells an insert from an update, so an id is
+      // generated only for a document that was inserted.
+      const outcome = await collection.findOneAndUpdate(filter, updateDocument, {
         ...mongoOptions,
         returnDocument: options?.returnDocument ?? "after",
-      },
-    );
+        includeResultMetadata: true,
+      });
+      const document = outcome.value as Record<string, unknown> | null;
+      const insertedId = outcome.lastErrorObject?.upserted;
+
+      if (document && insertedId !== undefined && insertedId !== null) {
+        const id = await this.assignInsertedId(table, insertedId, idOnInsert);
+
+        if (id !== undefined) {
+          document[idOnInsert.field] = id;
+        }
+      }
+
+      return document as T | null;
+    }
+
+    const result = await collection.findOneAndUpdate(filter, updateDocument, {
+      ...mongoOptions,
+      returnDocument: options?.returnDocument ?? "after",
+    });
 
     return result as T | null;
   }
@@ -964,7 +986,7 @@ export class MongoDbDriver implements DriverContract {
     options?: DriverAtomicUpdateOptions,
   ): Promise<UpdateResult> {
     const collection = this.getDatabaseInstance().collection(table);
-    const { returnDocument: _returnDocument, ...updateOptions } = options ?? {};
+    const { returnDocument: _returnDocument, idOnInsert, ...updateOptions } = options ?? {};
     const mongoOptions = this.withSession<UpdateOptions>(updateOptions);
     const result = await collection.updateMany(
       filter,
@@ -972,7 +994,41 @@ export class MongoDbDriver implements DriverContract {
       mongoOptions,
     );
 
-    return { modifiedCount: result.modifiedCount, upsertedCount: result.upsertedCount };
+    if (idOnInsert && result.upsertedCount > 0 && result.upsertedId !== null) {
+      await this.assignInsertedId(table, result.upsertedId, idOnInsert);
+    }
+
+    return {
+      modifiedCount: result.modifiedCount,
+      upsertedCount: result.upsertedCount,
+      upsertedId: result.upsertedId ?? undefined,
+    };
+  }
+
+  /**
+   * Write the generated id of a document an upsert just inserted, keyed on
+   * `_id` only. Returns the id, or `undefined` when none was generated.
+   */
+  private async assignInsertedId(
+    table: string,
+    documentId: unknown,
+    idOnInsert: DriverIdOnInsert,
+  ): Promise<unknown> {
+    const id = await idOnInsert.generate();
+
+    if (id === undefined) {
+      return undefined;
+    }
+
+    await this.getDatabaseInstance()
+      .collection(table)
+      .updateOne(
+        { _id: documentId } as Record<string, unknown>,
+        { $set: { [idOnInsert.field]: id } },
+        this.withSession<UpdateOptions>({}),
+      );
+
+    return id;
   }
 
   /**

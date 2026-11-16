@@ -187,7 +187,7 @@ type PutOptions = {
   mimeType?: string; // Override the guessed MIME
   metadata?: Record<string, string>; // Custom metadata — cloud drivers only
   cacheControl?: string; // Cache-Control header — cloud drivers only
-  contentDisposition?: string; // Content-Disposition header — cloud drivers only
+  contentDisposition?: string; // Content-Disposition header — cloud drivers only (default "attachment" for svg/html/xml/script files)
   visibility?: "public" | "private"; // Cloud drivers only
 };
 ```
@@ -565,7 +565,7 @@ A token signs the file's path **with** the storage prefix in effect when it was 
 - Validated where the same prefix is in effect, or where no prefix is set, it opens the file it was issued for. `result.path` is the location relative to the prefix in effect, as the other storage methods take it.
 - Validated where a different prefix is in effect (another tenant's host), it is refused with `invalid_token`, even when a file exists at the same relative path there.
 
-Two local disks that share one `signatureKey` accept each other's tokens for files at the same path; give each disk its own key.
+A token also carries the name of the disk that issued it, signed with the rest, so two local disks that share one `signatureKey` do not accept each other's tokens. Tokens issued before 5.54 are refused and must be issued again.
 
 The local driver reads its HMAC key from the `signatureKey` option on the driver config — set it in `src/config/storage.ts` if you use temporary URLs in dev.
 

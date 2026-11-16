@@ -330,7 +330,7 @@ export async function devLoop(cwd: string) {
 
 `grep` never hands the model's pattern to a backtracking engine: it compiles the usual JavaScript regex syntax (literals, classes, `\d \w \s`, anchors, `\b`, groups, alternation, all quantifiers, `ignoreCase`) into a matcher that costs at most pattern size × line length per line, with the same results as `RegExp#test`. `((a)+)+$`-style patterns finish at once.
 
-- Lookarounds and backreferences, patterns over 200 characters, and patterns expanding past 4000 states → `WorkspacePolicyError` `type: "unsafe-pattern"` naming the cause.
+- Lookarounds and backreferences, patterns over 200 characters, and patterns expanding past 1000 states → `WorkspacePolicyError` `type: "unsafe-pattern"` naming the cause.
 - A pattern that needs too much work per scanned character is stopped with `"unsafe-pattern"` (simplify it or narrow `path` / `glob`).
 - Lines over 2000 characters are skipped; files over `search.maxFileBytes` (default 2 MB) are skipped unread and counted in `skippedFiles`.
 - Globs (`glob`, `grep`'s `glob`, `list_dir`'s `ignore`, `denyPaths`, `skipDirs`, `.gitignore`) are matched without backtracking and compiled once; a model glob over 512 characters → `"unsafe-pattern"`, a longer `.gitignore` line is ignored.

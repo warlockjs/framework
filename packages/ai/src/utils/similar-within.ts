@@ -18,19 +18,24 @@ const WIDEN_FACTOR = 4;
  * When the first page is enough, this is exactly one query with the
  * caller's `topK` — the same call as before.
  *
+ * `query` also receives `accept`, so a store that can filter before it ranks
+ * (the `filter` option of the cache's `similar()`) is asked for in-scope
+ * entries only; it then answers from the first page. A store that ignores
+ * the filter still gets the widening above.
+ *
  * Returns the accepted hits of the last query, in the store's order.
  *
  * Internal — not exported from the package barrel.
  *
  * @example
  * const hits = await similarWithin(
- *   (topK) => store.similar(vector, { topK, threshold }),
+ *   (topK, accept) => store.similar(vector, { topK, threshold, filter: (hit) => accept({ ...hit, score: 1 }) }),
  *   (hit) => hit.value?.scope === scope,
  *   { topK: k * 5, want: k },
  * );
  */
 export async function similarWithin<THit>(
-  query: (topK: number) => Promise<THit[]>,
+  query: (topK: number, accept: (hit: THit) => boolean) => Promise<THit[]>,
   accept: (hit: THit) => boolean,
   options: { topK: number; want: number; maxTopK?: number },
 ): Promise<THit[]> {
@@ -38,7 +43,7 @@ export async function similarWithin<THit>(
   let topK = options.topK;
 
   for (;;) {
-    const hits = await query(topK);
+    const hits = await query(topK, accept);
     const accepted = hits.filter(accept);
 
     if (accepted.length >= options.want || hits.length < topK || topK <= 0 || topK >= maxTopK) {

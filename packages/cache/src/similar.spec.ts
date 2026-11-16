@@ -51,6 +51,20 @@ describe("MemoryCacheDriver — similar()", () => {
     await driver.disconnect();
   });
 
+  it("counts topK over the entries the filter accepts", async () => {
+    for (let index = 0; index < 20; index++) {
+      await driver.set(`other.${index}`, { index }, { vector: [1, 0, 0] });
+    }
+    await driver.set("mine.1", { text: "m" }, { vector: [0.5, 0.5, 0] });
+
+    const hits = await driver.similar([1, 0, 0], {
+      topK: 2,
+      filter: (hit) => hit.key.startsWith("mine."),
+    });
+
+    expect(hits.map((hit) => hit.key)).toEqual(["mine.1"]);
+  });
+
   it("returns nearest entries ordered by descending score", async () => {
     await driver.set("doc.a", { text: "a" }, { vector: [1, 0, 0] });
     await driver.set("doc.b", { text: "b" }, { vector: [0.9, 0.1, 0] });

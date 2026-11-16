@@ -9,14 +9,12 @@ import { reportEnvironmentOverrides } from "./report-environment-overrides";
  * Core's env precedence policy, in one place because two callers load env:
  * this module at boot, and the dev server when an `.env` file changes.
  *
- * `@mongez/dotenv` defaults to `precedence: "file-wins"`, which is backwards.
  * The `.env` file is a checked-in DEFAULT; a variable already exported into
  * `process.env` is the deliberate, situational override — a second instance on
  * another port, CI pointed at another database, a container's configuration.
- * Under the default, `PORT=6060 warlock dev` produced a server on the `.env`
- * file's 3000 and said nothing. A default that silently beats an explicit
- * instruction is the wrong way round, so core opts into `process-wins`:
- * the file supplies only the keys the environment does not already carry.
+ * `@mongez/dotenv` 2 defaults to `precedence: "process-wins"`; core still
+ * passes it explicitly so the policy does not depend on the library default.
+ * The file supplies only the keys the environment does not already carry.
  *
  * EMPTY STRING — `FOO=` in the environment counts as SET, and wins, so the
  * file's value is discarded and `env("FOO")` returns `""`. Chosen over

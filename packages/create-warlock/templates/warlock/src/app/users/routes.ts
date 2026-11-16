@@ -8,6 +8,9 @@ import { listUsersController } from "./controllers/list-users.controller";
 // a signed-in user without `role: "admin"` gets 403.
 guarded(() => {
   router.group({ middleware: [adminMiddleware] }, () => {
-    router.route("/users").list(listUsersController).post(createNewUserController);
+    router
+      .route("/users")
+      .list(listUsersController)
+      .post(createNewUserController, { uploads: true });
   });
 });

@@ -583,3 +583,29 @@ describe("httpRequestTool — the deadline covers the body", () => {
     expect(error).toBeDefined();
   });
 });
+
+describe("httpRequestTool — unrestricted static headers", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("warns when static headers are set without baseUrl or allowHosts", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    httpRequestTool({ headers: { authorization: "Bearer secret" } });
+
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(String(warn.mock.calls[0]?.[0])).toContain("authorization");
+    expect(String(warn.mock.calls[0]?.[0])).not.toContain("secret");
+  });
+
+  it("stays silent with baseUrl, allowHosts or no static headers", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    httpRequestTool({ baseUrl: "https://api.example.com", headers: { "x-key": "k" } });
+    httpRequestTool({ allowHosts: ["api.example.com"], headers: { "x-key": "k" } });
+    httpRequestTool({});
+
+    expect(warn).not.toHaveBeenCalled();
+  });
+});

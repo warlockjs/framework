@@ -5,7 +5,7 @@ import { isSet, warnOnError } from "./config-values";
 /**
  * Reports whether responses are compressed (`http.compression`).
  *
- * INFORMATIONAL: always `ok`. Compression off is the framework default and the
+ * INFORMATIONAL: always `ok`; the line that says compression is off carries `WL1020`. Compression off is the framework default and the
  * right choice behind a proxy or CDN that already compresses, so it is never a
  * warning; the line only says how to turn it on.
  *
@@ -30,6 +30,7 @@ export const compressionCheck: DoctorCheck = warnOnError({
     return {
       name: "compression",
       status: "ok",
+      code: "WL1020",
       detail:
         "response compression is off — set http.compression: true to send JSON and HTML " +
         "with br/gzip, unless a proxy or CDN in front of the app already compresses responses.",

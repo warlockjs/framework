@@ -1,7 +1,7 @@
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { safeFetchToBuffer } from "./safe-fetch";
+import { resetPinSkipWarnings, safeFetchToBuffer } from "./safe-fetch";
 import { StorageError } from "./storage-error";
 
 /**
@@ -74,5 +74,26 @@ describe("safeFetchToBuffer connects only to the address it checked", () => {
 
     expect(result.buffer.toString()).toBe("internal secret");
     expect(requestsSeen).toBe(1);
+  });
+});
+
+describe("safeFetchToBuffer pinning skip warning", () => {
+  it("warns once when an injected fetch keeps the connection from being pinned", async () => {
+    resetPinSkipWarnings();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const injected = vi.fn(async () => new Response("ok")) as unknown as typeof fetch;
+
+    dnsAnswers.push(
+      [{ address: "93.184.216.34", family: 4 }],
+      [{ address: "93.184.216.34", family: 4 }],
+    );
+
+    await safeFetchToBuffer("http://public.example.test/a", { fetch: injected });
+    await safeFetchToBuffer("http://public.example.test/b", { fetch: injected });
+
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(String(warn.mock.calls[0]?.[0])).toContain("injected fetch");
+
+    warn.mockRestore();
   });
 });

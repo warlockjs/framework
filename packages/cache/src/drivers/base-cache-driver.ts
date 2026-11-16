@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { rtrim } from "@mongez/reinforcements";
 import { log, maskEmailsInText } from "@warlock.js/logger";
 import { MemoryCacheList } from "../list/memory-cache-list";
 import { sampleMembers } from "../tag-sample";
@@ -24,7 +25,14 @@ import type {
   RememberOptions,
 } from "../types";
 import { CacheConfigurationError, CacheUnsupportedError } from "../types";
-import { normalizeToOptions, parseCacheKey, parseTtl, resolveTtl, safeErrorInfo } from "../utils";
+import {
+  applyTtlJitter,
+  normalizeToOptions,
+  parseCacheKey,
+  parseTtl,
+  resolveTtl,
+  safeErrorInfo,
+} from "../utils";
 
 /**
  * Normalized form of the 3rd `set` argument.
@@ -150,6 +158,32 @@ export abstract class BaseCacheDriver<
   }
 
   /**
+   * The key as a caller wrote it: `parseKey()` output with the configured
+   * `globalPrefix` removed, so the result can go back through `get()` /
+   * `remove()` without the prefix being applied twice.
+   */
+  protected unprefixKey(parsedKey: string): string {
+    const configured = this.options.globalPrefix;
+    const prefix = typeof configured === "function" ? configured() : configured;
+
+    if (!prefix) {
+      return parsedKey;
+    }
+
+    const lead = rtrim(prefix, ".") + ".";
+
+    return parsedKey.startsWith(lead) ? parsedKey.slice(lead.length) : parsedKey;
+  }
+
+  /**
+   * Whether a parsed `key` sits in the parsed `namespace` (the namespace key
+   * itself or `<namespace>.*`); an empty namespace matches everything.
+   */
+  protected inNamespace(key: string, namespace: string): boolean {
+    return namespace === "" || key === namespace || key.startsWith(namespace + ".");
+  }
+
+  /**
    * {@inheritdoc}
    */
   public setOptions(options: Options) {
@@ -247,7 +281,11 @@ export abstract class BaseCacheDriver<
     const options = normalizeToOptions(ttlOrOptions);
 
     return {
-      ttl: resolveTtl(options.ttl, options.expiresAt, this.ttl),
+      ttl: applyTtlJitter(
+        resolveTtl(options.ttl, options.expiresAt, this.ttl),
+        options.ttlJitter,
+        options.expiresAt,
+      ),
       tags: options.tags,
       onConflict: options.onConflict ?? "upsert",
       vector: options.vector,
@@ -444,9 +482,13 @@ export abstract class BaseCacheDriver<
    * {@inheritdoc}
    */
   public async has(key: CacheKey): Promise<boolean> {
-    const value = await this.get(key);
-    // Event is emitted by get() method
-    return value !== null;
+    // `exists()` never transfers the value; the `hit` / `miss` event carries
+    // the key only.
+    const found = await this.exists(key);
+
+    await this.emit(found ? "hit" : "miss", { key: this.parseKey(key) });
+
+    return found;
   }
 
   /**
@@ -568,6 +610,7 @@ export abstract class BaseCacheDriver<
     return {
       ttl: ttlOrOptions.ttl,
       tags: ttlOrOptions.tags,
+      ttlJitter: ttlOrOptions.ttlJitter,
     };
   }
 
@@ -615,6 +658,19 @@ export abstract class BaseCacheDriver<
 
     if (isFresh) {
       return entry.data as T;
+    }
+
+    if (options.failSafe) {
+      return this.singleFlight(this.swrFetchInFlight, parsedKey, async () => {
+        try {
+          return await this.swrFetchAndStore<T>(key, options, callback, freshSeconds, staleSeconds);
+        } catch (error) {
+          this.logError(`SWR refresh failed for ${parsedKey}, serving the stale value`, error);
+          await this.emit("error", { key: parsedKey, error });
+
+          return entry.data as T;
+        }
+      });
     }
 
     this.scheduleSwrRefresh<T>(parsedKey, key, options, callback, freshSeconds, staleSeconds);
@@ -687,6 +743,7 @@ export abstract class BaseCacheDriver<
       ttl: staleSeconds,
       staleAt: Date.now() + freshSeconds * 1000,
       tags: options.tags,
+      ttlJitter: options.ttlJitter,
     });
 
     return result;
@@ -719,6 +776,7 @@ export abstract class BaseCacheDriver<
           ttl: staleSeconds,
           staleAt: Date.now() + freshSeconds * 1000,
           tags: options.tags,
+          ttlJitter: options.ttlJitter,
         });
       } catch (error) {
         this.logError(`SWR background refresh failed for ${parsedKey}`, error);

@@ -8,6 +8,10 @@ const consoleLog = new ConsoleLog();
 // Lower `minLevel` to "debug" while investigating an issue.
 const productionConsoleLog = new ConsoleLog({ minLevel: "info" });
 
+// A JSON file channel (`new JSONFileLog(...)`) should set `format: "jsonl"`: one
+// appended line per entry. 6.0 makes it the default; the older "json" format
+// rewrites the whole file on each write.
+
 const logConfigurations: LogConfigurations = {
   enabled: true,
   development: {

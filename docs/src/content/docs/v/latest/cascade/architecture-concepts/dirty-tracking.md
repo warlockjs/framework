@@ -167,18 +167,10 @@ user.set("tags.0", "typescript"); // ✅ also fine
 
 ```ts
 user.set("name", "Ada"); // user.get("name") was already "Ada"
-user.isDirty("name"); // → true
+user.isDirty("name"); // → false
 ```
 
-Cascade marks the field as dirty regardless of whether the value actually changed. The dirty tracker tracks _attempts_, not _deltas_. If you need "did the value actually change?", compare manually:
-
-```ts
-const before = user.get("name");
-user.set("name", newName);
-const actuallyChanged = before !== newName;
-```
-
-For most apps this is a non-issue — `save()` is cheap, and the dirty tracker exists to _reduce_ writes, not to perfectly detect deltas. But if you're paying for round-trips, the manual compare is the safe path.
+The tracker compares the current data with the baseline it was loaded with (or had after the last `save()`), so writing a value equal to the stored one leaves the field clean.
 
 ## When the tracker resets
 

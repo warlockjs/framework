@@ -59,6 +59,24 @@ export class ContextSlot<TStore> implements ContextStorage<TStore> {
   }
 }
 
+/** The scope key outside every context. */
+const NO_SCOPE: object = Object.freeze({});
+
+/**
+ * An object that identifies the current scope's context stores. Two calls
+ * return the same object only when every context has the same store in both
+ * (the same request, the same `run()`); a `run()` or `enterWith()` of any
+ * context starts a new scope. Outside every context it returns one shared
+ * object.
+ *
+ * Code that collects work from several callers and runs it once (a batched
+ * query, for example) groups the callers by this key, so the work never runs
+ * with another request's or tenant's stores.
+ */
+export function currentContextScope(): object {
+  return sharedStorage.getStore() ?? NO_SCOPE;
+}
+
 /**
  * Run `callback` with several slots set at once: one shared-storage run,
  * however many contexts.

@@ -45,7 +45,29 @@ describe("template security and performance defaults", () => {
   });
 
   it("sets http.multipart.routes explicitly, so production boots without the unset-option warning", () => {
-    expect(read("src/config/http.ts")).toMatch(/multipart:\s*\{[^}]*\broutes:\s*"all",/s);
+    expect(read("src/config/http.ts")).toMatch(/multipart:\s*\{[^}]*\broutes:\s*"declared",/s);
+    expect(read("src/app/users/routes.ts")).toContain("uploads: true");
+    expect(read("src/app/posts/routes.ts")).toContain("uploads: true");
+  });
+
+  it("sets the safe values that become the defaults in 6.0", () => {
+    expect(read("src/app/auth/routes.ts")).toContain(
+      'loginThrottleMiddleware({ emailLock: "pair" })',
+    );
+    expect(read("src/config/auth.ts")).toContain('userVerification: "required"');
+    expect(read("src/config/log.ts")).toContain('format: "jsonl"');
+  });
+
+  it("recommends proxy addresses, not a bare true, for trustProxy", () => {
+    const http = read("src/config/http.ts");
+
+    expect(http).toContain("realIpHeader");
+    expect(http).not.toMatch(/set this to\s+`true`/);
+  });
+
+  it("does not filter users on a column the model lacks", () => {
+    expect(read("src/config/repository.ts")).not.toContain("isActiveColumn");
+    expect(read("src/app/users/services/list-users.service.ts")).not.toMatch(/Active/);
   });
 
   it("turns response compression on", () => {
@@ -103,7 +125,7 @@ describe("template security and performance defaults", () => {
     const routes = read("src/app/users/routes.ts");
 
     expect(routes).toMatch(
-      /router\.group\(\{ middleware: \[adminMiddleware\] \}, \(\) => \{\s*router\.route\("\/users"\)/,
+      /router\.group\(\{ middleware: \[adminMiddleware\] \}, \(\) => \{\s*router\s*\.route\("\/users"\)/,
     );
     expect(read("src/app/users/models/user/user.model.ts")).toContain(
       'role: v.enum(["user", "admin"]).default("user")',

@@ -910,6 +910,29 @@ export class PgCacheDriver
 
   /**
    * {@inheritdoc}
+   */
+  public async listKeys(namespace: string): Promise<string[]> {
+    const parsed = this.parseKey(namespace);
+    const t = this.table;
+
+    const result =
+      parsed === ""
+        ? await this.pgClient.query(
+            `SELECT key FROM ${t} WHERE (expires_at IS NULL OR expires_at > now())`,
+          )
+        : await this.pgClient.query(
+            `SELECT key FROM ${t} WHERE (key = $1 OR key LIKE $2 ESCAPE '\\') AND (expires_at IS NULL OR expires_at > now())`,
+            [
+              parsed,
+              `${parsed.replace(/\\/g, "\\\\").replace(/_/g, "\\_").replace(/%/g, "\\%")}.%`,
+            ],
+          );
+
+    return (result.rows as { key: string }[]).map((row) => this.unprefixKey(row.key));
+  }
+
+  /**
+   * {@inheritdoc}
    *
    * Honors `globalPrefix` — when configured, scopes the flush to entries
    * under the prefix rather than truncating the entire table (which could

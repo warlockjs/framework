@@ -100,3 +100,5 @@ await cache.set("k", v); // no TTL — driver default
 await cache.set("k", v, 3600); // seconds
 await cache.set("k", v, undefined); // same as no TTL
 ```
+
+- `ttlJitter: <percent>` spreads the TTL by up to that many percent either way per write (`{ ttl: "1h", ttlJitter: 10 }` expires in 54-66 minutes) so entries written together do not expire together; ignored for `expiresAt` / `Infinity`; also accepted by `remember()` and `swr()` options. `applyTtlJitter(ttl, percent, expiresAt?)` is the helper that computes it.

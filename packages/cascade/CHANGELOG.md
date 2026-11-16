@@ -4,6 +4,56 @@ All notable changes to `@warlock.js/cascade` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.54.0 - 2026-11-16
+
+### Upgrading
+
+- `model.load(...)` and `Model.find(id)` calls made in the same tick are now batched by default: several `find()` calls of one model class run one `whereIn` query, and `load()` calls with the same relations run one relation load, so query listeners and query counts see one query where they saw several. Results, per-call errors and transactions behave as before. A global scope that reads its own `AsyncLocalStorage` (not a `@warlock.js/context` context) cannot be told apart between callers: set `static batchLoads = false` on that model.
+
+### Added
+
+- `query.stream(batchSize?)` is an async iterator on both drivers: `for await (const user of User.query().stream(500))` reads and hydrates one batch per round trip, pages like `chunk()`, and stops reading when you leave the loop.
+- MongoDB now supports the relation-existence filters `has()`, `whereHas()`, `orWhereHas()`, `doesntHave()` and `whereDoesntHave()` for hasMany, hasOne, belongsTo and belongsToMany, in reads, counts and pagination. Each filter becomes a `$lookup` ahead of the `$match`, and `orWhereHas` joins the same `$or` as the other conditions. A write (`update()`, `delete()`, `unset()`, `increment()`) on a query holding such a filter, and a `whereHas` callback that filters by another relation, still throw `UnsupportedQueryOperationError`; resolve the ids with `pluck()` and write with `whereIn()`.
+- MongoDB `withCount()` now adds the related count (`postsCount`, or the `as` alias) from a `$lookup` with a `$count`, with the same alias and constraint-callback forms as PostgreSQL. The counts run after your filters (and after a `limit()`), or before them when a `where()` or `orderBy()` reads the count field.
+- `query.atomic(operations, options?)` on both builders applies update operators to every matching row in one statement, with the builder's filters and the model's global scopes inside it. `Model.atomic()` uses it for models with global scopes, so a scoped atomic write is one round trip instead of an id lookup followed by the write. Models with `fetching`, `hydrating` or `fetched` listeners keep the lookup.
+- PostgreSQL `query.prepare(name)` runs a read as a named prepared statement, so the server plans a hot query once per connection. The statement name carries a hash of the SQL text, so reusing a name on a query of another shape never collides.
+- `PostgresPoolConfig` types `statement_timeout` and `query_timeout`; the documentation recommends setting a statement timeout so one runaway query cannot hold a pool connection indefinitely.
+- `static guarded` on a model lists columns that mass assignment never writes. `merge()`, the object form of `set()`, `create()`, `createMany()`, `save({ merge })` and the data of `findOrCreate()` / `upsert()` skip them (and dot paths inside them), so `user.merge(request.all())` can no longer set `role` or `isAdmin`. `forceMerge()` and `Model.forceCreate()` write guarded columns on purpose from trusted code. The default is an empty list, so existing models behave as before.
+- Outside production, the first skipped write of a guarded column logs a warning naming the model and column. `markRawInput(object)` flags an object as raw request input; merging a flagged object into a model logs a one-time reminder to merge validated input.
+- Global scopes take a `stamp` option (`addGlobalScope(name, callback, { stamp: { tenantId } })`, or a function evaluated at each insert). The values are written into inserts made by `create()`, `createMany()`, `save()` of a new record and `upsert()` when the caller left the column unset, so a forgotten tenant column no longer creates a row outside every tenant. An upsert writes stamped columns only when it inserts.
+- `model.load(...)` calls and `Model.find(id)` calls made in the same tick are batched per model class: `Promise.all(posts.map((post) => post.load("author")))` runs one relation query, and several `find()` calls run one `whereIn` on the primary key. A lone call, a repeated id and any call inside a transaction run exactly as before. Only calls made under the same `@warlock.js/context` stores are grouped (one request, one `run()`), so a tenant global scope always sees its own caller's tenant. `static batchLoads = false` opts a model out.
+- `configureSyncFanout({ concurrency })` lets sync jobs for different source documents run side by side; jobs for one document always keep their order. The default stays one job at a time. `flushSyncFanout()` waits for queued jobs.
+- `Model.hydrate(row, driver?)` accepts the driver, so a caller hydrating a whole result set resolves it once.
+
+### Changed
+
+- A MongoDB upsert (`Model.atomic()` / `Model.findOneAndUpdate()` with `upsert: true`) generates its `id` only when it inserted a document, in a second write keyed on `_id` right after the insert. An upsert that updates an existing document no longer reserves an id (no counter round trip, no skipped numbers). Supply `id` in `$set` or `$setOnInsert` to choose it yourself, as before.
+- MongoDB `joinWith()` now loads the relations (with the same batched queries as `with()`) instead of recording them and doing nothing, and accepts names, an array, the `"id,name"` column shorthand and constraint callbacks.
+- `UpdateResult` carries `upsertedId` on MongoDB, and the driver atomic options accept `idOnInsert`.
+- A failing sync-event listener is retried on its own (3 attempts) and reported once; the other listeners of the event are no longer run again, and a listener failing for good no longer stops the ones after it.
+- A save, delete or restore of a model that has no sync listeners queues no fan-out job.
+- Hydrating a row resolves the model's data source once instead of twice, computes the schema's date columns once per model class, and only keeps the strings that could have been turned into dates.
+- `QueryBuilderContract.stream()` is optional in the contract. The MongoDB and PostgreSQL builders implement it; a custom builder or test double that does not stream keeps compiling.
+- Query builders hydrating a result set resolve the driver once per set and pass it to the hydrate callback (a new optional third argument) and on to `Model.hydrate(row, driver)`, instead of resolving the data source for every row.
+- PostgreSQL attaches the result's column types once per result when a builder hydrates it, not as one entry per row. Rows read through `driver.query()` directly behave as before.
+- The MongoDB `cursor()` error now points to `cursorPaginate()` and `stream()`.
+- Raised the `@mongez` dependency ranges to the 2026-11-16 releases (copper 2.1.4, dotenv 2.0.0, events 2.2.10, reinforcements 4.1.0, supportive-is 3.0.1).
+
+### Fixed
+
+- `cursorPaginate()` on both drivers read the cursor column as a model property, so any cursor column that was not a model member (`createdAt`, for example) produced `undefined` cursors. The cursors are now read with `model.get(column)` (lean rows as properties).
+- `findAndUpdate(filter, ops, { upsert: true })` updated only the first matching row. It now updates every matching row and inserts only when none matches.
+- MongoDB `withCount()` and `joinWith()` no longer succeed silently without doing anything.
+- MongoDB query clones keep `withCount()` entries, so `paginate()` and `chunk()` return the counts.
+
+### Documentation
+
+- Querying, relationships, atomic operations, configuration and the query builder reference pages describe the MongoDB relation filters and counts, `stream()`, `atomic()`, `prepare()`, scoped atomic writes, insert-time upsert ids and the PostgreSQL statement timeout; the query-data, define-relations, paginate-results, perform-atomic-ops and manage-data-sources skills match.
+- The CRUD basics page documents `guarded`, `forceMerge()` and `forceCreate()`; the scopes page documents `stamp`; the relationships page documents batched `load()` / `find()` and `batchLoads`; the sync page documents per-listener retry and `configureSyncFanout()`.
+- The `define-model`, `define-relations`, `query-data` and `perform-atomic-ops` skills cover the same behaviour.
+- The atomic-operations page and the `perform-atomic-ops` skill state that a MongoDB upsert writes its generated `id` in a second write right after the insert, so a crash between the two writes leaves the document without `id`, and how to avoid the window (supply `id` in `$setOnInsert`, or use a transaction).
+- The dirty-tracking page now says that setting a field to a value equal to the stored one leaves it clean, matching the tracker.
+
 ## 5.53.0 - 2026-11-11
 
 ### Upgrading

@@ -188,6 +188,29 @@ export class FileCacheDriver
   /**
    * {@inheritdoc}
    *
+   * Reads the entry directory names, so a key whose entry expired but was
+   * not read since is still listed; `get()` reports it missing.
+   */
+  public async listKeys(namespace: string): Promise<string[]> {
+    const parsed = this.parseKey(namespace);
+
+    try {
+      const entries = await listDirectoriesAsync(this.containedPath("")).catch(
+        () => [] as string[],
+      );
+
+      return entries
+        .map((entryPath) => this.decodeKeySegment(path.basename(entryPath)))
+        .filter((key) => this.inNamespace(key, parsed))
+        .map((key) => this.unprefixKey(key));
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * {@inheritdoc}
+   *
    * `onConflict: "create"` is exclusive (temp file + hard link, so `lock()`
    * is safe across concurrent writers). `onConflict: "update"` is NOT atomic:
    * the existence probe and the write are separate steps.

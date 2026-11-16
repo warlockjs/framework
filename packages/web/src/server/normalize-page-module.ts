@@ -12,7 +12,7 @@ import {
   type MetadataInput,
   type PageMetadata,
 } from "../metadata";
-import type { PageConfigValidation } from "../page-config";
+import type { PageConfigValidation, PageUploadsOption } from "../page-config";
 import type { PageCacheOptIn } from "../routing/route-identity";
 import type {
   SitemapModelLike,
@@ -48,6 +48,7 @@ export type NormalizedPageModule = {
   actions?: Readonly<Record<string, PageActionFunction>>;
   actionConfig?: NormalizedActionConfig;
   actionsConfig?: Readonly<Record<string, NormalizedActionConfig>>;
+  uploads?: PageUploadsOption;
   metadata?: PageMetadata<PipelineLoader> | { readonly robots?: string };
   sitemap?: SitemapPageExport | false | SitemapPageOptions;
   prefix?: string;
@@ -263,6 +264,32 @@ function validateActionConfig(
     result.middleware = value.middleware as readonly PipelineMiddleware[];
   }
   return result;
+}
+
+function validateUploads(value: unknown, sourceFile: string): PageUploadsOption {
+  if (typeof value === "boolean") return value;
+  if (plainObject(value)) {
+    assertExactKeys(
+      value,
+      ["maxTotalSize", "maxFileSize", "maxFiles"],
+      sourceFile,
+      "config.uploads",
+    );
+    for (const name of ["maxTotalSize", "maxFileSize", "maxFiles"] as const) {
+      const limit = value[name];
+      if (
+        limit !== undefined &&
+        (typeof limit !== "number" || !Number.isInteger(limit) || limit <= 0)
+      ) {
+        fail(sourceFile, `config.uploads.${name} must be a positive integer.`);
+      }
+    }
+    return value as PageUploadsOption;
+  }
+  return fail(
+    sourceFile,
+    "config.uploads must be a boolean or { maxTotalSize, maxFileSize, maxFiles }.",
+  );
 }
 
 function validateMiddleware(value: unknown, sourceFile: string): readonly PipelineMiddleware[] {
@@ -616,6 +643,8 @@ function normalizeUncached(
       }
       normalized.actionsConfig = actionsConfig;
     }
+    if (configValue.uploads !== undefined)
+      normalized.uploads = validateUploads(configValue.uploads, sourceFile);
     if (configValue.metadata !== undefined) {
       normalized.metadata = validatePageMetadata(configValue.metadata, sourceFile);
     }

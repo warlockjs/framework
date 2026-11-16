@@ -117,7 +117,8 @@ const truncated = ollama.embedder({ name: "mxbai-embed-large", dimensions: 512 }
 Wrapped into the typed `@warlock.js/ai` `AIError` hierarchy. The `ollama` client throws an internal `ResponseError` (`status_code` + message); transport failures surface as `fetch` `TypeError` with `ECONNREFUSED` cause:
 
 - **Daemon-down (`ECONNREFUSED` / "fetch failed") → `ProviderError`** (operational "is Ollama running?", not a request defect)
-- Timeouts → `ProviderTimeoutError`
+- Timeouts (`TimeoutError`, `ETIMEDOUT`) → `ProviderTimeoutError`
+- `AbortError` (the call's `signal`, `ollama.abort()`) → `ProviderAbortError` (category `cancelled`, never retried)
 - 401/403 → `ProviderAuthError`
 - 429 → `ProviderRateLimitError`
 - 4xx with context phrasing → `ContextLengthExceededError`, else `InvalidRequestError`

@@ -1,6 +1,11 @@
 import config from "@mongez/config";
 import { afterEach, describe, expect, it } from "vitest";
-import { LoaderTimeoutConfigError, resolveLoaderTimeoutMs } from "./streaming-config";
+import {
+  LoaderTimeoutConfigError,
+  ShellTimeoutConfigError,
+  resolveLoaderTimeoutMs,
+  resolveShellTimeoutMs,
+} from "./streaming-config";
 
 describe("resolveLoaderTimeoutMs (card 904a04eb)", () => {
   afterEach(() => {
@@ -33,5 +38,31 @@ describe("resolveLoaderTimeoutMs (card 904a04eb)", () => {
     config.set("web", { loaderTimeout: 12.5 });
 
     expect(() => resolveLoaderTimeoutMs()).toThrow(LoaderTimeoutConfigError);
+  });
+});
+
+describe("resolveShellTimeoutMs", () => {
+  afterEach(() => {
+    config.set("web", {});
+  });
+
+  it("defaults to 30000ms when web.shellTimeout is unset", () => {
+    expect(resolveShellTimeoutMs()).toBe(30_000);
+  });
+
+  it("reads web.shellTimeout, and 0 disables the bound", () => {
+    config.set("web", { shellTimeout: 2_000 });
+    expect(resolveShellTimeoutMs()).toBe(2_000);
+
+    config.set("web", { shellTimeout: 0 });
+    expect(resolveShellTimeoutMs()).toBe(0);
+  });
+
+  it("throws ShellTimeoutConfigError for a negative or fractional value", () => {
+    config.set("web", { shellTimeout: -1 });
+    expect(() => resolveShellTimeoutMs()).toThrow(ShellTimeoutConfigError);
+
+    config.set("web", { shellTimeout: 1.5 });
+    expect(() => resolveShellTimeoutMs()).toThrow(ShellTimeoutConfigError);
   });
 });

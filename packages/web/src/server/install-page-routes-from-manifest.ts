@@ -69,6 +69,7 @@ import {
 } from "./create-page-route-handler";
 import { layoutPrefixesByDirectory } from "./layout-prefixes";
 import { createRefusalPageRenderer } from "./core-refusal-page";
+import type { FailureShell } from "./render-page";
 import { notFoundPageHandlerOptions } from "./not-found-handler-options";
 import { normalizePageModule } from "./normalize-page-module";
 import { productionDeclaredStylesheetUrls, productionStylesheetUrls } from "./stylesheet-urls";
@@ -107,6 +108,26 @@ function manifestModule(entry: {
     entry.sourceFile,
     entry.setupSourceFile,
   );
+}
+
+/**
+ * The layouts that sit in the web root beside the application root (outermost
+ * first), the ones every page of the site renders inside. A refusal page has no
+ * route of its own, so these are the only layouts it can be wrapped in.
+ */
+function rootLayoutEntries(
+  manifest: PageManifest,
+  app: { sourceFile: string },
+): PageManifestLayoutEntry[] {
+  const webRoot = path.posix.dirname(app.sourceFile);
+
+  for (const page of manifest.pages) {
+    const root = page.layouts.find((layout) => path.posix.dirname(layout.sourceFile) === webRoot);
+
+    if (root !== undefined && typeof root.module.default !== "undefined") return [root];
+  }
+
+  return [];
 }
 
 /** The exports this module reads off a layout module namespace. */
@@ -785,7 +806,12 @@ export function installPageRoutesFromManifest(
         localeRouting,
         { pageFile: page.sourceFile, renderNotFound },
       )) {
-        router.post(routerPathOf(registration.path), registration.handler, { isPage: true });
+        router.post(routerPathOf(registration.path), registration.handler, {
+          isPage: true,
+          ...(pageModule.uploads === undefined || pageModule.uploads === false
+            ? {}
+            : { uploads: pageModule.uploads }),
+        });
       }
     }
 
@@ -808,6 +834,11 @@ export function installPageRoutesFromManifest(
     router,
     renderPage: notFoundPageHandler,
     renderRefusal: createRefusalPageRenderer({
+      loadShell: async () =>
+        ({
+          app: manifestModule(app),
+          layouts: rootLayoutEntries(manifest, app).map(manifestModule),
+        }) as FailureShell,
       name:
         siteSlice?.site === undefined
           ? NOT_FOUND_ROUTE_NAME

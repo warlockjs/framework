@@ -518,3 +518,26 @@ describe("JSONFileLog", () => {
     });
   });
 });
+
+describe("JSONFileLog default format warning", () => {
+  it("warns once, naming the setting and 6.0, when format is not set", async () => {
+    vi.resetModules();
+    const previous = process.env.NODE_ENV;
+    process.env.NODE_ENV = "production";
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    try {
+      const { JSONFileLog: Channel } = await import("./json-file-log");
+      new Channel({ storagePath: "/tmp/unused" } as any);
+      new Channel({ storagePath: "/tmp/unused" } as any);
+      new Channel({ storagePath: "/tmp/unused", format: "jsonl" } as any);
+
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(String(warn.mock.calls[0]?.[0])).toContain("format");
+      expect(String(warn.mock.calls[0]?.[0])).toContain("6.0");
+    } finally {
+      process.env.NODE_ENV = previous;
+      warn.mockRestore();
+    }
+  });
+});

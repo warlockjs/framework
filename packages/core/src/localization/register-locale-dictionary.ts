@@ -1,10 +1,7 @@
 import config from "@mongez/config";
-import {
-  getTranslationsList,
-  groupedTranslations,
-  setTranslationsList,
-} from "@mongez/localization";
+import { getTranslationsList } from "@mongez/localization";
 import { parseLocaleDictionary } from "./parse-locale-dictionary";
+import { groupedTranslations, setTranslationsList } from "./translations-revision";
 
 type Owner = { sourceFile: string; kind: "json" | "ts" };
 const owners = new Map<string, Owner>();

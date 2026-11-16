@@ -4,6 +4,43 @@ All notable changes to `@warlock.js/ai` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.54.0 - 2026-11-16
+
+### Added
+
+- `ai.guardrail` has a `toolResult` phase. Detectors listed under `toolResult` run on what a tool returned (a string as is, anything else as JSON) before the model reads it, which is the usual path for indirect prompt injection from fetched pages and files. `block` fails that tool call with a `GuardrailViolationError` (phase `"toolResult"`), `redact` replaces the result data with the rewritten text, and `flag` records the match. `toolNames` scopes it like the `tool` phase. `GuardrailPhase` gains the `"toolResult"` value.
+- `ai.guardrail({ wrapToolResults: true })` wraps each successful tool result in `<untrusted-tool-result tool="name">…</untrusted-tool-result>` so the model is told it is data, not instructions (a closing tag inside the data is neutralised). It works with or without `toolResult` detectors.
+- `fallbackModel` takes `alsoRetryOn` (a code list or predicate) that adds failover reasons on top of `retryOn` or the default set. `isDefaultFallbackRetryable(error)` and `DEFAULT_FALLBACK_RETRY_CODES` are exported so a custom `retryOn` predicate can compose with the standard failover instead of copying the list.
+- Snapshot stores may implement `markPending(runId, pending)`, which sets the `pending` field of the stored snapshot in place. The `memory`, `pg` (`jsonb_set`) and `sqlite` stores implement it.
+- Guarded outbound fetches warn once per reason (`[warlock-ai] outbound address pinning is off ...`) when connection pinning cannot apply: an injected `fetch`, a proxy or mock global dispatcher, an `Agent` with a function `connect`, or a runtime without a default dispatcher.
+- `ProviderAbortError`: the error an adapter raises when the caller aborts a provider call through its own `AbortSignal`. Its `name` is `AbortError`, its category is `cancelled`, and it is never retryable, so `retryModel` and `fallbackModel` stop on it.
+- `ai.rag({ store })` accepts a `VectorStore` directly (for example `ai.rag.pgVectorStore({ client: pool })`) as well as a cache driver. A cache driver is wrapped for you; a `VectorStore` is used as is.
+- `VectorStore` gains an optional `list(namespace)`, and `query()` takes an optional `filter`. `cacheVectorStore` offers `list()` when the cache driver can list its keys, and `ai.rag.pgVectorStore` offers `remove(key)` and `list(namespace)`.
+
+### Changed
+
+- `ai.session` writes the stored record once per turn on stores with `markPending` (the pending mark is a small in-place update; the full record is saved when the turn settles). Other stores, and the first turn of a new session, behave as before; crash recovery is unchanged.
+- The pinned dispatcher for guarded outbound fetches is built from the app's own global `Agent`, so it keeps that agent's connect options (private CA, client certificate, timeouts) and replaces only the address resolution.
+- `ai.serve` logs that it will refuse to start without `authToken`, `authorize` or `public: true` in 6.0 (the production warning is unchanged otherwise; nothing changes in 5.x).
+- The injection detector also folds combining marks, look-alike Cyrillic and Greek letters, and the separators `, ; : | / \ *`, Unicode spaces, dashes and connector punctuation, so those tricks no longer hide a phrase. Matching stays linear. Caller string markers are folded the same way.
+- The internal scoped-similarity helper passes its accept predicate to the query callback, so a store that filters before it ranks can answer a scoped recall with one query.
+- Scoped recalls are one query on stores that filter before ranking: semantic, episodic and procedural memory recall, the `semanticCache` middleware and `rag.retrieve()` hand their scope / namespace check to the store as the `similar()` `filter`. A store that ignores the filter still gets the widening of the candidate page.
+- `rag.clear()` lists the namespace and deletes exactly this rag's chunks when the store can list its keys (no probe embedding, no similarity sweeps); a store that cannot list keeps the sweep. `ai.rag.pgVectorStore` now also clears only the rag's own chunks, so a nested namespace survives.
+
+### Fixed
+
+- `fallbackModel`: a caller's own cancellation (an aborted `options.signal`, an `AbortError`, or a `cancelled` error) never advances the chain, so the backup model is no longer called with an already-aborted signal and the abort error is what surfaces.
+- `rag.clear()` removes only its own namespace's chunks; a nested namespace (`kb.acme.private`) and siblings on the same driver are kept.
+- `agent.execute()` and `agent.stream()` refuse a non-string `input` with an `InvalidRequestError` that says to pass the prompt text (`execute()` rejects, `stream()` throws) instead of passing an object into the prompt.
+
+### Documentation
+
+- The `retryOn` contract comment, the provider-fallback recipe, the resilience page and the `ai-dx-helpers` skill now say that `retryOn` (list or predicate) replaces the default set, name `alsoRetryOn` and `isDefaultFallbackRetryable`, and list `PROVIDER_OVERLOADED` in the default.
+- Guardrails page and `guard-input-output` skill: the `toolResult` phase, `wrapToolResults`, and the extended injection normalisation. Outbound-policy page and `secure-outbound-requests` skill: inherited connect options and the remaining pinning limits. RAG page and `run-ai-rag` skill: the exact `clear()`. Conversation-sessions and persist-data pages: `markPending`. Run-agent and serve pages: the input check and the 6.0 `ai.serve` change.
+- RAG pages and the `run-ai-rag` and `rag-loaders-and-stores` skills: a `VectorStore` as `store`, and the listing-based `clear()`. Error pages and the `handle-errors` skill: `ProviderAbortError`.
+- The pgvector knowledge-base example now passes the `pg` cache driver (configured with `vector`) as `ai.rag({ store })`, and a note explains that `ai.rag.pgVectorStore` returns a `VectorStore` for direct use, not a value `ai.rag({ store })` accepts.
+- The `ai.guardrail` doc comment now lists the `links` detector factory with the others.
+
 ## 5.53.0 - 2026-11-11
 
 ### Upgrading

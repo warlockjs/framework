@@ -171,6 +171,14 @@ const counter = await Counter.findOneAndUpdate(
 await Score.atomic({ id: 1 }, [{ $set: { total: { $add: ["$likes", "$shares"] } } }]);
 ```
 
+On a model with global scopes (tenant, soft delete), `atomic()` applies the scopes inside the same statement through the scoped query builder (`query.atomic(ops)`), so a scoped write is one round trip instead of an id lookup followed by the write. Models with a `fetching`, `hydrating` or `fetched` listener keep the lookup, because those listeners observe it.
+
+On MongoDB, a generated `id` for an upsert is written only when the upsert inserted a document: the driver writes it in a second write keyed on `_id` right after the insert. An upsert that updates an existing document does not generate (or use up) an id and costs no extra round trip. Supply `id` in `$set` / `$setOnInsert` (or filter on it) to choose the id yourself.
+
+The two writes are not one atomic step: the id has to come from an asynchronous generator, and reserving it before the upsert would use up a number every time the upsert only updates. If the process stops between the insert and the id write, the inserted document keeps no `id` until it is repaired. When that window matters, supply the `id` yourself in `$setOnInsert`, or run the upsert inside a transaction so both writes commit together.
+
+`Model.findAndUpdate(filter, ops, { upsert: true })` updates every row the filter matches, and inserts only when none matches.
+
 `Model.findAndUpdate`'s options omit `trustedFilter` (it always sanitizes its filter); `atomic` and `findOneAndUpdate` accept it.
 
 ### `trustedFilter` — conditional reservations

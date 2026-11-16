@@ -277,7 +277,7 @@ passkeys: {
   rpID: "example.com",
   rpName: "Example",
   origin: "https://example.com",
-  // userVerification: "preferred", // default; "required" demands a PIN or biometric
+  userVerification: "required", // "preferred" (current default) also accepts possession only
 },
 ```
 
@@ -287,6 +287,8 @@ accepts a passkey that only proves possession, such as a security key without
 a PIN. `"required"` refuses such an assertion with `InvalidPasskeyError`, so a
 passkey login is two factors; users whose authenticator cannot verify them
 cannot register or sign in with it.
+
+The default changes from `"preferred"` to `"required"` in 6.0. Until then, leaving `userVerification` unset logs a one-time warning; set it explicitly to choose now.
 
 ```ts title="src/app/users/routes.ts"
 import {

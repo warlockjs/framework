@@ -185,7 +185,15 @@ A field of type `"date"` produces an **envelope** by default — an object with 
 
 The envelope is what consumers usually want — every common representation in one go, no client-side date parsing needed.
 
-To pick a single representation, use the builder with `dateOptions`:
+To change the output for every date field at once, set `resource.dateOutput` in `src/config/resource.ts` to any value `dateOptions()` accepts (`"iso"`, `"timestamp"`, `"format"`, `"humanTime"`, `"locale"`, or an options object). Fields that call `dateOptions()` themselves keep their own choice, and unset keeps the envelope above. An app that only needs ISO strings sets it once and skips building the other formats on every field:
+
+```ts title="src/config/resource.ts"
+export default {
+  dateOutput: "iso",
+};
+```
+
+To pick a single representation for one field, use the builder with `dateOptions`:
 
 ```ts
 import { ResourceFieldBuilder } from "@warlock.js/core";

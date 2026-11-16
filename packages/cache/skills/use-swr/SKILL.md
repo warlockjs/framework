@@ -98,3 +98,4 @@ await feed.swr("home", { freshTtl: "30s", staleTtl: "10m", tags: ["computed"] },
 - Don't pick `freshTtl` to be the _same_ as `staleTtl` thinking it disables the stale window — that throws. Pick a tight `freshTtl` and wider `staleTtl` that reflects how stale your product can tolerate being.
 - Don't ignore `error` events. A persistent stream of refresh failures means upstream is broken and the cache is masking it.
 - Don't reach for SWR on the null driver — it caches nothing, so SWR always blocks.
+- `failSafe: true` makes a stale-window caller wait for the refresh (callers of one key share it) and return the stale value when the callback throws; the failure is logged and emitted as an `error` event. Default (off): stale value at once, refresh in the background.

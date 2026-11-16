@@ -215,6 +215,37 @@ export class RedisCacheDriver
   }
 
   /**
+   * {@inheritdoc}
+   *
+   * Walks the keyspace with `SCAN` (never `KEYS`), matching the namespace key
+   * itself plus `<namespace>.*`.
+   */
+  public async listKeys(namespace: string): Promise<string[]> {
+    if (!this.client) {
+      return [];
+    }
+
+    const parsed = this.parseKey(namespace);
+    const escaped = parsed.replace(/[\\*?[\]]/g, "\\$&");
+    const found = new Set<string>();
+
+    if (escaped !== "" && (await this.client.exists(parsed))) {
+      found.add(parsed);
+    }
+
+    for await (const scanned of this.client.scanIterator({
+      MATCH: escaped === "" ? "*" : `${escaped}.*`,
+      COUNT: 100,
+    })) {
+      for (const key of Array.isArray(scanned) ? scanned : [scanned]) {
+        found.add(key as unknown as string);
+      }
+    }
+
+    return [...found].map((key) => this.unprefixKey(key));
+  }
+
+  /**
    * Delete keys with `UNLINK` (non-blocking free), falling back to `DEL` when
    * the client lacks it. Returns the number of keys removed.
    */

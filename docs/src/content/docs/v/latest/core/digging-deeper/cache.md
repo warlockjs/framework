@@ -91,9 +91,19 @@ export default cacheConfigurations;
 | `drivers` | Name → class map. Drivers are lazy-instantiated on first reference |
 | `options` | Per-driver constructor options. Indexed by driver name             |
 
-The `database` driver uses a `cache` table — it ships with the auth migrations bundle, or you can register your own `cache.migration.ts`. Without the table the first `set` throws on boot.
+The `database` driver uses a `cache` table. Register the `cacheMigration` that `@warlock.js/core` exports in `warlock.config.ts` (`database: { migrations: [...authMigrations, cacheMigration] }`); it creates the table with a **unique** index on `key`. Without the table the first `set` throws.
+
+An app whose `cache` table already exists adds the index itself before turning on `upsert`, for example in a migration: `CREATE UNIQUE INDEX cache_key_unique ON cache (key)` (remove duplicate keys first, or the statement fails).
 
 `removeNamespace("users")` on the `database` driver removes the `users` key and every key under it (`users.id.1`, `users.list.…`), as the other drivers do, so a repository's cache invalidation clears its nested entries. `flush()` waits for the rows to be deleted before it resolves. An index on the `key` column keeps both fast.
+
+`get` reads a plain row (no model is built). For writes, `set` reads the row first and then inserts or updates it. Once the table has a **unique** index on `key`, pass `upsert: true` in the driver options and each `set` becomes one upsert (`conflictColumns: ["key"]`):
+
+```ts
+database: { upsert: true },
+```
+
+Without the unique index, leave it off: PostgreSQL refuses an upsert on a column that has no unique constraint.
 
 ### Driver picks at a glance
 
@@ -453,7 +463,7 @@ if (stored !== submitted) {
 - **`remember` is not stampede-proof across every driver.** Memory drivers serialise within process. Multi-process apps need Redis (or build your own coordination on `cache.lock`).
 - **Per-call driver overrides don't stick.** Passing `{ driver: "redis" }` for one call doesn't change the default — that's by design. Use `cache.use("redis")` to switch defaults.
 - **`globalPrefix` is per-driver.** Setting it on `memory` doesn't affect `redis`. If you use multiple drivers for the same app, pin the prefix uniformly to avoid cross-driver key collisions.
-- **The `database` driver requires the `cache` table.** It's part of `authMigrations` in the canonical project setup. Without the table the first `set` throws on a missing table — cover this in your startup health check.
+- **The `database` driver requires the `cache` table.** Register `cacheMigration` from `@warlock.js/core` in `database.migrations`. Without the table the first `set` throws on a missing table — cover this in your startup health check.
 - **Tags require a tagging driver.** Calling `cache.tags(...)` on the base `database` driver throws `CacheUnsupportedError`. Use Redis or `memoryExtended` if you need tags.
 - **`cache.lock` releases on its own TTL.** If your work exceeds the TTL, a second worker can pick up the job. Size the TTL generously, monitor for over-runs.
 

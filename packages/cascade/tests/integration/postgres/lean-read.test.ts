@@ -68,9 +68,11 @@ suite("Postgres lean read mode", () => {
     expect(first?.name).toBe("Alice");
     expect(first?.joined_at).toBe("2024-01-01T00:00:00.000Z");
 
-    // Control: the hydrated read casts the same column.
+    // Control: the hydrated read returns a Model; a date string the schema does not
+    // declare as a date stays a string.
     const hydrated = await Member.query().orderBy("id").first();
-    expect(hydrated?.get("joined_at")).toBeInstanceOf(Date);
+    expect(hydrated).toBeInstanceOf(Model);
+    expect(hydrated?.get("joined_at")).toBe("2024-01-01T00:00:00.000Z");
   });
 
   it("where / select / orderBy / limit behave the same as a hydrated read", async () => {

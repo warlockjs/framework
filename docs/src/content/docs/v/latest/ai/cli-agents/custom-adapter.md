@@ -32,6 +32,7 @@ export const acmeAdapter: CliAdapter = {
   title: "Acme Agent",
   command: "acme",
   apiKeyEnv: ["ACME_API_KEY"], // `apiKey` is exported as the first one
+  passEnv: ["ACME_BASE_URL"], // extra variables `inheritEnv: "curated"` passes from the host
   homeEnv: ["ACME_HOME"], // pointed at the run's home; [] if the CLI cannot relocate its config
   transports: ["argv", "stdin"], // in order of preference
   effort: false, // true when plan() maps `effort`

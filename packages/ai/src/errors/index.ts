@@ -72,6 +72,7 @@ export {
   ProviderRateLimitError,
   type ProviderRateLimitErrorOptions,
 } from "./provider-rate-limit-error";
+export { ProviderAbortError } from "./provider-abort-error";
 export { ProviderTimeoutError } from "./provider-timeout-error";
 export { QuotaExceededError } from "./quota-exceeded-error";
 export { RoutingError, type RoutingErrorOptions } from "./routing-error";

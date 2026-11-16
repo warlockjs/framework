@@ -39,6 +39,7 @@ describe("doctor auth-tokens check", () => {
     const result = await run();
 
     expect(result?.status).toBe("warn");
+    expect(result?.code).toBe("WL1013");
     expect(result?.detail).toContain("auth.accessToken.secret is 12 bytes");
   });
 

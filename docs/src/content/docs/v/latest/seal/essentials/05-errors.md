@@ -106,7 +106,7 @@ Most chain methods take an optional `errorMessage` argument:
 v.string().email("Please enter a valid email address").required("Email is required");
 ```
 
-That override replaces the rule's default message at this call site only. Reach for it when one rule needs a tailored message in a specific schema.
+That override replaces the rule's default message at this call site only. An override that is a dotted translation key (`"forms.emailInvalid"`, no spaces) is translated when the app sets `translateMessageKey` in `configureSeal()`; Warlock.js sets it to the request-locale translator, so such a key is translated in a Warlock.js app. A key with no translation is returned as written, and a sentence is never passed to the translator. Reach for it when one rule needs a tailored message in a specific schema.
 
 ### Global translation
 

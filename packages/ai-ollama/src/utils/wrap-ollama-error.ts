@@ -2,6 +2,7 @@ import {
   AIError,
   ContextLengthExceededError,
   InvalidRequestError,
+  ProviderAbortError,
   ProviderAuthError,
   ProviderError,
   ProviderRateLimitError,
@@ -52,6 +53,10 @@ export function wrapOllamaError(thrown: unknown): AIError {
   const shape = toShape(thrown);
   const context = buildContext(shape);
   const message = shape.message ?? (thrown instanceof Error ? thrown.message : String(thrown));
+
+  if (shape.name === "AbortError") {
+    return new ProviderAbortError(message, { cause: thrown, context });
+  }
 
   if (isTimeout(shape)) {
     return new ProviderTimeoutError(message, { cause: thrown, context });
@@ -108,7 +113,7 @@ function toShape(thrown: unknown): OllamaErrorShape {
 
 /** Transport-level timeout signals. */
 function isTimeout(shape: OllamaErrorShape): boolean {
-  if (shape.name === "AbortError" || shape.name === "TimeoutError") {
+  if (shape.name === "TimeoutError") {
     return true;
   }
 

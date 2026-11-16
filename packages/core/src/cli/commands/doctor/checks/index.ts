@@ -11,6 +11,7 @@ import { handlerSignatureCheck } from "./handler-signature.check";
 import { healthCheck } from "./health.check";
 import { jwtSecretCheck } from "./jwt-secret.check";
 import { localesTsDeprecatedCheck } from "./locales-ts-deprecated.check";
+import { keyRotationCheck } from "./key-rotation.check";
 import { memoryCacheCheck } from "./memory-cache.check";
 import { optionalPeersCheck } from "./optional-peers.check";
 import { productionLoggingCheck } from "./production-logging.check";
@@ -57,5 +58,6 @@ export const defaultDoctorChecks: DoctorCheck[] = [
   compressionCheck,
   envFilesCheck,
   memoryCacheCheck,
+  keyRotationCheck,
   releaseHygieneCheck,
 ];

@@ -10,6 +10,7 @@
  * @module cascade/drivers/postgres
  */
 
+import { createHash } from "node:crypto";
 import { colors } from "@mongez/copper";
 import { log } from "@warlock.js/logger";
 import {
@@ -190,6 +191,41 @@ export function buildPostgresPoolConfig(config: PostgresPoolConfig): PgPoolConfi
   };
 }
 
+/** Options for a single {@link PostgresDriver.query} call. */
+export type PostgresQueryOptions = {
+  /**
+   * Run the SQL as a named prepared statement. The name is combined with a
+   * hash of the SQL text so one name never maps to two different statements.
+   */
+  readonly statementName?: string;
+  /**
+   * Leave column types off the individual rows. The caller hydrates the whole
+   * result inside {@link PostgresDriver.withColumnTypes}, so the types are
+   * attached once per result instead of once per row.
+   */
+  readonly deferColumnTypes?: boolean;
+};
+
+/**
+ * The value handed to pg: the SQL and values, plus a statement name when the
+ * query is prepared. pg keeps a named statement per connection and rejects a
+ * name reused with different text, so the name carries a hash of the text.
+ */
+export function resolveStatement(
+  sql: string,
+  values: unknown[],
+  statementName?: string,
+): { text: string; values: unknown[]; name?: string } {
+  if (!statementName) {
+    return { text: sql, values };
+  }
+
+  const hash = createHash("sha1").update(sql).digest("hex").slice(0, 12);
+
+  // PostgreSQL identifiers are limited to 63 bytes.
+  return { text: sql, values, name: `${statementName.slice(0, 40)}:${hash}` };
+}
+
 /**
  * Cached pg module reference.
  */
@@ -337,6 +373,9 @@ export class PostgresDriver implements DriverContract {
 
   /** Column `dataTypeID`s per result row, filled by `query()` for `deserialize()`. */
   private readonly rowColumnTypes = new WeakMap<object, PostgresColumnTypes>();
+
+  /** Column types of the result being hydrated inside {@link withColumnTypes}. */
+  private activeColumnTypes: PostgresColumnTypes | undefined;
 
   /** Unique keys per table, resolved from `pg_index` for upsert conflict targets. */
   private readonly _uniqueKeys = new Map<string, ReadonlyArray<UniqueKey>>();
@@ -733,7 +772,7 @@ export class PostgresDriver implements DriverContract {
     // Column types come from the pg result `fields`, recorded per row by
     // `query()`. A row that did not come from `query()` is left as pg
     // returned it rather than guessed from its values (K1:B29).
-    const columnTypes = this.rowColumnTypes.get(data);
+    const columnTypes = this.rowColumnTypes.get(data) ?? this.activeColumnTypes;
     if (columnTypes) {
       for (const [key, value] of Object.entries(data)) {
         if (typeof value !== "string") continue;
@@ -1638,6 +1677,49 @@ export class PostgresDriver implements DriverContract {
   }
 
   /**
+   * Apply atomic update operators to the rows a prepared `WHERE` fragment
+   * selects, in one `UPDATE` statement.
+   *
+   * Used by the query builder so a write can carry the builder's filters and
+   * global scopes in the same statement instead of resolving ids first. The
+   * fragment's placeholders own `$1..$N`; the SET values bind after them.
+   *
+   * @param table - Target table name
+   * @param filter - `WHERE ...` fragment (or empty) and its parameters
+   * @param operations - Update operators (`$set`, `$unset`, `$inc`, `$dec`)
+   * @param options - Update options (`upsert` is not available here)
+   * @returns Update result with the number of rows updated
+   */
+  public async atomicWhere(
+    table: string,
+    filter: { sql: string; params: unknown[] },
+    operations: AtomicUpdate,
+    options?: DriverAtomicUpdateOptions,
+  ): Promise<UpdateResult> {
+    if (options?.upsert) {
+      throw new UnsupportedUpdateOperationError(
+        "upsert through a query builder",
+        "postgres",
+        "Use Model.atomic() with the upsert option instead.",
+      );
+    }
+
+    const update = assertPostgresUpdate(operations, options);
+    const set = this.buildSetClauses(table, update, filter.params.length + 1);
+
+    if (set.clauses.length === 0) {
+      throw new Error("No update operations specified");
+    }
+
+    const sql =
+      `UPDATE ${this.dialect.quoteTableIdentifier(table)} SET ${set.clauses.join(", ")}` +
+      (filter.sql ? ` ${filter.sql}` : "");
+    const result = await this.query(sql, [...filter.params, ...set.params]);
+
+    return { modifiedCount: result.rowCount ?? 0 };
+  }
+
+  /**
    * Get the sync adapter for bulk denormalized updates.
    *
    * Sync instructions arrive in the portable Mongo shape (`$set` with a `field.$`
@@ -1835,12 +1917,35 @@ export class PostgresDriver implements DriverContract {
    * @param params - Query parameters
    * @returns Query result
    */
-  private recordColumnTypes(result: PostgresQueryResult): void {
-    if (!result.fields?.length || !result.rows?.length) return;
+  public columnTypesOf(
+    result: Pick<PostgresQueryResult, "fields">,
+  ): PostgresColumnTypes | undefined {
+    if (!result.fields?.length) return undefined;
 
-    const columnTypes: PostgresColumnTypes = new Map(
-      result.fields.map((field) => [field.name, field.dataTypeID] as const),
-    );
+    return new Map(result.fields.map((field) => [field.name, field.dataTypeID] as const));
+  }
+
+  /**
+   * Run a synchronous hydration of one result's rows with that result's column
+   * types active, so {@link deserialize} needs no per-row entry. Use it with
+   * a result fetched through `query(..., { deferColumnTypes: true })`.
+   */
+  public withColumnTypes<R>(result: Pick<PostgresQueryResult, "fields">, callback: () => R): R {
+    const previous = this.activeColumnTypes;
+    this.activeColumnTypes = this.columnTypesOf(result);
+
+    try {
+      return callback();
+    } finally {
+      this.activeColumnTypes = previous;
+    }
+  }
+
+  private recordColumnTypes(result: PostgresQueryResult): void {
+    if (!result.rows?.length) return;
+
+    const columnTypes = this.columnTypesOf(result);
+    if (!columnTypes) return;
 
     for (const row of result.rows) {
       if (row && typeof row === "object") this.rowColumnTypes.set(row, columnTypes);
@@ -1850,7 +1955,10 @@ export class PostgresDriver implements DriverContract {
   public async query<T = Record<string, unknown>>(
     sql: string,
     params: unknown[] = [],
+    options?: PostgresQueryOptions,
   ): Promise<PostgresQueryResult<T>> {
+    const statement = resolveStatement(sql, params, options?.statementName);
+
     // Check for active transaction client
     const txClient = this.getOwnSession() as PgPoolClient | undefined;
 
@@ -1872,7 +1980,11 @@ export class PostgresDriver implements DriverContract {
         });
       }
       if (txClient) {
-        result = await this.executePostgresQuery(() => txClient.query(sql, params), sql, params);
+        result = await this.executePostgresQuery(
+          () => (statement.name ? txClient.query(statement) : txClient.query(sql, params)),
+          sql,
+          params,
+        );
       } else {
         // No automatic retry here: a client that looked idle-healthy to the
         // pool can already have been dropped by the server/OS (card
@@ -1885,7 +1997,11 @@ export class PostgresDriver implements DriverContract {
         // side effect and the response would duplicate it. Callers that
         // need retry semantics must implement them with real idempotency
         // guarantees at the call site.
-        result = await this.executePostgresQuery(() => this.pool.query(sql, params), sql, params);
+        result = await this.executePostgresQuery(
+          () => (statement.name ? this.pool.query(statement) : this.pool.query(sql, params)),
+          sql,
+          params,
+        );
       }
 
       if (this.config.logging) {
@@ -1898,7 +2014,7 @@ export class PostgresDriver implements DriverContract {
         });
       }
 
-      this.recordColumnTypes(result as PostgresQueryResult);
+      if (!options?.deferColumnTypes) this.recordColumnTypes(result as PostgresQueryResult);
 
       return result as PostgresQueryResult<T>;
     } catch (error) {

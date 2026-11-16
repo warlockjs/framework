@@ -35,6 +35,7 @@ describe("doctor trust-proxy check", () => {
     const result = await run();
 
     expect(result?.status).toBe("warn");
+    expect(result?.code).toBe("WL1014");
     expect(result?.detail).toContain("http.trustProxy");
     expect(result?.detail).toContain("http.realIpHeader");
   });

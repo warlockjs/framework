@@ -24,6 +24,12 @@ function toRoleList(value: unknown): string[] {
  * new DefaultAccessResolver(rolesMap, (user) => user.get("memberRoles"));
  */
 export class DefaultAccessResolver implements AccessResolver {
+  /**
+   * The sets are a pure function of the loaded user, so caching them would
+   * only delay a role change; the engine reads them straight from the user.
+   */
+  public readonly cacheable = false;
+
   public constructor(
     private readonly roles: RolesMap,
     private readonly readRoles: (user: Auth) => unknown = (user) =>

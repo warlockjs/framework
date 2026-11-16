@@ -4,6 +4,12 @@ All notable changes to `@warlock.js/ai-ollama` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.54.0 - 2026-11-16
+
+### Upgrading
+
+- An `AbortError` (the call's own `signal`, or `ollama.abort()`) is raised as a `ProviderAbortError` (category `cancelled`, never retried) instead of a `ProviderTimeoutError`. Code that caught `ProviderTimeoutError` to notice a cancel should catch `ProviderAbortError` (or check `category === "cancelled"`). `TimeoutError` (for example from `AbortSignal.timeout()`) and `ETIMEDOUT` stay timeouts.
+
 ## 5.45.0 - 2026-11-05
 
 ### Added

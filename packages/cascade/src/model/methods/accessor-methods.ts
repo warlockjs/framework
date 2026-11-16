@@ -2,6 +2,7 @@ import { get, merge, only, set, unset } from "@mongez/reinforcements";
 import { pruneEmptyParents } from "../../utils/prune-empty-parents";
 import { assertSafeFieldPath, assertSafeValueKeys } from "../../utils/safe-path";
 import type { Model } from "../model";
+import { stripGuardedColumns, warnRawInputMerge } from "./guarded-columns";
 
 /**
  * Sentinel symbol to distinguish a genuinely missing field from a field
@@ -110,6 +111,19 @@ function stripIdentityColumns(
 }
 
 export function mergeFields(model: Model, values: Record<string, unknown>): Model {
+  warnRawInputMerge(model.self(), values);
+
+  const unguarded = stripGuardedColumns(model.self(), values, "merge");
+
+  return mergeDriverFields(model, stripIdentityColumns(model, unguarded));
+}
+
+/**
+ * {@link mergeFields} without the `guarded` columns check: the explicit way to
+ * write a guarded column (`role`, `isAdmin`) from trusted code. Identity
+ * columns of a persisted model stay protected.
+ */
+export function forceMergeFields(model: Model, values: Record<string, unknown>): Model {
   return mergeDriverFields(model, stripIdentityColumns(model, values));
 }
 
@@ -143,7 +157,7 @@ export function setFields(model: Model, values: Record<string, unknown>): Model 
     throw new TypeError("model.set() expects a field name and a value, or an object of fields.");
   }
 
-  const safeValues = stripIdentityColumns(model, values);
+  const safeValues = stripIdentityColumns(model, stripGuardedColumns(model.self(), values, "set"));
 
   // All or nothing: refuse a reserved key before any entry is written.
   for (const key of Object.keys(safeValues)) {

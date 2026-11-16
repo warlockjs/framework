@@ -53,6 +53,7 @@ describe("doctor memory-cache check", () => {
     const result = await run();
 
     expect(result?.status).toBe("warn");
+    expect(result?.code).toBe("WL1018");
     expect(result?.detail).toContain("cache.options.memory.maxSize");
   });
 

@@ -26,6 +26,7 @@ export const acmeAdapter: CliAdapter = {
   title: "Acme Agent",
   command: "acme",
   apiKeyEnv: ["ACME_API_KEY"],
+  passEnv: ["ACME_BASE_URL"], // extra variables "curated" passes from the host
   homeEnv: ["ACME_HOME"],
   transports: ["argv", "stdin"],
   effort: false,

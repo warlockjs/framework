@@ -37,6 +37,7 @@ describe("doctor production-logging check", () => {
     const result = await run();
 
     expect(result?.status).toBe("warn");
+    expect(result?.code).toBe("WL1016");
     expect(result?.detail).toContain("log.production.channels");
     expect(result?.detail).toContain('minLevel: "info"');
   });

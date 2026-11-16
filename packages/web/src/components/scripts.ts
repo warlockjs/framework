@@ -1,6 +1,11 @@
 import { createElement, Fragment, type ReactElement } from "react";
 import { stringify } from "devalue";
 import { escapePayload, PAYLOAD_SCRIPT_ID, useDocumentContext } from "./document-context";
+import {
+  DOCUMENT_SLOT,
+  DOCUMENT_SLOT_ATTRIBUTE,
+  INLINE_PAYLOAD_OMITTED_DOCUMENT_SLOTS,
+} from "./document-slot-marker";
 import { isNonHydrating } from "../server/page-render-bundle";
 import { NAMED_API_ROUTES_SCRIPT_ID } from "../entry/publish-document-named-api-routes";
 
@@ -27,13 +32,15 @@ export function Scripts(props: ScriptsProps): ReactElement {
   // The route table has its own script (below), and the locale-routing table
   // its own `<meta name="warlock-locale-routing">` tag (`<Head/>`), so the
   // copies the payload's `document` slot holds are left out of this one: each
-  // would ship twice. The browser rebuilds both from those elements before it
-  // hydrates (`client/hydrate-page.tsx`).
-  const {
-    namedApiRoutes: _namedApiRoutes,
-    localeRouting: _localeRouting,
-    ...documentSlots
-  } = payload.document ?? document;
+  // would ship twice. The same goes for the stylesheet, preload, alternate and
+  // entry-script slots: `<Head/>` and this component already render them as
+  // elements. The browser rebuilds all of them from the document before it
+  // hydrates (`client/hydrate-page.tsx`, `client/read-document-slots.ts`).
+  const documentSlots = Object.fromEntries(
+    Object.entries(payload.document ?? document).filter(
+      ([key]) => !(INLINE_PAYLOAD_OMITTED_DOCUMENT_SLOTS as readonly string[]).includes(key),
+    ),
+  );
   const documentPayload = { ...payload, document: documentSlots };
 
   // `renderPageFailure` marks its payload non-hydrating (page-render-bundle.ts):
@@ -83,6 +90,7 @@ export function Scripts(props: ScriptsProps): ReactElement {
           type: "module",
           ...nonceAttributes,
           src: hydrationClientModuleUrl,
+          [DOCUMENT_SLOT_ATTRIBUTE]: DOCUMENT_SLOT.entry,
           ...(siteKey === undefined ? {} : { "data-warlock-site": siteKey }),
         })
       : null,

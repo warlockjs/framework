@@ -140,6 +140,66 @@ Category: your code · skill: `add-connector`
 
 Category: your code · skill: `use-localization`
 
+### WL1011
+
+**The multipart upload limits are larger than the app needs.** Lower http.multipart.maxTotalSize and http.fileUploadLimit to the largest upload the app accepts, and raise the cap only on routes that take large files with uploads: { maxTotalSize }.
+
+Category: your code · skill: `warlock-doctor`
+
+### WL1012
+
+**CORS allows more origins than the app needs.** List the browser origins allowed to call the API in http.cors.origin instead of a wildcard or an unset allowlist.
+
+Category: your code · skill: `warlock-doctor`
+
+### WL1013
+
+**A token setting is unsafe.** Set a signing secret of at least 32 bytes and a short access-token lifetime in src/config/auth.ts, as the doctor message names.
+
+Category: your code · skill: `warlock-doctor`
+
+### WL1014
+
+**http.trustProxy trusts a header the client can write.** Set http.trustProxy to the proxy's IP addresses or CIDR blocks, or set http.realIpHeader to the header the edge overwrites.
+
+Category: your code · skill: `warlock-doctor`
+
+### WL1015
+
+**The request timeout is turned off.** Remove the request timeout setting named in the message (default 5 minutes) or set it to the longest a client may take to send one request.
+
+Category: your code · skill: `warlock-doctor`
+
+### WL1016
+
+**A production console channel prints debug lines.** Create the console channel with new ConsoleLog({ minLevel: "info" }) in src/config/log.ts.
+
+Category: your code · skill: `warlock-doctor`
+
+### WL1017
+
+**An env file is not ignored by git.** Add .env and .env.* (then !.env.example) to .gitignore, and run git rm --cached on any env file already committed.
+
+Category: your code · skill: `warlock-doctor`
+
+### WL1018
+
+**The default memory cache has no size limit.** Set maxSize on the default memory cache in src/config/cache.ts to a bound such as 10_000.
+
+Category: your code · skill: `warlock-doctor`
+
+### WL1019
+
+**Retired encryption keys or token secrets are still configured.** Remove encryption.previousKeys, auth.accessToken.previousSecrets and auth.refreshToken.previousSecrets entries once nothing stored is encrypted with them and the tokens signed with them have expired.
+
+Category: your code · skill: `warlock-doctor`
+
+### WL1020
+
+**Response compression is off.** Set http.compression to true in src/config/http.ts to send JSON and HTML with br/gzip, unless a proxy or CDN in front of the app already compresses responses.
+
+Category: your code · skill: `warlock-doctor`
+
 ## WL2xxx — boot
 
 ### WL2001

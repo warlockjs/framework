@@ -5,40 +5,105 @@ import {
   type ModelSnapshot,
   type SerializedRelation,
 } from "../../relations/relation-hydrator";
+import type { DriverContract } from "../../contracts";
 import type { ChildModel, Model } from "../model";
 
-/**
- * Drivers re-inflate any ISO-looking string into a Date. Only fields the model
- * schema declares as dates may be converted, so put every other string back.
- */
-function restoreUndeclaredDateStrings<TModel extends Model>(
-  ModelClass: ChildModel<TModel>,
-  original: Record<string, string>,
-  data: Record<string, unknown>,
-): void {
-  const shape = ModelClass.schema?.schema ?? {};
+/** Date column names a model class's schema declares, computed once per class. */
+const declaredDateKeys = new WeakMap<object, ReadonlySet<string>>();
 
-  for (const [key, value] of Object.entries(original)) {
-    if (data[key] instanceof Date && !(shape[key] instanceof DateValidator)) {
-      data[key] = value;
-    }
+function getDeclaredDateKeys(ModelClass: ChildModel<Model>): ReadonlySet<string> {
+  let keys = declaredDateKeys.get(ModelClass);
+
+  if (!keys) {
+    const shape = ModelClass.schema?.schema ?? {};
+
+    keys = new Set(
+      Object.keys(shape).filter(
+        (key) => (shape as Record<string, unknown>)[key] instanceof DateValidator,
+      ),
+    );
+    declaredDateKeys.set(ModelClass, keys);
   }
+
+  return keys;
 }
 
+/**
+ * Whether a raw string could be one the driver re-inflates into a Date: an
+ * ISO timestamp or a date, so at least ten characters starting with a digit.
+ */
+function mayBecomeDate(value: string): boolean {
+  if (value.length < 10) return false;
+
+  const first = value.charCodeAt(0);
+
+  return first >= 48 && first <= 57;
+}
+
+/**
+ * The driver the next `new ModelClass(...)` of a hydration reuses, so the
+ * constructor does not resolve the data source a second time for the same row.
+ */
+let hydrationDriver: { ModelClass: unknown; driver: DriverContract } | undefined;
+
+/** Take the driver {@link hydrateModel} left for this model class, if any. */
+export function takeHydrationDriver(ModelClass: unknown): DriverContract | undefined {
+  const pending = hydrationDriver;
+
+  if (pending && pending.ModelClass === ModelClass) {
+    hydrationDriver = undefined;
+    return pending.driver;
+  }
+
+  return undefined;
+}
+
+/**
+ * Hydrate a model from a raw row.
+ *
+ * @param driver - The model's driver when the caller already resolved it (a
+ * query builder hydrating a whole result set resolves it once); looked up from
+ * the model's data source when omitted.
+ */
 export function hydrateModel<TModel extends Model = Model>(
   ModelClass: ChildModel<TModel>,
   data: Record<string, unknown>,
+  driver: DriverContract = ModelClass.getDriver(),
 ): TModel {
-  const strings: Record<string, string> = {};
+  // Drivers re-inflate any ISO-looking string into a Date, in place. Only
+  // fields the schema declares as dates may stay Dates, so keep the strings
+  // that could have been converted and put them back afterwards.
+  const dateKeys = getDeclaredDateKeys(ModelClass);
+  let strings: Record<string, string> | undefined;
 
-  for (const [key, value] of Object.entries(data)) {
-    if (typeof value === "string") strings[key] = value;
+  for (const key in data) {
+    const value = data[key];
+
+    if (typeof value === "string" && !dateKeys.has(key) && mayBecomeDate(value)) {
+      (strings ??= {})[key] = value;
+    }
   }
 
-  const deserialized = ModelClass.getDriver().deserialize(data);
-  restoreUndeclaredDateStrings(ModelClass, strings, deserialized);
+  const deserialized = driver.deserialize(data);
 
-  const model = new ModelClass(deserialized);
+  if (strings) {
+    for (const key in strings) {
+      if (deserialized[key] instanceof Date) {
+        deserialized[key] = strings[key];
+      }
+    }
+  }
+
+  hydrationDriver = { ModelClass, driver };
+
+  let model: TModel;
+
+  try {
+    model = new ModelClass(deserialized);
+  } finally {
+    hydrationDriver = undefined;
+  }
+
   model.isNew = false;
   return model;
 }

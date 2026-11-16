@@ -41,6 +41,12 @@ export function registerErrorResponseFormatter(server: FastifyInstance): void {
     async (request: FastifyRequest, reply: FastifyReply, payload: unknown) => {
       const contentType = String(reply.getHeader("content-type") ?? "");
 
+      // A reply another handler already wrote (or is writing) cannot be
+      // rewritten: touching headers now would throw ERR_HTTP_HEADERS_SENT.
+      if (reply.sent || reply.raw.headersSent || reply.raw.writableEnded) {
+        return payload;
+      }
+
       if (
         reply.statusCode < 400 ||
         reply.statusCode > 599 ||

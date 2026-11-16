@@ -160,11 +160,24 @@ describe("loadClientRouteComposition", () => {
     ["a blank layout", { Page: {}, layouts: [null] }],
     ["an explicitly blank App", { Page: {}, layouts: [], App: undefined }],
     ["an explicitly blank ErrorPage", { Page: {}, layouts: [], ErrorPage: undefined }],
+    ["a loadErrorPage that is not callable", { Page: {}, layouts: [], loadErrorPage: {} }],
     ["an extra composition key", { Page: {}, layouts: [], providerId: "dev" }],
   ])("rejects %s rather than returning fallback data", async (_caseName, value) => {
     const [entry] = validateClientRouteManifest([validEntry({ load: async () => value })]);
 
     await expect(loadClientRouteComposition(entry)).rejects.toThrow();
+  });
+
+  it("accepts the on-demand error and forbidden page loaders", async () => {
+    const composition = {
+      Page: {},
+      layouts: [],
+      loadErrorPage: async () => ({}),
+      loadForbiddenPage: async () => ({}),
+    };
+    const [entry] = validateClientRouteManifest([validEntry({ load: async () => composition })]);
+
+    await expect(loadClientRouteComposition(entry!)).resolves.toBe(composition);
   });
 
   it("allows App to be absent", async () => {

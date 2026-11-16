@@ -1,5 +1,12 @@
-import { invalidRule, VALID_RULE, type SchemaRule } from "@warlock.js/seal";
+import {
+  invalidRule as sealInvalidRule,
+  VALID_RULE,
+  type ContextualSchemaRule,
+  type SchemaContext,
+  type SchemaRule,
+} from "@warlock.js/seal";
 import { UploadedFile } from "../../http";
+import { t } from "../../http/middleware/inject-request-context";
 import { isMarkupMimeType, isRasterImageMimeType } from "../../http/uploads/sniff-upload-type";
 
 /**
@@ -7,6 +14,31 @@ import { isMarkupMimeType, isRasterImageMimeType } from "../../http/uploads/snif
  * that markup bytes are only accepted when the app listed a markup extension.
  */
 const MARKUP_EXTENSIONS = new Set(["svg", "svgz", "html", "htm", "xhtml", "xml", "js", "mjs"]);
+
+/** A dotted translation key such as `admin.uploadUnrecognisedMedia` (no spaces). */
+const TRANSLATION_KEY = /^[A-Za-z0-9_-]+(\.[A-Za-z0-9_-]+)+$/;
+
+/**
+ * Refuse a value. An `errorMessage` that is a translation key is translated
+ * for the request locale first; a key without a translation stays as given,
+ * so a literal message is never altered.
+ */
+function invalidRule(rule: ContextualSchemaRule, context: SchemaContext) {
+  const message = rule.context.errorMessage;
+
+  if (typeof message === "string" && TRANSLATION_KEY.test(message)) {
+    const translated = t(message);
+
+    if (translated && translated !== message) {
+      return sealInvalidRule(
+        { ...rule, context: { ...rule.context, errorMessage: translated } },
+        context,
+      );
+    }
+  }
+
+  return sealInvalidRule(rule, context);
+}
 
 /**
  * File rule - validates uploaded file
@@ -108,6 +140,9 @@ export const fileTypeRule: SchemaRule<{ mimeTypes: string | string[] }> = {
   async validate(value: any, context) {
     const configured = this.context.options.mimeTypes;
     const mimeTypes = typeof configured === "string" ? [configured] : configured;
+
+    // fills `:types` in the message
+    this.context.translationParams.types = mimeTypes.join(", ");
 
     if (!mimeTypes.includes(value.mimeType)) {
       return invalidRule(this, context);

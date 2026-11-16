@@ -45,6 +45,8 @@ Two pieces, always:
 1. **Schema file in `schema/`** — exports both the value (`createProductSchema`) and the inferred type (`CreateProductSchema`). One file, one source of truth.
 2. **Controller typed as `RequestHandler<Request<TSchema>>`** (or `GuardedRequestHandler<TSchema>` for auth'd routes) — pulls `TSchema` from the schema file and `controller.validation = { schema }` registers it with the framework.
 
+`request.all()`, `allExceptParams()`, `only()`, `except()` and `request.body` return raw input; passing one to a model's `merge()` or `set()` warns once in development. Pass `request.validated()` instead.
+
 No separate `*.request.ts` alias file. `RequestHandler<Request<TSchema>>` types `request.validated()` directly off the schema's inferred type.
 
 Scaffold with `npx warlock generate.controller <module>/<action> --with-validation`. If the scaffolder emits a `requests/<action>.request.ts` file, delete it — the inline pattern is the convention.
@@ -350,7 +352,7 @@ updateProductController.validation = {
 - **`v.url(...)` does not exist on the factory.** Use `v.string().url(...)`. Same goes for any other rule that's not in the table above — check `BaseValidator` / `StringValidator` first.
 - **`.optional()` and `.required()` are not symmetric.** `.optional()` brands the field as absent-allowed. `.required()` clears the optional flag _and_ replaces any prior required rule — read seal's `BaseValidator` source if you need conditional required.
 - **`uniqueExceptCurrentId` reads `request.input("id")`.** It only works inside an HTTP context — useless in CLI/job code.
-- **`request.validated()` is empty until the framework runs validation.** If you forgot the `controller.validation = { schema }` line, `validated()` returns `{}` (or the input from `setValidatedData` if you set it manually). Always pair the schema with the assignment.
+- **`request.validated()` is empty until the framework runs validation.** If you forgot the `controller.validation = { schema }` line, `validated()` returns `{}` (or the input from `setValidatedData` if you set it manually). Always pair the schema with the assignment. On a route with no schema, development logs one warning per route; read such routes with `request.input()` / `request.all()`.
 - **Import `v`/`Infer` from `@warlock.js/seal`.** Core does not re-export them — `@warlock.js/seal` is the canonical and only home.
 - **DB rules trigger queries on every validation pass.** For high-throughput endpoints, prefer enforcing uniqueness at the DB layer (`UNIQUE` index) and catch the conflict in the controller.
 

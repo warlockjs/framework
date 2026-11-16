@@ -164,3 +164,22 @@ describe("ai.snapshot.sqlite", () => {
     expect(sqlite({ path: "x.db" }).schema()).toContain("run_id TEXT PRIMARY KEY");
   });
 });
+
+describe.runIf(builtin)("ai.snapshot.sqlite markPending", () => {
+  it("sets pending on a stored snapshot and reports false for a missing one", async () => {
+    const store = sqlite<Snapshot & { pending?: unknown }>({ path: ":memory:", table: "marks" });
+
+    expect(await store.markPending?.("run-1", { runId: "x" })).toBe(false);
+
+    await store.save({ runId: "run-1", value: 1 });
+
+    expect(await store.markPending?.("run-1", { runId: "x" })).toBe(true);
+    expect(await store.load("run-1")).toEqual({
+      runId: "run-1",
+      value: 1,
+      pending: { runId: "x" },
+    });
+
+    await store.close();
+  });
+});

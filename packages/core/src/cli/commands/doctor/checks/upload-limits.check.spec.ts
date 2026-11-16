@@ -39,6 +39,7 @@ describe("doctor upload-limits check", () => {
     const result = await run();
 
     expect(result?.status).toBe("warn");
+    expect(result?.code).toBe("WL1011");
     expect(result?.detail).toContain("http.multipart.maxTotalSize is 2 GB");
     expect(result?.detail).not.toContain("http.fileUploadLimit");
   });

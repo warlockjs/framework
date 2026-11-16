@@ -660,6 +660,20 @@ This is explicit, runs reliably, and reads clearly — there's no hidden hook in
 
 `isCacheable` is the master switch. When it's `true` (the default), every `*Cached` method reads from / writes to the configured cache driver.
 
+### Invalidation cost: `"namespace"` or `"generation"`
+
+By default a write clears the repository's cache by removing every key under `repositories.<name>`; on Redis that scans the key space on each write. Set `repository.cacheInvalidation` to `"generation"` to make a write cost a constant number of round trips: entries are stored under a generation id (`repositories.<name>.g-<id>.…`), and a write replaces the id so the old entries become unreachable. Each cache read then does one extra read of the id.
+
+The settings are read from the `repository` config key (`repository.cacheInvalidation`, `repository.cacheGenerationTtl`), next to `repository.isCacheable` and `repository.cacheDriver`, or set as protected properties on one repository:
+
+```ts
+class UsersRepository extends RepositoryManager<User> {
+  protected cacheInvalidation = "generation" as const;
+}
+```
+
+Entries written in this mode expire after `cacheGenerationTtl` (default `"1d"`), which is what lets entries of replaced generations disappear on drivers without a default TTL. `clearModelCache()` still removes that model's `id.<id>` key.
+
 ### Cache keys
 
 Cache keys are namespaced per repository:
@@ -738,7 +752,7 @@ App-wide: set `config.get("repository.isCacheable")` to `false`. The per-reposit
 
 ## Active-record convenience
 
-The `*Active` variants are convenience methods for the common "soft-active" pattern — a row has an `isActive` column, and most queries should filter on it.
+The `*Active` variants (the starter does not set `isActiveColumn`; its users list uses the plain `listCached`) are convenience methods for the common "soft-active" pattern — a row has an `isActive` column, and most queries should filter on it.
 
 By default, `isActiveColumn = "isActive"` and `isActiveValue = true`. Every `*Active` method adds `{ [isActiveColumn]: isActiveValue }` to the filter:
 

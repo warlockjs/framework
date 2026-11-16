@@ -61,6 +61,7 @@ export default function Contact() {
 - Actions are never cached and always `private, no-store`; call `invalidatePageCache(tags)` to refresh other visitors' cached page.
 - Redirect after success: a no-JS action that returns data re-POSTs on reload.
 - `<Form>` defaults to `multipart/form-data`, so file inputs work; read them with `request.file(name)`.
+- Under `http.multipart.routes: "declared"` a multipart POST answers 415 unless the page declares `config.uploads: true` (or `{ maxTotalSize: 10 * 1024 * 1024, maxFileSize: 2 * 1024 * 1024, maxFiles: 3 }`, number literals); it marks the page's POST route and covers all its actions. It must be a literal, read at build time. In multi-site mode all sites share one POST route, so one declaration opens it for every site.
 - Per-user limit: `config.action.middleware: [middleware.rateLimit({ max: 5, duration: 60_000, key: "user", guests: "ip" })]` (`import { middleware } from "@warlock.js/core"`). Keyed on `request.locals.user.id`, so it needs `pageSession()` from `@warlock.js/auth`. `guests`: `"ip"` (default) or `"skip"`. Over the limit: 429, action not run.
 - With `@mongez/react-form`, use `useSubmitAction` from `@warlock.js/web/form` and alias one of the two `Form`s.
 

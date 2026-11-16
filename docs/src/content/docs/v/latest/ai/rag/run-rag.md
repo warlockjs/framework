@@ -191,7 +191,7 @@ The tool input is `{ query: string }`; the output is the full `RetrieveResult` (
 await kb.clear(); // drops every entry written under this rag's namespace
 ```
 
-`clear()` removes keys by namespace prefix, so on a shared driver it also removes the chunks of a nested namespace (`kb.acme.clear()` also clears `kb.acme.private`). Give rags that share a driver sibling names (`kb.acme.public`, `kb.acme.private`) rather than nesting one inside another.
+`clear()` removes only this rag's own chunks: a nested namespace (`kb.acme.private`) and sibling namespaces on the same driver are left alone. When the store can list its keys (the `memory`, `lru`, `memoryExtended`, `file`, `pg` and `redis` cache drivers through `listKeys()`, and `ai.rag.pgVectorStore`), `clear()` lists the namespace and deletes exactly this rag's chunks in one pass, with no embedding call. A store that cannot list falls back to similarity queries (one embedding call for a probe vector when nothing was indexed in this process), widening the page up to 5,000 candidates on a crowded driver; on such a driver shared with far more unrelated entries than that, give the rag its own driver. Chunks written before 5.53 whose document id contained a `.` cannot be told from a nested namespace's and stay until you re-index.
 
 :::note[Chunks indexed before 5.53]
 Older chunks do not record their namespace. Retrieval still reads them when their key is the namespace followed by exactly `<docId>.<chunkIndex>`; a chunk whose document id contained a `.` is skipped until you re-index it. Re-index once (`clear()` then `index()`) to bring an existing knowledge base fully onto exact namespace matching.

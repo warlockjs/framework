@@ -32,6 +32,7 @@ export const qwenCodeAdapter: CliAdapter = {
   title: "Qwen Code",
   command: "qwen",
   apiKeyEnv: ["OPENAI_API_KEY"],
+  passEnv: ["OPENAI_BASE_URL", "OPENAI_MODEL", "ANTHROPIC_API_KEY", "GEMINI_API_KEY"],
   homeEnv: ["QWEN_HOME"],
   transports: ["argv", "stdin"],
   effort: false,

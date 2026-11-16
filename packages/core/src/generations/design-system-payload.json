@@ -1,6 +1,6 @@
 {
   "dependencies": {
-    "@mongez/react-form": "4.0.0",
+    "@mongez/react-form": "4.1.0",
     "radix-ui": "1.7.0",
     "cmdk": "1.1.1",
     "react-day-picker": "9.14.0",

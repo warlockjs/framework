@@ -14,6 +14,11 @@ export class MemoryStore implements LocalStore {
   private undo?: Map<string, LocalJob | undefined>;
   /** Taken before the first removal, so a rollback restores the original order too. */
   private snapshot?: Map<string, LocalJob>;
+  /** Keys of each queue's jobs that can still become ready (not finished), so a poll skips kept history. */
+  private pollable = new Map<string, Set<string>>();
+  /** Insertion rank of every key, so ties on priority resolve to the oldest job. */
+  private ranks = new Map<string, number>();
+  private nextRank = 0;
 
   public transaction<T>(run: () => T): T {
     // Nested calls join the outer transaction.
@@ -38,6 +43,25 @@ export class MemoryStore implements LocalStore {
       else jobs.set(key, previous);
     }
     this.jobs = jobs;
+    this.reindex();
+  }
+  /** Rebuild the poll index and ranks from the stored jobs (after a rollback). */
+  private reindex(): void {
+    this.pollable.clear();
+    this.ranks.clear();
+    this.nextRank = 0;
+    for (const [key, job] of this.jobs) {
+      this.ranks.set(key, this.nextRank++);
+      this.track(key, job);
+    }
+  }
+  private track(key: string, job: LocalJob): void {
+    const keys = this.pollable.get(job.queue);
+    const isPollable = job.state === "active" || READY_STATES.includes(job.state);
+    if (isPollable) {
+      if (keys) keys.add(key);
+      else this.pollable.set(job.queue, new Set([key]));
+    } else keys?.delete(key);
   }
   private remember(key: string): void {
     if (this.undo && !this.undo.has(key)) this.undo.set(key, this.jobs.get(key));
@@ -55,19 +79,32 @@ export class MemoryStore implements LocalStore {
   }
   public ready(queue: string, now: number): LocalJob | undefined {
     let candidate: LocalJob | undefined;
-    for (const job of this.jobs.values()) {
-      if (job.queue !== queue) continue;
+    let candidateRank = 0;
+    for (const key of this.pollable.get(queue) ?? []) {
+      const job = this.jobs.get(key)!;
       const eligible =
         (job.state === "active" && job.leaseUntil <= now) ||
         (READY_STATES.includes(job.state) && job.readyAt <= now);
-      if (eligible && (!candidate || job.priority < candidate.priority)) candidate = job;
+      if (!eligible) continue;
+      const rank = this.ranks.get(key)!;
+      if (
+        !candidate ||
+        job.priority < candidate.priority ||
+        (job.priority === candidate.priority && rank < candidateRank)
+      ) {
+        candidate = job;
+        candidateRank = rank;
+      }
     }
     return candidate === undefined ? undefined : jsonCopy(candidate);
   }
   public put(job: LocalJob): void {
     const key = this.key(job.queue, job.id);
     this.remember(key);
-    this.jobs.set(key, jsonCopy(job));
+    const stored = jsonCopy(job);
+    this.jobs.set(key, stored);
+    if (!this.ranks.has(key)) this.ranks.set(key, this.nextRank++);
+    this.track(key, stored);
   }
   public remove(queue: string, id: string): void {
     const key = this.key(queue, id);
@@ -75,6 +112,8 @@ export class MemoryStore implements LocalStore {
     this.remember(key);
     if (this.undo && !this.snapshot) this.snapshot = new Map(this.jobs);
     this.jobs.delete(key);
+    this.ranks.delete(key);
+    this.pollable.get(queue)?.delete(key);
   }
   public prune(queue: string, state: "completed" | "failed", keep: RetentionWindow): void {
     const finished: LocalJob[] = [];
@@ -91,5 +130,7 @@ export class MemoryStore implements LocalStore {
   }
   public close(): void {
     this.jobs.clear();
+    this.pollable.clear();
+    this.ranks.clear();
   }
 }

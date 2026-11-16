@@ -53,6 +53,7 @@ export const reasonixAdapter: CliAdapter = {
   title: "Reasonix",
   command: "reasonix",
   apiKeyEnv: ["DEEPSEEK_API_KEY"],
+  passEnv: [],
   homeEnv: ["REASONIX_HOME"],
   transports: ["argv", "stdin"],
   effort: true,

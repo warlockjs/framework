@@ -17,6 +17,9 @@ export {
   getModelUpdatedEvent,
 } from "./model-events";
 
+// Fan-out settings
+export { configureSyncFanout, flushSyncFanout } from "./sync-fanout";
+
 // Internal (for advanced use)
 export { DEFAULT_MAX_SYNC_DEPTH, SyncContextManager } from "./sync-context";
 export { SyncManager } from "./sync-manager";

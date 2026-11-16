@@ -22,7 +22,7 @@ export default function CreateOrder() {
 }
 ```
 
-It needs `@mongez/http:^3.5.0` and `@mongez/react-form:^4.0.0`. By default it uses the configured `http` singleton, preserving its base URL, interceptors, authentication, and error handling. Pass `client` when a different configured `Http` instance is required.
+It needs `@mongez/http:^3.5.2` and `@mongez/react-form:^4.1.0`. By default it uses the configured `http` singleton, preserving its base URL, interceptors, authentication, and error handling. Pass `client` when a different configured `Http` instance is required.
 
 Pass exactly one of `route` or `path`. A named route uses its server-declared method; a direct `path` defaults to `POST` and accepts `method`. Use `params` for path segments and `query` for URL parameters. GET and HEAD send form values as query data; other requests send native `FormData`.
 

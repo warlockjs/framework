@@ -409,8 +409,12 @@ export function semanticCache(options: SemanticCacheOptions): AgentMiddleware {
         // foreign namespace's entries; a shared namespace another session's
         // answer; a shared session another agent's or another turn's answer.
         const [hit] = await similarWithin(
-          (topK) =>
-            store.similar<CachedEntry>(query.vector, { topK, threshold: options.threshold }),
+          (topK, accept) =>
+            store.similar<CachedEntry>(query.vector, {
+              topK,
+              threshold: options.threshold,
+              filter: (candidate) => accept({ ...candidate, score: 1 }),
+            }),
           (candidate: CacheSimilarHit<CachedEntry>) =>
             candidate.key.startsWith(`${namespace}.`) &&
             candidate.value?.scope === scope &&

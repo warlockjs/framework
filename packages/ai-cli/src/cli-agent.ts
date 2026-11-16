@@ -121,7 +121,7 @@ export function createCliAgent(
     buildEnvironment({
       source: host.env,
       inherit: options.inheritEnv ?? true,
-      credentials: adapter.apiKeyEnv,
+      credentials: [...adapter.apiKeyEnv, ...(adapter.passEnv ?? [])],
       managed: [],
       user: options.env,
       platform: host.platform,
@@ -263,7 +263,7 @@ export function createCliAgent(
       const env = buildEnvironment({
         source: host.env,
         inherit: options.inheritEnv ?? true,
-        credentials: adapter.apiKeyEnv,
+        credentials: [...adapter.apiKeyEnv, ...(adapter.passEnv ?? [])],
         managed: home === "inherit" ? [] : adapter.homeEnv,
         // A CLI that prefers $PWD over its real cwd must not see the host's.
         plan: host.platform === "win32" ? chosen.plan.env : { PWD: cwd, ...chosen.plan.env },

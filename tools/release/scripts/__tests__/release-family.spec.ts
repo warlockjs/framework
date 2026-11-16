@@ -1248,6 +1248,31 @@ describe("family release commit (one repository, one commit)", () => {
     }
   });
 
+  it("checks every member's source maps in its build directory, before that member is packed", async () => {
+    const control = commitFixture();
+    const order: string[] = [];
+    control.dependencies.assertSourceMapsSelfContained = async (directory) => {
+      order.push(`maps:${directory}`);
+      return 0;
+    };
+    const run = control.dependencies.runCommand!;
+    control.dependencies.runCommand = async (request) => {
+      if (request.args[1] === "pack") order.push(`pack:${String(request.args[2])}`);
+      return await run(request);
+    };
+    await runReleaseFamily(
+      { mode: "gate", version: VERSION, ...FULL_MATRIX },
+      control.dependencies,
+    );
+    const packs = order.filter((entry) => entry.startsWith("pack:"));
+    assert.equal(packs.length, FAMILY.members.length);
+    for (const pack of packs) {
+      const directory = pack.slice("pack:".length);
+      const before = order.indexOf(`maps:${directory}`);
+      assert.ok(before >= 0 && before < order.indexOf(pack), `maps checked before ${directory}`);
+    }
+  });
+
   it("records the SAME release commit for every member, distinct from the shared pre-bump gitHead", async () => {
     let capturedProvenance: unknown;
     const control = commitFixture();
@@ -1785,6 +1810,50 @@ describe("checkPackageTreeIsClean", () => {
 });
 
 describe("runReleaseFamily publish mode", () => {
+  it("passes --provenance to npm publish only when asked", async () => {
+    for (const provenance of [false, true]) {
+      const publishArgs: string[][] = [];
+      const artifacts = FAMILY.members.map((member, index) => ({
+        name: member.name,
+        tarballPath: path.resolve(`artifact-${index}.tgz`),
+        sha256: HASH,
+      }));
+      const control = fixture({
+        readTextFile: async () =>
+          JSON.stringify({
+            kind: "warlock-family-publish-handoff",
+            candidateVersion: VERSION,
+            subjects: FAMILY.members.map((member) => member.name),
+            artifacts,
+            verifiedAt: "2026-09-02T12:00:00.000Z",
+            matrixScope: "full",
+          }),
+        sha256File: async () => HASH,
+        runCommand: async (request) => {
+          if (request.args[1] === "config") return { stdout: `${NPM_ORIGIN}/\n`, stderr: "" };
+          if (request.args[1] === "publish") publishArgs.push([...request.args]);
+          return { stdout: "", stderr: "" };
+        },
+      });
+      await runReleaseFamily(
+        { mode: "publish", version: VERSION, provenance },
+        control.dependencies,
+      );
+      assert.ok(publishArgs.length > 0);
+      for (const args of publishArgs) assert.equal(args.includes("--provenance"), provenance);
+    }
+  });
+
+  it("parses the tag mode and the confirm-without-tag and provenance flags", () => {
+    assert.equal(parseArguments(["tag", "--version", VERSION]).mode, "tag");
+    assert.equal(parseArguments(["confirm", "--version", VERSION, "--no-tag"]).skipTag, true);
+    assert.equal(
+      parseArguments(["publish", "--version", VERSION, "--provenance"]).provenance,
+      true,
+    );
+    assert.equal(parseArguments(["publish", "--version", VERSION]).provenance, undefined);
+  });
+
   it("validates the whole batch, asserts isolated origin config, then re-hashes immediately before each publish", async () => {
     const events: string[] = [];
     const artifacts = FAMILY.members.map((member, index) => ({

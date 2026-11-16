@@ -4,6 +4,20 @@ All notable changes to `@warlock.js/ai-cli` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.54.0 - 2026-11-16
+
+### Upgrading
+
+- `inheritEnv` keeps defaulting to `true` in 5.x, and the production warning when it is unset stays. The default changes to `"curated"` in 6.0, so set `inheritEnv` explicitly now (`"curated"` to adopt the new behaviour, `true` to keep inheriting the whole environment).
+
+### Added
+
+- `CliAdapter` has an optional `passEnv` list: extra variables the CLI needs (base URLs, provider keys, auth tokens beyond `apiKeyEnv`). `inheritEnv: "curated"` passes them from the host together with `apiKeyEnv`. Every built-in adapter declares its list, so `"curated"` works out of the box for the usual setups; custom adapters can declare their own.
+
+### Documentation
+
+- The environment pages, the `run-cli-agents` and `write-a-cli-adapter` skills describe `passEnv` and the planned 6.0 default.
+
 ## 5.53.0 - 2026-11-11
 
 ### Upgrading

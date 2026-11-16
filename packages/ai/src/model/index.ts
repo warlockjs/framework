@@ -1,5 +1,9 @@
 // Main API
-export { fallbackModel } from "./fallback-model";
+export {
+  DEFAULT_FALLBACK_RETRY_CODES,
+  fallbackModel,
+  isDefaultFallbackRetryable,
+} from "./fallback-model";
 export { retryModel } from "./retry-model";
 export type { RetryBudgetKind, RetryEvent, RetryPolicy } from "../contracts/retry-policy.contract";
 

@@ -1415,18 +1415,10 @@ describe("MongoQueryBuilder", () => {
     });
 
     describe("joinWith()", () => {
-      it("should add relation to joinRelations map when definition exists", () => {
-        queryBuilder.relationDefinitions = {
-          author: { type: "belongsTo", model: "User" },
-        };
-
+      it("should load the relation like with()", () => {
         queryBuilder.joinWith("author");
 
-        expect(queryBuilder.joinRelations.has("author")).toBe(true);
-        expect(queryBuilder.joinRelations.get("author")).toEqual({
-          alias: "_rel_author",
-          type: "belongsTo",
-        });
+        expect(queryBuilder.eagerLoadRelations.get("author")).toBe(true);
       });
     });
   });

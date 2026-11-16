@@ -51,3 +51,9 @@ describe("DefaultAccessResolver", () => {
     expect(await resolver.resolveRoles(user({ memberRoles: ["a"] }))).toEqual(["a"]);
   });
 });
+
+describe("DefaultAccessResolver caching", () => {
+  it("opts out of the shared cache", () => {
+    expect(new DefaultAccessResolver({}).cacheable).toBe(false);
+  });
+});

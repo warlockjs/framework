@@ -4,16 +4,26 @@ name: release
 # version. Owner ruling 2026-09-29: releases run here, not on a developer
 # machine.
 #
-# One job on purpose: the handoff records ABSOLUTE tarball paths and the gate's
-# release commit, so gate, publish and confirm must share one filesystem.
+# Three jobs, so that no step that runs tests or package scripts holds a write
+# token, and the step that publishes never runs application or test code:
 #
-#   publish=false  full check (strictness, every member's tests + typecheck,
-#                  build, local-registry install, blog on the tarballs); stops
-#                  before npm.
-#   publish=true   the same, then npm publish, confirm at npm origin (install,
-#                  import, create-warlock), tag v<version> once on this
-#                  repository and push it with the release commit, and the
-#                  blog again from the registry.
+#   gate      contents: read. Strictness, every member's tests + typecheck,
+#             build, pack, local-registry install, blog on the tarballs.
+#             Uploads the tarballs and the handoff as an artifact.
+#   publish   (publish=true, needs gate) contents: write + id-token: write.
+#             Downloads the gate's tarballs, re-checks their hashes, publishes
+#             with provenance, confirms at npm origin, then tags v<version>
+#             and pushes it with the release commit. Installs only the
+#             release runner's own dependencies.
+#   registry  (publish=true, needs publish) contents: read. The blog again
+#             from the registry.
+#
+# The handoff records ABSOLUTE tarball paths, so the publish job checks out
+# the same commit at the same workspace path and downloads the artifact into
+# tools/release, where the gate wrote it.
+#
+#   publish=false  stops after the gate job; nothing reaches npm.
+#   publish=true   the whole chain.
 
 on:
   workflow_dispatch:
@@ -36,13 +46,13 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  release:
+  gate:
     runs-on: ubuntu-latest
     environment: release
     timeout-minutes: 350
     permissions:
-      # The confirm step pushes the release commit and the v<version> tag.
-      contents: write
+      # Nothing in this job can write to the repository: it runs the tests.
+      contents: read
     services:
       # Release quality checks require Redis integration coverage on port 6390.
       redis:
@@ -79,10 +89,9 @@ jobs:
             echo "::error::version must be exact semver, got '$WARLOCK_VERSION'"; exit 1
           fi
 
-      # Full history and tags: `confirm` checks ancestry against origin and
-      # pushes the recorded release commit. No credential is persisted to
-      # .git/config -- the token is passed per step below, so nothing else in
-      # the job (package tests included) can read it from disk.
+      # No credential is persisted to .git/config -- the read-only token is
+      # passed per step below, so nothing else in the job (package tests
+      # included) can read it from disk.
       - name: Checkout the framework
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -160,6 +169,10 @@ jobs:
         working-directory: tools/release
         run: npm run test:scripts
 
+      - name: Declared dependency ranges keep a patched version of every known advisory
+        working-directory: tools/release
+        run: npm run check:advisories
+
       - name: Skill indexes cover exported topics and use valid references
         # Grouped exports require complete indexes and topic folders, with no loose Markdown.
         working-directory: tools/release
@@ -177,7 +190,8 @@ jobs:
 
       - name: Gate (strictness, tests, typecheck, build, pack, local-registry install)
         working-directory: tools/release
-        # The branch check asks origin for its default branch.
+        # The branch check asks origin for its default branch. The token is the
+        # job's own, so it is read-only.
         env:
           GIT_CONFIG_COUNT: "1"
           GIT_CONFIG_KEY_0: url.https://x-access-token:${{ github.token }}@github.com/.insteadOf
@@ -210,43 +224,204 @@ jobs:
           set -o pipefail
           node tools/release/ci/blog-check.mjs 2>&1 | tee "$LOGS/blog-tarballs.log"
 
-      - name: Publish to npm
+      - name: The release commit is the dispatched commit
+        # The publish job checks out the dispatched commit; a gate that made a
+        # commit of its own would leave that job without the commit it tags.
         if: inputs.publish
-        working-directory: tools/release
-        env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
-          set -o pipefail
-          node --import tsx scripts/release-family.ts publish --version "$WARLOCK_VERSION" 2>&1 | tee "$LOGS/publish.log"
-
-      - name: Confirm at npm, then tag and push
-        if: inputs.publish
-        working-directory: tools/release
-        env:
-          GIT_CONFIG_COUNT: "1"
-          GIT_CONFIG_KEY_0: url.https://x-access-token:${{ github.token }}@github.com/.insteadOf
-          GIT_CONFIG_VALUE_0: https://github.com/
-        # The runner polls propagation for thirty minutes; never republish a 404.
-        run: |
-          set -o pipefail
-          node --import tsx scripts/release-family.ts confirm --version "$WARLOCK_VERSION" 2>&1 | tee -a "$LOGS/confirm.log"
-
-      - name: Blog from the registry
-        if: inputs.publish
-        env:
-          MODE: registry
-          PLAYWRIGHT_MODULE: ${{ github.workspace }}/packages/web/node_modules/@playwright/test/index.mjs
-          EVIDENCE_PATH: ${{ github.workspace }}/release-logs/blog-registry.json
-        run: |
-          set -o pipefail
-          git -C "$BLOG_DIR" checkout -- . && git -C "$BLOG_DIR" clean -fdxq
-          node tools/release/ci/blog-check.mjs 2>&1 | tee "$LOGS/blog-registry.log"
+          recorded=$(node -p "require('./tools/release/release-artifacts/$WARLOCK_VERSION/build-provenance.json').members[0].releaseCommitSha")
+          if [ "$recorded" != "$(git rev-parse HEAD)" ]; then
+            echo "::error::the gate recorded release commit $recorded, not the dispatched commit $(git rev-parse HEAD); commit the release edits first"; exit 1
+          fi
 
       - name: Keep the logs
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: warlock-${{ inputs.version }}-logs
+          path: release-logs
+          if-no-files-found: ignore
+          retention-days: 30
+
+  publish:
+    needs: gate
+    if: inputs.publish
+    runs-on: ubuntu-latest
+    environment: release
+    timeout-minutes: 120
+    permissions:
+      # contents: the confirm step pushes the release commit and the tag.
+      # id-token: npm signs a provenance statement for every tarball.
+      contents: write
+      id-token: write
+    env:
+      WARLOCK_VERSION: ${{ inputs.version }}
+      LOGS: ${{ github.workspace }}/release-logs
+      CI: "1"
+      NO_COLOR: "1"
+    steps:
+      - name: Validate version
+        run: |
+          if ! [[ "$WARLOCK_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::version must be exact semver, got '$WARLOCK_VERSION'"; exit 1
+          fi
+
+      # Full history and tags: tagging checks ancestry against origin. No
+      # credential is persisted; the push step below passes the token itself.
+      - name: Checkout the framework
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+          persist-credentials: false
+
+      - name: Create the logs directory
+        run: mkdir -p "$LOGS"
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+
+      - name: Git identity
+        run: |
+          git config --global user.name "warlock-release"
+          git config --global user.email "release@warlock.js.org"
+          git config --global core.autocrlf false
+          git config core.fileMode false
+
+      - name: Download the gate's tarballs and handoff
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: warlock-${{ inputs.version }}-artifacts
+          path: tools/release
+
+      - name: The tarballs were built from this commit
+        run: |
+          recorded=$(node -p "require('./tools/release/release-artifacts/$WARLOCK_VERSION/build-provenance.json').members[0].releaseCommitSha")
+          if [ "$recorded" != "$(git rev-parse HEAD)" ]; then
+            echo "::error::the tarballs were built at $recorded, this job is at $(git rev-parse HEAD)"; exit 1
+          fi
+
+      # The release runner's own dependencies only (no workspace install, no
+      # lifecycle scripts): this job never builds or tests the framework.
+      - name: Install the release runner
+        working-directory: tools/release
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Publish to npm with provenance
+        working-directory: tools/release
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set -o pipefail
+          node --import tsx scripts/release-family.ts publish --version "$WARLOCK_VERSION" --provenance 2>&1 | tee "$LOGS/publish.log"
+
+      # No git credential in this step: it installs and runs the published
+      # packages. The tag and the push are the next step.
+      - name: Confirm at npm
+        working-directory: tools/release
+        # The runner polls propagation for thirty minutes; never republish a 404.
+        run: |
+          set -o pipefail
+          node --import tsx scripts/release-family.ts confirm --version "$WARLOCK_VERSION" --no-tag 2>&1 | tee -a "$LOGS/confirm.log"
+
+      - name: Tag and push the release
+        working-directory: tools/release
+        env:
+          GIT_CONFIG_COUNT: "1"
+          GIT_CONFIG_KEY_0: url.https://x-access-token:${{ github.token }}@github.com/.insteadOf
+          GIT_CONFIG_VALUE_0: https://github.com/
+        run: |
+          set -o pipefail
+          node --import tsx scripts/release-family.ts tag --version "$WARLOCK_VERSION" 2>&1 | tee -a "$LOGS/tag.log"
+
+      - name: Keep the logs
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: warlock-${{ inputs.version }}-publish-logs
+          path: release-logs
+          if-no-files-found: ignore
+          retention-days: 30
+
+  registry:
+    needs: publish
+    runs-on: ubuntu-latest
+    environment: release
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: warlock_blog_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 3s --health-retries 20
+    env:
+      WARLOCK_VERSION: ${{ inputs.version }}
+      BLOG_DIR: ${{ github.workspace }}/blog
+      LOGS: ${{ github.workspace }}/release-logs
+      CI: "1"
+      NO_COLOR: "1"
+    steps:
+      - name: Create the logs directory
+        run: mkdir -p "$LOGS"
+
+      - name: Checkout the blog check
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: tooling
+          persist-credentials: false
+          sparse-checkout: tools/release/ci
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+
+      - name: Install pnpm beside node
+        run: npm install --global pnpm@11.24.0 && pnpm --version
+
+      - name: Clone the blog
+        # warlockjs/blog-test is private. A read-only deploy key scoped to that one
+        # repository; it lives only in RUNNER_TEMP for the clone and is removed after.
+        env:
+          BLOG_TEST_DEPLOY_KEY: ${{ secrets.BLOG_TEST_DEPLOY_KEY }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          key="$RUNNER_TEMP/blog-test-key"
+          hosts="$RUNNER_TEMP/github-known-hosts"
+          printf '%s\n' "$BLOG_TEST_DEPLOY_KEY" > "$key"
+          chmod 600 "$key"
+          curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors -H "Authorization: Bearer $GITHUB_TOKEN" https://api.github.com/meta | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{for(const k of JSON.parse(d).ssh_keys)console.log('github.com '+k)})" > "$hosts"
+          GIT_SSH_COMMAND="ssh -i $key -o IdentitiesOnly=yes -o UserKnownHostsFile=$hosts -o StrictHostKeyChecking=yes" \
+            git clone --quiet --branch main git@github.com:warlockjs/blog-test.git "$BLOG_DIR"
+          rm -f "$key"
+
+      - name: Install the browser
+        run: |
+          mkdir -p "$RUNNER_TEMP/pw" && cd "$RUNNER_TEMP/pw"
+          npm init -y > /dev/null
+          npm install --no-audit --no-fund @playwright/test@1.62.1
+          node node_modules/@playwright/test/cli.js install --with-deps chromium
+
+      - name: Blog from the registry
+        env:
+          MODE: registry
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/pw/node_modules/@playwright/test/index.mjs
+          EVIDENCE_PATH: ${{ github.workspace }}/release-logs/blog-registry.json
+        run: |
+          set -o pipefail
+          node tooling/tools/release/ci/blog-check.mjs 2>&1 | tee "$LOGS/blog-registry.log"
+
+      - name: Keep the logs
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: warlock-${{ inputs.version }}-registry-logs
           path: release-logs
           if-no-files-found: ignore
           retention-days: 30

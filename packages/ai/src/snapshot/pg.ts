@@ -131,6 +131,23 @@ class PgSnapshotStore<
   }
 
   /**
+   * Set the `pending` field of the stored payload in place (`jsonb_set`), so
+   * the snapshot is not sent again; `false` when no row exists.
+   */
+  public async markPending(runId: string, pending: unknown): Promise<boolean> {
+    const { rows } = await this.client.query(
+      `UPDATE ${this.table}
+       SET payload = jsonb_set(payload, '{pending}', $2::jsonb, true),
+           saved_at = now()
+       WHERE run_id = $1
+       RETURNING run_id`,
+      [runId, JSON.stringify(pending ?? null)],
+    );
+
+    return rows.length > 0;
+  }
+
+  /**
    * Drop the snapshot for a `runId`.
    */
   public async delete(runId: string): Promise<void> {

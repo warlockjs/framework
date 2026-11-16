@@ -3,8 +3,10 @@ import events from "@mongez/events";
 import { trans, transFrom } from "@mongez/localization";
 import { Random, except, get, only, set, unset } from "@mongez/reinforcements";
 import { isEmpty } from "@mongez/supportive-is";
+import { markRawInput as markObjectAsRawInput } from "@warlock.js/cascade";
 import type { LogLevel } from "@warlock.js/logger";
 import { log } from "@warlock.js/logger";
+import { environment } from "../utils/environment";
 import { BaseValidator, v } from "@warlock.js/seal";
 import type { FastifyRequest } from "fastify";
 import { randomBytes } from "node:crypto";
@@ -19,7 +21,9 @@ import type { Middleware, Route } from "../router";
 import { resolveRouteValidation } from "../router/resolve-route-validation";
 import { armRequestSummary, phaseLogLevel } from "./request-phase-log";
 import { validateAll } from "../validation/validateAll";
+import { HttpErrorCodes } from "./error-codes";
 import { CookieJarUnavailableError } from "./errors";
+import { createRequestRefusal } from "./request-refusal";
 import { createRequestStore } from "./middleware/inject-request-context";
 import { buildRequestLogSnapshot, type RequestLogSnapshot } from "./request-log-snapshot";
 import { Response } from "./response";
@@ -57,8 +61,8 @@ export type RequestCookieOptions = {
 };
 
 /**
- * What `rtrim(key, "[]")` removed: a `[` followed by one or more `]` at the
- * end of a key. A literal, so no pattern is compiled per input key.
+ * The array marker removed from the end of a key: a `[` followed by one or
+ * more `]`. A literal, so no pattern is compiled per input key.
  */
 const TRAILING_ARRAY_MARKER = /\[\]+$/;
 
@@ -101,6 +105,17 @@ function warnRequestOnDeprecated(): void {
 
 /** Default for `http.input.maxArrayIndex`. */
 const DEFAULT_MAX_INPUT_ARRAY_INDEX = 1000;
+const DEFAULT_MAX_INPUT_DEPTH = 32;
+
+/** Mark an object returned from the raw input getters; anything else is returned as is. */
+function markRawInput<TInput>(input: TInput): TInput {
+  if (input !== null && typeof input === "object") markObjectAsRawInput(input);
+
+  return input;
+}
+
+/** Routes already warned about reading `validated()` without a schema. */
+const validatedWithoutSchemaWarned = new Set<string>();
 
 /** A request-bound translator: keyword in, translated string out. */
 export type RequestTranslator = (keyword: string, placeholders?: Record<string, unknown>) => string;
@@ -511,8 +526,8 @@ export class Request<RequestValidation = any> {
       config.key("app.localeCodes"),
     );
     const preference = this.cookies[LOCALE_PREFERENCE_COOKIE_NAME];
-    // A stale browser preference must not hide the server's legacy cookie or
-    // header after an application removes a supported locale.
+    // A stale browser preference must not hide the header or the server's
+    // legacy cookie after an application removes a supported locale.
     const supportedPreference =
       typeof preference === "string" &&
       (localeCodes === undefined || localeCodes.includes(preference))
@@ -521,8 +536,9 @@ export class Request<RequestValidation = any> {
     const candidate = [
       this.query["locale"],
       supportedPreference,
-      this.cookies[LOCALE_COOKIE_NAME],
+      // An explicit per-request header outranks the server-persisted cookie.
       this.header("locale"),
+      this.cookies[LOCALE_COOKIE_NAME],
     ].find((value) => typeof value === "string" && value.length > 0);
 
     return this.cacheLocale(candidate);
@@ -850,7 +866,50 @@ export class Request<RequestValidation = any> {
     return isArrayKey ? [parse(value)] : parse(value);
   }
 
+  /**
+   * The deepest nesting a key or JSON body may have (`http.input.maxDepth`,
+   * default 32).
+   */
+  protected maxInputDepth(): number {
+    const configured = config.key("http.input.maxDepth");
+
+    return typeof configured === "number" && Number.isInteger(configured) && configured >= 1
+      ? configured
+      : DEFAULT_MAX_INPUT_DEPTH;
+  }
+
+  /**
+   * True when `value` nests objects or arrays deeper than `maxDepth`. Walks
+   * iteratively and stops as soon as the bound is passed, so a hostile body
+   * costs at most `maxDepth` levels of work per branch and never recurses.
+   */
+  protected exceedsDepth(value: unknown, maxDepth: number): boolean {
+    if (value === null || typeof value !== "object") return false;
+
+    const stack: Array<[object, number]> = [[value, 1]];
+
+    while (stack.length > 0) {
+      const [current, depth] = stack.pop()!;
+
+      if (depth > maxDepth) return true;
+
+      for (const child of Object.values(current)) {
+        if (child !== null && typeof child === "object") stack.push([child, depth + 1]);
+      }
+    }
+
+    return false;
+  }
+
   protected parsePayload() {
+    if (this.isJsonBody() && this.exceedsDepth(this.baseRequest.body, this.maxInputDepth())) {
+      throw createRequestRefusal(
+        400,
+        HttpErrorCodes.InputTooDeep,
+        `The JSON body is nested deeper than ${this.maxInputDepth()} levels. Send a flatter body, or raise http.input.maxDepth.`,
+      );
+    }
+
     this.payload.body = this.isJsonBody()
       ? (this.baseRequest.body ?? {})
       : this.parseBody(this.baseRequest.body);
@@ -887,6 +946,7 @@ export class Request<RequestValidation = any> {
       const arrayOfObjectValues: any = {};
 
       const maxArrayIndex = this.maxInputArrayIndex();
+      const maxDepth = this.maxInputDepth();
 
       // Bound once per body, not once per key.
       const parseValue = this.parseValue.bind(this);
@@ -909,6 +969,9 @@ export class Request<RequestValidation = any> {
         // every path a branch below can write goes through `set()`, which
         // turns digit segments into array indices: refuse huge ones up front
         if (this.exceedsArrayIndex(this.bracketKeyToPath(key), maxArrayIndex)) continue;
+
+        // a key nested deeper than the cap builds an object later walks recurse into
+        if (this.bracketKeyToPath(key).split(".").length > maxDepth) continue;
 
         // check if the key is has a square brackets, then convert it into object
         // i.e user[email] => user: {email: "value"}
@@ -1124,6 +1187,9 @@ export class Request<RequestValidation = any> {
     // (A partial test double without `isEnabled` keeps every line.)
     if (log.isEnabled?.(type) === false) return;
 
+    // A function builds its text only now that the line is kept.
+    if (typeof message === "function") message = message();
+
     log.log({
       module: "request",
       action: this.route.method + " " + this.route.path.replace("/*", "") + `:${this.id}`,
@@ -1315,7 +1381,31 @@ export class Request<RequestValidation = any> {
         : (this.validatedData as Output);
     }
 
+    this.warnValidatedWithoutSchema();
+
     return {} as Output;
+  }
+
+  /**
+   * In development, say once per route that `validated()` was read on a route
+   * with no validation schema (it returns `{}` there), pointing at `input()`.
+   */
+  protected warnValidatedWithoutSchema() {
+    if (environment() !== "development" || !this.route) return;
+
+    if (resolveRouteValidation(this.route)) return;
+
+    const key = `${this.route.method} ${this.route.path}`;
+
+    if (validatedWithoutSchemaWarned.has(key)) return;
+
+    validatedWithoutSchemaWarned.add(key);
+
+    log.warn(
+      "request",
+      "validated",
+      `${key}: request.validated() returns {} because this route has no validation schema. Add a schema, or read the input with request.input() / request.all().`,
+    );
   }
 
   /**
@@ -1375,7 +1465,7 @@ export class Request<RequestValidation = any> {
     const tracingEnabled = isTracingEnabled();
 
     for (const [index, middleware] of middlewares.entries()) {
-      this.log("Executing middleware " + colors.yellowBright(middleware.name));
+      this.log(() => "Executing middleware " + colors.yellowBright(middleware.name));
 
       const middlewareStartedAt = tracingEnabled ? performance.now() : 0;
 
@@ -1404,11 +1494,13 @@ export class Request<RequestValidation = any> {
         });
       }
 
-      this.log("Executed middleware " + colors.yellowBright(middleware.name), "success");
+      this.log(() => "Executed middleware " + colors.yellowBright(middleware.name), "success");
 
       if (output !== undefined) {
         this.log(
-          colors.yellow("request intercepted by middleware ") + colors.cyanBright(middleware.name),
+          () =>
+            colors.yellow("request intercepted by middleware ") +
+            colors.cyanBright(middleware.name),
           "warn",
         );
 
@@ -1550,7 +1642,7 @@ export class Request<RequestValidation = any> {
    * Get request body
    */
   public get body() {
-    return this.payload.body;
+    return markRawInput(this.payload.body);
   }
 
   /**
@@ -1578,7 +1670,7 @@ export class Request<RequestValidation = any> {
       bodyInputs[key] = value;
     }
 
-    return bodyInputs;
+    return markRawInput(bodyInputs);
   }
 
   /**
@@ -1643,20 +1735,24 @@ export class Request<RequestValidation = any> {
   }
 
   /**
-   * Get all inputs
+   * Get all inputs.
+   *
+   * The object is raw, unvalidated input: passing it to a model's `merge()`
+   * or `set()` warns once in development. Use `validated()` for the fields a
+   * schema accepted.
    */
   public all() {
-    return this.payload.all;
+    return markRawInput(this.payload.all);
   }
 
   /**
    * Get all inputs except params
    */
   public allExceptParams() {
-    return {
+    return markRawInput({
       ...this.payload.query,
       ...this.payload.body,
-    };
+    });
   }
 
   /**
@@ -1675,7 +1771,7 @@ export class Request<RequestValidation = any> {
       heavyInputs[key] = value;
     }
 
-    return heavyInputs;
+    return markRawInput(heavyInputs);
   }
 
   /**
@@ -1694,14 +1790,14 @@ export class Request<RequestValidation = any> {
       heavyInputs[key] = value;
     }
 
-    return heavyInputs;
+    return markRawInput(heavyInputs);
   }
 
   /**
    * Get only the given keys from the request data
    */
   public only(keys: string[]) {
-    return only(this.all(), keys);
+    return markRawInput(only(this.all(), keys));
   }
 
   /**
@@ -1719,7 +1815,7 @@ export class Request<RequestValidation = any> {
    * Get all request inputs except the given keys
    */
   public except(keys: string[]) {
-    return except(this.all(), keys);
+    return markRawInput(except(this.all(), keys));
   }
 
   /**

@@ -61,6 +61,7 @@ export const memoryCacheCheck: DoctorCheck = warnOnError({
       return {
         name: "memory-cache",
         status: "warn",
+        code: "WL1018",
         detail:
           `the default cache "${name}" has no size limit (${key}: ${String(maxSize)}) — keys built from ` +
           "request input can grow the process heap until it runs out of memory. Set " +

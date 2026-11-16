@@ -792,7 +792,7 @@ Differences from `FileLog`:
 - Error `stack` is stored as `string[]` (split on newlines) — easy to query in aggregators
 - `content` holds the original user-supplied `message` (not a pre-formatted line)
 - Corrupted existing file → renamed to `<file>.json.corrupt-<epoch ms>` (never overwritten), a new file is started and `onChannelError` is told
-- `format: "jsonl"` (type `JSONFileLogConfig`) → one JSON object per line in a `.jsonl` file, append-only writes; the default `"json"` rewrites the whole file on each write
+- `format: "jsonl"` (type `JSONFileLogConfig`) → one JSON object per line in a `.jsonl` file, append-only writes; the default `"json"` rewrites the whole file on each write, and becomes `"jsonl"` in 6.0 (a channel without `format` warns once per process; set it explicitly)
 - **Safe serialization by construction.** All writes go through `safe-stable-stringify` with a custom `Error` replacer — circular refs become `"[Circular]"`, BigInt is stringified, functions/symbols are dropped, nested `Error` instances expand to `{ name, message, stack, ...enumerable }`. A context payload with a class graph or circular reference will never throw during the write.
 
 ## `SentryLog`

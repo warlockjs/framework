@@ -354,7 +354,12 @@ class PgVectorStore implements VectorStore {
    */
   public async query<T>(
     vector: number[],
-    options: { topK: number; threshold?: number; tags?: string[] },
+    options: {
+      topK: number;
+      threshold?: number;
+      tags?: string[];
+      filter?: (hit: { key: string; value: any }) => boolean;
+    },
   ): Promise<{ key: string; value: T; score: number }[]> {
     const client = await this.client();
     const queryVector = vectorLiteral(vector);
@@ -390,6 +395,37 @@ class PgVectorStore implements VectorStore {
       key: row.key as string,
       value: parseValue<T>(row.value),
       score: distanceToScore(row.distance),
+    }));
+  }
+
+  /**
+   * Drop the entry stored under exactly `key`.
+   */
+  public async remove(key: string): Promise<void> {
+    const client = await this.client();
+
+    await client.query(`DELETE FROM ${this.table} WHERE key = $1`, [key]);
+  }
+
+  /**
+   * Every entry under `namespace` (its own key and the `<namespace>.*` keys,
+   * nested namespaces included), for the exact-namespace clearing of
+   * `rag.clear()`.
+   */
+  public async list<T>(namespace: string): Promise<{ key: string; value: T }[]> {
+    const client = await this.client();
+
+    const escaped = namespace.replace(/\\/g, "\\\\").replace(/_/g, "\\_").replace(/%/g, "\\%");
+
+    const { rows } = await client.query(
+      `SELECT key, value FROM ${this.table}
+       WHERE key = $1 OR key LIKE $2 ESCAPE '\\'`,
+      [namespace, `${escaped}.%`],
+    );
+
+    return (rows as Record<string, unknown>[]).map((row) => ({
+      key: row.key as string,
+      value: parseValue<T>(row.value),
     }));
   }
 

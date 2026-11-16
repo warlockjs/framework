@@ -14,8 +14,7 @@ import type {
 import { mergeDriverFields } from "../model/methods/accessor-methods";
 import { generateModelId } from "../model/generate-model-id";
 import type { ChildModel, Model } from "../model/model";
-import { enqueueSyncFanout } from "../sync/sync-fanout";
-import { triggerModelEvent } from "../sync/model-events";
+import { enqueueModelEventFanout } from "../sync/sync-fanout";
 import type { StrictMode } from "../types";
 import { DatabaseWriterValidationError } from "../validation";
 import { afterCommit } from "../transactions/after-commit";
@@ -839,10 +838,12 @@ export class DatabaseWriter implements WriterContract {
    * @private
    */
   private triggerSync(changedFields: string[]): void {
-    enqueueSyncFanout({
-      sourceModel: this.ctor.name,
+    enqueueModelEventFanout({
       operation: "update",
-      execute: () => triggerModelEvent(this.ctor, "updated", this.model, changedFields),
+      modelClass: this.ctor,
+      eventType: "updated",
+      model: this.model,
+      args: [changedFields],
     });
   }
 }

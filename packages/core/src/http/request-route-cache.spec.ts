@@ -1,5 +1,4 @@
 import config from "@mongez/config";
-import { rtrim } from "@mongez/reinforcements";
 import { afterEach, describe, expect, it } from "vitest";
 import { Request } from "./request";
 
@@ -62,9 +61,7 @@ describe("parseBody keys", () => {
     expect(parse({ "tags[]": ["x", "y"] })).toEqual({ tags: ["x", "y"] });
     expect(parse({ "user[name]": "Ada" })).toEqual({ user: { name: "Ada" } });
 
-    // `[` followed by one or more `]` is removed from the end of the key,
-    // the rule `rtrim(key, "[]")` applied.
-    expect(rtrim("odd[]]", "[]")).toBe("odd");
+    // `[` followed by one or more `]` is removed from the end of the key.
     expect(parse({ "odd[]]": "v" })).toEqual({ odd: "v" });
     expect(parse({ "list[][]": "v" })).toEqual({ list: { "": ["v"] } });
     expect(parse({ plain: "v" })).toEqual({ plain: "v" });

@@ -208,9 +208,18 @@ const UserModel = {
 
 import { InvalidOneTimeTokenError, NotificationsUnavailableError } from "../errors";
 import { OneTimeToken } from "../models/one-time-token";
-import { requestPasswordReset, resetPassword } from "./password-reset";
+import { requestPasswordReset as requestPasswordResetNow, resetPassword } from "./password-reset";
+import { settleBackgroundWork } from "./background-work";
 import { isEmailVerified, sendEmailVerification, verifyEmail } from "./email-verification";
 import { defined } from "../test-support/defined";
+
+/** The request, then the background work it started. */
+async function requestPasswordReset(
+  ...args: Parameters<typeof requestPasswordResetNow>
+): Promise<void> {
+  await requestPasswordResetNow(...args);
+  await settleBackgroundWork();
+}
 
 const sha256 = (value: string) => createHash("sha256").update(value).digest("hex");
 
@@ -413,10 +422,40 @@ describe("password reset", () => {
       definitions.find((candidate) => candidate.type === "auth.password-reset"),
       "reset notification",
     );
-    definition.send.mockImplementationOnce(() => new Promise(() => {}));
+    let finish: () => void = () => {};
+    definition.send.mockImplementationOnce(
+      () => new Promise<void>((resolve) => (finish = resolve)),
+    );
 
-    await expect(requestPasswordReset(UserModel as never, "a@x.io")).resolves.toBeUndefined();
-    expect(definition.send).toHaveBeenCalledOnce();
+    await expect(requestPasswordResetNow(UserModel as never, "a@x.io")).resolves.toBeUndefined();
+    await vi.waitFor(() => expect(definition.send).toHaveBeenCalledOnce());
+
+    // Let the delivery end so later specs do not wait on it.
+    finish();
+    await settleBackgroundWork();
+  });
+
+  it("answers while the account lookup is still pending, so a known account costs no extra time", async () => {
+    makeUser(1, { email: "a@x.io" });
+    const release: { resolve?: () => void } = {};
+    const original = UserModel.first;
+    UserModel.first = (filter: Record<string, unknown>) =>
+      new Promise((resolve) => {
+        release.resolve = () => resolve(original(filter));
+      }) as never;
+
+    try {
+      await expect(requestPasswordResetNow(UserModel as never, "a@x.io")).resolves.toBeUndefined();
+      await vi.waitFor(() => expect(release.resolve).toBeDefined());
+      expect(tokenRows).toHaveLength(0);
+
+      release.resolve?.();
+      await settleBackgroundWork();
+
+      expect(tokenRows).toHaveLength(1);
+    } finally {
+      UserModel.first = original;
+    }
   });
 
   it("reports a background delivery failure as password.resetDeliveryFailed", async () => {

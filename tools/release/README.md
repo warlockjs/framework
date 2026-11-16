@@ -7,7 +7,8 @@ pnpm workspace.
 
 - `pkgist.config.ts` — the static package registry (warlock family only). Member
   roots are `../../packages/<name>`. Never edit it for a release.
-- `scripts/release-family.ts` — the release state machine: `gate`, `publish`, `confirm`.
+- `scripts/release-family.ts` — the release state machine: `gate`, `publish` (`--provenance` signs every tarball), `confirm` (`--no-tag` stops after the origin checks), `tag` (tags and pushes the release commit).
+- `scripts/advisory-gate.ts` — `npm run check:advisories`: fails when a declared dependency range admits no version free of a known advisory (waivers in `scripts/advisory-allowances.jsonc`).
 - `ci/blog-check.mjs` — the end-to-end check against the private blog app.
 - `builds/`, `sources/`, `release-artifacts/`, `release-handoffs/` — run output, gitignored.
 
@@ -17,7 +18,7 @@ Releases run in GitHub Actions on this repository
 1. **gate** — public-text check, strictness ratchet, every member's typecheck and tests, a clean
    tree per member directory, pkgist build, ONE release commit for the family,
    pack, local-registry install, generator matrix at the stated scope.
-2. **publish** — every tarball to npm, re-hashed immediately before each publish.
+2. **publish** — every tarball to npm, re-hashed immediately before each publish. In Actions this is a separate job with the write token; the gate job only reads.
 3. **confirm** — install/import from the npm origin, then tag `v<version>` once on
    the release commit and push the tag and the branch. Registry reads and the
    install/import/scaffold checks share one thirty-minute deadline, with

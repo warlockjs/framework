@@ -234,7 +234,7 @@ passkeys: {
   rpID: "example.com",
   rpName: "Example",
   origin: "https://example.com",
-  userVerification: "preferred", // default; "required" refuses assertions without PIN/biometric
+  userVerification: "required", // "preferred" (default until 6.0, warns if unset) also accepts possession only
 },
 ```
 
@@ -333,7 +333,7 @@ router.post(
 - Codes have 6 digits and are stored in `one_time_tokens` (purpose `otp`) as a salted HMAC keyed from your access-token secret, never as plain SHA-256, which is trivially reversible for 6 digits. A new request invalidates the previous code.
 - Every verify counts an attempt atomically first. After `maxAttempts` the code is invalidated, even if the right code comes next, and even under concurrent guesses.
 - Delivery: `notify.channel(channel).send(phone, { body, code, expiresAt })`. Register that channel in `config/notifications.ts`, or set `auth.otp.send(phone, message, channel)`. `auth.otp.message(code)` changes the text.
-- **Anti-enumeration:** an unknown phone gets the same `requestOtp` result (nothing sent) and the same `InvalidOneTimeTokenError` (400, `EC008`) from `verifyOtp`. The code is delivered in the background (failures: log + `otp.deliveryFailed` event); `auth.otp.awaitDelivery: true` awaits it instead.
+- **Anti-enumeration:** an unknown phone gets the same `requestOtp` result (nothing sent) and the same `InvalidOneTimeTokenError` (400, `EC008`) from `verifyOtp`. The lookup, the code writes and the delivery run in the background (failures: log + `otp.deliveryFailed` event); `auth.otp.awaitDelivery: true` awaits it instead.
 - CSRF: `verifyOtp` is a POST. If the route uses cookie auth, the 5.12 Origin check applies. Otherwise there is no ambient credential to ride.
 
 ## Gotchas

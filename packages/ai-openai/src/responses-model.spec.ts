@@ -1,6 +1,7 @@
 import type { StandardSchemaV1 } from "@standard-schema/spec";
 import {
   InvalidRequestError,
+  ProviderAbortError,
   ProviderError,
   ProviderRateLimitError,
   type Message,
@@ -1502,7 +1503,9 @@ describe("OpenAIResponsesModel.stream()", () => {
 
     expect(requestOptions[0]).toEqual({ signal: controller.signal });
     expect(chunks).toEqual([{ type: "delta", content: "one" }]);
-    expect(error).toBeInstanceOf(ProviderError);
+    expect(error).toBeInstanceOf(ProviderAbortError);
+    expect((error as ProviderAbortError).category).toBe("cancelled");
+    expect((error as Error).name).toBe("AbortError");
     expect((error as Error).cause).toBeInstanceOf(OpenAIClient.APIUserAbortError);
   });
 

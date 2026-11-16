@@ -81,10 +81,13 @@ describe("LocalDriver temporary tokens and storage prefixes", () => {
   });
 
   it.each([
-    ["a string exp", { v: 2, path: "doc.txt", exp: "9999999999", sig: "a".repeat(64) }],
-    ["a non-integer exp", { v: 2, path: "doc.txt", exp: 1.5, sig: "a".repeat(64) }],
-    ["a non-string path", { v: 2, path: ["doc.txt"], exp: 9999999999, sig: "a".repeat(64) }],
-    ["a malformed signature", { v: 2, path: "doc.txt", exp: 9999999999, sig: "zz" }],
+    ["a string exp", { v: 3, disk: "", path: "doc.txt", exp: "9999999999", sig: "a".repeat(64) }],
+    ["a non-integer exp", { v: 3, disk: "", path: "doc.txt", exp: 1.5, sig: "a".repeat(64) }],
+    [
+      "a non-string path",
+      { v: 3, disk: "", path: ["doc.txt"], exp: 9999999999, sig: "a".repeat(64) },
+    ],
+    ["a malformed signature", { v: 3, disk: "", path: "doc.txt", exp: 9999999999, sig: "zz" }],
   ])("refuses a payload with %s", async (_label, payload) => {
     const driver = new LocalDriver({ root, signatureKey });
     await driver.put(Buffer.from("secret"), "doc.txt");
@@ -105,5 +108,38 @@ describe("LocalDriver temporary tokens and storage prefixes", () => {
     const forged = encode({ ...token, path: "a", exp: `1700000000:${token.exp}` });
 
     expect((await driver.validateTemporaryToken(forged)).valid).toBe(false);
+  });
+
+  it("does not accept a token issued by another disk that shares the key", async () => {
+    const uploads = new LocalDriver({ root, signatureKey }, "uploads");
+    const exports = new LocalDriver({ root, signatureKey }, "exports");
+    await uploads.put(Buffer.from("secret"), "doc.txt");
+
+    const token = uploads.encodeTemporaryToken("doc.txt", 3600);
+
+    expect((await uploads.validateTemporaryToken(token)).valid).toBe(true);
+    expect(await exports.validateTemporaryToken(token)).toEqual({
+      valid: false,
+      error: "invalid_signature",
+    });
+
+    // Renaming the disk inside the payload does not help: the name is signed.
+    const payload = JSON.parse(Buffer.from(token, "base64url").toString());
+    const forged = encode({ ...payload, disk: "exports" });
+
+    expect((await exports.validateTemporaryToken(forged)).valid).toBe(false);
+  });
+
+  it("refuses a version 2 token issued before tokens named their disk", async () => {
+    const driver = new LocalDriver({ root, signatureKey }, "uploads");
+    const exp = Math.floor(Date.now() / 1000) + 3600;
+    const sig = crypto
+      .createHmac("sha256", signatureKey)
+      .update(JSON.stringify([2, "doc.txt", exp]))
+      .digest("hex");
+
+    expect(
+      await driver.validateTemporaryToken(encode({ v: 2, path: "doc.txt", exp, sig })),
+    ).toEqual({ valid: false, error: "invalid_token" });
   });
 });

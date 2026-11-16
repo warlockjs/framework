@@ -1,3 +1,5 @@
+import v8 from "node:v8";
+import vm from "node:vm";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Request } from "../request";
 import type { Response } from "../response";
@@ -163,5 +165,25 @@ describe("rateLimitMiddleware in-memory buckets", () => {
     run(mw, path, undefined, "9.9.9.9");
 
     expect(memoryRateLimitBucketCount() - before).toBeLessThanOrEqual(2);
+  });
+
+  it("releases a limiter's buckets with its middleware", async () => {
+    v8.setFlagsFromString("--expose-gc");
+    const collect = vm.runInNewContext("gc") as () => void;
+
+    const path = `/w${seq++}`;
+    const before = memoryRateLimitBucketCount();
+
+    // built per call and dropped, like a limiter made inside a request handler
+    (() => {
+      for (let i = 0; i < 50; i++) {
+        run(rateLimitMiddleware({ max: 5, duration: 60_000 }), path, undefined, `8.8.8.${i}`);
+      }
+    })();
+
+    await vi.waitFor(() => {
+      collect();
+      expect(memoryRateLimitBucketCount()).toBeLessThanOrEqual(before);
+    });
   });
 });

@@ -51,6 +51,7 @@ export const grokAdapter: CliAdapter = {
   title: "Grok Build",
   command: "grok",
   apiKeyEnv: ["XAI_API_KEY"],
+  passEnv: [],
   homeEnv: ["GROK_HOME"],
   transports: ["argv", "file"],
   effort: true,

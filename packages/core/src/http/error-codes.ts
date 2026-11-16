@@ -66,6 +66,12 @@ export enum HttpErrorCodes {
   HostNotAllowed = "EC110",
 
   /**
+   * A JSON request body nests objects or arrays deeper than
+   * `http.input.maxDepth`.
+   */
+  InputTooDeep = "EC111",
+
+  /**
    * Default core CSRF-Origin guard (SECURITY, card 8a752ab2, `./csrf-default-guard.ts`)
    * refused an unsafe-method, cookie-carrying request whose `Origin`/`Referer`
    * did not name the request's own origin or an entry in

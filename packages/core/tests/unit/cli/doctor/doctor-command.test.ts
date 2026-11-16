@@ -76,6 +76,7 @@ describe("default doctor check set", () => {
       "compression",
       "env-files",
       "memory-cache",
+      "key-rotation",
       "release-hygiene",
     ]);
   });

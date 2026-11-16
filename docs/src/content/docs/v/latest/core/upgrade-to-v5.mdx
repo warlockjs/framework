@@ -209,7 +209,7 @@ const locale = request.locale;
 
 ### Client-supplied locales are allow-listed
 
-When `app.localeCodes` is configured, a client-supplied `locale` or `translation-locale-code` header, or a `locale` query value, outside that list is treated as absent and falls back to `app.localeCode`. In v4, the client value won as-is and could steer translations and serialized Resources to an unsupported locale. The default locale must itself appear in `localeCodes`.
+When `app.localeCodes` is configured, a client-supplied `locale` header, cookie or query value, outside that list is treated as absent and falls back to `app.localeCode`. In v4, the client value won as-is and could steer translations and serialized Resources to an unsupported locale. The default locale must itself appear in `localeCodes`.
 
 **Before (v4)**
 

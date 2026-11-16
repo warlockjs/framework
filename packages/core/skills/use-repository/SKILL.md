@@ -427,6 +427,7 @@ The third arg is a context object — `{ allValues, dateFormat, ... }` — for f
 - **`create`/`update`/`delete` clear cache on every write.** That's why `listCached` is usually safe. If you write outside the repository (raw query, bulk insert), the cache won't invalidate — call `repo.clearCache()` manually.
 - **The repository owns `clearCache` per repo + per model.** It doesn't reach into other repositories. If a write in one module affects another's cache, invalidate explicitly from a service.
 - **Adapter init is `setTimeout(0)` delayed.** Don't call repository methods synchronously inside the constructor — they'll fire before the adapter is ready.
+- Cache invalidation cost: by default a write removes the repository namespace (a keyspace scan on Redis). Set `repository.cacheInvalidation: "generation"` (or the protected `cacheInvalidation` property) so a write replaces a generation id instead (constant cost, one extra read per cache lookup); entries then expire after `repository.cacheGenerationTtl` (default `"1d"`).
 
 ## See also
 

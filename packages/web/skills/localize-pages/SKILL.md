@@ -57,7 +57,7 @@ A key used with `count` is stored as variants
 no literal names falls back to every group, and `warlock check` reports it as
 `WL9104` with the file, line and key text; the build log lists the same sites.
 A plain `config.translations` array only adds keys; it does not resolve a computed
-lookup. One dynamic site anywhere in the page's graph (page, layouts, root, error
+lookup. The key is accepted in the `config` of a page, a layout and the root (in the module or its setup file). One dynamic site anywhere in the page's graph (page, layouts, root, error
 pages) still ships every group, so fix the site itself (a literal key or a
 static-prefix template). Use a declaration for keys the analysis cannot see, such
 as ones read from data:
@@ -209,6 +209,8 @@ export default web;
 | `"prefix-except-default"`                     | `/about` (default locale), `/ar/about`; `/en/about` answers a 301 to `/about`        | the path prefix, else the default locale                                                                                             |
 
 Any other value, an empty `app.localeCodes`, or an `app.localeCode` that is not in `app.localeCodes` throws a `LocaleRoutingConfigError` at boot. A multi-site app can override the strategy per site with `sites.<key>.localeRouting` (see the `multi-site` topic). A page whose filesystem route begins with `[locale]` carries its own locale segment and cannot be combined with a non-`none` strategy (`LocaleParamRoutingConflictError` at boot). To build a locale-correct URL by hand, for a canonical link for example, use `localizedPath(path, locale?)` from `@warlock.js/web`; `<Link>` prefixes literal in-app paths itself (see the `navigate-on-the-client` topic for its `locale` prop).
+
+The not-found page and the page for a core-level refusal (for example `/ar/public/../x`) answer in the locale a leading URL prefix names; a refusal page's `error.errorCode` is the request id.
 
 ## Worked example: an en/ar routed page with a switcher
 

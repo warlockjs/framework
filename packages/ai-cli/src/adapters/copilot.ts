@@ -53,6 +53,7 @@ export const copilotAdapter: CliAdapter = {
   title: "Copilot CLI",
   command: "copilot",
   apiKeyEnv: ["COPILOT_GITHUB_TOKEN"],
+  passEnv: ["GH_TOKEN", "GITHUB_TOKEN"],
   homeEnv: ["COPILOT_HOME"],
   transports: ["argv", "stdin"],
   effort: true,

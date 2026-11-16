@@ -127,6 +127,24 @@ export class MockCacheDriver
   }
 
   /**
+   * {@inheritdoc}
+   */
+  public async listKeys(namespace: string): Promise<string[]> {
+    const parsed = this.parseKey(namespace);
+
+    this.recordCall("listKeys", parsed, [namespace]);
+
+    const now = Date.now();
+
+    return [...this.storage.entries()]
+      .filter(
+        ([key, data]) =>
+          this.inNamespace(key, parsed) && (data.expiresAt === undefined || data.expiresAt > now),
+      )
+      .map(([key]) => this.unprefixKey(key));
+  }
+
+  /**
    * Standard `set` with full `onConflict` support. Honors scope-default TTL
    * via {@link BaseCacheDriver.resolveSetOptions}.
    */

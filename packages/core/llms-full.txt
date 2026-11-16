@@ -896,6 +896,7 @@ router.restfulResource("/orders", new OrdersRestful());
 
 - **`router.restfulResource` wraps `prefix(path, ...)` internally** — register inside `guarded(...)` to guard the whole set, or pass middleware via the options. Avoid registering the same prefix twice.
 - **`Restful.update` is `PUT`, `Restful.patch` is `PATCH`.** They differ — `update` uses `request.allExceptParams()`, `patch` uses `request.heavyExceptParams()`. Don't conflate them.
+- **`Restful.list` rethrows failures** (a refused filter answers 400, anything else is a 5xx the request funnel records once) instead of answering `serverError` itself.
 - **`cache = true` reuses repository cache.** If the repository isn't cacheable, the cached methods silently fall through to the live query — set `cache = false` explicitly if you want to make that visible.
 - **`bulkDelete` reads `id` as an array.** The route is `DELETE /path` (no `:id`); send `id: ["1", "2", "3"]` in the body. Returns 400 if the value isn't an array.
 - **Validation hooks on `Restful`** are bound to the instance — call `this.repository` freely inside `validate()`. Plain controller validators don't get `this`.
@@ -1478,13 +1479,14 @@ Same shape — TS validates the union; runtime picks the `default` key.
 
 - `http.rateLimit` — `@fastify/rate-limit` options (`nameSpace`, ...); `store: "cache"` counts in `@warlock.js/cache` so every server shares the limit (per-route `middleware.rateLimit()` follows it; `skipOnError` defaults to `true`, so a cache outage fails open; the `null` and `file` cache drivers are refused); `redis` needs an ioredis client; `enabled: false` disables. Static files (public folder, `router.directory()` mounts, `router.file()` routes, web build assets) are exempt unless `staticFiles: true`.
 - `socket.adapter` — adapter factory for cross-server broadcast.
+- `database` cache driver: register `cacheMigration` (from `@warlock.js/core`) in `database.migrations` to create its `cache` table with the unique index on `key` that the `upsert` option needs.
 - `cache.silenceSingleServerWarning`, `storage.silenceSingleServerWarning`, `socket.silenceSingleServerWarning` — silence the production warnings for in-memory cache, local storage, and adapter-less sockets.
 
 `http.modelValidationErrorStatus` sets the status for a Cascade model-write validation failure (a model failing its own schema on save). It defaults to `500` with an opaque body, because request input is already validated with a `422` before the model is touched. Set a `4xx` (e.g. `422`) to treat it as a client error instead; the response then carries `{ errors }`.
 
 `http.errorMapper(error, request)` maps errors that are not an `HttpError` to `{ status, message?, payload? }` (return `undefined` to keep the default opaque `500`). A mapped 5xx keeps the opaque message unless the mapper sets one.
 
-Request input limits: `http.input.maxArrayIndex` (default 1000) drops keys naming a larger array index (`a[99999]`); `http.urlencoded.maxFields` (default 1000) answers 413 (`EC107`) past it. `http.cookies.secret` only signs cookies written with `{ signed: true }` (read with `request.signedCookie()`). `/ready` hides its check list in production unless `http.health.details: true`.
+Request input limits: `http.input.maxArrayIndex` (default 1000) drops keys naming a larger array index (`a[99999]`); `http.input.maxDepth` (default 32) drops deeper keys and refuses a deeper JSON body (400, `EC111`); `http.multipart.memoryLimit` spools larger file parts to temporary files; `http.compileResponseSchemas` serializes declared `responseSchema` statuses and drops undeclared fields; `resource.dateOutput` sets the default date output of resource fields (`"iso"`, ...); `http.urlencoded.maxFields` (default 1000) answers 413 (`EC107`) past it. `http.cookies.secret` only signs cookies written with `{ signed: true }` (read with `request.signedCookie()`). `/ready` hides its check list in production unless `http.health.details: true`.
 
 `http.logging` controls what request log entries carry: `{ body?: boolean, query?: boolean, redactQueryParams?: string[] }` (body/query default `true`). A route's `logging` option overrides it — use `logging: { body: false, query: false }` on routes that accept secrets or arbitrary text. Entries carry `request.toLogSnapshot()`, never the `Request` object, with credential query values masked in the URL.
 
@@ -2341,7 +2343,7 @@ If no locale is set on the request, the first entry wins as a fallback.
 
 ## Date output options
 
-Default date cast emits an object — `{ format, timestamp, humanTime, iso }`. To shape output globally use the static `parsedSchema` field after defining, or override via a subclass. For most APIs, the default is fine.
+Default date cast emits an object — `{ format, timestamp, humanTime, iso }`. Set `resource.dateOutput` in `src/config/resource.ts` (`"iso"`, `"timestamp"`, `"format"`, `"humanTime"`, `"locale"` or an options object) to change every date field at once; a field's own `dateOptions()` wins, and unset keeps the object. For most APIs, the default is fine.
 
 ## Computed fields (resolver functions)
 
@@ -2715,7 +2717,7 @@ Generate the keys once (Node REPL):
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
 
-Put both in `.env` and **never rotate the encryption key without a migration** — every value encrypted under the old key becomes garbage. The HMAC key can rotate if you accept that fingerprints recomputed under the new key won't match historical ones.
+Put both in `.env`. **Rotate the encryption key with `previousKeys`**: set the new `key` and list the old one in `previousKeys: [...]` (newest first). `encrypt()` uses only `key`; `decrypt()` tries `key`, then each retired key, only when the value does not open. Re-encrypt stored values, then drop the old key. Swapping `key` alone makes every old ciphertext garbage. The HMAC key can rotate if you accept that fingerprints recomputed under the new key won't match historical ones.
 
 ## `encrypt` / `decrypt` — reversible secrets
 
@@ -2863,7 +2865,7 @@ Same payload → same key → returns the cached result. Different keys (because
 - **Empty key value is fatal.** If `env("APP_ENCRYPTION_KEY")` returns `undefined`, the first `encrypt()` call throws "Missing encryption key" at runtime, not boot. Cover this in your startup health check.
 - **HMAC falls back to the encryption key.** If `hmacKey` isn't set, `hmacHash` uses `key`. Convenient, but slightly weakens your isolation — best practice is two separate keys.
 - **Don't reuse the same value across encrypt and password.** A bcrypt hash of a value isn't comparable to an encryption of that value. They're different domains.
-- **Rotating the encryption key requires a migration.** Every existing ciphertext becomes unrecoverable under a new key. Plan rotation as: keep the old key as `OLD_APP_ENCRYPTION_KEY`, decrypt each row with old, encrypt with new, retire old key once the table is clean.
+- **Don't just swap the encryption key.** Move the old key to `encryption.previousKeys`, set the new `key`, re-encrypt rows (`encrypt(decrypt(value))`), then retire the old key once the table is clean.
 
 ## Installation
 
@@ -3158,6 +3160,8 @@ const valid = await verifyPassword("user-password-123", hashed);
 ```
 
 Both are async because bcrypt is CPU-bound. The framework uses `bcryptjs` (pure JS — portable across every platform, no native build) under the hood. When the app installs the native `bcrypt` package, both helpers use it automatically: hashing then runs on the libuv thread pool instead of the event loop (worth it on busy login endpoints; raise `UV_THREADPOOL_SIZE` for many concurrent logins). Hashes are the same `$2b$` format either way, so existing hashes keep verifying.
+
+`needsRehash(hash)` is `true` when a stored hash was made with another algorithm or cost than the config asks for (and `false` for an unknown format); `authService.attemptLogin()` uses it to rehash after a correct login (`auth.rehashPasswords`, default `true`). `password.driver: "scrypt"` (with optional `password.scrypt: { cost, blockSize, parallelization }`) hashes new passwords with `node:crypto` scrypt on the thread pool; both formats always verify.
 
 bcrypt reads only the first 72 bytes (UTF-8) of a password. A longer one is hashed with a one-time warning; set `password.rejectLongPasswords: true` to make `hashPassword` throw instead, and cap password length in validation.
 
@@ -4222,7 +4226,17 @@ router.get("/webhooks/status", webhookStatusController, { rateLimit: false });
 route like production (declared `Content-Length` refused before reading, chunked bodies
 counted as they stream), and run the route's `preParsing` hooks. Keys the dev wildcard cannot
 honour (`schema`, `errorHandler`, `onSend`, `onResponse`, ...) log one boot warning naming the
-route and key. Multipart uploads use `http.fileUploadLimit`, not `bodyLimit`.
+route and key. Multipart uploads use `http.fileUploadLimit`, not `bodyLimit`. `serverOptions.config`
+(the per-route config Fastify plugins read, e.g. a per-route `multipartOptions` file limit) is also not
+applied by the dev wildcard and logs the same warning; the route-level `uploads` option works in dev.
+
+### Serializing through `responseSchema`
+
+`http.compileResponseSchemas: true` (or `compileResponseSchema: true` on one route, `false` to opt
+out) writes the declared statuses with a compiled serializer and drops fields the schema does not
+name. A missing declared field is omitted, `date` fields stay open, and a route that sets its own
+`serverOptions.schema.response` keeps it. Production builds and the in-process test server apply it;
+the dev server does not. It also warns once at boot when `http.compileResponseSchemas` or a route's `compileResponseSchema` is set, since the dev dispatcher does not apply compiled response schemas.
 
 ### Routes that take uploads
 
@@ -7083,7 +7097,7 @@ await storage.putFromBase64("data:image/png;base64,iVBORw0KGgo...", "uploads/pho
 await storage.put(request.file("image")!, "uploads/avatar.jpg"); // validate the upload first
 ```
 
-`putFromUrl` / `putFromBase64` store the MIME type of the location's extension, never the type the remote server or data URL declares (pass `{ mimeType }` to set it yourself). `putFromUrl` also pins each connection to the address that passed the private-host check, so DNS rebinding is refused.
+`putFromUrl` / `putFromBase64` store the MIME type of the location's extension, never the type the remote server or data URL declares (pass `{ mimeType }` to set it yourself). `putFromUrl` also pins each connection to the address that passed the private-host check, so DNS rebinding is refused (the one-time "pinning skipped" warnings can be re-armed in a test with `resetPinSkipWarnings()`).
 
 Every `put*` returns a `StorageFile`.
 
@@ -7314,7 +7328,7 @@ export const temporaryFileController: RequestHandler = async ({ request, respons
 
 Cloud drivers always return `{ valid: false }` from `validateTemporaryToken` — they validate via presigned URL on the cloud side.
 
-A token is bound to the storage prefix (tenant) in effect when it was issued: under another tenant's prefix it is refused with `invalid_token`. Tokens from versions before 5.53 are refused too. Give each local disk its own `signatureKey`.
+A token is bound to the storage prefix (tenant) in effect when it was issued: under another tenant's prefix it is refused with `invalid_token`. Tokens from versions before 5.54 are refused too. A token also names the disk that issued it, so two local disks sharing one `signatureKey` do not accept each other's tokens.
 
 ## Runtime driver registration
 
@@ -9254,7 +9268,7 @@ Re-running on an already-current project is a no-op: nothing resolves as newer, 
 ⚠ Could not reach the npm registry — no versions were changed. Check your connection and try again.
 ```
 
-If the install fails after the versions were rewritten, `package.json` keeps the new versions (re-run your package manager to finish) and the CLI exits non-zero.
+If the install fails after the versions were rewritten, `package.json` (and `package-lock.json`, when it was pruned) is put back as it was and the CLI exits non-zero; run `warlock update --no-install` and then your install to apply the versions anyway. With npm older than 11.6.2 the command refuses before changing anything and names the version it found.
 
 ## The dev-server update notice
 
@@ -10317,8 +10331,8 @@ The reverse direction — sending a stored file back via `response.sendFile(...)
 - **`save()` rewrites the extension on format change.** `file.format("webp").save("avatars")` produces `avatars/<name>.webp` regardless of the upload's original extension.
 - **`.use(driver)` mutates the instance.** It returns `this`; subsequent saves on the same instance keep the driver. Re-instantiate or call `.use("local")` to reset.
 - **Multipart parsing needs `fileUploadLimit` headroom.** Default is `10MB` (configurable via `http.fileUploadLimit` in `src/config/http.ts`). Schema `maxSize` is checked after parsing, so set the multipart limit at least as high.
-- **Declared types are the client's word.** `mimeType`, `extension` and `isImage` come from the request. `image()` sniffs the bytes (svg only with `{ svg: true }`); `mimeType()`/`accept()` also refuse markup bytes (svg, html, xml) unless listed. `save()` stores raster images with their sniffed type and markup as `application/octet-stream`; `uploads.trustClientContentType: true` stores the declared type instead.
-- **Total size and route opt-in.** `http.multipart.maxTotalSize` (default 25 MB) caps a whole request (413, `EC108`); `uploads: { maxTotalSize }` on a route overrides it. `http.multipart.routes: "declared"` parses multipart only on routes with `uploads: true` (others answer 415, `EC109`); the default `"all"` warns once in production.
+- **Declared types are the client's word.** `mimeType`, `extension` and `isImage` come from the request. `image()` sniffs the bytes (svg only with `{ svg: true }`); `mimeType()`/`accept()` also refuse markup bytes (svg, html, xml) unless listed. `save()` stores raster images with their sniffed type and markup as `application/octet-stream`; `uploads.trustClientContentType: true` stores the declared type instead. Cloud disks also store markup with `Content-Disposition: attachment` unless the put options pass `contentDisposition`.
+- **Total size and route opt-in.** `http.multipart.maxTotalSize` (default 25 MB) caps a whole request (413, `EC108`); `uploads: { maxTotalSize }` on a route overrides it, and `uploads: { maxFileSize, maxFiles }` cap one file and the file count for that route (413, `EC108`, in dev and production alike; only stricter than `http.fileUploadLimit` / `http.multipart.files`). `http.multipart.routes: "declared"` parses multipart only on routes with `uploads: true` (others answer 415, `EC109`); the default `"all"` warns once in production and changes to `"declared"` in 6.0. `http.multipart.memoryLimit` streams a part above it to a temporary file (deleted when the response closes): `UploadedFile` is unchanged, `save()` streams it to storage, `file.keep()` holds the copy for a queued job until `file.discard()` or process exit. `v.file().mimeType(types, msg)` fills `:types` with the allowed list, and a translation key passed as `msg` is translated.
 
   ```ts
   router.post("/avatars", uploadAvatar, { uploads: true });
@@ -10738,6 +10752,8 @@ Both pivot on **the request's locale** — auto-detected from headers / query st
 
 ## The shape
 
+Core keeps a translations revision that web's production page delivery reads to refresh its memoised dictionaries. `groupedTranslations`, `extend` and `setTranslationsList` move it whether they are imported from `@warlock.js/core` or `@mongez/localization` (core listens to the library's `translations` change event); call `bumpTranslationsRevision()` only for changes the library cannot report; `getTranslationsRevision()` reads the current number.
+
 ```ts
 // 1. Declare keys (auto-loaded from src/app/<module>/utils/locales.json)
 import { groupedTranslations } from "@mongez/localization";
@@ -10893,10 +10909,11 @@ Use when you want a value in a specific locale — e.g. sending a notification t
 
 The framework reads the locale from the incoming request in this order:
 
-1. **`translation-locale-code` header** (first priority).
-2. **`locale` header**.
-3. **`locale` query string param**.
-4. **Default** — `config.key("app.localeCode")` falling back to `"en"`.
+1. **`locale` query string param**.
+2. **`warlock.locale-preference` cookie** (only when its value is in `app.localeCodes`).
+3. **`locale` header** (outranks the `locale` cookie).
+4. **`locale` cookie**.
+5. **Default** — `config.key("app.localeCode")` falling back to `"en"`. A value outside a declared `app.localeCodes` counts as absent.
 
 ```ts
 const locale = request.getLocaleCode();
@@ -12093,6 +12110,7 @@ The third arg is a context object — `{ allValues, dateFormat, ... }` — for f
 - **`create`/`update`/`delete` clear cache on every write.** That's why `listCached` is usually safe. If you write outside the repository (raw query, bulk insert), the cache won't invalidate — call `repo.clearCache()` manually.
 - **The repository owns `clearCache` per repo + per model.** It doesn't reach into other repositories. If a write in one module affects another's cache, invalidate explicitly from a service.
 - **Adapter init is `setTimeout(0)` delayed.** Don't call repository methods synchronously inside the constructor — they'll fire before the adapter is ready.
+- Cache invalidation cost: by default a write removes the repository namespace (a keyspace scan on Redis). Set `repository.cacheInvalidation: "generation"` (or the protected `cacheInvalidation` property) so a write replaces a generation id instead (constant cost, one extra read per cache lookup); entries then expire after `repository.cacheGenerationTtl` (default `"1d"`).
 
 ## See also
 
@@ -12323,6 +12341,8 @@ Two pieces, always:
 
 1. **Schema file in `schema/`** — exports both the value (`createProductSchema`) and the inferred type (`CreateProductSchema`). One file, one source of truth.
 2. **Controller typed as `RequestHandler<Request<TSchema>>`** (or `GuardedRequestHandler<TSchema>` for auth'd routes) — pulls `TSchema` from the schema file and `controller.validation = { schema }` registers it with the framework.
+
+`request.all()`, `allExceptParams()`, `only()`, `except()` and `request.body` return raw input; passing one to a model's `merge()` or `set()` warns once in development. Pass `request.validated()` instead.
 
 No separate `*.request.ts` alias file. `RequestHandler<Request<TSchema>>` types `request.validated()` directly off the schema's inferred type.
 
@@ -12629,7 +12649,7 @@ updateProductController.validation = {
 - **`v.url(...)` does not exist on the factory.** Use `v.string().url(...)`. Same goes for any other rule that's not in the table above — check `BaseValidator` / `StringValidator` first.
 - **`.optional()` and `.required()` are not symmetric.** `.optional()` brands the field as absent-allowed. `.required()` clears the optional flag _and_ replaces any prior required rule — read seal's `BaseValidator` source if you need conditional required.
 - **`uniqueExceptCurrentId` reads `request.input("id")`.** It only works inside an HTTP context — useless in CLI/job code.
-- **`request.validated()` is empty until the framework runs validation.** If you forgot the `controller.validation = { schema }` line, `validated()` returns `{}` (or the input from `setValidatedData` if you set it manually). Always pair the schema with the assignment.
+- **`request.validated()` is empty until the framework runs validation.** If you forgot the `controller.validation = { schema }` line, `validated()` returns `{}` (or the input from `setValidatedData` if you set it manually). Always pair the schema with the assignment. On a route with no schema, development logs one warning per route; read such routes with `request.input()` / `request.all()`.
 - **Import `v`/`Infer` from `@warlock.js/seal`.** Core does not re-export them — `@warlock.js/seal` is the canonical and only home.
 - **DB rules trigger queries on every validation pass.** For high-throughput endpoints, prefer enforcing uniqueness at the DB layer (`UNIQUE` index) and catch the conflict in the controller.
 
@@ -13000,6 +13020,7 @@ const types = runTypecheck({ files: ["src/app/posts/services/publish.service.ts"
 - `check` boots nothing — no config, no connection, no port — so it runs the same with or without services; only tests that need them fail, and those report `WL8003`/`WL8004`.
 - Lint defaults to Oxlint (an app-root config + the app-installed package). No Oxlint config skips lint. A missing package reports `WL8002`. ESLint support was removed in 5.34.0; see `upgrade-from-5-29`.
 - Tests use the app's own vitest (`vitest run`, or `vitest related <files> --run` with `--changed`). Test files without vitest installed → `WL8002`.
+- A vitest run longer than 10 minutes is stopped and reported as `WL8007` (`The tests timed out after 600 s`); raise the limit with `--test-timeout <seconds>` or `WARLOCK_CHECK_TEST_TIMEOUT` (`0` = no limit). Exit 143 without that message means something outside `check` (a memory-capped wrapper) sent SIGTERM.
 - The typecheck runs in a child `warlock typecheck` process; running out of memory is reported as `WL8007` instead of ending the run.
 - The convention checks are the framework's own and run the same with Oxlint or no linter. A deliberate exception gets `// warlock-check-ignore WL9006 -- why` on the problem's line or the line above (no code = every code on that line).
 
@@ -13422,7 +13443,7 @@ Summary: 5 ok, 1 warn, 0 fail
 
 ## Error codes and `--json`
 
-Every `warn`/`fail` finding except the deployment-settings warnings (below, which name the setting instead) carries a stable error code (`WL1001`, `WL2001`, …), printed after the detail and explained by `warlock explain <code>`. `--json` prints the report with the same `code` / `hint` / `skill` / `docs` fields `warlock check --json` uses (boot output goes to stderr):
+Every `warn`/`fail` finding carries a stable error code (the deployment-settings warnings use `WL1011` to `WL1020`, one per check; `compression` never warns, so `WL1020` is printed on its `ok` line when compression is off) (`WL1001`, `WL2001`, …), printed after the detail and explained by `warlock explain <code>`. `--json` prints the report with the same `code` / `hint` / `skill` / `docs` fields `warlock check --json` uses (boot output goes to stderr):
 
 ```bash
 npx warlock doctor --json | jq '.results[] | select(.status != "ok") | "\(.code) \(.detail)"'
@@ -13488,9 +13509,10 @@ An app keeps the config files it was generated with, so safer defaults in a newe
 | `trust-proxy`        | `http.trustProxy: true` without `http.realIpHeader`                                                                                                                                                  | proxy addresses/CIDR in `http.trustProxy`, or `http.realIpHeader`                                 |
 | `request-timeout`    | `http.requestTimeout` (or `http.serverOptions.requestTimeout`) is `0`                                                                                                                                | remove it (default 5 minutes) or set a bound                                                      |
 | `production-logging` | a production console channel prints `debug` lines                                                                                                                                                    | `new ConsoleLog({ minLevel: "info" })`                                                            |
-| `compression`        | never — `ok` line notes when it is off (unneeded behind a compressing proxy/CDN)                                                                                                                     | `http.compression: true`                                                                          |
+| `compression`        | never — `ok` line (`WL1020`) notes when it is off (unneeded behind a compressing proxy/CDN)                                                                                                          | `http.compression: true`                                                                          |
 | `env-files`          | a root `.env` / `.env.*` file (not `.env.example`) is not ignored by git, or is committed (`git check-ignore`)                                                                                       | `.env`, `.env.*`, `!.env.example` in `.gitignore`                                                 |
 | `memory-cache`       | the default cache store is a memory driver with `maxSize: Infinity` / `0` / `null`                                                                                                                   | `cache.options.<store>.maxSize`                                                                   |
+| `key-rotation`       | `encryption.previousKeys` / `auth.accessToken.previousSecrets` / `auth.refreshToken.previousSecrets` still configured                                                                                | remove the retired entries (`WL1019`)                                                             |
 
 `auth-tokens` runs only when `auth.userType` is set and `@warlock.js/auth` is installed in a `node_modules` the project's lookup walks (core never imports or resolves it: its `exports` offer only an `import` entry); it reads `auth.accessToken.*` / `auth.refreshToken.*`, then the older `auth.jwt.*`. Values are read as the config resolves on the machine running `doctor`.
 

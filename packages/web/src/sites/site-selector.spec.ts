@@ -173,6 +173,51 @@ describe("createSiteSelector", () => {
         expect(resolveHost).toHaveBeenCalledTimes(1);
       });
 
+      it("remembers null for negativeTtl, not ttl", async () => {
+        let now = 0;
+        let known = false;
+        const resolveHost = vi.fn(() => (known ? hit : null));
+        const selector = createSiteSelector({
+          sites,
+          resolveHost,
+          resolveCache: { ttl: 600, negativeTtl: 5 },
+          now: () => now,
+        });
+
+        expect((await selector.select(at("x.com"))).kind).toBe("not-found");
+        known = true;
+        now += 4_999;
+        expect((await selector.select(at("x.com"))).kind).toBe("not-found");
+        now += 1;
+        expect((await selector.select(at("x.com"))).kind).toBe("site");
+        now += 599_000;
+        await selector.select(at("x.com"));
+        expect(resolveHost).toHaveBeenCalledTimes(2);
+      });
+
+      it("does not remember null when negativeTtl is 0", async () => {
+        const resolveHost = vi.fn(() => null);
+        const selector = createSiteSelector({
+          sites,
+          resolveHost,
+          resolveCache: { ttl: 10, negativeTtl: 0 },
+        });
+
+        await selector.select(at("x.com"));
+        await selector.select(at("x.com"));
+        expect(resolveHost).toHaveBeenCalledTimes(2);
+      });
+
+      it("rejects a negative negativeTtl", () => {
+        expect(() =>
+          createSiteSelector({
+            sites,
+            resolveHost: () => null,
+            resolveCache: { ttl: 1, negativeTtl: -1 },
+          }),
+        ).toThrow("negativeTtl");
+      });
+
       it("forget drops the entry", async () => {
         const { resolveHost, selector } = setup(() => hit);
         await selector.select(at("x.com"));

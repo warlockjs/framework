@@ -4,6 +4,33 @@ All notable changes to `@warlock.js/auth` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.54.0 - 2026-11-16
+
+### Upgrading
+
+- `authService.attemptLogin()` (so `login()`) now replaces a stored password hash made with another algorithm or cost than `encryption.password` asks for, after a correct password. Existing users catch up as they sign in. A failure to save is logged and never fails the login. Set `auth.rehashPasswords: false` to keep hashes as they are.
+- `requestPasswordReset()` and `requestOtp()` now run the account lookup, the token or code writes and the delivery after the response, so a known and an unknown account answer in the same time. Code that read the new token row right after `await requestPasswordReset(...)` without `auth.passwordReset.awaitDelivery: true` should wait for it (or read it from the delivery). A failure is logged and emitted as `password.resetDeliveryFailed` / `otp.deliveryFailed`.
+- A successful login no longer clears the shared IP bucket of `loginThrottleMiddleware()` when an account bucket (email, or email and IP) is tracked next to it; the IP bucket expires with its window. With `by: ["ip"]` alone a success still resets it.
+- Defaults that change in 6.0, with a one-time warning now: `auth.passkeys.userVerification` (`"preferred"` becomes `"required"`) when it is not set, `loginThrottleMiddleware({ emailLock })` (`"global"` becomes `"pair"`) when it is not set and both email and IP are tracked, and a JWT secret shorter than 32 bytes (the production warning now says it becomes a boot error). Set the first two explicitly to choose now.
+
+### Added
+
+- `auth.accessToken.previousSecrets` and `auth.refreshToken.previousSecrets` rotate JWT secrets without signing users out. A token whose signature the current secret rejects is checked against each retired secret; every other failure (expired, wrong issuer or audience, wrong token type, malformed) stays final, and a key passed explicitly to `jwt.verify()` ignores them. New tokens are always signed with the current secret. With no `refreshToken.secret`, the retired access secrets apply to refresh tokens too. Retired secrets get the same 32-byte production warning.
+- `auth.rehashPasswords` (default `true`), see Upgrading.
+
+### Changed
+
+- `authService.revokeAllTokens()` ("sign out everywhere") does its work in bulk: the distinct token families are ensured with one read and one insert, revoked with one update (`AuthTokenFamily.revokeAllFor()`), and every refresh token with one update, instead of a transaction per family. `token.familyRevoked` still fires per family, `token.revoked` for tokens outside any durable family, and `logout.all` once. `RefreshToken.revokeAllFor()` now revokes with one update instead of saving each row.
+- Raised the `@mongez` dependency ranges to the 2026-11-16 releases (copper 2.1.4, events 2.2.10, reinforcements 4.1.0).
+
+### Fixed
+
+- A password-reset or OTP request for a known account no longer answers slower than for an unknown one because of the token writes (see Upgrading).
+
+### Documentation
+
+- The configuration, throttle, passkeys, password-reset and token pages and the `manage-tokens`, `throttle-login-attempts`, `login-with-providers`, `verify-email-and-reset-password` and `auth-basics` skills cover secret rotation, rehashing, the IP bucket rule, the background request work and the 6.0 default changes.
+
 ## 5.53.0 - 2026-11-11
 
 ### Upgrading

@@ -276,6 +276,22 @@ class FakePool implements PgClientLike {
       return { rows: [], rowCount: existed ? 1 : 0 };
     }
 
+    // SELECT key FROM <t> WHERE (key = $1 OR key LIKE $2 ESCAPE '\') AND (not expired)
+    if (sql.startsWith(`SELECT key FROM ${t} WHERE (key = $1 OR key LIKE`)) {
+      const exact = values![0] as string;
+      const prefix = (values![1] as string)
+        .replace(/\\_/g, "_")
+        .replace(/\\%/g, "%")
+        .replace(/\\\\/g, "\\")
+        .replace(/%$/, "");
+
+      return {
+        rows: [...this.store.keys()]
+          .filter((k) => k === exact || k.startsWith(prefix))
+          .map((key) => ({ key })),
+      };
+    }
+
     // DELETE FROM <t> WHERE key = $1 OR key LIKE $2 ESCAPE '\'
     if (sql.startsWith(`DELETE FROM ${t} WHERE key = $1 OR key LIKE`)) {
       const exact = values![0] as string;
@@ -533,6 +549,24 @@ describe("PgCacheDriver — KV operations", () => {
     expect(pool.store.has("users.1")).toBe(false);
     expect(pool.store.has("users.2")).toBe(false);
     expect(pool.store.has("posts.1")).toBe(true);
+  });
+});
+
+describe("PgCacheDriver — listKeys", () => {
+  it("lists the namespace key and its dotted children, not siblings", async () => {
+    const pool = new FakePool();
+    const driver = new PgCacheDriver();
+    driver.setOptions({ client: pool });
+    driver.setLoggingState(false);
+    await driver.connect();
+
+    await driver.set("users", "list");
+    await driver.set("users.1", { id: 1 });
+    await driver.set("users2.1", { id: 9 });
+
+    expect((await driver.listKeys("users")).sort()).toEqual(["users", "users.1"]);
+
+    await driver.disconnect();
   });
 });
 

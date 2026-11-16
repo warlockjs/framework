@@ -118,7 +118,7 @@ ones included.
 | `mysql`    | 3306         | coming soon (disabled in the wizard)                                     |
 | `none`     | —            | opt out — no driver, no driver package, `src/config/database.ts` removed |
 
-**Features** (`--features`): `react`, `react-email`, `mail`, `ses`, `image`, `s3`, `redis`, `scheduler`, `herald`, `socket`, `test`, `access`, `web`, `tailwind`, `shadcn`, `mantine`, `notifications`.
+**Features** (`--features`): `react`, `react-email`, `mail`, `ses`, `image`, `s3`, `redis`, `scheduler`, `herald`, `socket`, `test`, `access`, `web`, `tailwind`, `shadcn`, `mantine`, `notifications`, `process`.
 
 **AI providers / packages** (`--ai`): `ai-openai`, `ai-google`, `ai-anthropic`, `ai-bedrock`, `ai-ollama`, plus the capability packages `ai-tools`, `ai-panoptic`, `ai-workspace`. Any pick auto-pulls the core `@warlock.js/ai` package.
 

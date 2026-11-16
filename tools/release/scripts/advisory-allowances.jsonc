@@ -1,0 +1,4 @@
+{
+  // Reviewed advisories the advisory gate does not fail on, keyed by advisory url:
+  //   "https://github.com/advisories/GHSA-xxxx": "why this does not affect the family"
+}

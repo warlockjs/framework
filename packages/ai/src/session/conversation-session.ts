@@ -197,10 +197,17 @@ class Session<TOutput> implements ConversationSession<TOutput> {
         };
         const runId = options?.runId ?? generateRunId("agent");
 
-        await this.config.store.save({
-          ...record,
-          pending: { runId, input, startedAt: now },
-        });
+        const pending = { runId, input, startedAt: now };
+
+        // A stored session gets only the small marker (one full write per turn,
+        // at settle); a store without the marker, or a new session, saves the record.
+        const marked = stored
+          ? ((await this.config.store.markPending?.(this.key, pending)) ?? false)
+          : false;
+
+        if (!marked) {
+          await this.config.store.save({ ...record, pending });
+        }
 
         let result: AgentResult<TOutput>;
 

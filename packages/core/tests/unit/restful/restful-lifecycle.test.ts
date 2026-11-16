@@ -164,15 +164,18 @@ describe("Restful.list", () => {
     expect(repository.listCached).toHaveBeenCalledWith({ paginate: false });
   });
 
-  it("falls back to serverError when the repository throws", async () => {
+  it("rethrows a repository failure so the request funnel answers and records it", async () => {
     const repository = makeRepository();
-    repository.listCached.mockRejectedValueOnce(new Error("db down"));
+    const failure = new Error("db down");
+    repository.listCached.mockRejectedValueOnce(failure);
     const resource = makeResource(repository);
     const response = makeResponse();
 
-    await resource.list({ request: makeRequest(), response: response });
+    await expect(resource.list({ request: makeRequest(), response: response })).rejects.toBe(
+      failure,
+    );
 
-    expect(response.calls[0].method).toBe("serverError");
+    expect(response.calls).toHaveLength(0);
   });
 });
 

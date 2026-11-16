@@ -1,6 +1,7 @@
 import type { ComponentType } from "react";
 import type { SerializedErrorPageProps } from "../../hydration-payload";
 import { loadClientRouteComposition, type ClientPageEntry } from "../runtime";
+import { errorPageComponentOf } from "../runtime/special-page-modules";
 
 /**
  * The CURRENT route's app-owned error page, resolved the same way
@@ -20,10 +21,7 @@ export async function resolveErrorPageComponent(
 
   if (entry === undefined) return undefined;
 
-  const composition = await loadClientRouteComposition(entry);
-  const component = composition.ErrorPage?.default;
-
-  return typeof component === "function"
-    ? (component as ComponentType<SerializedErrorPageProps>)
-    : undefined;
+  // A page behind the on-demand loader comes back as a lazy component: its
+  // chunk is fetched when the floor first renders it, not on every navigation.
+  return errorPageComponentOf(await loadClientRouteComposition(entry));
 }

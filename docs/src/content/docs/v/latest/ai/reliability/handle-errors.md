@@ -127,6 +127,7 @@ AIError  (base — code, category, message, cause?, context?)
 │   ├── ProviderOverloadedError  PROVIDER_OVERLOADED        { retryAfter? } — provider busy, retryable
 │   ├── QuotaExceededError       PROVIDER_QUOTA_EXCEEDED    — NOT retryable (billing cap)
 │   ├── ProviderTimeoutError     PROVIDER_TIMEOUT
+│   ├── ProviderAbortError       PROVIDER_ERROR             — caller aborted (name AbortError, category cancelled)
 │   ├── ContextLengthExceededError CONTEXT_LENGTH_EXCEEDED  { limit?, actual?, modelName? }
 │   ├── ContentFilterError       CONTENT_FILTER             { reason?, categories? }
 │   ├── InvalidRequestError      PROVIDER_INVALID_REQUEST
@@ -193,6 +194,7 @@ It is always `retryable`, and `ai.fallbackModel` fails over on it by default.
 | `ProviderRateLimitError`                                                          | Yes — back off by `retryAfter` ms                                              |
 | `ProviderOverloadedError`                                                         | Yes — back off (`retryAfter` when sent) or fail over to another model          |
 | `ProviderTimeoutError`                                                            | Yes — short delay                                                              |
+| `ProviderAbortError`                                                              | **No** — the caller cancelled the call; do not retry or fail over              |
 | `ProviderError` (generic)                                                         | Read `error.retryable` (true for 5xx / 408 / 409)                              |
 | `QuotaExceededError`                                                              | **No** — needs human intervention                                              |
 | `ProviderAuthError`                                                               | **No** — fix config / rotate key                                               |
@@ -208,6 +210,8 @@ It is always `retryable`, and `ai.fallbackModel` fails over on it by default.
 | `BudgetExceededError`                                                             | **No** — raise the cap, split the workload                                     |
 | `GuardrailViolationError` (`phase: "input"`)                                      | **No** — block / sanitize at the product layer                                 |
 | `GuardrailViolationError` (`phase: "output"`)                                     | Sometimes — re-prompt with adjusted system message                             |
+
+`ProviderAbortError` means the call's own `signal` was aborted. A request a provider SDK aborts by itself (the Gemini SDK's `httpOptions.timeout`, for example) stays a `ProviderTimeoutError`.
 
 ## Why extend `Error`, not `HttpError`
 

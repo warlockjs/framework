@@ -32,6 +32,7 @@ export const requestTimeoutCheck: DoctorCheck = warnOnError({
       return {
         name: "request-timeout",
         status: "warn",
+        code: "WL1015",
         detail:
           `${key} is 0, so the request timeout is off — a client can take forever to send a ` +
           `request and hold its connection open. Remove ${key} (default 300000 ms, 5 minutes) ` +

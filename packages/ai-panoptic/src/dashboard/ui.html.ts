@@ -1484,13 +1484,19 @@ export function dashboardHtml(
   try { savedTheme = localStorage.getItem(THEME_KEY) || "system"; } catch (e) {}
   applyTheme(savedTheme);
 
+  var listEtag = null;
   function poll() {
     Promise.all([
       fetchAuthed(API + "/aggregate").then(function (r) { return r.json(); }),
-      fetchAuthed(API + "/traces").then(function (r) { return r.json(); })
+      // Conditional poll: send the last ETag; a 304 means the list is unchanged.
+      fetchAuthed(API + "/traces", listEtag ? { headers: { "If-None-Match": listEtag } } : undefined).then(function (r) {
+        if (r.status === 304) return null;
+        listEtag = r.headers.get("ETag") || null;
+        return r.json();
+      })
     ]).then(function (res) {
       renderStats(res[0]);
-      state.traces = res[1] || [];
+      if (res[1] !== null) state.traces = res[1] || [];
       document.getElementById("meta").textContent = state.traces.length + " trace(s) · live";
       renderChips();
       renderList();

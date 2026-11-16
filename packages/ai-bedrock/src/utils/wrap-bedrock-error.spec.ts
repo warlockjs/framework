@@ -2,6 +2,7 @@ import {
   AIError,
   ContextLengthExceededError,
   InvalidRequestError,
+  ProviderAbortError,
   ProviderAuthError,
   ProviderError,
   ProviderRateLimitError,
@@ -275,5 +276,12 @@ describe("wrapBedrockError — overload and provider facts", () => {
     expect(
       wrapBedrockError(awsError({ name: "AccessDeniedException", httpStatusCode: 403 })),
     ).toMatchObject({ status: 403, billed: false, retryable: false });
+  });
+
+  it("maps an AbortError to a cancelled ProviderAbortError", () => {
+    const wrapped = wrapBedrockError({ name: "AbortError", message: "aborted" });
+
+    expect(wrapped).toBeInstanceOf(ProviderAbortError);
+    expect(wrapped.category).toBe("cancelled");
   });
 });

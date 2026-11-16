@@ -90,8 +90,14 @@ export async function retrieve(
   // The store ranks across every namespace it holds; widen the page when
   // other namespaces crowd this one out of the first `candidates` hits.
   const hits = await similarWithin(
-    (pageSize) => deps.store.query<StoredChunk>(vector, { topK: pageSize, threshold, tags }),
-    (hit) => belongsTo(hit, deps.namespace),
+    (pageSize, accept) =>
+      deps.store.query<StoredChunk>(vector, {
+        topK: pageSize,
+        threshold,
+        tags,
+        filter: (hit) => accept({ ...hit, score: 1 }),
+      }),
+    (hit: { key: string; value: StoredChunk; score: number }) => belongsTo(hit, deps.namespace),
     { topK: candidates, want: candidates },
   );
 
@@ -110,7 +116,7 @@ export async function retrieve(
  * `kb.acme.private`. An older chunk without the field is accepted only when
  * its key is the namespace followed by exactly `<docId>.<chunkIndex>`.
  */
-function belongsTo(hit: { key: string; value: StoredChunk }, namespace: string): boolean {
+export function belongsTo(hit: { key: string; value: StoredChunk }, namespace: string): boolean {
   if (!hit.value) {
     return false;
   }

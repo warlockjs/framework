@@ -35,6 +35,7 @@ describe("doctor cors check", () => {
     const result = await run();
 
     expect(result?.status).toBe("warn");
+    expect(result?.code).toBe("WL1012");
     expect(result?.detail).toContain('http.cors.origin is "*"');
   });
 

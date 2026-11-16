@@ -39,17 +39,23 @@ describe("MongoDB auto-increment upserts", () => {
       performAtomic(Model, { email: "a@b.c" }, { $set: { name: "Ada" } }, { upsert: true }),
     ).resolves.toBe(1);
 
+    // The driver spends the id only after it inserted, so nothing is generated up front.
+    expect(idGenerator.generateNextId).not.toHaveBeenCalled();
+    expect(driver.atomic).toHaveBeenCalledWith(
+      "users",
+      { email: "a@b.c" },
+      { $set: { name: "Ada" } },
+      { upsert: true, idOnInsert: { field: "id", generate: expect.any(Function) } },
+    );
+
+    const { idOnInsert } = driver.atomic.mock.calls[0]![3];
+
+    await expect(idOnInsert.generate()).resolves.toBe(42);
     expect(idGenerator.generateNextId).toHaveBeenCalledWith({
       table: "users",
       initialId: 1,
       incrementIdBy: 1,
     });
-    expect(driver.atomic).toHaveBeenCalledWith(
-      "users",
-      { email: "a@b.c" },
-      { $set: { name: "Ada" }, $setOnInsert: { id: 42 } },
-      { upsert: true },
-    );
   });
 
   it("uses $setOnInsert for findOneAndUpdate, leaving an existing id unchanged", async () => {

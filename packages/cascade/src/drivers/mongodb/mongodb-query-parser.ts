@@ -70,6 +70,8 @@ export type MongoQueryParserOptions = {
   createSubBuilder: () => MongoQueryBuilder;
   /** Caps applied to string LIKE patterns (the data source's `like` driver option) */
   likeLimits?: LikePatternLimits;
+  /** Stages appended after the parsed pipeline (e.g. removing temporary lookup fields) */
+  trailingStages?: Record<string, unknown>[];
 };
 
 /**
@@ -134,6 +136,11 @@ export class MongoQueryParser {
   private readonly likeLimits?: LikePatternLimits;
 
   /**
+   * Stages appended after the parsed pipeline.
+   */
+  private readonly trailingStages: Record<string, unknown>[];
+
+  /**
    * Track group field names for automatic _id renaming.
    * Maps pipeline index to field names.
    */
@@ -157,6 +164,7 @@ export class MongoQueryParser {
     this.operations = options.operations;
     this.createSubBuilder = options.createSubBuilder;
     this.likeLimits = options.likeLimits;
+    this.trailingStages = options.trailingStages ?? [];
   }
 
   /**
@@ -261,7 +269,7 @@ export class MongoQueryParser {
       emit(currentStage!, currentBuffer);
     }
 
-    return this.hoistVectorSearch(pipeline);
+    return [...this.hoistVectorSearch(pipeline), ...this.trailingStages];
   }
 
   /**
@@ -1234,8 +1242,9 @@ export class MongoQueryParser {
       case "havingRaw":
         return this.resolveRawExpression(op.data.expression as RawExpression, op.data.bindings);
 
-      // Relation-existence filters need a `$lookup` per relation, which the
-      // MongoDB driver does not build; refuse them instead of dropping them.
+      // Relation-existence filters are compiled into a `$lookup` and a plain
+      // condition by the query builder before parsing; one that reaches the
+      // parser uncompiled is refused instead of dropped.
       case "has":
       case "whereHas":
       case "orWhereHas":
@@ -2365,6 +2374,11 @@ export class MongoQueryParser {
     if (op === undefined) return null;
 
     const options = op.data;
+
+    // A relation lookup built by the relation compiler is already a stage.
+    if (options.stageDefinition) {
+      return options.stageDefinition;
+    }
 
     // Pipeline form: `join({ table, alias, pipeline })`. The pipeline used to
     // be dropped, leaving a $lookup with neither a pipeline nor join fields.

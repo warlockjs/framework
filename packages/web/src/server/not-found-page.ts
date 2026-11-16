@@ -61,6 +61,7 @@
 import type { HttpContext } from "@warlock.js/core";
 import type { PageRouteHandler } from "./create-page-route-handler";
 import { refusalStatusOf, type Router } from "@warlock.js/core";
+import { sendRouteNotFound } from "./route-not-found-response";
 import type { RefusalPageRenderer } from "./core-refusal-page";
 import { FRAMEWORK_DEFAULT_NOT_FOUND_STYLESHEET } from "./framework-default-not-found-stylesheet";
 
@@ -190,6 +191,15 @@ export function acceptsHtmlExplicitly(accept: string | undefined): boolean {
   }
 
   return false;
+}
+
+/** Whether the reply has been sent or its headers are already on the wire. */
+function replyCommitted(response: HttpContext["response"]): boolean {
+  const raw = response.baseResponse?.raw as
+    | { headersSent?: boolean; writableEnded?: boolean }
+    | undefined;
+
+  return response.sent === true || raw?.headersSent === true || raw?.writableEnded === true;
 }
 
 export type UnmatchedRequestKind = "page" | "api";
@@ -378,6 +388,10 @@ export function createNotFoundRouteHandler(options: NotFoundRouteHandlerOptions)
           // The refusal page is the last line of defence: a broken site page
           // falls back to the framework document, never to raw JSON.
           console.error("[warlock:web] rendering the refusal page failed:", error);
+
+          // A render that failed after it began writing has already committed
+          // the reply; a second one would throw "headers already sent".
+          if (replyCommitted(response)) return;
         }
 
         await response.html(
@@ -411,14 +425,9 @@ export function createNotFoundRouteHandler(options: NotFoundRouteHandlerOptions)
         accept: Array.isArray(accept) ? accept.join(",") : accept,
       }) === "api"
     ) {
-      // The same body core's own dev dispatcher writes for an unmatched route
-      // (`core/src/router/router.ts`), so an API 404 reads identically whether
-      // it fell through to core or was declined here — and identically in
-      // development and in production, which it previously was not.
-      await response.send(
-        { error: "Route not found", path: request.path, method: request.method },
-        404,
-      );
+      // One body for every unmatched API request, from the helper multi-site
+      // dispatch uses too: the same in development and in production.
+      await sendRouteNotFound(context);
 
       return;
     }

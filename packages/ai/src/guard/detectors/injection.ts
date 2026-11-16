@@ -164,8 +164,64 @@ class InjectionDetector implements SyncGuardrailDetector {
 /** Invisible format characters (zero-width space / joiners, BOM, bidi marks). */
 const FORMAT_CHAR = /\p{Cf}/u;
 
-/** Characters that separate words for matching: whitespace and `_` `-` `.`. */
-const SEPARATOR_CHAR = /[\s_.-]/;
+/**
+ * Characters that separate words for matching: whitespace and other
+ * Unicode spaces, dashes and connector punctuation, and the common
+ * `_ . , ; : | / \ * ~ \` • ·` fillers. Letters, digits and other
+ * punctuation (for example the `+` in `c++`) keep their meaning.
+ */
+const SEPARATOR_CHAR = /[\s\p{Z}\p{Pd}\p{Pc}.,;:|/\\*~`\u2022\u00b7]/u;
+
+/** Combining marks (accents, diacritics, enclosing marks) dropped before matching. */
+const COMBINING_MARK = /\p{M}/u;
+
+/**
+ * Look-alike letters from other scripts folded to the Latin letter they
+ * imitate (keys are lowercase; the text is lowercased first). Covers the
+ * Cyrillic and Greek letters that read the same as Latin ones.
+ */
+const CONFUSABLES: ReadonlyMap<string, string> = new Map(
+  Object.entries({
+    // Cyrillic
+    "\u0430": "a",
+    "\u0435": "e",
+    "\u043e": "o",
+    "\u0440": "p",
+    "\u0441": "c",
+    "\u0443": "y",
+    "\u0445": "x",
+    "\u0456": "i",
+    "\u0458": "j",
+    "\u0455": "s",
+    "\u04cf": "l",
+    "\u0501": "d",
+    "\u04bb": "h",
+    "\u043a": "k",
+    "\u043c": "m",
+    "\u0442": "t",
+    "\u043d": "h",
+    "\u0432": "b",
+    "\u0491": "r",
+    // Greek
+    "\u03bf": "o",
+    "\u03b1": "a",
+    "\u03b5": "e",
+    "\u03b9": "i",
+    "\u03bd": "v",
+    "\u03c1": "p",
+    "\u03c4": "t",
+    "\u03c5": "u",
+    "\u03ba": "k",
+    "\u03c7": "x",
+    "\u03b7": "n",
+    "\u03c9": "w",
+    // Latin look-alikes outside ASCII
+    "\u0131": "i",
+    "\u0261": "g",
+    "\u0251": "a",
+    "\u0269": "i",
+  }),
+);
 
 /**
  * Text prepared for phrase matching, with a map back to the original.
@@ -180,10 +236,12 @@ interface NormalizedText {
 
 /**
  * Normalize text so trivial obfuscation does not hide a phrase: each code
- * point is NFKC-folded (full-width and compatibility forms become plain
- * letters) and lowercased, invisible format characters are dropped, and
- * every run of whitespace, `_`, `-` or `.` becomes one space. Linear in the
- * length of `text`.
+ * point is NFKD-folded (full-width and compatibility forms become plain
+ * letters, accents split off) and lowercased, invisible format characters
+ * and combining marks are dropped, look-alike Cyrillic / Greek letters are
+ * folded to the Latin letter they imitate, and every run of separators
+ * (whitespace, dashes, `_`, `.`, `,` and similar) becomes one space.
+ * Linear in the length of `text`.
  */
 function normalizeForMatch(text: string): NormalizedText {
   const chars: string[] = [];
@@ -199,9 +257,16 @@ function normalizeForMatch(text: string): NormalizedText {
     if (codePoint < 0x80 || !FORMAT_CHAR.test(source)) {
       // ASCII needs no compatibility folding; skip the per-character NFKC call.
       const folded =
-        codePoint < 0x80 ? source.toLowerCase() : source.normalize("NFKC").toLowerCase();
+        codePoint < 0x80 ? source.toLowerCase() : source.normalize("NFKD").toLowerCase();
 
-      for (const char of folded) {
+      for (const folding of folded) {
+        // Accents and other combining marks carry no letter of their own.
+        if (codePoint >= 0x80 && COMBINING_MARK.test(folding)) {
+          continue;
+        }
+
+        const char = CONFUSABLES.get(folding) ?? folding;
+
         if (SEPARATOR_CHAR.test(char)) {
           if (chars.length === 0) {
             continue;
@@ -273,8 +338,9 @@ function compileMarkers(extra: readonly (string | RegExp)[]): readonly CompiledM
  * or `RegExp`s).
  *
  * Phrases match on normalized text: case, NFKC compatibility forms,
- * invisible format characters (zero-width space, joiners) and runs of
- * whitespace / `_` / `-` / `.` are folded, so `"Ignore  previous\ninstructions"`
+ * invisible format characters (zero-width space, joiners), combining marks,
+ * look-alike Cyrillic / Greek letters and runs of whitespace, dashes and
+ * `_ . , ; : | / \\ *` style separators are folded, so `"Ignore  previous\ninstructions"`
  * still matches. Caller `RegExp` markers run on the original text, without
  * their `g` / `y` flags. This is a heuristic, and it does not see tool
  * results: check content that enters through tools where it enters.

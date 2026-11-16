@@ -163,7 +163,7 @@ If no locale is set on the request, the first entry wins as a fallback.
 
 ## Date output options
 
-Default date cast emits an object — `{ format, timestamp, humanTime, iso }`. To shape output globally use the static `parsedSchema` field after defining, or override via a subclass. For most APIs, the default is fine.
+Default date cast emits an object — `{ format, timestamp, humanTime, iso }`. Set `resource.dateOutput` in `src/config/resource.ts` (`"iso"`, `"timestamp"`, `"format"`, `"humanTime"`, `"locale"` or an options object) to change every date field at once; a field's own `dateOptions()` wins, and unset keeps the object. For most APIs, the default is fine.
 
 ## Computed fields (resolver functions)
 

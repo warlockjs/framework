@@ -111,7 +111,7 @@ const usersWithPublishedPosts = await User.whereHas("posts", (query) => {
 }).get();
 ```
 
-`.whereHas(relation, callback)` runs the callback on a query builder scoped to the related model. Use when "find Xs that have at least one Y matching Z." The `has` family runs on PostgreSQL (the `has()` count is bound; its operator must be `=`, `!=`, `<>`, `>`, `>=`, `<`, `<=`); on MongoDB it throws `UnsupportedQueryOperationError` — filter by `whereIn("id", await Post.query().where(...).pluck("authorId"))` instead.
+`.whereHas(relation, callback)` runs the callback on a query builder scoped to the related model. Use when "find Xs that have at least one Y matching Z." The `has` family (`has`, `whereHas`, `orWhereHas`, `doesntHave`, `whereDoesntHave`) works on both drivers for hasMany, hasOne, belongsTo and belongsToMany (the `has()` count is bound; its operator must be `=`, `!=`, `<>`, `>`, `>=`, `<`, `<=`). On MongoDB each filter is a `$lookup` ahead of the `$match`, and `orWhereHas` joins the same `$or`. A write (`update()`, `delete()`, `increment()`) on a query holding one throws `UnsupportedQueryOperationError` on MongoDB, and so does a constraint callback that filters by another relation: resolve ids first with `whereIn("id", await Post.query().whereHas(...).pluck("id"))`. `.withCount("posts")` (or `"posts as total"`, or `{ posts: cb }`) adds `postsCount` on both drivers.
 
 ## Setting a relation on save — `setRelation`
 
@@ -139,7 +139,7 @@ await post.load("author");
 const author = post.getRelation("author");
 ```
 
-`getRelation("name")` returns the loaded relation (or null if not loaded). `post.load("relation", ...)` lazy-loads one or more relations onto the instance and returns the model (`this`) — read the value back with `getRelation` afterward. Useful when you didn't `.with()` upfront and need a relation conditionally.
+`getRelation("name")` returns the loaded relation (or null if not loaded). `post.load("relation", ...)` lazy-loads one or more relations onto the instance and returns the model (`this`) — read the value back with `getRelation` afterward. Useful when you didn't `.with()` upfront and need a relation conditionally. `load()` calls (and `Model.find(id)` calls) made in the same tick are batched per model class into one query, so `await Promise.all(posts.map((post) => post.load("author")))` runs one author query; a lone call, and calls inside a transaction, run as before. Only calls under the same context stores (`@warlock.js/context`: one request, one `run()`) are grouped, so tenant scopes never mix. Set `static batchLoads = false` on a model to opt out (do so when a global scope reads its own `AsyncLocalStorage`).
 
 ## Joins — when eager loading isn't enough
 
@@ -149,16 +149,16 @@ const author = post.getRelation("author");
 const result = await User.joinWith("posts").where("posts.status", "published").get();
 ```
 
-Use `.joinWith` when you need conditions across both tables in a single query. Use `.with` when you want hydrated relation models without joining.
+Use `.joinWith` when you need conditions across both tables in a single query. On MongoDB `.joinWith(...)` loads the relations with the same batched queries as `.with()` (names, arrays, `"id,name"` shorthand or a callback), so it hydrates the same way. Use `.with` when you want hydrated relation models without joining.
 
 ## Sync — embedded relations stay fresh
 
-For embedded/denormalized relations (cached `author_name` on posts, etc.), Cascade's sync system keeps the embedded copy in step with the source-of-truth via `Model.sync(Target, field)` and the `@warlock.js/cascade` sync helpers.
+For embedded/denormalized relations (cached `author_name` on posts, etc.), Cascade's sync system keeps the embedded copy in step with the source-of-truth via `Model.sync(Target, field)` and the `@warlock.js/cascade` sync helpers. Sync jobs run after commit, one at a time by default (`configureSyncFanout({ concurrency })` raises it; jobs for one source document keep their order), a failing event listener is retried alone, and a model nobody syncs from queues no job.
 
 ## Things NOT to do
 
 - Don't `post.set("author", user)`. Use `setRelation("author", user)`. `set` treats the value as a column write; `setRelation` picks the right foreign key.
-- Don't load all parents and iterate to fetch each child — that's the N+1 problem. Eager-load with `.with(...)` (or load specific children with `.load(...)` after the parent fetch).
+- Don't load all parents and iterate to fetch each child — that's the N+1 problem. Eager-load with `.with(...)` (or start the `.load(...)` calls together under `Promise.all`, which batches them; awaiting them one by one in a loop does not).
 - Don't define a relation on only one side. Both ends of `BelongsTo`/`HasMany` and both sides of `BelongsToMany` need the decorator for queries to work bidirectionally.
 - Don't import the related class for `@BelongsTo` if it would create a circular dependency. Use the string form (`@BelongsTo("User")`) or `lazy(() => User)`.
 

@@ -26,6 +26,14 @@ export type EncryptionConfigurations = {
   key: string;
 
   /**
+   * Retired encryption keys (same hex format as `key`), newest first.
+   * `decrypt()` tries them, in order, only when `key` fails to open a value;
+   * `encrypt()` always uses `key`. Remove a key once nothing stored is still
+   * encrypted with it.
+   */
+  previousKeys?: string[];
+
+  /**
    * Encryption algorithm to use.
    * Defaults to "aes-256-gcm" if not set.
    */
@@ -46,6 +54,30 @@ export type EncryptionConfigurations = {
 };
 
 export type EncryptionPasswordConfigurations = {
+  /**
+   * Hashing algorithm for new hashes. Both formats always verify, whatever
+   * this is set to, so switching never locks anyone out.
+   *
+   * - `"bcrypt"` — bcrypt, cost from `salt`.
+   * - `"scrypt"` — scrypt on `node:crypto` (runs on the thread pool, needs no
+   *   extra dependency, has no 72-byte password limit), parameters from `scrypt`.
+   * @default "bcrypt"
+   */
+  driver?: "bcrypt" | "scrypt";
+
+  /**
+   * scrypt parameters, used when `driver` is `"scrypt"`. Hashes made with other
+   * parameters still verify and report `needsRehash()`.
+   */
+  scrypt?: {
+    /** CPU/memory cost `N`, a power of two. @default 32768 */
+    cost?: number;
+    /** Block size `r`. @default 8 */
+    blockSize?: number;
+    /** Parallelization `p`. @default 1 */
+    parallelization?: number;
+  };
+
   /**
    * bcrypt salt rounds. Higher = slower and more secure.
    * 10–12 is the standard range. Defaults to 12.

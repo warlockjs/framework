@@ -68,6 +68,57 @@ export class AuthTokenFamily extends Model {
     return family;
   }
 
+  /**
+   * Make sure a durable row exists for every given lineage: one read finds the
+   * existing rows, and the missing ones are inserted together. A concurrent
+   * insert of the same lineage (a duplicate-key failure) falls back to
+   * {@link ensure} per missing lineage, which tolerates the race.
+   */
+  public static async ensureMany(user: Auth, familyIds: string[]): Promise<void> {
+    if (familyIds.length === 0) return;
+
+    const existing = await this.query().whereIn("family_id", familyIds).get();
+    const known = new Set<string>();
+
+    for (const family of existing) {
+      if (family.get("user_id") !== user.id || family.get<string>("user_type") !== user.userType) {
+        throw new Error("Token family belongs to a different user");
+      }
+
+      known.add(family.get<string>("family_id"));
+    }
+
+    const missing = familyIds.filter((familyId) => !known.has(familyId));
+
+    if (missing.length === 0) return;
+
+    try {
+      await this.createMany(
+        missing.map((familyId) => ({
+          family_id: familyId,
+          user_id: user.id,
+          user_type: user.userType,
+          revision: 0,
+        })),
+      );
+    } catch {
+      for (const familyId of missing) await this.ensure(user, familyId);
+    }
+  }
+
+  /**
+   * Revoke every active family of a user in one update: the revision advances
+   * and the revoke marker is stamped together, so a rotation holding an older
+   * revision fails its compare-and-set and finds the family unavailable.
+   * Resolves to the number of families revoked.
+   */
+  public static revokeAllFor(user: Auth): Promise<number> {
+    return this.atomic(
+      { user_id: user.id, user_type: user.userType, revoked_at: null },
+      { $inc: { revision: 1 }, $set: { revoked_at: new Date() } },
+    );
+  }
+
   /** Every non-revoked family for a user, including a rotated refresh row. */
   public static activeFor(user: Auth): Promise<AuthTokenFamily[]> {
     return this.query()

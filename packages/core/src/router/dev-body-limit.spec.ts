@@ -260,6 +260,39 @@ describe("describeUnsupportedServerOptions", () => {
     ]);
   });
 
+  it("warns about a route's config, which Fastify plugins read per route", () => {
+    const found = describeUnsupportedServerOptions([
+      {
+        method: "post",
+        path: "/upload",
+        serverOptions: { config: { multipartOptions: { limits: { fileSize: 50 } } } },
+      },
+    ] as any);
+
+    expect(found.map((entry) => entry.message)).toEqual([
+      expect.stringContaining("POST /upload: serverOptions.config is not applied"),
+    ]);
+  });
+
+  it("warns once about http.compileResponseSchemas and per route about compileResponseSchema", () => {
+    const routes = [
+      { method: "get", path: "/on", compileResponseSchema: true },
+      { method: "get", path: "/off", compileResponseSchema: false },
+      { method: "get", path: "/default" },
+    ] as any;
+
+    expect(describeUnsupportedServerOptions(routes).map((entry) => entry.message)).toEqual([
+      expect.stringContaining("GET /on: compileResponseSchema is not applied"),
+    ]);
+
+    const withGlobal = describeUnsupportedServerOptions(routes, { compileResponseSchemas: true });
+
+    expect(withGlobal.map((entry) => entry.message)).toEqual([
+      expect.stringContaining("http.compileResponseSchemas is set"),
+      expect.stringContaining("GET /on: compileResponseSchema"),
+    ]);
+  });
+
   it("logs each warning once when the dev dispatcher boots", async () => {
     const warn = vi.spyOn(log, "warn").mockImplementation(() => log);
     (router as any).routes = [];

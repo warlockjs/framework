@@ -229,6 +229,14 @@ Evicts every stored entry under any of the given tags, through
 connector. Declare `config.live.tags` to opt an open page into loader re-runs;
 `config.cache.tags` alone only labels its stored response.
 
+## Revalidation and compressed entries
+
+A HIT carries a weak `ETag` computed from the stored body. A request whose `If-None-Match` names it is answered `304` with no body, whichever `Accept-Encoding` it sent. With `http.compression` on, an entry is compressed once when it is stored (gzip, and brotli unless `http.compression.brotli` is `false`; bodies under the compression threshold stay plain) and a HIT sends the stored form that the request's `Accept-Encoding` accepts, so a HIT never compresses again. The `Vary` header then includes `Accept-Encoding`. Entries written by an earlier version have no stored forms; they are served as before until they expire.
+
+## A CDN keyed on `Host`
+
+The cache key uses the host that site selection chose. In a multi-site app, a CDN or shared proxy in front of it must key its own cache on the same host the origin selects from. If the edge keys on the `Host` header but forwards a client-supplied `X-Forwarded-Host` to the origin (and `http.trustProxy` trusts it), one site's page can be stored by the edge under another site's URL. Close it at the edge: overwrite `X-Forwarded-Host` with the matched `Host` (or strip it from client requests), and include the host in the cache key. The origin cannot close this: it cannot see what the edge keyed on.
+
 ## The `x-warlock-cache` header
 
 Every response from a `serverCache` route carries `x-warlock-cache: hit`,
@@ -248,6 +256,10 @@ the response depends on besides the URL:
   supports a single locale;
 - `User-Agent` for a page that uses `defer()`;
 - the route's `cache.varyHeaders`.
+
+A failure page for the same route (a module-load failure, a refusal rendered by
+the page host) is `no-store` but carries the same `Vary` value as the page, so
+the header does not change shape when a page fails.
 
 ## `@warlock.js/cache` is an optional peer
 

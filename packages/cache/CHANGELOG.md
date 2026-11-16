@@ -4,6 +4,25 @@ All notable changes to `@warlock.js/cache` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.54.0 - 2026-11-16
+
+### Added
+
+- `ttlJitter` on `set()`, `remember()` and `swr()` options spreads a relative TTL by up to that many percent either way for each write (`{ ttl: "1h", ttlJitter: 10 }` expires in 54 to 66 minutes), so entries written together no longer expire and miss together. It is skipped for `expiresAt`, `Infinity` and `0`.
+- `swr({ failSafe: true })` returns the stale value when the refresh throws. A caller in the stale window then waits for the refresh (callers of one key share it); the failure is logged and emitted as an `error` event, and the next read tries again.
+- `similar()` accepts a `filter({ key, value })` predicate that runs before `threshold` and `topK`, so `topK` counts only in-scope entries and a recall needs one query. The memory, LRU and memory-extended drivers honour it; `pg` ignores it, so callers that need a guarantee keep checking the returned hits. `cache.namespace(...)` scopes pass their prefix as the filter.
+- `listKeys(namespace)` on the `memory`, `lru`, `memoryExtended`, `file`, `pg`, `redis`, `mock` and `null` drivers (optional on the `CacheDriver` interface): the live keys under a namespace, in the form `get()` and `remove()` accept, `globalPrefix` removed. `CacheManager` forwards it and adds `supportsListKeys()`. Custom drivers can ship it and use the new protected `unprefixKey()` and `inNamespace()` helpers.
+
+### Changed
+
+- `has()` uses the driver's `exists()`, so no value is read or parsed. The `hit` and `miss` events it emits now carry the key only, without `value`; a listener that read `event.value` for `has()` calls gets `undefined`.
+- Raised the `@mongez` dependency ranges to the 2026-11-16 releases (reinforcements 4.1.0).
+
+### Documentation
+
+- The set-options, SWR, similarity and driver-interface pages and the matching skills describe `ttlJitter`, `failSafe`, the similarity `filter` and the new `has()` events.
+- Cache driver interface and custom-driver pages, and the `use-cache-namespace` skill: `listKeys()`.
+
 ## 5.53.0 - 2026-11-11
 
 ### Upgrading

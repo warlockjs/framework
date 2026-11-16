@@ -118,6 +118,25 @@ Stores only the SHA-256 digest of each access and refresh token in `access_token
 
 Separate signing key for refresh tokens. Generated alongside `JWT_SECRET` by `warlock jwt.generate`. Keeping it distinct from `jwt.secret` prevents an access-token compromise from forging refresh tokens (and vice versa).
 
+> **6.0:** a signing secret shorter than 32 bytes becomes a boot error. Today it logs a production warning; use `warlock jwt.generate` now.
+
+### `accessToken.previousSecrets` / `refreshToken.previousSecrets` — New in 5.54
+
+Retired signing secrets, used only to verify. To rotate a secret without signing everyone out, set the new secret and list the old one:
+
+```ts
+accessToken: {
+  secret: env("JWT_SECRET"), // new tokens are signed with this
+  previousSecrets: [env("JWT_SECRET_OLD")], // tokens signed with it still verify
+},
+refreshToken: {
+  secret: env("JWT_REFRESH_SECRET"),
+  previousSecrets: [env("JWT_REFRESH_SECRET_OLD")],
+},
+```
+
+A token whose signature the current secret rejects is checked against each retired secret in turn; every other failure (expired, wrong issuer, wrong token type, malformed) is final. New tokens always use the current secret. When no `refreshToken.secret` is set, the retired access secrets apply to refresh tokens too. Retired secrets get the same 32-byte strength warning in production. Remove an entry once every token signed with it has expired (the access-token and refresh-token lifetimes); a retired secret that stays configured stays able to forge tokens.
+
 ### `jwt.refresh.enabled`
 
 Default: `true`. When `false`, `login` / `createTokenPair` return only `accessToken`.
@@ -150,6 +169,18 @@ The default is right for most apps. If the client lost the refresh token, logout
 ### `password.salt`
 
 Default: `12`. The bcrypt cost factor for `hashPassword`. Higher = more secure but slower per login. The default is a sane balance for 2026 hardware.
+
+### `rehashPasswords` — New in 5.54
+
+Default: `true`. After a correct password, `attemptLogin` replaces a stored hash made with another algorithm or cost than `encryption.password` now asks for (a raised `salt`, or `driver: "scrypt"`) with a fresh one, so existing users catch up as they sign in. A failure to save is logged and never fails the login. Set `false` to leave hashes as they are. See [Encryption](/v/latest/core/digging-deeper/encryption/).
+
+### `passwordReset.awaitDelivery` / `otp.awaitDelivery` — New in 5.54
+
+Default: `false`. `requestPasswordReset` and the phone one-time-code request send their notification in the background, so the response time does not reveal whether the account exists. A background failure is logged and emitted as `password.resetDeliveryFailed` / `otp.deliveryFailed`. Set `awaitDelivery: true` on `auth.passwordReset` or `auth.otp` to wait for the notification so a delivery error reaches the caller. See [Verify email and reset password](../guides/verify-email-and-reset-password.md) and [Login with providers](../guides/login-with-providers.md).
+
+### `encryption.previousKeys` and `encryption.password.driver` — New in 5.54
+
+These live in `src/config/encryption.ts`, not the auth config: `previousKeys` keeps retired encryption keys readable during a rotation, and `password.driver` (`"bcrypt"` or `"scrypt"`) picks the algorithm for new password hashes. See [Encryption](/v/latest/core/digging-deeper/encryption/); `warlock doctor` reminds you to remove retired keys and secrets once they are no longer needed.
 
 ### `cookie.name` / `cookie.path` — New in 5.12
 

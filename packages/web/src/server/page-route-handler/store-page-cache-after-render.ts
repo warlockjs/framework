@@ -1,8 +1,7 @@
-import { stringify } from "devalue";
-
 import { config, type Request, type Response } from "@warlock.js/core";
 
-import { buildHydrationPayload } from "../build-hydration-payload";
+import { serializeHydrationPayload } from "../build-hydration-payload";
+import { encodeForStore } from "../page-cache-encoding";
 import { DATA_RESPONSE_CONTENT_TYPE } from "../../routing/data-request";
 import { isStoreEligible } from "../page-cache-eligibility";
 import { type PageCacheVariant } from "../page-cache-key";
@@ -93,7 +92,9 @@ export function isNoncedDocumentCache(variant: PageCacheVariant): boolean {
 /** Never rejects: a cache-backend failure must not reach the page's catch block. */
 async function storeSafely(...args: Parameters<typeof setPageCacheEntry>): Promise<void> {
   try {
-    await setPageCacheEntry(...args);
+    const [key, entry, ...rest] = args;
+
+    await setPageCacheEntry(key, { ...entry, ...(await encodeForStore(entry.body)) }, ...rest);
   } catch (error) {
     reportPageCacheFailure("store", error);
   }
@@ -228,7 +229,7 @@ export async function storePageCacheAfterRender(options: {
 
   if (rendered.bundle === undefined) return empty;
 
-  const precomputedJsonBody = stringify(buildHydrationPayload(rendered.bundle, request.locale));
+  const precomputedJsonBody = serializeHydrationPayload(rendered.bundle, request.locale);
   const bytes = Buffer.byteLength(precomputedJsonBody, "utf8");
 
   if (bytes > maxEntryBytes) {

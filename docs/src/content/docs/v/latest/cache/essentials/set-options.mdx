@@ -30,14 +30,15 @@ See [Duration Strings](/v/latest/cache/quick-start/#duration-strings) for the fu
 
 ## Options reference
 
-| Key          | Type                               | Purpose                                                                                                                                                          |
-| ------------ | ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ttl`        | `number \| string`                 | Relative expiry. Mutually exclusive with `expiresAt`.                                                                                                            |
-| `expiresAt`  | `number \| Date`                   | Absolute deadline. Must be in the future. Mutually exclusive with `ttl`.                                                                                         |
-| `tags`       | `string[]`                         | Inline tag list — equivalent to `cache.tags([...]).set(...)`.                                                                                                    |
-| `onConflict` | `"create" \| "update" \| "upsert"` | Conditional-write policy. Defaults to `"upsert"`.                                                                                                                |
-| `driver`     | `string`                           | Per-call driver override by registered name.                                                                                                                     |
-| `vector`     | `number[]`                         | Embedding indexed alongside the entry for [similarity retrieval](/v/latest/cache/similarity/). Drivers without similarity support throw `CacheUnsupportedError`. |
+| Key          | Type                               | Purpose                                                                                                                                                                                             |
+| ------------ | ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ttl`        | `number \| string`                 | Relative expiry. Mutually exclusive with `expiresAt`.                                                                                                                                               |
+| `expiresAt`  | `number \| Date`                   | Absolute deadline. Must be in the future. Mutually exclusive with `ttl`.                                                                                                                            |
+| `tags`       | `string[]`                         | Inline tag list — equivalent to `cache.tags([...]).set(...)`.                                                                                                                                       |
+| `ttlJitter`  | `number`                           | Spread the TTL by up to this many percent either way, per write, so entries written together do not expire together. `10` turns `1h` into 54 to 66 minutes. Ignored for `expiresAt` and `Infinity`. |
+| `onConflict` | `"create" \| "update" \| "upsert"` | Conditional-write policy. Defaults to `"upsert"`.                                                                                                                                                   |
+| `driver`     | `string`                           | Per-call driver override by registered name.                                                                                                                                                        |
+| `vector`     | `number[]`                         | Embedding indexed alongside the entry for [similarity retrieval](/v/latest/cache/similarity/). Drivers without similarity support throw `CacheUnsupportedError`.                                    |
 
 :::info Validation rules
 
@@ -64,6 +65,17 @@ await cache.set("campaign", data, {
 ```
 
 Passing both is rejected at the call site — two ways to say the same thing silently drift over time.
+
+### Spreading expiry with `ttlJitter`
+
+Entries written in one batch (a warm-up, a deploy, a burst of requests) share an expiry second, so they all miss together and hit the origin together. `ttlJitter` picks a random TTL within the given percentage for each write:
+
+```ts
+await cache.set("product.7", product, { ttl: "1h", ttlJitter: 10 }); // expires in 54-66 minutes
+await cache.remember("report", { ttl: "1h", ttlJitter: 10 }, build);
+```
+
+The result is rounded to whole seconds and is at least one second. It applies to a relative `ttl` (or the driver default) and is skipped for `expiresAt`, `Infinity` and `0`.
 
 ### TTL parsing rules
 

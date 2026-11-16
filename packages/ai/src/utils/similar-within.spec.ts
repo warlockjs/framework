@@ -20,7 +20,7 @@ describe("similarWithin", () => {
 
     expect(hits.map((hit) => hit.key)).toEqual(["a1", "a2"]);
     expect(query).toHaveBeenCalledTimes(1);
-    expect(query).toHaveBeenCalledWith(3);
+    expect(query).toHaveBeenCalledWith(3, expect.any(Function));
   });
 
   it("widens the page when other scopes crowd the top of the ranking", async () => {
@@ -49,5 +49,21 @@ describe("similarWithin", () => {
     await similarWithin(query, (hit) => hit.scope === "a", { topK: 4, want: 1, maxTopK: 30 });
 
     expect(query.mock.calls.map(([topK]) => topK)).toEqual([4, 16, 30]);
+  });
+
+  it("hands accept to the query, and a store that filters answers in one query", async () => {
+    const all = [
+      ...Array.from({ length: 50 }, (_, index) => ({ key: `b${index}`, scope: "b" })),
+      { key: "a1", scope: "a" },
+    ];
+    const query = vi.fn(
+      async (topK: number, accept: (hit: { key: string; scope: string }) => boolean) =>
+        all.filter(accept).slice(0, topK),
+    );
+
+    const hits = await similarWithin(query, (hit) => hit.scope === "a", { topK: 5, want: 1 });
+
+    expect(hits.map((hit) => hit.key)).toEqual(["a1"]);
+    expect(query).toHaveBeenCalledTimes(1);
   });
 });

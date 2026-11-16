@@ -4,6 +4,13 @@ All notable changes to `@warlock.js/context` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.54.0 - 2026-11-16
+
+### Added
+
+- `ContextStorage` is exported as a type, so a context subclass can name the type of its protected `storage` slot.
+- `currentContextScope()` returns an object that identifies the current scope's context stores: the same object for two callers only when every context has the same store for both. Code that collects work from several callers and runs it once groups them by it, so the work never runs under another request's or tenant's stores.
+
 ## 5.53.0 - 2026-11-11
 
 ### Upgrading

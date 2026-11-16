@@ -71,7 +71,9 @@ const encryptionConfig: EncryptionConfigurations = {
   password: {
     salt: 12, // bcrypt rounds. 10–12 is the standard band.
     rejectLongPasswords: true, // optional: refuse passwords over 72 bytes (default false)
+    // driver: "scrypt", // optional: hash new passwords with scrypt instead of bcrypt
   },
+  // previousKeys: [env("APP_ENCRYPTION_KEY_OLD")], // optional: retired keys, decrypt only
 };
 
 export default encryptionConfig;
@@ -79,13 +81,33 @@ export default encryptionConfig;
 
 | Field                          | Purpose                                                                                       |
 | ------------------------------ | --------------------------------------------------------------------------------------------- |
-| `key`                          | 32-byte hex key for `encrypt` / `decrypt`. **Never rotate without migration.**                |
+| `key`                          | 32-byte hex key for `encrypt` / `decrypt`. Rotate it with `previousKeys` (see below).         |
+| `previousKeys`                 | Retired keys, newest first. `decrypt` tries them only when `key` does not open a value.       |
 | `algorithm`                    | Cipher algorithm. Default `aes-256-gcm`. Other GCM variants work.                             |
 | `hmacKey`                      | Separate HMAC key for `hmacHash`. Falls back to `key` if not set.                             |
 | `password.salt`                | bcrypt rounds. Higher = slower = more secure. 10–12 standard.                                 |
 | `password.rejectLongPasswords` | `true` makes `hashPassword` throw for a password over 72 bytes. Default `false` (warns once). |
+| `password.driver`              | `"bcrypt"` (default) or `"scrypt"` for new hashes. Both formats always verify.                |
+| `password.scrypt`              | `{ cost, blockSize, parallelization }`, default `{ 32768, 8, 1 }`, used by the scrypt driver. |
 
-The encryption key is a forever decision. Every value you encrypt under it depends on that key for recovery — if you change it, every existing ciphertext becomes garbage. Plan a migration if you ever genuinely need to rotate (decrypt-all + re-encrypt under new key + atomic cutover).
+> **New in 5.54:** `previousKeys` lets you rotate `key` without losing stored ciphertexts.
+
+Replacing `key` alone makes every existing ciphertext unreadable. To rotate, move the old key into `previousKeys` and set a new `key`:
+
+```ts
+const encryptionConfig: EncryptionConfigurations = {
+  key: env("APP_ENCRYPTION_KEY"), // the new key: every new value is encrypted with it
+  previousKeys: [env("APP_ENCRYPTION_KEY_OLD")], // retired keys, newest first
+};
+```
+
+`encrypt()` always uses `key`. `decrypt()` tries `key` first and the retired keys, in order, only when the value does not open with the current one, so a value stays readable whichever key encrypted it. A value that no configured key opens, or that was tampered with, still throws `Decryption failed`. Every entry has the same format as `key` (64 hex characters for `aes-256-gcm`); a malformed entry throws without printing the key.
+
+Rotation recipe:
+
+1. Generate a new key, set it as `key`, and move the old one to `previousKeys`.
+2. Re-encrypt stored values in the background: `decrypt(value)` then `encrypt(plain)`, saving the result. Reads keep working the whole time.
+3. When nothing stored is encrypted with the old key any more, remove it from `previousKeys`. Do not leave retired keys configured for long: each one stays a key that can open your data.
 
 The HMAC key can rotate more freely if you accept that recomputed fingerprints under the new key won't match historical ones — you'd have to migrate the stored fingerprints too. Best practice is two separate keys; the framework defaults to using `key` for HMAC if `hmacKey` is missing, but you should split them in production.
 
@@ -165,6 +187,20 @@ pnpm add bcrypt
 With `bcrypt` installed, `hashPassword` and `verifyPassword` run on the libuv thread pool instead of the event loop. Nothing else changes: both libraries produce the same `$2b$` hashes, so passwords hashed before keep verifying, and a hash in another bcrypt variant (such as `$2y$`) is still verified by `bcryptjs`. The thread pool has 4 threads by default; raise `UV_THREADPOOL_SIZE` if many logins run at once.
 
 Both functions are async: never block the event loop with `hashSync`.
+
+### Raising the cost, or switching to scrypt (New in 5.54)
+
+Raising `password.salt` only affects new hashes. `needsRehash(hash)` answers whether a stored hash differs from what the config asks for (another algorithm, another bcrypt cost, other scrypt parameters); a value in no known format answers `false`. `authService.attemptLogin()` uses it to rehash after a correct password (`auth.rehashPasswords`, default `true`), so hashes catch up as users sign in.
+
+```ts
+import { hashPassword, needsRehash, verifyPassword } from "@warlock.js/core";
+
+if ((await verifyPassword(plain, stored)) && needsRehash(stored)) {
+  stored = await hashPassword(plain);
+}
+```
+
+Set `password.driver: "scrypt"` to hash new passwords with scrypt from `node:crypto`: it runs on the thread pool, needs no extra dependency and has no 72-byte limit. scrypt hashes look like `$scrypt$N=32768,r=8,p=1$<salt>$<hash>`. `verifyPassword` checks both formats whatever the driver is, so switching in either direction never locks anyone out; the password is normalized (NFKC) before scrypt.
 
 ### The 72-byte limit
 
@@ -378,7 +414,7 @@ This pattern preserves both lookup speed (indexed `hash` column) and confidentia
 - **HMAC falls back to the encryption key.** If `hmacKey` isn't set, `hmacHash` uses `key`. Convenient, but slightly weakens your isolation — best practice is two separate keys.
 - **Don't reuse the same value across `encrypt` and `hashPassword`.** A bcrypt hash and an AES ciphertext are different domains. You can't `decrypt(hashedPassword)` to recover the password, and you can't `verifyPassword(plain, encryptedValue)` to compare. Pick one helper for each value.
 - **`encrypt(value) === encrypt(value)` is `false`.** The IV is random per call. If you need determinism (for indexing, dedup), use `hmacHash` — that's its whole purpose.
-- **Rotating the encryption key is a migration.** Every value encrypted under the old key needs to be decrypted with the old key and re-encrypted with the new key, atomically. Plan for it; don't just swap the env var.
+- **Don't just swap the encryption key.** Move the old key to `previousKeys` so existing values still open, then re-encrypt them and drop the old key once nothing uses it.
 
 ## See also
 

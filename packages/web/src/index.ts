@@ -117,6 +117,7 @@ export type {
   RootConfig,
   PageConfigValidation,
   PageActionConfig,
+  PageUploadsOption,
   PageErrorBoundaryProps,
 } from "./page-config";
 // `listRoutablePages` is NOT re-exported here. It reaches `./build`, which

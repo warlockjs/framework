@@ -4,6 +4,12 @@ All notable changes to `@warlock.js/herald` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.54.0 - 2026-11-16
+
+### Changed
+
+- Raised the `@mongez` dependency ranges to the 2026-11-16 releases (copper 2.1.4, events 2.2.10, reinforcements 4.1.0).
+
 ## 5.53.0 - 2026-11-11
 
 ### Upgrading

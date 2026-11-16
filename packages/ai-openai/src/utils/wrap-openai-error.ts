@@ -3,6 +3,7 @@ import {
   ContentFilterError,
   ContextLengthExceededError,
   InvalidRequestError,
+  ProviderAbortError,
   ProviderAuthError,
   ProviderError,
   ProviderOverloadedError,
@@ -29,6 +30,27 @@ type OpenAIErrorShape = {
   headers?: Record<string, string> | undefined;
   name?: string;
 };
+
+/** Codes (and the `type` value) OpenAI uses when the account's credit or spend limit is used up. */
+const SPENT_CREDIT_CODES: ReadonlySet<string> = new Set([
+  "insufficient_quota",
+  "credit_balance_exhausted",
+  "billing_hard_limit_reached",
+  "billing_not_active",
+]);
+
+/**
+ * Whether the error means the account has no credit left, which no retry
+ * fixes. Decided on `code` or on `type`, before the status-429 branch, so a
+ * 429 that carries `type: "insufficient_quota"` with another code is not
+ * mistaken for a retryable rate limit.
+ */
+function isSpentCredit(shape: OpenAIErrorShape): boolean {
+  return (
+    (typeof shape.code === "string" && SPENT_CREDIT_CODES.has(shape.code)) ||
+    shape.type === "insufficient_quota"
+  );
+}
 
 /**
  * Wrap any thrown value caught inside the OpenAI adapter into the
@@ -60,6 +82,10 @@ export function wrapOpenAIError(thrown: unknown): AIError {
   const context = buildContext(thrown, shape);
   const message = shape.message ?? (thrown instanceof Error ? thrown.message : String(thrown));
 
+  if (thrown instanceof OpenAI.APIUserAbortError || shape.name === "APIUserAbortError") {
+    return new ProviderAbortError(message, { cause: thrown, context });
+  }
+
   if (isTimeout(thrown, shape)) {
     return new ProviderTimeoutError(message, { cause: thrown, context });
   }
@@ -68,7 +94,7 @@ export function wrapOpenAIError(thrown: unknown): AIError {
     return new ProviderAuthError(message, { cause: thrown, context });
   }
 
-  if (shape.code === "insufficient_quota") {
+  if (isSpentCredit(shape)) {
     return new QuotaExceededError(message, { cause: thrown, context });
   }
 

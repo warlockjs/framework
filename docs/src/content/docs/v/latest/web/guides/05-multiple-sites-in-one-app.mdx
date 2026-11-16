@@ -77,9 +77,13 @@ Upgrade: move each `src/web/(group)` site folder to `src/web/$sites/<key>` and d
 
 `resolveCache: { ttl }` caches the resolver result by host for `ttl` **seconds**. It is off by default: a resolver that varies by a cookie or header must not reuse one visitor's result for every visitor on that host. Enable it only when the answer depends on the host alone.
 
+`negativeTtl` sets a shorter memory (in seconds) for hosts the resolver answered `null` for: `resolveCache: { ttl: 300, negativeTtl: 10 }`. It defaults to `ttl`; `0` never remembers an unknown host. Use it so a tenant host added at runtime starts resolving within seconds while found hosts stay cached for the full `ttl`.
+
 The `Host` header is chosen by the client, so the cache is bounded: `resolveCache: { ttl: 60, maxEntries: 10_000 }` keeps at most `maxEntries` hosts (default `10_000`), drops expired hosts first and then the least recently used one. A host longer than 253 characters (the longest DNS name) never reaches `resolveHost`; it is treated as an unknown host.
 
 `basePath` puts an entire site below a path prefix on its hosts. In the example, the tenant-admin site is selected for `/admin` and descendants. `unknownHost` defaults to a plain 404; set it to a configured site key to use that site as a fallback.
+
+A site can carry its own `/robots.txt` policy: `robots` on a site (and on a `resolveHost` result, for a tenant host) is merged over `web.robots`. Each key set there replaces the global one, and `groups` and `extra` are replaced whole, not concatenated. A site without `robots` gets the global policy. See [Sitemap and robots.txt](/v/latest/web/guides/sitemap-and-robots).
 
 `localeRouting` on a site replaces the global `web.localeRouting` for that site. Omit it to inherit the global setting; use `{}` to disable locale routing for that site. The global locale codes and default locale still come from `app.localeCodes` and `app.localeCode`.
 
@@ -103,7 +107,7 @@ export default {
 };
 ```
 
-A request for any other host gets a 403 "Blocked request. This host is not allowed" from the dev server; add the host to `web.devAllowedHosts`. `devAllowedHosts: true` turns the check off and re-opens that hole, so prefer listing hosts. Production is not affected.
+A request for any other host gets a 403 "Blocked request. This host is not allowed" from the dev server; the message names `web.devAllowedHosts`, the setting to add the host to. `devAllowedHosts: true` turns the check off and re-opens that hole, so prefer listing hosts. Production is not affected.
 
 ## Use the selected site on the server
 

@@ -1,5 +1,5 @@
 import type { GenericObject } from "@mongez/reinforcements";
-import { UnsafeFilterError, type Model } from "@warlock.js/cascade";
+import type { Model } from "@warlock.js/cascade";
 import { log } from "@warlock.js/logger";
 import type { Request, Response } from "../http";
 import type { QueryBuilderContract, RepositoryManager } from "../repositories";
@@ -73,38 +73,31 @@ export abstract class Restful<T extends Model> implements RouteResource {
    * List records
    */
   public async list({ request, response }: HttpContext) {
-    try {
-      const middlewareOutput = await this.callMiddleware("list", request, response);
+    // The request funnel answers every failure and records it once: a filter
+    // value the database layer refused as a 400, anything else as a 5xx.
+    const middlewareOutput = await this.callMiddleware("list", request, response);
 
-      if (middlewareOutput) return middlewareOutput;
+    if (middlewareOutput) return middlewareOutput;
 
-      const responseDocument: GenericObject = {};
+    const responseDocument: GenericObject = {};
 
-      const data = request.heavy();
+    const data = request.heavy();
 
-      if (data.paginate === "false") {
-        data.paginate = false;
-      }
-
-      const listMethod = this.cache ? "listCached" : "list";
-
-      const { data: documents, pagination } = await this.repository[listMethod](data);
-
-      responseDocument[this.recordsListName] = documents;
-
-      if (pagination) {
-        responseDocument.pagination = pagination;
-      }
-
-      return response.success(responseDocument);
-    } catch (error: any) {
-      // A filter value the database layer refused came from the client: the
-      // request funnel answers it with a 400.
-      if (error instanceof UnsafeFilterError) throw error;
-
-      log.error("restful", "list", error);
-      return response.serverError(error);
+    if (data.paginate === "false") {
+      data.paginate = false;
     }
+
+    const listMethod = this.cache ? "listCached" : "list";
+
+    const { data: documents, pagination } = await this.repository[listMethod](data);
+
+    responseDocument[this.recordsListName] = documents;
+
+    if (pagination) {
+      responseDocument.pagination = pagination;
+    }
+
+    return response.success(responseDocument);
   }
 
   /**

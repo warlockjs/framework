@@ -31,6 +31,13 @@ export * from "./image";
 export * from "./logger";
 export * from "./loader/app-singleton";
 export * from "./localization";
+// Explicit so they win over the same names re-exported from `@mongez/localization` above.
+export {
+  extend,
+  getTranslationsRevision,
+  groupedTranslations,
+  setTranslationsList,
+} from "./localization/translations-revision";
 export * from "./mail";
 export * from "./openapi";
 export * from "./react";

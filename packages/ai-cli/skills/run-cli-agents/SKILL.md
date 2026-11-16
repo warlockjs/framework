@@ -152,7 +152,7 @@ console.log((await session.done()).text);
 
 The adapter's home variable (`CLAUDE_CONFIG_DIR`, `CODEX_HOME`, `COPILOT_HOME`, `GROK_HOME`, …) is pointed at it.
 
-**Environment.** `inheritEnv` decides which server variables the CLI sees. `true` (default) passes everything, so a model-driven CLI can read database URLs and signing keys. `"curated"` passes the minimal system set plus the adapter's own API key variables (`apiKeyEnv`); `false` passes the minimal set only; a list passes the minimal set plus those names. Prefer `"curated"` and add anything else through `env`. In production an unset `inheritEnv` logs a one-time warning; set `true` explicitly to keep the old behaviour without it.
+**Environment.** `inheritEnv` decides which server variables the CLI sees. `true` (default) passes everything, so a model-driven CLI can read database URLs and signing keys. `"curated"` passes the minimal system set plus the adapter's own API key variables (`apiKeyEnv`) and the extra variables it declares in `passEnv` (base URLs, provider keys); `false` passes the minimal set only; a list passes the minimal set plus those names. Prefer `"curated"` and add anything else through `env`. In production an unset `inheritEnv` logs a one-time warning; set `true` explicitly to keep the old behaviour without it. The default changes to `"curated"` in 6.0, so set it explicitly now.
 
 ## Use a CLI as an `ai.agent` model
 

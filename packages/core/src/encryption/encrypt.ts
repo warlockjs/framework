@@ -42,6 +42,31 @@ function getEncryptionKey(keyBytes: number): Buffer {
 }
 
 /**
+ * The retired keys from `encryption.previousKeys`, validated like the active
+ * key. Entries that are not strings are ignored.
+ */
+function getPreviousKeys(keyBytes: number): Buffer[] {
+  const keys = config.key<EncryptionConfigurations["previousKeys"]>("encryption.previousKeys");
+
+  if (!Array.isArray(keys)) return [];
+
+  return keys
+    .filter((key): key is string => typeof key === "string" && key !== "")
+    .map((key, index) => {
+      const buffer = Buffer.from(key, "hex");
+
+      if (buffer.length !== keyBytes) {
+        // Never include the key itself: this message reaches logs and error pages.
+        throw new Error(
+          `encryption.previousKeys[${index}] must be exactly ${keyBytes} bytes (${keyBytes * 2} hex characters). Got ${buffer.length} bytes.`,
+        );
+      }
+
+      return buffer;
+    });
+}
+
+/**
  * Supported algorithms (the format assumes GCM: 16-byte IV + auth tag)
  * mapped to their required key size in bytes.
  */
@@ -116,7 +141,9 @@ export function decrypt(cipherText: string): string {
   if (!cipherText) return cipherText;
 
   const algorithm = getAlgorithm();
-  const keyBuffer = getEncryptionKey(ALGORITHM_KEY_BYTES[algorithm]!);
+  const keyBytes = ALGORITHM_KEY_BYTES[algorithm]!;
+  const keyBuffer = getEncryptionKey(keyBytes);
+  const previousKeys = getPreviousKeys(keyBytes);
 
   try {
     const parts = cipherText.split(":");
@@ -139,21 +166,33 @@ export function decrypt(cipherText: string): string {
       );
     }
 
-    // `getAlgorithm()` only returns one of the GCM names in ALGORITHM_KEY_BYTES.
-    const decipher = crypto.createDecipheriv(
-      algorithm as crypto.CipherGCMTypes,
-      keyBuffer,
-      Buffer.from(ivHex, "hex"),
-      { authTagLength: AUTH_TAG_BYTES },
-    );
+    // The current key first; a retired key is tried only when the tag does
+    // not verify, so a rotated key still opens what it encrypted.
+    let firstError: unknown;
 
-    decipher.setAuthTag(Buffer.from(authTagHex, "hex"));
+    for (const [index, key] of [keyBuffer, ...previousKeys].entries()) {
+      try {
+        // `getAlgorithm()` only returns one of the GCM names in ALGORITHM_KEY_BYTES.
+        const decipher = crypto.createDecipheriv(
+          algorithm as crypto.CipherGCMTypes,
+          key,
+          Buffer.from(ivHex, "hex"),
+          { authTagLength: AUTH_TAG_BYTES },
+        );
 
-    let decrypted = decipher.update(encryptedHex, "hex", "utf8");
-    // .final() throws if auth tag is invalid (data tampered)
-    decrypted += decipher.final("utf8");
+        decipher.setAuthTag(Buffer.from(authTagHex, "hex"));
 
-    return decrypted;
+        let decrypted = decipher.update(encryptedHex, "hex", "utf8");
+        // .final() throws if auth tag is invalid (data tampered or another key)
+        decrypted += decipher.final("utf8");
+
+        return decrypted;
+      } catch (error) {
+        if (index === 0) firstError = error;
+      }
+    }
+
+    throw firstError;
   } catch (error) {
     throw new Error(`Decryption failed: ${(error as Error).message}`);
   }

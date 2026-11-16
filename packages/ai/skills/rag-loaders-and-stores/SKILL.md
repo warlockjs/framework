@@ -145,6 +145,8 @@ await pool.query(store.ensureSchema());
 
 `query()` runs the cosine floor (`threshold`) and `tags` overlap filter **in SQL** (a below-floor row never crosses the wire), orders by `embedding <=> $vec`, caps at `topK`, and maps the pgvector distance back to a `[0,1]` cosine-similarity `score` — the same scale the cache store emits. `removeNamespace()` is a prefix DELETE that escapes `_` / `%` so dropping `ai.rag.docs` never also catches `ai.rag.docs2`.
 
+`ai.rag({ store: pgVectorStore(...) })` takes the store directly (a `VectorStore` is used as is; a cache driver is wrapped). The store also offers `remove(key)` and `list(namespace)`, so `rag.clear()` drops only its own chunks.
+
 ## Pattern — a knowledge base from a website, backed by pgvector
 
 ```ts

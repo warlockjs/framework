@@ -89,6 +89,8 @@ override job options, which override `defaultJobOptions`. Payloads, context,
 progress, and results must be JSON serializable. Jobs without a matching
 handler, and handlers throwing `UnrecoverableJobError`, fail immediately.
 
+Large retention stays cheap: the memory store polls only the jobs that can still run, so kept completed and failed jobs add nothing to a poll, and the SQLite store keeps an index on the finish time, which the retention pruning uses (created on first open of an existing database file).
+
 Unprioritized jobs run first; positive priorities run in ascending order,
 with FIFO ordering within a priority. Delays are minimum waits: polling and
 available concurrency determine when a ready job actually starts. Concurrency

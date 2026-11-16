@@ -663,3 +663,17 @@ describe("helpers", () => {
     }
   });
 });
+
+describe("adapter passEnv", () => {
+  it("every built-in adapter declares its extra variables", () => {
+    for (const [name, adapter] of Object.entries(cliAdapters)) {
+      expect(Array.isArray(adapter.passEnv), name).toBe(true);
+    }
+  });
+
+  it("lists variables beyond apiKeyEnv for adapters that talk to several providers", () => {
+    expect(cliAdapters.aider.passEnv).toContain("ANTHROPIC_API_KEY");
+    expect(cliAdapters.codex.passEnv).toContain("OPENAI_BASE_URL");
+    expect(cliAdapters.kimi.passEnv).toContain("KIMI_MODEL_BASE_URL");
+  });
+});

@@ -243,6 +243,24 @@ export default {
 };
 ```
 
+## Shell timeout — `web.shellTimeout`
+
+A page whose first render suspends outside every `<Suspense>` (a `use()` on a
+promise that never settles, a lazy component that never loads) has no shell to
+send, so the response waits. A visitor who stays connected would wait as long as
+that promise stays pending. `web.shellTimeout` bounds the wait: it is 30000
+milliseconds by default (90000 under `warlock dev`), and `0` turns the bound
+off. When the shell is not ready in time the render is aborted and the request
+gets your `error.page.tsx` with status 504, the same way a loader timeout does.
+Content inside a `<Suspense>` boundary and `defer()`-ed values are not bounded
+by it.
+
+```ts title="src/config/web.ts"
+export default {
+  shellTimeout: 10_000,
+};
+```
+
 ## Parallel loaders — `web.loaders`
 
 By default (`"serial"`) a level's loader starts only after every level above it
@@ -324,6 +342,10 @@ export const config: PageConfig = {
   metadata: { title: { absolute: "Your profile" } },
 };
 ```
+
+A page whose resolved `robots` contains `noindex`, whether it sets it itself or
+is the not-found page, also emits no `hreflang` alternates, so search engines
+are never told that a page they must not index has translations.
 
 Metadata callbacks run only during server-side metadata resolution, after their
 own loader succeeds. They receive readonly `{ data, shared, child? }`; `child`

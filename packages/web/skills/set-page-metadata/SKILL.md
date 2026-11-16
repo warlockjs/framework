@@ -180,7 +180,7 @@ When the app has a public URL configured (`app.publicUrl`; under multi-site, the
 - `canonical` defaults to the public URL plus the request path (query string and hash ignored). Set a string to override it, or `false` for no canonical link and no automatic `og:url`.
 - A root-relative `canonical`, `openGraph.url`, any image URL and every `alternates` value are made absolute against the public URL. An absolute URL is left as is.
 - Without a public URL nothing is absolutized and no canonical is derived.
-- A page whose `robots` contains `noindex` skips all of this (no derived canonical, `og:url` or locale). The error page and the `404.page.tsx` page are `noindex` by framework default.
+- A page whose `robots` contains `noindex` skips all of this (no derived canonical, `og:url` or locale) and emits no generated `hreflang` alternates either. The error page and the `404.page.tsx` page are `noindex` by framework default.
 
 ## Root, layout and page merge order
 

@@ -288,7 +288,10 @@ describe.each<Mode>(["dev", "prod"])("multi-site dispatch (%s)", (mode) => {
 
     expect(rendered).toEqual([]);
     expect(sent).toEqual([
-      { body: { error: "Route not found", path: "/", method: "GET" }, status: 404 },
+      {
+        body: { error: "Route not found", code: "route_not_found", path: "/", method: "GET" },
+        status: 404,
+      },
     ]);
   });
 
@@ -508,5 +511,49 @@ describe("resolver shared hand-off across module copies", () => {
     const { RESOLVED_SITE_SHARED: second } = await import("./site-dispatch");
 
     expect(second).toBe(first);
+  });
+});
+
+describe("multi-site page uploads", () => {
+  const registerWith = (
+    declarations: (
+      | boolean
+      | { maxTotalSize?: number; maxFileSize?: number; maxFiles?: number }
+      | undefined
+    )[],
+  ) => {
+    const dispatch = createSiteDispatch({ sites: { landing: { hosts: ["a.test"] } } });
+
+    declarations.forEach((uploads, index) =>
+      dispatch.add("landing", "POST", `/p${index}`, vi.fn() as never, undefined, uploads),
+    );
+
+    const post = vi.fn();
+    const router = { list: () => [], get: vi.fn(), post } as unknown as Router;
+
+    dispatch.register(router);
+
+    return post.mock.calls[0]![2] as { uploads?: unknown };
+  };
+
+  it("leaves the POST route undeclared when no page declares uploads", () => {
+    expect(registerWith([undefined, false])).not.toHaveProperty("uploads");
+  });
+
+  it("declares uploads on the shared POST route when a page declares them", () => {
+    expect(registerWith([undefined, true]).uploads).toBe(true);
+  });
+
+  it("uses the largest declared size, or true when one declaration has no size", () => {
+    expect(registerWith([{ maxTotalSize: 10 }, { maxTotalSize: 50 }]).uploads).toEqual({
+      maxTotalSize: 50,
+    });
+    expect(registerWith([{ maxTotalSize: 10 }, true]).uploads).toBe(true);
+  });
+
+  it("keeps a file limit only when every page sets it, at the largest value", () => {
+    expect(registerWith([{ maxFileSize: 10, maxFiles: 2 }, { maxFileSize: 50 }]).uploads).toEqual({
+      maxFileSize: 50,
+    });
   });
 });

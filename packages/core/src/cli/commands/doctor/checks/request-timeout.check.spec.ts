@@ -26,6 +26,7 @@ describe("doctor request-timeout check", () => {
     const result = await run();
 
     expect(result?.status).toBe("warn");
+    expect(result?.code).toBe("WL1015");
     expect(result?.detail).toContain("http.requestTimeout is 0");
   });
 

@@ -1,10 +1,13 @@
 import type { MultipartFile } from "@fastify/multipart";
 import { Random } from "@mongez/reinforcements";
 import dayjs from "dayjs";
+import { createReadStream } from "node:fs";
+import { open } from "node:fs/promises";
 import path from "path";
 import { Image, type ImageFormat, type ImageTransformOptions } from "../image";
 import { storage, type ScopedStorage, type StorageDriverName, type StorageFile } from "../storage";
 import { sanitizePath } from "../utils/paths";
+import { removeSpool, spoolOf } from "./multipart-spool";
 import { uploadsConfig } from "./uploads-config";
 import {
   isMarkupMimeType,
@@ -223,8 +226,43 @@ export class UploadedFile {
    * Buffers the file content if not already buffered.
    */
   public async size(): Promise<number> {
+    // a spooled file knows its size without being read back
+    const spool = spoolOf(this.fileData);
+
+    if (spool && !this.bufferedFileContent) return spool.size;
+
     const file = await this.buffer();
     return file.length;
+  }
+
+  /**
+   * Keep the file's temporary copy past the end of the response.
+   *
+   * Only matters when `http.multipart.memoryLimit` spooled this upload to a
+   * temporary file, which is otherwise deleted when the response closes. Call
+   * it before handing the file to a queued job; the copy is removed when the
+   * process exits, so save the file to storage for anything longer-lived.
+   * Does nothing for a file that was kept in memory.
+   *
+   * @returns This instance for chaining
+   */
+  public keep(): this {
+    const spool = spoolOf(this.fileData);
+
+    if (spool) spool.kept = true;
+
+    return this;
+  }
+
+  /**
+   * Delete the file's temporary copy now, once it has been saved or is no
+   * longer needed. The file can still be read afterwards only if it was
+   * already buffered. Does nothing for a file kept in memory.
+   */
+  public async discard(): Promise<void> {
+    const spool = spoolOf(this.fileData);
+
+    if (spool) await removeSpool(spool);
   }
 
   /**
@@ -255,10 +293,32 @@ export class UploadedFile {
   public async detectedMimeType(): Promise<string | undefined> {
     if (this.detectedMimeTypeCache === undefined) {
       this.detectedMimeTypeCache =
-        sniffUploadMimeType((await this.buffer()).subarray(0, UPLOAD_SNIFF_BYTES)) ?? null;
+        sniffUploadMimeType((await this.head()).subarray(0, UPLOAD_SNIFF_BYTES)) ?? null;
     }
 
     return this.detectedMimeTypeCache ?? undefined;
+  }
+
+  /**
+   * The file's first bytes: read from the temporary file of a spooled upload,
+   * so sniffing the type never loads a large file whole.
+   * @internal
+   */
+  protected async head(): Promise<Buffer> {
+    const spool = spoolOf(this.fileData);
+
+    if (!spool || this.bufferedFileContent) return this.buffer();
+
+    const handle = await open(spool.path, "r");
+
+    try {
+      const head = Buffer.alloc(Math.min(UPLOAD_SNIFF_BYTES, spool.size));
+      const { bytesRead } = await handle.read(head, 0, head.length, 0);
+
+      return head.subarray(0, bytesRead);
+    } finally {
+      await handle.close();
+    }
   }
 
   // ============================================================
@@ -638,19 +698,30 @@ export class UploadedFile {
     location: string,
     driver?: StorageDriverName,
   ): Promise<StorageFile> {
-    // Get file content (apply transforms if image)
-    const content = await this.getProcessedContent();
-
     // Select storage
     const storageInstance = this.resolveStorage(driver);
 
     // Determine final location (adjust extension if format changed)
     const finalLocation = this.adjustLocationForFormat(location);
 
-    // Save to storage
-    this._storageFile = await storageInstance.put(content, finalLocation, {
-      mimeType: this.resolveStoredMimeType(content),
-    });
+    const spool = spoolOf(this.fileData);
+
+    if (spool && !this.bufferedFileContent && !(this.isImage && this.hasTransforms())) {
+      // a spooled file with nothing to transform goes to storage as a stream
+      this._storageFile = await storageInstance.putStream(
+        createReadStream(spool.path),
+        finalLocation,
+        { mimeType: this.resolveStoredMimeType(await this.head()) },
+      );
+    } else {
+      // Get file content (apply transforms if image)
+      const content = await this.getProcessedContent();
+
+      // Save to storage
+      this._storageFile = await storageInstance.put(content, finalLocation, {
+        mimeType: this.resolveStoredMimeType(content),
+      });
+    }
 
     // Store hash from StorageFile
     const info = await this._storageFile.data();
@@ -964,7 +1035,7 @@ export class UploadedFile {
       isImage: this.isImage,
       isVideo: this.isVideo,
       isAudio: this.isAudio,
-      size: this.bufferedFileContent?.length,
+      size: this.bufferedFileContent?.length ?? spoolOf(this.fileData)?.size,
     };
   }
 

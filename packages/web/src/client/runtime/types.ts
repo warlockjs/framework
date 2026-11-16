@@ -22,6 +22,14 @@ export type ClientRouteComposition = {
    * it, instead of `ErrorPage`, when the server rendered a 401/403 failure.
    */
   readonly ForbiddenPage?: ClientProjectedModule;
+  /**
+   * Loads the error page on demand. The generated registry emits this instead
+   * of `ErrorPage`, so a route that never fails never downloads the page.
+   * Resolve either form with `loadErrorPageModule`.
+   */
+  readonly loadErrorPage?: () => Promise<ClientProjectedModule>;
+  /** Loads the forbidden page on demand; see {@link ClientRouteComposition.loadErrorPage}. */
+  readonly loadForbiddenPage?: () => Promise<ClientProjectedModule>;
 };
 
 export type ClientRouteLoad = () => ClientRouteComposition | Promise<ClientRouteComposition>;

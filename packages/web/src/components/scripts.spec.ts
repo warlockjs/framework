@@ -61,8 +61,6 @@ describe("Scripts", () => {
         lang: "ar",
         dir: "rtl",
         nonce: "request-nonce",
-        stylesheetUrls: ["/app.css"],
-        hydrationClientModuleUrl: "/hydrate.js",
       },
     });
     if (typeof payload !== "object" || payload === null || !("document" in payload)) {
@@ -70,6 +68,26 @@ describe("Scripts", () => {
     }
     expect(payload.document).not.toHaveProperty("payload");
     expect(payload.document).not.toHaveProperty("metadata");
+  });
+
+  it("leaves the slots the document already carries out of the inline payload", () => {
+    const html = render(
+      documentValue({
+        stylesheetUrls: ["/app.css"],
+        fontPreloads: [{ href: "/inter.woff2", type: "font/woff2" }],
+        hydrationClientModuleUrl: "/hydrate.js",
+        hydrationClientModulePreloadUrls: ["/vendor-react.js"],
+        localeAlternates: [{ hreflang: "en", href: "https://app.test/" }],
+        siteKey: "shop",
+        lang: "en",
+      }),
+    );
+    const payload = readPayloadFromHtml(html) as { document: Record<string, unknown> };
+
+    expect(Object.keys(payload.document)).toEqual(["lang"]);
+    // The entry script is the one place its URL and site key appear.
+    expect(html.split("/hydrate.js").length - 1).toBe(1);
+    expect(html).toContain('data-warlock-site="shop"');
   });
 
   it("omits the __WARLOCK_DATA__ payload when the payload is marked non-hydrating (renderPageFailure's pre-triple fallback)", () => {
@@ -96,7 +114,9 @@ describe("Scripts", () => {
       documentValue({ nonce: "ctx-nonce-1", hydrationClientModuleUrl: "/hydrate.js" }),
     );
 
-    expect(html).toContain('<script type="module" nonce="ctx-nonce-1" src="/hydrate.js">');
+    expect(html).toContain(
+      '<script type="module" nonce="ctx-nonce-1" src="/hydrate.js" data-wl="entry">',
+    );
     expect(html.indexOf(PAYLOAD_SCRIPT_ID)).toBeLessThan(html.indexOf("/hydrate.js"));
   });
 

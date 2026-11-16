@@ -21,11 +21,12 @@ It is agent middleware, so it composes with everything else (budget, semantic ca
 
 ## The three phases
 
-| Phase    | Hook          | Inspects                   | Supported verdicts                                  |
-| -------- | ------------- | -------------------------- | --------------------------------------------------- |
-| `input`  | `trip.before` | the outbound user prompt   | `allow` / `block` / `flag` (**`redact` → `block`**) |
-| `output` | `trip.after`  | `response.content`         | `allow` / `redact` / `block` / `flag` (full)        |
-| `tool`   | `tool.before` | `JSON.stringify(toolArgs)` | `allow` / `block` / `flag` (**`redact` → `block`**) |
+| Phase        | Hook          | Inspects                                                       | Supported verdicts                                  |
+| ------------ | ------------- | -------------------------------------------------------------- | --------------------------------------------------- |
+| `input`      | `trip.before` | the outbound user prompt                                       | `allow` / `block` / `flag` (**`redact` → `block`**) |
+| `output`     | `trip.after`  | `response.content`                                             | `allow` / `redact` / `block` / `flag` (full)        |
+| `tool`       | `tool.before` | `JSON.stringify(toolArgs)`                                     | `allow` / `block` / `flag` (**`redact` → `block`**) |
+| `toolResult` | `tool.after`  | what the tool returned (a string as is, else `JSON.stringify`) | `allow` / `redact` / `block` / `flag`               |
 
 Each phase is an **array of detectors run in registration order**; the first non-`allow`/non-`flag` verdict short-circuits that phase.
 
@@ -58,15 +59,33 @@ interface GuardOptions {
   input?: readonly GuardrailDetector[]; // run at trip.before over the prompt
   output?: readonly GuardrailDetector[]; // run at trip.after over response.content
   tool?: readonly GuardrailDetector[]; // run at tool.before over JSON.stringify(args)
-  toolNames?: string | readonly string[]; // restrict the tool detectors to these tools
+  toolResult?: readonly GuardrailDetector[]; // run at tool.after over the tool's returned data
+  wrapToolResults?: boolean; // mark each successful tool result as untrusted data (default false)
+  toolNames?: string | readonly string[]; // restrict the tool and toolResult detectors to these tools
   escalation?: GuardrailEscalation; // onBlock hook for escalate:true verdicts
   stream?: "buffered" | "unguarded"; // how a streaming run meets the output detectors; default "buffered"
 }
 ```
 
-`toolNames` scopes only the `tool` hooks (via the core `forTool` helper); `input` / `output` detectors still fire on every trip regardless. A guard with no detectors is a harmless no-op.
+`toolNames` scopes only the `tool` and `toolResult` hooks (via the core `forTool` helper); `input` / `output` detectors still fire on every trip regardless. A guard with no detectors is a harmless no-op.
 
 `input` detectors run once per distinct user text per run: the prompt does not change between the trips of a tool-using run, so a later trip whose text already passed skips them (and any paid moderation call). A detector that faulted runs again on the next trip.
+
+## Tool results (indirect prompt injection)
+
+Text a tool returns (a fetched page, a file, a search hit) goes to the model as if it were trusted, which is the usual way injected instructions arrive. `toolResult` detectors scan it at `tool.after`, before the model reads it:
+
+```ts
+const policy = ai.guardrail({
+  toolResult: [ai.guardrail.injection({ onMatch: "block" })],
+  wrapToolResults: true,
+});
+```
+
+- `block` fails that tool call with a `GuardrailViolationError` (phase `"toolResult"`); the model sees a failed call, never the data.
+- `redact` replaces the result data with the rewritten text (a string). `flag` records the match and leaves the data alone.
+- `wrapToolResults: true` turns each successful result into a string inside `<untrusted-tool-result tool="name">…</untrusted-tool-result>` (a closing tag in the data is neutralised), so the model is told it is data, not instructions. It works on its own or after the detectors.
+- Failed tool results are not scanned. The scan is a heuristic, as for the other phases.
 
 ## Streaming
 
@@ -162,7 +181,7 @@ ai.guardrail.injection({ markers: [/system\s*:\s*override/i, "sudo mode"] });
 
 `onMatch` defaults to `"flag"` — callers commonly escalate to `"block"` on the `input` phase. Phrases are deliberately specific so ordinary prose does not trip the rule.
 
-Phrases match on normalized text, so trivial obfuscation does not hide them: case, full-width and other compatibility forms (NFKC), invisible characters such as zero-width spaces, and runs of whitespace, `_`, `-` or `.` are folded. `"Ignore  previous\ninstructions"` and `"ignore_previous-instructions"` both match. Caller `string` markers are normalized the same way. Caller `RegExp` markers run on the original text, as a copy without their `g` / `y` flags, so a global pattern matches on every check. The detector is a heuristic: it sees the user prompt, the reply and tool arguments, not tool results or retrieved documents, so check that content where it enters (inside the tool, or in a custom `tool.after` middleware).
+Phrases match on normalized text, so trivial obfuscation does not hide them: case, full-width and other compatibility forms, invisible characters such as zero-width spaces, combining marks (accents stacked on letters), look-alike Cyrillic and Greek letters (a Cyrillic `о` for a Latin `o`) and runs of whitespace, dashes, `_`, `.`, `,`, `;`, `:`, `|`, `/` and `*` are folded. `"Ignore  previous\ninstructions"` and `"ignore_previous-instructions"` both match. Caller `string` markers are normalized the same way. Caller `RegExp` markers run on the original text, as a copy without their `g` / `y` flags, so a global pattern matches on every check. The detector is a heuristic: it sees whatever text the phase hands it: the user prompt, the reply, tool arguments, and tool results when you configure `toolResult`. Retrieved documents that do not pass through a tool are not seen, so check them where they enter.
 
 ### `ai.guardrail.links(options?)`
 
@@ -237,7 +256,7 @@ import { GuardrailViolationError } from "@warlock.js/ai";
 const result = await agent.execute(userText);
 
 if (result.error instanceof GuardrailViolationError) {
-  // result.error.phase    — "input" | "output" (widened with "tool" at runtime)
+  // result.error.phase    — "input" | "output" (widened with "tool" / "toolResult" at runtime)
   // result.error.reason    — the detector's reason
   // result.error.guardrail — the guard's `name`
 }
@@ -268,7 +287,7 @@ ai.guardrail({
 ```ts
 interface FlagRecord {
   detector: string; // which detector flagged
-  phase: GuardrailPhase; // "input" | "output" | "tool"
+  phase: GuardrailPhase; // "input" | "output" | "tool" | "toolResult"
   reason: string;
   matches: readonly GuardrailMatch[];
 }

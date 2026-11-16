@@ -46,6 +46,11 @@ export type ModuleConfigRead = {
    * Declared in source order, unique. Absent when the config declares none.
    */
   apiRoutes?: string[];
+  /**
+   * The page's `config.uploads` declaration: `true`, `false` or
+   * `{ maxTotalSize }`. Absent when the config declares none.
+   */
+  uploads?: boolean | UploadLimits;
 };
 
 type ModuleKind = PageModuleKind;
@@ -86,6 +91,53 @@ function stringLiteral(node: ValueNode): string | undefined {
 function booleanLiteral(node: ValueNode): boolean | undefined {
   const value = unwrap(node);
   return value.type === "BooleanLiteral" ? value.value : undefined;
+}
+
+/** A positive integer written as number literals joined by `*` (for example `10 * 1024 * 1024`). */
+function numberExpression(node: ValueNode): number | undefined {
+  const value = unwrap(node);
+  if (value.type === "NumericLiteral") return value.value;
+  if (value.type === "BinaryExpression" && value.operator === "*") {
+    const left = numberExpression(value.left as ValueNode);
+    const right = numberExpression(value.right as ValueNode);
+    return left === undefined || right === undefined ? undefined : left * right;
+  }
+  return undefined;
+}
+
+/** The numeric limits a page's `config.uploads` object may set. */
+type UploadLimits = { maxTotalSize?: number; maxFileSize?: number; maxFiles?: number };
+
+const UPLOAD_LIMIT_NAMES = ["maxTotalSize", "maxFileSize", "maxFiles"] as const;
+
+/** Reads `config.uploads`: a boolean literal, or an object literal with numeric limits. */
+function readUploads(value: ValueNode, sourceFile: string): boolean | UploadLimits {
+  const flag = booleanLiteral(value);
+  if (flag !== undefined) return flag;
+
+  const object = directObject(value, sourceFile, "config.uploads");
+  const limits: UploadLimits = {};
+
+  for (const member of object.properties) {
+    const name = member.type === "ObjectProperty" ? propertyName(member, sourceFile) : undefined;
+    const limit = UPLOAD_LIMIT_NAMES.find((candidate) => candidate === name);
+
+    if (member.type !== "ObjectProperty" || limit === undefined) {
+      fail(
+        sourceFile,
+        "config.uploads accepts only `maxTotalSize`, `maxFileSize` and `maxFiles` properties",
+      );
+    }
+
+    const number = numberExpression(member.value);
+    if (number === undefined || !Number.isInteger(number) || number <= 0) {
+      fail(sourceFile, `config.uploads.${limit} must be a positive integer literal`);
+    }
+
+    limits[limit] = number;
+  }
+
+  return Object.keys(limits).length === 0 ? true : limits;
 }
 
 function propertyName(
@@ -215,7 +267,7 @@ function inspectConfig(
   bindings: ReadonlySet<string>,
 ): Pick<
   ModuleConfigRead,
-  "route" | "prefix" | "strictMode" | "hasMiddleware" | "guardsUser" | "apiRoutes"
+  "route" | "prefix" | "strictMode" | "hasMiddleware" | "guardsUser" | "apiRoutes" | "uploads"
 > & {
   actionKeys: string[];
 } {
@@ -230,6 +282,7 @@ function inspectConfig(
   let hasMiddleware = false;
   let guardsUser = false;
   let apiRoutes: string[] | undefined;
+  let uploads: boolean | UploadLimits | undefined;
   const actionKeys: string[] = [];
 
   for (const member of object.properties) {
@@ -257,6 +310,7 @@ function inspectConfig(
     if (key === "actions") actionKeys.push(...literalKeys(member.value));
     if (key === "route") route = readRoute(member.value, sourceFile);
     if (key === "apiRoutes") apiRoutes = readApiRoutes(member.value, sourceFile);
+    if (key === "uploads") uploads = readUploads(member.value, sourceFile);
     if (key === "prefix") {
       const value = stringLiteral(member.value);
       if (value === undefined) fail(sourceFile, "config.prefix must be a string literal");
@@ -276,6 +330,7 @@ function inspectConfig(
     hasMiddleware,
     ...(guardsUser ? { guardsUser: true as const } : {}),
     ...(apiRoutes === undefined ? {} : { apiRoutes }),
+    ...(uploads === undefined ? {} : { uploads }),
     actionKeys,
   };
 }
@@ -321,6 +376,7 @@ export function readModuleConfig(
   let hasMiddleware = false;
   let guardsUser = false;
   let apiRoutes: string[] | undefined;
+  let uploads: boolean | UploadLimits | undefined;
   let hasDefault = false;
   let declaresAction = false;
   let hasSingleAction = false;
@@ -395,6 +451,7 @@ export function readModuleConfig(
       hasMiddleware = read.hasMiddleware;
       guardsUser = read.guardsUser === true;
       apiRoutes = read.apiRoutes;
+      uploads = read.uploads;
       for (const key of read.actionKeys) actionNames.add(key);
     }
   }
@@ -409,6 +466,7 @@ export function readModuleConfig(
     hasMiddleware,
     ...(guardsUser ? { guardsUser: true as const } : {}),
     ...(apiRoutes === undefined ? {} : { apiRoutes }),
+    ...(uploads === undefined ? {} : { uploads }),
     hasDefault,
     hasConfig: configSeen,
     ...(actionNames.size > 0 ? { actionNames: [...actionNames].sort() } : {}),
@@ -491,6 +549,7 @@ export function mergeModuleConfigReads(
     hasMiddleware: configOwner?.hasMiddleware ?? false,
     ...(configOwner?.guardsUser === true ? { guardsUser: true as const } : {}),
     ...(configOwner?.apiRoutes === undefined ? {} : { apiRoutes: configOwner.apiRoutes }),
+    ...(configOwner?.uploads === undefined ? {} : { uploads: configOwner.uploads }),
     hasDefault: primaryRead.hasDefault,
     hasConfig: primaryRead.hasConfig || setupRead.hasConfig,
     ...(actionNames.length > 0 ? { actionNames } : {}),

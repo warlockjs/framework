@@ -26,7 +26,7 @@ const result = await chat.send("What is my name?"); // AgentResult, history incl
 
 What `send(input, options)` does, under a per-session lock:
 
-1. Load the record stored under `session:<id>`, mark it `pending: { runId, input }`.
+1. Load the record stored under `session:<id>`, mark it `pending: { runId, input }` (stores with the optional `markPending(runId, pending)` — memory, pg, sqlite — update only that field in place; others save the record).
 2. Run `agent.execute(input, { ...options, history, captureMessages: true, sessionId: id })`.
 3. On success, store the run's messages (without the agent's system prompt) plus the final reply with its `blocks`; on a failed / cancelled run keep the old history. Clear `pending`.
 

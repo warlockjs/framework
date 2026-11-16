@@ -310,7 +310,7 @@ export const config = {
 };
 ```
 
-`"statuses.*"` declares every key under `statuses.`, `"members.title"` declares
+The `translations` key is accepted in the `config` of a page, a layout and the root, whether it sits in the module itself or in its setup file. `"statuses.*"` declares every key under `statuses.`, `"members.title"` declares
 one key, and a plain group name declares the group with its subtree. A
 declaration may name a key the page reads only through a helper. `warlock check`
 reports each computed lookup in `src/web` as `WL9104` with its file, line and key
@@ -364,6 +364,15 @@ and the table that carries it are fixed for the life of the process:
   payload.
 - A locale the registry did not hold at boot gets an empty shared table. Its
   keys travel inline, the same way.
+
+In production a page's pruned dictionary is computed once per route and locale
+and reused until the translation registry changes. Core keeps a revision number
+that every registration bumps: page and module dictionaries, and
+`groupedTranslations()`, `extend()` and `setTranslationsList()` imported from
+either `@warlock.js/core` or `@mongez/localization`. A registration after the
+first request therefore shows up in the next payload. Call
+`bumpTranslationsRevision()` from `@warlock.js/core` only after changing
+translations by some other means.
 
 In development the table is recomputed from the registry for every payload and
 republished when it changes (`no-store`), so an edit shows at once.

@@ -175,6 +175,6 @@ describe("fonts in rendered documents", () => {
     expect(data.bundle?.document?.stylesheetUrls).toEqual(
       document.bundle?.document?.stylesheetUrls,
     );
-    expect(data.html).toContain('as="font"');
+    expect(document.html).toContain('as="font"');
   });
 });

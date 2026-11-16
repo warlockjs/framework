@@ -48,7 +48,7 @@ Generate the keys once (Node REPL):
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
 
-Put both in `.env` and **never rotate the encryption key without a migration** — every value encrypted under the old key becomes garbage. The HMAC key can rotate if you accept that fingerprints recomputed under the new key won't match historical ones.
+Put both in `.env`. **Rotate the encryption key with `previousKeys`**: set the new `key` and list the old one in `previousKeys: [...]` (newest first). `encrypt()` uses only `key`; `decrypt()` tries `key`, then each retired key, only when the value does not open. Re-encrypt stored values, then drop the old key. Swapping `key` alone makes every old ciphertext garbage. The HMAC key can rotate if you accept that fingerprints recomputed under the new key won't match historical ones.
 
 ## `encrypt` / `decrypt` — reversible secrets
 
@@ -196,7 +196,7 @@ Same payload → same key → returns the cached result. Different keys (because
 - **Empty key value is fatal.** If `env("APP_ENCRYPTION_KEY")` returns `undefined`, the first `encrypt()` call throws "Missing encryption key" at runtime, not boot. Cover this in your startup health check.
 - **HMAC falls back to the encryption key.** If `hmacKey` isn't set, `hmacHash` uses `key`. Convenient, but slightly weakens your isolation — best practice is two separate keys.
 - **Don't reuse the same value across encrypt and password.** A bcrypt hash of a value isn't comparable to an encryption of that value. They're different domains.
-- **Rotating the encryption key requires a migration.** Every existing ciphertext becomes unrecoverable under a new key. Plan rotation as: keep the old key as `OLD_APP_ENCRYPTION_KEY`, decrypt each row with old, encrypt with new, retire old key once the table is clean.
+- **Don't just swap the encryption key.** Move the old key to `encryption.previousKeys`, set the new `key`, re-encrypt rows (`encrypt(decrypt(value))`), then retire the old key once the table is clean.
 
 ## Installation
 

@@ -16,6 +16,7 @@ await chat.set("messages.10", msg); // chats.<id>.messages.10, 30d, user.<userId
 await chat.set("draft", d, { ttl: "1h" }); // per-call ttl wins
 await chat.tags(["unread"]).set("ping", p); // tags merge: user.<userId> + unread
 await chat.clear(); // sugar for removeNamespace
+const keys = await cache.listKeys("chats.7"); // live keys under a prefix, ready for get() / remove(); optional on custom drivers
 ```
 
 Scopes are pure views — same connection, same driver, no extra state. Per-call options always win over scope defaults; tags merge additively.

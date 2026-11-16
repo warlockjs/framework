@@ -87,7 +87,22 @@ This is local to the query — it doesn't remove the scope from the model.
 
 ### Writes honour global scopes too
 
-The write statics apply the same scopes as queries: `atomic()`, `findOneAndUpdate()`, `findAndUpdate()`, `findAndReplace()`, `findOneAndDelete()`, `upsert()`, `restore()` and `restoreAll()` only touch rows the scopes let the caller see. `upsert()` updates a visible match by its primary key and throws when its filter matches a row a scope hides (another tenant's, a soft-deleted one) instead of updating it; when nothing matches it inserts, like `create()`, so set the tenant column in the data you pass. A model with no global scope skips the extra lookup and sends the write straight to the database.
+The write statics apply the same scopes as queries: `atomic()`, `findOneAndUpdate()`, `findAndUpdate()`, `findAndReplace()`, `findOneAndDelete()`, `upsert()`, `restore()` and `restoreAll()` only touch rows the scopes let the caller see. `upsert()` updates a visible match by its primary key and throws when its filter matches a row a scope hides (another tenant's, a soft-deleted one) instead of updating it; when nothing matches it inserts, like `create()`, and writes the scope's `stamp` columns (see below) so a tenant column cannot be forgotten. A model with no global scope skips the extra lookup and sends the write straight to the database.
+
+### Stamping scope values into inserts
+
+A tenant scope hides other tenants' rows from reads, but an insert that forgets the tenant column creates a row no tenant can see. Give the scope a `stamp` and the column is filled for you:
+
+```ts
+Order.addGlobalScope("tenant", (query) => query.where("tenantId", currentTenantId()), {
+  stamp: () => ({ tenantId: currentTenantId() }),
+});
+
+await Order.create({ total: 40 }); // inserted with tenantId set
+await Order.upsert({ number: "A-1" }, { total: 40 }); // a row it inserts gets tenantId too
+```
+
+`stamp` is an object or a function evaluated at each insert. It applies to `create()`, `createMany()`, `save()` of a new record and `upsert()`; for an upsert the stamped columns are written only when the upsert inserts, never when it updates an existing row. A value you set yourself is kept, and a stamp value of `undefined` is not written.
 
 ### Removing a global scope permanently
 

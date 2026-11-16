@@ -100,6 +100,12 @@ export type AccessTokenConfig = {
    */
   secret?: string;
   /**
+   * Retired access-token secrets, newest first. Tokens signed with one of them
+   * still verify; new tokens are always signed with `secret`. Remove an entry
+   * once every token signed with it has expired.
+   */
+  previousSecrets?: string[];
+  /**
    * JWT algorithm.
    * @default "HS256"
    */
@@ -154,6 +160,13 @@ export type RefreshTokenConfig = {
    * to the access-token secret when omitted.
    */
   secret?: string;
+  /**
+   * Retired refresh-token secrets. Tokens signed with one of them still
+   * verify; new tokens are always signed with `secret`. When no refresh
+   * `secret` is set, the retired access-token secrets apply to refresh tokens
+   * too.
+   */
+  previousSecrets?: string[];
   /**
    * Refresh-token lifetime — a duration string `ms` parses to a **positive**
    * number of milliseconds; an unusable value throws naming this key on issue
@@ -354,6 +367,15 @@ export type AuthConfigurations = {
    * @default false
    */
   hashTokensAtRest?: boolean;
+  /**
+   * After a successful password login, replace a stored hash made with another
+   * algorithm or cost than `encryption.password` now asks for (a raised bcrypt
+   * `salt`, or a switch to the `"scrypt"` driver) with a fresh one. A failure
+   * to save is logged and never fails the login. Set `false` to keep hashes as
+   * they are.
+   * @default true
+   */
+  rehashPasswords?: boolean;
   /**
    * Access-token configuration (secret, expiry, algorithm, model override).
    */

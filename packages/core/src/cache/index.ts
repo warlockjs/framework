@@ -1,4 +1,5 @@
 export { DatabaseCacheDriver } from "./database-cache-driver";
+export { cacheMigration } from "./cache.migration";
 export type { DatabaseCacheOptions } from "./database-cache-driver";
 
 // Auto-register database cache driver

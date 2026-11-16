@@ -60,6 +60,7 @@ export const trustProxyCheck: DoctorCheck = warnOnError({
     return {
       name: "trust-proxy",
       status: "warn",
+      code: "WL1014",
       detail:
         "http.trustProxy is true and http.realIpHeader is not set — the client IP is the " +
         "leftmost X-Forwarded-For entry, which clients can write themselves, so per-IP rate " +

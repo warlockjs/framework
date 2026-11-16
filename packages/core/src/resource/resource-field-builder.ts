@@ -1,6 +1,7 @@
 import { isObject } from "@mongez/supportive-is";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime.js";
+import { config } from "../config";
 import { storage } from "../storage";
 
 // `humanTime` date options call dayjs(...).fromNow(), which lives in the
@@ -13,6 +14,17 @@ import {
   type ResourceFieldBuilderDateOutputOptions,
   type ResourceOutputValueCastType,
 } from "./types";
+
+/** The date object every date field returns unless told otherwise. */
+const FULL_DATE_OUTPUT: ResourceFieldBuilderDateOutputOptions = {
+  format: true,
+  timestamp: true,
+  timezone: false,
+  locale: false,
+  offset: false,
+  humanTime: true,
+  iso: true,
+};
 
 export class ResourceFieldBuilder {
   /**
@@ -57,15 +69,21 @@ export class ResourceFieldBuilder {
    * If type of the date options is string then it will be returned as a string
    * otherwise it will be returned as an object contains the date options
    */
-  protected dateOptionsInput: ResourceFieldBuilderDateOutputOptions = {
-    format: true,
-    timestamp: true,
-    timezone: false,
-    locale: false,
-    offset: false,
-    humanTime: true,
-    iso: true,
-  };
+  protected dateOptionsInput?: ResourceFieldBuilderDateOutputOptions;
+
+  /**
+   * The date output in force: the field's own `dateOptions()`, else the app's
+   * `resource.dateOutput` default, else the full date object.
+   */
+  protected resolveDateOptions(): ResourceFieldBuilderDateOutputOptions {
+    if (this.dateOptionsInput !== undefined) return this.dateOptionsInput;
+
+    const configured = config.key<ResourceFieldBuilderDateOutputOptions | undefined>(
+      "resource.dateOutput",
+    );
+
+    return configured !== undefined && configured !== null ? configured : FULL_DATE_OUTPUT;
+  }
 
   /**
    * Constructor
@@ -253,27 +271,29 @@ export class ResourceFieldBuilder {
       return this.isNullable ? null : undefined;
     }
 
-    if (typeof this.dateOptionsInput === "string") {
+    const dateOptions = this.resolveDateOptions();
+
+    if (typeof dateOptions === "string") {
       // The single-value outputs read `value` itself, not its `iso` key.
       const date = source === value ? parsed : dayjs(value);
 
-      if (this.dateOptionsInput === "format") {
+      if (dateOptions === "format") {
         return date.format(this.dateFormat);
       }
 
-      if (this.dateOptionsInput === "iso") {
+      if (dateOptions === "iso") {
         return date.toISOString();
       }
 
-      if (this.dateOptionsInput === "timestamp") {
+      if (dateOptions === "timestamp") {
         return date.valueOf();
       }
 
-      if (this.dateOptionsInput === "humanTime") {
+      if (dateOptions === "humanTime") {
         return (date as any).fromNow();
       }
 
-      if (this.dateOptionsInput === "locale") {
+      if (dateOptions === "locale") {
         if (!locale) {
           return date.format(this.dateFormat);
         }
@@ -293,23 +313,23 @@ export class ResourceFieldBuilder {
 
     const dayjsObject = locale ? parsed.locale(locale) : parsed;
 
-    if (this.dateOptionsInput.iso) {
+    if (dateOptions.iso) {
       output.iso = dayjsObject.toISOString();
     }
 
-    if (this.dateOptionsInput.format) {
+    if (dateOptions.format) {
       output.format = dayjsObject.format(this.dateFormat);
     }
 
-    if (this.dateOptionsInput.timestamp) {
+    if (dateOptions.timestamp) {
       output.timestamp = dayjsObject.valueOf();
     }
 
-    if (this.dateOptionsInput.humanTime) {
+    if (dateOptions.humanTime) {
       output.humanTime = (dayjsObject as any).fromNow();
     }
 
-    if (this.dateOptionsInput.locale) {
+    if (dateOptions.locale) {
       output.locale = dayjsObject.format(this.dateFormat);
     }
 

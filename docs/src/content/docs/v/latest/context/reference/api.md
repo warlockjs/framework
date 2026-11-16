@@ -137,6 +137,28 @@ if (!userContext.hasContext()) {
 }
 ```
 
+### `ContextStorage<TStore>`
+
+Type of the protected `storage` slot of a context (`run`, `enterWith`, `getStore`). Exported so subclasses can name it: `import type { ContextStorage } from "@warlock.js/context"`.
+
+## `currentContextScope()`
+
+```ts
+function currentContextScope(): object;
+```
+
+An object that identifies the current scope's context stores. Two calls return the same object only when every context has the same store in both (the same request, the same `run()`); a `run()` or `enter()` of any context starts a new scope, and outside every context one shared object is returned. Code that collects work from several callers and runs it once groups the callers by this key, so the work never runs with another request's or tenant's stores. Cascade's batched `load()` / `find()` use it.
+
+```ts
+import { currentContextScope } from "@warlock.js/context";
+
+const queues = new Map<object, Job[]>();
+const scope = currentContextScope();
+queues.set(scope, [...(queues.get(scope) ?? []), job]);
+```
+
+---
+
 ## `ContextManager`
 
 Orchestrates multiple registered `Context` instances. The package exports a singleton `contextManager`; you can also instantiate `new ContextManager()` if you need a separate orchestrator.

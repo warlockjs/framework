@@ -179,6 +179,8 @@ with `sitemap.cacheControl`. Versioned generation URLs use immutable caching.
 sitemap URL when enabled and an origin exists. A hand-written
 `public/robots.txt` wins; maintain its Sitemap line yourself.
 
+In multi-site mode set `robots` on a site in `web.sites` (or on a `resolveHost` result) to give that host its own policy. It is merged over `web.robots` key by key (`groups` and `extra` are replaced whole); a site without it gets the global policy; a merged `enabled: false` answers 404; a site may enable robots while the global one is off. A non-indexable dynamic site still answers `Disallow: /`. `sitemap.gzip` stays `false` by default; with `http.compression` on, a served sitemap is compressed on the wire anyway.
+
 ## Example support files
 
 The sample data below makes the example runnable. Replace it with the app's persistence or domain service when integrating.

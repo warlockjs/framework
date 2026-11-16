@@ -100,6 +100,20 @@ class SqliteStore<TSnapshot extends { runId: string }> implements SqliteSnapshot
       .run(snapshot.runId, JSON.stringify(snapshot), new Date().toISOString());
   }
 
+  public async markPending(runId: string, pending: unknown): Promise<boolean> {
+    const database = await this.open();
+    const result = database
+      .prepare(
+        `UPDATE ${this.table} SET payload = json_set(payload, '$.pending', json(?)), updated_at = ? ` +
+          "WHERE run_id = ?",
+      )
+      .run(JSON.stringify(pending ?? null), new Date().toISOString(), runId) as
+      | { changes?: number | bigint }
+      | undefined;
+
+    return Number(result?.changes ?? 0) > 0;
+  }
+
   public async delete(runId: string): Promise<void> {
     const database = await this.open();
 

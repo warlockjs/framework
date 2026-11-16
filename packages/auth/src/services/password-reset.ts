@@ -3,6 +3,7 @@ import { log } from "@warlock.js/logger";
 import type { Auth } from "../models/auth.model";
 import { authConfig } from "./auth-config";
 import { authEvents } from "./auth-events";
+import { runInBackground } from "./background-work";
 import { authService } from "./auth.service";
 import { consumeOneTimeToken, issueOneTimeToken } from "./one-time-tokens";
 import { resolveTokenNotification } from "./token-notifications";
@@ -48,11 +49,13 @@ async function writePassword(user: Auth, plainPassword: string): Promise<void> {
  * **Anti-enumeration:** resolves `undefined` whether or not the account exists
  * — an unknown identifier simply sends nothing. Notification availability is
  * checked before the lookup, so a misconfigured app fails identically for both.
- * The notification is sent in the background: awaiting it (an SMTP round trip
- * for a known account, nothing for an unknown one) would let response timing
- * reveal which accounts exist. A send that fails is logged and emitted as
- * `password.resetDeliveryFailed`; set `auth.passwordReset.awaitDelivery: true`
- * to wait for it (and receive its error) instead.
+ * The account lookup, the token writes and the notification all run in the
+ * background: doing any of them before answering (a database write and an SMTP
+ * round trip for a known account, nothing for an unknown one) would let
+ * response timing reveal which accounts exist. A failure is logged and
+ * emitted as `password.resetDeliveryFailed`; set
+ * `auth.passwordReset.awaitDelivery: true` to wait for all of it (and receive
+ * its error) instead.
  *
  * @throws NotificationsUnavailableError when `@warlock.js/notifications` is not installed or not configured.
  *
@@ -68,37 +71,44 @@ export async function requestPasswordReset<T extends Auth>(
 
   if (typeof identifier !== "string" || identifier.length === 0) return;
 
-  const user = (await Model.first({
-    [authConfig.passwordReset.identifierField()]: identifier,
-  })) as T | null;
+  let user: T | null = null;
 
-  if (!user) return;
+  const issueAndDeliver = async (): Promise<void> => {
+    user = (await Model.first({
+      [authConfig.passwordReset.identifierField()]: identifier,
+    })) as T | null;
 
-  const { token, expiresAt } = await issueOneTimeToken(
-    user,
-    "password-reset",
-    authConfig.passwordReset.expiresInMs(),
-    true,
-  );
+    if (!user) return;
 
-  authEvents.emit("password.resetRequested", user, token);
+    const { token, expiresAt } = await issueOneTimeToken(
+      user,
+      "password-reset",
+      authConfig.passwordReset.expiresInMs(),
+      true,
+    );
 
-  const url = authConfig.passwordReset.url()?.(token, user);
+    authEvents.emit("password.resetRequested", user, token);
 
-  const delivery = Promise.resolve().then(() =>
-    notification.send(user, { token, expiresAt, ...(url ? { url } : {}) }),
-  );
+    const url = authConfig.passwordReset.url()?.(token, user);
+
+    await notification.send(user, { token, expiresAt, ...(url ? { url } : {}) });
+  };
 
   if (authConfig.passwordReset.awaitDelivery()) {
-    await delivery;
+    await issueAndDeliver();
 
     return;
   }
 
-  delivery.catch((error: unknown) => {
-    log.error("auth", "password-reset", error);
-    authEvents.emit("password.resetDeliveryFailed", user, error);
-  });
+  // The lookup, the token writes and the delivery all run after the response,
+  // so a known and an unknown account answer in the same time.
+  runInBackground(() =>
+    issueAndDeliver().catch((error: unknown) => {
+      log.error("auth", "password-reset", error);
+
+      if (user) authEvents.emit("password.resetDeliveryFailed", user, error);
+    }),
+  );
 }
 
 /**

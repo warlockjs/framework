@@ -169,6 +169,89 @@ describe("multipart total size", () => {
   });
 });
 
+describe("per-route file limits", () => {
+  afterEach(() => config.set("http.multipart", undefined));
+
+  it("refuses a file above uploads.maxFileSize and accepts one under it", async () => {
+    const server = await buildServer({ "/small": { maxFileSize: 100 } });
+
+    const tooBig = await post(
+      server,
+      "/small",
+      multipartBody([{ name: "file", filename: "a.bin", value: "x".repeat(500) }]),
+    );
+    const fine = await post(
+      server,
+      "/small",
+      multipartBody([{ name: "file", filename: "a.bin", value: "x".repeat(50) }]),
+    );
+
+    expect(tooBig.statusCode).toBe(413);
+    expect(tooBig.json().code).toBe("EC108");
+    expect(fine.statusCode).toBe(200);
+  });
+
+  it("refuses more files than uploads.maxFiles", async () => {
+    const server = await buildServer({ "/two": { maxFiles: 2 } });
+    const part = (name: string) => ({ name, filename: `${name}.bin`, value: "x" });
+
+    const three = await post(server, "/two", multipartBody([part("a"), part("b"), part("c")]));
+    const two = await post(server, "/two", multipartBody([part("a"), part("b")]));
+
+    expect(three.statusCode).toBe(413);
+    expect(three.json().code).toBe("EC108");
+    expect(two.statusCode).toBe(200);
+  });
+
+  it("leaves other routes on the global limits", async () => {
+    const server = await buildServer({ "/small": { maxFileSize: 100 } });
+
+    const response = await post(
+      server,
+      "/open",
+      multipartBody([{ name: "file", filename: "a.bin", value: "x".repeat(500) }]),
+    );
+
+    expect(response.statusCode).toBe(200);
+  });
+
+  it("applies the same limits to a route matched by the development dispatcher", async () => {
+    const server = Fastify();
+
+    registerMultipart(server as never);
+    server.addHook("onRequest", async (request) => {
+      (request as unknown as { matchedDevRoute: unknown }).matchedDevRoute = {
+        route: { uploads: { maxFileSize: 100, maxFiles: 1 } },
+      };
+    });
+    server.post("/dev", async () => ({ ok: true }));
+    await server.ready();
+
+    const tooBig = await post(
+      server as never,
+      "/dev",
+      multipartBody([{ name: "file", filename: "a.bin", value: "x".repeat(500) }]),
+    );
+    const tooMany = await post(
+      server as never,
+      "/dev",
+      multipartBody([
+        { name: "a", filename: "a.bin", value: "x" },
+        { name: "b", filename: "b.bin", value: "x" },
+      ]),
+    );
+    const fine = await post(
+      server as never,
+      "/dev",
+      multipartBody([{ name: "a", filename: "a.bin", value: "x" }]),
+    );
+
+    expect(tooBig.statusCode).toBe(413);
+    expect(tooMany.statusCode).toBe(413);
+    expect(fine.statusCode).toBe(200);
+  });
+});
+
 describe('http.multipart.routes: "declared"', () => {
   afterEach(() => config.set("http.multipart", undefined));
 

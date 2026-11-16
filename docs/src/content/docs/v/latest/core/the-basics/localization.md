@@ -32,51 +32,32 @@ Three things made that work: the request resolved a locale at construction, `t()
 
 ## Locale resolution precedence
 
-This is the part the recipe used to under-document. The `Request.locale` getter checks **three** sources, and the very first one is a header that is easy to miss.
+`Request.locale` checks five sources in a fixed order and uses the first one that holds a value.
 
 ```mermaid
 flowchart TD
-    A["translation-locale-code header"] -->|present| OUT["resolved locale"]
-    A -->|absent| B["locale header"]
-    B -->|absent| C["?locale query param"]
-    C -->|absent| D["app.localeCode config<br/>(falls back to 'en')"]
+    A["?locale query param"] -->|absent| B["warlock.locale-preference cookie<br/>(only if in app.localeCodes)"]
+    B -->|absent| C["locale header"]
+    C -->|absent| D["locale cookie"]
+    D -->|absent| E["app.localeCode config<br/>(falls back to 'en')"]
+    A -->|present| OUT["resolved locale"]
     B -->|present| OUT
     C -->|present| OUT
-    D --> OUT
+    D -->|present| OUT
+    E --> OUT
 ```
 
 In precedence order:
 
-| #   | Source                               | Example                       | Read by                                 |
-| --- | ------------------------------------ | ----------------------------- | --------------------------------------- |
-| 1   | **`translation-locale-code` header** | `translation-locale-code: ar` | `request.locale` getter (checked first) |
-| 2   | **`locale` header**                  | `locale: ar`                  | `request.localized` getter              |
-| 3   | **`?locale` query param**            | `?locale=ar`                  | `request.localized` getter              |
-| 4   | **`app.localeCode` config**          | defaults to `"en"`            | `request.getLocaleCode()`               |
+| #   | Source                                 | Example                                                                    |
+| --- | -------------------------------------- | -------------------------------------------------------------------------- |
+| 1   | **`?locale` query param**              | `?locale=ar`                                                               |
+| 2   | **`warlock.locale-preference` cookie** | set by the web package, ignored when its value is not in `app.localeCodes` |
+| 3   | **`locale` header**                    | `locale: ar`                                                               |
+| 4   | **`locale` cookie**                    | `Cookie: locale=ar`                                                        |
+| 5   | **`app.localeCode` config**            | defaults to `"en"`                                                         |
 
-The request resolves the locale like this:
-
-```ts title="How the request resolves locale"
-public get locale() {
-  if (this._locale) return this._locale;
-
-  return this.header("translation-locale-code") || this.localized;
-}
-
-public get localized() {
-  if (this._locale) return this._locale;
-
-  return (this._locale = this.header("locale") || this.query["locale"]);
-}
-
-public getLocaleCode(defaultLocaleCode: string = config.key("app.localeCode") || "en") {
-  return this.locale || defaultLocaleCode;
-}
-```
-
-So `translation-locale-code` wins over everything; `locale` (header or query) is the fallback; the configured default applies only when no source resolved a value. `request.setLocaleCode(code)` (or assigning `request.locale = code`) sets `_locale`, which short-circuits all of the above for the rest of the request.
-
-> The existing [Localized responses recipe](../recipes/localized-responses.md) lists only the `locale` header / `?locale` query / config default. That is the `request.localized` chain — it omits the higher-priority `translation-locale-code` header. When in doubt, this precedence table is authoritative.
+The explicit per-request `locale` header outranks the server-persisted `locale` cookie, so a client that keeps a cookie jar and also sends the header gets the header's locale. When `app.localeCodes` is declared, a value outside the list is treated as absent, so a forged locale falls back to the default. `request.setLocaleCode(code)` (or assigning `request.locale = code`) caches the locale and short-circuits all of the above for the rest of the request.
 
 ### The config key for the default locale
 
@@ -100,7 +81,7 @@ Both fields are declared on the `AppConfigurations` type as `localeCode?` and `l
 
 ## The translation registry
 
-`@warlock.js/core` re-exports `@mongez/localization` wholesale (`export * from "@mongez/localization"` in core's barrel), so `t`, `trans`, `groupedTranslations`, and `setCurrentLocaleCode` are all importable from `@warlock.js/core` **or** `@mongez/localization` — same functions either way.
+`@warlock.js/core` re-exports `@mongez/localization` wholesale (`export * from "@mongez/localization"` in core's barrel), so `t`, `trans`, `groupedTranslations`, and `setCurrentLocaleCode` are all importable from `@warlock.js/core` **or** `@mongez/localization` — same functions either way. `groupedTranslations`, `extend` and `setTranslationsList` move the translations revision wherever they are imported from, so web's cached page dictionaries notice the registration.
 
 ### Registering translations
 
@@ -226,6 +207,8 @@ t("products.insufficientQuantity", { available: 3 });
 
 Unmatched tokens stay as literals, which makes typos visible rather than silent.
 
+In the default colon form (`:name`), a placeholder name is letters, digits and underscores, so a hyphen ends it: `":minutes-min"` with `{ minutes: 5 }` renders `5-min`. When the object has a key with the hyphenated name (`{ "minutes-min": 5 }`), that key is used instead.
+
 ### Validation messages are localized for free
 
 Warlock wires seal's rule/attribute translation through this same registry. Rule messages resolve from `validation.<ruleName>` and attribute names from `attributes.<field>`, both via `t()` — so they come out in the request's locale automatically. See [Validation](./validation.md#locale-aware-error-messages) for the message keys.
@@ -280,7 +263,7 @@ export const ProductResource = defineResource({
 ```
 
 ```json
-// GET /products/1 with translation-locale-code: ar
+// GET /products/1 with the header  locale: ar
 {
   "product": {
     "id": "1",
@@ -291,7 +274,7 @@ export const ProductResource = defineResource({
 }
 ```
 
-How the locale is chosen: the resource reads `useRequestStore()?.request?.locale` — i.e. the same `request.locale` getter, so it honors the `translation-locale-code` header first, then the `locale` header/query. The matching `{ localeCode, value }` entry's `value` is returned. If the stored value is already a plain string (not an array), it passes through unchanged — the gradual-migration case. If no locale resolves, the first entry's value is used.
+How the locale is chosen: the resource reads `useRequestStore()?.request?.locale` — i.e. the same `request.locale` getter, so it follows the [precedence order](#locale-resolution-precedence). The matching `{ localeCode, value }` entry's `value` is returned. If the stored value is already a plain string (not an array), it passes through unchanged — the gradual-migration case. If no locale resolves, the first entry's value is used.
 
 There is also a builder form, `resource.localized(inputKey?)`, for resources that build fields imperatively rather than via the schema map. The string cast `"localized"` and the builder do the same transform.
 
@@ -333,7 +316,7 @@ In development, the first time a key's translation cannot be filled, a warning n
 
 ## Gotchas
 
-- **`translation-locale-code` beats the `locale` header and `?locale` query.** If a request sets both `translation-locale-code: en` and `locale: ar`, you get English. The recipe's three-source list omits this header — this page's [precedence table](#locale-resolution-precedence) is the authoritative order.
+- **The `locale` header beats the `locale` cookie; the query string beats both.** A request with `?locale=en` and `locale: ar` gets English. See the [precedence table](#locale-resolution-precedence) for the full order.
 - **Locale resolves once, lazily, and is then cached on `_locale`.** The first read of `request.locale`/`request.localized` memoizes the value. Calling `request.setLocaleCode("ar")` afterward changes `_locale`, but `t()` was already bound at construction — so for an already-bound `t()` to follow a mid-request change is not guaranteed. To translate in a specific locale mid-request, use `request.transFrom("ar", "key")` explicitly.
 - **The default-locale config key is `app.localeCode`, not `app.locale`.** The runtime reads `config.key("app.localeCode")`. `app.locales` (plural) is the separate allowed-list used to preload `dayjs` locale data — it is **not** the default.
 - **`t()` / `trans()` return the key itself when nothing matches.** `t("products.unknown")` returns `"products.unknown"` (or the fallback locale's value). Treat an unresolved key as a development bug, not a user-facing string.

@@ -55,6 +55,18 @@ cache.on("error", ({ key, error }) => {
 
 This is a deliberate design choice: SWR optimizes for "the user always gets a response." A failed refresh is observability work, not a user-facing error.
 
+## Serving the stale value when the refresh fails (`failSafe`)
+
+By default a caller in the stale window gets the stale value at once and the refresh runs in the background. With `failSafe: true` the caller waits for the refresh instead (callers of the same key share one), and when the callback throws the stale value is returned. The failure is logged and emitted as an `error` event, and the next stale-window read tries again:
+
+```ts
+const rates = await cache.swr("rates", { freshTtl: "1m", staleTtl: "1h", failSafe: true }, () =>
+  fetchRates(),
+);
+```
+
+Use it when an outage upstream must not turn into errors for your users. A miss past `staleTtl` still blocks and throws, because the entry is gone. `ttlJitter` is accepted here too and spreads both windows.
+
 ## When to choose SWR over `remember()`
 
 | Scenario                                                                               | Use          |

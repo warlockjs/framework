@@ -61,6 +61,8 @@ export class SqliteStore implements LocalStore {
         );
         CREATE INDEX IF NOT EXISTS warlock_queue_ready
           ON warlock_queue_jobs(namespace, queue, state, ready_at, lease_until);
+        CREATE INDEX IF NOT EXISTS warlock_queue_finished
+          ON warlock_queue_jobs(namespace, queue, state, ${FINISHED_AT});
       `);
     } catch (error) {
       this.db.close();
@@ -141,7 +143,7 @@ export class SqliteStore implements LocalStore {
   }
   /** One DELETE statement; the rows are never decoded in JavaScript. */
   public prune(queue: string, state: "completed" | "failed", keep: RetentionWindow): void {
-    const finishedAt = "COALESCE(json_extract(body, '$.finishedAt'), 0)";
+    const finishedAt = FINISHED_AT;
     const outside: string[] = [];
     const parameters: SqliteValue[] = [this.namespace, queue, state];
     if (keep.before !== undefined) {
@@ -164,6 +166,9 @@ export class SqliteStore implements LocalStore {
     this.db.close();
   }
 }
+
+/** Also the expression of the `warlock_queue_finished` index; the text must match for the index to be used. */
+const FINISHED_AT = "COALESCE(json_extract(body, '$.finishedAt'), 0)";
 
 function decode(row: Record<string, unknown> | undefined): LocalJob | undefined {
   return typeof row?.body === "string" ? (JSON.parse(row.body) as LocalJob) : undefined;

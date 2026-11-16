@@ -15,12 +15,14 @@ export type JSONFileLogConfig = FileLogConfig & {
    * - `"jsonl"` — one JSON object per line (JSON Lines) in a `.jsonl` file.
    *   Each write only appends, so its cost does not grow with the file.
    *
-   * @default "json"
+   * @default "json" (becomes `"jsonl"` in 6.0; set it explicitly to keep either)
    */
   format?: "json" | "jsonl";
 };
 
 type JsonLogDocument = { messages: unknown[] };
+
+let warnedAboutDefaultFormat = false;
 
 export class JSONFileLog extends FileLog implements LogContract {
   /**
@@ -30,6 +32,17 @@ export class JSONFileLog extends FileLog implements LogContract {
 
   public constructor(configurations?: JSONFileLogConfig) {
     super(configurations);
+
+    if (
+      (configurations as JSONFileLogConfig | undefined)?.format === undefined &&
+      !warnedAboutDefaultFormat &&
+      process.env.NODE_ENV !== "test"
+    ) {
+      warnedAboutDefaultFormat = true;
+      console.warn(
+        '[logger] JSONFileLog: `format` is not set, so entries are stored as one JSON document per file (rewritten on every write). The default becomes "jsonl" (append-only) in 6.0. Set `format: "json"` to keep the current layout or `format: "jsonl"` to switch now.',
+      );
+    }
   }
 
   /**

@@ -104,7 +104,7 @@ Re-running on an already-current project is a no-op: nothing resolves as newer, 
 ⚠ Could not reach the npm registry — no versions were changed. Check your connection and try again.
 ```
 
-If the install fails after the versions were rewritten, `package.json` keeps the new versions (re-run your package manager to finish) and the CLI exits non-zero.
+If the install fails after the versions were rewritten, `package.json` (and `package-lock.json`, when it was pruned) is put back as it was and the CLI exits non-zero; run `warlock update --no-install` and then your install to apply the versions anyway. With npm older than 11.6.2 the command refuses before changing anything and names the version it found.
 
 ## The dev-server update notice
 

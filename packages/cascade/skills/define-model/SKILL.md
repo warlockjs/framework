@@ -100,6 +100,8 @@ The everyday case. Service takes `Partial<UserSchema>` from a request body, merg
 
 **Safe against id-retargeting by design.** `model.merge(req.body); await model.save();` is the canonical update-my-profile shape — and `req.body` is attacker-controlled. On an already-persisted model, `merge()` drops identity columns (`id`, `_id`, the configured primary key) instead of applying them, so a body carrying `{ id: "<victim-id>", role: "admin" }` cannot redirect the write onto someone else's row: `update()`/`replace()`/`destroy()` build their filter from `model.trustedPrimaryKey` — the id captured when the instance became persisted (hydration, or right after an insert), never the current in-memory value. Identity columns are also excluded from the `$set`/`$unset` payload, so an explicit `.set("id", …)` on a loaded record doesn't rewrite the key of the row it's pinned to either. This only applies to an _existing_ record — `User.create({ id, ... })` with an explicit id is unchanged, since there's no row to retarget yet. If you deliberately need to change a primary key, do it through the atomic/raw APIs (see the `perform-atomic-ops` topic), not `merge()`.
 
+**Guarded columns.** `static guarded = ["role", "isAdmin"]` makes `merge()`, the object form of `set()`, `create()`, `createMany()`, `save({ merge })` and the data of `findOrCreate()` / `upsert()` skip those columns (and dot paths inside them); write them on purpose with `forceMerge(values)` / `Model.forceCreate(data)`. Single-column `set("role", v)` and `new User({...})` are not guarded. Outside production a skipped column logs a one-time warning, and merging an object marked with `markRawInput()` (`isRawInput(value)` tells) logs a reminder to use `request.validated()`.
+
 **Unknown and nested fields follow `static strictMode`.** On insert and update alike, a field the schema doesn't declare is dropped (`"strip"`, default), rejected (`"fail"`), or written (`"allow"`); this covers nested objects too (`merge({ permissions: { all: true } })` writes nothing under `"strip"`). A nested change is validated through its top-level field and only the changed leaves are written. A path segment `__proto__` / `constructor` / `prototype` in `set()` / `unset()`, or a `__proto__` key inside a `set()` / `merge()` value, throws before anything is written.
 
 ### `.save()` after manual mutation — when changes are spread
@@ -220,6 +222,7 @@ Mark a column the server alone sets with `.internal()` (`authorId: v.int().requi
 - Don't redeclare server-set fields on a request schema; mark them `.internal()` on the model schema and use `Model.requestSchema()`.
 - Don't `await user.save()` and forget the `await` — your changes live only on the instance and never reach the DB.
 - Don't `.merge()` an object column when the value is the complete new one: nested plain objects are deep-merged, so omitted keys stay stored. Use `.set({ column })` or `.set("column", value)` (`warlock check` warns with `WL9025`).
+- Don't `merge(request.all())` on a model with privileged columns (`role`, `isAdmin`) unless they are listed in `static guarded`; merge `request.validated()`.
 - Don't expect schema defaults to apply on `.merge()` — defaults fire on `.create()` only.
 
 ## See also

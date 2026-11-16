@@ -4,6 +4,12 @@ All notable changes to `@warlock.js/ai-bedrock` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.54.0 - 2026-11-16
+
+### Fixed
+
+- An `AbortError` is raised as a `ProviderAbortError` (category `cancelled`) instead of a plain `ProviderError`.
+
 ## 5.45.0 - 2026-11-05
 
 ### Added

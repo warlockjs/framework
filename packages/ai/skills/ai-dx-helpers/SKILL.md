@@ -105,9 +105,15 @@ const agent = ai.agent({ model }); // hand it anywhere a model goes
 // custom retry predicate or code list:
 ai.fallbackModel([primary, backup], { retryOn: ["PROVIDER_RATE_LIMIT", "PROVIDER_TIMEOUT"] });
 ai.fallbackModel([primary, backup], { retryOn: (error) => error instanceof ProviderError });
+
+// retryOn REPLACES the default set (both forms). To keep the default and add a reason:
+ai.fallbackModel([primary, backup], { alsoRetryOn: (error) => error instanceof MyQuotaError });
+ai.fallbackModel([primary, backup], {
+  retryOn: (error) => isDefaultFallbackRetryable(error) || error instanceof MyQuotaError,
+});
 ```
 
-Default retryable codes: `PROVIDER_RATE_LIMIT`, `PROVIDER_OVERLOADED`, `PROVIDER_TIMEOUT`, `PROVIDER_ERROR`. Auth / invalid-request / context-length / content-filter re-throw immediately (they'd fail identically downstream — retrying only burns budget). Identity/capabilities/pricing front the primary model. Usage aggregates across attempted models. Inspect `model.lastAttempts` for the failed models of the most recent call.
+Default retryable codes (exported as `DEFAULT_FALLBACK_RETRY_CODES`; `isDefaultFallbackRetryable(error)` tests them): `PROVIDER_RATE_LIMIT`, `PROVIDER_OVERLOADED`, `PROVIDER_TIMEOUT`, `PROVIDER_ERROR`. Auth / invalid-request / context-length / content-filter re-throw immediately (they'd fail identically downstream — retrying only burns budget). Identity/capabilities/pricing front the primary model. Usage aggregates across attempted models. A caller's own abort (aborted `signal`, abort error, `cancelled` category) never advances the chain. Inspect `model.lastAttempts` for the failed models of the most recent call.
 
 **Streaming caveat:** `stream()` can only fail over while no chunk has been emitted yet — once the first `delta` / `tool-call` reaches the consumer, a mid-stream failure propagates instead of restarting. It advances _instantly_ (no backoff) — pair with a backoff middleware if you want delay.
 

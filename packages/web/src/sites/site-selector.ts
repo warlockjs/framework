@@ -17,6 +17,12 @@ export type ResolveCacheOptions = {
   /** Seconds a result (including `null`) is reused. */
   ttl: number;
   /**
+   * Seconds a `null` result (an unknown host) is reused. Defaults to `ttl`.
+   * Set it lower so a host added at runtime starts resolving sooner; `0`
+   * never remembers an unknown host.
+   */
+  negativeTtl?: number;
+  /**
    * Most hosts remembered at once; the least recently used is dropped first.
    * Default 10,000.
    */
@@ -64,6 +70,14 @@ export function createSiteSelector({
     );
   }
 
+  const negativeTtl = resolveCache?.negativeTtl;
+
+  if (negativeTtl !== undefined && (!Number.isFinite(negativeTtl) || negativeTtl < 0)) {
+    throw new Error(
+      `web.resolveCache.negativeTtl must be zero or a positive number of seconds, received ${JSON.stringify(negativeTtl)}.`,
+    );
+  }
+
   const remember = (host: string, entry: CacheEntry): void => {
     if (cache.size >= maxEntries) {
       const current = now();
@@ -104,7 +118,10 @@ export function createSiteSelector({
     const value = await resolveHost({ host, request });
 
     if (resolveCache) {
-      remember(host, { value, expiresAt: now() + resolveCache.ttl * 1000 });
+      const ttl =
+        value === null ? (resolveCache.negativeTtl ?? resolveCache.ttl) : resolveCache.ttl;
+
+      if (ttl > 0) remember(host, { value, expiresAt: now() + ttl * 1000 });
     }
 
     return value;

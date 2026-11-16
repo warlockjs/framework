@@ -26,6 +26,11 @@ const databaseConfigurations: ConnectionOptions<never, PostgresPoolConfig> = {
     // required here too even though it duplicates the top-level value above.
     database: databaseName,
 
+    // Stop any statement that runs longer than 30 seconds (milliseconds), so one
+    // runaway query cannot hold a pooled connection forever. `query_timeout`
+    // is the client-side equivalent.
+    statement_timeout: 30_000,
+
     // Native `pg` pool options — tune these for your workload.
     // max: 10,
     // min: 0,

@@ -7,7 +7,7 @@ const LIST_ORIGINS =
   "List the browser origins allowed to call the API in http.cors.origin (new apps read them from CORS_ORIGINS)";
 
 function warn(detail: string): CheckResult {
-  return { name: "cors", status: "warn", detail };
+  return { name: "cors", status: "warn", code: "WL1012", detail };
 }
 
 function ok(detail: string): CheckResult {

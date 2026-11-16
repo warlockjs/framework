@@ -2,7 +2,9 @@ import {
   AIError,
   ContextLengthExceededError,
   InvalidRequestError,
+  ProviderAbortError,
   ProviderAuthError,
+  QuotaExceededError,
   ProviderError,
   ProviderRateLimitError,
   ProviderTimeoutError,
@@ -41,6 +43,23 @@ describe("wrapGoogleError", () => {
     expect(wrapGoogleError(googleError(429))).toBeInstanceOf(ProviderRateLimitError);
     expect(
       wrapGoogleError(googleError(undefined, "RESOURCE_EXHAUSTED: quota exceeded")),
+    ).toBeInstanceOf(ProviderRateLimitError);
+  });
+
+  it("maps spent billing quota to QuotaExceededError, not a rate limit", () => {
+    const spent = wrapGoogleError(
+      googleError(
+        429,
+        "You exceeded your current quota, please check your plan and billing details.",
+      ),
+    );
+
+    expect(spent).toBeInstanceOf(QuotaExceededError);
+    expect(spent.category).toBe("quota");
+    expect(
+      wrapGoogleError(
+        googleError(429, "Quota exceeded for metric: requests per minute, retry in 12s"),
+      ),
     ).toBeInstanceOf(ProviderRateLimitError);
   });
 
@@ -94,10 +113,26 @@ describe("wrapGoogleError", () => {
     );
   });
 
-  it("maps an AbortError name to ProviderTimeoutError", () => {
-    expect(
-      wrapGoogleError({ name: "AbortError", message: "The operation was aborted" }),
-    ).toBeInstanceOf(ProviderTimeoutError);
+  it("maps an AbortError of an aborted caller signal to a cancelled ProviderAbortError", () => {
+    const controller = new AbortController();
+    controller.abort();
+
+    const wrapped = wrapGoogleError(
+      { name: "AbortError", message: "The operation was aborted" },
+      { signal: controller.signal },
+    );
+
+    expect(wrapped).toBeInstanceOf(ProviderAbortError);
+    expect(wrapped.category).toBe("cancelled");
+  });
+
+  it("maps any other AbortError (the SDK's httpOptions.timeout) to ProviderTimeoutError", () => {
+    const abort = { name: "AbortError", message: "The operation was aborted" };
+
+    expect(wrapGoogleError(abort)).toBeInstanceOf(ProviderTimeoutError);
+    expect(wrapGoogleError(abort, { signal: new AbortController().signal })).toBeInstanceOf(
+      ProviderTimeoutError,
+    );
   });
 
   it("maps an ECONNABORTED code to ProviderTimeoutError", () => {
@@ -106,11 +141,17 @@ describe("wrapGoogleError", () => {
     ).toBeInstanceOf(ProviderTimeoutError);
   });
 
-  it("classifies timeout ahead of an accompanying 503 server status", () => {
-    // isTimeout() is checked before the status ladder; the AbortError name wins.
+  it("classifies an abort ahead of an accompanying 503 server status", () => {
+    // The abort check runs before the status ladder; the AbortError name wins.
+    const controller = new AbortController();
+    controller.abort();
+
     expect(
-      wrapGoogleError({ name: "AbortError", status: 503, message: "aborted mid-flight" }),
-    ).toBeInstanceOf(ProviderTimeoutError);
+      wrapGoogleError(
+        { name: "AbortError", status: 503, message: "aborted mid-flight" },
+        { signal: controller.signal },
+      ),
+    ).toBeInstanceOf(ProviderAbortError);
   });
 
   it("maps 500 / 503 to plain ProviderError", () => {

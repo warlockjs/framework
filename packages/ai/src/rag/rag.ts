@@ -1,3 +1,4 @@
+import type { CacheDriver } from "@warlock.js/cache";
 import { resolveDefaultStore } from "../config";
 import { EmbeddingVectorCountMismatchError } from "../errors";
 import { chunk as chunkText } from "./chunk/chunk";
@@ -6,7 +7,7 @@ import type { RetrieveOptions, RetrieveResult } from "./contracts/citation.type"
 import type { Rag, RagAsToolOptions, RagConfig } from "./contracts/rag-config.type";
 import type { RagDocument } from "./contracts/rag-document.type";
 import { ragAsTool } from "./as-tool";
-import { retrieve as runRetrieve, type StoredChunk } from "./retrieve";
+import { belongsTo, retrieve as runRetrieve, type StoredChunk } from "./retrieve";
 import { cacheVectorStore } from "./store/cache-vector-store";
 import type { VectorStore } from "./store/vector-store.contract";
 
@@ -65,11 +66,11 @@ export function rag(config: RagConfig): Rag {
 
   if (!driver) {
     throw new Error(
-      `rag("${name}"): no store — pass \`store\` (a vector-capable @warlock.js/cache CacheDriver) or call \`ai.config({ defaultStore })\` at app boot before constructing the rag`,
+      `rag("${name}"): no store — pass \`store\` (a vector-capable @warlock.js/cache CacheDriver or a VectorStore such as ai.rag.pgVectorStore()) or call \`ai.config({ defaultStore })\` at app boot before constructing the rag`,
     );
   }
 
-  const store: VectorStore = cacheVectorStore(driver);
+  const store: VectorStore = isVectorStore(driver) ? driver : cacheVectorStore(driver);
   const namespace = config.namespace ?? `${DEFAULT_NAMESPACE_PREFIX}.${name}`;
   const embedder = config.embedder;
 
@@ -197,7 +198,36 @@ export function rag(config: RagConfig): Rag {
     },
 
     async clear(): Promise<void> {
-      await store.removeNamespace(namespace);
+      // Deleting by key prefix would also reach a nested namespace
+      // (`kb.acme` → `kb.acme.private`), so delete only this namespace's own chunks.
+      if (!store.remove) {
+        await store.removeNamespace(namespace);
+
+        return;
+      }
+
+      // A store that lists its keys gives the exact chunks to drop in one pass.
+      if (store.list) {
+        const entries = await store.list<StoredChunk>(namespace);
+
+        await Promise.all(
+          entries
+            .filter((entry) => belongsTo(entry, namespace))
+            .map((entry) => store.remove!(entry.key)),
+        );
+
+        return;
+      }
+
+      await clearOwnChunks(store, namespace, async () => {
+        const probe = indexedDimensions
+          ? new Array<number>(indexedDimensions)
+              .fill(0)
+              .map((_, position) => (position === 0 ? 1 : 0))
+          : (await embedder.embed(namespace)).vector;
+
+        return probe;
+      });
     },
 
     asTool(options?: RagAsToolOptions) {
@@ -210,6 +240,58 @@ export function rag(config: RagConfig): Rag {
   };
 
   return instance;
+}
+
+/**
+ * Whether `store` is already a {@link VectorStore} (it has `upsert` and
+ * `query`) rather than a cache driver (which has `set` and `similar`).
+ */
+function isVectorStore(store: CacheDriver<any, any> | VectorStore): store is VectorStore {
+  const candidate = store as Partial<VectorStore> & { similar?: unknown };
+
+  return (
+    typeof candidate.upsert === "function" &&
+    typeof candidate.query === "function" &&
+    typeof candidate.similar !== "function"
+  );
+}
+
+/** Chunks requested per sweep while clearing a namespace. */
+const CLEAR_PAGE = 200;
+/** Largest page a clearing sweep widens to on a crowded store. */
+const CLEAR_MAX_PAGE = 5_000;
+
+/**
+ * Delete the chunks that belong to exactly `namespace` (not a nested one).
+ * Fallback for a store with no key listing: the chunks are found with similarity
+ * queries (no score floor), removed, and the sweep repeats until a query
+ * returns none of them; a page that returned nothing of ours while full is
+ * widened up to {@link CLEAR_MAX_PAGE}.
+ */
+async function clearOwnChunks(
+  store: VectorStore,
+  namespace: string,
+  probe: () => Promise<number[]>,
+): Promise<void> {
+  const vector = await probe();
+  let pageSize = CLEAR_PAGE;
+
+  for (;;) {
+    const hits = await store.query<StoredChunk>(vector, { topK: pageSize, threshold: -1 });
+    const owned = hits.filter((hit) => belongsTo(hit, namespace));
+
+    if (owned.length > 0) {
+      await Promise.all(owned.map((hit) => store.remove!(hit.key)));
+
+      continue;
+    }
+
+    if (hits.length < pageSize || pageSize >= CLEAR_MAX_PAGE) {
+      return;
+    }
+
+    pageSize = Math.min(pageSize * 4, CLEAR_MAX_PAGE);
+  }
 }
 
 /**

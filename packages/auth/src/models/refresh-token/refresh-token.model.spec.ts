@@ -204,18 +204,31 @@ describe("RefreshToken statics", () => {
     expect(query.whereIn).toHaveBeenCalledTimes(3);
   });
 
-  it("revokeAllFor fetches active rows, revokes each, and returns them", async () => {
+  it("revokeAllFor fetches active rows, revokes them with one update, and returns them", async () => {
     const rows = [{ revoke: vi.fn() }, { revoke: vi.fn() }];
     const query = buildQueryStub(rows);
     modelQuery.mockReturnValue(query);
+    modelAtomic.mockClear();
 
     const result = await RefreshToken.revokeAllFor(user);
 
     expect(query.where).toHaveBeenCalledWith({ user_id: 7, user_type: "user", revoked_at: null });
-    expect(rows[0].revoke).toHaveBeenCalledOnce();
-    expect(rows[1].revoke).toHaveBeenCalledOnce();
+    expect(modelAtomic).toHaveBeenCalledOnce();
+    expect(modelAtomic).toHaveBeenCalledWith(
+      { user_id: 7, user_type: "user", revoked_at: null },
+      { $set: { revoked_at: expect.any(Date) } },
+    );
+    expect(rows[0].revoke).not.toHaveBeenCalled();
     // the revoked rows are returned so the service can emit a per-token event
     expect(result).toBe(rows);
+  });
+
+  it("revokeAllFor writes nothing when no row is active", async () => {
+    modelQuery.mockReturnValue(buildQueryStub([]));
+    modelAtomic.mockClear();
+
+    expect(await RefreshToken.revokeAllFor(user)).toEqual([]);
+    expect(modelAtomic).not.toHaveBeenCalled();
   });
 
   it("revokeFamily fetches active rows in the family, revokes each, and returns them", async () => {

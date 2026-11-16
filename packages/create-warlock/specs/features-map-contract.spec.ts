@@ -58,6 +58,13 @@ describe("features array shape", () => {
     expect(featureKeys).toContain("auth-passkeys");
     expect(featureKeys).toContain("queue");
   });
+
+  it("offers process supervision, which core's add map installs", () => {
+    const process = features.find((feature) => feature.key === "process");
+
+    expect(process?.group).toBe("Tooling");
+    expect(process?.defaultSelected).toBeUndefined();
+  });
 });
 
 describe("aiProviders + aiPackages array shape", () => {

@@ -336,6 +336,42 @@ webConnector({ build: { previousBuild: "../releases/current/dist" } });
 Delete the record (or drop the option) when you intentionally stop serving the
 previous build's assets.
 
+## What the inline payload carries
+
+The `#__WARLOCK_DATA__` script holds the page's data, shared state, translations
+and the document's `lang`, `dir` and nonce. It leaves out what the document
+already spells in its own elements: stylesheet links, font and module preloads,
+`hreflang` alternates, the hydration entry script and its site key. `<Head/>`
+and `<Scripts/>` mark those elements with a `data-wl` attribute, and the browser
+reads them back before it hydrates, so the hydrated tree renders the same
+markup. Elements your own root renders never carry the attribute and are never
+read back. Each document is smaller by the size of those lists, which grows with the
+number of stylesheets, preloads and locales.
+
+## Early Hints — `web.earlyHints`
+
+A page document normally tells the browser about its hydration entry and
+stylesheets only when the shell arrives, after the loaders have run. Set
+`web.earlyHints` to `true` and the server first sends a `103 Early Hints`
+response with `Link` headers for the entry and its module preloads
+(`rel=modulepreload`) and the page's stylesheets (`rel=preload; as=style`), so
+the browser starts fetching them while the loaders still run.
+
+```ts title="src/config/web.ts"
+export default {
+  earlyHints: true,
+};
+```
+
+It is off by default. Only document requests send hints, never client
+navigations, and a connection that cannot carry an interim response (an
+HTTP/1.0 client, a runtime without `writeEarlyHints`) simply gets none. Browsers
+act on a 103 over HTTP/2 and HTTP/3, and over HTTP/1.1 in current Chromium
+browsers. Check that your proxy passes 103 responses through: nginx and several
+CDNs drop them or need a setting for it, and a proxy that drops them costs
+nothing beyond the missed head start. Stylesheets chosen per request with
+`linkStylesheetsFor()` are not known that early and are not included.
+
 ## What runs per request
 
 In production, the work that depends only on the build is done once:
