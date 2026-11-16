@@ -11,6 +11,7 @@ import {
   isWorkerFile,
 } from "../../dev-server/special-file-patterns";
 import { forEachChild } from "../syntax/ast";
+import { createDocLookup, readFileHeader } from "./file-comments";
 import type { InspectFile, InspectWarning } from "./inspect-report.types";
 
 const CODE = /\.(?:[cm]?[jt]s|[jt]sx)$/;
@@ -40,6 +41,10 @@ export function fileRole(file: string): string {
   if (isWorkerFile(file)) return "worker";
   if (isEventFile(file)) return "event";
   if (isLocaleFile(file)) return "locale";
+  // A file named for one of these says what it is, whatever folder holds it.
+  for (const role of ["use-case", "seed", "request", "mail", "job", "event", "client"]) {
+    if (stem.endsWith(`.${role}`)) return role;
+  }
   for (const role of ["routes", "page", "setup", "layout", "root"]) {
     if (stem === role || stem.endsWith(`.${role}`)) return role;
   }
@@ -48,6 +53,13 @@ export function fileRole(file: string): string {
     "service",
     "repository",
     "model",
+    "use-case",
+    "seed",
+    "request",
+    "mail",
+    "job",
+    "event",
+    "client",
     "migration",
     "schema",
     "resource",
@@ -68,6 +80,14 @@ export function fileRole(file: string): string {
   if (/^use[A-Z]/.test(stem)) return "hook";
   if (/\.tsx$|\.jsx$/.test(file)) return "component";
   return "source";
+}
+
+function countLines(source: string): number {
+  if (source === "") return 0;
+  let count = 1;
+  for (let index = source.indexOf("\n"); index !== -1; index = source.indexOf("\n", index + 1))
+    if (index < source.length - 1) count++;
+  return count;
 }
 
 function bindingNames(node: Node): string[] {
@@ -134,34 +154,51 @@ export function collectFiles(cwd: string, warnings: InspectWarning[] = []): Insp
     };
     if (!CODE.test(file)) return record;
     try {
-      const parsed = parseSync(absolute, readFileSync(absolute, "utf8"));
+      const source = readFileSync(absolute, "utf8");
+      const parsed = parseSync(absolute, source);
+      record.lines = countLines(source);
       for (const error of parsed.errors)
         warnings.push({ code: null, source: file, message: error.message });
       const exports = new Set<string>();
       const imports = new Set<string>();
-      for (const statement of parsed.program.body) {
-        if (statement.type === "ExportDefaultDeclaration") exports.add("default");
+      const exportDocs: Record<string, string> = {};
+      const docAbove = createDocLookup(source, parsed.comments);
+      const body = parsed.program.body;
+      const header = readFileHeader(source, parsed.comments, body[0]?.start ?? source.length);
+      record.about = header.about;
+      record.tags = header.tags;
+      for (const statement of body) {
+        const names: string[] = [];
+        const add = (name: string): void => {
+          exports.add(name);
+          names.push(name);
+        };
+        if (statement.type === "ExportDefaultDeclaration") add("default");
         if (statement.type === "ExportAllDeclaration")
-          exports.add(
+          add(
             statement.exported
               ? statement.exported.type === "Identifier"
                 ? statement.exported.name
                 : String(statement.exported.value)
               : "*",
           );
-        if (statement.type !== "ExportNamedDeclaration") continue;
-        for (const specifier of statement.specifiers)
-          exports.add(
-            specifier.exported.type === "Identifier"
-              ? specifier.exported.name
-              : String(specifier.exported.value),
-          );
-        const declaration = statement.declaration;
-        if (declaration?.type === "VariableDeclaration") {
-          for (const item of declaration.declarations)
-            for (const name of bindingNames(item.id)) exports.add(name);
-        } else if (declaration && "id" in declaration && declaration.id?.type === "Identifier")
-          exports.add(declaration.id.name);
+        if (statement.type === "ExportNamedDeclaration") {
+          for (const specifier of statement.specifiers)
+            add(
+              specifier.exported.type === "Identifier"
+                ? specifier.exported.name
+                : String(specifier.exported.value),
+            );
+          const declaration = statement.declaration;
+          if (declaration?.type === "VariableDeclaration") {
+            for (const item of declaration.declarations)
+              for (const name of bindingNames(item.id)) add(name);
+          } else if (declaration && "id" in declaration && declaration.id?.type === "Identifier")
+            add(declaration.id.name);
+        }
+        if (names.length === 0) continue;
+        const doc = docAbove(statement.start);
+        if (doc.text && !doc.fileoverview) for (const name of names) exportDocs[name] ??= doc.text;
       }
       const visit = (node: Node): void => {
         if (
@@ -188,6 +225,7 @@ export function collectFiles(cwd: string, warnings: InspectWarning[] = []): Insp
       };
       visit(parsed.program);
       record.exports = [...exports].sort();
+      record.exportDocs = exportDocs;
       record.imports = [...imports].sort().map((specifier) => {
         const bases = specifier.startsWith(".")
           ? [path.resolve(path.dirname(absolute), specifier)]

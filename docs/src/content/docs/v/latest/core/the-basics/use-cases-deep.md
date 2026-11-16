@@ -641,7 +641,7 @@ All `HttpError` subclasses map to the right status code automatically. You only 
 
 A realistic "place an order" use-case. Auth check, schema validation, address normalization, tax calculation, the actual order creation, then two fire-and-forget side effects:
 
-```ts title="src/app/orders/use-cases/place-order.usecase.ts"
+```ts title="src/app/orders/use-cases/place-order.use-case.ts"
 import { ForbiddenError, useCase } from "@warlock.js/core";
 import { v } from "@warlock.js/seal";
 import { type User } from "app/users/models/user";
@@ -763,7 +763,7 @@ And the controller:
 
 ```ts title="src/app/orders/controllers/place-order.controller.ts"
 import type { RequestHandler } from "@warlock.js/core";
-import { placeOrderUseCase } from "../use-cases/place-order.usecase";
+import { placeOrderUseCase } from "../use-cases/place-order.use-case";
 
 export const placeOrderController: RequestHandler = async ({ request, response }) => {
   const result = await placeOrderUseCase(request.validated(), {

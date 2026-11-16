@@ -2,7 +2,12 @@ import type { RequestLogFilter, RequestLogRecord, RequestLogSummary } from "@war
 import type { DevtoolsAgentTraceSource } from "../sources/agent-trace-source";
 import type { DevtoolsAiSource } from "../sources/ai-source";
 import type { ProcessPanel } from "../process-panel";
-import type { DevtoolsCollector, DevtoolsQuery, ResolvedDevtoolsOptions } from "../types";
+import type {
+  DevtoolsCollector,
+  DevtoolsPanel,
+  DevtoolsQuery,
+  ResolvedDevtoolsOptions,
+} from "../types";
 
 /**
  * One row of the route map, matching what `warlock routes --json` reads from
@@ -35,7 +40,10 @@ export type DevtoolsRequestLogSource = {
  * and the optional EXPLAIN, route-listing, OpenAPI and Postman hooks.
  */
 export type MountDevtoolsRoutesDeps = {
+  /** The app's process list behind the built-in Processes panel. */
   processPanel?: ProcessPanel;
+  /** Panels mounted after the built-in ones; an invalid panel or a reused id throws. */
+  panels?: readonly DevtoolsPanel[];
   collector: DevtoolsCollector;
   /** Optional Panoptic feed, attached only in development. */
   ai?: DevtoolsAiSource;

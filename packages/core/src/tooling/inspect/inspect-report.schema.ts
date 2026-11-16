@@ -47,6 +47,8 @@ const route = {
     name: nullableString,
     sourceFile: nullableString,
     handler: { type: "string" },
+    controller: nullableString,
+    action: nullableString,
     description: nullableString,
     isPage: { type: "boolean" },
     middleware: stringArray,
@@ -245,7 +247,7 @@ const event = {
 
 const page = {
   type: "object",
-  required: ["path", "name", "file", "layouts", "loaders", "actions", "guard"],
+  required: ["path", "name", "file", "layouts", "loaders", "actions", "guard", "setupFile", "site"],
   properties: {
     path: { type: "string" },
     name: nullableString,
@@ -254,6 +256,8 @@ const page = {
     loaders: stringArray,
     actions: stringArray,
     guard: nullableString,
+    setupFile: nullableString,
+    site: nullableString,
   },
 };
 
@@ -368,6 +372,10 @@ export const INSPECT_REPORT_JSON_SCHEMA: Record<string, unknown> = {
           role: { type: "string" },
           exports: stringArray,
           importedBy: stringArray,
+          lines: { type: "integer", minimum: 0 },
+          about: nullableString,
+          tags: { type: "object", additionalProperties: stringArray },
+          exportDocs: { type: "object", additionalProperties: { type: "string" } },
           imports: {
             type: "array",
             items: {

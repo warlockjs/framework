@@ -24,5 +24,6 @@ export function resolveDevtoolsOptions(options: DevtoolsOptions = {}): ResolvedD
     nPlusOneThreshold,
     allowedHosts: options.allowedHosts ?? [],
     allowProxied: options.allowProxied ?? false,
+    panels: options.panels ?? [],
   };
 }

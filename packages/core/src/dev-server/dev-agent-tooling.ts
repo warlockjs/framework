@@ -36,7 +36,8 @@ function errorMessage(error: unknown): string {
  * - keeps the generated section of `AGENTS.md` fresh (unless
  *   `devServer.agentsMd: false`), on boot and after each reload, debounced;
  * - with `--mcp` / `devServer.mcp`, serves `warlock mcp` over HTTP on
- *   loopback from this process, so `inspect_*` reads the live registries.
+ *   loopback from this process, so `inspect_*` reads the live registries,
+ *   with the tools `warlock.config.ts` registers next to the built-in ones.
  *
  * The tooling modules are imported lazily: they pull in the TypeScript
  * compiler and the generators, which a dev boot without them never needs.
@@ -140,13 +141,19 @@ export class DevAgentTooling {
     serverUrl?: string,
   ): Promise<void> {
     try {
-      const [{ createMcpContext }, { startWarlockMcpServer }, { inspectApp }, { featuresMap }] =
-        await Promise.all([
-          import("../tooling/mcp/create-mcp-context"),
-          import("../tooling/mcp/start-mcp-server"),
-          import("../tooling/inspect/inspect-app"),
-          import("../generations/features"),
-        ]);
+      const [
+        { createMcpContext },
+        { startWarlockMcpServer },
+        { inspectApp },
+        { featuresMap },
+        { configuredMcpTools },
+      ] = await Promise.all([
+        import("../tooling/mcp/create-mcp-context"),
+        import("../tooling/mcp/start-mcp-server"),
+        import("../tooling/inspect/inspect-app"),
+        import("../generations/features"),
+        import("../tooling/mcp/configured-mcp-tools"),
+      ]);
       const context = createMcpContext({
         cwd: this.cwd,
         allowWrites: options.allowWrites,
@@ -158,6 +165,7 @@ export class DevAgentTooling {
 
       this.mcp = await startWarlockMcpServer({
         context,
+        tools: await configuredMcpTools(),
         transport: {
           type: "http",
           host: "127.0.0.1",

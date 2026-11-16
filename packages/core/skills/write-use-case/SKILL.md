@@ -9,7 +9,7 @@ A use case is a named, observable, transport-agnostic unit of business logic. Th
 
 ## The shape
 
-```ts title="src/app/orders/use-cases/place-order.usecase.ts"
+```ts title="src/app/orders/use-cases/place-order.use-case.ts"
 import { useCase } from "@warlock.js/core";
 import { v } from "@warlock.js/seal";
 import { placeOrderService } from "../services/place-order.service";

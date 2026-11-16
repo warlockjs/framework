@@ -496,6 +496,13 @@ export type Route = RouteOptions & {
    */
   handler: RequestHandler;
   /**
+   * Set when the route was registered as a `[controller, "action"]` tuple:
+   * the controller's class name (`null` for a plain object) and the action name.
+   * The handler itself is a bound function, so this is the only place they survive.
+   */
+  $controller?: string | null;
+  $action?: string;
+  /**
    * Path prefix
    * Kindly note the prefix is auto added by the router and it should be added to the path itself
    * this will be used for generating the documentation

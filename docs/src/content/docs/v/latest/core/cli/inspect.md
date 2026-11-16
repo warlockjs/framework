@@ -30,7 +30,7 @@ Except for `--section files`, which reads source without booting, it boots exact
 | `resources` | Every resource reached from a route response or a model, with its output shape as JSON Schema and the models that use it.                                                                                               |
 | `config`    | Every loaded config key as a dotted path with its **type** — never its value — and the `src/config/*` file it came from.                                                                                                |
 | `events`    | Listeners app modules registered on `@mongez/events` while loading (`events/`, `main.ts`, `routes.ts`, models), grouped by event, with the file that registered each.                                                   |
-| `pages`     | Pages `@warlock.js/web` installed: path, name, page file, layout chain (outermost first), which files on the chain export a `loader`, actions, guard. Empty without the web package.                                    |
+| `pages`     | Pages from the `@warlock.js/web` page graph (the one the build uses): route path and name, page file, setup file, site (multi-site apps), layout chain (outermost first), which files on the chain export a `loader`, actions, guard. Empty without the web package. |
 | `jobs`      | Jobs defined with `defineJob()` from `@warlock.js/queue`: name, queue, attempts, backoff, retention. Empty without the queue package.                                                                                   |
 | `schedules` | Tasks on the `@warlock.js/scheduler` scheduler: name, cron expression, intervals, next run. Empty without the scheduler.                                                                                                |
 | `files`     | Source files with module, convention role, exports and resolved imports/importedBy; no app boot for files-only requests.                                                                                                |
@@ -46,6 +46,8 @@ Except for `--section files`, which reads source without booting, it boots exact
   "name": "posts.update",
   "sourceFile": "src/app/posts/routes.ts",
   "handler": "updatePostController",
+  "controller": null,
+  "action": null,
   "description": null,
   "isPage": false,
   "middleware": ["authMiddleware", "auditTrail"],
@@ -255,7 +257,9 @@ npx warlock explain src/web/components/Post.tsx --json
 npx warlock explain WL3001 --json
 ```
 
-The `files` section reads every file under `src/`, without importing app modules or booting connectors. Each entry has `file`, `module`, `role`, `exports`, `imports` and `importedBy`. Paths are relative to the project root. Modules use `src/app/<module>` or the containing top-level `src` directory. Roles follow file names and directories: controller, service, repository, model, migration, schema, resource, routes, page, setup, layout, root, hook, component, util, type, config and spec; unmatched files use `source`. Non-code assets have empty exports and imports.
+The `files` section reads every file under `src/`, without importing app modules or booting connectors. Each entry has `file`, `module`, `role`, `exports`, `imports` and `importedBy`, and for code files `lines` (line count), `about` (first sentence of the comment block at the top of the file, before any import, or `null`), `tags` (the `@tag value` lines of that comment, such as `@feature checkout`, as arrays keyed by tag name) and `exportDocs` (first sentence of the doc comment above each export that has one). Paths are relative to the project root. Modules use `src/app/<module>` or the containing top-level `src` directory. Roles follow file names and directories: controller, service, repository, model, use-case, seed, request, mail, job, event, client, migration, schema, resource, routes, page, setup, layout, root, hook, component, util, type, config and spec (a `*.use-case.ts`, `*.seed.ts`, `*.request.ts`, `*.mail.ts`, `*.job.ts`, `*.event.ts` or `*.client.ts(x)` file gets that role in any folder; a file in `use-cases/`, `seeds/`, `requests/`, `mails/`, `jobs/` or `clients/` gets it too); unmatched files use `source`. Non-code assets have empty exports and imports and no `lines`. These fields were added in 5.55.0 without a new `schemaVersion`; a report from an older version lacks them.
+
+A route registered as `[controller, "action"]` carries `controller` (the class name, `null` for a plain object) and `action`; both are `null` for a function handler. `collectFiles(cwd)` and `fileRole(file)` are exported from `@warlock.js/core/tooling` for tools that need the file list without a full report.
 
 Each code file is parsed once with OXC per inspection. Export names include types, aliases, destructured bindings, `default` and `*` for star re-exports; star exports are recorded rather than expanded. Imports include type imports, side effects, re-exports and literal dynamic imports. Each import is `{ specifier, file }`: `file` is the resolved local path, or `null` for external/unresolved imports. Resolution follows inherited tsconfig path aliases, fallback targets, baseUrl, extensionless files and directory indexes within `src/`. Computed dynamic imports and CommonJS `require()` calls are not graph edges. Parse/config failures appear in `warnings`.
 

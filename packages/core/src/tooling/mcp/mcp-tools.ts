@@ -68,7 +68,11 @@ export type WarlockMcpTool = {
   name: string;
   description: string;
   input: McpInputSchema;
-  /** Whether a call can change project files. Only exposed with `allowWrites`. */
+  /**
+   * Whether a call changes project files. A registered tool with `writes: true`
+   * is listed on a read-only server but every call is refused (WL7005) unless
+   * the server runs with `--allow-writes`.
+   */
   writes: boolean;
   /** A check run before validation; return a message to refuse the call. */
   precheck?: (input: Record<string, unknown>) => string | null;

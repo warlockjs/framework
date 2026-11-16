@@ -238,6 +238,51 @@ describe("inspectApp", () => {
     });
   });
 
+  it("keeps the controller class and action of a tuple route, and null for a plain handler", async () => {
+    const report = await inspectApp({
+      cwd: root,
+      sections: ["routes"],
+      routes: [
+        route({
+          method: "GET",
+          path: "/posts",
+          handler: listPosts,
+          $controller: "PostsController",
+          $action: "list",
+        }),
+        route({ method: "GET", path: "/plain", handler: listPosts }),
+      ],
+    });
+    expect(report.routes?.find((entry) => entry.path === "/posts")).toMatchObject({
+      controller: "PostsController",
+      action: "list",
+    });
+    expect(report.routes?.find((entry) => entry.path === "/plain")).toMatchObject({
+      controller: null,
+      action: null,
+    });
+  });
+
+  it("reports line counts, header text, tags and export docs in the files section and keeps schema version 1", async () => {
+    mkdirSync(path.join(root, "src", "app", "posts", "use-cases"), { recursive: true });
+    writeFileSync(
+      path.join(root, "src", "app", "posts", "use-cases", "publish.use-case.ts"),
+      "/**\n * Publishes a post.\n *\n * @feature publishing\n */\nimport { x } from './x';\n\n/** Publish it. */\nexport const publish = x;\n",
+    );
+    const report = await inspectApp({ cwd: root, sections: ["files"] });
+    const validate = new Ajv2020({ strict: false, allErrors: true }).compile(
+      INSPECT_REPORT_JSON_SCHEMA,
+    );
+    expect(validate(report), JSON.stringify(validate.errors, null, 2)).toBe(true);
+    expect(report.schemaVersion).toBe(1);
+    expect(report.files?.find((entry) => entry.role === "use-case")).toMatchObject({
+      lines: 9,
+      about: "Publishes a post.",
+      tags: { feature: ["publishing"] },
+      exportDocs: { publish: "Publish it." },
+    });
+  });
+
   it("describes models with columns, relations and their resource", async () => {
     const report = await inspectFixture();
 
@@ -302,6 +347,8 @@ describe("inspectApp", () => {
         path: "/blog",
         name: "blog",
         file: "src/app/web/blog.page.tsx",
+        setupFile: null,
+        site: null,
         layouts: [],
         loaders: [],
         actions: ["default"],

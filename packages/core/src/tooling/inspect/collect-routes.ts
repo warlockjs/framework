@@ -151,6 +151,8 @@ export function collectRoutes(
       name: route.name ? route.name : null,
       sourceFile: route.sourceFile ? route.sourceFile : null,
       handler: functionName(handler),
+      controller: route.$controller ?? null,
+      action: route.$action ?? null,
       description: route.description ?? handler?.description ?? null,
       isPage: route.isPage === true,
       middleware: (route.middleware ?? []).map(functionName),

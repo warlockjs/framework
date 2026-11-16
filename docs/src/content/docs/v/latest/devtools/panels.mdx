@@ -1,0 +1,175 @@
+---
+title: Registering a panel
+description: Add your own tab to the devtools dashboard, with data routes behind the devtools guard and a browser view module that devtools serves.
+---
+
+A package or an app can add its own tab to the dashboard at `/__warlock`. A
+panel declares three things:
+
+- an **id** and a **title**: the tab,
+- **data routes**, mounted under the dashboard's API behind the same guard as
+  the built-in routes,
+- a **view module**: a browser JavaScript file that devtools serves and loads
+  when the tab opens.
+
+The built-in **Processes** tab is registered this way.
+
+## Turn a panel on: one line
+
+List the panel's module in `src/config/devtools.ts`:
+
+```ts title="src/config/devtools.ts"
+export default {
+  panels: ["@acme/queue/devtools"],
+};
+```
+
+The config stays a plain object: devtools imports the listed module itself,
+only in development, after it has checked that the app runs in development.
+Nothing is imported in production, and the production build bundles nothing
+from it.
+
+An entry is one of:
+
+- a package export, such as `"@acme/queue/devtools"`, resolved from
+  the app root;
+- a path starting with `./`, relative to the app root, such as
+  `"./src/devtools/queue-panel.ts"`;
+- a panel object.
+
+A module that fails to load, or a panel that is invalid or reuses an id, is
+reported in the terminal and left out; the rest of the dashboard still works.
+
+## Write a panel module
+
+The module's default export is a panel, a list of panels, or a function (it
+may be async) that returns either. The function receives `{ root }`, the app's
+root directory.
+
+```ts title="src/devtools/queue-panel.ts"
+import type { DevtoolsPanelExport } from "@warlock.js/devtools";
+
+const queuePanel: DevtoolsPanelExport = ({ root }) => ({
+  id: "queue",
+  title: "Queue",
+  // The browser module, served at /__warlock/panels/queue/view.js.
+  view: new URL("./queue-view.js", import.meta.url),
+  // More files the view imports, served next to it.
+  assets: { "chart.js": new URL("./queue-chart.js", import.meta.url) },
+  routes: [
+    // GET /__warlock/api/queue
+    { path: "", handler: () => ({ root, jobs: [] }) },
+    // GET /__warlock/api/queue/jobs/:id
+    { path: "/jobs/:id", handler: ({ params }) => ({ id: params.id }) },
+    // POST /__warlock/api/queue/retry
+    { method: "POST", path: "/retry", handler: ({ body }) => ({ retried: body }) },
+  ],
+});
+
+export default queuePanel;
+```
+
+Use `import type` only: the module must not need devtools at runtime, because
+devtools is a development dependency.
+
+### The panel fields
+
+| Field    | Required | What it is                                                                                                 |
+| -------- | -------- | ---------------------------------------------------------------------------------------------------------- |
+| `id`     | yes      | Lower-case letters, digits and dashes, starting with a letter. Names the tab, the URLs and the hash route. |
+| `title`  | yes      | The tab label.                                                                                             |
+| `view`   | yes      | The browser module: an absolute file path or a `file:` URL. It must exist when devtools starts.            |
+| `routes` | no       | Data routes: `{ method?, path, handler }`.                                                                 |
+| `assets` | no       | More files by served name: `{ "chart.js": <path or file: URL> }`. Plain file names, no folders.            |
+
+An id that another panel already uses is refused with a message naming that
+panel. The dashboard's own ids (`requests`, `ai`, `agents`, `queries`, `mail`,
+`logs`, `routes`, `api`, and the API names `mails`, `background`, `stream`,
+`docs`, `assets`, `panels`) and the built-in `processes` are taken.
+
+### Data routes
+
+A route is served at `/__warlock/api/<id><path>`. `path` is `""` for the
+panel's base URL or starts with `/` and may hold parameters (`/flows/:name`).
+`method` is `GET` (the default), `POST`, `PUT`, `PATCH` or `DELETE`.
+
+The handler receives `{ params, query, body }`. What it returns is sent as
+JSON with `Cache-Control: no-store`; `undefined` sends `204`. To answer with
+another status, throw an error that has a `statusCode`:
+
+```ts
+import type { DevtoolsPanelRoute } from "@warlock.js/devtools";
+
+const flowRoute: DevtoolsPanelRoute = {
+  path: "/flows/:name",
+  handler: ({ params }) => {
+    throw Object.assign(new Error(`No flow named "${params.name}".`), { statusCode: 404 });
+  },
+};
+```
+
+The client then gets `404` with `{ "error": "No flow named \"checkout\"." }`.
+
+## Write the view module
+
+The view is a plain ES module that runs in the browser. Devtools serves it at
+`/__warlock/panels/<id>/view.js` with no caching, so an edit shows on the next
+page load. Files listed in `assets` are served at
+`/__warlock/panels/<id>/<name>`, so the view can `import "./chart.js"`.
+
+Its default export renders the panel. It receives a context object and either
+fills `context.root` or returns the element to show. It may be async.
+
+```js title="queue-view.js"
+import { barChart } from "./chart.js";
+
+export default async function renderQueue({ api, el, empty, href, route, root }) {
+  if (route.startsWith("jobs/")) {
+    const job = await api(`jobs/${route.slice("jobs/".length)}`);
+    root.append(el("h2", { text: `Job ${job.id}` }), el("a", { href: href(), text: "All jobs" }));
+    return;
+  }
+
+  const { jobs } = await api();
+  root.append(el("h2", { text: "Queue" }));
+  if (!jobs.length) root.append(empty("No jobs yet."));
+  for (const job of jobs) {
+    root.append(el("a", { href: href(`jobs/${encodeURIComponent(job.id)}`), text: job.name }));
+  }
+  root.append(barChart(jobs));
+}
+```
+
+| Context field               | What it does                                                                                                                                                                                                                                                                  |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`                        | The panel id.                                                                                                                                                                                                                                                                 |
+| `root`                      | An empty `<section class="panel">` to render into. Shown when the function returns nothing.                                                                                                                                                                                   |
+| `api(path, init)`           | `fetch` on the panel's data routes, parsed as JSON. `api()`, `api("search?q=a")`, `api("/jobs/1")` and `api("?page=2")` all stay under `api/<id>`. A failed request throws an `Error` with the server's `error` message. `init` is passed to `fetch` (method, headers, body). |
+| `route`                     | The panel's part of the URL hash: `"jobs/7"` for `#queue/jobs/7`, `""` otherwise. Values are as written; encode them with `encodeURIComponent`.                                                                                                                               |
+| `href(route)`               | The link to one of the panel's views: `href("jobs/7")` is `#queue/jobs/7`, `href()` is `#queue`. A link opens the tab and renders that view.                                                                                                                                  |
+| `navigate(route)`           | Goes to that view, as following `href(route)` would.                                                                                                                                                                                                                          |
+| `refresh()`                 | Renders the panel again.                                                                                                                                                                                                                                                      |
+| `asset(name)`               | The URL of one of the panel's `assets`, for a `<link rel="stylesheet">` or an image.                                                                                                                                                                                          |
+| `el(tag, attrs, children)`  | Builds an element. `text` sets the text, `class` the class name, `on<event>` adds a listener, anything else is an attribute.                                                                                                                                                  |
+| `svg(tag, attrs, children)` | The same for SVG elements, for small graphs drawn without a chart library.                                                                                                                                                                                                    |
+| `empty(message)`            | The dashboard's empty-state paragraph.                                                                                                                                                                                                                                        |
+
+Hash routes make views linkable: `#<id>/<route>` in the address bar opens the
+panel on that view, and the browser's Back button returns to the previous one.
+Clicking a tab opens its first view. Build text with `text` (never
+`innerHTML`) so data from the app cannot inject markup.
+
+## Security
+
+A panel's data routes, its view module and its assets are mounted in the same
+scope as the dashboard, so the same guard applies to each request:
+
+- devtools mounts nothing outside development;
+- only a loopback socket is answered;
+- the `Host` must be a loopback name (or one in `allowedHosts`);
+- an `Origin` from another site is refused, so a web page you visit cannot
+  call a panel's routes;
+- a request with a proxy header is refused unless `allowProxied` is set.
+
+A refused request gets an empty `404` before the handler runs. Only the files
+a panel lists are served; a request never becomes a file path.

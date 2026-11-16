@@ -328,7 +328,7 @@ measure(name, callback, { latencyRange: { excellent, poor } });
 
 If your list endpoint goes through a use-case, the benchmark integration is built in:
 
-```ts title="src/app/products/use-cases/list-products.usecase.ts"
+```ts title="src/app/products/use-cases/list-products.use-case.ts"
 import { useCase } from "@warlock.js/core";
 import { listProductsService } from "../services/list-products.service";
 

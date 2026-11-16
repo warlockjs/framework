@@ -1,0 +1,157 @@
+/**
+ * The catalog of stable Grimoire finding codes.
+ *
+ * THE SCHEME: `GR` followed by four digits. The first digit is the area:
+ *
+ * | Range  | Area      | Meaning                                                     |
+ * | ------ | --------- | ----------------------------------------------------------- |
+ * | GR1xxx | structure | a written file does not follow its fixed structure          |
+ * | GR2xxx | links     | a written name points at something that does not exist      |
+ * | GR3xxx | files     | source files: headers, owners, files no flow reaches        |
+ * | GR4xxx | tests     | criteria, `@proves` lines and test results                  |
+ * | GR5xxx | apps      | sites, mobile apps, pages, screens and blocks               |
+ * | GR6xxx | changelog | feature versions, changelogs and releases                   |
+ * | GR7xxx | tasks     | task files                                                  |
+ * | GR8xxx | book      | building the book from the framework's facts                |
+ * | GR9xxx | usage     | a command or query was asked something it cannot answer     |
+ *
+ * STABILITY: a released code keeps its meaning. Titles and fixes may be
+ * reworded; a code is never reused or renumbered.
+ *
+ * This module imports nothing, so any entry can use it.
+ */
+import type { GrimoireCodeDefinition } from "../contracts/findings";
+
+function define<const Code extends string>(
+  code: Code,
+  area: GrimoireCodeDefinition["area"],
+  severity: GrimoireCodeDefinition["severity"],
+  title: string,
+  fix: string,
+  skill: string,
+): GrimoireCodeDefinition & { readonly code: Code } {
+  return { code, area, severity, title, fix, skill };
+}
+
+const WRITE = "write-a-feature";
+const RECORD = "record-a-change";
+const APP = "describe-an-app";
+const FILE = "document-a-file";
+const USE = "use-the-grimoire";
+
+/** Every code, in order. */
+export const GRIMOIRE_CODE_LIST = [
+  // ── GR1xxx structure ─────────────────────────────────────────────────────
+  define("GR1001", "structure", "error", "A written file has no front matter", "Start the file with the front matter block its template shows, between two `---` lines.", WRITE),
+  define("GR1002", "structure", "error", "The front matter cannot be read", "Write one `key: value` per line; lists as `[a, b]` or as `- item` lines under the key; close the block with `---`.", WRITE),
+  define("GR1003", "structure", "error", "A required front matter key is missing", "Add the key named in the message; the template of that file lists every required key.", WRITE),
+  define("GR1004", "structure", "error", "A front matter value has the wrong form", "Use the form the message names: dates as yyyy-mm-dd, versions as 2.1, ids in lower-case-with-dashes, a status from the list.", WRITE),
+  define("GR1005", "structure", "warning", "A front matter key is not part of the template", "Remove the key, or move what it says into the body of the file.", WRITE),
+  define("GR1006", "structure", "error", "A required heading is missing", "Add the heading named in the message, spelled as in the template.", WRITE),
+  define("GR1007", "structure", "warning", "A heading is not part of the template", "Use the template's headings; put the text under one of them or remove it.", WRITE),
+  define("GR1008", "structure", "error", "A step line has the wrong form", "Write steps as `1. route   POST /wishlist`: a number, a kind, then the name used in code.", WRITE),
+  define("GR1009", "structure", "error", "A step names an unknown kind", "Use one of: page, route, mail, notification, job, event, outside service, affects.", WRITE),
+  define("GR1010", "structure", "error", "Steps are not numbered 1, 2, 3 in order", "Number the steps from 1 without gaps, in the order a user meets them.", WRITE),
+  define("GR1011", "structure", "error", "A case line has the wrong form", "Write cases as `- double submit   two taps save once`: the question, two spaces, the answer.", WRITE),
+  define("GR1012", "structure", "warning", "A case question is not answered", "Answer the question under Cases (or `does not apply` and why), or list it under Not handled.", WRITE),
+  define("GR1013", "structure", "error", "A criterion line has the wrong form", "Write criteria as `- AC-3   a guest is sent to sign in`, optionally `- AC-4 [mobile]   …`.", WRITE),
+  define("GR1014", "structure", "error", "A criterion id is used twice in one flow", "Give the new criterion the next free number. Never renumber existing criteria.", WRITE),
+  define("GR1015", "structure", "error", "A changelog line has the wrong form", "Write entries as `- 2.1  fixed   new-arrivals: what changed (AC-2)`.", RECORD),
+  define("GR1016", "structure", "error", "A changelog entry uses an unknown word", "Use one of: added, changed, fixed, removed.", RECORD),
+  define("GR1017", "structure", "error", "A changelog heading has the wrong form", "Use `## Unreleased`, or `## <release> (<yyyy-mm-dd>)` for entries of a release.", RECORD),
+  define("GR1018", "structure", "error", "A blocks table has the wrong form", "Use the columns Block, Flow, Who sees it, Changes with; one row per part of the page.", APP),
+  define("GR1019", "structure", "error", "An id does not match its folder or file name", "Make the front matter `id` (or `release`) equal the folder or file name.", WRITE),
+  define("GR1020", "structure", "warning", "A file in the grimoire folder is not part of the layout", "Move the file to where the layout expects it, or remove it.", USE),
+  define("GR1021", "structure", "error", "A feature or app folder has no README.md", "Add README.md with the front matter of its template.", WRITE),
+  define("GR1022", "structure", "error", "Two files use the same id", "Give each feature, app or task its own id.", WRITE),
+  define("GR1023", "structure", "error", "A task file is misnamed or misplaced", "Name tasks `T-<n>-<slug>.md`, in `tasks/open/` or `tasks/done/<yyyy-mm>/`.", RECORD),
+  define("GR1024", "structure", "error", "The collected-list markers of a release file are broken", "Keep the start and end markers in pairs, or remove both and run `warlock grimoire release` again.", RECORD),
+  define("GR1025", "structure", "error", "A written file cannot be read", "Save the file as UTF-8 text.", USE),
+  define("GR1026", "structure", "error", "The feature README lists a flow that has no file", "Add `flows/<flow>.md`, or remove the flow from the README's Flows list.", WRITE),
+  define("GR1027", "structure", "warning", "A flow file is not listed in the feature README", "Add the flow to the README's Flows list.", WRITE),
+  define("GR1028", "structure", "error", "A list line has the wrong form", "Write list lines as `- name   text`: the name, two or more spaces, the text.", WRITE),
+
+  // ── GR2xxx links ─────────────────────────────────────────────────────────
+  define("GR2001", "links", "error", "A route step names a route that does not exist", "Fix the method and path in the flow, or add the route in code.", RECORD),
+  define("GR2002", "links", "error", "A page step names a page that does not exist", "Fix the route path in the flow, or add the page to one of the feature's apps.", RECORD),
+  define("GR2003", "links", "error", "A mail step names a mail that does not exist", "Use the mail's name as code defines it, or add the mail.", RECORD),
+  define("GR2004", "links", "error", "A notification step names a notification that does not exist", "Use the notification's name as code defines it, or add it.", RECORD),
+  define("GR2005", "links", "error", "A job step names a job that does not exist", "Use the job's name as code defines it, or add the job.", RECORD),
+  define("GR2006", "links", "error", "An event step names an event that does not exist", "Use the event's name as code emits it, or add the event.", RECORD),
+  define("GR2007", "links", "error", "An affects step names a feature or flow that does not exist", "Write `affects   <feature>/<flow>` with an existing feature and flow.", WRITE),
+  define("GR2008", "links", "error", "A name refers to an app with no folder", "Add `grimoire/apps/<app>/README.md`, or fix the app id.", APP),
+  define("GR2009", "links", "warning", "A flow names an app its feature does not list", "Add the app to the feature's `apps`, or fix the app id in Differs by app or the criterion.", WRITE),
+  define("GR2010", "links", "error", "A changelog entry names a flow that does not exist", "Fix the flow id before the `:`, or add the flow.", RECORD),
+  define("GR2011", "links", "error", "A changelog entry names a criterion the flow does not have", "Fix the criterion id, or add the criterion to the flow.", RECORD),
+  define("GR2012", "links", "error", "A README relation names a flow that does not exist", "Fix the `<feature>/<flow>` reference in Affects and affected by.", WRITE),
+
+  // ── GR3xxx files ─────────────────────────────────────────────────────────
+  define("GR3001", "files", "warning", "A source file has no header sentence", "Start the file with a one-sentence comment saying why it exists.", FILE),
+  define("GR3002", "files", "warning", "A source file belongs to no feature", "Add its folder to a feature's `folders`, or tag it `@feature <id>` in its header.", FILE),
+  define("GR3003", "files", "error", "A source file has two owners", "Keep one owner: remove the duplicate folder from one feature, or keep one `@feature` tag.", FILE),
+  define("GR3004", "files", "error", "A `@feature` tag names a feature that does not exist", "Fix the tag, or write the feature.", FILE),
+  define("GR3005", "files", "error", "A feature's `folders` entry does not exist", "Fix the folder path, or remove it from `folders`.", WRITE),
+  define("GR3006", "files", "warning", "A file in a feature's folders is reached by no flow", "Describe the behaviour in a flow, or delete dead code.", RECORD),
+
+  // ── GR4xxx tests ─────────────────────────────────────────────────────────
+  define("GR4001", "tests", "warning", "A criterion has no test", "Write a test with `// @proves <feature>/<flow> AC-<n>` above it, or say in the task why not.", RECORD),
+  define("GR4002", "tests", "error", "A `@proves` line names a flow or criterion that does not exist", "Fix the `@proves` line to name an existing `<feature>/<flow> AC-<n>`.", RECORD),
+  define("GR4003", "tests", "error", "A `@proves` line has the wrong form", "Write `// @proves <feature>/<flow> AC-<n>` on its own line.", RECORD),
+  define("GR4004", "tests", "error", "A `@proves` line is not directly above a test", "Move the line right above the `it(…)` or `test(…)` it describes.", RECORD),
+  define("GR4005", "tests", "warning", "One test proves two criteria", "Split the test so each proves one criterion.", RECORD),
+  define("GR4006", "tests", "error", "A test proving a criterion failed in its last run", "Fix the code or the test, then run the tests again.", RECORD),
+  define("GR4007", "tests", "warning", "A criterion's test result is older than the test file", "Run the tests again.", RECORD),
+  define("GR4008", "tests", "warning", "A criterion's test did not run in the last run", "Run the tests that prove the criterion.", RECORD),
+
+  // ── GR5xxx apps ──────────────────────────────────────────────────────────
+  define("GR5001", "apps", "error", "A block points to a flow that does not exist", "Fix the `<feature>/<flow>` in the Flow column or the block file.", APP),
+  define("GR5002", "apps", "error", "A condition is not declared in the app README", "Add the condition under Conditions in the app README, or use a declared one.", APP),
+  define("GR5003", "apps", "error", "A page's route does not exist in its site", "Fix the `route` of the page file, or remove the page file if the page is gone.", APP),
+  define("GR5004", "apps", "error", "A page names a layout with no file", "Add `layouts/<layout>.md` to the app, or fix the page's `layout`.", APP),
+  define("GR5005", "apps", "error", "An app's root matches no site or mobile app", "Set `root` to the site folder (`src/web/$sites/<site>`) or the mobile app folder.", APP),
+  define("GR5006", "apps", "error", "A screen's route does not exist in the mobile app", "Fix the `route` of the screen file, or remove it if the screen is gone.", APP),
+  define("GR5007", "apps", "warning", "A block file has no row in its page's Blocks table", "Add the block to the page's Blocks table, or remove the block file.", APP),
+  define("GR5008", "apps", "error", "An entry point in Also reached from does not exist", "Fix the mail, notification or page name.", APP),
+  define("GR5009", "apps", "warning", "A site or mobile app has no folder in grimoire/apps", "Add `grimoire/apps/<app>/README.md` for it.", APP),
+
+  // ── GR6xxx changelog ─────────────────────────────────────────────────────
+  define("GR6001", "changelog", "error", "A release lists a changelog entry that is not stamped with it", "Move the entry under `## <release> (<date>)` in the feature's CHANGELOG.md.", RECORD),
+  define("GR6002", "changelog", "error", "A changelog release section has no release file", "Write `grimoire/releases/<release>.md`, or fix the release in the heading.", RECORD),
+  define("GR6003", "changelog", "error", "A changelog release date differs from the release file", "Use the date in the release file's front matter.", RECORD),
+  define("GR6004", "changelog", "error", "The README `updated` is older than the newest changelog entry", "Reshape the README to describe the feature as it is now, and set `updated`.", RECORD),
+  define("GR6005", "changelog", "error", "The README `version` differs from the newest changelog entry", "Set `version` to the newest entry's version.", RECORD),
+  define("GR6006", "changelog", "warning", "A changelog word does not match its version step", "Use a whole-number version for added and removed, a decimal for changed and fixed.", RECORD),
+  define("GR6007", "changelog", "error", "A flow's `since` is newer than its feature's version", "Fix `since`, or the feature `version`.", WRITE),
+  define("GR6008", "changelog", "warning", "A new whole-number version has no brief", "Write `versions/v<n>.md` before building it.", WRITE),
+
+  // ── GR7xxx tasks ─────────────────────────────────────────────────────────
+  define("GR7001", "tasks", "error", "A task names a feature that does not exist", "Fix the task's `feature`, or write the feature first.", WRITE),
+  define("GR7002", "tasks", "error", "A task names a flow that does not exist", "Fix the task's `flow`, or write the flow first.", WRITE),
+  define("GR7003", "tasks", "error", "A task's status does not match its folder", "Done tasks live in `tasks/done/<yyyy-mm>/` with `status: done` and `shipped`; open tasks in `tasks/open/`.", RECORD),
+  define("GR7004", "tasks", "error", "A task's `shipped` names a version the changelog does not have", "Fix `shipped: <feature> <version>`, or add the changelog entry.", RECORD),
+  define("GR7005", "tasks", "warning", "A task's brief does not exist", "Fix the `Brief:` path, or write the brief.", WRITE),
+
+  // ── GR8xxx book ──────────────────────────────────────────────────────────
+  define("GR8001", "book", "error", "The project's source files could not be read", "Read the message; fix the file or folder it names, then build again.", USE),
+  define("GR8002", "book", "warning", "Route facts could not be read because the app did not boot", "Run `warlock doctor`, fix what stops the app from booting, then `warlock grimoire build`.", USE),
+  define("GR8003", "book", "warning", "Route facts are older than the routes files", "Run `warlock grimoire build` to refresh them.", USE),
+  define("GR8004", "book", "warning", "Pages or screens could not be read", "Read the message; fix the page file it names, then build again.", USE),
+
+  // ── GR9xxx usage ─────────────────────────────────────────────────────────
+  define("GR9001", "usage", "error", "The file is not in the book", "Pass a code file under the source roots, as a project-relative path.", USE),
+  define("GR9002", "usage", "error", "No route matches", "Pass `\"<METHOD> <path>\"` as the route is registered; `warlock routes` lists them.", USE),
+  define("GR9003", "usage", "error", "No feature has that id", "Use an id from `grimoire/features/`.", USE),
+  define("GR9004", "usage", "error", "No flow has that id", "Use `<feature>/<flow>` with a file in `grimoire/features/<feature>/flows/`.", USE),
+  define("GR9005", "usage", "error", "The release file has no brief yet", "Write `grimoire/releases/<release>.md` with `release` and `date` front matter and the brief, then run the command again.", RECORD),
+  define("GR9006", "usage", "error", "A query argument has the wrong form", "Read the command's help (`warlock scry --help`) and pass the argument in that form.", USE),
+] as const;
+
+/** One registered code, as a union. */
+export type GrimoireCode = (typeof GRIMOIRE_CODE_LIST)[number]["code"];
+
+/** The catalog, keyed by code. */
+export const GRIMOIRE_CODES: Readonly<Record<GrimoireCode, GrimoireCodeDefinition>> =
+  Object.fromEntries(GRIMOIRE_CODE_LIST.map((definition) => [definition.code, definition])) as Record<
+    GrimoireCode,
+    GrimoireCodeDefinition
+  >;

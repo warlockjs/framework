@@ -39,7 +39,7 @@ A handler that already has a schema and a description is most of the way there. 
 import type { Request, RequestHandler } from "@warlock.js/core";
 import { ProductResource } from "app/products/resources/product.resource";
 import { type CreateProductSchema, createProductSchema } from "../schema/create-product.schema";
-import { createProductUseCase } from "../use-cases/create-product.usecase";
+import { createProductUseCase } from "../use-cases/create-product.use-case";
 
 export const createProduct: RequestHandler<Request<CreateProductSchema>> = async ({
   request,

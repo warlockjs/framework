@@ -1,3 +1,7 @@
+import path from "node:path";
+import type { DevtoolsPanel } from "./types";
+import { resolveUiRoot } from "./ui-root";
+
 /** Structural contract keeps process supervision an optional application feature. */
 export type ProcessPanel = { list(): Promise<readonly unknown[]> };
 
@@ -12,4 +16,18 @@ export async function loadProcessPanel(): Promise<ProcessPanel | undefined> {
   if (!existsSync(file)) return undefined;
   const module: { processPanel?: ProcessPanel } = await import(pathToFileURL(file).href);
   return module.processPanel;
+}
+
+/**
+ * The built-in **Processes** tab, registered like any other panel:
+ * `GET <path>/api/processes` lists the app's supervised processes (an empty
+ * list without a registration) and `ui/panels/processes.js` renders them.
+ */
+export function processesDevtoolsPanel(processPanel?: ProcessPanel): DevtoolsPanel {
+  return {
+    id: "processes",
+    title: "Processes",
+    view: path.join(resolveUiRoot(), "panels", "processes.js"),
+    routes: [{ path: "", handler: async () => (processPanel ? await processPanel.list() : []) }],
+  };
 }

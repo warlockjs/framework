@@ -72,6 +72,67 @@ Nothing the server does writes project files unless it was started with `--allow
 - **Writes.** With `--allow-writes`, those two tools accept `write: true`, run the generator in the project itself and return the same diff. Without it the argument is not advertised, and a `write: true` sent anyway is refused with `WL7005`.
 - `check_run` and `test_run` run your linters and tests, which may write their own caches; they do not change source files.
 
+## Add tools from a package or the app
+
+The server serves its built-in tools, then the tools `warlock.config.ts` registers. `warlock mcp` and `warlock dev --mcp` read them from two places:
+
+- **A command in `cli.commands`.** A package attaches tools to the command its register function returns with `withMcpTools()`. The app lists the command once, and both the command and its tools appear.
+- **`mcp.tools`.** Tools the app defines itself.
+
+```ts title="register-report-commands.ts"
+import { command, inputSchema, withMcpTools } from "@warlock.js/core";
+
+export function registerReportCommands() {
+  return withMcpTools(
+    command({ name: "report", description: "Print the report", action: () => undefined }),
+    [
+      // A function receives the server context: cwd, allowWrites, inspect(), docs()…
+      (context) => ({
+        name: "report_routes",
+        description: "How many routes the app has, per HTTP method. Read-only.",
+        input: inputSchema({ method: { type: "string", description: "Only this method." } }),
+        writes: false,
+        run: async (input) => {
+          const { routes = [] } = await context.inspect(["routes"]);
+
+          return routes.filter((route) => !input.method || route.method === input.method).length;
+        },
+      }),
+    ],
+  );
+}
+```
+
+```ts title="warlock.config.ts"
+import { defineConfig, inputSchema } from "@warlock.js/core";
+import { registerReportCommands } from "./register-report-commands";
+
+export default defineConfig({
+  // One line: the `report` command and its `report_routes` tool.
+  cli: { commands: [registerReportCommands()] },
+  mcp: {
+    tools: [
+      {
+        name: "app_ping",
+        description: "Answer pong. Read-only.",
+        input: inputSchema({}),
+        writes: false,
+        run: async () => "pong",
+      },
+    ],
+  },
+});
+```
+
+A registered tool follows the same rules as a built-in one:
+
+- **Name.** 1 to 128 letters, digits, `_` or `-` (no dots). Prefix it with your package, e.g. `report_routes`. A name that a built-in tool or another registered tool already has stops the server with a message naming the tool.
+- **Input.** Build it with `inputSchema()`: a closed object of strings (with an optional `enum`), integers (with `minimum` / `maximum`), booleans and arrays of strings, each with a description. The server checks the schema when it starts, and checks every call's arguments against it; invalid arguments are answered with `isError: true` and every problem.
+- **Writes.** Set `writes: true` when a call changes project files. Without `--allow-writes` the tool is still listed, its description says the server is read-only, and every call is refused with `WL7005` before `run` is called.
+- **Errors.** A tool that throws answers with `isError: true` and the message; a `WarlockError` adds its code and fix.
+
+`withMcpTools()` returns the same command, and calling it again adds more tools. Keep the imports of a register function light: `warlock.config.ts` is part of the production build, so load heavy modules inside `run`.
+
 ## HTTP transport
 
 `--http` uses the Streamable HTTP transport of `@warlock.js/ai-tools`:
@@ -123,9 +184,10 @@ const context = createMcpContext({
 // The tool definitions (name, description, JSON Schema input, run) without a transport:
 const tools = createWarlockMcpTools(context);
 
-// Or served:
+// Or served, with extra tools after the built-in ones:
 const server = await startWarlockMcpServer({
   context,
+  tools: [],
   transport: { type: "http", port: 0, token: "a-long-random-token" },
 });
 
@@ -136,7 +198,7 @@ console.error(
 await server.close();
 ```
 
-`runTests({ files | changed | base })` (what `test_run` calls), `sandboxBackend()` / `applyGeneration()` (the generator previews), `loadDocsCorpus()` / `searchDocs()` and `buildDbSchema()` are exported too.
+`resolveWarlockMcpTools(context, tools)` returns the full list the server would serve (and throws on an invalid or clashing tool); `mcpToolsFromConfig(config)` returns the tools a Warlock config registers; `mcpToolsOf(command)` returns the tools attached to one command. `runTests({ files | changed | base })` (what `test_run` calls), `sandboxBackend()` / `applyGeneration()` (the generator previews), `loadDocsCorpus()` / `searchDocs()` and `buildDbSchema()` are exported too.
 
 ## Error codes
 
@@ -144,7 +206,7 @@ await server.close();
 | -------- | ---------------------------------------------------------------------------------------------- |
 | `WL7003` | `@warlock.js/ai-tools` or `@warlock.js/ai` is not installed; the message has the install line. |
 | `WL7004` | `--host` is not loopback and no token was given.                                               |
-| `WL7005` | A generate tool was asked to write on a read-only server.                                      |
+| `WL7005` | A generate tool was asked to write, or a registered `writes: true` tool was called, on a read-only server. |
 | `WL8008` | `requests_recent`: no dev server recorded, or it does not answer.                              |
 | `WL8009` | `requests_recent`: the dev server answers but devtools is not mounted.                         |
 

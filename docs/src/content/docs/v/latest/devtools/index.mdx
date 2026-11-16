@@ -76,6 +76,13 @@ and loopback guards. Without registration it returns an empty list. Process
 stops remain application APIs; this panel has no stop endpoint. See
 [process supervision](/v/latest/process/) for ownership and platform limits.
 
+## Your own panels
+
+A package or the app can add a tab with its own data routes and view, with one
+line in `src/config/devtools.ts` (`panels: ["<package>/devtools"]`). The
+Processes tab is registered the same way. See
+[Registering a panel](/v/latest/devtools/panels/).
+
 ## API docs
 
 The dashboard has an **API** tab, and the same page is served on its own at `/__warlock/docs`. It renders the app's OpenAPI 3.1 document with [Scalar](https://github.com/scalar/scalar): every API route with its parameters, request body, responses and security.
@@ -119,6 +126,9 @@ export default {
   allowedHosts: ["app.test"],
   // Answer requests that came through a proxy. Default: false.
   allowProxied: false,
+  // Extra tabs, loaded only in development. Default: [].
+  // See /v/latest/devtools/panels/.
+  panels: [],
 };
 ```
 

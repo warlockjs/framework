@@ -141,6 +141,20 @@ describe("source file inspection", () => {
     ["src/web/root.tsx", "root"],
     ["src/web/layout.tsx", "layout"],
     ["src/shared/post.spec.ts", "spec"],
+    ["src/app/orders/use-cases/place-order.use-case.ts", "use-case"],
+    ["src/app/orders/place-order.use-case.ts", "use-case"],
+    ["src/app/orders/seeds/orders.seed.ts", "seed"],
+    ["src/app/orders/seeds/default.ts", "seed"],
+    ["src/app/orders/requests/place.request.ts", "request"],
+    ["src/app/orders/services/mail/welcome.mail.ts", "mail"],
+    ["src/app/orders/mails/welcome.ts", "mail"],
+    ["src/app/orders/jobs/send-invoice.job.ts", "job"],
+    ["src/app/orders/send-invoice.job.ts", "job"],
+    ["src/app/orders/utils/audit.event.ts", "event"],
+    ["src/app/orders/audit.event.ts", "event"],
+    ["src/app/orders/events/audit.ts", "event"],
+    ["src/app/orders/cart.client.ts", "client"],
+    ["src/app/orders/cart.client.tsx", "client"],
   ])("infers %s as %s", (file, role) => expect(fileRole(file)).toBe(role));
 
   it("explains transitive route and page reachability including layouts without looping on cycles", async () => {
@@ -176,5 +190,74 @@ describe("source file inspection", () => {
     expect(report.routes).toBeUndefined();
     expect(report.files?.length).toBe(10);
     expect(report.warnings).toEqual([]);
+  });
+
+  it("reads line counts, the header sentence, header tags and export doc comments in one pass", () => {
+    write(
+      "src/app/posts/publish.use-case.ts",
+      [
+        "/**",
+        " * Publishes a post and tells its followers.",
+        " * A second sentence that stays out.",
+        " *",
+        " * @feature post-publishing",
+        " * @feature   feed",
+        " * @owner team-content",
+        " */",
+        'import { value } from "../../shared/value";',
+        "",
+        "/** Publish one post. Extra detail. */",
+        "export const publish = () => value;",
+        "",
+        "// not a doc comment",
+        "export const undocumented = 1;",
+        "",
+        "/** The result of a publish\n * spread over lines. */",
+        "export type Published = { id: string };",
+        "",
+        "/** Default entry. */",
+        "export default publish;",
+        "",
+      ].join("\n"),
+    );
+    const file = collectFiles(root).find(
+      (entry) => entry.file === "src/app/posts/publish.use-case.ts",
+    );
+    expect(file).toMatchObject({
+      role: "use-case",
+      lines: 22,
+      about: "Publishes a post and tells its followers.",
+      tags: { feature: ["post-publishing", "feed"], owner: ["team-content"] },
+      exportDocs: {
+        publish: "Publish one post.",
+        Published: "The result of a publish spread over lines.",
+        default: "Default entry.",
+      },
+    });
+    expect(file?.exportDocs).not.toHaveProperty("undocumented");
+  });
+
+  it("reads a // header, a @fileoverview header, skips tool directives and handles no header", () => {
+    write(
+      "src/a.ts",
+      "// eslint-disable no-console\n// Builds the thing.\n// More.\nimport './shared/value';\n",
+    );
+    write(
+      "src/b.ts",
+      "/**\n * @fileoverview The overview sentence. Second.\n */\nexport const b = 1;\n",
+    );
+    write("src/c.ts", "export const c = 1;\n");
+    write("src/d.ts", "");
+    const files = collectFiles(root);
+    const find = (name: string) => files.find((entry) => entry.file === name);
+    expect(find("src/a.ts")).toMatchObject({ about: "Builds the thing.", tags: {}, lines: 4 });
+    expect(find("src/b.ts")).toMatchObject({
+      about: "The overview sentence.",
+      tags: { fileoverview: ["The overview sentence. Second."] },
+      exportDocs: {},
+    });
+    expect(find("src/c.ts")).toMatchObject({ about: null, tags: {}, exportDocs: {}, lines: 1 });
+    expect(find("src/d.ts")?.lines).toBe(0);
+    expect(find("src/styles.css")?.lines).toBeUndefined();
   });
 });

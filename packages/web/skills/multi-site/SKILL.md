@@ -107,6 +107,10 @@ Boot fails for an unassigned page, a `$sites` folder without a matching `web.sit
 
 Out of scope: path- or session-selected tenants, sharing a root between sites, cross-site prefetch, API host scoping, and automatic Cascade query scoping.
 
+## Read the page graph from tooling
+
+A tool that needs each page's site, setup file and layout chain calls `discoverPageGraph` from `@warlock.js/web/build` with `appRoot` and the `web.sites` config, and filters the pages with `type` equal to `"page"`. `layout.tsx` files come back in `layouts`, outermost first, the same chain the build uses. `layoutChainFor` computes one page's chain. It only reads files and starts nothing. Import it lazily, never from page modules.
+
 ## Route dictionaries across sites
 
 A `locales.json` inside a site folder reaches only that site's pages. A `locales.json` above the site folders (`src/web/locales.json`, `src/web/$sites/locales.json`) reaches every page of every site and is merged before the site's own dictionaries. Each key is declared in one `locales.json` in the whole app, so put keys shared by several sites in a dictionary above the site folders instead of repeating them. The build warns about a `locales.json` that applies to no page; move it next to or above the pages that use it.

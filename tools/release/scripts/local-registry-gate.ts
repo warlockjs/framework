@@ -52,6 +52,7 @@ export const WARLOCK_FAMILY_PACKAGE_NAMES = Object.freeze([
   "@warlock.js/queue",
   "@warlock.js/sitemap",
   "@warlock.js/devtools",
+  "@warlock.js/grimoire",
 ] as const);
 
 export interface CandidateArtifact {

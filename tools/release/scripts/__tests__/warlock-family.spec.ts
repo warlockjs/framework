@@ -34,6 +34,7 @@ const FAMILY_NAMES = [
   "@warlock.js/context",
   "@warlock.js/core",
   "@warlock.js/fs",
+  "@warlock.js/grimoire",
   "@warlock.js/herald",
   "@warlock.js/logger",
   "@warlock.js/notifications",

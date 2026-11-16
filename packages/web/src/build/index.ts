@@ -29,3 +29,11 @@ export {
   writeCurrentRouteTypes,
   type WriteCurrentRouteTypesInput,
 } from "./write-current-route-types";
+export {
+  discoverPageGraph,
+  layoutChainFor,
+  type DiscoverPagesOptions,
+  type DiscoveredPage,
+  type DiscoveredPageGraph,
+  type DiscoveredRoutablePage,
+} from "./discover-pages";

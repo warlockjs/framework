@@ -1,7 +1,7 @@
 name: Windows
 
 # Runs the unit suites of the packages Windows apps depend on, on a Windows
-# runner: fs, process, core, web and ai.
+# runner: fs, process, core, web, ai and grimoire.
 #
 # This is a separate workflow, not a job of ci.yml, so a red Windows run does
 # not turn the main CI result red while Windows support is being brought up.
@@ -44,7 +44,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        package: [fs, process, core, web, ai]
+        package: [fs, process, core, web, ai, grimoire]
     env:
       CI: "1"
       NO_COLOR: "1"

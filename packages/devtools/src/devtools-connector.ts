@@ -8,7 +8,8 @@
  * this mirrors.
  */
 import type { Connector, ConnectorLifecyclePhase } from "@warlock.js/core";
-import { loadProcessPanel } from "./process-panel";
+import { loadDevtoolsPanels } from "./panels";
+import { loadProcessPanel, processesDevtoolsPanel } from "./process-panel";
 import { createCollector } from "./collector";
 import { resolveDevtoolsOptions } from "./options";
 import type { DevtoolsRequestLogSource, DevtoolsRouteRow } from "./server";
@@ -52,7 +53,8 @@ export type DevtoolsConnectorOptions = DevtoolsOptions;
  * `Application.runtimeStrategy` and, when it isn't `"development"`, logs one
  * warning and returns without mounting a route or subscribing to anything.
  * In development it attaches every source (tracing, queries, cache, mail,
- * logs), then mounts the dashboard's routes on the HTTP server — before it
+ * logs), loads the panels listed in the `panels` option, then mounts the
+ * dashboard's routes on the HTTP server — before it
  * starts listening, the only point in the boot sequence where mounting is
  * possible (see `queue/src/dashboard-boot.ts` for the same constraint).
  *
@@ -109,12 +111,22 @@ export function devtoolsConnector(options: DevtoolsConnectorOptions = {}): Conne
       const { mountDevtoolsRoutes } = await import("./server");
       const postmanBuilder = await findPostmanBuilder();
       const requestLog = await findRequestLogSource();
+      const processPanel = await loadProcessPanel();
+      const builtIn = processesDevtoolsPanel(processPanel);
+      // A panel that fails to load or reuses an id is reported and left out;
+      // it never stops the dashboard or the app.
+      const panels = await loadDevtoolsPanels(resolved.panels ?? [], {
+        root: "rootPath" in core ? core.rootPath() : process.cwd(),
+        warn: (message) => log.warn("devtools", "panel", message),
+        taken: new Map([[builtIn.id, builtIn.title]]),
+      });
 
       mountDevtoolsRoutes(getHttpServer(), {
         collector,
         ai,
         agentTraces,
-        processPanel: await loadProcessPanel(),
+        ...(processPanel ? { processPanel } : {}),
+        panels,
         options: resolved,
         requestLog,
         isDevelopment: () => Application.runtimeStrategy === "development",

@@ -101,7 +101,7 @@ Some older modules still have a `validation/` folder instead of `schema/` — hi
 | ---------------- | -------------------------------------------------------------------------------------------- | ---------------------------------------- |
 | `.controller.ts` | HTTP handler                                                                                 | `create-product.controller.ts`           |
 | `.service.ts`    | Stateless business logic                                                                     | `create-product.service.ts`              |
-| `.usecase.ts`    | `useCase()` pipeline                                                                         | `login.usecase.ts`                       |
+| `.use-case.ts`   | `useCase()` pipeline                                                                         | `login.use-case.ts`                      |
 | `.model.ts`      | Cascade model class                                                                          | `product.model.ts`                       |
 | `.repository.ts` | `RepositoryManager` subclass                                                                 | `products.repository.ts`                 |
 | `.resource.ts`   | `Resource` subclass                                                                          | `product.resource.ts`                    |

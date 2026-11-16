@@ -1,5 +1,8 @@
+import baseConfig from "@mongez/config";
+import { moduleResolve } from "import-meta-resolve";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import * as ast from "../syntax/ast";
 import { connectorsManager } from "../../connectors/connectors-manager";
 import type { InspectFile, InspectPage, InspectWarning } from "./inspect-report.types";
@@ -36,6 +39,88 @@ export function installedPagesFromConnectors(): unknown[] | undefined {
   const pages: unknown = read.call(web);
 
   return Array.isArray(pages) ? pages : undefined;
+}
+
+/**
+ * The fields of one routable page from `@warlock.js/web/build`'s
+ * `discoverPageGraph()` that inspect reads. Declared here because core does
+ * not depend on `@warlock.js/web`.
+ */
+export type GraphPageLike = {
+  type: string;
+  routeName: string;
+  routePath: string;
+  pageFile: string;
+  setupFile?: string;
+  layouts: readonly string[];
+  layoutSetupFiles?: ReadonlyArray<string | undefined>;
+  site?: string;
+  actions?: readonly string[];
+  guard?: string;
+};
+
+/** The slice of `@warlock.js/web/build` inspect calls. */
+export type WebBuildModule = {
+  discoverPageGraph?: (options: { appRoot: string; sites?: unknown }) => {
+    pages: readonly GraphPageLike[];
+  };
+};
+
+/** Imports `@warlock.js/web/build` as the app at `cwd` resolves it; `undefined` when web is not installed. */
+export async function importWebBuild(cwd: string): Promise<WebBuildModule | undefined> {
+  const parent = pathToFileURL(path.join(cwd, "package.json"));
+
+  try {
+    moduleResolve("@warlock.js/web", parent);
+  } catch {
+    return undefined;
+  }
+
+  try {
+    return (await import(moduleResolve("@warlock.js/web/build", parent).href)) as WebBuildModule;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * The routable pages of the app's page graph, exactly as the web build
+ * discovers them. Reads files only: no server and no build. `undefined` when
+ * `@warlock.js/web` is not installed (or too old to export the discovery),
+ * or when discovery fails (a warning says why).
+ *
+ * @param load How to load the web build entry; defaults to {@link importWebBuild}.
+ */
+export async function discoverGraphPages(
+  cwd: string,
+  warnings: InspectWarning[],
+  load: (cwd: string) => Promise<WebBuildModule | undefined> = importWebBuild,
+  sites?: unknown,
+): Promise<GraphPageLike[] | undefined> {
+  const web = await load(cwd);
+
+  if (typeof web?.discoverPageGraph !== "function") return undefined;
+
+  const webConfig: unknown = baseConfig.get("web");
+  const configuredSites =
+    sites ?? (typeof webConfig === "object" && webConfig !== null ? Reflect.get(webConfig, "sites") : undefined);
+
+  try {
+    const graph = web.discoverPageGraph({
+      appRoot: cwd,
+      ...(configuredSites === undefined ? {} : { sites: configuredSites }),
+    });
+
+    return graph.pages.filter((page) => page.type === "page");
+  } catch (error) {
+    warnings.push({
+      code: null,
+      message: `The page graph could not be read: ${error instanceof Error ? error.message : String(error)}`,
+      source: "pages",
+    });
+
+    return undefined;
+  }
 }
 
 function toPosix(file: string): string {
@@ -132,11 +217,47 @@ export function collectPages(
   cwd: string,
   warnings: InspectWarning[],
   files?: readonly InspectFile[],
+  graph?: readonly GraphPageLike[],
 ): InspectPage[] {
-  if (!pages) return [];
+  if (!pages && !graph) return [];
 
   const collected: InspectPage[] = [];
   const exports = files ? new Map(files.map((file) => [file.file, file.exports])) : undefined;
+  const hasLoader = (file: string) =>
+    exports ? exports.get(relativeTo(cwd, file))?.includes("loader") === true : exportsName(file, "loader");
+
+  if (graph) {
+    for (const page of graph) {
+      const chain: string[] = [];
+
+      page.layouts.forEach((layout, index) => {
+        chain.push(layout);
+
+        const layoutSetup = page.layoutSetupFiles?.[index];
+
+        if (layoutSetup !== undefined) chain.push(layoutSetup);
+      });
+      chain.push(page.pageFile);
+
+      if (page.setupFile !== undefined) chain.push(page.setupFile);
+
+      collected.push({
+        path: page.routePath,
+        name: page.routeName.length > 0 ? page.routeName : null,
+        file: relativeTo(cwd, page.pageFile),
+        setupFile: page.setupFile === undefined ? null : relativeTo(cwd, page.setupFile),
+        site: page.site ?? null,
+        layouts: page.layouts.map((file) => relativeTo(cwd, file)),
+        loaders: chain.filter(hasLoader).map((file) => relativeTo(cwd, file)),
+        actions: [...(page.actions ?? [])].sort(),
+        guard: page.guard ?? null,
+      });
+    }
+
+    return sortPages(collected);
+  }
+
+  if (!pages) return [];
 
   for (const page of pages) {
     if (!isInstalledPage(page)) {
@@ -146,11 +267,7 @@ export function collectPages(
 
     const pageFile = path.isAbsolute(page.file) ? page.file : path.join(cwd, page.file);
     const layouts = layoutChainOf(pageFile, cwd);
-    const loaders = [...layouts, pageFile].filter((file) =>
-      exports
-        ? exports.get(relativeTo(cwd, file))?.includes("loader") === true
-        : exportsName(file, "loader"),
-    );
+    const loaders = [...layouts, pageFile].filter(hasLoader);
     const actions = Array.isArray(page.actions)
       ? page.actions.filter((action): action is string => typeof action === "string")
       : [];
@@ -159,6 +276,8 @@ export function collectPages(
       path: page.path,
       name: typeof page.name === "string" && page.name.length > 0 ? page.name : null,
       file: relativeTo(cwd, pageFile),
+      setupFile: null,
+      site: null,
       layouts: layouts.map((file) => relativeTo(cwd, file)),
       loaders: loaders.map((file) => relativeTo(cwd, file)),
       actions: [...actions].sort(),
@@ -166,7 +285,11 @@ export function collectPages(
     });
   }
 
-  return collected.sort((first, second) => {
+  return sortPages(collected);
+}
+
+function sortPages(pages: InspectPage[]): InspectPage[] {
+  return pages.sort((first, second) => {
     if (first.path !== second.path) return first.path < second.path ? -1 : 1;
 
     return first.file.localeCompare(second.file);

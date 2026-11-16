@@ -14,7 +14,7 @@ This page covers the shape, the pipeline order, the context object, and how it s
 
 ## The shape
 
-```ts title="src/app/orders/use-cases/place-order.usecase.ts"
+```ts title="src/app/orders/use-cases/place-order.use-case.ts"
 import { useCase } from "@warlock.js/core";
 import { placeOrderSchema, type PlaceOrderInput } from "../validation/place-order.schema";
 import { authGuard } from "app/shared/guards/auth.guard";
@@ -47,13 +47,13 @@ Two type parameters and one config object — that's the whole API surface.
 
 ## Where it lives
 
-Use-cases live under the module's `use-cases/` folder, file named `<action>.usecase.ts`:
+Use-cases live under the module's `use-cases/` folder, file named `<action>.use-case.ts`:
 
 ```
 src/app/orders/use-cases/
-  place-order.usecase.ts
-  cancel-order.usecase.ts
-  refund-order.usecase.ts
+  place-order.use-case.ts
+  cancel-order.use-case.ts
+  refund-order.use-case.ts
 ```
 
 Naming mirrors controllers: `placeOrderUseCase`, `cancelOrderUseCase`. The export name signals what it does; the file name matches the export.
@@ -226,7 +226,7 @@ The use-case definition reads what it needs, ignores the rest.
 
 The actual `login` use-case from the reference codebase — sixteen lines, no decorators, no DI:
 
-```ts title="src/app/auth/use-cases/login.usecase.ts"
+```ts title="src/app/auth/use-cases/login.use-case.ts"
 import type { DeviceInfo, LoginResult } from "@warlock.js/auth";
 import { ForbiddenError, useCase } from "@warlock.js/core";
 import { type User } from "app/users/models/user";

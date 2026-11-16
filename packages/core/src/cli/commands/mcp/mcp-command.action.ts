@@ -3,6 +3,7 @@ import { featuresMap } from "../../../generations/features";
 import { bootForInspect, inspectOptionsFromBoot } from "../../../tooling/inspect/boot-for-inspect";
 import { inspectApp, type InspectOptions } from "../../../tooling/inspect/inspect-app";
 import { createMcpContext } from "../../../tooling/mcp/create-mcp-context";
+import { configuredMcpTools } from "../../../tooling/mcp/configured-mcp-tools";
 import {
   resolveMcpTransport,
   startWarlockMcpServer,
@@ -84,7 +85,9 @@ function lazyInspectOptions(): () => Promise<InspectOptions> {
  * Serves the app's tools over MCP. The app is booted the `warlock inspect`
  * way — connectors booted, none started, no connection, no port — on the
  * first call that needs it, so the server answers `initialize` at once.
- * Runs until stdin closes (stdio) or SIGINT/SIGTERM.
+ * Tools registered in `warlock.config.ts` (on `cli.commands` or in
+ * `mcp.tools`) are served after the built-in ones. Runs until stdin closes
+ * (stdio) or SIGINT/SIGTERM.
  */
 export async function mcpCommandAction({ options }: CommandActionData): Promise<void> {
   const transport = mcpTransportFromOptions(options);
@@ -116,6 +119,7 @@ export async function mcpCommandAction({ options }: CommandActionData): Promise<
   const server = await startWarlockMcpServer({
     context,
     transport,
+    tools: await configuredMcpTools(),
     version: await getWarlockVersion(),
   });
 

@@ -87,6 +87,10 @@ export type InspectRoute = {
   sourceFile: string | null;
   /** Handler function name, `"anonymous"` when it has none. */
   handler: string;
+  /** Controller class name when the route was registered as a `[controller, "action"]` tuple. */
+  controller?: string | null;
+  /** Action (method) name of that controller tuple. */
+  action?: string | null;
   description: string | null;
   /** Whether a page (SSR) route registered it. */
   isPage: boolean;
@@ -182,6 +186,10 @@ export type InspectPage = {
   actions: string[];
   /** `"user"` when the page or a layout statically requires a user. */
   guard: string | null;
+  /** Project-relative `*.setup.ts` file that holds the page's logic, or `null` when it has none. */
+  setupFile: string | null;
+  /** Site the page belongs to in a multi-site app, or `null`. */
+  site: string | null;
 };
 
 /** One queue job defined with `defineJob()`. */
@@ -307,4 +315,12 @@ export type InspectFile = {
   /** Literal imports and re-exports; null means external or unresolved. */
   imports: { specifier: string; file: string | null }[];
   importedBy: string[];
+  /** Line count of a code file; absent for non-code files. */
+  lines?: number;
+  /** First sentence of the comment block at the top of the file (before any import), or `null`. */
+  about?: string | null;
+  /** `@tag value` lines of that header comment, keyed by tag name without the `@` (`feature`, `owner`, ...). */
+  tags?: Record<string, string[]>;
+  /** First sentence of the doc comment above each export that has one, keyed by export name. */
+  exportDocs?: Record<string, string>;
 };

@@ -5,12 +5,9 @@ import {
   type ServeToolContract,
   type ServeTransportOptions,
 } from "./load-ai-tools";
-import {
-  createWarlockMcpTools,
-  describeToolError,
-  type WarlockMcpContext,
-  type WarlockMcpTool,
-} from "./mcp-tools";
+import type { WarlockMcpToolSource } from "./mcp-tool-registry";
+import { describeToolError, type WarlockMcpContext, type WarlockMcpTool } from "./mcp-tools";
+import { resolveWarlockMcpTools } from "./resolve-mcp-tools";
 import { toStandardSchema, validateToolInput } from "./tool-input";
 
 /** Where the server listens. */
@@ -36,6 +33,13 @@ export type StartWarlockMcpServerOptions = {
   /** Advertised in `initialize`. Default `"warlock"`. */
   name?: string;
   version?: string;
+  /**
+   * Extra tools served after the built-in ones: tools, or functions that
+   * build tools from `context`. A name already taken is refused; a tool with
+   * `writes: true` is refused on every call unless `context.allowWrites`.
+   * `warlock mcp` passes `mcpToolsFromConfig(config)`.
+   */
+  tools?: readonly WarlockMcpToolSource[];
   /** How `@warlock.js/ai-tools` is loaded (tests inject it). */
   loadServe?: () => Promise<AiToolsServeModule>;
 };
@@ -147,7 +151,8 @@ export function toServeContract(tool: WarlockMcpTool): ServeToolContract {
 /**
  * Serve the app's tools over MCP — stdio by default, or Streamable HTTP
  * through `@warlock.js/ai-tools` (loopback by default; a token is required off
- * loopback). Read-only unless `context.allowWrites`.
+ * loopback). Read-only unless `context.allowWrites`. `tools` adds tools
+ * from packages or the app next to the built-in ones.
  *
  * @example
  * const server = await startWarlockMcpServer({
@@ -161,8 +166,9 @@ export async function startWarlockMcpServer(
   options: StartWarlockMcpServerOptions,
 ): Promise<WarlockMcpServerHandle> {
   const transport = resolveMcpTransport(options.transport);
+  // Refuse an invalid or clashing registered tool before anything loads.
+  const tools = resolveWarlockMcpTools(options.context, options.tools);
   const module = await (options.loadServe ?? (() => loadAiToolsServe(options.context.cwd)))();
-  const tools = createWarlockMcpTools(options.context);
   const server = module.serve(tools.map(toServeContract), {
     name: options.name ?? "warlock",
     version: options.version,

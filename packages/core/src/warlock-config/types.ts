@@ -7,6 +7,7 @@ import type {
   BuiltInHealthCheckerOptions,
   FileHealthCheckerContract,
 } from "../dev-server/health-checker/file-health-checker.contract";
+import type { WarlockMcpToolSource } from "../tooling/mcp/mcp-tool-registry";
 import { type BuildOptions } from "esbuild";
 
 /**
@@ -181,6 +182,34 @@ export type WarlockConfig = {
    */
   cli?: {
     commands?: CLICommand[];
+  };
+
+  /**
+   * Extra tools for the MCP server of `warlock mcp` and `warlock dev --mcp`,
+   * served after the built-in ones. Tools attached to a command in
+   * `cli.commands` with `withMcpTools()` are served too, without listing them
+   * here. A tool with `writes: true` is refused unless the server runs with
+   * `--allow-writes`; a name that is already taken stops the server.
+   *
+   * @example
+   * ```typescript
+   * export default defineConfig({
+   *   mcp: {
+   *     tools: [
+   *       {
+   *         name: "app_feature_flags",
+   *         description: "The feature flags this app reads. Read-only.",
+   *         input: inputSchema({}),
+   *         writes: false,
+   *         run: async () => listFeatureFlags(),
+   *       },
+   *     ],
+   *   },
+   * });
+   * ```
+   */
+  mcp?: {
+    tools?: WarlockMcpToolSource[];
   };
 
   /**

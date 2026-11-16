@@ -51,5 +51,15 @@ export * from "./use-cases";
 export * from "./utils";
 export * from "./validation";
 export * from "./warlock-config";
+// MCP tool registration for `warlock.config.ts`: type-only and dependency-free
+// modules, so the config does not pull in the development tooling.
+export {
+  mcpToolsFromConfig,
+  mcpToolsOf,
+  withMcpTools,
+  type WarlockMcpToolSource,
+} from "./tooling/mcp/mcp-tool-registry";
+export type { WarlockMcpContext, WarlockMcpTool } from "./tooling/mcp/mcp-tools";
+export { inputSchema, type McpInputProperty, type McpInputSchema } from "./tooling/mcp/tool-input";
 
 export { colors, env };

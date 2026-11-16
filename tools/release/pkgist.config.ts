@@ -421,6 +421,31 @@ export default defineConfig({
             "llms-full.txt",
           ],
         },
+        {
+          /**
+           * The project map (experimental), new in 5.55. Every subpath is its
+           * own entry: the root is framework-neutral and must not load the
+           * Warlock adapter; `warlock/index.ts` is reached from an app's
+           * `warlock.config.ts`; `vitest/index.ts` is loaded by a Vitest
+           * config; `devtools/index.ts` is loaded by the devtools `panels`
+           * option by package specifier. `ui` (the devtools view module) is
+           * cloned, not bundled: devtools serves it as a browser file.
+           */
+          name: "@warlock.js/grimoire",
+          root: "../../packages/grimoire",
+          mainType: "esm",
+          formats: ["esm"],
+          entries: ["index.ts", "warlock/index.ts", "vitest/index.ts", "devtools/index.ts"],
+          clone: [
+            "README.md",
+            "LICENSE",
+            "CHANGELOG.md",
+            "ui",
+            "skills",
+            "llms.txt",
+            "llms-full.txt",
+          ],
+        },
       ],
     },
   ],

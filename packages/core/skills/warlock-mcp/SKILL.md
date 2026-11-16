@@ -1,6 +1,6 @@
 ---
 name: warlock-mcp
-description: 'Serve the app to a coding agent over the Model Context Protocol: `warlock mcp` (stdio, or `--http` on loopback with a bearer token required off loopback) and `warlock dev --mcp` / `devServer.mcp` (live registries) expose `inspect_app` + `inspect_<section>` (routes, models, resources, config, events, pages, jobs, schedules, packages), `db_schema`, `docs_search` / `docs_read` (installed @warlock.js skills, READMEs and llms files only, offline), `explain`, `check_run`, `test_run`, `requests_recent` (devtools: timeline, queries with nPlusOne, logs) and `generate_make` / `generate_add` (a unified diff from a throw-away copy; writes only with `--allow-writes`). Read-only by default. Needs `@warlock.js/ai-tools` (optional peer). Triggers: `warlock mcp`, `--allow-writes`, `--http`, `WARLOCK_MCP_TOKEN`, `warlock dev --mcp`, `devServer.mcp`, `startWarlockMcpServer`, `createMcpContext`, `createWarlockMcpTools`, `runTests`, `sandboxBackend`, `WL7003`, `WL7004`, `WL7005`, `.mcp.json`; "connect Claude Code / Cursor to my Warlock app", "let the agent ask the app", "MCP server for this project", "preview what a generator writes". Skip: the JSON report itself — the `warlock-inspect` topic; serving YOUR OWN agent tools over MCP — the `expose-as-mcp-server` topic of @warlock.js/ai-tools; one request''s timeline from the terminal — the `warlock-trace` topic.'
+description: 'Serve the app to a coding agent over the Model Context Protocol: `warlock mcp` (stdio, or `--http` on loopback with a bearer token required off loopback) and `warlock dev --mcp` / `devServer.mcp` (live registries) expose `inspect_app` + `inspect_<section>` (routes, models, resources, config, events, pages, jobs, schedules, packages), `db_schema`, `docs_search` / `docs_read` (installed @warlock.js skills, READMEs and llms files only, offline), `explain`, `check_run`, `test_run`, `requests_recent` (devtools: timeline, queries with nPlusOne, logs) and `generate_make` / `generate_add` (a unified diff from a throw-away copy; writes only with `--allow-writes`). Read-only by default. Packages and the app add tools with `withMcpTools()` on a `cli.commands` entry or `mcp.tools` in `warlock.config.ts`. Needs `@warlock.js/ai-tools` (optional peer). Triggers: `warlock mcp`, `--allow-writes`, `--http`, `WARLOCK_MCP_TOKEN`, `warlock dev --mcp`, `devServer.mcp`, `startWarlockMcpServer`, `createMcpContext`, `createWarlockMcpTools`, `withMcpTools`, `mcp.tools`, `resolveWarlockMcpTools`, `runTests`, `sandboxBackend`, `WL7003`, `WL7004`, `WL7005`, `.mcp.json`; "connect Claude Code / Cursor to my Warlock app", "let the agent ask the app", "MCP server for this project", "preview what a generator writes". Skip: the JSON report itself — the `warlock-inspect` topic; serving YOUR OWN agent tools over MCP — the `expose-as-mcp-server` topic of @warlock.js/ai-tools; one request''s timeline from the terminal — the `warlock-trace` topic.'
 ---
 
 # Warlock — `warlock mcp`
@@ -65,6 +65,56 @@ Without `--allow-writes`, `generate_make` / `generate_add` have no `write` argum
 
 A `write: true` sent to a read-only server is refused with `WL7005`. With `--allow-writes`, `write: true` runs the generator in the project and returns the same diff.
 
+## Add tools from a package or the app
+
+The built-in tools come first, then the tools `warlock.config.ts` registers; `warlock mcp` and `warlock dev --mcp` both read them. A package attaches tools to the command its register function returns with `withMcpTools()`, so the app's one `cli.commands` line brings the command and its tools. The app adds its own under `mcp.tools`.
+
+```ts
+import { command, defineConfig, inputSchema, withMcpTools } from "@warlock.js/core";
+
+// In the package: a tool, or a function of the server context (cwd, allowWrites, inspect(), docs()…).
+export function registerReportCommands() {
+  return withMcpTools(
+    command({ name: "report", description: "Print the report", action: () => undefined }),
+    [
+      (context) => ({
+        name: "report_routes",
+        description: "How many routes the app has. Read-only.",
+        input: inputSchema({ method: { type: "string", description: "Only this method." } }),
+        writes: false,
+        run: async (input) => {
+          const { routes = [] } = await context.inspect(["routes"]);
+
+          return routes.filter((route) => !input.method || route.method === input.method).length;
+        },
+      }),
+    ],
+  );
+}
+
+// In the app's warlock.config.ts:
+export default defineConfig({
+  cli: { commands: [registerReportCommands()] },
+  mcp: {
+    tools: [
+      {
+        name: "app_ping",
+        description: "Answer pong. Read-only.",
+        input: inputSchema({}),
+        writes: false,
+        run: async () => "pong",
+      },
+    ],
+  },
+});
+```
+
+- Names: `^[a-zA-Z0-9_-]{1,128}$`, prefixed with the package (`report_routes`). A name a built-in or another registered tool already has stops the server with a message naming the tool.
+- Input: `inputSchema()` only — strings (optional `enum`), integers (`minimum` / `maximum`), booleans, arrays of strings, each with a description. The schema is checked at start; every call's arguments are checked against it.
+- `writes: true` means a call changes project files: without `--allow-writes` the tool is listed but every call is refused with `WL7005` before `run`.
+- `warlock.config.ts` is part of the production build: keep a register function's imports light and load heavy modules inside `run`.
+- `startWarlockMcpServer({ context, tools })` takes the same list from code. `resolveWarlockMcpTools(context, tools)` returns what the server would serve (and throws on an invalid or clashing tool); `mcpToolsFromConfig(config)` and `mcpToolsOf(command)` read the registrations.
+
 ## HTTP rules
 
 - Binds `127.0.0.1` by default. Any other `--host` needs `--token` (or `WARLOCK_MCP_TOKEN`), otherwise `WL7004` before anything boots.
@@ -111,6 +161,7 @@ await server.close();
 - Over stdio, stdout is the JSON-RPC stream: `console.log` / `info` / `debug` are sent to stderr for the whole run.
 - `requests_recent` fails with `WL8008` when no dev server is recorded or reachable, and `WL8009` when devtools is not installed (`npx warlock add devtools`).
 - Missing `@warlock.js/ai-tools` / `@warlock.js/ai` → `WL7003` with the install line.
+- A registered tool with a taken name or an invalid schema stops `warlock mcp` with a message naming it; under `warlock dev --mcp` it prints `MCP server not started: …` and the dev server keeps running.
 
 ## See also
 

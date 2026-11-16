@@ -226,4 +226,37 @@ describe("devtoolsConnector options from src/config/devtools.ts", () => {
 
     await connector.shutdown();
   });
+
+  it("loads the panels listed in the app config and leaves out a reused id", async () => {
+    const core = await import("@warlock.js/core");
+    (core.Application as { runtimeStrategy: string }).runtimeStrategy = "development";
+    configured.devtools = {
+      panels: [
+        "./tests/fixtures/test-panel/panel.ts",
+        {
+          id: "processes",
+          title: "Copy",
+          view: new URL("./fixtures/test-panel/view.js", import.meta.url),
+        },
+      ],
+    };
+    mountDevtoolsRoutes.mockClear();
+
+    const { log } = await import("@warlock.js/logger");
+    const warn = vi.spyOn(log, "warn");
+    const { devtoolsConnector } = await import("../src/devtools-connector");
+    const connector = devtoolsConnector();
+
+    await connector.boot();
+
+    const deps = mountDevtoolsRoutes.mock.calls[0]?.[1] as { panels: { id: string }[] };
+    expect(deps.panels.map((panel) => panel.id)).toEqual(["fixture"]);
+    expect(warn).toHaveBeenCalledWith(
+      "devtools",
+      "panel",
+      expect.stringContaining('Devtools panel id "processes" is already registered'),
+    );
+
+    await connector.shutdown();
+  });
 });

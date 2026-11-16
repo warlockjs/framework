@@ -1,0 +1,61 @@
+---
+title: Grimoire
+description: An experimental project map for Warlock.js apps, written partly by Warlock and partly by AI agents.
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+<Aside type="caution" title="Experimental">
+  Grimoire is experimental in 5.55. The structure of the written files and the commands may still
+  change before they are declared stable.
+</Aside>
+
+`@warlock.js/grimoire` is a map of your project for AI agents and developers. It answers the
+questions an agent asks before changing code: where things are, what a feature is meant to do, and
+what a change will touch.
+
+- **Warlock writes the book**: one entry per source file (what it is for, its exports, what it
+  imports and what imports it), the routes, the pages of each site and the screens of a mobile app.
+- **Agents write the rest**: what the product does (features and their flows, with cases and
+  acceptance criteria), where users meet it (sites, mobile apps, pages and blocks), and the work
+  (tasks and releases).
+- **A read-only check ties them together**: every name a written file uses (a route, a page, a
+  mail, a flow) is looked up in the book, and every name that no longer exists is reported.
+
+Warlock never edits a file an agent wrote.
+
+## The folder
+
+```text
+grimoire/
+  book/                         Warlock. Not in git; rebuilt when sources change.
+  features/
+    index.json                  Warlock. Not in git.
+    <feature>/
+      README.md                 What the feature is, as it is now.
+      CHANGELOG.md              One entry per feature version.
+      flows/<flow>.md           Who, steps, cases, acceptance criteria.
+      flows/<flow>.bookmap.json Warlock. Files behind each step, tests per criterion.
+      versions/v<n>.md          The brief written before a whole-number version.
+      bookmap.json              Warlock. Owned and borrowed files, routes, pages.
+  apps/
+    <app>/README.md             One site or mobile app and its conditions.
+    <app>/layouts/<layout>.md   Blocks every page of a layout shares.
+    <app>/pages/<page>/README.md
+    <app>/screens/<screen>/README.md
+  tasks/
+    open/T-<n>-<slug>.md
+    done/<yyyy-mm>/T-<n>-<slug>.md
+    index.json                  Warlock. Not in git.
+  releases/<release>.md         The agent's brief and the collected changes.
+```
+
+## Commands
+
+```sh
+npx warlock grimoire build      # build or refresh the book
+npx warlock grimoire check      # report broken names, untested criteria, files with no owner
+npx warlock scry <file>         # what is this file?
+npx warlock scry --impact <file>
+npx warlock scry --search "new arrivals"
+```

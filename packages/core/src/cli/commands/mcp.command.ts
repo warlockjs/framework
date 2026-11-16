@@ -6,7 +6,9 @@ import { mcpCommandAction, routeConsoleToStderr } from "./mcp/mcp-command.action
  * Protocol: `inspect_*` (routes, models, config keys, events, pages, jobs…),
  * `db_schema`, `docs_search` / `docs_read` (installed skills and docs only,
  * offline), `explain`, `check_run`, `test_run`, `requests_recent` (from
- * devtools) and `generate_make` / `generate_add` (a diff by default).
+ * devtools) and `generate_make` / `generate_add` (a diff by default), then
+ * the tools `warlock.config.ts` registers (`withMcpTools()` on a
+ * `cli.commands` entry, or `mcp.tools`).
  *
  * stdio by default; `--http` serves Streamable HTTP on loopback (a token is
  * required off loopback). Read-only unless `--allow-writes`. Needs

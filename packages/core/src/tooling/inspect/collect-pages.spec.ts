@@ -2,7 +2,8 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { collectPages, exportsName, layoutChainOf } from "./collect-pages";
+import { discoverPageGraph } from "../../../../web/src/build";
+import { collectPages, discoverGraphPages, exportsName, layoutChainOf } from "./collect-pages";
 import type { InspectWarning } from "./inspect-report.types";
 
 let root: string;
@@ -56,6 +57,8 @@ describe("page facts", () => {
         path: "/blog/:slug",
         name: "blog.show",
         file: "src/app/web/blog/[slug].page.tsx",
+        setupFile: null,
+        site: null,
         layouts: ["src/app/web/layout.tsx", "src/app/web/blog/layout.tsx"],
         loaders: ["src/app/web/blog/layout.tsx", "src/app/web/blog/[slug].page.tsx"],
         actions: [],
@@ -67,5 +70,60 @@ describe("page facts", () => {
 
   it("reports no pages for an app without the web connector", () => {
     expect(collectPages(undefined, root, [])).toEqual([]);
+  });
+
+  it("reports setup file, site and the build's layout chain for a multi-site tree", async () => {
+    const page = "export default function Page() { return null; }";
+    const layout = "export default function Layout() { return null; }";
+
+    write("src/web/$sites/shop/root.tsx", layout);
+    write("src/web/$sites/shop/layout.tsx", layout);
+    write("src/web/$sites/shop/cart/layout.tsx", "export const config = { middleware: [] };");
+    write("src/web/$sites/shop/cart/cart.page.tsx", page);
+    write("src/web/$sites/shop/cart/cart.setup.ts", "export async function loader() { return {}; }");
+    write("src/web/$sites/admin/root.tsx", layout);
+    write("src/web/$sites/admin/home.page.tsx", page);
+
+    const sites = {
+      shop: { hosts: ["shop.test"] },
+      admin: { hosts: ["admin.test"], basePath: "/admin" },
+    };
+    const warnings: InspectWarning[] = [];
+    const graphPages = await discoverGraphPages(
+      root,
+      warnings,
+      async () => ({ discoverPageGraph }),
+      sites,
+    );
+    const expected = discoverPageGraph({ appRoot: root, sites }).pages.filter(
+      (entry) => entry.type === "page",
+    );
+    const pages = collectPages(undefined, root, warnings, undefined, graphPages);
+    const rel = (file: string) => path.relative(root, file).split(path.sep).join("/");
+
+    expect(warnings).toEqual([]);
+    expect(pages).toHaveLength(2);
+
+    for (const entry of expected) {
+      const reported = pages.find((candidate) => candidate.file === rel(entry.pageFile));
+
+      expect(reported?.layouts).toEqual(entry.layouts.map(rel));
+      expect(reported?.site).toBe(entry.site ?? null);
+      expect(reported?.setupFile).toBe(entry.setupFile ? rel(entry.setupFile) : null);
+    }
+
+    const cart = pages.find((candidate) => candidate.site === "shop");
+
+    expect(cart?.layouts).toEqual([
+      "src/web/$sites/shop/layout.tsx",
+      "src/web/$sites/shop/cart/layout.tsx",
+    ]);
+    expect(cart?.setupFile).toBe("src/web/$sites/shop/cart/cart.setup.ts");
+    expect(cart?.loaders).toEqual(["src/web/$sites/shop/cart/cart.setup.ts"]);
+    expect(pages.find((candidate) => candidate.site === "admin")?.setupFile).toBeNull();
+  });
+
+  it("returns no graph when web is absent", async () => {
+    expect(await discoverGraphPages(root, [], async () => undefined)).toBeUndefined();
   });
 });

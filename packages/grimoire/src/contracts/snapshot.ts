@@ -1,0 +1,58 @@
+/**
+ * Everything a question needs, loaded once: the written files, the book, the
+ * owners, the book maps, the proofs and the test results. `openGrimoire()`
+ * builds it; `checkGrimoire()`, `scry()` and the devtools panel read it.
+ */
+import type { BookMobileApp, BookSite } from "./adapter";
+import type { BookAnnotations, LoadedBook } from "./book";
+import type { CollectedFiles, Ownership } from "./bookmap";
+import type { GrimoireFinding, RouteFreshness } from "./findings";
+import type { ProofLine, TestResultsStore } from "./test-results";
+import type { WrittenGrimoire } from "./written";
+
+export type GrimoireSnapshot = {
+  /** Absolute project root. */
+  root: string;
+  written: WrittenGrimoire;
+  /** Structure errors (`GR1xxx`) from parsing the written files. */
+  structure: GrimoireFinding[];
+  book: LoadedBook;
+  ownership: Ownership;
+  /** Written apps matched to the sites and mobile apps the adapter reports, by app id. */
+  apps: Record<string, AppMatch>;
+  proofs: ProofLine[];
+  /** `GR4003`–`GR4005` findings from reading the `@proves` lines. */
+  proofFindings: GrimoireFinding[];
+  /** `null` when no test run has written results. */
+  results: TestResultsStore | null;
+  collected: CollectedFiles;
+  annotations: BookAnnotations;
+  routes: RouteFreshness;
+};
+
+/** Options of `openGrimoire()`. */
+export type OpenGrimoireOptions = {
+  /** See `BuildBookOptions.routes`. Default `cached`. */
+  routes?: "fresh" | "cached";
+  /** Write the book and the collected files (default `true`). `false` computes in memory only. */
+  write?: boolean;
+  /** Rebuild every book entry. */
+  force?: boolean;
+  now?: () => Date;
+};
+
+/** A check rule: reads the snapshot, returns findings. Never writes. */
+export type GrimoireRule = (snapshot: GrimoireSnapshot) => GrimoireFinding[];
+
+/**
+ * A written app (`grimoire/apps/<id>`) matched by its `root` to what the
+ * adapter reports: a `site` app to a `BookSite` with the same root, a
+ * `mobile` app to a `BookMobileApp` with the same root. `null` when nothing
+ * matches (`GR5005`).
+ */
+export type AppMatch = {
+  app: string;
+  type: "site" | "mobile";
+  site: BookSite | null;
+  mobile: BookMobileApp | null;
+};

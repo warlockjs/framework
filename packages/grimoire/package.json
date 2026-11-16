@@ -1,0 +1,87 @@
+{
+  "name": "@warlock.js/grimoire",
+  "version": "5.54.0",
+  "type": "module",
+  "description": "Experimental project map for Warlock.js apps: a generated book of the code, agent-written features, flows, apps, tasks and releases, a read-only check, and scry queries for agents.",
+  "keywords": [
+    "warlock.js",
+    "grimoire",
+    "project map",
+    "agents",
+    "documentation"
+  ],
+  "author": "hassanzohdy",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/warlockjs/framework.git",
+    "directory": "packages/grimoire"
+  },
+  "bugs": {
+    "url": "https://github.com/warlockjs/framework/issues"
+  },
+  "homepage": "https://warlock.js.org",
+  "engines": {
+    "node": ">=22.15.0"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "generate:llms": "node scripts/generate-llms.mjs"
+  },
+  "main": "./src/index.ts",
+  "module": "./src/index.ts",
+  "typings": "./src/index.ts",
+  "packageManager": "pnpm@11.24.0",
+  "warlock": {
+    "environment": "server"
+  },
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./warlock": {
+      "types": "./src/warlock/index.ts",
+      "import": "./src/warlock/index.ts",
+      "default": "./src/warlock/index.ts"
+    },
+    "./vitest": {
+      "types": "./src/vitest/index.ts",
+      "import": "./src/vitest/index.ts",
+      "default": "./src/vitest/index.ts"
+    },
+    "./devtools": {
+      "types": "./src/devtools/index.ts",
+      "import": "./src/devtools/index.ts",
+      "default": "./src/devtools/index.ts"
+    }
+  },
+  "peerDependencies": {
+    "@warlock.js/core": "5.54.0",
+    "@warlock.js/web": "5.54.0"
+  },
+  "peerDependenciesMeta": {
+    "@warlock.js/web": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/node": "^25.6.2",
+    "@warlock.js/core": "workspace:^",
+    "@warlock.js/web": "workspace:^",
+    "typescript": "7.0.2",
+    "vitest": "5.0.3"
+  },
+  "files": [
+    "src",
+    "ui",
+    "skills",
+    "llms.txt",
+    "llms-full.txt",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ]
+}

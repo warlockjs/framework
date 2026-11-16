@@ -3,6 +3,8 @@ if (!location.pathname.endsWith("/"))
 
 const app = document.querySelector("#app");
 const tabs = document.querySelectorAll(".tab");
+/** Ids of the registered panels: the server renders their tab buttons with `data-panel`. */
+const panelIds = new Set(Array.from(tabs, (button) => button.dataset?.panel).filter(Boolean));
 const state = {
   tab: "requests",
   requests: [],
@@ -61,10 +63,15 @@ function sql(query) {
 function canExplain(query) {
   return query.driver === "postgres" && /^(select|with)\b/i.test((query.sql || "").trim());
 }
-function setTab(tab) {
+function showTab(tab) {
   state.tab = tab;
   tabs.forEach((button) => button.classList.toggle("is-active", button.dataset.tab === tab));
   render();
+}
+function setTab(tab) {
+  // A tab click opens the tab's first view, so a panel's hash route is dropped.
+  if (hashPanel()) history.replaceState(null, "", location.pathname + location.search);
+  showTab(tab);
 }
 
 function requestRow(request, selected) {
@@ -977,16 +984,99 @@ function apiView() {
 
 let renderVersion = 0;
 
-async function processesView() {
-  const rows = await api("api/processes");
-  const section = el("section", { class: "card detail" }, [el("h2", { text: "Processes" })]);
-  section.append(el("button", { text: "Refresh", onclick: () => render() }));
-  if (!rows.length)
-    section.append(empty("No supervised processes. Configure with warlock add process."));
-  for (const row of rows) {
-    section.append(el("pre", { text: JSON.stringify(row, null, 2) }));
+const SVG_NS = "http://www.w3.org/2000/svg";
+
+/** Like `el()`, for SVG elements (graphs drawn by panels). */
+function svg(tag, attrs = {}, children = []) {
+  const node = document.createElementNS(SVG_NS, tag);
+  for (const [key, attr] of Object.entries(attrs)) {
+    if (attr == null) continue;
+    if (key === "text") node.textContent = attr;
+    else if (key.startsWith("on")) node.addEventListener(key.slice(2), attr);
+    else node.setAttribute(key, attr);
   }
-  return section;
+  for (const child of Array.isArray(children) ? children : [children]) node.append(child);
+  return node;
+}
+
+/** A panel's data URL: `""`, `"search?q=x"`, `"/flows/a"` and `"?page=2"` all resolve under `api/<id>`. */
+function panelApiUrl(id, path = "") {
+  const suffix = !path || path.startsWith("/") || path.startsWith("?") ? path : `/${path}`;
+  return `api/${id}${suffix}`;
+}
+
+/** The link to one of a panel's views: `#<id>` or `#<id>/<route>`. */
+function panelHref(id, route = "") {
+  return `#${id}${route ? `/${route}` : ""}`;
+}
+
+/** The panel that owns the location hash, if any. */
+function hashPanel() {
+  const owner = location.hash.slice(1).split("/")[0];
+  return panelIds.has(owner) ? owner : undefined;
+}
+
+/** The panel's part of the hash, as written: `#grimoire/flow/checkout` gives `flow/checkout`. */
+function panelRoute(id) {
+  const hash = location.hash.slice(1);
+  return hash.startsWith(`${id}/`) ? hash.slice(id.length + 1) : "";
+}
+
+function panelTitle(id) {
+  return (
+    Array.from(tabs)
+      .find((button) => button.dataset?.panel === id)
+      ?.textContent?.trim() || id
+  );
+}
+
+const panelModules = new Map();
+
+/** Imports a panel's view module once per page load; a failed import is retried next time. */
+function loadPanelModule(id) {
+  if (!panelModules.has(id)) {
+    const loading = import(new URL(`panels/${id}/view.js`, location.href).href);
+    loading.catch(() => panelModules.delete(id));
+    panelModules.set(id, loading);
+  }
+  return panelModules.get(id);
+}
+
+/** What a panel's view module receives; see the devtools docs on registering a panel. */
+function panelContext(id, root) {
+  return {
+    id,
+    root,
+    route: panelRoute(id),
+    api: (path, init) => api(panelApiUrl(id, path), init),
+    asset: (name) => `panels/${id}/${name}`,
+    href: (route) => panelHref(id, route),
+    navigate(route) {
+      const next = panelHref(id, route);
+      if (location.hash === next) render();
+      else location.hash = next;
+    },
+    refresh: () => render(),
+    el,
+    svg,
+    empty,
+  };
+}
+
+async function panelView(id) {
+  let module;
+  try {
+    module = await loadPanelModule(id);
+  } catch (error) {
+    throw new Error(
+      `the ${panelTitle(id)} panel's view module did not load (${error.message}). Check the terminal running warlock dev.`,
+      { cause: error },
+    );
+  }
+  if (typeof module?.default !== "function")
+    throw new Error(`the ${panelTitle(id)} panel's view module has no default export function.`);
+  const root = el("section", { class: "panel", "data-panel": id });
+  return (await module.default(panelContext(id, root))) ?? root;
 }
 
 async function render() {
@@ -1007,8 +1097,8 @@ async function render() {
                   ? await logsView()
                   : state.tab === "routes"
                     ? await routesView()
-                    : state.tab === "processes"
-                      ? await processesView()
+                    : panelIds.has(state.tab)
+                      ? await panelView(state.tab)
                       : apiView();
     if (version === renderVersion) app.replaceChildren(view);
   } catch (error) {
@@ -1051,4 +1141,11 @@ for (const type of ["request", "mail", "log", "ai", "agent-trace"])
       /* malformed stream data is ignored */
     }
   });
-render();
+// A panel link (`#<id>/<route>`), typed, followed or reached with Back, opens that panel view.
+window.addEventListener("hashchange", () => {
+  const panel = hashPanel();
+  if (panel) showTab(panel);
+});
+const startPanel = hashPanel();
+if (startPanel) showTab(startPanel);
+else render();

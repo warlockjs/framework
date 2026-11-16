@@ -129,6 +129,13 @@ async function runRouteHooks(
  * Bound functions do not inherit static properties, so the handler metadata that
  * documentation and typings read (`responseSchema`) is copied onto the bound copy.
  */
+/** Class name of a controller instance or class; `null` for a plain object literal. */
+function controllerClassName(controller: GenericObject): string | null {
+  const name = typeof controller === "function" ? controller.name : controller.constructor?.name;
+
+  return name && name !== "Object" && name !== "Function" ? name : null;
+}
+
 function copyResponseSchema(source: unknown, target: RequestHandler): void {
   const responseSchema = (source as RequestHandler | undefined)?.responseSchema;
 
@@ -504,8 +511,14 @@ export class Router {
       options.sites = groupSites;
     }
 
+    let controllerName: string | null | undefined;
+    let actionName: string | undefined;
+
     if (Array.isArray(handler)) {
       const [controller, action] = handler;
+
+      controllerName = controllerClassName(controller);
+      actionName = String(action);
 
       if (typeof controller[action] !== "function") {
         throw new WarlockError(
@@ -541,6 +554,7 @@ export class Router {
       $prefixStack: [...this.stacks.prefix],
       // Inject source file from stacks if set
       sourceFile: this.stacks.sourceFile || "",
+      ...(actionName !== undefined ? { $controller: controllerName ?? null, $action: actionName } : {}),
     };
 
     const routes = this.routeReplacementTransaction?.routes ?? this.routes;

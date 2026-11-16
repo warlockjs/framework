@@ -1,7 +1,11 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import type { FastifyInstance, FastifyReply } from "fastify";
+import type { MountedDevtoolsPanel } from "../panels";
 import { resolveUiRoot } from "../ui-root";
+
+/** Where `index.html` takes the registered panels' tab buttons. */
+const PANEL_TABS_MARKER = "<!-- devtools:panel-tabs -->";
 
 /**
  * Where an asset's bytes come from: a file in this package's `ui/` folder.
@@ -46,15 +50,45 @@ export function sendFile(reply: FastifyReply, file: string, contentType: string)
     .send(readFileSync(file));
 }
 
+function escapeHtml(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
+}
+
+/** `index.html` with one tab button per registered panel, in registration order. */
+export function renderIndexHtml(html: string, panels: readonly MountedDevtoolsPanel[]): string {
+  const buttons = panels
+    .map(
+      (panel) =>
+        `<button class="tab" data-tab="${panel.id}" data-panel="${panel.id}">${escapeHtml(panel.title)}</button>`,
+    )
+    .join("\n        ");
+
+  return html.replace(PANEL_TABS_MARKER, buttons);
+}
+
 /**
- * Serves the static dashboard: `index.html` at the dashboard root and the
- * whitelisted assets (`app.js`, `app.css`, the vendored Scalar bundle as
- * `scalar.js`, and the vendored Swagger UI files plus their init script). The asset name is matched against a fixed whitelist — never
- * joined into a filesystem path — so no request can traverse outside it.
+ * Serves the static dashboard: `index.html` at the dashboard root (with a
+ * tab per registered panel) and the whitelisted assets (`app.js`, `app.css`,
+ * the vendored Scalar bundle as `scalar.js`, and the vendored Swagger UI
+ * files plus their init script). The asset name is matched against a fixed
+ * whitelist — never joined into a filesystem path — so no request can
+ * traverse outside it.
  */
-export function registerUiAssets(server: FastifyInstance): void {
+export function registerUiAssets(
+  server: FastifyInstance,
+  panels: readonly MountedDevtoolsPanel[] = [],
+): void {
   const serveIndex = (_request: unknown, reply: FastifyReply): void => {
-    sendFile(reply, path.join(resolveUiRoot(), "index.html"), "text/html; charset=utf-8");
+    const html = readFileSync(path.join(resolveUiRoot(), "index.html"), "utf8");
+
+    reply
+      .header("Cache-Control", "no-store")
+      .header("Content-Type", "text/html; charset=utf-8")
+      .send(renderIndexHtml(html, panels));
   };
 
   server.get("/", serveIndex);

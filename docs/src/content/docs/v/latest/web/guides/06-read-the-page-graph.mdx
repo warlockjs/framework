@@ -1,0 +1,51 @@
+---
+title: Read the page graph
+slug: v/latest/web/guides/read-the-page-graph
+description: Read the pages, setup files, sites and layout chains the web build sees, without starting a server or a build.
+sidebar:
+  order: 6
+  label: Read the page graph
+---
+
+`@warlock.js/web/build` exports the page-graph discovery the build runs. Use it
+when a tool must report the same pages, layouts and sites as the build.
+
+```ts
+import { discoverPageGraph } from "@warlock.js/web/build";
+
+const { pages } = discoverPageGraph({ appRoot: process.cwd(), sites: webConfig.sites });
+
+for (const page of pages) {
+  if (page.type !== "page") continue;
+
+  console.log(page.routePath, page.site, page.setupFile, page.layouts);
+}
+```
+
+Discovery only reads files. It does not start a server, run a build or import
+page modules.
+
+## Exports
+
+| Export                                         | What it gives you                                                                                  |
+| ---------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `discoverPageGraph(options)`                   | The pages and locale files found under `src`.                                                      |
+| `layoutChainFor(pageFile, webRoot)`            | The `layout.tsx` files from the web root down to the page's folder, outermost first.               |
+| `DiscoveredRoutablePage`                       | A page: `routeName`, `routePath`, `pageFile`, `setupFile`, `layouts`, `layoutSetupFiles`, `site`.  |
+| `DiscoveredPage`, `DiscoveredPageGraph`        | The union of page kinds (page, error, forbidden) and the graph result.                             |
+| `DiscoverPagesOptions`                         | `appRoot`, `srcDir` and `sites`.                                                                   |
+
+Pass `sites` (your `web.sites` config) for a multi-site app. Each page then
+carries the `site` key of the folder it lives in. Without `sites`, `site` is
+absent.
+
+`layouts` is outermost first and is the same chain the build composes.
+
+## The inspect report
+
+The `pages` section of [`warlock inspect`](/v/latest/core/cli/inspect/) is built
+from this graph when `@warlock.js/web` is installed, so it always agrees with
+the build.
+
+Import this entry lazily and only from build or tooling code. Do not import it
+from page modules.

@@ -105,6 +105,10 @@ const fullSections = [
   { label: "Reference", dir: "reference", collapsed: true },
 ];
 
+// Grimoire (experimental): an overview plus one guide per area, ordered by
+// the number prefix of each file in grimoire/guides.
+const grimoireSections = [{ label: "Guides", dir: "guides", collapsed: false }];
+
 // Sitemap is small enough (one connector, one config, one page export) that
 // Guides/Recipes would sit empty — Essentials + Reference cover it.
 const sitemapSections = [
@@ -592,6 +596,7 @@ const topics = [
   // Devtools is one page (install, panels, safety): overview only.
   pkgTopic({ label: "Devtools", slug: "devtools" }, "latest"),
   pkgTopic({ label: "Process", slug: "process" }, "latest"),
+  pkgTopic({ label: "Grimoire", slug: "grimoire", sections: grimoireSections }, "latest"),
 
   // Data
   pkgTopic({ label: "Cascade", slug: "cascade", sections: cascadeSections }, "latest"),

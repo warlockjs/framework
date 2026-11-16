@@ -19,6 +19,12 @@ export {
   type ServeToolContract,
 } from "./load-ai-tools";
 export {
+  mcpToolsFromConfig,
+  mcpToolsOf,
+  withMcpTools,
+  type WarlockMcpToolSource,
+} from "./mcp-tool-registry";
+export {
   createWarlockMcpTools,
   describeToolError,
   makeSpecFromInput,
@@ -26,6 +32,7 @@ export {
   type WarlockMcpContext,
   type WarlockMcpTool,
 } from "./mcp-tools";
+export { resolveWarlockMcpTools } from "./resolve-mcp-tools";
 export {
   isLoopbackHost,
   resolveMcpTransport,

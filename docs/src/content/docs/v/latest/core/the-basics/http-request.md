@@ -376,7 +376,7 @@ Real example:
 ```ts title="src/app/auth/controllers/login.controller.ts"
 import { t, type Request, type RequestHandler } from "@warlock.js/core";
 import { type LoginSchema, loginSchema } from "../schema/login.schema";
-import { loginUseCase } from "../use-cases/login.usecase";
+import { loginUseCase } from "../use-cases/login.use-case";
 
 export const login: RequestHandler<Request<LoginSchema>> = async ({ request, response }) => {
   const result = await loginUseCase({

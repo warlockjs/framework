@@ -51,13 +51,91 @@ export type DevtoolsOptions = {
    * @default false
    */
   allowProxied?: boolean;
+  /**
+   * Extra dashboard tabs. Each entry is a module specifier, loaded only in
+   * development, whose default export is a `DevtoolsPanelExport`: a package
+   * export such as `"@warlock.js/grimoire/devtools"` (resolved from the app
+   * root) or a path starting with `./` (relative to the app root). An entry
+   * may also be a `DevtoolsPanel` object.
+   *
+   * @default []
+   */
+  panels?: readonly (string | DevtoolsPanel)[];
 };
 
 /** `DevtoolsOptions` with every default applied. */
 export type ResolvedDevtoolsOptions = Required<
   Pick<DevtoolsOptions, "path" | "maxRequests" | "nPlusOneThreshold">
 > &
-  Pick<DevtoolsOptions, "allowedHosts" | "allowProxied">;
+  Pick<DevtoolsOptions, "allowedHosts" | "allowProxied" | "panels">;
+
+/** HTTP methods a panel data route may answer. */
+export type DevtoolsPanelMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+
+/** What a panel data route handler receives. */
+export type DevtoolsPanelRequest = {
+  /** Path parameters, e.g. `{ name: "checkout" }` for the route path `/flows/:name`. */
+  params: Readonly<Record<string, string>>;
+  /** Query string values; a key given more than once is an array. */
+  query: Readonly<Record<string, string | readonly string[]>>;
+  /** The parsed request body; `undefined` when there is none. */
+  body: unknown;
+};
+
+/**
+ * One data route of a panel, served at `<path>/api/<panel id><route path>`
+ * behind the devtools guard. The handler's return value is sent as JSON with
+ * `Cache-Control: no-store`; `undefined` sends `204`. A thrown error with a
+ * numeric `statusCode` answers that status with `{ error: message }`.
+ */
+export type DevtoolsPanelRoute = {
+  /** @default "GET" */
+  method?: DevtoolsPanelMethod;
+  /** `""` for the panel's base URL, or a path starting with `/` (`"/search"`, `"/flows/:name"`). */
+  path: string;
+  handler: (request: DevtoolsPanelRequest) => unknown;
+};
+
+/**
+ * A dashboard tab added through the devtools `panels` option.
+ *
+ * The tab shows `title`. Clicking it loads `view`, a browser ES module that
+ * devtools serves at `<path>/panels/<id>/view.js`; its default export renders
+ * the panel and calls the panel's `routes`.
+ */
+export type DevtoolsPanel = {
+  /** Lower-case letters, digits and dashes, starting with a letter. Names the tab, the URL segment and the hash route. */
+  id: string;
+  /** The tab label. */
+  title: string;
+  /** The view module: an absolute file path or a `file:` URL. */
+  view: string | URL;
+  /** Data routes the view calls. */
+  routes?: readonly DevtoolsPanelRoute[];
+  /**
+   * More files the view loads, by served name: `{ "graph.js": "/abs/graph.js" }`
+   * is served at `<path>/panels/<id>/graph.js`, so the view can
+   * `import "./graph.js"`. Names are plain file names (no folders).
+   */
+  assets?: Readonly<Record<string, string | URL>>;
+};
+
+/** What a panel factory receives. */
+export type DevtoolsPanelFactoryContext = {
+  /** The app's root directory. */
+  root: string;
+};
+
+/** One panel or several. */
+export type DevtoolsPanels = DevtoolsPanel | readonly DevtoolsPanel[];
+
+/**
+ * The default export of a module listed in the devtools `panels` option: a
+ * panel, a list of panels, or a function (sync or async) that returns either.
+ */
+export type DevtoolsPanelExport =
+  | DevtoolsPanels
+  | ((context: DevtoolsPanelFactoryContext) => DevtoolsPanels | Promise<DevtoolsPanels>);
 
 /** A source file position, as shown next to an N+1 warning. */
 export type DevtoolsCallerLocation = {

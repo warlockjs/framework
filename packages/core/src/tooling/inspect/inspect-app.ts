@@ -14,7 +14,7 @@ import {
   createAppModuleImporter,
   readAppPackage,
 } from "./collect-packages";
-import { collectPages, installedPagesFromConnectors } from "./collect-pages";
+import { collectPages, discoverGraphPages, installedPagesFromConnectors } from "./collect-pages";
 import { collectRoutes } from "./collect-routes";
 import { collectWiring, wiringFilesFromScan, type WiringSourceFile } from "./collect-wiring";
 import { groupListeners, type RecordedListener } from "./event-recorder";
@@ -174,6 +174,7 @@ export async function inspectApp(options: InspectOptions = {}): Promise<InspectR
       cwd,
       warnings,
       report.files,
+      options.pages === undefined ? await discoverGraphPages(cwd, warnings) : undefined,
     );
   }
 

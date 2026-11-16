@@ -89,6 +89,12 @@
           "handler": {
             "type": "string"
           },
+          "controller": {
+            "type": ["string", "null"]
+          },
+          "action": {
+            "type": ["string", "null"]
+          },
           "description": {
             "type": ["string", "null"]
           },
@@ -397,7 +403,17 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["path", "name", "file", "layouts", "loaders", "actions", "guard"],
+        "required": [
+          "path",
+          "name",
+          "file",
+          "layouts",
+          "loaders",
+          "actions",
+          "guard",
+          "setupFile",
+          "site"
+        ],
         "properties": {
           "path": {
             "type": "string"
@@ -427,6 +443,12 @@
             }
           },
           "guard": {
+            "type": ["string", "null"]
+          },
+          "setupFile": {
+            "type": ["string", "null"]
+          },
+          "site": {
             "type": ["string", "null"]
           }
         }
@@ -510,44 +532,6 @@
           },
           "version": {
             "type": "string"
-          }
-        }
-      }
-    },
-    "components": {
-      "type": "object",
-      "required": ["schemas"],
-      "properties": {
-        "schemas": {
-          "type": "object",
-          "additionalProperties": {
-            "type": "object"
-          }
-        }
-      }
-    },
-    "warnings": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "required": ["code", "message", "source"],
-        "properties": {
-          "code": {
-            "oneOf": [
-              {
-                "type": "string",
-                "pattern": "^WL[0-9]{4}$"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "message": {
-            "type": "string"
-          },
-          "source": {
-            "type": ["string", "null"]
           }
         }
       }
@@ -649,6 +633,28 @@
               "type": "string"
             }
           },
+          "lines": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "about": {
+            "type": ["string", "null"]
+          },
+          "tags": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "exportDocs": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
           "imports": {
             "type": "array",
             "items": {
@@ -663,6 +669,44 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "components": {
+      "type": "object",
+      "required": ["schemas"],
+      "properties": {
+        "schemas": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object"
+          }
+        }
+      }
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["code", "message", "source"],
+        "properties": {
+          "code": {
+            "oneOf": [
+              {
+                "type": "string",
+                "pattern": "^WL[0-9]{4}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "source": {
+            "type": ["string", "null"]
           }
         }
       }
