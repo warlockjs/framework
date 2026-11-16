@@ -161,4 +161,25 @@ describe("checkTasks", () => {
     ]);
     expect(codes([task("T-2", brief("features/catalog/versions/v3.md"))], root)).toEqual([]);
   });
+
+  it("GR7005: never looks up a brief outside grimoire/", () => {
+    const root = mkdtempSync(path.join(tmpdir(), "grimoire-tasks-"));
+
+    roots.push(root);
+    mkdirSync(path.join(root, "grimoire"), { recursive: true });
+    writeFileSync(path.join(root, "outside.md"), "# outside\n");
+
+    const brief = (value: string) => ({ fields: [{ key: "Brief", value, at: at("t.md", 7) }] });
+    const messages = (value: string) =>
+      run([task("T-1", brief(value))], root).map((item) => `${item.code} ${item.message}`);
+
+    // The file exists, but only by leaving the folder.
+    expect(messages("../outside.md")).toEqual([
+      'GR7005 task T-1 points at brief "../outside.md", which is not a path inside grimoire/',
+    ]);
+    expect(messages("..\\outside.md")).toEqual([
+      'GR7005 task T-1 points at brief "..\\outside.md", which is not a path inside grimoire/',
+    ]);
+    expect(messages(path.join(root, "outside.md"))[0]).toMatch(/^GR7005 /);
+  });
 });

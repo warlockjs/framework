@@ -37,6 +37,8 @@ npx warlock grimoire build
 `cli.commands` of `warlock.config.ts` (it creates the `cli` block when there is none), adds the
 generated files to `.gitignore`, adds the Grimoire tab to `src/config/devtools.ts`, and adds
 `grimoireReporter()` to `vite.config.ts` when the app runs Vitest. Running it twice changes nothing.
+When one of those settings comes from a variable (`cli: cliSettings`), it leaves the file as it is and
+prints the line to add yourself.
 
 ## Who writes what
 

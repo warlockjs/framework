@@ -38,6 +38,8 @@ describe("devtoolsConnector", () => {
   it("warns and mounts nothing in production", async () => {
     const core = await import("@warlock.js/core");
     (core.Application as { runtimeStrategy: string }).runtimeStrategy = "production";
+    // A listed panel module is never imported in production: this one would fail to load and be reported.
+    configured.devtools = { panels: ["./tests/fixtures/test-panel/absent.ts"] };
 
     const { log } = await import("@warlock.js/logger");
     const warn = vi.spyOn(log, "warn");
@@ -46,6 +48,9 @@ describe("devtoolsConnector", () => {
     const connector = devtoolsConnector();
 
     await connector.boot();
+    delete configured.devtools;
+
+    expect(warn).not.toHaveBeenCalledWith("devtools", "panel", expect.anything());
 
     expect(warn).toHaveBeenCalledWith(
       "devtools",

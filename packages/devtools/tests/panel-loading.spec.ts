@@ -30,6 +30,20 @@ describe("loadDevtoolsPanels", () => {
     });
   });
 
+  it("reports a panels option that is not a list instead of loading it letter by letter", async () => {
+    const warn = vi.fn();
+    const importModule = vi.fn();
+    const loaded = await loadDevtoolsPanels(
+      "@warlock.js/grimoire/devtools" as unknown as readonly string[],
+      { root: packageRoot, warn, importModule },
+    );
+
+    expect(loaded).toEqual([]);
+    expect(importModule).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalledOnce();
+    expect(warn.mock.calls[0]?.[0]).toContain('The devtools "panels" option must be a list');
+  });
+
   it("accepts a list of panels and a panel object", async () => {
     const loaded = await loadDevtoolsPanels(["list-module", panel("inline")], {
       root: packageRoot,

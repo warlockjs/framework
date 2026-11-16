@@ -77,7 +77,8 @@ function nodeTarget(id) {
   const rest = id.slice(colon + 1);
 
   if (type === "file" || type === "feature" || type === "flow") return targetOf(type, rest);
-  if (type === "page" || type === "layout") {
+  // A layout has no view of its own: its blocks are listed on each page that uses it.
+  if (type === "page") {
     const [app, page] = rest.split("/");
     return `page/${encodeURIComponent(app ?? "")}/${encodeURIComponent(page ?? "")}`;
   }
@@ -267,7 +268,11 @@ async function homeView(ctx) {
     ]),
     el("div", { class: "card" }, [
       el("h3", { text: "Tasks" }),
-      link(ctx, `${data.tasks.open.length} open, ${data.tasks.waiting.length} waiting`, "tasks"),
+      link(
+        ctx,
+        `${data.tasks.open.length - data.tasks.waiting.length} open, ${data.tasks.waiting.length} waiting`,
+        "tasks",
+      ),
       el("p", { class: "muted", text: `${data.tasks.done.length} done` }),
     ]),
     el("div", { class: "card" }, [
@@ -690,8 +695,10 @@ async function appsView(ctx) {
 
 async function tasksView(ctx, only) {
   const data = await ctx.api("tasks");
+  // `waiting` is the part of `open` that waits for the owner: each task shows in one group only.
+  const waiting = new Set(data.waiting.map((task) => task.id));
   const groups = [
-    ["Open", data.open],
+    ["Open", data.open.filter((task) => !waiting.has(task.id))],
     ["Waiting for approval", data.waiting],
     ["Done", data.done],
   ]

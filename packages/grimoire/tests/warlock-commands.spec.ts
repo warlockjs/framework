@@ -64,7 +64,7 @@ describe("warlock grimoire build", () => {
     expect(await runBuild({ root: copy.root, adapter, io })).toBe(0);
     expect(io.stdout[0]).toMatch(/^book {6}35 files \(\d+ written, 0 removed\), routes fresh$/);
     expect(io.stdout[1]).toBe(
-      "features  3 (bookmaps written: 9)   tasks  2 open, 1 waiting, 1 done",
+      "features  3 (bookmaps written: 9)   tasks  1 open, 1 waiting, 1 done",
     );
     expect(adapter.calls.routes).toBe(1);
 
@@ -118,6 +118,22 @@ describe("warlock grimoire build", () => {
     expect(io.stdout.at(-1)).toBe("site      public/grimoire/index.html");
     expect(existsSync(path.join(copy.root, "public", "grimoire", "index.html"))).toBe(true);
   });
+
+  it("refuses an --out outside the project or the project root itself, before writing", async () => {
+    const copy = fixture();
+
+    for (const out of ["", ".", "..", "../elsewhere", path.join(copy.root, "..", "elsewhere")]) {
+      const io = capture();
+      const adapter = createShopAdapter();
+
+      expect(await runBuild({ root: copy.root, adapter, io }, { site: true, out })).toBe(1);
+      expect(io.stderr[0]).toMatch(/^GR9006 {2}--out .* is not a folder inside the project/);
+      expect(adapter.calls.files).toBe(0);
+    }
+
+    expect(existsSync(path.join(copy.root, "index.html"))).toBe(false);
+    expect(existsSync(path.join(copy.root, "..", "elsewhere"))).toBe(false);
+  });
 });
 
 describe("warlock grimoire check", () => {
@@ -148,6 +164,27 @@ describe("warlock grimoire check", () => {
 
     expect(report.ok).toBe(false);
     expect(report.findings[0]).toMatchObject({ code: "GR2001", expected: false });
+  });
+
+  it("goes on with cached routes when the app does not boot: a GR8002 warning, exit 0", async () => {
+    const copy = fixture();
+
+    await runBuild({ root: copy.root, adapter: createShopAdapter(), io: capture() });
+    copy.replace("src/app/orders/routes.ts", "\n", "\n// changed\n");
+
+    const adapter: BookAdapter = {
+      ...createShopAdapter(),
+      routes: async () => {
+        throw new Error("the app did not boot (src/app/orders/routes.ts: boom)");
+      },
+    };
+    const io = capture();
+
+    expect(await runCheck({ root: copy.root, adapter, io })).toBe(0);
+    expect(io.stdout).toContain(
+      "-  GR8002  warning  route facts could not be read: the app did not boot (src/app/orders/routes.ts: boom)",
+    );
+    expect(io.stdout.at(-1)).toBe("0 errors, 10 warnings, 8 expected  (routes: stale)");
   });
 });
 
@@ -411,6 +448,9 @@ describe("Grimoire MCP tools", () => {
     );
     await expect(byName.get("grimoire_explain")?.run({ code: "GR0000" })).rejects.toThrow(
       /Unknown Grimoire code/,
+    );
+    await expect(byName.get("grimoire_search")?.run({ text: "order", limit: 0 })).rejects.toThrow(
+      /^GR9006: --limit must be a whole number above 0/,
     );
   });
 });

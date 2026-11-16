@@ -1,7 +1,8 @@
 /**
  * Answers one scry query from a snapshot. Pure: reads the snapshot only.
  */
-import { normalizeRoutePath } from "../bookmap";
+import { packagesOf } from "../book";
+import { normalizeRoutePath, routeMatches } from "../bookmap";
 import { checkGrimoire } from "../check";
 import { GrimoireError } from "../codes";
 import type { BookFile, BookRoute } from "../contracts/adapter";
@@ -24,11 +25,8 @@ import type {
 } from "../contracts/scry";
 import type { GrimoireSnapshot } from "../contracts/snapshot";
 import type { WrittenFeature, WrittenFlow } from "../contracts/written";
-import { fileGraph, importClosure, importerClosure, packageNameOf } from "../graph";
+import { fileGraph, importClosure, importerClosure } from "../graph";
 import { bookEntryPaths, projectPath, toPosixPath } from "../paths";
-
-/** `ScryFileResult` plus the path of the file's book entry (`grimoire/book/...json`). */
-export type ScryFileAnswer = ScryFileResult & { bookEntry: string | null };
 
 const byText = (left: string, right: string): number => (left < right ? -1 : left > right ? 1 : 0);
 const sortedUnique = (items: Iterable<string>): string[] => [...new Set(items)].sort(byText);
@@ -83,20 +81,6 @@ function mobileApp(snapshot: GrimoireSnapshot, mobile: string): string {
   return match?.app ?? mobile;
 }
 
-function packagesOf(file: BookFile): string[] {
-  const names = new Set<string>();
-
-  for (const entry of file.imports) {
-    if (entry.file !== null) continue;
-
-    const name = packageNameOf(entry.specifier);
-
-    if (name !== null && !name.startsWith("node:")) names.add(name);
-  }
-
-  return [...names].sort(byText);
-}
-
 /** The book entry of one file, as the book writes it. */
 function entryOf(snapshot: GrimoireSnapshot, file: BookFile): BookEntry {
   const facts = snapshot.book.facts;
@@ -119,6 +103,7 @@ function entryOf(snapshot: GrimoireSnapshot, file: BookFile): BookEntry {
     borrowedBy: sortedUnique(annotation?.borrowedBy ?? []),
     flows: sortedUnique(annotation?.flows ?? []),
     exports: file.exports.map((entry) => ({ name: entry.name, about: entry.about })),
+    // The same list the book entry holds (bare Node builtins such as `fs` left out too).
     packages: packagesOf(file),
     imports: sortedUnique(
       file.imports.flatMap((entry) => (entry.file === null ? [] : [entry.file])),
@@ -193,7 +178,7 @@ function bookEntryOf(snapshot: GrimoireSnapshot, file: string): string | null {
 function scryFile(
   snapshot: GrimoireSnapshot,
   query: Extract<ScryQuery, { type: "file" }>,
-): ScryFileAnswer {
+): ScryFileResult {
   const file = bookFile(snapshot, fileOf(snapshot, query.file));
 
   return {
@@ -256,25 +241,22 @@ function scryImpact(
     .map((bookmap) => bookmap.ref);
   const ownership = snapshot.ownership.files;
   const owner = ownership[target.file]?.owner ?? null;
+  // Looked up once per importer: an app with thousands of files stays linear.
+  const specFiles = new Set(
+    facts.files.filter((item) => item.type === "spec").map((item) => item.file),
+  );
   const borrowers = sortedUnique([
     ...(ownership[target.file]?.borrowedBy ?? []),
     ...importers.flatMap((file) => {
       const ownerOf = ownership[file]?.owner;
 
-      return ownerOf === undefined ||
-        ownerOf === null ||
-        facts.files.find((item) => item.file === file)?.type === "spec"
-        ? []
-        : [ownerOf];
+      return ownerOf === undefined || ownerOf === null || specFiles.has(file) ? [] : [ownerOf];
     }),
   ]).filter((feature) => feature !== owner);
   const testFiles = new Set(facts.tests);
   const flowSet = new Set(flows);
   const tests = sortedUnique([
-    ...importers.filter(
-      (file) =>
-        testFiles.has(file) || facts.files.find((item) => item.file === file)?.type === "spec",
-    ),
+    ...importers.filter((file) => testFiles.has(file) || specFiles.has(file)),
     ...snapshot.proofs.filter((proof) => flowSet.has(proof.ref)).map((proof) => proof.at.file),
   ]);
 
@@ -297,17 +279,6 @@ function scryImpact(
     ],
     tests,
   };
-}
-
-/** Whether a registered route answers `METHOD path` (`ALL` on either side matches any method). */
-function routeMatches(
-  route: Pick<BookRoute, "method" | "path">,
-  method: string,
-  path: string,
-): boolean {
-  const methodMatches = route.method === method || route.method === "ALL" || method === "ALL";
-
-  return methodMatches && normalizeRoutePath(route.path) === normalizeRoutePath(path);
 }
 
 function scryRoute(

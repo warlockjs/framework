@@ -216,8 +216,9 @@ source roots its size, modification time and sha256 hash. It also records the ha
 
 Before anything else, every command does this:
 
-1. Stat every file under the source roots (`src/` and any mobile app root). `node_modules` and dot folders are
-   skipped.
+1. Stat every file under the source roots: `src/` and the top-level folders of each mobile app, except its native
+   projects and build output (`android/`, `ios/`, `build/`, `dist/`, `web-build/`, `coverage/`). `node_modules` and
+   dot folders are skipped. Code files directly in a mobile app's folder (such as `App.tsx`) are not in the book.
 2. Hash only the files whose size or modification time differ from the manifest. A file that was only touched keeps
    its hash.
 3. If the set of files, every hash, the test file hashes and the versions all match, the book is fresh. Nothing is

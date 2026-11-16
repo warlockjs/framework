@@ -9,7 +9,8 @@
  * The default export is a panel factory (devtools' `DevtoolsPanelExport`),
  * typed structurally here so this entry needs no `@warlock.js/devtools`
  * import. The browser view lives in the package's `ui/` folder. Data routes
- * open the snapshot with `routes: "cached"` and never boot the app.
+ * open the snapshot with `routes: "cached"` (never booting the app) and keep
+ * the generated book up to date; agent-written files are only read.
  */
 import type { BookAdapter } from "../contracts/adapter";
 import type { GrimoireSnapshot } from "../contracts/snapshot";
@@ -45,7 +46,7 @@ export type GrimoirePanelContext = {
   root: string;
   /** The adapter to open the book with. Default: the Warlock adapter, loaded on first request. */
   adapter?: BookAdapter | (() => Promise<BookAdapter>);
-  /** How long an opened snapshot is reused when the book manifest did not change (ms). Default 2000. */
+  /** How long an opened snapshot is reused when the book manifest did not change (ms). Default 2000, longer after a slow open. */
   ttlMs?: number;
 };
 
@@ -60,7 +61,10 @@ function one(query: GrimoirePanelRequest["query"], name: string): string | undef
 export async function grimoireDevtoolsPanel(
   context: GrimoirePanelContext,
 ): Promise<GrimoireDevtoolsPanel> {
+  // The tab keeps Warlock's generated files (book, book maps, indexes) up to date, so the next
+  // open is incremental. Agent-written files are only read, and cached routes never boot the app.
   const source = createSnapshotSource(context.root, {
+    write: true,
     ...(context.adapter === undefined ? {} : { adapter: context.adapter }),
     ...(context.ttlMs === undefined ? {} : { ttlMs: context.ttlMs }),
   });

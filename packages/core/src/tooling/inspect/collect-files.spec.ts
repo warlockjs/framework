@@ -155,6 +155,12 @@ describe("source file inspection", () => {
     ["src/app/orders/events/audit.ts", "event"],
     ["src/app/orders/cart.client.ts", "client"],
     ["src/app/orders/cart.client.tsx", "client"],
+    // A module named after a role word keeps the roles of its own folders.
+    ["src/app/events/migrations/create-events-table.ts", "migration"],
+    ["src/app/events/utils/format-date.ts", "util"],
+    ["src/app/jobs/components/JobCard.tsx", "component"],
+    ["src/app/clients/types/client.ts", "type"],
+    ["src/app/events/jobs/close-event.ts", "job"],
   ])("infers %s as %s", (file, role) => expect(fileRole(file)).toBe(role));
 
   it("explains transitive route and page reachability including layouts without looping on cycles", async () => {
@@ -283,6 +289,19 @@ describe("collectFiles dirs", () => {
     // Only `src/app/<module>` splits by module; a mobile app's `app/` folder is one module.
     expect(files.find((file) => file.file === "mobile/app/products/[id].tsx")?.module).toBe(
       "mobile/app",
+    );
+  });
+
+  it("skips node_modules and hidden folders inside a scanned folder", () => {
+    write("mobile/app/x.tsx", "export const x = 1;");
+    write("mobile/node_modules/react/index.js", "module.exports = {};");
+    write("mobile/.expo/types/router.d.ts", "export {};");
+
+    const names = collectFiles(root, [], { dirs: ["src", "mobile"] }).map((file) => file.file);
+
+    expect(names).toContain("mobile/app/x.tsx");
+    expect(names.some((name) => name.includes("node_modules") || name.includes(".expo"))).toBe(
+      false,
     );
   });
 

@@ -54,7 +54,10 @@ function grimoireStaticApi(data) {
     }
 
     if (name === "file" || name === "graph/file") {
-      const found = data.files[params.get("path") ?? ""];
+      const file = params.get("path") ?? "";
+      const found = Object.prototype.hasOwnProperty.call(data.files, file)
+        ? data.files[file]
+        : undefined;
       if (!found) throw new Error(`"${params.get("path")}" is not in the exported book.`);
       return name === "file" ? found.result : found.graph;
     }

@@ -121,12 +121,17 @@ async function recordModule(
   previous: TestResultsStore | null,
   now: Date,
 ): Promise<ModuleRecord | null> {
-  if (module.state && module.state() === "pending") return null;
+  // `queued` (never started) and `pending` (cut short) files must keep their old results.
+  const state = module.state?.();
+
+  if (state === "pending" || state === "queued") return null;
 
   const absolute = path.resolve(root, module.moduleId);
-  const relative = toPosixPath(path.relative(root, absolute));
+  const fromRoot = path.relative(root, absolute);
+  const relative = toPosixPath(fromRoot);
 
-  if (relative.startsWith("..")) return null;
+  // Outside the project (another drive on Windows gives an absolute path).
+  if (relative === ".." || relative.startsWith("../") || path.isAbsolute(fromRoot)) return null;
 
   let buffer: Buffer;
 

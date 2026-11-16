@@ -123,6 +123,8 @@ export function checkDevtoolsPanel(
     throw new Error(`The view module of devtools panel "${id}" was not found at ${view}.`);
   }
 
+  // Two routes on one method and path would make the server refuse to start.
+  const seen = new Set<string>();
   const routes = (panel.routes ?? []).map((route) => {
     const method = route.method ?? "GET";
 
@@ -141,6 +143,14 @@ export function checkDevtoolsPanel(
     if (typeof route.handler !== "function") {
       throw new Error(`Devtools panel "${id}" route ${method} "${route.path}" has no handler.`);
     }
+
+    if (seen.has(`${method} ${route.path}`)) {
+      throw new Error(
+        `Devtools panel "${id}" lists route ${method} "${route.path}" twice; keep one.`,
+      );
+    }
+
+    seen.add(`${method} ${route.path}`);
 
     return { ...route, method };
   });
@@ -221,6 +231,15 @@ export async function loadDevtoolsPanels(
   entries: readonly (string | DevtoolsPanel)[],
   options: LoadDevtoolsPanelsOptions,
 ): Promise<MountedDevtoolsPanel[]> {
+  // `src/config/devtools.ts` is a plain object with no types: a single string would be read letter by letter.
+  if (!Array.isArray(entries as unknown)) {
+    options.warn(
+      `The devtools "panels" option must be a list, such as panels: ["@warlock.js/grimoire/devtools"]; got ${JSON.stringify(entries)}. No panel was added.`,
+    );
+
+    return [];
+  }
+
   const importModule = options.importModule ?? ((specifier: string) => import(specifier));
   const taken = new Map<string, string>(options.taken ?? []);
   const panels: MountedDevtoolsPanel[] = [];

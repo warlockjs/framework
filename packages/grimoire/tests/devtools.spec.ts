@@ -2,11 +2,13 @@
  * The Grimoire devtools panel over the `shop` fixture: data routes, the
  * book-only case, the static export. Needs `scry()` (search and per-item answers).
  */
-import { readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import { createContext, runInContext } from "node:vm";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { fakeHelpers, FakeNode } from "./support/fake-dom";
+import { renderSiteHtml } from "../src/devtools/site";
 import grimoireDevtoolsPanelDefault, {
   exportGrimoireSite,
   grimoireDevtoolsPanel,
@@ -216,6 +218,35 @@ describe("the panel", () => {
   });
 });
 
+describe("the panel keeps the generated book up to date", () => {
+  it("writes the book on first open, reuses it after, and never changes an agent-written file", async () => {
+    copy = copyFixture();
+    const root = copy.root;
+    const agentFiles = (): Record<string, string> =>
+      Object.fromEntries(
+        (readdirSync(path.join(root, "grimoire"), { recursive: true }) as string[])
+          .map((file) => file.split(path.sep).join("/"))
+          // Book entries are Warlock's own `.md` files; everything else in grimoire/ is the agent's.
+          .filter((file) => file.endsWith(".md") && !file.startsWith("book/"))
+          .map((file) => [file, readFileSync(path.join(root, "grimoire", file), "utf8")]),
+      );
+    const before = agentFiles();
+    const adapter = createShopAdapter();
+    const panel = await grimoireDevtoolsPanel({ root, adapter, ttlMs: 0 });
+
+    expect(existsSync(path.join(root, "grimoire", "book", "manifest.json"))).toBe(false);
+    await call(panel, "/summary");
+    expect(existsSync(path.join(root, "grimoire", "book", "manifest.json"))).toBe(true);
+    expect(adapter.calls.files).toBe(1);
+
+    // The next open finds the stored book current and does not ask for the files again.
+    await call(panel, "/summary");
+    expect(adapter.calls.files).toBe(1);
+    expect(adapter.calls.routes).toBe(0);
+    expect(agentFiles()).toEqual(before);
+  });
+});
+
 describe("the panel with no features written (book only)", () => {
   it("serves the book, search and graphs, and 404s the written items", async () => {
     const { panel } = await shopPanel({ written: false });
@@ -266,14 +297,14 @@ async function openExportedPage(html: string, hash = "") {
   });
 
   runInContext(`(async () => {${script.replace(/^\s*export .*$/gm, "")}})()`, context);
-  await new Promise((resolve) => setTimeout(resolve, 50));
+  await vi.waitFor(() => expect(rootNode.children.length).toBeGreaterThan(0));
 
   return {
     root: rootNode,
     goTo: async (next: string) => {
       location.hash = next;
+      // The page's listener returns the render, so awaiting it waits for the new view.
       for (const listener of listeners.hashchange ?? []) await listener();
-      await new Promise((resolve) => setTimeout(resolve, 50));
     },
   };
 }
@@ -317,6 +348,9 @@ describe("exportGrimoireSite", () => {
       expect.arrayContaining(["catalog/new-arrivals", "T-014"]),
     );
     expect(Object.keys(data.files)).toContain("src/app/catalog/routes.ts");
+    // A shared export does not reveal where the project sits on this machine.
+    expect(html).not.toContain(copy.root);
+    expect(html).not.toContain(JSON.stringify(copy.root).slice(1, -1));
     // The book writer leaves the folder alone on the next run.
     await openGrimoire(copy.root, createShopAdapter(), { routes: "cached" });
     expect(copy.read(`${outDir}/index.html`)).toBe(html);
@@ -352,6 +386,43 @@ describe("exportGrimoireSite", () => {
 
     await page.goTo("#grimoire/file/src%2Fapp%2Fcatalog%2Froutes.ts");
     expect(page.root.text).toContain("src/app/catalog/routes.ts");
+
+    // A name the export does not hold is said in place, inherited object keys included.
+    await page.goTo("#grimoire/file/__proto__");
+    expect(page.root.text).toContain('"__proto__" is not in the exported book.');
+  });
+
+  it("writes an absolute outDir where it points and returns it project-relative", async () => {
+    copy = copyFixture();
+    const target = mkdtempSync(path.join(tmpdir(), "grimoire-site-"));
+
+    try {
+      const outDir = await exportGrimoireSite(copy.root, {
+        adapter: createShopAdapter(),
+        outDir: target,
+      });
+
+      expect(existsSync(path.join(target, "index.html"))).toBe(true);
+      expect(path.isAbsolute(outDir)).toBe(false);
+      expect(path.resolve(copy.root, outDir)).toBe(target);
+    } finally {
+      rmSync(target, { recursive: true, force: true });
+    }
+  });
+
+  it("keeps the inline code from closing its script tag in any letter case", () => {
+    const html = renderSiteHtml(
+      { routes: {}, files: {}, search: [] },
+      {
+        view: 'const a = "</SCRIPT><img src=x>"; const b = "</script>";\nexport default renderGrimoire;',
+        loader: "/* <!-- */",
+        css: "",
+      },
+    );
+
+    expect(html.match(/<\/script/gi)).toHaveLength(2);
+    expect(html).toContain('"<\\/SCRIPT><img src=x>"');
+    expect(html).not.toContain("<!--");
   });
 
   it("exports a book-only project", async () => {

@@ -8,6 +8,7 @@ import { createFinding } from "../codes";
 import type { GrimoireFinding } from "../contracts/findings";
 import type { GrimoireSnapshot } from "../contracts/snapshot";
 import type { WrittenGrimoire, WrittenTask } from "../contracts/written";
+import { toPosixPath } from "../paths";
 
 type Subject = { feature: string | null; task: string; file: string };
 
@@ -59,7 +60,7 @@ export function checkTasks(snapshot: GrimoireSnapshot): GrimoireFinding[] {
       findings.push(
         createFinding({
           code: "GR7001",
-          message: `Task ${id} names feature "${task.feature.value}", which has no folder in grimoire/features`,
+          message: `task ${id} names feature "${task.feature.value}", which has no folder in grimoire/features`,
           at: task.feature.at,
           ...subjectOf(task, task.feature.value),
         }),
@@ -73,7 +74,7 @@ export function checkTasks(snapshot: GrimoireSnapshot): GrimoireFinding[] {
       findings.push(
         createFinding({
           code: "GR7002",
-          message: `Task ${id} names flow "${task.flow.value}" without a feature; write \`<feature>/<flow>\` or set \`feature\``,
+          message: `task ${id} names flow "${task.flow.value}" without a feature; write \`<feature>/<flow>\` or set \`feature\``,
           at: task.flow.at,
           ...subjectOf(task, null),
         }),
@@ -86,7 +87,7 @@ export function checkTasks(snapshot: GrimoireSnapshot): GrimoireFinding[] {
         findings.push(
           createFinding({
             code: "GR7002",
-            message: `Task ${id} names flow "${flow.feature}/${flow.flow}", which has no file`,
+            message: `task ${id} names flow "${flow.feature}/${flow.flow}", which has no file`,
             at: task.flow.at,
             ...subjectOf(task, flow.feature),
             flow: `${flow.feature}/${flow.flow}`,
@@ -102,7 +103,7 @@ export function checkTasks(snapshot: GrimoireSnapshot): GrimoireFinding[] {
       findings.push(
         createFinding({
           code: "GR7003",
-          message: `Task ${id} is in tasks/done but ${status !== "done" ? `has status "${status}"` : "has no `shipped`"}`,
+          message: `task ${id} is in tasks/done but ${status !== "done" ? `has status "${status}"` : "has no `shipped`"}`,
           at: status !== "done" ? task.status.at : task.id.at,
           ...subjectOf(task, task.feature?.value ?? null),
         }),
@@ -111,7 +112,7 @@ export function checkTasks(snapshot: GrimoireSnapshot): GrimoireFinding[] {
       findings.push(
         createFinding({
           code: "GR7003",
-          message: `Task ${id} has status "done" but is in tasks/open; move it to tasks/done/<yyyy-mm>/`,
+          message: `task ${id} has status "done" but is in tasks/open; move it to tasks/done/<yyyy-mm>/`,
           at: task.status.at,
           ...subjectOf(task, task.feature?.value ?? null),
         }),
@@ -126,7 +127,7 @@ export function checkTasks(snapshot: GrimoireSnapshot): GrimoireFinding[] {
         findings.push(
           createFinding({
             code: "GR7004",
-            message: `Task ${id} shipped "${feature} ${version}", but the ${feature} changelog has no entry for version ${version}`,
+            message: `task ${id} shipped "${feature} ${version}", but the ${feature} changelog has no entry for version ${version}`,
             at: task.shipped.at,
             ...subjectOf(task, feature),
           }),
@@ -138,15 +139,21 @@ export function checkTasks(snapshot: GrimoireSnapshot): GrimoireFinding[] {
     const brief = briefPath(task);
 
     if (brief !== null) {
-      const target = path.resolve(root, "grimoire", ...brief.split("/"));
+      const folder = path.resolve(root, "grimoire");
+      const target = path.resolve(folder, ...toPosixPath(brief).split("/"));
+      const relative = path.relative(folder, target);
+      // A brief outside `grimoire/` (`../x`, an absolute path) is never looked up.
+      const inside = relative !== "" && !relative.startsWith("..") && !path.isAbsolute(relative);
 
-      if (!existsSync(target)) {
+      if (!inside || !existsSync(target)) {
         const line = task.fields.find((item) => item.key.toLowerCase() === "brief");
 
         findings.push(
           createFinding({
             code: "GR7005",
-            message: `Task ${id} points at brief "${brief}", which does not exist under grimoire/`,
+            message: inside
+              ? `task ${id} points at brief "${brief}", which does not exist under grimoire/`
+              : `task ${id} points at brief "${brief}", which is not a path inside grimoire/`,
             at: line?.at ?? null,
             ...subjectOf(task, task.feature?.value ?? null),
           }),

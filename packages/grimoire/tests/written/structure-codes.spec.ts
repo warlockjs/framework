@@ -138,11 +138,11 @@ const CASES: Case[] = [
   },
   {
     code: "GR1011",
-    name: "a case with one space before the answer",
+    name: "a case with a question and no answer",
     breakIt: (copy) =>
-      copy.replace(LOGIN, "- invalid input   a missing", "- invalid input a missing"),
+      copy.replace(LOGIN, "- invalid input   a missing password → 422", "- invalid input"),
     file: LOGIN,
-    line: "- invalid input a missing",
+    line: "- invalid input",
     subject: LOGIN_SUBJECT,
   },
   {
@@ -171,15 +171,15 @@ const CASES: Case[] = [
   },
   {
     code: "GR1015",
-    name: "a changelog entry with single spaces",
+    name: "a changelog entry with no word",
     breakIt: (copy) =>
       copy.replace(
         "grimoire/features/orders/CHANGELOG.md",
-        "- 1.0  added     place-order",
-        "- 1.0 added place-order",
+        "- 1.0  added     place-order: customers pay for their cart and get a confirmation email",
+        "- 1.0",
       ),
     file: "grimoire/features/orders/CHANGELOG.md",
-    line: "- 1.0 added",
+    line: "- 1.0",
     subject: { feature: "orders" },
   },
   {
@@ -293,10 +293,15 @@ const CASES: Case[] = [
   },
   {
     code: "GR1028",
-    name: "a Differs by app line with one space",
-    breakIt: (copy) => copy.replace(NEW_ARRIVALS, "- mobile   uses", "- mobile uses"),
+    name: "a Differs by app line with an app and no text",
+    breakIt: (copy) =>
+      copy.replace(
+        NEW_ARRIVALS,
+        "- mobile   uses the device's country when the customer has none",
+        "- mobile",
+      ),
     file: NEW_ARRIVALS,
-    line: "- mobile uses",
+    line: "- mobile",
     subject: { feature: "catalog", flow: "catalog/new-arrivals" },
   },
 ];

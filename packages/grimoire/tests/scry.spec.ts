@@ -8,6 +8,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { buildEntries } from "../src/book/render";
 import { GrimoireError } from "../src/codes";
 import type { ScryQuery } from "../src/contracts/scry";
 import type { GrimoireSnapshot } from "../src/contracts/snapshot";
@@ -94,6 +95,52 @@ describe("scry over the shop fixture", () => {
       { id: "catalog", via: "owner" },
       { id: "orders", via: "borrower" },
     ]);
+  });
+
+  it("answers a file with the entry the book wrote, and where that entry is", () => {
+    for (const file of snapshot.book.facts.files) {
+      const result = scry(snapshot, { type: "file", file: file.file });
+
+      if (result.type !== "file") throw new Error("expected a file answer");
+      expect(result.bookEntry).not.toBeNull();
+      expect(result.entry).toEqual(
+        JSON.parse(
+          readFileSync(path.join(copy.root, ...(result.bookEntry ?? "").split("/")), "utf8"),
+        ),
+      );
+    }
+  });
+
+  it("leaves Node builtins out of a file's packages, bare or node:, as the book entry does", () => {
+    const target = "src/app/catalog/services/new-arrivals.service.ts";
+    const withBuiltins: GrimoireSnapshot = {
+      ...snapshot,
+      book: {
+        ...snapshot.book,
+        facts: {
+          ...snapshot.book.facts,
+          files: snapshot.book.facts.files.map((file) =>
+            file.file === target
+              ? {
+                  ...file,
+                  imports: [
+                    ...file.imports,
+                    { specifier: "fs", file: null },
+                    { specifier: "node:path", file: null },
+                    { specifier: "dayjs/plugin/utc", file: null },
+                  ],
+                }
+              : file,
+          ),
+        },
+      },
+    };
+    const result = scry(withBuiltins, { type: "file", file: target });
+
+    expect(result.type === "file" && result.entry.packages).toEqual(["dayjs"]);
+    expect(result.type === "file" && result.entry).toEqual(
+      buildEntries(withBuiltins.book.facts, withBuiltins.annotations).get(target),
+    );
   });
 
   it("gives per-criterion test status in --flow", () => {

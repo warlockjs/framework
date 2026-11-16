@@ -1079,6 +1079,17 @@ async function panelView(id) {
   return (await module.default(panelContext(id, root))) ?? root;
 }
 
+/**
+ * A panel link (`#<id>/<route>`), typed, followed or reached with Back, opens
+ * that panel view; Back to an address without one shows the open panel's
+ * first view again.
+ */
+function onHashChange() {
+  const panel = hashPanel();
+  if (panel) showTab(panel);
+  else if (panelIds.has(state.tab)) render();
+}
+
 async function render() {
   const version = ++renderVersion;
   try {
@@ -1141,11 +1152,7 @@ for (const type of ["request", "mail", "log", "ai", "agent-trace"])
       /* malformed stream data is ignored */
     }
   });
-// A panel link (`#<id>/<route>`), typed, followed or reached with Back, opens that panel view.
-window.addEventListener("hashchange", () => {
-  const panel = hashPanel();
-  if (panel) showTab(panel);
-});
+window.addEventListener("hashchange", onHashChange);
 const startPanel = hashPanel();
 if (startPanel) showTab(startPanel);
 else render();

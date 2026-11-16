@@ -8,14 +8,14 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { BookAdapter } from "../contracts/adapter";
 import type { GrimoireSnapshot } from "../contracts/snapshot";
-import { GRIMOIRE_PATHS } from "../paths";
+import { GRIMOIRE_PATHS, projectPath, toPosixPath } from "../paths";
 import * as data from "./data";
 import { featureGraph, fileGraph, pageGraph } from "./graphs";
 import { createSnapshotSource } from "./snapshot-source";
 
 /** Options of `exportGrimoireSite()`. */
 export type ExportGrimoireSiteOptions = {
-  /** Output folder, project-relative. Default `grimoire/book/site` (the book writer leaves it alone and git ignores it). */
+  /** Output folder, project-relative or absolute. Default `grimoire/book/site` (the book writer leaves it alone and git ignores it). */
   outDir?: string;
   /** The adapter to open the book with. Default: the Warlock adapter. */
   adapter?: BookAdapter | (() => Promise<BookAdapter>);
@@ -37,7 +37,8 @@ export function buildSiteData(snapshot: GrimoireSnapshot) {
     apps: data.apps(snapshot),
     tasks: data.tasks(snapshot),
     releases: data.releases(snapshot),
-    check: data.check(snapshot),
+    // The page is meant to be shared: it does not name where the project sits on this machine.
+    check: { ...data.check(snapshot), root: "." },
     "graph/modules": data.graphOfModules(snapshot),
   };
   const search: SearchItem[] = [];
@@ -135,9 +136,9 @@ function inlineJson(value: unknown): string {
   return JSON.stringify(value).replaceAll("<", "\\u003c");
 }
 
-/** Code for an inline `<script>`: `</script` and `<!--` (only possible in strings and comments) are broken up. */
+/** Code for an inline `<script>`: `</script` (in any case) and `<!--` (only possible in strings and comments) are broken up. */
 function inlineCode(code: string): string {
-  return code.replaceAll("</script", "<\\/script").replaceAll("<!--", "<\\!--");
+  return code.replace(/<\/(script)/gi, "<\\/$1").replaceAll("<!--", "<\\!--");
 }
 
 /** The answer, or `undefined` when the item cannot be answered (the export skips it). */
@@ -211,10 +212,11 @@ export async function exportGrimoireSite(
   root: string,
   options: ExportGrimoireSiteOptions = {},
 ): Promise<string> {
-  const outDir = (options.outDir ?? GRIMOIRE_PATHS.staticSite)
-    .split("\\")
-    .join("/")
-    .replace(/\/+$/, "");
+  // Project-relative from here on; an absolute folder is kept where it is.
+  const outDir = projectPath(root, toPosixPath(options.outDir ?? GRIMOIRE_PATHS.staticSite)).replace(
+    /\/+$/,
+    "",
+  );
   const snapshot =
     options.snapshot ??
     (await createSnapshotSource(
@@ -231,7 +233,7 @@ export async function exportGrimoireSite(
     loader: loader ?? "",
     css: css ?? "",
   });
-  const absolute = path.resolve(root, ...outDir.split("/"));
+  const absolute = path.resolve(root, outDir);
 
   await mkdir(absolute, { recursive: true });
   await writeFile(path.join(absolute, "index.html"), html);

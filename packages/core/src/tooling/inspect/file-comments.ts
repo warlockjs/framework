@@ -11,6 +11,18 @@ export type FileHeader = {
 const DIRECTIVE = /^\s*(?:eslint|oxlint|prettier|istanbul|c8|v8|@ts-|@vitest|@jsx|biome|#)/i;
 const SUMMARY_TAGS = ["fileoverview", "file", "overview", "description", "module"];
 
+/**
+ * Whether `source` holds only whitespace from `from` to `to`. Stops at the
+ * first other character, so a comment far above a statement costs nothing.
+ */
+function onlyWhitespace(source: string, from: number, to: number): boolean {
+  for (let index = from; index < to; index++) {
+    if (!/\s/.test(source.charAt(index))) return false;
+  }
+
+  return true;
+}
+
 /** The text lines of one comment, without the comment markers. */
 function commentLines(comment: Comment): string[] {
   const lines = comment.value.split(/\r?\n/);
@@ -109,7 +121,7 @@ export function readFileHeader(
 
     const previous = group[group.length - 1];
 
-    if (previous && source.slice(previous.end, comment.start).trim() !== "") {
+    if (previous && !onlyWhitespace(source, previous.end, comment.start)) {
       const header = done();
 
       if (header) return header;
@@ -143,7 +155,7 @@ export function createDocLookup(
       !comment ||
       comment.type !== "Block" ||
       !comment.value.startsWith("*") ||
-      source.slice(comment.end, statementStart).trim() !== ""
+      !onlyWhitespace(source, comment.end, statementStart)
     )
       return none;
 

@@ -20,6 +20,7 @@ import { grimoireVersion, WRITE_STATE_PATH } from "./build";
 import {
   bookFile,
   hashText,
+  isInsideBook,
   IO_CONCURRENCY,
   listBookFiles,
   mapLimit,
@@ -113,7 +114,10 @@ export async function writeBook(
 
     const known =
       state === null ? (await listBookFiles(root)).filter(isGenerated) : Object.keys(state.files);
-    const gone = known.filter((bookPath) => !contents.has(bookPath) && !isKept(bookPath)).sort();
+    // `written.json` is a file on disk: a path in it that leaves `grimoire/book/` is ignored, never removed.
+    const gone = known
+      .filter((bookPath) => isInsideBook(bookPath) && !contents.has(bookPath) && !isKept(bookPath))
+      .sort();
 
     await mapLimit(gone, IO_CONCURRENCY, async (bookPath) => removeBookFile(root, bookPath));
     removed.push(...gone);

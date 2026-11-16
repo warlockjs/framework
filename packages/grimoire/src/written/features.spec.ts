@@ -97,7 +97,7 @@ describe("parseFlow", () => {
         "## Steps",
         "1. route   /api/wishlist",
         "2. request   POST /x",
-        "3. page /x",
+        "3. page",
         "- page   /x",
         "5. affects   Orders",
         "",
@@ -127,7 +127,7 @@ describe("parseFlow", () => {
         "## Steps",
         "## Cases",
         "* Invalid Input   a",
-        "- not allowed b",
+        "- limits",
         "- my own case   c",
         "## Not handled",
         "- not found   d",
@@ -177,6 +177,118 @@ describe("parseFlow", () => {
     ]);
   });
 
+  it("reports a case question written with no answer, in Cases and in Not handled", () => {
+    const { sink, findings } = collect();
+    const flow = parseFlow(
+      FLOW,
+      flowText([
+        "## Steps",
+        "## Cases",
+        "- invalid input   a",
+        "- not allowed   b",
+        "- not found   c",
+        "- duplicate   d",
+        "- limits   e",
+        "- expiry   f",
+        "- outside service down   g",
+        "- Double Submit",
+        "## Not handled",
+        "- double submit",
+        "## Acceptance criteria",
+      ]),
+      "catalog",
+      "wishlist",
+      sink,
+    );
+
+    expect(flow.cases.map((entry) => entry.question)).not.toContain("double");
+    expect(flow.notHandled).toEqual([]);
+    expect(findings.map((finding) => [finding.code, finding.at?.line, finding.message])).toEqual([
+      ["GR1011", 19, 'the case "- Double Submit" is not `- <question>   <answer>`.'],
+      [
+        "GR1028",
+        21,
+        'the Not handled line "- double submit" is not `- name   text` (the name, spaces, then the text).',
+      ],
+      [
+        "GR1012",
+        11,
+        'the case question "double submit" is answered neither under Cases nor under Not handled.',
+      ],
+    ]);
+  });
+
+  it("reads lines whose spaces a Markdown formatter collapsed to one", () => {
+    const { sink, findings } = collect();
+    const flow = parseFlow(
+      FLOW,
+      flowText([
+        "## Steps",
+        "",
+        "1. page /products/:id",
+        "2. route POST /wishlist — saves it",
+        "3. outside service payment gateway",
+        "4. request POST /x",
+        "",
+        "## Differs by app",
+        "",
+        "- mobile the save button is also on the product card",
+        "",
+        "## Cases",
+        "",
+        "- invalid input a product id that is not an id → 422",
+        "- Not Allowed guest → sent to sign in",
+        "- not found the product does not exist → 404",
+        "- duplicate already saved → stays saved",
+        "- limits at most 200 products",
+        "- expiry does not apply: saved products do not expire",
+        "- outside service down does not apply",
+        "- payment declined   the card is refused → 402",
+        "",
+        "## Not handled",
+        "",
+        "- double submit two taps can save twice",
+        "",
+        "## Acceptance criteria",
+        "",
+        "- AC-1 a saved product appears on /wishlist",
+        "- AC-2 [mobile] the product card has a save button",
+      ]),
+      "catalog",
+      "wishlist",
+      sink,
+    );
+
+    expect(findings.map((finding) => [finding.code, finding.at?.line])).toEqual([["GR1009", 15]]);
+    expect(flow.steps.map((step) => [step.kind, step.target, step.note])).toEqual([
+      ["page", "/products/:id", null],
+      ["route", "POST /wishlist", "saves it"],
+      ["outside service", "payment gateway", null],
+    ]);
+    expect(flow.differs.map((line) => [line.name, line.text])).toEqual([
+      ["mobile", "the save button is also on the product card"],
+    ]);
+    expect(flow.cases.map((entry) => [entry.question, entry.fixed, entry.answer])).toEqual([
+      ["invalid input", true, "a product id that is not an id → 422"],
+      ["not allowed", true, "guest → sent to sign in"],
+      ["not found", true, "the product does not exist → 404"],
+      ["duplicate", true, "already saved → stays saved"],
+      ["limits", true, "at most 200 products"],
+      ["expiry", true, "does not apply: saved products do not expire"],
+      ["outside service down", true, "does not apply"],
+      ["payment declined", false, "the card is refused → 402"],
+    ]);
+    expect(flow.notHandled.map((line) => [line.name, line.text])).toEqual([
+      ["double submit", "two taps can save twice"],
+    ]);
+    expect(flow.criteria.map((criterion) => [criterion.id, criterion.app, criterion.text])).toEqual(
+      [
+        ["AC-1", null, "a saved product appears on /wishlist"],
+        ["AC-2", "mobile", "the product card has a save button"],
+      ],
+    );
+  });
+
   it("checks the front matter: required keys, forms, unknown keys, the id against the file name", () => {
     const { sink, findings } = collect();
     const flow = parseFlow(
@@ -194,21 +306,21 @@ describe("parseFlow", () => {
       [
         "GR1005",
         6,
-        'The front matter key "owner" is not part of the flow template (id, since, status, who, origin).',
+        'the front matter key "owner" is not part of the flow template (id, since, status, who, origin).',
       ],
-      ["GR1019", 2, 'The flow id "wish-list" must equal its "wishlist" name.'],
+      ["GR1019", 2, 'the flow id "wish-list" must equal its "wishlist" name.'],
       [
         "GR1004",
         3,
-        'The front matter key "since" is "three"; write a version as <whole>.<decimal>, like 2.1.',
+        'the front matter key "since" is "three"; write a version as <whole>.<decimal>, like 2.1.',
       ],
       [
         "GR1004",
         4,
-        'The front matter key "status" is "done"; use one of: proposed, building, shipped, retired.',
+        'the front matter key "status" is "done"; use one of: proposed, building, shipped, retired.',
       ],
-      ["GR1003", 1, 'The front matter key "who" is missing.'],
-      ["GR1004", 5, 'The front matter key "origin" is "guessed"; use one of: inferred, confirmed.'],
+      ["GR1003", 1, 'the front matter key "who" is missing.'],
+      ["GR1004", 5, 'the front matter key "origin" is "guessed"; use one of: inferred, confirmed.'],
     ]);
     expect(flow.status.value).toBe("building");
     expect(flow.who).toEqual({ value: "", at: { file: FLOW, line: 1, column: null } });
@@ -338,7 +450,7 @@ describe("parseChangelog", () => {
       [
         "- 1.0  added   before any heading",
         "## Unreleased",
-        "- 2.1 fixed one space",
+        "- 2.1",
         "- 2.1  tweaked   x",
         "- v2  fixed   x",
         "a stray line",

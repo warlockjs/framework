@@ -5,7 +5,7 @@
  */
 import { createHash } from "node:crypto";
 import type { Dirent } from "node:fs";
-import { readFile, readdir, stat } from "node:fs/promises";
+import { readFile, readdir, realpath, stat } from "node:fs/promises";
 import path from "node:path";
 import type { GrimoireFinding } from "../contracts/findings";
 import type { Located } from "../contracts/location";
@@ -61,6 +61,8 @@ class Walker {
   /** Feature and app folders, in name order. */
   public readonly features: string[] = [];
   public readonly apps: { id: string; dir: string; hasReadme: boolean }[] = [];
+  /** Real paths of the folders the deep walks entered: a linked folder loop is walked once. */
+  private readonly entered = new Set<string>();
 
   public constructor(
     private readonly root: string,
@@ -108,12 +110,23 @@ class Walker {
 
   /** GR1020 for a file the layout has no place for. */
   public unknown(file: string, sink: FindingSink = this.sink): void {
-    sink.report("GR1020", `The file ${file} is not part of the grimoire layout.`, lineAt(file, 1));
+    sink.report("GR1020", `the file ${file} is not part of the grimoire layout.`, lineAt(file, 1));
   }
 
-  /** GR1020 for every file under a folder the layout has no place for (a linked folder loop stops at a depth of 16). */
+  /** Whether a deep walk enters `dir` for the first time (a linked folder loop is entered once). */
+  private async enter(dir: string): Promise<boolean> {
+    const real = await realpath(this.absolute(dir)).catch(() => null);
+
+    if (real === null || this.entered.has(real)) return false;
+
+    this.entered.add(real);
+
+    return true;
+  }
+
+  /** GR1020 for every file under a folder the layout has no place for (a linked folder loop is walked once). */
   public async unknownFolder(dir: string, sink: FindingSink = this.sink, depth = 0): Promise<void> {
-    if (depth > 16) return;
+    if (depth > 16 || !(await this.enter(dir))) return;
 
     const listing = await this.list(dir);
 
@@ -163,7 +176,7 @@ class Walker {
       if (!inside.files.includes("README.md")) {
         sink.report(
           "GR1021",
-          `The feature folder ${dir} has no README.md.`,
+          `the feature folder ${dir} has no README.md.`,
           lineAt(`${dir}/README.md`, 1),
         );
       }
@@ -231,7 +244,7 @@ class Walker {
       if (!hasReadme) {
         sink.report(
           "GR1021",
-          `The app folder ${dir} has no README.md.`,
+          `the app folder ${dir} has no README.md.`,
           lineAt(`${dir}/README.md`, 1),
         );
       }
@@ -283,7 +296,7 @@ class Walker {
       if (!inside.files.includes("README.md")) {
         sink.report(
           "GR1021",
-          `The ${pageType} folder ${dir} has no README.md.`,
+          `the ${pageType} folder ${dir} has no README.md.`,
           lineAt(`${dir}/README.md`, 1),
         );
       }
@@ -313,7 +326,7 @@ class Walker {
 
   /** GR1023 for a task file outside `open/` and `done/<yyyy-mm>/`; other files get GR1020. */
   private async misplacedTasks(dir: string, depth = 0): Promise<void> {
-    if (depth > 16) return;
+    if (depth > 16 || !(await this.enter(dir))) return;
 
     const listing = await this.list(dir);
 
@@ -329,7 +342,7 @@ class Walker {
 
     this.sink.report(
       "GR1023",
-      `The task file ${file} is not in tasks/open/ or tasks/done/<yyyy-mm>/; it is not read.`,
+      `the task file ${file} is not in tasks/open/ or tasks/done/<yyyy-mm>/; it is not read.`,
       lineAt(file, 1),
     );
   }
@@ -353,7 +366,7 @@ class Walker {
       if (!match) {
         this.sink.report(
           "GR1023",
-          `The task file name ${name} is not T-<n>-<slug>.md.`,
+          `the task file name ${name} is not T-<n>-<slug>.md.`,
           lineAt(file, 1),
         );
       }
@@ -412,6 +425,34 @@ class Walker {
   }
 }
 
+/**
+ * Files read at once. A grimoire grows by a task file a change, so reading
+ * them all at once runs out of file handles (`EMFILE`) on a large project.
+ */
+const READ_CONCURRENCY = 32;
+
+/** `items.map(run)` with at most `limit` calls in flight; results keep the order of `items`. */
+async function mapLimited<T, R>(
+  items: readonly T[],
+  limit: number,
+  run: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let next = 0;
+
+  const worker = async (): Promise<void> => {
+    while (next < items.length) {
+      const index = next++;
+
+      results[index] = await run(items[index] as T);
+    }
+  };
+
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+
+  return results;
+}
+
 /** Read one file as UTF-8; `null` (with GR1025) when it cannot be read or is not UTF-8. */
 async function readWritten(
   root: string,
@@ -424,14 +465,14 @@ async function readWritten(
     try {
       return { bytes, text: decoder.decode(bytes) };
     } catch {
-      sink.report("GR1025", `The file ${file} is not UTF-8 text.`, lineAt(file, 1));
+      sink.report("GR1025", `the file ${file} is not UTF-8 text.`, lineAt(file, 1));
 
       return null;
     }
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
 
-    sink.report("GR1025", `The file ${file} cannot be read: ${reason}`, lineAt(file, 1));
+    sink.report("GR1025", `the file ${file} cannot be read: ${reason}`, lineAt(file, 1));
 
     return null;
   }
@@ -498,8 +539,8 @@ export async function parseGrimoire(root: string): Promise<ParseGrimoireResult> 
   const walker = new Walker(absoluteRoot, sink);
   await walker.walk();
 
-  const texts = await Promise.all(
-    walker.jobs.map((job) => readWritten(absoluteRoot, job.file, sinkFor(job, sink))),
+  const texts = await mapLimited(walker.jobs, READ_CONCURRENCY, (job) =>
+    readWritten(absoluteRoot, job.file, sinkFor(job, sink)),
   );
   const hashed = walker.jobs
     .map((job, index) => ({ file: job.file, read: texts[index] }))
@@ -676,7 +717,7 @@ function linkFlows(feature: WrittenFeature, sink: FindingSink): void {
         .scope({ flow: `${feature.id}/${line.name}` })
         .report(
           "GR1026",
-          `The README lists the flow "${line.name}", which has no file flows/${line.name}.md.`,
+          `the README lists the flow "${line.name}", which has no file flows/${line.name}.md.`,
           line.at,
         );
     }
@@ -690,7 +731,7 @@ function linkFlows(feature: WrittenFeature, sink: FindingSink): void {
         .scope({ flow: flow.ref })
         .report(
           "GR1027",
-          `The flow "${name}" is not listed under "## Flows" in the feature README.`,
+          `the flow "${name}" is not listed under "## Flows" in the feature README.`,
           lineAt(flow.file, 1),
         );
     }
@@ -711,7 +752,7 @@ function duplicates(
     if (first !== undefined) {
       sink
         .scope(item.subject)
-        .report("GR1022", `The ${what} id ${item.id.value} is also used by ${first}.`, item.id.at);
+        .report("GR1022", `the ${what} id ${item.id.value} is also used by ${first}.`, item.id.at);
       continue;
     }
 

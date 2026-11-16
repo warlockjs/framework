@@ -102,6 +102,68 @@ describe("insertCliCommandEntry", () => {
     expect(insertCliCommandEntry(first, CALL)).toEqual({ status: "already-present" });
   });
 
+  it("keeps CRLF line endings in a multi-line commands array", () => {
+    const next = added(
+      "defineConfig({\r\n  cli: {\r\n    commands: [\r\n      a(),\r\n    ],\r\n  },\r\n});\r\n",
+    );
+
+    expect(next).toContain("commands: [\r\n      registerGrimoireCommands(),\r\n      a(),\r\n");
+    expect(next.replace(/\r\n/g, "")).not.toContain("\n");
+  });
+
+  it("skips comments and strings: apostrophes, braces and a commented-out cli block", () => {
+    const source = [
+      "export default defineConfig({",
+      "  /** The app's name. Don't change it. */",
+      "  // cli: { commands: [] },",
+      '  app: { name: "a \\" { b" },',
+      "});",
+      "",
+    ].join("\n");
+    const next = added(source);
+
+    expect(next).toContain("  cli: { commands: [registerGrimoireCommands()] },\n  /** The app's");
+    expect(next).toContain("  // cli: { commands: [] },");
+  });
+
+  it("does not count a call that is only mentioned in a comment", () => {
+    expect(added("// registerGrimoireCommands() later\ndefineConfig({ a: 1 })")).toContain(
+      "defineConfig({ cli: { commands: [registerGrimoireCommands()] }, a: 1 })",
+    );
+  });
+
+  it("keeps entries that contain brackets of their own", () => {
+    expect(added('defineConfig({ cli: { commands: [make(["a"]), b()] } })')).toContain(
+      'commands: [registerGrimoireCommands(), make(["a"]), b()]',
+    );
+    expect(
+      added(["defineConfig({ cli: { commands: [", '  make(["a"]),', "] } })"].join("\n")),
+    ).toContain('[\n  registerGrimoireCommands(),\n  make(["a"]),\n]');
+  });
+
+  it("adds to a commands array that also spreads shared commands", () => {
+    expect(added("defineConfig({ cli: { commands: [...shared, a()] } })")).toContain(
+      "commands: [registerGrimoireCommands(), ...shared, a()]",
+    );
+  });
+
+  it("leaves cli or commands set from a variable alone instead of adding a second key", () => {
+    for (const source of [
+      "defineConfig({ cli: settings })",
+      "defineConfig({\n  cli,\n})",
+      "defineConfig({ cli: { commands: baseCommands } })",
+      "defineConfig({ cli: { ...baseCli } })",
+    ]) {
+      expect(insertCliCommandEntry(source, CALL)).toEqual({ status: "unrecognised" });
+    }
+  });
+
+  it("adds to a satisfies-typed config that has a cli block", () => {
+    expect(
+      added("export default {\n  cli: { commands: [] },\n} satisfies WarlockConfig;\n"),
+    ).toContain("cli: { commands: [registerGrimoireCommands()] }");
+  });
+
   it("reports a file with no defineConfig object", () => {
     expect(insertCliCommandEntry("export default {};\n", CALL)).toEqual({ status: "unrecognised" });
   });

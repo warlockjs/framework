@@ -16,9 +16,8 @@ import { loadBook } from "../book";
 import { projectPath } from "../paths";
 import { writeRelease } from "../releases";
 import { formatScryResult, parseScryQuery, scry } from "../scry";
-import { openGrimoire } from "../workspace";
+import { openGrimoire, runGrimoire, type GrimoireRun } from "../workspace";
 import { parseGrimoire } from "../written";
-import { runGrimoire, type GrimoireRun } from "./pipeline";
 
 /** Where a command writes: `out` for its answer, `err` for problems. */
 export type CommandIO = {
@@ -72,7 +71,11 @@ async function withFreshRoutes<T>(
 
     return {
       value: await open("cached"),
-      bootProblem: createFinding({ code: "GR8002", message: error.message }),
+      // Finding messages start lower-case, like every other line of the check report.
+      bootProblem: createFinding({
+        code: "GR8002",
+        message: `${error.message.charAt(0).toLowerCase()}${error.message.slice(1)}`,
+      }),
     };
   }
 }
@@ -174,8 +177,32 @@ function buildSummary(run: GrimoireRun): { book: string; collected: string } {
 
   return {
     book,
-    collected: `features  ${snapshot.collected.featuresIndex.features.length} (bookmaps written: ${bookmaps})   tasks  ${tasks.open.length} open, ${tasks.waiting.length} waiting, ${tasks.done.length} done`,
+    // `waiting` is a part of `open`: count each task once, as the devtools tab does.
+    collected: `features  ${snapshot.collected.featuresIndex.features.length} (bookmaps written: ${bookmaps})   tasks  ${tasks.open.length - tasks.waiting.length} open, ${tasks.waiting.length} waiting, ${tasks.done.length} done`,
   };
+}
+
+/**
+ * The `--out` folder of the static site, project-relative. A folder outside
+ * the project, or the project itself (its own `index.html`), is refused.
+ */
+function siteFolder(root: string, out: string): string {
+  const folder = projectPath(root, out.trim());
+
+  if (
+    out.trim() === "" ||
+    folder === "" ||
+    folder === ".." ||
+    folder.startsWith("../") ||
+    path.isAbsolute(folder)
+  ) {
+    throw new GrimoireError(
+      "GR9006",
+      `--out ${JSON.stringify(out)} is not a folder inside the project. Pass a project-relative folder, like --out public/grimoire.`,
+    );
+  }
+
+  return folder;
 }
 
 /** `warlock grimoire build [--force] [--site [--out <dir>]] [--json]`. */
@@ -184,6 +211,7 @@ export async function runBuild(context: CommandContext, options: Options = {}): 
 
   try {
     const force = options.force === true;
+    const outDir = typeof options.out === "string" ? siteFolder(root, options.out) : undefined;
     const { value: run, bootProblem } = await withFreshRoutes((routes) =>
       runGrimoire(root, adapter, { routes, force }),
     );
@@ -191,7 +219,6 @@ export async function runBuild(context: CommandContext, options: Options = {}): 
 
     if (options.site === true || typeof options.out === "string") {
       const { exportGrimoireSite } = await import("../devtools");
-      const outDir = typeof options.out === "string" ? projectPath(root, options.out) : undefined;
 
       site = await exportGrimoireSite(root, {
         adapter,

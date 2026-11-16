@@ -63,18 +63,21 @@ export function formatRegisteredExplanation(code: ExplainableCode): string[] {
 /** Ask the explainers of the commands in `cli.commands`; never boots the app. */
 async function explainPackageCode(requested: string, json: boolean): Promise<void> {
   let answer: ExplainableCode | undefined;
+  let configError = "";
 
   try {
     if (!warlockConfigManager.isLoaded) await warlockConfigManager.load();
+  } catch (error) {
+    configError = ` (warlock.config.ts could not be read: ${error instanceof Error ? error.message : String(error)})`;
+  }
 
+  if (!configError) {
     answer = explainRegisteredCode(warlockConfigManager.get("cli")?.commands, requested);
-  } catch {
-    answer = undefined;
   }
 
   if (!answer) {
     throw new Error(
-      `Unknown error code ${JSON.stringify(requested)}. No installed package explains it: register the package's commands in cli.commands of warlock.config.ts, or run \`warlock explain\` to list the Warlock codes.`,
+      `Unknown error code ${JSON.stringify(requested)}. No installed package explains it${configError}: register the package's commands in cli.commands of warlock.config.ts, or run \`warlock explain\` to list the Warlock codes.`,
     );
   }
 
@@ -123,7 +126,8 @@ export async function explainCommandAction({ args, options }: CommandActionData)
   }
 
   if (!/^WL\d+$/i.test(requested.trim()) && /^[A-Z]{2}\d{4}$/i.test(requested.trim())) {
-    await explainPackageCode(requested.trim(), Boolean(options.json));
+    // Codes are upper case by convention; `gr2001` asks for `GR2001`.
+    await explainPackageCode(requested.trim().toUpperCase(), Boolean(options.json));
     return;
   }
 

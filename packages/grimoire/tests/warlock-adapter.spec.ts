@@ -7,13 +7,14 @@
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { inspectApp, type InspectOptions, type InspectSection } from "@warlock.js/core/tooling";
 import { setConfig } from "@warlock.js/core";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { BookAdapter, BookFile } from "../src/contracts/adapter";
 import { scry } from "../src/scry";
 import { createWarlockAdapter } from "../src/warlock";
+import { installedVersion } from "../src/warlock/adapter";
 import { openGrimoire } from "../src/workspace";
 import { shopFacts, shopRoot } from "./fixtures/shop-facts";
 
@@ -100,6 +101,9 @@ const FILES: Record<string, string> = {
     "}",
     "",
   ].join("\n"),
+  "mobile/android/app/build/generated/index.android.js": "export const generated = 1;\n",
+  "mobile/ios/Pods/Some/Pod.js": "export const pod = 1;\n",
+  "mobile/.expo/cache.js": "export const cache = 1;\n",
   "e2e/checkout.e2e.ts": "export {};\n",
 };
 
@@ -184,8 +188,12 @@ afterAll(() => {
 });
 
 describe("createWarlockAdapter over a real app", () => {
-  it("finds the source roots: src and the mobile app", async () => {
-    expect(await adapter.sourceRoots(root)).toEqual(["src", "mobile"]);
+  it("finds the source roots: src and the mobile app's source folders, never its native projects", async () => {
+    expect(await adapter.sourceRoots(root)).toEqual(["src", "mobile/app"]);
+
+    const files = (await adapter.files(root)).map((file) => file.file);
+
+    expect(files.filter((file) => /^mobile\/(?:android|ios|\.expo)\//.test(file))).toEqual([]);
   });
 
   it("maps collectFiles(): roles, headers, tags, export docs, imports across src and mobile", async () => {
@@ -371,5 +379,69 @@ describe("createWarlockAdapter over the shop fixture", () => {
         }));
 
     expect(project(await shop.files(shopRoot))).toEqual(project(shopFacts.files));
+  });
+});
+
+describe("installedVersion (the core version in the book manifest)", () => {
+  /** A project with a published-style core: ESM only, `exports` without `./package.json`. */
+  function installed(): string {
+    const project = mkdtempSync(path.join(tmpdir(), "grimoire-core-version-"));
+    const core = path.join(project, "node_modules", "@warlock.js", "core");
+
+    mkdirSync(path.join(core, "esm"), { recursive: true });
+    mkdirSync(path.join(project, "src", "app"), { recursive: true });
+    writeFileSync(
+      path.join(core, "package.json"),
+      JSON.stringify({
+        name: "@warlock.js/core",
+        version: "5.50.0",
+        type: "module",
+        exports: { ".": { import: { default: "./esm/index.mjs" } } },
+      }),
+    );
+    writeFileSync(path.join(core, "esm", "index.mjs"), "export {};\n");
+    writeFileSync(path.join(core, "esm", "package.json"), JSON.stringify({ type: "module" }));
+
+    return project;
+  }
+
+  it("walks up from the resolved entry to the package's own package.json", () => {
+    const project = installed();
+
+    try {
+      const entry = pathToFileURL(
+        path.join(project, "node_modules", "@warlock.js", "core", "esm", "index.mjs"),
+      ).href;
+
+      expect(installedVersion("@warlock.js/core", path.join(project, "src"), () => entry)).toBe(
+        "5.50.0",
+      );
+    } finally {
+      rmSync(project, { recursive: true, force: true });
+    }
+  });
+
+  it("finds the package in a node_modules above when the entry cannot be resolved", () => {
+    const project = installed();
+
+    try {
+      const unresolvable = () => {
+        throw Object.assign(new Error("not exported"), { code: "ERR_PACKAGE_PATH_NOT_EXPORTED" });
+      };
+
+      expect(
+        installedVersion("@warlock.js/core", path.join(project, "src", "app"), unresolvable),
+      ).toBe("5.50.0");
+      expect(installedVersion("@warlock.js/core", path.join(project, "src"), undefined)).toBe(
+        "5.50.0",
+      );
+      expect(installedVersion("@warlock.js/nope", path.join(project, "src"), undefined)).toBeNull();
+    } finally {
+      rmSync(project, { recursive: true, force: true });
+    }
+  });
+
+  it("gives the adapter the workspace core's version, never unknown", () => {
+    expect(createWarlockAdapter().version).toMatch(/^\d+\.\d+\.\d+/);
   });
 });

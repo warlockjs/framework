@@ -76,7 +76,7 @@ export function parseTask(
   if (place.nameId !== null && id.value !== "" && id.value !== place.nameId) {
     sink.report(
       "GR1019",
-      `The task id ${JSON.stringify(id.value)} must equal ${JSON.stringify(place.nameId)} from its file name.`,
+      `the task id ${JSON.stringify(id.value)} must equal ${JSON.stringify(place.nameId)} from its file name.`,
       id.at,
     );
   }
@@ -148,7 +148,7 @@ export function parseRelease(
   if (release.value !== "" && release.value !== name) {
     sink.report(
       "GR1019",
-      `The release ${JSON.stringify(release.value)} must equal the file name ${JSON.stringify(name)}.`,
+      `the release ${JSON.stringify(release.value)} must equal the file name ${JSON.stringify(name)}.`,
       release.at,
     );
   }
@@ -158,7 +158,7 @@ export function parseRelease(
   if (document.title === null) {
     sink.report(
       "GR1006",
-      "The file has no `# ` title heading.",
+      "the file has no `# ` title heading.",
       lineAt(file, document.bodyStartLine),
     );
   }
@@ -189,7 +189,7 @@ export function parseRelease(
     if (problem !== null || start === undefined || end === undefined) {
       sink.report(
         "GR1024",
-        `The release file ${problem?.[0] ?? "has broken markers"}.`,
+        `the release file ${problem?.[0] ?? "has broken markers"}.`,
         lineAt(file, problem?.[1] ?? 1),
       );
     } else {
@@ -242,8 +242,8 @@ function readCollected(
       sink.report(
         "GR1015",
         feature === null && match
-          ? `The collected entry ${JSON.stringify(line.text)} is not under a "### <feature>" heading.`
-          : `The collected line ${JSON.stringify(line.text)} is not an entry \`- <version> <word> <text>\`.`,
+          ? `the collected entry ${JSON.stringify(line.text)} is not under a "### <feature>" heading.`
+          : `the collected line ${JSON.stringify(line.text)} is not an entry \`- <version> <word> <text>\`.`,
         at,
       );
       continue;
@@ -252,7 +252,7 @@ function readCollected(
     if (!CHANGE_WORDS.includes(word as ChangeWord)) {
       sink.report(
         "GR1016",
-        `The collected word ${JSON.stringify(word)} is not one of ${CHANGE_WORDS.join(", ")}.`,
+        `the collected word ${JSON.stringify(word)} is not one of ${CHANGE_WORDS.join(", ")}.`,
         at,
       );
       continue;

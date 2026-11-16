@@ -46,9 +46,13 @@ Follow `write-a-feature` for the shapes, with these differences:
 ```md
 ---
 id: auth
+title: Accounts
 status: shipped
 origin: inferred
 version: 1.0
+updated: 2026-11-16
+apps: [web-client, mobile]
+folders: [src/app/auth]
 ---
 ```
 
@@ -57,8 +61,15 @@ version: 1.0
   `- 1.0  added  described from the existing code`.
 - **Steps:** take them from the routes and pages, in the order a user meets them.
 - **Cases:** write only the cases the code handles. For a question the code does not handle
-  (a double submit, an expired code), do not write a case. List it under `## Not handled` so
-  the owner sees the gap.
+  (a double submit, an expired code), do not write a case. List it under `## Not handled`, in the
+  same form as a case (the question, then what happens today), so the owner sees the gap:
+
+  ```md
+  ## Not handled
+
+  - double submit two quick taps create two accounts
+  ```
+
 - **Criteria:** one per case. Tag the existing tests with `@proves` where a test clearly proves
   one. Do not write new tests during a backfill.
 - **Intent you cannot see:** write `Unknown: why does a VIP skip the stock check?` in the flow.

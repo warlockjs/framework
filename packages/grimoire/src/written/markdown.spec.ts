@@ -123,10 +123,10 @@ describe("checkHeadings", () => {
     );
 
     expect(findings.map((finding) => [finding.code, finding.at?.line, finding.message])).toEqual([
-      ["GR1006", 1, "The file has no `# ` title heading."],
-      ["GR1006", 1, 'The heading "## Cases" is missing.'],
-      ["GR1007", 2, 'The heading "## Notes" is not part of the template.'],
-      ["GR1007", 3, 'The heading "## steps" is written twice; only the first is read.'],
+      ["GR1006", 1, "the file has no `# ` title heading."],
+      ["GR1006", 1, 'the heading "## Cases" is missing.'],
+      ["GR1007", 2, 'the heading "## Notes" is not part of the template.'],
+      ["GR1007", 3, 'the heading "## steps" is written twice; only the first is read.'],
     ]);
   });
 });

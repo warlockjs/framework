@@ -486,6 +486,25 @@ describe("paths and safety", () => {
     expect(filesUnder(bookDir(copy)).filter((file) => file.endsWith(".tmp"))).toEqual([]);
   });
 
+  it("never removes a path from .cache/written.json that leaves grimoire/book", async () => {
+    const copy = fixture();
+
+    await buildAndWrite(copy, createShopAdapter(), { routes: "fresh" });
+
+    const statePath = path.join(bookDir(copy), ".cache", "written.json");
+    const state = JSON.parse(readFileSync(statePath, "utf8"));
+
+    state.stamp = "edited";
+    state.files["grimoire/book/../../keep.json"] = "x";
+    writeFileSync(statePath, JSON.stringify(state));
+    writeFileSync(path.join(copy.root, "keep.json"), "{}\n");
+
+    const result = await buildAndWrite(copy, createShopAdapter(), { routes: "fresh" });
+
+    expect(result.removed).toEqual([]);
+    expect(existsSync(path.join(copy.root, "keep.json"))).toBe(true);
+  });
+
   it("reports GR8001 when the adapter cannot read the source files", async () => {
     const copy = fixture();
     const adapter = {

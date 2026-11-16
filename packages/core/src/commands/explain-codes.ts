@@ -32,7 +32,8 @@ const EXPLAIN_CODES = Symbol.for("warlock.explain.codes");
 /**
  * Let `warlock explain <code>` answer the codes of a package. When the command
  * is listed in `cli.commands` of `warlock.config.ts`, the explainer is asked
- * for any code that is not a Warlock code. Returns the same command, so a
+ * for a code of two letters and four digits that is not a Warlock `WL` code
+ * (`GR2001`, upper-cased before it is asked). Returns the same command, so a
  * package's register function stays one expression. Calling it again adds
  * more explainers.
  *

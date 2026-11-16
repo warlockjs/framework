@@ -105,7 +105,7 @@ export function readDocument(
     if (fields === null && result.errors.length === 0 && frontMatter === "required") {
       sink.report(
         "GR1001",
-        "The file has no front matter; it must start with a `---` line.",
+        "the file has no front matter; it must start with a `---` line.",
         lineAt(file, 1),
       );
     }
@@ -195,12 +195,12 @@ export function checkHeadings(
   const where = lineAt(document.file, document.title?.line ?? document.bodyStartLine);
 
   if (template.title && document.title === null) {
-    sink.report("GR1006", "The file has no `# ` title heading.", where);
+    sink.report("GR1006", "the file has no `# ` title heading.", where);
   }
 
   for (const required of template.required) {
     if (!document.sections.some((section) => section.key === normalizeKey(required))) {
-      sink.report("GR1006", `The heading "## ${required}" is missing.`, where);
+      sink.report("GR1006", `the heading "## ${required}" is missing.`, where);
     }
   }
 
@@ -211,13 +211,13 @@ export function checkHeadings(
     if (!known.has(section.key)) {
       sink.report(
         "GR1007",
-        `The heading "## ${section.title}" is not part of the template.`,
+        `the heading "## ${section.title}" is not part of the template.`,
         lineAt(document.file, section.line),
       );
     } else if (seen.has(section.key)) {
       sink.report(
         "GR1007",
-        `The heading "## ${section.title}" is written twice; only the first is read.`,
+        `the heading "## ${section.title}" is written twice; only the first is read.`,
         lineAt(document.file, section.line),
       );
     }

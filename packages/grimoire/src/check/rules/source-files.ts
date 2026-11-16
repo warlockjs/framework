@@ -71,13 +71,16 @@ export function checkOwners(snapshot: GrimoireSnapshot): GrimoireFinding[] {
       );
     }
 
+    // The feature id is the tag's first word, as the owner rule reads it (`@feature catalog — …`).
     for (const tag of file.tags["feature"] ?? []) {
-      if (features.has(tag)) continue;
+      const id = tag.trim().split(/\s+/)[0] ?? "";
+
+      if (id === "" || features.has(id)) continue;
 
       findings.push(
         createFinding({
           code: "GR3004",
-          message: `${file.file} is tagged @feature ${tag}, which is no feature`,
+          message: `${file.file} is tagged @feature ${id}, which is no feature`,
           at: top(file.file),
         }),
       );
@@ -102,15 +105,34 @@ function needsFeature(file: BookFile): boolean {
  * file under the source roots, code or not).
  */
 export function checkFolders(snapshot: GrimoireSnapshot): GrimoireFinding[] {
-  const known = [
+  // Every folder that holds a known file (and the files themselves), built once: one lookup per entry.
+  const held = new Set<string>();
+
+  for (const file of [
     ...Object.keys(snapshot.book.manifest.files),
-    ...snapshot.book.facts.files.map((file) => file.file),
-  ].map(toPosixPath);
+    ...snapshot.book.facts.files.map((item) => item.file),
+  ]) {
+    const parts = toPosixPath(file).split("/");
+
+    for (let length = parts.length; length > 0; length--) {
+      const folder = parts.slice(0, length).join("/");
+
+      if (held.has(folder)) break;
+
+      held.add(folder);
+    }
+  }
+
   const findings: GrimoireFinding[] = [];
 
   for (const feature of snapshot.written.features) {
     for (const folder of feature.readme?.folders ?? []) {
-      if (known.some((file) => isInsideFolder(file, folder.value))) continue;
+      // Written the way the owner rule reads it: `./` and a trailing `/` do not matter.
+      const normalized = toPosixPath(folder.value.trim())
+        .replace(/^(?:\.\/)+/, "")
+        .replace(/\/+$/, "");
+
+      if (held.has(normalized)) continue;
 
       findings.push(
         createFinding({

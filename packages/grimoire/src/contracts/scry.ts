@@ -35,6 +35,8 @@ export type ScryPageRef = { app: string; route: string; file: string; type: "pag
 export type ScryFileResult = ScryNotes & {
   type: "file";
   entry: BookEntry;
+  /** Where the book keeps the entry (`grimoire/book/….json`), or `null` when the file has none. */
+  bookEntry: string | null;
 };
 
 // `routes` below lists the affected routes, so the route freshness is only in `notes`.
@@ -43,12 +45,15 @@ export type ScryImpactResult = Omit<ScryNotes, "routes"> & {
   file: string;
   /** Files that import it, transitively, sorted; `direct` are the ones importing it directly. */
   importers: { direct: string[]; all: string[] };
-  /** Routes whose handler or routes file reaches the file through imports. */
+  /**
+   * API routes (`isPage: false`) whose handler file reaches the file through
+   * imports; the routes file counts only when the handler file is unknown.
+   */
   routes: Pick<BookRoute, "method" | "path" | "name" | "handlerFile">[];
   pages: ScryPageRef[];
   /** `<feature>/<flow>` whose step files include it. */
   flows: string[];
-  /** Owner first, then borrowers. */
+  /** Owner first, then borrowers: features whose files (not specs) import it, directly or through other files. */
   features: { id: string; via: "owner" | "borrower" }[];
   /** Test files among the importers, plus tests proving the flows above. */
   tests: string[];

@@ -15,6 +15,8 @@ import { createDocLookup, readFileHeader } from "./file-comments";
 import type { InspectFile, InspectWarning } from "./inspect-report.types";
 
 const CODE = /\.(?:[cm]?[jt]s|[jt]sx)$/;
+/** Roles a `*.<role>.ts` file name sets whatever folder holds it. */
+const NAMED_ROLES = new Set(["use-case", "seed", "request", "mail", "job", "event", "client"]);
 const EXTENSIONS = [".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs", ".d.ts"];
 
 export function projectFile(cwd: string, file: string): string {
@@ -45,12 +47,16 @@ export function fileRole(file: string): string {
   if (isEventFile(file)) return "event";
   if (isLocaleFile(file)) return "locale";
   // A file named for one of these says what it is, whatever folder holds it.
-  for (const role of ["use-case", "seed", "request", "mail", "job", "event", "client"]) {
+  for (const role of NAMED_ROLES) {
     if (stem.endsWith(`.${role}`)) return role;
   }
   for (const role of ["routes", "page", "setup", "layout", "root"]) {
     if (stem === role || stem.endsWith(`.${role}`)) return role;
   }
+  const folders = file.split("/");
+  // For these roles the module folder itself does not count: `src/app/events/`
+  // or `src/app/jobs/` is a module named after the word, not a folder of events.
+  const innerFolders = folders.slice(folders[0] === "src" && folders[1] === "app" ? 3 : 0);
   for (const role of [
     "controller",
     "service",
@@ -74,7 +80,9 @@ export function fileRole(file: string): string {
   ]) {
     if (
       stem.endsWith(`.${role}`) ||
-      file.split("/").includes(role === "repository" ? "repositories" : `${role}s`)
+      (NAMED_ROLES.has(role) ? innerFolders : folders).includes(
+        role === "repository" ? "repositories" : `${role}s`,
+      )
     )
       return role;
   }
@@ -108,7 +116,10 @@ function bindingNames(node: Node): string[] {
 
 /** Options of {@link collectFiles}. */
 export type CollectFilesOptions = {
-  /** Project-relative folders to scan. Default `["src"]`. */
+  /**
+   * Project-relative folders to scan. Default `["src"]`. `node_modules` and
+   * hidden folders (`.expo`, `.git`) inside them are skipped.
+   */
   dirs?: readonly string[];
 };
 
@@ -125,6 +136,9 @@ export function collectFiles(
     try {
       for (const entry of readdirSync(directory, { withFileTypes: true })) {
         const file = path.join(directory, entry.name);
+        // A scanned app folder (a mobile app) has its own installs and tool caches.
+        if (entry.isDirectory() && (entry.name === "node_modules" || entry.name.startsWith(".")))
+          continue;
         if (entry.isDirectory()) scan(file);
         else if (entry.isFile()) paths.push(file);
       }

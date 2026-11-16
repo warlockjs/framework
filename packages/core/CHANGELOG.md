@@ -19,7 +19,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - A registered MCP tool is checked like a built-in one. A tool name that is already taken stops the server with a message that names the tool.
 - `cli.commands` accepts arrays of commands (`CLICommandEntry`), so one register function can return several commands.
 - `withExplainCodes()` lets a package answer `warlock explain <code>` for its own codes, without booting the app.
-- `warlock add grimoire` (experimental) installs `@warlock.js/grimoire`, registers its commands in `cli.commands`, adds the generated files to `.gitignore`, and adds the devtools panel and the Vitest reporter. Running it twice changes nothing.
+- `warlock add grimoire` (experimental) installs `@warlock.js/grimoire`, registers its commands in `cli.commands` of `warlock.config.ts`, adds the generated files to `.gitignore`, adds the devtools panel to `src/config/devtools.ts` and, when the app has a `vite.config.ts`, the Vitest reporter. Comments and strings in those files are skipped. When `cli`, `commands`, `reporters` or `panels` is set from a variable, it changes nothing there and prints the line to add. Running it twice changes nothing.
 - `warlock add test` adds `grimoireReporter()` to the Vitest config it creates when the app uses Grimoire.
 
 ### Changed

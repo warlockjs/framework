@@ -8,9 +8,10 @@
  * `@warlock.js/core/tooling` is imported inside the methods, never at the
  * top: this module is reached from `warlock.config.ts`.
  */
+import { readFileSync } from "node:fs";
 import { readdir } from "node:fs/promises";
-import { createRequire } from "node:module";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import type {
   InspectFile,
   InspectReport,
@@ -54,16 +55,79 @@ export type WarlockAdapterOptions = {
   inspect?: WarlockInspect;
 };
 
-/** The framework version, for the book manifest. */
-function coreVersion(): string {
+/** The `version` of a `package.json` named `name`, or `null` when the file is not that package's. */
+function versionIn(file: string, name: string): string | null {
   try {
-    const require = createRequire(import.meta.url);
-    const manifest = require("@warlock.js/core/package.json") as { version?: unknown };
+    const manifest = JSON.parse(readFileSync(file, "utf8")) as {
+      name?: unknown;
+      version?: unknown;
+    };
 
-    return typeof manifest.version === "string" ? manifest.version : "unknown";
+    return manifest.name === name && typeof manifest.version === "string" ? manifest.version : null;
   } catch {
-    return "unknown";
+    return null;
   }
+}
+
+/**
+ * The installed version of a package, read from its `package.json` without
+ * going through its `exports` (published `@warlock.js/core` exports neither
+ * `./package.json` nor a `require` condition). It resolves the package's
+ * entry and walks up to the `package.json` with that name; when the entry
+ * cannot be resolved, it looks in each `node_modules` above `from`.
+ *
+ * @param from Absolute folder to look from.
+ * @param resolve Resolves a bare specifier to a file URL or path (`import.meta.resolve`).
+ */
+export function installedVersion(
+  name: string,
+  from: string,
+  resolve: ((specifier: string) => string) | undefined,
+): string | null {
+  try {
+    const entry = resolve?.(name);
+
+    if (entry !== undefined) {
+      let folder = path.dirname(entry.startsWith("file:") ? fileURLToPath(entry) : entry);
+
+      for (;;) {
+        const version = versionIn(path.join(folder, "package.json"), name);
+
+        if (version !== null) return version;
+
+        const parent = path.dirname(folder);
+
+        if (parent === folder) break;
+
+        folder = parent;
+      }
+    }
+  } catch {
+    // Not resolvable from here: look in the node_modules folders below.
+  }
+
+  for (let folder = from; ; folder = path.dirname(folder)) {
+    const version = versionIn(
+      path.join(folder, "node_modules", ...name.split("/"), "package.json"),
+      name,
+    );
+
+    if (version !== null) return version;
+    if (path.dirname(folder) === folder) return null;
+  }
+}
+
+/** The framework version, for the book manifest (a core upgrade rebuilds the book). */
+function coreVersion(): string {
+  const resolve =
+    typeof import.meta.resolve === "function"
+      ? (specifier: string) => import.meta.resolve(specifier)
+      : undefined;
+
+  return (
+    installedVersion("@warlock.js/core", path.dirname(fileURLToPath(import.meta.url)), resolve) ??
+    "unknown"
+  );
 }
 
 /** Run `work` with `console.log`/`info`/`debug` on stderr, so a boot never mixes with `--json` output. */
@@ -101,7 +165,7 @@ function bootedInspect(): WarlockInspect {
       );
 
       throw new Error(
-        `The app did not boot, so its routes could not be read${failures.length > 0 ? ` (${failures.join("; ")})` : ""}. Run warlock doctor to see why.`,
+        `the app did not boot${failures.length > 0 ? ` (${failures.join("; ")})` : ""}. Run warlock doctor to see why.`,
       );
     }
 
@@ -134,11 +198,36 @@ function toBookFile(file: InspectFile, mobile: readonly BookMobileApp[]): BookFi
   };
 }
 
+/** Files by the names they export, built once per `routes()` call. */
+type ExportIndex = () => ReadonlyMap<string, readonly string[]>;
+
+function exportIndex(files: ReadonlyMap<string, BookFile>): ExportIndex {
+  let index: Map<string, string[]> | undefined;
+
+  return () => {
+    if (index) return index;
+
+    index = new Map();
+
+    for (const file of files.values()) {
+      for (const entry of file.exports) {
+        const list = index.get(entry.name) ?? [];
+
+        list.push(file.file);
+        index.set(entry.name, list);
+      }
+    }
+
+    return index;
+  };
+}
+
 /** The file that defines a route's handler: the controller's file for a tuple, else the file exporting the handler. */
 function handlerFileOf(
   route: InspectRoute,
   files: ReadonlyMap<string, BookFile>,
   pages: readonly BookPage[],
+  exporters: ExportIndex,
 ): string | null {
   if (route.isPage) {
     return pages.find((page) => page.route === route.path)?.file ?? null;
@@ -161,7 +250,8 @@ function handlerFileOf(
   if (fromImports) return fromImports;
   if (exportsName(route.sourceFile, name)) return route.sourceFile;
 
-  const anywhere = [...files.keys()].filter((file) => exportsName(file, name));
+  // Not imported by the routes file: the one file in the project exporting it, when there is only one.
+  const anywhere = [...new Set(exporters().get(name) ?? [])];
 
   return anywhere.length === 1 ? (anywhere[0] ?? null) : null;
 }
@@ -170,6 +260,7 @@ function toBookRoute(
   route: InspectRoute,
   files: ReadonlyMap<string, BookFile>,
   pages: readonly BookPage[],
+  exporters: ExportIndex,
 ): BookRoute {
   const controller = route.controller ?? null;
   const action = route.action ?? null;
@@ -186,7 +277,7 @@ function toBookRoute(
     handler,
     controller,
     action,
-    handlerFile: handlerFileOf(route, files, pages),
+    handlerFile: handlerFileOf(route, files, pages, exporters),
     middleware: [...route.middleware],
     auth: { required: route.auth.required, userTypes: [...route.auth.userTypes] },
     isPage: route.isPage,
@@ -222,6 +313,32 @@ async function webSitesConfig(): Promise<
     : undefined;
 }
 
+/**
+ * Folders of a mobile app that hold native projects, build output or tool
+ * caches, never app source. `node_modules` and dot folders are skipped too.
+ */
+const MOBILE_SKIPPED_FOLDERS = new Set([
+  "android",
+  "ios",
+  "build",
+  "dist",
+  "web-build",
+  "coverage",
+  "node_modules",
+]);
+
+/**
+ * The source folders of a mobile app: its top-level folders minus native
+ * projects and build output (`android/`, `ios/` with Pods and builds can hold
+ * hundreds of megabytes). Code files directly in the app folder (`App.tsx`)
+ * are not read: `collectFiles` scans folders only.
+ */
+async function mobileSourceFolders(root: string, app: BookMobileApp): Promise<string[]> {
+  return (await folderNames(path.join(root, ...app.root.split("/"))))
+    .filter((name) => !name.startsWith(".") && !MOBILE_SKIPPED_FOLDERS.has(name))
+    .map((name) => `${app.root}/${name}`);
+}
+
 /** The adapter over `inspectApp()`, `collectFiles()` and the mobile app folders. */
 export function createWarlockAdapter(options: WarlockAdapterOptions = {}): BookAdapter {
   const inspect = options.inspect ?? bootedInspect();
@@ -231,10 +348,17 @@ export function createWarlockAdapter(options: WarlockAdapterOptions = {}): BookA
 
   const mobileApps = (root: string) => collectMobileFacts(root, mobileOptions);
 
+  /** `src` and each mobile app's source folders: what `files()` reads and the book fingerprints. */
+  async function sourceFolders(root: string, mobile: readonly BookMobileApp[]): Promise<string[]> {
+    const folders = await Promise.all(mobile.map((app) => mobileSourceFolders(root, app)));
+
+    return ["src", ...folders.flat()];
+  }
+
   async function files(root: string): Promise<BookFile[]> {
     const { collectFiles } = await import("@warlock.js/core/tooling");
     const mobile = await mobileApps(root);
-    const dirs = ["src", ...mobile.map((app) => app.root)];
+    const dirs = await sourceFolders(root, mobile);
     const collected = collectFiles(root, [], { dirs })
       .filter((file) => isCodeFile(file.file))
       .map((file) => toBookFile(file, mobile));
@@ -287,7 +411,7 @@ export function createWarlockAdapter(options: WarlockAdapterOptions = {}): BookA
     name: "warlock",
     version: coreVersion(),
     async sourceRoots(root) {
-      return ["src", ...(await mobileApps(root)).map((app) => app.root)];
+      return sourceFolders(root, await mobileApps(root));
     },
     files,
     async routes(root) {
@@ -297,7 +421,9 @@ export function createWarlockAdapter(options: WarlockAdapterOptions = {}): BookA
       const sitePages =
         lastPages?.root === root ? lastPages.pages : await pages(root).catch(() => []);
 
-      return (report.routes ?? []).map((route) => toBookRoute(route, known, sitePages));
+      const exporters = exportIndex(known);
+
+      return (report.routes ?? []).map((route) => toBookRoute(route, known, sitePages, exporters));
     },
     async named(root) {
       const report = await inspect(root, ["events", "jobs"]);

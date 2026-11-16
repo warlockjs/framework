@@ -72,7 +72,7 @@ export function parseBlocksTable(
   const start = lines.findIndex((line) => !line.fenced && line.text.includes("|"));
 
   if (start === -1) {
-    sink.report("GR1018", "The Blocks section has no table.", lineAt(file, section.line));
+    sink.report("GR1018", "the Blocks section has no table.", lineAt(file, section.line));
 
     return rows;
   }
@@ -90,7 +90,7 @@ export function parseBlocksTable(
   ) {
     sink.report(
       "GR1018",
-      `The Blocks table header is ${JSON.stringify(header.text.trim())}; use the columns Block | Flow | Who sees it | Changes with.`,
+      `the Blocks table header is ${JSON.stringify(header.text.trim())}; use the columns Block | Flow | Who sees it | Changes with.`,
       lineAt(file, header.line),
     );
 
@@ -106,7 +106,7 @@ export function parseBlocksTable(
   ) {
     sink.report(
       "GR1018",
-      "The Blocks table header is not followed by a separator row (`| --- | --- | --- | --- |`).",
+      "the Blocks table header is not followed by a separator row (`| --- | --- | --- | --- |`).",
       lineAt(file, separator?.line ?? header.line),
     );
 
@@ -122,21 +122,21 @@ export function parseBlocksTable(
     const cells = tableCells(line.text);
 
     if (cells.length !== BLOCK_COLUMNS.length) {
-      sink.report("GR1018", `The Blocks row has ${cells.length} cells instead of 4.`, at);
+      sink.report("GR1018", `the Blocks row has ${cells.length} cells instead of 4.`, at);
       continue;
     }
 
     const [block = "", flow = "", who = "", changesWith = ""] = cells;
 
     if (block === "") {
-      sink.report("GR1018", "The Blocks row has no block name.", at);
+      sink.report("GR1018", "the Blocks row has no block name.", at);
       continue;
     }
 
     if (!EMPTY_CELL.test(flow) && !FLOW_REF.test(flow)) {
       sink.report(
         "GR1018",
-        `The Flow cell ${JSON.stringify(flow)} of block "${block}" is not <feature>/<flow> or —.`,
+        `the Flow cell ${JSON.stringify(flow)} of block "${block}" is not <feature>/<flow> or —.`,
         at,
       );
       continue;
@@ -145,7 +145,7 @@ export function parseBlocksTable(
     if (EMPTY_CELL.test(who)) {
       sink.report(
         "GR1018",
-        `The "Who sees it" cell of block "${block}" is empty; write everyone or condition names.`,
+        `the "Who sees it" cell of block "${block}" is empty; write everyone or condition names.`,
         at,
       );
       continue;
@@ -201,7 +201,7 @@ export function parseAppReadme(
   if (id.value !== "" && id.value !== folder) {
     sink.report(
       "GR1019",
-      `The app id ${JSON.stringify(id.value)} must equal its folder name ${JSON.stringify(folder)}.`,
+      `the app id ${JSON.stringify(id.value)} must equal its folder name ${JSON.stringify(folder)}.`,
       id.at,
     );
   }
@@ -229,7 +229,7 @@ export function parseLayout(
 ): WrittenLayout {
   const document = readDocument(file, text, "none", sink);
 
-  new FrontMatterReader(document, sink).onlyKeys([], "A layout");
+  new FrontMatterReader(document, sink).onlyKeys([], "a layout");
   checkHeadings(document, { title: false, required: ["Blocks"], optional: [] }, sink);
 
   const blocks = findSection(document, "blocks");
@@ -264,7 +264,7 @@ export function parsePage(
   if (type === "screen" && fields.present && route === null && screen === null) {
     sink.report(
       "GR1003",
-      'A screen needs the front matter key "route" (file-based routing) or "screen" (its name in code).',
+      'a screen needs the front matter key "route" (file-based routing) or "screen" (its name in code).',
       lineAt(file, 1),
     );
   }

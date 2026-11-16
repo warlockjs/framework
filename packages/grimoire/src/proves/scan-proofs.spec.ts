@@ -1,6 +1,32 @@
-import { describe, expect, it } from "vitest";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { describe, expect, it, vi } from "vitest";
 import { shopFacts, shopRoot } from "../../tests/fixtures/shop-facts";
 import { scanProofs, scanProofsInText } from "./scan-proofs";
+
+/** Counts the reads in flight, passing every call through to the real `readFile`. */
+const reads = vi.hoisted(() => ({ inFlight: 0, most: 0 }));
+
+vi.mock("node:fs/promises", async (importOriginal) => {
+  const original = await importOriginal<typeof import("node:fs/promises")>();
+
+  return {
+    ...original,
+    readFile: async (...args: Parameters<typeof original.readFile>) => {
+      reads.inFlight++;
+      reads.most = Math.max(reads.most, reads.inFlight);
+
+      try {
+        await new Promise((resolve) => setImmediate(resolve));
+
+        return await original.readFile(...args);
+      } finally {
+        reads.inFlight--;
+      }
+    },
+  };
+});
 
 const FILE = "src/app/catalog/tests/new-arrivals.test.ts";
 
@@ -148,5 +174,34 @@ describe("scanProofs", () => {
       "src/app/orders/tests/place-order.test.ts:11 orders/place-order AC-1 @12",
       "src/app/orders/tests/place-order.test.ts:16 orders/place-order AC-2 @17",
     ]);
+  });
+});
+
+describe("scanProofs on a large suite", () => {
+  it("reads every test file with a bounded number of files open at once", async () => {
+    const root = mkdtempSync(path.join(tmpdir(), "grimoire-proofs-"));
+
+    try {
+      const files = Array.from({ length: 400 }, (_, index) => `tests/t${index}.test.ts`);
+
+      mkdirSync(path.join(root, "tests"));
+
+      for (const file of files) {
+        writeFileSync(
+          path.join(root, ...file.split("/")),
+          '// @proves catalog/new-arrivals AC-1\nit("works", () => {});\n',
+        );
+      }
+
+      reads.most = 0;
+
+      const result = await scanProofs(root, files);
+
+      expect(result.proofs).toHaveLength(400);
+      expect(reads.most).toBeGreaterThan(1);
+      expect(reads.most).toBeLessThanOrEqual(32);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });

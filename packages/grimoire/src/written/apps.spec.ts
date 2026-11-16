@@ -179,7 +179,7 @@ describe("parseLayout, parsePage and parseBlockFile", () => {
     const { sink, findings } = collect();
     const page = parsePage(
       PAGE,
-      "---\nroute: /\nlayout: site\n---\n# Home\nThe first page.\n## Also reached from\n- mail   order-confirmation\n- notification order-shipped\n",
+      "---\nroute: /\nlayout: site\n---\n# Home\nThe first page.\n## Also reached from\n- mail   order-confirmation\n- notification order-shipped\n- page\n",
       "web-client",
       "page",
       "home",
@@ -191,8 +191,9 @@ describe("parseLayout, parsePage and parseBlockFile", () => {
     expect(page.purpose).toBe("The first page.");
     expect(page.alsoReachedFrom).toEqual([
       { kind: "mail", name: "order-confirmation", at: { file: PAGE, line: 8, column: null } },
+      { kind: "notification", name: "order-shipped", at: { file: PAGE, line: 9, column: null } },
     ]);
-    expect(findings.map((finding) => [finding.code, finding.at?.line])).toEqual([["GR1028", 9]]);
+    expect(findings.map((finding) => [finding.code, finding.at?.line])).toEqual([["GR1028", 10]]);
   });
 
   it("requires a page route, and a screen route or screen name", () => {

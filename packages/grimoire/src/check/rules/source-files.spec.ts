@@ -101,7 +101,7 @@ describe("checkOwners", () => {
     target.book.facts.files.push(
       bookFile("src/app/shared/jobs/clean.job.ts", {
         type: "job",
-        tags: { feature: ["auth", "billing"] },
+        tags: { feature: ["auth", "billing", "auth — the sign-up clean-up", "  "] },
       }),
     );
 
@@ -129,7 +129,15 @@ describe("checkFolders", () => {
 
   it("reports nothing when each folder holds a source file", () => {
     expect(
-      checkFolders(foldersSnapshot(["src/app/shop", "src/web/shop/", "src\\app\\shop"])),
+      checkFolders(
+        foldersSnapshot([
+          "src/app/shop",
+          "src/web/shop/",
+          "src\\app\\shop",
+          "./src/app/shop",
+          "src",
+        ]),
+      ),
     ).toEqual([]);
   });
 

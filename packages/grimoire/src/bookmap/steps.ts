@@ -26,6 +26,24 @@ export function normalizeRoutePath(route: string): string {
   return trimmed === "" ? "/" : trimmed;
 }
 
+/**
+ * Whether a route answers `METHOD path`: paths compared after
+ * `normalizeRoutePath` (`:id` ≡ `[id]`, trailing `/` ignored), methods
+ * without regard to case, `ALL` on either side matching any method. The
+ * check, the book maps and `scry --route` all match this way.
+ */
+export function routeMatches(
+  route: { readonly method: string; readonly path: string },
+  method: string,
+  path: string,
+): boolean {
+  const routeMethod = route.method.toUpperCase();
+  const asked = method.toUpperCase();
+  const methodMatches = routeMethod === asked || routeMethod === "ALL" || asked === "ALL";
+
+  return methodMatches && normalizeRoutePath(route.path) === normalizeRoutePath(path);
+}
+
 function sortedUnique(files: Iterable<string>): string[] {
   return [...new Set(files)].sort();
 }
@@ -38,14 +56,8 @@ const NOTHING: StepMatch = { found: false, entry: null, files: [] };
 function routeStep(step: WrittenStep, facts: BookFacts, graph: FileGraph): StepMatch {
   if (facts.routes === null || step.route === null) return { found: null, entry: null, files: [] };
 
-  const method = step.route.method.toUpperCase();
-  const routes = facts.routes.filter(
-    (route) =>
-      route.path === step.route?.path &&
-      (route.method.toUpperCase() === method ||
-        route.method.toUpperCase() === "ALL" ||
-        method === "ALL"),
-  );
+  const target = step.route;
+  const routes = facts.routes.filter((route) => routeMatches(route, target.method, target.path));
   const first = routes[0];
 
   if (!first) return NOTHING;

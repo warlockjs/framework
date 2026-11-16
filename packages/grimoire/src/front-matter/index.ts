@@ -94,7 +94,7 @@ export function readFrontMatter(text: string, file: string): FrontMatterResult {
   const end = lines.findIndex((line, index) => index > 0 && FENCE.test(line));
 
   if (end === -1) {
-    fail(1, "The front matter starts with `---` but is never closed by another `---` line.");
+    fail(1, "the front matter starts with `---` but is never closed by another `---` line.");
 
     return { fields: null, body: "", bodyStartLine: lines.length + 1, errors };
   }
@@ -119,7 +119,7 @@ export function readFrontMatter(text: string, file: string): FrontMatterResult {
     const match = KEY_LINE.exec(raw);
 
     if (!match) {
-      fail(lineNumber, `Front matter line ${JSON.stringify(raw.trim())} is not \`key: value\`.`);
+      fail(lineNumber, `front matter line ${JSON.stringify(raw.trim())} is not \`key: value\`.`);
       open = undefined;
       continue;
     }
@@ -128,7 +128,7 @@ export function readFrontMatter(text: string, file: string): FrontMatterResult {
     const rawValue = (match[2] ?? "").trim();
 
     if (fields.has(key)) {
-      fail(lineNumber, `Front matter key "${key}" is written twice.`);
+      fail(lineNumber, `front matter key "${key}" is written twice.`);
       open = undefined;
       continue;
     }

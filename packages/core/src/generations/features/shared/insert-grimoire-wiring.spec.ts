@@ -16,6 +16,12 @@ describe("ensureImportLine", () => {
     expect(once).toBe(`${line}\nexport default {};\n`);
     expect(ensureImportLine(once, line)).toBe(once);
   });
+
+  it("keeps CRLF line endings", () => {
+    expect(ensureImportLine("export default {};\r\n", line)).toBe(
+      `${line}\r\nexport default {};\r\n`,
+    );
+  });
 });
 
 describe("appendGitignoreLines", () => {
@@ -74,6 +80,39 @@ describe("insertVitestReporter", () => {
     );
   });
 
+  it("appends after a reporter given with options, not inside it", () => {
+    const single = insertVitestReporter(
+      'test: { reporters: [["json", { outputFile: "r.json" }], "default"] }',
+      call,
+    );
+
+    expect(single.status === "added" && single.next).toBe(
+      'test: { reporters: [["json", { outputFile: "r.json" }], "default", grimoireReporter()] }',
+    );
+
+    const multi = insertVitestReporter(
+      [
+        "test: {",
+        "  reporters: [",
+        '    "default",',
+        '    ["junit", { outputFile: "j.xml" }],',
+        "  ],",
+        "}",
+      ].join("\n"),
+      call,
+    );
+
+    expect(multi.status === "added" && multi.next).toContain(
+      '    ["junit", { outputFile: "j.xml" }],\n    grimoireReporter(),\n  ],',
+    );
+  });
+
+  it("leaves reporters set without a list alone", () => {
+    expect(insertVitestReporter('test: { reporters: "verbose" }', call)).toEqual({
+      status: "unrecognised",
+    });
+  });
+
   it("is idempotent and reports an unknown file", () => {
     expect(insertVitestReporter("reporters: [grimoireReporter()]", call)).toEqual({
       status: "already-present",
@@ -99,6 +138,20 @@ describe("insertDevtoolsPanel", () => {
     expect(result.status === "added" && result.next).toBe(
       'export default {\n  panels: ["@warlock.js/grimoire/devtools"],\n  maxRequests: 50,\n};\n',
     );
+  });
+
+  it("adds to a typed settings object and leaves panels from a variable alone", () => {
+    const typed = insertDevtoolsPanel(
+      "const settings: DevtoolsOptions = {\n  maxRequests: 50,\n};\nexport default settings;\n",
+      panel,
+    );
+
+    expect(typed.status === "added" && typed.next).toContain(
+      '= {\n  panels: ["@warlock.js/grimoire/devtools"],\n  maxRequests: 50,',
+    );
+    expect(insertDevtoolsPanel("export default { panels: myPanels };", panel)).toEqual({
+      status: "unrecognised",
+    });
   });
 
   it("is idempotent", () => {

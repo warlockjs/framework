@@ -67,11 +67,16 @@ skipped too. Any other file in these folders is reported as not part of the layo
 - **Headings.** The `# ` title and the `## ` headings are compared without case and extra spaces, so
   `## Acceptance Criteria` matches `## Acceptance criteria`. A `## ` heading the template does not have is a warning
   (`GR1007`). Deeper headings and text between the lines of a section are free.
-- **List lines.** A list line is a `-` or `*` bullet, a name, **two or more spaces** (or a tab), then the text:
+- **List lines.** A list line is a `-` or `*` bullet, a name, spaces (or a tab), then the text:
 
   ```md
   - outside service down the payment gateway is down → the order waits
   ```
+
+  Two or more spaces line the texts up and always end the name. One space is read too, because a Markdown
+  formatter collapses the spaces: the name is then one of the eight case questions when the line starts with one,
+  and otherwise the first word. A name of several words of your own (a case question the owner described) needs two
+  or more spaces after it. Steps, criteria and changelog entries follow the same rule.
 
   A longer text goes on indented lines right below; they are joined with one space:
 
@@ -147,7 +152,7 @@ No front matter. Sections, newest first:
 
 - A section heading is `## Unreleased` or `## <release> (<yyyy-mm-dd>)`. Anything else at `##` or below is
   `GR1017`. A `# ` title line is allowed and skipped.
-- An entry is `- <version>  <word>  <text>`, with two or more spaces between the parts (`GR1015`). The word is
+- An entry is `- <version>  <word>  <text>`, with spaces between the parts (`GR1015`). The word is
   `added`, `changed`, `fixed` or `removed` (`GR1016`).
 - The text may start with the flow id and a colon (`new-arrivals: …`) and end with the criteria it concerns in
   parentheses (`(AC-2)`, `(AC-1, AC-3)`).
@@ -215,8 +220,8 @@ and `## Not handled` are optional.
 
 A flow is named `<feature>/<flow>` everywhere else: in blocks, tasks, `affects` steps and `@proves` lines.
 
-**Steps** are numbered `1.`, `2.`, `3.` in order (`GR1010`). Each is `<n>. <kind>   <name>`, with two or more spaces
-after the kind (`GR1008`), and an optional note after `—` or `--`:
+**Steps** are numbered `1.`, `2.`, `3.` in order (`GR1010`). Each is `<n>. <kind>   <name>`, with spaces after the
+kind (`GR1008`), and an optional note after `—` or `--`:
 
 ```md
 3. route GET /api/products/:id — the page loads it through its setup file
@@ -234,6 +239,9 @@ after the kind (`GR1008`), and an optional note after `—` or `--`:
 | `affects`         | another feature, or `<feature>/<flow>`                                              | `catalog/browse-products` |
 
 Any other kind is `GR1009`.
+
+A `route` or `page` name matches the code with params written either way (`:id` or `[id]`) and a trailing `/`
+ignored; a route's method matches whatever its case, and `ALL` matches any method.
 
 **Cases** are `- <question>   <answer>` lines (`GR1011`). Every flow answers these eight questions, under
 `## Cases` or under `## Not handled` (`GR1012`, a warning):
@@ -371,7 +379,7 @@ flow: catalog/new-arrivals
 
 - position second row, under Featured products
 - shows a grid of up to 20 products
-- on phones one row that scrolls sideways
+- phones one row that scrolls sideways
 ```
 
 `flow` is required. Detail lines are `- <name>   <text>`; other text is free.
@@ -447,7 +455,7 @@ The first release: customers browse products, see new arrivals, sign up and plac
 
 The `# ` title is required. Everything between the title and the start marker is the brief. The markers come in one
 pair, start first (`GR1024`). Between them: `## Changes`, a `### <feature>` heading per feature, entry lines in the
-changelog grammar (single spaces are allowed here), or `No feature changes.`.
+changelog grammar, or `No feature changes.`.
 
 ## Structure codes
 

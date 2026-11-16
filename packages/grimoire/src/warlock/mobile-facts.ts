@@ -35,6 +35,11 @@ const IGNORED_FOLDERS = new Set([
   "ios",
 ]);
 
+/** Code-point order, the same on every machine and locale. */
+function compare(left: string, right: string): number {
+  return left < right ? -1 : left > right ? 1 : 0;
+}
+
 async function exists(file: string): Promise<boolean> {
   try {
     await fs.access(file);
@@ -98,7 +103,7 @@ async function discover(root: string): Promise<MobileAppOption[]> {
     });
   }
 
-  return found.sort((left, right) => left.root.localeCompare(right.root));
+  return found.sort((left, right) => compare(left.root, right.root));
 }
 
 /** Every code file under a folder, as POSIX paths relative to it. */
@@ -195,7 +200,7 @@ async function screensOf(root: string, routesDir: string): Promise<BookScreen[]>
   }
 
   return screens.sort(
-    (left, right) => left.route.localeCompare(right.route) || left.file.localeCompare(right.file),
+    (left, right) => compare(left.route, right.route) || compare(left.file, right.file),
   );
 }
 

@@ -51,17 +51,19 @@ export const STEP_KINDS: readonly StepKind[] = [
 /** A status that is missing or wrong is read as `building`: never `proposed`, which would hide findings. */
 const FALLBACK_STATUS: WrittenStatus = "building";
 
+// The parts of a step, a criterion and a changelog entry are split by spaces
+// or tabs: two or more line them up, one is read too (a Markdown formatter
+// collapses them).
 const STEP = new RegExp(
-  String.raw`^(\d+)\.[ \t]+(${STEP_KINDS.join("|")})${SEP}(\S.*?)(?:[ \t]+(?:—|--)[ \t]+(\S.*))?$`,
+  String.raw`^(\d+)\.[ \t]+(${STEP_KINDS.join("|")})[ \t]+(\S.*?)(?:[ \t]+(?:—|--)[ \t]+(\S.*))?$`,
 );
 const STEP_ANY_KIND = new RegExp(String.raw`^(\d+)\.[ \t]+(\S.*?)${SEP}(\S.*)$`);
+const STEP_FIRST_WORD = /^(\d+)\.[ \t]+(\S+)[ \t]+(\S.*)$/;
 const NUMBERED = /^(\d+)\.(?:[ \t]|$)/;
 const ROUTE_TARGET = /^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS|ALL)[ \t]+(\/\S*)$/i;
 const AFFECTS_TARGET = /^([a-z0-9]+(?:-[a-z0-9]+)*)(?:\/([a-z0-9]+(?:-[a-z0-9]+)*))?$/;
-const CRITERION = new RegExp(
-  String.raw`^[-*][ \t]+AC-(\d+)(?:[ \t]+\[([a-z0-9-]+)\])?${SEP}(\S.*)$`,
-);
-const CHANGELOG_ENTRY = new RegExp(String.raw`^[-*][ \t]+(\S+)${SEP}(\S+)${SEP}(\S.*)$`);
+const CRITERION = /^[-*][ \t]+AC-(\d+)(?:[ \t]+\[([a-z0-9-]+)\])?[ \t]+([^\s[].*)$/;
+const CHANGELOG_ENTRY = /^[-*][ \t]+(\S+)[ \t]+(\S+)[ \t]+(\S.*)$/;
 const RELEASE_HEADING = /^##[ \t]+(\S+)[ \t]+\((.+)\)$/;
 const UNRELEASED_HEADING = /^##[ \t]+unreleased$/i;
 const FLOW_PREFIX = /^([a-z0-9-]+):[ \t]+(\S.*)$/;
@@ -85,7 +87,7 @@ function sameAsName(
   if (located.value !== "" && located.value !== name) {
     sink.report(
       "GR1019",
-      `The ${what} ${JSON.stringify(located.value)} must equal its ${JSON.stringify(name)} name.`,
+      `the ${what} ${JSON.stringify(located.value)} must equal its ${JSON.stringify(name)} name.`,
       located.at,
     );
   }
@@ -167,7 +169,7 @@ export function parseFeatureReadme(
     if (!ID.test(flow.name)) {
       sink.report(
         "GR1028",
-        `The Flows line names ${JSON.stringify(flow.name)}, which is not a flow id.`,
+        `the Flows line names ${JSON.stringify(flow.name)}, which is not a flow id.`,
         flow.at,
       );
       continue;
@@ -200,7 +202,7 @@ export function parseChangelog(
 ): WrittenChangelog {
   const document = readDocument(file, text, "none", sink);
 
-  new FrontMatterReader(document, sink).onlyKeys([], "A changelog");
+  new FrontMatterReader(document, sink).onlyKeys([], "a changelog");
 
   const sections: WrittenChangelogSection[] = [];
   const entries: WrittenChangelogEntry[] = [];
@@ -225,7 +227,7 @@ export function parseChangelog(
       if (section === null) {
         sink.report(
           "GR1017",
-          `The changelog heading ${JSON.stringify(line.text)} is neither "## Unreleased" nor "## <release> (<yyyy-mm-dd>)".`,
+          `the changelog heading ${JSON.stringify(line.text)} is neither "## Unreleased" nor "## <release> (<yyyy-mm-dd>)".`,
           at,
         );
         continue;
@@ -236,7 +238,7 @@ export function parseChangelog(
       if (seen.has(key)) {
         sink.report(
           "GR1017",
-          `The changelog heading ${JSON.stringify(line.text)} is written twice; write each section once.`,
+          `the changelog heading ${JSON.stringify(line.text)} is written twice; write each section once.`,
           at,
         );
       }
@@ -248,7 +250,7 @@ export function parseChangelog(
     }
 
     if (!BULLET.test(line.text)) {
-      sink.report("GR1015", `The changelog line ${JSON.stringify(line.text)} is not an entry.`, at);
+      sink.report("GR1015", `the changelog line ${JSON.stringify(line.text)} is not an entry.`, at);
       continue;
     }
 
@@ -259,7 +261,7 @@ export function parseChangelog(
     if (!match || !VERSION.test(version)) {
       sink.report(
         "GR1015",
-        `The changelog line ${JSON.stringify(line.text)} is not \`- <version>  <word>  <text>\` (two or more spaces between the parts).`,
+        `the changelog line ${JSON.stringify(line.text)} is not \`- <version>  <word>  <text>\`.`,
         at,
       );
       continue;
@@ -268,7 +270,7 @@ export function parseChangelog(
     if (!CHANGE_WORDS.includes(word as ChangeWord)) {
       sink.report(
         "GR1016",
-        `The changelog word ${JSON.stringify(word)} is not one of ${CHANGE_WORDS.join(", ")}.`,
+        `the changelog word ${JSON.stringify(word)} is not one of ${CHANGE_WORDS.join(", ")}.`,
         at,
       );
       continue;
@@ -277,7 +279,7 @@ export function parseChangelog(
     if (current === null) {
       sink.report(
         "GR1015",
-        `The changelog entry ${JSON.stringify(line.text)} is not under "## Unreleased" or a release heading.`,
+        `the changelog entry ${JSON.stringify(line.text)} is not under "## Unreleased" or a release heading.`,
         at,
       );
     }
@@ -314,7 +316,7 @@ function parseSteps(file: string, document: WrittenDocument, sink: FindingSink):
       if (BULLET.test(line.text)) {
         sink.report(
           "GR1008",
-          `The step ${JSON.stringify(line.text)} is a bullet; number steps \`1. <kind>   <name>\`.`,
+          `the step ${JSON.stringify(line.text)} is a bullet; number steps \`1. <kind>   <name>\`.`,
           at,
         );
       }
@@ -327,19 +329,19 @@ function parseSteps(file: string, document: WrittenDocument, sink: FindingSink):
     const match = STEP.exec(line.text);
 
     if (!match) {
-      const other = STEP_ANY_KIND.exec(line.text);
+      const other = STEP_ANY_KIND.exec(line.text) ?? STEP_FIRST_WORD.exec(line.text);
       const kind = other?.[2] ?? "";
 
       if (other && !STEP_KINDS.includes(kind as StepKind)) {
         sink.report(
           "GR1009",
-          `The step kind ${JSON.stringify(kind)} is not one of: ${STEP_KINDS.join(", ")}.`,
+          `the step kind ${JSON.stringify(kind)} is not one of: ${STEP_KINDS.join(", ")}.`,
           at,
         );
       } else {
         sink.report(
           "GR1008",
-          `The step ${JSON.stringify(line.text)} is not \`<n>. <kind>   <name>\` (two or more spaces after the kind).`,
+          `the step ${JSON.stringify(line.text)} is not \`<n>. <kind>   <name>\`.`,
           at,
         );
       }
@@ -358,7 +360,7 @@ function parseSteps(file: string, document: WrittenDocument, sink: FindingSink):
       if (!routeMatch) {
         sink.report(
           "GR1008",
-          `The route step ${JSON.stringify(target)} is not \`<METHOD> /path\`.`,
+          `the route step ${JSON.stringify(target)} is not \`<METHOD> /path\`.`,
           at,
         );
         continue;
@@ -373,7 +375,7 @@ function parseSteps(file: string, document: WrittenDocument, sink: FindingSink):
       if (!affectsMatch) {
         sink.report(
           "GR1008",
-          `The affects step ${JSON.stringify(target)} is not \`<feature>\` or \`<feature>/<flow>\`.`,
+          `the affects step ${JSON.stringify(target)} is not \`<feature>\` or \`<feature>/<flow>\`.`,
           at,
         );
         continue;
@@ -399,7 +401,7 @@ function parseSteps(file: string, document: WrittenDocument, sink: FindingSink):
   if (first !== undefined) {
     sink.report(
       "GR1010",
-      `Step ${first.number} should be step ${wrong + 1}; number the steps 1, 2, 3 in order.`,
+      `step ${first.number} should be step ${wrong + 1}; number the steps 1, 2, 3 in order.`,
       lineAt(file, first.line),
     );
   }
@@ -411,12 +413,12 @@ function parseCases(file: string, document: WrittenDocument, sink: FindingSink):
   const cases: WrittenCase[] = [];
 
   for (const line of bulletLines(findSection(document, "cases")?.lines ?? [])) {
-    const split = splitListLine(line.text);
+    const split = splitListLine(line.text, CASE_QUESTIONS);
 
     if (split === null) {
       sink.report(
         "GR1011",
-        `The case ${JSON.stringify(line.text)} is not \`- <question>   <answer>\` (two or more spaces before the answer).`,
+        `the case ${JSON.stringify(line.text)} is not \`- <question>   <answer>\`.`,
         lineAt(file, line.line),
       );
       continue;
@@ -451,7 +453,7 @@ function parseCriteria(
     if (!match) {
       sink.report(
         "GR1013",
-        `The criterion ${JSON.stringify(line.text)} is not \`- AC-<n>   <text>\` or \`- AC-<n> [<app>]   <text>\`.`,
+        `the criterion ${JSON.stringify(line.text)} is not \`- AC-<n>   <text>\` or \`- AC-<n> [<app>]   <text>\`.`,
         at,
       );
       continue;
@@ -534,6 +536,7 @@ export function parseFlow(
     findSection(document, "not handled")?.lines,
     "Not handled",
     sink,
+    CASE_QUESTIONS,
   );
   flow.criteria = parseCriteria(file, document, sink);
 
@@ -560,7 +563,7 @@ export function parseFlow(
       if (!answered.has(question)) {
         sink.report(
           "GR1012",
-          `The case question "${question}" is answered neither under Cases nor under Not handled.`,
+          `the case question "${question}" is answered neither under Cases nor under Not handled.`,
           lineAt(file, cases.line),
         );
       }
@@ -582,7 +585,7 @@ export function parseVersionBrief(
 ): WrittenVersionBrief {
   const document = readDocument(file, text, "none", sink);
 
-  new FrontMatterReader(document, sink).onlyKeys([], "A version brief");
+  new FrontMatterReader(document, sink).onlyKeys([], "a version brief");
 
   return { file, feature, major, heading: heading(document) };
 }

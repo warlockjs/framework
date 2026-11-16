@@ -10,7 +10,8 @@ import { Aside } from "@astrojs/starlight/components";
   change before they are declared stable.
 </Aside>
 
-The Grimoire tab shows the book and the written files in the devtools dashboard at `/__warlock`. It only reads.
+The Grimoire tab shows the book and the written files in the devtools dashboard at `/__warlock`. It reads the
+agent-written files and keeps the generated book up to date, with cached routes.
 
 ## Turn it on
 
@@ -37,7 +38,7 @@ copy the address of what you are looking at.
 | Flow            | The steps with the files behind each, the acceptance criteria with their tests and last results, the pages that show the flow, the cases and unknowns, and its history from the changelog. |
 | Page or screen  | Its blocks (with the layout's), who sees each, what each changes with, the files in the book, and a graph of the page and its blocks.                                                      |
 | Apps            | Every written app with its pages and screens.                                                                                                                                              |
-| Tasks, Releases | The task lists from the index, and each release with what it collected.                                                                                                                    |
+| Tasks, Releases | The open, waiting and done tasks from the index (a task waiting for approval is listed only under waiting), and each release with what it collected.                                       |
 | Check           | The same findings as `warlock grimoire check`.                                                                                                                                             |
 | File            | The book entry: exports, imports, importers, owner, flows, routes, and a graph of the file's neighbours.                                                                                   |
 | Modules         | Module coupling as a graph.                                                                                                                                                                |
@@ -49,9 +50,15 @@ says that no features are written yet.
 
 ## It never boots your app
 
-The tab opens the snapshot with `routes: "cached"`. It keeps the snapshot in memory and opens it again when the book
-manifest changes, or after a short time when the written files change. If the cached routes are old or missing, the
-home view says so; run `warlock grimoire build` to refresh them.
+The tab opens the snapshot the way `warlock grimoire build` does, but with `routes: "cached"`: it never boots the app,
+and it never reads routes again. It reads the agent-written files and never changes them. It does write Warlock's own
+generated files (the book entries and manifest, the book maps and the indexes), so the next open only redoes what
+changed since the last one.
+
+It keeps the snapshot in memory and opens it again when the book manifest changes, or once it is two seconds old (longer
+when an open took long), so edits to the written files show on the next view. Requests that arrive together share one
+open, so two views never rebuild the book at the same time. If the cached routes are old or missing, the home view says
+so; run `warlock grimoire build` to refresh them.
 
 Every route sits behind the devtools guard, so only a local browser reaches it.
 
@@ -84,7 +91,8 @@ const folder = await exportGrimoireSite(process.cwd());
 
 The folder holds one `index.html`. The view, its styles and the answers (as JSON) are inside it, so it opens straight
 from disk or from any static host. The default folder, `grimoire/book/site`, is inside the book folder: the book writer
-leaves it alone, and git ignores it. Pass `outDir` (project-relative) to write elsewhere.
+leaves it alone, and git ignores it. Pass `outDir` (project-relative or absolute) to write elsewhere; the function
+returns the folder relative to the project.
 
 The static page answers everything in the table above except impact and route views, which need the running app and say
 so in place. Search runs in the page over the exported names. Per-file answers cover the 3000 most imported files.

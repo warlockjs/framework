@@ -64,7 +64,7 @@ function routeRef(route: BookRoute): BookRouteRef {
 }
 
 /** External package names a file imports: sorted, unique, Node builtins left out. */
-function packagesOf(file: BookFile): string[] {
+export function packagesOf(file: BookFile): string[] {
   const names = new Set<string>();
 
   for (const entry of file.imports) {

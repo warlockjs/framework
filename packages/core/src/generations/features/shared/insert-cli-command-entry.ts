@@ -10,7 +10,12 @@ import type { ConnectorInsertion } from "./insert-connector-entry";
  *   (empty array, single line, one entry per line).
  * - `cli` exists without `commands`: a `commands` property is added to it.
  * - There is no `cli` block: one is added to the `defineConfig({ ... })` object.
- * - The command is already registered anywhere in the file: nothing changes.
+ * - The command is already called anywhere in the file's code: nothing changes.
+ * - `cli` or `commands` is set some other way (a variable, a spread): the
+ *   result is `unrecognised`, since a second key would replace the app's own.
+ *
+ * Comments and strings are skipped, so a commented-out `cli` block is never
+ * edited, and nested brackets in an entry do not end the array early.
  *
  * @param source The config file's current text.
  * @param commandCall The full call to insert, e.g. `"registerGrimoireCommands()"`.
@@ -18,22 +23,23 @@ import type { ConnectorInsertion } from "./insert-connector-entry";
  */
 export function insertCliCommandEntry(source: string, commandCall: string): ConnectorInsertion {
   const commandName = commandCall.slice(0, commandCall.indexOf("("));
+  const code = codeOnly(source);
 
-  if (new RegExp(`\\b${escapeForRegExp(commandName)}\\s*\\(`).test(source)) {
+  if (new RegExp(`\\b${escapeForRegExp(commandName)}\\s*\\(`).test(code)) {
     return { status: "already-present" };
   }
 
-  const cliOpen = /\bcli:\s*\{/.exec(source);
+  const cliOpen = /\bcli:\s*\{/.exec(code);
 
   if (cliOpen) {
     const bodyStart = cliOpen.index + cliOpen[0].length;
-    const bodyEnd = matchingBrace(source, bodyStart - 1);
+    const bodyEnd = matchingBracket(code, bodyStart - 1);
 
     if (bodyEnd === -1) {
       return { status: "unrecognised" };
     }
 
-    const body = source.slice(bodyStart, bodyEnd);
+    const body = code.slice(bodyStart, bodyEnd);
     const commandsOpen = /\bcommands:\s*\[/.exec(body);
 
     if (commandsOpen) {
@@ -44,7 +50,12 @@ export function insertCliCommandEntry(source: string, commandCall: string): Conn
       );
     }
 
-    if (body.trim() === "") {
+    // `commands` comes from a variable or a spread: a second key would replace it.
+    if (/\bcommands\b|\.\.\./.test(body)) {
+      return { status: "unrecognised" };
+    }
+
+    if (source.slice(bodyStart, bodyEnd).trim() === "") {
       return {
         status: "added",
         next: `${source.slice(0, bodyStart)} commands: [${commandCall}] ${source.slice(bodyEnd)}`,
@@ -57,16 +68,21 @@ export function insertCliCommandEntry(source: string, commandCall: string): Conn
     };
   }
 
-  const configOpen = /defineConfig\(\s*\{/.exec(source);
+  const configOpen = /defineConfig\(\s*\{/.exec(code);
 
   if (!configOpen) {
     return { status: "unrecognised" };
   }
 
   const start = configOpen.index + configOpen[0].length;
-  const end = matchingBrace(source, start - 1);
+  const end = matchingBracket(code, start - 1);
 
   if (end === -1) {
+    return { status: "unrecognised" };
+  }
+
+  // `cli` is set another way (`cli: settings`, `cli,`): a second key would replace it.
+  if (/\bcli\b/.test(code.slice(start, end))) {
     return { status: "unrecognised" };
   }
 
@@ -89,13 +105,14 @@ export function insertIntoArray(
   afterBracket: number,
   entry: string,
 ): ConnectorInsertion {
-  const closeOffset = source.slice(afterBracket).indexOf("]");
+  const code = codeOnly(source);
+  const close = matchingBracket(code, afterBracket - 1);
 
-  if (closeOffset === -1) {
+  if (close === -1) {
     return { status: "unrecognised" };
   }
 
-  const inner = source.slice(afterBracket, afterBracket + closeOffset);
+  const inner = code.slice(afterBracket, close);
 
   if (inner.trim() === "") {
     return {
@@ -107,12 +124,14 @@ export function insertIntoArray(
   const multiline = /\n([ \t]*)\S/.exec(inner);
 
   if (multiline) {
-    const insertAt = afterBracket + inner.indexOf("\n") + 1;
+    const firstBreak = inner.indexOf("\n");
+    const insertAt = afterBracket + firstBreak + 1;
     const indent = multiline[1] ?? "";
+    const lineBreak = inner[firstBreak - 1] === "\r" ? "\r\n" : "\n";
 
     return {
       status: "added",
-      next: `${source.slice(0, insertAt)}${indent}${entry},\n${source.slice(insertAt)}`,
+      next: `${source.slice(0, insertAt)}${indent}${entry},${lineBreak}${source.slice(insertAt)}`,
     };
   }
 
@@ -144,28 +163,23 @@ export function addProperty(source: string, bodyStart: number, property: string)
   return `${source.slice(0, bodyStart)}${leading}${property}, ${rest.slice(leading.length)}`;
 }
 
-/** Index of the `}` that closes the `{` at `open`, or -1. Strings and comments are skipped. */
-export function matchingBrace(source: string, open: number): number {
+/**
+ * Index of the bracket that closes the `{`, `[` or `(` at `open` in text from
+ * {@link codeOnly}, or -1.
+ */
+export function matchingBracket(code: string, open: number): number {
+  const opening = code[open];
+  const closing = opening === "{" ? "}" : opening === "[" ? "]" : opening === "(" ? ")" : "";
   let depth = 0;
 
-  for (let index = open; index < source.length; index++) {
-    const char = source[index];
+  if (closing === "") return -1;
 
-    if (char === '"' || char === "'" || char === "`") {
-      const close = source.indexOf(char, index + 1);
+  for (let index = open; index < code.length; index++) {
+    const char = code[index];
 
-      if (close === -1) return -1;
-
-      index = close;
-    } else if (char === "/" && source[index + 1] === "/") {
-      const lineEnd = source.indexOf("\n", index);
-
-      if (lineEnd === -1) return -1;
-
-      index = lineEnd;
-    } else if (char === "{") {
+    if (char === opening) {
       depth++;
-    } else if (char === "}") {
+    } else if (char === closing) {
       depth--;
 
       if (depth === 0) return index;
@@ -173,6 +187,50 @@ export function matchingBrace(source: string, open: number): number {
   }
 
   return -1;
+}
+
+/**
+ * `source` with every comment and the inside of every string literal turned into
+ * spaces (line breaks kept). Offsets are unchanged, so a search of the result finds
+ * code only, and its indexes can be used to cut `source`.
+ */
+export function codeOnly(source: string): string {
+  const blank = (text: string) => text.replace(/[^\r\n]/g, " ");
+  let code = "";
+  let index = 0;
+
+  while (index < source.length) {
+    const char = source[index];
+    const next = source[index + 1];
+
+    if (char === "/" && (next === "/" || next === "*")) {
+      const close = next === "/" ? source.indexOf("\n", index) : source.indexOf("*/", index + 2);
+      const stop = close === -1 ? source.length : next === "/" ? close : close + 2;
+
+      code += blank(source.slice(index, stop));
+      index = stop;
+    } else if (char === '"' || char === "'" || char === "`") {
+      let cursor = index + 1;
+
+      while (cursor < source.length && source[cursor] !== char) {
+        if (char !== "`" && source[cursor] === "\n") break;
+
+        cursor += source[cursor] === "\\" ? 2 : 1;
+      }
+
+      cursor = Math.min(cursor, source.length);
+
+      const closed = source[cursor] === char;
+
+      code += `${char}${blank(source.slice(index + 1, cursor))}${closed ? char : ""}`;
+      index = closed ? cursor + 1 : cursor;
+    } else {
+      code += char;
+      index++;
+    }
+  }
+
+  return code;
 }
 
 /** Escape a literal string for embedding in a regular expression. */

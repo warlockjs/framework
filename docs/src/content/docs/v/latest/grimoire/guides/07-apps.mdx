@@ -88,7 +88,7 @@ Every block file needs a row in the page's Blocks table.
 
 A mobile app has screens instead of pages, in `screens/<screen>/README.md`.
 
-- **File-based routing** (Expo Router). Warlock lists the screens from the file names under `app/`. A group folder
+- **File-based routing** (Expo Router). Warlock lists the screens from the file names under `app/` (or `src/app/`). A group folder
   such as `(tabs)` is not part of the route, `index` is the route of its folder, and `[id]` stays as written.
   `_layout`, `+not-found`, `+html` and `+api` files are not screens. Write the route of the screen in the front
   matter (`route: /products/[id]`); Warlock reports a route that has no file.

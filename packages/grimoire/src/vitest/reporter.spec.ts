@@ -187,6 +187,40 @@ describe("grimoireReporter", () => {
     expect((await readTestResults(root))?.results[0]?.outcome).toBe("pass");
   });
 
+  it("keeps the results of a file that was still queued when the run stopped", async () => {
+    const file = path.join(root, "src/a.spec.ts");
+    const reporter = grimoireReporter({ root });
+
+    await reporter.onTestRunEnd?.(
+      [testModule(file, [testCase("adds", 2, "passed")])],
+      [],
+      "passed",
+    );
+    await reporter.onTestRunEnd?.([testModule(file, [], "queued")], [], "interrupted");
+
+    expect((await readTestResults(root))?.results.map((item) => item.outcome)).toEqual(["pass"]);
+  });
+
+  it("ignores a test file outside the project root", async () => {
+    const outside = await mkdtemp(path.join(tmpdir(), "grimoire-outside-"));
+
+    try {
+      await writeFile(path.join(outside, "b.spec.ts"), SPEC);
+
+      const reporter = grimoireReporter({ root });
+
+      await reporter.onTestRunEnd?.(
+        [testModule(path.join(outside, "b.spec.ts"), [testCase("adds", 2, "passed")])],
+        [],
+        "passed",
+      );
+
+      expect(await readTestResults(root)).toBeNull();
+    } finally {
+      await rm(outside, { recursive: true, force: true });
+    }
+  });
+
   it("warns once and never throws when the store cannot be written", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     // `grimoire` is a file, so the book folder cannot be created.

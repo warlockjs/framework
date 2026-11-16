@@ -158,6 +158,26 @@ describe("panel views in the dashboard", () => {
     expect(runInContext(`hashPanel()`, context)).toBe("processes");
   });
 
+  it("re-renders the open panel when Back leaves its hash, and leaves other tabs alone", () => {
+    const { context, location } = ui({}, "#book/items/a");
+    const render = vi.fn();
+    context.render = render;
+    runInContext(`state.tab = "book"`, context);
+
+    location.hash = "";
+    runInContext("onHashChange()", context);
+    expect(render).toHaveBeenCalledOnce();
+
+    runInContext(`state.tab = "requests"`, context);
+    runInContext("onHashChange()", context);
+    expect(render).toHaveBeenCalledOnce();
+
+    location.hash = "#book/items/b";
+    runInContext("onHashChange()", context);
+    expect(runInContext("state.tab", context)).toBe("book");
+    expect(render).toHaveBeenCalledTimes(2);
+  });
+
   it("names the panel when its view module fails to load or has no default export", async () => {
     const broken = ui();
     broken.context.loadPanelModule = async () => {

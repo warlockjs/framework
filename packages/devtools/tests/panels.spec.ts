@@ -274,4 +274,29 @@ describe("panel registration checks", () => {
       ]),
     ).toThrow('has an asset named "../graph.js"');
   });
+
+  it("rejects two routes on one method and path, which would stop the server from starting", () => {
+    const handler = () => 1;
+
+    expect(() =>
+      checkDevtoolsPanels([
+        testPanel({
+          routes: [
+            { path: "/items", handler },
+            { method: "GET", path: "/items", handler },
+          ],
+        }),
+      ]),
+    ).toThrow('Devtools panel "test-panel" lists route GET "/items" twice; keep one.');
+    expect(() =>
+      checkDevtoolsPanels([
+        testPanel({
+          routes: [
+            { path: "/items", handler },
+            { method: "POST", path: "/items", handler },
+          ],
+        }),
+      ]),
+    ).not.toThrow();
+  });
 });

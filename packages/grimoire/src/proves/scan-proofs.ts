@@ -12,6 +12,9 @@ export type ScanProofsResult = {
   findings: GrimoireFinding[];
 };
 
+/** How many test files `scanProofs` reads at once. */
+const READ_CONCURRENCY = 32;
+
 /** A `// @proves …` line comment on its own line; group 1 is the rest of the line. */
 const PROOF_LINE = /^\s*\/\/\s*@proves\b(.*)$/;
 /** A `// @proves` comment after code on the same line. */
@@ -141,15 +144,28 @@ export async function scanProofs(
   testFiles: readonly string[],
 ): Promise<ScanProofsResult> {
   const files = [...new Set(testFiles.map(toPosixPath))].sort();
-  const results = await Promise.all(
-    files.map(async (file) => {
+  const results: ScanProofsResult[] = new Array(files.length);
+  let next = 0;
+
+  // A few reads at a time: opening thousands of test files at once fails with EMFILE, and a
+  // failed read would drop that file's proofs without a word.
+  const worker = async (): Promise<void> => {
+    while (next < files.length) {
+      const index = next++;
+      const file = files[index] ?? "";
+
       try {
-        return scanProofsInText(await readFile(path.join(root, ...file.split("/")), "utf8"), file);
+        results[index] = scanProofsInText(
+          await readFile(path.join(root, ...file.split("/")), "utf8"),
+          file,
+        );
       } catch {
-        return { proofs: [], findings: [] };
+        results[index] = { proofs: [], findings: [] };
       }
-    }),
-  );
+    }
+  };
+
+  await Promise.all(Array.from({ length: Math.min(READ_CONCURRENCY, files.length) }, worker));
 
   return {
     proofs: results.flatMap((result) => result.proofs),

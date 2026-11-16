@@ -45,8 +45,8 @@ root: src/web/$sites/client
 ```
 
 Every page and block of this app uses these names and no others. Add a condition here before
-using it. Name roles and permissions exactly as the access configuration does, so they can be
-checked.
+using it. Name roles and permissions exactly as the access configuration does, so a reader can
+find them in the code.
 
 A mobile app in the same repository is one more app: `type: mobile`, `root: mobile`.
 
@@ -123,7 +123,7 @@ flow: catalog/new-arrivals
 
 - position second row, under Featured products
 - shows a grid of up to 20 products
-- on phones one row that scrolls sideways
+- phones one row that scrolls sideways
 ```
 
 ## Where a difference between apps goes

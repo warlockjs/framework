@@ -258,6 +258,16 @@ describe("writeRelease", () => {
     );
   });
 
+  it("refuses two collected lists (GR1024) and leaves the file as it was", async () => {
+    const twice = `${brief}\n${COLLECTED_START_MARKER}\na\n${COLLECTED_END_MARKER}\n${COLLECTED_START_MARKER}\nb\n${COLLECTED_END_MARKER}\n`;
+    const { root, written } = project(twice, build);
+
+    await expect(writeRelease(root, written, "1.1.0")).rejects.toThrow(
+      /broken collected-list markers/,
+    );
+    expect(readFileSync(path.join(root, "grimoire/releases/1.1.0.md"), "utf8")).toBe(twice);
+  });
+
   it("refuses broken markers (GR1024)", async () => {
     const { root, written } = project(`${brief}\n${COLLECTED_START_MARKER}\n`, build);
 

@@ -256,6 +256,12 @@ describe("grimoire view: no features written (book only)", () => {
       summary: {
         ...emptySummary,
         counts,
+        tasks: {
+          schemaVersion: 1,
+          open: [{ id: "T-1" }, { id: "T-2" }, { id: "T-3" }],
+          waiting: [{ id: "T-3" }],
+          done: [],
+        },
         features: {
           schemaVersion: 1,
           features: [
@@ -276,7 +282,43 @@ describe("grimoire view: no features written (book only)", () => {
     });
 
     expect(view.text).toContain("1 errors, 2 warnings");
+    // Waiting tasks are counted once, as waiting.
+    expect(view.text).toContain("2 open, 1 waiting");
     expect(view.links).toContain("#grimoire/feature/auth");
+  });
+});
+
+describe("grimoire view: tasks", () => {
+  const task = (id: string, status: string) => ({
+    id,
+    title: `Task ${id}`,
+    type: "feature",
+    status,
+    feature: null,
+    flow: null,
+    apps: [],
+    file: `grimoire/tasks/open/${id}.md`,
+    shipped: null,
+    decisionNeeded: null,
+  });
+
+  it("shows a waiting task only under Waiting, not also under Open", async () => {
+    const waiting = task("T-2", "waiting for approval");
+    const { view } = await renderView(
+      {
+        tasks: {
+          schemaVersion: 1,
+          open: [task("T-1", "open"), waiting],
+          waiting: [waiting],
+          done: [task("T-3", "done")],
+        },
+      },
+      "tasks",
+    );
+    const headings = view.find("h3").map((node) => node.text);
+
+    expect(headings).toEqual(["Open (1)", "Waiting for approval (1)", "Done (1)"]);
+    expect(view.links.filter((link) => link === "#grimoire/task/T-2")).toHaveLength(1);
   });
 });
 
@@ -327,6 +369,44 @@ describe("grimoire view: graphs", () => {
       "#grimoire/feature/auth",
     ]);
     expect(view.text).toContain("Browse products.");
+  });
+
+  it("links the page, its blocks and flows in a page graph, and leaves the layout unlinked", async () => {
+    const { view } = await renderView(
+      {
+        "apps/web-client/pages/home": {
+          page: {
+            id: "home",
+            heading: located("Home"),
+            route: located("/"),
+            screen: null,
+            purpose: null,
+            blocks: [],
+            blockFiles: [],
+          },
+          layout: null,
+          book: null,
+        },
+        "graph/page?app=web-client&page=home": {
+          nodes: [
+            { id: "page:web-client/home", label: "Home", type: "center" },
+            { id: "layout:web-client/main", label: "main", type: "layout" },
+            { id: "block:web-client/home/New arrivals", label: "New arrivals", type: "block" },
+            { id: "flow:catalog/new-arrivals", label: "catalog/new-arrivals", type: "flow" },
+          ],
+          edges: [],
+        },
+      },
+      "page/web-client/home",
+    );
+    const svg = view.find("svg")[0] as FakeNode;
+
+    expect(svg.find("circle")).toHaveLength(4);
+    expect(svg.links).toEqual([
+      "#grimoire/page/web-client/home",
+      "#grimoire/page/web-client/home",
+      "#grimoire/flow/catalog/new-arrivals",
+    ]);
   });
 
   it("draws the module graph without a centre", async () => {

@@ -17,6 +17,7 @@ import {
   annotationsFrom,
   buildCollectedFiles,
   normalizeRoutePath,
+  routeMatches,
   type CollectedInput,
 } from "./index";
 
@@ -333,6 +334,41 @@ describe("buildCollectedFiles: flow book maps", () => {
       buildCollectedFiles(world({ facts: { routes: null } })).flows["orders/place"]?.steps ?? [];
 
     expect(steps[0]).toMatchObject({ found: null, entry: null, files: [] });
+  });
+
+  it("matches route params written either way, a trailing slash and any method case", () => {
+    const steps =
+      buildCollectedFiles(
+        world({
+          facts: {
+            routes: [route("post", "/api/orders/:id/", null, "src/app/orders/routes.ts")],
+          },
+        }),
+      ).flows["orders/place"]?.steps ?? [];
+
+    expect(steps[0]).toMatchObject({ found: false });
+
+    const bracketed = world({
+      facts: { routes: [route("post", "/api/orders/[order]/", null, "src/app/orders/routes.ts")] },
+    });
+    const flow = bracketed.written.features[1]?.flows[0];
+
+    if (flow?.steps[0]?.route) flow.steps[0].route = { method: "POST", path: "/api/orders/:order" };
+
+    expect(buildCollectedFiles(bracketed).flows["orders/place"]?.steps[0]).toMatchObject({
+      found: true,
+      entry: "src/app/orders/routes.ts",
+    });
+  });
+
+  it("shares routeMatches with scry: params, trailing slash, method case and ALL", () => {
+    expect(routeMatches({ method: "get", path: "/products/[id]/" }, "GET", "/products/:id")).toBe(
+      true,
+    );
+    expect(routeMatches({ method: "ALL", path: "/a" }, "delete", "/a/")).toBe(true);
+    expect(routeMatches({ method: "GET", path: "/a" }, "ALL", "/a")).toBe(true);
+    expect(routeMatches({ method: "GET", path: "/a/:id" }, "POST", "/a/:id")).toBe(false);
+    expect(routeMatches({ method: "GET", path: "/a/:id" }, "GET", "/a")).toBe(false);
   });
 
   it("matches a route registered for ALL methods", () => {

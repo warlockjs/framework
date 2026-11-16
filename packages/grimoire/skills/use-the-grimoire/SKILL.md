@@ -68,13 +68,13 @@ in `grimoire/book/app/auth/controllers/login.controller.json`.
 
 ## Commands
 
-| Command                              | Does                                                                             |
-| ------------------------------------ | -------------------------------------------------------------------------------- |
-| `warlock grimoire build`             | Builds or refreshes the book. `scry` and `check` do it when it is stale          |
-| `warlock grimoire check`             | Reports broken names, untested criteria, files with no owner. Exit 1 on an error |
-| `warlock grimoire release <release>` | Writes the collected list into `grimoire/releases/<release>.md`                  |
-| `warlock grimoire export [dir]`      | Writes the book as a static site                                                 |
-| `warlock explain GR2001`             | Explains a finding code                                                          |
+| Command                                     | Does                                                                             |
+| ------------------------------------------- | -------------------------------------------------------------------------------- |
+| `warlock grimoire build`                    | Builds or refreshes the book. `scry` and `check` do it when it is stale          |
+| `warlock grimoire build --site [--out dir]` | Also writes the book as a static site (default `grimoire/book/site`)             |
+| `warlock grimoire check`                    | Reports broken names, untested criteria, files with no owner. Exit 1 on an error |
+| `warlock grimoire release <release>`        | Writes the collected list into `grimoire/releases/<release>.md`                  |
+| `warlock explain GR2001`                    | Explains a finding code                                                          |
 
 Every finding has a code (`GR2001`) and a fix hint. A finding marked `(expected)` belongs to work
 that is still `proposed`; it does not fail the check.

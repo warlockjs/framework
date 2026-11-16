@@ -9,7 +9,7 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { BookAdapter, LoadedBook } from "../contracts";
 import { codeFile, facts, feature, step, written } from "../../tests/support/written-model";
-import { openGrimoire } from "./index";
+import { openGrimoire, runGrimoire } from "./index";
 
 const fakes = vi.hoisted(() => ({
   calls: [] as string[],
@@ -33,7 +33,7 @@ vi.mock("../book", () => ({
   },
   writeBook: async () => {
     fakes.calls.push("writeBook");
-    return { written: [], removed: [] };
+    return { written: ["grimoire/book/app/catalog/routes.json"], removed: [] };
   },
 }));
 
@@ -183,5 +183,24 @@ describe("openGrimoire", () => {
       "src/app/catalog/list.controller.ts",
       "src/app/catalog/routes.ts",
     ]);
+  });
+});
+
+describe("runGrimoire", () => {
+  it("returns what the book and the collected files wrote, with the snapshot openGrimoire gives", async () => {
+    const run = await runGrimoire(root, adapter, { routes: "fresh" });
+
+    expect(run.rebuilt).toBe(true);
+    expect(run.changed).toEqual([]);
+    expect(run.book).toEqual({ written: ["grimoire/book/app/catalog/routes.json"], removed: [] });
+    expect(run.collected.written).toContain("grimoire/features/catalog/bookmap.json");
+    expect(run.snapshot.collected.features.catalog?.feature).toBe("catalog");
+  });
+
+  it("reports nothing written with write: false", async () => {
+    const run = await runGrimoire(root, adapter, { write: false });
+
+    expect(run.book).toEqual({ written: [], removed: [] });
+    expect(run.collected).toEqual({ written: [], removed: [] });
   });
 });

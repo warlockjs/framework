@@ -88,7 +88,7 @@ export class FrontMatterReader {
           "GR1005",
           keys.length === 0
             ? `${what} has no front matter; the key "${field.key}" is not read.`
-            : `The front matter key "${field.key}" is not part of the ${what} template (${keys.join(", ")}).`,
+            : `the front matter key "${field.key}" is not part of the ${what} template (${keys.join(", ")}).`,
           this.at(field.line),
         );
       }
@@ -113,7 +113,7 @@ export class FrontMatterReader {
 
     if (!field) {
       if (options.required && this.present) {
-        this.sink.report("GR1003", `The front matter key "${key}" is missing.`, this.top);
+        this.sink.report("GR1003", `the front matter key "${key}" is missing.`, this.top);
       }
 
       return null;
@@ -125,8 +125,8 @@ export class FrontMatterReader {
       this.sink.report(
         "GR1004",
         field.value.length === 0
-          ? `The front matter key "${key}" has no value.`
-          : `The front matter key "${key}" must be one value, not a list.`,
+          ? `the front matter key "${key}" has no value.`
+          : `the front matter key "${key}" must be one value, not a list.`,
         at,
       );
 
@@ -138,7 +138,7 @@ export class FrontMatterReader {
     if (expected !== null) {
       this.sink.report(
         "GR1004",
-        `The front matter key "${key}" is ${JSON.stringify(field.value)}; ${expected}.`,
+        `the front matter key "${key}" is ${JSON.stringify(field.value)}; ${expected}.`,
         at,
       );
     }
@@ -201,7 +201,7 @@ export class FrontMatterReader {
 
     if (!field) {
       if (options.required && this.present) {
-        this.sink.report("GR1003", `The front matter key "${key}" is missing.`, this.top);
+        this.sink.report("GR1003", `the front matter key "${key}" is missing.`, this.top);
       }
 
       return [];
@@ -221,7 +221,7 @@ export class FrontMatterReader {
       if (expected !== null) {
         this.sink.report(
           "GR1004",
-          `The "${key}" item ${JSON.stringify(item)} is wrong: ${expected}.`,
+          `the "${key}" item ${JSON.stringify(item)} is wrong: ${expected}.`,
           at,
         );
 

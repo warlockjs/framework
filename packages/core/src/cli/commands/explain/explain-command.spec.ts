@@ -68,6 +68,24 @@ describe("warlock explain for package codes", () => {
     expect(JSON.parse(String(log.mock.calls[0]?.[0]))).toEqual(fix);
   });
 
+  it("asks for the upper-case code when it is typed in lower case", async () => {
+    await explainCommandAction(data("gr2001", true));
+
+    expect(JSON.parse(String(log.mock.calls[0]?.[0]))).toEqual(fix);
+  });
+
+  it("names the reason when warlock.config.ts cannot be read", async () => {
+    config.isLoaded = false;
+    config.load.mockRejectedValueOnce(new Error("Unexpected token in warlock.config.ts"));
+
+    try {
+      await expect(explainCommandAction(data("GR2001"))).rejects.toThrow(/Unexpected token/);
+      expect(bootForInspect).not.toHaveBeenCalled();
+    } finally {
+      config.isLoaded = true;
+    }
+  });
+
   it("throws for a code no package explains, without booting", async () => {
     await expect(explainCommandAction(data("GR9999"))).rejects.toThrow(/cli\.commands/);
     expect(bootForInspect).not.toHaveBeenCalled();

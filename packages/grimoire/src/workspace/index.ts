@@ -21,7 +21,7 @@ import {
   type CollectedInput,
 } from "../bookmap";
 import type { BookAdapter } from "../contracts/adapter";
-import type { BuildBookOptions } from "../contracts/book";
+import type { BuildBookOptions, WriteBookResult } from "../contracts/book";
 import type { GrimoireSnapshot, OpenGrimoireOptions } from "../contracts/snapshot";
 import { resolveOwnership } from "../ownership";
 import { toPosixPath } from "../paths";
@@ -56,16 +56,30 @@ async function testFileHashes(
   return hashes;
 }
 
+/** What one pass of the pipeline did, with the snapshot it produced (`warlock grimoire build` prints it). */
+export type GrimoireRun = {
+  snapshot: GrimoireSnapshot;
+  /** `false` when the book's fingerprint matched and the adapter was not asked for files. */
+  rebuilt: boolean;
+  /** Source files added, changed or removed since the last build. */
+  changed: string[];
+  /** Book files written and removed (both empty with `write: false`). */
+  book: WriteBookResult;
+  /** Collected files (book maps, indexes) written and removed (both empty with `write: false`). */
+  collected: { written: string[]; removed: string[] };
+};
+
 /**
- * Load, refresh and return everything about the project's grimoire.
+ * Run the pipeline and say what it wrote. `openGrimoire` is this without the
+ * counts.
  *
  * @param root Absolute project root.
  */
-export async function openGrimoire(
+export async function runGrimoire(
   root: string,
   adapter: BookAdapter,
   options: OpenGrimoireOptions = {},
-): Promise<GrimoireSnapshot> {
+): Promise<GrimoireRun> {
   const write = options.write !== false;
   const { written, findings: structure } = await parseGrimoire(root);
 
@@ -77,7 +91,7 @@ export async function openGrimoire(
   if (options.now !== undefined) bookOptions.now = options.now;
   if (!write) bookOptions.write = false;
 
-  const { book } = await buildBook(root, adapter, bookOptions);
+  const { book, rebuilt, changed } = await buildBook(root, adapter, bookOptions);
   const apps = matchApps(written.apps, book.facts);
   const ownership = resolveOwnership(written, book.facts);
   const { proofs, findings: proofFindings } = await scanProofs(root, book.facts.tests);
@@ -95,24 +109,45 @@ export async function openGrimoire(
   };
   const collected = buildCollectedFiles(input);
   const annotations = annotationsFrom(input, collected, { tests: testHashes });
+  let bookWrite: WriteBookResult = { written: [], removed: [] };
+  let collectedWrite: { written: string[]; removed: string[] } = { written: [], removed: [] };
 
   if (write) {
-    await writeBook(book, annotations);
-    await writeCollectedFiles(root, collected);
+    bookWrite = await writeBook(book, annotations);
+    collectedWrite = await writeCollectedFiles(root, collected);
   }
 
   return {
-    root,
-    written,
-    structure,
-    book,
-    ownership,
-    apps,
-    proofs,
-    proofFindings,
-    results,
-    collected,
-    annotations,
-    routes: book.routes,
+    snapshot: {
+      root,
+      written,
+      structure,
+      book,
+      ownership,
+      apps,
+      proofs,
+      proofFindings,
+      results,
+      collected,
+      annotations,
+      routes: book.routes,
+    },
+    rebuilt,
+    changed,
+    book: bookWrite,
+    collected: collectedWrite,
   };
+}
+
+/**
+ * Load, refresh and return everything about the project's grimoire.
+ *
+ * @param root Absolute project root.
+ */
+export async function openGrimoire(
+  root: string,
+  adapter: BookAdapter,
+  options: OpenGrimoireOptions = {},
+): Promise<GrimoireSnapshot> {
+  return (await runGrimoire(root, adapter, options)).snapshot;
 }

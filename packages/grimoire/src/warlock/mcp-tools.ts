@@ -165,12 +165,20 @@ export function createGrimoireMcpTools(
         ["text"],
       ),
       writes: false,
-      run: ask((input) => {
+      run: ask(async (input) => {
         const limit = input.limit;
 
-        return typeof limit === "number"
-          ? { type: "search", text: text(input, "text"), limit }
-          : { type: "search", text: text(input, "text") };
+        if (limit === undefined || limit === null)
+          return { type: "search", text: text(input, "text") };
+
+        const { parseLimit } = await scryParts();
+
+        // A limit of 0, a negative or a fraction is refused with GR9006, as `--limit` is.
+        return {
+          type: "search",
+          text: text(input, "text"),
+          limit: parseLimit(typeof limit === "number" || typeof limit === "string" ? limit : true),
+        };
       }),
     },
     {
@@ -200,7 +208,7 @@ export function createGrimoireMcpTools(
       writes: false,
       run: async (input) => {
         try {
-          const { runGrimoire } = await import("./pipeline");
+          const { runGrimoire } = await import("../workspace");
           const loaded = await loadAdapter();
           const force = input.force === true;
           let run;

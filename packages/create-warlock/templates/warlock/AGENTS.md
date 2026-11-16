@@ -90,7 +90,7 @@ read the **`use-the-grimoire`** skill and ask the map: `npx warlock scry --searc
 `npx warlock scry <file>` or `npx warlock scry --impact <file>`. When you add or change
 behaviour, follow its sibling skills (`write-a-feature`, `record-a-change`, `describe-an-app`,
 `document-a-file`, `backfill-a-grimoire`). Never edit files Warlock generates
-(`grimoire/book/`, `index.json`, `*.bookmap.json`).
+(`grimoire/book/`, `index.json`, `bookmap.json`, `*.bookmap.json`).
 
 ## Commands
 

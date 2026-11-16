@@ -29,7 +29,7 @@
 - `createWarlockAdapter()` builds the book from the facts of `warlock inspect`.
 - Task and release checks report the problems in `GR6001`–`GR6003` and `GR7001`–`GR7005`.
 - The apps check (`GR5001`–`GR5009`) covers blocks, conditions, pages, layouts, screens, entry points, uncovered sites and mobile apps.
-- Mobile screens are read from the Expo Router file names.
+- Mobile screens are read from the Expo Router file names. When a mobile app defines its navigation in code, the agent declares its screens in `grimoire/apps/<app>/screens/`.
 - `@warlock.js/grimoire/vitest` exports a Vitest reporter. It records the last result (pass, fail or skipped) of every test marked `// @proves <feature>/<flow> AC-n` in `grimoire/book/test-results.json`, and merges the results of partial runs.
 - The reporter marks a result older than its test file as stale. `warlock grimoire check` reports failing (`GR4006`), stale (`GR4007`) and not-run (`GR4008`) criteria.
 - A Grimoire tab for the devtools dashboard, registered with `panels: ["@warlock.js/grimoire/devtools"]`. It has one search box across flows, blocks, routes, files and tasks, and views for features, flows, pages, tasks, releases and the check report. It also shows small graphs of a file, a feature, a page and module coupling. It reads the cached book and never boots the app.

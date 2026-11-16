@@ -9,7 +9,8 @@
  * - `features/index.json` and `tasks/index.json`.
  *
  * Rules for the files behind a step:
- * - `route`: routes with the same path and method (`ALL` matches any); the
+ * - `route`: routes with the same method and path (`routeMatches`: `ALL`
+ *   matches any method, `:id` ≡ `[id]`, no trailing `/`); the
  *   entry is the handler file (else the routes file); files are the handler's
  *   import closure plus the routes file alone. No route facts → `found: null`.
  * - `page`: pages of the sites and screens of the mobile apps matched to the
@@ -21,5 +22,5 @@
  *   flow) exists; no files.
  */
 export { annotationsFrom, buildCollectedFiles, flowFileId, type CollectedInput } from "./build";
-export { normalizeRoutePath } from "./steps";
+export { normalizeRoutePath, routeMatches } from "./steps";
 export { writeCollectedFiles } from "./write";

@@ -2,8 +2,9 @@
  * Writes the collected files. Warlock writes only `index.json` and
  * `*.bookmap.json` files here, never a file an agent wrote.
  */
+import { randomBytes } from "node:crypto";
 import { existsSync } from "node:fs";
-import { mkdir, readdir, readFile, rm, rmdir, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rename, rm, rmdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { CollectedFiles } from "../contracts/bookmap";
 import { featureBookmapPath, flowBookmapPath, GRIMOIRE_PATHS } from "../paths";
@@ -21,6 +22,19 @@ async function readText(file: string): Promise<string | null> {
     return await readFile(file, "utf8");
   } catch {
     return null;
+  }
+}
+
+/** Write through a temporary file and a rename, so a reader (the devtools tab) never sees half a file. */
+async function writeAtomic(target: string, content: string): Promise<void> {
+  const temporary = `${target}.${process.pid}.${randomBytes(4).toString("hex")}.tmp`;
+
+  try {
+    await writeFile(temporary, content);
+    await rename(temporary, target);
+  } catch (error) {
+    await rm(temporary, { force: true });
+    throw error;
   }
 }
 
@@ -121,7 +135,7 @@ export async function writeCollectedFiles(
     if ((await readText(target)) === content) continue;
 
     await mkdir(path.dirname(target), { recursive: true });
-    await writeFile(target, content);
+    await writeAtomic(target, content);
     written.push(file);
   }
 

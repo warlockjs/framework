@@ -55,8 +55,8 @@ status: waiting for approval
 If your app keeps one file of tasks (for example `docs/tasks.md` with `T-nnn` entries), move it once:
 
 1. Create `grimoire/tasks/open/` and `grimoire/tasks/done/`.
-2. Make one file per entry. Name it `T-<n>-<slug>.md` and keep the id. `### T-131 [feature] Grimoire tasks`
-   becomes `id: T-131`, `type: feature` and the heading `# Grimoire tasks`.
+2. Make one file per entry. Name it `T-<n>-<slug>.md` and keep the id. `### T-014 [feature] Wishlist`
+   becomes `id: T-014`, `type: feature` and the heading `# Wishlist`.
 3. Put the entry's other lines in the body as `- Key: value` lines (`Source` becomes `Asked by`, `What and why`
    becomes `Why`).
 4. Give each entry its status. An entry that waits for the owner's decision gets
@@ -105,19 +105,15 @@ npx warlock grimoire release 1.4.1
 
 The command collects only the entries the agent stamped with that release, and writes them between the markers:
 
-```md
+```text
 <!-- grimoire:collected:start -->
-
 ## Changes
 
 ### catalog
-
-- 2.1 fixed new-arrivals: a customer with no country saw an empty list (AC-2)
+- 2.1  fixed  new-arrivals: a customer with no country saw an empty list (AC-2)
 
 ### orders
-
-- 3.0 added pay-later: customers can pay within 14 days
-
+- 3.0  added  pay-later: customers can pay within 14 days
 <!-- grimoire:collected:end -->
 ```
 

@@ -176,7 +176,13 @@ export async function writeRelease(
     const base = current.replace(/\s+$/, "");
 
     next = `${base}${eol}${eol}${list}${eol}`;
-  } else if (start === -1 || end === -1 || end < start) {
+  } else if (
+    start === -1 ||
+    end === -1 ||
+    end < start ||
+    current.indexOf(COLLECTED_START_MARKER, start + 1) !== -1 ||
+    current.indexOf(COLLECTED_END_MARKER, end + 1) !== -1
+  ) {
     throw new GrimoireError(
       "GR1024",
       `${file} has broken collected-list markers. Keep one start marker followed by one end marker, or remove both.`,
@@ -225,7 +231,7 @@ export function checkReleases(snapshot: GrimoireSnapshot): GrimoireFinding[] {
         findings.push(
           createFinding({
             code: "GR6001",
-            message: `Release ${file.release.value} lists "${listed.feature} ${listed.version} ${listed.word}: ${listed.text}", but no entry in that changelog is stamped with ${file.release.value} and a date`,
+            message: `release ${file.release.value} lists "${listed.feature} ${listed.version} ${listed.word}: ${listed.text}", but no entry in that changelog is stamped with ${file.release.value} and a date`,
             at: listed.at,
             feature: listed.feature,
             file: file.file,

@@ -43,7 +43,7 @@ async function registerCommands(): Promise<void> {
 
   if (insertion.status === "unrecognised") {
     console.log(
-      `${colors.yellowBright("warlock.config.ts")} has no recognisable defineConfig({...}) — add this yourself:\n${manual}`,
+      `${colors.yellowBright("warlock.config.ts")} could not be updated safely (no defineConfig({...}), or cli set from a variable) — add this yourself:\n${manual}`,
     );
 
     return;

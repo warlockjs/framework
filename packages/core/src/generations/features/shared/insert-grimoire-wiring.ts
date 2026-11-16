@@ -1,5 +1,10 @@
 import type { ConnectorInsertion } from "./insert-connector-entry";
-import { addProperty, insertIntoArray, matchingBrace } from "./insert-cli-command-entry";
+import {
+  addProperty,
+  codeOnly,
+  insertIntoArray,
+  matchingBracket,
+} from "./insert-cli-command-entry";
 
 /** Lines Grimoire keeps out of git: everything Warlock generates under `grimoire/`. */
 export const GRIMOIRE_GITIGNORE_LINES = [
@@ -32,7 +37,7 @@ export function ensureImportLine(source: string, importLine: string): string {
     }
   }
 
-  return `${importLine}\n${source}`;
+  return `${importLine}${source.includes("\r\n") ? "\r\n" : "\n"}${source}`;
 }
 
 /**
@@ -61,6 +66,7 @@ export function appendGitignoreLines(source: string, lines: readonly string[]): 
  * - A `reporters: [...]` list gets the call at its end.
  * - A `test: { ... }` block without `reporters` gets `reporters: ["default", call]`.
  * - Nothing is changed when the call is already there.
+ * - `reporters` set some other way (a string, a variable) is `unrecognised`.
  *
  * @param source The Vitest config text.
  * @param reporterCall The call to insert, e.g. `"grimoireReporter()"`.
@@ -68,16 +74,17 @@ export function appendGitignoreLines(source: string, lines: readonly string[]): 
  */
 export function insertVitestReporter(source: string, reporterCall: string): ConnectorInsertion {
   const name = reporterCall.slice(0, reporterCall.indexOf("("));
+  const code = codeOnly(source);
 
-  if (new RegExp(`\\b${name}\\s*\\(`).test(source)) {
+  if (new RegExp(`\\b${name}\\s*\\(`).test(code)) {
     return { status: "already-present" };
   }
 
-  const reporters = /\breporters:\s*\[/.exec(source);
+  const reporters = /\breporters:\s*\[/.exec(code);
 
   if (reporters) {
     const open = reporters.index + reporters[0].length;
-    const close = source.indexOf("]", open);
+    const close = matchingBracket(code, open - 1);
 
     if (close === -1) {
       return { status: "unrecognised" };
@@ -109,15 +116,15 @@ export function insertVitestReporter(source: string, reporterCall: string): Conn
     };
   }
 
-  const testBlock = /\btest:\s*\{/.exec(source);
+  const testBlock = /\btest:\s*\{/.exec(code);
 
-  if (!testBlock) {
+  if (!testBlock || /\breporters\b/.test(code)) {
     return { status: "unrecognised" };
   }
 
   const bodyStart = testBlock.index + testBlock[0].length;
 
-  if (matchingBrace(source, bodyStart - 1) === -1) {
+  if (matchingBracket(code, bodyStart - 1) === -1) {
     return { status: "unrecognised" };
   }
 
@@ -140,15 +147,21 @@ export function insertDevtoolsPanel(source: string, panel: string): ConnectorIns
   }
 
   const entry = JSON.stringify(panel);
-  const panels = /\bpanels:\s*\[/.exec(source);
+  const code = codeOnly(source);
+  const panels = /\bpanels:\s*\[/.exec(code);
 
   if (panels) {
     return insertIntoArray(source, panels.index + panels[0].length, entry);
   }
 
-  const object = /(?:export\s+default\s*|=\s*)\{/.exec(source);
+  const object = /(?:export\s+default\s*|=\s*)\{/.exec(code);
 
-  if (!object || matchingBrace(source, object.index + object[0].length - 1) === -1) {
+  // `panels` set some other way (a variable) would be replaced by a second key.
+  if (
+    !object ||
+    /\bpanels\b/.test(code) ||
+    matchingBracket(code, object.index + object[0].length - 1) === -1
+  ) {
     return { status: "unrecognised" };
   }
 

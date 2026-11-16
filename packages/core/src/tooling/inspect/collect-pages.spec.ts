@@ -140,4 +140,27 @@ describe("page facts", () => {
   it("returns no graph when web is absent", async () => {
     expect(await discoverGraphPages(root, [], async () => undefined)).toBeUndefined();
   });
+
+  it("warns and falls back to the installed pages when the page graph cannot be read", async () => {
+    write("src/web/home.page.tsx", "export default function Page() { return null; }");
+
+    const warnings: InspectWarning[] = [];
+    const graphPages = await discoverGraphPages(root, warnings, async () => ({
+      discoverPageGraph: () => {
+        throw new Error("Duplicate page route name");
+      },
+    }));
+    const pages = collectPages(
+      [{ path: "/", name: "home", file: "src/web/home.page.tsx" }],
+      root,
+      warnings,
+      undefined,
+      graphPages,
+    );
+
+    expect(graphPages).toBeUndefined();
+    expect(warnings).toEqual([expect.objectContaining({ source: "pages" })]);
+    expect(warnings[0]?.message).toContain("Duplicate page route name");
+    expect(pages.map((page) => page.file)).toEqual(["src/web/home.page.tsx"]);
+  });
 });

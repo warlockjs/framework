@@ -69,7 +69,7 @@ function releaseOf(entry: WrittenChangelogEntry): string {
   return entry.release === null ? "unreleased" : `${entry.release}, ${entry.date ?? "no date"}`;
 }
 
-function formatFile(result: ScryFileResult & { bookEntry?: string | null }): string[] {
+function formatFile(result: ScryFileResult): string[] {
   const entry = result.entry;
   const feature =
     entry.feature === null && entry.borrowedBy.length === 0
@@ -108,7 +108,7 @@ function formatFile(result: ScryFileResult & { bookEntry?: string | null }): str
       "screens",
       entry.screens.map((screen) => `${screen.app} ${screen.route}  (${screen.via})`),
     ),
-    ...section("entry", typeof result.bookEntry === "string" ? [result.bookEntry] : []),
+    ...section("entry", result.bookEntry === null ? [] : [result.bookEntry]),
     ...notes(result),
   ];
 }

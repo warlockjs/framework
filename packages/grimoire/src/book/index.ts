@@ -17,5 +17,5 @@
  *   `stale`.
  */
 export { buildBook, defaultRouteInputs, loadBook } from "./build";
-export { renderModuleSummary } from "./render";
+export { packagesOf, renderModuleSummary } from "./render";
 export { writeBook } from "./write";

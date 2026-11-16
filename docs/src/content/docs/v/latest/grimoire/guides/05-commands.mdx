@@ -57,7 +57,7 @@ routes file, a file it imports, a config file, a mail, job, event or notificatio
 - `warlock grimoire build` and `warlock grimoire check` boot the app only when the route facts are stale or missing.
   When the app does not boot, they go on with the cached route facts and print a `GR8002` warning.
 - `warlock scry` and the MCP tools never boot the app. They use the cached route facts and add a note when they are
-  stale. The first `warlock scry --route` of a project with no route facts reads them once.
+  stale. The first `warlock scry --route` (or `grimoire_route`) of a project with no route facts reads them once.
 - An app with several sites (`src/web/$sites/<site>`) loads only `src/config/web.ts` for file questions, because the
   sites' base paths shape the page routes.
 
@@ -73,12 +73,13 @@ npx warlock grimoire build --json
 
 ```
 book      35 files (46 written, 0 removed), routes fresh
-features  3 (bookmaps written: 9)   tasks  2 open, 1 waiting, 1 done
+features  3 (bookmaps written: 9)   tasks  1 open, 1 waiting, 1 done
 ```
 
-A run with nothing to do prints `book      up to date`. `--site` writes the same view as the devtools tab as one
-static `index.html` (see [Devtools](/v/latest/grimoire/guides/09-devtools/)); `--out` takes a project-relative
-folder. `--json` prints `{ rebuilt, changed, written, removed, routes, site, problems }`.
+A run with nothing to do prints `book      up to date`. A task waiting for the owner is counted under `waiting`
+only, not under `open`. `--site` writes the same view as the devtools tab as one
+static `index.html` (see [Devtools](/v/latest/grimoire/guides/09-devtools/)); `--out` takes a folder inside the
+project; a folder outside it, or the project folder itself, stops the command with `GR9006`. `--json` prints `{ rebuilt, changed, written, removed, routes, site, problems }`.
 
 ## `warlock grimoire check`
 
@@ -158,7 +159,7 @@ tests      e2e/checkout.e2e.ts  src/app/catalog/tests/new-arrivals.test.ts  src/
 
 `routes` lists API routes whose handler file (or routes file, when the handler file is unknown) reaches the file
 through imports; pages and screens are listed under `pages`. `features` lists the owner of the file and every
-feature whose files import it (borrowers). `tests` lists the test files among the importers and the tests that prove
+feature whose files import it, directly or through other files (borrowers; spec files do not count). `tests` lists the test files among the importers and the tests that prove
 the flows above.
 
 ### A route: `--route`
@@ -183,8 +184,9 @@ files       src/app/catalog/models/product.model.ts
 steps       orders/place-order step 2
 ```
 
-`files` is the handler file and everything it imports. Route params match written either way (`:id` or `[id]`), and
-a trailing `/` is ignored.
+`files` is the handler file and everything it imports. Route params match written either way (`:id` or `[id]`), a
+trailing `/` is ignored and the method may be in any case. `warlock grimoire check` matches flow route steps the same
+way.
 
 ### A feature: `--feature`
 
@@ -272,7 +274,8 @@ GR9003  No feature has the id "billing". Features: auth, catalog, orders.
 ## MCP tools
 
 `warlock mcp` and `warlock dev --mcp` serve these tools next to the built-in ones. They answer with the same objects
-`--json` prints. The read tools never boot the app; they use the cached route facts.
+`--json` prints. The read tools never boot the app; they use the cached route facts (only the first `grimoire_route` of a project with
+no route facts reads them once, as `warlock scry --route` does).
 
 | Tool               | Input                           | Answer                                            | Writes |
 | ------------------ | ------------------------------- | ------------------------------------------------- | ------ |
@@ -329,7 +332,8 @@ console.log(await collectMobileFacts(root));
 ```
 
 `createWarlockAdapter(options)` turns the inspect report into the book's facts: files from `collectFiles()` of
-`@warlock.js/core/tooling` (over `src` and each mobile app's folder), routes, events and jobs from `inspectApp()`
+`@warlock.js/core/tooling` (over `src` and each mobile app's source folders, leaving out `android/`, `ios/` and
+build output), routes, events and jobs from `inspectApp()`
 after the boot pass, pages from the web page graph, and mobile apps from their folders (`collectMobileFacts()`).
 `reachedFrom` of a page is `null` (unknown) for now. Mails are files named `*.mail.ts`, notifications files named
 `*.notification.ts`; jobs come from the queue's registry when it knows any, else from `*.job.ts` file names.

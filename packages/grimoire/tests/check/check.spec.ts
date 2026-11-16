@@ -100,6 +100,41 @@ describe("checkGrimoire on the shop fixture", () => {
     matchGolden("report.txt", `${formatCheckReport(report).join("\n")}\n`);
   });
 
+  it("matches route steps the way scry --route does: [id] for :id, a trailing slash ignored", async () => {
+    const copy = copyFixture();
+
+    copies.push(copy);
+    copy.replace(
+      "grimoire/features/catalog/flows/browse-products.md",
+      "GET /api/products/:id —",
+      "GET /api/products/[id]/ —",
+    );
+    copy.replace(
+      "grimoire/features/catalog/flows/new-arrivals.md",
+      "GET /api/products/new-arrivals",
+      "GET /api/products/new-arrivals/",
+    );
+
+    const snapshot = await openGrimoire(copy.root, createShopAdapter(), {
+      routes: "fresh",
+      write: false,
+    });
+    const report = checkGrimoire(snapshot);
+
+    expect(report.counts).toEqual({ errors: 0, warnings: 8, expected: 8 });
+    expect(
+      report.findings.filter((finding) => finding.code === "GR2001" && !finding.expected),
+    ).toEqual([]);
+    expect(snapshot.collected.flows["catalog/browse-products"]?.steps[2]).toMatchObject({
+      target: "GET /api/products/[id]/",
+      found: true,
+    });
+    expect(snapshot.collected.flows["catalog/new-arrivals"]?.steps[1]).toMatchObject({
+      found: true,
+      entry: "src/app/catalog/controllers/new-arrivals.controller.ts",
+    });
+  });
+
   const AUTH = "grimoire/features/auth";
   const CATALOG = "grimoire/features/catalog";
   const ORDERS = "grimoire/features/orders";

@@ -53,7 +53,9 @@ findings are problems.
 ## Route facts
 
 Route steps, and mail, job, event and notification steps, are checked against facts that need the app to boot. The
-check refreshes them when the routes files changed (`routes: fresh`).
+check refreshes them when the routes files changed (`routes: fresh`). A route step matches a route the same way
+`warlock scry --route` does: params written either way (`:id` or `[id]`), a trailing `/` ignored, the method in any
+case, and `ALL` matching any method. `GR2001` means no route matches that way.
 
 - When they are older than the routes files (`routes: stale`), the steps are checked against the cached facts and
   the report adds `GR8003`.
@@ -205,7 +207,7 @@ Steps are not numbered 1, 2, 3 in order.
 A case line has the wrong form.
 
 - **Severity:** error
-- **What to do:** Write cases as `- double submit   two taps save once`: the question, two spaces, the answer.
+- **What to do:** Write cases as `- double submit   two taps save once`: the question, spaces, then the answer.
 - **Skill:** `write-a-feature`
 
 ### GR1012
@@ -341,7 +343,7 @@ A flow file is not listed in the feature README.
 A list line has the wrong form.
 
 - **Severity:** error
-- **What to do:** Write list lines as `- name   text`: the name, two or more spaces, the text.
+- **What to do:** Write list lines as `- name   text`: the name, spaces, then the text.
 - **Skill:** `write-a-feature`
 
 ## GR2xxx: names that point at nothing

@@ -192,13 +192,25 @@ function featureBookmap(
   const own = ownership.features[feature.id]?.own ?? [];
   const ownSet = new Set(own);
 
+  // Own files importing each file, from one pass over the own files' imports (`own` is sorted, so each list is too).
+  const importersOf = new Map<string, string[]>();
+
+  for (const ownFile of own) {
+    for (const entry of byPath.get(ownFile)?.imports ?? []) {
+      if (entry.file === null) continue;
+
+      const list = importersOf.get(entry.file) ?? [];
+
+      if (list.at(-1) !== ownFile) list.push(ownFile);
+      importersOf.set(entry.file, list);
+    }
+  }
+
   const borrowed: FeatureBookmap["borrowed"] = (ownership.features[feature.id]?.borrowed ?? []).map(
     (file) => ({
       file,
       owner: ownership.files[file]?.owner ?? null,
-      by: own.filter(
-        (ownFile) => byPath.get(ownFile)?.imports.some((entry) => entry.file === file) ?? false,
-      ),
+      by: importersOf.get(file) ?? [],
     }),
   );
 

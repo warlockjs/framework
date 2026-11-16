@@ -67,6 +67,7 @@ Customers browse products, search them and see what is new.
 ## Flows
 
 - browse-products list and filter products
+- new-arrivals the newest products sold in the customer's country
 - wishlist save a product for later
 
 ## Affects and affected by
@@ -112,7 +113,7 @@ who: customer
 - limits at most 200 products
 - expiry does not apply: saved products do not expire
 - double submit two taps save once
-- outside service down does not apply
+- outside service down does not apply: no outside service is called
 
 ## Acceptance criteria
 

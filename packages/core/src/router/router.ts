@@ -125,10 +125,6 @@ async function runRouteHooks(
   return undefined;
 }
 
-/**
- * Bound functions do not inherit static properties, so the handler metadata that
- * documentation and typings read (`responseSchema`) is copied onto the bound copy.
- */
 /** Class name of a controller instance or class; `null` for a plain object literal. */
 function controllerClassName(controller: GenericObject): string | null {
   const name = typeof controller === "function" ? controller.name : controller.constructor?.name;
@@ -136,6 +132,10 @@ function controllerClassName(controller: GenericObject): string | null {
   return name && name !== "Object" && name !== "Function" ? name : null;
 }
 
+/**
+ * Bound functions do not inherit static properties, so the handler metadata that
+ * documentation and typings read (`responseSchema`) is copied onto the bound copy.
+ */
 function copyResponseSchema(source: unknown, target: RequestHandler): void {
   const responseSchema = (source as RequestHandler | undefined)?.responseSchema;
 

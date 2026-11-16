@@ -127,7 +127,7 @@ export const GRIMOIRE_CODE_LIST = [
     "structure",
     "error",
     "A case line has the wrong form",
-    "Write cases as `- double submit   two taps save once`: the question, two spaces, the answer.",
+    "Write cases as `- double submit   two taps save once`: the question, spaces, then the answer.",
     WRITE,
   ),
   define(
@@ -263,7 +263,7 @@ export const GRIMOIRE_CODE_LIST = [
     "structure",
     "error",
     "A list line has the wrong form",
-    "Write list lines as `- name   text`: the name, two or more spaces, the text.",
+    "Write list lines as `- name   text`: the name, spaces, then the text.",
     WRITE,
   ),
 

@@ -18,4 +18,4 @@ export {
   parseRouteText,
   parseScryQuery,
 } from "./parse";
-export { scry, type ScryFileAnswer } from "./query";
+export { scry } from "./query";

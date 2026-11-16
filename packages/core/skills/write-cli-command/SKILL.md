@@ -144,7 +144,7 @@ A register function may return an array of commands. An entry of `cli.commands` 
 
 ### Explaining a package's error codes
 
-`withExplainCodes(command, explainer)` attaches a `CodeExplainer` to a command. When that command is in `cli.commands`, `warlock explain <code>` asks the explainer for any code that is not a `WL` code (for example `GR2001`), reading only `warlock.config.ts` and never booting the app. The explainer returns an `ExplainableCode` (`code`, `title`, `area`, `fix`, `skill`, `docs`) or `undefined` when the code is not the package's. `explainersOf(command)` lists the attached explainers and `explainRegisteredCode(entries, code)` asks them all; the first answer wins.
+`withExplainCodes(command, explainer)` attaches a `CodeExplainer` to a command. When that command is in `cli.commands`, `warlock explain <code>` asks the explainer for a code of two letters and four digits that is not a `WL` code (for example `GR2001`, upper-cased first), reading only `warlock.config.ts` and never booting the app. The explainer returns an `ExplainableCode` (`code`, `title`, `area`, `fix`, `skill`, `docs`) or `undefined` when the code is not the package's. `explainersOf(command)` lists the attached explainers and `explainRegisteredCode(entries, code)` asks them all; the first answer wins.
 
 ```ts
 import { command, withExplainCodes } from "@warlock.js/core";
